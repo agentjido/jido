@@ -1,31 +1,77 @@
+defmodule JidoTest.BasicAgent do
+  @moduledoc false
+  use Jido.Agent,
+    name: "BasicAgent",
+    schema: [
+      location: [type: :atom, default: :home],
+      battery_level: [type: :integer, default: 100]
+    ]
+end
+
 defmodule JidoTest.SimpleAgent do
   @moduledoc false
-  alias Jido.Actions.Basic
+  alias Jido.Actions.Basic.{Log, Sleep}
 
   use Jido.Agent,
     name: "SimpleBot",
+    planner: JidoTest.SimpleAgent.Planner,
+    runner: JidoTest.SimpleAgent.Runner,
     schema: [
       location: [type: :atom, default: :home],
       battery_level: [type: :integer, default: 100]
     ]
 
-  def plan(agent) do
-    {:ok,
-     %Jido.ActionSet{
-       agent: agent,
-       plan: [
-         {Basic.Log, message: "Hello, world!"},
-         {Basic.Sleep, duration: 50},
-         {Basic.Log, message: "Goodbye, world!"}
-       ]
-     }}
+  defmodule Planner do
+    @behaviour Jido.Planner
+
+    def plan(_agent, :default, _params) do
+      {:ok,
+       [
+         {Log, message: "Hello, world!"},
+         {Sleep, duration: 50},
+         {Log, message: "Goodbye, world!"}
+       ]}
+    end
+
+    def plan(_agent, :custom, %{message: message}) do
+      {:ok,
+       [
+         {Log, message: message},
+         {Sleep, duration: 100},
+         {Log, message: "Custom command completed"}
+       ]}
+    end
+
+    def plan(_agent, :sleep, %{duration: duration}) do
+      {:ok,
+       [
+         {Log, message: "Going to sleep..."},
+         {Sleep, duration: duration},
+         {Log, message: "Waking up!"}
+       ]}
+    end
+
+    # Fallback for unknown commands
+    def plan(_agent, command, _params) do
+      {:ok,
+       [
+         {Log, message: "Unknown command: #{inspect(command)}"},
+         {Log, message: "Please use :default, :custom, or :sleep"}
+       ]}
+    end
+  end
+
+  defmodule Runner do
+    @behaviour Jido.Runner
+
+    def run(agent, actions, _opts) do
+      Jido.Runner.Chain.run(agent, actions)
+    end
   end
 end
 
 defmodule JidoTest.AdvancedAgent do
   @moduledoc false
-  alias Jido.Actions.Simplebot
-
   use Jido.Agent,
     name: "AdvancedBot",
     schema: [
@@ -34,26 +80,22 @@ defmodule JidoTest.AdvancedAgent do
       has_reported: [type: :boolean, default: false]
     ]
 
-  def plan(agent) do
-    actions =
-      cond do
-        agent.battery_level <= 20 ->
-          [{Simplebot.Move, destination: :charging_station}, Simplebot.Recharge]
+  # def plan(agent, _command \\ :default, _params \\ %{}) do
+  #   actions =
+  #     cond do
+  #       agent.battery_level <= 20 ->
+  #         [{Simplebot.Move, destination: :charging_station}, Simplebot.Recharge]
 
-        agent.location != :work_area ->
-          [{Simplebot.Move, destination: :work_area}]
+  #       agent.location != :work_area ->
+  #         [{Simplebot.Move, destination: :work_area}]
 
-        !agent.has_reported ->
-          [Simplebot.DoWork, Simplebot.Report]
+  #       !agent.has_reported ->
+  #         [Simplebot.DoWork, Simplebot.Report]
 
-        true ->
-          [Simplebot.Idle]
-      end
+  #       true ->
+  #         [Simplebot.Idle]
+  #     end
 
-    {:ok,
-     %Jido.ActionSet{
-       agent: agent,
-       plan: actions
-     }}
-  end
+  #   {:ok, actions}
+  # end
 end

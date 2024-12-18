@@ -33,7 +33,7 @@ defmodule Jido.Agent do
         @impl true
         def plan(agent) do
           # Your planning logic here
-          {:ok, %Jido.ActionSet{agent: agent, plan: [MyAction1, MyAction2]}}
+          {:ok, [MyAction1, MyAction2]}
         end
       end
 
@@ -47,13 +47,19 @@ defmodule Jido.Agent do
   alias Jido.Error
   require OK
 
+  @type action :: module() | {module(), map()}
   @type t :: %__MODULE__{
+          id: String.t(),
           name: String.t(),
           description: String.t(),
           category: String.t(),
           tags: [String.t()],
           vsn: String.t(),
-          schema: NimbleOptions.schema()
+          schema: NimbleOptions.schema(),
+          planner: module(),
+          runner: module(),
+          dirty_state?: boolean(),
+          pending: :queue.queue(action())
         }
 
   @agent_compiletime_options_schema NimbleOptions.new!(
@@ -83,32 +89,72 @@ defmodule Jido.Agent do
                                         required: false,
                                         doc: "The version of the Agent."
                                       ],
+                                      planner: [
+                                        type: :atom,
+                                        required: false,
+                                        default: Jido.Planner.Direct,
+                                        doc: "Module implementing the Jido.Planner behavior"
+                                      ],
+                                      runner: [
+                                        type: :atom,
+                                        required: false,
+                                        default: Jido.Runner.Chain,
+                                        doc: "Module implementing the Jido.Runner behavior"
+                                      ],
                                       schema: [
                                         type: :keyword_list,
                                         default: [],
                                         doc:
-                                          "A NimbleOptions schema for validating the Agent's input parameters."
+                                          "A NimbleOptions schema for validating the Agent's state."
                                       ]
                                     )
-  defstruct [:name, :description, :category, :tags, :vsn, :schema]
 
-  @callback plan(t()) :: {:ok, Jido.ActionSet.t()} | {:error, any()}
+  defstruct [
+    :id,
+    :name,
+    :description,
+    :category,
+    :tags,
+    :vsn,
+    :planner,
+    :runner,
+    :schema,
+    :dirty_state?,
+    :pending
+  ]
+
+  @callback set(t(), attrs :: map() | list()) :: {:ok, t()} | {:error, any()}
+  @callback validate(t()) :: {:ok, t()} | {:error, any()}
+  @callback plan(t(), command :: atom() | module(), params :: map()) ::
+              {:ok, t()} | {:error, any()}
+  @callback run(t()) :: {:ok, t()} | {:error, any()}
 
   defmacro __using__(opts) do
     escaped_schema = Macro.escape(@agent_compiletime_options_schema)
 
     quote location: :keep do
       @behaviour Jido.Agent
-      @base_agent_schema [
+      @agent_runtime_schema [
         id: [
           type: :string,
           required: true,
-          doc: "The unique identifier for the Agent."
+          doc: "The unique identifier for an instance of an Agent."
+        ],
+        dirty_state?: [
+          type: :boolean,
+          required: false,
+          default: false,
+          doc: "Whether the Agent state is dirty, meaning it hasn't been acted upon yet."
+        ],
+        pending: [
+          # Reference to an erlang :queue.queue()
+          type: :any,
+          required: false,
+          default: nil,
+          doc: "A queue of pending actions for the Agent."
         ]
       ]
       alias Jido.Agent
-      alias Jido.ActionSet
-      alias Jido.Workflow.Chain
       alias Jido.Util
       require OK
       require Logger
@@ -117,7 +163,8 @@ defmodule Jido.Agent do
         {:ok, validated_opts} ->
           @validated_opts validated_opts
 
-          @struct_keys Keyword.keys(@base_agent_schema) ++ Keyword.keys(@validated_opts[:schema])
+          @struct_keys Keyword.keys(@agent_runtime_schema) ++
+                         Keyword.keys(@validated_opts[:schema])
           defstruct @struct_keys
 
           def name, do: @validated_opts[:name]
@@ -126,20 +173,20 @@ defmodule Jido.Agent do
           def tags, do: @validated_opts[:tags]
           def vsn, do: @validated_opts[:vsn]
           def planner, do: @validated_opts[:planner]
-          def schema, do: @validated_opts[:schema]
+          def runner, do: @validated_opts[:runner]
+          def schema, do: @agent_runtime_schema ++ @validated_opts[:schema]
 
           def to_json do
-            json = %{
+            %{
               name: @validated_opts[:name],
               description: @validated_opts[:description],
               category: @validated_opts[:category],
               tags: @validated_opts[:tags],
               vsn: @validated_opts[:vsn],
               planner: @validated_opts[:planner],
-              schema: @validated_opts[:schema]
+              runner: @validated_opts[:runner],
+              schema: @agent_runtime_schema ++ @validated_opts[:schema]
             }
-
-            json
           end
 
           def __agent_metadata__ do
@@ -158,91 +205,93 @@ defmodule Jido.Agent do
               @validated_opts[:schema]
               |> Enum.map(fn {key, opts} -> {key, Keyword.get(opts, :default)} end)
               |> Keyword.put(:id, generated_id)
+              |> Keyword.put(:dirty_state?, false)
+              |> Keyword.put(:pending, :queue.new())
 
             struct(__MODULE__, defaults)
           end
 
-          @doc """
-          Updates the agent's attributes using deep merge.
-          """
+          @impl true
           def set(%__MODULE__{} = agent, attrs) when is_map(attrs) or is_list(attrs) do
-            # Ensure attrs is a map for consistency
-            attrs_map = Map.new(attrs)
+            if Enum.empty?(attrs) do
+              {:ok, agent}
+            else
+              case do_set(agent, attrs) do
+                {:ok, updated_agent} -> {:ok, %{updated_agent | dirty_state?: true}}
+                error -> error
+              end
+            end
+          end
 
-            # Convert agent to map, deeply merge attrs, then rebuild the struct
-            merged = DeepMerge.deep_merge(Map.from_struct(agent), attrs_map)
+          defp do_set(%__MODULE__{} = agent, attrs) when is_map(attrs) or is_list(attrs) do
+            merged = DeepMerge.deep_merge(Map.from_struct(agent), Map.new(attrs))
             updated_agent = struct(__MODULE__, merged)
 
-            # Validate the updated agent
-            case validate(updated_agent) do
-              {:ok, valid_agent} ->
-                {:ok, valid_agent}
-
-              {:error, reason} ->
-                {:error, reason}
+            if Map.equal?(Map.from_struct(agent), Map.from_struct(updated_agent)) do
+              {:ok, updated_agent}
+            else
+              validate(updated_agent)
             end
           end
 
+          @impl true
           def validate(%__MODULE__{} = agent) do
-            schema = @base_agent_schema ++ @validated_opts[:schema]
-
-            # Convert the agent struct to a keyword list
-            opts =
-              agent
-              |> Map.from_struct()
-              |> Map.to_list()
-
-            case NimbleOptions.validate(opts, schema) do
-              {:ok, validated_opts} ->
-                # On success, create a new struct with the validated options
-                {:ok, struct(__MODULE__, validated_opts)}
-
-              {:error, %NimbleOptions.ValidationError{} = error} ->
-                # Format the validation error for clarity
-                {:error, Agent.format_validation_error(error)}
-
-              error ->
-                # Unexpected error scenario
-                {:error, "Unexpected error during validation: #{inspect(error)}"}
+            case NimbleOptions.validate(Map.to_list(Map.from_struct(agent)), schema()) do
+              {:ok, validated_opts} -> {:ok, struct(__MODULE__, validated_opts)}
+              {:error, error} -> {:error, Agent.format_validation_error(error)}
             end
           end
 
-          def plan(%__MODULE__{} = agent) do
-            raise "plan/1 must be implemented by #{__MODULE__}"
-          end
-
-          def run(%ActionSet{agent: agent, plan: plan} = _frame) do
-            case Chain.chain(plan, agent) do
-              {:ok, final_state} = result ->
-                Logger.info("Plan executed successfully",
-                  agent_id: agent.id,
-                  initial_state: agent,
-                  final_state: final_state
-                )
-
-                result
-
-              {:error, reason} = error ->
-                Logger.error("Plan execution failed",
-                  agent_id: agent.id,
-                  reason: reason,
-                  state: agent
-                )
-
-                error
+          @impl true
+          def plan(%__MODULE__{} = agent, command \\ :default, params \\ %{}) do
+            with planner = planner(),
+                 {:ok, actions} <- planner.plan(agent, command, params) do
+              new_queue = Enum.reduce(actions, agent.pending, &:queue.in(&1, &2))
+              {:ok, %{agent | pending: new_queue, dirty_state?: true}}
             end
           end
 
-          def act(%__MODULE__{} = agent, attrs \\ %{}) do
-            with {:ok, updated} <- set(agent, attrs),
-                 # No need to validate again, we already did that in set/2
-                 {:ok, plan_frame} <- plan(updated),
-                 {:ok, final_state} <- run(plan_frame) do
-              {:ok, final_state}
+          @impl true
+          def run(%__MODULE__{} = agent, opts \\ []) do
+            pending_actions = :queue.to_list(agent.pending || :queue.new())
+            apply_state = Keyword.get(opts, :apply_state, true)
+            runner = runner()
+
+            with {:ok, result} <- runner.run(agent, pending_actions, opts) do
+              base_updates = %{pending: :queue.new(), dirty_state?: false}
+
+              case {apply_state, agent.dirty_state?} do
+                {true, true} ->
+                  do_set(agent, Map.from_struct(result))
+                  |> OK.map(&struct(&1, base_updates))
+
+                {_, _} ->
+                  {:ok, struct(agent, base_updates), result}
+              end
             end
           end
 
-          defoverridable plan: 1
+          def reset(%__MODULE__{} = agent) do
+            {:ok, %{agent | pending: :queue.new()}}
+          end
+
+          def pending?(%__MODULE__{} = agent) do
+            :queue.len(agent.pending)
+          end
+
+          def act(%__MODULE__{} = agent, command \\ :default, params \\ %{}, opts \\ []) do
+            apply_state = Keyword.get(opts, :apply_state, true)
+
+            with {:ok, validated_agent} <- validate(agent),
+                 {:ok, updated_agent} <-
+                   if(apply_state, do: set(validated_agent, params), else: {:ok, validated_agent}),
+                 {:ok, planned_agent} <- plan(updated_agent, command, params),
+                 {:ok, final_agent} <- run(planned_agent, opts) do
+              {:ok, final_agent}
+            end
+          end
+
+          defoverridable set: 2, validate: 1
 
         {:error, error} ->
           Logger.warning("Invalid configuration given to use Jido.Agent: #{error}")
