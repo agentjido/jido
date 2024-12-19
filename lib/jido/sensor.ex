@@ -46,14 +46,16 @@ defmodule Jido.Sensor do
 
   require OK
 
-  @type t :: %__MODULE__{
-          name: String.t(),
-          description: String.t(),
-          category: atom(),
-          tags: [atom()],
-          vsn: String.t(),
-          schema: NimbleOptions.t()
-        }
+  use TypedStruct
+
+  typedstruct do
+    field(:name, String.t(), enforce: true)
+    field(:description, String.t())
+    field(:category, atom())
+    field(:tags, [atom()], default: [])
+    field(:vsn, String.t())
+    field(:schema, NimbleOptions.t())
+  end
 
   @type options :: [
           id: String.t(),
@@ -97,8 +99,6 @@ defmodule Jido.Sensor do
                                            "A NimbleOptions schema for validating the Sensor's runtime options."
                                        ]
                                      )
-
-  defstruct [:name, :description, :category, :tags, :vsn, :schema]
 
   @callback mount(map()) :: {:ok, map()} | {:error, any()}
   @callback generate_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}

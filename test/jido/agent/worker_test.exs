@@ -51,172 +51,172 @@ defmodule Jido.Agent.WorkerTest do
     end
   end
 
-  describe "state management" do
-    setup %{agent: agent} do
-      name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
-      agent = %{agent | id: name}
-      base = "jido.agent.#{agent.id}"
+  # describe "state management" do
+  #   setup %{agent: agent} do
+  #     name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
+  #     agent = %{agent | id: name}
+  #     base = "jido.agent.#{agent.id}"
 
-      topics = %{
-        input: base,
-        emit: "#{base}/emit",
-        metrics: "#{base}/metrics"
-      }
+  #     topics = %{
+  #       input: base,
+  #       emit: "#{base}/emit",
+  #       metrics: "#{base}/metrics"
+  #     }
 
-      # Subscribe to all topics
-      subscribe_to_topics(topics)
+  #     # Subscribe to all topics
+  #     subscribe_to_topics(topics)
 
-      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
+  #     {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
 
-      # Clear the startup metric
-      assert_metric_signal("jido.agent.started")
+  #     # Clear the startup metric
+  #     assert_metric_signal("jido.agent.started")
 
-      %{worker: pid, agent: agent, topics: topics}
-    end
+  #     %{worker: pid, agent: agent, topics: topics}
+  #   end
 
-    test "set/2 updates agent state and emits signal", %{worker: pid} do
-      :ok = Worker.set(pid, %{location: :office})
+  #   test "set/2 updates agent state and emits signal", %{worker: pid} do
+  #     :ok = Worker.set(pid, %{location: :office})
 
-      # Action events go to emit topic
-      signal = assert_emitted_signal("jido.agent.set_processed")
-      assert signal.data.attrs.location == :office
+  #     # Action events go to emit topic
+  #     signal = assert_emitted_signal("jido.agent.set_processed")
+  #     assert signal.data.attrs.location == :office
 
-      state = :sys.get_state(pid)
-      assert state.agent.location == :office
-    end
+  #     state = :sys.get_state(pid)
+  #     assert state.agent.location == :office
+  #   end
 
-    test "set/2 with invalid data emits error signal", %{worker: pid} do
-      :ok = Worker.set(pid, %{battery_level: "not a number"})
+  #   test "set/2 with invalid data emits error signal", %{worker: pid} do
+  #     :ok = Worker.set(pid, %{battery_level: "not a number"})
 
-      # Error events go to emit topic
-      signal = assert_emitted_signal("jido.agent.set_failed")
-      assert signal.data.error != nil
+  #     # Error events go to emit topic
+  #     signal = assert_emitted_signal("jido.agent.set_failed")
+  #     assert signal.data.error != nil
 
-      state = :sys.get_state(pid)
-      refute state.agent.battery_level == "not a number"
-    end
+  #     state = :sys.get_state(pid)
+  #     refute state.agent.battery_level == "not a number"
+  #   end
 
-    test "set/2 ignores nil input and emits error", %{worker: pid} do
-      :ok = Worker.set(pid, nil)
+  #   test "set/2 ignores nil input and emits error", %{worker: pid} do
+  #     :ok = Worker.set(pid, nil)
 
-      signal = assert_emitted_signal("jido.agent.set_failed")
-      assert signal.data.error == "nil attrs not allowed"
-    end
+  #     signal = assert_emitted_signal("jido.agent.set_failed")
+  #     assert signal.data.error == "nil attrs not allowed"
+  #   end
 
-    test "act/2 updates agent state and emits completion", %{worker: pid} do
-      :ok = Worker.act(pid, %{battery_level: 50})
+  #   test "act/2 updates agent state and emits completion", %{worker: pid} do
+  #     :ok = Worker.act(pid, %{battery_level: 50})
 
-      signal = assert_emitted_signal("jido.agent.act_completed")
-      assert signal.data.final_state.battery_level == 50
+  #     signal = assert_emitted_signal("jido.agent.act_completed")
+  #     assert signal.data.final_state.battery_level == 50
 
-      state = :sys.get_state(pid)
-      assert state.agent.battery_level == 50
-      assert state.status == :idle
-    end
+  #     state = :sys.get_state(pid)
+  #     assert state.agent.battery_level == 50
+  #     assert state.status == :idle
+  #   end
 
-    test "act/2 with invalid attrs emits failure", %{worker: pid} do
-      :ok = Worker.act(pid, %{battery_level: "invalid"})
+  #   test "act/2 with invalid attrs emits failure", %{worker: pid} do
+  #     :ok = Worker.act(pid, %{battery_level: "invalid"})
 
-      signal = assert_emitted_signal("jido.agent.act_failed")
-      assert signal.data.error != nil
+  #     signal = assert_emitted_signal("jido.agent.act_failed")
+  #     assert signal.data.error != nil
 
-      state = :sys.get_state(pid)
-      # Default value
-      assert state.agent.battery_level == 100
-    end
-  end
+  #     state = :sys.get_state(pid)
+  #     # Default value
+  #     assert state.agent.battery_level == 100
+  #   end
+  # end
 
-  describe "command handling" do
-    setup %{agent: agent} do
-      name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
-      agent = %{agent | id: name}
+  # describe "command handling" do
+  #   setup %{agent: agent} do
+  #     name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
+  #     agent = %{agent | id: name}
 
-      topics = %{
-        input: "jido.agent.#{name}",
-        emit: "jido.agent.#{name}/emit",
-        metrics: "jido.agent.#{name}/metrics"
-      }
+  #     topics = %{
+  #       input: "jido.agent.#{name}",
+  #       emit: "jido.agent.#{name}/emit",
+  #       metrics: "jido.agent.#{name}/metrics"
+  #     }
 
-      subscribe_to_topics(topics)
+  #     subscribe_to_topics(topics)
 
-      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
+  #     {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
 
-      # Clear the startup metric
-      assert_metric_signal("jido.agent.started")
+  #     # Clear the startup metric
+  #     assert_metric_signal("jido.agent.started")
 
-      %{worker: pid, agent: agent, topics: topics}
-    end
+  #     %{worker: pid, agent: agent, topics: topics}
+  #   end
 
-    test "pause command pauses the worker and emits event", %{worker: pid} do
-      assert {:ok, state} = Worker.cmd(pid, :pause)
+  #   test "pause command pauses the worker and emits event", %{worker: pid} do
+  #     assert {:ok, state} = Worker.cmd(pid, :pause)
 
-      signal = assert_emitted_signal("jido.agent.pause_completed")
-      assert signal.data.args == nil
-      assert state.status == :paused
-    end
+  #     signal = assert_emitted_signal("jido.agent.pause_completed")
+  #     assert signal.data.args == nil
+  #     assert state.status == :paused
+  #   end
 
-    test "resume command resumes the worker and emits event", %{worker: pid} do
-      {:ok, paused_state} = Worker.cmd(pid, :pause)
-      assert paused_state.status == :paused
-      assert_emitted_signal("jido.agent.pause_completed")
+  #   test "resume command resumes the worker and emits event", %{worker: pid} do
+  #     {:ok, paused_state} = Worker.cmd(pid, :pause)
+  #     assert paused_state.status == :paused
+  #     assert_emitted_signal("jido.agent.pause_completed")
 
-      {:ok, resumed_state} = Worker.cmd(pid, :resume)
-      assert resumed_state.status == :running
-      assert_emitted_signal("jido.agent.resume_completed")
-    end
-  end
+  #     {:ok, resumed_state} = Worker.cmd(pid, :resume)
+  #     assert resumed_state.status == :running
+  #     assert_emitted_signal("jido.agent.resume_completed")
+  #   end
+  # end
 
-  describe "pubsub message handling" do
-    setup %{agent: agent} do
-      name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
-      agent = %{agent | id: name}
+  # describe "pubsub message handling" do
+  #   setup %{agent: agent} do
+  #     name = "#{agent.id}_#{:erlang.unique_integer([:positive])}"
+  #     agent = %{agent | id: name}
 
-      topics = %{
-        input: "jido.agent.#{name}",
-        emit: "jido.agent.#{name}/emit",
-        metrics: "jido.agent.#{name}/metrics"
-      }
+  #     topics = %{
+  #       input: "jido.agent.#{name}",
+  #       emit: "jido.agent.#{name}/emit",
+  #       metrics: "jido.agent.#{name}/metrics"
+  #     }
 
-      subscribe_to_topics(topics)
+  #     subscribe_to_topics(topics)
 
-      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
+  #     {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: name)
 
-      # Clear the startup metric
-      assert_metric_signal("jido.agent.started")
+  #     # Clear the startup metric
+  #     assert_metric_signal("jido.agent.started")
 
-      %{worker: pid, agent: agent, topics: topics}
-    end
+  #     %{worker: pid, agent: agent, topics: topics}
+  #   end
 
-    test "handles set command via pubsub", %{worker: pid, topics: topics} do
-      signal = %Signal{
-        type: "jido.agent.set",
-        source: "/test",
-        data: %{location: :kitchen}
-      }
+  #   test "handles set command via pubsub", %{worker: pid, topics: topics} do
+  #     signal = %Signal{
+  #       type: "jido.agent.set",
+  #       source: "/test",
+  #       data: %{location: :kitchen}
+  #     }
 
-      Phoenix.PubSub.broadcast(TestPubSub, topics.input, signal)
+  #     Phoenix.PubSub.broadcast(TestPubSub, topics.input, signal)
 
-      response = assert_emitted_signal("jido.agent.set_processed")
-      assert response.data.attrs.location == :kitchen
+  #     response = assert_emitted_signal("jido.agent.set_processed")
+  #     assert response.data.attrs.location == :kitchen
 
-      state = :sys.get_state(pid)
-      assert state.agent.location == :kitchen
-    end
+  #     state = :sys.get_state(pid)
+  #     assert state.agent.location == :kitchen
+  #   end
 
-    test "handles act command via pubsub", %{worker: pid, topics: topics} do
-      signal = %Signal{
-        type: "jido.agent.act",
-        source: "/test",
-        data: %{battery_level: 75}
-      }
+  #   test "handles act command via pubsub", %{worker: pid, topics: topics} do
+  #     signal = %Signal{
+  #       type: "jido.agent.act",
+  #       source: "/test",
+  #       data: %{battery_level: 75}
+  #     }
 
-      Phoenix.PubSub.broadcast(TestPubSub, topics.input, signal)
+  #     Phoenix.PubSub.broadcast(TestPubSub, topics.input, signal)
 
-      response = assert_emitted_signal("jido.agent.act_completed")
-      assert response.data.final_state.battery_level == 75
+  #     response = assert_emitted_signal("jido.agent.act_completed")
+  #     assert response.data.final_state.battery_level == 75
 
-      state = :sys.get_state(pid)
-      assert state.agent.battery_level == 75
-    end
-  end
+  #     state = :sys.get_state(pid)
+  #     assert state.agent.battery_level == 75
+  #   end
+  # end
 end

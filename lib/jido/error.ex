@@ -76,8 +76,7 @@ defmodule Jido.Error do
           | :invalid_async_ref
           | :compensation_error
 
-  @enforce_keys [:type, :message]
-  defstruct [:type, :message, :details, :stacktrace]
+  use TypedStruct
 
   @typedoc """
   Represents a structured error in the Jido system.
@@ -88,12 +87,12 @@ defmodule Jido.Error do
   - `details`: Optional map containing additional error context.
   - `stacktrace`: Optional list representing the error's stacktrace.
   """
-  @type t :: %__MODULE__{
-          type: error_type(),
-          message: String.t(),
-          details: map() | nil,
-          stacktrace: list() | nil
-        }
+  typedstruct enforce: [:type, :message] do
+    field(:type, error_type(), enforce: true)
+    field(:message, String.t(), enforce: true)
+    field(:details, map(), default: %{})
+    field(:stacktrace, list(), default: [])
+  end
 
   @doc """
   Creates a new error struct with the given type and message.

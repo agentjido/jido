@@ -67,14 +67,16 @@ defmodule Jido.Action do
 
   require OK
 
-  @type t :: %__MODULE__{
-          name: String.t(),
-          description: String.t(),
-          category: String.t(),
-          tags: [String.t()],
-          vsn: String.t(),
-          schema: NimbleOptions.schema()
-        }
+  use TypedStruct
+
+  typedstruct do
+    field(:name, String.t(), enforce: true)
+    field(:description, String.t())
+    field(:category, String.t())
+    field(:tags, [String.t()], default: [])
+    field(:vsn, String.t())
+    field(:schema, NimbleOptions.schema())
+  end
 
   @action_config_schema NimbleOptions.new!(
                           name: [
@@ -119,8 +121,6 @@ defmodule Jido.Action do
                               "A NimbleOptions schema for validating the Action's input parameters."
                           ]
                         )
-
-  defstruct [:name, :description, :category, :tags, :vsn, :schema]
 
   @doc """
   Defines a new Action module.

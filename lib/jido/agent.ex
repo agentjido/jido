@@ -44,23 +44,25 @@ defmodule Jido.Agent do
   - `c:plan/1`: Generates a plan (sequence of Actions) for the Agent to execute.
 
   """
+  use TypedStruct
   alias Jido.Error
   require OK
 
   @type action :: module() | {module(), map()}
-  @type t :: %__MODULE__{
-          id: String.t(),
-          name: String.t(),
-          description: String.t(),
-          category: String.t(),
-          tags: [String.t()],
-          vsn: String.t(),
-          schema: NimbleOptions.schema(),
-          planner: module(),
-          runner: module(),
-          dirty_state?: boolean(),
-          pending: :queue.queue(action())
-        }
+
+  typedstruct do
+    field(:id, String.t())
+    field(:name, String.t())
+    field(:description, String.t())
+    field(:category, String.t())
+    field(:tags, [String.t()])
+    field(:vsn, String.t())
+    field(:schema, NimbleOptions.schema())
+    field(:planner, module())
+    field(:runner, module())
+    field(:dirty_state?, boolean())
+    field(:pending, :queue.queue(action()))
+  end
 
   @agent_compiletime_options_schema NimbleOptions.new!(
                                       name: [
@@ -108,20 +110,6 @@ defmodule Jido.Agent do
                                           "A NimbleOptions schema for validating the Agent's state."
                                       ]
                                     )
-
-  defstruct [
-    :id,
-    :name,
-    :description,
-    :category,
-    :tags,
-    :vsn,
-    :planner,
-    :runner,
-    :schema,
-    :dirty_state?,
-    :pending
-  ]
 
   @callback set(t(), attrs :: map() | list()) :: {:ok, t()} | {:error, any()}
   @callback validate(t()) :: {:ok, t()} | {:error, any()}

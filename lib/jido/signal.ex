@@ -4,29 +4,20 @@ defmodule Jido.Signal do
   This is a local implementation of the CloudEvents specification v1.0.
   """
 
-  @type t :: %__MODULE__{
-          specversion: String.t(),
-          type: String.t(),
-          source: String.t(),
-          id: String.t(),
-          subject: String.t() | nil,
-          time: String.t() | nil,
-          datacontenttype: String.t() | nil,
-          dataschema: String.t() | nil,
-          data: any(),
-          extensions: %{optional(String.t()) => any()}
-        }
+  use TypedStruct
 
-  defstruct specversion: "1.0",
-            type: nil,
-            source: nil,
-            id: nil,
-            subject: nil,
-            time: nil,
-            datacontenttype: nil,
-            dataschema: nil,
-            data: nil,
-            extensions: %{}
+  typedstruct do
+    field(:specversion, String.t(), default: "1.0")
+    field(:id, String.t(), enforce: true)
+    field(:source, String.t(), enforce: true)
+    field(:type, String.t(), enforce: true)
+    field(:subject, String.t())
+    field(:time, String.t())
+    field(:datacontenttype, String.t())
+    field(:dataschema, String.t())
+    field(:data, term())
+    field(:extensions, %{optional(String.t()) => term()}, default: %{})
+  end
 
   @doc """
   Creates a new Signal struct.

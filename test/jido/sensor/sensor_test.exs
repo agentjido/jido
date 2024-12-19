@@ -108,7 +108,14 @@ defmodule JidoTest.SensorTest do
 
     test "retains last values", %{pid: pid} do
       Enum.each(1..15, fn i ->
-        signal = %Jido.Signal{subject: "test_signal", data: %{value: i}}
+        signal = %Jido.Signal{
+          id: Jido.Util.generate_id(),
+          source: "test_sensor",
+          type: "test.signal",
+          subject: "test_signal",
+          data: %{value: i}
+        }
+
         send(pid, {:sensor_signal, signal})
       end)
 
