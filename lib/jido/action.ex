@@ -232,7 +232,7 @@ defmodule Jido.Action do
 
                   {:error, %NimbleOptions.ValidationError{} = error} ->
                     error
-                    |> Action.format_validation_error()
+                    |> Error.format_nimble_validation_error("Action")
                     |> Error.validation_error()
                     |> OK.failure()
                 end
@@ -264,7 +264,7 @@ defmodule Jido.Action do
 
         {:error, error} ->
           error
-          |> Action.format_config_error()
+          |> Error.format_nimble_config_error("Action")
           |> Error.config_error()
           |> OK.failure()
       end
@@ -399,67 +399,4 @@ defmodule Jido.Action do
     |> Error.config_error()
     |> OK.failure()
   end
-
-  @doc """
-  Formats error messages for action configuration errors.
-
-  ## Parameters
-
-  - `error`: The error to format. Can be a `NimbleOptions.ValidationError` or any term.
-
-  ## Returns
-
-  A formatted error message as a string.
-
-  ## Examples
-
-      iex> error = %NimbleOptions.ValidationError{keys_path: [:name], message: "is invalid"}
-      iex> Jido.Action.format_config_error(error)
-      "Invalid configuration given to use Jido.Action for key [:name]: is invalid"
-
-  """
-  @spec format_config_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    "Invalid configuration given to use Jido.Action: #{message}"
-  end
-
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: keys_path, message: message}) do
-    "Invalid configuration given to use Jido.Action for key #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_config_error(error) when is_binary(error), do: error
-  def format_config_error(error), do: inspect(error)
-
-  @doc """
-  Formats error messages for action validation errors.
-
-  ## Parameters
-
-  - `error`: The error to format. Can be a `NimbleOptions.ValidationError` or any term.
-
-  ## Returns
-
-  A formatted error message as a string.
-
-  ## Examples
-
-      iex> error = %NimbleOptions.ValidationError{keys_path: [:input], message: "is required"}
-      iex> Jido.Action.format_validation_error(error)
-      "Invalid parameters for Action at [:input]: is required"
-
-  """
-  @spec format_validation_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_validation_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    "Invalid parameters for Action: #{message}"
-  end
-
-  def format_validation_error(%NimbleOptions.ValidationError{
-        keys_path: keys_path,
-        message: message
-      }) do
-    "Invalid parameters for Action at #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_validation_error(error) when is_binary(error), do: error
-  def format_validation_error(error), do: inspect(error)
 end

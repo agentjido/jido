@@ -241,7 +241,7 @@ defmodule Jido.Sensor do
                 OK.success(Map.new(validated))
 
               {:error, %NimbleOptions.ValidationError{} = error} ->
-                OK.failure(Sensor.format_validation_error(error))
+                OK.failure(Error.format_nimble_validation_error(error, "Sensor"))
             end
           end
 
@@ -333,9 +333,9 @@ defmodule Jido.Sensor do
 
         {:error, error} ->
           error
-          |> Sensor.format_config_error()
+          |> Error.format_nimble_config_error("Sensor")
           |> Error.config_error()
-          |> OK.error()
+          |> OK.failure()
       end
     end
   end
@@ -349,38 +349,9 @@ defmodule Jido.Sensor do
 
       {:error, %NimbleOptions.ValidationError{} = error} ->
         error
-        |> format_validation_error()
+        |> Error.format_nimble_validation_error("Sensor")
         |> Error.config_error()
         |> OK.failure()
     end
   end
-
-  @doc false
-  @spec format_config_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    "Invalid configuration given to use Jido.Sensors.Sensor: #{message}"
-  end
-
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: keys_path, message: message}) do
-    "Invalid configuration given to use Jido.Sensors.Sensor for key #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_config_error(error) when is_binary(error), do: error
-  def format_config_error(error), do: inspect(error)
-
-  @doc false
-  @spec format_validation_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_validation_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    "Invalid parameters for Sensor: #{message}"
-  end
-
-  def format_validation_error(%NimbleOptions.ValidationError{
-        keys_path: keys_path,
-        message: message
-      }) do
-    "Invalid parameters for Sensor at #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_validation_error(error) when is_binary(error), do: error
-  def format_validation_error(error), do: inspect(error)
 end

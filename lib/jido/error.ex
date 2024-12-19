@@ -483,6 +483,72 @@ defmodule Jido.Error do
     {:current_stacktrace, stacktrace} = Process.info(self(), :current_stacktrace)
     Enum.drop(stacktrace, 2)
   end
+
+  @doc """
+  Formats a NimbleOptions validation error for configuration validation.
+  Used when validating configuration options at compile or runtime.
+
+  ## Parameters
+  - `error`: The NimbleOptions.ValidationError to format
+  - `module_type`: String indicating the module type (e.g. "Action", "Agent", "Sensor")
+
+  ## Examples
+
+      iex> error = %NimbleOptions.ValidationError{keys_path: [:name], message: "is required"}
+      iex> Jido.Error.format_nimble_config_error(error, "Action")
+      "Invalid configuration given to use Jido.Action for key [:name]: is required"
+  """
+  @spec format_nimble_config_error(NimbleOptions.ValidationError.t() | any(), String.t()) ::
+          String.t()
+  def format_nimble_config_error(
+        %NimbleOptions.ValidationError{keys_path: [], message: message},
+        module_type
+      ) do
+    "Invalid configuration given to use Jido.#{module_type}: #{message}"
+  end
+
+  def format_nimble_config_error(
+        %NimbleOptions.ValidationError{keys_path: keys_path, message: message},
+        module_type
+      ) do
+    "Invalid configuration given to use Jido.#{module_type} for key #{inspect(keys_path)}: #{message}"
+  end
+
+  def format_nimble_config_error(error, _module_type) when is_binary(error), do: error
+  def format_nimble_config_error(error, _module_type), do: inspect(error)
+
+  @doc """
+  Formats a NimbleOptions validation error for parameter validation.
+  Used when validating runtime parameters.
+
+  ## Parameters
+  - `error`: The NimbleOptions.ValidationError to format
+  - `module_type`: String indicating the module type (e.g. "Action", "Agent", "Sensor")
+
+  ## Examples
+
+      iex> error = %NimbleOptions.ValidationError{keys_path: [:input], message: "is required"}
+      iex> Jido.Error.format_nimble_validation_error(error, "Action")
+      "Invalid parameters for Action at [:input]: is required"
+  """
+  @spec format_nimble_validation_error(NimbleOptions.ValidationError.t() | any(), String.t()) ::
+          String.t()
+  def format_nimble_validation_error(
+        %NimbleOptions.ValidationError{keys_path: [], message: message},
+        module_type
+      ) do
+    "Invalid parameters for #{module_type}: #{message}"
+  end
+
+  def format_nimble_validation_error(
+        %NimbleOptions.ValidationError{keys_path: keys_path, message: message},
+        module_type
+      ) do
+    "Invalid parameters for #{module_type} at #{inspect(keys_path)}: #{message}"
+  end
+
+  def format_nimble_validation_error(error, _module_type) when is_binary(error), do: error
+  def format_nimble_validation_error(error, _module_type), do: inspect(error)
 end
 
 defimpl String.Chars, for: Jido.Error do

@@ -226,7 +226,7 @@ defmodule Jido.Agent do
           def validate(%__MODULE__{} = agent) do
             case NimbleOptions.validate(Map.to_list(Map.from_struct(agent)), schema()) do
               {:ok, validated_opts} -> {:ok, struct(__MODULE__, validated_opts)}
-              {:error, error} -> {:error, Agent.format_validation_error(error)}
+              {:error, error} -> {:error, Error.format_nimble_validation_error(error, "Agent")}
             end
           end
 
@@ -285,53 +285,10 @@ defmodule Jido.Agent do
           Logger.warning("Invalid configuration given to use Jido.Agent: #{error}")
 
           error
-          |> Agent.format_config_error()
+          |> Error.format_nimble_config_error("Agent")
           |> Error.config_error()
           |> OK.failure()
       end
     end
-  end
-
-  @spec format_config_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    formatted = "Invalid configuration given to use Jido.Agent: #{message}"
-    formatted
-  end
-
-  def format_config_error(%NimbleOptions.ValidationError{keys_path: keys_path, message: message}) do
-    formatted =
-      "Invalid configuration given to use Jido.Agent for key #{inspect(keys_path)}: #{message}"
-
-    formatted
-  end
-
-  def format_config_error(error) when is_binary(error) do
-    error
-  end
-
-  def format_config_error(error) do
-    inspect(error)
-  end
-
-  @spec format_validation_error(NimbleOptions.ValidationError.t() | any()) :: String.t()
-  def format_validation_error(%NimbleOptions.ValidationError{keys_path: [], message: message}) do
-    formatted = "Invalid parameters for Agent: #{message}"
-    formatted
-  end
-
-  def format_validation_error(%NimbleOptions.ValidationError{
-        keys_path: keys_path,
-        message: message
-      }) do
-    formatted = "Invalid parameters for Agent at #{inspect(keys_path)}: #{message}"
-    formatted
-  end
-
-  def format_validation_error(error) when is_binary(error) do
-    error
-  end
-
-  def format_validation_error(error) do
-    inspect(error)
   end
 end
