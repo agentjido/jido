@@ -38,6 +38,7 @@ defmodule Jido.Agent.Worker.State do
   - `:topic` - PubSub topic for worker events (required)
   - `:status` - Current state of the worker (default: :idle)
   - `:pending` - Queue of pending commands awaiting execution
+  - `:max_queue_size` - Maximum number of commands that can be queued (default: 10000)
 
   ## Example
 
@@ -72,6 +73,7 @@ defmodule Jido.Agent.Worker.State do
     field(:topic, String.t(), enforce: true)
     field(:status, status(), default: :idle)
     field(:pending, :queue.queue(), default: :queue.new())
+    field(:max_queue_size, non_neg_integer(), default: 10_000)
   end
 
   # Define valid state transitions and their conditions

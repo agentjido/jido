@@ -200,4 +200,140 @@ defmodule Jido.Agent.WorkerTest do
       assert :ok = Worker.act(pid, %{command: :move, destination: :kitchen})
     end
   end
+
+  describe "max queue size" do
+    setup %{agent: agent} do
+      max_queue_size = 2
+      topic = "test.topic"
+
+      {:ok, pid} =
+        Worker.start_link(
+          agent: agent,
+          pubsub: TestPubSub,
+          topic: topic,
+          max_queue_size: max_queue_size
+        )
+
+      Phoenix.PubSub.subscribe(TestPubSub, topic)
+
+      # First resume to get to running state, then pause to force command queueing
+      {:ok, _} = Worker.manage(pid, :resume)
+      {:ok, _} = Worker.manage(pid, :pause)
+
+      %{worker: pid, max_queue_size: max_queue_size}
+    end
+
+    test "accepts commands up to max queue size", %{worker: pid, max_queue_size: max_size} do
+      # Fill queue to capacity
+      for i <- 1..max_size do
+        assert :ok = Worker.act(pid, %{command: :move, destination: "loc_#{i}"})
+      end
+
+      # Verify no overflow events were emitted
+      refute_receive %Signal{type: "jido.agent.queue_overflow"}
+    end
+
+    test "drops commands when queue is full", %{worker: pid, max_queue_size: max_size} do
+      # Fill queue to capacity
+      for i <- 1..max_size do
+        assert :ok = Worker.act(pid, %{command: :move, destination: "loc_#{i}"})
+      end
+
+      # Send one more command that should be dropped
+      overflow_command = %{command: :move, destination: :overflow_location}
+      assert :ok = Worker.act(pid, overflow_command)
+
+      # Verify overflow event was emitted with correct data
+      assert_receive %Signal{
+        type: "jido.agent.queue_overflow",
+        data: %{
+          queue_size: ^max_size,
+          max_size: ^max_size,
+          dropped_command: {:act, ^overflow_command}
+        }
+      }
+    end
+
+    test "processes queued commands after resume", %{worker: pid, max_queue_size: max_size} do
+      # Queue up commands - using simple move commands
+      commands =
+        for i <- 1..max_size do
+          %{command: :move, destination: :kitchen}
+        end
+
+      Enum.each(commands, &Worker.act(pid, &1))
+
+      # Resume worker and wait for state change
+      {:ok, _} = Worker.manage(pid, :resume)
+      assert_receive %Signal{type: "jido.agent.state_changed", data: %{to: :running}}
+
+      # Wait for either completion or failure signals
+      for _ <- 1..max_size do
+        receive do
+          %Signal{type: "jido.agent.act_completed"} -> :ok
+          %Signal{type: "jido.agent.act_failed"} -> :ok
+        after
+          1000 -> flunk("Command processing timeout")
+        end
+      end
+
+      # Verify the state has changed in some way
+      state = :sys.get_state(pid)
+      refute state.agent.location == :home
+    end
+
+    test "handles custom max queue size", %{agent: _agent} do
+      custom_size = 5
+      # Create a new agent with a unique ID
+      agent = SimpleAgent.new("test_agent_custom_queue")
+
+      {:ok, pid} =
+        Worker.start_link(
+          agent: agent,
+          pubsub: TestPubSub,
+          topic: "test.topic",
+          max_queue_size: custom_size
+        )
+
+      # First resume to get to running state, then pause to force command queueing
+      {:ok, _} = Worker.manage(pid, :resume)
+      {:ok, _} = Worker.manage(pid, :pause)
+
+      # Fill queue to custom capacity
+      for i <- 1..custom_size do
+        assert :ok = Worker.act(pid, %{command: :move, destination: "loc_#{i}"})
+      end
+
+      # Verify next command is dropped
+      overflow_command = %{command: :move, destination: :overflow_location}
+      assert :ok = Worker.act(pid, overflow_command)
+
+      assert_receive %Signal{
+        type: "jido.agent.queue_overflow",
+        data: %{
+          queue_size: ^custom_size,
+          max_size: ^custom_size,
+          dropped_command: {:act, ^overflow_command}
+        }
+      }
+    end
+
+    test "uses default max queue size when not specified", %{agent: _agent} do
+      # Create a new agent with a unique ID
+      agent = SimpleAgent.new("test_agent_default_queue")
+
+      {:ok, pid} =
+        Worker.start_link(
+          agent: agent,
+          pubsub: TestPubSub,
+          topic: "test.topic"
+        )
+
+      # First resume to get to running state to match other tests
+      {:ok, _} = Worker.manage(pid, :resume)
+
+      state = :sys.get_state(pid)
+      assert state.max_queue_size == 10_000
+    end
+  end
 end
