@@ -224,6 +224,7 @@ defmodule Jido.Workflow do
 
   def cancel(_), do: {:error, Error.invalid_async_ref("Invalid async ref for cancellation")}
 
+  # Private functions are exposed to the test suite
   private do
     @spec normalize_params(params()) :: {:ok, map()} | {:error, Error.t()}
     defp normalize_params(%Error{} = error), do: OK.failure(error)
@@ -501,14 +502,14 @@ defmodule Jido.Workflow do
 
     @spec execute_action_with_timeout(action(), params(), context(), non_neg_integer()) ::
             {:ok, map()} | {:error, Error.t()}
-    def execute_action_with_timeout(action, params, context, timeout)
+    defp execute_action_with_timeout(action, params, context, timeout)
 
-    def execute_action_with_timeout(action, params, context, 0) do
+    defp execute_action_with_timeout(action, params, context, 0) do
       execute_action(action, params, context)
     end
 
-    def execute_action_with_timeout(action, params, context, timeout)
-        when is_integer(timeout) and timeout > 0 do
+    defp execute_action_with_timeout(action, params, context, timeout)
+         when is_integer(timeout) and timeout > 0 do
       parent = self()
       ref = make_ref()
 
@@ -549,7 +550,7 @@ defmodule Jido.Workflow do
       end
     end
 
-    def execute_action_with_timeout(action, params, context, _timeout) do
+    defp execute_action_with_timeout(action, params, context, _timeout) do
       execute_action_with_timeout(action, params, context, @default_timeout)
     end
 

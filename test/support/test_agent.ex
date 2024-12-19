@@ -33,6 +33,26 @@ defmodule JidoTest.SimpleAgent do
        ]}
     end
 
+    def plan(agent, :move, %{location: new_location}) do
+      {:ok,
+       [
+         {Log, message: "Moving from #{agent.location} to #{new_location}..."},
+         fn agent ->
+           {:ok, %{agent | location: new_location, battery_level: agent.battery_level - 10}}
+         end,
+         {Log, message: "Arrived at #{new_location}!"}
+       ]}
+    end
+
+    def plan(_agent, :recharge, _params) do
+      {:ok,
+       [
+         {Log, message: "Recharging battery..."},
+         fn agent -> {:ok, %{agent | battery_level: 100}} end,
+         {Log, message: "Battery fully charged!"}
+       ]}
+    end
+
     def plan(_agent, :custom, %{message: message}) do
       {:ok,
        [
