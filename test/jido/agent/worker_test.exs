@@ -257,7 +257,7 @@ defmodule Jido.Agent.WorkerTest do
     test "processes queued commands after resume", %{worker: pid, max_queue_size: max_size} do
       # Queue up commands - using simple move commands
       commands =
-        for i <- 1..max_size do
+        for _i <- 1..max_size do
           %{command: :move, destination: :kitchen}
         end
 
