@@ -170,7 +170,7 @@ defmodule JidoTest.AgentTest do
 
       assert unknown_actions == [
                {Log, message: "Unknown command: :invalid"},
-               {Log, message: "Please use :default, :custom, or :sleep"}
+               {Log, message: "Please use :default, :move, :recharge, or :sleep"}
              ]
     end
 

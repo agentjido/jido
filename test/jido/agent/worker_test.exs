@@ -7,34 +7,35 @@ defmodule Jido.Agent.WorkerTest do
   alias JidoTest.SimpleAgent
 
   setup do
-    Logger.configure(level: :debug)
     {:ok, _} = start_supervised({Phoenix.PubSub, name: TestPubSub})
     {:ok, _} = start_supervised({Registry, keys: :unique, name: Jido.AgentRegistry})
     agent = SimpleAgent.new("test_agent")
     %{agent: agent}
   end
 
-  # Helper functions for topic-specific assertions
-  defp assert_signal(type, timeout \\ 2000) do
-    assert_receive %Signal{type: ^type} = signal, timeout
-    signal
-  end
-
-  describe "initialization" do
+  describe "start_link/1" do
     test "starts worker with valid agent and pubsub", %{agent: agent} do
-      topic = "jido.agent.#{agent.id}"
-      :ok = Phoenix.PubSub.subscribe(TestPubSub, topic)
-      # Add a small delay to ensure subscription is ready
-      Process.sleep(10)
-
       {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub)
       assert Process.alive?(pid)
+      assert [{^pid, nil}] = Registry.lookup(Jido.AgentRegistry, "test_agent")
+    end
 
-      assert_signal("jido.agent.started")
-
+    test "starts worker with module agent", %{agent: _agent} do
+      {:ok, pid} = Worker.start_link(agent: SimpleAgent, pubsub: TestPubSub)
+      assert Process.alive?(pid)
       state = :sys.get_state(pid)
-      assert state.agent.id == agent.id
-      assert state.status == :idle
+      assert state.agent.__struct__ == SimpleAgent
+    end
+
+    test "starts worker with custom topic", %{agent: agent} do
+      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, topic: "custom.topic")
+      state = :sys.get_state(pid)
+      assert state.topic == "custom.topic"
+    end
+
+    test "starts worker with custom name", %{agent: agent} do
+      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, name: "custom_name")
+      assert [{^pid, nil}] = Registry.lookup(Jido.AgentRegistry, "custom_name")
     end
 
     test "fails to start with missing pubsub", %{agent: agent} do
@@ -42,111 +43,161 @@ defmodule Jido.Agent.WorkerTest do
         Worker.start_link(agent: agent)
       end
     end
+
+    test "fails with duplicate registration", %{agent: agent} do
+      {:ok, _pid1} = Worker.start_link(agent: agent, pubsub: TestPubSub)
+      assert {:error, {:already_started, _}} = Worker.start_link(agent: agent, pubsub: TestPubSub)
+    end
   end
 
-  describe "command handling" do
-    setup %{agent: agent} do
-      topic = "jido.agent.#{agent.id}"
-      :ok = Phoenix.PubSub.subscribe(TestPubSub, topic)
-      # Add a small delay to ensure subscription is ready
-      Process.sleep(10)
+  describe "child_spec/1" do
+    test "returns valid child spec", %{agent: agent} do
+      spec = Worker.child_spec(agent: agent, pubsub: TestPubSub)
+      assert spec.id == Worker
+      assert spec.start == {Worker, :start_link, [[agent: agent, pubsub: TestPubSub]]}
+      assert spec.type == :worker
+      assert spec.restart == :permanent
+    end
 
+    test "allows custom id", %{agent: agent} do
+      spec = Worker.child_spec(agent: agent, pubsub: TestPubSub, id: :custom_id)
+      assert spec.id == :custom_id
+    end
+  end
+
+  describe "act/2" do
+    setup %{agent: agent} do
       {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub)
-      assert_signal("jido.agent.started")
       %{worker: pid}
     end
 
-    test "act/2 processes agent actions", %{worker: pid} do
-      :ok = Worker.act(pid, %{command: :move, location: :kitchen})
-      signal = assert_signal("jido.agent.act_completed")
-      assert signal.data.final_state.location == :kitchen
+    test "sends act command to worker", %{worker: pid} do
+      assert :ok = Worker.act(pid, %{command: :move, destination: :kitchen})
+      state = :sys.get_state(pid)
+      assert state.agent.location == :kitchen
     end
 
-    test "manage/3 handles pause command", %{worker: pid} do
+    test "handles invalid action parameters", %{worker: pid} do
+      # Missing destination
+      assert :ok = Worker.act(pid, %{command: :move})
+      state = :sys.get_state(pid)
+      # Location shouldn't change
+      assert state.agent.location == :home
+    end
+
+    test "handles concurrent actions", %{worker: pid} do
+      tasks =
+        for dest <- [:kitchen, :living_room, :bedroom] do
+          Task.async(fn -> Worker.act(pid, %{command: :move, destination: dest}) end)
+        end
+
+      results = Task.await_many(tasks)
+      assert Enum.all?(results, &(&1 == :ok))
+
+      # Last action should win
+      state = :sys.get_state(pid)
+      assert state.agent.location in [:kitchen, :living_room, :bedroom]
+    end
+  end
+
+  describe "manage/3" do
+    setup %{agent: agent} do
+      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub)
+      %{worker: pid}
+    end
+
+    test "pauses worker", %{worker: pid} do
+      {:ok, running_state} = Worker.manage(pid, :resume)
+      assert running_state.status == :running
+
       {:ok, state} = Worker.manage(pid, :pause)
       assert state.status == :paused
     end
 
-    test "manage/3 handles resume from paused state", %{worker: pid} do
+    test "resumes worker", %{worker: pid} do
+      {:ok, running_state} = Worker.manage(pid, :resume)
+      assert running_state.status == :running
+
       {:ok, paused_state} = Worker.manage(pid, :pause)
       assert paused_state.status == :paused
 
-      {:ok, resumed_state} = Worker.manage(pid, :resume)
-      assert resumed_state.status == :running
+      {:ok, state} = Worker.manage(pid, :resume)
+      assert state.status == :running
     end
 
-    test "manage/3 handles reset command", %{worker: pid} do
-      :ok = Worker.act(pid, %{command: :move, location: :kitchen})
-      assert_signal("jido.agent.act_completed")
+    test "handles invalid state transitions", %{worker: pid} do
+      # Try to pause when already idle
+      {:error, {:invalid_state, :idle}} = Worker.manage(pid, :pause)
 
-      {:ok, reset_state} = Worker.manage(pid, :reset)
-      assert reset_state.status == :idle
-      assert :queue.len(reset_state.agent.pending) == 0
+      # Try to resume when already running
+      {:ok, _} = Worker.manage(pid, :resume)
+      {:error, {:invalid_state, :running}} = Worker.manage(pid, :resume)
+    end
+
+    test "resets worker", %{worker: pid} do
+      # Queue some commands
+      Worker.act(pid, %{command: :move, destination: :kitchen})
+      Worker.act(pid, %{command: :move, destination: :living_room})
+
+      {:ok, state} = Worker.manage(pid, :reset)
+      assert state.status == :idle
+      assert :queue.len(state.pending) == 0
+    end
+
+    test "handles state transitions during pending commands", %{worker: pid} do
+      # Queue commands while paused
+      {:ok, _} = Worker.manage(pid, :resume)
+      {:ok, _} = Worker.manage(pid, :pause)
+
+      Worker.act(pid, %{command: :move, destination: :kitchen})
+      Worker.act(pid, %{command: :move, destination: :living_room})
+
+      {:ok, state} = Worker.manage(pid, :resume)
+      assert state.status == :running
+
+      # Wait for commands to process
+      :timer.sleep(100)
+      final_state = :sys.get_state(pid)
+      assert final_state.agent.location == :living_room
+    end
+
+    test "returns error for invalid command", %{worker: pid} do
+      assert {:error, :invalid_command} = Worker.manage(pid, :invalid_command)
     end
   end
 
-  # describe "command queueing" do
-  #   setup %{agent: agent} do
-  #     {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub)
-  #     :ok = Phoenix.PubSub.subscribe(TestPubSub, "jido.agent.#{agent.id}")
-  #     assert_signal("jido.agent.started")
-  #     %{worker: pid}
-  #   end
+  describe "pubsub and events" do
+    setup %{agent: agent} do
+      topic = "test.topic"
+      {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub, topic: topic)
+      Phoenix.PubSub.subscribe(TestPubSub, topic)
+      %{worker: pid, topic: topic}
+    end
 
-  #   test "queues commands when paused", %{worker: pid} do
-  #     {:ok, paused_state} = Worker.manage(pid, :pause)
-  #     assert paused_state.status == :paused
+    test "emits events for state transitions", %{worker: pid} do
+      {:ok, _} = Worker.manage(pid, :resume)
+      assert_receive %Signal{type: "jido.agent.state_changed", data: %{from: :idle, to: :running}}
 
-  #     :ok = Worker.act(pid, %{input: "test1"})
-  #     :ok = Worker.act(pid, %{input: "test2"})
+      {:ok, _} = Worker.manage(pid, :pause)
 
-  #     state = :sys.get_state(pid)
-  #     assert :queue.len(state.pending) == 2
+      assert_receive %Signal{
+        type: "jido.agent.state_changed",
+        data: %{from: :running, to: :paused}
+      }
+    end
 
-  #     {:ok, _} = Worker.manage(pid, :resume)
+    test "emits events for completed actions", %{worker: pid} do
+      Worker.act(pid, %{command: :move, destination: :kitchen})
+      assert_receive %Signal{type: "jido.agent.act_completed"}, 1000
+    end
 
-  #     signal = assert_signal("jido.agent.act_completed")
-  #     assert signal.data.final_state.input == "test1"
+    test "handles malformed signals", %{worker: pid, topic: topic} do
+      # Send malformed signal directly
+      Phoenix.PubSub.broadcast(TestPubSub, topic, %{invalid: "signal"})
 
-  #     signal = assert_signal("jido.agent.act_completed")
-  #     assert signal.data.final_state.input == "test2"
-  #   end
-  # end
-
-  # describe "pubsub handling" do
-  #   setup %{agent: agent} do
-  #     {:ok, pid} = Worker.start_link(agent: agent, pubsub: TestPubSub)
-  #     topic = "jido.agent.#{agent.id}"
-  #     :ok = Phoenix.PubSub.subscribe(TestPubSub, topic)
-  #     assert_signal("jido.agent.started")
-  #     %{worker: pid, topic: topic}
-  #   end
-
-  #   test "handles act signals via pubsub", %{worker: pid, topic: topic} do
-  #     {:ok, signal} =
-  #       Signal.new(%{
-  #         type: "jido.agent.act",
-  #         source: "/test",
-  #         data: %{input: "via_pubsub"}
-  #       })
-
-  #     Phoenix.PubSub.broadcast(TestPubSub, topic, signal)
-
-  #     signal = assert_signal("jido.agent.act_completed")
-  #     assert signal.data.final_state.input == "via_pubsub"
-  #   end
-
-  #   test "handles manage signals via pubsub", %{worker: pid, topic: topic} do
-  #     {:ok, signal} =
-  #       Signal.new(%{
-  #         type: "jido.agent.manage",
-  #         source: "/test",
-  #         data: %{command: :pause}
-  #       })
-
-  #     Phoenix.PubSub.broadcast(TestPubSub, topic, signal)
-  #     state = :sys.get_state(pid)
-  #     assert state.status == :paused
-  #   end
-  # end
+      # Worker should still be alive and functioning
+      assert Process.alive?(pid)
+      assert :ok = Worker.act(pid, %{command: :move, destination: :kitchen})
+    end
+  end
 end

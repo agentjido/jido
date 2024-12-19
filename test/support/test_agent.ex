@@ -11,6 +11,7 @@ end
 defmodule JidoTest.SimpleAgent do
   @moduledoc false
   alias Jido.Actions.Basic.{Log, Sleep}
+  alias Jido.Actions.Simplebot.{Move, Recharge}
 
   use Jido.Agent,
     name: "SimpleBot",
@@ -33,13 +34,11 @@ defmodule JidoTest.SimpleAgent do
        ]}
     end
 
-    def plan(agent, :move, %{location: new_location}) do
+    def plan(agent, :move, %{destination: new_location}) do
       {:ok,
        [
          {Log, message: "Moving from #{agent.location} to #{new_location}..."},
-         fn agent ->
-           {:ok, %{agent | location: new_location, battery_level: agent.battery_level - 10}}
-         end,
+         {Move, destination: new_location},
          {Log, message: "Arrived at #{new_location}!"}
        ]}
     end
@@ -48,17 +47,8 @@ defmodule JidoTest.SimpleAgent do
       {:ok,
        [
          {Log, message: "Recharging battery..."},
-         fn agent -> {:ok, %{agent | battery_level: 100}} end,
-         {Log, message: "Battery fully charged!"}
-       ]}
-    end
-
-    def plan(_agent, :custom, %{message: message}) do
-      {:ok,
-       [
-         {Log, message: message},
-         {Sleep, duration: 100},
-         {Log, message: "Custom command completed"}
+         Recharge,
+         {Log, message: "Battery recharged!"}
        ]}
     end
 
@@ -71,12 +61,21 @@ defmodule JidoTest.SimpleAgent do
        ]}
     end
 
+    def plan(_agent, :custom, %{message: message}) do
+      {:ok,
+       [
+         {Log, message: message},
+         {Sleep, duration: 100},
+         {Log, message: "Custom command completed"}
+       ]}
+    end
+
     # Fallback for unknown commands
     def plan(_agent, command, _params) do
       {:ok,
        [
          {Log, message: "Unknown command: #{inspect(command)}"},
-         {Log, message: "Please use :default, :custom, or :sleep"}
+         {Log, message: "Please use :default, :move, :recharge, or :sleep"}
        ]}
     end
   end

@@ -85,12 +85,11 @@ defmodule Jido.Actions.Simplebot do
 
     @spec run(map(), map()) :: {:ok, map()}
     def run(params, _ctx) do
-      # Randomize recharge time between 1-2 seconds
+      # Randomize recharge time between 400ms-1s for simulation
       recharge_time = Enum.random(400..1000)
-      # Randomize recharge amount between 20-40%
-      recharge_amount = Enum.random(5..25)
       Process.sleep(recharge_time)
-      new_params = Map.update(params, :battery_level, 100, &min(100, &1 + recharge_amount))
+      # Always recharge to 100% for predictable behavior
+      new_params = Map.put(params, :battery_level, 100)
       {:ok, new_params}
     end
   end
