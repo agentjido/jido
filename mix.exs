@@ -66,7 +66,6 @@ defmodule Jido.MixProject do
           Jido.Actions.Simplebot
         ],
         Utilities: [
-          Jido.ActionSet,
           Jido.Util,
           Jido.Error,
           Jido.Agent.Worker.State

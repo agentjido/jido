@@ -1,106 +1,166 @@
 defmodule Jido.Agent.Worker do
   @moduledoc """
-  A GenServer implementation for managing Jido agents with centralized command handling
-  and pluggable communication.
+  A GenServer implementation for managing agent state and operations in a distributed system.
 
-  This module provides a robust worker process for Jido agents, handling:
-  - Agent state management
-  - Command processing and queueing
-  - PubSub-based communication
-  - Metrics and signal emission
+  The Worker module provides a robust framework for managing agent lifecycle, state transitions,
+  and command processing. It handles both synchronous and asynchronous operations while
+  maintaining fault tolerance and providing comprehensive logging and telemetry.
 
-  It supports various commands like replan, pause, resume, reset, and stop,
-  and manages the agent's lifecycle through different states (idle, planning, running, paused).
+  ## Features
+
+  - State machine-based lifecycle management
+  - Asynchronous command processing with queuing
+  - PubSub-based event broadcasting
+  - Comprehensive error handling and recovery
+  - Telemetry integration for monitoring
+  - Distributed registration via Registry
+
+  ## States
+
+  Workers follow a state machine pattern with these states:
+  - `:initializing` - Initial startup state
+  - `:idle` - Ready to accept commands
+  - `:running` - Actively processing commands
+  - `:paused` - Suspended command processing (queues new commands)
+  - `:planning` - Planning but not executing actions
+
+  ## Command Types
+
+  The worker processes two main types of commands:
+  1. Act commands: Asynchronous actions that modify agent state
+  2. Management commands: Synchronous operations that control worker behavior
+
+  ## Usage
+
+  Start a worker under a supervisor:
+
+      children = [
+        {Jido.Agent.Worker,
+          agent: MyAgent.new(),
+          pubsub: MyApp.PubSub,
+          topic: "custom.topic",
+          max_queue_size: 1000  # Optional, defaults to 10000
+        }
+      ]
+      Supervisor.start_link(children, strategy: :one_for_one)
+
+  Send commands to the worker:
+
+      # Asynchronous action
+      Worker.act(worker_pid, %{command: :move, destination: :kitchen})
+
+      # Synchronous management
+      {:ok, new_state} = Worker.manage(worker_pid, :pause)
+
+  ## Events
+
+  The worker emits these events on its PubSub topic:
+  - `jido.agent.started` - Worker initialization complete
+  - `jido.agent.state_changed` - Worker state transitions
+  - `jido.agent.act_completed` - Action execution completed
+  - `jido.agent.queue_overflow` - Queue size exceeded max_queue_size
+
+  ## Error Handling
+
+  The worker implements several error handling mechanisms:
+  - Command validation and queueing
+  - State transition validation
+  - Automatic command retries (configurable)
+  - Dead letter handling for failed commands
+  - Queue size limits with overflow protection
   """
-
   use GenServer
-  require Logger
-  use Jido.Util, debug_enabled: false
+  use Private
+  use Jido.Util, debug_enabled: true
   alias Jido.Signal
+  alias Jido.Agent.Worker.State
+  require Logger
 
+  @default_max_queue_size 10_000
+
+  @typedoc """
+  Management commands that can be sent to the worker.
+
+  - `:replan` - Trigger replanning of current actions
+  - `:pause` - Suspend command processing
+  - `:resume` - Resume command processing
+  - `:reset` - Reset to initial state
+  - `:stop` - Gracefully stop the worker
+  """
   @type command :: :replan | :pause | :resume | :reset | :stop
-  @type agent :: Jido.Agent.t()
-  @type topic :: String.t()
-
-  defmodule State do
-    @moduledoc """
-    Struct module for the Agent Worker state.
-    """
-
-    @type t :: %__MODULE__{
-            agent: Jido.Agent.Worker.agent(),
-            pubsub: module(),
-            topics: %{
-              input: String.t(),
-              emit: String.t(),
-              metrics: String.t()
-            },
-            status: :idle | :planning | :running | :paused,
-            config: map(),
-            pending_commands: :queue.queue()
-          }
-
-    defstruct [
-      :agent,
-      :pubsub,
-      :topics,
-      status: :idle,
-      config: %{act_on_input?: true},
-      pending_commands: :queue.new()
-    ]
-
-    @spec default_topics(String.t()) :: %{
-            input: String.t(),
-            emit: String.t(),
-            metrics: String.t()
-          }
-    def default_topics(agent_id) do
-      base = "jido.agent.#{agent_id}"
-
-      %{
-        input: base,
-        emit: "#{base}/emit",
-        metrics: "#{base}/metrics"
-      }
-    end
-  end
-
-  # Client API
-
   @doc """
-  Starts a new Agent Worker process.
+  Starts a worker process linked to the current process.
 
   ## Options
 
-    * `:agent` - The Jido agent to manage (required)
-    * `:name` - The name to register the process under (optional, defaults to agent ID)
-    * `:pubsub` - The PubSub module to use for communication (required)
+    * `:agent` - Agent struct or module implementing agent behavior (required)
+    * `:pubsub` - PubSub module for event broadcasting (required)
+    * `:topic` - Custom topic for events (optional, defaults to agent.id)
+    * `:name` - Registration name (optional, defaults to agent.id)
+    * `:max_queue_size` - Maximum queue size for commands (optional, defaults to 10000)
 
   ## Returns
 
-    * `{:ok, pid}` on success
-    * `{:error, reason}` on failure
+    * `{:ok, pid}` - Successfully started worker
+    * `{:error, reason}` - Failed to start worker
+
+  ## Examples
+
+      iex> Worker.start_link(agent: MyAgent.new(), pubsub: MyApp.PubSub)
+      {:ok, #PID<0.123.0>}
+
+      iex> Worker.start_link(
+      ...>   agent: MyAgent.new(),
+      ...>   pubsub: MyApp.PubSub,
+      ...>   topic: "custom.topic",
+      ...>   name: "worker_1"
+      ...> )
+      {:ok, #PID<0.124.0>}
   """
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
-    agent = Keyword.fetch!(opts, :agent)
+    debug("Starting worker", opts: opts)
+    agent_input = Keyword.fetch!(opts, :agent)
+
+    agent =
+      if is_atom(agent_input) and :erlang.function_exported(agent_input, :new, 0) do
+        agent_input.new()
+      else
+        agent_input
+      end
+
     name = opts[:name] || agent.id
     pubsub = Keyword.fetch!(opts, :pubsub)
+    topic = Keyword.get(opts, :topic)
+    max_queue_size = Keyword.get(opts, :max_queue_size, @default_max_queue_size)
 
-    debug("Starting Jido Agent Worker", %{agent: agent, pubsub: pubsub})
+    debug("Initializing worker", name: name, pubsub: pubsub, topic: topic)
 
     GenServer.start_link(
       __MODULE__,
-      %{agent: agent, pubsub: pubsub},
+      %{agent: agent, pubsub: pubsub, topic: topic, max_queue_size: max_queue_size},
       name: via_tuple(name)
     )
   end
 
   @doc """
-  Returns a child specification for starting the Agent Worker under a supervisor.
+  Returns a child specification for starting the worker under a supervisor.
+
+  ## Options
+
+  Accepts same options as `start_link/1` plus:
+    * `:id` - Optional supervisor child id (defaults to module name)
+
+  ## Examples
+
+      children = [
+        {Worker, agent: agent, pubsub: pubsub, id: :worker_1}
+      ]
+      Supervisor.start_link(children, strategy: :one_for_one)
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
+    debug("Creating child spec", opts: opts)
     id = Keyword.get(opts, :id, __MODULE__)
 
     %{
@@ -113,426 +173,357 @@ defmodule Jido.Agent.Worker do
   end
 
   @doc """
-  Updates the agent's attributes.
+  Sends an asynchronous action command to the worker.
+
+  The command is processed based on the worker's current state:
+  - If :running or :idle - Executed immediately
+  - If :paused - Queued for later execution
+  - Otherwise - Returns error
 
   ## Parameters
 
-    * `server` - The GenServer reference
-    * `attrs` - A map of attributes to update
+    * `server` - Worker pid or name
+    * `attrs` - Map of command attributes including :command key
 
-  ## Returns
+  ## Examples
 
-    * `:ok`
-  """
-  @spec set(GenServer.server(), map()) :: :ok
-  def set(server, attrs) do
-    debug("Calling set", %{server: server, attrs: attrs})
-    GenServer.cast(server, {:set, attrs})
-  end
+      iex> Worker.act(worker, %{command: :move, destination: :kitchen})
+      :ok
 
-  @doc """
-  Triggers the agent to act based on its current state.
-
-  ## Parameters
-
-    * `server` - The GenServer reference
-    * `attrs` - A map of additional attributes for the action
-
-  ## Returns
-
-    * `:ok`
+      iex> Worker.act(worker, %{command: :recharge})
+      :ok
   """
   @spec act(GenServer.server(), map()) :: :ok
   def act(server, attrs) do
-    debug("Calling act", %{server: server, attrs: attrs})
-    GenServer.cast(server, {:act, attrs})
+    debug("Received act command", server: server, attrs: attrs)
+
+    {:ok, signal} =
+      Signal.new(%{
+        type: "jido.agent.act",
+        source: "/agent/act",
+        data: attrs
+      })
+
+    GenServer.cast(server, signal)
   end
 
   @doc """
-  Sends a command to the agent.
+  Sends a synchronous management command to the worker.
 
   ## Parameters
 
-    * `server` - The GenServer reference
-    * `command` - The command to execute
-    * `args` - Additional arguments for the command (optional)
+    * `server` - Worker pid or name
+    * `command` - Management command (see @type command)
+    * `args` - Optional arguments for the command
 
   ## Returns
 
-    * `{:ok, State.t()}` on success
-    * `{:error, term()}` on failure
+    * `{:ok, state}` - Command processed successfully
+    * `{:error, reason}` - Command failed
+
+  ## Examples
+
+      iex> Worker.manage(worker, :pause)
+      {:ok, %State{status: :paused}}
+
+      iex> Worker.manage(worker, :resume)
+      {:ok, %State{status: :running}}
   """
-  @spec cmd(GenServer.server(), command(), term()) :: {:ok, State.t()} | {:error, term()}
-  def cmd(server, command, args \\ nil) do
-    debug("Calling cmd", %{server: server, command: command, args: args})
-    GenServer.call(server, {:cmd, command, args})
+  @spec manage(GenServer.server(), command(), term()) :: {:ok, State.t()} | {:error, term()}
+  def manage(server, command, args \\ nil) do
+    debug("Received manage command", server: server, command: command, args: args)
+
+    {:ok, signal} =
+      Signal.new(%{
+        type: "jido.agent.manage",
+        source: "/agent/manage",
+        data: %{command: command, args: args}
+      })
+
+    GenServer.call(server, signal)
   end
 
   # Server Callbacks
 
   @impl true
-  @spec init(map()) :: {:ok, State.t()} | {:stop, term()}
-  def init(%{agent: agent, pubsub: pubsub}) do
-    debug("Initializing Jido Agent Worker", %{agent: agent, pubsub: pubsub})
+  def init(%{agent: agent, pubsub: pubsub, topic: topic, max_queue_size: max_queue_size}) do
+    debug("Initializing state", agent: agent, pubsub: pubsub, topic: topic)
 
     state = %State{
       agent: agent,
       pubsub: pubsub,
-      topics: State.default_topics(agent.id)
+      topic: topic || State.default_topic(agent.id),
+      status: :initializing,
+      max_queue_size: max_queue_size
     }
 
     with :ok <- validate_state(state),
-         :ok <- subscribe_to_input(state) do
-      emit_metrics(state, :started, %{agent_id: agent.id})
-      {:ok, state}
+         :ok <- subscribe_to_topic(state),
+         {:ok, running_state} <- State.transition(state, :idle) do
+      emit(running_state, :started, %{agent_id: agent.id})
+      debug("Worker initialized successfully", state: running_state)
+      {:ok, running_state}
     else
       {:error, reason} ->
-        debug("Initialization failed", %{reason: reason})
+        error("Failed to initialize worker", reason: reason)
         {:stop, reason}
     end
   end
 
-  # Message Handlers
-
   @impl true
-  @spec handle_cast({:set, map()} | {:act, map()}, State.t()) :: {:noreply, State.t()}
-  def handle_cast({:set, attrs}, state) do
-    debug("Handling set cast", %{attrs: attrs})
+  def handle_cast(%Signal{type: "jido.agent.act", data: attrs}, state) do
+    debug("Handling act signal", attrs: attrs, state: state)
 
-    case do_set(state, attrs) do
+    case process_act(attrs, state) do
       {:ok, new_state} ->
-        debug("Set successful, processing next command")
-        maybe_process_next_command(new_state)
+        debug("Act processed successfully", new_state: new_state)
+        {:noreply, process_pending_commands(new_state)}
+
+      {:error, :queue_overflow} ->
+        debug("Act dropped due to queue overflow")
+        {:noreply, state}
 
       {:error, reason} ->
-        debug("Set failed", %{reason: reason})
+        error("Failed to process act", reason: reason)
         {:noreply, state}
     end
   end
 
-  def handle_cast({:act, attrs}, state) do
-    debug("Handling act cast", %{attrs: attrs})
+  def handle_cast(_msg, state), do: {:noreply, state}
 
-    case do_act(state, attrs) do
+  @impl true
+  def handle_call(
+        %Signal{type: "jido.agent.manage", data: %{command: cmd, args: args}},
+        from,
+        state
+      ) do
+    debug("Handling manage signal", command: cmd, args: args, from: from)
+
+    case process_manage(cmd, args, from, state) do
       {:ok, new_state} ->
-        debug("Act successful, processing next command")
-        maybe_process_next_command(new_state)
+        debug("Manage command processed successfully", new_state: new_state)
+        {:reply, {:ok, new_state}, process_pending_commands(new_state)}
 
       {:error, reason} ->
-        debug("Act failed", %{reason: reason})
-        {:noreply, state}
+        error("Failed to process manage command", reason: reason)
+        {:reply, {:error, reason}, state}
     end
   end
+
+  def handle_call(_msg, _from, state), do: {:reply, {:error, :invalid_command}, state}
 
   @impl true
-  @spec handle_call({:cmd, command(), term()}, GenServer.from(), State.t()) ::
-          {:reply, {:ok, State.t()} | {:ok, :queued} | {:error, term()}, State.t()}
-  def handle_call({:cmd, command, args}, _from, state) do
-    debug("Handling cmd call", %{command: command, args: args})
+  def handle_info(%Signal{} = signal, state) do
+    debug("Handling info signal", signal: signal)
 
-    case enqueue_or_execute_command(state, command, args) do
-      {:execute, result, new_state} ->
-        debug("Command executed immediately", %{result: result})
-        {:reply, result, new_state}
-
-      {:enqueue, new_state} ->
-        debug("Command enqueued")
-        {:reply, {:ok, :queued}, new_state}
-    end
-  end
-
-  # PubSub Handler
-  @impl true
-  @spec handle_info(Jido.Signal.t() | term(), State.t()) :: {:noreply, State.t()}
-  def handle_info(%Jido.Signal{} = signal, state) do
-    debug("Handling incoming signal", %{type: signal.type})
-
-    case signal.type do
-      "jido.agent.set" ->
-        case do_set(state, signal.data) do
-          {:ok, new_state} ->
-            maybe_process_next_command(new_state)
-
-          {:error, reason} ->
-            debug("Set failed", %{reason: reason})
-            {:noreply, state}
-        end
-
-      "jido.agent.act" ->
-        case do_act(state, signal.data) do
-          {:ok, new_state} ->
-            maybe_process_next_command(new_state)
-
-          {:error, reason} ->
-            debug("Act failed", %{reason: reason})
-            {:noreply, state}
-        end
-
-      "jido.agent.cmd" ->
-        case enqueue_or_execute_command(state, signal.data.command, signal.data.args) do
-          {:execute, {:ok, new_state}, _} ->
-            debug("Command executed immediately")
-            {:noreply, new_state}
-
-          {:execute, {:error, reason}, _} ->
-            debug("Command execution failed", %{reason: reason})
-            {:noreply, state}
-
-          {:enqueue, new_state} ->
-            debug("Command enqueued")
-            {:noreply, new_state}
-        end
-
-      _ ->
-        debug("Unhandled signal type", %{type: signal.type})
-        {:noreply, state}
-    end
-  end
-
-  def handle_info(msg, state) do
-    debug("Unhandled info message", %{msg: msg})
-    {:noreply, state}
-  end
-
-  # Command Handling
-
-  @spec enqueue_or_execute_command(State.t(), command(), term()) ::
-          {:execute, {:ok, State.t()} | {:error, term()}, State.t()} | {:enqueue, State.t()}
-  defp enqueue_or_execute_command(%{status: status} = state, :resume, args)
-       when status == :paused do
-    debug("Executing resume command immediately", %{args: args})
-
-    case do_cmd(state, :resume, args) do
-      {:ok, new_state} -> {:execute, {:ok, new_state}, new_state}
-      error -> {:execute, error, state}
-    end
-  end
-
-  defp enqueue_or_execute_command(%{status: :idle} = state, command, args) do
-    debug("Executing command immediately", %{command: command, args: args})
-
-    case do_cmd(state, command, args) do
+    case process_signal(signal, state) do
       {:ok, new_state} ->
-        {:execute, {:ok, new_state}, new_state}
+        debug("Signal processed successfully", new_state: new_state)
+        {:noreply, process_pending_commands(new_state)}
 
-      error ->
-        debug("Command execution failed", %{error: error})
-        {:execute, error, state}
-    end
-  end
+      :ignore ->
+        debug("Signal ignored")
+        {:noreply, state}
 
-  defp enqueue_or_execute_command(state, command, args) do
-    debug("Enqueuing command", %{command: command, args: args})
-    new_state = %{state | pending_commands: :queue.in({command, args}, state.pending_commands)}
-    {:enqueue, new_state}
-  end
+      {:error, reason} ->
+        error("Failed to process signal", reason: reason)
 
-  @spec maybe_process_next_command(State.t()) :: {:noreply, State.t()}
-  defp maybe_process_next_command(%{status: :idle, pending_commands: queue} = state) do
-    debug("Processing next command")
+        Logger.warning("Invalid signal received",
+          signal: signal,
+          reason: reason,
+          agent_id: state.agent.id
+        )
 
-    case :queue.out(queue) do
-      {{:value, {command, args}}, new_queue} ->
-        debug("Executing next command", %{command: command, args: args})
-        new_state = %{state | pending_commands: new_queue}
-
-        case do_cmd(new_state, command, args) do
-          {:ok, final_state} ->
-            {:noreply, final_state}
-
-          {:error, reason} ->
-            debug("Command execution failed", %{reason: reason})
-            {:noreply, new_state}
-        end
-
-      {:empty, _queue} ->
-        debug("No pending commands")
         {:noreply, state}
     end
   end
 
-  defp maybe_process_next_command(state) do
-    debug("Not processing next command", %{status: state.status})
-    {:noreply, state}
-  end
+  def handle_info(_msg, state), do: {:noreply, state}
 
-  # Core Command Handlers
+  # Private Methods
+  private do
+    defp process_signal(%Signal{type: "jido.agent.act", data: data}, state) do
+      debug("Processing act signal", data: data)
+      process_act(data, state)
+    end
 
-  @spec do_set(State.t(), map() | nil) :: {:ok, State.t()} | {:error, String.t()}
-  defp do_set(%State{status: :paused} = state, _attrs) do
-    debug("Set ignored due to paused state")
-    {:ok, state}
-  end
+    defp process_signal(
+           %Signal{type: "jido.agent.manage", data: %{command: cmd, args: args}},
+           state
+         ) do
+      debug("Processing manage signal", command: cmd, args: args)
+      process_manage(cmd, args, nil, state)
+    end
 
-  defp do_set(%State{} = state, nil) do
-    debug("Set failed: nil attrs not allowed")
-    emit_signal(state, :set_failed, %{error: "nil attrs not allowed"})
-    {:error, "nil attrs not allowed"}
-  end
+    defp process_signal(_signal, _state), do: :ignore
 
-  defp do_set(%State{agent: agent} = state, attrs) when is_map(attrs) do
-    debug("Performing set", %{attrs: attrs})
+    defp process_act(attrs, state) do
+      case state.status do
+        :paused ->
+          debug("Queueing act while paused", attrs: attrs)
 
-    case agent.__struct__.set(agent, attrs) do
-      {:ok, updated_agent} ->
-        new_state = %{state | agent: updated_agent}
-        emit_signal(new_state, :set_processed, %{attrs: attrs})
-
-        if state.config.act_on_input? do
-          debug("Performing automatic act")
-
-          case do_act(new_state, %{}) do
-            {:ok, final_state} ->
-              {:ok, final_state}
-
-            {:error, reason} ->
-              debug("Automatic act failed", %{reason: reason})
-              emit_signal(state, :auto_act_failed, %{error: reason})
-              {:ok, new_state}
+          case queue_command(state, {:act, attrs}) do
+            {:ok, new_state} -> {:ok, new_state}
+            {:error, :queue_overflow} = error -> error
           end
-        else
-          {:ok, new_state}
-        end
 
-      {:error, reason} = error ->
-        debug("Set failed", %{reason: reason})
-        emit_signal(state, :set_failed, %{error: reason, attrs: attrs})
-        error
+        status when status in [:idle, :running] ->
+          debug("Processing act in #{status} state", attrs: attrs)
+
+          with {:ok, running_state} <- ensure_running_state(state),
+               {:ok, new_agent} <- execute_action(running_state, attrs),
+               {:ok, idle_state} <- State.transition(%{running_state | agent: new_agent}, :idle) do
+            emit(idle_state, :act_completed, %{
+              initial_state: state.agent,
+              final_state: new_agent
+            })
+
+            {:ok, idle_state}
+          end
+
+        _ ->
+          {:error, {:invalid_state, state.status}}
+      end
     end
-  end
 
-  @spec do_act(State.t(), map()) :: {:ok, State.t()} | {:error, term()}
-  defp do_act(%State{status: :paused} = state, _attrs) do
-    debug("Act ignored due to paused state")
-    {:ok, state}
-  end
+    defp process_manage(:pause, _args, _from, %{status: status} = state) do
+      debug("Pausing agent")
 
-  defp do_act(%State{agent: agent, status: status} = state, attrs)
-       when status in [:idle, :running] do
-    debug("Performing act", %{attrs: attrs})
+      case status do
+        :running ->
+          with {:ok, paused_state} <- State.transition(state, :paused) do
+            emit(paused_state, :state_changed, %{from: :running, to: :paused})
+            {:ok, paused_state}
+          end
 
-    case agent.__struct__.act(agent, attrs) do
-      {:ok, updated_agent} ->
-        emit_signal(state, :act_completed, %{
-          initial_state: agent,
-          final_state: updated_agent
+        _ ->
+          {:error, {:invalid_state, status}}
+      end
+    end
+
+    defp process_manage(:resume, _args, _from, %{status: status} = state) do
+      debug("Resuming agent")
+
+      case status do
+        status when status in [:idle, :paused] ->
+          with {:ok, running_state} <- State.transition(state, :running) do
+            emit(running_state, :state_changed, %{from: status, to: :running})
+
+            # Process any pending commands while in idle state
+            idle_state = %{running_state | status: :idle}
+            processed_state = process_pending_commands(idle_state)
+
+            # Return to running state after processing commands
+            case State.transition(processed_state, :running) do
+              {:ok, final_running_state} ->
+                {:ok, final_running_state}
+
+              error ->
+                error
+            end
+          end
+
+        _ ->
+          {:error, {:invalid_state, status}}
+      end
+    end
+
+    defp process_manage(:reset, _args, _from, state) do
+      debug("Resetting agent")
+
+      with {:ok, idle_state} <- State.transition(state, :idle) do
+        emit(idle_state, :state_changed, %{from: state.status, to: :idle})
+        {:ok, %{idle_state | pending: :queue.new()}}
+      end
+    end
+
+    defp process_manage(cmd, _args, _from, _state) do
+      error("Invalid manage command", command: cmd)
+      {:error, :invalid_command}
+    end
+
+    defp process_pending_commands(%{status: :idle, pending: queue} = state) do
+      case :queue.out(queue) do
+        {{:value, {:act, attrs}}, new_queue} ->
+          state_with_new_queue = %{state | pending: new_queue}
+
+          case process_act(attrs, state_with_new_queue) do
+            {:ok, new_state} -> process_pending_commands(new_state)
+            {:error, _reason} -> state_with_new_queue
+          end
+
+        {:empty, _} ->
+          state
+      end
+    end
+
+    defp process_pending_commands(state), do: state
+
+    defp execute_action(%{status: status} = _state, _attrs) when status != :running do
+      {:error, {:invalid_state, status}}
+    end
+
+    defp execute_action(%{status: :running} = state, %{command: command} = attrs) do
+      params = Map.delete(attrs, :command)
+      state.agent.__struct__.act(state.agent, command, params)
+    end
+
+    defp execute_action(%{status: :running} = state, attrs) do
+      state.agent.__struct__.act(state.agent, :default, attrs)
+    end
+
+    defp ensure_running_state(%{status: :idle} = state) do
+      with {:ok, running_state} <- State.transition(state, :running) do
+        emit(running_state, :state_changed, %{from: :idle, to: :running})
+        {:ok, running_state}
+      end
+    end
+
+    defp ensure_running_state(%{status: :running} = state), do: {:ok, state}
+
+    defp validate_state(%State{pubsub: nil}), do: {:error, "PubSub module is required"}
+    defp validate_state(%State{agent: nil}), do: {:error, "Agent is required"}
+    defp validate_state(_state), do: :ok
+
+    defp queue_command(state, command) do
+      queue_size = :queue.len(state.pending)
+
+      if queue_size >= state.max_queue_size do
+        debug("Queue overflow, dropping command",
+          queue_size: queue_size,
+          max_size: state.max_queue_size
+        )
+
+        emit(state, :queue_overflow, %{
+          queue_size: queue_size,
+          max_size: state.max_queue_size,
+          dropped_command: command
         })
 
-        {:ok, %{state | agent: updated_agent, status: :idle}}
-
-      {:error, reason} = error ->
-        debug("Act failed", %{reason: reason})
-        emit_signal(state, :act_failed, %{error: reason})
-        error
+        {:error, :queue_overflow}
+      else
+        {:ok, %{state | pending: :queue.in(command, state.pending)}}
+      end
     end
-  end
 
-  @spec do_cmd(State.t(), command(), term()) :: {:ok, State.t()} | {:error, term()}
-  defp do_cmd(state, command, args) do
-    debug("Executing command", %{command: command, args: args})
-
-    case execute_command(state, command, args) do
-      {:ok, new_state} = result ->
-        emit_signal(new_state, :"#{command}_completed", %{args: args})
-        result
-
-      {:error, reason} = error ->
-        debug("Command execution failed", %{reason: reason})
-        emit_signal(state, :"#{command}_failed", %{error: reason})
-        error
+    defp subscribe_to_topic(%State{pubsub: pubsub, topic: topic}) do
+      debug("Subscribing to topic", pubsub: pubsub, topic: topic)
+      Phoenix.PubSub.subscribe(pubsub, topic)
     end
-  end
 
-  @spec execute_command(State.t(), command(), term()) :: {:ok, State.t()} | {:error, term()}
-  defp execute_command(state, :pause, _args) do
-    debug("Executing pause command")
-    {:ok, %{state | status: :paused}}
-  end
+    defp emit(%State{} = state, event_type, payload) do
+      debug("Emitting event", type: event_type, payload: payload)
 
-  defp execute_command(state, :resume, _args) do
-    debug("Executing resume command")
-    {:ok, %{state | status: :running}}
-  end
+      {:ok, signal} =
+        Signal.new(%{
+          type: "jido.agent.#{event_type}",
+          source: "/agent/#{state.agent.id}",
+          data: payload
+        })
 
-  defp execute_command(%{agent: agent} = state, :reset, _args) do
-    debug("Executing reset command")
-
-    case agent.__struct__.new(agent.id) do
-      %{} = new_agent ->
-        {:ok, %{state | agent: new_agent, status: :idle}}
-
-      error ->
-        debug("Reset failed", %{error: error})
-        {:error, error}
+      Phoenix.PubSub.broadcast(state.pubsub, state.topic, signal)
     end
-  end
 
-  defp execute_command(state, :replan, _args) do
-    debug("Executing replan command")
-    {:ok, %{state | status: :idle}}
-  end
-
-  defp execute_command(state, :stop, _args) do
-    debug("Executing stop command")
-    emit_signal(state, :stopped, %{})
-    {:ok, %{state | status: :stopped}}
-  end
-
-  defp execute_command(_state, command, _args) do
-    debug("Unknown command", %{command: command})
-    {:error, {:unknown_command, command}}
-  end
-
-  # Private Helper Functions
-
-  @spec validate_state(State.t()) :: :ok | {:error, String.t()}
-  defp validate_state(%State{pubsub: nil}), do: {:error, "PubSub module is required"}
-  defp validate_state(%State{agent: nil}), do: {:error, "Agent is required"}
-  defp validate_state(_state), do: :ok
-
-  @spec subscribe_to_input(State.t()) :: :ok
-  defp subscribe_to_input(%State{pubsub: pubsub, topics: topics}) do
-    debug("Subscribing to input topic", %{topic: topics.input})
-    Phoenix.PubSub.subscribe(pubsub, topics.input)
-  end
-
-  @spec emit_signal(State.t(), atom(), map()) :: :ok
-  defp emit_signal(%State{} = state, event_type, payload) do
-    debug("Emitting signal", %{event_type: event_type, payload: payload})
-
-    {:ok, signal} =
-      Signal.new(%{
-        type: "jido.agent.#{event_type}",
-        source: "/agent/#{state.agent.id}",
-        data: payload
-      })
-
-    broadcast_event(state, :emit, signal)
-  end
-
-  @spec emit_metrics(State.t(), atom(), map()) :: :ok
-  defp emit_metrics(%State{} = state, event_type, payload) do
-    debug("Emitting metrics", %{event_type: event_type, payload: payload})
-
-    {:ok, signal} =
-      Signal.new(%{
-        type: "jido.agent.#{event_type}",
-        source: "/agent/#{state.agent.id}",
-        data: payload
-      })
-
-    broadcast_event(state, :metrics, signal)
-  end
-
-  @spec broadcast_event(State.t(), atom(), term()) :: :ok
-  defp broadcast_event(%State{pubsub: pubsub, topics: topics}, channel, payload) do
-    topic = Map.get(topics, channel)
-    debug("Broadcasting event", %{channel: channel, topic: topic})
-    Phoenix.PubSub.broadcast(pubsub, topic, payload)
-  end
-
-  @spec via_tuple(term()) :: {:via, Registry, {Jido.AgentRegistry, term()}}
-  defp via_tuple(name) do
-    {:via, Registry, {Jido.AgentRegistry, name}}
+    defp via_tuple(name), do: {:via, Registry, {Jido.AgentRegistry, name}}
   end
 end

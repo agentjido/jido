@@ -22,7 +22,7 @@ defmodule JidoTest.Workflow.ActionTest do
   describe "error formatting" do
     test "format_config_error formats NimbleOptions.ValidationError" do
       error = %NimbleOptions.ValidationError{keys_path: [:name], message: "is invalid"}
-      formatted = Action.format_config_error(error)
+      formatted = Error.format_nimble_config_error(error, "Action")
 
       assert formatted ==
                "Invalid configuration given to use Jido.Action for key [:name]: is invalid"
@@ -30,36 +30,36 @@ defmodule JidoTest.Workflow.ActionTest do
 
     test "format_config_error formats NimbleOptions.ValidationError with empty keys_path" do
       error = %NimbleOptions.ValidationError{keys_path: [], message: "is invalid"}
-      formatted = Action.format_config_error(error)
+      formatted = Error.format_nimble_config_error(error, "Action")
       assert formatted == "Invalid configuration given to use Jido.Action: is invalid"
     end
 
     test "format_config_error handles binary errors" do
-      assert Action.format_config_error("Some error") == "Some error"
+      assert Error.format_nimble_config_error("Some error", "Action") == "Some error"
     end
 
     test "format_config_error handles other error types" do
-      assert Action.format_config_error(:some_atom) == ":some_atom"
+      assert Error.format_nimble_config_error(:some_atom, "Action") == ":some_atom"
     end
 
-    test "format_validation_error formats NimbleOptions.ValidationError" do
+    test "format_nimble_validation_error formats NimbleOptions.ValidationError" do
       error = %NimbleOptions.ValidationError{keys_path: [:input], message: "is required"}
-      formatted = Action.format_validation_error(error)
+      formatted = Error.format_nimble_validation_error(error, "Action")
       assert formatted == "Invalid parameters for Action at [:input]: is required"
     end
 
-    test "format_validation_error formats NimbleOptions.ValidationError with empty keys_path" do
+    test "format_nimble_validation_error formats NimbleOptions.ValidationError with empty keys_path" do
       error = %NimbleOptions.ValidationError{keys_path: [], message: "is invalid"}
-      formatted = Action.format_validation_error(error)
+      formatted = Error.format_nimble_validation_error(error, "Action")
       assert formatted == "Invalid parameters for Action: is invalid"
     end
 
-    test "format_validation_error handles binary errors" do
-      assert Action.format_validation_error("Some error") == "Some error"
+    test "format_nimble_validation_error handles binary errors" do
+      assert Error.format_nimble_validation_error("Some error", "Action") == "Some error"
     end
 
-    test "format_validation_error handles other error types" do
-      assert Action.format_validation_error(:some_atom) == ":some_atom"
+    test "format_nimble_validation_error handles other error types" do
+      assert Error.format_nimble_validation_error(:some_atom, "Action") == ":some_atom"
     end
   end
 
