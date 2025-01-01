@@ -133,6 +133,7 @@ defmodule Jido.MixProject do
         Guides: [
           "Getting Started": "guides/getting-started.md",
           Actions: "guides/actions.md",
+          Instructions: "guides/instructions.md",
           Agents: "guides/agents.md",
           "Sensors & Signals": "guides/sensors.md",
           Directives: "guides/directives.md"
@@ -168,11 +169,11 @@ defmodule Jido.MixProject do
       # Testing
       {:credo, "~> 1.7"},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
-      {:dialyxir, "~> 1.4", only: [:dev], server: false},
-      {:ex_doc, "~> 0.34", only: :dev, server: false},
+      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
       {:ex_dbug, "~> 1.2"},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], server: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mimic, "~> 1.7", only: [:dev, :test]},
       {:mock, "~> 0.3.8", only: [:dev, :test]},
       {:stream_data, "~> 1.1", only: [:dev, :test]}

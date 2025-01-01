@@ -72,6 +72,8 @@ defmodule Jido.Agent.Server.State do
   """
   @type status :: :initializing | :idle | :planning | :running | :paused
 
+  @derive Jason.Encoder
+  @derive Inspect
   typedstruct do
     field(:agent, Jido.Agent.t(), enforce: true)
     field(:pubsub, module())

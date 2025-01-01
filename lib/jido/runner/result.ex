@@ -16,6 +16,8 @@ defmodule Jido.Runner.Result do
   use TypedStruct
   alias Jido.Error
 
+  @derive Jason.Encoder
+  @derive Inspect
   typedstruct enforce: true do
     field(:id, String.t(), default: Jido.Util.generate_id())
     field(:initial_state, map(), default: %{})

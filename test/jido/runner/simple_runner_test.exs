@@ -1,6 +1,8 @@
 defmodule Jido.Runner.SimpleTest do
   use ExUnit.Case, async: true
-  alias Jido.Runner.{Simple, Instruction, Result}
+  alias Jido.Runner.Simple
+  alias Jido.Instruction
+  alias Jido.Runner.Result
   alias Jido.Agent.Directive.EnqueueDirective
   alias JidoTest.TestActions.{Add, ErrorAction}
   alias Jido.Actions.Syscall

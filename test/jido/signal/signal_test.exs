@@ -30,7 +30,7 @@ defmodule JidoTest.SignalTest do
         "datacontenttype" => "application/json",
         "dataschema" => "https://example.com/schema",
         "data" => %{"key" => "value"},
-        "jidoaction" => [{:action1, %{param1: "value1"}}],
+        "jidoinstructions" => [{:action1, %{param1: "value1"}}],
         "jidoopts" => %{"opt1" => "value1"}
       }
 
@@ -41,7 +41,7 @@ defmodule JidoTest.SignalTest do
       assert signal.datacontenttype == "application/json"
       assert signal.dataschema == "https://example.com/schema"
       assert signal.data == %{"key" => "value"}
-      assert signal.jidoaction == [{:action1, %{param1: "value1"}}]
+      assert signal.jidoinstructions == [{:action1, %{param1: "value1"}}]
       assert signal.jidoopts == %{"opt1" => "value1"}
     end
 
@@ -89,31 +89,31 @@ defmodule JidoTest.SignalTest do
       assert signal.datacontenttype == "application/json"
     end
 
-    test "handles jidoaction and jidoopts fields" do
+    test "handles jidoinstructions and jidoopts fields" do
       map = %{
         "specversion" => "1.0.2",
         "type" => "example.event",
         "source" => "/example",
         "id" => "123",
-        "jidoaction" => [{:action1, %{param1: "value1"}}],
+        "jidoinstructions" => [{:action1, %{param1: "value1"}}],
         "jidoopts" => %{"opt1" => "value1"}
       }
 
       assert {:ok, signal} = Signal.from_map(map)
-      assert signal.jidoaction == [{:action1, %{param1: "value1"}}]
+      assert signal.jidoinstructions == [{:action1, %{param1: "value1"}}]
       assert signal.jidoopts == %{"opt1" => "value1"}
     end
 
-    test "returns error for invalid jidoaction format" do
+    test "returns error for invalid jidoinstructions format" do
       map = %{
         "specversion" => "1.0.2",
         "type" => "example.event",
         "source" => "/example",
         "id" => "123",
-        "jidoaction" => "invalid_format"
+        "jidoinstructions" => "invalid_format"
       }
 
-      assert {:error, "parse error: jidoaction must be a list of action tuples"} =
+      assert {:error, "parse error: jidoinstructions must be a list of instructions"} =
                Signal.from_map(map)
     end
 

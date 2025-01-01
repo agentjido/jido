@@ -27,7 +27,8 @@ defmodule Jido.Runner.Simple do
 
   use ExDbug, enabled: false, truncate: false
 
-  alias Jido.Runner.{Instruction, Result}
+  alias Jido.Instruction
+  alias Jido.Runner.Result
   alias Jido.Agent.{Directive, Syscall}
   alias Jido.Error
 

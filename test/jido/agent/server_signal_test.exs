@@ -41,7 +41,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       assert signal.type == ServerSignal.cmd()
       assert signal.subject == "agent-123"
-      assert signal.jidoaction == [{:test_action, %{}}]
+      assert signal.jidoinstructions == [{:test_action, %{}}]
       assert signal.jidoopts == %{apply_state: true}
     end
 
@@ -49,7 +49,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       action = {:test_action, %{arg: "value"}}
       {:ok, signal} = ServerSignal.action_signal("agent-123", action)
 
-      assert signal.jidoaction == [{:test_action, %{arg: "value"}}]
+      assert signal.jidoinstructions == [{:test_action, %{arg: "value"}}]
     end
 
     test "creates command signal with action list" do
@@ -60,7 +60,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       {:ok, signal} = ServerSignal.action_signal("agent-123", actions)
 
-      assert signal.jidoaction == actions
+      assert signal.jidoinstructions == actions
     end
 
     test "accepts custom args and opts" do
@@ -80,7 +80,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
         type: "jido.agent.cmd",
         source: "jido",
         subject: "agent-123",
-        jidoaction: [{:test_action, %{param: "value"}}],
+        jidoinstructions: [{:test_action, %{param: "value"}}],
         jidoopts: %{apply_state: true},
         data: %{arg: "value"}
       }
@@ -97,7 +97,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
         type: "jido.agent.cmd",
         source: "jido",
         subject: "agent-123",
-        jidoaction: nil,
+        jidoinstructions: nil,
         jidoopts: nil
       }
 

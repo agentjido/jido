@@ -89,7 +89,9 @@ defmodule Jido.Error do
   - `details`: Optional map containing additional error context.
   - `stacktrace`: Optional list representing the error's stacktrace.
   """
-  typedstruct enforce: [:type, :message] do
+  @derive Jason.Encoder
+  @derive Inspect
+  typedstruct do
     field(:type, error_type(), enforce: true)
     field(:message, String.t(), enforce: true)
     field(:details, map(), default: %{})

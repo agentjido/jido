@@ -24,7 +24,7 @@ Every Signal includes standard CloudEvents fields like:
 - `data`: The actual event payload
 
 Plus Jido-specific fields for:
-- `jidoaction`: Action definitions for command signals
+- `jidoinstructions`: Instructions for the Agent to execute
 - `jidoopts`: Options for signal processing
 
 ### Why Sensors?

@@ -70,7 +70,8 @@ defmodule Jido.Agent.Directive do
   use ExDbug, enabled: false
   use TypedStruct
   alias Jido.Agent
-  alias Jido.Runner.{Result, Instruction}
+  alias Jido.Runner.Result
+  alias Jido.Instruction
 
   typedstruct module: EnqueueDirective do
     @typedoc "Directive to enqueue a new instruction"

@@ -1,6 +1,8 @@
 defmodule Jido.Runner.ChainTest do
   use ExUnit.Case, async: true
-  alias Jido.Runner.{Chain, Instruction, Result}
+  alias Jido.Runner.Chain
+  alias Jido.Instruction
+  alias Jido.Runner.Result
   alias Jido.Error
   alias JidoTest.TestActions.{Add, Multiply, ErrorAction, EnqueueAction}
   alias Jido.Agent.Directive.EnqueueDirective

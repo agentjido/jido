@@ -258,7 +258,7 @@ defmodule Jido.Agent do
       use ExDbug, enabled: false
       alias Jido.Agent
       alias Jido.Util
-      alias Jido.Runner.Instruction
+      alias Jido.Instruction
       alias Jido.Runner.Result
       alias Jido.Agent.Directive
       require OK

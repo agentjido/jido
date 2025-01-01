@@ -10,7 +10,8 @@ defmodule JidoTest.DirectiveTest do
     DeregisterActionDirective
   }
 
-  alias Jido.Runner.{Result, Instruction}
+  alias Jido.Runner.Result
+  alias Jido.Instruction
   alias JidoTest.TestAgents.BasicAgent
 
   setup :verify_on_exit!
