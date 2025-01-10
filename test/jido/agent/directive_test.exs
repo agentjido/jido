@@ -10,7 +10,8 @@ defmodule JidoTest.DirectiveTest do
     DeregisterActionDirective
   }
 
-  alias Jido.Runner.{Result, Instruction}
+  alias Jido.Runner.Result
+  alias Jido.Instruction
   alias JidoTest.TestAgents.BasicAgent
 
   setup :verify_on_exit!
@@ -36,7 +37,7 @@ defmodule JidoTest.DirectiveTest do
     end
   end
 
-  describe "apply_directives/3 queue management" do
+  describe "apply_agent_directives/3 queue management" do
     setup do
       agent = BasicAgent.new()
       {:ok, agent: agent}
@@ -62,7 +63,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: [directive]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify queue state
       assert :queue.len(updated_agent.pending_instructions) == 1
@@ -79,7 +80,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: [directive]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       assert :queue.len(updated_agent.pending_instructions) == 1
       {{:value, instruction}, _} = :queue.out(updated_agent.pending_instructions)
@@ -95,7 +96,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: directives}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       assert :queue.len(updated_agent.pending_instructions) == 3
 
@@ -132,7 +133,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: directives}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify final queue state
       assert :queue.len(updated_agent.pending_instructions) == 2
@@ -162,7 +163,7 @@ defmodule JidoTest.DirectiveTest do
       bad_directive = %EnqueueDirective{action: nil}
       result = %Result{directives: [bad_directive]}
 
-      {:error, :invalid_action} = Directive.apply_directives(agent, result)
+      {:error, :invalid_action} = Directive.apply_agent_directives(agent, result)
 
       # Verify original instruction is still in queue
       assert :queue.len(agent.pending_instructions) == 1
@@ -172,7 +173,7 @@ defmodule JidoTest.DirectiveTest do
     end
   end
 
-  describe "apply_directives/3 edge cases" do
+  describe "apply_agent_directives/3 edge cases" do
     setup do
       agent = BasicAgent.new()
       {:ok, agent: agent}
@@ -193,11 +194,11 @@ defmodule JidoTest.DirectiveTest do
       directive = %EnqueueDirective{action: Add, params: %{value: 3}}
       result = %Result{directives: [directive]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Should only have the new instruction after removing current one
       assert :queue.len(updated_agent.pending_instructions) == 2
-      {{:value, first}, q1} = :queue.out(updated_agent.pending_instructions)
+      {{:value, first}, _q1} = :queue.out(updated_agent.pending_instructions)
       assert first.action == EnqueueAction
       assert first.params.value == 2
     end
@@ -212,7 +213,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: directives}
 
-      {:error, :invalid_action} = Directive.apply_directives(agent, result)
+      {:error, :invalid_action} = Directive.apply_agent_directives(agent, result)
 
       # Queue should be empty since we rollback on failure
       assert :queue.is_empty(agent.pending_instructions)
@@ -233,7 +234,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: [nested_directive]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify the nested structure is maintained
       assert :queue.len(updated_agent.pending_instructions) == 1
@@ -252,7 +253,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: large_directive_list}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify queue integrity with large number of instructions
       assert :queue.len(updated_agent.pending_instructions) == 1000
@@ -269,7 +270,7 @@ defmodule JidoTest.DirectiveTest do
       result = %Result{directives: [directive]}
 
       assert_raise ArgumentError, fn ->
-        Directive.apply_directives(corrupted_agent, result)
+        Directive.apply_agent_directives(corrupted_agent, result)
       end
     end
 
@@ -284,7 +285,7 @@ defmodule JidoTest.DirectiveTest do
 
       result = %Result{directives: directives}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify final state
       assert :queue.len(updated_agent.pending_instructions) == 1
@@ -307,7 +308,7 @@ defmodule JidoTest.DirectiveTest do
       # Apply empty directive list
       result = %Result{directives: []}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Should have removed current instruction but added nothing new
       assert :queue.is_empty(updated_agent.pending_instructions)
@@ -320,7 +321,7 @@ defmodule JidoTest.DirectiveTest do
       directive = %EnqueueDirective{action: Add, params: %{value: 1}}
       result = %Result{directives: [directive]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
       # Verify dirty state is preserved
       assert updated_agent.dirty_state?

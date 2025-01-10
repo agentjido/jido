@@ -56,6 +56,15 @@ defmodule JidoTest.AgentDefinitionTest do
       assert agent.id == custom_id
     end
 
+    test "creates agent with initial state" do
+      initial_state = %{location: :garage, battery_level: 50}
+      agent = BasicAgent.new("test_id", initial_state)
+
+      assert agent.id == "test_id"
+      assert agent.state.location == :garage
+      assert agent.state.battery_level == 50
+    end
+
     test "creates agent without schema" do
       agent = MinimalAgent.new()
 
@@ -98,6 +107,18 @@ defmodule JidoTest.AgentDefinitionTest do
       agent = ValidationAgent.new()
       assert Map.has_key?(agent.state, :required_string)
       assert Map.has_key?(agent.state, :nested_map)
+    end
+
+    test "merges initial state with schema defaults" do
+      initial_state = %{battery_level: 75}
+      agent = FullFeaturedAgent.new("test_id", initial_state)
+
+      # From initial state
+      assert agent.state.battery_level == 75
+      # From schema default
+      assert agent.state.location == :home
+      # From schema default
+      assert agent.state.status == :idle
     end
   end
 
@@ -271,8 +292,8 @@ defmodule JidoTest.AgentDefinitionTest do
       {:ok, updated} = BasicAgent.register_action(agent, BasicAction)
 
       actions = updated.actions
-      assert length(actions) == 6
-      assert Enum.count(actions, &(&1 == BasicAction)) == 2
+      assert length(actions) == 5
+      assert Enum.count(actions, &(&1 == BasicAction)) == 1
     end
   end
 

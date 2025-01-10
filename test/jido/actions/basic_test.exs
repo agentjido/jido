@@ -105,4 +105,40 @@ defmodule JidoTest.Actions.BasicActionsTest do
       assert {:ok, %{value: 4}} = Basic.Decrement.run(%{value: 5}, %{})
     end
   end
+
+  describe "Noop" do
+    test "returns input params unchanged" do
+      params = %{test: "value", other: 123}
+      assert {:ok, ^params} = Basic.Noop.run(params, %{})
+    end
+
+    test "works with empty params" do
+      assert {:ok, %{}} = Basic.Noop.run(%{}, %{})
+    end
+  end
+
+  describe "Inspect" do
+    import ExUnit.CaptureIO
+
+    test "inspects simple values" do
+      output =
+        capture_io(fn ->
+          assert {:ok, %{value: 123}} = Basic.Inspect.run(%{value: 123}, %{})
+        end)
+
+      assert output =~ "123"
+    end
+
+    test "inspects complex data structures" do
+      complex_value = %{a: [1, 2, 3], b: %{c: "test"}}
+      expected_output = inspect(complex_value)
+
+      output =
+        capture_io(fn ->
+          assert {:ok, %{value: ^complex_value}} = Basic.Inspect.run(%{value: complex_value}, %{})
+        end)
+
+      assert String.trim(output) == expected_output
+    end
+  end
 end

@@ -98,7 +98,7 @@ defmodule JidoTest.Agent.Server.PubSubTest do
 
     test "can subscribe multiple times to same topic", %{state: state, topic: topic} do
       assert {:ok, state} = PubSub.subscribe(state, topic)
-      assert {:ok, state} = PubSub.subscribe(state, topic)
+      assert {:ok, _state} = PubSub.subscribe(state, topic)
     end
 
     test "receives all events after subscribing", %{state: state, topic: topic} do
@@ -117,7 +117,7 @@ defmodule JidoTest.Agent.Server.PubSubTest do
       assert_receive %BaseSignal{type: ^event3}
     end
 
-    test "tracks subscriptions in state", %{state: state, topic: topic} do
+    test "tracks subscriptions in state", %{state: state} do
       # Initial state should have no subscriptions
       assert state.subscriptions == []
 
@@ -143,7 +143,7 @@ defmodule JidoTest.Agent.Server.PubSubTest do
     end
 
     test "can unsubscribe when not subscribed", %{state: state, topic: topic} do
-      assert {:ok, state} = PubSub.unsubscribe(state, topic)
+      assert {:ok, _state} = PubSub.unsubscribe(state, topic)
     end
 
     test "stops receiving events after unsubscribe", %{state: state, topic: topic} do

@@ -230,7 +230,7 @@ defmodule JidoTest.Workflow.ActionTest do
       assert Enum.sort(CompensateAction.__action_metadata__()[:compensation]) == [
                enabled: true,
                max_retries: 3,
-               timeout: 250
+               timeout: 50
              ]
     end
 

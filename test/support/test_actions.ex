@@ -116,7 +116,7 @@ defmodule JidoTest.TestActions do
     use Action,
       name: "compensate_action",
       description: "Action that tests compensation behavior",
-      compensation: [enabled: true, max_retries: 3, timeout: 250],
+      compensation: [enabled: true, max_retries: 3, timeout: 50],
       schema: [
         should_fail: [type: :boolean, required: true],
         compensation_should_fail: [type: :boolean, default: false],
@@ -242,8 +242,6 @@ defmodule JidoTest.TestActions do
       name: "task_action",
       description: "Runs multiple concurrent tasks"
 
-    def run(_, context), do: run(%{count: 1, delay: 250}, context)
-
     def run(%{count: count, delay: delay, link_to_group?: link_to_group?}, context) do
       task_group = Map.get(context, :__task_group__)
 
@@ -268,6 +266,8 @@ defmodule JidoTest.TestActions do
           {:error, "Tasks failed to complete"}
       end
     end
+
+    def run(_, context), do: run(%{count: 1, delay: 250}, context)
   end
 
   defmodule NakedTaskAction do
@@ -275,8 +275,6 @@ defmodule JidoTest.TestActions do
     use Action,
       name: "naked_task_action",
       description: "Spawns tasks without linking into OTP"
-
-    def run(_, context), do: run(%{count: 1}, context)
 
     def run(%{count: count}, _context) do
       _pids =
@@ -288,6 +286,8 @@ defmodule JidoTest.TestActions do
 
       {:ok, %{result: "Multi-process workflow completed"}}
     end
+
+    def run(_, context), do: run(%{count: 1}, context)
   end
 
   defmodule Add do

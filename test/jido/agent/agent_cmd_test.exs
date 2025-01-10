@@ -109,7 +109,7 @@ defmodule JidoTest.AgentCmdTest do
       assert {:error, error} =
                FullFeaturedAgent.cmd(agent, UnregisteredAction, %{}, runner: Chain)
 
-      assert error.type == :execution_error
+      assert error.type == :config_error
       assert error.message =~ "Action not registered"
     end
 
@@ -215,7 +215,7 @@ defmodule JidoTest.AgentCmdTest do
         {TestActions.Add, %{amount: 5}}
       ]
 
-      assert {:error, agent_with_error} =
+      assert {:error, result} =
                FullFeaturedAgent.cmd(
                  agent,
                  instructions,
@@ -223,10 +223,10 @@ defmodule JidoTest.AgentCmdTest do
                  runner: Chain
                )
 
-      assert agent_with_error.result.error.type == :validation_error
+      assert result.error.type == :validation_error
       # Chain should stop at first error
       # Original value unchanged
-      assert agent_with_error.state.value == 0
+      assert result.result_state.value == 0
     end
 
     test "handles extremely large instruction lists", %{agent: agent} do

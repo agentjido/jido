@@ -27,3 +27,7 @@ jido-*.tar
 
 # Elixir Language Server
 .elixir_ls/
+
+# expublish
+RELEASE.md
+NOTES.md

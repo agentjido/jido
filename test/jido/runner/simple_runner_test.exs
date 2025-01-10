@@ -1,10 +1,11 @@
 defmodule Jido.Runner.SimpleTest do
   use ExUnit.Case, async: true
-  alias Jido.Runner.{Simple, Instruction, Result}
+  alias Jido.Runner.Simple
+  alias Jido.Instruction
+  alias Jido.Runner.Result
   alias Jido.Agent.Directive.EnqueueDirective
   alias JidoTest.TestActions.{Add, ErrorAction}
-  alias Jido.Actions.Syscall
-  alias Jido.Agent.Syscall.{SpawnSyscall, KillSyscall, BroadcastSyscall}
+  alias Jido.Actions.Directives
 
   @moduletag :capture_log
 
@@ -114,83 +115,6 @@ defmodule Jido.Runner.SimpleTest do
                 directives: [%EnqueueDirective{action: :next_action, params: %{}, context: %{}}],
                 status: :ok,
                 error: nil
-              }} = Simple.run(agent)
-    end
-
-    test "handles spawn syscall" do
-      instruction = %Instruction{
-        action: Syscall.Spawn,
-        params: %{
-          module: TestModule,
-          args: [1, 2, 3]
-        },
-        context: %{}
-      }
-
-      agent = %{
-        id: "test-agent",
-        state: %{processes: []},
-        pending_instructions: :queue.from_list([instruction])
-      }
-
-      assert {:ok,
-              %Result{
-                initial_state: %{processes: []},
-                instructions: [^instruction],
-                result_state: %{processes: []},
-                syscalls: [%SpawnSyscall{module: TestModule, args: [1, 2, 3]}],
-                status: :ok
-              }} = Simple.run(agent)
-    end
-
-    test "handles kill syscall" do
-      pid = spawn(fn -> :ok end)
-
-      instruction = %Instruction{
-        action: Syscall.Kill,
-        params: %{pid: pid},
-        context: %{}
-      }
-
-      agent = %{
-        id: "test-agent",
-        state: %{processes: [pid]},
-        pending_instructions: :queue.from_list([instruction])
-      }
-
-      assert {:ok,
-              %Result{
-                initial_state: %{processes: [^pid]},
-                instructions: [^instruction],
-                result_state: %{processes: [^pid]},
-                syscalls: [%KillSyscall{pid: ^pid}],
-                status: :ok
-              }} = Simple.run(agent)
-    end
-
-    test "handles broadcast syscall" do
-      instruction = %Instruction{
-        action: Syscall.Broadcast,
-        params: %{
-          topic: "test_topic",
-          message: "hello world"
-        },
-        context: %{}
-      }
-
-      agent = %{
-        id: "test-agent",
-        state: %{},
-        pending_instructions: :queue.from_list([instruction])
-      }
-
-      assert {:ok,
-              %Result{
-                initial_state: %{},
-                instructions: [^instruction],
-                result_state: %{},
-                syscalls: [%BroadcastSyscall{topic: "test_topic", message: "hello world"}],
-                status: :ok
               }} = Simple.run(agent)
     end
   end

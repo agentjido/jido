@@ -182,6 +182,10 @@ defmodule Jido.Action do
             }
           end
 
+          def to_tool do
+            Jido.Workflow.Tool.to_tool(__MODULE__)
+          end
+
           def __action_metadata__ do
             to_json()
           end
@@ -263,10 +267,8 @@ defmodule Jido.Action do
                          on_error: 4
 
         {:error, error} ->
-          error
-          |> Error.format_nimble_config_error("Action", __MODULE__)
-          |> Error.config_error()
-          |> OK.failure()
+          message = Error.format_nimble_config_error(error, "Action", __MODULE__)
+          raise CompileError, description: message, file: __ENV__.file, line: __ENV__.line
       end
     end
   end

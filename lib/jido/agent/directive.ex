@@ -13,6 +13,7 @@ defmodule Jido.Agent.Directive do
     * `EnqueueDirective` - Adds a new instruction to the agent's pending queue
         - Requires an action atom
         - Supports optional params and context maps
+        - Supports optional opts keyword list
         - Example: `%EnqueueDirective{action: :move, params: %{location: :kitchen}}`
 
     * `RegisterActionDirective` - Registers a new action module with the agent
@@ -23,9 +24,29 @@ defmodule Jido.Agent.Directive do
         - Requires a valid module atom
         - Example: `%DeregisterActionDirective{action_module: MyApp.Actions.Move}`
 
+    * `SpawnDirective` - Spawns a child process under the agent's supervisor
+        - Requires a module atom and arguments
+        - Example: `%SpawnDirective{module: MyWorker, args: [id: 1]}`
+
+    * `KillDirective` - Terminates a child process
+        - Requires a valid PID
+        - Example: `%KillDirective{pid: #PID<0.123.0>}`
+
+    * `PublishDirective` - Broadcasts a message on a PubSub topic
+        - Requires a topic string and message
+        - Example: `%PublishDirective{topic: "events", message: %{type: :update}}`
+
+    * `SubscribeDirective` - Subscribes to a PubSub topic
+        - Requires a topic string
+        - Example: `%SubscribeDirective{topic: "events"}`
+
+    * `UnsubscribeDirective` - Unsubscribes from a PubSub topic
+        - Requires a topic string
+        - Example: `%UnsubscribeDirective{topic: "events"}`
+
     ## Usage
 
-    Directives are typically created by action handlers and applied through the `apply_directives/3`
+    Directives are typically created by action handlers and applied through the `apply_agent_directives/3`
     function. The function processes directives in order and ensures atomicity - if any directive
     fails, the entire operation is rolled back.
 
@@ -33,7 +54,7 @@ defmodule Jido.Agent.Directive do
     # Single directive
     directive = %EnqueueDirective{action: :move, params: %{location: :kitchen}}
     result = %Result{directives: [directive]}
-    {:ok, updated_agent} = Directive.apply_directives(agent, result)
+    {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
     # Multiple directives
     directives = [
@@ -42,7 +63,7 @@ defmodule Jido.Agent.Directive do
     ]
 
     result = %Result{directives: directives}
-    {:ok, updated_agent} = Directive.apply_directives(agent, result)
+    {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
     ```
 
     ## Validation
@@ -52,6 +73,11 @@ defmodule Jido.Agent.Directive do
     * `EnqueueDirective` requires a non-nil atom for the action
     * `RegisterActionDirective` requires a valid module atom
     * `DeregisterActionDirective` requires a valid module atom
+    * `SpawnDirective` requires a valid module atom and arguments
+    * `KillDirective` requires a valid PID
+    * `PublishDirective` requires a valid topic string and message
+    * `SubscribeDirective` requires a valid topic string
+    * `UnsubscribeDirective` requires a valid topic string
 
     Failed validation results in an error tuple being returned and processing being halted.
 
@@ -66,14 +92,18 @@ defmodule Jido.Agent.Directive do
 
     * `:invalid_action` - The action specified in an `EnqueueDirective` is invalid
     * `:invalid_action_module` - The module specified in a `Register/DeregisterDirective` is invalid
+    * `:invalid_module` - The module specified in a `SpawnDirective` is invalid
+    * `:invalid_pid` - The PID specified in a `KillDirective` is invalid
+    * `:invalid_topic` - The topic specified in a broadcast/subscribe/unsubscribe directive is invalid
   """
   use ExDbug, enabled: false
   use TypedStruct
   alias Jido.Agent
-  alias Jido.Runner.{Result, Instruction}
+  alias Jido.Runner.Result
+  alias Jido.Instruction
 
   typedstruct module: EnqueueDirective do
-    @typedoc "Directive to enqueue a new instruction"
+    @moduledoc "Directive to enqueue a new instruction"
     field(:action, atom(), enforce: true)
     field(:params, map(), default: %{})
     field(:context, map(), default: %{})
@@ -81,16 +111,52 @@ defmodule Jido.Agent.Directive do
   end
 
   typedstruct module: RegisterActionDirective do
-    @typedoc "Directive to register a new action module"
+    @moduledoc "Directive to register a new action module"
     field(:action_module, module(), enforce: true)
   end
 
   typedstruct module: DeregisterActionDirective do
-    @typedoc "Directive to deregister an existing action module"
+    @moduledoc "Directive to deregister an existing action module"
     field(:action_module, module(), enforce: true)
   end
 
-  @type t :: EnqueueDirective.t() | RegisterActionDirective.t() | DeregisterActionDirective.t()
+  typedstruct module: SpawnDirective do
+    @moduledoc "Directive to spawn a child process"
+    field(:module, module(), enforce: true)
+    field(:args, term(), enforce: true)
+  end
+
+  typedstruct module: KillDirective do
+    @moduledoc "Directive to terminate a child process"
+    field(:pid, pid(), enforce: true)
+  end
+
+  typedstruct module: PublishDirective do
+    @moduledoc "Directive to broadcast a message"
+    field(:stream_id, String.t(), enforce: true)
+    field(:signal, term(), enforce: true)
+  end
+
+  typedstruct module: SubscribeDirective do
+    @moduledoc "Directive to subscribe to a topic"
+    field(:stream_id, String.t(), enforce: true)
+  end
+
+  typedstruct module: UnsubscribeDirective do
+    @moduledoc "Directive to unsubscribe from a topic"
+    field(:stream_id, String.t(), enforce: true)
+  end
+
+  @type t ::
+          EnqueueDirective.t()
+          | RegisterActionDirective.t()
+          | DeregisterActionDirective.t()
+          | SpawnDirective.t()
+          | KillDirective.t()
+          | PublishDirective.t()
+          | SubscribeDirective.t()
+          | UnsubscribeDirective.t()
+
   @type directive_result :: {:ok, Agent.t()} | {:error, term()}
 
   @doc """
@@ -125,9 +191,20 @@ defmodule Jido.Agent.Directive do
   def is_directive?({:ok, directive}) when is_struct(directive, DeregisterActionDirective),
     do: true
 
+  def is_directive?({:ok, directive}) when is_struct(directive, SpawnDirective), do: true
+  def is_directive?({:ok, directive}) when is_struct(directive, KillDirective), do: true
+  def is_directive?({:ok, directive}) when is_struct(directive, PublishDirective), do: true
+  def is_directive?({:ok, directive}) when is_struct(directive, SubscribeDirective), do: true
+  def is_directive?({:ok, directive}) when is_struct(directive, UnsubscribeDirective), do: true
+
   def is_directive?(directive) when is_struct(directive, EnqueueDirective), do: true
   def is_directive?(directive) when is_struct(directive, RegisterActionDirective), do: true
   def is_directive?(directive) when is_struct(directive, DeregisterActionDirective), do: true
+  def is_directive?(directive) when is_struct(directive, SpawnDirective), do: true
+  def is_directive?(directive) when is_struct(directive, KillDirective), do: true
+  def is_directive?(directive) when is_struct(directive, PublishDirective), do: true
+  def is_directive?(directive) when is_struct(directive, SubscribeDirective), do: true
+  def is_directive?(directive) when is_struct(directive, UnsubscribeDirective), do: true
   def is_directive?(_), do: false
 
   @doc """
@@ -150,14 +227,14 @@ defmodule Jido.Agent.Directive do
         %RegisterActionDirective{action_module: MyAction}
       ]}
 
-      {:ok, updated_agent} = Directive.apply_directives(agent, result)
+      {:ok, updated_agent} = Directive.apply_agent_directives(agent, result)
 
   ## Behavior
   - Applies directives in order, stopping on first error
   - Maintains atomicity - all directives succeed or none are applied
   - Logs debug info about directive application
   """
-  def apply_directives(agent, %Result{directives: directives}, opts \\ []) do
+  def apply_agent_directives(agent, %Result{directives: directives}, opts \\ []) do
     dbug("Applying #{length(directives)} directives to agent #{agent.id}",
       agent_id: agent.id,
       directive_count: length(directives)
@@ -174,7 +251,7 @@ defmodule Jido.Agent.Directive do
 
     # Now process the directives
     Enum.reduce_while(directives, {:ok, agent}, fn directive, {:ok, current_agent} ->
-      case apply_directive(current_agent, directive, opts) do
+      case apply_agent_directive(current_agent, directive, opts) do
         {:ok, updated_agent} ->
           {:cont, {:ok, updated_agent}}
 
@@ -213,9 +290,24 @@ defmodule Jido.Agent.Directive do
 
   ### DeregisterActionDirective
   Removes an action module from the agent.
+
+  ### SpawnDirective
+  Spawns a child process under the agent's supervisor.
+
+  ### KillDirective
+  Terminates a child process.
+
+  ### PublishDirective
+  Broadcasts a message on a PubSub topic.
+
+  ### SubscribeDirective
+  Subscribes to a PubSub topic.
+
+  ### UnsubscribeDirective
+  Unsubscribes from a PubSub topic.
   """
-  @spec apply_directive(Agent.t(), t(), keyword()) :: directive_result()
-  def apply_directive(agent, %EnqueueDirective{} = directive, _opts) do
+  @spec apply_agent_directive(Agent.t(), t(), keyword()) :: directive_result()
+  def apply_agent_directive(agent, %EnqueueDirective{} = directive, _opts) do
     case validate_enqueue_directive(directive) do
       :ok ->
         instruction = build_instruction(directive)
@@ -233,7 +325,7 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  def apply_directive(agent, %RegisterActionDirective{} = directive, _opts) do
+  def apply_agent_directive(agent, %RegisterActionDirective{} = directive, _opts) do
     case validate_register_directive(directive) do
       :ok ->
         dbug("Registering action module",
@@ -248,7 +340,7 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  def apply_directive(agent, %DeregisterActionDirective{} = directive, _opts) do
+  def apply_agent_directive(agent, %DeregisterActionDirective{} = directive, _opts) do
     case validate_deregister_directive(directive) do
       :ok ->
         dbug("Deregistering action module",
@@ -263,6 +355,29 @@ defmodule Jido.Agent.Directive do
     end
   end
 
+  @spec validate_syscall(t()) :: :ok | {:error, term()}
+  def validate_syscall(%SpawnDirective{module: nil}), do: {:error, :invalid_module}
+  def validate_syscall(%SpawnDirective{module: mod}) when is_atom(mod), do: :ok
+
+  def validate_syscall(%KillDirective{pid: pid}) when is_pid(pid), do: :ok
+  def validate_syscall(%KillDirective{}), do: {:error, :invalid_pid}
+
+  def validate_syscall(%PublishDirective{stream_id: stream_id}) when is_binary(stream_id),
+    do: :ok
+
+  def validate_syscall(%PublishDirective{}), do: {:error, :invalid_stream_id}
+
+  def validate_syscall(%SubscribeDirective{stream_id: stream_id}) when is_binary(stream_id),
+    do: :ok
+
+  def validate_syscall(%SubscribeDirective{}), do: {:error, :invalid_stream_id}
+
+  def validate_syscall(%UnsubscribeDirective{stream_id: stream_id}) when is_binary(stream_id),
+    do: :ok
+
+  def validate_syscall(%UnsubscribeDirective{}), do: {:error, :invalid_stream_id}
+
+  def validate_syscall(_), do: {:error, :invalid_syscall}
   defp validate_enqueue_directive(%EnqueueDirective{action: nil}), do: {:error, :invalid_action}
   defp validate_enqueue_directive(%EnqueueDirective{action: action}) when is_atom(action), do: :ok
   defp validate_enqueue_directive(_), do: {:error, :invalid_action}

@@ -63,6 +63,7 @@ defmodule Jido.Error do
   - `:invalid_async_ref`: Indicates an invalid asynchronous workflow reference.
   - `:compensation_error`: Indicates an error occurred during compensation.
   - `:planning_error`: Used when an error occurs during workflow planning.
+  - `:routing_error`: Used when an error occurs during workflow routing.
   """
   @type error_type ::
           :invalid_action
@@ -77,6 +78,7 @@ defmodule Jido.Error do
           | :timeout
           | :invalid_async_ref
           | :compensation_error
+          | :routing_error
 
   use TypedStruct
 
@@ -89,7 +91,7 @@ defmodule Jido.Error do
   - `details`: Optional map containing additional error context.
   - `stacktrace`: Optional list representing the error's stacktrace.
   """
-  typedstruct enforce: [:type, :message] do
+  typedstruct do
     field(:type, error_type(), enforce: true)
     field(:message, String.t(), enforce: true)
     field(:details, map(), default: %{})
@@ -409,6 +411,31 @@ defmodule Jido.Error do
   @spec invalid_async_ref(String.t(), map() | nil, list() | nil) :: t()
   def invalid_async_ref(message, details \\ nil, stacktrace \\ nil) do
     new(:invalid_async_ref, message, details, stacktrace)
+  end
+
+  @doc """
+  Creates a new routing error.
+
+  Use this when an error occurs during workflow routing.
+
+  ## Parameters
+  - `message`: A string describing the routing error.
+  - `details`: (optional) A map containing additional error details.
+  - `stacktrace`: (optional) The stacktrace at the point of error.
+
+  ## Example
+
+      iex> Jido.Error.routing_error("Invalid route configuration", %{route: "user_workflow"})
+      %Jido.Error{
+        type: :routing_error,
+        message: "Invalid route configuration",
+        details: %{route: "user_workflow"},
+        stacktrace: [...]
+      }
+  """
+  @spec routing_error(String.t(), map() | nil, list() | nil) :: t()
+  def routing_error(message, details \\ nil, stacktrace \\ nil) do
+    new(:routing_error, message, details, stacktrace)
   end
 
   @doc """

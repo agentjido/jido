@@ -331,10 +331,12 @@ defmodule Jido.Sensor do
                          shutdown: 1
 
         {:error, error} ->
-          error
-          |> Error.format_nimble_config_error("Sensor", __MODULE__)
-          |> Error.config_error()
-          |> OK.failure()
+          message = Error.format_nimble_config_error(error, "Sensor", __MODULE__)
+
+          raise CompileError,
+            description: message,
+            file: __ENV__.file,
+            line: __ENV__.line
       end
     end
   end

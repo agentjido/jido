@@ -41,15 +41,15 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       assert signal.type == ServerSignal.cmd()
       assert signal.subject == "agent-123"
-      assert signal.jidoaction == [{:test_action, %{}}]
-      assert signal.jidoopts == %{apply_state: true}
+      assert signal.jido_instructions == [{:test_action, %{}}]
+      assert signal.jido_opts == %{apply_state: true}
     end
 
     test "creates command signal with action tuple" do
       action = {:test_action, %{arg: "value"}}
       {:ok, signal} = ServerSignal.action_signal("agent-123", action)
 
-      assert signal.jidoaction == [{:test_action, %{arg: "value"}}]
+      assert signal.jido_instructions == [{:test_action, %{arg: "value"}}]
     end
 
     test "creates command signal with action list" do
@@ -60,7 +60,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       {:ok, signal} = ServerSignal.action_signal("agent-123", actions)
 
-      assert signal.jidoaction == actions
+      assert signal.jido_instructions == actions
     end
 
     test "accepts custom args and opts" do
@@ -69,7 +69,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       {:ok, signal} = ServerSignal.action_signal("agent-123", :test, args, opts)
 
       assert signal.data == args
-      assert signal.jidoopts == %{apply_state: false}
+      assert signal.jido_opts == %{apply_state: false}
     end
   end
 
@@ -80,8 +80,8 @@ defmodule JidoTest.Agent.Server.SignalTest do
         type: "jido.agent.cmd",
         source: "jido",
         subject: "agent-123",
-        jidoaction: [{:test_action, %{param: "value"}}],
-        jidoopts: %{apply_state: true},
+        jido_instructions: [{:test_action, %{param: "value"}}],
+        jido_opts: %{apply_state: true},
         data: %{arg: "value"}
       }
 
@@ -97,8 +97,8 @@ defmodule JidoTest.Agent.Server.SignalTest do
         type: "jido.agent.cmd",
         source: "jido",
         subject: "agent-123",
-        jidoaction: nil,
-        jidoopts: nil
+        jido_instructions: nil,
+        jido_opts: nil
       }
 
       assert {:error, :invalid_signal_format} = ServerSignal.extract_actions(invalid_signal)
@@ -137,27 +137,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       assert ServerSignal.is_agent_signal?(agent_signal)
       refute ServerSignal.is_agent_signal?(other_signal)
-    end
-
-    test "is_syscall_signal?" do
-      {:ok, syscall_signal} =
-        Signal.new(%{
-          id: "123",
-          source: "jido",
-          type: "jido.agent.syscall.test",
-          subject: "test-agent"
-        })
-
-      {:ok, other_signal} =
-        Signal.new(%{
-          id: "123",
-          source: "jido",
-          type: "other",
-          subject: "test-agent"
-        })
-
-      assert ServerSignal.is_syscall_signal?(syscall_signal)
-      refute ServerSignal.is_syscall_signal?(other_signal)
     end
 
     test "is_event_signal?" do

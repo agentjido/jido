@@ -17,8 +17,11 @@ defmodule Jido.Signal do
     field(:dataschema, String.t())
     field(:data, term())
     # Jido-specific fields
-    field(:jidoaction, [{atom(), map()}])
-    field(:jidoopts, map())
+    field(:jido_instructions, Jido.Runner.Instruction.instruction_list())
+    field(:jido_opts, map())
+    field(:jido_causation_id, String.t())
+    field(:jido_correlation_id, String.t())
+    field(:metadata, map())
   end
 
   @doc """
@@ -80,8 +83,8 @@ defmodule Jido.Signal do
          {:ok, datacontenttype} <- parse_datacontenttype(map),
          {:ok, dataschema} <- parse_dataschema(map),
          {:ok, data} <- parse_data(map["data"]),
-         {:ok, jidoaction} <- parse_jidoaction(map["jidoaction"]),
-         {:ok, jidoopts} <- parse_jidoopts(map["jidoopts"]) do
+         {:ok, jido_instructions} <- parse_jido_instructions(map["jido_instructions"]),
+         {:ok, jido_opts} <- parse_jido_opts(map["jido_opts"]) do
       event = %__MODULE__{
         specversion: "1.0.2",
         type: type,
@@ -92,14 +95,36 @@ defmodule Jido.Signal do
         datacontenttype: datacontenttype || if(data, do: "application/json"),
         dataschema: dataschema,
         data: data,
-        jidoaction: jidoaction,
-        jidoopts: jidoopts
+        jido_instructions: jido_instructions,
+        jido_opts: jido_opts
       }
 
       {:ok, event}
     else
       {:error, reason} -> {:error, "parse error: #{reason}"}
     end
+  end
+
+  def map_to_signal_data(signals, fields \\ [])
+
+  @spec map_to_signal_data(list(struct), Keyword.t()) :: list(t())
+  def map_to_signal_data(signals, fields) when is_list(signals) do
+    Enum.map(signals, &map_to_signal_data(&1, fields))
+  end
+
+  alias Jido.Serialization.TypeProvider
+
+  @spec map_to_signal_data(struct, Keyword.t()) :: t()
+  def map_to_signal_data(signal, fields) do
+    %__MODULE__{
+      id: UUID.uuid4(),
+      source: "http://example.com/bank",
+      jido_causation_id: Keyword.get(fields, :jido_causation_id),
+      jido_correlation_id: Keyword.get(fields, :jido_correlation_id),
+      type: TypeProvider.to_string(signal),
+      data: signal,
+      metadata: Keyword.get(fields, :metadata, %{})
+    }
   end
 
   # Parser functions for standard CloudEvents fields
@@ -138,20 +163,21 @@ defmodule Jido.Signal do
   defp parse_data(""), do: {:error, "data field given but empty"}
   defp parse_data(data), do: {:ok, data}
 
-  defp parse_jidoaction(nil), do: {:ok, nil}
+  defp parse_jido_instructions(nil), do: {:ok, nil}
 
-  defp parse_jidoaction(actions) when is_list(actions) do
-    if Enum.all?(actions, &valid_action?/1),
-      do: {:ok, actions},
-      else: {:error, "invalid action format"}
+  defp parse_jido_instructions(instructions) when is_list(instructions) do
+    if Enum.all?(instructions, &valid_instruction?/1),
+      do: {:ok, instructions},
+      else: {:error, "invalid instruction format"}
   end
 
-  defp parse_jidoaction(_), do: {:error, "jidoaction must be a list of action tuples"}
+  defp parse_jido_instructions(_),
+    do: {:error, "jido_instructions must be a list of instructions"}
 
-  defp parse_jidoopts(nil), do: {:ok, %{}}
-  defp parse_jidoopts(opts) when is_map(opts), do: {:ok, opts}
-  defp parse_jidoopts(_), do: {:error, "jidoopts must be a map"}
+  defp parse_jido_opts(nil), do: {:ok, %{}}
+  defp parse_jido_opts(opts) when is_map(opts), do: {:ok, opts}
+  defp parse_jido_opts(_), do: {:error, "jido_opts must be a map"}
 
-  defp valid_action?({action, params}) when is_atom(action) and is_map(params), do: true
-  defp valid_action?(_), do: false
+  defp valid_instruction?({action, params}) when is_atom(action) and is_map(params), do: true
+  defp valid_instruction?(_), do: false
 end

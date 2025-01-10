@@ -37,7 +37,7 @@ defmodule JidoTest.AgentPlanTest do
 
     test "handles unregistered actions", %{agent: agent} do
       assert {:error, error} = BasicAgent.plan(agent, UnregisteredAction, %{})
-      assert error.type == :execution_error
+      assert error.type == :config_error
 
       assert error.message =~
                "Action: Elixir.UnregisteredAction not registered with agent basic_agent"
@@ -137,7 +137,7 @@ defmodule JidoTest.AgentPlanTest do
       ]
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
-      assert error.type == :execution_error
+      assert error.type == :config_error
       assert error.message =~ "Action not registered"
     end
 
@@ -149,7 +149,7 @@ defmodule JidoTest.AgentPlanTest do
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
       assert error.type == :execution_error
-      assert error.message =~ "Invalid instruction format."
+      assert error.message =~ "Invalid params format."
     end
 
     test "preserves existing instructions when planning list", %{agent: agent} do
@@ -247,7 +247,7 @@ defmodule JidoTest.AgentPlanTest do
       assert :queue.len(planned.pending_instructions) == 1000
     end
 
-    test "executes on_before_plan callback for each action" do
+    test "executes on_before_plan callback once per plan call" do
       agent = JidoTest.TestAgents.CallbackTrackingAgent.new()
 
       actions = [
@@ -258,6 +258,7 @@ defmodule JidoTest.AgentPlanTest do
 
       {:ok, planned} = JidoTest.TestAgents.CallbackTrackingAgent.plan(agent, actions, %{})
 
+      # Verify only one on_before_plan callback was executed
       total_callbacks =
         planned.state.callback_count
         |> Enum.reduce(0, fn
@@ -265,13 +266,10 @@ defmodule JidoTest.AgentPlanTest do
           _, acc -> acc
         end)
 
-      assert total_callbacks == 3
-
-      assert planned.state.callback_count[{:on_before_plan, JidoTest.TestActions.Add}] == 2
-      assert planned.state.callback_count[{:on_before_plan, JidoTest.TestActions.Multiply}] == 1
+      assert total_callbacks == 1
     end
 
-    test "tracks callbacks in correct order" do
+    test "tracks callback execution order" do
       agent = JidoTest.TestAgents.CallbackTrackingAgent.new()
 
       actions = [
@@ -283,14 +281,13 @@ defmodule JidoTest.AgentPlanTest do
 
       # Verify callback log order
       log = planned.state.callback_log
-      assert length(log) == 2
+      assert length(log) == 1
 
-      [last, first] = log
-      assert last.callback == {:on_before_plan, JidoTest.TestActions.Multiply}
-      assert first.callback == {:on_before_plan, JidoTest.TestActions.Add}
+      [callback_entry] = log
+      assert callback_entry.callback == {:on_before_plan, nil}
     end
 
-    test "maintains callback state between plans" do
+    test "maintains callback state between multiple plan calls" do
       agent = JidoTest.TestAgents.CallbackTrackingAgent.new()
 
       # First plan
@@ -309,12 +306,11 @@ defmodule JidoTest.AgentPlanTest do
           %{}
         )
 
-      # Verify cumulative counts
+      # Verify we have two on_before_plan callbacks recorded (one per plan call)
       counts = agent_with_two.state.callback_count
-      assert counts[{:on_before_plan, JidoTest.TestActions.Add}] == 1
-      assert counts[{:on_before_plan, JidoTest.TestActions.Multiply}] == 1
+      assert counts[{:on_before_plan, nil}] == 2
 
-      # Verify log maintains history
+      # Verify log maintains history of both callbacks
       log = agent_with_two.state.callback_log
       assert length(log) == 2
     end

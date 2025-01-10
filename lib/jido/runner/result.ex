@@ -24,7 +24,6 @@ defmodule Jido.Runner.Result do
     field(:error, Error.t(), default: nil)
     field(:instructions, list(), default: [])
     field(:directives, list(), default: [])
-    field(:syscalls, list(), default: [])
     field(:pending_instructions, :queue.queue(), default: :queue.new())
   end
 end

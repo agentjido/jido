@@ -165,4 +165,9 @@ defmodule Jido.Util do
          )}
     end
   end
+
+  @doc false
+  def pluck(enumerable, field) do
+    Enum.map(enumerable, &Map.get(&1, field))
+  end
 end

@@ -218,8 +218,8 @@ defmodule JidoTest.TestAgents do
     end
 
     @impl true
-    def on_before_plan(agent, action, _params) do
-      agent = track_callback(agent, {:on_before_plan, action})
+    def on_before_plan(agent, _instructions, _context) do
+      agent = track_callback(agent, {:on_before_plan, nil})
       {:ok, agent}
     end
 
@@ -252,21 +252,23 @@ defmodule JidoTest.TestAgents do
       actions: [JidoTest.TestActions.BasicAction]
   end
 
-  defmodule SyscallAgent do
-    @moduledoc "Agent that emits syscalls for testing server process management"
+  defmodule DirectiveAgent do
+    @moduledoc "Agent that emits directives for testing server process management"
     use Jido.Agent,
-      name: "syscall_agent",
-      description: "Tests syscall functionality",
+      name: "directive_agent",
+      description: "Tests directive functionality",
       category: "test",
-      tags: ["test", "syscalls"],
+      tags: ["test", "directives"],
       vsn: "1.0.0",
       actions: [
-        Jido.Actions.Syscall.Spawn,
-        Jido.Actions.Syscall.Kill,
-        Jido.Actions.Syscall.Broadcast,
-        Jido.Actions.Syscall.Subscribe,
-        Jido.Actions.Syscall.Unsubscribe,
-        Jido.Actions.Syscall.Checkpoint
+        Jido.Actions.Directives.EnqueueAction,
+        Jido.Actions.Directives.RegisterAction,
+        Jido.Actions.Directives.DeregisterAction,
+        Jido.Actions.Directives.Spawn,
+        Jido.Actions.Directives.Kill,
+        Jido.Actions.Directives.Publish,
+        Jido.Actions.Directives.Subscribe,
+        Jido.Actions.Directives.Unsubscribe
       ],
       schema: [
         processes: [

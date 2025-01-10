@@ -7,12 +7,12 @@ defmodule Jido.Runner.Simple do
   The Simple Runner follows a sequential execution model:
   1. Dequeues a single instruction from the agent's pending queue
   2. Executes the instruction via its action module
-  3. Processes the result (either a directive, syscall or state update)
+  3. Processes the result (either a directive or state update)
   4. Returns a Result struct containing the execution outcome
 
   ## Features
   * Single instruction execution
-  * Support for directives, syscalls and state results
+  * Support for directives and state results
   * Atomic execution guarantees
   * Comprehensive error handling
   * Debug logging at key execution points
@@ -27,8 +27,9 @@ defmodule Jido.Runner.Simple do
 
   use ExDbug, enabled: false, truncate: false
 
-  alias Jido.Runner.{Instruction, Result}
-  alias Jido.Agent.{Directive, Syscall}
+  alias Jido.Instruction
+  alias Jido.Runner.Result
+  alias Jido.Agent.Directive
   alias Jido.Error
 
   @type run_opts :: keyword()
@@ -41,7 +42,7 @@ defmodule Jido.Runner.Simple do
   1. Dequeues the oldest instruction from the agent's queue
   2. Creates a new Result struct to track execution
   3. Executes the instruction through its action module
-  4. Processes the execution result (directive, syscall or state)
+  4. Processes the execution result (directive or state)
   5. Returns the final Result struct
 
   ## Parameters
@@ -56,7 +57,6 @@ defmodule Jido.Runner.Simple do
     * `{:ok, %Result{}}` - Successful execution with:
       * `result_state` - Updated state map (for state results)
       * `directives` - List of directives (for directive results)
-      * `syscalls` - List of syscalls (for syscall results)
       * `status` - Set to :ok
       * `error` - Set to nil
     * `{:error, reason}` - Execution failed with:
@@ -72,10 +72,6 @@ defmodule Jido.Runner.Simple do
       # Successful directive
       {:ok, %Result{directives: [%EnqueueDirective{...}]}} =
         Runner.Simple.run(agent_with_directive)
-
-      # Successful syscall
-      {:ok, %Result{syscalls: [%SpawnSyscall{...}]}} =
-        Runner.Simple.run(agent_with_syscall)
 
       # Empty queue error
       {:error, "No pending instructions"} =
@@ -124,7 +120,6 @@ defmodule Jido.Runner.Simple do
           instructions: [],
           result_state: agent.state,
           directives: [],
-          syscalls: [],
           status: :ok
         }
 
@@ -180,34 +175,19 @@ defmodule Jido.Runner.Simple do
       result_type: get_result_type(result_value)
     )
 
-    cond do
-      Directive.is_directive?(result_value) ->
-        dbug("Storing directive result")
+    if Directive.is_directive?(result_value) do
+      dbug("Storing directive result")
 
-        {:ok,
-         %{
-           result
-           | result_state: result.initial_state,
-             directives: [result_value],
-             syscalls: [],
-             status: :ok
-         }}
-
-      Syscall.is_syscall?(result_value) ->
-        dbug("Storing syscall result")
-
-        {:ok,
-         %{
-           result
-           | result_state: result.initial_state,
-             directives: [],
-             syscalls: [result_value],
-             status: :ok
-         }}
-
-      true ->
-        dbug("Storing state result")
-        {:ok, %{result | result_state: result_value, directives: [], syscalls: [], status: :ok}}
+      {:ok,
+       %{
+         result
+         | result_state: result.initial_state,
+           directives: [result_value],
+           status: :ok
+       }}
+    else
+      dbug("Storing state result")
+      {:ok, %{result | result_state: result_value, directives: [], status: :ok}}
     end
   end
 end

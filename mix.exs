@@ -12,6 +12,7 @@ defmodule Jido.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      consolidate_protocols: Mix.env() != :test,
 
       # Docs
       name: "Jido",
@@ -23,7 +24,12 @@ defmodule Jido.MixProject do
       docs: docs(),
 
       # Coverage
-      test_coverage: [tool: ExCoveralls, export: "cov"],
+      test_coverage: [
+        tool: ExCoveralls,
+        summary: [threshold: 90],
+        export: "cov",
+        ignore_modules: [~r/^JidoTest\./]
+      ],
       preferred_cli_env: [
         coveralls: :test,
         "coveralls.github": :test,
@@ -45,7 +51,8 @@ defmodule Jido.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/jido/bus/support"]
+  defp elixirc_paths(:dev), do: ["lib", "bench"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp docs do
@@ -60,6 +67,8 @@ defmodule Jido.MixProject do
         {"guides/actions.md", title: "Actions & Workflows"},
         {"guides/agents.md", title: "Agents"},
         {"guides/sensors.md", title: "Sensors"},
+        {"guides/bus.md", title: "Signals & Bus"},
+        {"guides/instructions.md", title: "Instructions"},
         {"guides/directives.md", title: "Agent Directives"}
       ],
       groups_for_modules: [
@@ -81,7 +90,7 @@ defmodule Jido.MixProject do
         ],
         Example_Actions: [
           Jido.Action.Directives,
-          Jido.Actions.Calculator,
+          Jido.Actions.Arithmetic,
           Jido.Actions.Basic,
           Jido.Actions.Files,
           Jido.Actions.Simplebot,
@@ -95,15 +104,12 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive,
           Jido.Agent.Directive.DeregisterActionDirective,
           Jido.Agent.Directive.EnqueueDirective,
-          Jido.Agent.Directive.RegisterActionDirective
-        ],
-        Syscalls: [
-          Jido.Agent.Syscall,
-          Jido.Agent.Syscall.BroadcastSyscall,
-          Jido.Agent.Syscall.KillSyscall,
-          Jido.Agent.Syscall.SpawnSyscall,
-          Jido.Agent.Syscall.SubscribeSyscall,
-          Jido.Agent.Syscall.UnsubscribeSyscall
+          Jido.Agent.Directive.RegisterActionDirective,
+          Jido.Agent.Directive.SpawnDirective,
+          Jido.Agent.Directive.KillDirective,
+          Jido.Agent.Directive.PublishDirective,
+          Jido.Agent.Directive.SubscribeDirective,
+          Jido.Agent.Directive.UnsubscribeDirective
         ],
         Runner: [
           Jido.Runner,
@@ -133,9 +139,12 @@ defmodule Jido.MixProject do
         Guides: [
           "Getting Started": "guides/getting-started.md",
           Actions: "guides/actions.md",
+          Instructions: "guides/instructions.md",
           Agents: "guides/agents.md",
           "Sensors & Signals": "guides/sensors.md",
-          Directives: "guides/directives.md"
+          Directives: "guides/directives.md",
+          "Signal Router": "guides/signal-router.md",
+          Skills: "guides/skills.md"
         ]
       ]
     ]
@@ -154,6 +163,8 @@ defmodule Jido.MixProject do
 
   defp deps do
     [
+      # Jido Deps
+      {:backoff, "~> 1.1"},
       {:deep_merge, "~> 1.0"},
       {:elixir_uuid, "~> 1.2"},
       {:jason, "~> 1.4"},
@@ -165,14 +176,20 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:typed_struct, "~> 0.3.0"},
 
+      # Skill & Action Dependencies for examples
+      {:abacus, "~> 2.1"},
+
       # Testing
+      {:benchee, "~> 1.3", only: [:dev, :test]},
+      {:benchee_html, "~> 1.0", only: [:dev, :test]},
       {:credo, "~> 1.7"},
       {:doctor, "~> 0.22.0", only: [:dev, :test]},
-      {:dialyxir, "~> 1.4", only: [:dev], server: false},
-      {:ex_doc, "~> 0.34", only: :dev, server: false},
+      {:dialyxir, "~> 1.4", only: [:dev], runtime: false},
+      {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
       {:ex_dbug, "~> 1.2"},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test], server: false},
+      {:expublish, "~> 2.7", only: [:dev], runtime: false},
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mimic, "~> 1.7", only: [:dev, :test]},
       {:mock, "~> 0.3.8", only: [:dev, :test]},
       {:stream_data, "~> 1.1", only: [:dev, :test]}

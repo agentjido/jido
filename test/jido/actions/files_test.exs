@@ -2,7 +2,13 @@ defmodule JidoTest.Actions.FilesTest do
   use ExUnit.Case, async: true
   alias Jido.Actions.Files
 
-  @moduletag :tmp_dir
+  setup do
+    tmp_dir = Path.join(System.tmp_dir!(), "#{__MODULE__}_#{System.unique_integer()}")
+    File.rm_rf!(tmp_dir)
+    File.mkdir_p!(tmp_dir)
+    on_exit(fn -> File.rm_rf!(tmp_dir) end)
+    {:ok, tmp_dir: tmp_dir}
+  end
 
   describe "WriteFile" do
     test "writes content to a file with parent directory creation", %{tmp_dir: tmp_dir} do
@@ -35,6 +41,35 @@ defmodule JidoTest.Actions.FilesTest do
 
       assert File.read!(path) == initial_content <> append_content
     end
+
+    test "fails when directory creation fails", %{tmp_dir: tmp_dir} do
+      # Create a file where we want the directory to be
+      parent_path = Path.join(tmp_dir, "file_not_dir")
+      path = Path.join(parent_path, "test.txt")
+      File.write!(parent_path, "")
+
+      assert {:error, message} =
+               Files.WriteFile.run(
+                 %{path: path, content: "test", create_dirs: true, mode: :write},
+                 %{}
+               )
+
+      assert message =~ "Failed to write file"
+    end
+
+    test "fails when write fails due to permissions", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "readonly.txt")
+      File.write!(path, "")
+      File.chmod!(path, 0o444)
+
+      assert {:error, message} =
+               Files.WriteFile.run(
+                 %{path: path, content: "test", create_dirs: false, mode: :write},
+                 %{}
+               )
+
+      assert message =~ "Failed to write file"
+    end
   end
 
   describe "MakeDirectory" do
@@ -56,6 +91,14 @@ defmodule JidoTest.Actions.FilesTest do
 
     test "fails when parent doesn't exist and recursive is false", %{tmp_dir: tmp_dir} do
       path = Path.join([tmp_dir, "nonexistent", "child"])
+
+      assert {:error, message} = Files.MakeDirectory.run(%{path: path, recursive: false}, %{})
+      assert message =~ "Failed to create directory"
+    end
+
+    test "fails when directory already exists", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "existing_dir")
+      File.mkdir!(path)
 
       assert {:error, message} = Files.MakeDirectory.run(%{path: path, recursive: false}, %{})
       assert message =~ "Failed to create directory"
@@ -87,6 +130,40 @@ defmodule JidoTest.Actions.FilesTest do
       assert {:ok, result} = Files.ListDirectory.run(%{path: tmp_dir, recursive: true}, %{})
       assert "subdir" in result.entries
       assert "root.txt" in result.entries
+    end
+
+    test "lists only files when recursive is false", %{tmp_dir: tmp_dir} do
+      subdir = Path.join(tmp_dir, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(tmp_dir, "file.txt"), "")
+
+      assert {:ok, result} = Files.ListDirectory.run(%{path: tmp_dir, recursive: false}, %{})
+      assert "file.txt" in result.entries
+      refute "subdir" in result.entries
+    end
+
+    test "fails when directory doesn't exist", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "nonexistent")
+
+      assert {:error, message} = Files.ListDirectory.run(%{path: path, recursive: false}, %{})
+      assert message =~ "Failed to list directory"
+    end
+
+    test "recursively lists with pattern matching", %{tmp_dir: tmp_dir} do
+      subdir = Path.join(tmp_dir, "subdir")
+      File.mkdir_p!(subdir)
+      File.write!(Path.join(tmp_dir, "root.txt"), "")
+      File.write!(Path.join(subdir, "sub.txt"), "")
+      File.write!(Path.join(subdir, "sub.log"), "")
+
+      assert {:ok, result} =
+               Files.ListDirectory.run(
+                 %{path: tmp_dir, pattern: "**/*.txt", recursive: true},
+                 %{}
+               )
+
+      assert Enum.all?(result.entries, &String.ends_with?(&1, ".txt"))
+      assert length(result.entries) == 2
     end
   end
 
@@ -121,6 +198,34 @@ defmodule JidoTest.Actions.FilesTest do
       assert {:ok, _} = Files.DeleteFile.run(%{path: path, recursive: false, force: true}, %{})
       refute File.exists?(path)
     end
+
+    test "fails when deleting non-existent file", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "nonexistent.txt")
+
+      assert {:error, message} =
+               Files.DeleteFile.run(%{path: path, recursive: false, force: false}, %{})
+
+      assert message =~ "Failed to delete"
+    end
+
+    test "fails when recursive delete encounters errors", %{tmp_dir: tmp_dir} do
+      dir_path = Path.join(tmp_dir, "to_delete")
+      File.mkdir_p!(dir_path)
+      file_path = Path.join(dir_path, "readonly.txt")
+      File.write!(file_path, "protected")
+
+      # First make the file read-only
+      File.chmod!(file_path, 0o444)
+      # Then make the directory read-only
+      File.chmod!(dir_path, 0o555)
+
+      assert {:error, message} = Files.DeleteFile.run(%{path: dir_path, recursive: true}, %{})
+      assert message =~ "Failed to delete some paths"
+
+      # Cleanup: Reset permissions to allow cleanup
+      File.chmod!(dir_path, 0o755)
+      File.chmod!(file_path, 0o644)
+    end
   end
 
   describe "ReadFile" do
@@ -139,6 +244,18 @@ defmodule JidoTest.Actions.FilesTest do
 
       assert {:error, error_message} = Files.ReadFile.run(%{path: path}, %{})
       assert error_message =~ "Failed to read file"
+    end
+
+    test "returns error when file is not readable", %{tmp_dir: tmp_dir} do
+      path = Path.join(tmp_dir, "unreadable.txt")
+      File.write!(path, "secret")
+      File.chmod!(path, 0o000)
+
+      assert {:error, message} = Files.ReadFile.run(%{path: path}, %{})
+      assert message =~ "Failed to read file"
+
+      # Cleanup: Reset permissions to allow cleanup
+      File.chmod!(path, 0o644)
     end
   end
 
@@ -165,6 +282,20 @@ defmodule JidoTest.Actions.FilesTest do
 
       assert error_message =~ "Failed to copy file"
     end
+
+    test "returns error when destination is not writable", %{tmp_dir: tmp_dir} do
+      source = Path.join(tmp_dir, "source.txt")
+      destination = Path.join(tmp_dir, "readonly/dest.txt")
+
+      File.write!(source, "test")
+      File.mkdir_p!(Path.dirname(destination))
+      File.chmod!(Path.dirname(destination), 0o444)
+
+      assert {:error, message} =
+               Files.CopyFile.run(%{source: source, destination: destination}, %{})
+
+      assert message =~ "Failed to copy file"
+    end
   end
 
   describe "MoveFile" do
@@ -189,6 +320,31 @@ defmodule JidoTest.Actions.FilesTest do
                Files.MoveFile.run(%{source: source, destination: destination}, %{})
 
       assert error_message =~ "Failed to move file"
+    end
+
+    test "returns error when destination is not writable", %{tmp_dir: tmp_dir} do
+      source = Path.join(tmp_dir, "source.txt")
+      destination = Path.join(tmp_dir, "readonly/dest.txt")
+
+      File.write!(source, "test")
+      File.mkdir_p!(Path.dirname(destination))
+      File.chmod!(Path.dirname(destination), 0o444)
+
+      assert {:error, message} =
+               Files.MoveFile.run(%{source: source, destination: destination}, %{})
+
+      assert message =~ "Failed to move file"
+    end
+
+    test "returns error when moving across devices", %{tmp_dir: tmp_dir} do
+      source = Path.join(tmp_dir, "source.txt")
+      File.write!(source, "test")
+      destination = "/dev/null/dest.txt"
+
+      assert {:error, message} =
+               Files.MoveFile.run(%{source: source, destination: destination}, %{})
+
+      assert message =~ "Failed to move file"
     end
   end
 end

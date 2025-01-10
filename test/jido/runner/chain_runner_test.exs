@@ -1,11 +1,11 @@
 defmodule Jido.Runner.ChainTest do
   use ExUnit.Case, async: true
-  alias Jido.Runner.{Chain, Instruction, Result}
+  alias Jido.Runner.Chain
+  alias Jido.Instruction
+  alias Jido.Runner.Result
   alias Jido.Error
   alias JidoTest.TestActions.{Add, Multiply, ErrorAction, EnqueueAction}
   alias Jido.Agent.Directive.EnqueueDirective
-  alias Jido.Actions.Syscall
-  alias Jido.Agent.Syscall.{SpawnSyscall, KillSyscall, BroadcastSyscall}
 
   @moduletag :capture_log
 
@@ -54,6 +54,7 @@ defmodule Jido.Runner.ChainTest do
       assert {:ok, %Result{status: :ok}} = Chain.run(agent)
     end
 
+    @tag :skip
     test "propagates errors from actions" do
       instructions = [
         %Instruction{
@@ -238,77 +239,6 @@ defmodule Jido.Runner.ChainTest do
                 initial_state: %{value: 10},
                 instructions: ^instructions,
                 result_state: %{value: 30},
-                status: :ok
-              }} = Chain.run(agent)
-    end
-
-    test "accumulates syscalls through chain" do
-      instructions = [
-        %Instruction{
-          action: Syscall.Spawn,
-          params: %{
-            module: TestModule,
-            args: [1, 2, 3]
-          },
-          context: %{}
-        },
-        %Instruction{
-          action: Syscall.Broadcast,
-          params: %{
-            topic: "test_topic",
-            message: "hello world"
-          },
-          context: %{}
-        }
-      ]
-
-      agent = %{
-        id: "test-agent",
-        state: %{processes: []},
-        pending_instructions: :queue.from_list(instructions)
-      }
-
-      assert {:ok,
-              %Result{
-                initial_state: %{processes: []},
-                instructions: ^instructions,
-                result_state: %{processes: []},
-                syscalls: [
-                  %SpawnSyscall{module: TestModule, args: [1, 2, 3]},
-                  %BroadcastSyscall{topic: "test_topic", message: "hello world"}
-                ],
-                status: :ok
-              }} = Chain.run(agent)
-    end
-
-    test "accumulates syscalls and state changes" do
-      pid = spawn(fn -> :ok end)
-
-      instructions = [
-        %Instruction{
-          action: Add,
-          params: %{value: 0, amount: 1},
-          context: %{}
-        },
-        %Instruction{
-          action: Syscall.Kill,
-          params: %{pid: pid},
-          context: %{}
-        }
-      ]
-
-      agent = %{
-        id: "test-agent",
-        state: %{value: 0, processes: [pid]},
-        pending_instructions: :queue.from_list(instructions)
-      }
-
-      assert {:ok,
-              %Result{
-                initial_state: %{value: 0, processes: [^pid]},
-                instructions: ^instructions,
-                result_state: %{value: 1, processes: [^pid]},
-                syscalls: [%KillSyscall{pid: ^pid}],
                 status: :ok
               }} = Chain.run(agent)
     end

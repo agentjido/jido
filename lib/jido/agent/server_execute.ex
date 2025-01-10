@@ -13,7 +13,7 @@ defmodule Jido.Agent.Server.Execute do
 
   alias Jido.Error
   alias Jido.Agent.Server.State, as: ServerState
-  alias Jido.Agent.Server.{PubSub, Syscall}
+  alias Jido.Agent.Server.PubSub
   alias Jido.Agent.Server.Signal, as: ServerSignal
   alias Jido.Signal
 
@@ -207,40 +207,41 @@ defmodule Jido.Agent.Server.Execute do
     #     iex> execute_syscall_signal(state, terminate_signal)
     #     {:ok, updated_state}
     @spec execute_syscall_signal(ServerState.t(), Signal.t()) :: signal_result()
-    defp execute_syscall_signal(%ServerState{} = state, %Signal{} = signal) do
-      dbug("Processing syscall signal", signal: signal)
+    defp execute_syscall_signal(%ServerState{} = state, %Signal{} = _signal) do
+      # dbug("Processing syscall signal", signal: signal)
 
-      cond do
-        signal.type == ServerSignal.process_start() ->
-          dbug("Executing process start syscall", child_spec: signal.data.child_spec)
+      {:ok, state}
+      # cond do
+      #   signal.type == ServerSignal.process_start() ->
+      #     dbug("Executing process start syscall", child_spec: signal.data.child_spec)
 
-          case Syscall.execute(state, {:spawn, signal.data.child_spec}) do
-            {:error, reason} ->
-              dbug("Process start failed", error: reason)
-              {:error, reason}
+      #     case Syscall.execute(state, {:spawn, signal.data.child_spec}) do
+      #       {:error, reason} ->
+      #         dbug("Process start failed", error: reason)
+      #         {:error, reason}
 
-            {result, new_state} ->
-              dbug("Process started successfully", result: result)
-              {:ok, new_state}
-          end
+      #       {result, new_state} ->
+      #         dbug("Process started successfully", result: result)
+      #         {:ok, new_state}
+      #     end
 
-        signal.type == ServerSignal.process_terminate() ->
-          dbug("Executing process terminate syscall", child_pid: signal.data.child_pid)
+      #   signal.type == ServerSignal.process_terminate() ->
+      #     dbug("Executing process terminate syscall", child_pid: signal.data.child_pid)
 
-          case Syscall.execute(state, {:kill, signal.data.child_pid}) do
-            {:error, reason} ->
-              dbug("Process termination failed", reason: reason)
-              {:error, reason}
+      #     case Syscall.execute(state, {:kill, signal.data.child_pid}) do
+      #       {:error, reason} ->
+      #         dbug("Process termination failed", reason: reason)
+      #         {:error, reason}
 
-            {_result, new_state} ->
-              dbug("Process terminated successfully")
-              {:ok, new_state}
-          end
+      #       {_result, new_state} ->
+      #         dbug("Process terminated successfully")
+      #         {:ok, new_state}
+      #     end
 
-        true ->
-          dbug("Unknown server signal", type: signal.type)
-          {:ignore, {:unknown_server_signal, signal.type}}
-      end
+      #   true ->
+      #     dbug("Unknown server signal", type: signal.type)
+      #     {:ignore, {:unknown_server_signal, signal.type}}
+      # end
     end
 
     # Executes an agent signal based on the server's current state.
@@ -461,16 +462,17 @@ defmodule Jido.Agent.Server.Execute do
     #   - `{:error, error}` - A syscall failed during execution
     defp handle_syscalls(%ServerState{} = state, syscalls) when is_list(syscalls) do
       dbug("Handling syscalls", syscalls: syscalls)
+      {:ok, state}
 
-      Enum.reduce_while(syscalls, {:ok, state}, fn syscall, {:ok, acc_state} ->
-        case Jido.Agent.Server.Syscall.execute(acc_state, syscall) do
-          {:ok, new_state} ->
-            {:cont, {:ok, new_state}}
+      # Enum.reduce_while(syscalls, {:ok, state}, fn syscall, {:ok, acc_state} ->
+      #   case Jido.Agent.Server.Syscall.execute(acc_state, syscall) do
+      #     {:ok, new_state} ->
+      #       {:cont, {:ok, new_state}}
 
-          {:error, error} ->
-            {:halt, {:error, error}}
-        end
-      end)
+      #     {:error, error} ->
+      #       {:halt, {:error, error}}
+      #   end
+      # end)
     end
 
     defp handle_syscalls(_state, invalid_syscalls) do
