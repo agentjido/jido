@@ -7,8 +7,8 @@ defmodule Jido.Application do
       # Workflow Async Actions Task Supervisor
       {Task.Supervisor, name: Jido.Workflow.TaskSupervisor},
 
-      # Default PubSub
-      {Phoenix.PubSub, name: Jido.PubSub},
+      # Default global process registry
+      {Registry, keys: :unique, name: Jido.Registry},
 
       # Agent Registry & Default Supervisor
       {Registry, keys: :unique, name: Jido.Agent.Registry},
@@ -17,6 +17,9 @@ defmodule Jido.Application do
       # Bus Registry & Default Supervisor
       {Registry, keys: :unique, name: Jido.Bus.Registry},
       {DynamicSupervisor, strategy: :one_for_one, name: Jido.Bus.Supervisor},
+
+      # Default Bus - register with a name
+      {Jido.Signal.Bus, name: :default_bus},
 
       # Add the Jido Scheduler (Quantum) under the name :jido_quantum
       {Jido.Scheduler, name: :jido_quantum}

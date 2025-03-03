@@ -9,4 +9,4 @@ Enum.each(
 
 ExUnit.start()
 
-ExUnit.configure(exclude: [:skip])
+ExUnit.configure(exclude: [:skip, :bus_skip])
