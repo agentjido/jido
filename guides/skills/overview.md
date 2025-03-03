@@ -27,7 +27,7 @@ defmodule MyApp.WeatherMonitorSkill do
     tags: ["weather", "alerts"],
     vsn: "1.0.0",
     # An optional schema key to namespace the skill's state
-    schema_key: :weather,
+    opts_key: :weather,
     # An optional list of signals the skill will handle
     signals: [
       input: ["weather.data.received", "weather.alert.*"],
@@ -51,13 +51,13 @@ Let's break down each component:
 - `category`: Broad classification for organization
 - `tags`: List of searchable tags
 - `vsn`: Version string for compatibility checking
-- `schema_key`: Atom key for state namespace isolation
+- `opts_key`: Atom key for state namespace isolation
 - `signals`: Input/output signal patterns the skill handles
 - `config`: Configuration schema for validation
 
 ### 2. State Management
 
-Skills use `schema_key` for state namespace isolation. This prevents different skills from accidentally interfering with each other's state:
+Skills use `opts_key` for state namespace isolation. This prevents different skills from accidentally interfering with each other's state:
 
 ```elixir
 def initial_state do
@@ -69,11 +69,11 @@ def initial_state do
 end
 ```
 
-This state will be stored under the skill's `schema_key` in the agent's state map:
+This state will be stored under the skill's `opts_key` in the agent's state map:
 
 ```elixir
 %{
-  weather: %{  # Matches schema_key
+  weather: %{  # Matches opts_key
     current_conditions: nil,
     alert_history: [],
     last_update: nil
@@ -129,7 +129,7 @@ defmodule MyApp.DataProcessingSkill do
   use Jido.Skill,
     name: "data_processor",
     description: "Processes and transforms data streams",
-    schema_key: :processor,
+    opts_key: :processor,
     signals: [
       input: ["data.received.*", "data.transform.*"],
       output: ["data.processed.*"]
@@ -210,7 +210,7 @@ end
 
 1. **State Isolation**
 
-   - Use meaningful `schema_key` names
+   - Use meaningful `opts_key` names
    - Keep state focused and minimal
    - Document state structure
    - Consider persistence needs
