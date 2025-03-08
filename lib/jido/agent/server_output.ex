@@ -5,13 +5,14 @@ defmodule Jido.Agent.Server.Output do
   alias Jido.Signal.Dispatch
   alias Jido.Agent.Server.State, as: ServerState
 
-  @type log_levels :: :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
+  @type log_levels ::
+          :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
   @default_dispatch {:logger, [level: :info]}
 
   def log(level_or_state, message, opts \\ [])
 
   def log(%ServerState{log_level: log_level, agent: %{id: agent_id}} = _state, message, opts) do
-    opts = Keyword.merge(opts, [agent_id: agent_id])
+    opts = Keyword.merge(opts, agent_id: agent_id)
     do_log(log_level, message, opts)
   end
 

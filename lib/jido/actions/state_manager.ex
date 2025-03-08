@@ -36,13 +36,15 @@ defmodule Jido.Actions.StateManager do
       directives = ensure_path_exists(params.path, context.state)
 
       # Then add our set directive
-      directives = directives ++ [
-        %StateModification{
-          op: :set,
-          path: params.path,
-          value: params.value
-        }
-      ]
+      directives =
+        directives ++
+          [
+            %StateModification{
+              op: :set,
+              path: params.path,
+              value: params.value
+            }
+          ]
 
       {:ok, context.state, directives}
     end
@@ -51,14 +53,17 @@ defmodule Jido.Actions.StateManager do
       path
       |> Enum.reduce({[], []}, fn key, {current_path, directives} ->
         current_path = current_path ++ [key]
+
         if length(current_path) < length(path) and get_in(state, current_path) == nil do
-          {current_path, directives ++ [
-            %StateModification{
-              op: :set,
-              path: current_path,
-              value: %{}
-            }
-          ]}
+          {current_path,
+           directives ++
+             [
+               %StateModification{
+                 op: :set,
+                 path: current_path,
+                 value: %{}
+               }
+             ]}
         else
           {current_path, directives}
         end
@@ -82,13 +87,15 @@ defmodule Jido.Actions.StateManager do
       directives = ensure_path_exists(params.path, context.state)
 
       # Then add our update directive
-      directives = directives ++ [
-        %StateModification{
-          op: :set,
-          path: params.path,
-          value: params.value
-        }
-      ]
+      directives =
+        directives ++
+          [
+            %StateModification{
+              op: :set,
+              path: params.path,
+              value: params.value
+            }
+          ]
 
       {:ok, context.state, directives}
     end
@@ -97,14 +104,17 @@ defmodule Jido.Actions.StateManager do
       path
       |> Enum.reduce({[], []}, fn key, {current_path, directives} ->
         current_path = current_path ++ [key]
+
         if length(current_path) < length(path) and get_in(state, current_path) == nil do
-          {current_path, directives ++ [
-            %StateModification{
-              op: :set,
-              path: current_path,
-              value: %{}
-            }
-          ]}
+          {current_path,
+           directives ++
+             [
+               %StateModification{
+                 op: :set,
+                 path: current_path,
+                 value: %{}
+               }
+             ]}
         else
           {current_path, directives}
         end
@@ -132,15 +142,18 @@ defmodule Jido.Actions.StateManager do
         [] ->
           Logger.info("Empty path, returning original state")
           {:ok, context.state, []}
+
         path ->
           Logger.info("Deleting path: #{inspect(path)}")
-          {:ok, context.state, [
-            %StateModification{
-              op: :delete,
-              path: path,
-              value: nil
-            }
-          ]}
+
+          {:ok, context.state,
+           [
+             %StateModification{
+               op: :delete,
+               path: path,
+               value: nil
+             }
+           ]}
       end
     end
   end

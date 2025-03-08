@@ -413,7 +413,7 @@ defmodule JidoTest.TestAgents do
           type: :map,
           default: %{},
           doc: "List of tasks"
-        ],
+        ]
       ]
   end
 end

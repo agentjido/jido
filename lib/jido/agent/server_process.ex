@@ -19,34 +19,6 @@ defmodule Jido.Agent.Server.Process do
   @type server_state :: ServerState.t()
 
   @doc """
-  Starts the DynamicSupervisor for managing an Agent's child processes.
-
-  The supervisor uses a :one_for_one strategy, meaning each child is supervised
-  independently.
-
-  ## Parameters
-  - state: Current server state
-
-  ## Returns
-  - `{:ok, updated_state}` - Supervisor started successfully
-  - `{:error, reason}` - Failed to start supervisor
-  """
-  @spec start_supervisor(server_state()) :: {:ok, server_state()} | {:error, term()}
-  def start_supervisor(%ServerState{} = state) do
-    dbug("Starting supervisor", state: state)
-
-    case DynamicSupervisor.start_link(strategy: :one_for_one) do
-      {:ok, supervisor} ->
-        dbug("Supervisor started successfully", supervisor: supervisor)
-        {:ok, %{state | child_supervisor: supervisor}}
-
-      {:error, _reason} = error ->
-        dbug("Failed to start supervisor", error: error)
-        error
-    end
-  end
-
-  @doc """
   Stops the DynamicSupervisor and all its child processes.
 
   ## Parameters
@@ -104,6 +76,18 @@ defmodule Jido.Agent.Server.Process do
   """
   @spec start(server_state(), child_spec() | [child_spec()]) ::
           {:ok, server_state(), child_pid() | [child_pid()]} | {:error, term()}
+  def start(%ServerState{} = state, []) do
+    dbug("No child specs provided")
+    {:ok, state, []}
+  end
+
+  def start(%ServerState{child_supervisor: nil} = state, child_specs) do
+    case start_supervisor(state) do
+      {:ok, state_with_supervisor} -> start(state_with_supervisor, child_specs)
+      error -> error
+    end
+  end
+
   def start(%ServerState{child_supervisor: supervisor} = state, child_specs)
       when is_pid(supervisor) and is_list(child_specs) do
     dbug("Starting multiple child processes", state: state, specs: child_specs)
@@ -283,6 +267,21 @@ defmodule Jido.Agent.Server.Process do
      - A list of any of the above
      Got: #{inspect(invalid)}
      """}
+  end
+
+  @spec start_supervisor(server_state()) :: {:ok, server_state()} | {:error, term()}
+  defp start_supervisor(%ServerState{} = state) do
+    dbug("Starting supervisor", state: state)
+
+    case DynamicSupervisor.start_link(strategy: :one_for_one) do
+      {:ok, supervisor} ->
+        dbug("Supervisor started successfully", supervisor: supervisor)
+        {:ok, %{state | child_supervisor: supervisor}}
+
+      {:error, _reason} = error ->
+        dbug("Failed to start supervisor", error: error)
+        error
+    end
   end
 
   @spec start_child(server_state(), child_spec()) :: {:ok, pid()} | {:error, term()}

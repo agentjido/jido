@@ -103,10 +103,14 @@ defmodule Jido.Signal.Journal.Adapters.ETS do
   @impl GenServer
   def init(prefix) do
     adapter = %__MODULE__{
-      signals_table: String.to_atom("#{prefix}signals_#{System.unique_integer([:positive, :monotonic])}"),
-      causes_table: String.to_atom("#{prefix}causes_#{System.unique_integer([:positive, :monotonic])}"),
-      effects_table: String.to_atom("#{prefix}effects_#{System.unique_integer([:positive, :monotonic])}"),
-      conversations_table: String.to_atom("#{prefix}conversations_#{System.unique_integer([:positive, :monotonic])}")
+      signals_table:
+        String.to_atom("#{prefix}signals_#{System.unique_integer([:positive, :monotonic])}"),
+      causes_table:
+        String.to_atom("#{prefix}causes_#{System.unique_integer([:positive, :monotonic])}"),
+      effects_table:
+        String.to_atom("#{prefix}effects_#{System.unique_integer([:positive, :monotonic])}"),
+      conversations_table:
+        String.to_atom("#{prefix}conversations_#{System.unique_integer([:positive, :monotonic])}")
     }
 
     # Create tables if they don't exist

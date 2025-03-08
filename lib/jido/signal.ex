@@ -146,17 +146,17 @@ defmodule Jido.Signal do
   use TypedStruct
 
   @derive {Jason.Encoder,
-   only: [
-     :id,
-     :source,
-     :type,
-     :subject,
-     :time,
-     :datacontenttype,
-     :dataschema,
-     :data,
-     :specversion
-   ]}
+           only: [
+             :id,
+             :source,
+             :type,
+             :subject,
+             :time,
+             :datacontenttype,
+             :dataschema,
+             :data,
+             :specversion
+           ]}
 
   typedstruct do
     field(:specversion, String.t(), default: "1.0.2")

@@ -73,7 +73,8 @@ defmodule Jido.Agent.Server.State do
   """
   @type status :: :initializing | :idle | :planning | :running | :paused
   @type modes :: :auto | :step
-  @type log_levels :: :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
+  @type log_levels ::
+          :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
   @type dispatch_config :: [
           out: Dispatch.dispatch_config(),
           log: Dispatch.dispatch_config(),
@@ -231,6 +232,56 @@ defmodule Jido.Agent.Server.State do
     else
       dbug("Enqueuing signal", signal: signal)
       {:ok, %{state | pending_signals: :queue.in(signal, state.pending_signals)}}
+    end
+  end
+
+  @doc """
+  Enqueues a signal at the front of the state's pending signals queue.
+
+  Validates that the queue size is within the configured maximum before adding.
+  Emits a queue_overflow event if the queue is full.
+
+  ## Parameters
+
+  - `state` - Current server state
+  - `signal` - Signal to enqueue at front
+
+  ## Returns
+
+  - `{:ok, new_state}` - Signal was successfully enqueued at front
+  - `{:error, :queue_overflow}` - Queue is at max capacity
+
+  ## Examples
+
+      iex> state = %Server.State{pending_signals: :queue.new(), max_queue_size: 2}
+      iex> Server.State.enqueue_front(state, %Signal{type: "test"})
+      {:ok, %Server.State{pending_signals: updated_queue}}
+
+      iex> state = %Server.State{pending_signals: full_queue, max_queue_size: 1}
+      iex> Server.State.enqueue_front(state, %Signal{type: "test"})
+      {:error, :queue_overflow}
+  """
+  @spec enqueue_front(%__MODULE__{}, Signal.t()) ::
+          {:ok, %__MODULE__{}} | {:error, :queue_overflow}
+  def enqueue_front(%__MODULE__{} = state, %Signal{} = signal) do
+    dbug("Attempting to enqueue signal at front", signal: signal)
+    queue_size = :queue.len(state.pending_signals)
+    dbug("Current queue size", size: queue_size, max_size: state.max_queue_size)
+
+    if queue_size >= state.max_queue_size do
+      dbug("Queue overflow detected", queue_size: queue_size, max_size: state.max_queue_size)
+
+      :queue_overflow
+      |> ServerSignal.event_signal(state, %{
+        queue_size: queue_size,
+        max_size: state.max_queue_size
+      })
+      |> ServerOutput.emit()
+
+      {:error, :queue_overflow}
+    else
+      dbug("Enqueuing signal at front", signal: signal)
+      {:ok, %{state | pending_signals: :queue.in_r(signal, state.pending_signals)}}
     end
   end
 

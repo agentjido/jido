@@ -150,6 +150,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
 
       assert map_size(updated.state.tasks) == 3
       updated_tasks = Enum.to_list(updated.state.tasks)
+
       assert Enum.map(updated_tasks, fn {_id, task} -> task.title end) |> Enum.sort() ==
                ["Task 1", "Updated Task 2", "Task 3"] |> Enum.sort()
 
@@ -168,7 +169,10 @@ defmodule Jido.Actions.TasksIntegrationTest do
 
       assert map_size(toggled.state.tasks) == 3
       toggled_tasks = Enum.to_list(toggled.state.tasks)
-      completed_statuses = Enum.map(toggled_tasks, fn {_id, task} -> task.completed end) |> Enum.sort()
+
+      completed_statuses =
+        Enum.map(toggled_tasks, fn {_id, task} -> task.completed end) |> Enum.sort()
+
       assert completed_statuses == [false, false, true]
 
       # Delete one task
@@ -183,6 +187,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
 
       assert map_size(deleted.state.tasks) == 2
       deleted_tasks = Enum.to_list(deleted.state.tasks)
+
       assert Enum.map(deleted_tasks, fn {_id, task} -> task.title end) |> Enum.sort() ==
                ["Task 1", "Task 3"] |> Enum.sort()
     end
@@ -266,6 +271,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       # Get task IDs and verify initial state
       tasks = Enum.to_list(with_task3.state.tasks)
       task_ids = Enum.map(tasks, fn {id, task} -> {id, task.title} end)
+
       assert Enum.map(task_ids, fn {_id, title} -> title end) |> Enum.sort() ==
                ["First", "Second", "Third"] |> Enum.sort()
 
@@ -285,6 +291,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
 
       # Verify update
       updated_tasks = Enum.to_list(updated.state.tasks)
+
       assert Enum.map(updated_tasks, fn {_id, task} -> task.title end) |> Enum.sort() ==
                ["First", "Updated Second", "Third"] |> Enum.sort()
 
@@ -303,6 +310,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
 
       # Verify toggle and map integrity
       toggled_tasks = Enum.to_list(toggled.state.tasks)
+
       assert Enum.map(toggled_tasks, fn {_id, task} -> task.title end) |> Enum.sort() ==
                ["First", "Updated Second", "Third"] |> Enum.sort()
 

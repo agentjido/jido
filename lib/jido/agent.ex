@@ -1212,8 +1212,13 @@ defmodule Jido.Agent do
   @callback child_spec(opts :: keyword()) :: Supervisor.child_spec()
   @callback mount(agent :: t(), opts :: keyword()) :: {:ok, map()} | {:error, any()}
   @callback shutdown(agent :: t(), reason :: any()) :: {:ok, map()} | {:error, any()}
-  @callback handle_signal(signal :: Signal.t(), agent :: t()) :: {:ok, Signal.t()} | {:error, any()}
-  @callback transform_result(signal :: Signal.t(), result :: {:ok, term()} | {:error, any()}, agent :: t()) ::
+  @callback handle_signal(signal :: Signal.t(), agent :: t()) ::
+              {:ok, Signal.t()} | {:error, any()}
+  @callback transform_result(
+              signal :: Signal.t(),
+              result :: {:ok, term()} | {:error, any()},
+              agent :: t()
+            ) ::
               {:ok, term()} | {:error, any()}
 
   @optional_callbacks [

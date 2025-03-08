@@ -248,7 +248,8 @@ defmodule Jido.Skill do
                          signal_patterns: [
                            type: {:list, :string},
                            default: ["**"],
-                           doc: "List of signal patterns this skill handles, defaults to matching all signals"
+                           doc:
+                             "List of signal patterns this skill handles, defaults to matching all signals"
                          ]
                        )
 
@@ -368,7 +369,8 @@ defmodule Jido.Skill do
   # Behaviour callbacks
   @callback child_spec(config :: map()) :: Supervisor.child_spec() | [Supervisor.child_spec()]
   @callback router(skill_opts :: keyword()) :: [Route.t()]
-  @callback handle_signal(signal :: Signal.t(), skill :: t()) :: {:ok, Signal.t()} | {:error, term()}
+  @callback handle_signal(signal :: Signal.t(), skill :: t()) ::
+              {:ok, Signal.t()} | {:error, term()}
   @callback transform_result(signal :: Signal.t(), result :: term(), skill :: t()) ::
               {:ok, term()} | {:error, any()}
   @callback mount(agent :: Jido.Agent.t(), opts :: keyword()) ::

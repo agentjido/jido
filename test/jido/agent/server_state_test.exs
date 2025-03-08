@@ -245,6 +245,92 @@ defmodule Jido.Agent.Server.StateTest do
     end
   end
 
+  describe "enqueue_front/2" do
+    test "successfully enqueues signal at front of queue", %{state: state} do
+      # Create 4 test signals
+      {:ok, signal1} =
+        Signal.new(%{
+          type: "test.signal.1",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      {:ok, signal2} =
+        Signal.new(%{
+          type: "test.signal.2",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      {:ok, signal3} =
+        Signal.new(%{
+          type: "test.signal.3",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      {:ok, signal4} =
+        Signal.new(%{
+          type: "test.signal.4",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      # Build up queue with mix of enqueue and enqueue_front
+      {:ok, state_with_one} = State.enqueue(state, signal1)
+      {:ok, state_with_two} = State.enqueue_front(state_with_one, signal2)
+      {:ok, state_with_three} = State.enqueue(state_with_two, signal3)
+      {:ok, state_with_four} = State.enqueue_front(state_with_three, signal4)
+
+      assert :queue.len(state_with_four.pending_signals) == 4
+
+      # Verify signals come out in expected order:
+      # signal4 (front), signal2, signal1, signal3 (back)
+
+      {:ok, first_signal, state_with_three} = State.dequeue(state_with_four)
+      assert first_signal.type == "test.signal.4"
+
+      {:ok, second_signal, state_with_two} = State.dequeue(state_with_three)
+      assert second_signal.type == "test.signal.2"
+
+      {:ok, third_signal, state_with_one} = State.dequeue(state_with_two)
+      assert third_signal.type == "test.signal.1"
+
+      {:ok, fourth_signal, empty_state} = State.dequeue(state_with_one)
+      assert fourth_signal.type == "test.signal.3"
+
+      assert :queue.is_empty(empty_state.pending_signals)
+    end
+
+    test "returns error and emits overflow signal when queue is at max capacity", %{state: state} do
+      {:ok, signal1} =
+        Signal.new(%{
+          type: "test.signal.1",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      {:ok, signal2} =
+        Signal.new(%{
+          type: "test.signal.2",
+          source: "test-source",
+          subject: "test-subject",
+          jido_dispatch: {:logger, []}
+        })
+
+      state = %{state | max_queue_size: 1}
+      {:ok, state_with_one} = State.enqueue(state, signal1)
+
+      assert {:error, :queue_overflow} = State.enqueue_front(state_with_one, signal2)
+      assert :queue.len(state_with_one.pending_signals) == 1
+    end
+  end
+
   describe "dequeue/1" do
     test "successfully dequeues a signal", %{state: state} do
       {:ok, signal} =

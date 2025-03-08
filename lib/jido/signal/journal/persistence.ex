@@ -12,13 +12,15 @@ defmodule Jido.Signal.Journal.Persistence do
 
   @callback put_signal(Signal.t(), pid() | nil) :: :ok | error()
 
-  @callback get_signal(signal_id(), pid() | nil) :: {:ok, Signal.t()} | {:error, :not_found} | error()
+  @callback get_signal(signal_id(), pid() | nil) ::
+              {:ok, Signal.t()} | {:error, :not_found} | error()
 
   @callback put_cause(signal_id(), signal_id(), pid() | nil) :: :ok | error()
 
   @callback get_effects(signal_id(), pid() | nil) :: {:ok, MapSet.t()} | error()
 
-  @callback get_cause(signal_id(), pid() | nil) :: {:ok, signal_id()} | {:error, :not_found} | error()
+  @callback get_cause(signal_id(), pid() | nil) ::
+              {:ok, signal_id()} | {:error, :not_found} | error()
 
   @callback put_conversation(conversation_id(), signal_id(), pid() | nil) :: :ok | error()
 
