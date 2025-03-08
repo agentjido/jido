@@ -33,7 +33,7 @@ defmodule JidoTest.Signal.Bus do
     end
 
     test "subscribes with persistent option", %{bus: bus} do
-      {:ok, subscription_id} = Bus.subscribe(bus, "test.signal", persistent: true)
+      {:ok, subscription_id} = Bus.subscribe(bus, "test.signal", persistent?: true)
       assert is_binary(subscription_id)
 
       # Publish a signal
@@ -161,7 +161,6 @@ defmodule JidoTest.Signal.Bus do
           type: "test.signal",
           source: "/test",
           data: %{value: 1},
-          jido_metadata: %{correlation_id: "test-correlation"}
         })
 
       {:ok, _} = Bus.publish(bus, [signal])

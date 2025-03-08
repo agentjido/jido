@@ -1,5 +1,5 @@
 defmodule Jido.Signal.Bus.Stream do
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Router
   alias Jido.Signal
@@ -43,8 +43,8 @@ defmodule Jido.Signal.Bus.Stream do
 
                   ts
                 rescue
-                  e ->
-                    dbug("Failed to extract timestamp", error: e)
+                  _error ->
+                    dbug("Failed to extract timestamp", error: _error)
                     # Default to 0 to include the signal
                     0
                 end

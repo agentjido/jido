@@ -31,7 +31,7 @@ defmodule Jido.Runner.Simple do
   alias Jido.Error
   alias Jido.Agent.Directive
 
-  @type run_opts :: [apply_state: boolean()]
+  @type run_opts :: []
   @type run_result :: {:ok, Jido.Agent.t(), list()} | {:error, Error.t()}
 
   @doc """
@@ -51,7 +51,7 @@ defmodule Jido.Runner.Simple do
       * `state` - Current agent state
       * `id` - Agent identifier
     * `opts` - Optional keyword list of execution options:
-      * `apply_state` - Whether to apply state changes (default: true)
+      * none
 
   ## Returns
     * `{:ok, updated_agent, directives}` - Successful execution with:
@@ -68,7 +68,7 @@ defmodule Jido.Runner.Simple do
       {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update)
 
       # Execute without applying state
-      {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update, apply_state: false)
+      {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update)
 
       # Empty queue - returns agent unchanged
       {:ok, agent, []} = Runner.Simple.run(agent_with_empty_queue)
@@ -91,13 +91,11 @@ defmodule Jido.Runner.Simple do
   """
   @impl true
   @spec run(Jido.Agent.t(), run_opts()) :: run_result()
-  def run(%{pending_instructions: instructions} = agent, opts \\ []) do
-    apply_state = Keyword.get(opts, :apply_state, true)
-
+  def run(%{pending_instructions: instructions} = agent, _opts \\ []) do
     case :queue.out(instructions) do
       {{:value, %Instruction{} = instruction}, remaining} ->
         agent = %{agent | pending_instructions: remaining}
-        execute_instruction(agent, instruction, apply_state)
+        execute_instruction(agent, instruction)
 
       {:empty, _} ->
         {:ok, agent, []}
@@ -105,21 +103,20 @@ defmodule Jido.Runner.Simple do
   end
 
   @doc false
-  @spec execute_instruction(Jido.Agent.t(), Instruction.t(), boolean()) :: run_result()
-  defp execute_instruction(agent, instruction, apply_state) do
+  @spec execute_instruction(Jido.Agent.t(), Instruction.t()) :: run_result()
+  defp execute_instruction(agent, instruction) do
     # Inject agent state into instruction context
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
     case Jido.Workflow.run(instruction) do
-      {:ok, state_map, directives} when is_list(directives) ->
-        handle_directive_result(agent, state_map, directives, apply_state)
+      {:ok, result, directives} when is_list(directives) ->
+        handle_directive_result(agent, result, directives)
 
-      {:ok, state_map, directive} ->
-        handle_directive_result(agent, state_map, [directive], apply_state)
+      {:ok, result, directive} ->
+        handle_directive_result(agent, result, [directive])
 
-      {:ok, state_map} ->
-        agent_with_state = apply_state(agent, state_map, apply_state)
-        {:ok, agent_with_state, []}
+      {:ok, result} ->
+        {:ok, %{agent | result: result}, []}
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -132,13 +129,11 @@ defmodule Jido.Runner.Simple do
     end
   end
 
-  @spec handle_directive_result(Jido.Agent.t(), map(), list(), boolean()) :: run_result()
-  defp handle_directive_result(agent, state_map, directives, apply_state) do
-    agent_with_state = apply_state(agent, state_map, apply_state)
-
-    case Directive.apply_agent_directive(agent_with_state, directives) do
+  @spec handle_directive_result(Jido.Agent.t(), term(), list()) :: run_result()
+  defp handle_directive_result(agent, result, directives) do
+    case Directive.apply_agent_directive(agent, directives) do
       {:ok, updated_agent, server_directives} ->
-        {:ok, updated_agent, server_directives}
+        {:ok, %{updated_agent | result: result}, server_directives}
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -151,15 +146,5 @@ defmodule Jido.Runner.Simple do
   @spec handle_directive_error(String.t()) :: {:error, Error.t()}
   defp handle_directive_error(reason) do
     {:error, Error.validation_error("Invalid directive", %{reason: reason})}
-  end
-
-  @doc false
-  @spec apply_state(Jido.Agent.t(), map(), boolean()) :: Jido.Agent.t()
-  defp apply_state(agent, state_map, true) do
-    %{agent | state: Map.merge(agent.state, state_map), result: state_map}
-  end
-
-  defp apply_state(agent, state_map, false) do
-    %{agent | result: state_map}
   end
 end

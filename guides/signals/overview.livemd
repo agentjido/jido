@@ -105,12 +105,7 @@ Instructions tell agents what actions to take:
 {:ok, task_signal} = Jido.Signal.new(%{
   type: "task.assigned",
   source: "/workflow",
-  data: %{task_id: "789"},
-  jido_instructions: [
-    ValidateTask,
-    {AssignTask, %{worker: "agent_1"}},
-    NotifyAssignment
-  ]
+  data: %Instruction{action: AssignTask, args: %{worker: "agent_1"}},
 })
 ```
 

@@ -146,8 +146,7 @@ defmodule Jido.Signal.Bus.StreamTest do
         Signal.new(%{
           type: "test.signal",
           source: "/test",
-          data: %{value: 1},
-          jido_metadata: %{correlation_id: "test-correlation"}
+          data: %{value: 1}
         })
 
       signals = [signal]
@@ -158,8 +157,6 @@ defmodule Jido.Signal.Bus.StreamTest do
       log_signals = BusState.log_to_list(new_state)
 
       assert length(log_signals) == 1
-      # Check that the correlation_id is preserved in the signal's metadata
-      assert hd(log_signals).jido_metadata.correlation_id == "test-correlation"
     end
 
     test "handles empty signal list" do
@@ -343,8 +340,7 @@ defmodule Jido.Signal.Bus.StreamTest do
         Signal.new(%{
           type: "test.signal.1",
           source: "/test",
-          data: %{value: 1},
-          jido_metadata: %{correlation_id: "test-correlation"}
+          data: %{value: 1}
         })
 
       {:ok, signal2} =

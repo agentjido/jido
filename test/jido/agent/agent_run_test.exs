@@ -34,9 +34,7 @@ defmodule JidoTest.AgentRunTest do
 
       {:ok, final, _directives} = FullFeaturedAgent.run(planned, apply_state: true)
 
-      assert final.state.value == 11
       assert final.result.value == 11
-      assert final.state.status == :idle
     end
 
     test "preserves original state when apply_state: false", %{agent: agent} do
@@ -65,7 +63,7 @@ defmodule JidoTest.AgentRunTest do
       {:ok, final, _directives} = FullFeaturedAgent.run(planned, runner: Jido.Runner.Chain)
 
       # (10 + 1) * 2 + 8
-      assert final.state.value == 30
+      assert final.result.value == 30
     end
 
     test "handles errors appropriately" do
@@ -143,11 +141,11 @@ defmodule JidoTest.AgentRunTest do
 
     test "processes large instruction queues without stack overflow", %{agent: agent} do
       qty = 1000
-      actions = List.duplicate({TestActions.Add, %{amount: 1}}, qty)
+      actions = List.duplicate({TestActions.Add, %{value: 0, amount: 1}}, qty)
       {:ok, planned} = FullFeaturedAgent.plan(agent, actions)
       {:ok, final, _directives} = FullFeaturedAgent.run(planned, runner: Jido.Runner.Chain)
 
-      assert final.state.value == qty
+      assert final.result.value == qty
     end
   end
 

@@ -73,7 +73,7 @@ defmodule Jido.Agent.Server.State do
   """
   @type status :: :initializing | :idle | :planning | :running | :paused
   @type modes :: :auto | :step
-  @type log_levels :: :debug | :info | :warn | :error
+  @type log_levels :: :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
   @type dispatch_config :: [
           out: Dispatch.dispatch_config(),
           log: Dispatch.dispatch_config(),
@@ -82,6 +82,7 @@ defmodule Jido.Agent.Server.State do
 
   typedstruct do
     field(:agent, Jido.Agent.t(), enforce: true)
+    field(:opts, keyword(), default: [])
     field(:mode, modes(), default: :auto)
     field(:log_level, log_levels(), default: :info)
     field(:max_queue_size, non_neg_integer(), default: 10_000)
