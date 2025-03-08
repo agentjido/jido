@@ -67,7 +67,6 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
           type: "test-type",
           source: "/test",
           data: %{test: "data"},
-          jido_metadata: %{correlation_id: "test-correlation"}
         })
 
       # Generate a UUID7 for the signal log ID
@@ -121,7 +120,6 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
           type: "test-type-1",
           source: "/test",
           data: %{test: "data1"},
-          jido_metadata: %{correlation_id: "test-correlation-1"}
         })
 
       signal2 =
@@ -129,7 +127,6 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
           type: "test-type-2",
           source: "/test",
           data: %{test: "data2"},
-          jido_metadata: %{correlation_id: "test-correlation-2"}
         })
 
       # Generate UUID7s for signal log IDs
@@ -216,7 +213,6 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
               type: "test-type-#{i}",
               source: "/test",
               data: %{test: "data#{i}"},
-              jido_metadata: %{correlation_id: "test-correlation-#{i}"}
             })
 
           # Generate a UUID7 for the signal log ID

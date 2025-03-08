@@ -1,7 +1,7 @@
 defmodule Jido.Signal.Bus do
   use GenServer
   require Logger
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   use TypedStruct
   alias Jido.Signal.Router
   alias Jido.Signal.Bus.State, as: BusState
@@ -307,34 +307,73 @@ defmodule Jido.Signal.Bus do
     end
   end
 
-  def handle_call({:reconnect, subscription_id, _client_pid}, _from, state) do
-    # Check if the subscription exists
-    subscription = BusState.get_subscription(state, subscription_id)
+  def handle_call({:reconnect, subscriber_id, client_pid}, _from, state) do
+    case BusState.get_subscription(state, subscriber_id) do
+      nil ->
+        {:reply, {:error, :subscription_not_found}, state}
 
-    cond do
-      # If subscription doesn't exist, return error
-      is_nil(subscription) ->
-        {:reply,
-         {:error,
-          Error.validation_error("Subscription does not exist", %{
-            subscription_id: subscription_id
-          })}, state}
+      subscription ->
+        if subscription.persistent? do
+          # Update the client PID in the subscription
+          updated_subscription = %{
+            subscription
+            | dispatch: {:pid, [delivery_mode: :async, target: client_pid]}
+          }
 
-      # If subscription is not persistent, return error
-      not subscription.persistent? ->
-        {:reply,
-         {:error,
-          Error.validation_error("Subscription is not persistent", %{
-            subscription_id: subscription_id
-          })}, state}
+          case BusState.add_subscription(state, subscriber_id, updated_subscription) do
+            {:error, :subscription_exists} ->
+              # If subscription already exists, notify the persistence process and get latest timestamp
+              GenServer.cast(subscription.persistence_pid, {:reconnect, client_pid})
 
-      # Otherwise, reconnect the client
-      true ->
-        # In a real implementation, this would reconnect the client to the subscription
-        # and return the current checkpoint
-        # Default checkpoint for testing
-        checkpoint = 0
-        {:reply, {:ok, checkpoint}, state}
+              latest_timestamp =
+                state.log
+                |> Map.values()
+                |> Enum.map(& &1.time)
+                |> Enum.max(fn -> 0 end)
+
+              {:reply, {:ok, latest_timestamp}, state}
+
+            {:ok, updated_state} ->
+              # Notify the persistence process and get latest timestamp
+              GenServer.cast(subscription.persistence_pid, {:reconnect, client_pid})
+
+              latest_timestamp =
+                updated_state.log
+                |> Map.values()
+                |> Enum.map(& &1.time)
+                |> Enum.max(fn -> 0 end)
+
+              {:reply, {:ok, latest_timestamp}, updated_state}
+          end
+        else
+          # For non-persistent subscriptions, just update the client PID
+          updated_subscription = %{
+            subscription
+            | dispatch: {:pid, [delivery_mode: :async, target: client_pid]}
+          }
+
+          case BusState.add_subscription(state, subscriber_id, updated_subscription) do
+            {:error, :subscription_exists} ->
+              # If subscription already exists, just get the latest timestamp
+              latest_timestamp =
+                state.log
+                |> Map.values()
+                |> Enum.map(& &1.time)
+                |> Enum.max(fn -> 0 end)
+
+              {:reply, {:ok, latest_timestamp}, state}
+
+            {:ok, updated_state} ->
+              # Get the latest signal timestamp from the log
+              latest_timestamp =
+                updated_state.log
+                |> Map.values()
+                |> Enum.map(& &1.time)
+                |> Enum.max(fn -> 0 end)
+
+              {:reply, {:ok, latest_timestamp}, updated_state}
+          end
+        end
     end
   end
 

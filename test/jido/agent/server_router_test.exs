@@ -156,34 +156,14 @@ defmodule Jido.Agent.Server.RouterTest do
       {:ok, signal} =
         Signal.new(%{
           type: "test.signal",
-          jido_instructions: [direct_instruction],
-          data: %{}
+          data: direct_instruction
         })
 
       assert {:ok, [instruction]} = Router.route(state, signal)
       assert instruction == direct_instruction
     end
 
-    test "handles list of jido_instructions", %{state: state} do
-      instructions = [
-        %Instruction{action: :first_action},
-        %Instruction{action: :second_action}
-      ]
-
-      {:ok, signal} =
-        Signal.new(%{
-          type: "test.signal",
-          data: %{},
-          jido_instructions: instructions
-        })
-
-      assert {:ok, received_instructions} = Router.route(state, signal)
-      assert length(received_instructions) == 2
-      assert Enum.at(received_instructions, 0).action == :first_action
-      assert Enum.at(received_instructions, 1).action == :second_action
-    end
-
-    test "falls back to router when no jido_instruction present", %{state: state} do
+    test "falls back to router when no instruction in data", %{state: state} do
       route_instruction = %Instruction{action: :route_action}
       {:ok, state} = Router.add(state, {"special.signal", route_instruction})
 

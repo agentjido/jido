@@ -1,6 +1,7 @@
 defmodule Jido.Signal.Bus.Subscriber do
   use Private
   use TypedStruct
+  use ExDbug, enabled: false
 
   alias Jido.Signal.Bus.Subscriber
   alias Jido.Signal.Bus.State, as: BusState
@@ -19,11 +20,14 @@ defmodule Jido.Signal.Bus.Subscriber do
   @spec subscribe(BusState.t(), String.t(), String.t(), keyword()) ::
           {:ok, BusState.t()} | {:error, Error.t()}
   def subscribe(%BusState{} = state, subscription_id, path, opts) do
-    persistent? = Keyword.get(opts, :persistent, false)
+    dbug("subscribe", state: state, subscription_id: subscription_id, path: path, opts: opts)
+    persistent? = Keyword.get(opts, :persistent?, false)
     dispatch = Keyword.get(opts, :dispatch)
 
     # Check if subscription already exists
     if BusState.has_subscription?(state, subscription_id) do
+      dbug("subscription already exists", subscription_id: subscription_id)
+
       {:error,
        Error.validation_error("Subscription already exists", %{
          subscription_id: subscription_id
@@ -40,6 +44,7 @@ defmodule Jido.Signal.Bus.Subscriber do
       }
 
       if persistent? do
+        dbug("creating persistent subscription", subscription: subscription)
         # Extract the client PID from the dispatch configuration
         client_pid = extract_client_pid(dispatch)
 
@@ -58,14 +63,17 @@ defmodule Jido.Signal.Bus.Subscriber do
                {Jido.Signal.Bus.PersistentSubscription, persistent_sub_opts}
              ) do
           {:ok, pid} ->
+            dbug("persistent subscription started", pid: pid)
             # Update subscription with persistence pid
             subscription = %{subscription | persistence_pid: pid}
             BusState.add_subscription(state, subscription_id, subscription)
 
           {:error, reason} ->
+            dbug("failed to start persistent subscription", reason: reason)
             {:error, Error.execution_error("Failed to start persistent subscription", reason)}
         end
       else
+        dbug("creating non-persistent subscription", subscription: subscription)
         BusState.add_subscription(state, subscription_id, subscription)
       end
     end
@@ -73,7 +81,8 @@ defmodule Jido.Signal.Bus.Subscriber do
 
   @spec unsubscribe(BusState.t(), String.t(), keyword()) ::
           {:ok, BusState.t()} | {:error, Error.t()}
-  def unsubscribe(%BusState{} = state, subscription_id, opts \\ []) do
+  def unsubscribe(%BusState{} = state, subscription_id, _opts \\ []) do
+    dbug("unsubscribe", state: state, subscription_id: subscription_id)
     # Get the subscription before removing it
     subscription = BusState.get_subscription(state, subscription_id)
 
@@ -81,6 +90,11 @@ defmodule Jido.Signal.Bus.Subscriber do
       {:ok, new_state} ->
         # If this was a persistent subscription, terminate the process
         if subscription && subscription.persistent? && subscription.persistence_pid do
+          dbug("terminating persistent subscription",
+            subscription_id: subscription_id,
+            persistence_pid: subscription.persistence_pid
+          )
+
           # Send shutdown message to terminate the process gracefully
           Process.send(subscription.persistence_pid, {:shutdown, :normal}, [])
         end
@@ -88,20 +102,25 @@ defmodule Jido.Signal.Bus.Subscriber do
         {:ok, new_state}
 
       {:error, :subscription_not_found} ->
+        dbug("subscription not found", subscription_id: subscription_id)
+
         {:error,
          Error.validation_error("Subscription does not exist", %{subscription_id: subscription_id})}
 
       {:error, reason} ->
+        dbug("failed to remove subscription", reason: reason)
         {:error, Error.execution_error("Failed to remove subscription", reason)}
     end
   end
 
   # Helper function to extract client PID from dispatch configuration
   defp extract_client_pid({:pid, opts}) when is_list(opts) do
+    dbug("extracting client pid", opts: opts)
     Keyword.get(opts, :target)
   end
 
   defp extract_client_pid(_) do
+    dbug("no client pid found in dispatch config")
     nil
   end
 end

@@ -26,7 +26,7 @@ defmodule Jido.Agent.Server.ProcessTest do
   end
 
   describe "start/2" do
-    test "starts a child process and emits signal", %{state: state} do
+    test "starts a child process with map format and emits signal", %{state: state} do
       child_spec = %{
         id: :test_child,
         start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}
@@ -41,17 +41,89 @@ defmodule Jido.Agent.Server.ProcessTest do
       assert signal.data.child_spec == child_spec
     end
 
+    test "starts a child process with tuple format and emits signal", %{state: state} do
+      child_spec = {Task, [fn -> Process.sleep(:infinity) end]}
+
+      assert {:ok, %ServerState{}, pid} = ServerProcess.start(state, child_spec)
+      assert Process.alive?(pid)
+
+      assert_receive {:signal, signal}
+      assert signal.type == ServerSignal.join_type(ServerSignal.type({:event, :process_started}))
+      assert signal.data.child_pid == pid
+      assert signal.data.child_spec == child_spec
+    end
+
+    test "starts a child process with module format and emits signal", %{state: state} do
+      child_spec = JidoTest.TestAgents.BasicAgent
+
+      assert {:ok, %ServerState{}, pid} = ServerProcess.start(state, child_spec)
+      assert Process.alive?(pid)
+
+      assert_receive {:signal, signal}
+      assert signal.type == ServerSignal.join_type(ServerSignal.type({:event, :process_started}))
+      assert signal.data.child_pid == pid
+      assert signal.data.child_spec == child_spec
+    end
+
+    test "starts multiple child processes with mixed formats", %{state: state} do
+      child_specs = [
+        %{id: :test_child1, start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}},
+        {Task, [fn -> Process.sleep(:infinity) end]},
+        JidoTest.TestAgents.BasicAgent
+      ]
+
+      assert {:ok, %ServerState{}, pids} = ServerProcess.start(state, child_specs)
+      assert length(pids) == 3
+      assert Enum.all?(pids, &Process.alive?/1)
+
+      # Should receive signals for each child
+      for _ <- 1..3 do
+        assert_receive {:signal, signal}
+
+        assert signal.type ==
+                 ServerSignal.join_type(ServerSignal.type({:event, :process_started}))
+
+        assert Process.alive?(signal.data.child_pid)
+      end
+    end
+
     test "handles empty child spec list", %{state: state} do
       assert {:ok, %ServerState{}, []} = ServerProcess.start(state, [])
       # No signal should be emitted for empty child specs
       refute_receive {:signal, _signal}
     end
 
-    test "emits failure signal when start fails", %{state: state} do
+    test "emits failure signal when start fails with invalid module", %{state: state} do
       invalid_spec = %{
         id: :invalid_child,
         start: {:not_a_module, :not_a_function, []}
       }
+
+      capture_log(fn ->
+        assert {:error, _reason} = ServerProcess.start(state, invalid_spec)
+      end)
+
+      assert_receive {:signal, signal}
+      assert signal.type == ServerSignal.join_type(ServerSignal.type({:event, :process_failed}))
+      assert signal.data.child_spec == invalid_spec
+      assert signal.data.error != nil
+    end
+
+    test "emits failure signal when start fails with invalid tuple format", %{state: state} do
+      invalid_spec = {:not_a_module, []}
+
+      capture_log(fn ->
+        assert {:error, _reason} = ServerProcess.start(state, invalid_spec)
+      end)
+
+      assert_receive {:signal, signal}
+      assert signal.type == ServerSignal.join_type(ServerSignal.type({:event, :process_failed}))
+      assert signal.data.child_spec == invalid_spec
+      assert signal.data.error != nil
+    end
+
+    test "emits failure signal when start fails with invalid module name", %{state: state} do
+      invalid_spec = :not_a_module
 
       capture_log(fn ->
         assert {:error, _reason} = ServerProcess.start(state, invalid_spec)

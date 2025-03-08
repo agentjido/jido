@@ -42,7 +42,7 @@ defmodule JidoTest.Signal.Bus.SubscriberTest do
       result =
         Subscriber.subscribe(state, subscription_id, path,
           dispatch: client_dispatch,
-          persistent: true
+          persistent?: true
         )
 
       assert {:ok, new_state} = result

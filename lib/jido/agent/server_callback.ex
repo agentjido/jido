@@ -100,7 +100,7 @@ defmodule Jido.Agent.Server.Callback do
 
   The signal is first processed by the agent, then by any skills whose patterns
   match the signal type. Each handler can modify the signal before passing it
-  to the next handler.
+  to the next handler. If any handler fails, the original signal is returned.
 
   ## Parameters
     - state: The current server state containing the agent and skills
@@ -114,38 +114,85 @@ defmodule Jido.Agent.Server.Callback do
           {:ok, Signal.t()} | {:error, term()}
   def handle_signal(state, {:ok, signal}), do: handle_signal(state, signal)
 
-  def handle_signal(%ServerState{agent: agent, skills: skills} = _state, %Signal{} = signal) do
-    dbug("Handling signal", agent: agent, signal: signal)
-    # First let the agent handle the signal
-    with {:ok, handled_signal} <- agent.__struct__.handle_signal(signal) do
+  def handle_signal(%ServerState{skills: skills} = state, %Signal{} = signal) do
+    dbug("Starting signal pipeline", signal: signal)
+
+    # First try to handle with the agent
+    with {:ok, handled_signal} <- safe_agent_handle_signal(state, signal) do
       dbug("Agent handled signal", handled_signal: handled_signal)
-      # Then let matching skills handle it
+
+      # Then try to handle with matching skills
       matching_skills = find_matching_skills(skills, signal)
-      dbug("Found matching skills", matching_skills: matching_skills)
+      dbug("Found matching skills", count: length(matching_skills))
 
-      Enum.reduce_while(matching_skills, {:ok, handled_signal}, fn {_key, skill},
-                                                                   {:ok, acc_signal} ->
-        dbug("Processing skill", skill: skill, acc_signal: acc_signal)
+      # Process through each matching skill
+      final_signal =
+        Enum.reduce(matching_skills, handled_signal, fn skill, acc_signal ->
+          case safe_skill_handle_signal(state, skill, acc_signal) do
+            {:ok, new_signal} ->
+              dbug("Skill processed signal", skill: skill)
+              new_signal
 
-        case skill.__struct__.handle_signal(acc_signal) do
-          {:ok, new_signal} ->
-            dbug("Skill processed signal successfully", new_signal: new_signal)
-            {:cont, {:ok, new_signal}}
+            {:error, _reason} ->
+              dbug("Skill failed to process signal, continuing with previous signal", skill: skill)
+              acc_signal
+          end
+        end)
 
-          error ->
-            dbug("Skill failed to process signal", error: error)
-            {:halt, error}
-        end
-      end)
+      {:ok, final_signal}
+    else
+      {:error, _reason} ->
+        dbug("Agent failed to handle signal, returning original signal")
+        {:ok, signal}
+    end
+  end
+
+  # Safely calls handle_signal on a module, returning the original signal if it fails
+  defp safe_agent_handle_signal(state, signal) do
+    try do
+      agent = state.agent
+      case agent.__struct__.handle_signal(signal, agent) do
+        {:ok, new_signal} -> {:ok, new_signal}
+        {:error, reason} -> {:error, reason}
+        other -> {:error, {:invalid_return, other}}
+      end
+    rescue
+      e ->
+        # dbug("Error in handle_signal", agent: agent, error: e)
+        {:error, e}
+    catch
+      kind, value ->
+        # dbug("Caught error in handle_signal", agent: agent, kind: kind, value: value)
+        {:error, {kind, value}}
+    end
+  end
+  # Safely calls handle_signal on a module, returning the original signal if it fails
+  defp safe_skill_handle_signal(state, skill, signal) do
+    try do
+      opts_key = skill.opts_key()
+      opts = Keyword.get(state.opts, opts_key, [])
+      case skill.handle_signal(signal, opts) do
+        {:ok, new_signal} -> {:ok, new_signal}
+        {:error, reason} -> {:error, reason}
+        other -> {:error, {:invalid_return, other}}
+      end
+    rescue
+      e ->
+        # dbug("Error in handle_signal", skill: skill, error: e)
+        {:error, e}
+    catch
+      kind, value ->
+        # dbug("Caught error in handle_signal", skill: skill, kind: kind, value: value)
+        {:error, {kind, value}}
     end
   end
 
   @doc """
-  Calls the process_result callback on the agent and all matching skills.
+  Calls the transform_result callback on the agent and all matching skills.
 
   The result is first processed by the agent, then by any skills whose patterns
   match the signal type. Each handler can modify the result before passing it
-  to the next handler.
+  to the next handler. If any handler fails, the original result is returned.
 
   ## Parameters
     - state: The current server state containing the agent and skills
@@ -156,73 +203,126 @@ defmodule Jido.Agent.Server.Callback do
     - `{:ok, result}` - Result successfully processed with possibly modified result
     - `{:error, reason}` - Result processing failed with reason
   """
-  @spec process_result(ServerState.t(), Signal.t() | {:ok, Signal.t()} | nil, term()) ::
+  @spec transform_result(ServerState.t(), Signal.t() | {:ok, Signal.t()} | nil, term()) ::
           {:ok, term()}
-  def process_result(state, {:ok, signal}, result) do
-    process_result(state, signal, result)
+  def transform_result(state, {:ok, signal}, result) do
+    transform_result(state, signal, result)
   end
 
-  def process_result(
+  def transform_result(
         %ServerState{agent: agent, skills: skills} = _state,
         %Signal{} = signal,
         result
       ) do
-    dbug("Processing result", result: result, signal: signal)
-    # First let the agent process the result
-    with {:ok, processed_result} <- agent.__struct__.process_result(signal, result) do
-      dbug("Agent processed result", processed_result: processed_result)
-      # Then let matching skills process it
+    dbug("Starting result transformation pipeline", signal: signal, result: result)
+
+    # First try to transform with the agent
+    with {:ok, transformed_result} <- safe_transform_result(agent.__struct__, signal, result, agent) do
+      dbug("Agent transformed result", transformed_result: transformed_result)
+
+      # Then try to transform with matching skills
       matching_skills = find_matching_skills(skills, signal)
-      dbug("Found matching skills", matching_skills: matching_skills)
+      dbug("Found matching skills", count: length(matching_skills))
 
-      Enum.reduce_while(matching_skills, {:ok, processed_result}, fn {_key, skill},
-                                                                     {:ok, acc_result} ->
-        dbug("Processing skill", skill: skill, acc_result: acc_result)
+      # Process through each matching skill
+      final_result =
+        Enum.reduce(matching_skills, transformed_result, fn skill, acc_result ->
+          case safe_transform_result(skill, signal, acc_result, skill) do
+            {:ok, new_result} ->
+              dbug("Skill transformed result", skill: skill)
+              new_result
 
-        case skill.__struct__.process_result(signal, acc_result) do
-          {:ok, new_result} ->
-            dbug("Skill processed result successfully", new_result: new_result)
-            {:cont, {:ok, new_result}}
+            {:error, _reason} ->
+              dbug("Skill failed to transform result, continuing with previous result", skill: skill)
+              acc_result
+          end
+        end)
 
-          error ->
-            dbug("Skill failed to process result", error: error)
-            {:halt, error}
-        end
-      end)
+      {:ok, final_result}
+    else
+      {:error, _reason} ->
+        dbug("Agent failed to transform result, returning original result")
+        {:ok, result}
     end
   end
 
-  def process_result(%ServerState{} = _state, nil, result) do
+  def transform_result(%ServerState{} = _state, nil, result) do
     dbug("Processing result with no signal", result: result)
     {:ok, result}
+  end
+
+  # Safely calls transform_result on a module, returning the original result if it fails
+  @spec safe_transform_result(module(), Signal.t(), term(), Jido.Agent.t() | Jido.Skill.t()) ::
+          {:ok, term()} | {:error, term()}
+  defp safe_transform_result(module, signal, result, struct) do
+    try do
+      case module.transform_result(signal, result, struct) do
+        {:ok, new_result} -> {:ok, new_result}
+        {:error, reason} -> {:error, reason}
+        other -> {:error, {:invalid_return, other}}
+      end
+    rescue
+      e ->
+        dbug("Error in transform_result", module: module, error: e)
+        {:error, e}
+    catch
+      kind, value ->
+        dbug("Caught error in transform_result", module: module, kind: kind, value: value)
+        {:error, {kind, value}}
+    end
   end
 
   # Finds skills that match a signal's type based on their input/output patterns.
   #
   # Parameters:
-  #   - skills: Map of skills to check
+  #   - skills: List of skills to check
   #   - signal: Signal to match against
   #
   # Returns:
-  #   List of {key, skill} tuples for matching skills
-  @spec find_matching_skills(skills :: %{optional(atom()) => struct()}, signal :: Signal.t()) ::
-          list({atom(), struct()})
-  defp find_matching_skills(skills, %Signal{} = signal) do
-    dbug("Finding matching skills", skills: skills, signal: signal)
-
+  #   List of matching skills
+  @spec find_matching_skills(skills :: list(Jido.Skill.t()) | nil, signal :: Signal.t() | nil) ::
+          list(Jido.Skill.t())
+  defp find_matching_skills(nil, _signal), do: []
+  defp find_matching_skills(skills, %Signal{} = signal) when is_list(skills) do
     matches =
-      Enum.filter(skills, fn {_key, skill} ->
-        patterns = skill.__struct__.signals()
-        input_patterns = patterns[:input] || []
-        output_patterns = patterns[:output] || []
-        all_patterns = input_patterns ++ output_patterns
+      Enum.filter(skills, fn skill ->
+        try do
+          case skill do
+            nil ->
+              false
 
-        Enum.any?(all_patterns, fn pattern ->
-          Router.matches?(signal.type, pattern)
-        end)
+            skill ->
+              case skill.signal_patterns() do
+                nil ->
+                  false
+
+                patterns when is_list(patterns) ->
+                  Enum.any?(patterns, fn pattern ->
+                    case pattern do
+                      pattern when is_binary(pattern) ->
+                        matches = Router.matches?(signal.type, pattern)
+                        dbug("Pattern match result", pattern: pattern, matches: matches)
+                        matches
+
+                      _invalid ->
+                        false
+                    end
+                  end)
+
+                _invalid ->
+                  dbug("Invalid patterns format - must be list")
+                  false
+              end
+          end
+        rescue
+          _ ->
+            dbug("Error matching skill patterns")
+            false
+        end
       end)
 
-    dbug("Found matching skills", matches: matches)
+    dbug("Found matching skills", matches: matches, count: length(matches))
     matches
   end
+  defp find_matching_skills(_skills, _signal), do: []
 end

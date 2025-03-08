@@ -39,7 +39,7 @@ defmodule Jido.Signal.Bus.Snapshot do
   ```
   """
   use TypedStruct
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Bus.Stream
   alias Jido.Signal.ID

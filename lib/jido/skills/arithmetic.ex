@@ -12,20 +12,6 @@ defmodule Jido.Skills.Arithmetic do
     tags: ["math", "arithmetic", "calculations"],
     vsn: "1.0.0",
     opts_key: :arithmetic,
-    signals: %{
-      input: [
-        "arithmetic.add",
-        "arithmetic.subtract",
-        "arithmetic.multiply",
-        "arithmetic.divide",
-        "arithmetic.square",
-        "arithmetic.eval"
-      ],
-      output: [
-        "arithmetic.result",
-        "arithmetic.error"
-      ]
-    },
     opts_schema: [
       max_value: [
         type: :integer,
@@ -33,6 +19,9 @@ defmodule Jido.Skills.Arithmetic do
         default: 1_000_000,
         doc: "Maximum allowed value for calculations"
       ]
+    ],
+    signal_patterns: [
+      "arithmetic.*"
     ]
 
   defmodule Actions do
@@ -220,8 +209,8 @@ defmodule Jido.Skills.Arithmetic do
   @doc """
   Process the result of an arithmetic operation.
   """
-  @spec process_result(Signal.t(), {:ok, map()} | {:error, String.t()}) :: {:ok, Signal.t()}
-  def process_result(%Signal{} = signal, {:ok, result}) do
+  @spec transform_result(Signal.t(), {:ok, map()} | {:error, String.t()}) :: {:ok, Signal.t()}
+  def transform_result(%Signal{} = signal, {:ok, result}) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
 
     {:ok,
@@ -233,7 +222,7 @@ defmodule Jido.Skills.Arithmetic do
      }}
   end
 
-  def process_result(%Signal{} = signal, {:error, error}) do
+  def transform_result(%Signal{} = signal, {:error, error}) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
 
     {:ok,

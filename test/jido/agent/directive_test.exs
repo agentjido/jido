@@ -11,7 +11,8 @@ defmodule JidoTest.DirectiveTest do
     RegisterAction,
     DeregisterAction,
     Spawn,
-    Kill
+    Kill,
+    StateModification
   }
 
   alias Jido.Agent.Server.State, as: ServerState
@@ -189,6 +190,165 @@ defmodule JidoTest.DirectiveTest do
       ]
 
       assert {:error, :invalid_action} = Directive.apply_server_directive(state, directives)
+    end
+  end
+
+  describe "state modification directives" do
+    setup do
+      agent = FullFeaturedAgent.new("test-agent")
+      {:ok, agent: agent}
+    end
+
+    test "successfully sets value at path", %{agent: agent} do
+      directive = %StateModification{
+        op: :set,
+        path: [:value],
+        value: 42
+      }
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, [directive])
+
+      assert updated_agent.state.value == 42
+    end
+
+    test "successfully sets nested value", %{agent: agent} do
+      directive = %StateModification{
+        op: :set,
+        path: [:metadata, :test],
+        value: true
+      }
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, [directive])
+
+      assert updated_agent.state.metadata.test == true
+    end
+
+    test "updates value with function", %{agent: agent} do
+      # First set initial value
+      {:ok, agent} = FullFeaturedAgent.set(agent, %{value: 10})
+
+      directive = %StateModification{
+        op: :update,
+        path: [:value],
+        value: &(&1 * 2)
+      }
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, [directive])
+
+      assert updated_agent.state.value == 20
+    end
+
+    test "deletes value at path", %{agent: agent} do
+      # First set a value to delete
+      {:ok, agent} = FullFeaturedAgent.set(agent, %{test_field: "delete me"})
+      assert agent.state.test_field == "delete me"
+
+      directive = %StateModification{
+        op: :delete,
+        path: [:test_field]
+      }
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, [directive])
+
+      refute Map.has_key?(updated_agent.state, :test_field)
+    end
+
+    test "resets value to nil", %{agent: agent} do
+      # First set a value to reset
+      {:ok, agent} = FullFeaturedAgent.set(agent, %{value: 42})
+      assert agent.state.value == 42
+
+      directive = %StateModification{
+        op: :reset,
+        path: [:value]
+      }
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, [directive])
+
+      assert updated_agent.state.value == nil
+    end
+
+    test "validates operation type", %{agent: agent} do
+      directive = %StateModification{
+        op: :invalid_op,
+        path: [:value],
+        value: 42
+      }
+
+      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert error.type == :validation_error
+      assert error.message =~ "Invalid operation"
+    end
+
+    test "validates path type", %{agent: agent} do
+      directive = %StateModification{
+        op: :set,
+        path: "invalid_path",
+        value: 42
+      }
+
+      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert error.type == :validation_error
+      assert error.message =~ "Invalid path"
+    end
+
+    test "validates update function", %{agent: agent} do
+      directive = %StateModification{
+        op: :update,
+        path: [:value],
+        value: "not a function"
+      }
+
+      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert error.type == :validation_error
+      assert error.message =~ "Invalid update function"
+    end
+
+    test "handles multiple state modifications", %{agent: agent} do
+      directives = [
+        %StateModification{
+          op: :set,
+          path: [:value],
+          value: 10
+        },
+        %StateModification{
+          op: :update,
+          path: [:value],
+          value: &(&1 * 2)
+        },
+        %StateModification{
+          op: :set,
+          path: [:metadata, :updated],
+          value: true
+        }
+      ]
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, directives)
+
+      assert updated_agent.state.value == 20
+      assert updated_agent.state.metadata.updated == true
+    end
+
+    test "handles mixed directives with state modifications", %{agent: agent} do
+      directives = [
+        %StateModification{
+          op: :set,
+          path: [:value],
+          value: 42
+        },
+        %RegisterAction{action_module: Add},
+        %StateModification{
+          op: :set,
+          path: [:status],
+          value: :ready
+        }
+      ]
+
+      {:ok, updated_agent, []} = Directive.apply_agent_directive(agent, directives)
+
+      assert updated_agent.state.value == 42
+      assert updated_agent.state.status == :ready
+      assert Add in updated_agent.actions
     end
   end
 end

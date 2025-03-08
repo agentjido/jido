@@ -1,6 +1,6 @@
 defmodule Jido.Signal.Bus.State do
   use TypedStruct
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
 
   alias Jido.Signal
   alias Jido.Signal.Router

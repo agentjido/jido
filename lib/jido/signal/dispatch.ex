@@ -104,6 +104,19 @@ defmodule Jido.Signal.Dispatch do
     nil: nil
   }
 
+  # Future Idea
+  # use TypedStruct
+
+  # typedstruct do
+  #   @typedoc "A dispatch configuration for sending signals"
+
+  #   field :signals, Jido.Signal.t() | [Jido.Signal.t()], default: [], doc: "List of signals to be dispatched"
+  #   field :targets, [dispatch_config()], default: [], doc: "List of dispatch_config tuples"
+  #   field :mode, :sync | :async, default: :sync, doc: ":sync or :async"
+  #   field :opts, Keyword.t(), default: [], doc: "General options including batch settings"
+  #   field :validated, boolean(), default: false, doc: "Whether targets have been validated"
+  # end
+
   @doc """
   Validates a dispatch configuration.
 

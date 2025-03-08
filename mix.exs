@@ -16,7 +16,6 @@ defmodule Jido.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
-      consolidate_protocols: Mix.env() != :test,
 
       # Docs
       name: "Jido",

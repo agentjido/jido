@@ -9,7 +9,7 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
   use GenServer
   use TypedStruct
   require Logger
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   alias Jido.Signal.Bus.Subscriber
   alias Jido.Signal.Dispatch
   alias Jido.Signal.ID
@@ -57,8 +57,8 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
         timestamp when is_integer(timestamp) and timestamp >= 0 ->
           opts
 
-        invalid ->
-          dbug("Invalid start_from value, using :origin", invalid_value: invalid)
+        _invalid ->
+          dbug("Invalid start_from value, using :origin", invalid_value: _invalid)
           Keyword.put(opts, :start_from, :origin)
       end
 
@@ -122,32 +122,6 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
     new_state = process_pending_signals(new_state)
 
     {:reply, :ok, new_state}
-  end
-
-  @impl GenServer
-  def handle_cast({:ack, signal_log_id}, state) when is_binary(signal_log_id) do
-    dbug("Acknowledging signal (async)",
-      id: state.id,
-      signal_log_id: signal_log_id,
-      current_checkpoint: state.checkpoint
-    )
-
-    # Remove the acknowledged signal from in-flight
-    new_in_flight = Map.delete(state.in_flight_signals, signal_log_id)
-
-    # Extract timestamp from UUID7 for checkpoint comparison
-    timestamp = ID.extract_timestamp(signal_log_id)
-
-    # Update checkpoint if this is a higher number
-    new_checkpoint = max(state.checkpoint, timestamp)
-
-    # Update state
-    new_state = %{state | in_flight_signals: new_in_flight, checkpoint: new_checkpoint}
-
-    # Process any pending signals
-    new_state = process_pending_signals(new_state)
-
-    {:noreply, new_state}
   end
 
   @impl GenServer
@@ -221,9 +195,75 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
   end
 
   @impl GenServer
-  def handle_call(req, _from, state) do
-    dbug("Unexpected call", request: req)
+  def handle_call(_req, _from, state) do
+    dbug("Unexpected call", request: _req)
     {:reply, :ok, state}
+  end
+
+  @impl GenServer
+  def handle_cast({:ack, signal_log_id}, state) when is_binary(signal_log_id) do
+    dbug("Acknowledging signal (async)",
+      id: state.id,
+      signal_log_id: signal_log_id,
+      current_checkpoint: state.checkpoint
+    )
+
+    # Remove the acknowledged signal from in-flight
+    new_in_flight = Map.delete(state.in_flight_signals, signal_log_id)
+
+    # Extract timestamp from UUID7 for checkpoint comparison
+    timestamp = ID.extract_timestamp(signal_log_id)
+
+    # Update checkpoint if this is a higher number
+    new_checkpoint = max(state.checkpoint, timestamp)
+
+    # Update state
+    new_state = %{state | in_flight_signals: new_in_flight, checkpoint: new_checkpoint}
+
+    # Process any pending signals
+    new_state = process_pending_signals(new_state)
+
+    {:noreply, new_state}
+  end
+
+  @impl GenServer
+  def handle_cast({:reconnect, new_client_pid}, state) do
+    dbug("Reconnecting client",
+      id: state.id,
+      old_client_pid: state.client_pid,
+      new_client_pid: new_client_pid,
+      bus_subscription: state.bus_subscription,
+      checkpoint: state.checkpoint
+    )
+
+    # Only proceed if the new client is alive
+    if Process.alive?(new_client_pid) do
+      # Monitor the new client process
+      Process.monitor(new_client_pid)
+
+      # Update the bus subscription to point to the new client PID
+      updated_subscription = %{
+        state.bus_subscription
+        | dispatch: {:pid, target: new_client_pid, delivery_mode: :async}
+      }
+
+      dbug("Updated subscription",
+        subscription: updated_subscription,
+        has_log: Map.has_key?(updated_subscription, :log),
+        subscription_keys: Map.keys(updated_subscription)
+      )
+
+      # Update state with new client PID and subscription
+      new_state = %{state | client_pid: new_client_pid, bus_subscription: updated_subscription}
+
+      # Replay any signals that were missed while disconnected
+      new_state = replay_missed_signals(new_state)
+
+      {:noreply, new_state}
+    else
+      dbug("New client process is not alive", new_client_pid: new_client_pid)
+      {:noreply, state}
+    end
   end
 
   @impl GenServer
@@ -265,11 +305,11 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
   end
 
   @impl GenServer
-  def handle_info({:DOWN, _ref, :process, pid, reason}, %{client_pid: client_pid} = state)
+  def handle_info({:DOWN, _ref, :process, pid, _reason}, %{client_pid: client_pid} = state)
       when pid == client_pid do
     dbug("Client process down",
       client_pid: client_pid,
-      reason: reason,
+      reason: _reason,
       subscription_id: state.id
     )
 
@@ -278,16 +318,71 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
     {:noreply, state}
   end
 
-  def handle_info(msg, state) do
-    dbug("Unexpected message", msg: msg)
+  def handle_info(_msg, state) do
+    dbug("Unexpected message", msg: _msg)
     {:noreply, state}
   end
 
+  # Helper function to replay missed signals
+  defp replay_missed_signals(state) do
+    Logger.debug("Replaying missed signals for subscription #{state.id}")
+
+    dbug("Replay state",
+      subscription_id: state.id,
+      checkpoint: state.checkpoint,
+      bus_subscription: state.bus_subscription,
+      has_log: Map.has_key?(state.bus_subscription, :log),
+      subscription_keys: Map.keys(state.bus_subscription)
+    )
+
+    # Get the bus state to access the log
+    bus_state = :sys.get_state(state.bus_pid)
+
+    dbug("Bus state",
+      has_log: Map.has_key?(bus_state, :log),
+      log_keys: Map.keys(bus_state.log),
+      log_count: map_size(bus_state.log)
+    )
+
+    missed_signals =
+      Enum.filter(bus_state.log, fn {_id, signal} ->
+        case DateTime.from_iso8601(signal.time) do
+          {:ok, timestamp, _offset} -> DateTime.to_unix(timestamp) > state.checkpoint
+          _ -> false
+        end
+      end)
+
+    dbug("Missed signals",
+      count: length(missed_signals),
+      signal_types: Enum.map(missed_signals, fn {_id, signal} -> signal.type end)
+    )
+
+    Enum.each(missed_signals, fn {_id, signal} ->
+      case DateTime.from_iso8601(signal.time) do
+        {:ok, timestamp, _offset} ->
+          if DateTime.to_unix(timestamp) > state.checkpoint do
+            if state.bus_subscription.dispatch do
+              dispatch_result = Dispatch.dispatch(signal, state.bus_subscription.dispatch)
+
+              if dispatch_result != :ok do
+                Logger.debug("Dispatch failed during replay", result: dispatch_result)
+              end
+            end
+          end
+
+        _ ->
+          :ok
+      end
+    end)
+
+    state
+  end
+
   @impl GenServer
-  def terminate(reason, state) do
+  def terminate(_reason, state) do
     dbug("Terminating persistent subscription",
       id: state.id,
-      reason: reason
+      reason: _reason
     )
 
     # Use state.id as the subscription_id since that's what we're using to identify the subscription

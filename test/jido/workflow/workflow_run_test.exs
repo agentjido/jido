@@ -3,6 +3,7 @@ defmodule JidoTest.WorkflowRunTest do
   use Mimic
 
   import ExUnit.CaptureLog
+  import ExUnit.CaptureIO
 
   alias Jido.Error
   alias Jido.Workflow
@@ -157,9 +158,19 @@ defmodule JidoTest.WorkflowRunTest do
     end
 
     test "handles IO operations" do
-      capture_log(fn ->
-        assert {:ok, %{input: "value"}} = Workflow.run(IOAction, %{input: "value"})
-      end)
+      io =
+        capture_io(fn ->
+          assert {:ok, %{input: "test", operation: :inspect}} =
+                   Workflow.run(IOAction, %{input: "test", operation: :inspect}, %{},
+                     timeout: 5000
+                   )
+        end)
+
+      assert io =~ "IOAction"
+      assert io =~ "input"
+      assert io =~ "test"
+      assert io =~ "operation"
+      assert io =~ "inspect"
     end
   end
 

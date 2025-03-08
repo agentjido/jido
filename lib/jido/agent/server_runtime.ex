@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Server.Runtime do
   @moduledoc false
   use Private
-  use ExDbug, enabled: false
+  use ExDbug, enabled: true
   require Logger
 
   alias Jido.Error
@@ -186,7 +186,7 @@ defmodule Jido.Agent.Server.Runtime do
 
       # Process the instruction result through callbacks first
       with {:ok, processed_result} <-
-             ServerCallback.process_result(state, state.current_signal, result) do
+             ServerCallback.transform_result(state, state.current_signal, result) do
         # Use the signal's dispatch config if present, otherwise use server's default
         dispatch_config =
           case state.current_signal do
@@ -226,7 +226,7 @@ defmodule Jido.Agent.Server.Runtime do
     defp handle_signal_result(%ServerState{} = state, _signal, result) do
       # Process the final result through callbacks first
       with {:ok, result} <-
-             ServerCallback.process_result(state, state.current_signal, result) do
+             ServerCallback.transform_result(state, state.current_signal, result) do
         case state.current_signal_type do
           :async ->
             # Use the signal's dispatch config if present, otherwise use server's default

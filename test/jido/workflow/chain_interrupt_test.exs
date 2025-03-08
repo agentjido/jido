@@ -10,8 +10,8 @@ defmodule JidoTest.Workflow.ChainInterruptTest do
   @moduletag :capture_log
 
   setup do
-    # Ensure debug logs are captured
-    :ok = Logger.configure(level: :debug)
+    # Ensure info logs are captured
+    :ok = Logger.configure(level: :info)
     on_exit(fn -> Logger.configure(level: :warning) end)
     :ok
   end
@@ -63,7 +63,7 @@ defmodule JidoTest.Workflow.ChainInterruptTest do
       initial_params = %{value: 5, amount: 2}
 
       log =
-        capture_log([level: :debug], fn ->
+        capture_log([level: :info], fn ->
           Chain.chain(workflows, initial_params, interrupt_check: fn -> true end)
         end)
 

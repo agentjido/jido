@@ -19,19 +19,9 @@ defmodule Jido.Agent.Server.CallbackTest do
       result: nil
     }
 
-    skill = %TestSkill{
-      name: "test_skill",
-      description: "Test skill for callback testing",
-      opts_key: :test_skill,
-      signals: %{
-        input: ["test.skill.*"],
-        output: ["test.skill.result"]
-      }
-    }
-
     state = %ServerState{
       agent: agent,
-      skills: %{test_skill: skill}
+      skills: [TestSkill]
     }
 
     {:ok, %{state: state}}
@@ -77,21 +67,21 @@ defmodule Jido.Agent.Server.CallbackTest do
       assert get_in(handled_signal.data, [:skill_handled]) == true
     end
 
-    test "process_result with agent", %{state: state} do
+    test "transform_result with agent", %{state: state} do
       signal = Signal.new(%{type: "test.agent", data: %{}})
-      {:ok, processed} = Callback.process_result(state, signal, %{})
+      {:ok, processed} = Callback.transform_result(state, signal, %{})
       assert get_in(processed, [:agent_processed]) == true
     end
 
-    test "process_result with skill", %{state: state} do
+    test "transform_result with skill", %{state: state} do
       signal = Signal.new(%{type: "test.skill.action", data: %{}})
-      {:ok, processed} = Callback.process_result(state, signal, %{})
+      {:ok, processed} = Callback.transform_result(state, signal, %{})
       assert get_in(processed, [:skill_processed]) == true
     end
 
-    test "process_result with both agent and skill", %{state: state} do
+    test "transform_result with both agent and skill", %{state: state} do
       signal = Signal.new(%{type: "test.skill.action", data: %{}})
-      {:ok, processed} = Callback.process_result(state, signal, %{})
+      {:ok, processed} = Callback.transform_result(state, signal, %{})
       assert get_in(processed, [:agent_processed]) == true
       assert get_in(processed, [:skill_processed]) == true
     end

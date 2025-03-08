@@ -155,12 +155,12 @@ def handle_signal(signal) do
 end
 ```
 
-#### `process_result/2`
+#### `transform_result/2`
 
 Processes results before returning them.
 
 ```elixir
-def process_result(signal, result) do
+def transform_result(signal, result) do
   case result do
     {:ok, data} ->
       processed = transform_result(data)
@@ -228,7 +228,7 @@ defmodule TransformingAgent do
   use Jido.Agent,
     name: "transforming_agent"
 
-  def process_result(_signal, {:ok, result}) do
+  def transform_result(_signal, {:ok, result}) do
     transformed = %{
       data: result,
       processed_at: DateTime.utc_now(),
@@ -238,7 +238,7 @@ defmodule TransformingAgent do
     {:ok, transformed}
   end
 
-  def process_result(_signal, {:error, _} = error), do: error
+  def transform_result(_signal, {:error, _} = error), do: error
 end
 ```
 

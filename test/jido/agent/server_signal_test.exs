@@ -149,7 +149,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.set"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_opts == opts
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -162,7 +161,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.validate"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_opts == opts
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -175,7 +173,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.plan"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_opts == context
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -186,7 +183,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       assert signal.type == "jido.agent.cmd.run"
       assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.jido_opts == opts
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -199,7 +195,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.cmd"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == %{param: "value"}
-      assert signal.jido_opts == opts
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -217,19 +212,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.event.started"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
-      assert is_binary(signal.id)
-    end
-
-    test "builds started event signal with extra attributes", %{state: state} do
-      params = %{status: "ok"}
-      extra_attrs = %{jido_metadata: %{correlation_id: "abc-123"}}
-      signal = ServerSignal.event_signal(:started, state, params, extra_attrs)
-
-      assert signal.type == "jido.agent.event.started"
-      assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.data == params
-      assert signal.jido_metadata == %{correlation_id: "abc-123"}
       assert signal.jido_dispatch == {:noop, []}
       assert is_binary(signal.id)
     end
@@ -266,22 +248,8 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert is_binary(signal.id)
     end
 
-    test "builds process event signals with extra attributes", %{state: state} do
-      params = %{pid: "123"}
-      extra_attrs = %{jido_metadata: %{correlation_id: "abc-123"}}
-
-      signal = ServerSignal.event_signal(:process_started, state, params, extra_attrs)
-      assert signal.type == "jido.agent.event.process.started"
-      assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.data == params
-      assert signal.jido_metadata == %{correlation_id: "abc-123"}
-      assert signal.jido_dispatch == {:noop, []}
-      assert is_binary(signal.id)
-    end
-
     test "returns nil for unknown event type", %{state: state} do
       assert ServerSignal.event_signal(:unknown, state, %{}) == nil
-      assert ServerSignal.event_signal(:unknown, state, %{}, %{extra: "attr"}) == nil
     end
   end
 
@@ -297,23 +265,9 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert is_binary(signal.id)
     end
 
-    test "builds execution error signal with extra attributes", %{state: state} do
-      error = %Error{type: :execution_error, message: "test error"}
-      extra_attrs = %{jido_metadata: %{correlation_id: "abc-123"}}
-      signal = ServerSignal.err_signal(:execution_error, state, error, %{}, extra_attrs)
-
-      assert signal.type == "jido.agent.err.execution.error"
-      assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.data == error
-      assert signal.jido_metadata == %{correlation_id: "abc-123"}
-      assert signal.jido_dispatch == {:noop, []}
-      assert is_binary(signal.id)
-    end
-
     test "returns nil for unknown error type", %{state: state} do
       error = %Error{type: :unknown, message: "test error"}
       assert ServerSignal.err_signal(:unknown, state, error, %{}) == nil
-      assert ServerSignal.err_signal(:unknown, state, error, %{}, %{extra: "attr"}) == nil
     end
   end
 
@@ -329,19 +283,6 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert is_binary(signal.id)
     end
 
-    test "builds instruction result output signal with extra attributes", %{state: state} do
-      result = %{output: "test result"}
-      extra_attrs = %{jido_metadata: %{correlation_id: "abc-123"}}
-      signal = ServerSignal.out_signal(:instruction_result, state, result, %{}, extra_attrs)
-
-      assert signal.type == "jido.agent.out.instruction.result"
-      assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.data == result
-      assert signal.jido_metadata == %{correlation_id: "abc-123"}
-      assert signal.jido_dispatch == {:noop, []}
-      assert is_binary(signal.id)
-    end
-
     test "builds signal result output signal", %{state: state} do
       result = %{output: "test result"}
       signal = ServerSignal.out_signal(:signal_result, state, result, %{})
@@ -353,22 +294,8 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert is_binary(signal.id)
     end
 
-    test "builds signal result output signal with extra attributes", %{state: state} do
-      result = %{output: "test result"}
-      extra_attrs = %{jido_metadata: %{correlation_id: "abc-123"}}
-      signal = ServerSignal.out_signal(:signal_result, state, result, %{}, extra_attrs)
-
-      assert signal.type == "jido.agent.out.signal.result"
-      assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.data == result
-      assert signal.jido_metadata == %{correlation_id: "abc-123"}
-      assert signal.jido_dispatch == {:noop, []}
-      assert is_binary(signal.id)
-    end
-
     test "returns nil for unknown output type", %{state: state} do
       assert ServerSignal.out_signal(:unknown, state, %{}, %{}) == nil
-      assert ServerSignal.out_signal(:unknown, state, %{}, %{}, %{extra: "attr"}) == nil
     end
   end
 end

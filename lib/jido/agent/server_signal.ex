@@ -55,20 +55,20 @@ defmodule Jido.Agent.Server.Signal do
   @doc false
   def cmd_signal(type, state, params \\ %{}, opts \\ %{})
 
-  def cmd_signal(:set, %ServerState{} = state, params, opts) when is_map(opts),
-    do: build(state, %{type: type({:cmd, :set}), data: params, jido_opts: opts})
+  def cmd_signal(:set, %ServerState{} = state, params, _opts),
+    do: build(state, %{type: type({:cmd, :set}), data: params})
 
-  def cmd_signal(:validate, %ServerState{} = state, params, opts) when is_map(opts),
-    do: build(state, %{type: type({:cmd, :validate}), data: params, jido_opts: opts})
+  def cmd_signal(:validate, %ServerState{} = state, params, _opts),
+    do: build(state, %{type: type({:cmd, :validate}), data: params})
 
-  def cmd_signal(:plan, %ServerState{} = state, params, context),
-    do: build(state, %{type: type({:cmd, :plan}), data: params, jido_opts: context})
+  def cmd_signal(:plan, %ServerState{} = state, params, _context),
+    do: build(state, %{type: type({:cmd, :plan}), data: params})
 
-  def cmd_signal(:run, %ServerState{} = state, opts, _params) when is_map(opts),
-    do: build(state, %{type: type({:cmd, :run}), jido_opts: opts})
+  def cmd_signal(:run, %ServerState{} = state, _opts, _params),
+    do: build(state, %{type: type({:cmd, :run})})
 
-  def cmd_signal(:cmd, %ServerState{} = state, {_instructions, params}, opts) when is_map(opts),
-    do: build(state, %{type: type({:cmd, :cmd}), data: params, jido_opts: opts})
+  def cmd_signal(:cmd, %ServerState{} = state, {_instructions, params}, _opts),
+    do: build(state, %{type: type({:cmd, :cmd}), data: params})
 
   def cmd_signal(:state, _state, _params, _opts),
     do: build(nil, %{type: type({:cmd, :state})})

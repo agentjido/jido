@@ -22,7 +22,7 @@ defmodule Jido.Application do
       {Jido.Signal.Bus, name: :default_bus},
 
       # Add the Jido Scheduler (Quantum) under the name :jido_quantum
-      {Jido.Scheduler, name: :jido_quantum}
+      {Jido.Scheduler, name: Jido.Quantum}
     ]
 
     # Initialize discovery cache asynchronously

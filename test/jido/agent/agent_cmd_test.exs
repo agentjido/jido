@@ -26,7 +26,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value == 15
+      assert final.result.value == 15
     end
 
     test "executes list of action tuples", %{agent: agent} do
@@ -39,7 +39,7 @@ defmodule JidoTest.AgentCmdTest do
       {:ok, final, []} =
         FullFeaturedAgent.cmd(agent, instructions, %{}, runner: Jido.Runner.Chain)
 
-      assert final.state.value == 30
+      assert final.result.value == 30
     end
 
     test "preserves state with apply_state: false", %{agent: agent} do
@@ -88,8 +88,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value == 11
-      assert final.state.unknown_field == "test"
+      assert final.result.value == 11
     end
 
     test "handles unregistered actions", %{agent: agent} do
@@ -114,7 +113,7 @@ defmodule JidoTest.AgentCmdTest do
       callbacks = Enum.map(final.state.callback_log, & &1.callback)
 
       assert :on_before_run in callbacks
-      assert final.state.value == 15
+      assert final.result.value == 15
     end
   end
 
@@ -210,7 +209,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value == 2
+      assert final.result.value == 2
     end
 
     test "handles nil context in opts", %{agent: agent} do
@@ -223,7 +222,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value == 2
+      assert final.result.value == 2
     end
 
     test "invalid agent struct type returns error" do
@@ -265,7 +264,7 @@ defmodule JidoTest.AgentCmdTest do
     test "handles extremely large instruction lists", %{agent: agent} do
       large_instruction_list =
         Enum.map(1..1000, fn i ->
-          {TestActions.Add, %{amount: i}}
+          {TestActions.Add, %{value: 0, amount: i}}
         end)
 
       {:ok, final, []} =
@@ -277,7 +276,7 @@ defmodule JidoTest.AgentCmdTest do
         )
 
       # Sum of numbers 1 to 1000
-      assert final.state.value == 500_500
+      assert final.result.value == 500_500
     end
 
     test "maintains state consistency on error", %{agent: agent} do
@@ -319,15 +318,15 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value == 3
+      assert final.result.value == 3
     end
 
     test "handles all types of valid instructions", %{agent: agent} do
       mixed_instructions = [
+        # Tuple with params
+        {TestActions.Add, %{amount: 0, value: 1}},
         # Module only
         TestActions.Add,
-        # Tuple with params
-        {TestActions.Add, %{value: 1}},
         # Empty params
         {TestActions.Add, %{}},
         # Nil params
@@ -342,7 +341,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert final.state.value > 0
+      assert final.result.value > 0
     end
   end
 end

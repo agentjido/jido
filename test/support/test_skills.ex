@@ -7,18 +7,15 @@ defmodule JidoTest.TestSkills do
       name: "test_skill",
       description: "Test skill for callback testing",
       opts_key: :test_skill,
-      signals: %{
-        input: ["test.skill.*"],
-        output: ["test.skill.result"]
-      }
+      signal_patterns: [
+        "test.skill.**"
+      ]
 
-    defstruct [:name, :description, :opts_key, :signals]
-
-    def handle_signal(signal) do
+    def handle_signal(signal, _skill) do
       {:ok, %{signal | data: Map.put(signal.data, :skill_handled, true)}}
     end
 
-    def process_result(_signal, result) do
+    def transform_result(_signal, result, _skill) do
       {:ok, Map.put(result, :skill_processed, true)}
     end
   end
@@ -32,20 +29,9 @@ defmodule JidoTest.TestSkills do
       tags: ["weather", "alerts", "monitoring"],
       vsn: "1.0.0",
       opts_key: :weather,
-      signals: %{
-        # Input signals this skill handles
-        input: [
-          "weather_monitor.data.received",
-          "weather_monitor.alert.triggered",
-          "weather_monitor.conditions.updated"
-        ],
-        # Output signals this skill may emit
-        output: [
-          "weather_monitor.alert.generated",
-          "weather_monitor.data.processed",
-          "weather_monitor.conditions.changed"
-        ]
-      },
+      signal_patterns: [
+        "weather_monitor.**"
+      ],
       opts_schema: [
         weather_api: [
           type: :map,
@@ -58,8 +44,6 @@ defmodule JidoTest.TestSkills do
           doc: "Alert configuration"
         ]
       ]
-
-    defstruct [:name, :description, :category, :tags, :vsn, :opts_key, :signals, :config]
 
     # Actions that this skill provides to the agent
     defmodule Actions do
@@ -272,12 +256,12 @@ defmodule JidoTest.TestSkills do
       []
     end
 
-    # Add handle_signal and process_result callbacks
-    def handle_signal(signal) do
+    # Add handle_signal and transform_result callbacks
+    def handle_signal(signal, _skill) do
       {:ok, %{signal | data: Map.put(signal.data, :skill_handled, true)}}
     end
 
-    def process_result(_signal, result) do
+    def transform_result(_signal, result, _skill) do
       {:ok, Map.put(result, :skill_processed, true)}
     end
   end
@@ -291,10 +275,9 @@ defmodule JidoTest.TestSkills do
       name: "mock_skill",
       description: "Basic mock skill for testing",
       opts_key: :mock_skill,
-      signals: %{
-        input: ["test.path.*"],
-        output: ["test.result.*"]
-      }
+      signal_patterns: [
+        "test.path.*"
+      ]
 
     @impl true
     def router(_opts \\ []) do
@@ -326,10 +309,9 @@ defmodule JidoTest.TestSkills do
       name: "mock_skill_with_router",
       description: "Mock skill with router function",
       opts_key: :mock_skill_with_router,
-      signals: %{
-        input: ["test.path.*"],
-        output: ["test.result.*"]
-      }
+      signal_patterns: [
+        "test.path.*"
+      ]
 
     @impl true
     def router(_opts \\ []) do
@@ -355,10 +337,9 @@ defmodule JidoTest.TestSkills do
       name: "invalid_router_skill",
       description: "Mock skill with invalid router",
       opts_key: :invalid_router_skill,
-      signals: %{
-        input: ["test.path.*"],
-        output: ["test.result.*"]
-      }
+      signal_patterns: [
+        "test.path.*"
+      ]
 
     @impl true
     def router(_opts \\ []) do
@@ -378,10 +359,9 @@ defmodule JidoTest.TestSkills do
       name: "mock_skill_with_schema",
       description: "Mock skill with validation schema",
       opts_key: :mock_skill_with_schema,
-      signals: %{
-        input: ["test.path.*"],
-        output: ["test.result.*"]
-      },
+      signal_patterns: [
+        "test.path.*"
+      ],
       opts_schema: [
         api_key: [
           type: :string,
@@ -425,10 +405,9 @@ defmodule JidoTest.TestSkills do
       name: "mock_skill_with_mount",
       description: "Mock skill with custom mount implementation",
       opts_key: :mock_skill_with_mount,
-      signals: %{
-        input: ["test.path.*"],
-        output: ["test.result.*"]
-      },
+      signal_patterns: [
+        "test.path.*"
+      ],
       opts_schema: []
 
     @impl true

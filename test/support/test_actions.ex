@@ -610,17 +610,30 @@ defmodule JidoTest.TestActions do
   end
 
   defmodule IOAction do
-    @moduledoc false
     use Action,
       name: "io_action",
-      description: "Showcases IO operations",
+      description: "Showcases various IO operations",
       schema: [
-        input: [type: :string, required: true]
+        input: [type: :any, required: true, default: %{foo: "bar"}],
+        operation: [type: {:in, [:puts, :inspect, :write]}, required: true]
       ]
 
-    def run(params, _context) do
-      IO.puts("IO operation detected: #{inspect(params)}")
+    @impl true
+    def run(%{input: _input, operation: :inspect} = params, _context) do
+      IO.inspect(params, label: "IOAction")
       {:ok, params}
+    end
+
+    @impl true
+    def run(%{input: input, operation: :puts}, _context) do
+      IO.puts(input)
+      {:ok, %{input: input}}
+    end
+
+    @impl true
+    def run(%{input: input, operation: :write}, _context) do
+      IO.write(input)
+      {:ok, %{input: input}}
     end
   end
 

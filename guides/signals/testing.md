@@ -89,12 +89,12 @@ defmodule MyApp.SignalCreationTest do
     attrs = %{
       type: "task.process",
       source: "/tasks",
-      data: %{task_id: 456},
-      jido_instructions: [ProcessTask, NotifyCompletion]
+      data: %Instruction{action: ProcessTask, args: %{task_id: 456}},
     }
 
     assert {:ok, signal} = Jido.Signal.new(attrs)
-    assert length(signal.jido_instructions) == 2
+    assert signal.data.action == ProcessTask
+    assert signal.data.args.task_id == 456
   end
 end
 ```
