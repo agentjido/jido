@@ -66,7 +66,7 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
         Signal.new!(%{
           type: "test-type",
           source: "/test",
-          data: %{test: "data"},
+          data: %{test: "data"}
         })
 
       # Generate a UUID7 for the signal log ID
@@ -119,14 +119,14 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
         Signal.new!(%{
           type: "test-type-1",
           source: "/test",
-          data: %{test: "data1"},
+          data: %{test: "data1"}
         })
 
       signal2 =
         Signal.new!(%{
           type: "test-type-2",
           source: "/test",
-          data: %{test: "data2"},
+          data: %{test: "data2"}
         })
 
       # Generate UUID7s for signal log IDs
@@ -212,7 +212,7 @@ defmodule JidoTest.Signal.Bus.PersistentSubscriptionTest do
             Signal.new!(%{
               type: "test-type-#{i}",
               source: "/test",
-              data: %{test: "data#{i}"},
+              data: %{test: "data#{i}"}
             })
 
           # Generate a UUID7 for the signal log ID

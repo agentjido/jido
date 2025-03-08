@@ -28,7 +28,7 @@ defmodule Jido.SkillDefinitionTest do
       assert metadata.opts_key == :weather
 
       assert metadata.signal_patterns == [
-               "weather_monitor.**",
+               "weather_monitor.**"
              ]
 
       assert metadata.opts_schema == [
@@ -52,7 +52,7 @@ defmodule Jido.SkillDefinitionTest do
       signal_patterns = WeatherMonitorSkill.signal_patterns()
 
       assert signal_patterns == [
-               "weather_monitor.**",
+               "weather_monitor.**"
              ]
     end
 

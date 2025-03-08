@@ -156,7 +156,6 @@ defmodule Jido.Agent.Server do
          opts = Keyword.put(opts, :agent, agent),
          {:ok, opts} <- ServerOptions.validate_server_opts(opts),
          {:ok, state} <- build_initial_state_from_opts(opts),
-         {:ok, state} <- ServerProcess.start_supervisor(state),
          {:ok, state, opts} <- ServerSkills.build(state, opts),
          {:ok, state} <- ServerRouter.build(state, opts),
          {:ok, state, _pids} <- ServerProcess.start(state, opts[:child_specs]),
@@ -386,12 +385,14 @@ defmodule Jido.Agent.Server do
         dbug("Agent input type",
           is_atom: is_atom(agent_input),
           is_struct: is_struct(agent_input),
-          module_info: if(is_atom(agent_input),
-            do: %{
-              module_loaded: Code.ensure_loaded?(agent_input),
-              module_exports_new: :erlang.function_exported(agent_input, :new, 2)
-            },
-            else: :not_a_module),
+          module_info:
+            if(is_atom(agent_input),
+              do: %{
+                module_loaded: Code.ensure_loaded?(agent_input),
+                module_exports_new: :erlang.function_exported(agent_input, :new, 2)
+              },
+              else: :not_a_module
+            ),
           agent_input: agent_input
         )
 
@@ -409,6 +410,7 @@ defmodule Jido.Agent.Server do
                   dbug("Module #{inspect(agent_input)} does not export new/2")
                   {:error, :invalid_agent}
                 end
+
               {:error, _reason} ->
                 # dbug("Failed to load module #{inspect(agent_input)}", reason: reason)
                 {:error, :invalid_agent}

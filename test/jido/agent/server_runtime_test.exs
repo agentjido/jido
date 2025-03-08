@@ -55,6 +55,19 @@ defmodule JidoTest.Agent.ServerRuntimeTest do
 
       assert {:error, :invalid_signal} = ServerRuntime.route_signal(state, :invalid)
     end
+
+    test "returns error for non-matching route" do
+      {:ok, instruction} = Instruction.new(%{action: NoSchema})
+      base_state = %ServerState{agent: BasicAgent.new("test")}
+      {:ok, router_state} = ServerRouter.build(base_state, routes: [{"test", instruction}])
+      signal = Signal.new!(%{type: "non_existent", id: "test-id-789"})
+      state = %{base_state | router: router_state.router, current_signal: signal}
+
+      assert {:error, error} = ServerRuntime.route_signal(state, signal)
+      # Verify it's a routing error - could be either an atom or a Jido.Error struct
+      assert (is_atom(error) and error == :no_matching_route) or
+               (is_struct(error, Jido.Error) and error.type == :routing_error)
+    end
   end
 
   describe "process_signal/2" do

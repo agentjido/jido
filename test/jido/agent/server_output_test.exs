@@ -48,18 +48,20 @@ defmodule Jido.Agent.Server.OutputTest do
 
   describe "log/3" do
     test "logs message with state log level and agent id", %{state: state} do
-      log = capture_log([level: :info], fn ->
-        Output.log(state, "Test message")
-      end)
+      log =
+        capture_log([level: :info], fn ->
+          Output.log(state, "Test message")
+        end)
 
       assert log =~ "Test message"
       assert log =~ "agent_id=test-agent-123"
     end
 
     test "logs message with explicit log level" do
-      log = capture_log([level: :warning], fn ->
-        Output.log(:warning, "Warning message")
-      end)
+      log =
+        capture_log([level: :warning], fn ->
+          Output.log(:warning, "Warning message")
+        end)
 
       assert log =~ "Warning message"
     end
@@ -68,18 +70,20 @@ defmodule Jido.Agent.Server.OutputTest do
       levels = [:debug, :info, :notice, :warning, :error, :critical, :alert, :emergency]
 
       Enum.each(levels, fn level ->
-        log = capture_log([level: level], fn ->
-          Output.log(level, "#{level} message")
-        end)
+        log =
+          capture_log([level: level], fn ->
+            Output.log(level, "#{level} message")
+          end)
 
         assert log =~ "#{level} message"
       end)
     end
 
     test "includes custom metadata in log", %{state: state} do
-      log = capture_log([level: :info], fn ->
-        Output.log(state, "Test with metadata", metadata: "test")
-      end)
+      log =
+        capture_log([level: :info], fn ->
+          Output.log(state, "Test with metadata", metadata: "test")
+        end)
 
       assert log =~ "Test with metadata"
       assert log =~ "metadata=test"
@@ -211,10 +215,11 @@ defmodule Jido.Agent.Server.OutputTest do
       {:ok, state} = Server.state(pid)
 
       # Capture all logs and check their levels
-      log = capture_log(fn ->
-        Output.log(state, "Debug message")
-        Process.sleep(10)
-      end)
+      log =
+        capture_log(fn ->
+          Output.log(state, "Debug message")
+          Process.sleep(10)
+        end)
 
       assert log =~ "[debug]"
       assert log =~ "Debug message"
@@ -225,13 +230,14 @@ defmodule Jido.Agent.Server.OutputTest do
       {:ok, state2} = Server.state(pid2)
 
       # Capture all logs and check their levels
-      error_log = capture_log(fn ->
-        # Debug message should be logged at error level
-        Output.log(state2, "Debug message")
-        # Error message should be logged at error level
-        Output.log(state2, "Error message")
-        Process.sleep(10)
-      end)
+      error_log =
+        capture_log(fn ->
+          # Debug message should be logged at error level
+          Output.log(state2, "Debug message")
+          # Error message should be logged at error level
+          Output.log(state2, "Error message")
+          Process.sleep(10)
+        end)
 
       # Both messages should be at error level since that's the server's log level
       assert error_log =~ "[error] Debug message"
@@ -244,10 +250,11 @@ defmodule Jido.Agent.Server.OutputTest do
       {:ok, pid} = Server.start_link(agent: agent, log_level: :info)
       {:ok, state} = Server.state(pid)
 
-      log = capture_log([level: :info], fn ->
-        Output.log(state, "Test message")
-        Process.sleep(10)
-      end)
+      log =
+        capture_log([level: :info], fn ->
+          Output.log(state, "Test message")
+          Process.sleep(10)
+        end)
 
       assert log =~ "Test message"
       assert log =~ "agent_id=#{id}"

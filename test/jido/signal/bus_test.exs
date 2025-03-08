@@ -160,7 +160,7 @@ defmodule JidoTest.Signal.Bus do
         Signal.new(%{
           type: "test.signal",
           source: "/test",
-          data: %{value: 1},
+          data: %{value: 1}
         })
 
       {:ok, _} = Bus.publish(bus, [signal])

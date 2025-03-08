@@ -80,23 +80,44 @@ defmodule Jido.Runner.Chain do
     end
   end
 
-  defp execute_chain_step([instruction | remaining], agent, accumulated_directives, last_result, merge_results) do
+  defp execute_chain_step(
+         [instruction | remaining],
+         agent,
+         accumulated_directives,
+         last_result,
+         merge_results
+       ) do
     # Merge last_result into instruction params if enabled
-    instruction = if merge_results do
-      %{instruction | params: Map.merge(instruction.params, last_result)}
-    else
-      instruction
-    end
+    instruction =
+      if merge_results do
+        %{instruction | params: Map.merge(instruction.params, last_result)}
+      else
+        instruction
+      end
 
     # Inject agent state into instruction context
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
     case Jido.Workflow.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
-        handle_chain_result(result, directives, remaining, agent, accumulated_directives, merge_results)
+        handle_chain_result(
+          result,
+          directives,
+          remaining,
+          agent,
+          accumulated_directives,
+          merge_results
+        )
 
       {:ok, result, directive} ->
-        handle_chain_result(result, [directive], remaining, agent, accumulated_directives, merge_results)
+        handle_chain_result(
+          result,
+          [directive],
+          remaining,
+          agent,
+          accumulated_directives,
+          merge_results
+        )
 
       {:ok, result} ->
         execute_chain_step(remaining, agent, accumulated_directives, result, merge_results)
@@ -112,14 +133,29 @@ defmodule Jido.Runner.Chain do
     end
   end
 
-  @spec handle_chain_result(term(), [Directive.t() | Instruction.t()], [Instruction.t()], Jido.Agent.t(), [Directive.t()], boolean()) ::
+  @spec handle_chain_result(
+          term(),
+          [Directive.t() | Instruction.t()],
+          [Instruction.t()],
+          Jido.Agent.t(),
+          [Directive.t()],
+          boolean()
+        ) ::
           chain_result()
-  defp handle_chain_result(result, directives, remaining, agent, accumulated_directives, merge_results) do
+  defp handle_chain_result(
+         result,
+         directives,
+         remaining,
+         agent,
+         accumulated_directives,
+         merge_results
+       ) do
     # Convert any instructions to enqueue directives
-    processed_directives = Enum.map(directives, fn
-      %Instruction{} = instruction -> Directive.Enqueue.new(instruction)
-      directive -> directive
-    end)
+    processed_directives =
+      Enum.map(directives, fn
+        %Instruction{} = instruction -> Directive.Enqueue.new(instruction)
+        directive -> directive
+      end)
 
     updated_directives = accumulated_directives ++ processed_directives
     execute_chain_step(remaining, agent, updated_directives, result, merge_results)

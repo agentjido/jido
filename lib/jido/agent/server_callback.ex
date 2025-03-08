@@ -134,7 +134,10 @@ defmodule Jido.Agent.Server.Callback do
               new_signal
 
             {:error, _reason} ->
-              dbug("Skill failed to process signal, continuing with previous signal", skill: skill)
+              dbug("Skill failed to process signal, continuing with previous signal",
+                skill: skill
+              )
+
               acc_signal
           end
         end)
@@ -151,6 +154,7 @@ defmodule Jido.Agent.Server.Callback do
   defp safe_agent_handle_signal(state, signal) do
     try do
       agent = state.agent
+
       case agent.__struct__.handle_signal(signal, agent) do
         {:ok, new_signal} -> {:ok, new_signal}
         {:error, reason} -> {:error, reason}
@@ -166,11 +170,13 @@ defmodule Jido.Agent.Server.Callback do
         {:error, {kind, value}}
     end
   end
+
   # Safely calls handle_signal on a module, returning the original signal if it fails
   defp safe_skill_handle_signal(state, skill, signal) do
     try do
       opts_key = skill.opts_key()
       opts = Keyword.get(state.opts, opts_key, [])
+
       case skill.handle_signal(signal, opts) do
         {:ok, new_signal} -> {:ok, new_signal}
         {:error, reason} -> {:error, reason}
@@ -217,7 +223,8 @@ defmodule Jido.Agent.Server.Callback do
     dbug("Starting result transformation pipeline", signal: signal, result: result)
 
     # First try to transform with the agent
-    with {:ok, transformed_result} <- safe_transform_result(agent.__struct__, signal, result, agent) do
+    with {:ok, transformed_result} <-
+           safe_transform_result(agent.__struct__, signal, result, agent) do
       dbug("Agent transformed result", transformed_result: transformed_result)
 
       # Then try to transform with matching skills
@@ -233,7 +240,10 @@ defmodule Jido.Agent.Server.Callback do
               new_result
 
             {:error, _reason} ->
-              dbug("Skill failed to transform result, continuing with previous result", skill: skill)
+              dbug("Skill failed to transform result, continuing with previous result",
+                skill: skill
+              )
+
               acc_result
           end
         end)
@@ -283,6 +293,7 @@ defmodule Jido.Agent.Server.Callback do
   @spec find_matching_skills(skills :: list(Jido.Skill.t()) | nil, signal :: Signal.t() | nil) ::
           list(Jido.Skill.t())
   defp find_matching_skills(nil, _signal), do: []
+
   defp find_matching_skills(skills, %Signal{} = signal) when is_list(skills) do
     matches =
       Enum.filter(skills, fn skill ->
@@ -324,5 +335,6 @@ defmodule Jido.Agent.Server.Callback do
     dbug("Found matching skills", matches: matches, count: length(matches))
     matches
   end
+
   defp find_matching_skills(_skills, _signal), do: []
 end

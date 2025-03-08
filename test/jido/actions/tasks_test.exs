@@ -44,6 +44,7 @@ defmodule Jido.Actions.TasksTest do
         Tasks.CreateTask.run(%{title: title2, deadline: deadline}, %{state: %{tasks: tasks1}})
 
       assert map_size(tasks2) == 2
+
       assert Enum.map(tasks2, fn {_id, task} -> task.title end) |> Enum.sort() ==
                [title1, title2] |> Enum.sort()
     end
@@ -52,7 +53,12 @@ defmodule Jido.Actions.TasksTest do
   describe "UpdateTask" do
     setup do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
-      {:ok, task, [%StateModification{value: tasks}]} = Tasks.CreateTask.run(%{title: "Original Title", deadline: deadline}, %{state: %{tasks: %{}}})
+
+      {:ok, task, [%StateModification{value: tasks}]} =
+        Tasks.CreateTask.run(%{title: "Original Title", deadline: deadline}, %{
+          state: %{tasks: %{}}
+        })
+
       %{task_id: task.id, task: task, tasks: tasks}
     end
 
@@ -95,7 +101,10 @@ defmodule Jido.Actions.TasksTest do
   describe "ToggleTask" do
     setup do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
-      {:ok, task, [%StateModification{value: tasks}]} = Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+
+      {:ok, task, [%StateModification{value: tasks}]} =
+        Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+
       %{task_id: task.id, task: task, tasks: tasks}
     end
 
@@ -144,7 +153,10 @@ defmodule Jido.Actions.TasksTest do
   describe "DeleteTask" do
     setup do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
-      {:ok, task, [%StateModification{value: tasks}]} = Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+
+      {:ok, task, [%StateModification{value: tasks}]} =
+        Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+
       %{task_id: task.id, task: task, tasks: tasks}
     end
 

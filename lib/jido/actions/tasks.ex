@@ -47,11 +47,14 @@ defmodule Jido.Actions.Tasks do
       tasks = Map.get(context.state, :tasks, %{})
       updated_tasks = Map.put(tasks, task.id, task)
 
-      {:ok, task, [%StateModification{
-        op: :set,
-        path: [:tasks],
-        value: updated_tasks
-      }]}
+      {:ok, task,
+       [
+         %StateModification{
+           op: :set,
+           path: [:tasks],
+           value: updated_tasks
+         }
+       ]}
     end
   end
 
@@ -74,19 +77,19 @@ defmodule Jido.Actions.Tasks do
           {:error, :task_not_found}
 
         task ->
-          updated_task = %Task{task |
-            title: params.title,
-            deadline: params.deadline
-          }
+          updated_task = %Task{task | title: params.title, deadline: params.deadline}
 
           tasks = Map.get(context.state, :tasks, %{})
           updated_tasks = Map.put(tasks, params.id, updated_task)
 
-          {:ok, updated_task, [%StateModification{
-            op: :set,
-            path: [:tasks],
-            value: updated_tasks
-          }]}
+          {:ok, updated_task,
+           [
+             %StateModification{
+               op: :set,
+               path: [:tasks],
+               value: updated_tasks
+             }
+           ]}
       end
     end
 
@@ -118,11 +121,14 @@ defmodule Jido.Actions.Tasks do
           tasks = Map.get(context.state, :tasks, %{})
           updated_tasks = Map.put(tasks, params.id, updated_task)
 
-          {:ok, updated_task, [%StateModification{
-            op: :set,
-            path: [:tasks],
-            value: updated_tasks
-          }]}
+          {:ok, updated_task,
+           [
+             %StateModification{
+               op: :set,
+               path: [:tasks],
+               value: updated_tasks
+             }
+           ]}
       end
     end
 
@@ -153,11 +159,14 @@ defmodule Jido.Actions.Tasks do
           tasks = Map.get(context.state, :tasks, %{})
           updated_tasks = Map.delete(tasks, params.id)
 
-          {:ok, task, [%StateModification{
-            op: :set,
-            path: [:tasks],
-            value: updated_tasks
-          }]}
+          {:ok, task,
+           [
+             %StateModification{
+               op: :set,
+               path: [:tasks],
+               value: updated_tasks
+             }
+           ]}
       end
     end
 
