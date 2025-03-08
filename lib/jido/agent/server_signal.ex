@@ -29,7 +29,7 @@ defmodule Jido.Agent.Server.Signal do
   def type({:cmd, :plan}), do: @cmd_base ++ ["plan"]
   def type({:cmd, :run}), do: @cmd_base ++ ["run"]
   def type({:cmd, :cmd}), do: @cmd_base ++ ["cmd"]
-
+  def type({:cmd, :enqueue}), do: @cmd_base ++ ["enqueue"]
   def type({:event, :started}), do: @event_base ++ ["started"]
   def type({:event, :stopped}), do: @event_base ++ ["stopped"]
 
@@ -72,6 +72,9 @@ defmodule Jido.Agent.Server.Signal do
 
   def cmd_signal(:state, _state, _params, _opts),
     do: build(nil, %{type: type({:cmd, :state})})
+
+  def cmd_signal(:enqueue, %ServerState{} = state, instruction, _opts),
+    do: build(state, %{type: type({:cmd, :enqueue}), data: instruction})
 
   @doc false
   def cmd_signal(_, _, _, _), do: nil

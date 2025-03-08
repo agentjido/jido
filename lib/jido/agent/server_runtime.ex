@@ -126,14 +126,10 @@ defmodule Jido.Agent.Server.Runtime do
     end
 
     defp do_agent_cmd(%ServerState{agent: agent} = state, instructions, opts) do
-      case agent.__struct__.cmd(agent, instructions, opts) do
+      opts = Keyword.put(opts, :apply_directives?, false)
+      case agent.__struct__.cmd(agent, instructions, %{}, opts) do
         {:ok, new_agent, directives} ->
-          # Clear the pending instructions after the command is executed, we will translate directives to signals
-          new_agent = %{new_agent | pending_instructions: :queue.new()}
           state = %{state | agent: new_agent}
-
-          {:ok, state} = handle_agent_result(state, new_agent, directives)
-
           case handle_agent_result(state, new_agent, directives) do
             {:ok, state} ->
               {:ok, state, new_agent.result}

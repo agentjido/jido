@@ -82,26 +82,44 @@ defmodule Jido.Agent.Server.State do
         ]
 
   typedstruct do
-    field(:agent, Jido.Agent.t(), enforce: true)
+    # Original opts the Agent was created with
     field(:opts, keyword(), default: [])
+
+    # The Agent struct being managed by this worker
+    field(:agent, Jido.Agent.t(), enforce: true)
+
+    # The mode of the worker, execute signals automatically or force step-by-step
     field(:mode, modes(), default: :auto)
+
+    # The log level of the worker
     field(:log_level, log_levels(), default: :info)
+
+    # The maximum size of the pending signals queue
     field(:max_queue_size, non_neg_integer(), default: 10_000)
+
+    # The registry of the agent
     field(:registry, atom(), default: Jido.Agent.Registry)
 
+    # The dispatch configuration for the worker
     field(:dispatch, dispatch_config(), default: {:logger, []})
 
+    # The router of the worker
     field(:router, Jido.Signal.Router.Router.t(), default: Jido.Signal.Router.new!())
+    field(:journal, Jido.Signal.Journal.t(), default: nil)
+
+    # Skills to compose capabilities into the Agent
     field(:skills, [Jido.Skill.t()], default: [])
 
+    # Pids for the local supervisor, parent and
     field(:child_supervisor, pid())
+    field(:parent_pid, pid())
+    field(:orchestrator_pid, pid())
+
+    # Runtime status
     field(:status, status(), default: :idle)
     field(:pending_signals, :queue.queue(), default: :queue.new())
-
     field(:current_signal_type, atom(), default: nil)
     field(:current_signal, Jido.Signal.t(), default: nil)
-
-    # Map to store GenServer.from() references for reply-later functionality
     field(:reply_refs, %{String.t() => GenServer.from()}, default: %{})
   end
 

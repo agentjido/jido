@@ -26,6 +26,7 @@ defmodule Jido.Runner.Simple do
   * All errors preserve the original agent state
   """
   @behaviour Jido.Runner
+  use ExDbug, enabled: true
 
   alias Jido.Instruction
   alias Jido.Error
@@ -92,12 +93,16 @@ defmodule Jido.Runner.Simple do
   @impl true
   @spec run(Jido.Agent.t(), run_opts()) :: run_result()
   def run(%{pending_instructions: instructions} = agent, opts \\ []) do
+    dbug("Starting runner with agent", agent_id: agent.id)
+
     case :queue.out(instructions) do
       {{:value, %Instruction{} = instruction}, remaining} ->
+        dbug("Dequeued instruction", instruction: instruction)
         agent = %{agent | pending_instructions: remaining}
         execute_instruction(agent, instruction, opts)
 
       {:empty, _} ->
+        dbug("No pending instructions")
         {:ok, agent, []}
     end
   end
@@ -107,24 +112,31 @@ defmodule Jido.Runner.Simple do
   defp execute_instruction(agent, instruction, opts) do
     # Inject agent state into instruction context
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+    dbug("Executing instruction", instruction: instruction)
 
     case Jido.Workflow.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
+        dbug("Workflow returned result with directive list", result: result, directives: directives)
         handle_directive_result(agent, result, directives, opts)
 
       {:ok, result, directive} ->
+        dbug("Workflow returned result with single directive", result: result, directive: directive)
         handle_directive_result(agent, result, [directive], opts)
 
       {:ok, result} ->
+        dbug("Workflow returned result only", result: result)
         {:ok, %{agent | result: result}, []}
 
       {:error, %Error{} = error} ->
+        dbug("Workflow returned error struct", error: error)
         {:error, error}
 
       {:error, reason} when is_binary(reason) ->
+        dbug("Workflow returned string error", reason: reason)
         handle_directive_error(reason)
 
       {:error, reason} ->
+        dbug("Workflow returned other error", reason: reason)
         {:error, Error.new(:execution_error, "Workflow execution failed", reason)}
     end
   end
@@ -132,25 +144,31 @@ defmodule Jido.Runner.Simple do
   @spec handle_directive_result(Jido.Agent.t(), term(), list(), keyword()) :: run_result()
   defp handle_directive_result(agent, result, directives, opts) do
     apply_directives? = Keyword.get(opts, :apply_directives?, true)
+    dbug("Handling directive result", apply_directives?: apply_directives?)
 
     if apply_directives? do
       case Directive.apply_agent_directive(agent, directives) do
         {:ok, updated_agent, server_directives} ->
+          dbug("Applied directives successfully", server_directives: server_directives)
           {:ok, %{updated_agent | result: result}, server_directives}
 
         {:error, %Error{} = error} ->
+          dbug("Directive application failed with error struct", error: error)
           {:error, error}
 
         {:error, reason} ->
+          dbug("Directive application failed with reason", reason: reason)
           {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
       end
     else
+      dbug("Skipping directive application")
       {:ok, %{agent | result: result}, directives}
     end
   end
 
   @spec handle_directive_error(String.t()) :: {:error, Error.t()}
   defp handle_directive_error(reason) do
+    dbug("Handling directive error", reason: reason)
     {:error, Error.validation_error("Invalid directive", %{reason: reason})}
   end
 end
