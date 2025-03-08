@@ -276,5 +276,50 @@ defmodule Jido.Runner.SimpleTest do
                state_in_context: %{value: 42, status: :ready}
              }
     end
+
+    test "respects apply_directives? option when false" do
+      instruction = %Instruction{
+        action: JidoTest.TestActions.EnqueueAction,
+        params: %{
+          action: :next_action,
+          params: %{value: 42}
+        },
+        context: %{}
+      }
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list([instruction])}
+
+      assert {:ok, updated_agent, directives} = Simple.run(agent, apply_directives?: false)
+      # Verify directives were returned but not applied
+      assert length(directives) == 1
+      [directive] = directives
+      assert %Jido.Agent.Directive.Enqueue{} = directive
+      assert directive.action == :next_action
+      assert directive.params == %{value: 42}
+      # Verify no instructions were enqueued
+      assert :queue.is_empty(updated_agent.pending_instructions)
+    end
+
+    test "respects apply_directives? option when true (default)" do
+      instruction = %Instruction{
+        action: JidoTest.TestActions.EnqueueAction,
+        params: %{
+          action: :next_action,
+          params: %{value: 42}
+        },
+        context: %{}
+      }
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list([instruction])}
+
+      assert {:ok, updated_agent, []} = Simple.run(agent)
+      # Verify directive was applied (instruction was enqueued)
+      assert :queue.len(updated_agent.pending_instructions) == 1
+      {{:value, enqueued}, _} = :queue.out(updated_agent.pending_instructions)
+      assert enqueued.action == :next_action
+      assert enqueued.params == %{value: 42}
+    end
   end
 end

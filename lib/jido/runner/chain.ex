@@ -19,7 +19,10 @@ defmodule Jido.Runner.Chain do
   alias Jido.Error
 
   @type chain_result :: {:ok, Jido.Agent.t(), [Directive.t()]} | {:error, Error.t()}
-  @type chain_opts :: [merge_results: boolean()]
+  @type chain_opts :: [
+    merge_results: boolean(),
+    apply_directives?: boolean()
+  ]
 
   @doc """
   Executes a chain of instructions sequentially, with optional result merging.
@@ -31,6 +34,7 @@ defmodule Jido.Runner.Chain do
       * `id` - Agent identifier
     * `opts` - Optional keyword list of execution options:
       * `:merge_results` - When true, merges each result into the next instruction's params (default: true)
+      * `:apply_directives?` - When true (default), applies directives during execution
 
   ## Returns
     * `{:ok, updated_agent, directives}` - Chain completed successfully with:
@@ -45,6 +49,9 @@ defmodule Jido.Runner.Chain do
 
       # Chain with result merging disabled
       {:ok, updated_agent, directives} = Chain.run(agent, merge_results: false)
+
+      # Chain without applying directives
+      {:ok, updated_agent, directives} = Chain.run(agent, apply_directives?: false)
   """
   @impl true
   @spec run(Jido.Agent.t(), chain_opts()) :: chain_result()
@@ -62,21 +69,27 @@ defmodule Jido.Runner.Chain do
   defp execute_chain(agent, instructions_list, opts) do
     merge_results = Keyword.get(opts, :merge_results, true)
     agent = %{agent | pending_instructions: :queue.new()}
-    execute_chain_step(instructions_list, agent, [], %{}, merge_results)
+    execute_chain_step(instructions_list, agent, [], %{}, merge_results, opts)
   end
 
-  @spec execute_chain_step([Instruction.t()], Jido.Agent.t(), [Directive.t()], map(), boolean()) ::
+  @spec execute_chain_step([Instruction.t()], Jido.Agent.t(), [Directive.t()], map(), boolean(), keyword()) ::
           chain_result()
-  defp execute_chain_step([], agent, accumulated_directives, last_result, _merge_results) do
-    case Directive.apply_agent_directive(agent, accumulated_directives) do
-      {:ok, updated_agent, server_directives} ->
-        {:ok, %{updated_agent | result: last_result}, server_directives}
+  defp execute_chain_step([], agent, accumulated_directives, last_result, _merge_results, opts) do
+    apply_directives? = Keyword.get(opts, :apply_directives?, true)
 
-      {:error, %Error{} = error} ->
-        {:error, error}
+    if apply_directives? do
+      case Directive.apply_agent_directive(agent, accumulated_directives) do
+        {:ok, updated_agent, server_directives} ->
+          {:ok, %{updated_agent | result: last_result}, server_directives}
 
-      {:error, reason} ->
-        {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
+        {:error, %Error{} = error} ->
+          {:error, error}
+
+        {:error, reason} ->
+          {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
+      end
+    else
+      {:ok, %{agent | result: last_result}, accumulated_directives}
     end
   end
 
@@ -85,7 +98,8 @@ defmodule Jido.Runner.Chain do
          agent,
          accumulated_directives,
          last_result,
-         merge_results
+         merge_results,
+         opts
        ) do
     # Merge last_result into instruction params if enabled
     instruction =
@@ -106,7 +120,8 @@ defmodule Jido.Runner.Chain do
           remaining,
           agent,
           accumulated_directives,
-          merge_results
+          merge_results,
+          opts
         )
 
       {:ok, result, directive} ->
@@ -116,11 +131,12 @@ defmodule Jido.Runner.Chain do
           remaining,
           agent,
           accumulated_directives,
-          merge_results
+          merge_results,
+          opts
         )
 
       {:ok, result} ->
-        execute_chain_step(remaining, agent, accumulated_directives, result, merge_results)
+        execute_chain_step(remaining, agent, accumulated_directives, result, merge_results, opts)
 
       {:error, %Error{} = error} ->
         {:error, error}
@@ -139,7 +155,8 @@ defmodule Jido.Runner.Chain do
           [Instruction.t()],
           Jido.Agent.t(),
           [Directive.t()],
-          boolean()
+          boolean(),
+          keyword()
         ) ::
           chain_result()
   defp handle_chain_result(
@@ -148,7 +165,8 @@ defmodule Jido.Runner.Chain do
          remaining,
          agent,
          accumulated_directives,
-         merge_results
+         merge_results,
+         opts
        ) do
     # Convert any instructions to enqueue directives
     processed_directives =
@@ -158,6 +176,6 @@ defmodule Jido.Runner.Chain do
       end)
 
     updated_directives = accumulated_directives ++ processed_directives
-    execute_chain_step(remaining, agent, updated_directives, result, merge_results)
+    execute_chain_step(remaining, agent, updated_directives, result, merge_results, opts)
   end
 end

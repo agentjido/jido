@@ -244,6 +244,79 @@ defmodule Jido.Runner.ChainTest do
       assert {:error, error} = Chain.run(agent)
       assert error.message == "Compensation completed for: Intentional failure"
     end
+
+    test "respects apply_directives? option when false" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{}
+        },
+        %Instruction{
+          action: EnqueueAction,
+          params: %{
+            action: :next_action,
+            params: %{value: 42}
+          },
+          context: %{}
+        },
+        %Instruction{
+          action: Add,
+          params: %{value: 1, amount: 2},
+          context: %{}
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      assert {:ok, updated_agent, directives} = Chain.run(agent, apply_directives?: false)
+      # Verify final result
+      assert updated_agent.result == %{value: 3}
+      # Verify directives were returned but not applied
+      assert length(directives) == 1
+      [directive] = directives
+      assert %Jido.Agent.Directive.Enqueue{} = directive
+      assert directive.action == :next_action
+      assert directive.params == %{value: 42}
+      # Verify no instructions were enqueued
+      assert :queue.is_empty(updated_agent.pending_instructions)
+    end
+
+    test "respects apply_directives? option when true (default)" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{}
+        },
+        %Instruction{
+          action: EnqueueAction,
+          params: %{
+            action: :next_action,
+            params: %{value: 42}
+          },
+          context: %{}
+        },
+        %Instruction{
+          action: Add,
+          params: %{value: 1, amount: 2},
+          context: %{}
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      assert {:ok, updated_agent, []} = Chain.run(agent)
+      # Verify final result
+      assert updated_agent.result == %{value: 3}
+      # Verify directive was applied (instruction was enqueued)
+      assert :queue.len(updated_agent.pending_instructions) == 1
+      {{:value, enqueued}, _} = :queue.out(updated_agent.pending_instructions)
+      assert enqueued.action == :next_action
+      assert enqueued.params == %{value: 42}
+    end
   end
 
   describe "instruction directive handling" do
