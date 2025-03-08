@@ -13,7 +13,7 @@ defmodule Jido.Runner.Chain do
   * Comprehensive error handling
   """
   @behaviour Jido.Runner
-
+  use ExDbug, enabled: true
   alias Jido.Instruction
   alias Jido.Agent.Directive
   alias Jido.Error
@@ -56,17 +56,21 @@ defmodule Jido.Runner.Chain do
   @impl true
   @spec run(Jido.Agent.t(), chain_opts()) :: chain_result()
   def run(%{pending_instructions: instructions} = agent, opts \\ []) do
+    dbug("Starting chain run", agent: agent.id, opts: opts)
     case :queue.to_list(instructions) do
       [] ->
+        dbug("No instructions to run", agent: agent.id)
         {:ok, %{agent | pending_instructions: :queue.new()}, []}
 
       instructions_list ->
+        dbug("Executing chain", agent: agent.id, instructions: length(instructions_list))
         execute_chain(agent, instructions_list, opts)
     end
   end
 
   @spec execute_chain(Jido.Agent.t(), [Instruction.t()], keyword()) :: chain_result()
   defp execute_chain(agent, instructions_list, opts) do
+    dbug("Setting up chain execution", agent: agent.id)
     merge_results = Keyword.get(opts, :merge_results, true)
     agent = %{agent | pending_instructions: :queue.new()}
     execute_chain_step(instructions_list, agent, [], %{}, merge_results, opts)
@@ -75,20 +79,26 @@ defmodule Jido.Runner.Chain do
   @spec execute_chain_step([Instruction.t()], Jido.Agent.t(), [Directive.t()], map(), boolean(), keyword()) ::
           chain_result()
   defp execute_chain_step([], agent, accumulated_directives, last_result, _merge_results, opts) do
+    dbug("Chain execution complete", agent: agent.id, directives: length(accumulated_directives))
     apply_directives? = Keyword.get(opts, :apply_directives?, true)
 
     if apply_directives? do
+      dbug("Applying accumulated directives", agent: agent.id)
       case Directive.apply_agent_directive(agent, accumulated_directives) do
         {:ok, updated_agent, server_directives} ->
+          dbug("Directives applied successfully", agent: agent.id)
           {:ok, %{updated_agent | result: last_result}, server_directives}
 
         {:error, %Error{} = error} ->
+          dbug("Error applying directives", agent: agent.id, error: error)
           {:error, error}
 
         {:error, reason} ->
+          dbug("Error applying directives", agent: agent.id, reason: reason)
           {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
       end
     else
+      dbug("Skipping directive application", agent: agent.id)
       {:ok, %{agent | result: last_result}, accumulated_directives}
     end
   end
@@ -101,9 +111,11 @@ defmodule Jido.Runner.Chain do
          merge_results,
          opts
        ) do
+    dbug("Executing chain step", agent: agent.id, instruction: instruction.id)
     # Merge last_result into instruction params if enabled
     instruction =
       if merge_results do
+        dbug("Merging results into params", agent: agent.id)
         %{instruction | params: Map.merge(instruction.params, last_result)}
       else
         instruction
@@ -112,8 +124,10 @@ defmodule Jido.Runner.Chain do
     # Inject agent state into instruction context
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
+    dbug("Running workflow", agent: agent.id, instruction: instruction.id)
     case Jido.Workflow.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
+        dbug("Workflow returned result with directive list", agent: agent.id)
         handle_chain_result(
           result,
           directives,
@@ -125,6 +139,7 @@ defmodule Jido.Runner.Chain do
         )
 
       {:ok, result, directive} ->
+        dbug("Workflow returned result with single directive", agent: agent.id)
         handle_chain_result(
           result,
           [directive],
@@ -136,15 +151,19 @@ defmodule Jido.Runner.Chain do
         )
 
       {:ok, result} ->
+        dbug("Workflow returned result with no directives", agent: agent.id)
         execute_chain_step(remaining, agent, accumulated_directives, result, merge_results, opts)
 
       {:error, %Error{} = error} ->
+        dbug("Workflow returned error", agent: agent.id, error: error)
         {:error, error}
 
       {:error, reason} when is_binary(reason) ->
+        dbug("Workflow returned string error", agent: agent.id, reason: reason)
         {:error, Error.validation_error("Invalid directive", %{reason: reason})}
 
       {:error, reason} ->
+        dbug("Workflow returned generic error", agent: agent.id, reason: reason)
         {:error, Error.new(:execution_error, "Chain execution failed", reason)}
     end
   end
@@ -168,6 +187,7 @@ defmodule Jido.Runner.Chain do
          merge_results,
          opts
        ) do
+    dbug("Handling chain result", agent: agent.id, directives: length(directives))
     # Convert any instructions to enqueue directives
     processed_directives =
       Enum.map(directives, fn
@@ -176,6 +196,7 @@ defmodule Jido.Runner.Chain do
       end)
 
     updated_directives = accumulated_directives ++ processed_directives
+    dbug("Continuing chain execution", agent: agent.id, remaining: length(remaining))
     execute_chain_step(remaining, agent, updated_directives, result, merge_results, opts)
   end
 end

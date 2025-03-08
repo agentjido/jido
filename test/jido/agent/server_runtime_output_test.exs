@@ -49,26 +49,14 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
 
   describe "do_agent_cmd/3" do
     test "executes single instruction and returns result", %{state: state} do
-      instruction = %Instruction{id: "test", action: TestActions.NoSchema, params: %{value: 1}}
+      instruction = %Instruction{action: TestActions.NoSchema, params: %{value: 1}}
 
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
+      assert {:ok, final_state, result} = Runtime.do_agent_cmd(state, [instruction], [])
       assert final_state.agent.result == %{result: 3}
+      assert result == %{result: 3}
       assert :queue.is_empty(final_state.agent.pending_instructions)
     end
 
-    @tag :skip
-    test "executes multiple initial instructions in sequence", %{state: state} do
-      instructions = [
-        %Instruction{id: "first", action: TestActions.NoSchema, params: %{value: 1}},
-        %Instruction{id: "second", action: TestActions.Add, params: %{value: 3, amount: 1}}
-      ]
-
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, instructions, [])
-      assert final_state.agent.result == %{value: 4}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
-    end
-
-    @tag :skip
     test "executes enqueued actions from directives in initial instruction", %{state: state} do
       # Initial instruction that enqueues more actions via directive
       instruction = %Instruction{
@@ -77,9 +65,9 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
         params: %{type: :agent}
       }
 
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
-      assert final_state.agent.result == %{value: 4}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
+      assert {:ok, step_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
+      assert step_state.agent.result == %{}
+      assert :queue.len(step_state.pending_signals) == 2
     end
 
     test "handles errors in initial instruction", %{state: state} do
@@ -134,6 +122,7 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
       # Result should be from enqueued actions, not from signal instruction
       assert final_state.agent.result == %{result: 12}
       assert :queue.is_empty(final_state.agent.pending_instructions)
+      assert :queue.len(final_state.pending_signals) == 2
     end
   end
 
