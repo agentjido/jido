@@ -3,7 +3,7 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
   require Logger
 
   alias Jido.Agent.Server.{Runtime, State}
-  alias Jido.{Agent, Instruction}
+  alias Jido.Instruction
   alias Jido.Signal
   alias Jido.Signal.Router
   alias JidoTest.TestAgents.BasicAgent
@@ -12,21 +12,6 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
 
   @moduletag :capture_log
   @moduletag timeout: 30_000
-  # Mock the Agent module's run function
-  defmodule MockAgent do
-    def run(%Agent{} = agent, _opts) do
-      case :queue.peek(agent.pending_instructions) do
-        :empty ->
-          {:ok, agent, []}
-
-        {:value, %Instruction{action: TestActions.ErrorAction}} ->
-          {:error, "Test error"}
-
-        _ ->
-          {:ok, agent, []}
-      end
-    end
-  end
 
   setup do
     {:ok, supervisor} = start_supervised(DynamicSupervisor)
@@ -64,21 +49,11 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
 
   describe "do_agent_cmd/3" do
     test "executes single instruction and returns result", %{state: state} do
-      instruction = %Instruction{id: "test", action: TestActions.NoSchema, params: %{value: 1}}
+      instruction = %Instruction{action: TestActions.NoSchema, params: %{value: 1}}
 
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
+      assert {:ok, final_state, result} = Runtime.do_agent_cmd(state, [instruction], [])
       assert final_state.agent.result == %{result: 3}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
-    end
-
-    test "executes multiple initial instructions in sequence", %{state: state} do
-      instructions = [
-        %Instruction{id: "first", action: TestActions.NoSchema, params: %{value: 1}},
-        %Instruction{id: "second", action: TestActions.Add, params: %{value: 3, amount: 1}}
-      ]
-
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, instructions, [])
-      assert final_state.agent.result == %{value: 4}
+      assert result == %{result: 3}
       assert :queue.is_empty(final_state.agent.pending_instructions)
     end
 
@@ -90,9 +65,9 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
         params: %{type: :agent}
       }
 
-      assert {:ok, final_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
-      assert final_state.agent.result == %{value: 4}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
+      assert {:ok, step_state, _result} = Runtime.do_agent_cmd(state, [instruction], [])
+      assert step_state.agent.result == %{}
+      assert :queue.len(step_state.pending_signals) == 2
     end
 
     test "handles errors in initial instruction", %{state: state} do
@@ -147,80 +122,7 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
       # Result should be from enqueued actions, not from signal instruction
       assert final_state.agent.result == %{result: 12}
       assert :queue.is_empty(final_state.agent.pending_instructions)
-    end
-  end
-
-  describe "do_agent_run/2" do
-    test "returns {:ok, state, result} when no pending instructions", %{state: state} do
-      agent = %{state.agent | result: :ok, pending_instructions: :queue.new()}
-      state = %{state | agent: agent}
-      assert {:ok, _state, :ok} = Runtime.do_agent_run(state, [])
-    end
-
-    test "executes pending instructions and returns result", %{state: state} do
-      instruction = %Instruction{id: "test", action: TestActions.NoSchema, params: %{value: 1}}
-      queue = :queue.in(instruction, :queue.new())
-      agent = %{state.agent | pending_instructions: queue}
-      state = %{state | agent: agent}
-
-      assert {:ok, final_state, %{result: 3}} = Runtime.do_agent_run(state, [])
-      assert final_state.agent.result == %{result: 3}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
-    end
-
-    test "executes enqueued actions from directives", %{state: state} do
-      # Create initial instruction that will enqueue more actions
-      instruction = %Instruction{
-        id: "test",
-        action: TestActions.MultiDirectiveAction,
-        params: %{
-          type: :agent
-        }
-      }
-
-      queue = :queue.in(instruction, :queue.new())
-      agent = %{state.agent | pending_instructions: queue}
-      state = %{state | agent: agent}
-
-      {:ok, final_state, _result} = Runtime.do_agent_run(state, [])
-
-      assert final_state.agent.result == %{value: 4}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
-    end
-
-    test "handles errors during instruction execution", %{state: state} do
-      instruction = %Instruction{id: "test", action: TestActions.ErrorAction}
-      queue = :queue.in(instruction, :queue.new())
-      agent = %{state.agent | pending_instructions: queue}
-      state = %{state | agent: agent}
-
-      assert {:error, _reason} = Runtime.do_agent_run(state, [])
-    end
-
-    test "executes chain of enqueued actions", %{state: state} do
-      # First action adds 2 to value 1
-      first_instruction = %Instruction{
-        id: "first",
-        action: TestActions.NoSchema,
-        params: %{value: 1}
-      }
-
-      # Second action adds 1 to the previous result
-      second_instruction = %Instruction{
-        id: "second",
-        action: TestActions.Add,
-        params: %{value: 3, amount: 1}
-      }
-
-      queue = :queue.in(first_instruction, :queue.new())
-      queue = :queue.in(second_instruction, queue)
-      agent = %{state.agent | pending_instructions: queue}
-      state = %{state | agent: agent}
-
-      assert {:ok, final_state, %{value: 4}} = Runtime.do_agent_run(state, [])
-      # First adds 2 (1->3), second adds 1 (3->4)
-      assert final_state.agent.result == %{value: 4}
-      assert :queue.is_empty(final_state.agent.pending_instructions)
+      assert :queue.len(final_state.pending_signals) == 2
     end
   end
 

@@ -34,6 +34,11 @@ defmodule Jido.Agent.Directive do
         - Requires a valid PID
         - Example: `%Kill{pid: #PID<0.123.0>}`
 
+    * `StateModification` - Modifies agent state at a given path
+        - Requires an operation and path
+        - Supports optional value
+        - Example: `%StateModification{op: :set, path: [:config, :mode], value: :active}`
+
     ## Usage
 
     Directives can be applied to either an Agent or ServerState struct:
@@ -85,6 +90,7 @@ defmodule Jido.Agent.Directive do
   """
   use TypedStruct
   alias Jido.Agent
+  alias Jido.Error
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Instruction
 
@@ -117,6 +123,17 @@ defmodule Jido.Agent.Directive do
         context: instruction.context,
         opts: instruction.opts
       }
+    end
+  end
+
+  defmodule StateModification do
+    @moduledoc "Directive to modify agent state at a given path"
+    use TypedStruct
+
+    typedstruct do
+      field(:op, :set | :update | :delete | :reset, enforce: true)
+      field(:path, list(atom()) | atom(), enforce: true)
+      field(:value, any())
     end
   end
 
@@ -163,6 +180,7 @@ defmodule Jido.Agent.Directive do
           | DeregisterAction.t()
           | Spawn.t()
           | Kill.t()
+          | StateModification.t()
           | Instruction.t()
           | [Instruction.t()]
 
@@ -172,7 +190,7 @@ defmodule Jido.Agent.Directive do
           | {:error, term()}
 
   # Define which directive types are agent-specific, other directives are server-specific
-  @agent_directives [Enqueue, RegisterAction, DeregisterAction]
+  @agent_directives [Enqueue, RegisterAction, DeregisterAction, StateModification]
 
   @doc """
   Applies agent directives to an Agent struct.
@@ -193,8 +211,6 @@ defmodule Jido.Agent.Directive do
       {agent_directives, server_directives} = split_directives(directives)
 
       Enum.reduce_while(agent_directives, {:ok, agent}, fn directive, {:ok, current_agent} ->
-        Logger.info("Applying agent directive: #{directive.__struct__}")
-
         case apply_single_directive(current_agent, directive, opts) do
           {:ok, updated_agent} -> {:cont, {:ok, updated_agent}}
           error -> {:halt, error}
@@ -321,6 +337,28 @@ defmodule Jido.Agent.Directive do
     end
   end
 
+  defp apply_single_directive(agent, %StateModification{} = directive, _opts) do
+    with :ok <- validate_directive(directive) do
+      case directive.op do
+        :set ->
+          updated_state = put_in(agent.state, List.wrap(directive.path), directive.value)
+          {:ok, %{agent | state: updated_state}}
+
+        :update when is_function(directive.value) ->
+          updated_state = update_in(agent.state, List.wrap(directive.path), directive.value)
+          {:ok, %{agent | state: updated_state}}
+
+        :delete ->
+          {_, updated_state} = pop_in(agent.state, List.wrap(directive.path))
+          {:ok, %{agent | state: updated_state}}
+
+        :reset ->
+          updated_state = put_in(agent.state, List.wrap(directive.path), nil)
+          {:ok, %{agent | state: updated_state}}
+      end
+    end
+  end
+
   defp validate_directive(%Enqueue{action: nil}), do: {:error, :invalid_action}
   defp validate_directive(%Enqueue{action: action}) when is_atom(action), do: :ok
 
@@ -341,6 +379,22 @@ defmodule Jido.Agent.Directive do
 
   defp validate_directive(%Instruction{action: nil}), do: {:error, :invalid_action}
   defp validate_directive(%Instruction{action: action}) when is_atom(action), do: :ok
+
+  defp validate_directive(%StateModification{op: op, path: path, value: value}) do
+    cond do
+      op not in [:set, :update, :delete, :reset] ->
+        {:error, Error.validation_error("Invalid operation", %{op: op})}
+
+      not (is_list(path) or is_atom(path)) ->
+        {:error, Error.validation_error("Invalid path", %{path: path})}
+
+      op == :update and not is_function(value) ->
+        {:error, Error.validation_error("Invalid update function", %{value: value})}
+
+      true ->
+        :ok
+    end
+  end
 
   defp validate_directive(instructions) when is_list(instructions) do
     if Enum.all?(instructions, &match?(%Instruction{}, &1)) do

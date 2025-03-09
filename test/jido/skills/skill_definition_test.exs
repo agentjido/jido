@@ -27,18 +27,9 @@ defmodule Jido.SkillDefinitionTest do
       assert metadata.vsn == "1.0.0"
       assert metadata.opts_key == :weather
 
-      assert metadata.signals == %{
-               input: [
-                 "weather_monitor.data.received",
-                 "weather_monitor.alert.triggered",
-                 "weather_monitor.conditions.updated"
-               ],
-               output: [
-                 "weather_monitor.alert.generated",
-                 "weather_monitor.data.processed",
-                 "weather_monitor.conditions.changed"
-               ]
-             }
+      assert metadata.signal_patterns == [
+               "weather_monitor.**"
+             ]
 
       assert metadata.opts_schema == [
                weather_api: [type: :map, required: true, doc: "Weather API configuration"],
@@ -58,18 +49,10 @@ defmodule Jido.SkillDefinitionTest do
     end
 
     test "skill defines valid signal patterns" do
-      signals = WeatherMonitorSkill.signals()
+      signal_patterns = WeatherMonitorSkill.signal_patterns()
 
-      assert signals.input == [
-               "weather_monitor.data.received",
-               "weather_monitor.alert.triggered",
-               "weather_monitor.conditions.updated"
-             ]
-
-      assert signals.output == [
-               "weather_monitor.alert.generated",
-               "weather_monitor.data.processed",
-               "weather_monitor.conditions.changed"
+      assert signal_patterns == [
+               "weather_monitor.**"
              ]
     end
 

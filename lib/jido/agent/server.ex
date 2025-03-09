@@ -48,6 +48,7 @@ defmodule Jido.Agent.Server do
     * `:initial_state` - Initial state map for the agent
     * `:registry` - Registry for process registration
     * `:mode` - Operation mode (`:auto` or `:manual`)
+    * `:routes` - Routes for the agent
     * `:output` - Output destination for agent signals
     * `:log_level` - Logging level
     * `:max_queue_size` - Maximum size of pending signals queue
@@ -59,12 +60,15 @@ defmodule Jido.Agent.Server do
   @spec start_link([start_option()]) :: GenServer.on_start()
   def start_link(opts) do
     dbug("Starting agent server", opts: opts)
-    opts = Keyword.put_new(opts, :id, Jido.Util.generate_id())
+
+    # Ensure ID consistency
+    opts = ensure_id_consistency(opts)
 
     with {:ok, agent} <- build_agent(opts),
-         opts = Keyword.put(opts, :agent, agent),
+         # Update the opts with the agent's ID to ensure consistency
+         opts = Keyword.put(opts, :agent, agent) |> Keyword.put(:id, agent.id),
          {:ok, opts} <- ServerOptions.validate_server_opts(opts) do
-      agent_id = Keyword.get(opts, :agent).id
+      agent_id = agent.id
       registry = Keyword.get(opts, :registry)
 
       GenServer.start_link(
@@ -143,13 +147,15 @@ defmodule Jido.Agent.Server do
   @impl true
   def init(opts) do
     dbug("Initializing agent server", opts: opts)
-    opts = Keyword.put_new(opts, :id, Jido.Util.generate_id())
+    ServerOutput.log(opts[:log_level], "Initializing agent server")
+
+    # Ensure ID consistency - should be a no-op if already consistent from start_link
+    opts = ensure_id_consistency(opts)
 
     with {:ok, agent} <- build_agent(opts),
          opts = Keyword.put(opts, :agent, agent),
          {:ok, opts} <- ServerOptions.validate_server_opts(opts),
          {:ok, state} <- build_initial_state_from_opts(opts),
-         {:ok, state} <- ServerProcess.start_supervisor(state),
          {:ok, state, opts} <- ServerSkills.build(state, opts),
          {:ok, state} <- ServerRouter.build(state, opts),
          {:ok, state, _pids} <- ServerProcess.start(state, opts[:child_specs]),
@@ -376,28 +382,61 @@ defmodule Jido.Agent.Server do
 
     case Keyword.fetch(opts, :agent) do
       {:ok, agent_input} when not is_nil(agent_input) ->
+        dbug("Agent input type",
+          is_atom: is_atom(agent_input),
+          is_struct: is_struct(agent_input),
+          module_info:
+            if(is_atom(agent_input),
+              do: %{
+                module_loaded: Code.ensure_loaded?(agent_input),
+                module_exports_new: :erlang.function_exported(agent_input, :new, 2)
+              },
+              else: :not_a_module
+            ),
+          agent_input: agent_input
+        )
+
         cond do
-          is_atom(agent_input) and :erlang.function_exported(agent_input, :new, 2) ->
-            id = Keyword.get(opts, :id)
-            initial_state = Keyword.get(opts, :initial_state, %{})
-            {:ok, agent_input.new(id, initial_state)}
+          is_atom(agent_input) ->
+            # First ensure the module is loaded
+            case Code.ensure_loaded(agent_input) do
+              {:module, _} ->
+                if :erlang.function_exported(agent_input, :new, 2) do
+                  id = Keyword.get(opts, :id)
+                  initial_state = Keyword.get(opts, :initial_state, %{})
+                  dbug("Creating new agent instance", module: agent_input, id: id)
+                  {:ok, agent_input.new(id, initial_state)}
+                else
+                  dbug("Module #{inspect(agent_input)} does not export new/2")
+                  {:error, :invalid_agent}
+                end
+
+              {:error, _reason} ->
+                # dbug("Failed to load module #{inspect(agent_input)}", reason: reason)
+                {:error, :invalid_agent}
+            end
 
           is_struct(agent_input) ->
             # Check if the provided ID differs from the agent's ID
             provided_id = Keyword.get(opts, :id)
+            agent_id = agent_input.id
 
-            if provided_id && provided_id != agent_input.id do
+            # Check for non-empty IDs that differ
+            if is_binary(provided_id) && is_binary(agent_id) &&
+                 provided_id != "" && agent_id != "" &&
+                 provided_id != agent_id do
               require Logger
 
+              # Always emit this warning regardless of debug settings
               Logger.warning(
-                "Agent ID mismatch: provided ID '#{provided_id}' will be superseded by agent's ID '#{agent_input.id}'"
+                "Agent ID mismatch: provided ID '#{provided_id}' will be superseded by agent's ID '#{agent_id}'"
               )
             end
 
             {:ok, agent_input}
 
           true ->
-            dbug("Invalid agent input")
+            dbug("Invalid agent input - not an atom or struct", agent_input: agent_input)
             {:error, :invalid_agent}
         end
 
@@ -413,6 +452,7 @@ defmodule Jido.Agent.Server do
 
     state = %ServerState{
       agent: opts[:agent],
+      opts: opts,
       mode: opts[:mode],
       log_level: opts[:log_level],
       max_queue_size: opts[:max_queue_size],
@@ -422,5 +462,45 @@ defmodule Jido.Agent.Server do
     }
 
     {:ok, state}
+  end
+
+  @spec ensure_id_consistency(keyword()) :: keyword()
+  defp ensure_id_consistency(opts) do
+    # Check if we have an agent with an ID
+    agent_id =
+      case Keyword.get(opts, :agent) do
+        %{id: id} when is_binary(id) ->
+          if id != "", do: id, else: nil
+
+        _ ->
+          nil
+      end
+
+    # Check if we have an explicit ID in the options
+    explicit_id = Keyword.get(opts, :id)
+    explicit_id = if is_binary(explicit_id) && explicit_id != "", do: explicit_id, else: nil
+
+    cond do
+      # If we have both an agent ID and an explicit ID, and they differ,
+      # we'll keep the agent ID but update the options
+      agent_id && explicit_id && agent_id != explicit_id ->
+        Keyword.put(opts, :id, agent_id)
+
+      # If we have an agent ID but no explicit ID, use the agent ID
+      agent_id && !explicit_id ->
+        Keyword.put(opts, :id, agent_id)
+
+      # If we have an explicit ID but no agent ID, keep the explicit ID
+      !agent_id && explicit_id ->
+        opts
+
+      # If we have neither, generate a new ID
+      !agent_id && !explicit_id ->
+        Keyword.put(opts, :id, Jido.Util.generate_id())
+
+      # Otherwise, options are already consistent
+      true ->
+        opts
+    end
   end
 end

@@ -7,7 +7,7 @@ defmodule Jido.Agent.Server.Process do
   alias Jido.Agent.Server.Output, as: ServerOutput
 
   @typedoc "Child process specification"
-  @type child_spec :: Supervisor.child_spec() | {module(), term()} | module()
+  @type child_spec :: Supervisor.child_spec() | {module(), term()} | module() | [child_spec()]
 
   @typedoc "Child process ID"
   @type child_pid :: pid()
@@ -17,34 +17,6 @@ defmodule Jido.Agent.Server.Process do
 
   @typedoc "Server state type"
   @type server_state :: ServerState.t()
-
-  @doc """
-  Starts the DynamicSupervisor for managing an Agent's child processes.
-
-  The supervisor uses a :one_for_one strategy, meaning each child is supervised
-  independently.
-
-  ## Parameters
-  - state: Current server state
-
-  ## Returns
-  - `{:ok, updated_state}` - Supervisor started successfully
-  - `{:error, reason}` - Failed to start supervisor
-  """
-  @spec start_supervisor(server_state()) :: {:ok, server_state()} | {:error, term()}
-  def start_supervisor(%ServerState{} = state) do
-    dbug("Starting supervisor", state: state)
-
-    case DynamicSupervisor.start_link(strategy: :one_for_one) do
-      {:ok, supervisor} ->
-        dbug("Supervisor started successfully", supervisor: supervisor)
-        {:ok, %{state | child_supervisor: supervisor}}
-
-      {:error, _reason} = error ->
-        dbug("Failed to start supervisor", error: error)
-        error
-    end
-  end
 
   @doc """
   Stops the DynamicSupervisor and all its child processes.
@@ -83,7 +55,11 @@ defmodule Jido.Agent.Server.Process do
 
   ## Parameters
   - state: Current server state
-  - child_specs: Child specification(s) to start
+  - child_specs: Child specification(s) to start. Can be:
+    - A map with :id and :start fields (standard supervisor format)
+    - A tuple {module, args} (from skills)
+    - A module name
+    - A list of any of the above
 
   ## Returns
   - `{:ok, state, pid}` - Single child started successfully
@@ -100,6 +76,18 @@ defmodule Jido.Agent.Server.Process do
   """
   @spec start(server_state(), child_spec() | [child_spec()]) ::
           {:ok, server_state(), child_pid() | [child_pid()]} | {:error, term()}
+  def start(%ServerState{} = state, []) do
+    dbug("No child specs provided")
+    {:ok, state, []}
+  end
+
+  def start(%ServerState{child_supervisor: nil} = state, child_specs) do
+    case start_supervisor(state) do
+      {:ok, state_with_supervisor} -> start(state_with_supervisor, child_specs)
+      error -> error
+    end
+  end
+
   def start(%ServerState{child_supervisor: supervisor} = state, child_specs)
       when is_pid(supervisor) and is_list(child_specs) do
     dbug("Starting multiple child processes", state: state, specs: child_specs)
@@ -234,6 +222,68 @@ defmodule Jido.Agent.Server.Process do
 
   # Private Functions
 
+  @spec convert_child_spec(child_spec()) :: {:ok, Supervisor.child_spec()} | {:error, term()}
+  defp convert_child_spec([spec | _] = specs) when is_list(specs) do
+    convert_child_spec(spec)
+  end
+
+  defp convert_child_spec(%{id: _id, start: _start} = spec) do
+    # If it's already a valid supervisor child spec, return it as is
+    {:ok, spec}
+  end
+
+  defp convert_child_spec({module, args}) when is_atom(module) and is_list(args) do
+    {:ok,
+     %{
+       id: module,
+       start: {module, :start_link, args},
+       type: :worker,
+       restart: :permanent
+     }}
+  end
+
+  defp convert_child_spec(module) when is_atom(module) do
+    # For module-based specs, we need to ensure the module has start_link/1
+    if Code.ensure_loaded?(module) and function_exported?(module, :start_link, 1) do
+      {:ok,
+       %{
+         id: module,
+         start: {module, :start_link, []},
+         type: :worker,
+         restart: :permanent
+       }}
+    else
+      {:error, "Module #{inspect(module)} does not export start_link/1"}
+    end
+  end
+
+  defp convert_child_spec(invalid) do
+    {:error,
+     """
+     Invalid child specification. Expected one of:
+     - A map with :id and :start fields
+     - A tuple {module, args}
+     - A module name that exports start_link/1
+     - A list of any of the above
+     Got: #{inspect(invalid)}
+     """}
+  end
+
+  @spec start_supervisor(server_state()) :: {:ok, server_state()} | {:error, term()}
+  defp start_supervisor(%ServerState{} = state) do
+    dbug("Starting supervisor", state: state)
+
+    case DynamicSupervisor.start_link(strategy: :one_for_one) do
+      {:ok, supervisor} ->
+        dbug("Supervisor started successfully", supervisor: supervisor)
+        {:ok, %{state | child_supervisor: supervisor}}
+
+      {:error, _reason} = error ->
+        dbug("Failed to start supervisor", error: error)
+        error
+    end
+  end
+
   @spec start_child(server_state(), child_spec()) :: {:ok, pid()} | {:error, term()}
   defp start_child(%ServerState{} = _state, []) do
     dbug("Empty child spec provided, skipping process start")
@@ -246,18 +296,31 @@ defmodule Jido.Agent.Server.Process do
     require Logger
     Logger.debug("Starting child process #{inspect(child_spec)}")
 
-    case DynamicSupervisor.start_child(supervisor, child_spec) do
-      {:ok, pid} = result ->
-        dbug("Child process started successfully", pid: pid)
+    # Convert the child spec to a proper supervisor child spec
+    case convert_child_spec(child_spec) do
+      {:ok, supervisor_child_spec} ->
+        case DynamicSupervisor.start_child(supervisor, supervisor_child_spec) do
+          {:ok, pid} = result ->
+            dbug("Child process started successfully", pid: pid)
 
-        :process_started
-        |> ServerSignal.event_signal(state, %{child_pid: pid, child_spec: child_spec})
-        |> ServerOutput.emit()
+            :process_started
+            |> ServerSignal.event_signal(state, %{child_pid: pid, child_spec: child_spec})
+            |> ServerOutput.emit()
 
-        result
+            result
+
+          {:error, reason} = error ->
+            dbug("Failed to start child process", reason: reason)
+
+            :process_failed
+            |> ServerSignal.event_signal(state, %{child_spec: child_spec, error: reason})
+            |> ServerOutput.emit()
+
+            error
+        end
 
       {:error, reason} = error ->
-        dbug("Failed to start child process", reason: reason)
+        dbug("Invalid child spec", reason: reason)
 
         :process_failed
         |> ServerSignal.event_signal(state, %{child_spec: child_spec, error: reason})

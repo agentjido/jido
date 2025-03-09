@@ -6,6 +6,7 @@ defmodule Jido.Agent.Server.Router do
   alias Jido.Signal
   alias Jido.Signal.Router
   alias Jido.Error
+  alias Jido.Instruction
 
   @type route_spec :: {String.t(), term()}
   @type router_opts :: [routes: [route_spec()]]
@@ -206,7 +207,7 @@ defmodule Jido.Agent.Server.Router do
   - state: The current server state
   - signal: The signal to route
 
-  If the signal contains a jido_instruction, that instruction is returned directly.
+  If the signal.data contains a single Instruction struct, that instruction is returned directly.
   Otherwise, the signal is routed through the router to find matching instructions.
 
   ## Returns
@@ -222,15 +223,19 @@ defmodule Jido.Agent.Server.Router do
   def route(%ServerState{} = state, %Signal{} = signal) do
     dbug("Routing signal", state: state, signal: signal)
 
-    case signal.jido_instructions do
-      instructions when is_list(instructions) and instructions != [] ->
-        dbug("Using explicit instructions from signal", instructions: instructions)
-        {:ok, instructions}
+    case signal.data do
+      %Instruction{} = instruction ->
+        dbug("Using explicit instruction from signal", instruction: instruction)
+        {:ok, [instruction]}
 
-      nil ->
+      _ ->
         dbug("Routing through router")
 
         case Router.route(state.router, signal) do
+          {:ok, []} ->
+            dbug("No matching routes found for signal type", type: signal.type)
+            {:error, :no_matching_route}
+
           {:ok, instructions} ->
             dbug("Signal routed successfully", instructions: instructions)
             {:ok, instructions}

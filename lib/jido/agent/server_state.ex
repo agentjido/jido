@@ -73,7 +73,8 @@ defmodule Jido.Agent.Server.State do
   """
   @type status :: :initializing | :idle | :planning | :running | :paused
   @type modes :: :auto | :step
-  @type log_levels :: :debug | :info | :warn | :error
+  @type log_levels ::
+          :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
   @type dispatch_config :: [
           out: Dispatch.dispatch_config(),
           log: Dispatch.dispatch_config(),
@@ -81,25 +82,44 @@ defmodule Jido.Agent.Server.State do
         ]
 
   typedstruct do
+    # Original opts the Agent was created with
+    field(:opts, keyword(), default: [])
+
+    # The Agent struct being managed by this worker
     field(:agent, Jido.Agent.t(), enforce: true)
+
+    # The mode of the worker, execute signals automatically or force step-by-step
     field(:mode, modes(), default: :auto)
+
+    # The log level of the worker
     field(:log_level, log_levels(), default: :info)
+
+    # The maximum size of the pending signals queue
     field(:max_queue_size, non_neg_integer(), default: 10_000)
+
+    # The registry of the agent
     field(:registry, atom(), default: Jido.Agent.Registry)
 
+    # The dispatch configuration for the worker
     field(:dispatch, dispatch_config(), default: {:logger, []})
 
+    # The router of the worker
     field(:router, Jido.Signal.Router.Router.t(), default: Jido.Signal.Router.new!())
+    field(:journal, Jido.Signal.Journal.t(), default: nil)
+
+    # Skills to compose capabilities into the Agent
     field(:skills, [Jido.Skill.t()], default: [])
 
+    # Pids for the local supervisor, parent and
     field(:child_supervisor, pid())
+    field(:parent_pid, pid())
+    field(:orchestrator_pid, pid())
+
+    # Runtime status
     field(:status, status(), default: :idle)
     field(:pending_signals, :queue.queue(), default: :queue.new())
-
     field(:current_signal_type, atom(), default: nil)
     field(:current_signal, Jido.Signal.t(), default: nil)
-
-    # Map to store GenServer.from() references for reply-later functionality
     field(:reply_refs, %{String.t() => GenServer.from()}, default: %{})
   end
 
@@ -230,6 +250,56 @@ defmodule Jido.Agent.Server.State do
     else
       dbug("Enqueuing signal", signal: signal)
       {:ok, %{state | pending_signals: :queue.in(signal, state.pending_signals)}}
+    end
+  end
+
+  @doc """
+  Enqueues a signal at the front of the state's pending signals queue.
+
+  Validates that the queue size is within the configured maximum before adding.
+  Emits a queue_overflow event if the queue is full.
+
+  ## Parameters
+
+  - `state` - Current server state
+  - `signal` - Signal to enqueue at front
+
+  ## Returns
+
+  - `{:ok, new_state}` - Signal was successfully enqueued at front
+  - `{:error, :queue_overflow}` - Queue is at max capacity
+
+  ## Examples
+
+      iex> state = %Server.State{pending_signals: :queue.new(), max_queue_size: 2}
+      iex> Server.State.enqueue_front(state, %Signal{type: "test"})
+      {:ok, %Server.State{pending_signals: updated_queue}}
+
+      iex> state = %Server.State{pending_signals: full_queue, max_queue_size: 1}
+      iex> Server.State.enqueue_front(state, %Signal{type: "test"})
+      {:error, :queue_overflow}
+  """
+  @spec enqueue_front(%__MODULE__{}, Signal.t()) ::
+          {:ok, %__MODULE__{}} | {:error, :queue_overflow}
+  def enqueue_front(%__MODULE__{} = state, %Signal{} = signal) do
+    dbug("Attempting to enqueue signal at front", signal: signal)
+    queue_size = :queue.len(state.pending_signals)
+    dbug("Current queue size", size: queue_size, max_size: state.max_queue_size)
+
+    if queue_size >= state.max_queue_size do
+      dbug("Queue overflow detected", queue_size: queue_size, max_size: state.max_queue_size)
+
+      :queue_overflow
+      |> ServerSignal.event_signal(state, %{
+        queue_size: queue_size,
+        max_size: state.max_queue_size
+      })
+      |> ServerOutput.emit()
+
+      {:error, :queue_overflow}
+    else
+      dbug("Enqueuing signal at front", signal: signal)
+      {:ok, %{state | pending_signals: :queue.in_r(signal, state.pending_signals)}}
     end
   end
 

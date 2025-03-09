@@ -53,7 +53,7 @@ defmodule MyApp.StatefulAgent do
   end
 
   # Result processing
-  def process_result(%Signal{type: "process.data"}, result) do
+  def transform_result(%Signal{type: "process.data"}, result) do
     {:ok, result}
   end
 end
@@ -165,7 +165,7 @@ defmodule MyApp.StatefulAgent do
   end
 
   # Process execution results
-  def process_result(%Signal{type: "custom.event"}, result) do
+  def transform_result(%Signal{type: "custom.event"}, result) do
     {:ok, process_output(result)}
   end
 end
@@ -239,7 +239,7 @@ defmodule MyApp.Skills.DataProcessor do
     {:ok, signal}
   end
 
-  def process_result(_signal, result) do
+  def transform_result(_signal, result) do
     {:ok, result}
   end
 end

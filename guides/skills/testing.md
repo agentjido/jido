@@ -61,7 +61,7 @@ defmodule MyApp.SkillCase do
       setup do
         skill_config = %{
           name: "test_skill",
-          schema_key: :test
+          opts_key: :test
         }
 
         {:ok, %{config: skill_config}}

@@ -900,15 +900,14 @@ defmodule Jido.Agent do
           * `agent` - The agent struct containing pending instructions
           * `opts` - Keyword list of options:
             * `:runner` - Module implementing the Runner behavior (default: agent's configured runner)
-            * `:apply_state` - Whether to merge runner results into agent state (default: true)
 
           ## State Management
-          * When apply_state: true
-            * Runner results are merged into agent state
-            * Original state is preserved on error
-          * When apply_state: false
-            * Runner results stored in agent.result
-            * Agent state remains unchanged
+
+          State modifications are handled through StateModification directives:
+          * `:set` - Set a value at a path: `%StateModification{op: :set, path: [:config, :mode], value: :active}`
+          * `:update` - Update with function: `%StateModification{op: :update, path: [:counter], value: &(&1 + 1)}`
+          * `:delete` - Remove value at path: `%StateModification{op: :delete, path: [:temp_data]}`
+          * `:reset` - Set path to nil: `%StateModification{op: :reset, path: [:cache]}`
 
           ## Directives
           * Directives are applied after runner execution
@@ -916,30 +915,27 @@ defmodule Jido.Agent do
           * Review `Jido.Agent.Directive` for more information
 
           ## Returns
-          * `{:ok, updated_agent}` - Execution completed successfully
+          * `{:ok, updated_agent, directives}` - Execution completed successfully
           * `{:error, %Error{}}` - Execution failed with specific error type:
             * `:execution_error` - Runner execution failed
             * Any other error wrapped as execution_error
 
           ## Examples
+
               # Set up your agent, register and plan some actions to fill the instruction queue
               agent = MyAgent.new()
               {:ok, agent} = MyAgent.plan(agent, [BasicAction, {NoSchema, %{value: 2}}])
 
-              # Basic execution with state application
-              {:ok, agent} = MyAgent.run(agent)
-
-              # Execute without applying state
-              {:ok, agent} = MyAgent.run(agent, apply_state: false)
-              result = agent.result
+              # Basic execution with state modification directives
+              {:ok, agent, directives} = MyAgent.run(agent)
 
               # Using custom runner
-              {:ok, agent} = MyAgent.run(agent, runner: CustomRunner)
+              {:ok, agent, directives} = MyAgent.run(agent, runner: CustomRunner)
 
               # Error handling
               case MyAgent.run(agent) do
-                {:ok, agent} ->
-                  # Success - state updated
+                {:ok, agent, directives} ->
+                  # Success - state updated through directives
                   agent.state
 
                 {:error, %Error{type: :validation_error}} ->
@@ -959,7 +955,6 @@ defmodule Jido.Agent do
           def run(agent, opts \\ [])
 
           def run(%__MODULE__{} = agent, opts) do
-            apply_state = Keyword.get(opts, :apply_state, true)
             runner = Keyword.get(opts, :runner, runner())
 
             with {:ok, validated_runner} <- Jido.Util.validate_runner(runner),
@@ -1001,9 +996,8 @@ defmodule Jido.Agent do
               * Mixed list of modules and tuples (e.g. [ValidateAction, {ProcessAction, %{file: "data.csv"}}])
             * `context` - Map of execution context data (default: %{})
             * `opts` - Keyword list of execution options:
-              * `:apply_state` - Whether to merge results into agent state (default: true)
               * `:runner` - Custom runner module (default: agent's configured runner)
-              * `:validation` - Enable/disable param validation (default: true)
+              * `:strict_validation` - Enable/disable param validation (default: false)
 
           ## Command Flow
           1. Optional parameter validation
@@ -1011,24 +1005,24 @@ defmodule Jido.Agent do
           3. State preparation and merging
           4. Action planning with context
           5. Execution with configured runner
-          6. Result processing and state application
+          6. Result processing and state application through directives
 
           ## Returns
-            * `{:ok, updated_agent}` - Command executed successfully
-              * When apply_state: true, result merged into agent state
-              * When apply_state: false, result stored in agent.result field
+            * `{:ok, updated_agent, directives}` - Command executed successfully
+              * State modifications are handled through directives
+              * Result stored in agent.result field
             * `{:error, Error.t()}` - Detailed error with context
 
           ## Examples
 
               # Basic command with single action
-              {:ok, agent} = MyAgent.cmd(agent, ProcessAction)
+              {:ok, agent, directives} = MyAgent.cmd(agent, ProcessAction)
 
               # Single action with params
-              {:ok, agent} = MyAgent.cmd(agent, {ProcessAction, %{file: "data.csv"}})
+              {:ok, agent, directives} = MyAgent.cmd(agent, {ProcessAction, %{file: "data.csv"}})
 
               # Multiple actions with context
-              {:ok, agent} = MyAgent.cmd(
+              {:ok, agent, directives} = MyAgent.cmd(
                 agent,
                 [
                   ValidateAction,
@@ -1039,17 +1033,17 @@ defmodule Jido.Agent do
               )
 
               # With custom options
-              {:ok, agent} = MyAgent.cmd(
+              {:ok, agent, directives} = MyAgent.cmd(
                 agent,
                 {ProcessAction, %{file: "data.csv"}},
                 %{user_id: "123"},
-                apply_state: false
+                runner: CustomRunner
               )
 
               # Error handling
               case MyAgent.cmd(agent, ProcessAction, %{}) do
-                {:ok, updated_agent} ->
-                  # Success case
+                {:ok, updated_agent, directives} ->
+                  # Success case - state updated through directives
                   updated_agent.state
                 {:error, %Error{type: :validation_error}} ->
                   # Handle validation failure
@@ -1062,7 +1056,6 @@ defmodule Jido.Agent do
           def cmd(agent, instructions, attrs \\ %{}, opts \\ [])
 
           def cmd(%__MODULE__{} = agent, instructions, attrs, opts) do
-            apply_state? = Keyword.get(opts, :apply_state, true)
             strict_validation = Keyword.get(opts, :strict_validation, false)
             runner = Keyword.get(opts, :runner, runner())
             context = Keyword.get(opts, :context, %{})
@@ -1146,12 +1139,12 @@ defmodule Jido.Agent do
           @spec shutdown(ServerState.t(), reason :: any()) :: agent_result()
           def shutdown(state, _reason), do: OK.success(state)
 
-          @spec handle_signal(Signal.t()) :: {:ok, Signal.t()} | {:error, any()}
-          def handle_signal(signal), do: OK.success(signal)
+          @spec handle_signal(Signal.t(), t()) :: {:ok, Signal.t()} | {:error, any()}
+          def handle_signal(signal, _agent), do: OK.success(signal)
 
-          @spec process_result(Signal.t(), term() | {:ok, term()} | {:error, any()}) ::
+          @spec transform_result(Signal.t(), term() | {:ok, term()} | {:error, any()}, t()) ::
                   {:ok, term()} | {:error, any()}
-          def process_result(signal, result), do: OK.success(result)
+          def transform_result(signal, result, _agent), do: OK.success(result)
 
           defoverridable start_link: 1,
                          child_spec: 1,
@@ -1159,8 +1152,8 @@ defmodule Jido.Agent do
                          mount: 2,
                          code_change: 3,
                          shutdown: 2,
-                         handle_signal: 1,
-                         process_result: 2,
+                         handle_signal: 2,
+                         transform_result: 3,
                          on_before_validate_state: 1,
                          on_after_validate_state: 1,
                          on_before_plan: 3,
@@ -1219,8 +1212,13 @@ defmodule Jido.Agent do
   @callback child_spec(opts :: keyword()) :: Supervisor.child_spec()
   @callback mount(agent :: t(), opts :: keyword()) :: {:ok, map()} | {:error, any()}
   @callback shutdown(agent :: t(), reason :: any()) :: {:ok, map()} | {:error, any()}
-  @callback handle_signal(signal :: Signal.t()) :: {:ok, Signal.t()} | {:error, any()}
-  @callback process_result(signal :: Signal.t(), result :: {:ok, term()} | {:error, any()}) ::
+  @callback handle_signal(signal :: Signal.t(), agent :: t()) ::
+              {:ok, Signal.t()} | {:error, any()}
+  @callback transform_result(
+              signal :: Signal.t(),
+              result :: {:ok, term()} | {:error, any()},
+              agent :: t()
+            ) ::
               {:ok, term()} | {:error, any()}
 
   @optional_callbacks [
@@ -1228,8 +1226,8 @@ defmodule Jido.Agent do
     child_spec: 1,
     mount: 2,
     shutdown: 2,
-    handle_signal: 1,
-    process_result: 2,
+    handle_signal: 2,
+    transform_result: 3,
     on_before_validate_state: 1,
     on_after_validate_state: 1,
     on_before_plan: 3,

@@ -6,7 +6,10 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
   alias Jido.Agent.Directive.{
     Spawn,
-    Kill
+    Kill,
+    RegisterAction,
+    DeregisterAction,
+    StateModification
   }
 
   @moduletag :capture_log
@@ -21,7 +24,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
   setup do
     {:ok, supervisor} = start_supervised(DynamicSupervisor)
-    agent = BasicAgent.new("test")
+    agent = %{BasicAgent.new("test") | state: %{config: %{}}}
 
     state = %State{
       agent: agent,
@@ -148,6 +151,110 @@ defmodule Jido.Agent.Server.DirectiveTest do
         type: :execution_error,
         message: "Process not found",
         details: %{pid: non_existent_pid}
+      })
+    end
+  end
+
+  describe "agent modification directives" do
+    test "register_action adds action module to agent", %{state: state} do
+      directive = %RegisterAction{action_module: MyAction}
+      {:ok, updated_state} = Directive.execute(state, directive)
+
+      # Verify action module was added to agent's actions
+      assert MyAction in updated_state.agent.actions
+
+      # Registering same module again should not duplicate it
+      {:ok, final_state} = Directive.execute(updated_state, directive)
+      assert MyAction in final_state.agent.actions
+      assert length(final_state.agent.actions) == length(updated_state.agent.actions)
+    end
+
+    test "deregister_action removes action module from agent", %{state: state} do
+      # First register the action
+      {:ok, state_with_action} =
+        Directive.execute(state, %RegisterAction{action_module: MyAction})
+
+      assert MyAction in state_with_action.agent.actions
+
+      # Then deregister it
+      directive = %DeregisterAction{action_module: MyAction}
+      {:ok, updated_state} = Directive.execute(state_with_action, directive)
+
+      # Verify action module was removed
+      refute MyAction in updated_state.agent.actions
+    end
+
+    test "state_modification updates agent state", %{state: state} do
+      # Test :set operation
+      set_directive = %StateModification{
+        op: :set,
+        path: [:config, :mode],
+        value: :active
+      }
+
+      {:ok, state_after_set} = Directive.execute(state, set_directive)
+      assert get_in(state_after_set.agent.state, [:config, :mode]) == :active
+
+      # Test :update operation
+      update_directive = %StateModification{
+        op: :update,
+        path: [:config, :mode],
+        value: fn _ -> :inactive end
+      }
+
+      {:ok, state_after_update} = Directive.execute(state_after_set, update_directive)
+      assert get_in(state_after_update.agent.state, [:config, :mode]) == :inactive
+
+      # Test :delete operation
+      delete_directive = %StateModification{
+        op: :delete,
+        path: [:config, :mode]
+      }
+
+      {:ok, state_after_delete} = Directive.execute(state_after_update, delete_directive)
+      assert get_in(state_after_delete.agent.state, [:config, :mode]) == nil
+
+      # Test :reset operation
+      reset_directive = %StateModification{
+        op: :reset,
+        path: [:config]
+      }
+
+      {:ok, state_after_reset} = Directive.execute(state_after_delete, reset_directive)
+      assert get_in(state_after_reset.agent.state, [:config]) == nil
+    end
+
+    test "state_modification validates operation type", %{state: state} do
+      directive = %StateModification{
+        op: :invalid_op,
+        path: [:config],
+        value: :something
+      }
+
+      {:error, error} = Directive.execute(state, directive)
+
+      assert_error_match(error, %Error{
+        type: :validation_error,
+        message: "Invalid state modification operation",
+        details: %{op: :invalid_op}
+      })
+    end
+
+    test "state_modification handles invalid paths", %{state: state} do
+      directive = %StateModification{
+        op: :update,
+        path: [:nonexistent, :path],
+        value: fn _ -> :something end
+      }
+
+      {:error, error} = Directive.execute(state, directive)
+
+      assert_error_match(error, %Error{
+        type: :execution_error,
+        message: "Failed to modify state",
+        details: %{
+          error: %ArgumentError{message: "could not put/update key :path on a nil value"}
+        }
       })
     end
   end

@@ -16,34 +16,6 @@ defmodule Jido.Agent.Server.Runtime do
   alias Jido.Agent.Directive
 
   @doc """
-  Process a signal in a unified way, handling both synchronous and asynchronous signals.
-  """
-  @spec process_signal(ServerState.t(), Signal.t()) ::
-          {:ok, ServerState.t(), term()} | {:error, term()}
-  def process_signal(%ServerState{} = state, %Signal{} = signal) do
-    dbug("Processing signal", signal_id: signal.id)
-
-    with state <- set_current_signal(state, signal),
-         {:ok, state, result} <- execute_signal(state, signal) do
-      case ServerState.get_reply_ref(state, signal.id) do
-        nil ->
-          dbug("No reply ref found for signal", signal_id: signal.id)
-          {:ok, state, result}
-
-        from ->
-          dbug("Found reply ref for signal", signal_id: signal.id, from: from)
-          state = ServerState.remove_reply_ref(state, signal.id)
-          GenServer.reply(from, {:ok, result})
-          {:ok, state, result}
-      end
-    else
-      {:error, reason} ->
-        dbug("Error processing signal", signal_id: signal.id, error: reason)
-        {:error, reason}
-    end
-  end
-
-  @doc """
   Process all signals in the queue until empty.
   """
   @spec process_signals_in_queue(ServerState.t()) ::
@@ -66,8 +38,11 @@ defmodule Jido.Agent.Server.Runtime do
                 GenServer.reply(from, {:ok, result})
             end
 
-            # Loop to process next signal
-            process_signals_in_queue(final_state)
+            # Only continue processing in auto mode
+            case final_state.mode do
+              :auto -> process_signals_in_queue(final_state)
+              :step -> {:ok, final_state}
+            end
 
           {:error, reason} ->
             dbug("Error processing queued signal", signal_id: signal.id, error: reason)
@@ -82,7 +57,11 @@ defmodule Jido.Agent.Server.Runtime do
                 GenServer.reply(from, {:error, reason})
             end
 
-            {:error, reason}
+            # Only continue processing in auto mode
+            case new_state.mode do
+              :auto -> process_signals_in_queue(new_state)
+              :step -> {:ok, new_state}
+            end
         end
 
       {:error, :empty_queue} ->
@@ -92,6 +71,31 @@ defmodule Jido.Agent.Server.Runtime do
   end
 
   private do
+    @spec process_signal(ServerState.t(), Signal.t()) ::
+            {:ok, ServerState.t(), term()} | {:error, term()}
+    defp process_signal(%ServerState{} = state, %Signal{} = signal) do
+      dbug("Processing signal", signal_id: signal.id)
+
+      with state <- set_current_signal(state, signal),
+           {:ok, state, result} <- execute_signal(state, signal) do
+        case ServerState.get_reply_ref(state, signal.id) do
+          nil ->
+            dbug("No reply ref found for signal", signal_id: signal.id)
+            {:ok, state, result}
+
+          from ->
+            dbug("Found reply ref for signal", signal_id: signal.id, from: from)
+            state = ServerState.remove_reply_ref(state, signal.id)
+            GenServer.reply(from, {:ok, result})
+            {:ok, state, result}
+        end
+      else
+        {:error, reason} ->
+          dbug("Error processing signal", signal_id: signal.id, error: reason)
+          {:error, reason}
+      end
+    end
+
     @spec execute_signal(ServerState.t(), Signal.t()) ::
             {:ok, ServerState.t(), term()} | {:error, term()}
     defp execute_signal(%ServerState{} = state, %Signal{} = signal) do
@@ -119,47 +123,22 @@ defmodule Jido.Agent.Server.Runtime do
     end
 
     defp do_agent_cmd(%ServerState{agent: agent} = state, instructions, opts) do
-      case agent.__struct__.cmd(agent, instructions, opts) do
-        {:ok, agent, directives} ->
-          state = %{state | agent: agent}
+      opts = Keyword.put(opts, :apply_directives?, false)
 
-          case handle_agent_result(state, agent, directives) do
-            {:ok, state} -> do_agent_run(state, opts)
-            error -> error
+      case agent.__struct__.cmd(agent, instructions, %{}, opts) do
+        {:ok, new_agent, directives} ->
+          state = %{state | agent: new_agent}
+
+          case handle_agent_result(state, new_agent, directives) do
+            {:ok, state} ->
+              {:ok, state, new_agent.result}
+
+            error ->
+              error
           end
 
         {:error, reason} ->
           {:error, reason}
-      end
-    end
-
-    defp do_agent_run(%ServerState{agent: agent} = state, opts) do
-      is_empty =
-        case agent.pending_instructions do
-          nil -> true
-          queue -> :queue.is_empty(queue)
-        end
-
-      case is_empty do
-        true ->
-          {:ok, state, agent.result}
-
-        false ->
-          case agent.__struct__.run(agent, opts) do
-            {:ok, agent, directives} ->
-              state = %{state | agent: agent}
-
-              case handle_agent_result(state, agent, directives) do
-                {:ok, state} ->
-                  do_agent_run(state, opts)
-
-                error ->
-                  error
-              end
-
-            {:error, reason} ->
-              {:error, reason}
-          end
       end
     end
 
@@ -186,7 +165,7 @@ defmodule Jido.Agent.Server.Runtime do
 
       # Process the instruction result through callbacks first
       with {:ok, processed_result} <-
-             ServerCallback.process_result(state, state.current_signal, result) do
+             ServerCallback.transform_result(state, state.current_signal, result) do
         # Use the signal's dispatch config if present, otherwise use server's default
         dispatch_config =
           case state.current_signal do
@@ -226,7 +205,7 @@ defmodule Jido.Agent.Server.Runtime do
     defp handle_signal_result(%ServerState{} = state, _signal, result) do
       # Process the final result through callbacks first
       with {:ok, result} <-
-             ServerCallback.process_result(state, state.current_signal, result) do
+             ServerCallback.transform_result(state, state.current_signal, result) do
         case state.current_signal_type do
           :async ->
             # Use the signal's dispatch config if present, otherwise use server's default
@@ -277,6 +256,10 @@ defmodule Jido.Agent.Server.Runtime do
             {:ok, instructions} ->
               {:ok, instructions}
 
+            {:error, :no_matching_route} ->
+              runtime_error(state, "No matching route found for signal", :no_matching_route)
+              {:error, :no_matching_route}
+
             {:error, reason} ->
               runtime_error(state, "Error routing signal", reason)
               {:error, reason}
@@ -290,10 +273,19 @@ defmodule Jido.Agent.Server.Runtime do
       dbug("Applying signal to first instruction", instruction: first)
 
       try do
-        merged_params = Map.merge(first.params || %{}, signal.data || %{})
-        result = [%{first | params: merged_params} | rest]
-        dbug("Signal applied successfully")
-        {:ok, result}
+        case signal.data do
+          %Instruction{} ->
+            {:ok, [first | rest]}
+
+          data when is_map(data) or is_nil(data) or is_number(data) or is_binary(data) ->
+            merged_params = Map.merge(first.params || %{}, signal.data || %{})
+            result = [%{first | params: merged_params} | rest]
+            dbug("Signal applied successfully")
+            {:ok, result}
+
+          _ ->
+            {:ok, [first | rest]}
+        end
       rescue
         error ->
           dbug("Failed to apply signal", error: error)

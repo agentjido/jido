@@ -32,9 +32,9 @@ defmodule Jido.Skill do
   ```elixir
   use Jido.Skill,
     name: "weather_monitor",
-    signals: [
-      input: ["weather.data.*", "weather.alert.**"],
-      output: ["weather.alert.generated"]
+    signal_patterns: [
+      "weather.data.*",
+      "weather.alert.**"
     ]
   ```
 
@@ -88,9 +88,9 @@ defmodule Jido.Skill do
       tags: ["weather", "alerts"],
       vsn: "1.0.0",
       opts_key: :weather,
-      signals: [
-        input: ["weather.data.*", "weather.alert.**"],
-        output: ["weather.alert.generated"]
+      signal_patterns: [
+        "weather.data.*",
+        "weather.alert.**"
       ],
       config: [
         api_key: [type: :string, required: true]
@@ -102,9 +102,14 @@ defmodule Jido.Skill do
       ]
     end
 
-    def handle_signal(%Signal{type: "weather.data.updated"} = signal) do
+    def handle_signal(%Signal{type: "weather.data.updated"} = signal, _skill) do
       # Handle weather updates
       {:ok, signal}
+    end
+
+    def transform_result(%Signal{} = signal, result, _skill) do
+      # Transform the result
+      {:ok, result}
     end
   end
   ```
@@ -115,8 +120,8 @@ defmodule Jido.Skill do
 
   - `child_spec/1` - Returns child process specifications
   - `router/0` - Returns signal routing rules
-  - `handle_signal/1` - Processes incoming signals
-  - `process_result/2` - Post-processes signal handling results
+  - `handle_signal/2` - Processes incoming signals
+  - `transform_result/3` - Post-processes signal handling results
   - `mount/2` - Mounts the skill to an agent
 
   ## Behavior
@@ -126,8 +131,8 @@ defmodule Jido.Skill do
   ```elixir
   @callback child_spec(config :: map()) :: Supervisor.child_spec() | [Supervisor.child_spec()]
   @callback router() :: [map()]
-  @callback handle_signal(signal :: Signal.t()) :: {:ok, Signal.t()} | {:error, term()}
-  @callback process_result(signal :: Signal.t(), result :: term()) ::
+  @callback handle_signal(signal :: Signal.t(), skill :: t()) :: {:ok, Signal.t()} | {:error, term()}
+  @callback transform_result(signal :: Signal.t(), result :: term(), skill :: t()) ::
               {:ok, term()} | {:error, term()}
   @callback mount(agent :: Jido.Agent.t(), opts :: keyword()) :: Jido.Agent.t()
   ```
@@ -142,8 +147,8 @@ defmodule Jido.Skill do
   - `tags` - List of searchable tags
   - `vsn` - Version string
   - `opts_key` - State namespace key
-  - `signals` - Input/output patterns
-  - `config` - Configuration schema
+  - `signal_patterns` - Input/output patterns
+  - `opts_schema` - Configuration schema
 
   ## Best Practices
 
@@ -188,8 +193,8 @@ defmodule Jido.Skill do
   - `tags`: List of searchable tags
   - `vsn`: Version string for compatibility
   - `opts_key`: Atom key for state namespace
-  - `signals`: Input/output signal patterns
-  - `config`: Configuration schema
+  - `signal_patterns`: Input/output signal patterns
+  - `opts_schema`: Configuration schema
   """
   typedstruct do
     field(:name, String.t(), enforce: true)
@@ -198,8 +203,8 @@ defmodule Jido.Skill do
     field(:tags, [String.t()], default: [])
     field(:vsn, String.t())
     field(:opts_key, atom())
-    field(:signals, map())
-    field(:config, map())
+    field(:opts_schema, map())
+    field(:signal_patterns, [String.t()], default: [])
   end
 
   # Configuration schema validation
@@ -240,14 +245,11 @@ defmodule Jido.Skill do
                            default: [],
                            doc: "Nimble Options schema for skill options"
                          ],
-                         signals: [
-                           type: :map,
-                           required: true,
-                           doc: "Input/output signal patterns",
-                           keys: [
-                             input: [type: {:list, :string}, default: []],
-                             output: [type: {:list, :string}, default: []]
-                           ]
+                         signal_patterns: [
+                           type: {:list, :string},
+                           default: ["**"],
+                           doc:
+                             "List of signal patterns this skill handles, defaults to matching all signals"
                          ]
                        )
 
@@ -307,7 +309,7 @@ defmodule Jido.Skill do
           def opts_key, do: @validated_opts[:opts_key]
 
           @doc false
-          def signals, do: @validated_opts[:signals]
+          def signal_patterns, do: @validated_opts[:signal_patterns]
 
           @doc false
           def opts_schema, do: @validated_opts[:opts_schema]
@@ -321,8 +323,8 @@ defmodule Jido.Skill do
               tags: @validated_opts[:tags],
               vsn: @validated_opts[:vsn],
               opts_key: @validated_opts[:opts_key],
-              signals: @validated_opts[:signals],
-              opts_schema: @validated_opts[:opts_schema]
+              opts_schema: @validated_opts[:opts_schema],
+              signal_patterns: @validated_opts[:signal_patterns]
             }
           end
 
@@ -339,18 +341,18 @@ defmodule Jido.Skill do
           def router(_opts), do: []
 
           @doc false
-          def handle_signal(signal), do: {:ok, signal}
+          def handle_signal(signal, _skill), do: {:ok, signal}
 
           @doc false
-          def process_result(signal, result), do: {:ok, result}
+          def transform_result(signal, result, _skill), do: {:ok, result}
 
           @doc false
           def mount(agent, _opts), do: {:ok, agent}
 
           defoverridable child_spec: 1,
                          router: 1,
-                         handle_signal: 1,
-                         process_result: 2,
+                         handle_signal: 2,
+                         transform_result: 3,
                          mount: 2
 
         {:error, error} ->
@@ -367,8 +369,9 @@ defmodule Jido.Skill do
   # Behaviour callbacks
   @callback child_spec(config :: map()) :: Supervisor.child_spec() | [Supervisor.child_spec()]
   @callback router(skill_opts :: keyword()) :: [Route.t()]
-  @callback handle_signal(signal :: Signal.t()) :: {:ok, Signal.t()} | {:error, term()}
-  @callback process_result(signal :: Signal.t(), result :: term()) ::
+  @callback handle_signal(signal :: Signal.t(), skill :: t()) ::
+              {:ok, Signal.t()} | {:error, term()}
+  @callback transform_result(signal :: Signal.t(), result :: term(), skill :: t()) ::
               {:ok, term()} | {:error, any()}
   @callback mount(agent :: Jido.Agent.t(), opts :: keyword()) ::
               {:ok, Jido.Agent.t()} | {:error, Error.t()}
@@ -437,55 +440,5 @@ defmodule Jido.Skill do
       false ->
         {:error, Error.config_error("Skill has no opts schema")}
     end
-  end
-
-  @doc """
-  Validates a signal against a skill's defined patterns.
-
-  ## Parameters
-  - `signal`: The signal to validate
-  - `patterns`: Map of input/output patterns
-
-  ## Returns
-  - `:ok`: Signal matches patterns
-  - `{:error, reason}`: No matching patterns
-
-  ## Example
-
-      Skill.validate_signal(
-        %Signal{type: "weather.data.updated"},
-        %{input: ["weather.data.*"], output: []}
-      )
-  """
-  @spec validate_signal(Signal.t(), map()) :: :ok | {:error, Error.t()}
-  def validate_signal(%Signal{} = signal, patterns) do
-    cond do
-      match_any_pattern?(signal.type, patterns.input) ->
-        :ok
-
-      match_any_pattern?(signal.type, patterns.output) ->
-        :ok
-
-      true ->
-        {:error, Error.validation_error("Signal type does not match any patterns")}
-    end
-  end
-
-  # Private helpers
-  defp match_any_pattern?(signal_type, patterns) do
-    Enum.any?(patterns, &pattern_match?(signal_type, &1))
-  end
-
-  defp pattern_match?(signal_type, pattern) do
-    regex = pattern_to_regex(pattern)
-    String.match?(signal_type, regex)
-  end
-
-  defp pattern_to_regex(pattern) do
-    pattern
-    |> String.replace(".", "\\.")
-    |> String.replace("*", ".*")
-    |> then(&"^#{&1}$")
-    |> Regex.compile!()
   end
 end

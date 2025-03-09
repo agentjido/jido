@@ -38,10 +38,7 @@ defmodule Jido.Signal do
 
   Beyond the CloudEvents spec, Signals include Jido-specific fields:
 
-  - `jido_instructions`: List of instructions to execute (optional)
-  - `jido_opts`: Processing options and flags (optional)
   - `jido_dispatch`: Routing and delivery configuration (optional)
-  - `jido_metadata`: Additional context and tracking data - primarily for internal use (optional)
 
   ## Creating Signals
 
@@ -144,7 +141,6 @@ defmodule Jido.Signal do
   - `Jido.Signal.Dispatch` - Dispatch handling
   - CloudEvents spec: https://cloudevents.io/
   """
-  alias Jido.Instruction
   alias Jido.Signal.Dispatch
   alias Jido.Signal.ID
   use TypedStruct
@@ -159,8 +155,7 @@ defmodule Jido.Signal do
              :datacontenttype,
              :dataschema,
              :data,
-             :specversion,
-             :jido_metadata
+             :specversion
            ]}
 
   typedstruct do
@@ -174,10 +169,7 @@ defmodule Jido.Signal do
     field(:dataschema, String.t())
     field(:data, term())
     # Jido-specific fields
-    field(:jido_instructions, Jido.Instruction.instruction_list())
-    field(:jido_opts, map())
     field(:jido_dispatch, Dispatch.dispatch_configs())
-    field(:jido_metadata, map())
   end
 
   @doc """
@@ -289,9 +281,6 @@ defmodule Jido.Signal do
          {:ok, datacontenttype} <- parse_datacontenttype(map),
          {:ok, dataschema} <- parse_dataschema(map),
          {:ok, data} <- parse_data(map["data"]),
-         {:ok, jido_instructions} <- parse_jido_instructions(map["jido_instructions"]),
-         {:ok, jido_opts} <- parse_jido_opts(map["jido_opts"]),
-         {:ok, jido_metadata} <- parse_jido_metadata(map["jido_metadata"]),
          {:ok, jido_dispatch} <- parse_jido_dispatch(map["jido_dispatch"]) do
       event = %__MODULE__{
         specversion: "1.0.2",
@@ -303,9 +292,6 @@ defmodule Jido.Signal do
         datacontenttype: datacontenttype || if(data, do: "application/json"),
         dataschema: dataschema,
         data: data,
-        jido_instructions: jido_instructions,
-        jido_opts: jido_opts,
-        jido_metadata: jido_metadata,
         jido_dispatch: jido_dispatch
       }
 
@@ -325,13 +311,12 @@ defmodule Jido.Signal do
   alias Jido.Signal.Serialization.TypeProvider
 
   @spec map_to_signal_data(struct, Keyword.t()) :: t()
-  def map_to_signal_data(signal, fields) do
+  def map_to_signal_data(signal, _fields) do
     %__MODULE__{
       id: ID.generate(),
       source: "http://example.com/bank",
       type: TypeProvider.to_string(signal),
-      data: signal,
-      jido_metadata: Keyword.get(fields, :jido_metadata, %{})
+      data: signal
     }
   end
 
@@ -372,19 +357,6 @@ defmodule Jido.Signal do
   defp parse_data(""), do: {:error, "data field given but empty"}
   defp parse_data(data), do: {:ok, data}
 
-  defp parse_jido_instructions(nil), do: {:ok, nil}
-
-  defp parse_jido_instructions(instructions) do
-    case Instruction.normalize(instructions) do
-      {:ok, normalized} -> {:ok, normalized}
-      {:error, _} -> {:error, "jido_instructions must be a list of instructions"}
-    end
-  end
-
-  defp parse_jido_opts(nil), do: {:ok, %{}}
-  defp parse_jido_opts(opts) when is_map(opts), do: {:ok, opts}
-  defp parse_jido_opts(_), do: {:error, "jido_opts must be a map"}
-
   defp parse_jido_dispatch(nil), do: {:ok, nil}
 
   defp parse_jido_dispatch({adapter, opts} = config) when is_atom(adapter) and is_list(opts) do
@@ -396,8 +368,4 @@ defmodule Jido.Signal do
   end
 
   defp parse_jido_dispatch(_), do: {:error, "invalid dispatch config"}
-
-  defp parse_jido_metadata(nil), do: {:ok, nil}
-  defp parse_jido_metadata(metadata) when is_map(metadata), do: {:ok, metadata}
-  defp parse_jido_metadata(_), do: {:error, "jido_metadata must be a map"}
 end

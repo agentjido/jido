@@ -162,5 +162,30 @@ defmodule JidoTest.Agent.Server.RuntimeInputTest do
         assert {:error, _reason} = Runtime.execute_signal(state, invalid_signal)
       end
     end
+
+    test "returns error when signal type doesn't match any routes and properly dequeues", %{
+      state: state
+    } do
+      # Create two signals - one that won't route and one that will
+      unroutable_signal =
+        Signal.new!(%{type: "nonexistent_action", data: %{}, id: "test-id-no-match"})
+
+      routable_signal =
+        Signal.new!(%{type: "test_action", data: %{value: 1}, id: "test-id-valid"})
+
+      # First enqueue both signals
+      {:ok, state_with_signals} = ServerState.enqueue(state, unroutable_signal)
+      {:ok, state_with_both} = ServerState.enqueue(state_with_signals, routable_signal)
+
+      # Verify both signals are queued
+      assert :queue.len(state_with_both.pending_signals) == 2
+
+      # Process all signals in queue
+      {:ok, final_state} = Runtime.process_signals_in_queue(state_with_both)
+
+      # Verify queue is now empty and in final idle state
+      assert :queue.is_empty(final_state.pending_signals)
+      assert final_state.status == :idle
+    end
   end
 end

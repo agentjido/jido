@@ -31,13 +31,11 @@ defmodule Jido.Runner.ChainTest do
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:ok, updated_agent, []} = Chain.run(agent)
-      assert updated_agent.state.value == 4
+      assert updated_agent.result == %{value: 4}
       assert :queue.is_empty(updated_agent.pending_instructions)
     end
 
     test "executes all initial instructions but accumulates directive instructions in queue" do
-      # Initial instructions: Add(0,1) -> EnqueueAction -> Add(1,2)
-      # EnqueueAction will add a new instruction but it shouldn't be executed
       instructions = [
         %Instruction{
           action: Add,
@@ -63,8 +61,8 @@ defmodule Jido.Runner.ChainTest do
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:ok, updated_agent, []} = Chain.run(agent)
-      # Verify all initial instructions executed
-      assert updated_agent.state.value == 3
+      # Verify final result
+      assert updated_agent.result == %{value: 3}
 
       # Verify directive's instruction was enqueued but not executed
       assert :queue.len(updated_agent.pending_instructions) == 1
@@ -163,36 +161,6 @@ defmodule Jido.Runner.ChainTest do
       assert second.params == %{value: 2}
     end
 
-    test "accumulates directives while executing state changes" do
-      instructions = [
-        %Instruction{
-          action: Add,
-          params: %{value: 0, amount: 1},
-          context: %{}
-        },
-        %Instruction{
-          action: EnqueueAction,
-          params: %{
-            action: :next_action,
-            params: %{value: 1}
-          },
-          context: %{}
-        }
-      ]
-
-      agent = FullFeaturedAgent.new("test-agent")
-      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
-
-      assert {:ok, updated_agent, []} = Chain.run(agent)
-      # State changes applied
-      assert updated_agent.state.value == 1
-      # Directive accumulated
-      assert :queue.len(updated_agent.pending_instructions) == 1
-      {{:value, enqueued}, _} = :queue.out(updated_agent.pending_instructions)
-      assert enqueued.action == :next_action
-      assert enqueued.params == %{value: 1}
-    end
-
     test "accumulates results through Add, Multiply, Add chain" do
       instructions = [
         %Instruction{
@@ -213,15 +181,10 @@ defmodule Jido.Runner.ChainTest do
       ]
 
       agent = FullFeaturedAgent.new("test-agent")
-
-      agent = %{
-        agent
-        | state: Map.put(agent.state, :value, 10),
-          pending_instructions: :queue.from_list(instructions)
-      }
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:ok, updated_agent, []} = Chain.run(agent)
-      assert updated_agent.state.value == 30
+      assert updated_agent.result == %{value: 30}
       assert :queue.is_empty(updated_agent.pending_instructions)
     end
 
@@ -282,7 +245,7 @@ defmodule Jido.Runner.ChainTest do
       assert error.message == "Compensation completed for: Intentional failure"
     end
 
-    test "preserves agent state on error" do
+    test "respects apply_directives? option when false" do
       instructions = [
         %Instruction{
           action: Add,
@@ -290,31 +253,16 @@ defmodule Jido.Runner.ChainTest do
           context: %{}
         },
         %Instruction{
-          action: ErrorAction,
-          params: %{error_type: :runtime},
+          action: EnqueueAction,
+          params: %{
+            action: :next_action,
+            params: %{value: 42}
+          },
           context: %{}
-        }
-      ]
-
-      agent = FullFeaturedAgent.new("test-agent")
-
-      agent = %{
-        agent
-        | state: Map.put(agent.state, :value, 42),
-          pending_instructions: :queue.from_list(instructions)
-      }
-
-      initial_state = agent.state
-
-      assert {:error, _} = Chain.run(agent)
-      assert agent.state == initial_state
-    end
-
-    test "handles custom errors in action execution" do
-      instructions = [
+        },
         %Instruction{
-          action: ErrorAction,
-          params: %{error_type: :custom},
+          action: Add,
+          params: %{value: 1, amount: 2},
           context: %{}
         }
       ]
@@ -322,23 +270,37 @@ defmodule Jido.Runner.ChainTest do
       agent = FullFeaturedAgent.new("test-agent")
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
-      assert {:error, error} = Chain.run(agent)
-      assert error.message == "Server error in JidoTest.TestActions.ErrorAction: Custom error"
+      assert {:ok, updated_agent, directives} = Chain.run(agent, apply_directives?: false)
+      # Verify final result
+      assert updated_agent.result == %{value: 3}
+      # Verify directives were returned but not applied
+      assert length(directives) == 1
+      [directive] = directives
+      assert %Jido.Agent.Directive.Enqueue{} = directive
+      assert directive.action == :next_action
+      assert directive.params == %{value: 42}
+      # Verify no instructions were enqueued
+      assert :queue.is_empty(updated_agent.pending_instructions)
     end
 
-    test "executes all instructions and accumulates directives" do
+    test "respects apply_directives? option when true (default)" do
       instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{}
+        },
         %Instruction{
           action: EnqueueAction,
           params: %{
-            action: :first_action,
-            params: %{value: 1}
+            action: :next_action,
+            params: %{value: 42}
           },
           context: %{}
         },
         %Instruction{
           action: Add,
-          params: %{value: 0, amount: 1},
+          params: %{value: 1, amount: 2},
           context: %{}
         }
       ]
@@ -347,13 +309,13 @@ defmodule Jido.Runner.ChainTest do
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:ok, updated_agent, []} = Chain.run(agent)
-      # Second instruction executed
-      assert updated_agent.state.value == 1
-      # Directive accumulated
+      # Verify final result
+      assert updated_agent.result == %{value: 3}
+      # Verify directive was applied (instruction was enqueued)
       assert :queue.len(updated_agent.pending_instructions) == 1
       {{:value, enqueued}, _} = :queue.out(updated_agent.pending_instructions)
-      assert enqueued.action == :first_action
-      assert enqueued.params == %{value: 1}
+      assert enqueued.action == :next_action
+      assert enqueued.params == %{value: 42}
     end
   end
 
@@ -403,7 +365,7 @@ defmodule Jido.Runner.ChainTest do
       assert second.params == %{value: 2}
     end
 
-    test "handles mixed instructions and state changes in chain" do
+    test "handles mixed instructions and results in chain" do
       instructions = [
         %Instruction{
           action: Add,
@@ -426,8 +388,8 @@ defmodule Jido.Runner.ChainTest do
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:ok, %FullFeaturedAgent{} = updated_agent, []} = Chain.run(agent)
-      # State changes from Add actions applied
-      assert updated_agent.state.value == 3
+      # Final result from Add actions
+      assert updated_agent.result == %{value: 3}
       # Instruction from ReturnInstructionAction added to queue
       assert :queue.len(updated_agent.pending_instructions) == 1
       {{:value, next_instruction}, _} = :queue.out(updated_agent.pending_instructions)

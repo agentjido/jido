@@ -38,7 +38,11 @@ defmodule JidoTest.TestAgents do
         JidoTest.TestActions.Add,
         JidoTest.TestActions.Multiply,
         JidoTest.TestActions.DelayAction,
-        JidoTest.TestActions.ContextAction
+        JidoTest.TestActions.ContextAction,
+        Jido.Actions.StateManager.Get,
+        Jido.Actions.StateManager.Set,
+        Jido.Actions.StateManager.Update,
+        Jido.Actions.StateManager.Delete
       ],
       schema: [
         value: [
@@ -222,12 +226,12 @@ defmodule JidoTest.TestAgents do
     end
 
     @impl true
-    def handle_signal(signal) do
+    def handle_signal(signal, _agent) do
       {:ok, %{signal | data: Map.put(signal.data, :agent_handled, true)}}
     end
 
     @impl true
-    def process_result(_signal, result) do
+    def transform_result(_signal, result, _agent) do
       {:ok, Map.put(result, :agent_processed, true)}
     end
 
@@ -373,20 +377,43 @@ defmodule JidoTest.TestAgents do
       ]
 
     @impl true
-    def process_result(%Signal{type: "test.string"} = _signal, data) do
+    def transform_result(%Signal{type: "test.string"} = _signal, data, _agent) do
       {:ok, {:processed_string, String.upcase(data)}}
     end
 
-    def process_result(%Signal{type: "test.map"} = _signal, data) do
+    def transform_result(%Signal{type: "test.map"} = _signal, data, _agent) do
       {:ok, Map.put(data, :processed_at, DateTime.utc_now())}
     end
 
-    def process_result(%Signal{type: "test.error"} = signal, reason) do
+    def transform_result(%Signal{type: "test.error"} = signal, reason, _agent) do
       {:error, %{reason: reason, signal_id: signal.id}}
     end
 
-    def process_result(signal, other) do
+    def transform_result(signal, other, _agent) do
       {:error, %{signal: signal, result: other}}
     end
+  end
+
+  defmodule TaskManagementAgent do
+    @moduledoc "Agent for testing task management functionality"
+    use Jido.Agent,
+      name: "task_management_agent",
+      description: "Tests task management functionality",
+      category: "test",
+      tags: ["test", "tasks"],
+      vsn: "1.0.0",
+      actions: [
+        Jido.Actions.Tasks.CreateTask,
+        Jido.Actions.Tasks.UpdateTask,
+        Jido.Actions.Tasks.ToggleTask,
+        Jido.Actions.Tasks.DeleteTask
+      ],
+      schema: [
+        tasks: [
+          type: :map,
+          default: %{},
+          doc: "List of tasks"
+        ]
+      ]
   end
 end

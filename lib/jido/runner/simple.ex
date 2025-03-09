@@ -26,12 +26,13 @@ defmodule Jido.Runner.Simple do
   * All errors preserve the original agent state
   """
   @behaviour Jido.Runner
+  use ExDbug, enabled: false
 
   alias Jido.Instruction
   alias Jido.Error
   alias Jido.Agent.Directive
 
-  @type run_opts :: [apply_state: boolean()]
+  @type run_opts :: [apply_directives?: boolean()]
   @type run_result :: {:ok, Jido.Agent.t(), list()} | {:error, Error.t()}
 
   @doc """
@@ -51,7 +52,7 @@ defmodule Jido.Runner.Simple do
       * `state` - Current agent state
       * `id` - Agent identifier
     * `opts` - Optional keyword list of execution options:
-      * `apply_state` - Whether to apply state changes (default: true)
+      * `apply_directives?` - When true (default), applies directives during execution
 
   ## Returns
     * `{:ok, updated_agent, directives}` - Successful execution with:
@@ -67,8 +68,8 @@ defmodule Jido.Runner.Simple do
       # Successful state update
       {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update)
 
-      # Execute without applying state
-      {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update, apply_state: false)
+      # Execute without applying directives
+      {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update, apply_directives?: false)
 
       # Empty queue - returns agent unchanged
       {:ok, agent, []} = Runner.Simple.run(agent_with_empty_queue)
@@ -92,74 +93,90 @@ defmodule Jido.Runner.Simple do
   @impl true
   @spec run(Jido.Agent.t(), run_opts()) :: run_result()
   def run(%{pending_instructions: instructions} = agent, opts \\ []) do
-    apply_state = Keyword.get(opts, :apply_state, true)
+    dbug("Starting runner with agent", agent_id: agent.id)
 
     case :queue.out(instructions) do
       {{:value, %Instruction{} = instruction}, remaining} ->
+        dbug("Dequeued instruction", instruction: instruction)
         agent = %{agent | pending_instructions: remaining}
-        execute_instruction(agent, instruction, apply_state)
+        execute_instruction(agent, instruction, opts)
 
       {:empty, _} ->
+        dbug("No pending instructions")
         {:ok, agent, []}
     end
   end
 
   @doc false
-  @spec execute_instruction(Jido.Agent.t(), Instruction.t(), boolean()) :: run_result()
-  defp execute_instruction(agent, instruction, apply_state) do
+  @spec execute_instruction(Jido.Agent.t(), Instruction.t(), keyword()) :: run_result()
+  defp execute_instruction(agent, instruction, opts) do
     # Inject agent state into instruction context
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+    dbug("Executing instruction", instruction: instruction)
 
     case Jido.Workflow.run(instruction) do
-      {:ok, state_map, directives} when is_list(directives) ->
-        handle_directive_result(agent, state_map, directives, apply_state)
+      {:ok, result, directives} when is_list(directives) ->
+        dbug("Workflow returned result with directive list",
+          result: result,
+          directives: directives
+        )
 
-      {:ok, state_map, directive} ->
-        handle_directive_result(agent, state_map, [directive], apply_state)
+        handle_directive_result(agent, result, directives, opts)
 
-      {:ok, state_map} ->
-        agent_with_state = apply_state(agent, state_map, apply_state)
-        {:ok, agent_with_state, []}
+      {:ok, result, directive} ->
+        dbug("Workflow returned result with single directive",
+          result: result,
+          directive: directive
+        )
+
+        handle_directive_result(agent, result, [directive], opts)
+
+      {:ok, result} ->
+        dbug("Workflow returned result only", result: result)
+        {:ok, %{agent | result: result}, []}
 
       {:error, %Error{} = error} ->
+        dbug("Workflow returned error struct", error: error)
         {:error, error}
 
       {:error, reason} when is_binary(reason) ->
+        dbug("Workflow returned string error", reason: reason)
         handle_directive_error(reason)
 
       {:error, reason} ->
+        dbug("Workflow returned other error", reason: reason)
         {:error, Error.new(:execution_error, "Workflow execution failed", reason)}
     end
   end
 
-  @spec handle_directive_result(Jido.Agent.t(), map(), list(), boolean()) :: run_result()
-  defp handle_directive_result(agent, state_map, directives, apply_state) do
-    agent_with_state = apply_state(agent, state_map, apply_state)
+  @spec handle_directive_result(Jido.Agent.t(), term(), list(), keyword()) :: run_result()
+  defp handle_directive_result(agent, result, directives, opts) do
+    apply_directives? = Keyword.get(opts, :apply_directives?, true)
+    dbug("Handling directive result", apply_directives?: apply_directives?)
 
-    case Directive.apply_agent_directive(agent_with_state, directives) do
-      {:ok, updated_agent, server_directives} ->
-        {:ok, updated_agent, server_directives}
+    if apply_directives? do
+      case Directive.apply_agent_directive(agent, directives) do
+        {:ok, updated_agent, server_directives} ->
+          dbug("Applied directives successfully", server_directives: server_directives)
+          {:ok, %{updated_agent | result: result}, server_directives}
 
-      {:error, %Error{} = error} ->
-        {:error, error}
+        {:error, %Error{} = error} ->
+          dbug("Directive application failed with error struct", error: error)
+          {:error, error}
 
-      {:error, reason} ->
-        {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
+        {:error, reason} ->
+          dbug("Directive application failed with reason", reason: reason)
+          {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
+      end
+    else
+      dbug("Skipping directive application")
+      {:ok, %{agent | result: result}, directives}
     end
   end
 
   @spec handle_directive_error(String.t()) :: {:error, Error.t()}
   defp handle_directive_error(reason) do
+    dbug("Handling directive error", reason: reason)
     {:error, Error.validation_error("Invalid directive", %{reason: reason})}
-  end
-
-  @doc false
-  @spec apply_state(Jido.Agent.t(), map(), boolean()) :: Jido.Agent.t()
-  defp apply_state(agent, state_map, true) do
-    %{agent | state: Map.merge(agent.state, state_map), result: state_map}
-  end
-
-  defp apply_state(agent, state_map, false) do
-    %{agent | result: state_map}
   end
 end

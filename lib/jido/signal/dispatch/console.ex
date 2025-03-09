@@ -122,7 +122,6 @@ defmodule Jido.Signal.Dispatch.ConsoleAdapter do
     id=#{signal.id}
     type=#{signal.type}
     source=#{signal.source}
-    metadata=#{inspect(signal.jido_metadata, pretty: true)}
     data=#{inspect(signal.data, pretty: true)}
     """)
 
