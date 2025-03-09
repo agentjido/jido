@@ -124,9 +124,11 @@ defmodule Jido.Agent.Server.Runtime do
 
     defp do_agent_cmd(%ServerState{agent: agent} = state, instructions, opts) do
       opts = Keyword.put(opts, :apply_directives?, false)
+
       case agent.__struct__.cmd(agent, instructions, %{}, opts) do
         {:ok, new_agent, directives} ->
           state = %{state | agent: new_agent}
+
           case handle_agent_result(state, new_agent, directives) do
             {:ok, state} ->
               {:ok, state, new_agent.result}

@@ -171,7 +171,9 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
     test "deregister_action removes action module from agent", %{state: state} do
       # First register the action
-      {:ok, state_with_action} = Directive.execute(state, %RegisterAction{action_module: MyAction})
+      {:ok, state_with_action} =
+        Directive.execute(state, %RegisterAction{action_module: MyAction})
+
       assert MyAction in state_with_action.agent.actions
 
       # Then deregister it
@@ -189,6 +191,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
         path: [:config, :mode],
         value: :active
       }
+
       {:ok, state_after_set} = Directive.execute(state, set_directive)
       assert get_in(state_after_set.agent.state, [:config, :mode]) == :active
 
@@ -198,6 +201,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
         path: [:config, :mode],
         value: fn _ -> :inactive end
       }
+
       {:ok, state_after_update} = Directive.execute(state_after_set, update_directive)
       assert get_in(state_after_update.agent.state, [:config, :mode]) == :inactive
 
@@ -206,6 +210,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
         op: :delete,
         path: [:config, :mode]
       }
+
       {:ok, state_after_delete} = Directive.execute(state_after_update, delete_directive)
       assert get_in(state_after_delete.agent.state, [:config, :mode]) == nil
 
@@ -214,6 +219,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
         op: :reset,
         path: [:config]
       }
+
       {:ok, state_after_reset} = Directive.execute(state_after_delete, reset_directive)
       assert get_in(state_after_reset.agent.state, [:config]) == nil
     end
@@ -224,6 +230,7 @@ defmodule Jido.Agent.Server.DirectiveTest do
         path: [:config],
         value: :something
       }
+
       {:error, error} = Directive.execute(state, directive)
 
       assert_error_match(error, %Error{
@@ -239,12 +246,15 @@ defmodule Jido.Agent.Server.DirectiveTest do
         path: [:nonexistent, :path],
         value: fn _ -> :something end
       }
+
       {:error, error} = Directive.execute(state, directive)
 
       assert_error_match(error, %Error{
         type: :execution_error,
         message: "Failed to modify state",
-        details: %{error: %ArgumentError{message: "could not put/update key :path on a nil value"}}
+        details: %{
+          error: %ArgumentError{message: "could not put/update key :path on a nil value"}
+        }
       })
     end
   end

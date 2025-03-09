@@ -89,7 +89,12 @@ defmodule Jido.Agent.Server.Directive do
   """
   @spec execute(ServerState.t(), Directive.t()) :: {:ok, ServerState.t()} | {:error, Error.t()}
 
-  def execute(%ServerState{} = state, %Enqueue{action: action, params: params, context: context, opts: opts}) do
+  def execute(%ServerState{} = state, %Enqueue{
+        action: action,
+        params: params,
+        context: context,
+        opts: opts
+      }) do
     dbug("Executing enqueue directive", action: action, params: params)
 
     # Create instruction from directive
@@ -140,11 +145,19 @@ defmodule Jido.Agent.Server.Directive do
     try do
       case op do
         :set ->
-          updated_agent = %{state.agent | state: put_in(state.agent.state, List.wrap(path), value)}
+          updated_agent = %{
+            state.agent
+            | state: put_in(state.agent.state, List.wrap(path), value)
+          }
+
           {:ok, %{state | agent: updated_agent}}
 
         :update when is_function(value) ->
-          updated_agent = %{state.agent | state: update_in(state.agent.state, List.wrap(path), value)}
+          updated_agent = %{
+            state.agent
+            | state: update_in(state.agent.state, List.wrap(path), value)
+          }
+
           {:ok, %{state | agent: updated_agent}}
 
         :delete ->
@@ -158,7 +171,9 @@ defmodule Jido.Agent.Server.Directive do
 
         invalid_op ->
           dbug("Invalid state modification operation", op: invalid_op)
-          {:error, Error.validation_error("Invalid state modification operation", %{op: invalid_op})}
+
+          {:error,
+           Error.validation_error("Invalid state modification operation", %{op: invalid_op})}
       end
     rescue
       error in [ArgumentError] ->
