@@ -1,7 +1,7 @@
 defmodule Jido.Agent.Server.Runtime do
   @moduledoc false
   use Private
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   require Logger
 
   alias Jido.Error
@@ -71,9 +71,6 @@ defmodule Jido.Agent.Server.Runtime do
   end
 
   private do
-    @doc """
-    Process a signal in a unified way, handling both synchronous and asynchronous signals.
-    """
     @spec process_signal(ServerState.t(), Signal.t()) ::
             {:ok, ServerState.t(), term()} | {:error, term()}
     defp process_signal(%ServerState{} = state, %Signal{} = signal) do

@@ -13,7 +13,7 @@ defmodule Jido.Runner.Chain do
   * Comprehensive error handling
   """
   @behaviour Jido.Runner
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   alias Jido.Instruction
   alias Jido.Agent.Directive
   alias Jido.Error
