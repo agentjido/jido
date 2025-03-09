@@ -20,9 +20,9 @@ defmodule Jido.Runner.Chain do
 
   @type chain_result :: {:ok, Jido.Agent.t(), [Directive.t()]} | {:error, Error.t()}
   @type chain_opts :: [
-    merge_results: boolean(),
-    apply_directives?: boolean()
-  ]
+          merge_results: boolean(),
+          apply_directives?: boolean()
+        ]
 
   @doc """
   Executes a chain of instructions sequentially, with optional result merging.
@@ -57,6 +57,7 @@ defmodule Jido.Runner.Chain do
   @spec run(Jido.Agent.t(), chain_opts()) :: chain_result()
   def run(%{pending_instructions: instructions} = agent, opts \\ []) do
     dbug("Starting chain run", agent: agent.id, opts: opts)
+
     case :queue.to_list(instructions) do
       [] ->
         dbug("No instructions to run", agent: agent.id)
@@ -76,7 +77,14 @@ defmodule Jido.Runner.Chain do
     execute_chain_step(instructions_list, agent, [], %{}, merge_results, opts)
   end
 
-  @spec execute_chain_step([Instruction.t()], Jido.Agent.t(), [Directive.t()], map(), boolean(), keyword()) ::
+  @spec execute_chain_step(
+          [Instruction.t()],
+          Jido.Agent.t(),
+          [Directive.t()],
+          map(),
+          boolean(),
+          keyword()
+        ) ::
           chain_result()
   defp execute_chain_step([], agent, accumulated_directives, last_result, _merge_results, opts) do
     dbug("Chain execution complete", agent: agent.id, directives: length(accumulated_directives))
@@ -84,6 +92,7 @@ defmodule Jido.Runner.Chain do
 
     if apply_directives? do
       dbug("Applying accumulated directives", agent: agent.id)
+
       case Directive.apply_agent_directive(agent, accumulated_directives) do
         {:ok, updated_agent, server_directives} ->
           dbug("Directives applied successfully", agent: agent.id)
@@ -125,9 +134,11 @@ defmodule Jido.Runner.Chain do
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
     dbug("Running workflow", agent: agent.id, instruction: instruction.id)
+
     case Jido.Workflow.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
         dbug("Workflow returned result with directive list", agent: agent.id)
+
         handle_chain_result(
           result,
           directives,
@@ -140,6 +151,7 @@ defmodule Jido.Runner.Chain do
 
       {:ok, result, directive} ->
         dbug("Workflow returned result with single directive", agent: agent.id)
+
         handle_chain_result(
           result,
           [directive],

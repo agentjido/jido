@@ -116,11 +116,19 @@ defmodule Jido.Runner.Simple do
 
     case Jido.Workflow.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
-        dbug("Workflow returned result with directive list", result: result, directives: directives)
+        dbug("Workflow returned result with directive list",
+          result: result,
+          directives: directives
+        )
+
         handle_directive_result(agent, result, directives, opts)
 
       {:ok, result, directive} ->
-        dbug("Workflow returned result with single directive", result: result, directive: directive)
+        dbug("Workflow returned result with single directive",
+          result: result,
+          directive: directive
+        )
+
         handle_directive_result(agent, result, [directive], opts)
 
       {:ok, result} ->
