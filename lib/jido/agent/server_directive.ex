@@ -1,6 +1,6 @@
 defmodule Jido.Agent.Server.Directive do
   @moduledoc false
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Agent.Server.Signal, as: ServerSignal
   alias Jido.Agent.Server.Process, as: ServerProcess
@@ -179,8 +179,8 @@ defmodule Jido.Agent.Server.Directive do
     }
 
     case ServerProcess.start(state, child_spec) do
-      {:ok, updated_state, pid} ->
-        dbug("Task spawned successfully", pid: pid)
+      {:ok, updated_state, _pid} ->
+        dbug("Task spawned successfully: pid: #{inspect(_pid)}")
         {:ok, updated_state}
 
       {:error, reason} ->
@@ -193,8 +193,8 @@ defmodule Jido.Agent.Server.Directive do
     dbug("Executing spawn directive", module: module, args: args)
 
     case ServerProcess.start(state, {module, args}) do
-      {:ok, updated_state, pid} ->
-        dbug("Process spawned successfully", pid: pid)
+      {:ok, updated_state, _pid} ->
+        dbug("Process spawned successfully: pid: #{inspect(_pid)}")
         {:ok, updated_state}
 
       {:error, reason} ->

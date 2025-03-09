@@ -26,7 +26,7 @@ defmodule Jido.Runner.Simple do
   * All errors preserve the original agent state
   """
   @behaviour Jido.Runner
-  use ExDbug, enabled: true
+  use ExDbug, enabled: false
 
   alias Jido.Instruction
   alias Jido.Error
