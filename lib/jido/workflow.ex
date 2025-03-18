@@ -736,8 +736,15 @@ defmodule Jido.Workflow do
               result
             catch
               kind, reason ->
+                stacktrace = __STACKTRACE__
                 dbug("Action execution caught error", action: action, kind: kind, reason: reason)
-                {:error, Error.execution_error("Caught #{kind}: #{inspect(reason)}")}
+
+                {:error,
+                 Error.execution_error(
+                   "Caught #{kind}: #{inspect(reason)}",
+                   %{kind: kind, reason: reason, action: action},
+                   stacktrace
+                 )}
             end
 
           send(parent, {:done, ref, result})
@@ -843,22 +850,36 @@ Debug info:
     rescue
       e in RuntimeError ->
         dbug("Runtime error in action", error: e)
+        stacktrace = __STACKTRACE__
 
         OK.failure(
-          Error.execution_error("Server error in #{inspect(action)}: #{Exception.message(e)}")
+          Error.execution_error(
+            "Server error in #{inspect(action)}: #{Exception.message(e)}",
+            %{original_exception: e, action: action},
+            stacktrace
+          )
         )
 
       e in ArgumentError ->
         dbug("Argument error in action", error: e)
+        stacktrace = __STACKTRACE__
 
         OK.failure(
-          Error.execution_error("Argument error in #{inspect(action)}: #{Exception.message(e)}")
+          Error.execution_error(
+            "Argument error in #{inspect(action)}: #{Exception.message(e)}",
+            %{original_exception: e, action: action},
+            stacktrace
+          )
         )
 
       e ->
+        stacktrace = __STACKTRACE__
+
         OK.failure(
           Error.execution_error(
-            "An unexpected error occurred during execution of #{inspect(action)}: #{inspect(e)}"
+            "An unexpected error occurred during execution of #{inspect(action)}: #{inspect(e)}",
+            %{original_exception: e, action: action},
+            stacktrace
           )
         )
     end

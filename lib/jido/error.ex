@@ -684,18 +684,14 @@ defimpl Inspect, for: Jido.Error do
     # Add details if present
     parts =
       if error.details do
-        details_doc =
-          error.details
-          |> inspect_details()
-          |> to_doc(opts)
-          |> nest(2)
+        formatted_details = format_error_details(error.details, opts)
 
         parts ++
           [
             concat([
               line(),
               "  details: ",
-              details_doc
+              formatted_details
             ])
           ]
       else
@@ -731,10 +727,35 @@ defimpl Inspect, for: Jido.Error do
     ])
   end
 
-  # Handle nested error details specially
-  defp inspect_details(%{original_error: %Jido.Error{}} = details) do
-    Map.delete(details, :original_error)
+  # Format details with special handling for original exceptions
+  defp format_error_details(%{original_exception: exception} = details, opts)
+       when not is_nil(exception) do
+    # Format the exception and its stacktrace
+    exception_class = exception.__struct__
+    exception_message = Exception.message(exception)
+
+    # Create a formatted version of the exception details
+    exception_details = "#{exception_class}: #{exception_message}"
+
+    # Remove the original_exception from the details map and add the formatted details
+    details_without_exception =
+      details
+      |> Map.delete(:original_exception)
+      |> Map.put(:exception_details, exception_details)
+
+    # Format the remaining details
+    to_doc(details_without_exception, opts)
+    |> nest(2)
   end
 
-  defp inspect_details(details), do: details
+  # Handle nested error in details specially (retained from original inspect_details)
+  defp format_error_details(%{original_error: %Jido.Error{}} = details, opts) do
+    to_doc(Map.delete(details, :original_error), opts)
+    |> nest(2)
+  end
+
+  defp format_error_details(details, opts) do
+    to_doc(details, opts)
+    |> nest(2)
+  end
 end
