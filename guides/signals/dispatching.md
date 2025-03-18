@@ -114,7 +114,7 @@ The Logger adapter emits signals through the Logger system:
 
 ```elixir
 config = {:logger, [
-  level: :info,  # :debug, :info, :warn, or :error
+  level: :info,  # :debug, :info, :warning, or :error
   structured: true  # optional, for structured logging
 ]}
 ```

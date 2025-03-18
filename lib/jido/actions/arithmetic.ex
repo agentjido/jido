@@ -21,8 +21,8 @@ defmodule Jido.Actions.Arithmetic do
       name: "add",
       description: "Adds two numbers",
       schema: [
-        value: [type: :number, required: true, doc: "The first number to add"],
-        amount: [type: :number, required: true, doc: "The second number to add"]
+        value: [type: :integer, required: true, doc: "The first number to add"],
+        amount: [type: :integer, required: true, doc: "The second number to add"]
       ]
 
     @spec run(map(), map()) :: {:ok, map()}
@@ -37,8 +37,8 @@ defmodule Jido.Actions.Arithmetic do
       name: "subtract",
       description: "Subtracts one number from another",
       schema: [
-        value: [type: :number, required: true, doc: "The number to subtract from"],
-        amount: [type: :number, required: true, doc: "The number to subtract"]
+        value: [type: :integer, required: true, doc: "The number to subtract from"],
+        amount: [type: :integer, required: true, doc: "The number to subtract"]
       ]
 
     @spec run(map(), map()) :: {:ok, map()}
@@ -53,8 +53,8 @@ defmodule Jido.Actions.Arithmetic do
       name: "multiply",
       description: "Multiplies two numbers",
       schema: [
-        value: [type: :number, required: true, doc: "The first number to multiply"],
-        amount: [type: :number, required: true, doc: "The second number to multiply"]
+        value: [type: :integer, required: true, doc: "The first number to multiply"],
+        amount: [type: :integer, required: true, doc: "The second number to multiply"]
       ]
 
     @spec run(map(), map()) :: {:ok, map()}
@@ -69,8 +69,8 @@ defmodule Jido.Actions.Arithmetic do
       name: "divide",
       description: "Divides one number by another",
       schema: [
-        value: [type: :number, required: true, doc: "The number to be divided (dividend)"],
-        amount: [type: :number, required: true, doc: "The number to divide by (divisor)"]
+        value: [type: :integer, required: true, doc: "The number to be divided (dividend)"],
+        amount: [type: :integer, required: true, doc: "The number to divide by (divisor)"]
       ]
 
     @spec run(map(), map()) :: {:ok, map()} | {:error, String.t()}
@@ -89,7 +89,7 @@ defmodule Jido.Actions.Arithmetic do
       name: "square",
       description: "Squares a number",
       schema: [
-        value: [type: :number, required: true, doc: "The number to be squared"]
+        value: [type: :float, required: true, doc: "The number to be squared"]
       ]
 
     @spec run(map(), map()) :: {:ok, map()}

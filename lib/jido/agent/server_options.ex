@@ -19,7 +19,7 @@ defmodule Jido.Agent.Server.Options do
                                 doc: "Server execution mode"
                               ],
                               log_level: [
-                                type: {:in, [:debug, :info, :warn, :error]},
+                                type: {:in, [:debug, :info, :warning, :error]},
                                 default: :info,
                                 doc: "Logging verbosity level"
                               ],

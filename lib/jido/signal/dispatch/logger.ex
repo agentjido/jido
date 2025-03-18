@@ -8,7 +8,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
 
   ## Configuration Options
 
-  * `:level` - (optional) The log level to use, one of [:debug, :info, :warn, :error], defaults to `:info`
+  * `:level` - (optional) The log level to use, one of [:debug, :info, :warning, :error], defaults to `:info`
   * `:structured` - (optional) Whether to use structured logging format, defaults to `false`
 
   ## Logging Formats
@@ -63,7 +63,7 @@ defmodule Jido.Signal.Dispatch.LoggerAdapter do
   @behaviour Jido.Signal.Dispatch.Adapter
   require Logger
 
-  @valid_levels [:debug, :info, :warn, :error]
+  @valid_levels [:debug, :info, :warning, :error]
 
   @impl Jido.Signal.Dispatch.Adapter
   @doc """

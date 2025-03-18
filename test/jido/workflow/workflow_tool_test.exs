@@ -49,6 +49,67 @@ defmodule Jido.Action.ToolTest do
     end
   end
 
+  describe "convert_params_using_schema/2" do
+    test "converts string parameters to correct types based on schema" do
+      params = %{
+        "integer" => "42",
+        "float" => "3.14",
+        "string" => "hello",
+        "unspecified" => "value"
+      }
+
+      schema = [
+        integer: [type: :integer],
+        float: [type: :float],
+        string: [type: :string]
+      ]
+
+      result = Tool.convert_params_using_schema(params, schema)
+
+      assert result == %{
+               integer: 42,
+               float: 3.14,
+               string: "hello"
+             }
+    end
+
+    test "handles invalid number strings" do
+      params = %{
+        "integer" => "not_a_number",
+        "float" => "invalid"
+      }
+
+      schema = [
+        integer: [type: :integer],
+        float: [type: :float]
+      ]
+
+      result = Tool.convert_params_using_schema(params, schema)
+
+      assert result == %{
+               integer: "not_a_number",
+               float: "invalid"
+             }
+    end
+
+    test "ignores parameters not in schema" do
+      params = %{
+        "in_schema" => "42",
+        "not_in_schema" => "value"
+      }
+
+      schema = [
+        in_schema: [type: :integer]
+      ]
+
+      result = Tool.convert_params_using_schema(params, schema)
+
+      assert result == %{
+               in_schema: 42
+             }
+    end
+  end
+
   describe "build_parameters_schema/1" do
     test "builds correct schema from workflow schema" do
       schema = TestActions.SchemaAction.schema()
@@ -97,7 +158,7 @@ defmodule Jido.Action.ToolTest do
     test "converts NimbleOptions types to JSON Schema types" do
       assert Tool.nimble_type_to_json_schema_type(:string) == "string"
       assert Tool.nimble_type_to_json_schema_type(:integer) == "integer"
-      assert Tool.nimble_type_to_json_schema_type(:float) == "number"
+      assert Tool.nimble_type_to_json_schema_type(:float) == "string"
       assert Tool.nimble_type_to_json_schema_type(:boolean) == "boolean"
       assert Tool.nimble_type_to_json_schema_type(:keyword_list) == "object"
       assert Tool.nimble_type_to_json_schema_type(:map) == "object"

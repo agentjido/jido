@@ -37,12 +37,12 @@ defmodule Jido.Action.Tool do
       }
   """
   @spec to_tool(module()) :: tool()
-  def to_tool(workflow) when is_atom(workflow) do
+  def to_tool(action) when is_atom(action) do
     %{
-      name: workflow.name(),
-      description: workflow.description(),
-      function: &execute_workflow(workflow, &1, &2),
-      parameters_schema: build_parameters_schema(workflow.schema())
+      name: action.name(),
+      description: action.description(),
+      function: &execute_workflow(action, &1, &2),
+      parameters_schema: build_parameters_schema(action.schema())
     }
   end
 
@@ -52,14 +52,55 @@ defmodule Jido.Action.Tool do
   This function is typically used as the function value in the tool representation.
   """
   @spec execute_workflow(module(), map(), map()) :: {:ok, String.t()} | {:error, String.t()}
-  def execute_workflow(workflow, params, context) do
-    case Jido.Workflow.run(workflow, params, context) do
+  def execute_workflow(action, params, context) do
+    # Convert string keys to atom keys and handle type conversion based on schema
+    converted_params = convert_params_using_schema(params, action.schema())
+    safe_context = context || %{}
+
+    case Jido.Workflow.run(action, converted_params, safe_context) do
       {:ok, result} ->
         {:ok, Jason.encode!(result)}
 
       {:error, %Error{} = error} ->
         {:error, Jason.encode!(%{error: inspect(error)})}
     end
+  end
+
+  # Helper function to convert params using schema information
+  def convert_params_using_schema(params, schema) do
+    schema_keys = Keyword.keys(schema)
+
+    Enum.reduce(schema_keys, %{}, fn key, acc ->
+      string_key = to_string(key)
+
+      if Map.has_key?(params, string_key) do
+        value = params[string_key]
+        schema_entry = Keyword.get(schema, key, [])
+        type = Keyword.get(schema_entry, :type)
+
+        converted_value =
+          case {type, value} do
+            {:float, val} when is_binary(val) ->
+              case Float.parse(val) do
+                {num, _} -> num
+                :error -> val
+              end
+
+            {:integer, val} when is_binary(val) ->
+              case Integer.parse(val) do
+                {num, _} -> num
+                :error -> val
+              end
+
+            _ ->
+              value
+          end
+
+        Map.put(acc, key, converted_value)
+      else
+        acc
+      end
+    end)
   end
 
   @doc """
@@ -125,8 +166,9 @@ defmodule Jido.Action.Tool do
   """
   @spec nimble_type_to_json_schema_type(atom()) :: String.t()
   def nimble_type_to_json_schema_type(:string), do: "string"
+  def nimble_type_to_json_schema_type(:number), do: "integer"
   def nimble_type_to_json_schema_type(:integer), do: "integer"
-  def nimble_type_to_json_schema_type(:float), do: "number"
+  def nimble_type_to_json_schema_type(:float), do: "string"
   def nimble_type_to_json_schema_type(:boolean), do: "boolean"
   def nimble_type_to_json_schema_type(:keyword_list), do: "object"
   def nimble_type_to_json_schema_type(:map), do: "object"

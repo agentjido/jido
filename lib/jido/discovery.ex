@@ -202,11 +202,11 @@ defmodule Jido.Discovery do
     try do
       cache = build_cache()
       :persistent_term.put(@cache_key, cache)
-      Logger.debug("Jido discovery cache initialized successfully")
+      Logger.debug("[Jido.Discovery] Jido cache initialized successfully")
       :ok
     rescue
       e ->
-        Logger.warning("Failed to initialize Jido discovery cache: #{inspect(e)}")
+        Logger.warning("[Jido.Discovery] Failed to initialize discovery cache: #{inspect(e)}")
         {:error, :cache_init_failed}
     end
   end
