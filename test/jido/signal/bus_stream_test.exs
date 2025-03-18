@@ -366,7 +366,7 @@ defmodule Jido.Signal.Bus.StreamTest do
 
       # Since the implementation is looking for correlation_id directly on the signal
       # and not in jido_metadata, we expect no matches
-      assert length(filtered_signals) == 0
+      assert Enum.empty?(filtered_signals)
     end
 
     test "returns signals in chronological order" do

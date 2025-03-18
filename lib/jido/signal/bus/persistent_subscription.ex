@@ -365,7 +365,9 @@ defmodule Jido.Signal.Bus.PersistentSubscription do
               dispatch_result = Dispatch.dispatch(signal, state.bus_subscription.dispatch)
 
               if dispatch_result != :ok do
-                Logger.debug("Dispatch failed during replay", result: dispatch_result)
+                Logger.debug(
+                  "Dispatch failed during replay, signal: #{inspect(signal)}, dispatch_result: #{inspect(dispatch_result)}"
+                )
               end
             end
           end

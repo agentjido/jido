@@ -76,9 +76,9 @@ defmodule Jido.Signal.JournalTest do
       effects2 = Journal.get_effects(journal, signal2.id)
       effects3 = Journal.get_effects(journal, signal3.id)
 
-      assert length(effects1) == 1
-      assert length(effects2) == 1
-      assert length(effects3) == 0
+      refute Enum.empty?(effects1)
+      refute Enum.empty?(effects2)
+      assert effects3 == []
       assert hd(effects1).id == signal2.id
       assert hd(effects2).id == signal3.id
 

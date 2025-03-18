@@ -620,6 +620,7 @@ defmodule JidoTest.TestActions do
 
     @impl true
     def run(%{input: _input, operation: :inspect} = params, _context) do
+      # credo:disable-for-next-line Credo.Check.Warning.IoInspect
       IO.inspect(params, label: "IOAction")
       {:ok, params}
     end
