@@ -1,4 +1,11 @@
 defmodule Jido.Actions.StateManager do
+  @moduledoc """
+  Provides generic actions for managing state within an agent.
+
+  This module implements the Jido.Action behavior and offers a collection
+  of actions for getting, setting, updating, and deleting values in an agent's state.
+  """
+
   use Jido.Action,
     name: "state_manager",
     description: "Generic actions for state management"
@@ -7,6 +14,12 @@ defmodule Jido.Actions.StateManager do
   alias Jido.Agent.Directive.StateModification
 
   defmodule Get do
+    @moduledoc """
+    Action for retrieving a value from the agent's state.
+
+    Gets a value from the agent's state at the specified path.
+    """
+
     use Jido.Action,
       name: "get",
       description: "Get a value from the state at a given path",
@@ -22,6 +35,12 @@ defmodule Jido.Actions.StateManager do
   end
 
   defmodule Set do
+    @moduledoc """
+    Action for setting a value in the agent's state.
+
+    Sets a value in the agent's state at the specified path.
+    """
+
     use Jido.Action,
       name: "set",
       description: "Set a value in the state at a given path",
@@ -73,6 +92,13 @@ defmodule Jido.Actions.StateManager do
   end
 
   defmodule Update do
+    @moduledoc """
+    Action for updating a value in the agent's state.
+
+    Updates a value in the agent's state at the specified path using
+    a transformation function.
+    """
+
     use Jido.Action,
       name: "update",
       description: "Update a value in the state at a given path with a new value",
@@ -124,9 +150,15 @@ defmodule Jido.Actions.StateManager do
   end
 
   defmodule Delete do
+    @moduledoc """
+    Action for deleting a value from the agent's state.
+
+    Removes a value from the agent's state at the specified path.
+    """
+
     use Jido.Action,
       name: "delete",
-      description: "Delete a key from the state at a given path",
+      description: "Delete a value from the state at a given path",
       schema: [
         path: [type: {:list, :atom}, required: true]
       ]

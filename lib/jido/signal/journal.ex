@@ -68,20 +68,22 @@ defmodule Jido.Signal.Journal do
   """
   @spec get_conversation(t(), String.t()) :: [Signal.t()]
   def get_conversation(%__MODULE__{} = journal, conversation_id) do
-    with {:ok, signal_ids} <- call_adapter(journal, :get_conversation, [conversation_id]) do
-      signal_ids
-      |> MapSet.to_list()
-      |> Task.async_stream(fn id ->
-        case call_adapter(journal, :get_signal, [id]) do
-          {:ok, signal} -> signal
-          _ -> nil
-        end
-      end)
-      |> Stream.map(fn {:ok, signal} -> signal end)
-      |> Stream.reject(&is_nil/1)
-      |> Enum.sort_by(& &1.time, &sort_time_compare/2)
-    else
-      _ -> []
+    case call_adapter(journal, :get_conversation, [conversation_id]) do
+      {:ok, signal_ids} ->
+        signal_ids
+        |> MapSet.to_list()
+        |> Task.async_stream(fn id ->
+          case call_adapter(journal, :get_signal, [id]) do
+            {:ok, signal} -> signal
+            _ -> nil
+          end
+        end)
+        |> Stream.map(fn {:ok, signal} -> signal end)
+        |> Stream.reject(&is_nil/1)
+        |> Enum.sort_by(& &1.time, &sort_time_compare/2)
+
+      _ ->
+        []
     end
   end
 
@@ -96,20 +98,22 @@ defmodule Jido.Signal.Journal do
   """
   @spec get_effects(t(), String.t()) :: [Signal.t()]
   def get_effects(%__MODULE__{} = journal, signal_id) do
-    with {:ok, effect_ids} <- call_adapter(journal, :get_effects, [signal_id]) do
-      effect_ids
-      |> MapSet.to_list()
-      |> Task.async_stream(fn id ->
-        case call_adapter(journal, :get_signal, [id]) do
-          {:ok, signal} -> signal
-          _ -> nil
-        end
-      end)
-      |> Stream.map(fn {:ok, signal} -> signal end)
-      |> Stream.reject(&is_nil/1)
-      |> Enum.sort_by(& &1.time, &sort_time_compare/2)
-    else
-      _ -> []
+    case call_adapter(journal, :get_effects, [signal_id]) do
+      {:ok, effect_ids} ->
+        effect_ids
+        |> MapSet.to_list()
+        |> Task.async_stream(fn id ->
+          case call_adapter(journal, :get_signal, [id]) do
+            {:ok, signal} -> signal
+            _ -> nil
+          end
+        end)
+        |> Stream.map(fn {:ok, signal} -> signal end)
+        |> Stream.reject(&is_nil/1)
+        |> Enum.sort_by(& &1.time, &sort_time_compare/2)
+
+      _ ->
+        []
     end
   end
 
@@ -144,10 +148,12 @@ defmodule Jido.Signal.Journal do
   """
   @spec trace_chain(t(), String.t(), :forward | :backward) :: [Signal.t()]
   def trace_chain(journal, signal_id, direction \\ :forward) do
-    with {:ok, signal} <- call_adapter(journal, :get_signal, [signal_id]) do
-      do_trace_chain(journal, [signal], direction, MapSet.new([signal_id]))
-    else
-      _ -> []
+    case call_adapter(journal, :get_signal, [signal_id]) do
+      {:ok, signal} ->
+        do_trace_chain(journal, [signal], direction, MapSet.new([signal_id]))
+
+      _ ->
+        []
     end
   end
 
@@ -176,22 +182,26 @@ defmodule Jido.Signal.Journal do
   defp validate_causality(_journal, _signal, nil), do: :ok
 
   defp validate_causality(journal, signal, cause_id) do
-    with {:ok, cause} <- call_adapter(journal, :get_signal, [cause_id]) do
-      cond do
-        # Would create a cycle
-        would_create_cycle?(journal, signal.id, cause_id) ->
-          {:error, :causality_cycle}
+    case call_adapter(journal, :get_signal, [cause_id]) do
+      {:ok, cause} ->
+        cond do
+          # Would create a cycle
+          would_create_cycle?(journal, signal.id, cause_id) ->
+            {:error, :causality_cycle}
 
-        # Cause is chronologically after the effect
-        time_compare(signal.time, cause.time) == :lt ->
-          {:error, :invalid_temporal_order}
+          # Cause is chronologically after the effect
+          time_compare(signal.time, cause.time) == :lt ->
+            {:error, :invalid_temporal_order}
 
-        true ->
-          :ok
-      end
-    else
-      {:error, :not_found} -> {:error, :cause_not_found}
-      error -> error
+          true ->
+            :ok
+        end
+
+      {:error, :not_found} ->
+        {:error, :cause_not_found}
+
+      error ->
+        error
     end
   end
 

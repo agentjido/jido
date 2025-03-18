@@ -103,7 +103,7 @@ defmodule Jido.Agent.Server.SkillsTest do
     test "validates skill options and stores them in agent state", %{state: state} do
       opts = [
         skills: [MockSkillWithSchema],
-        mock_skill_with_schema: [api_key: "test_key", timeout: 10000]
+        mock_skill_with_schema: [api_key: "test_key", timeout: 10_000]
       ]
 
       assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
@@ -112,14 +112,14 @@ defmodule Jido.Agent.Server.SkillsTest do
       # Check that the validated options are stored in the agent state
       stored_opts = updated_state.agent.state[:mock_skill_with_schema]
       assert Keyword.get(stored_opts, :api_key) == "test_key"
-      assert Keyword.get(stored_opts, :timeout) == 10000
+      assert Keyword.get(stored_opts, :timeout) == 10_000
     end
 
     test "returns error when skill options validation fails", %{state: state} do
       opts = [
         skills: [MockSkillWithSchema],
         # Missing required api_key
-        mock_skill_with_schema: [timeout: 10000]
+        mock_skill_with_schema: [timeout: 10_000]
       ]
 
       assert {:error, error_message} = Skills.build(state, opts)

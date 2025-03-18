@@ -1,4 +1,13 @@
 defmodule Jido.Signal.Bus.State do
+  @moduledoc """
+  Defines the state structure for the signal bus.
+
+  This module contains the type definitions and operations for managing
+  the internal state of the signal bus, including signal logs, subscriptions,
+  snapshots, and router configuration. It provides functions for manipulating
+  and querying this state.
+  """
+
   use TypedStruct
   use ExDbug, enabled: false
 

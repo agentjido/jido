@@ -1,4 +1,12 @@
 defmodule Jido.Signal.Bus.Subscriber do
+  @moduledoc """
+  Defines the subscriber model and subscription management for the signal bus.
+
+  This module contains the subscriber type definition and functions for creating,
+  managing, and dispatching signals to subscribers. It supports both regular and
+  persistent subscriptions, handling subscription lifetime and signal delivery.
+  """
+
   use Private
   use TypedStruct
   use ExDbug, enabled: false

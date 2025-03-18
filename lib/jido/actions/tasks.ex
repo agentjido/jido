@@ -1,4 +1,11 @@
 defmodule Jido.Actions.Tasks do
+  @moduledoc """
+  Provides a set of actions for managing tasks within an agent.
+
+  This module implements the Jido.Action behavior and offers a collection
+  of actions for creating, updating, toggling, and deleting tasks.
+  """
+
   use Jido.Action,
     name: "tasks",
     description: "Actions for managing a list of tasks"
@@ -7,6 +14,13 @@ defmodule Jido.Actions.Tasks do
   alias Jido.Signal.ID
 
   defmodule Task do
+    @moduledoc """
+    Defines the task data structure used by the Tasks actions.
+
+    Represents a task with properties such as id, title, completion status,
+    creation timestamp, and deadline.
+    """
+
     use TypedStruct
 
     typedstruct do
@@ -31,12 +45,19 @@ defmodule Jido.Actions.Tasks do
   end
 
   defmodule CreateTask do
+    @moduledoc """
+    Action for creating a new task.
+
+    Creates a task with the specified title and optional deadline,
+    adding it to the agent's state.
+    """
+
     use Jido.Action,
       name: "create",
       description: "Create a new task",
       schema: [
         title: [type: :string, required: true],
-        deadline: [type: :any, required: true]
+        deadline: [type: :any, required: false]
       ]
 
     alias Jido.Actions.Tasks.Task
@@ -59,13 +80,20 @@ defmodule Jido.Actions.Tasks do
   end
 
   defmodule UpdateTask do
+    @moduledoc """
+    Action for updating an existing task.
+
+    Updates a task's properties such as title and deadline based on the
+    provided task ID.
+    """
+
     use Jido.Action,
       name: "update",
-      description: "Update a task's title and deadline",
+      description: "Update an existing task",
       schema: [
         id: [type: :string, required: true],
-        title: [type: :string, required: true],
-        deadline: [type: :any, required: true]
+        title: [type: :string, required: false],
+        deadline: [type: :any, required: false]
       ]
 
     alias Jido.Actions.Tasks.Task
@@ -101,6 +129,13 @@ defmodule Jido.Actions.Tasks do
   end
 
   defmodule ToggleTask do
+    @moduledoc """
+    Action for toggling the completion status of a task.
+
+    Switches a task's completed status between true and false based on
+    the provided task ID.
+    """
+
     use Jido.Action,
       name: "toggle",
       description: "Toggle the completion status of a task",
@@ -140,9 +175,15 @@ defmodule Jido.Actions.Tasks do
   end
 
   defmodule DeleteTask do
+    @moduledoc """
+    Action for deleting a task.
+
+    Removes a task from the agent's state based on the provided task ID.
+    """
+
     use Jido.Action,
       name: "delete",
-      description: "Delete an existing task",
+      description: "Delete a task",
       schema: [
         id: [type: :string, required: true]
       ]

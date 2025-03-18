@@ -1,4 +1,14 @@
 defmodule Jido.Signal.Bus do
+  @moduledoc """
+  Implements a signal bus for routing, filtering, and distributing signals.
+
+  The Bus acts as a central hub for signals in the system, allowing components
+  to publish and subscribe to signals. It handles routing based on signal paths,
+  subscription management, persistence, and signal filtering. The Bus maintains
+  an internal log of signals and provides mechanisms for retrieving historical
+  signals and snapshots.
+  """
+
   use GenServer
   require Logger
   use ExDbug, enabled: false

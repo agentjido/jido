@@ -1,4 +1,13 @@
 defmodule Jido.Signal.Bus.Stream do
+  @moduledoc """
+  Provides streaming functionality for the signal bus.
+
+  This module contains functions for filtering, processing, and publishing
+  signals through the bus streaming interface. It supports operations like
+  filtering signals by type pattern and timestamp, as well as publishing
+  signals to subscribers.
+  """
+
   use ExDbug, enabled: false
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Router

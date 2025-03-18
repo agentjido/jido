@@ -28,8 +28,7 @@ defmodule Jido.Agent.Server.Output do
 
       metadata =
         opts
-        |> Enum.map(fn {k, v} -> "#{k}=#{v}" end)
-        |> Enum.join(" ")
+        |> Enum.map_join(" ", fn {k, v} -> "#{k}=#{v}" end)
 
       message = if metadata != "", do: "#{message} #{metadata}", else: message
 

@@ -1,4 +1,11 @@
 defmodule Jido.Examples.TaskSkill do
+  @moduledoc """
+  An example skill that provides task management capabilities to agents.
+
+  This skill registers task-related actions (create, update, toggle, delete)
+  with the agent and handles task-related signals.
+  """
+
   use Jido.Skill,
     name: "task_skill",
     description: "A skill to let agents manage a list of tasks",

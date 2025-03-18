@@ -118,32 +118,33 @@ defmodule Jido.Agent.Server.Callback do
     dbug("Starting signal pipeline", signal: signal)
 
     # First try to handle with the agent
-    with {:ok, handled_signal} <- safe_agent_handle_signal(state, signal) do
-      dbug("Agent handled signal", handled_signal: handled_signal)
+    case safe_agent_handle_signal(state, signal) do
+      {:ok, handled_signal} ->
+        dbug("Agent handled signal", handled_signal: handled_signal)
 
-      # Then try to handle with matching skills
-      matching_skills = find_matching_skills(skills, signal)
-      dbug("Found matching skills", count: length(matching_skills))
+        # Then try to handle with matching skills
+        matching_skills = find_matching_skills(skills, signal)
+        dbug("Found matching skills", count: length(matching_skills))
 
-      # Process through each matching skill
-      final_signal =
-        Enum.reduce(matching_skills, handled_signal, fn skill, acc_signal ->
-          case safe_skill_handle_signal(state, skill, acc_signal) do
-            {:ok, new_signal} ->
-              dbug("Skill processed signal", skill: skill)
-              new_signal
+        # Process through each matching skill
+        final_signal =
+          Enum.reduce(matching_skills, handled_signal, fn skill, acc_signal ->
+            case safe_skill_handle_signal(state, skill, acc_signal) do
+              {:ok, new_signal} ->
+                dbug("Skill processed signal", skill: skill)
+                new_signal
 
-            {:error, _reason} ->
-              dbug("Skill failed to process signal, continuing with previous signal",
-                skill: skill
-              )
+              {:error, _reason} ->
+                dbug("Skill failed to process signal, continuing with previous signal",
+                  skill: skill
+                )
 
-              acc_signal
-          end
-        end)
+                acc_signal
+            end
+          end)
 
-      {:ok, final_signal}
-    else
+        {:ok, final_signal}
+
       {:error, _reason} ->
         dbug("Agent failed to handle signal, returning original signal")
         {:ok, signal}
@@ -223,33 +224,33 @@ defmodule Jido.Agent.Server.Callback do
     dbug("Starting result transformation pipeline", signal: signal, result: result)
 
     # First try to transform with the agent
-    with {:ok, transformed_result} <-
-           safe_transform_result(agent.__struct__, signal, result, agent) do
-      dbug("Agent transformed result", transformed_result: transformed_result)
+    case safe_transform_result(agent.__struct__, signal, result, agent) do
+      {:ok, transformed_result} ->
+        dbug("Agent transformed result", transformed_result: transformed_result)
 
-      # Then try to transform with matching skills
-      matching_skills = find_matching_skills(skills, signal)
-      dbug("Found matching skills", count: length(matching_skills))
+        # Then try to transform with matching skills
+        matching_skills = find_matching_skills(skills, signal)
+        dbug("Found matching skills", count: length(matching_skills))
 
-      # Process through each matching skill
-      final_result =
-        Enum.reduce(matching_skills, transformed_result, fn skill, acc_result ->
-          case safe_transform_result(skill, signal, acc_result, skill) do
-            {:ok, new_result} ->
-              dbug("Skill transformed result", skill: skill)
-              new_result
+        # Process through each matching skill
+        final_result =
+          Enum.reduce(matching_skills, transformed_result, fn skill, acc_result ->
+            case safe_transform_result(skill, signal, acc_result, skill) do
+              {:ok, new_result} ->
+                dbug("Skill transformed result", skill: skill)
+                new_result
 
-            {:error, _reason} ->
-              dbug("Skill failed to transform result, continuing with previous result",
-                skill: skill
-              )
+              {:error, _reason} ->
+                dbug("Skill failed to transform result, continuing with previous result",
+                  skill: skill
+                )
 
-              acc_result
-          end
-        end)
+                acc_result
+            end
+          end)
 
-      {:ok, final_result}
-    else
+        {:ok, final_result}
+
       {:error, _reason} ->
         dbug("Agent failed to transform result, returning original result")
         {:ok, result}

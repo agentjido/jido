@@ -205,17 +205,17 @@ defmodule Jido.Signal.Topology do
   # Check if setting this parent would create a cycle
   defp would_create_cycle?(topology, parent_id, child_id) do
     # A cycle would be created if the child is already an ancestor of the parent
-    parent_id == child_id || is_ancestor?(topology, child_id, parent_id)
+    parent_id == child_id || ancestor?(topology, child_id, parent_id)
   end
 
   # Check if potential_ancestor is an ancestor of process_id
-  defp is_ancestor?(topology, potential_ancestor, process_id) do
+  defp ancestor?(topology, potential_ancestor, process_id) do
     case Map.fetch(topology.processes, process_id) do
       {:ok, process} ->
         case process.parent_id do
           nil -> false
           ^potential_ancestor -> true
-          parent_id -> is_ancestor?(topology, potential_ancestor, parent_id)
+          parent_id -> ancestor?(topology, potential_ancestor, parent_id)
         end
 
       :error ->

@@ -610,6 +610,12 @@ defmodule JidoTest.TestActions do
   end
 
   defmodule IOAction do
+    @moduledoc """
+    Test action module that demonstrates various IO operations.
+
+    Used for testing IO-related functionality within actions.
+    """
+
     use Action,
       name: "io_action",
       description: "Showcases various IO operations",
