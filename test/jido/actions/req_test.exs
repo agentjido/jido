@@ -37,6 +37,18 @@ defmodule JidoTest.Actions.ReqTest do
     # No transform_result implementation - will use default
   end
 
+  # Example without custom transform_result
+  defmodule SimplePost do
+    use ReqAction,
+      name: "simple_post",
+      description: "Simple POST request example",
+      url: "https://example.com/api",
+      method: :post,
+      schema: []
+
+    # No transform_result implementation - will use default
+  end
+
   setup :verify_on_exit!
 
   test "req action validates and stores configuration" do
@@ -45,6 +57,9 @@ defmodule JidoTest.Actions.ReqTest do
 
     assert SimpleGet.name() == "simple_get"
     assert SimpleGet.description() == "Simple GET request example"
+
+    assert SimplePost.name() == "simple_post"
+    assert SimplePost.description() == "Simple POST request example"
   end
 
   test "req action with custom transform executes and transforms results" do
@@ -82,5 +97,43 @@ defmodule JidoTest.Actions.ReqTest do
     assert result.request.method == :get
     assert result.response.status == 200
     assert result.response.body == %{"data" => "example response"}
+  end
+
+  test "req action includes params in req_options for GET requests" do
+    # Create a mock response
+    mock_response = %{
+      status: 200,
+      body: %{"data" => "example response"},
+      headers: %{"content-type" => "application/json"}
+    }
+
+    # Mock Req.request! to verify params in options
+    expect(Req, :request!, fn opts ->
+      assert Keyword.has_key?(opts, :params)
+      assert opts[:params] == %{"key" => "value"}
+      mock_response
+    end)
+
+    # Call run with params
+    assert {:ok, _result} = SimpleGet.run(%{"key" => "value"}, %{})
+  end
+
+  test "req action includes json in req_options for POST requests" do
+    # Create a mock response
+    mock_response = %{
+      status: 200,
+      body: %{"data" => "example response"},
+      headers: %{"content-type" => "application/json"}
+    }
+
+    # Mock Req.request! to verify json in options
+    expect(Req, :request!, fn opts ->
+      assert Keyword.has_key?(opts, :json)
+      assert opts[:json] == %{"key" => "value"}
+      mock_response
+    end)
+
+    # Call run with params
+    assert {:ok, _result} = SimplePost.run(%{"key" => "value"}, %{})
   end
 end

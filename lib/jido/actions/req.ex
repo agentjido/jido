@@ -110,7 +110,7 @@ defmodule Jido.Actions.ReqAction do
                       Keyword.put(req_options, :json, params)
 
                     _ ->
-                      req_options
+                      Keyword.put(req_options, :params, params)
                   end
 
                 # Execute the request
