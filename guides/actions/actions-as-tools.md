@@ -8,7 +8,7 @@ Jido Actions can be converted into tools compatible with LLM frameworks like Lan
 
 - An Action defines a discrete unit of functionality with validated inputs and outputs
 - Langchain tools represent capabilities that can be invoked by LLMs
-- The `Jido.Action.Tool` module handles the conversion between these formats
+- The `Jido.Actions.Tool` module handles the conversion between these formats
 
 ## Basic Tool Conversion
 

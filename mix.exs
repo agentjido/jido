@@ -218,7 +218,7 @@ defmodule Jido.MixProject do
           Jido.Actions.Directives
         ],
         "Actions: Extra": [
-          Jido.Action.Tool
+          Jido.Actions.Tool
         ],
         "Signals: Core": [
           Jido.Signal,

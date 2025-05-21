@@ -9,7 +9,7 @@ defmodule Jido.Examples.ActionExecTest do
   @moduletag :capture_log
 
   defmodule MyWorkflow do
-    use Jido.WorkflowAction,
+    use Jido.Actions.Workflow,
       name: "my_workflow",
       description: "My workflow",
       schema: [

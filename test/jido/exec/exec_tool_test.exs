@@ -1,6 +1,6 @@
-defmodule Jido.Action.ToolTest do
+defmodule Jido.Actions.ToolTest do
   use JidoTest.Case, async: true
-  alias Jido.Action.Tool
+  alias Jido.Actions.Tool
   alias JidoTest.TestActions
 
   @moduletag :capture_log

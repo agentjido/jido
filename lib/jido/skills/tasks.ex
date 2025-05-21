@@ -1,4 +1,4 @@
-defmodule Jido.Examples.TaskSkill do
+defmodule Jido.Skills.Tasks do
   @moduledoc """
   An example skill that provides task management capabilities to agents.
 

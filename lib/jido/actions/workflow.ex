@@ -1,4 +1,4 @@
-defmodule Jido.WorkflowAction do
+defmodule Jido.Actions.Workflow do
   @moduledoc """
   A specialized Action type that executes a sequence of workflow steps.
 
@@ -21,7 +21,7 @@ defmodule Jido.WorkflowAction do
 
   ```elixir
   defmodule MyWorkflow do
-    use Jido.WorkflowAction,
+    use Jido.Actions.Workflow,
       name: "my_workflow",
       description: "A workflow that performs multiple steps",
       steps: [
@@ -135,7 +135,7 @@ defmodule Jido.WorkflowAction do
           use Jido.Action, action_opts
 
           # Implement the behavior
-          @behaviour Jido.WorkflowAction
+          @behaviour Jido.Actions.Workflow
 
           # Implement the run function that executes the workflow
           @impl Jido.Action

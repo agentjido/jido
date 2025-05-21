@@ -1,4 +1,4 @@
-# defmodule Jido.WorkflowActionTest do
+# defmodule Jido.Actions.WorkflowTest do
 #   use JidoTest.Case, async: true
 
 #   # Define a simple LogAction for testing
@@ -35,7 +35,7 @@
 
 #   # Define test modules at the top level
 #   defmodule ValidWorkflow do
-#     use Jido.WorkflowAction,
+#     use Jido.Actions.Workflow,
 #       name: "valid_workflow",
 #       description: "A valid test workflow",
 #       schema: [
@@ -51,7 +51,7 @@
 #   end
 
 #   defmodule ConditionalWorkflow do
-#     use Jido.WorkflowAction,
+#     use Jido.Actions.Workflow,
 #       name: "conditional_workflow",
 #       description: "A workflow with conditional steps",
 #       schema: [
@@ -72,7 +72,7 @@
 #       ]
 
 #     # Override execute_step to handle our specific condition check
-#     @impl Jido.WorkflowAction
+#     @impl Jido.Actions.Workflow
 #     def execute_step(
 #           {:branch, [name: "condition_check"], [_placeholder, true_branch, false_branch]},
 #           params,
@@ -96,7 +96,7 @@
 #   end
 
 #   defmodule ParallelWorkflow do
-#     use Jido.WorkflowAction,
+#     use Jido.Actions.Workflow,
 #       name: "parallel_workflow",
 #       description: "A workflow with parallel steps",
 #       schema: [

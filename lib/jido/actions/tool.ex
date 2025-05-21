@@ -1,4 +1,4 @@
-defmodule Jido.Action.Tool do
+defmodule Jido.Actions.Tool do
   @moduledoc """
   Provides functionality to convert Jido Execs into tool representations.
 
@@ -28,7 +28,7 @@ defmodule Jido.Action.Tool do
 
   ## Examples
 
-      iex> tool = Jido.Action.Tool.to_tool(MyExec)
+      iex> tool = Jido.Actions.Tool.to_tool(MyExec)
       %{
         name: "my_action",
         description: "Performs a specific task",
