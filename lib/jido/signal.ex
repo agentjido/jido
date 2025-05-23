@@ -72,6 +72,34 @@ defmodule Jido.Signal do
   })
   ```
 
+  ## Custom Signal Types
+
+  You can define custom Signal types using the `use Jido.Signal` pattern:
+
+  ```elixir
+  defmodule MySignal do
+    use Jido.Signal,
+      type: "my.custom.signal",
+      default_source: "/my/service",
+      datacontenttype: "application/json",
+      schema: [
+        user_id: [type: :string, required: true],
+        message: [type: :string, required: true]
+      ]
+  end
+
+  # Create instances
+  {:ok, signal} = MySignal.new(%{user_id: "123", message: "Hello"})
+
+  # Override runtime fields
+  {:ok, signal} = MySignal.new(
+    %{user_id: "123", message: "Hello"},
+    source: "/different/source",
+    subject: "user-notification",
+    jido_dispatch: {:pubsub, topic: "events"}
+  )
+  ```
+
   ## Signal Types
 
   Signal types are strings, but typically use a hierarchical dot notation:
@@ -145,6 +173,37 @@ defmodule Jido.Signal do
   alias Jido.Signal.ID
   use TypedStruct
 
+  require OK
+
+  @signal_config_schema NimbleOptions.new!(
+                          type: [
+                            type: :string,
+                            required: true,
+                            doc: "The type of the Signal"
+                          ],
+                          default_source: [
+                            type: :string,
+                            required: false,
+                            doc: "The default source of the Signal"
+                          ],
+                          datacontenttype: [
+                            type: :string,
+                            required: false,
+                            doc: "The content type of the data field"
+                          ],
+                          dataschema: [
+                            type: :string,
+                            required: false,
+                            doc: "Schema URI for the data field (optional)"
+                          ],
+                          schema: [
+                            type: :keyword_list,
+                            default: [],
+                            doc:
+                              "A NimbleOptions schema for validating the Signal's data parameters"
+                          ]
+                        )
+
   @derive {Jason.Encoder,
            only: [
              :id,
@@ -170,6 +229,197 @@ defmodule Jido.Signal do
     field(:data, term())
     # Jido-specific fields
     field(:jido_dispatch, Dispatch.dispatch_configs())
+  end
+
+  @doc """
+  Defines a new Signal module.
+
+  This macro sets up the necessary structure and callbacks for a custom Signal,
+  including configuration validation and default implementations.
+
+  ## Options
+
+  #{NimbleOptions.docs(@signal_config_schema)}
+
+  ## Examples
+
+      defmodule MySignal do
+        use Jido.Signal,
+          type: "my.custom.signal",
+          default_source: "/my/service",
+          schema: [
+            user_id: [type: :string, required: true],
+            message: [type: :string, required: true]
+          ]
+      end
+
+  """
+  defmacro __using__(opts) do
+    escaped_schema = Macro.escape(@signal_config_schema)
+
+    quote location: :keep do
+      alias Jido.Signal
+      alias Jido.Signal.ID
+
+      require OK
+
+      case NimbleOptions.validate(unquote(opts), unquote(escaped_schema)) do
+        {:ok, validated_opts} ->
+          @validated_opts validated_opts
+
+          def type, do: @validated_opts[:type]
+          def default_source, do: @validated_opts[:default_source]
+          def datacontenttype, do: @validated_opts[:datacontenttype]
+          def dataschema, do: @validated_opts[:dataschema]
+          def schema, do: @validated_opts[:schema]
+
+          def to_json do
+            %{
+              type: @validated_opts[:type],
+              default_source: @validated_opts[:default_source],
+              datacontenttype: @validated_opts[:datacontenttype],
+              dataschema: @validated_opts[:dataschema],
+              schema: @validated_opts[:schema]
+            }
+          end
+
+          def __signal_metadata__ do
+            to_json()
+          end
+
+          @doc """
+          Creates a new Signal instance with the configured type and validated data.
+
+          ## Parameters
+
+          - `data`: A map containing the Signal's data payload.
+          - `opts`: Additional Signal options (source, subject, etc.)
+
+          ## Returns
+
+          `{:ok, Signal.t()}` if the data is valid, `{:error, String.t()}` otherwise.
+
+          ## Examples
+
+              iex> MySignal.new(%{user_id: "123", message: "Hello"})
+              {:ok, %Jido.Signal{type: "my.custom.signal", data: %{user_id: "123", message: "Hello"}, ...}}
+
+          """
+          @spec new(map(), keyword()) :: {:ok, Signal.t()} | {:error, String.t()}
+          def new(data \\ %{}, opts \\ []) do
+            with {:ok, validated_data} <- validate_data(data),
+                 {:ok, signal_attrs} <- build_signal_attrs(validated_data, opts) do
+              Signal.from_map(signal_attrs)
+            else
+              {:error, reason} -> {:error, reason}
+            end
+          end
+
+          @doc """
+          Creates a new Signal instance, raising an error if invalid.
+
+          ## Parameters
+
+          - `data`: A map containing the Signal's data payload.
+          - `opts`: Additional Signal options (source, subject, etc.)
+
+          ## Returns
+
+          `Signal.t()` if the data is valid.
+
+          ## Raises
+
+          `RuntimeError` if the data is invalid.
+
+          ## Examples
+
+              iex> MySignal.new!(%{user_id: "123", message: "Hello"})
+              %Jido.Signal{type: "my.custom.signal", data: %{user_id: "123", message: "Hello"}, ...}
+
+          """
+          @spec new!(map(), keyword()) :: Signal.t() | no_return()
+          def new!(data \\ %{}, opts \\ []) do
+            case new(data, opts) do
+              {:ok, signal} -> signal
+              {:error, reason} -> raise reason
+            end
+          end
+
+          @doc """
+          Validates the data for the Signal according to its schema.
+
+          ## Examples
+
+              iex> MySignal.validate_data(%{user_id: "123", message: "Hello"})
+              {:ok, %{user_id: "123", message: "Hello"}}
+
+              iex> MySignal.validate_data(%{})
+              {:error, "Invalid data for Signal: Required key :user_id not found"}
+
+          """
+          @spec validate_data(map()) :: {:ok, map()} | {:error, String.t()}
+          def validate_data(data) do
+            case @validated_opts[:schema] do
+              [] ->
+                OK.success(data)
+
+              schema when is_list(schema) ->
+                case NimbleOptions.validate(Enum.to_list(data), schema) do
+                  {:ok, validated_data} ->
+                    OK.success(Map.new(validated_data))
+
+                  {:error, %NimbleOptions.ValidationError{} = error} ->
+                    error
+                    |> Jido.Error.format_nimble_validation_error("Signal", __MODULE__)
+                    |> OK.failure()
+                end
+            end
+          end
+
+          defp build_signal_attrs(validated_data, opts) do
+            caller =
+              Process.info(self(), :current_stacktrace)
+              |> elem(1)
+              |> Enum.find(fn {mod, _fun, _arity, _info} ->
+                mod_str = to_string(mod)
+                mod_str != "Elixir.Jido.Signal" and mod_str != "Elixir.Process"
+              end)
+              |> elem(0)
+              |> to_string()
+
+            attrs = %{
+              "type" => @validated_opts[:type],
+              "source" => @validated_opts[:default_source] || caller,
+              "data" => validated_data,
+              "id" => ID.generate!(),
+              "time" => DateTime.utc_now() |> DateTime.to_iso8601(),
+              "specversion" => "1.0.2"
+            }
+
+            attrs =
+              if @validated_opts[:datacontenttype],
+                do: Map.put(attrs, "datacontenttype", @validated_opts[:datacontenttype]),
+                else: attrs
+
+            attrs =
+              if @validated_opts[:dataschema],
+                do: Map.put(attrs, "dataschema", @validated_opts[:dataschema]),
+                else: attrs
+
+            # Override with any user-provided options
+            final_attrs =
+              Enum.reduce(opts, attrs, fn {key, value}, acc ->
+                Map.put(acc, to_string(key), value)
+              end)
+
+            OK.success(final_attrs)
+          end
+
+        {:error, error} ->
+          message = Jido.Error.format_nimble_config_error(error, "Signal", __MODULE__)
+          raise CompileError, description: message, file: __ENV__.file, line: __ENV__.line
+      end
+    end
   end
 
   @doc """
