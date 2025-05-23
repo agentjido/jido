@@ -12,7 +12,10 @@ defmodule JidoTest.Exec.ActionTest do
   alias JidoTest.TestActions.FullAction
   alias JidoTest.TestActions.LongRunningAction
   alias JidoTest.TestActions.Multiply
+  alias JidoTest.TestActions.NoOutputSchemaAction
   alias JidoTest.TestActions.NoSchema
+  alias JidoTest.TestActions.OutputCallbackAction
+  alias JidoTest.TestActions.OutputSchemaAction
   alias JidoTest.TestActions.RateLimitedAction
   alias JidoTest.TestActions.StreamingAction
   alias JidoTest.TestActions.Subtract
@@ -308,6 +311,54 @@ defmodule JidoTest.Exec.ActionTest do
                )
 
       assert compensation_result.compensated == true
+    end
+  end
+
+  describe "output validation" do
+    test "action with valid output schema validates successfully" do
+      assert {:ok, result} =
+               OutputSchemaAction.validate_output(%{result: "test", length: 4, extra: "data"})
+
+      assert result.result == "test"
+      assert result.length == 4
+      assert result.extra == "data"
+    end
+
+    test "action with invalid output fails validation" do
+      assert {:error, %Error{type: :validation_error, message: error_message}} =
+               OutputSchemaAction.validate_output(%{result: "test"})
+
+      assert error_message =~ "required :length option not found"
+    end
+
+    test "action without output schema skips validation" do
+      assert {:ok, result} = NoOutputSchemaAction.validate_output(%{anything: "goes"})
+      assert result.anything == "goes"
+    end
+
+    test "output validation callbacks are called" do
+      assert {:ok, result} = OutputCallbackAction.validate_output(%{value: 42})
+      assert result.value == 42
+      assert result.preprocessed == true
+      assert result.postprocessed == true
+    end
+
+    test "action metadata includes output_schema" do
+      metadata = OutputSchemaAction.__action_metadata__()
+
+      assert metadata[:output_schema] == [
+               result: [type: :string, required: true],
+               length: [type: :integer, required: true]
+             ]
+    end
+
+    test "to_json includes output_schema" do
+      json = OutputSchemaAction.to_json()
+
+      assert json.output_schema == [
+               result: [type: :string, required: true],
+               length: [type: :integer, required: true]
+             ]
     end
   end
 end

@@ -55,6 +55,74 @@ defmodule JidoTest.TestActions do
     def run(_params, _context), do: {:ok, %{result: "No params"}}
   end
 
+  defmodule OutputSchemaAction do
+    @moduledoc false
+    use Action,
+      name: "output_schema_action",
+      description: "Action that validates output with schema",
+      schema: [
+        input: [type: :string, required: true]
+      ],
+      output_schema: [
+        result: [type: :string, required: true],
+        length: [type: :integer, required: true]
+      ]
+
+    def run(%{input: input}, _context) do
+      {:ok, %{result: String.upcase(input), length: String.length(input), extra: "not validated"}}
+    end
+  end
+
+  defmodule InvalidOutputAction do
+    @moduledoc false
+    use Action,
+      name: "invalid_output_action",
+      description: "Action that returns invalid output",
+      output_schema: [
+        required_field: [type: :string, required: true]
+      ]
+
+    def run(_params, _context) do
+      {:ok, %{wrong_field: "this will fail validation"}}
+    end
+  end
+
+  defmodule NoOutputSchemaAction do
+    @moduledoc false
+    use Action,
+      name: "no_output_schema_action",
+      description: "Action without output schema"
+
+    def run(_params, _context) do
+      {:ok, %{anything: "goes", here: 123}}
+    end
+  end
+
+  defmodule OutputCallbackAction do
+    @moduledoc false
+    use Action,
+      name: "output_callback_action",
+      description: "Action that uses output validation callbacks",
+      output_schema: [
+        value: [type: :integer, required: true]
+      ]
+
+    @impl true
+    def run(%{input: input}, _context) do
+      {:ok, %{value: input}}
+    end
+
+    @impl true
+    def on_before_validate_output(output) do
+      {:ok, Map.put(output, :preprocessed, true)}
+    end
+
+    @impl true
+    def on_after_validate_output(output) do
+      {:ok, Map.put(output, :postprocessed, true)}
+    end
+  end
+
   defmodule FullAction do
     @moduledoc false
     use Action,

@@ -410,6 +410,42 @@ defmodule Jido.Exec do
       end
     end
 
+    @spec validate_output(action(), map(), run_opts()) :: {:ok, map()} | {:error, Error.t()}
+    defp validate_output(action, output, opts) do
+      log_level = Keyword.get(opts, :log_level, :info)
+      dbug("Validating output", action: action, output: output)
+
+      if function_exported?(action, :validate_output, 1) do
+        case action.validate_output(output) do
+          {:ok, validated_output} ->
+            cond_log(log_level, :debug, "Output validation succeeded for #{inspect(action)}")
+            OK.success(validated_output)
+
+          {:error, reason} ->
+            cond_log(
+              log_level,
+              :debug,
+              "Output validation failed for #{inspect(action)}: #{inspect(reason)}"
+            )
+
+            OK.failure(reason)
+
+          _ ->
+            cond_log(log_level, :debug, "Invalid return from action.validate_output/1")
+            OK.failure(Error.validation_error("Invalid return from action.validate_output/1"))
+        end
+      else
+        # If action doesn't have validate_output/1, skip output validation
+        cond_log(
+          log_level,
+          :debug,
+          "No output validation function found for #{inspect(action)}, skipping"
+        )
+
+        OK.success(output)
+      end
+    end
+
     @spec do_run_with_retry(action(), params(), context(), run_opts()) ::
             {:ok, map()} | {:error, Error.t()}
     defp do_run_with_retry(action, params, context, opts) do
@@ -893,24 +929,52 @@ Debug info:
         {:ok, result, other} ->
           dbug("Action succeeded with additional info", result: result, other: other)
 
-          cond_log(
-            log_level,
-            :debug,
-            "Finished execution of #{inspect(action)}, result: #{inspect(result)}, directive: #{inspect(other)}"
-          )
+          case validate_output(action, result, opts) do
+            {:ok, validated_result} ->
+              cond_log(
+                log_level,
+                :debug,
+                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}, directive: #{inspect(other)}"
+              )
 
-          {:ok, result, other}
+              {:ok, validated_result, other}
+
+            {:error, validation_error} ->
+              dbug("Action output validation failed", error: validation_error)
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
+              {:error, validation_error, other}
+          end
 
         OK.success(result) ->
           dbug("Action succeeded", result: result)
 
-          cond_log(
-            log_level,
-            :debug,
-            "Finished execution of #{inspect(action)}, result: #{inspect(result)}"
-          )
+          case validate_output(action, result, opts) do
+            {:ok, validated_result} ->
+              cond_log(
+                log_level,
+                :debug,
+                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}"
+              )
 
-          OK.success(result)
+              OK.success(validated_result)
+
+            {:error, validation_error} ->
+              dbug("Action output validation failed", error: validation_error)
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
+              OK.failure(validation_error)
+          end
 
         {:error, reason, other} ->
           dbug("Action failed with additional info", error: reason, other: other)
@@ -930,13 +994,27 @@ Debug info:
         result ->
           dbug("Action returned unexpected result", result: result)
 
-          cond_log(
-            log_level,
-            :debug,
-            "Finished execution of #{inspect(action)}, result: #{inspect(result)}"
-          )
+          case validate_output(action, result, opts) do
+            {:ok, validated_result} ->
+              cond_log(
+                log_level,
+                :debug,
+                "Finished execution of #{inspect(action)}, result: #{inspect(validated_result)}"
+              )
 
-          OK.success(result)
+              OK.success(validated_result)
+
+            {:error, validation_error} ->
+              dbug("Action output validation failed", error: validation_error)
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
+              OK.failure(validation_error)
+          end
       end
     rescue
       e in RuntimeError ->

@@ -20,22 +20,25 @@ defmodule Jido.Action do
   To define a new Action, use the `Jido.Action` behavior in your module:
 
       defmodule MyAction do
-        use Jido.Action,
-          name: "my_action",
-          description: "Performs my action",
-          category: "processing",
-          tags: ["example", "demo"],
-          vsn: "1.0.0",
-          schema: [
-            input: [type: :string, required: true]
-          ]
+      use Jido.Action,
+      name: "my_action",
+      description: "Performs my action",
+      category: "processing",
+      tags: ["example", "demo"],
+      vsn: "1.0.0",
+      schema: [
+      input: [type: :string, required: true]
+      ],
+           output_schema: [
+          result: [type: :string, required: true]
+        ]
 
-        @impl true
-        def run(params, _context) do
-          # Your action logic here
-          {:ok, %{result: String.upcase(params.input)}}
-        end
-      end
+      @impl true
+      def run(params, _context) do
+           # Your action logic here
+           {:ok, %{result: String.upcase(params.input)}}
+         end
+       end
 
   ## Callbacks
 
@@ -140,13 +143,17 @@ defmodule Jido.Action do
 
   See `Jido.Exec` documentation for more details on action-based testing.
 
-  ## Parameter Validation
+  ## Parameter and Output Validation
 
   > **Note on Validation:** The validation process for Actions is intentionally open.
-  > Only fields specified in the schema are validated. Unspecified fields are not
-  > validated, allowing for easier Action composition. This approach enables Actions
-  > to accept and pass along additional parameters that may be required by other
-  > Actions in a chain without causing validation errors.
+  > Only fields specified in the schema and output_schema are validated. Unspecified 
+  > fields are not validated, allowing for easier Action composition. This approach 
+  > enables Actions to accept and pass along additional parameters that may be required 
+  > by other Actions in a chain without causing validation errors.
+  >
+  > Output validation works the same way - only fields specified in the output_schema
+  > are validated, allowing Actions to return additional data that may be used by
+  > downstream Actions or systems.
   """
 
   alias Jido.Error
@@ -162,6 +169,7 @@ defmodule Jido.Action do
     field(:tags, [String.t()], default: [])
     field(:vsn, String.t())
     field(:schema, NimbleOptions.schema())
+    field(:output_schema, NimbleOptions.schema())
   end
 
   @action_config_schema NimbleOptions.new!(
@@ -205,6 +213,12 @@ defmodule Jido.Action do
                             default: [],
                             doc:
                               "A NimbleOptions schema for validating the Action's input parameters."
+                          ],
+                          output_schema: [
+                            type: :keyword_list,
+                            default: [],
+                            doc:
+                              "A NimbleOptions schema for validating the Action's output. Only specified fields are validated."
                           ]
                         )
 
@@ -257,6 +271,7 @@ defmodule Jido.Action do
           def tags, do: @validated_opts[:tags]
           def vsn, do: @validated_opts[:vsn]
           def schema, do: @validated_opts[:schema]
+          def output_schema, do: @validated_opts[:output_schema]
 
           def to_json do
             %{
@@ -266,7 +281,8 @@ defmodule Jido.Action do
               tags: @validated_opts[:tags],
               vsn: @validated_opts[:vsn],
               compensation: @validated_opts[:compensation],
-              schema: @validated_opts[:schema]
+              schema: @validated_opts[:schema],
+              output_schema: @validated_opts[:output_schema]
             }
           end
 
@@ -308,6 +324,36 @@ defmodule Jido.Action do
             end
           end
 
+          @doc """
+          Validates the output result for the Action.
+
+          ## Examples
+
+              iex> defmodule ExampleAction do
+              ...>   use Jido.Action,
+              ...>     name: "example_action",
+              ...>     output_schema: [
+              ...>       result: [type: :string, required: true]
+              ...>     ]
+              ...> end
+              ...> ExampleAction.validate_output(%{result: "test", extra: "ignored"})
+              {:ok, %{result: "test", extra: "ignored"}}
+
+              iex> ExampleAction.validate_output(%{extra: "ignored"})
+              {:error, "Invalid output for Action: Required key :result not found"}
+
+          """
+          @spec validate_output(map()) :: {:ok, map()} | {:error, String.t()}
+          def validate_output(output) do
+            with {:ok, output} <- on_before_validate_output(output),
+                 {:ok, validated_output} <- do_validate_output(output),
+                 {:ok, after_output} <- on_after_validate_output(validated_output) do
+              OK.success(after_output)
+            else
+              {:error, reason} -> OK.failure(reason)
+            end
+          end
+
           defp do_validate_params(params) do
             case @validated_opts[:schema] do
               [] ->
@@ -331,6 +377,29 @@ defmodule Jido.Action do
             end
           end
 
+          defp do_validate_output(output) do
+            case @validated_opts[:output_schema] do
+              [] ->
+                OK.success(output)
+
+              output_schema when is_list(output_schema) ->
+                known_keys = Keyword.keys(output_schema)
+                {known_output, unknown_output} = Map.split(output, known_keys)
+
+                case NimbleOptions.validate(Enum.to_list(known_output), output_schema) do
+                  {:ok, validated_output} ->
+                    merged_output = Map.merge(unknown_output, Map.new(validated_output))
+                    OK.success(merged_output)
+
+                  {:error, %NimbleOptions.ValidationError{} = error} ->
+                    error
+                    |> Error.format_nimble_validation_error("Action output", __MODULE__)
+                    |> Error.validation_error()
+                    |> OK.failure()
+                end
+            end
+          end
+
           @doc """
           Executes the Action with the given parameters and context.
 
@@ -345,11 +414,15 @@ defmodule Jido.Action do
 
           def on_before_validate_params(params), do: OK.success(params)
           def on_after_validate_params(params), do: OK.success(params)
+          def on_before_validate_output(output), do: OK.success(output)
+          def on_after_validate_output(output), do: OK.success(output)
           def on_after_run(result), do: OK.success(result)
           def on_error(failed_params, _error, _context, _opts), do: OK.success(failed_params)
 
           defoverridable on_before_validate_params: 1,
                          on_after_validate_params: 1,
+                         on_before_validate_output: 1,
+                         on_after_validate_output: 1,
                          run: 2,
                          on_after_run: 1,
                          on_error: 4
@@ -412,6 +485,40 @@ defmodule Jido.Action do
   - `{:error, reason}` if post-processing fails.
   """
   @callback on_after_validate_params(params :: map()) :: {:ok, map()} | {:error, any()}
+
+  @doc """
+  Called before output validation.
+
+  This optional callback allows for pre-processing of action output
+  before it is validated against the Action's output schema.
+
+  ## Parameters
+
+  - `output`: A map of raw action output.
+
+  ## Returns
+
+  - `{:ok, modified_output}` where `modified_output` is a map of potentially modified output.
+  - `{:error, reason}` if pre-processing fails.
+  """
+  @callback on_before_validate_output(output :: map()) :: {:ok, map()} | {:error, any()}
+
+  @doc """
+  Called after output validation.
+
+  This optional callback allows for post-processing of validated output
+  before it is returned to the caller.
+
+  ## Parameters
+
+  - `output`: A map of validated action output.
+
+  ## Returns
+
+  - `{:ok, modified_output}` where `modified_output` is a map of potentially modified output.
+  - `{:error, reason}` if post-processing fails.
+  """
+  @callback on_after_validate_output(output :: map()) :: {:ok, map()} | {:error, any()}
 
   @doc """
   Called after the Action's main logic has executed.
