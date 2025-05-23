@@ -33,10 +33,6 @@ defmodule Jido.Signal.Serialization.TypeProvider do
   """
   @spec type_provider() :: module()
   def type_provider do
-    Application.get_env(
-      :jido,
-      :type_provider,
-      Jido.Signal.Serialization.ModuleNameTypeProvider
-    )
+    Jido.Signal.Serialization.Config.default_type_provider()
   end
 end

@@ -1,5 +1,5 @@
 defmodule JidoTest.Signal.Bus.RecordedSignalSerializationTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias Jido.Signal
   alias Jido.Signal.Bus.RecordedSignal
 

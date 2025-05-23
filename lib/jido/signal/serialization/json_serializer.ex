@@ -8,22 +8,26 @@ if Code.ensure_loaded?(Jason) do
     A serializer that uses the JSON format and Jason library.
     """
 
+    @behaviour Jido.Signal.Serialization.Serializer
+
     alias Jido.Signal.Serialization.TypeProvider
     alias Jido.Signal.Serialization.JsonDecoder
 
     @doc """
     Serialize given term to JSON binary data.
     """
-    def serialize(term) do
-      Jason.encode!(term)
+    @impl true
+    def serialize(term, _opts \\ []) do
+      {:ok, Jason.encode!(term)}
+    rescue
+      e -> {:error, Exception.message(e)}
     end
 
     @doc """
     Deserialize given JSON binary data to the expected type.
     """
-    def deserialize(binary, config \\ [])
-
-    def deserialize(binary, config) do
+    @impl true
+    def deserialize(binary, config \\ []) do
       {type, opts} =
         case Keyword.get(config, :type) do
           nil ->
@@ -34,16 +38,39 @@ if Code.ensure_loaded?(Jason) do
             module_name = String.to_atom(type_str)
 
             if Code.ensure_loaded?(module_name) do
-              {TypeProvider.to_struct(type_str), [keys: :atoms]}
+              type_provider = Keyword.get(config, :type_provider, TypeProvider)
+              {type_provider.to_struct(type_str), [keys: :atoms]}
             else
               raise ArgumentError, "Cannot deserialize to non-existent module: #{type_str}"
             end
         end
 
-      binary
-      |> Jason.decode!(opts)
-      |> to_struct(type)
-      |> JsonDecoder.decode()
+      result =
+        binary
+        |> Jason.decode!(opts)
+        |> to_struct(type)
+        |> JsonDecoder.decode()
+
+      {:ok, result}
+    rescue
+      e -> {:error, Exception.message(e)}
+    end
+
+    # Legacy API for backward compatibility
+    @doc false
+    def serialize_legacy(term) do
+      case serialize(term) do
+        {:ok, result} -> result
+        {:error, _} -> raise "Serialization failed"
+      end
+    end
+
+    @doc false
+    def deserialize_legacy(binary, config \\ []) do
+      case deserialize(binary, config) do
+        {:ok, result} -> result
+        {:error, reason} -> raise reason
+      end
     end
 
     defp to_struct(data, nil), do: data
@@ -62,8 +89,4 @@ if Code.ensure_loaded?(Jason) do
       struct(type, data)
     end
   end
-
-  # require Protocol
-
-  # Protocol.derive(Jason.Encoder, Commanded.EventStore.SnapshotData)
 end
