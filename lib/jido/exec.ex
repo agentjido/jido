@@ -204,7 +204,7 @@ defmodule Jido.Exec do
   or cancel the action.
 
   **Note**: This approach integrates with OTP by spawning tasks under a `Task.Supervisor`.
-  Make sure `{Task.Supervisor, name: Jido.Exec.TaskSupervisor}` is part of your supervision tree.
+  Make sure `{Task.Supervisor, name: Jido.TaskSupervisor}` is part of your supervision tree.
 
   ## Parameters
 
@@ -236,7 +236,7 @@ defmodule Jido.Exec do
     # Start the task under the TaskSupervisor.
     # If the supervisor is not running, this will raise an error.
     {:ok, pid} =
-      Task.Supervisor.start_child(Jido.Exec.TaskSupervisor, fn ->
+      Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
         result = run(action, params, context, opts)
         send(parent, {:action_async_result, ref, result})
         result
@@ -803,7 +803,7 @@ defmodule Jido.Exec do
       # Create a temporary task group for this execution
       {:ok, task_group} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.flag(:trap_exit, true)
 
@@ -903,7 +903,7 @@ Debug info:
 
       Process.exit(task_group, :kill)
 
-      Task.Supervisor.children(Jido.Exec.TaskSupervisor)
+      Task.Supervisor.children(Jido.TaskSupervisor)
       |> Enum.filter(fn pid ->
         case Process.info(pid, :group_leader) do
           {:group_leader, ^task_group} -> true

@@ -87,7 +87,7 @@ defmodule Jido.ExecTaskTest do
       # Create a task group that will stay alive until we kill it
       {:ok, task_group} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.flag(:trap_exit, true)
 
@@ -102,7 +102,7 @@ defmodule Jido.ExecTaskTest do
         for _ <- 1..3 do
           {:ok, pid} =
             Task.Supervisor.start_child(
-              Jido.Exec.TaskSupervisor,
+              Jido.TaskSupervisor,
               fn ->
                 Process.group_leader(self(), task_group)
                 # Keep process alive until killed
@@ -132,7 +132,7 @@ defmodule Jido.ExecTaskTest do
       # Create and immediately kill a task group
       {:ok, task_group} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.flag(:trap_exit, true)
 
@@ -153,7 +153,7 @@ defmodule Jido.ExecTaskTest do
       # Create a task group
       {:ok, task_group} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.flag(:trap_exit, true)
 
@@ -166,7 +166,7 @@ defmodule Jido.ExecTaskTest do
       # Create a process in the task group
       {:ok, group_pid} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.group_leader(self(), task_group)
             Process.sleep(:infinity)
@@ -176,7 +176,7 @@ defmodule Jido.ExecTaskTest do
       # Create a process outside the task group
       {:ok, other_pid} =
         Task.Supervisor.start_child(
-          Jido.Exec.TaskSupervisor,
+          Jido.TaskSupervisor,
           fn ->
             Process.sleep(:infinity)
           end
