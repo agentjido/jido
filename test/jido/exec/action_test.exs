@@ -316,7 +316,9 @@ defmodule JidoTest.Exec.ActionTest do
 
   describe "output validation" do
     test "action with valid output schema validates successfully" do
-      assert {:ok, result} = OutputSchemaAction.validate_output(%{result: "test", length: 4, extra: "data"})
+      assert {:ok, result} =
+               OutputSchemaAction.validate_output(%{result: "test", length: 4, extra: "data"})
+
       assert result.result == "test"
       assert result.length == 4
       assert result.extra == "data"
@@ -343,18 +345,20 @@ defmodule JidoTest.Exec.ActionTest do
 
     test "action metadata includes output_schema" do
       metadata = OutputSchemaAction.__action_metadata__()
+
       assert metadata[:output_schema] == [
-        result: [type: :string, required: true],
-        length: [type: :integer, required: true]
-      ]
+               result: [type: :string, required: true],
+               length: [type: :integer, required: true]
+             ]
     end
 
     test "to_json includes output_schema" do
       json = OutputSchemaAction.to_json()
+
       assert json.output_schema == [
-        result: [type: :string, required: true],
-        length: [type: :integer, required: true]
-      ]
+               result: [type: :string, required: true],
+               length: [type: :integer, required: true]
+             ]
     end
   end
 end

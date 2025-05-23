@@ -422,7 +422,12 @@ defmodule Jido.Exec do
             OK.success(validated_output)
 
           {:error, reason} ->
-            cond_log(log_level, :debug, "Output validation failed for #{inspect(action)}: #{inspect(reason)}")
+            cond_log(
+              log_level,
+              :debug,
+              "Output validation failed for #{inspect(action)}: #{inspect(reason)}"
+            )
+
             OK.failure(reason)
 
           _ ->
@@ -431,7 +436,12 @@ defmodule Jido.Exec do
         end
       else
         # If action doesn't have validate_output/1, skip output validation
-        cond_log(log_level, :debug, "No output validation function found for #{inspect(action)}, skipping")
+        cond_log(
+          log_level,
+          :debug,
+          "No output validation function found for #{inspect(action)}, skipping"
+        )
+
         OK.success(output)
       end
     end
@@ -931,7 +941,13 @@ Debug info:
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
-              cond_log(log_level, :error, "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}")
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
               {:error, validation_error, other}
           end
 
@@ -950,7 +966,13 @@ Debug info:
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
-              cond_log(log_level, :error, "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}")
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
               OK.failure(validation_error)
           end
 
@@ -984,7 +1006,13 @@ Debug info:
 
             {:error, validation_error} ->
               dbug("Action output validation failed", error: validation_error)
-              cond_log(log_level, :error, "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}")
+
+              cond_log(
+                log_level,
+                :error,
+                "Action #{inspect(action)} output validation failed: #{inspect(validation_error)}"
+              )
+
               OK.failure(validation_error)
           end
       end

@@ -52,10 +52,10 @@ defmodule JidoTest.Exec.OutputValidationTest do
 
     test "output validation with async execution" do
       params = %{input: "world"}
-      
+
       async_ref = Exec.run_async(OutputSchemaAction, params, %{})
       assert {:ok, result} = Exec.await(async_ref)
-      
+
       assert result.result == "WORLD"
       assert result.length == 5
       assert result.extra == "not validated"
@@ -63,10 +63,10 @@ defmodule JidoTest.Exec.OutputValidationTest do
 
     test "async execution with invalid output fails" do
       async_ref = Exec.run_async(InvalidOutputAction, %{}, %{})
-      
-      assert {:error, %Error{type: :validation_error, message: error_message}} = 
+
+      assert {:error, %Error{type: :validation_error, message: error_message}} =
                Exec.await(async_ref)
-      
+
       assert error_message =~ "required :required_field option not found"
     end
 
@@ -103,20 +103,21 @@ defmodule JidoTest.Exec.OutputValidationTest do
         end
       end
 
-      assert {:error, %Error{type: :validation_error}, directive} = 
+      assert {:error, %Error{type: :validation_error}, directive} =
                Exec.run(InvalidTupleOutputAction, %{}, %{})
+
       assert directive == :continue
     end
 
     test "output validation preserves unknown fields" do
       params = %{input: "test"}
-      
+
       assert {:ok, result} = Exec.run(OutputSchemaAction, params, %{})
-      
+
       # Known fields are validated
       assert result.result == "TEST"
       assert result.length == 4
-      
+
       # Unknown fields are preserved
       assert result.extra == "not validated"
     end
