@@ -1,5 +1,5 @@
 defmodule Jido.SignalSerializationTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias Jido.Signal
 
   describe "Signal.serialize/1" do
@@ -10,7 +10,7 @@ defmodule Jido.SignalSerializationTest do
         id: "test-id-123"
       }
 
-      json = Signal.serialize(signal)
+      {:ok, json} = Signal.serialize(signal)
       assert is_binary(json)
 
       decoded = Jason.decode!(json)
@@ -28,7 +28,7 @@ defmodule Jido.SignalSerializationTest do
         data: %{key: "value", number: 42}
       }
 
-      json = Signal.serialize(signal)
+      {:ok, json} = Signal.serialize(signal)
       assert is_binary(json)
 
       decoded = Jason.decode!(json)
@@ -42,13 +42,27 @@ defmodule Jido.SignalSerializationTest do
         %Signal{type: "second.event", source: "/test/second", id: "second-id"}
       ]
 
-      json = Signal.serialize(signals)
+      {:ok, json} = Signal.serialize(signals)
       assert is_binary(json)
 
       decoded = Jason.decode!(json)
       assert length(decoded) == 2
       assert Enum.at(decoded, 0)["type"] == "first.event"
       assert Enum.at(decoded, 1)["type"] == "second.event"
+    end
+
+    test "legacy serialize! function" do
+      signal = %Signal{
+        type: "test.event",
+        source: "/test/source",
+        id: "test-id-123"
+      }
+
+      json = Signal.serialize!(signal)
+      assert is_binary(json)
+
+      decoded = Jason.decode!(json)
+      assert decoded["type"] == "test.event"
     end
   end
 
@@ -125,7 +139,7 @@ defmodule Jido.SignalSerializationTest do
         }
       }
 
-      json = Signal.serialize(original)
+      {:ok, json} = Signal.serialize(original)
       {:ok, deserialized} = Signal.deserialize(json)
 
       assert deserialized.type == original.type
@@ -147,7 +161,7 @@ defmodule Jido.SignalSerializationTest do
         %Signal{type: "second.event", source: "/test/second", id: "second-id"}
       ]
 
-      json = Signal.serialize(originals)
+      {:ok, json} = Signal.serialize(originals)
       {:ok, deserialized} = Signal.deserialize(json)
 
       assert length(deserialized) == length(originals)
@@ -158,6 +172,30 @@ defmodule Jido.SignalSerializationTest do
         assert deserialized.source == original.source
         assert deserialized.id == original.id
       end)
+    end
+
+    test "round-trip with different serializers" do
+      signal = %Signal{
+        type: "test.event",
+        source: "/test/source",
+        id: "test-id-123",
+        data: %{"message" => "hello", "count" => 42}
+      }
+
+      serializers = [
+        Jido.Signal.Serialization.JsonSerializer,
+        Jido.Signal.Serialization.ErlangTermSerializer,
+        Jido.Signal.Serialization.MsgpackSerializer
+      ]
+
+      for serializer <- serializers do
+        {:ok, binary} = Signal.serialize(signal, serializer: serializer)
+        {:ok, deserialized} = Signal.deserialize(binary, serializer: serializer)
+
+        assert deserialized.type == signal.type
+        assert deserialized.source == signal.source
+        assert deserialized.id == signal.id
+      end
     end
   end
 end

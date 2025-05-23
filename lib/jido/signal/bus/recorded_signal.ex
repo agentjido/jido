@@ -50,11 +50,11 @@ defmodule Jido.Signal.Bus.RecordedSignal do
   """
   @spec serialize(t() | list(t())) :: binary()
   def serialize(%__MODULE__{} = recorded_signal) do
-    JsonSerializer.serialize(recorded_signal)
+    JsonSerializer.serialize_legacy(recorded_signal)
   end
 
   def serialize(recorded_signals) when is_list(recorded_signals) do
-    JsonSerializer.serialize(recorded_signals)
+    JsonSerializer.serialize_legacy(recorded_signals)
   end
 
   @doc """

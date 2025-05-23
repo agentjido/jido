@@ -298,6 +298,7 @@ defmodule Jido.MixProject do
       {:backoff, "~> 1.1"},
       {:deep_merge, "~> 1.0"},
       {:jason, "~> 1.4"},
+      {:msgpax, "~> 2.3"},
       {:nimble_options, "~> 1.1"},
       {:nimble_parsec, "~> 1.4"},
       {:ok, "~> 2.3"},
