@@ -7,9 +7,9 @@ defmodule JidoTest.Signal.SerializationTest do
   describe "JsonSerializer" do
     test "serializes and deserializes structs" do
       original = %TestStruct{field1: "test", field2: 123}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized, type: "Elixir.JidoTest.TestStructs.TestStruct")
 
       assert deserialized == original
@@ -17,9 +17,9 @@ defmodule JidoTest.Signal.SerializationTest do
 
     test "serializes and deserializes structs with nil values" do
       original = %TestStruct{field1: nil, field2: nil}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized, type: "Elixir.JidoTest.TestStructs.TestStruct")
 
       assert deserialized == original
@@ -27,9 +27,9 @@ defmodule JidoTest.Signal.SerializationTest do
 
     test "serializes and deserializes structs with nested maps" do
       original = %TestStruct{field1: %{nested: "value"}, field2: 123}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized, type: "Elixir.JidoTest.TestStructs.TestStruct")
 
       assert deserialized == original
@@ -37,9 +37,9 @@ defmodule JidoTest.Signal.SerializationTest do
 
     test "serializes and deserializes structs with lists" do
       original = %TestStruct{field1: [1, 2, 3], field2: ["a", "b", "c"]}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized, type: "Elixir.JidoTest.TestStructs.TestStruct")
 
       assert deserialized == original
@@ -47,33 +47,33 @@ defmodule JidoTest.Signal.SerializationTest do
 
     test "serializes and deserializes maps" do
       original = %{"key" => "value", "nested" => %{"num" => 42}}
-      serialized = JsonSerializer.serialize(original)
-      deserialized = JsonSerializer.deserialize(serialized)
+      {:ok, serialized} = JsonSerializer.serialize(original)
+      {:ok, deserialized} = JsonSerializer.deserialize(serialized)
 
       assert deserialized == original
     end
 
     test "serializes and deserializes empty maps" do
       original = %{}
-      serialized = JsonSerializer.serialize(original)
-      deserialized = JsonSerializer.deserialize(serialized)
+      {:ok, serialized} = JsonSerializer.serialize(original)
+      {:ok, deserialized} = JsonSerializer.deserialize(serialized)
 
       assert deserialized == original
     end
 
     test "serializes and deserializes maps with lists" do
       original = %{"list" => [1, 2, %{"nested" => "value"}]}
-      serialized = JsonSerializer.serialize(original)
-      deserialized = JsonSerializer.deserialize(serialized)
+      {:ok, serialized} = JsonSerializer.serialize(original)
+      {:ok, deserialized} = JsonSerializer.deserialize(serialized)
 
       assert deserialized == original
     end
 
     test "handles custom JsonDecoder implementation" do
       original = %CustomDecodedStruct{value: 5}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized,
           type: "Elixir.JidoTest.TestStructs.CustomDecodedStruct"
         )
@@ -84,9 +84,9 @@ defmodule JidoTest.Signal.SerializationTest do
 
     test "handles custom JsonDecoder with nil value" do
       original = %CustomDecodedStruct{value: nil}
-      serialized = JsonSerializer.serialize(original)
+      {:ok, serialized} = JsonSerializer.serialize(original)
 
-      deserialized =
+      {:ok, deserialized} =
         JsonSerializer.deserialize(serialized,
           type: "Elixir.JidoTest.TestStructs.CustomDecodedStruct"
         )
@@ -94,18 +94,15 @@ defmodule JidoTest.Signal.SerializationTest do
       assert deserialized.value == nil
     end
 
-    test "raises on invalid JSON" do
-      assert_raise Jason.DecodeError, fn ->
+    test "returns error on invalid JSON" do
+      {:error, _reason} =
         JsonSerializer.deserialize("{invalid_json",
           type: "Elixir.JidoTest.TestStructs.TestStruct"
         )
-      end
     end
 
-    test "raises on non-existent type" do
-      assert_raise ArgumentError, fn ->
-        JsonSerializer.deserialize("{}", type: "NonExistentModule")
-      end
+    test "returns error on non-existent type" do
+      {:error, _reason} = JsonSerializer.deserialize("{}", type: "NonExistentModule")
     end
   end
 

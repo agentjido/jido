@@ -8,7 +8,7 @@ defmodule Jido.Application do
       Jido.Telemetry,
 
       # Exec Async Actions Task Supervisor
-      {Task.Supervisor, name: Jido.Exec.TaskSupervisor},
+      {Task.Supervisor, name: Jido.TaskSupervisor},
 
       # Global Registry & Default Supervisor
       {Registry, keys: :unique, name: Jido.Registry},

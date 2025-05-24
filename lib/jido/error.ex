@@ -64,6 +64,7 @@ defmodule Jido.Error do
   - `:compensation_error`: Indicates an error occurred during compensation.
   - `:planning_error`: Used when an error occurs during action planning.
   - `:routing_error`: Used when an error occurs during action routing.
+  - `:dispatch_error`: Used when an error occurs during signal dispatching.
   """
   @type error_type ::
           :invalid_action
@@ -79,6 +80,7 @@ defmodule Jido.Error do
           | :invalid_async_ref
           | :compensation_error
           | :routing_error
+          | :dispatch_error
 
   use TypedStruct
 
@@ -436,6 +438,31 @@ defmodule Jido.Error do
   @spec routing_error(String.t(), map() | nil, list() | nil) :: t()
   def routing_error(message, details \\ nil, stacktrace \\ nil) do
     new(:routing_error, message, details, stacktrace)
+  end
+
+  @doc """
+  Creates a new dispatch error.
+
+  Use this when an error occurs during signal dispatching.
+
+  ## Parameters
+  - `message`: A string describing the dispatch error.
+  - `details`: (optional) A map containing additional error details.
+  - `stacktrace`: (optional) The stacktrace at the point of error.
+
+  ## Example
+
+      iex> Jido.Error.dispatch_error("Failed to deliver signal", %{adapter: :http, reason: :timeout})
+      %Jido.Error{
+        type: :dispatch_error,
+        message: "Failed to deliver signal",
+        details: %{adapter: :http, reason: :timeout},
+        stacktrace: [...]
+      }
+  """
+  @spec dispatch_error(String.t(), map() | nil, list() | nil) :: t()
+  def dispatch_error(message, details \\ nil, stacktrace \\ nil) do
+    new(:dispatch_error, message, details, stacktrace)
   end
 
   @doc """
