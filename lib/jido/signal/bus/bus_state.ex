@@ -21,6 +21,7 @@ defmodule Jido.Signal.Bus.State do
     field(:snapshots, %{String.t() => Signal.t()}, default: %{})
     field(:subscriptions, %{String.t() => Jido.Signal.Bus.Subscriber.t()}, default: %{})
     field(:child_supervisor, pid())
+    field(:middleware, [Jido.Signal.Bus.MiddlewarePipeline.middleware_config()], default: [])
   end
 
   @doc """
