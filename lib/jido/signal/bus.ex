@@ -17,6 +17,7 @@ defmodule Jido.Signal.Bus do
   alias Jido.Signal.Bus.State, as: BusState
   alias Jido.Signal.Bus.Stream
   alias Jido.Signal.Bus.Snapshot
+  alias Jido.Signal.Bus.MiddlewarePipeline
   alias Jido.Error
 
   @type start_option ::
@@ -54,6 +55,7 @@ defmodule Jido.Signal.Bus do
   Options:
   - name: The name to register the bus under (required)
   - router: A custom router implementation (optional)
+  - middleware: A list of {module, opts} tuples for middleware (optional)
   """
   @impl GenServer
   def init({name, opts}) do
@@ -63,13 +65,23 @@ defmodule Jido.Signal.Bus do
 
     {:ok, child_supervisor} = DynamicSupervisor.start_link(strategy: :one_for_one)
 
-    state = %BusState{
-      name: name,
-      router: Keyword.get(opts, :router, Router.new!()),
-      child_supervisor: child_supervisor
-    }
+    # Initialize middleware
+    middleware_specs = Keyword.get(opts, :middleware, [])
 
-    {:ok, state}
+    case MiddlewarePipeline.init_middleware(middleware_specs) do
+      {:ok, middleware_configs} ->
+        state = %BusState{
+          name: name,
+          router: Keyword.get(opts, :router, Router.new!()),
+          child_supervisor: child_supervisor,
+          middleware: middleware_configs
+        }
+
+        {:ok, state}
+
+      {:error, reason} ->
+        {:stop, {:middleware_init_failed, reason}}
+    end
   end
 
   def start_link(opts) do
@@ -234,26 +246,42 @@ defmodule Jido.Signal.Bus do
   end
 
   def handle_call({:publish, signals}, _from, state) do
-    case Stream.publish(state, signals) do
-      {:ok, new_state} ->
-        # Extract the signals from the log that we just added
-        # We need to return the recorded signals, not the state
-        recorded_signals =
-          signals
-          |> Enum.map(fn signal ->
-            # Create a RecordedSignal struct for each signal
-            %Jido.Signal.Bus.RecordedSignal{
-              id: signal.id,
-              type: signal.type,
-              created_at: DateTime.utc_now(),
-              signal: signal
-            }
-          end)
+    context = %{
+      bus_name: state.name,
+      timestamp: DateTime.utc_now(),
+      metadata: %{}
+    }
 
-        {:reply, {:ok, recorded_signals}, new_state}
+    # Run before_publish middleware
+    case MiddlewarePipeline.before_publish(state.middleware, signals, context) do
+      {:ok, processed_signals} ->
+        case publish_with_middleware(state, processed_signals, context) do
+          {:ok, new_state} ->
+            # Run after_publish middleware
+            MiddlewarePipeline.after_publish(state.middleware, processed_signals, context)
 
-      {:error, error} ->
-        {:reply, {:error, error}, state}
+            # Extract the signals from the log that we just added
+            # We need to return the recorded signals, not the state
+            recorded_signals =
+              processed_signals
+              |> Enum.map(fn signal ->
+                # Create a RecordedSignal struct for each signal
+                %Jido.Signal.Bus.RecordedSignal{
+                  id: signal.id,
+                  type: signal.type,
+                  created_at: DateTime.utc_now(),
+                  signal: signal
+                }
+              end)
+
+            {:reply, {:ok, recorded_signals}, new_state}
+
+          {:error, error} ->
+            {:reply, {:error, error}, state}
+        end
+
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -384,6 +412,57 @@ defmodule Jido.Signal.Bus do
               {:reply, {:ok, latest_timestamp}, updated_state}
           end
         end
+    end
+  end
+
+  # Private helper function to publish signals with middleware dispatch hooks
+  defp publish_with_middleware(state, signals, context) do
+    with :ok <- validate_signals(signals),
+         {:ok, new_state, _new_signals} <- BusState.append_signals(state, signals) do
+      # Route signals to subscribers with middleware
+      Enum.each(signals, fn signal ->
+        # For each subscription, check if the signal type matches the subscription path
+        Enum.each(new_state.subscriptions, fn {_id, subscription} ->
+          if Router.matches?(signal.type, subscription.path) do
+            # Run before_dispatch middleware
+            case MiddlewarePipeline.before_dispatch(state.middleware, signal, subscription, context) do
+              {:ok, processed_signal} ->
+                # Dispatch the potentially modified signal
+                result = Jido.Signal.Dispatch.dispatch(processed_signal, subscription.dispatch)
+                
+                # Run after_dispatch middleware
+                MiddlewarePipeline.after_dispatch(
+                  state.middleware,
+                  processed_signal,
+                  subscription,
+                  result,
+                  context
+                )
+
+              :skip ->
+                # Skip this subscriber
+                :ok
+
+              {:error, reason} ->
+                Logger.warning("Middleware halted dispatch for signal #{signal.id}: #{inspect(reason)}")
+            end
+          end
+        end)
+      end)
+
+      {:ok, new_state}
+    end
+  end
+
+  defp validate_signals(signals) do
+    invalid_signals =
+      Enum.reject(signals, fn signal ->
+        is_struct(signal, Jido.Signal)
+      end)
+
+    case invalid_signals do
+      [] -> :ok
+      _ -> {:error, :invalid_signals}
     end
   end
 
