@@ -40,24 +40,28 @@ defmodule Jido.Signal.Bus.State do
   @spec append_signals(t(), list(Jido.Signal.t() | {:ok, Jido.Signal.t()} | map())) ::
           {:ok, t(), list(Signal.t())} | {:error, term()}
   def append_signals(%__MODULE__{} = state, signals) when is_list(signals) do
-    try do
-      {uuids, _timestamp} = Jido.Signal.ID.generate_batch(length(signals))
+    if signals == [] do
+      {:ok, state, []}
+    else
+      try do
+        {uuids, _timestamp} = Jido.Signal.ID.generate_batch(length(signals))
 
-      new_log =
-        uuids
-        |> Enum.zip(signals)
-        |> Enum.reduce(state.log, fn {uuid, signal}, acc ->
-          # Use the UUID as the key for the signal
-          Map.put(acc, uuid, signal)
-        end)
+        new_log =
+          uuids
+          |> Enum.zip(signals)
+          |> Enum.reduce(state.log, fn {uuid, signal}, acc ->
+            # Use the UUID as the key for the signal
+            Map.put(acc, uuid, signal)
+          end)
 
-      {:ok, %{state | log: new_log}, signals}
-    rescue
-      e in KeyError ->
-        {:error, "Invalid signal format: #{Exception.message(e)}"}
+        {:ok, %{state | log: new_log}, signals}
+      rescue
+        e in KeyError ->
+          {:error, "Invalid signal format: #{Exception.message(e)}"}
 
-      e ->
-        {:error, "Error processing signals: #{Exception.message(e)}"}
+        e ->
+          {:error, "Error processing signals: #{Exception.message(e)}"}
+      end
     end
   end
 
