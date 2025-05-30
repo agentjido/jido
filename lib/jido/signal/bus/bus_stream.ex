@@ -137,20 +137,24 @@ defmodule Jido.Signal.Bus.Stream do
   def publish(%BusState{} = state, signals) when is_list(signals) do
     dbug("publish", signals: signals)
 
-    with :ok <- validate_signals(signals),
-         {:ok, new_state, _new_signals} <- BusState.append_signals(state, signals) do
-      # Route signals to subscribers
-      Enum.each(signals, fn signal ->
-        # For each subscription, check if the signal type matches the subscription path
-        Enum.each(new_state.subscriptions, fn {_id, subscription} ->
-          if Router.matches?(signal.type, subscription.path) do
-            # If it matches, dispatch the signal
-            Jido.Signal.Dispatch.dispatch(signal, subscription.dispatch)
-          end
+    if signals == [] do
+      {:error, :empty_signal_list}
+    else
+      with :ok <- validate_signals(signals),
+           {:ok, new_state, _new_signals} <- BusState.append_signals(state, signals) do
+        # Route signals to subscribers
+        Enum.each(signals, fn signal ->
+          # For each subscription, check if the signal type matches the subscription path
+          Enum.each(new_state.subscriptions, fn {_id, subscription} ->
+            if Router.matches?(signal.type, subscription.path) do
+              # If it matches, dispatch the signal
+              Jido.Signal.Dispatch.dispatch(signal, subscription.dispatch)
+            end
+          end)
         end)
-      end)
 
-      {:ok, new_state}
+        {:ok, new_state}
+      end
     end
   end
 
