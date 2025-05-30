@@ -316,7 +316,7 @@ defmodule JidoTest.TestActions do
 
       tasks =
         for _ <- 1..count do
-          Task.Supervisor.async_nolink(Jido.Exec.TaskSupervisor, fn ->
+          Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn ->
             # Link to task group for cleanup
             if link_to_group? do
               Process.group_leader(self(), task_group)

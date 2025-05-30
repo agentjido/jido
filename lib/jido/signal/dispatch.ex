@@ -1,4 +1,5 @@
 defmodule Jido.Signal.Dispatch do
+  alias Jido.Error
   @moduledoc """
   A flexible signal dispatching system that routes signals to various destinations using configurable adapters.
 
@@ -11,7 +12,7 @@ defmodule Jido.Signal.Dispatch do
   The following adapters are provided out of the box:
 
   * `:pid` - Direct delivery to a specific process (see `Jido.Signal.Dispatch.PidAdapter`)
-  * `:bus` - Delivery to an event bus (see `Jido.Signal.Dispatch.Bus`)
+  * `:bus` - Delivery to an event bus (**UNSUPPORTED** - implementation pending)
   * `:named` - Delivery to a named process (see `Jido.Signal.Dispatch.Named`)
   * `:pubsub` - Delivery via PubSub mechanism (see `Jido.Signal.Dispatch.PubSub`)
   * `:logger` - Log signals using Logger (see `Jido.Signal.Dispatch.LoggerAdapter`)
@@ -71,7 +72,7 @@ defmodule Jido.Signal.Dispatch do
 
   @type adapter ::
           :pid
-          | :bus
+          # | :bus  # TODO: Unsupported - implementation pending
           | :named
           | :pubsub
           | :logger
@@ -90,10 +91,11 @@ defmodule Jido.Signal.Dispatch do
 
   @default_batch_size 50
   @default_max_concurrency 5
+  @normalize_errors_compile_time Application.compile_env(:jido, :normalize_dispatch_errors, false)
 
   @builtin_adapters %{
     pid: Jido.Signal.Dispatch.PidAdapter,
-    bus: Jido.Signal.Dispatch.Bus,
+    # bus: Jido.Signal.Dispatch.Bus, # TODO: Unsupported - implementation pending
     named: Jido.Signal.Dispatch.Named,
     pubsub: Jido.Signal.Dispatch.PubSub,
     logger: Jido.Signal.Dispatch.LoggerAdapter,
@@ -233,7 +235,7 @@ defmodule Jido.Signal.Dispatch do
   def dispatch_async(signal, config) do
     case validate_opts(config) do
       {:ok, validated_config} ->
-        task = Task.async(fn -> dispatch(signal, validated_config) end)
+        task = Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn -> dispatch(signal, validated_config) end)
         {:ok, task}
 
       error ->
@@ -290,19 +292,23 @@ defmodule Jido.Signal.Dispatch do
         {:error, _} -> false
       end)
 
-    # Extract just the configs from valid results
-    validated_configs = Enum.map(valid_configs, fn {:ok, {config, _}} -> config end)
+    # Extract configs with their original indices
+    validated_configs_with_idx = Enum.map(valid_configs, fn {:ok, {config, idx}} -> {config, idx} end)
 
     # Process valid configs in batches
     dispatch_results =
-      if validated_configs != [] do
-        batches = Enum.chunk_every(validated_configs, batch_size)
+      if validated_configs_with_idx != [] do
+        batches = Enum.chunk_every(validated_configs_with_idx, batch_size)
 
-        Task.async_stream(
+        Task.Supervisor.async_stream(
+          Jido.TaskSupervisor,
           batches,
           fn batch ->
-            Enum.map(batch, fn config ->
-              dispatch_single(signal, config)
+            Enum.map(batch, fn {config, original_idx} ->
+              case dispatch_single(signal, config) do
+                :ok -> {:ok, original_idx}
+                {:error, reason} -> {:error, {original_idx, reason}}
+              end
             end)
           end,
           max_concurrency: max_concurrency,
@@ -318,9 +324,8 @@ defmodule Jido.Signal.Dispatch do
 
     # Check for dispatch errors
     dispatch_errors =
-      Enum.with_index(dispatch_results)
-      |> Enum.reduce([], fn
-        {{:error, reason}, idx}, acc -> [{idx, reason} | acc]
+      Enum.reduce(dispatch_results, [], fn
+        {:error, error}, acc -> [error | acc]
         {:ok, _}, acc -> acc
       end)
 
@@ -334,27 +339,123 @@ defmodule Jido.Signal.Dispatch do
 
   # Private helpers
 
+  defp normalize_error(reason, adapter, config) when is_atom(reason) do
+    if should_normalize_errors?() do
+      details = %{
+        adapter: adapter,
+        reason: reason,
+        config: config
+      }
+      {:error, Error.dispatch_error("Dispatch failed: #{reason}", details)}
+    else
+      {:error, reason}
+    end
+  end
+
+  defp normalize_error(%Error{} = error, _adapter, _config) do
+    {:error, error}
+  end
+
+  defp normalize_error(reason, adapter, config) do
+    if should_normalize_errors?() do
+      details = %{
+        adapter: adapter,
+        reason: reason,
+        config: config
+      }
+      {:error, Error.dispatch_error("Dispatch failed", details)}
+    else
+      {:error, reason}
+    end
+  end
+
+  defp should_normalize_errors?() do
+    @normalize_errors_compile_time or 
+      Application.get_env(:jido, :normalize_dispatch_errors, false)
+  end
+
+  defp get_target_from_opts(opts) do
+    cond do
+      target = Keyword.get(opts, :target) -> target
+      url = Keyword.get(opts, :url) -> url
+      pid = Keyword.get(opts, :pid) -> pid
+      name = Keyword.get(opts, :name) -> name
+      topic = Keyword.get(opts, :topic) -> topic
+      true -> :unknown
+    end
+  end
+
   defp validate_single_config({nil, opts}) when is_list(opts) do
     {:ok, {nil, opts}}
   end
 
   defp validate_single_config({adapter, opts}) when is_atom(adapter) and is_list(opts) do
-    with {:ok, adapter_module} <- resolve_adapter(adapter),
-         {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
-      {:ok, {adapter, validated_opts}}
+    with {:ok, adapter_module} <- resolve_adapter(adapter) do
+      if adapter_module == nil do
+        {:ok, {adapter, opts}}
+      else
+        with {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
+          {:ok, {adapter, validated_opts}}
+        else
+          {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
+        end
+      end
+    else
+      {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
     end
   end
 
   defp dispatch_single(_signal, {nil, _opts}), do: :ok
 
   defp dispatch_single(signal, {adapter, opts}) do
-    with {:ok, adapter_module} <- resolve_adapter(adapter),
-         {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
-      adapter_module.deliver(signal, validated_opts)
+    start_time = System.monotonic_time(:millisecond)
+    signal_type = case signal do
+      %{type: type} -> type
+      _ -> :unknown
     end
+    
+    metadata = %{
+      adapter: adapter,
+      signal_type: signal_type,
+      target: get_target_from_opts(opts)
+    }
+
+    :telemetry.execute([:jido, :dispatch, :start], %{}, metadata)
+
+    result = with {:ok, adapter_module} <- resolve_adapter(adapter) do
+      if adapter_module == nil do
+        :ok
+      else
+        with {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
+          case adapter_module.deliver(signal, validated_opts) do
+            :ok -> :ok
+            {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
+          end
+        else
+          {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
+        end
+      end
+    else
+      {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
+    end
+
+    end_time = System.monotonic_time(:millisecond)
+    latency_ms = end_time - start_time
+    success = match?(:ok, result)
+
+    measurements = %{latency_ms: latency_ms}
+    metadata = Map.merge(metadata, %{success?: success})
+
+    if success do
+      :telemetry.execute([:jido, :dispatch, :stop], measurements, metadata)
+    else
+      :telemetry.execute([:jido, :dispatch, :exception], measurements, metadata)
+    end
+
+    result
   end
 
-  defp resolve_adapter(nil), do: {:error, :no_adapter_needed}
+  defp resolve_adapter(nil), do: {:ok, nil}
 
   defp resolve_adapter(adapter) when is_atom(adapter) do
     case Map.fetch(@builtin_adapters, adapter) do
@@ -369,7 +470,7 @@ defmodule Jido.Signal.Dispatch do
           {:ok, adapter}
         else
           {:error,
-           "#{inspect(adapter)} is not a valid adapter - must be one of :pid, :bus, :named, :pubsub, :logger, :console, :noop, :http, :webhook or a module implementing deliver/2"}
+          "#{inspect(adapter)} is not a valid adapter - must be one of :pid, :named, :pubsub, :logger, :console, :noop, :http, :webhook or a module implementing deliver/2"}
         end
     end
   end
