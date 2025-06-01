@@ -286,6 +286,7 @@ defmodule Jido.Exec do
   """
   @spec await(async_ref(), timeout()) :: {:ok, map()} | {:error, Error.t()}
   def await(%{ref: ref, pid: pid}, timeout \\ @default_timeout) do
+    timeout = if timeout == 0, do: :infinity, else: timeout
     dbug("Awaiting async action result", ref: ref, pid: pid, timeout: timeout)
 
     receive do
