@@ -405,13 +405,15 @@ defmodule Jido.Runner.ChainTest do
           action: Add,
           params: %{value: 0, amount: 1},
           context: %{},
-          opts: [timeout: 5000]  # Instruction-specific timeout
+          # Instruction-specific timeout
+          opts: [timeout: 5000]
         },
         %Instruction{
           action: Add,
           params: %{value: 1, amount: 1},
           context: %{},
-          opts: []  # No timeout in this instruction
+          # No timeout in this instruction
+          opts: []
         }
       ]
 
@@ -429,13 +431,15 @@ defmodule Jido.Runner.ChainTest do
           action: Add,
           params: %{value: 0, amount: 1},
           context: %{},
-          opts: []  # No timeout in instruction
+          # No timeout in instruction
+          opts: []
         },
         %Instruction{
           action: Add,
           params: %{value: 1, amount: 1},
           context: %{},
-          opts: []  # No timeout in instruction
+          # No timeout in instruction
+          opts: []
         }
       ]
 
@@ -453,13 +457,15 @@ defmodule Jido.Runner.ChainTest do
           action: Add,
           params: %{value: 0, amount: 1},
           context: %{},
-          opts: [timeout: 5000, retry: true]  # Instruction has some opts
+          # Instruction has some opts
+          opts: [timeout: 5000, retry: true]
         },
         %Instruction{
           action: Add,
           params: %{value: 1, amount: 1},
           context: %{},
-          opts: [timeout: 2000]  # Different timeout
+          # Different timeout
+          opts: [timeout: 2000]
         }
       ]
 
@@ -467,9 +473,9 @@ defmodule Jido.Runner.ChainTest do
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       # Runner provides different opts, should be merged with instruction opts taking precedence
-      assert {:ok, updated_agent, []} = 
-        Chain.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
-      
+      assert {:ok, updated_agent, []} =
+               Chain.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
+
       assert updated_agent.result == %{value: 2}
       # Each instruction should have received merged opts with instruction opts taking precedence
     end
@@ -480,7 +486,8 @@ defmodule Jido.Runner.ChainTest do
           action: Add,
           params: %{value: 0, amount: 1},
           context: %{},
-          opts: [timeout: 0]  # Disable timeout for this instruction
+          # Disable timeout for this instruction
+          opts: [timeout: 0]
         }
       ]
 

@@ -327,7 +327,8 @@ defmodule Jido.Runner.SimpleTest do
         action: Add,
         params: %{value: 0, amount: 1},
         context: %{},
-        opts: [timeout: 5000]  # Instruction-specific timeout
+        # Instruction-specific timeout
+        opts: [timeout: 5000]
       }
 
       agent = FullFeaturedAgent.new("test-agent")
@@ -343,7 +344,8 @@ defmodule Jido.Runner.SimpleTest do
         action: Add,
         params: %{value: 0, amount: 1},
         context: %{},
-        opts: []  # No timeout in instruction
+        # No timeout in instruction
+        opts: []
       }
 
       agent = FullFeaturedAgent.new("test-agent")
@@ -359,16 +361,17 @@ defmodule Jido.Runner.SimpleTest do
         action: Add,
         params: %{value: 0, amount: 1},
         context: %{},
-        opts: [timeout: 5000, retry: true]  # Instruction has some opts
+        # Instruction has some opts
+        opts: [timeout: 5000, retry: true]
       }
 
       agent = FullFeaturedAgent.new("test-agent")
       agent = %{agent | pending_instructions: :queue.from_list([instruction])}
 
       # Runner provides different opts
-      assert {:ok, %FullFeaturedAgent{} = updated_agent, []} = 
-        Simple.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
-      
+      assert {:ok, %FullFeaturedAgent{} = updated_agent, []} =
+               Simple.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
+
       assert updated_agent.result == %{value: 1}
       # The instruction should have received merged opts with instruction opts taking precedence
     end
