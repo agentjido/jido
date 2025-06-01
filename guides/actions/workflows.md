@@ -55,9 +55,12 @@ Workflow.run(%Instruction{} = instruction)
 
 ### Timeouts
 
-By default, Actions have a 5 second timeout. You can customize this:
+By default, Actions have a 30 second timeout. You can customize this globally or per-action:
 
 ```elixir
+# Global configuration (in config.exs)
+config :jido, default_timeout: 60_000  # 60 seconds
+
 # Disable timeout completely
 Workflow.run(MyAction, %{}, %{}, timeout: 0)
 

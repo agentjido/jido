@@ -185,6 +185,107 @@ end
 
 This guide serves primarily as a reference for understanding runner behavior and creating custom implementations when needed.
 
+## Timeout Configuration
+
+Runners support flexible timeout configuration at multiple levels, providing fine-grained control over action execution timing.
+
+### Global Timeout Configuration
+
+Configure the default timeout for all actions in your application:
+
+```elixir
+# config/config.exs
+config :jido, default_timeout: 60_000  # 60 seconds (default: 30 seconds)
+```
+
+### Runner-Level Timeouts
+
+Set timeouts that apply to all instructions processed by a runner:
+
+```elixir
+# Simple Runner with timeout
+{:ok, agent, directives} = Jido.Runner.Simple.run(agent, timeout: 45_000)
+
+# Chain Runner with timeout
+{:ok, agent, directives} = Jido.Runner.Chain.run(agent, timeout: 120_000)
+```
+
+### Instruction-Level Timeouts
+
+Individual instructions can specify their own timeouts, which take precedence over runner-level timeouts:
+
+```elixir
+# Instruction with specific timeout
+instruction = %Instruction{
+  action: LongRunningAction,
+  params: %{data: large_dataset},
+  opts: [timeout: 300_000]  # 5 minutes for this specific action
+}
+
+# This instruction will use 300 seconds, others use runner or global timeout
+{:ok, agent, directives} = Jido.Runner.Simple.run(agent, timeout: 30_000)
+```
+
+### Timeout Precedence Rules
+
+Timeout options follow a clear precedence hierarchy:
+
+1. **Instruction-level timeout** (highest precedence)
+2. **Runner-level timeout** 
+3. **Global configuration timeout** (lowest precedence)
+
+```elixir
+# Example showing precedence
+instructions = [
+  %Instruction{
+    action: FastAction,
+    opts: [timeout: 5_000]    # This instruction: 5 seconds
+  },
+  %Instruction{
+    action: NormalAction,
+    opts: []                  # This instruction: 45 seconds (runner timeout)
+  }
+]
+
+# Runner timeout applies to instructions without specific timeout
+Jido.Runner.Chain.run(agent, timeout: 45_000)
+```
+
+### Special Timeout Values
+
+- **`timeout: 0`** - Disables timeout completely, action can run indefinitely
+- **Positive integers** - Timeout in milliseconds
+
+```elixir
+# Disable timeout for long-running batch operations
+batch_instruction = %Instruction{
+  action: BatchProcessor,
+  params: %{items: thousands_of_items},
+  opts: [timeout: 0]  # No timeout limit
+}
+```
+
+### Integration with Agent Configuration
+
+Agents can specify default timeouts for their runners:
+
+```elixir
+defmodule MyAgent do
+  use Jido.Agent,
+    name: "timeout_example",
+    runner: Jido.Runner.Simple
+  
+  # Override start_link to set default runner options
+  def start_link(opts \\ []) do
+    runner_opts = Keyword.get(opts, :runner_opts, [])
+    runner_opts = Keyword.put_new(runner_opts, :timeout, 120_000)  # 2 minutes
+    
+    opts = Keyword.put(opts, :runner_opts, runner_opts)
+    super(opts)
+  end
+end
+```
+
 ## Best Practices
 
 1. **Choose the Right Runner**
@@ -199,17 +300,26 @@ This guide serves primarily as a reference for understanding runner behavior and
    - Validate state changes
    - Handle edge cases
 
-3. **Error Handling**
+3. **Timeout Management**
+
+   - Set appropriate global defaults in configuration
+   - Use runner-level timeouts for consistent behavior
+   - Override with instruction-level timeouts for special cases
+   - Use `timeout: 0` sparingly and only for truly long-running operations
+   - Monitor timeout patterns to optimize performance
+
+4. **Error Handling**
 
    - Implement comprehensive error handling
    - Provide clear error messages
    - Consider recovery strategies
 
-4. **Testing**
+5. **Testing**
    - Test happy paths thoroughly
    - Test error conditions
    - Test state transitions
    - Test directive handling
+   - Test timeout scenarios
 
 ## Next Steps
 

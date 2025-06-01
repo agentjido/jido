@@ -32,7 +32,7 @@ defmodule Jido.Runner.Simple do
   alias Jido.Error
   alias Jido.Agent.Directive
 
-  @type run_opts :: [apply_directives?: boolean(), log_level: atom()]
+  @type run_opts :: [apply_directives?: boolean(), log_level: atom(), timeout: non_neg_integer()]
   @type run_result :: {:ok, Jido.Agent.t(), list()} | {:error, Error.t()}
 
   @doc """
@@ -53,6 +53,8 @@ defmodule Jido.Runner.Simple do
       * `id` - Agent identifier
     * `opts` - Optional keyword list of execution options:
       * `apply_directives?` - When true (default), applies directives during execution
+      * `timeout` - Timeout in milliseconds for action execution (merged with instruction opts)
+      * `log_level` - Log level for debugging output
 
   ## Returns
     * `{:ok, updated_agent, directives}` - Successful execution with:
@@ -71,11 +73,19 @@ defmodule Jido.Runner.Simple do
       # Execute without applying directives
       {:ok, updated_agent, directives} = Runner.Simple.run(agent_with_state_update, apply_directives?: false)
 
+      # Execute with custom timeout (runner opts are merged with instruction opts)
+      {:ok, updated_agent, directives} = Runner.Simple.run(agent, timeout: 60_000)
+
       # Empty queue - returns agent unchanged
       {:ok, agent, []} = Runner.Simple.run(agent_with_empty_queue)
 
       # Execution error
       {:error, error} = Runner.Simple.run(agent_with_failing_action)
+
+  ## Option Merging
+    * Runner options are merged with each instruction's options
+    * Instruction options take precedence over runner options
+    * This allows per-instruction customization while providing defaults
 
   ## Error Handling
     * Returns `{:error, "No pending instructions"}` for empty queue
@@ -110,11 +120,14 @@ defmodule Jido.Runner.Simple do
   @doc false
   @spec execute_instruction(Jido.Agent.t(), Instruction.t(), keyword()) :: run_result()
   defp execute_instruction(agent, instruction, opts) do
-    # Inject agent state and runtime opts into instruction
+    # Inject agent state and merge runtime opts with instruction opts
+    # Instruction opts take precedence over runner opts
+    merged_opts = Keyword.merge(opts, instruction.opts)
+
     instruction = %{
       instruction
       | context: Map.put(instruction.context, :state, agent.state),
-        opts: opts
+        opts: merged_opts
     }
 
     dbug("Executing instruction", instruction: instruction)
