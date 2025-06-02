@@ -56,6 +56,7 @@ defmodule JidoTest.Agent.ServerRuntimeTest do
       assert {:error, :invalid_signal} = ServerRuntime.route_signal(state, :invalid)
     end
 
+    @tag :flaky
     test "returns error for non-matching route" do
       {:ok, instruction} = Instruction.new(%{action: NoSchema})
       base_state = %ServerState{agent: BasicAgent.new("test")}

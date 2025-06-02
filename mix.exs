@@ -295,6 +295,7 @@ defmodule Jido.MixProject do
   defp deps do
     [
       {:jido_signal, github: "agentjido/jido_signal", branch: "main"},
+      # {:jido_signal, path: "../jido_signal"},
 
       # Jido Deps
       {:backoff, "~> 1.1"},
