@@ -44,10 +44,9 @@ defmodule Jido.Agent.Server.RouterTest do
       assert error.type == :validation_error
       assert error.message == "Routes must be a list"
 
-      # This error comes directly from Signal.Router
-      assert {:error, error} = Router.build(state, routes: [{"test", :not_an_instruction}])
-      assert error.type == :validation_error
-      assert error.message == "Target must be an Instruction or valid dispatch configuration"
+      # Any term is now accepted as a target
+      assert {:ok, updated_state} = Router.build(state, routes: [{"test", :any_term}])
+      assert updated_state.router.route_count == 1
     end
   end
 

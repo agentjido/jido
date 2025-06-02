@@ -1,5 +1,6 @@
 defmodule Jido.Signal.Dispatch do
   alias Jido.Error
+
   @moduledoc """
   A flexible signal dispatching system that routes signals to various destinations using configurable adapters.
 
@@ -235,7 +236,11 @@ defmodule Jido.Signal.Dispatch do
   def dispatch_async(signal, config) do
     case validate_opts(config) do
       {:ok, validated_config} ->
-        task = Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn -> dispatch(signal, validated_config) end)
+        task =
+          Task.Supervisor.async_nolink(Jido.TaskSupervisor, fn ->
+            dispatch(signal, validated_config)
+          end)
+
         {:ok, task}
 
       error ->
@@ -293,7 +298,8 @@ defmodule Jido.Signal.Dispatch do
       end)
 
     # Extract configs with their original indices
-    validated_configs_with_idx = Enum.map(valid_configs, fn {:ok, {config, idx}} -> {config, idx} end)
+    validated_configs_with_idx =
+      Enum.map(valid_configs, fn {:ok, {config, idx}} -> {config, idx} end)
 
     # Process valid configs in batches
     dispatch_results =
@@ -346,6 +352,7 @@ defmodule Jido.Signal.Dispatch do
         reason: reason,
         config: config
       }
+
       {:error, Error.dispatch_error("Dispatch failed: #{reason}", details)}
     else
       {:error, reason}
@@ -363,6 +370,7 @@ defmodule Jido.Signal.Dispatch do
         reason: reason,
         config: config
       }
+
       {:error, Error.dispatch_error("Dispatch failed", details)}
     else
       {:error, reason}
@@ -370,7 +378,7 @@ defmodule Jido.Signal.Dispatch do
   end
 
   defp should_normalize_errors?() do
-    @normalize_errors_compile_time or 
+    @normalize_errors_compile_time or
       Application.get_env(:jido, :normalize_dispatch_errors, false)
   end
 
@@ -409,11 +417,13 @@ defmodule Jido.Signal.Dispatch do
 
   defp dispatch_single(signal, {adapter, opts}) do
     start_time = System.monotonic_time(:millisecond)
-    signal_type = case signal do
-      %{type: type} -> type
-      _ -> :unknown
-    end
-    
+
+    signal_type =
+      case signal do
+        %{type: type} -> type
+        _ -> :unknown
+      end
+
     metadata = %{
       adapter: adapter,
       signal_type: signal_type,
@@ -422,22 +432,23 @@ defmodule Jido.Signal.Dispatch do
 
     :telemetry.execute([:jido, :dispatch, :start], %{}, metadata)
 
-    result = with {:ok, adapter_module} <- resolve_adapter(adapter) do
-      if adapter_module == nil do
-        :ok
-      else
-        with {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
-          case adapter_module.deliver(signal, validated_opts) do
-            :ok -> :ok
+    result =
+      with {:ok, adapter_module} <- resolve_adapter(adapter) do
+        if adapter_module == nil do
+          :ok
+        else
+          with {:ok, validated_opts} <- adapter_module.validate_opts(opts) do
+            case adapter_module.deliver(signal, validated_opts) do
+              :ok -> :ok
+              {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
+            end
+          else
             {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
           end
-        else
-          {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
         end
+      else
+        {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
       end
-    else
-      {:error, reason} -> normalize_error(reason, adapter, {adapter, opts})
-    end
 
     end_time = System.monotonic_time(:millisecond)
     latency_ms = end_time - start_time
@@ -470,7 +481,7 @@ defmodule Jido.Signal.Dispatch do
           {:ok, adapter}
         else
           {:error,
-          "#{inspect(adapter)} is not a valid adapter - must be one of :pid, :named, :pubsub, :logger, :console, :noop, :http, :webhook or a module implementing deliver/2"}
+           "#{inspect(adapter)} is not a valid adapter - must be one of :pid, :named, :pubsub, :logger, :console, :noop, :http, :webhook or a module implementing deliver/2"}
         end
     end
   end

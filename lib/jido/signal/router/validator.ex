@@ -6,9 +6,7 @@ defmodule Jido.Signal.Router.Validator do
   use ExDbug, enabled: false
 
   alias Jido.Error
-  alias Jido.Instruction
   alias Jido.Signal
-  alias Jido.Signal.Dispatch
   alias Jido.Signal.Router.Route
 
   @default_priority 0
@@ -132,24 +130,9 @@ defmodule Jido.Signal.Router.Validator do
      })}
   end
 
-  defp normalize_target(%Instruction{} = instruction), do: {:ok, instruction}
-
-  defp normalize_target(dispatch_config)
-       when is_tuple(dispatch_config) or is_list(dispatch_config) do
-    case Dispatch.validate_opts(dispatch_config) do
-      {:ok, validated} ->
-        {:ok, validated}
-
-      {:error, reason} ->
-        {:error, Error.validation_error("Invalid dispatch configuration", %{reason: reason})}
-    end
-  end
-
-  defp normalize_target(invalid) do
-    {:error,
-     Error.validation_error("Target must be an Instruction or valid dispatch configuration", %{
-       value: invalid
-     })}
+  defp normalize_target(target) do
+    # Accept any term as a target - the router is agnostic about what it stores
+    {:ok, target}
   end
 
   # defp normalize_target({adapter, _opts} = config) when is_atom(adapter), do: {:ok, config}
@@ -283,49 +266,17 @@ defmodule Jido.Signal.Router.Validator do
   defp valid_segment?(segment), do: String.match?(segment, ~r/^[a-zA-Z0-9_-]+$/)
 
   @doc """
-  Validates that a target is either an instruction or a dispatch config.
+  Validates that a target is a valid term.
 
-  ## Valid Formats
-  - %Instruction{} with an atom action
-  - {adapter, opts} where adapter is an atom
-  - [{adapter, opts}, ...] list of adapter configs
+  ## Valid Targets
+  - Any term
 
   ## Returns
-  - `{:ok, target}` if valid
-  - `{:error, reason}` if invalid
+  - `{:ok, target}` - Always succeeds
   """
-  def validate_target(%Instruction{action: action} = instruction) when is_atom(action) do
-    {:ok, instruction}
-  end
-
-  def validate_target({adapter, _opts} = config) when is_atom(adapter) do
-    {:ok, config}
-  end
-
-  def validate_target(dispatch_configs) when is_list(dispatch_configs) do
-    # Try to convert from keyword list format first
-    case Enum.reduce_while(dispatch_configs, [], fn
-           {adapter, opts}, acc when is_atom(adapter) and is_list(opts) ->
-             {:cont, [{adapter, opts} | acc]}
-
-           _, _acc ->
-             {:halt, :error}
-         end) do
-      :error ->
-        # If not a keyword list, check if it's already in tuple format
-        if Enum.all?(dispatch_configs, &match?({adapter, _opts} when is_atom(adapter), &1)) do
-          {:ok, dispatch_configs}
-        else
-          {:error, Error.routing_error("Invalid dispatch config list")}
-        end
-
-      configs ->
-        {:ok, Enum.reverse(configs)}
-    end
-  end
-
-  def validate_target(_invalid) do
-    {:error, Error.routing_error("Invalid route specification format")}
+  def validate_target(target) do
+    # Accept any term as a target - the router is agnostic about what it stores
+    {:ok, target}
   end
 
   @doc """

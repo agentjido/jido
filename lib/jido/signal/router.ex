@@ -175,35 +175,29 @@ defmodule Jido.Signal.Router do
 
   alias Jido.Signal
   alias Jido.Error
-  alias Jido.Instruction
-  alias Jido.Signal.Dispatch
   alias Jido.Signal.Router.{Engine, Route, Validator}
 
   @type path :: String.t()
   @type match :: (Signal.t() -> boolean())
   @type priority :: non_neg_integer()
   @type wildcard_type :: :single | :multi
-  @type target :: Instruction.t() | Dispatch.dispatch_config()
+  @type target :: term()
 
   @type route_spec ::
           {String.t(), target()}
           | {String.t(), target(), priority()}
           | {String.t(), match(), target()}
           | {String.t(), match(), target(), priority()}
-          | {String.t(), pid()}
 
   @doc """
   Normalizes route specifications into Route structs.
 
   ## Parameters
-    * `input` - One of:
-      * Single Route struct
-      * List of Route structs
-      * List of route_spec tuples
-      * {path, target} tuple where target is:
-        * %Instruction{}
-        * {adapter, opts}
-        * [{adapter, opts}, ...]
+  * `input` - One of:
+    * Single Route struct
+    * List of Route structs
+    * List of route_spec tuples:
+      * {path, target} tuple where target can be any term
       * {path, target, priority} tuple
       * {path, match_fn, target} tuple
       * {path, match_fn, target, priority} tuple
@@ -407,7 +401,7 @@ defmodule Jido.Signal.Router do
   @doc """
   Lists all routes currently registered in the router.
 
-  Returns a list of Route structs containing the path, instruction, priority and match function
+  Returns a list of Route structs containing the path, target, priority and match function
   for each registered route.
 
   ## Returns
@@ -421,13 +415,13 @@ defmodule Jido.Signal.Router do
       [
         %Route{
           path: "user.created",
-          instruction: %Instruction{action: MyApp.Actions.HandleUserCreated},
+          target: MyApp.Actions.HandleUserCreated,
           priority: 0,
           match: nil
         },
         %Route{
           path: "payment.processed",
-          instruction: %Instruction{action: MyApp.Actions.HandleLargePayment},
+          target: {:some_adapter, [opts: :here]},
           priority: 90,
           match: #Function<1.123456789/1>
         }
@@ -499,17 +493,17 @@ defmodule Jido.Signal.Router do
 
   ## Returns
 
-  * `{:ok, [instruction]}` - List of matching instructions, may be empty if no matches
+  * `{:ok, [term()]}` - List of matching targets, may be empty if no matches
   * `{:error, term()}` - Other errors that occurred during routing
 
   ## Examples
 
-      {:ok, results} = Router.route(router, %Signal{
+      {:ok, targets} = Router.route(router, %Signal{
         type: "payment.processed",
         data: %{amount: 100}
       })
   """
-  @spec route(Router.t(), Signal.t()) :: {:ok, [Instruction.t()]} | {:error, term()}
+  @spec route(Router.t(), Signal.t()) :: {:ok, [term()]} | {:error, term()}
   def route(%Router{trie: _trie}, %Signal{type: nil}) do
     {:error, Error.routing_error("Signal type cannot be nil")}
   end

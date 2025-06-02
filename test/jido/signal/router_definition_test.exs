@@ -148,17 +148,16 @@ defmodule Jido.Signal.RouterDefinitionTest do
       assert Keyword.get(elem(pid_config, 1), :target) == test_pid
     end
 
-    test "returns error for invalid dispatch config list" do
+    test "accepts any dispatch config list as term" do
       path = "test.path"
-      # Using an invalid adapter that will be caught by dispatch validation
-      invalid_configs = [
+      # Any term is accepted as a target
+      config_list = [
         {:noop, [key: "value1"]},
         {:invalid_adapter, [key: "value2"]}
       ]
 
-      assert {:error, error} = Validator.normalize({path, invalid_configs})
-      assert error.type == :validation_error
-      assert error.message == "Invalid dispatch configuration"
+      assert {:ok, [route]} = Validator.normalize({path, config_list})
+      assert route.target == config_list
     end
 
     test "returns error for invalid route specification" do
@@ -262,26 +261,24 @@ defmodule Jido.Signal.RouterDefinitionTest do
       assert error.message == "Path contains invalid characters"
     end
 
-    test "returns error for invalid target" do
+    test "accepts any target term" do
       route = %Router.Route{
         path: "test.path",
         target: :invalid
       }
 
-      assert {:error, error} = Router.validate(route)
-      assert error.type == :routing_error
-      assert error.message == "Invalid route specification format"
+      assert {:ok, validated_route} = Router.validate(route)
+      assert validated_route.target == :invalid
     end
 
-    test "returns error for invalid dispatch config" do
+    test "accepts any dispatch config term" do
       route = %Router.Route{
         path: "test.path",
         target: {"not_an_atom", []}
       }
 
-      assert {:error, error} = Router.validate(route)
-      assert error.type == :routing_error
-      assert error.message == "Invalid route specification format"
+      assert {:ok, validated_route} = Router.validate(route)
+      assert validated_route.target == {"not_an_atom", []}
     end
 
     test "returns error for invalid priority" do

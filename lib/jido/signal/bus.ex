@@ -425,11 +425,16 @@ defmodule Jido.Signal.Bus do
         Enum.each(new_state.subscriptions, fn {_id, subscription} ->
           if Router.matches?(signal.type, subscription.path) do
             # Run before_dispatch middleware
-            case MiddlewarePipeline.before_dispatch(state.middleware, signal, subscription, context) do
+            case MiddlewarePipeline.before_dispatch(
+                   state.middleware,
+                   signal,
+                   subscription,
+                   context
+                 ) do
               {:ok, processed_signal} ->
                 # Dispatch the potentially modified signal
                 result = Jido.Signal.Dispatch.dispatch(processed_signal, subscription.dispatch)
-                
+
                 # Run after_dispatch middleware
                 MiddlewarePipeline.after_dispatch(
                   state.middleware,
@@ -444,7 +449,9 @@ defmodule Jido.Signal.Bus do
                 :ok
 
               {:error, reason} ->
-                Logger.warning("Middleware halted dispatch for signal #{signal.id}: #{inspect(reason)}")
+                Logger.warning(
+                  "Middleware halted dispatch for signal #{signal.id}: #{inspect(reason)}"
+                )
             end
           end
         end)

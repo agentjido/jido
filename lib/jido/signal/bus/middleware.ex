@@ -43,7 +43,7 @@ defmodule Jido.Signal.Bus.Middleware do
   Called before signals are published to the bus.
 
   Can transform signals or prevent publication by returning :halt.
-  
+
   ## Parameters
   - signals: List of signals about to be published
   - context: Context information about the operation
@@ -65,7 +65,7 @@ defmodule Jido.Signal.Bus.Middleware do
   Called after signals are successfully published to the bus.
 
   Cannot modify signals but can perform side effects or update middleware state.
-  
+
   ## Parameters
   - signals: List of signals that were published
   - context: Context information about the operation
@@ -85,7 +85,7 @@ defmodule Jido.Signal.Bus.Middleware do
   Called before a signal is dispatched to a specific subscriber.
 
   Can transform the signal or prevent dispatch to this subscriber.
-  
+
   ## Parameters
   - signal: The signal about to be dispatched
   - subscriber: The subscriber that will receive the signal
@@ -111,7 +111,7 @@ defmodule Jido.Signal.Bus.Middleware do
   Called after a signal is dispatched to a subscriber.
 
   Cannot modify the signal but can react to dispatch results.
-  
+
   ## Parameters
   - signal: The signal that was dispatched
   - subscriber: The subscriber that received the signal
@@ -160,13 +160,11 @@ defmodule Jido.Signal.Bus.Middleware do
       @impl true
       def after_dispatch(_signal, _subscriber, _result, _context, state), do: {:cont, state}
 
-      defoverridable [
-        init: 1,
-        before_publish: 3,
-        after_publish: 3,
-        before_dispatch: 4,
-        after_dispatch: 5
-      ]
+      defoverridable init: 1,
+                     before_publish: 3,
+                     after_publish: 3,
+                     before_dispatch: 4,
+                     after_dispatch: 5
     end
   end
 end

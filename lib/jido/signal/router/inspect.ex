@@ -19,17 +19,19 @@ defimpl Inspect, for: Jido.Signal.Router.Router do
             # Format the target more concisely
             target_str =
               case route.target do
-                %Jido.Instruction{} = instruction ->
-                  "→ %Instruction{action: #{inspect(instruction.action)}}"
-
                 {adapter, opts} when is_atom(adapter) ->
                   "→ {#{inspect(adapter)}, #{inspect(opts)}}"
 
                 targets when is_list(targets) ->
-                  "→ [#{Enum.count(targets)} dispatchers]"
+                  "→ [#{Enum.count(targets)} items]"
 
                 other ->
-                  "→ #{inspect(other)}"
+                  # For other targets, show their type or module
+                  case other do
+                    %{__struct__: module} -> "→ %#{inspect(module)}{}"
+                    atom when is_atom(atom) -> "→ #{inspect(atom)}"
+                    _ -> "→ #{inspect(other)}"
+                  end
               end
 
             "  #{route.path}#{matcher_str}#{priority_str} #{target_str}"
