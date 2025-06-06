@@ -321,5 +321,59 @@ defmodule Jido.Runner.SimpleTest do
       assert enqueued.action == :next_action
       assert enqueued.params == %{value: 42}
     end
+
+    test "merges runner timeout with instruction opts (instruction opts take precedence)" do
+      instruction = %Instruction{
+        action: Add,
+        params: %{value: 0, amount: 1},
+        context: %{},
+        # Instruction-specific timeout
+        opts: [timeout: 5000]
+      }
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list([instruction])}
+
+      # Runner provides a different timeout, but instruction timeout should win
+      assert {:ok, %FullFeaturedAgent{} = updated_agent, []} = Simple.run(agent, timeout: 1000)
+      assert updated_agent.result == %{value: 1}
+    end
+
+    test "uses runner timeout when instruction has no timeout" do
+      instruction = %Instruction{
+        action: Add,
+        params: %{value: 0, amount: 1},
+        context: %{},
+        # No timeout in instruction
+        opts: []
+      }
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list([instruction])}
+
+      # Runner timeout should be used
+      assert {:ok, %FullFeaturedAgent{} = updated_agent, []} = Simple.run(agent, timeout: 1000)
+      assert updated_agent.result == %{value: 1}
+    end
+
+    test "merges all opts correctly" do
+      instruction = %Instruction{
+        action: Add,
+        params: %{value: 0, amount: 1},
+        context: %{},
+        # Instruction has some opts
+        opts: [timeout: 5000, retry: true]
+      }
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list([instruction])}
+
+      # Runner provides different opts
+      assert {:ok, %FullFeaturedAgent{} = updated_agent, []} =
+               Simple.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
+
+      assert updated_agent.result == %{value: 1}
+      # The instruction should have received merged opts with instruction opts taking precedence
+    end
   end
 end

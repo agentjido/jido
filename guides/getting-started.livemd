@@ -263,6 +263,29 @@ case Chain.chain([FormatUser, EnrichUserData, NotifyUser], invalid_data) do
 end
 ```
 
+## Configuration
+
+### Global Timeout Settings
+
+By default, Jido actions have a 30-second timeout. You can configure this globally in your application:
+
+```elixir
+# config/config.exs
+config :jido, default_timeout: 60_000  # 60 seconds
+```
+
+### Per-Action Timeouts
+
+You can also set timeouts for individual actions:
+
+```elixir
+# Run with a custom timeout
+{:ok, result} = Jido.Exec.run(FormatUser, %{name: "Alice", email: "alice@example.com", age: 30}, %{}, timeout: 10_000)
+
+# Disable timeout completely for long-running operations
+{:ok, result} = Jido.Exec.run(LongRunningAction, params, %{}, timeout: 0)
+```
+
 ## Next Steps
 
 Now that you understand the basics of Jido actions and workflows, you can:
@@ -271,5 +294,6 @@ Now that you understand the basics of Jido actions and workflows, you can:
 2. Build more complex workflows with branching and conditions
 3. Add error compensation and rollback handling
 4. Create agents that use these actions
+5. Configure timeouts and other execution options for your use case
 
 The complete Jido documentation has more examples and advanced features to explore!

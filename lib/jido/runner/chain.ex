@@ -22,7 +22,8 @@ defmodule Jido.Runner.Chain do
   @type chain_opts :: [
           merge_results: boolean(),
           apply_directives?: boolean(),
-          log_level: atom()
+          log_level: atom(),
+          timeout: non_neg_integer()
         ]
 
   @doc """
@@ -36,6 +37,8 @@ defmodule Jido.Runner.Chain do
     * `opts` - Optional keyword list of execution options:
       * `:merge_results` - When true, merges each result into the next instruction's params (default: true)
       * `:apply_directives?` - When true (default), applies directives during execution
+      * `:timeout` - Timeout in milliseconds for action execution (merged with instruction opts)
+      * `:log_level` - Log level for debugging output
 
   ## Returns
     * `{:ok, updated_agent, directives}` - Chain completed successfully with:
@@ -53,6 +56,9 @@ defmodule Jido.Runner.Chain do
 
       # Chain without applying directives
       {:ok, updated_agent, directives} = Chain.run(agent, apply_directives?: false)
+
+      # Chain with custom timeout (runner opts are merged with instruction opts)
+      {:ok, updated_agent, directives} = Chain.run(agent, timeout: 60_000)
   """
   @impl true
   @spec run(Jido.Agent.t(), chain_opts()) :: chain_result()
@@ -131,11 +137,14 @@ defmodule Jido.Runner.Chain do
         instruction
       end
 
-    # Inject agent state into instruction context
+    # Inject agent state and merge opts with instruction opts
+    # Instruction opts take precedence over runner opts
+    merged_opts = Keyword.merge(opts, instruction.opts)
+
     instruction = %{
       instruction
       | context: Map.put(instruction.context, :state, agent.state),
-        opts: opts
+        opts: merged_opts
     }
 
     dbug("Running action", agent: agent.id, instruction: instruction.id)

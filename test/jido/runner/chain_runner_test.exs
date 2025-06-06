@@ -397,4 +397,105 @@ defmodule Jido.Runner.ChainTest do
       assert next_instruction.params == %{value: 42}
     end
   end
+
+  describe "timeout option handling" do
+    test "merges runner timeout with instruction opts (instruction opts take precedence)" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{},
+          # Instruction-specific timeout
+          opts: [timeout: 5000]
+        },
+        %Instruction{
+          action: Add,
+          params: %{value: 1, amount: 1},
+          context: %{},
+          # No timeout in this instruction
+          opts: []
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      # Runner provides a different timeout, but instruction timeout should win for first instruction
+      assert {:ok, updated_agent, []} = Chain.run(agent, timeout: 1000)
+      assert updated_agent.result == %{value: 2}
+    end
+
+    test "uses runner timeout when instruction has no timeout" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{},
+          # No timeout in instruction
+          opts: []
+        },
+        %Instruction{
+          action: Add,
+          params: %{value: 1, amount: 1},
+          context: %{},
+          # No timeout in instruction
+          opts: []
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      # Runner timeout should be used for all instructions
+      assert {:ok, updated_agent, []} = Chain.run(agent, timeout: 1000)
+      assert updated_agent.result == %{value: 2}
+    end
+
+    test "merges all opts correctly in chain" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{},
+          # Instruction has some opts
+          opts: [timeout: 5000, retry: true]
+        },
+        %Instruction{
+          action: Add,
+          params: %{value: 1, amount: 1},
+          context: %{},
+          # Different timeout
+          opts: [timeout: 2000]
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      # Runner provides different opts, should be merged with instruction opts taking precedence
+      assert {:ok, updated_agent, []} =
+               Chain.run(agent, timeout: 1000, log_level: :debug, apply_directives?: false)
+
+      assert updated_agent.result == %{value: 2}
+      # Each instruction should have received merged opts with instruction opts taking precedence
+    end
+
+    test "works with timeout 0 (no timeout)" do
+      instructions = [
+        %Instruction{
+          action: Add,
+          params: %{value: 0, amount: 1},
+          context: %{},
+          # Disable timeout for this instruction
+          opts: [timeout: 0]
+        }
+      ]
+
+      agent = FullFeaturedAgent.new("test-agent")
+      agent = %{agent | pending_instructions: :queue.from_list(instructions)}
+
+      assert {:ok, updated_agent, []} = Chain.run(agent)
+      assert updated_agent.result == %{value: 1}
+    end
+  end
 end

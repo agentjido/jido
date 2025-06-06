@@ -222,6 +222,7 @@ end
 
 ## Next Steps
 
+- Learn about [Action Configuration](configuration.md) including timeout settings
 - Learn about [Action Workflows](workflows.html)
 - Explore [Testing Actions](testing.html)
 - Understand [Action Directives](directives.html)
@@ -229,6 +230,7 @@ end
 
 ## See Also
 
+- [Action Configuration](configuration.md)
 - [Signal Overview](../signals/overview.livemd)
 - [Agent Overview](../agents/overview.md)
 - [Action Testing](testing.md)

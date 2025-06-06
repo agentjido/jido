@@ -36,6 +36,18 @@ defmodule Jido.Exec do
       # ... do other work ...
       result = Jido.Exec.await(async_ref)
 
+  ## Configuration
+
+  The default timeout for action execution can be configured using the Application environment:
+
+      config :jido, default_timeout: 60_000  # 60 seconds
+
+  If not configured, the default timeout is 30 seconds (30,000 milliseconds).
+
+  Special timeout values:
+  - `timeout: 0` - Disables timeout completely, actions run without time limits
+  - Any positive integer - Sets timeout in milliseconds
+
   """
 
   use Private
@@ -49,7 +61,7 @@ defmodule Jido.Exec do
 
   import Jido.Util, only: [cond_log: 3]
 
-  @default_timeout 5000
+  @default_timeout Application.compile_env(:jido, :default_timeout, 30_000)
   @default_max_retries 1
   @initial_backoff 250
 
@@ -255,7 +267,7 @@ defmodule Jido.Exec do
   ## Parameters
 
   - `async_ref`: The reference returned by `run_async/4`.
-  - `timeout`: Maximum time (in ms) to wait for the result (default: 5000).
+  - `timeout`: Maximum time (in ms) to wait for the result (default: #{@default_timeout}).
 
   ## Returns
 
@@ -273,7 +285,8 @@ defmodule Jido.Exec do
       {:error, %Jido.Error{type: :timeout, message: "Async action timed out after 100ms"}}
   """
   @spec await(async_ref(), timeout()) :: {:ok, map()} | {:error, Error.t()}
-  def await(%{ref: ref, pid: pid}, timeout \\ 5000) do
+  def await(%{ref: ref, pid: pid}, timeout \\ @default_timeout) do
+    timeout = if timeout == 0, do: :infinity, else: timeout
     dbug("Awaiting async action result", ref: ref, pid: pid, timeout: timeout)
 
     receive do
@@ -689,9 +702,9 @@ defmodule Jido.Exec do
         timeout =
           Keyword.get(opts, :timeout) ||
             case compensation_opts do
-              opts when is_list(opts) -> Keyword.get(opts, :timeout, 5_000)
+              opts when is_list(opts) -> Keyword.get(opts, :timeout, @default_timeout)
               %{timeout: timeout} -> timeout
-              _ -> 5_000
+              _ -> @default_timeout
             end
 
         dbug("Starting compensation", action: action, timeout: timeout)
