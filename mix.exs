@@ -85,7 +85,6 @@ defmodule Jido.MixProject do
           "guides/examples/think-plan-act.livemd",
           "guides/examples/multi-agent.livemd"
         ],
-
         Actions: [
           "guides/actions/overview.md",
           "guides/actions/workflows.md",
@@ -139,8 +138,6 @@ defmodule Jido.MixProject do
         {"guides/examples/think-plan-act.livemd", title: "Think-Plan-Act"},
         {"guides/examples/chain-of-thought.livemd", title: "Chain of Thought"},
         {"guides/examples/multi-agent.livemd", title: "Multi-Agent Systems"},
-
-        
 
         # Actions
         {"guides/actions/overview.md", title: "Overview"},
@@ -207,7 +204,6 @@ defmodule Jido.MixProject do
         "Actions: Extra": [
           Jido.Actions.Tool
         ],
-
         Skills: [
           Jido.Skill,
           Jido.Skills.Arithmetic
