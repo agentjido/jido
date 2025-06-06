@@ -41,7 +41,7 @@ Jido Workbench relies on the following packages to extend Jido's capabilities:
 - 🤖 **Agent Data Structures**: Stateless agentic data structures for planning and execution
 - 🔥 **Agent GenServer**: OTP integration for agents, with dynamic supervisors
 - 📡 **Real-time Sensors**: Event-driven data gathering and monitoring
-- 📨 **Signal System**: Comprehensive system for agent and external communication
+
 - 🧠 **Skills**: Reusable, composable behavior modules - Plugins for agents
 - ⚡ **Distributed by Design**: Built for multi-node Elixir clusters
 - 🧪 **Testing Tools**: Rich helpers for unit and property-based testing
@@ -111,11 +111,10 @@ end
 # Start the agent
 {:ok, pid} = MyApp.CalculatorAgent.start_link()
 
-# Synchronous call
-{:ok, result} = MyApp.CalculatorAgent.call(pid, Signal.new!(%{type: "add", data: %{a: 1, b: 2}}))
-
-# Asynchronous call
-{:ok, response_ref} = MyApp.CalculatorAgent.cast(pid, Signal.new!(%{type: "add", data: %{a: 1, b: 2}}))
+# Send instructions directly to the agent
+{:ok, result} = MyApp.CalculatorAgent.cmd(pid, [
+  %Jido.Instruction{action: "add", params: %{a: 1, b: 2}}
+])
 ```
 
 [Learn more about Agents →](guides/agents/overview.md)
@@ -199,7 +198,7 @@ Jido provides several testing helpers:
 - Property-based testing via StreamData
 - Mocking support through Mimic
 - PubSub testing helpers
-- Signal assertion helpers
+
 
 ### Running Tests
 

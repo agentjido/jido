@@ -97,21 +97,20 @@ This enables:
 - Runtime introspection
 - Tool integration
 
-### 4. Event-Driven Messaging
+### 4. Event-Driven Processing
 
-The system is built around event-driven communication using signals:
+The system is built around event-driven communication using actions and instructions:
 
 ```elixir
-# Emit a signal
-{:ok, signal} = Signal.new(%{
-  type: "user.created",
-  source: "/users",
-  data: user_data
-})
+# Create an instruction
+instruction = %Jido.Instruction{
+  action: "process_user",
+  params: %{user_data: user_data, source: "/users"}
+}
 
-# Route based on signal type
-def handle_signal(%Signal{type: "user.created"} = signal) do
-  with {:ok, processed} <- process_user(signal.data),
+# Process instruction through agent
+def run(%{user_data: data}, context) do
+  with {:ok, processed} <- process_user(data),
        {:ok, notification} <- generate_notification(processed) do
     {:ok, notification}
   end
@@ -122,7 +121,7 @@ Key aspects:
 
 - Decoupled components
 - Asynchronous processing
-- Clear signal paths
+- Clear action paths
 - Flexible routing
 
 ### 5. Agents as Dynamic ETL
@@ -249,6 +248,5 @@ Key features:
 
 ## See Also
 
-- [Signal Overview](signals/overview.livemd)
 - [Agent Overview](agents/overview.md)
-- [Testing Guide](signals/testing.md)
+- [Action Overview](actions/overview.md)

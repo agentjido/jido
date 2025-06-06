@@ -159,8 +159,8 @@ defmodule MyApp.Sensors.MetricsCollector do
     metrics = collect_system_metrics(state.metrics_types)
     new_state = %{state | collected_metrics: [metrics | state.collected_metrics]}
     
-    # Emit collected data
-    :ok = emit_signal(:metrics_collected, metrics)
+    # Process collected data
+    Logger.info("Metrics collected: #{inspect(metrics)}")
     
     {:noreply, schedule_collection(new_state)}
   end
@@ -172,25 +172,7 @@ defmodule MyApp.Sensors.MetricsCollector do
 end
 ```
 
-### 4. Signals - Communication System
 
-Signals handle inter-component communication:
-
-```elixir
-# Creating and sending signals
-signal = Jido.Signal.new!(%{
-  type: :data_processed,
-  data: %{result: processed_data, timestamp: DateTime.utc_now()},
-  source: "workflow_agent",
-  target: "notification_agent"
-})
-
-# Route to specific agent
-{:ok, response} = Jido.Signal.route(signal, target_agent_pid)
-
-# Broadcast to multiple subscribers
-:ok = Jido.Signal.broadcast(signal, topic: "data_events")
-```
 
 ## OTP Integration Patterns
 
@@ -204,8 +186,7 @@ defmodule MyApp.Application do
 
   def start(_type, _args) do
     children = [
-      # Start the signal bus
-      {Jido.Signal.Bus, []},
+
       
       # Agent supervisor for dynamic agents
       {DynamicSupervisor, name: MyApp.AgentSupervisor, strategy: :one_for_one},

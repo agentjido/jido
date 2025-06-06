@@ -17,7 +17,7 @@ Each guide should align with Jido's main documentation sections:
 - Getting Started
 - About Jido
 - Examples
-- Signals
+
 - Actions
 - Sensors
 - Agents
@@ -28,13 +28,13 @@ Each guide should align with Jido's main documentation sections:
 ### 1. Foundational Concepts
 
 - Basic agent terminology
-- Simple signal flows
+- Simple action flows
 - First actions and workflows
 - Understanding agent lifecycles
 
 ### 2. Core Mechanics
 
-- Signal routing and dispatch
+- Action routing and dispatch
 - Action composition
 - Sensor basics
 - State management
@@ -141,7 +141,7 @@ If the guide is a good fit for a Livebook, add the following snippet to the top 
 > ### Learn with Livebook {: .tip}
 >
 > This guide is available as a Livebook. The examples below can be run interactively.
-> [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fagentjido%2Fjido%2Fblob%2Fmain%2Fguides%2Fsignals%2Foverview.livemd)
+> [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fagentjido%2Fjido%2Fblob%2Fmain%2Fguides%2Fgetting-started.livemd)
 
 <!-- livebook:{"disable_formatting":true} -->
 
@@ -180,13 +180,7 @@ Mix.install([
 {"guides/examples/think-plan-act.livemd", title: "Think-Plan-Act"},
 {"guides/examples/multi-agent.livemd", title: "Multi-Agent Systems"},
 
-# Signals
 
-{"guides/signals/overview.md", title: "Overview"},
-{"guides/signals/routing.md", title: "Routing"},
-{"guides/signals/dispatching.md", title: "Dispatching"},
-{"guides/signals/bus.md", title: "Signal Bus"},
-{"guides/signals/serialization.md", title: "Serialization"},
 
 # Actions
 
