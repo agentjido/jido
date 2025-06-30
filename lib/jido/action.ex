@@ -257,6 +257,8 @@ defmodule Jido.Action do
 
       alias Jido.Action
       alias Jido.Instruction
+
+      @type action_result :: Jido.Action.action_result()
       alias Jido.Signal
 
       require OK
@@ -405,7 +407,7 @@ defmodule Jido.Action do
 
           The `run/2` function must be implemented in the module using Jido.Action.
           """
-          @spec run(map(), map()) :: {:ok, map()} | {:error, any()}
+          @spec run(map(), map()) :: action_result()
           def run(params, context) do
             "run/2 must be implemented in in your Action"
             |> Error.config_error()
@@ -434,6 +436,15 @@ defmodule Jido.Action do
     end
   end
 
+  # Type definitions for Action results
+  @type directive :: Jido.Agent.Directive.t()
+  @type directive_list :: [directive()]
+  @type action_result ::
+          {:ok, map()}
+          | {:ok, map(), directive() | directive_list()}
+          | {:error, any()}
+          | {:error, any(), directive() | directive_list()}
+
   @doc """
   Executes the Action with the given parameters and context.
 
@@ -442,15 +453,33 @@ defmodule Jido.Action do
   ## Parameters
 
   - `params`: A map of validated input parameters.
-  - `context`: A map containing any additional context for the .
+  - `context`: A map containing any additional context for the action.
 
   ## Returns
 
-  - `{:ok, result}` where `result` is a map containing the 's output.
-  - `{:error, reason}` where `reason` describes why the  failed.
+  Actions can return results in two patterns:
+
+  ### Simple Pattern (2-tuple)
+  - `{:ok, result}` where `result` is a map containing the action's output.
+  - `{:error, reason}` where `reason` describes why the action failed.
+
+  ### Directive Pattern (3-tuple)
+  For actions that need to modify agent state or trigger other operations:
+  - `{:ok, result, directives}` where `directives` is a single directive or list of directives.
+  - `{:error, reason, directives}` where the error includes directives for compensation or cleanup.
+
+  ## Directives
+
+  Directives are instructions that tell the agent runtime to perform additional operations:
+  - State modifications (set, update, delete values)
+  - Action enqueueing (add new actions to the queue)
+  - Process management (spawn/kill child processes)
+  - Action registration/deregistration
+
+  Basic actions typically use the 2-tuple pattern, while workflow and state management
+  actions use the 3-tuple pattern with directives.
   """
-  @callback run(params :: map(), context :: map()) ::
-              {:ok, map()} | {:error, any()}
+  @callback run(params :: map(), context :: map()) :: action_result()
 
   @doc """
   Called before parameter validation.

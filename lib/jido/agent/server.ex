@@ -178,7 +178,8 @@ defmodule Jido.Agent.Server do
          opts = Keyword.put(opts, :agent, agent),
          {:ok, opts} <- ServerOptions.validate_server_opts(opts),
          {:ok, state} <- build_initial_state_from_opts(opts),
-         {:ok, state} <- register_actions(state, opts[:actions]),
+         actions <- Keyword.get(opts, :actions, []),
+         {:ok, state} <- register_actions(state, actions),
          {:ok, state, opts} <- ServerSkills.build(state, opts),
          {:ok, state} <- ServerRouter.build(state, opts),
          {:ok, state, _pids} <- ServerProcess.start(state, opts[:child_specs]),
@@ -328,7 +329,6 @@ defmodule Jido.Agent.Server do
   def handle_info(:process_queue, state) do
     case ServerRuntime.process_signals_in_queue(state) do
       {:ok, new_state} -> {:noreply, new_state}
-      {:error, _reason} -> {:noreply, state}
     end
   end
 
@@ -475,7 +475,7 @@ defmodule Jido.Agent.Server do
     end
   end
 
-  @spec build_initial_state_from_opts(keyword()) :: {:ok, ServerState.t()}
+  @spec build_initial_state_from_opts(Keyword.t()) :: {:ok, ServerState.t()}
   defp build_initial_state_from_opts(opts) do
     dbug("Building initial state from options", opts: opts)
 
@@ -487,6 +487,7 @@ defmodule Jido.Agent.Server do
       max_queue_size: opts[:max_queue_size],
       registry: opts[:registry],
       dispatch: opts[:dispatch],
+      router: Jido.Signal.Router.new!(),
       skills: []
     }
 
@@ -540,7 +541,13 @@ defmodule Jido.Agent.Server do
     end
   end
 
-  @spec register_actions(ServerState.t(), [module()]) :: {:ok, ServerState.t()} | {:error, term()}
+  @spec register_actions(ServerState.t(), [module()] | module()) ::
+          {:ok, ServerState.t()} | {:error, Jido.Error.t()}
+  defp register_actions(%ServerState{} = state, provided_actions)
+       when is_atom(provided_actions) do
+    register_actions(state, [provided_actions])
+  end
+
   defp register_actions(%ServerState{} = state, provided_actions)
        when is_list(provided_actions) do
     dbug("Registering actions with agent",
@@ -566,6 +573,4 @@ defmodule Jido.Agent.Server do
         {:error, reason}
     end
   end
-
-  defp register_actions(state, _), do: {:ok, state}
 end

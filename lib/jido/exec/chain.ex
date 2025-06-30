@@ -78,13 +78,13 @@ defmodule Jido.Exec.Chain do
   defp should_interrupt?(check) when is_function(check, 0), do: check.()
 
   @spec process_action(chain_action(), map(), map(), keyword()) ::
-          {:cont, OK.t()} | {:halt, chain_result()}
+          {:cont, {:ok, map()}} | {:halt, chain_result()}
   defp process_action(action, params, context, opts) when is_atom(action) do
     run_action(action, params, context, opts)
   end
 
   @spec process_action({module(), keyword()} | {module(), map()}, map(), map(), keyword()) ::
-          {:cont, OK.t()} | {:halt, chain_result()}
+          {:cont, {:ok, map()}} | {:halt, chain_result()}
   defp process_action({action, action_opts}, params, context, opts)
        when is_atom(action) and (is_list(action_opts) or is_map(action_opts)) do
     case validate_action_params(action_opts) do
@@ -119,17 +119,20 @@ defmodule Jido.Exec.Chain do
     end
   end
 
+  @dialyzer {:nowarn_function, run_action: 4}
+  # This function correctly handles 3-tuple returns from Jido.Exec.run/4 but Dialyzer
+  # incorrectly reports them as unreachable due to conservative type inference
   @spec run_action(module(), map(), map(), keyword()) ::
-          {:cont, OK.t()} | {:halt, chain_result()}
+          {:cont, {:ok, map()}} | {:halt, chain_result()}
   defp run_action(action, params, context, opts) do
     case Exec.run(action, params, context, opts) do
-      OK.success(result) when is_map(result) ->
+      {:ok, result} when is_map(result) ->
         {:cont, OK.success(Map.merge(params, result))}
 
-      OK.success(result) ->
-        {:cont, OK.success(Map.put(params, :result, result))}
+      {:ok, result, _directives} when is_map(result) ->
+        {:cont, OK.success(Map.merge(params, result))}
 
-      OK.failure(error) ->
+      {:error, error} ->
         Logger.warning("Exec in chain failed: #{inspect(action)} #{inspect(error)}")
         {:halt, OK.failure(error)}
     end

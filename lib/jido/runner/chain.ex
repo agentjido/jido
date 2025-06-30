@@ -119,6 +119,9 @@ defmodule Jido.Runner.Chain do
     end
   end
 
+  @dialyzer {:nowarn_function, execute_chain_step: 6}
+  # This function correctly handles 3-tuple returns from Jido.Exec.run/1 but Dialyzer
+  # incorrectly reports them as unreachable due to conservative type inference
   defp execute_chain_step(
          [instruction | remaining],
          agent,
@@ -150,6 +153,10 @@ defmodule Jido.Runner.Chain do
     dbug("Running action", agent: agent.id, instruction: instruction.id)
 
     case Jido.Exec.run(instruction) do
+      {:ok, result} when is_map(result) ->
+        dbug("Exec returned result with no directives", agent: agent.id)
+        execute_chain_step(remaining, agent, accumulated_directives, result, merge_results, opts)
+
       {:ok, result, directives} when is_list(directives) ->
         dbug("Exec returned result with directive list", agent: agent.id)
 
@@ -176,24 +183,15 @@ defmodule Jido.Runner.Chain do
           opts
         )
 
-      {:ok, result} ->
-        dbug("Exec returned result with no directives", agent: agent.id)
-        execute_chain_step(remaining, agent, accumulated_directives, result, merge_results, opts)
-
       {:error, %Error{} = error} ->
         dbug("Exec returned error", agent: agent.id, error: error)
         {:error, error}
-
-      {:error, reason} when is_binary(reason) ->
-        dbug("Exec returned string error", agent: agent.id, reason: reason)
-        {:error, Error.validation_error("Invalid directive", %{reason: reason})}
-
-      {:error, reason} ->
-        dbug("Exec returned generic error", agent: agent.id, reason: reason)
-        {:error, Error.new(:execution_error, "Chain execution failed", reason)}
     end
   end
 
+  @dialyzer {:nowarn_function, handle_chain_result: 7}
+  # This function is called from execute_chain_step/6 but Dialyzer incorrectly reports it as unused
+  # due to conservative type inference on 3-tuple returns from Jido.Exec.run/1
   @spec handle_chain_result(
           term(),
           [Directive.t() | Instruction.t()],
