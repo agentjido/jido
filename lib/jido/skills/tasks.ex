@@ -30,10 +30,26 @@ defmodule Jido.Skills.Tasks do
 
   def router(_opts) do
     [
-      {"jido.cmd.task.create", %Instruction{action: CreateTask}},
-      {"jido.cmd.task.update", %Instruction{action: UpdateTask}},
-      {"jido.cmd.task.toggle", %Instruction{action: ToggleTask}},
-      {"jido.cmd.task.delete", %Instruction{action: DeleteTask}}
+      %Jido.Signal.Router.Route{
+        path: "jido.cmd.task.create",
+        target: %Instruction{action: CreateTask},
+        priority: 0
+      },
+      %Jido.Signal.Router.Route{
+        path: "jido.cmd.task.update",
+        target: %Instruction{action: UpdateTask},
+        priority: 0
+      },
+      %Jido.Signal.Router.Route{
+        path: "jido.cmd.task.toggle",
+        target: %Instruction{action: ToggleTask},
+        priority: 0
+      },
+      %Jido.Signal.Router.Route{
+        path: "jido.cmd.task.delete",
+        target: %Instruction{action: DeleteTask},
+        priority: 0
+      }
     ]
   end
 end

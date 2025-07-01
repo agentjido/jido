@@ -1,0 +1,33 @@
+[
+  %{
+    :filename => "lib/jido/agent/server.ex",
+    :line => 478,
+    :id => :invalid_contract,
+    :info => {:invalid_contract,
+              [{:"Jido.Agent.Server",:"build_initial_state_from_opts",1}]}
+  },
+  
+  %{
+    :filename => "lib/jido/agent/server.ex", 
+    :line => 544,
+    :id => :invalid_contract,
+    :info => {:invalid_contract,
+              [{:"Jido.Agent.Server",:"register_actions",2}]}
+  },
+  
+  %{
+    :filename => "lib/jido/agent/server.ex",
+    :line => 182, 
+    :id => :call,
+    :info => {:call,
+              [{:"Jido.Agent.Server",:"register_actions",2}]}
+  },
+  
+  %{
+    :filename => "lib/jido/agent/server.ex",
+    :line => 546,
+    :id => :call, 
+    :info => {:call,
+              [{:"Jido.Agent.Server",:"register_actions",2}]}
+  }
+]

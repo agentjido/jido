@@ -41,16 +41,15 @@ defmodule Jido.Sensors.Heartbeat do
   def deliver_signal(state) do
     now = DateTime.utc_now()
 
-    {:ok,
-     Jido.Signal.new(%{
-       source: "#{state.sensor.name}:#{state.id}",
-       type: "heartbeat",
-       data: %{
-         message: state.config.message,
-         timestamp: now,
-         last_beat: state.last_beat
-       }
-     })}
+    Jido.Signal.new(%{
+      source: "#{state.sensor.name}:#{state.id}",
+      type: "heartbeat",
+      data: %{
+        message: state.config.message,
+        timestamp: now,
+        last_beat: state.last_beat
+      }
+    })
   end
 
   @impl GenServer

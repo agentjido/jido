@@ -65,7 +65,7 @@ defmodule Jido.Exec do
   @default_max_retries 1
   @initial_backoff 250
 
-  @type action :: module()
+  @type action :: module() | Instruction.t()
   @type params :: map()
   @type context :: map()
   @type run_opts :: [timeout: non_neg_integer()]
@@ -120,7 +120,14 @@ defmodule Jido.Exec do
       #   end
       # end
   """
-  @spec run(action(), params(), context(), run_opts()) :: {:ok, map()} | {:error, Error.t()}
+  @spec run(action()) ::
+          {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
+  @spec run(action(), params()) ::
+          {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
+  @spec run(action(), params(), context()) ::
+          {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
+  @spec run(action(), params(), context(), run_opts()) ::
+          {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
   def run(action, params \\ %{}, context \\ %{}, opts \\ [])
 
   def run(action, params, context, opts) when is_atom(action) and is_list(opts) do
@@ -152,11 +159,6 @@ defmodule Jido.Exec do
         dbug("Error in action setup", error: reason)
         cond_log(log_level, :debug, "Action Execution failed: #{inspect(reason)}")
         OK.failure(reason)
-
-      {:error, reason, other} ->
-        dbug("Error with additional info in action setup", error: reason, other: other)
-        cond_log(log_level, :debug, "Action Execution failed with directive: #{inspect(reason)}")
-        {:error, reason, other}
     end
   rescue
     e in [FunctionClauseError, BadArityError, BadFunctionError] ->
@@ -193,6 +195,8 @@ defmodule Jido.Exec do
       OK.failure(Error.internal_server_error("Caught #{kind}: #{inspect(reason)}"))
   end
 
+  @spec run(Instruction.t(), any(), any(), any()) ::
+          {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
   def run(%Instruction{} = instruction, _params, _context, _opts) do
     dbug("Running instruction", instruction: instruction)
 
@@ -476,7 +480,8 @@ defmodule Jido.Exec do
             non_neg_integer(),
             non_neg_integer(),
             non_neg_integer()
-          ) :: {:ok, map()} | {:error, Error.t()}
+          ) ::
+            {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
     defp do_run_with_retry(action, params, context, opts, retry_count, max_retries, backoff) do
       dbug("Attempting run", action: action, retry_count: retry_count)
 
@@ -561,7 +566,7 @@ defmodule Jido.Exec do
     end
 
     @spec do_run(action(), params(), context(), run_opts()) ::
-            {:ok, map()} | {:error, Error.t()}
+            {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
     defp do_run(action, params, context, opts) do
       timeout = Keyword.get(opts, :timeout)
       telemetry = Keyword.get(opts, :telemetry, :full)
@@ -799,7 +804,7 @@ defmodule Jido.Exec do
     end
 
     @spec execute_action_with_timeout(action(), params(), context(), non_neg_integer()) ::
-            {:ok, map()} | {:error, Error.t()}
+            {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
     defp execute_action_with_timeout(action, params, context, timeout, opts \\ [])
 
     defp execute_action_with_timeout(action, params, context, 0, opts) do
@@ -927,7 +932,7 @@ Debug info:
     end
 
     @spec execute_action(action(), params(), context(), run_opts()) ::
-            {:ok, map()} | {:error, Error.t()}
+            {:ok, map()} | {:ok, map(), any()} | {:error, Error.t()} | {:error, Error.t(), any()}
     defp execute_action(action, params, context, opts) do
       log_level = Keyword.get(opts, :log_level, :info)
       dbug("Executing action", action: action, params: params, context: context)
