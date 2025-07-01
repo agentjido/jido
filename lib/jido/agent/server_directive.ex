@@ -229,10 +229,6 @@ defmodule Jido.Agent.Server.Directive do
       {:error, :not_found} ->
         dbug("Process not found", pid: pid)
         {:error, Error.execution_error("Process not found", %{pid: pid})}
-
-      {:error, reason} ->
-        dbug("Failed to terminate process", pid: pid, reason: reason)
-        {:error, Error.execution_error("Failed to terminate process", %{reason: reason})}
     end
   end
 

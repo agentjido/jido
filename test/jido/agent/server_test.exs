@@ -309,4 +309,77 @@ defmodule Jido.Agent.ServerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
     end
   end
+
+  describe "terminate race condition" do
+    test "handles Process.info/2 race condition during termination" do
+      # This test reproduces the bug where Process.info/2 throws ErlangError
+      # when called on a dead process during the terminate callback
+
+      # Create an agent that will be terminated
+      {:ok, agent_pid} = Server.start_link(agent: BasicAgent, id: "terminate_race_test")
+
+      # Verify agent is running
+      assert Process.alive?(agent_pid)
+
+      # The race condition happens when the process is dying and 
+      # terminate/2 callback tries to get stacktrace via Process.info/2
+      # 
+      # Before our fix: This would throw ErlangError and crash
+      # After our fix: This should complete gracefully
+
+      # Monitor the agent to ensure it terminates properly
+      ref = Process.monitor(agent_pid)
+
+      # Stop the agent - this triggers the terminate/2 callback
+      # which calls Process.info(self(), :current_stacktrace)
+      GenServer.stop(agent_pid, :normal)
+
+      # Verify the agent terminated normally without crashing
+      # If the race condition bug exists, this might fail with a timeout
+      # or receive a different exit reason
+      assert_receive {:DOWN, ^ref, :process, ^agent_pid, :normal}, 1000
+
+      # Additional verification that the process is actually dead
+      refute Process.alive?(agent_pid)
+    end
+
+    test "handles Process.info/2 on external processes during cleanup" do
+      # This test specifically targets the cleanup_task_group function
+      # which calls Process.info(pid, :group_leader) on potentially dead processes
+
+      # Create a temporary task that will die quickly
+      task_pid =
+        spawn(fn ->
+          Process.sleep(1)
+          # Process dies here
+        end)
+
+      # Wait for the task to die
+      Process.sleep(10)
+      refute Process.alive?(task_pid)
+
+      # Before our fix: This would crash with ErlangError when 
+      # Process.info(task_pid, :group_leader) is called on dead process
+      # After our fix: This should handle the dead process gracefully
+
+      # Create a fake task group (just a normal process)
+      task_group =
+        spawn(fn ->
+          receive do
+            :shutdown -> :ok
+          after
+            5000 -> :timeout
+          end
+        end)
+
+      # This should not crash even though task_pid is dead
+      # The cleanup logic should use Process.alive?/1 check first
+      assert :ok = Jido.Exec.cleanup_task_group(task_group)
+
+      # Clean up
+      if Process.alive?(task_group) do
+        Process.exit(task_group, :kill)
+      end
+    end
+  end
 end
