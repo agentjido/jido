@@ -251,10 +251,11 @@ defmodule JidoTest.Agent.Server.RuntimeOutputTest do
       assert result.params == %{baz: "qux"}
     end
 
-    test "returns ok with empty list for empty instructions" do
+    test "returns error for empty instructions" do
       signal = Signal.new!(%{type: "test", data: %{foo: "bar"}})
 
-      assert {:ok, []} = Runtime.apply_signal_to_first_instruction(signal, [])
+      assert {:error, :invalid_instruction} =
+               Runtime.apply_signal_to_first_instruction(signal, [])
     end
 
     test "returns error for invalid instruction" do

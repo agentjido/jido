@@ -111,9 +111,9 @@ defmodule Jido.Agent.Server.State do
     field(:skills, [Jido.Skill.t()], default: [])
 
     # Pids for the local supervisor, parent and
-    field(:child_supervisor, pid())
-    field(:parent_pid, pid())
-    field(:orchestrator_pid, pid())
+    field(:child_supervisor, pid() | nil, default: nil)
+    field(:parent_pid, pid() | nil, default: nil)
+    field(:orchestrator_pid, pid() | nil, default: nil)
 
     # Runtime status
     field(:status, status(), default: :idle)

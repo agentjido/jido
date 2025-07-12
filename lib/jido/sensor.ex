@@ -99,8 +99,10 @@ defmodule Jido.Sensor do
                                        ]
                                      )
 
+  @type sensor_result :: {:ok, Jido.Signal.t()} | {:error, any()}
+
   @callback mount(map()) :: {:ok, map()} | {:error, any()}
-  @callback deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
+  @callback deliver_signal(map()) :: sensor_result()
   @callback on_before_deliver(Jido.Signal.t(), map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   @callback shutdown(map()) :: {:ok, map()} | {:error, any()}
 

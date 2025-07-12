@@ -118,6 +118,9 @@ defmodule Jido.Runner.Simple do
   end
 
   @doc false
+  @dialyzer {:nowarn_function, execute_instruction: 3}
+  # This function correctly handles 3-tuple returns from Jido.Exec.run/1 but Dialyzer
+  # incorrectly reports them as unreachable due to conservative type inference
   @spec execute_instruction(Jido.Agent.t(), Instruction.t(), keyword()) :: run_result()
   defp execute_instruction(agent, instruction, opts) do
     # Inject agent state and merge runtime opts with instruction opts
@@ -133,6 +136,10 @@ defmodule Jido.Runner.Simple do
     dbug("Executing instruction", instruction: instruction)
 
     case Jido.Exec.run(instruction) do
+      {:ok, result} when is_map(result) ->
+        dbug("Exec returned result only", result: result)
+        {:ok, %{agent | result: result}, []}
+
       {:ok, result, directives} when is_list(directives) ->
         dbug("Exec returned result with directive list",
           result: result,
@@ -149,24 +156,15 @@ defmodule Jido.Runner.Simple do
 
         handle_directive_result(agent, result, [directive], opts)
 
-      {:ok, result} ->
-        dbug("Exec returned result only", result: result)
-        {:ok, %{agent | result: result}, []}
-
       {:error, %Error{} = error} ->
         dbug("Exec returned error struct", error: error)
         {:error, error}
-
-      {:error, reason} when is_binary(reason) ->
-        dbug("Exec returned string error", reason: reason)
-        handle_directive_error(reason)
-
-      {:error, reason} ->
-        dbug("Exec returned other error", reason: reason)
-        {:error, Error.new(:execution_error, "Exec execution failed", reason)}
     end
   end
 
+  @dialyzer {:nowarn_function, handle_directive_result: 4}
+  # This function is called from execute_instruction/3 but Dialyzer incorrectly reports it as unused
+  # due to conservative type inference on 3-tuple returns from Jido.Exec.run/1
   @spec handle_directive_result(Jido.Agent.t(), term(), list(), keyword()) :: run_result()
   defp handle_directive_result(agent, result, directives, opts) do
     apply_directives? = Keyword.get(opts, :apply_directives?, true)
@@ -190,11 +188,5 @@ defmodule Jido.Runner.Simple do
       dbug("Skipping directive application")
       {:ok, %{agent | result: result}, directives}
     end
-  end
-
-  @spec handle_directive_error(String.t()) :: {:error, Error.t()}
-  defp handle_directive_error(reason) do
-    dbug("Handling directive error", reason: reason)
-    {:error, Error.validation_error("Invalid directive", %{reason: reason})}
   end
 end

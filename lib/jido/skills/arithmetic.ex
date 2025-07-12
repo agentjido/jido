@@ -155,44 +155,38 @@ defmodule Jido.Skills.Arithmetic do
     * arithmetic.result: Result of arithmetic operation
     * arithmetic.error: Error from arithmetic operation
   """
-  @spec router() :: [map()]
+  @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
   def router(_opts \\ []) do
     [
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.add",
-        instruction: %{
-          action: Actions.Add
-        }
+        target: %Jido.Instruction{action: Actions.Add},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.subtract",
-        instruction: %{
-          action: Actions.Subtract
-        }
+        target: %Jido.Instruction{action: Actions.Subtract},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.multiply",
-        instruction: %{
-          action: Actions.Multiply
-        }
+        target: %Jido.Instruction{action: Actions.Multiply},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.divide",
-        instruction: %{
-          action: Actions.Divide
-        }
+        target: %Jido.Instruction{action: Actions.Divide},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.square",
-        instruction: %{
-          action: Actions.Square
-        }
+        target: %Jido.Instruction{action: Actions.Square},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.eval",
-        instruction: %{
-          action: Actions.Eval
-        }
+        target: %Jido.Instruction{action: Actions.Eval},
+        priority: 0
       }
     ]
   end
