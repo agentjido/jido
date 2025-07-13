@@ -233,10 +233,18 @@ defmodule Jido.Agent.Server.Process do
   end
 
   defp convert_child_spec({module, args}) when is_atom(module) and is_list(args) do
+    start_args =
+      if Keyword.keyword?(args) do
+        # Wrap keyword list in a list
+        [args]
+      else
+        args
+      end
+
     {:ok,
      %{
        id: module,
-       start: {module, :start_link, args},
+       start: {module, :start_link, start_args},
        type: :worker,
        restart: :permanent
      }}
