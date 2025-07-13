@@ -65,6 +65,21 @@ defmodule Jido.Agent.Server.ProcessTest do
       assert signal.data.child_spec == child_spec
     end
 
+    test "starts a child process with keyword list args and emits signal", %{state: state} do
+      child_spec = {Jido.Signal.Bus, [name: :test_bus]}
+
+      assert {:ok, %ServerState{}, pid} = ServerProcess.start(state, child_spec)
+      assert Process.alive?(pid)
+
+      assert_receive {:signal, signal}
+      assert signal.type == ServerSignal.join_type(ServerSignal.type({:event, :process_started}))
+      assert signal.data.child_pid == pid
+      assert signal.data.child_spec == child_spec
+
+      # Verify the bus was started with the correct name
+      assert {:ok, ^pid} = Jido.Signal.Util.whereis(:test_bus)
+    end
+
     test "starts multiple child processes with mixed formats", %{state: state} do
       child_specs = [
         %{id: :test_child1, start: {Task, :start_link, [fn -> Process.sleep(:infinity) end]}},
