@@ -102,10 +102,7 @@ defmodule Jido.Agent.Server.Skills do
             # Validate routes
             if is_list(new_routes) do
               # Get child_spec from the skill
-              skill_child_spec = skill.child_spec(validated_opts)
-
-              new_child_specs =
-                if is_list(skill_child_spec), do: skill_child_spec, else: [skill_child_spec]
+              new_child_specs = List.wrap(skill.child_spec(validated_opts))
 
               dbug("Got skill child specs", child_specs: new_child_specs)
 
