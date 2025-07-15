@@ -92,6 +92,18 @@ defmodule Jido.Sensors.Cron do
     {:ok, state}
   end
 
+  @impl true
+  def deliver_signal(state) do
+    Jido.Signal.new(%{
+      source: "#{Map.get(state.sensor, :name)}:#{state.id}",
+      type: "cron_sensor_signal",
+      data: %{
+        scheduler: state.config.scheduler,
+        timestamp: DateTime.utc_now()
+      }
+    })
+  end
+
   @doc """
   Adds a new cron job with the given name, schedule, and task.
 
@@ -170,11 +182,15 @@ defmodule Jido.Sensors.Cron do
       |> Quantum.Job.set_name(name)
       |> Quantum.Job.set_schedule(schedule)
       |> Quantum.Job.set_task(fn ->
-        signal = build_signal(state, name, schedule, task)
-        # Dispatch the signal through Jido and unwrap the {:ok, signal} tuple
-        case Jido.Signal.Dispatch.dispatch(signal, state.target) do
-          {:ok, dispatched_signal} -> dispatched_signal
-          other -> other
+        case build_signal(state, name, schedule, task) do
+          {:ok, signal} ->
+            case Jido.Signal.Dispatch.dispatch(signal, state.target) do
+              :ok -> :ok
+              other -> other
+            end
+
+          {:error, reason} ->
+            {:error, reason}
         end
       end)
 

@@ -564,8 +564,13 @@ defmodule Jido.Error do
   """
   @spec capture_stacktrace() :: list()
   def capture_stacktrace do
-    {:current_stacktrace, stacktrace} = Process.info(self(), :current_stacktrace)
-    Enum.drop(stacktrace, 2)
+    try do
+      {:current_stacktrace, stacktrace} = Process.info(self(), :current_stacktrace)
+      Enum.drop(stacktrace, 2)
+    rescue
+      ErlangError ->
+        []
+    end
   end
 
   @doc """
