@@ -11,7 +11,8 @@ defmodule Jido.Agent.Server.SkillsTest do
   alias JidoTest.TestSkills.{
     MockSkill,
     MockSkillWithSchema,
-    MockSkillWithMount
+    MockSkillWithMount,
+    MockSkillWithListChildSpecs
   }
 
   describe "build/2" do
@@ -155,6 +156,64 @@ defmodule Jido.Agent.Server.SkillsTest do
 
       # Verify the action was registered
       assert Enum.member?(updated_state.agent.actions, JidoTest.TestActions.BasicAction)
+    end
+
+    test "correctly handles skills that return list of child specs", %{state: state} do
+      # Create a mock skill that returns a list of child specs
+
+      opts = [skills: [MockSkillWithListChildSpecs]]
+
+      assert {:ok, updated_state, updated_opts} = Skills.build(state, opts)
+      assert [MockSkillWithListChildSpecs] == updated_state.skills
+
+      # Check that child_specs are properly flattened (not nested)
+      child_specs = Keyword.get(updated_opts, :child_specs)
+      assert is_list(child_specs)
+      assert length(child_specs) == 2
+
+      # Verify they are proper child specs (not nested lists)
+      Enum.each(child_specs, fn spec ->
+        assert is_tuple(spec)
+        assert tuple_size(spec) == 2
+      end)
+    end
+
+    test "correctly handles skills that return single child spec", %{state: state} do
+      # Use MockSkill which returns a single child spec
+      opts = [skills: [MockSkill]]
+
+      assert {:ok, updated_state, updated_opts} = Skills.build(state, opts)
+      assert [MockSkill] == updated_state.skills
+
+      # Check that single child_spec is properly wrapped in a list
+      child_specs = Keyword.get(updated_opts, :child_specs)
+      assert is_list(child_specs)
+      assert length(child_specs) == 1
+
+      # Verify it's a proper child spec (not nested list)
+      [child_spec] = child_specs
+      assert is_map(child_spec)
+      assert Map.has_key?(child_spec, :id)
+      assert Map.has_key?(child_spec, :start)
+    end
+
+    test "handles mixed skills with different child_spec return types", %{state: state} do
+      opts = [skills: [MockSkill, MockSkillWithListChildSpecs]]
+
+      assert {:ok, updated_state, updated_opts} = Skills.build(state, opts)
+      assert length(updated_state.skills) == 2
+
+      # Check that all child_specs are properly flattened
+      child_specs = Keyword.get(updated_opts, :child_specs)
+      assert is_list(child_specs)
+      # 1 from MockSkill + 2 from MockSkillWithListChildSpecs
+      assert length(child_specs) == 3
+
+      # Verify none are nested lists
+      Enum.each(child_specs, fn spec ->
+        refute is_list(spec)
+        assert is_tuple(spec) or is_map(spec)
+      end)
     end
   end
 end

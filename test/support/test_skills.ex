@@ -300,6 +300,22 @@ defmodule JidoTest.TestSkills do
     end
   end
 
+  defmodule MockSkillWithListChildSpecs do
+    @moduledoc false
+    use Jido.Skill,
+      name: "mock_skill_with_list_child_specs",
+      description: "Mock skill with list of child specs",
+      opts_key: :mock_skill_with_list_child_specs
+
+    @impl true
+    def child_spec(_opts \\ []) do
+      [
+        {Task, [fn -> :ok end]},
+        {Agent, [fn -> %{} end]}
+      ]
+    end
+  end
+
   # Mock skill with router function
   defmodule MockSkillWithRouter do
     @moduledoc """
