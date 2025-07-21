@@ -39,8 +39,7 @@ defmodule JidoTest.AgentPlanTest do
       assert {:error, error} = BasicAgent.plan(agent, UnregisteredAction, %{})
       assert error.type == :config_error
 
-      assert error.message =~
-               "Action: Elixir.UnregisteredAction not registered with agent basic_agent"
+      assert error.message =~ "Actions not allowed: Elixir.UnregisteredAction"
     end
 
     test "preserves existing instructions when planning new ones", %{agent: agent} do
@@ -138,7 +137,7 @@ defmodule JidoTest.AgentPlanTest do
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
       assert error.type == :config_error
-      assert error.message =~ "Action not registered"
+      assert error.message =~ "Actions not allowed"
     end
 
     test "handles invalid action format in list", %{agent: agent} do
