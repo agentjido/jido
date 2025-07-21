@@ -2,7 +2,7 @@ defmodule Jido.Agent.Server.OptionsTest do
   use JidoTest.Case, async: true
   alias Jido.Agent.Server.Options
   alias JidoTest.TestAgents.{MinimalAgent, BasicAgent}
-  alias Jido.Actions.Basic.{Log, Sleep, Noop}
+  alias Jido.Tools.Basic.{Log, Sleep, Noop}
 
   describe "validate_server_opts/1" do
     test "validates minimal valid options" do

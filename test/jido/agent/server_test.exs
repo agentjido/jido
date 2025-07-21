@@ -61,9 +61,9 @@ defmodule Jido.Agent.ServerTest do
       registered_actions = Jido.Agent.registered_actions(state.agent)
 
       # Verify some of the default actions are registered
-      assert Jido.Actions.Basic.Log in registered_actions
-      assert Jido.Actions.Basic.Noop in registered_actions
-      assert Jido.Actions.Basic.Sleep in registered_actions
+      assert Jido.Tools.Basic.Log in registered_actions
+      assert Jido.Tools.Basic.Noop in registered_actions
+      assert Jido.Tools.Basic.Sleep in registered_actions
     end
 
     test "registers provided actions with agent" do
@@ -81,7 +81,7 @@ defmodule Jido.Agent.ServerTest do
       assert TestAction in registered_actions
 
       # Default actions should still be registered
-      assert Jido.Actions.Basic.Log in registered_actions
+      assert Jido.Tools.Basic.Log in registered_actions
     end
 
     test "merges actions with existing agent actions" do
@@ -116,7 +116,7 @@ defmodule Jido.Agent.ServerTest do
       assert ServerAction in registered_actions
 
       # Default actions should also be registered
-      assert Jido.Actions.Basic.Log in registered_actions
+      assert Jido.Tools.Basic.Log in registered_actions
     end
 
     test "starts with custom registry", %{registry: registry} do

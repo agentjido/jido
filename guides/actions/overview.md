@@ -158,7 +158,7 @@ Jido provides several built-in Action modules:
 ### Basic Operations
 
 ```elixir
-alias Jido.Actions.Basic
+alias Jido.Tools.Basic
 
 # Sleep for a duration
 Basic.Sleep.run(%{duration_ms: 1000}, %{})

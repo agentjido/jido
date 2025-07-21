@@ -29,11 +29,11 @@ defmodule Jido.Agent.Server do
   alias Jido.Instruction
   # Default actions to register with every agent
   @default_actions [
-    Jido.Actions.Basic.Log,
-    Jido.Actions.Basic.Sleep,
-    Jido.Actions.Basic.Noop,
-    Jido.Actions.Basic.Inspect,
-    Jido.Actions.Basic.Today
+    Jido.Tools.Basic.Log,
+    Jido.Tools.Basic.Sleep,
+    Jido.Tools.Basic.Noop,
+    Jido.Tools.Basic.Inspect,
+    Jido.Tools.Basic.Today
   ]
 
   @type start_option ::
