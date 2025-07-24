@@ -2,14 +2,14 @@ defmodule Jido.Examples.ActionExecTest do
   use ExUnit.Case
 
   require Logger
-  alias Jido.Actions.Basic.Log, as: LogAction
+  alias Jido.Tools.Basic.Log, as: LogAction
   alias JidoTest.TestAgents.BasicAgent, as: B
   alias Jido.Instruction
 
   @moduletag :capture_log
 
   defmodule MyWorkflow do
-    use Jido.Actions.Workflow,
+    use Jido.Tools.Workflow,
       name: "my_workflow",
       description: "My workflow",
       schema: [

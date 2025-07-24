@@ -160,7 +160,7 @@ defmodule Jido.Util do
       {:ok, ValidRunner}
 
       iex> Jido.Util.validate_runner(InvalidModule)
-      {:error, %Jido.Error{type: :validation_error, message: "Module InvalidModule must implement run/2"}}
+      {:error, %Jido.Error.InvalidInputError{message: "Runner module InvalidModule must exist and implement run/2"}}
   """
   @spec validate_runner(module()) :: {:ok, module()} | {:error, Jido.Error.t()}
   def validate_runner(module) when is_atom(module) do

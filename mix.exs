@@ -233,7 +233,7 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, github: "agentjido/jido_action"},
-      {:jido_signal, "~> 1.0.0"},
+      {:jido_signal, github: "agentjido/jido_signal"},
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -246,6 +246,7 @@ defmodule Jido.MixProject do
       {:phoenix_pubsub, "~> 2.1"},
       {:private, "~> 0.1.2"},
       {:proper_case, "~> 1.3"},
+      {:splode, "~> 0.2.5"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
       {:typed_struct, "~> 0.3.0"},

@@ -255,7 +255,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
   describe "err_signal/5" do
     test "builds execution error signal", %{state: state} do
-      error = %Error{type: :execution_error, message: "test error"}
+      error = Error.execution_error("test error")
       signal = ServerSignal.err_signal(:execution_error, state, error, %{})
 
       assert signal.type == "jido.agent.err.execution.error"
@@ -266,7 +266,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
     end
 
     test "returns nil for unknown error type", %{state: state} do
-      error = %Error{type: :unknown, message: "test error"}
+      error = Error.internal_error("test error")
       assert ServerSignal.err_signal(:unknown, state, error, %{}) == nil
     end
   end

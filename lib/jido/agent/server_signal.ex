@@ -2,7 +2,7 @@ defmodule Jido.Agent.Server.Signal do
   @moduledoc false
   use ExDbug, enabled: false
   alias Jido.Signal
-  alias Jido.Error
+
   alias Jido.Agent.Server.State, as: ServerState
 
   @config %{
@@ -141,7 +141,7 @@ defmodule Jido.Agent.Server.Signal do
   def err_signal(
         :execution_error,
         %ServerState{} = state,
-        %Error{} = error,
+        %_{} = error,
         _params,
         extra_attrs
       ),

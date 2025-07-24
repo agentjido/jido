@@ -105,7 +105,7 @@ defmodule Jido.Runner.Chain do
           dbug("Directives applied successfully", agent: agent.id)
           {:ok, %{updated_agent | result: last_result}, server_directives}
 
-        {:error, %Error{} = error} ->
+        {:error, %_{} = error} ->
           dbug("Error applying directives", agent: agent.id, error: error)
           {:error, error}
 
@@ -180,7 +180,7 @@ defmodule Jido.Runner.Chain do
         dbug("Exec returned result with no directives", agent: agent.id)
         execute_chain_step(remaining, agent, accumulated_directives, result, merge_results, opts)
 
-      {:error, %Error{} = error} ->
+      {:error, %_{} = error} ->
         dbug("Exec returned error", agent: agent.id, error: error)
         {:error, error}
 

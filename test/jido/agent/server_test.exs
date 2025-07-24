@@ -7,6 +7,7 @@ defmodule Jido.Agent.ServerTest do
   alias JidoTest.TestAgents.BasicAgent
   alias Jido.Signal.Router
   alias Jido.Instruction
+  alias Jido.Error
 
   @moduletag :capture_log
 
@@ -297,7 +298,7 @@ defmodule Jido.Agent.ServerTest do
       # Add timeout to prevent test from hanging
       result = Server.call(pid, signal, 1000)
       assert {:error, error} = result
-      assert error.type == :routing_error
+      assert Error.to_map(error).type == :routing_error
     end
 
     @tag :capture_log

@@ -2,6 +2,7 @@ defmodule Jido.Agent.Server.RouterTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent.Server.Router
+  alias Jido.Error
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Signal
   alias Jido.Signal.Router.Route
@@ -41,7 +42,7 @@ defmodule Jido.Agent.Server.RouterTest do
 
     test "returns error for invalid routes", %{state: state} do
       assert {:error, error} = Router.build(state, routes: :invalid)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message == "Routes must be a list"
 
       # Any term is now accepted as a target
@@ -120,7 +121,7 @@ defmodule Jido.Agent.Server.RouterTest do
 
     test "returns error for invalid merge input", %{state: state} do
       assert {:error, error} = Router.merge(state, :invalid)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
     end
   end
 
@@ -140,13 +141,13 @@ defmodule Jido.Agent.Server.RouterTest do
     test "returns error for non-matching signal", %{state: state} do
       {:ok, signal} = Signal.new(%{type: "nonexistent.signal", data: "test"})
       assert {:error, error} = Router.route(state, signal)
-      assert error.type == :routing_error
+      assert Error.to_map(error).type == :routing_error
       assert error.message == "No matching handlers found for signal"
     end
 
     test "returns error for invalid signal", %{state: state} do
       assert {:error, error} = Router.route(state, :invalid)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
     end
 
     test "uses jido_instruction from signal if present", %{state: state} do

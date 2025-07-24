@@ -153,7 +153,7 @@ defmodule Jido.Runner.Simple do
         dbug("Exec returned result only", result: result)
         {:ok, %{agent | result: result}, []}
 
-      {:error, %Error{} = error} ->
+      {:error, %_{} = error} ->
         dbug("Exec returned error struct", error: error)
         {:error, error}
 
@@ -178,7 +178,7 @@ defmodule Jido.Runner.Simple do
           dbug("Applied directives successfully", server_directives: server_directives)
           {:ok, %{updated_agent | result: result}, server_directives}
 
-        {:error, %Error{} = error} ->
+        {:error, %_{} = error} ->
           dbug("Directive application failed with error struct", error: error)
           {:error, error}
 

@@ -8,6 +8,8 @@ defmodule JidoTest.AgentRunTest do
     CallbackTrackingAgent
   }
 
+  alias Jido.Error
+
   alias JidoTest.TestActions
 
   @moduletag :capture_log
@@ -72,8 +74,8 @@ defmodule JidoTest.AgentRunTest do
       {:ok, planned} = ErrorHandlingAgent.plan(agent, {TestActions.ErrorAction, %{}})
       {:error, error} = ErrorHandlingAgent.run(planned)
 
-      assert error.type == :execution_error
-      assert error.message == "Exec failed"
+      assert Error.to_map(error).type == :execution_error
+      assert Error.extract_message(error) == "Exec failed"
     end
 
     test "tracks callbacks in correct order" do
@@ -95,8 +97,8 @@ defmodule JidoTest.AgentRunTest do
       {:error, error} = ErrorHandlingAgent.run(planned, apply_state: true)
 
       # Error result should be stored
-      assert error.type == :execution_error
-      assert error.message == "Exec failed"
+      assert Error.to_map(error).type == :execution_error
+      assert Error.extract_message(error) == "Exec failed"
     end
 
     test "attempts recovery on error" do
@@ -110,13 +112,13 @@ defmodule JidoTest.AgentRunTest do
       assert recovered_agent.state.error_count == 1
       # Last error should be stored
       assert recovered_agent.state.last_error.type == :execution_error
-      assert recovered_agent.state.last_error.message =~ "Exec failed"
+      assert Error.extract_message(recovered_agent.state.last_error) =~ "Exec failed"
     end
 
     test "prevents calling run with wrong agent module" do
       agent = BasicAgent.new()
       assert {:error, error} = FullFeaturedAgent.run(agent, apply_state: true)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
 
       assert error.message =~
                "Invalid agent type. Expected #{BasicAgent}, got #{FullFeaturedAgent}"
@@ -127,7 +129,7 @@ defmodule JidoTest.AgentRunTest do
       {:ok, planned} = BasicAgent.plan(agent, TestActions.BasicAction)
       {:error, error} = BasicAgent.run(planned, runner: NonExistentRunner)
 
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
 
       assert error.message =~
                "Runner module #{inspect(NonExistentRunner)} must exist and implement run/2"

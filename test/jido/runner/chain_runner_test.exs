@@ -238,11 +238,13 @@ defmodule Jido.Runner.ChainTest do
         }
       ]
 
-      agent = FullFeaturedAgent.new("test-agent")
+      agent = JidoTest.TestAgents.ErrorHandlingAgent.new("test-agent")
       agent = %{agent | pending_instructions: :queue.from_list(instructions)}
 
       assert {:error, error} = Chain.run(agent)
-      assert error.message == "Compensation completed for: Intentional failure"
+      assert error.message =~ "Compensation completed for:"
+      assert error.details.compensated == true
+      assert Exception.message(error.details.original_error) =~ "Intentional failure"
     end
 
     test "respects apply_directives? option when false" do

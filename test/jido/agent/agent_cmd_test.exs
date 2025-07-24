@@ -8,6 +8,7 @@ defmodule JidoTest.AgentCmdTest do
   }
 
   alias JidoTest.TestActions
+  alias Jido.Error
 
   @moduletag :capture_log
 
@@ -74,7 +75,7 @@ defmodule JidoTest.AgentCmdTest do
                  runner: Jido.Runner.Chain
                )
 
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Strict validation is enabled"
       assert error.message =~ "unknown_field"
 
@@ -95,7 +96,7 @@ defmodule JidoTest.AgentCmdTest do
       assert {:error, error} =
                FullFeaturedAgent.cmd(agent, UnregisteredAction, %{}, runner: Jido.Runner.Chain)
 
-      assert error.type == :config_error
+      assert Error.to_map(error).type == :config_error
       assert error.message =~ "Action not registered"
     end
 
@@ -130,8 +131,8 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert error.type == :execution_error
-      assert error.message == "Exec failed"
+      assert Error.to_map(error).type == :execution_error
+      assert Error.extract_message(error) == "Exec failed"
     end
 
     test "preserves state on action error" do
@@ -146,8 +147,8 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert error.type == :execution_error
-      assert error.message == "Exec failed"
+      assert Error.to_map(error).type == :execution_error
+      assert Error.extract_message(error) == "Exec failed"
       # State should be preserved
       assert agent.state.battery_level == 100
     end
@@ -168,7 +169,7 @@ defmodule JidoTest.AgentCmdTest do
       assert recovered.state.error_count == 1
       # Last error should be stored
       assert recovered.state.last_error.type == :execution_error
-      assert recovered.state.last_error.message =~ "Exec failed"
+      assert Error.extract_message(recovered.state.last_error) =~ "Exec failed"
     end
   end
 
@@ -196,7 +197,7 @@ defmodule JidoTest.AgentCmdTest do
           runner: Jido.Runner.Chain
         )
 
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid state update. Expected a map or keyword list, got nil"
     end
 
@@ -236,7 +237,7 @@ defmodule JidoTest.AgentCmdTest do
                  runner: Jido.Runner.Chain
                )
 
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid agent type"
     end
 
@@ -255,7 +256,7 @@ defmodule JidoTest.AgentCmdTest do
                  runner: Jido.Runner.Chain
                )
 
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid parameters for Action"
       # Original value unchanged
       assert agent.state.value == 0

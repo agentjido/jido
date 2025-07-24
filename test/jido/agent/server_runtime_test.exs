@@ -65,9 +65,9 @@ defmodule JidoTest.Agent.ServerRuntimeTest do
       state = %{base_state | router: router_state.router, current_signal: signal}
 
       assert {:error, error} = ServerRuntime.route_signal(state, signal)
-      # Verify it's a routing error - could be either an atom or a Jido.Error struct
+      # Verify it's a routing error - could be either an atom or an error struct
       assert (is_atom(error) and error == :no_matching_route) or
-               (is_struct(error, Jido.Error) and error.type == :routing_error)
+               (Exception.exception?(error) and Error.to_map(error).type == :routing_error)
     end
   end
 

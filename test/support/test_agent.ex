@@ -147,10 +147,13 @@ defmodule JidoTest.TestAgents do
 
     @impl true
     def on_error(%{state: %{should_recover?: true}} = agent, result) do
+      # Convert error to map format that tests expect  
+      error_map = Jido.Error.to_map(result)
+
       new_state =
         agent.state
         |> Map.update!(:error_count, &(&1 + 1))
-        |> Map.put(:last_error, result)
+        |> Map.put(:last_error, error_map)
 
       {:ok, %{agent | state: new_state}, []}
     end
