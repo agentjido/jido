@@ -168,7 +168,7 @@ defmodule Jido.Agent.Server.Process do
 
         :ok
 
-      {:error, _reason} = error ->
+      {:error, :not_found} = error ->
         dbug("Failed to terminate child process", error: error)
         error
     end
@@ -188,22 +188,23 @@ defmodule Jido.Agent.Server.Process do
   - child_spec: Specification to use for new process
 
   ## Returns
-  - `{:ok, new_pid}` - Process restarted successfully
+  - `{:ok, updated_state, new_pid}` - Process restarted successfully  
   - `{:error, reason}` - Failed to restart process
   """
-  @spec restart(server_state(), child_pid(), child_spec()) :: {:ok, pid()} | {:error, term()}
+  @spec restart(server_state(), child_pid(), child_spec()) ::
+          {:ok, server_state(), pid()} | {:error, term()}
   def restart(%ServerState{} = state, child_pid, child_spec) do
     dbug("Restarting child process", state: state, child_pid: child_pid, spec: child_spec)
 
     with :ok <- terminate(state, child_pid),
-         {:ok, _new_pid} = result <- start(state, child_spec) do
-      dbug("Successfully restarted child process", result: result)
+         {:ok, updated_state, new_pid} <- start(state, child_spec) do
+      dbug("Successfully restarted child process", new_pid: new_pid)
 
       :process_restarted
-      |> ServerSignal.event_signal(state, %{child_pid: child_pid, child_spec: child_spec})
-      |> ServerOutput.emit(state)
+      |> ServerSignal.event_signal(updated_state, %{child_pid: child_pid, child_spec: child_spec})
+      |> ServerOutput.emit(updated_state)
 
-      result
+      {:ok, updated_state, new_pid}
     else
       error ->
         dbug("Failed to restart child process", error: error)

@@ -368,7 +368,7 @@ defmodule Jido.Skill do
 
   # Behaviour callbacks
   @callback child_spec(config :: map()) :: Supervisor.child_spec() | [Supervisor.child_spec()]
-  @callback router(skill_opts :: keyword()) :: [Route.t()]
+  @callback router(skill_opts :: keyword()) :: [Signal.Router.Route.t()]
   @callback handle_signal(signal :: Signal.t(), skill :: t()) ::
               {:ok, Signal.t()} | {:error, term()}
   @callback transform_result(signal :: Signal.t(), result :: term(), skill :: t()) ::

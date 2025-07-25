@@ -165,7 +165,7 @@ defmodule Jido.Agent.Server.Router do
       # Merge from another router
       {:ok, state} = Router.merge(state, other_router)
   """
-  @spec merge(ServerState.t(), [Router.Route.t()] | Router.t()) ::
+  @spec merge(ServerState.t(), [Signal.Router.Route.t()] | Signal.Router.Router.t()) ::
           {:ok, ServerState.t()} | {:error, term()}
   def merge(%ServerState{} = state, routes) when is_list(routes) do
     dbug("Merging route list", state: state, routes: routes)

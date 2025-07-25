@@ -45,11 +45,11 @@ defmodule Jido.Sensors.HeartbeatTest do
       {:ok, _pid} = Heartbeat.start_link(opts)
 
       # Wait for and verify two heartbeats
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
       assert signal.type == "heartbeat"
       assert signal.data.message == "test heartbeat"
 
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
       assert signal.type == "heartbeat"
       assert signal.data.message == "test heartbeat"
     end
@@ -64,7 +64,7 @@ defmodule Jido.Sensors.HeartbeatTest do
 
       {:ok, _pid} = Heartbeat.start_link(opts)
 
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
 
       assert signal.type == "heartbeat"
       assert signal.source =~ "heartbeat_sensor:"

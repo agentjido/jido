@@ -40,6 +40,11 @@ defmodule Jido.MixProject do
         "coveralls.post": :test,
         "coveralls.html": :test,
         "coveralls.cobertura": :test
+      ],
+
+      # Dialyzer
+      dialyzer: [
+        ignore_warnings: ".dialyzer_ignore"
       ]
     ]
   end
