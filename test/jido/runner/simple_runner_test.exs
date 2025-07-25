@@ -4,6 +4,7 @@ defmodule Jido.Runner.SimpleTest do
   alias Jido.Instruction
   alias JidoTest.TestActions.{Add, ErrorAction, CompensateAction}
   alias JidoTest.TestAgents.FullFeaturedAgent
+  alias Jido.Error
 
   @moduletag :capture_log
 
@@ -146,8 +147,8 @@ defmodule Jido.Runner.SimpleTest do
       agent = FullFeaturedAgent.new("test-agent")
       agent = %{agent | pending_instructions: :queue.from_list([instruction])}
 
-      assert {:error, %Jido.Error{} = error} = Simple.run(agent)
-      assert error.type == :validation_error
+      assert {:error, %_{} = error} = Simple.run(agent)
+      assert Error.to_map(error).type == :validation_error
       assert error.message == "Invalid directive"
     end
 
@@ -213,11 +214,13 @@ defmodule Jido.Runner.SimpleTest do
         context: %{}
       }
 
-      agent = FullFeaturedAgent.new("test-agent")
+      agent = JidoTest.TestAgents.ErrorHandlingAgent.new("test-agent")
       agent = %{agent | pending_instructions: :queue.from_list([instruction])}
 
       assert {:error, error} = Simple.run(agent)
-      assert error.message == "Compensation completed for: Intentional failure"
+      assert error.message =~ "Compensation completed for:"
+      assert error.details.compensated == true
+      assert Exception.message(error.details.original_error) =~ "Intentional failure"
     end
 
     test "preserves agent state on error" do

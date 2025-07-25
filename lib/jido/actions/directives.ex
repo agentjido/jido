@@ -7,14 +7,12 @@ defmodule Jido.Actions.Directives do
   - RegisterAction: Registers a new action module
   - DeregisterAction: Deregisters an existing action module
 
-  Each action is implemented as a separate submodule and follows the Jido.Action behavior.
+  Each action is implemented as a separate submodule and follows the Jido.DirectiveAction behavior.
   """
-
-  alias Jido.Action
 
   defmodule EnqueueAction do
     @moduledoc false
-    use Action,
+    use Jido.Action,
       name: "enqueue_action",
       description: "Enqueues another action based on params",
       schema: [
@@ -40,7 +38,7 @@ defmodule Jido.Actions.Directives do
 
   defmodule RegisterAction do
     @moduledoc false
-    use Action,
+    use Jido.Action,
       name: "register_action",
       description: "Registers a new action module",
       schema: [
@@ -59,7 +57,7 @@ defmodule Jido.Actions.Directives do
 
   defmodule DeregisterAction do
     @moduledoc false
-    use Action,
+    use Jido.Action,
       name: "deregister_action",
       description: "Deregisters an existing action module",
       schema: [
@@ -85,7 +83,7 @@ defmodule Jido.Actions.Directives do
 
   defmodule Spawn do
     @moduledoc false
-    use Action,
+    use Jido.Action,
       name: "spawn_process",
       description: "Spawns a child process under the agent's supervisor",
       schema: [
@@ -106,7 +104,7 @@ defmodule Jido.Actions.Directives do
 
   defmodule Kill do
     @moduledoc false
-    use Action,
+    use Jido.Action,
       name: "kill_process",
       description: "Terminates a child process",
       schema: [

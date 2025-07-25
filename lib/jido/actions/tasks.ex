@@ -62,6 +62,7 @@ defmodule Jido.Actions.Tasks do
 
     alias Jido.Actions.Tasks.Task
 
+    @spec run(map(), map()) :: {:ok, map()} | {:ok, map(), any()} | {:error, any()}
     @impl true
     def run(params, context) do
       task = Task.new(params.title, params.deadline)

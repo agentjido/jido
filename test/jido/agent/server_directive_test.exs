@@ -16,10 +16,12 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
   # Helper to compare Error structs ignoring stacktrace
   defp assert_error_match(actual, expected) do
-    assert %Error{} = actual
-    assert actual.type == expected.type
-    assert actual.message == expected.message
-    assert actual.details == expected.details
+    assert Exception.exception?(actual)
+    actual_map = Error.to_map(actual)
+    expected_map = Error.to_map(expected)
+    assert actual_map.type == expected_map.type
+    assert actual_map.message == expected_map.message
+    assert actual_map.details == expected_map.details
   end
 
   setup do
@@ -77,11 +79,10 @@ defmodule Jido.Agent.Server.DirectiveTest do
       assert signal.type == Signal.process_started()
       refute_receive {:signal, _}
 
-      assert_error_match(error, %Error{
-        type: :validation_error,
-        message: "Invalid directive",
-        details: %{directive: :invalid_directive}
-      })
+      assert_error_match(
+        error,
+        Error.validation_error("Invalid directive", %{directive: :invalid_directive})
+      )
     end
 
     test "handles single directive", %{state: state} do
@@ -147,11 +148,10 @@ defmodule Jido.Agent.Server.DirectiveTest do
       directive = %Kill{pid: non_existent_pid}
       {:error, error} = Directive.execute(state, directive)
 
-      assert_error_match(error, %Error{
-        type: :execution_error,
-        message: "Process not found",
-        details: %{pid: non_existent_pid}
-      })
+      assert_error_match(
+        error,
+        Error.execution_error("Process not found", %{pid: non_existent_pid})
+      )
     end
   end
 
@@ -233,11 +233,10 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
       {:error, error} = Directive.execute(state, directive)
 
-      assert_error_match(error, %Error{
-        type: :validation_error,
-        message: "Invalid state modification operation",
-        details: %{op: :invalid_op}
-      })
+      assert_error_match(
+        error,
+        Error.validation_error("Invalid state modification operation", %{op: :invalid_op})
+      )
     end
 
     test "state_modification handles invalid paths", %{state: state} do
@@ -249,13 +248,12 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
       {:error, error} = Directive.execute(state, directive)
 
-      assert_error_match(error, %Error{
-        type: :execution_error,
-        message: "Failed to modify state",
-        details: %{
+      assert_error_match(
+        error,
+        Error.execution_error("Failed to modify state", %{
           error: %ArgumentError{message: "could not put/update key :path on a nil value"}
-        }
-      })
+        })
+      )
     end
   end
 
@@ -263,11 +261,10 @@ defmodule Jido.Agent.Server.DirectiveTest do
     test "returns error for invalid directive", %{state: state} do
       {:error, error} = Directive.execute(state, :invalid_directive)
 
-      assert_error_match(error, %Error{
-        type: :validation_error,
-        message: "Invalid directive",
-        details: %{directive: :invalid_directive}
-      })
+      assert_error_match(
+        error,
+        Error.validation_error("Invalid directive", %{directive: :invalid_directive})
+      )
     end
   end
 end

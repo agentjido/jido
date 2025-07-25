@@ -184,14 +184,6 @@ defmodule Jido.MixProject do
           Jido.Sensor,
           Jido.Workflow
         ],
-        "Actions: Execution": [
-          Jido.Runner,
-          Jido.Runner.Chain,
-          Jido.Runner.Simple,
-          Jido.Workflow,
-          Jido.Workflow.Chain,
-          Jido.Workflow.Closure
-        ],
         "Actions: Directives": [
           Jido.Agent.Directive,
           Jido.Agent.Directive.Enqueue,
@@ -201,16 +193,13 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.Spawn,
           Jido.Actions.Directives
         ],
-        "Actions: Extra": [
-          Jido.Actions.Tool
-        ],
         Skills: [
           Jido.Skill,
           Jido.Skills.Arithmetic
         ],
         Examples: [
           Jido.Actions.Arithmetic,
-          Jido.Actions.Basic,
+          Jido.Tools.Basic,
           Jido.Actions.Files,
           Jido.Actions.Simplebot,
           Jido.Sensors.Cron,
@@ -242,8 +231,9 @@ defmodule Jido.MixProject do
 
   defp deps do
     [
-      # Jido Signal
-      {:jido_signal, "~> 1.0.0"},
+      # Jido Ecosystem
+      {:jido_action, github: "agentjido/jido_action"},
+      {:jido_signal, github: "agentjido/jido_signal"},
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -256,6 +246,7 @@ defmodule Jido.MixProject do
       {:phoenix_pubsub, "~> 2.1"},
       {:private, "~> 0.1.2"},
       {:proper_case, "~> 1.3"},
+      {:splode, "~> 0.2.5"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.1"},
       {:typed_struct, "~> 0.3.0"},

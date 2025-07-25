@@ -1,5 +1,7 @@
 defmodule Jido.SkillDefinitionTest do
   use JidoTest.Case, async: true
+
+  alias Jido.Error
   alias JidoTest.TestSkills.WeatherMonitorSkill
 
   @moduletag :capture_log
@@ -83,7 +85,7 @@ defmodule Jido.SkillDefinitionTest do
 
     test "skills cannot be defined at runtime" do
       assert {:error, error} = Jido.Skill.new()
-      assert error.type == :config_error
+      assert Error.to_map(error).type == :config_error
       assert error.message == "Skills should not be defined at runtime"
     end
   end

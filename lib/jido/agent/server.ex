@@ -29,11 +29,11 @@ defmodule Jido.Agent.Server do
   alias Jido.Instruction
   # Default actions to register with every agent
   @default_actions [
-    Jido.Actions.Basic.Log,
-    Jido.Actions.Basic.Sleep,
-    Jido.Actions.Basic.Noop,
-    Jido.Actions.Basic.Inspect,
-    Jido.Actions.Basic.Today
+    Jido.Tools.Basic.Log,
+    Jido.Tools.Basic.Sleep,
+    Jido.Tools.Basic.Noop,
+    Jido.Tools.Basic.Inspect,
+    Jido.Tools.Basic.Today
   ]
 
   @type start_option ::
@@ -475,7 +475,6 @@ defmodule Jido.Agent.Server do
     end
   end
 
-  @spec build_initial_state_from_opts(keyword()) :: {:ok, ServerState.t()}
   defp build_initial_state_from_opts(opts) do
     dbug("Building initial state from options", opts: opts)
 
@@ -540,7 +539,7 @@ defmodule Jido.Agent.Server do
     end
   end
 
-  @spec register_actions(ServerState.t(), [module()]) :: {:ok, ServerState.t()} | {:error, term()}
+  @spec register_actions(any(), [module()]) :: {:ok, any()} | {:error, term()}
   defp register_actions(%ServerState{} = state, provided_actions)
        when is_list(provided_actions) do
     dbug("Registering actions with agent",

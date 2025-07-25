@@ -64,6 +64,8 @@ defmodule Jido.Sensor do
           retain_last: pos_integer()
         ]
 
+  @type sensor_result :: {:ok, Jido.Signal.t()} | {:error, any()}
+
   @sensor_compiletime_options_schema NimbleOptions.new!(
                                        name: [
                                          type: {:custom, Jido.Util, :validate_name, []},

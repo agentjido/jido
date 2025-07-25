@@ -27,6 +27,7 @@ defmodule Jido.Actions.StateManager do
         path: [type: {:list, :atom}, required: true]
       ]
 
+    @spec run(map(), map()) :: {:ok, map()} | {:ok, map(), any()} | {:error, any()}
     @impl true
     def run(params, context) do
       value = get_in(context.state, params.path)
@@ -49,6 +50,7 @@ defmodule Jido.Actions.StateManager do
         value: [type: :any, required: true]
       ]
 
+    @spec run(map(), map()) :: {:ok, map()} | {:ok, map(), any()} | {:error, any()}
     @impl true
     def run(params, context) do
       # First ensure all intermediate maps exist
@@ -107,6 +109,7 @@ defmodule Jido.Actions.StateManager do
         value: [type: :any, required: true]
       ]
 
+    @spec run(map(), map()) :: {:ok, map()} | {:ok, map(), any()} | {:error, any()}
     @impl true
     def run(params, context) do
       # First ensure all intermediate maps exist
@@ -165,6 +168,7 @@ defmodule Jido.Actions.StateManager do
 
     require Logger
 
+    @spec run(map(), map()) :: {:ok, map()} | {:ok, map(), any()} | {:error, any()}
     @impl true
     def run(params, context) do
       Logger.info("Delete action called with path: #{inspect(params.path)}")

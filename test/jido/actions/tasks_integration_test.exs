@@ -1,6 +1,7 @@
 defmodule Jido.Actions.TasksIntegrationTest do
   use JidoTest.Case, async: true
   alias JidoTest.TestAgents.TaskManagementAgent
+  alias Jido.Error
 
   @moduletag :capture_log
 
@@ -204,7 +205,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
           apply_state: true
         )
 
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
       assert error.message == :task_not_found
       assert map_size(agent.state.tasks) == 0
 
@@ -218,7 +219,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
           apply_state: true
         )
 
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
       assert error.message == :task_not_found
       assert map_size(agent.state.tasks) == 0
 
@@ -232,7 +233,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
           apply_state: true
         )
 
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
       assert error.message == :task_not_found
       assert map_size(agent.state.tasks) == 0
     end

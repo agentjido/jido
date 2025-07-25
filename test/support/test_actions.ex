@@ -244,7 +244,7 @@ defmodule JidoTest.TestActions do
       throw("Action threw an error")
     end
 
-    def run(_params, _context), do: {:error, "Exec failed"}
+    def run(_params, _context), do: {:error, Error.execution_error("Exec failed")}
   end
 
   defmodule NormalExitAction do

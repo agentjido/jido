@@ -3,6 +3,7 @@ defmodule JidoTest.AgentPlanTest do
 
   alias JidoTest.TestAgents.{BasicAgent, FullFeaturedAgent}
   alias JidoTest.TestActions.{BasicAction, NoSchema}
+  alias Jido.Error
 
   describe "plan/3" do
     setup do
@@ -37,7 +38,7 @@ defmodule JidoTest.AgentPlanTest do
 
     test "handles unregistered actions", %{agent: agent} do
       assert {:error, error} = BasicAgent.plan(agent, UnregisteredAction, %{})
-      assert error.type == :config_error
+      assert Error.to_map(error).type == :config_error
 
       assert error.message =~
                "Action: Elixir.UnregisteredAction not registered with agent basic_agent"
@@ -137,8 +138,10 @@ defmodule JidoTest.AgentPlanTest do
       ]
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
-      assert error.type == :config_error
-      assert error.message =~ "Action not registered"
+      assert Error.to_map(error).type == :config_error
+
+      assert error.message =~
+               "Action: Elixir.UnregisteredAction not registered with agent basic_agent"
     end
 
     test "handles invalid action format in list", %{agent: agent} do
@@ -148,7 +151,7 @@ defmodule JidoTest.AgentPlanTest do
       ]
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
       assert error.message =~ "Invalid params format."
     end
 
@@ -212,7 +215,7 @@ defmodule JidoTest.AgentPlanTest do
 
     test "validates params are maps", %{agent: agent} do
       assert {:error, error} = BasicAgent.plan(agent, {BasicAction, ["invalid"]}, %{})
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
     end
 
     test "handles nil params", %{agent: agent} do
@@ -229,7 +232,7 @@ defmodule JidoTest.AgentPlanTest do
       ]
 
       assert {:error, error} = BasicAgent.plan(agent, actions, %{})
-      assert error.type == :execution_error
+      assert Error.to_map(error).type == :execution_error
       assert error.message =~ "Invalid instruction format"
     end
 
@@ -366,7 +369,7 @@ defmodule JidoTest.AgentPlanTest do
     test "prevents calling plan with wrong agent module" do
       agent = FullFeaturedAgent.new()
       assert {:error, error} = BasicAgent.plan(agent, BasicAction, %{})
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
 
       assert error.message =~
                "Invalid agent type. Expected #{FullFeaturedAgent}, got #{BasicAgent}"

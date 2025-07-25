@@ -7,6 +7,7 @@ defmodule JidoTest.AgentStateTest do
   }
 
   alias JidoTest.TestActions
+  alias Jido.Error
 
   @moduletag :capture_log
   describe "state management" do
@@ -111,7 +112,7 @@ defmodule JidoTest.AgentStateTest do
     test "prevents calling set with wrong agent module" do
       agent = BasicAgent.new()
       assert {:error, error} = FullFeaturedAgent.set(agent, %{value: 42})
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
 
       assert error.message =~
                "Invalid agent type. Expected JidoTest.TestAgents.BasicAgent, got JidoTest.TestAgents.FullFeaturedAgent"
@@ -149,7 +150,7 @@ defmodule JidoTest.AgentStateTest do
     test "prevents calling validate with wrong agent module" do
       agent = BasicAgent.new()
       assert {:error, error} = FullFeaturedAgent.validate(agent)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
 
       assert error.message =~
                "Invalid agent type. Expected Elixir.JidoTest.TestAgents.BasicAgent, got Elixir.JidoTest.TestAgents.FullFeaturedAgent"

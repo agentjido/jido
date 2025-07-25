@@ -9,6 +9,8 @@ defmodule JidoTest.AgentDefinitionTest do
     CustomRunnerAgent
   }
 
+  alias Jido.Error
+
   alias JidoTest.TestActions.{
     BasicAction,
     NoSchema,
@@ -22,7 +24,7 @@ defmodule JidoTest.AgentDefinitionTest do
   describe "naked new/1" do
     test "returns error for server agent creation" do
       {:error, error} = Jido.Agent.new()
-      assert error.type == :config_error
+      assert Error.to_map(error).type == :config_error
 
       assert error.message =~
                "Agents must be implemented as a module utilizing `use Jido.Agent ...`"
@@ -309,7 +311,7 @@ defmodule JidoTest.AgentDefinitionTest do
     test "prevents registering invalid modules" do
       agent = BasicAgent.new()
       assert {:error, error} = BasicAgent.register_action(agent, InvalidModule)
-      assert error.type == :validation_error
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Failed to register actions"
 
       # Original actions list should be unchanged

@@ -18,6 +18,7 @@ defmodule JidoTest.DirectiveTest do
   alias Jido.Agent.Server.State, as: ServerState
   alias JidoTest.TestAgents.FullFeaturedAgent
   alias JidoTest.TestActions.Add
+  alias Jido.Error
 
   setup :verify_on_exit!
 
@@ -275,8 +276,8 @@ defmodule JidoTest.DirectiveTest do
         value: 42
       }
 
-      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
-      assert error.type == :validation_error
+      assert {:error, %_{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid operation"
     end
 
@@ -287,8 +288,8 @@ defmodule JidoTest.DirectiveTest do
         value: 42
       }
 
-      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
-      assert error.type == :validation_error
+      assert {:error, %_{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid path"
     end
 
@@ -299,8 +300,8 @@ defmodule JidoTest.DirectiveTest do
         value: "not a function"
       }
 
-      assert {:error, %Jido.Error{} = error} = Directive.apply_agent_directive(agent, [directive])
-      assert error.type == :validation_error
+      assert {:error, %_{} = error} = Directive.apply_agent_directive(agent, [directive])
+      assert Error.to_map(error).type == :validation_error
       assert error.message =~ "Invalid update function"
     end
 
