@@ -1252,8 +1252,8 @@ defmodule Jido.Agent do
       {:error, %Jido.Error.ConfigurationError{message: "Agents must be implemented as a module utilizing `use Jido.Agent ...`"}}
 
   """
-  @spec new() :: {:error, Error.t()}
-  @spec new(String.t()) :: {:error, Error.t()}
+  @spec new() :: {:error, any()}
+  @spec new(String.t()) :: {:error, any()}
   def new, do: new("")
 
   def new(_id) do

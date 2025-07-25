@@ -192,7 +192,7 @@ defmodule Jido.Runner.Simple do
     end
   end
 
-  @spec handle_directive_error(String.t()) :: {:error, Error.t()}
+  @spec handle_directive_error(any()) :: {:error, any()}
   defp handle_directive_error(reason) do
     dbug("Handling directive error", reason: reason)
     {:error, Error.validation_error("Invalid directive", %{reason: reason})}

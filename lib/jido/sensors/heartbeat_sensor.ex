@@ -37,6 +37,7 @@ defmodule Jido.Sensors.Heartbeat do
     {:ok, state}
   end
 
+  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   @impl true
   def deliver_signal(state) do
     now = DateTime.utc_now()
