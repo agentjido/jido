@@ -179,6 +179,7 @@ defmodule Jido.Skill do
   - `Jido.Agent` - Agent integration
   """
   alias Jido.Signal
+  alias Jido.Signal.Router.Route
   alias Jido.Error
   require OK
   use TypedStruct
@@ -381,8 +382,8 @@ defmodule Jido.Skill do
 
   This function always returns an error to enforce compile-time definition.
   """
-  @spec new() :: {:error, Error.t()}
-  @spec new(map() | keyword()) :: {:error, Error.t()}
+  @spec new() :: {:error, any()}
+  @spec new(map() | keyword()) :: {:error, any()}
   def new, do: new(%{})
 
   @doc false

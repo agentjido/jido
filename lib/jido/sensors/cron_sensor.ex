@@ -61,6 +61,17 @@ defmodule Jido.Sensors.Cron do
 
   require Logger
 
+  # Override the default deliver_signal from the macro to provide explicit typing
+  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
+  @impl true
+  def deliver_signal(state) do
+    {:ok,
+     Jido.Signal.new(%{
+       topic: "cron_signal",
+       data: %{status: :ok, sensor_id: state.id}
+     })}
+  end
+
   @impl true
   def mount(opts) do
     state = %{

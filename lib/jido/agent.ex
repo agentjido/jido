@@ -847,11 +847,11 @@ defmodule Jido.Agent do
                  {:ok, agent} <- enqueue_instructions(agent, instruction_structs) do
               OK.success(%{agent | dirty_state?: true})
             else
-              {:error, %Error{type: :config_error} = error} ->
+              {:error, %{details: %{actions: actions}} = error} ->
                 %{
                   error
                   | message:
-                      "Action: #{error.details.actions |> Enum.join(", ")} not registered with agent #{__MODULE__.name()}"
+                      "Action: #{actions |> Enum.join(", ")} not registered with agent #{__MODULE__.name()}"
                 }
                 |> OK.failure()
 
@@ -1249,11 +1249,11 @@ defmodule Jido.Agent do
   ## Examples
 
       iex> Jido.Agent.new()
-      {:error, %Jido.Error{type: :config_error, message: "Agents should not be defined at server"}}
+      {:error, %Jido.Error.ConfigurationError{message: "Agents must be implemented as a module utilizing `use Jido.Agent ...`"}}
 
   """
-  @spec new() :: {:error, Error.t()}
-  @spec new(String.t()) :: {:error, Error.t()}
+  @spec new() :: {:error, any()}
+  @spec new(String.t()) :: {:error, any()}
   def new, do: new("")
 
   def new(_id) do
