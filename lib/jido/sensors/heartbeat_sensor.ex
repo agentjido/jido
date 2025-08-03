@@ -26,6 +26,7 @@ defmodule Jido.Sensors.Heartbeat do
     state = %{
       id: opts.id,
       target: opts.target,
+      sensor: %{name: "heartbeat_sensor"},
       config: %{
         interval: opts.interval,
         message: opts.message
@@ -37,21 +38,20 @@ defmodule Jido.Sensors.Heartbeat do
     {:ok, state}
   end
 
-  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   @impl true
+  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   def deliver_signal(state) do
     now = DateTime.utc_now()
 
-    {:ok,
-     Jido.Signal.new(%{
-       source: "#{state.sensor.name}:#{state.id}",
-       type: "heartbeat",
-       data: %{
-         message: state.config.message,
-         timestamp: now,
-         last_beat: state.last_beat
-       }
-     })}
+    Jido.Signal.new(%{
+      source: "#{state.sensor.name}:#{state.id}",
+      type: "heartbeat",
+      data: %{
+        message: state.config.message,
+        timestamp: now,
+        last_beat: state.last_beat
+      }
+    })
   end
 
   @impl GenServer
@@ -65,16 +65,16 @@ defmodule Jido.Sensors.Heartbeat do
             schedule_heartbeat(state.config.interval)
             {:noreply, %{state | last_beat: now}}
 
-          error ->
+          {:error, reason} ->
             require Logger
-            Logger.warning("Error delivering heartbeat signal: #{inspect(error)}")
+            Logger.warning("Error delivering heartbeat signal: #{inspect(reason)}")
             schedule_heartbeat(state.config.interval)
             {:noreply, state}
         end
 
-      error ->
+      {:error, reason} ->
         require Logger
-        Logger.warning("Error generating heartbeat signal: #{inspect(error)}")
+        Logger.warning("Error creating heartbeat signal: #{inspect(reason)}")
         schedule_heartbeat(state.config.interval)
         {:noreply, state}
     end

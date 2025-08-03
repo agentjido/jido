@@ -204,7 +204,9 @@ defmodule Jido.Agent.Directive do
     - `{:ok, updated_agent, unapplied_directives}` - Successfully applied agent directives
     - `{:error, reason}` - Failed to apply directives
   """
-  @spec apply_agent_directive(Agent.t(), [t()], keyword()) :: directive_result()
+  @spec apply_agent_directive(Agent.t(), [t()]) :: {:ok, Agent.t(), [t()]} | {:error, term()}
+  @spec apply_agent_directive(Agent.t(), [t()], keyword()) ::
+          {:ok, Agent.t(), [t()]} | {:error, term()}
   def apply_agent_directive(agent, directives, opts \\ []) do
     with :ok <- validate_directives(directives) do
       # Split and apply agent directives

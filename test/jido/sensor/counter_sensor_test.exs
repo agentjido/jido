@@ -52,15 +52,15 @@ defmodule JidoTest.SensorCounterTest do
       {:ok, _pid} = CounterSensor.start_link(opts)
 
       # Wait for three emissions
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
       assert signal.type == "counter"
       assert signal.data.value == 6
 
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
       assert signal.type == "counter"
       assert signal.data.value == 7
 
-      assert_receive {:signal, {:ok, signal}}, 200
+      assert_receive {:signal, signal}, 200
       assert signal.type == "counter"
       assert signal.data.value == 8
     end

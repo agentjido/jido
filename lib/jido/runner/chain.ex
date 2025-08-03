@@ -70,7 +70,7 @@ defmodule Jido.Runner.Chain do
         dbug("No instructions to run", agent: agent.id)
         {:ok, %{agent | pending_instructions: :queue.new()}, []}
 
-      instructions_list ->
+      [_ | _] = instructions_list ->
         dbug("Executing chain", agent: agent.id, instructions: length(instructions_list))
         execute_chain(agent, instructions_list, opts)
     end

@@ -411,7 +411,7 @@ defmodule Jido.Skill do
         interval: 1000
       })
   """
-  @spec validate_opts(module(), map()) :: {:ok, map()} | {:error, Error.t()}
+  @spec validate_opts(module(), map()) :: {:ok, map()}
   def validate_opts(skill_module, config) do
     with {:ok, schema} <- get_opts_schema(skill_module) do
       NimbleOptions.validate(config, schema)

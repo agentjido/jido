@@ -61,15 +61,13 @@ defmodule Jido.Sensors.Cron do
 
   require Logger
 
-  # Override the default deliver_signal from the macro to provide explicit typing
-  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   @impl true
+  @spec deliver_signal(map()) :: {:ok, Jido.Signal.t()} | {:error, any()}
   def deliver_signal(state) do
-    {:ok,
-     Jido.Signal.new(%{
-       topic: "cron_signal",
-       data: %{status: :ok, sensor_id: state.id}
-     })}
+    Jido.Signal.new(%{
+      topic: "cron_signal",
+      data: %{status: :ok, sensor_id: state.id}
+    })
   end
 
   @impl true
@@ -181,11 +179,9 @@ defmodule Jido.Sensors.Cron do
       |> Quantum.Job.set_name(name)
       |> Quantum.Job.set_schedule(schedule)
       |> Quantum.Job.set_task(fn ->
-        signal = build_signal(state, name, schedule, task)
-        # Dispatch the signal through Jido and unwrap the {:ok, signal} tuple
-        case Jido.Signal.Dispatch.dispatch(signal, state.target) do
-          {:ok, dispatched_signal} -> dispatched_signal
-          other -> other
+        case build_signal(state, name, schedule, task) do
+          {:ok, signal} -> Jido.Signal.Dispatch.dispatch(signal, state.target)
+          {:error, _} = err -> err
         end
       end)
 

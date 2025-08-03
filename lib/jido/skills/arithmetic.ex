@@ -24,6 +24,9 @@ defmodule Jido.Skills.Arithmetic do
       "arithmetic.*"
     ]
 
+  alias Jido.Signal
+  alias Jido.Instruction
+
   defmodule Actions do
     @moduledoc false
     defmodule Add do
@@ -155,44 +158,39 @@ defmodule Jido.Skills.Arithmetic do
     * arithmetic.result: Result of arithmetic operation
     * arithmetic.error: Error from arithmetic operation
   """
-  @spec router() :: [map()]
-  def router(_opts \\ []) do
+  @impl true
+  @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
+  def router(_opts) do
     [
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.add",
-        instruction: %{
-          action: Actions.Add
-        }
+        target: %Instruction{action: Actions.Add},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.subtract",
-        instruction: %{
-          action: Actions.Subtract
-        }
+        target: %Instruction{action: Actions.Subtract},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.multiply",
-        instruction: %{
-          action: Actions.Multiply
-        }
+        target: %Instruction{action: Actions.Multiply},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.divide",
-        instruction: %{
-          action: Actions.Divide
-        }
+        target: %Instruction{action: Actions.Divide},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.square",
-        instruction: %{
-          action: Actions.Square
-        }
+        target: %Instruction{action: Actions.Square},
+        priority: 0
       },
-      %{
+      %Jido.Signal.Router.Route{
         path: "arithmetic.eval",
-        instruction: %{
-          action: Actions.Eval
-        }
+        target: %Instruction{action: Actions.Eval},
+        priority: 0
       }
     ]
   end
@@ -200,8 +198,9 @@ defmodule Jido.Skills.Arithmetic do
   @doc """
   Handle an arithmetic signal.
   """
-  @spec handle_signal(Signal.t()) :: {:ok, Signal.t()}
-  def handle_signal(%Signal{} = signal) do
+  @impl true
+  @spec handle_signal(Signal.t(), Jido.Skill.t()) :: {:ok, Signal.t()}
+  def handle_signal(%Signal{} = signal, _skill) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
     {:ok, %{signal | data: Map.put(signal.data, :operation, operation)}}
   end
@@ -209,8 +208,10 @@ defmodule Jido.Skills.Arithmetic do
   @doc """
   Process the result of an arithmetic operation.
   """
-  @spec transform_result(Signal.t(), {:ok, map()} | {:error, String.t()}) :: {:ok, Signal.t()}
-  def transform_result(%Signal{} = signal, {:ok, result}) do
+  @impl true
+  @spec transform_result(Signal.t(), {:ok, map()} | {:error, String.t()}, Jido.Skill.t()) ::
+          {:ok, Signal.t()}
+  def transform_result(%Signal{} = signal, {:ok, result}, _skill) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
 
     {:ok,
@@ -222,7 +223,7 @@ defmodule Jido.Skills.Arithmetic do
      }}
   end
 
-  def transform_result(%Signal{} = signal, {:error, error}) do
+  def transform_result(%Signal{} = signal, {:error, error}, _skill) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
 
     {:ok,

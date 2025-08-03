@@ -23,15 +23,16 @@ defmodule Jido.Agent.Server.Callback do
   @spec mount(state :: ServerState.t()) :: {:ok, ServerState.t()} | {:error, term()}
   def mount(%ServerState{agent: agent} = state) do
     dbug("Mounting agent", agent: agent)
+    mod = agent.__struct__
 
-    case agent.__struct__.mount(state, []) do
-      {:ok, new_state} ->
-        dbug("Agent mounted successfully", new_state: new_state)
-        {:ok, new_state}
-
-      error ->
-        dbug("Agent mount failed", error: error)
-        error
+    if function_exported?(mod, :mount, 2) do
+      case mod.mount(state, []) do
+        {:ok, new_state} -> {:ok, new_state}
+        {:error, _} = err -> err
+        other -> {:error, {:invalid_return, other}}
+      end
+    else
+      {:ok, state}
     end
   end
 
@@ -53,15 +54,16 @@ defmodule Jido.Agent.Server.Callback do
           {:ok, ServerState.t()} | {:error, term()}
   def code_change(%ServerState{agent: agent} = state, old_vsn, extra) do
     dbug("Code change", agent: agent, old_vsn: old_vsn, extra: extra)
+    mod = agent.__struct__
 
-    case agent.__struct__.code_change(state, old_vsn, extra) do
-      {:ok, new_state} ->
-        dbug("Code change successful", new_state: new_state)
-        {:ok, new_state}
-
-      error ->
-        dbug("Code change failed", error: error)
-        error
+    if function_exported?(mod, :code_change, 3) do
+      case mod.code_change(state, old_vsn, extra) do
+        {:ok, new_state} -> {:ok, new_state}
+        {:error, _} = err -> err
+        other -> {:error, {:invalid_return, other}}
+      end
+    else
+      {:ok, state}
     end
   end
 
@@ -83,15 +85,16 @@ defmodule Jido.Agent.Server.Callback do
           {:ok, ServerState.t()} | {:error, term()}
   def shutdown(%ServerState{agent: agent} = state, reason) do
     dbug("Shutting down agent", agent: agent, reason: reason)
+    mod = agent.__struct__
 
-    case agent.__struct__.shutdown(state, reason) do
-      {:ok, new_state} ->
-        dbug("Agent shutdown successful", new_state: new_state)
-        {:ok, new_state}
-
-      error ->
-        dbug("Agent shutdown failed", error: error)
-        error
+    if function_exported?(mod, :shutdown, 2) do
+      case mod.shutdown(state, reason) do
+        {:ok, new_state} -> {:ok, new_state}
+        {:error, _} = err -> err
+        other -> {:error, {:invalid_return, other}}
+      end
+    else
+      {:ok, state}
     end
   end
 
@@ -216,6 +219,7 @@ defmodule Jido.Agent.Server.Callback do
     transform_result(state, signal, result)
   end
 
+  @dialyzer {:nowarn_function, transform_result: 3}
   def transform_result(
         %ServerState{agent: agent, skills: skills} = _state,
         %Signal{} = signal,
@@ -266,20 +270,24 @@ defmodule Jido.Agent.Server.Callback do
   @spec safe_transform_result(module(), Signal.t(), term(), Jido.Agent.t() | Jido.Skill.t()) ::
           {:ok, term()} | {:error, term()}
   defp safe_transform_result(module, signal, result, struct) do
-    try do
-      case module.transform_result(signal, result, struct) do
-        {:ok, new_result} -> {:ok, new_result}
-        {:error, reason} -> {:error, reason}
-        other -> {:error, {:invalid_return, other}}
+    if function_exported?(module, :transform_result, 3) do
+      try do
+        case module.transform_result(signal, result, struct) do
+          {:ok, new_result} -> {:ok, new_result}
+          {:error, reason} -> {:error, reason}
+          other -> {:error, {:invalid_return, other}}
+        end
+      rescue
+        e ->
+          dbug("Error in transform_result", module: module, error: e)
+          {:error, e}
+      catch
+        kind, value ->
+          dbug("Caught error in transform_result", module: module, kind: kind, value: value)
+          {:error, {kind, value}}
       end
-    rescue
-      e ->
-        dbug("Error in transform_result", module: module, error: e)
-        {:error, e}
-    catch
-      kind, value ->
-        dbug("Caught error in transform_result", module: module, kind: kind, value: value)
-        {:error, {kind, value}}
+    else
+      {:ok, result}
     end
   end
 

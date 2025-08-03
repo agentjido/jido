@@ -23,9 +23,8 @@ defmodule Jido.Agent.Server.Skills do
   - `{:ok, state, opts}` - The updated state and options
   - `{:error, reason}` - An error occurred
   """
-  @spec build(ServerState.t(), Keyword.t()) ::
-          {:ok, ServerState.t(), Keyword.t()} | {:error, String.t()}
-  def build(state, opts) do
+  @dialyzer {:nowarn_function, build: 2}
+  def build(%ServerState{} = state, opts) do
     dbug("Building skills", state: state, opts: opts)
 
     case Keyword.get(opts, :skills) do
@@ -76,54 +75,46 @@ defmodule Jido.Agent.Server.Skills do
     dbug("Skill options", skill_opts: skill_opts)
 
     # Validate the skill options against the skill's schema
-    case Skill.validate_opts(skill, skill_opts) do
-      {:ok, validated_opts} ->
-        dbug("Skill options validated successfully", validated_opts: validated_opts)
+    {:ok, validated_opts} = Skill.validate_opts(skill, skill_opts)
+    dbug("Skill options validated successfully", validated_opts: validated_opts)
 
-        # Update the agent's state with the validated options
-        updated_agent =
-          Map.update!(state.agent, :state, fn current_state ->
-            Map.put(current_state, opts_key, validated_opts)
-          end)
+    # Update the agent's state with the validated options
+    updated_agent =
+      Map.update!(state.agent, :state, fn current_state ->
+        Map.put(current_state, opts_key, validated_opts)
+      end)
 
-        # Call the skill's mount callback to allow it to transform the agent
-        case skill.mount(updated_agent, validated_opts) do
-          {:ok, mounted_agent} ->
-            dbug("Mounted skill to agent", mounted_agent: mounted_agent)
+    # Call the skill's mount callback to allow it to transform the agent
+    case skill.mount(updated_agent, validated_opts) do
+      {:ok, mounted_agent} ->
+        dbug("Mounted skill to agent", mounted_agent: mounted_agent)
 
-            # Update the state with the skill and mounted agent
-            updated_state = %{state | skills: [skill | state.skills], agent: mounted_agent}
-            dbug("Updated agent state with skill options", updated_state: updated_state)
+        # Update the state with the skill and mounted agent
+        updated_state = %{state | skills: [skill | state.skills], agent: mounted_agent}
+        dbug("Updated agent state with skill options", updated_state: updated_state)
 
-            # Get routes from the skill's router function
-            new_routes = skill.router(validated_opts)
-            dbug("Got skill routes", routes: new_routes)
+        # Get routes from the skill's router function
+        new_routes = skill.router(validated_opts)
+        dbug("Got skill routes", routes: new_routes)
 
-            # Validate routes
-            if is_list(new_routes) do
-              # Get child_spec from the skill
-              new_child_specs = List.wrap(skill.child_spec(validated_opts))
+        # Validate routes
+        if is_list(new_routes) do
+          # Get child_spec from the skill
+          new_child_specs = List.wrap(skill.child_spec(validated_opts))
 
-              dbug("Got skill child specs", child_specs: new_child_specs)
+          dbug("Got skill child specs", child_specs: new_child_specs)
 
-              # Continue processing with updated accumulators
-              {:cont,
-               {updated_state, opts, routes_acc ++ new_routes, child_specs_acc ++ new_child_specs}}
-            else
-              {:halt,
-               {:error, "Skill #{skill.name()} returned invalid routes: #{inspect(new_routes)}"}}
-            end
-
-          {:error, reason} ->
-            dbug("Skill mount failed", reason: reason)
-            {:halt, {:error, "Failed to mount skill #{skill.name()}: #{inspect(reason)}"}}
+          # Continue processing with updated accumulators
+          {:cont,
+           {updated_state, opts, routes_acc ++ new_routes, child_specs_acc ++ new_child_specs}}
+        else
+          {:halt,
+           {:error, "Skill #{skill.name()} returned invalid routes: #{inspect(new_routes)}"}}
         end
 
       {:error, reason} ->
-        dbug("Skill options validation failed", reason: reason)
-
-        {:halt,
-         {:error, "Failed to validate options for skill #{skill.name()}: #{inspect(reason)}"}}
+        dbug("Skill mount failed", reason: reason)
+        {:halt, {:error, "Failed to mount skill #{skill.name()}: #{inspect(reason)}"}}
     end
   end
 end

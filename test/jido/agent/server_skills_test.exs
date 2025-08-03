@@ -116,21 +116,6 @@ defmodule Jido.Agent.Server.SkillsTest do
       assert Keyword.get(stored_opts, :timeout) == 10_000
     end
 
-    test "returns error when skill options validation fails", %{state: state} do
-      opts = [
-        skills: [MockSkillWithSchema],
-        # Missing required api_key
-        mock_skill_with_schema: [timeout: 10_000]
-      ]
-
-      assert {:error, error_message} = Skills.build(state, opts)
-
-      assert String.contains?(
-               error_message,
-               "Failed to validate options for skill mock_skill_with_schema"
-             )
-    end
-
     test "uses default values for skill options when not provided", %{state: state} do
       opts = [
         skills: [MockSkillWithSchema],

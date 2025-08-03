@@ -328,7 +328,6 @@ defmodule Jido.Agent.Server do
   def handle_info(:process_queue, state) do
     case ServerRuntime.process_signals_in_queue(state) do
       {:ok, new_state} -> {:noreply, new_state}
-      {:error, _reason} -> {:noreply, state}
     end
   end
 
@@ -405,7 +404,7 @@ defmodule Jido.Agent.Server do
     {:via, Registry, {registry, name}}
   end
 
-  @spec build_agent(keyword()) :: {:ok, struct()} | {:error, :invalid_agent}
+  @spec build_agent(keyword()) :: {:ok, Jido.Agent.t()} | {:error, :invalid_agent}
   defp build_agent(opts) do
     dbug("Building agent", opts: opts)
 
@@ -539,7 +538,6 @@ defmodule Jido.Agent.Server do
     end
   end
 
-  @spec register_actions(any(), [module()]) :: {:ok, any()} | {:error, term()}
   defp register_actions(%ServerState{} = state, provided_actions)
        when is_list(provided_actions) do
     dbug("Registering actions with agent",
@@ -550,20 +548,15 @@ defmodule Jido.Agent.Server do
     # Combine default actions with provided actions
     all_actions = @default_actions ++ provided_actions
 
-    # Register actions with the agent
-    case Jido.Agent.register_action(state.agent, all_actions) do
-      {:ok, updated_agent} ->
-        dbug("Successfully registered actions",
-          agent_id: updated_agent.id,
-          actions: Jido.Agent.registered_actions(updated_agent)
-        )
+    # Register actions with the agent - this should always succeed for valid actions
+    {:ok, updated_agent} = Jido.Agent.register_action(state.agent, all_actions)
 
-        {:ok, %{state | agent: updated_agent}}
+    dbug("Successfully registered actions",
+      agent_id: updated_agent.id,
+      actions: Jido.Agent.registered_actions(updated_agent)
+    )
 
-      {:error, reason} ->
-        dbug("Failed to register actions", reason: reason)
-        {:error, reason}
-    end
+    {:ok, %{state | agent: updated_agent}}
   end
 
   defp register_actions(state, _), do: {:ok, state}

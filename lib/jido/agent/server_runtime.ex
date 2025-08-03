@@ -117,6 +117,7 @@ defmodule Jido.Agent.Server.Runtime do
       end
     end
 
+    @dialyzer {:nowarn_function, execute_signal: 2}
     defp execute_signal(%ServerState{} = state, _invalid_signal) do
       runtime_error(state, "Invalid signal format", :invalid_signal, "invalid-signal")
       {:error, :invalid_signal}
@@ -247,66 +248,70 @@ defmodule Jido.Agent.Server.Runtime do
       end
     end
 
-    defp route_signal(%ServerState{router: router} = state, %Signal{} = signal) do
-      case router do
-        nil ->
-          {:error, :no_router}
+    defp route_signal(%ServerState{} = state, %Signal{} = signal) do
+      case ServerRouter.route(state, signal) do
+        {:ok, instructions} ->
+          {:ok, instructions}
 
-        _ ->
-          case ServerRouter.route(state, signal) do
-            {:ok, instructions} ->
-              {:ok, instructions}
-
-            {:error, :no_matching_route} ->
-              runtime_error(state, "No matching route found for signal", :no_matching_route)
-              {:error, :no_matching_route}
-
-            {:error, reason} ->
-              runtime_error(state, "Error routing signal", reason)
-              {:error, reason}
-          end
+        {:error, reason} ->
+          runtime_error(state, "Error routing signal", reason)
+          {:error, reason}
       end
     end
 
+    @dialyzer {:nowarn_function, route_signal: 2}
     defp route_signal(_state, _invalid), do: {:error, :invalid_signal}
 
-    defp apply_signal_to_first_instruction(%Signal{} = signal, [%Instruction{} = first | rest]) do
-      dbug("Applying signal to first instruction", instruction: first)
+    @dialyzer {:nowarn_function, apply_signal_to_first_instruction: 2}
+    defp apply_signal_to_first_instruction(%Signal{} = signal, instructions)
+         when is_list(instructions) do
+      case instructions do
+        [%Instruction{} = first | rest] ->
+          dbug("Applying signal to first instruction", instruction: first)
 
-      try do
-        case signal.data do
-          %Instruction{} ->
-            {:ok, [first | rest]}
+          try do
+            case signal.data do
+              %Instruction{} ->
+                {:ok, [first | rest]}
 
-          data when is_map(data) or is_nil(data) or is_number(data) or is_binary(data) ->
-            merged_params = Map.merge(first.params || %{}, signal.data || %{})
-            result = [%{first | params: merged_params} | rest]
-            dbug("Signal applied successfully")
-            {:ok, result}
+              data when is_map(data) or is_nil(data) or is_number(data) or is_binary(data) ->
+                merged_params = Map.merge(first.params || %{}, signal.data || %{})
+                result = [%{first | params: merged_params} | rest]
+                dbug("Signal applied successfully")
+                {:ok, result}
 
-          _ ->
-            {:ok, [first | rest]}
-        end
-      rescue
-        error ->
-          dbug("Failed to apply signal", error: error)
-          {:error, error}
+              _ ->
+                {:ok, [first | rest]}
+            end
+          rescue
+            error ->
+              dbug("Failed to apply signal", error: error)
+              {:error, error}
+          end
+
+        [] ->
+          dbug("No instructions to apply signal to")
+          {:ok, []}
+
+        _ ->
+          dbug("Invalid instruction format")
+          {:error, :invalid_instruction}
       end
     end
 
-    defp apply_signal_to_first_instruction(%Signal{}, []) do
-      dbug("No instructions to apply signal to")
-      {:ok, []}
+    defp runtime_error(state, message, reason, source \\ nil)
+
+    defp runtime_error(state, message, reason, nil) do
+      source =
+        case state.current_signal do
+          %Jido.Signal{id: id} when not is_nil(id) -> id
+          _ -> "unknown"
+        end
+
+      runtime_error(state, message, reason, source)
     end
 
-    defp apply_signal_to_first_instruction(%Signal{}, _) do
-      dbug("Invalid instruction format")
-      {:error, :invalid_instruction}
-    end
-
-    defp runtime_error(state, message, reason, source \\ nil) do
-      source = source || state.current_signal.id || "unknown"
-
+    defp runtime_error(state, message, reason, source) do
       :execution_error
       |> ServerSignal.err_signal(
         state,

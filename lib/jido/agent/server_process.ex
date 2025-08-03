@@ -76,7 +76,7 @@ defmodule Jido.Agent.Server.Process do
   """
   @spec start(server_state(), child_spec() | [child_spec()]) ::
           {:ok, server_state(), child_pid() | [child_pid()]} | {:error, term()}
-  def start(%ServerState{} = state, []) do
+  def start(%ServerState{} = state, child_specs) when child_specs == [] do
     dbug("No child specs provided")
     {:ok, state, []}
   end
@@ -196,7 +196,7 @@ defmodule Jido.Agent.Server.Process do
     dbug("Restarting child process", state: state, child_pid: child_pid, spec: child_spec)
 
     with :ok <- terminate(state, child_pid),
-         {:ok, _new_pid} = result <- start(state, child_spec) do
+         {:ok, _updated_state, _new_pid} = result <- start(state, child_spec) do
       dbug("Successfully restarted child process", result: result)
 
       :process_restarted
@@ -293,7 +293,7 @@ defmodule Jido.Agent.Server.Process do
   end
 
   @spec start_child(server_state(), child_spec()) :: {:ok, pid()} | {:error, term()}
-  defp start_child(%ServerState{} = _state, []) do
+  defp start_child(%ServerState{} = _state, child_spec) when child_spec == [] do
     dbug("Empty child spec provided, skipping process start")
     {:ok, nil}
   end

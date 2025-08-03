@@ -84,35 +84,22 @@ defmodule Jido.Telemetry do
   Handles telemetry events.
   """
   @spec handle_event(event_name(), measurements(), metadata(), config :: term()) :: :ok
-  def handle_event([:jido, :operation, :start], measurements, metadata, _config) do
-    Logger.info("Operation started",
-      event: :operation_started,
-      measurements: measurements,
-      metadata: metadata
-    )
+  def handle_event([:jido, :operation, :start], _measurements, _metadata, _config) do
+    Logger.info("Operation started")
   end
 
-  def handle_event([:jido, :operation, :stop], measurements, metadata, _config) do
-    Logger.info("Operation completed",
-      event: :operation_completed,
-      duration: Map.get(measurements, :duration),
-      measurements: measurements,
-      metadata: metadata
-    )
+  def handle_event([:jido, :operation, :stop], measurements, _metadata, _config) do
+    duration = Map.get(measurements, :duration, 0)
+    Logger.info("Operation completed in #{duration}ms")
   end
 
   def handle_event(
         [:jido, :operation, :exception],
-        measurements,
-        %{error: error} = metadata,
+        _measurements,
+        %{error: error},
         _config
       ) do
-    Logger.warning("Operation failed",
-      event: :operation_failed,
-      error: inspect(error),
-      measurements: measurements,
-      metadata: metadata
-    )
+    Logger.warning("Operation failed: #{inspect(error)}")
   end
 
   @doc """

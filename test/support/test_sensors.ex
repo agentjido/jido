@@ -146,7 +146,7 @@ defmodule JidoTest.TestSensors do
     def handle_info(:emit, state) do
       case deliver_signal(state) do
         {:ok, signal, new_state} ->
-          case Jido.Signal.Dispatch.dispatch({:ok, signal}, state.target) do
+          case Jido.Signal.Dispatch.dispatch(signal, state.target) do
             :ok ->
               schedule_emit(new_state)
               {:noreply, new_state}

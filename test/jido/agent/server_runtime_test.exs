@@ -31,10 +31,12 @@ defmodule JidoTest.Agent.ServerRuntimeTest do
   end
 
   describe "route_signal/2" do
-    test "returns error when router is nil" do
-      state = %ServerState{agent: BasicAgent.new("test"), router: nil}
-      signal = Signal.new!(%{type: "test", id: "test-id-123"})
-      assert {:error, :no_router} = ServerRuntime.route_signal(state, signal)
+    test "returns error when no routes match" do
+      state = %ServerState{agent: BasicAgent.new("test")}
+      signal = Signal.new!(%{type: "nonexistent", id: "test-id-123"})
+
+      assert {:error, %Jido.Signal.Error.RoutingError{}} =
+               ServerRuntime.route_signal(state, signal)
     end
 
     test "routes signal successfully" do

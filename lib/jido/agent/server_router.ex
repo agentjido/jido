@@ -231,18 +231,21 @@ defmodule Jido.Agent.Server.Router do
       _ ->
         dbug("Routing through router")
 
-        case Router.route(state.router, signal) do
-          {:ok, []} ->
-            dbug("No matching routes found for signal type", type: signal.type)
-            {:error, :no_matching_route}
+        case state.router do
+          nil ->
+            dbug("No router configured")
+            {:error, :no_router}
 
-          {:ok, instructions} ->
-            dbug("Signal routed successfully", instructions: instructions)
-            {:ok, instructions}
+          router ->
+            case Router.route(router, signal) do
+              {:ok, instructions} ->
+                dbug("Signal routed successfully", instructions: instructions)
+                {:ok, instructions}
 
-          {:error, reason} ->
-            dbug("Failed to route signal", error: reason)
-            {:error, reason}
+              {:error, reason} ->
+                dbug("Failed to route signal", error: reason)
+                {:error, reason}
+            end
         end
     end
   end

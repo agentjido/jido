@@ -43,7 +43,7 @@ defmodule Jido.Agent.Server.Directive do
       ])
   """
   @spec handle(ServerState.t(), Directive.t() | [Directive.t()]) ::
-          {:ok, ServerState.t()} | {:error, Error.t()}
+          {:ok, ServerState.t()} | {:error, term()}
   def handle(%ServerState{} = state, directives) when is_list(directives) do
     dbug("Processing multiple directives", directives: directives)
 
@@ -87,7 +87,60 @@ defmodule Jido.Agent.Server.Directive do
       # Execute a kill directive
       {:ok, state} = Directive.execute(state, %Kill{pid: worker_pid})
   """
-  @spec execute(ServerState.t(), Directive.t()) :: {:ok, ServerState.t()} | {:error, Error.t()}
+  @spec execute(ServerState.t(), Directive.t()) :: {:ok, ServerState.t()} | {:error, term()}
+
+  # Kill directive - should come before Spawn to avoid pattern overlap
+  def execute(%ServerState{} = state, %Kill{pid: pid}) do
+    dbug("Executing kill directive", pid: pid)
+
+    case ServerProcess.terminate(state, pid) do
+      :ok ->
+        dbug("Process terminated successfully", pid: pid)
+        {:ok, state}
+
+      {:error, :not_found} ->
+        dbug("Process not found", pid: pid)
+        {:error, Error.execution_error("Process not found", %{pid: pid})}
+    end
+  end
+
+  # Spawn directive for Task with function
+  def execute(%ServerState{} = state, %Spawn{module: Task, args: fun}) when is_function(fun) do
+    dbug("Executing spawn task directive", fun: fun)
+
+    # Create a proper child spec for Task
+    child_spec = %{
+      id: make_ref(),
+      start: {Task, :start_link, [fun]},
+      restart: :temporary,
+      type: :worker
+    }
+
+    case ServerProcess.start(state, child_spec) do
+      {:ok, updated_state, _pid} ->
+        dbug("Task spawned successfully: pid: #{inspect(_pid)}")
+        {:ok, updated_state}
+
+      {:error, reason} ->
+        dbug("Failed to spawn task", reason: reason)
+        {:error, Error.execution_error("Failed to spawn process", %{reason: reason})}
+    end
+  end
+
+  # Spawn directive for general modules  
+  def execute(%ServerState{} = state, %Spawn{module: module, args: args}) do
+    dbug("Executing spawn directive", module: module, args: args)
+
+    case ServerProcess.start(state, {module, args}) do
+      {:ok, updated_state, _pid} ->
+        dbug("Process spawned successfully: pid: #{inspect(_pid)}")
+        {:ok, updated_state}
+
+      {:error, reason} ->
+        dbug("Failed to spawn process", reason: reason)
+        {:error, Error.execution_error("Failed to spawn process", %{reason: reason})}
+    end
+  end
 
   def execute(%ServerState{} = state, %Enqueue{
         action: action,
@@ -97,23 +150,35 @@ defmodule Jido.Agent.Server.Directive do
       }) do
     dbug("Executing enqueue directive", action: action, params: params)
 
-    # Create instruction from directive
-    instruction = %Instruction{action: action, params: params, context: context, opts: opts}
+    # Validate action is not nil  
+    cond do
+      action == nil ->
+        {:error, Error.validation_error("Action cannot be nil", %{action: action})}
 
-    # Create signal with instruction as data
-    signal = ServerSignal.cmd_signal(:enqueue, state, instruction)
+      not is_atom(action) ->
+        {:error, Error.validation_error("Action must be an atom", %{action: action})}
 
-    dbug("Processing enqueue directive", signal: signal)
+      true ->
+        # Create instruction from directive
+        instruction = %Instruction{action: action, params: params, context: context, opts: opts}
 
-    # Enqueue signal at front of queue
-    case ServerState.enqueue_front(state, signal) do
-      {:ok, updated_state} ->
-        dbug("Signal enqueued successfully")
-        {:ok, updated_state}
+        # Create signal with instruction as data
+        signal = ServerSignal.cmd_signal(:enqueue, state, instruction)
 
-      {:error, :queue_overflow} ->
-        dbug("Failed to enqueue signal - queue overflow")
-        {:error, Error.execution_error("Failed to enqueue signal", %{reason: :queue_overflow})}
+        dbug("Processing enqueue directive", signal: signal)
+
+        # Enqueue signal at front of queue
+        case ServerState.enqueue_front(state, signal) do
+          {:ok, updated_state} ->
+            dbug("Signal enqueued successfully")
+            {:ok, updated_state}
+
+          {:error, :queue_overflow} ->
+            dbug("Failed to enqueue signal - queue overflow")
+
+            {:error,
+             Error.execution_error("Failed to enqueue signal", %{reason: :queue_overflow})}
+        end
     end
   end
 
@@ -169,6 +234,7 @@ defmodule Jido.Agent.Server.Directive do
           updated_agent = %{state.agent | state: put_in(state.agent.state, List.wrap(path), nil)}
           {:ok, %{state | agent: updated_agent}}
 
+        # Handle test cases and potential runtime type bypassing
         invalid_op ->
           dbug("Invalid state modification operation", op: invalid_op)
 
@@ -179,60 +245,6 @@ defmodule Jido.Agent.Server.Directive do
       error in [ArgumentError] ->
         dbug("Failed to modify state", error: error)
         {:error, Error.execution_error("Failed to modify state", %{error: error})}
-    end
-  end
-
-  def execute(%ServerState{} = state, %Spawn{module: Task, args: fun}) when is_function(fun) do
-    dbug("Executing spawn task directive", fun: fun)
-
-    # Create a proper child spec for Task
-    child_spec = %{
-      id: make_ref(),
-      start: {Task, :start_link, [fun]},
-      restart: :temporary,
-      type: :worker
-    }
-
-    case ServerProcess.start(state, child_spec) do
-      {:ok, updated_state, _pid} ->
-        dbug("Task spawned successfully: pid: #{inspect(_pid)}")
-        {:ok, updated_state}
-
-      {:error, reason} ->
-        dbug("Failed to spawn task", reason: reason)
-        {:error, Error.execution_error("Failed to spawn process", %{reason: reason})}
-    end
-  end
-
-  def execute(%ServerState{} = state, %Spawn{module: module, args: args}) do
-    dbug("Executing spawn directive", module: module, args: args)
-
-    case ServerProcess.start(state, {module, args}) do
-      {:ok, updated_state, _pid} ->
-        dbug("Process spawned successfully: pid: #{inspect(_pid)}")
-        {:ok, updated_state}
-
-      {:error, reason} ->
-        dbug("Failed to spawn process", reason: reason)
-        {:error, Error.execution_error("Failed to spawn process", %{reason: reason})}
-    end
-  end
-
-  def execute(%ServerState{} = state, %Kill{pid: pid}) do
-    dbug("Executing kill directive", pid: pid)
-
-    case ServerProcess.terminate(state, pid) do
-      :ok ->
-        dbug("Process terminated successfully", pid: pid)
-        {:ok, state}
-
-      {:error, :not_found} ->
-        dbug("Process not found", pid: pid)
-        {:error, Error.execution_error("Process not found", %{pid: pid})}
-
-      {:error, reason} ->
-        dbug("Failed to terminate process", pid: pid, reason: reason)
-        {:error, Error.execution_error("Failed to terminate process", %{reason: reason})}
     end
   end
 
