@@ -258,6 +258,7 @@ defmodule Jido.MixProject do
       # Skill & Action Dependencies for examples
       {:abacus, "~> 2.1"},
       {:req, "~> 0.5.10"},
+      {:behavior_tree, "~> 0.3.1"},
 
       # Development & Test Dependencies
       {:credo, "~> 1.7", only: [:dev, :test]},
