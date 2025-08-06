@@ -56,7 +56,8 @@ defmodule Jido.Agents.BehaviorTree do
       Jido.Actions.StateManager.Get,
       Jido.Actions.StateManager.Set,
       Jido.Actions.StateManager.Update,
-      Jido.Actions.StateManager.Delete
+      Jido.Actions.StateManager.Delete,
+      Jido.Actions.StateManager.Replace
     ]
 
   @default_opts [

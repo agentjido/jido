@@ -234,6 +234,10 @@ defmodule Jido.Agent.Server.Directive do
           updated_agent = %{state.agent | state: put_in(state.agent.state, List.wrap(path), nil)}
           {:ok, %{state | agent: updated_agent}}
 
+        :replace ->
+          updated_agent = %{state.agent | state: value}
+          {:ok, %{state | agent: updated_agent}}
+
         # Handle test cases and potential runtime type bypassing
         invalid_op ->
           dbug("Invalid state modification operation", op: invalid_op)

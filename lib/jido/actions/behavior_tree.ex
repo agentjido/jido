@@ -31,7 +31,7 @@ defmodule Jido.Actions.BehaviorTree.Tick do
   alias BehaviorTree
   require Logger
 
-  def run(%{tree: tree_node, context: context, verbose: verbose}, _action_context) do
+  def run(%{tree: tree_node, context: context, verbose: verbose}, action_context) do
     # Start or continue the behavior tree
     behavior_tree = BehaviorTree.start(tree_node)
     current_behavior = BehaviorTree.value(behavior_tree)
@@ -40,17 +40,18 @@ defmodule Jido.Actions.BehaviorTree.Tick do
       Logger.info("BehaviorTree.Tick: Current behavior is #{inspect(current_behavior)}")
     end
     
-    # Persist the updated tree state and context to agent
+    # Create new state with updated tree state and context
+    new_state = Map.merge(action_context.state, %{
+      tree_state: behavior_tree,
+      context: context
+    })
+    
+    # Replace the entire state
     state_directives = [
       %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:tree_state],
-        value: behavior_tree
-      },
-      %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:context],
-        value: context
+        op: :replace,
+        path: [],
+        value: new_state
       }
     ]
     
@@ -106,17 +107,18 @@ defmodule Jido.Actions.BehaviorTree.Succeed do
       Logger.info("BehaviorTree.Succeed: Advanced to behavior #{inspect(current_behavior)}")
     end
     
-    # Persist the updated tree state and context to agent
+    # Create new state with updated tree state and context
+    new_state = Map.merge(context.state, %{
+      tree_state: new_tree_state,
+      context: bt_context
+    })
+    
+    # Replace the entire state
     state_directives = [
       %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:tree_state],
-        value: new_tree_state
-      },
-      %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:context],
-        value: bt_context
+        op: :replace,
+        path: [],
+        value: new_state
       }
     ]
     
@@ -172,17 +174,18 @@ defmodule Jido.Actions.BehaviorTree.Fail do
       Logger.info("BehaviorTree.Fail: Advanced to behavior #{inspect(current_behavior)}")
     end
     
-    # Persist the updated tree state and context to agent
+    # Create new state with updated tree state and context
+    new_state = Map.merge(context.state, %{
+      tree_state: new_tree_state,
+      context: bt_context
+    })
+    
+    # Replace the entire state
     state_directives = [
       %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:tree_state],
-        value: new_tree_state
-      },
-      %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:context],
-        value: bt_context
+        op: :replace,
+        path: [],
+        value: new_state
       }
     ]
     
@@ -214,7 +217,7 @@ defmodule Jido.Actions.BehaviorTree.Reset do
   alias BehaviorTree
   require Logger
 
-  def run(%{tree: tree_node, context: context, verbose: verbose}, _action_context) do
+  def run(%{tree: tree_node, context: context, verbose: verbose}, action_context) do
     behavior_tree = BehaviorTree.start(tree_node)
     current_behavior = BehaviorTree.value(behavior_tree)
     
@@ -222,17 +225,18 @@ defmodule Jido.Actions.BehaviorTree.Reset do
       Logger.info("BehaviorTree.Reset: Reset to behavior #{inspect(current_behavior)}")
     end
     
-    # Persist the reset tree state and context to agent
+    # Create new state with reset tree state and context
+    new_state = Map.merge(action_context.state, %{
+      tree_state: behavior_tree,
+      context: context
+    })
+    
+    # Replace the entire state
     state_directives = [
       %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:tree_state],
-        value: behavior_tree
-      },
-      %Jido.Agent.Directive.StateModification{
-        op: :set,
-        path: [:context],
-        value: context
+        op: :replace,
+        path: [],
+        value: new_state
       }
     ]
     
