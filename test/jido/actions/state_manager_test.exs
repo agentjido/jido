@@ -440,6 +440,7 @@ defmodule Jido.Actions.StateManagerTest do
 
     test "replaces state with complex nested structure" do
       state = %{simple: "state"}
+
       new_state = %{
         complex: %{
           nested: %{

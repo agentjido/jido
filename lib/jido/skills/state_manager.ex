@@ -1,20 +1,20 @@
 defmodule Jido.Skills.StateManager do
   @moduledoc """
   A skill that provides state management capabilities for agents.
-  
+
   This skill allows agents to get, set, update, and delete values in their state
   using structured signals.
-  
+
   ## Signal Types
-  
+
   - `jido.state.get` - Get a value from the agent's state
   - `jido.state.set` - Set a value in the agent's state
   - `jido.state.update` - Update a value in the agent's state
   - `jido.state.delete` - Delete a value from the agent's state
   """
-  
+
   alias Jido.Instruction
-  
+
   use Jido.Skill,
     name: "state_manager_skill",
     description: "Provides state management capabilities for agents",

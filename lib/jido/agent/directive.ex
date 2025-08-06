@@ -39,6 +39,14 @@ defmodule Jido.Agent.Directive do
         - Supports optional value
         - Example: `%StateModification{op: :set, path: [:config, :mode], value: :active}`
 
+    * `AddRoute` - Adds a route to the agent's router
+        - Requires a path pattern and instruction
+        - Example: `%AddRoute{path: "child.*", instruction: %Instruction{action: :handle_child}}`
+
+    * `RemoveRoute` - Removes a route from the agent's router
+        - Requires a path pattern
+        - Example: `%RemoveRoute{path: "child.*"}`
+
     ## Usage
 
     Directives can be applied to either an Agent or ServerState struct:
@@ -79,6 +87,7 @@ defmodule Jido.Agent.Directive do
     * `:invalid_module` - The module specified in a `Spawn` is invalid
     * `:invalid_pid` - The PID specified in a `Kill` is invalid
     * `:invalid_topic` - The topic specified in a broadcast/subscribe/unsubscribe directive is invalid
+    * `:invalid_route_path` - The path specified in `AddRoute` or `RemoveRoute` is invalid
 
     ## Ideas
     Change Mode
@@ -174,6 +183,25 @@ defmodule Jido.Agent.Directive do
     end
   end
 
+  defmodule AddRoute do
+    @moduledoc "Directive to add a route to the agent's router"
+    use TypedStruct
+
+    typedstruct do
+      field(:path, String.t(), enforce: true)
+      field(:instruction, term(), enforce: true)
+    end
+  end
+
+  defmodule RemoveRoute do
+    @moduledoc "Directive to remove a route from the agent's router"
+    use TypedStruct
+
+    typedstruct do
+      field(:path, String.t(), enforce: true)
+    end
+  end
+
   @type t ::
           Enqueue.t()
           | RegisterAction.t()
@@ -181,6 +209,8 @@ defmodule Jido.Agent.Directive do
           | Spawn.t()
           | Kill.t()
           | StateModification.t()
+          | AddRoute.t()
+          | RemoveRoute.t()
           | Instruction.t()
           | [Instruction.t()]
 
@@ -397,6 +427,12 @@ defmodule Jido.Agent.Directive do
         :ok
     end
   end
+
+  defp validate_directive(%AddRoute{path: path}) when is_binary(path), do: :ok
+  defp validate_directive(%AddRoute{}), do: {:error, :invalid_route_path}
+
+  defp validate_directive(%RemoveRoute{path: path}) when is_binary(path), do: :ok
+  defp validate_directive(%RemoveRoute{}), do: {:error, :invalid_route_path}
 
   defp validate_directive(instructions) when is_list(instructions) do
     if Enum.all?(instructions, &match?(%Instruction{}, &1)) do

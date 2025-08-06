@@ -1,6 +1,7 @@
 defmodule JidoTest.Actions.DirectivesTest do
   use JidoTest.Case, async: true
   alias Jido.Actions.Directives
+  alias Jido.Action.Error
 
   describe "EnqueueAction" do
     test "creates enqueue directive with params" do
@@ -58,6 +59,52 @@ defmodule JidoTest.Actions.DirectivesTest do
       pid = self()
       assert {:ok, %{}, directive} = Directives.Kill.run(%{pid: pid}, %{})
       assert directive.pid == pid
+    end
+  end
+
+  describe "AddRoute" do
+    test "creates add route directive" do
+      path = "child.*"
+      instruction = %Jido.Instruction{action: :handle_child}
+
+      assert {:ok, %{}, directive} =
+               Directives.AddRoute.run(%{path: path, instruction: instruction}, %{})
+
+      assert directive.path == path
+      assert directive.instruction == instruction
+    end
+
+    test "validates required parameters" do
+      # Missing path parameter
+      params = %{instruction: %Jido.Instruction{action: :handle_child}}
+      assert {:error, error} = Directives.AddRoute.validate_params(params)
+      assert %Error.InvalidInputError{} = error
+
+      # Missing instruction parameter  
+      params = %{path: "child.*"}
+      assert {:error, error} = Directives.AddRoute.validate_params(params)
+      assert %Error.InvalidInputError{} = error
+
+      # Missing both parameters
+      params = %{}
+      assert {:error, error} = Directives.AddRoute.validate_params(params)
+      assert %Error.InvalidInputError{} = error
+    end
+  end
+
+  describe "RemoveRoute" do
+    test "creates remove route directive" do
+      path = "child.*"
+
+      assert {:ok, %{}, directive} = Directives.RemoveRoute.run(%{path: path}, %{})
+      assert directive.path == path
+    end
+
+    test "validates required parameters" do
+      # Missing path parameter
+      params = %{}
+      assert {:error, error} = Directives.RemoveRoute.validate_params(params)
+      assert %Error.InvalidInputError{} = error
     end
   end
 end

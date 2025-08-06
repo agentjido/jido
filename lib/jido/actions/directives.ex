@@ -6,6 +6,10 @@ defmodule Jido.Actions.Directives do
   - EnqueueAction: Enqueues another action based on params
   - RegisterAction: Registers a new action module
   - DeregisterAction: Deregisters an existing action module
+  - Spawn: Spawns a child process under the agent's supervisor
+  - Kill: Terminates a child process
+  - AddRoute: Adds a route to the agent's router for signal routing
+  - RemoveRoute: Removes a route from the agent's router
 
   Each action is implemented as a separate submodule and follows the Jido.DirectiveAction behavior.
   """
@@ -114,6 +118,44 @@ defmodule Jido.Actions.Directives do
     @spec run(map(), map()) :: {:ok, map(), Jido.Agent.Directive.Kill.t()} | {:error, term()}
     def run(%{pid: pid}, _ctx) do
       directive = %Jido.Agent.Directive.Kill{pid: pid}
+      {:ok, %{}, directive}
+    end
+  end
+
+  defmodule AddRoute do
+    @moduledoc false
+    use Jido.Action,
+      name: "add_route",
+      description: "Adds a route to the agent's router",
+      schema: [
+        path: [type: :string, required: true, doc: "Signal path pattern to match"],
+        instruction: [type: :any, required: true, doc: "Instruction to execute when path matches"]
+      ]
+
+    @spec run(map(), map()) :: {:ok, map(), Jido.Agent.Directive.AddRoute.t()} | {:error, term()}
+    def run(%{path: path, instruction: instruction}, _ctx) do
+      directive = %Jido.Agent.Directive.AddRoute{
+        path: path,
+        instruction: instruction
+      }
+
+      {:ok, %{}, directive}
+    end
+  end
+
+  defmodule RemoveRoute do
+    @moduledoc false
+    use Jido.Action,
+      name: "remove_route",
+      description: "Removes a route from the agent's router",
+      schema: [
+        path: [type: :string, required: true, doc: "Signal path pattern to remove"]
+      ]
+
+    @spec run(map(), map()) ::
+            {:ok, map(), Jido.Agent.Directive.RemoveRoute.t()} | {:error, term()}
+    def run(%{path: path}, _ctx) do
+      directive = %Jido.Agent.Directive.RemoveRoute{path: path}
       {:ok, %{}, directive}
     end
   end
