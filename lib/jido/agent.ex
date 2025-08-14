@@ -1210,8 +1210,10 @@ defmodule Jido.Agent do
   # Server Callbacks
   @callback start_link(opts :: keyword()) :: {:ok, pid()} | {:error, any()}
   @callback child_spec(opts :: keyword()) :: Supervisor.child_spec()
-  @callback mount(agent :: t(), opts :: keyword()) :: {:ok, map()} | {:error, any()}
-  @callback shutdown(agent :: t(), reason :: any()) :: {:ok, map()} | {:error, any()}
+  @callback mount(state :: Jido.Agent.Server.State.t(), opts :: keyword()) ::
+              {:ok, Jido.Agent.Server.State.t()} | {:error, term()}
+  @callback shutdown(state :: Jido.Agent.Server.State.t(), reason :: term()) ::
+              {:ok, Jido.Agent.Server.State.t()} | {:error, term()}
   @callback handle_signal(signal :: Signal.t(), agent :: t()) ::
               {:ok, Signal.t()} | {:error, any()}
   @callback transform_result(
