@@ -466,7 +466,6 @@ defmodule Jido.Agent.Server do
   ## Private functions
 
   @doc false
-  @spec validate_instruction(Instruction.t()) :: {:ok, Instruction.t()} | {:error, term()}
   defp validate_instruction(%Instruction{action: action} = instruction) when not is_nil(action) do
     cond do
       is_atom(action) and Code.ensure_loaded?(action) ->
