@@ -9,15 +9,6 @@ defmodule Jido.Agent.Server do
   - Queue management with backpressure
   - Automatic state validation and debugging
 
-  ## Architecture
-
-  The server uses GenStateMachine instead of GenServer to provide:
-  - **Explicit State Machine**: Automatic state transition validation
-  - **Better Concurrency**: More efficient event handling  
-  - **Enhanced Debugging**: Built-in tracing and state inspection
-  - **Safer Operations**: Prevents invalid state transitions
-  - **Cleaner Code**: Single event handler instead of multiple callbacks
-
   ## Agent States
 
   - `:initializing` - Server is starting up and mounting callbacks
