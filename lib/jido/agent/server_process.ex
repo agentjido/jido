@@ -1,7 +1,5 @@
 defmodule Jido.Agent.Server.Process do
   @moduledoc false
-
-  use ExDbug, enabled: false
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Agent.Server.Signal, as: ServerSignal
   alias Jido.Agent.Server.Output, as: ServerOutput
@@ -31,19 +29,15 @@ defmodule Jido.Agent.Server.Process do
   @spec stop_supervisor(server_state()) :: :ok | {:error, term()}
   def stop_supervisor(%ServerState{child_supervisor: supervisor})
       when is_pid(supervisor) do
-    dbug("Stopping supervisor", supervisor: supervisor)
-
     try do
       DynamicSupervisor.stop(supervisor, :shutdown)
     catch
       :exit, _reason ->
-        dbug("Supervisor already stopped", reason: _reason)
         :ok
     end
   end
 
   def stop_supervisor(%ServerState{} = _state) do
-    dbug("No supervisor to stop")
     :ok
   end
 
@@ -77,7 +71,6 @@ defmodule Jido.Agent.Server.Process do
   @spec start(server_state(), child_spec() | [child_spec()]) ::
           {:ok, server_state(), child_pid() | [child_pid()]} | {:error, term()}
   def start(%ServerState{} = state, child_specs) when child_specs == [] do
-    dbug("No child specs provided")
     {:ok, state, []}
   end
 
@@ -90,32 +83,25 @@ defmodule Jido.Agent.Server.Process do
 
   def start(%ServerState{child_supervisor: supervisor} = state, child_specs)
       when is_pid(supervisor) and is_list(child_specs) do
-    dbug("Starting multiple child processes", state: state, specs: child_specs)
     results = Enum.map(child_specs, &start_child(state, &1))
 
     case Enum.split_with(results, &match?({:ok, _}, &1)) do
       {successes, []} ->
         pids = Enum.map(successes, fn {:ok, pid} -> pid end)
-        dbug("Successfully started all children", pids: pids)
         {:ok, state, pids}
 
       {_, failures} ->
         reasons = Enum.map(failures, fn {:error, reason} -> reason end)
-        dbug("Failed to start some children", failures: reasons)
         {:error, reasons}
     end
   end
 
   def start(%ServerState{} = state, child_spec) do
-    dbug("Starting single child process", state: state, spec: child_spec)
-
     case start_child(state, child_spec) do
       {:ok, pid} ->
-        dbug("Successfully started child", pid: pid)
         {:ok, state, pid}
 
       error ->
-        dbug("Failed to start child", error: error)
         error
     end
   end
@@ -134,9 +120,7 @@ defmodule Jido.Agent.Server.Process do
   """
   @spec list(server_state()) :: [{:undefined, pid(), :worker, [module()]}]
   def list(%ServerState{child_supervisor: supervisor}) when is_pid(supervisor) do
-    dbug("Listing child processes", supervisor: supervisor)
     children = DynamicSupervisor.which_children(supervisor)
-    dbug("Found children", children: children)
     children
   end
 
@@ -156,12 +140,8 @@ defmodule Jido.Agent.Server.Process do
   @spec terminate(server_state(), child_pid()) :: :ok | {:error, :not_found}
   def terminate(%ServerState{child_supervisor: supervisor} = state, child_pid)
       when is_pid(supervisor) do
-    dbug("Terminating child process", state: state, child_pid: child_pid)
-
     case DynamicSupervisor.terminate_child(supervisor, child_pid) do
       :ok ->
-        dbug("Child process terminated successfully")
-
         :process_terminated
         |> ServerSignal.event_signal(state, %{child_pid: child_pid})
         |> ServerOutput.emit(state)
@@ -169,7 +149,6 @@ defmodule Jido.Agent.Server.Process do
         :ok
 
       {:error, _reason} = error ->
-        dbug("Failed to terminate child process", error: error)
         error
     end
   end
@@ -193,12 +172,8 @@ defmodule Jido.Agent.Server.Process do
   """
   @spec restart(server_state(), child_pid(), child_spec()) :: {:ok, pid()} | {:error, term()}
   def restart(%ServerState{} = state, child_pid, child_spec) do
-    dbug("Restarting child process", state: state, child_pid: child_pid, spec: child_spec)
-
     with :ok <- terminate(state, child_pid),
          {:ok, _updated_state, _new_pid} = result <- start(state, child_spec) do
-      dbug("Successfully restarted child process", result: result)
-
       :process_restarted
       |> ServerSignal.event_signal(state, %{child_pid: child_pid, child_spec: child_spec})
       |> ServerOutput.emit(state)
@@ -206,8 +181,6 @@ defmodule Jido.Agent.Server.Process do
       result
     else
       error ->
-        dbug("Failed to restart child process", error: error)
-
         :process_failed
         |> ServerSignal.event_signal(state, %{
           child_pid: child_pid,
@@ -279,28 +252,21 @@ defmodule Jido.Agent.Server.Process do
 
   @spec start_supervisor(server_state()) :: {:ok, server_state()} | {:error, term()}
   defp start_supervisor(%ServerState{} = state) do
-    dbug("Starting supervisor", state: state)
-
     case DynamicSupervisor.start_link(strategy: :one_for_one) do
       {:ok, supervisor} ->
-        dbug("Supervisor started successfully", supervisor: supervisor)
         {:ok, %{state | child_supervisor: supervisor}}
 
       {:error, _reason} = error ->
-        dbug("Failed to start supervisor", error: error)
         error
     end
   end
 
   @spec start_child(server_state(), child_spec()) :: {:ok, pid()} | {:error, term()}
   defp start_child(%ServerState{} = _state, child_spec) when child_spec == [] do
-    dbug("Empty child spec provided, skipping process start")
     {:ok, nil}
   end
 
   defp start_child(%ServerState{child_supervisor: supervisor} = state, child_spec) do
-    dbug("Starting child process", supervisor: supervisor, spec: child_spec)
-
     require Logger
     Logger.debug("Starting child process #{inspect(child_spec)}")
 
@@ -309,8 +275,6 @@ defmodule Jido.Agent.Server.Process do
       {:ok, supervisor_child_spec} ->
         case DynamicSupervisor.start_child(supervisor, supervisor_child_spec) do
           {:ok, pid} = result ->
-            dbug("Child process started successfully", pid: pid)
-
             :process_started
             |> ServerSignal.event_signal(state, %{child_pid: pid, child_spec: child_spec})
             |> ServerOutput.emit(state)
@@ -318,8 +282,6 @@ defmodule Jido.Agent.Server.Process do
             result
 
           {:error, reason} = error ->
-            dbug("Failed to start child process", reason: reason)
-
             :process_failed
             |> ServerSignal.event_signal(state, %{child_spec: child_spec, error: reason})
             |> ServerOutput.emit(state)
@@ -328,8 +290,6 @@ defmodule Jido.Agent.Server.Process do
         end
 
       {:error, reason} = error ->
-        dbug("Invalid child spec", reason: reason)
-
         :process_failed
         |> ServerSignal.event_signal(state, %{child_spec: child_spec, error: reason})
         |> ServerOutput.emit(state)

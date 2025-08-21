@@ -56,7 +56,6 @@ defmodule Jido.Agent.Server.State do
   """
 
   use TypedStruct
-  use ExDbug, enabled: false
   alias Jido.Signal
   alias Jido.Agent.Server.Signal, as: ServerSignal
   alias Jido.Agent.Server.Output, as: ServerOutput
@@ -176,17 +175,12 @@ defmodule Jido.Agent.Server.State do
   @spec transition(%__MODULE__{status: status()}, status()) ::
           {:ok, %__MODULE__{}} | {:error, {:invalid_transition, status(), status()}}
   def transition(%__MODULE__{status: current} = state, current) do
-    dbug("State already in desired state - no transition needed", current: current)
     {:ok, state}
   end
 
   def transition(%__MODULE__{status: current} = state, desired) do
-    dbug("Attempting state transition", current: current, desired: desired)
-
     case @transitions[current][desired] do
       nil ->
-        dbug("Invalid state transition", current: current, desired: desired)
-
         :transition_failed
         |> ServerSignal.event_signal(state, %{from: current, to: desired})
         |> ServerOutput.emit(state)
@@ -194,8 +188,6 @@ defmodule Jido.Agent.Server.State do
         {:error, {:invalid_transition, current, desired}}
 
       _reason ->
-        dbug("Valid state transition", current: current, desired: desired, reason: _reason)
-
         :transition_succeeded
         |> ServerSignal.event_signal(state, %{from: current, to: desired})
         |> ServerOutput.emit(state)
@@ -232,13 +224,9 @@ defmodule Jido.Agent.Server.State do
   """
   @spec enqueue(%__MODULE__{}, Signal.t()) :: {:ok, %__MODULE__{}} | {:error, :queue_overflow}
   def enqueue(%__MODULE__{} = state, %Signal{} = signal) do
-    dbug("Attempting to enqueue signal", signal: signal)
     queue_size = :queue.len(state.pending_signals)
-    dbug("Current queue size", size: queue_size, max_size: state.max_queue_size)
 
     if queue_size >= state.max_queue_size do
-      dbug("Queue overflow detected", queue_size: queue_size, max_size: state.max_queue_size)
-
       :queue_overflow
       |> ServerSignal.event_signal(state, %{
         queue_size: queue_size,
@@ -248,7 +236,6 @@ defmodule Jido.Agent.Server.State do
 
       {:error, :queue_overflow}
     else
-      dbug("Enqueuing signal", signal: signal)
       {:ok, %{state | pending_signals: :queue.in(signal, state.pending_signals)}}
     end
   end
@@ -282,13 +269,9 @@ defmodule Jido.Agent.Server.State do
   @spec enqueue_front(%__MODULE__{}, Signal.t()) ::
           {:ok, %__MODULE__{}} | {:error, :queue_overflow}
   def enqueue_front(%__MODULE__{} = state, %Signal{} = signal) do
-    dbug("Attempting to enqueue signal at front", signal: signal)
     queue_size = :queue.len(state.pending_signals)
-    dbug("Current queue size", size: queue_size, max_size: state.max_queue_size)
 
     if queue_size >= state.max_queue_size do
-      dbug("Queue overflow detected", queue_size: queue_size, max_size: state.max_queue_size)
-
       :queue_overflow
       |> ServerSignal.event_signal(state, %{
         queue_size: queue_size,
@@ -298,7 +281,6 @@ defmodule Jido.Agent.Server.State do
 
       {:error, :queue_overflow}
     else
-      dbug("Enqueuing signal at front", signal: signal)
       {:ok, %{state | pending_signals: :queue.in_r(signal, state.pending_signals)}}
     end
   end
@@ -330,12 +312,8 @@ defmodule Jido.Agent.Server.State do
   """
   @spec dequeue(%__MODULE__{}) :: {:ok, term(), %__MODULE__{}} | {:error, :empty_queue}
   def dequeue(%__MODULE__{} = state) do
-    dbug("Attempting to dequeue signal")
-
     case :queue.out(state.pending_signals) do
       {{:value, signal}, new_queue} ->
-        dbug("Signal dequeued successfully", signal: signal)
-
         {:ok, signal,
          %{
            state
@@ -344,7 +322,6 @@ defmodule Jido.Agent.Server.State do
          }}
 
       {:empty, _} ->
-        dbug("Queue is empty")
         {:error, :empty_queue}
     end
   end
@@ -370,8 +347,6 @@ defmodule Jido.Agent.Server.State do
   """
   @spec clear_queue(%__MODULE__{}) :: {:ok, %__MODULE__{}}
   def clear_queue(%__MODULE__{} = state) do
-    dbug("Clearing signal queue", queue_size: :queue.len(state.pending_signals))
-
     :queue_cleared
     |> ServerSignal.event_signal(state, %{
       queue_size: :queue.len(state.pending_signals)
@@ -407,13 +382,9 @@ defmodule Jido.Agent.Server.State do
   """
   @spec check_queue_size(%__MODULE__{}) :: {:ok, non_neg_integer()} | {:error, :queue_overflow}
   def check_queue_size(%__MODULE__{} = state) do
-    dbug("Checking queue size")
     queue_size = :queue.len(state.pending_signals)
-    dbug("Current queue metrics", size: queue_size, max_size: state.max_queue_size)
 
     if queue_size > state.max_queue_size do
-      dbug("Queue size exceeds maximum", queue_size: queue_size, max_size: state.max_queue_size)
-
       :queue_overflow
       |> ServerSignal.event_signal(state, %{
         queue_size: queue_size,
@@ -423,7 +394,6 @@ defmodule Jido.Agent.Server.State do
 
       {:error, :queue_overflow}
     else
-      dbug("Queue size within limits", size: queue_size)
       {:ok, queue_size}
     end
   end
@@ -443,7 +413,6 @@ defmodule Jido.Agent.Server.State do
   """
   @spec store_reply_ref(%__MODULE__{}, String.t(), GenServer.from()) :: %__MODULE__{}
   def store_reply_ref(%__MODULE__{} = state, signal_id, from) do
-    dbug("Storing reply ref", signal_id: signal_id, from: from)
     %{state | reply_refs: Map.put(state.reply_refs, signal_id, from)}
   end
 
@@ -461,7 +430,6 @@ defmodule Jido.Agent.Server.State do
   """
   @spec get_reply_ref(%__MODULE__{}, String.t()) :: GenServer.from() | nil
   def get_reply_ref(%__MODULE__{} = state, signal_id) do
-    dbug("Getting reply ref", signal_id: signal_id)
     Map.get(state.reply_refs, signal_id)
   end
 
@@ -479,7 +447,6 @@ defmodule Jido.Agent.Server.State do
   """
   @spec remove_reply_ref(%__MODULE__{}, String.t()) :: %__MODULE__{}
   def remove_reply_ref(%__MODULE__{} = state, signal_id) do
-    dbug("Removing reply ref", signal_id: signal_id)
     %{state | reply_refs: Map.delete(state.reply_refs, signal_id)}
   end
 end

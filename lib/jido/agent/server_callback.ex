@@ -1,7 +1,5 @@
 defmodule Jido.Agent.Server.Callback do
   @moduledoc false
-
-  use ExDbug, enabled: false
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Signal
   alias Jido.Signal.Router
@@ -22,7 +20,6 @@ defmodule Jido.Agent.Server.Callback do
   """
   @spec mount(state :: ServerState.t()) :: {:ok, ServerState.t()} | {:error, term()}
   def mount(%ServerState{agent: agent} = state) do
-    dbug("Mounting agent", agent: agent)
     mod = agent.__struct__
 
     if function_exported?(mod, :mount, 2) do
@@ -53,7 +50,6 @@ defmodule Jido.Agent.Server.Callback do
   @spec code_change(state :: ServerState.t(), old_vsn :: term(), extra :: term()) ::
           {:ok, ServerState.t()} | {:error, term()}
   def code_change(%ServerState{agent: agent} = state, old_vsn, extra) do
-    dbug("Code change", agent: agent, old_vsn: old_vsn, extra: extra)
     mod = agent.__struct__
 
     if function_exported?(mod, :code_change, 3) do
@@ -84,7 +80,6 @@ defmodule Jido.Agent.Server.Callback do
   @spec shutdown(state :: ServerState.t(), reason :: term()) ::
           {:ok, ServerState.t()} | {:error, term()}
   def shutdown(%ServerState{agent: agent} = state, reason) do
-    dbug("Shutting down agent", agent: agent, reason: reason)
     mod = agent.__struct__
 
     if function_exported?(mod, :shutdown, 2) do
@@ -118,30 +113,19 @@ defmodule Jido.Agent.Server.Callback do
   def handle_signal(state, {:ok, signal}), do: handle_signal(state, signal)
 
   def handle_signal(%ServerState{skills: skills} = state, %Signal{} = signal) do
-    dbug("Starting signal pipeline", signal: signal)
-
     # First try to handle with the agent
     case safe_agent_handle_signal(state, signal) do
       {:ok, handled_signal} ->
-        dbug("Agent handled signal", handled_signal: handled_signal)
-
         # Then try to handle with matching skills
         matching_skills = find_matching_skills(skills, signal)
-        dbug("Found matching skills", count: length(matching_skills))
-
         # Process through each matching skill
         final_signal =
           Enum.reduce(matching_skills, handled_signal, fn skill, acc_signal ->
             case safe_skill_handle_signal(state, skill, acc_signal) do
               {:ok, new_signal} ->
-                dbug("Skill processed signal", skill: skill)
                 new_signal
 
               {:error, _reason} ->
-                dbug("Skill failed to process signal, continuing with previous signal",
-                  skill: skill
-                )
-
                 acc_signal
             end
           end)
@@ -149,7 +133,6 @@ defmodule Jido.Agent.Server.Callback do
         {:ok, final_signal}
 
       {:error, _reason} ->
-        dbug("Agent failed to handle signal, returning original signal")
         {:ok, signal}
     end
   end
@@ -166,11 +149,9 @@ defmodule Jido.Agent.Server.Callback do
       end
     rescue
       e ->
-        # dbug("Error in handle_signal", agent: agent, error: e)
         {:error, e}
     catch
       kind, value ->
-        # dbug("Caught error in handle_signal", agent: agent, kind: kind, value: value)
         {:error, {kind, value}}
     end
   end
@@ -188,11 +169,9 @@ defmodule Jido.Agent.Server.Callback do
       end
     rescue
       e ->
-        # dbug("Error in handle_signal", skill: skill, error: e)
         {:error, e}
     catch
       kind, value ->
-        # dbug("Caught error in handle_signal", skill: skill, kind: kind, value: value)
         {:error, {kind, value}}
     end
   end
@@ -225,30 +204,19 @@ defmodule Jido.Agent.Server.Callback do
         %Signal{} = signal,
         result
       ) do
-    dbug("Starting result transformation pipeline", signal: signal, result: result)
-
     # First try to transform with the agent
     case safe_transform_result(agent.__struct__, signal, result, agent) do
       {:ok, transformed_result} ->
-        dbug("Agent transformed result", transformed_result: transformed_result)
-
         # Then try to transform with matching skills
         matching_skills = find_matching_skills(skills, signal)
-        dbug("Found matching skills", count: length(matching_skills))
-
         # Process through each matching skill
         final_result =
           Enum.reduce(matching_skills, transformed_result, fn skill, acc_result ->
             case safe_transform_result(skill, signal, acc_result, skill) do
               {:ok, new_result} ->
-                dbug("Skill transformed result", skill: skill)
                 new_result
 
               {:error, _reason} ->
-                dbug("Skill failed to transform result, continuing with previous result",
-                  skill: skill
-                )
-
                 acc_result
             end
           end)
@@ -256,13 +224,11 @@ defmodule Jido.Agent.Server.Callback do
         {:ok, final_result}
 
       {:error, _reason} ->
-        dbug("Agent failed to transform result, returning original result")
         {:ok, result}
     end
   end
 
   def transform_result(%ServerState{} = _state, nil, result) do
-    dbug("Processing result with no signal", result: result)
     {:ok, result}
   end
 
@@ -279,11 +245,9 @@ defmodule Jido.Agent.Server.Callback do
         end
       rescue
         e ->
-          dbug("Error in transform_result", module: module, error: e)
           {:error, e}
       catch
         kind, value ->
-          dbug("Caught error in transform_result", module: module, kind: kind, value: value)
           {:error, {kind, value}}
       end
     else
@@ -321,7 +285,6 @@ defmodule Jido.Agent.Server.Callback do
                     case pattern do
                       pattern when is_binary(pattern) ->
                         matches = Router.matches?(signal.type, pattern)
-                        dbug("Pattern match result", pattern: pattern, matches: matches)
                         matches
 
                       _invalid ->
@@ -330,18 +293,15 @@ defmodule Jido.Agent.Server.Callback do
                   end)
 
                 _invalid ->
-                  dbug("Invalid patterns format - must be list")
                   false
               end
           end
         rescue
           _ ->
-            dbug("Error matching skill patterns")
             false
         end
       end)
 
-    dbug("Found matching skills", matches: matches, count: length(matches))
     matches
   end
 

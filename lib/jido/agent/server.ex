@@ -12,8 +12,6 @@ defmodule Jido.Agent.Server do
   The server can be started in different modes (`:auto` or `:manual`) and supports
   both synchronous (call) and asynchronous (cast) signal handling.
   """
-
-  use ExDbug, enabled: false
   use GenServer
 
   alias Jido.Agent.Server.Callback, as: ServerCallback
@@ -68,8 +66,6 @@ defmodule Jido.Agent.Server do
   """
   @spec start_link([start_option()]) :: GenServer.on_start()
   def start_link(opts) do
-    dbug("Starting agent server", opts: opts)
-
     # Ensure ID consistency
     opts = ensure_id_consistency(opts)
 
@@ -93,7 +89,6 @@ defmodule Jido.Agent.Server do
   """
   @spec child_spec(keyword()) :: Supervisor.child_spec()
   def child_spec(opts) do
-    dbug("Building child spec", opts: opts)
     id = Keyword.get(opts, :id, __MODULE__)
 
     %{
@@ -110,8 +105,6 @@ defmodule Jido.Agent.Server do
   """
   @spec state(pid() | atom() | {atom(), node()}) :: {:ok, ServerState.t()} | {:error, term()}
   def state(agent) do
-    dbug("Getting state for agent", agent: agent)
-
     with {:ok, pid} <- Jido.resolve_pid(agent),
          signal <- ServerSignal.cmd_signal(:state, nil) do
       GenServer.call(pid, {:signal, signal})
@@ -126,23 +119,18 @@ defmodule Jido.Agent.Server do
   def call(agent, signal_or_instruction, timeout \\ 5000)
 
   def call(agent, %Signal{} = signal, timeout) do
-    dbug("Calling agent with signal", agent: agent, signal: signal)
-
     with {:ok, pid} <- Jido.resolve_pid(agent) do
       case GenServer.call(pid, {:signal, signal}, timeout) do
         {:ok, response} ->
-          dbug("Call successful", response: response)
           {:ok, response}
 
         other ->
-          dbug("Call failed", result: other)
           other
       end
     end
   end
 
   def call(agent, %Instruction{} = instruction, timeout) do
-    dbug("Calling agent with instruction", agent: agent, instruction: instruction)
     signal = Signal.new!(%{type: "instruction", data: instruction})
     call(agent, signal, timeout)
   end
@@ -153,8 +141,6 @@ defmodule Jido.Agent.Server do
   @spec cast(pid() | atom() | {atom(), node()}, Signal.t() | Instruction.t()) ::
           {:ok, String.t()} | {:error, term()}
   def cast(agent, %Signal{} = signal) do
-    dbug("Casting signal to agent", agent: agent, signal: signal)
-
     with {:ok, pid} <- Jido.resolve_pid(agent) do
       GenServer.cast(pid, {:signal, signal})
       {:ok, signal.id}
@@ -162,15 +148,12 @@ defmodule Jido.Agent.Server do
   end
 
   def cast(agent, %Instruction{} = instruction) do
-    dbug("Casting instruction to agent", agent: agent, instruction: instruction)
     signal = Signal.new!(%{type: "instruction", data: instruction})
     cast(agent, signal)
   end
 
   @impl true
   def init(opts) do
-    dbug("Initializing agent server", opts: opts)
-
     # Ensure ID consistency - should be a no-op if already consistent from start_link
     opts = ensure_id_consistency(opts)
 
@@ -199,14 +182,12 @@ defmodule Jido.Agent.Server do
       {:ok, state}
     else
       {:error, reason} ->
-        dbug("Failed to initialize agent server", reason: reason)
         {:stop, reason}
     end
   end
 
   @impl true
   def handle_call({:signal, %Signal{type: @cmd_state}}, _from, %ServerState{} = state) do
-    dbug("Handling state command")
     {:reply, {:ok, state}, state}
   end
 
@@ -215,8 +196,6 @@ defmodule Jido.Agent.Server do
         _from,
         %ServerState{} = state
       ) do
-    dbug("Handling queue size command")
-
     case ServerState.check_queue_size(state) do
       {:ok, _queue_size} ->
         {:reply, {:ok, state}, state}
@@ -227,12 +206,8 @@ defmodule Jido.Agent.Server do
   end
 
   def handle_call({:signal, %Signal{} = signal}, from, %ServerState{} = state) do
-    dbug("Handling signal", type: signal.type, signal: signal)
-
     # Store the from reference for reply later
     state = ServerState.store_reply_ref(state, signal.id, from)
-    dbug("Stored reply ref", ref: signal.id, signal: signal, from: from)
-
     # Enqueue the signal
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
@@ -241,20 +216,16 @@ defmodule Jido.Agent.Server do
         {:noreply, new_state}
 
       {:error, reason} ->
-        dbug("Failed to enqueue signal", reason: reason)
         {:reply, {:error, reason}, state}
     end
   end
 
   def handle_call(_unhandled, _from, state) do
-    dbug("Unhandled call", call: _unhandled)
     {:reply, {:error, :unhandled_call}, state}
   end
 
   @impl true
   def handle_cast({:signal, %Signal{} = signal}, %ServerState{} = state) do
-    dbug("Handling cast signal", signal: signal)
-
     # Enqueue the signal
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
@@ -268,7 +239,6 @@ defmodule Jido.Agent.Server do
   end
 
   def handle_cast(_unhandled, state) do
-    dbug("Unhandled cast", cast: _unhandled)
     {:noreply, state}
   end
 
@@ -277,21 +247,16 @@ defmodule Jido.Agent.Server do
         {:signal, %Signal{type: @cmd_queue_size} = _signal},
         %ServerState{} = state
       ) do
-    dbug("Handling info queue size signal", signal: _signal)
-
     case ServerState.check_queue_size(state) do
       {:ok, _queue_size} ->
         {:noreply, state}
 
       {:error, :queue_overflow} ->
-        dbug("Queue overflow detected")
         {:noreply, state}
     end
   end
 
   def handle_info({:signal, %Signal{} = signal}, %ServerState{} = state) do
-    dbug("Handling info signal", signal: signal)
-
     # Enqueue the signal
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
@@ -300,19 +265,15 @@ defmodule Jido.Agent.Server do
         {:noreply, new_state}
 
       {:error, _reason} ->
-        dbug("Failed to enqueue info signal", reason: _reason)
         {:noreply, state}
     end
   end
 
   def handle_info({:EXIT, _pid, reason}, %ServerState{} = state) do
-    dbug("Process exited", pid: _pid, reason: reason)
     {:stop, reason, state}
   end
 
   def handle_info({:DOWN, _ref, :process, pid, reason}, %ServerState{} = state) do
-    dbug("DOWN message received", ref: _ref, pid: pid, reason: reason)
-
     :process_terminated
     |> ServerSignal.event_signal(state, %{pid: pid, reason: reason})
     |> ServerOutput.emit(state)
@@ -321,7 +282,6 @@ defmodule Jido.Agent.Server do
   end
 
   def handle_info(:timeout, state) do
-    dbug("Timeout received")
     {:noreply, state}
   end
 
@@ -332,13 +292,11 @@ defmodule Jido.Agent.Server do
   end
 
   def handle_info(_unhandled, state) do
-    dbug("Unhandled info", info: _unhandled)
     {:noreply, state}
   end
 
   @impl true
   def terminate(reason, %ServerState{} = state) do
-    dbug("Terminating agent server", reason: reason)
     require Logger
     stacktrace = Process.info(self(), :current_stacktrace)
 
@@ -371,21 +329,17 @@ defmodule Jido.Agent.Server do
         :ok
 
       {:error, reason} ->
-        dbug("Failed to shutdown server", reason: reason)
         {:error, reason}
     end
   end
 
   @impl true
   def code_change(old_vsn, %ServerState{} = state, extra) do
-    dbug("Code change", old_vsn: old_vsn, extra: extra)
     ServerCallback.code_change(state, old_vsn, extra)
   end
 
   @impl true
   def format_status(_opts, [_pdict, state]) do
-    dbug("Formatting status")
-
     %{
       state: state,
       status: state.status,
@@ -400,30 +354,13 @@ defmodule Jido.Agent.Server do
   """
   @spec via_tuple(String.t(), module()) :: {:via, Registry, {module(), String.t()}}
   def via_tuple(name, registry) do
-    dbug("Creating via tuple", name: name, registry: registry)
     {:via, Registry, {registry, name}}
   end
 
   @spec build_agent(keyword()) :: {:ok, Jido.Agent.t()} | {:error, :invalid_agent}
   defp build_agent(opts) do
-    dbug("Building agent", opts: opts)
-
     case Keyword.fetch(opts, :agent) do
       {:ok, agent_input} when not is_nil(agent_input) ->
-        dbug("Agent input type",
-          is_atom: is_atom(agent_input),
-          is_struct: is_struct(agent_input),
-          module_info:
-            if(is_atom(agent_input),
-              do: %{
-                module_loaded: Code.ensure_loaded?(agent_input),
-                module_exports_new: :erlang.function_exported(agent_input, :new, 2)
-              },
-              else: :not_a_module
-            ),
-          agent_input: agent_input
-        )
-
         cond do
           is_atom(agent_input) ->
             # First ensure the module is loaded
@@ -432,15 +369,12 @@ defmodule Jido.Agent.Server do
                 if :erlang.function_exported(agent_input, :new, 2) do
                   id = Keyword.get(opts, :id)
                   initial_state = Keyword.get(opts, :initial_state, %{})
-                  dbug("Creating new agent instance", module: agent_input, id: id)
                   {:ok, agent_input.new(id, initial_state)}
                 else
-                  dbug("Module #{inspect(agent_input)} does not export new/2")
                   {:error, :invalid_agent}
                 end
 
               {:error, _reason} ->
-                # dbug("Failed to load module #{inspect(agent_input)}", reason: reason)
                 {:error, :invalid_agent}
             end
 
@@ -464,19 +398,15 @@ defmodule Jido.Agent.Server do
             {:ok, agent_input}
 
           true ->
-            dbug("Invalid agent input - not an atom or struct", agent_input: agent_input)
             {:error, :invalid_agent}
         end
 
       _ ->
-        dbug("Missing agent input")
         {:error, :invalid_agent}
     end
   end
 
   defp build_initial_state_from_opts(opts) do
-    dbug("Building initial state from options", opts: opts)
-
     state = %ServerState{
       agent: opts[:agent],
       opts: opts,
@@ -540,21 +470,11 @@ defmodule Jido.Agent.Server do
 
   defp register_actions(%ServerState{} = state, provided_actions)
        when is_list(provided_actions) do
-    dbug("Registering actions with agent",
-      default_actions: @default_actions,
-      provided_actions: provided_actions
-    )
-
     # Combine default actions with provided actions
     all_actions = @default_actions ++ provided_actions
 
     # Register actions with the agent - this should always succeed for valid actions
     {:ok, updated_agent} = Jido.Agent.register_action(state.agent, all_actions)
-
-    dbug("Successfully registered actions",
-      agent_id: updated_agent.id,
-      actions: Jido.Agent.registered_actions(updated_agent)
-    )
 
     {:ok, %{state | agent: updated_agent}}
   end

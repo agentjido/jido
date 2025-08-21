@@ -1,7 +1,5 @@
 defmodule Jido.Agent.Server.Router do
   @moduledoc false
-
-  use ExDbug, enabled: false
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Signal
   alias Jido.Signal.Router
@@ -32,29 +30,22 @@ defmodule Jido.Agent.Server.Router do
   """
   @spec build(ServerState.t(), router_opts()) :: {:ok, ServerState.t()} | {:error, term()}
   def build(%ServerState{} = state, opts) do
-    dbug("Building router", state: state, opts: opts)
     router = state.router || Signal.Router.new!()
 
     case opts[:routes] do
       nil ->
-        dbug("No routes provided, using empty router")
         {:ok, %{state | router: router}}
 
       routes when is_list(routes) ->
-        dbug("Adding initial routes", routes: routes)
-
         case Router.add(router, routes) do
           {:ok, updated_router} ->
-            dbug("Router built successfully")
             {:ok, %{state | router: updated_router}}
 
           {:error, reason} ->
-            dbug("Failed to build router", error: reason)
             {:error, reason}
         end
 
       invalid ->
-        dbug("Invalid routes provided", routes: invalid)
         {:error, Error.validation_error("Routes must be a list", %{routes: invalid})}
     end
   end
@@ -81,15 +72,11 @@ defmodule Jido.Agent.Server.Router do
   @spec add(ServerState.t(), route_spec() | [route_spec()]) ::
           {:ok, ServerState.t()} | {:error, term()}
   def add(%ServerState{} = state, routes) do
-    dbug("Adding routes", state: state, routes: routes)
-
     case Signal.Router.add(state.router, routes) do
       {:ok, updated_router} ->
-        dbug("Routes added successfully")
         {:ok, %{state | router: updated_router}}
 
       error ->
-        dbug("Failed to add routes", error: error)
         error
     end
   end
@@ -111,14 +98,11 @@ defmodule Jido.Agent.Server.Router do
   """
   @spec remove(ServerState.t(), String.t() | [String.t()]) :: {:ok, ServerState.t()}
   def remove(%ServerState{} = state, paths) when is_list(paths) do
-    dbug("Removing routes", state: state, paths: paths)
     {:ok, updated_router} = Signal.Router.remove(state.router, paths)
-    dbug("Routes removed successfully")
     {:ok, %{state | router: updated_router}}
   end
 
   def remove(%ServerState{} = state, path) when is_binary(path) do
-    dbug("Removing single route", state: state, path: path)
     remove(state, [path])
   end
 
@@ -140,7 +124,6 @@ defmodule Jido.Agent.Server.Router do
   """
   @spec list(ServerState.t()) :: {:ok, [Signal.Router.Route.t()]} | {:error, term()}
   def list(%ServerState{} = state) do
-    dbug("Listing routes", state: state)
     Signal.Router.list(state.router)
   end
 
@@ -168,35 +151,26 @@ defmodule Jido.Agent.Server.Router do
   @spec merge(ServerState.t(), [Router.Route.t()] | Signal.Router.Router.t()) ::
           {:ok, ServerState.t()} | {:error, term()}
   def merge(%ServerState{} = state, routes) when is_list(routes) do
-    dbug("Merging route list", state: state, routes: routes)
-
     case Signal.Router.merge(state.router, routes) do
       {:ok, updated_router} ->
-        dbug("Routes merged successfully")
         {:ok, %{state | router: updated_router}}
 
       {:error, reason} ->
-        dbug("Failed to merge routes", error: reason)
         {:error, reason}
     end
   end
 
   def merge(%ServerState{} = state, %Router.Router{} = other_router) do
-    dbug("Merging router", state: state, other_router: other_router)
-
     with {:ok, routes} <- Signal.Router.list(other_router),
          {:ok, updated_router} <- Signal.Router.merge(state.router, routes) do
-      dbug("Router merged successfully")
       {:ok, %{state | router: updated_router}}
     else
       {:error, reason} ->
-        dbug("Failed to merge router", error: reason)
         {:error, reason}
     end
   end
 
   def merge(%ServerState{} = _state, invalid) do
-    dbug("Invalid merge input", invalid: invalid)
     {:error, Error.validation_error("Invalid routes for merging", %{routes: invalid})}
   end
 
@@ -221,29 +195,21 @@ defmodule Jido.Agent.Server.Router do
   """
   @spec route(ServerState.t(), Signal.t()) :: {:ok, [term()]} | {:error, term()}
   def route(%ServerState{} = state, %Signal{} = signal) do
-    dbug("Routing signal", state: state, signal: signal)
-
     case signal.data do
       %Instruction{} = instruction ->
-        dbug("Using explicit instruction from signal", instruction: instruction)
         {:ok, [instruction]}
 
       _ ->
-        dbug("Routing through router")
-
         case state.router do
           nil ->
-            dbug("No router configured")
             {:error, :no_router}
 
           router ->
             case Router.route(router, signal) do
               {:ok, instructions} ->
-                dbug("Signal routed successfully", instructions: instructions)
                 {:ok, instructions}
 
               {:error, reason} ->
-                dbug("Failed to route signal", error: reason)
                 {:error, reason}
             end
         end
@@ -251,7 +217,6 @@ defmodule Jido.Agent.Server.Router do
   end
 
   def route(%ServerState{} = _state, invalid) do
-    dbug("Invalid signal for routing", signal: invalid)
     {:error, Error.validation_error("Invalid signal for routing", %{signal: invalid})}
   end
 end

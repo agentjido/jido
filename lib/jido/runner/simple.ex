@@ -26,7 +26,6 @@ defmodule Jido.Runner.Simple do
   * All errors preserve the original agent state
   """
   @behaviour Jido.Runner
-  use ExDbug, enabled: false
 
   alias Jido.Instruction
   alias Jido.Error
@@ -103,16 +102,12 @@ defmodule Jido.Runner.Simple do
   @impl true
   @spec run(Jido.Agent.t(), run_opts()) :: run_result()
   def run(%{pending_instructions: instructions} = agent, opts \\ []) do
-    dbug("Starting runner with agent", agent_id: agent.id)
-
     case :queue.out(instructions) do
       {{:value, %Instruction{} = instruction}, remaining} ->
-        dbug("Dequeued instruction", instruction: instruction)
         agent = %{agent | pending_instructions: remaining}
         execute_instruction(agent, instruction, opts)
 
       {:empty, _} ->
-        dbug("No pending instructions")
         {:ok, agent, []}
     end
   end
@@ -130,35 +125,20 @@ defmodule Jido.Runner.Simple do
         opts: merged_opts
     }
 
-    dbug("Executing instruction", instruction: instruction)
-
     case Jido.Exec.run(instruction) do
       {:ok, result, directives} when is_list(directives) ->
-        dbug("Exec returned result with directive list",
-          result: result,
-          directives: directives
-        )
-
         handle_directive_result(agent, result, directives, opts)
 
       {:ok, result, directive} ->
-        dbug("Exec returned result with single directive",
-          result: result,
-          directive: directive
-        )
-
         handle_directive_result(agent, result, [directive], opts)
 
       {:ok, result} ->
-        dbug("Exec returned result only", result: result)
         {:ok, %{agent | result: result}, []}
 
       {:error, %_{} = error, _dirs} ->
-        dbug("Exec returned error struct with directives", error: error)
         {:error, error}
 
       {:error, %_{} = error} ->
-        dbug("Exec returned error struct", error: error)
         {:error, error}
     end
   end
@@ -166,24 +146,19 @@ defmodule Jido.Runner.Simple do
   @spec handle_directive_result(Jido.Agent.t(), term(), list(), keyword()) :: run_result()
   defp handle_directive_result(agent, result, directives, opts) do
     apply_directives? = Keyword.get(opts, :apply_directives?, true)
-    dbug("Handling directive result", apply_directives?: apply_directives?)
 
     if apply_directives? do
       case Directive.apply_agent_directive(agent, directives) do
         {:ok, updated_agent, server_directives} ->
-          dbug("Applied directives successfully", server_directives: server_directives)
           {:ok, %{updated_agent | result: result}, server_directives}
 
         {:error, %_{} = error} ->
-          dbug("Directive application failed with error struct", error: error)
           {:error, error}
 
         {:error, reason} ->
-          dbug("Directive application failed with reason", reason: reason)
           {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
       end
     else
-      dbug("Skipping directive application")
       {:ok, %{agent | result: result}, directives}
     end
   end

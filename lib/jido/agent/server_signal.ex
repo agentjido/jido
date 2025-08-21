@@ -1,6 +1,5 @@
 defmodule Jido.Agent.Server.Signal do
   @moduledoc false
-  use ExDbug, enabled: false
   alias Jido.Signal
 
   alias Jido.Agent.Server.State, as: ServerState

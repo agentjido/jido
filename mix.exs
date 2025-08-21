@@ -232,8 +232,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      ws_dep(:jido_action, "../jido_action", [github: "agentjido/jido_action"]),
-      ws_dep(:jido_signal, "../jido_signal", [github: "agentjido/jido_signal"]),
+      ws_dep(:jido_action, "../jido_action", github: "agentjido/jido_action"),
+      ws_dep(:jido_signal, "../jido_signal", github: "agentjido/jido_signal"),
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -253,8 +253,6 @@ defmodule Jido.MixProject do
       {:typed_struct_nimble_options, "~> 0.1.1"},
       {:quantum, "~> 3.5"},
       {:uniq, "~> 0.6.1"},
-      {:ex_dbug, "~> 2.1"},
-
       # Skill & Action Dependencies for examples
       {:abacus, "~> 2.1"},
       {:req, "~> 0.5.10"},

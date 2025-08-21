@@ -1,7 +1,5 @@
 defmodule Jido.Agent.Server.Output do
   @moduledoc false
-
-  use ExDbug, enabled: false
   require Logger
 
   alias Jido.Signal
@@ -70,7 +68,6 @@ defmodule Jido.Agent.Server.Output do
   def emit(signal, state, opts \\ [])
 
   def emit(nil, _state, _opts) do
-    dbug("No signal provided")
     {:error, :no_signal}
   end
 
@@ -81,9 +78,6 @@ defmodule Jido.Agent.Server.Output do
     # Configure dispatch with the appropriate level
     base_dispatch = Keyword.get(opts, :dispatch) || signal.jido_dispatch || @default_dispatch
     dispatch_config = add_level_to_dispatch(base_dispatch, level)
-
-    dbug("Emitting", signal: signal, level: level)
-    dbug("Using dispatch config", dispatch_config: dispatch_config)
 
     log(
       state,

@@ -100,7 +100,6 @@ defmodule Jido.Agent do
   Each Agent module defines its own struct type and behavior. Agent functions must be called
   on matching agent structs:
 
-
   ```elixir
     # Correct usage:
     agent = MyAgent.new()
@@ -140,7 +139,6 @@ defmodule Jido.Agent do
   """
   use TypedStruct
   use Private
-  use ExDbug, enabled: false
 
   alias Jido.{Error, Signal, Instruction}
   alias Jido.Agent.Directive
