@@ -269,7 +269,7 @@ defmodule Jido.Agent.Server do
     # Trigger queue processing when entering certain states
     actions =
       case new_state do
-        state when state in [:idle, :running] ->
+        current_state when current_state in [:idle, :running] ->
           case :queue.len(updated_state.pending_signals) do
             0 -> []
             _ -> [{:next_event, :internal, :process_queue}]
