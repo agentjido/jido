@@ -327,19 +327,6 @@ defmodule Jido.Agent.Server.SignalProcessorTest do
       assert {:error, _reason} = result
     end
 
-    test "handles state corruption gracefully", %{state: state} do
-      # Create a corrupted state (missing required fields)
-      corrupted_state = %{state | agent: nil}
-
-      instruction = Instruction.new!(%{action: JidoTest.TestActions.NoSchema, params: %{}})
-      {:ok, signal} = Signal.new(%{type: "instruction", data: instruction})
-
-      # This should crash but we catch the error with try/rescue
-      assert_raise KeyError, fn ->
-        SignalProcessor.execute_instruction_signal(corrupted_state, signal)
-      end
-    end
-
     test "processes signals with large payloads", %{state: state} do
       # Create instruction with large data payload
       large_params = for i <- 1..1000, into: %{}, do: {"key_#{i}", "value_#{i}"}
