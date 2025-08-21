@@ -1,10 +1,6 @@
 defmodule Jido.Agent.Server.SignalProcessor do
   @moduledoc """
   Handles signal processing logic for the Agent Server.
-
-  This module contains the core signal processing functionality that was
-  extracted from the main Agent.Server module to improve maintainability
-  and testability.
   """
 
   alias Jido.Agent.Server.{Directive, Router, Output, State}
