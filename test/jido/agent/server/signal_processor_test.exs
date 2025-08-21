@@ -225,12 +225,7 @@ defmodule Jido.Agent.Server.SignalProcessorTest do
       # This should go through the router, which may return an error
       result = SignalProcessor.execute_signal_for_state_machine(state, signal)
 
-      # The exact result depends on router implementation, but it should not crash
-      case result do
-        {:ok, _new_state, _result} -> :ok
-        {:error, _reason} -> :ok
-        _ -> flunk("Unexpected result: #{inspect(result)}")
-      end
+      assert {:error, %{message: "No matching handlers found for signal"}} = result
     end
   end
 
