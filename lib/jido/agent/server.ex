@@ -308,7 +308,7 @@ defmodule Jido.Agent.Server do
   end
 
   # Handle synchronous signals
-  def handle_event({:call, from}, {:signal, %Signal{} = signal}, current_state, data) do
+  def handle_event({:call, from}, {:signal, %Signal{} = signal}, _current_state, data) do
     # Store the from reference for reply later
     data = ServerState.store_reply_ref(data, signal.id, from)
 
@@ -372,11 +372,11 @@ defmodule Jido.Agent.Server do
   end
 
   # Handle process termination
-  def handle_event(:info, {:EXIT, exit_pid, reason}, _state, data) do
+  def handle_event(:info, {:EXIT, _exit_pid, reason}, _state, data) do
     {:stop, reason, data}
   end
 
-  def handle_event(:info, {:DOWN, monitor_ref, :process, pid, reason}, _state, data) do
+  def handle_event(:info, {:DOWN, _monitor_ref, :process, pid, reason}, _state, data) do
     :process_terminated
     |> ServerSignal.event_signal(data, %{pid: pid, reason: reason})
     |> ServerOutput.emit(data)
@@ -401,7 +401,7 @@ defmodule Jido.Agent.Server do
   end
 
   # Handle unrecognized events
-  def handle_event(event_type, event_content, current_state, _data) do
+  def handle_event(_event_type, _event_content, _current_state, _data) do
     :keep_state_and_data
   end
 
