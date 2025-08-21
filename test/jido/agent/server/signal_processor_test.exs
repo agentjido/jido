@@ -297,7 +297,7 @@ defmodule Jido.Agent.Server.SignalProcessorTest do
   end
 
   describe "execute_routed_instructions/3" do
-    test "executes first routed instruction", %{state: state} do
+    test "executes all routed instructions", %{state: state} do
       instruction1 = Instruction.new!(%{action: JidoTest.TestActions.NoSchema, params: %{id: 1}})
       instruction2 = Instruction.new!(%{action: JidoTest.TestActions.NoSchema, params: %{id: 2}})
 

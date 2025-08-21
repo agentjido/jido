@@ -183,9 +183,31 @@ defmodule Jido.Agent.Server.SignalProcessor do
   """
   @spec execute_routed_instructions(State.t(), [Instruction.t()], Signal.t()) ::
           {:ok, State.t(), any()} | {:error, any()}
-  def execute_routed_instructions(state, [instruction | _], original_signal) do
-    # Execute the first routed instruction
-    execute_instruction_signal(state, %{original_signal | data: instruction})
+  def execute_routed_instructions(state, instructions, _original_signal) do
+    # Execute all routed instructions using the agent's cmd system
+    opts = [apply_directives?: false, log_level: state.log_level]
+
+    case state.agent.__struct__.cmd(state.agent, instructions, %{}, opts) do
+      {:ok, new_agent, directives} ->
+        updated_state = %{state | agent: new_agent}
+
+        # Handle directives if any
+        case handle_agent_directives(updated_state, directives) do
+          {:ok, final_state} ->
+            # Emit output signal
+            :instruction_result
+            |> ServerSignal.out_signal(final_state, new_agent.result)
+            |> Output.emit(final_state)
+
+            {:ok, final_state, new_agent.result}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   defp process_signal_batch(data, batch_size, processed, replies) when processed >= batch_size do
