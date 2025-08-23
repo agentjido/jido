@@ -310,4 +310,31 @@ defmodule Jido.Agent.ServerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
     end
   end
+
+  describe "agent DSL" do
+    test "pipeline signal sending" do
+      result =
+        spawn_agent()
+        |> send_signal("user.registered", %{user_id: 123, email: "test@example.com"})
+        |> send_signal("email.verification.sent", %{token: "abc123"})
+        |> send_signal("profile.completed", %{full_name: "John Doe"})
+
+      assert result.agent.__struct__ == JidoTest.TestAgents.BasicAgent
+      assert is_pid(result.server_pid)
+      assert Process.alive?(result.server_pid)
+    end
+
+    test "single signal sending" do
+      result = send_signal(spawn_agent(), "order.created", %{id: "ord_456", amount: 100.0})
+
+      assert is_map(result)
+      assert is_pid(result.server_pid)
+    end
+
+    test "works with different agent types" do
+      spawn_agent(JidoTest.TestAgents.FullFeaturedAgent)
+      |> send_signal("system.startup", %{version: "1.0.0"})
+      |> send_signal("config.loaded", %{env: "test"})
+    end
+  end
 end
