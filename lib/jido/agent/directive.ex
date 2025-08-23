@@ -400,14 +400,13 @@ defmodule Jido.Agent.Directive do
   defp validate_directive(%Kill{pid: pid}) when is_pid(pid), do: :ok
   defp validate_directive(%Kill{}), do: {:error, :invalid_pid}
 
-  defp validate_directive(%AddRoute{path: path, target: target})
-       when is_binary(path) and not is_nil(target),
-       do: :ok
-
-  defp validate_directive(%AddRoute{path: path}) when not is_binary(path),
-    do: {:error, :invalid_path}
-
-  defp validate_directive(%AddRoute{target: nil}), do: {:error, :invalid_target}
+  defp validate_directive(%AddRoute{path: path, target: target}) do
+    cond do
+      not is_binary(path) -> {:error, :invalid_path}
+      is_nil(target) -> {:error, :invalid_target}
+      true -> :ok
+    end
+  end
 
   defp validate_directive(%RemoveRoute{path: path}) when is_binary(path), do: :ok
   defp validate_directive(%RemoveRoute{}), do: {:error, :invalid_path}
