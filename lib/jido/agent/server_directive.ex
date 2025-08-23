@@ -201,11 +201,11 @@ defmodule Jido.Agent.Server.Directive do
           updated_agent = %{state.agent | state: value}
           {:ok, %{state | agent: updated_agent}}
 
-        :reset when path == nil ->
+        :reset when is_nil(path) ->
           updated_agent = %{state.agent | state: %{}}
           {:ok, %{state | agent: updated_agent}}
 
-        :reset ->
+        :reset when not is_nil(path) ->
           updated_agent = %{state.agent | state: put_in(state.agent.state, List.wrap(path), nil)}
           {:ok, %{state | agent: updated_agent}}
 
