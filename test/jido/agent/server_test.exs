@@ -332,16 +332,17 @@ defmodule Jido.Agent.ServerTest do
     end
 
     test "works with different agent types" do
-      spawn_agent(JidoTest.TestAgents.FullFeaturedAgent)
-      |> send_signal("system.startup", %{version: "1.0.0"})
-      |> send_signal("config.loaded", %{env: "test"})
-    result =
-        spawn_agent(JidoTest.TestAgents.FullFeaturedAgent)
+      custom_agent = JidoTest.TestAgents.FullFeaturedAgent
+
+      result =
+        custom_agent
+        |> spawn_agent()
         |> send_signal("system.startup", %{version: "1.0.0"})
         |> send_signal("config.loaded", %{env: "test"})
 
-      assert result.agent.__struct__ == JidoTest.TestAgents.FullFeaturedAgent
+      assert result.agent.__struct__ == custom_agent
       assert is_pid(result.server_pid)
       assert Process.alive?(result.server_pid)
+    end
   end
 end
