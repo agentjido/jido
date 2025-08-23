@@ -9,7 +9,9 @@ defmodule Jido.Agent.Server.DirectiveTest do
     Kill,
     RegisterAction,
     DeregisterAction,
-    StateModification
+    StateModification,
+    AddRoute,
+    RemoveRoute
   }
 
   @moduletag :capture_log
@@ -254,6 +256,65 @@ defmodule Jido.Agent.Server.DirectiveTest do
           error: %ArgumentError{message: "could not put/update key :path on a nil value"}
         })
       )
+    end
+  end
+
+  describe "routing directives" do
+    test "add_route adds a route to the router", %{state: state} do
+      directive = %AddRoute{
+        path: "user.created",
+        target: %Jido.Instruction{action: :process_user, params: %{type: :new}}
+      }
+
+      {:ok, updated_state} = Directive.execute(state, directive)
+
+      # Verify the route was added by checking the router
+      {:ok, routes} = Jido.Agent.Server.Router.list(updated_state)
+      route_paths = Enum.map(routes, & &1.path)
+      assert "user.created" in route_paths
+    end
+
+    test "remove_route removes a route from the router", %{state: state} do
+      # First add a route
+      add_directive = %AddRoute{
+        path: "user.deleted",
+        target: %Jido.Instruction{action: :cleanup_user, params: %{}}
+      }
+
+      {:ok, state_with_route} = Directive.execute(state, add_directive)
+
+      # Verify the route exists
+      {:ok, routes} = Jido.Agent.Server.Router.list(state_with_route)
+      route_paths = Enum.map(routes, & &1.path)
+      assert "user.deleted" in route_paths
+
+      # Now remove the route
+      remove_directive = %RemoveRoute{path: "user.deleted"}
+      {:ok, updated_state} = Directive.execute(state_with_route, remove_directive)
+
+      # Verify the route was removed
+      {:ok, routes_after_removal} = Jido.Agent.Server.Router.list(updated_state)
+      route_paths_after = Enum.map(routes_after_removal, & &1.path)
+      refute "user.deleted" in route_paths_after
+    end
+
+    test "add_route with atom target", %{state: state} do
+      directive = %AddRoute{
+        path: "system.status",
+        target: :check_status
+      }
+
+      {:ok, updated_state} = Directive.execute(state, directive)
+
+      {:ok, routes} = Jido.Agent.Server.Router.list(updated_state)
+      route_paths = Enum.map(routes, & &1.path)
+      assert "system.status" in route_paths
+    end
+
+    test "remove_route for non-existent route succeeds silently", %{state: state} do
+      directive = %RemoveRoute{path: "non.existent.route"}
+      {:ok, updated_state} = Directive.execute(state, directive)
+      assert updated_state.router == state.router
     end
   end
 

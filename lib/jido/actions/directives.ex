@@ -117,4 +117,42 @@ defmodule Jido.Actions.Directives do
       {:ok, %{}, directive}
     end
   end
+
+  defmodule AddRoute do
+    @moduledoc false
+    use Jido.Action,
+      name: "add_route",
+      description: "Adds a route to the agent's router",
+      schema: [
+        path: [type: :string, required: true, doc: "Route path to match against signals"],
+        target: [type: :any, required: true, doc: "Target instruction or action to execute"]
+      ]
+
+    @spec run(map(), map()) :: {:ok, map(), Jido.Agent.Directive.AddRoute.t()} | {:error, term()}
+    def run(%{path: path, target: target}, _ctx) do
+      directive = %Jido.Agent.Directive.AddRoute{
+        path: path,
+        target: target
+      }
+
+      {:ok, %{}, directive}
+    end
+  end
+
+  defmodule RemoveRoute do
+    @moduledoc false
+    use Jido.Action,
+      name: "remove_route",
+      description: "Removes a route from the agent's router",
+      schema: [
+        path: [type: :string, required: true, doc: "Route path to remove"]
+      ]
+
+    @spec run(map(), map()) ::
+            {:ok, map(), Jido.Agent.Directive.RemoveRoute.t()} | {:error, term()}
+    def run(%{path: path}, _ctx) do
+      directive = %Jido.Agent.Directive.RemoveRoute{path: path}
+      {:ok, %{}, directive}
+    end
+  end
 end

@@ -12,7 +12,9 @@ defmodule JidoTest.DirectiveTest do
     DeregisterAction,
     Spawn,
     Kill,
-    StateModification
+    StateModification,
+    AddRoute,
+    RemoveRoute
   }
 
   alias Jido.Agent.Server.State, as: ServerState
@@ -137,6 +139,16 @@ defmodule JidoTest.DirectiveTest do
       # Invalid directive type
       assert {:error, :invalid_directive} =
                Directive.apply_agent_directive(agent, [:not_a_directive])
+
+      # Invalid routing directives
+      assert {:error, :invalid_path} =
+               Directive.apply_agent_directive(agent, [%AddRoute{path: nil, target: :something}])
+
+      assert {:error, :invalid_target} =
+               Directive.apply_agent_directive(agent, [%AddRoute{path: "valid.path", target: nil}])
+
+      assert {:error, :invalid_path} =
+               Directive.apply_agent_directive(agent, [%RemoveRoute{path: nil}])
     end
   end
 

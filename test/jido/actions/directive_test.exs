@@ -60,4 +60,39 @@ defmodule JidoTest.Actions.DirectivesTest do
       assert directive.pid == pid
     end
   end
+
+  describe "AddRoute" do
+    test "creates add route directive" do
+      path = "user.created"
+      target = :process_user
+
+      assert {:ok, %{}, directive} =
+               Directives.AddRoute.run(%{path: path, target: target}, %{})
+
+      assert directive.path == path
+      assert directive.target == target
+    end
+
+    test "creates add route directive with instruction target" do
+      path = "order.placed"
+      target = %Jido.Instruction{action: :process_order, params: %{priority: :high}}
+
+      assert {:ok, %{}, directive} =
+               Directives.AddRoute.run(%{path: path, target: target}, %{})
+
+      assert directive.path == path
+      assert directive.target == target
+    end
+  end
+
+  describe "RemoveRoute" do
+    test "creates remove route directive" do
+      path = "user.deleted"
+
+      assert {:ok, %{}, directive} =
+               Directives.RemoveRoute.run(%{path: path}, %{})
+
+      assert directive.path == path
+    end
+  end
 end
