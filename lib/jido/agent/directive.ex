@@ -132,7 +132,7 @@ defmodule Jido.Agent.Directive do
 
     typedstruct do
       field(:op, :set | :update | :delete | :reset | :replace, enforce: true)
-      field(:path, list(atom()) | atom(), enforce: true)
+      field(:path, list(atom()) | atom())
       field(:value, any())
     end
   end

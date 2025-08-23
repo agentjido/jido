@@ -222,6 +222,25 @@ defmodule Jido.Agent.Server.DirectiveTest do
 
       {:ok, state_after_reset} = Directive.execute(state_after_delete, reset_directive)
       assert get_in(state_after_reset.agent.state, [:config]) == nil
+
+      # Test :replace operation (no path required)
+      new_state = %{completely: :new, data: %{value: 42}}
+
+      replace_directive = %StateModification{
+        op: :replace,
+        value: new_state
+      }
+
+      {:ok, state_after_replace} = Directive.execute(state, replace_directive)
+      assert state_after_replace.agent.state == new_state
+
+      # Test :reset operation without path (resets entire state)
+      reset_all_directive = %StateModification{
+        op: :reset
+      }
+
+      {:ok, state_after_reset_all} = Directive.execute(state_after_replace, reset_all_directive)
+      assert state_after_reset_all.agent.state == %{}
     end
 
     test "state_modification validates operation type", %{state: state} do

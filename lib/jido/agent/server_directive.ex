@@ -113,7 +113,7 @@ defmodule Jido.Agent.Server.Directive do
     end
   end
 
-  # Spawn directive for general modules  
+  # Spawn directive for general modules
   def execute(%ServerState{} = state, %Spawn{module: module, args: args}) do
     case ServerProcess.start(state, {module, args}) do
       {:ok, updated_state, _pid} ->
@@ -130,7 +130,7 @@ defmodule Jido.Agent.Server.Directive do
         context: context,
         opts: opts
       }) do
-    # Validate action is not nil  
+    # Validate action is not nil
     cond do
       action == nil ->
         {:error, Error.validation_error("Action cannot be nil", %{action: action})}
@@ -195,6 +195,14 @@ defmodule Jido.Agent.Server.Directive do
         :delete ->
           {_, updated_state} = pop_in(state.agent.state, List.wrap(path))
           updated_agent = %{state.agent | state: updated_state}
+          {:ok, %{state | agent: updated_agent}}
+
+        :replace ->
+          updated_agent = %{state.agent | state: value}
+          {:ok, %{state | agent: updated_agent}}
+
+        :reset when path == nil ->
+          updated_agent = %{state.agent | state: %{}}
           {:ok, %{state | agent: updated_agent}}
 
         :reset ->
