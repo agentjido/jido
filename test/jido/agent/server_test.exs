@@ -335,6 +335,13 @@ defmodule Jido.Agent.ServerTest do
       spawn_agent(JidoTest.TestAgents.FullFeaturedAgent)
       |> send_signal("system.startup", %{version: "1.0.0"})
       |> send_signal("config.loaded", %{env: "test"})
-    end
+    result =
+        spawn_agent(JidoTest.TestAgents.FullFeaturedAgent)
+        |> send_signal("system.startup", %{version: "1.0.0"})
+        |> send_signal("config.loaded", %{env: "test"})
+
+      assert result.agent.__struct__ == JidoTest.TestAgents.FullFeaturedAgent
+      assert is_pid(result.server_pid)
+      assert Process.alive?(result.server_pid)
   end
 end
