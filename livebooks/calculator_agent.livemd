@@ -1,0 +1,660 @@
+# Building a Calculator Agent with Jido
+
+```elixir
+Mix.install([
+  {:jido, "~> 0.3.0"}
+])
+```
+
+## Welcome to Jido Agent Development!
+
+This LiveBook will guide you through building a **CalculatorAgent** from scratch using the Jido framework. You'll learn:
+
+* How to set up a Jido agent
+* How to leverage built-in skills (Arithmetic)
+* How to manage agent state and history
+* How to create clean, user-friendly APIs
+
+By the end, you'll have a fully functional calculator agent that can perform mathematical operations and track calculation history.
+
+## What is Jido?
+
+Jido is an Elixir framework for building intelligent, reactive agents. It provides:
+
+* **Agent lifecycle management** via `Jido.Agent.Server`
+* **Signal-based communication** for flexible messaging
+* **Skills and Actions** for modular capabilities
+* **State management** with built-in persistence
+* **Routing and transformation** for clean APIs
+
+Let's start building!
+
+## Step 1: Basic Agent Structure
+
+Every Jido agent starts with the `use Jido.Agent` macro. This sets up the agent's metadata and configuration:
+
+```elixir
+defmodule CalculatorAgent do
+  @moduledoc """
+  A simple calculator agent for performing arithmetic operations.
+  """
+
+  use Jido.Agent,
+    name: "calculator_agent",
+    description: "Simple calculator agent for arithmetic operations",
+    category: "Math Agents",
+    tags: ["calculator", "math", "arithmetic"],
+    vsn: "1.0.0"
+end
+```
+
+The `use Jido.Agent` macro accepts several configuration options:
+
+* **`name`** - Internal identifier for the agent
+* **`description`** - Human-readable description
+* **`category`** - Organizational category
+* **`tags`** - Searchable tags for discovery
+* **`vsn`** - Version string for tracking
+
+## Step 2: Defining Agent State Schema
+
+Next, we define what data our agent will track. For a calculator, we want to remember calculation history:
+
+```elixir
+defmodule CalculatorAgent do
+  use Jido.Agent,
+    name: "calculator_agent",
+    description: "Simple calculator agent for arithmetic operations",
+    category: "Math Agents",
+    tags: ["calculator", "math", "arithmetic"],
+    vsn: "1.0.0",
+    schema: [
+      # Track calculation history
+      calculations: [type: {:list, :map}, default: []],
+      calculation_count: [type: :integer, default: 0]
+    ]
+end
+```
+
+The **`schema`** defines the agent's internal state structure:
+
+* **`calculations`** - List of calculation records
+* **`calculation_count`** - Total number of calculations performed
+
+Each schema field specifies its type and default value. Jido validates state against this schema.
+
+## Step 3: Adding Actions and Skills
+
+Jido agents gain capabilities through **Actions** and **Skills**. Let's understand the difference:
+
+### Actions: Individual Tools 🔧
+
+**Actions** are individual, atomic operations that an agent can perform. Think of them as individual tools in a toolbox:
+
+* `Jido.Skills.Arithmetic.Actions.Eval` - Evaluates mathematical expressions
+* `Jido.Actions.StateManager.Set` - Sets a value in agent state
+* `Jido.Actions.StateManager.Get` - Retrieves a value from agent state
+* `Jido.Tools.Basic.Log` - Logs a message
+
+Each action has a single, focused responsibility and can be used independently.
+
+### Skills: Coordinated Capabilities 🎯
+
+**Skills** are collections of related actions that work together to provide a complete capability. They're like specialized toolkits:
+
+* **`Jido.Skills.Arithmetic`** - Contains actions for mathematical operations
+* **`Jido.Skills.StateManager`** - Contains actions for state management (Set, Get, Update, Delete)
+* **`Jido.Skills.WebScraper`** - Would contain actions for HTTP requests, HTML parsing, etc.
+
+Skills also provide:
+- **Signal routing** - Automatic handling of related signal types
+- **Coordination logic** - How actions work together
+- **Shared configuration** - Common settings for all actions in the skill
+
+### Our Calculator's Requirements
+
+Our calculator needs:
+
+* **Arithmetic operations** - Individual `Eval` action from the Arithmetic skill
+* **State management** - Individual actions (`Set`, `Get`, `Update`, `Delete`) from StateManager skill
+* **Basic utilities** - Individual logging and no-op actions
+
+```elixir
+defmodule CalculatorAgent do
+  use Jido.Agent,
+    name: "calculator_agent",
+    description: "Simple calculator agent for arithmetic operations",
+    category: "Math Agents",
+    tags: ["calculator", "math", "arithmetic"],
+    vsn: "1.0.0",
+    schema: [
+      calculations: [type: {:list, :map}, default: []],
+      calculation_count: [type: :integer, default: 0]
+    ],
+    actions: [
+      # Individual actions we need
+      Jido.Skills.Arithmetic.Actions.Eval,        # 🔧 Single tool: evaluate math
+      Jido.Tools.Basic.Log,                       # 🔧 Single tool: log messages
+      Jido.Tools.Basic.Noop,                      # 🔧 Single tool: do nothing
+      Jido.Actions.StateManager.Set,              # 🔧 Single tool: set state
+      Jido.Actions.StateManager.Get,              # 🔧 Single tool: get state
+      Jido.Actions.StateManager.Update,           # 🔧 Single tool: update state
+      Jido.Actions.StateManager.Delete            # 🔧 Single tool: delete state
+    ]
+
+  require Logger
+end
+```
+
+Notice we're listing individual **actions** (the tools), not the skills themselves. However, we'll activate the **StateManager skill** later to get automatic signal routing for state operations.
+
+## Step 4: Agent Startup Configuration
+
+The `start_link/1` function initializes our agent with proper configuration:
+
+```elixir
+defmodule CalculatorAgent do
+  # ... previous code ...
+
+  @default_opts [
+    agent: __MODULE__,
+    mode: :auto,
+    log_level: :info
+  ]
+
+  @default_timeout 30_000
+
+  @impl true
+  def start_link(opts) when is_list(opts) do
+    # Ensure name is provided
+    name = Keyword.fetch!(opts, :name)
+
+    # Set up agent with calculation state
+    initial_state = %{
+      calculations: [],
+      calculation_count: 0
+    }
+
+    # Merge default options with routing
+    server_opts =
+      @default_opts
+      |> Keyword.merge(opts)
+      |> Keyword.put(:id, name)
+      |> Keyword.put(:initial_state, initial_state)
+      |> Keyword.put(:routes, routes)
+      |> Keyword.put(:skills, [Jido.Skills.StateManager])  # 🎯 Activate the StateManager skill
+
+    Jido.Agent.Server.start_link(server_opts)
+  end
+end
+```
+
+Key configuration elements:
+
+* **`initial_state`** - Starting state matching our schema
+* **`skills`** - Skills to activate (the **skill** provides automatic signal routing for its **actions**)
+
+## Step 5: The Primary Calculate Interface
+
+Now for the main functionality - the `calculate/2` function:
+
+```elixir
+defmodule CalculatorAgent do
+  # ... previous code ...
+
+  @doc """
+  Primary calculation interface - evaluates mathematical expressions.
+
+  ## Examples
+
+      {:ok, result} = CalculatorAgent.calculate(pid, "2 + 2")
+      {:ok, result} = CalculatorAgent.calculate(pid, "sqrt(25) * 2")
+      {:ok, result} = CalculatorAgent.calculate(pid, "sin(pi/2)")
+  """
+  @spec calculate(pid() | String.t(), String.t()) :: {:ok, number()} | {:error, term()}
+  def calculate(agent_ref, expression) when is_binary(expression) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, signal} <- build_calc_signal(expression) do
+      case Jido.Agent.Server.call(pid, signal, @default_timeout) do
+        {:ok, result} ->
+          # Store calculation in history
+          store_calculation(pid, expression, result)
+          {:ok, result}
+        error -> error
+      end
+    end
+  end
+
+  # Helper functions
+  defp resolve_pid(pid) when is_pid(pid), do: {:ok, pid}
+  defp resolve_pid(name) when is_binary(name) do
+    case Process.whereis(String.to_atom(name)) do
+      nil -> {:error, {:agent_not_found, name}}
+      pid -> {:ok, pid}
+    end
+  end
+
+  defp build_calc_signal(expression) do
+    Jido.Signal.new(%{
+      type: "jido.arithmetic.eval",
+      data: %{expression: expression}
+    })
+  end
+end
+```
+
+The `calculate/2` function:
+
+1. **Resolves the agent PID** from name or PID
+2. **Builds a signal** to trigger arithmetic evaluation
+3. **Calls the agent** with the signal
+4. **Stores the result** in calculation history
+5. **Returns the result** to the caller
+
+## Step 6: History Management Functions
+
+Let's add functions to work with calculation history:
+
+```elixir
+defmodule CalculatorAgent do
+  # ... previous code ...
+
+  @doc """
+  Get the agent's calculation history.
+  """
+  @spec history(pid() | String.t()) :: {:ok, [map()]} | {:error, term()}
+  def history(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, state} <- Jido.Agent.Server.state(pid) do
+      calculations = get_in(state.agent.state, [:calculations]) || []
+      {:ok, calculations}
+    end
+  end
+
+  @doc """
+  Get the count of calculations performed.
+  """
+  @spec count(pid() | String.t()) :: {:ok, integer()} | {:error, term()}
+  def count(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, state} <- Jido.Agent.Server.state(pid) do
+      count = get_in(state.agent.state, [:calculation_count]) || 0
+      {:ok, count}
+    end
+  end
+
+  @doc """
+  Clear the agent's calculation history.
+  """
+  @spec clear(pid() | String.t()) :: :ok | {:error, term()}
+  def clear(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, clear_calcs_signal} <- build_clear_calculations_signal(),
+         {:ok, reset_count_signal} <- build_reset_count_signal() do
+      with {:ok, _} <- Jido.Agent.Server.call(pid, clear_calcs_signal),
+           {:ok, _} <- Jido.Agent.Server.call(pid, reset_count_signal) do
+        :ok
+      else
+        error -> error
+      end
+    end
+  end
+
+  # Helper functions for state management signals
+  defp build_clear_calculations_signal do
+    Jido.Signal.new(%{
+      type: "jido.state.set",
+      data: %{path: [:calculations], value: []}
+    })
+  end
+
+  defp build_reset_count_signal do
+    Jido.Signal.new(%{
+      type: "jido.state.set",
+      data: %{path: [:calculation_count], value: 0}
+    })
+  end
+end
+```
+
+These functions provide a complete API for managing calculation history using Jido's state management capabilities.
+
+## Step 7: Signal Handling and Transformation
+
+Jido agents can transform signal results before returning them to callers:
+
+```elixir
+defmodule CalculatorAgent do
+  # ... previous code ...
+
+  ## Signal Handling
+
+  @impl true
+  def transform_result(%Jido.Signal{type: "jido.arithmetic.eval"}, result, _instruction) do
+    # Extract numeric result from arithmetic evaluation
+    {:ok, result}
+  end
+
+  def transform_result(%Jido.Signal{type: "jido.state.set"}, _result, _instruction) do
+    {:ok, "State updated"}
+  end
+
+  def transform_result(%Jido.Signal{type: type}, result, _instruction)
+      when type in ["jido.state.get", "jido.state.update", "jido.state.delete"] do
+    {:ok, result}
+  end
+end
+```
+
+The `transform_result/3` callback lets you customize how signal results are presented to callers.
+
+## Step 8: Storing Calculations in History
+
+Finally, let's implement the `store_calculation/3` function that saves each calculation:
+
+```elixir
+defmodule CalculatorAgent do
+  # ... previous code ...
+
+  defp store_calculation(pid, expression, result) do
+    # Get current state to increment count and add calculation
+    with {:ok, state} <- Jido.Agent.Server.state(pid) do
+      current_count = get_in(state.agent.state, [:calculation_count]) || 0
+      current_calcs = get_in(state.agent.state, [:calculations]) || []
+
+      new_calculation = %{
+        expression: expression,
+        result: result,
+        timestamp: DateTime.utc_now()
+      }
+
+      # Update count
+      count_signal = Jido.Signal.new!(%{
+        type: "jido.state.set",
+        data: %{path: [:calculation_count], value: current_count + 1}
+      })
+
+      # Update calculations list
+      calc_signal = Jido.Signal.new!(%{
+        type: "jido.state.set",
+        data: %{path: [:calculations], value: [new_calculation | current_calcs]}
+      })
+
+      # Send both updates (fire and forget)
+      Jido.Agent.Server.call(pid, count_signal)
+      Jido.Agent.Server.call(pid, calc_signal)
+    end
+  end
+end
+```
+
+This function creates a calculation record with timestamp and updates both the calculations list and count.
+
+## Let's Try It Out!
+
+Now let's test our complete CalculatorAgent:
+
+```elixir
+# Load the complete CalculatorAgent module
+defmodule CalculatorAgent do
+  @moduledoc """
+  A simple calculator agent for performing arithmetic operations.
+  """
+
+  use Jido.Agent,
+    name: "calculator_agent",
+    description: "Simple calculator agent for arithmetic operations",
+    category: "Math Agents",
+    tags: ["calculator", "math", "arithmetic"],
+    vsn: "1.0.0",
+    schema: [
+      calculations: [type: {:list, :map}, default: []],
+      calculation_count: [type: :integer, default: 0]
+    ],
+    actions: [
+      Jido.Skills.Arithmetic.Actions.Eval,
+      Jido.Tools.Basic.Log,
+      Jido.Tools.Basic.Noop,
+      Jido.Actions.StateManager.Set,
+      Jido.Actions.StateManager.Get,
+      Jido.Actions.StateManager.Update,
+      Jido.Actions.StateManager.Delete
+    ]
+
+  require Logger
+
+  @default_opts [
+    agent: __MODULE__,
+    mode: :auto,
+    log_level: :info
+  ]
+
+  @default_timeout 30_000
+
+  @impl true
+  def start_link(opts) when is_list(opts) do
+    name = Keyword.fetch!(opts, :name)
+
+    initial_state = %{
+      calculations: [],
+      calculation_count: 0
+    }
+
+    routes = []
+
+    server_opts =
+      @default_opts
+      |> Keyword.merge(opts)
+      |> Keyword.put(:id, name)
+      |> Keyword.put(:initial_state, initial_state)
+      |> Keyword.put(:routes, routes)
+      |> Keyword.put(:skills, [Jido.Skills.StateManager])
+
+    Jido.Agent.Server.start_link(server_opts)
+  end
+
+  @spec calculate(pid() | String.t(), String.t()) :: {:ok, number()} | {:error, term()}
+  def calculate(agent_ref, expression) when is_binary(expression) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, signal} <- build_calc_signal(expression) do
+      case Jido.Agent.Server.call(pid, signal, @default_timeout) do
+        {:ok, result} ->
+          store_calculation(pid, expression, result)
+          {:ok, result}
+        error -> error
+      end
+    end
+  end
+
+  @spec history(pid() | String.t()) :: {:ok, [map()]} | {:error, term()}
+  def history(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, state} <- Jido.Agent.Server.state(pid) do
+      calculations = get_in(state.agent.state, [:calculations]) || []
+      {:ok, calculations}
+    end
+  end
+
+  @spec count(pid() | String.t()) :: {:ok, integer()} | {:error, term()}
+  def count(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, state} <- Jido.Agent.Server.state(pid) do
+      count = get_in(state.agent.state, [:calculation_count]) || 0
+      {:ok, count}
+    end
+  end
+
+  @spec clear(pid() | String.t()) :: :ok | {:error, term()}
+  def clear(agent_ref) do
+    with {:ok, pid} <- resolve_pid(agent_ref),
+         {:ok, clear_calcs_signal} <- build_clear_calculations_signal(),
+         {:ok, reset_count_signal} <- build_reset_count_signal() do
+      with {:ok, _} <- Jido.Agent.Server.call(pid, clear_calcs_signal),
+           {:ok, _} <- Jido.Agent.Server.call(pid, reset_count_signal) do
+        :ok
+      else
+        error -> error
+      end
+    end
+  end
+
+  @impl true
+  def transform_result(%Jido.Signal{type: "jido.arithmetic.eval"}, result, _instruction) do
+    {:ok, result}
+  end
+
+  def transform_result(%Jido.Signal{type: "jido.state.set"}, _result, _instruction) do
+    {:ok, "State updated"}
+  end
+
+  def transform_result(%Jido.Signal{type: type}, result, _instruction)
+      when type in ["jido.state.get", "jido.state.update", "jido.state.delete"] do
+    {:ok, result}
+  end
+
+  # Private functions
+  defp resolve_pid(pid) when is_pid(pid), do: {:ok, pid}
+  defp resolve_pid(name) when is_binary(name) do
+    case Process.whereis(String.to_atom(name)) do
+      nil -> {:error, {:agent_not_found, name}}
+      pid -> {:ok, pid}
+    end
+  end
+
+  defp build_calc_signal(expression) do
+    Jido.Signal.new(%{
+      type: "jido.arithmetic.eval",
+      data: %{expression: expression}
+    })
+  end
+
+  defp build_clear_calculations_signal do
+    Jido.Signal.new(%{
+      type: "jido.state.set",
+      data: %{path: [:calculations], value: []}
+    })
+  end
+
+  defp build_reset_count_signal do
+    Jido.Signal.new(%{
+      type: "jido.state.set",
+      data: %{path: [:calculation_count], value: 0}
+    })
+  end
+
+  defp store_calculation(pid, expression, result) do
+    with {:ok, state} <- Jido.Agent.Server.state(pid) do
+      current_count = get_in(state.agent.state, [:calculation_count]) || 0
+      current_calcs = get_in(state.agent.state, [:calculations]) || []
+
+      new_calculation = %{
+        expression: expression,
+        result: result,
+        timestamp: DateTime.utc_now()
+      }
+
+      count_signal = Jido.Signal.new!(%{
+        type: "jido.state.set",
+        data: %{path: [:calculation_count], value: current_count + 1}
+      })
+
+      calc_signal = Jido.Signal.new!(%{
+        type: "jido.state.set",
+        data: %{path: [:calculations], value: [new_calculation | current_calcs]}
+      })
+
+      Jido.Agent.Server.call(pid, count_signal)
+      Jido.Agent.Server.call(pid, calc_signal)
+    end
+  end
+end
+```
+
+## Interactive Demo
+
+Let's start our calculator agent and try some calculations:
+
+```elixir
+# Start the calculator agent
+{:ok, calc_pid} = CalculatorAgent.start_link(name: "my_calculator")
+```
+
+```elixir
+# Perform some calculations
+{:ok, result1} = CalculatorAgent.calculate(calc_pid, "2 + 2")
+IO.puts("2 + 2 = #{result1}")
+
+{:ok, result2} = CalculatorAgent.calculate(calc_pid, "15 * 7")
+IO.puts("15 * 7 = #{result2}")
+
+{:ok, result3} = CalculatorAgent.calculate(calc_pid, "sqrt(64)")
+IO.puts("sqrt(64) = #{result3}")
+```
+
+```elixir
+# Check our calculation count
+{:ok, count} = CalculatorAgent.count(calc_pid)
+IO.puts("Total calculations: #{count}")
+```
+
+```elixir
+# View calculation history
+{:ok, history} = CalculatorAgent.history(calc_pid)
+IO.puts("Calculation History:")
+Enum.each(history, fn calc ->
+  IO.puts("  #{calc.expression} = #{calc.result} (#{DateTime.to_string(calc.timestamp)})")
+end)
+```
+
+```elixir
+# Clear history and verify
+:ok = CalculatorAgent.clear(calc_pid)
+{:ok, count_after_clear} = CalculatorAgent.count(calc_pid)
+{:ok, history_after_clear} = CalculatorAgent.history(calc_pid)
+
+IO.puts("Count after clear: #{count_after_clear}")
+IO.puts("History after clear: #{inspect(history_after_clear)}")
+```
+
+## Key Takeaways
+
+Congratulations! You've built a fully functional CalculatorAgent with Jido. Here's what we learned:
+
+### 🏗️ **Agent Structure**
+- Use `use Jido.Agent` to set up agent metadata
+- Define state schema with types and defaults
+- Configure actions and skills for capabilities
+
+### 🔄 **Signal-Based Communication**
+- Agents communicate via signals (`Jido.Signal`)
+- Signals have types and data payloads
+- Transform results for clean APIs
+
+### 📊 **State Management**
+- Use `StateManager` skill for state operations
+- Access state with `Jido.Agent.Server.state/1`
+- Update state with signals (`jido.state.*`)
+
+### 🎯 **Skills and Actions**
+- Actions provide individual capabilities
+- Skills group related actions together
+- Built-in skills like `Arithmetic` and `StateManager`
+
+### 🚀 **Clean APIs**
+- Hide complexity behind simple function interfaces
+- Handle both PIDs and named agent references
+- Provide comprehensive error handling
+
+## Next Steps
+
+Try extending your CalculatorAgent:
+
+1. **Add more mathematical functions** (trigonometry, logarithms)
+2. **Implement memory functions** (store/recall values)
+3. **Add calculation validation** (prevent division by zero)
+4. **Build a web interface** using LiveView
+5. **Add persistence** to save history between restarts
+
+The Jido framework gives you the foundation - your imagination sets the limits!
+
+Happy coding! 🎉
