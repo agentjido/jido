@@ -90,10 +90,16 @@ defmodule JidoTest.AgentCase do
       end
     rescue
       UndefinedFunctionError ->
-        reraise ArgumentError, "Agent module #{inspect(module)} does not implement new/1"
+        reraise ArgumentError.exception(
+                  "Agent module #{inspect(module)} does not implement new/1"
+                ),
+                __STACKTRACE__
 
       e ->
-        reraise ArgumentError, "Agent module #{inspect(module)} new/1 failed: #{inspect(e)}"
+        reraise ArgumentError.exception(
+                  "Agent module #{inspect(module)} new/1 failed: #{inspect(e)}"
+                ),
+                __STACKTRACE__
     end
   end
 
