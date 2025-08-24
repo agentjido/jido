@@ -134,6 +134,40 @@ defmodule Jido.Util do
   end
 
   @doc """
+  Validates that a module is a valid Elixir module that can be loaded.
+  Used as a custom validator for NimbleOptions.
+
+  ## Parameters
+
+  - `module`: A module atom to validate
+
+  ## Returns
+
+  - `{:ok, module}` if the module is valid
+  - `{:error, reason}` if the module is invalid
+
+  ## Examples
+
+      iex> Jido.Util.validate_module(Enum)
+      {:ok, Enum}
+
+      iex> Jido.Util.validate_module(:invalid_module)
+      {:error, "Module :invalid_module does not exist or cannot be loaded"}
+  """
+  @spec validate_module(any()) :: {:ok, module()} | {:error, String.t()}
+  def validate_module(module) when is_atom(module) do
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      {:error, "Module #{inspect(module)} does not exist or cannot be loaded"}
+    end
+  end
+
+  def validate_module(_) do
+    {:error, "Module must be an atom"}
+  end
+
+  @doc """
   Validates that a module implements the Jido.Runner behavior.
 
   This function ensures that the provided module is a valid Jido.Runner implementation
