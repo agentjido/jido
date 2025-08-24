@@ -26,15 +26,6 @@ defmodule Jido.Skills.Tasks do
   alias Jido.Instruction
 
   @impl true
-  def mount(agent, _opts) do
-    {:ok, agent}
-  end
-
-  def run(input) do
-    {:ok, %{input: input, result: "Hello, World!"}}
-  end
-
-  @impl true
   @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
   def router(_opts) do
     [

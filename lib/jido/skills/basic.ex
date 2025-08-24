@@ -4,7 +4,7 @@ defmodule Jido.Skills.Basic do
 
   This skill includes fundamental actions that are commonly needed by agents:
   - Logging capabilities
-  - Sleep/wait functionality  
+  - Sleep/wait functionality
   - No-operation (noop) for testing
   - Inspection utilities
   - Date/time functions
@@ -33,11 +33,6 @@ defmodule Jido.Skills.Basic do
     ]
 
   alias Jido.Instruction
-
-  @impl true
-  def mount(agent, _opts) do
-    {:ok, agent}
-  end
 
   @impl true
   @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
