@@ -78,8 +78,22 @@ defmodule JidoTest.AgentCase do
   end
 
   defp validate_agent_module!(module) do
-    unless is_atom(module) and function_exported?(module, :new, 1) do
-      raise ArgumentError, "Expected agent module with new/1 function, got: #{inspect(module)}"
+    unless is_atom(module) do
+      raise ArgumentError, "Expected agent module, got: #{inspect(module)}"
+    end
+
+    try do
+      test_agent = module.new("test_#{System.unique_integer()}")
+
+      unless is_struct(test_agent) do
+        raise "new/1 did not return a struct"
+      end
+    rescue
+      UndefinedFunctionError ->
+        reraise ArgumentError, "Agent module #{inspect(module)} does not implement new/1"
+
+      e ->
+        reraise ArgumentError, "Agent module #{inspect(module)} new/1 failed: #{inspect(e)}"
     end
   end
 
