@@ -158,6 +158,21 @@ defmodule Jido.Skills.Arithmetic do
     * arithmetic.result: Result of arithmetic operation
     * arithmetic.error: Error from arithmetic operation
   """
+
+  @impl true
+  def mount(agent, _opts) do
+    actions = [
+      __MODULE__.Actions.Add,
+      __MODULE__.Actions.Subtract,
+      __MODULE__.Actions.Multiply,
+      __MODULE__.Actions.Divide,
+      __MODULE__.Actions.Square,
+      __MODULE__.Actions.Eval
+    ]
+
+    Jido.Agent.register_action(agent, actions)
+  end
+
   @impl true
   @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
   def router(_opts) do

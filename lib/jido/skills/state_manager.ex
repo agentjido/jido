@@ -25,32 +25,38 @@ defmodule Jido.Skills.StateManager do
     opts_schema: [],
     signal_patterns: [
       "jido.state.**"
+    ],
+    actions: [
+      Jido.Tools.StateManager.Get,
+      Jido.Tools.StateManager.Set,
+      Jido.Tools.StateManager.Update,
+      Jido.Tools.StateManager.Delete
     ]
 
-  def mount(agent, _opts) do
-    {:ok, agent}
+  def mount(_agent, _opts) do
+    :ok
   end
 
   def router(_opts \\ []) do
     [
       %Jido.Signal.Router.Route{
         path: "jido.state.get",
-        target: %Instruction{action: Jido.Actions.StateManager.Get},
+        target: %Instruction{action: Jido.Tools.StateManager.Get},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.state.set",
-        target: %Instruction{action: Jido.Actions.StateManager.Set},
+        target: %Instruction{action: Jido.Tools.StateManager.Set},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.state.update",
-        target: %Instruction{action: Jido.Actions.StateManager.Update},
+        target: %Instruction{action: Jido.Tools.StateManager.Update},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.state.delete",
-        target: %Instruction{action: Jido.Actions.StateManager.Delete},
+        target: %Instruction{action: Jido.Tools.StateManager.Delete},
         priority: 0
       }
     ]
