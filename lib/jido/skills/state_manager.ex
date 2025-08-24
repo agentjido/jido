@@ -33,8 +33,8 @@ defmodule Jido.Skills.StateManager do
       Jido.Tools.StateManager.Delete
     ]
 
-  def mount(_agent, _opts) do
-    :ok
+  def mount(agent, _opts) do
+    {:ok, agent}
   end
 
   def router(_opts \\ []) do

@@ -13,6 +13,12 @@ defmodule Jido.Skills.Tasks do
     signal_patterns: [
       "jido.cmd.task.*",
       "jido.event.task.*"
+    ],
+    actions: [
+      Jido.Tools.Tasks.Create,
+      Jido.Tools.Tasks.Update,
+      Jido.Tools.Tasks.Toggle,
+      Jido.Tools.Tasks.Delete
     ]
 
   require Logger
@@ -21,14 +27,7 @@ defmodule Jido.Skills.Tasks do
 
   @impl true
   def mount(agent, _opts) do
-    actions = [
-      Jido.Tools.Tasks.Create,
-      Jido.Tools.Tasks.Update,
-      Jido.Tools.Tasks.Toggle,
-      Jido.Tools.Tasks.Delete
-    ]
-
-    Jido.Agent.register_action(agent, actions)
+    {:ok, agent}
   end
 
   def run(input) do
