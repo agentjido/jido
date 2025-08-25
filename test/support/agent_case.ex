@@ -25,7 +25,6 @@ defmodule JidoTest.AgentCase do
   - `send_signal_sync/3` - Send a signal and wait for idle state (prevents race conditions)
   - `assert_agent_state/2` - Assert agent state matches expected values
   - `wait_for_agent_status/3` - Wait for agent to reach specific status
-  - `assert_signal_received/3` - Assert a signal was received with expected data
   - `get_agent_state/1` - Get current agent state
   - `assert_queue_empty/1` - Assert agent's signal queue is empty
   - `assert_queue_size/2` - Assert agent's signal queue has expected size
@@ -222,28 +221,6 @@ defmodule JidoTest.AgentCase do
     context
   end
 
-  @doc """
-  Assert that a signal was received with the expected type and optional data.
-
-  ## Examples
-
-      assert_signal_received("user.registered")
-      assert_signal_received("user.updated", %{name: "John"})
-      assert_signal_received("error.occurred", %{}, 1000)
-  """
-  @spec assert_signal_received(String.t(), map(), non_neg_integer()) :: :ok
-  def assert_signal_received(expected_type, expected_data \\ %{}, timeout \\ 500) do
-    assert_receive {:signal, %Signal{type: ^expected_type, data: data}}, timeout
-
-    Enum.each(expected_data, fn {key, expected_value} ->
-      actual_value = Map.get(data, key)
-
-      assert actual_value == expected_value,
-             "Expected signal data #{inspect(key)} to be #{inspect(expected_value)}, got #{inspect(actual_value)}"
-    end)
-
-    :ok
-  end
 
   @doc """
   Assert that the agent's signal queue is empty and return context for chaining.
