@@ -12,7 +12,6 @@ defmodule JidoTest.Case do
       # Import test helpers
       import JidoTest.Case
       import JidoTest.Helpers.Assertions
-      import JidoTest.AgentCase
 
       @moduletag :capture_log
     end

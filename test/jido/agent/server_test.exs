@@ -310,5 +310,4 @@ defmodule Jido.Agent.ServerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, :killed}
     end
   end
-
 end
