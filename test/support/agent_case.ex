@@ -23,12 +23,25 @@ defmodule JidoTest.AgentCase do
   - `spawn_agent/2` - Spawn an agent with automatic cleanup
   - `send_signal_async/3` - Send a signal asynchronously (may cause race conditions)
   - `send_signal_sync/3` - Send a signal and wait for idle state (prevents race conditions)
+  - `assert_agent_state/2` - Assert agent state matches expected values
+  - `wait_for_agent_status/3` - Wait for agent to reach specific status
+  - `assert_signal_received/3` - Assert a signal was received with expected data
+  - `get_agent_state/1` - Get current agent state
+  - `assert_queue_empty/1` - Assert agent's signal queue is empty
+  - `assert_queue_size/2` - Assert agent's signal queue has expected size
 
   """
 
   alias Jido.Agent.Server
   alias Jido.Signal
   import ExUnit.Assertions
+
+  # Import all functions from this module
+  defmacro __using__(_opts) do
+    quote do
+      import JidoTest.AgentCase
+    end
+  end
 
   @type agent_context :: %{agent: struct(), server_pid: pid()}
   @type agent_or_context :: agent_context() | struct()
@@ -134,6 +147,141 @@ defmodule JidoTest.AgentCase do
       {:error, _reason} ->
         raise "Agent server not found for ID: #{agent.id}"
     end
+  end
+
+  @doc """
+  Get the current agent state from the agent context.
+  """
+  @spec get_agent_state(agent_context()) :: map()
+  def get_agent_state(%{server_pid: server_pid}) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    state.agent.state
+  end
+
+  @doc """
+  Assert that the agent state matches expected values and return context for chaining.
+
+  Expected state can be a map or keyword list. Only the specified keys are checked,
+  allowing partial state verification.
+
+  ## Examples
+
+      spawn_agent()
+      |> send_signal_sync("user.registered", %{name: "John"})
+      |> assert_agent_state(%{name: "John", status: :active})
+
+      spawn_agent()
+      |> assert_agent_state(location: :home, battery_level: 100)
+  """
+  @spec assert_agent_state(agent_context(), map() | keyword()) :: agent_context()
+  def assert_agent_state(context, expected_state) when is_list(expected_state) do
+    assert_agent_state(context, Enum.into(expected_state, %{}))
+  end
+
+  def assert_agent_state(context, expected_state) when is_map(expected_state) do
+    actual_state = get_agent_state(context)
+
+    Enum.each(expected_state, fn {key, expected_value} ->
+      actual_value = Map.get(actual_state, key)
+
+      assert actual_value == expected_value,
+             "Expected #{inspect(key)} to be #{inspect(expected_value)}, got #{inspect(actual_value)}"
+    end)
+
+    context
+  end
+
+  @doc """
+  Wait for the agent to reach a specific status and return context for chaining.
+
+  ## Examples
+
+      spawn_agent()
+      |> send_signal_async("start.processing")
+      |> wait_for_agent_status(:running)
+      |> send_signal_sync("complete.processing")
+  """
+  @spec wait_for_agent_status(agent_context(), atom(), keyword()) :: agent_context()
+  def wait_for_agent_status(%{server_pid: server_pid} = context, expected_status, opts \\ []) do
+    validate_process!(server_pid)
+    timeout = Keyword.get(opts, :timeout, 1000)
+    check_interval = Keyword.get(opts, :check_interval, 10)
+
+    JidoTest.Helpers.Assertions.wait_for(
+      fn ->
+        {:ok, state} = Server.state(server_pid)
+
+        assert state.status == expected_status,
+               "Expected agent status to be #{inspect(expected_status)}, got #{inspect(state.status)}"
+      end,
+      timeout: timeout,
+      check_interval: check_interval
+    )
+
+    context
+  end
+
+  @doc """
+  Assert that a signal was received with the expected type and optional data.
+
+  ## Examples
+
+      assert_signal_received("user.registered")
+      assert_signal_received("user.updated", %{name: "John"})
+      assert_signal_received("error.occurred", %{}, 1000)
+  """
+  @spec assert_signal_received(String.t(), map(), non_neg_integer()) :: :ok
+  def assert_signal_received(expected_type, expected_data \\ %{}, timeout \\ 500) do
+    assert_receive {:signal, %Signal{type: ^expected_type, data: data}}, timeout
+
+    Enum.each(expected_data, fn {key, expected_value} ->
+      actual_value = Map.get(data, key)
+
+      assert actual_value == expected_value,
+             "Expected signal data #{inspect(key)} to be #{inspect(expected_value)}, got #{inspect(actual_value)}"
+    end)
+
+    :ok
+  end
+
+  @doc """
+  Assert that the agent's signal queue is empty and return context for chaining.
+
+  ## Examples
+
+      spawn_agent()
+      |> send_signal_sync("process.all")
+      |> assert_queue_empty()
+  """
+  @spec assert_queue_empty(agent_context()) :: agent_context()
+  def assert_queue_empty(%{server_pid: server_pid} = context) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    assert :queue.is_empty(state.pending_signals), "Expected queue to be empty"
+    context
+  end
+
+  @doc """
+  Assert that the agent's signal queue has the expected size and return context for chaining.
+
+  ## Examples
+
+      spawn_agent()
+      |> send_signal_async("task.1")
+      |> send_signal_async("task.2")
+      |> assert_queue_size(2)
+  """
+  @spec assert_queue_size(agent_context(), non_neg_integer()) :: agent_context()
+  def assert_queue_size(%{server_pid: server_pid} = context, expected_size) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    actual_size = :queue.len(state.pending_signals)
+
+    assert actual_size == expected_size,
+           "Expected queue size to be #{expected_size}, got #{actual_size}"
+
+    context
   end
 
   defp validate_agent_module!(module) do
