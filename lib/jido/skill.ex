@@ -262,9 +262,9 @@ defmodule Jido.Skill do
                              "List of signal patterns this skill handles, defaults to matching all signals"
                          ],
                          actions: [
-                         type: {:list, {:custom, Jido.Util, :validate_module_compiled, []}},
-                         default: [],
-                         doc: "List of action modules required by this skill"
+                           type: {:list, {:custom, Jido.Util, :validate_module_compiled, []}},
+                           default: [],
+                           doc: "List of action modules required by this skill"
                          ]
                        )
 
@@ -301,14 +301,14 @@ defmodule Jido.Skill do
 
       # Validate configuration at compile time
       case NimbleOptions.validate(unquote(opts), unquote(escaped_schema)) do
-      {:ok, validated_opts} ->
-      @validated_opts validated_opts
+        {:ok, validated_opts} ->
+          @validated_opts validated_opts
 
-      # Ensure all action modules are compiled before this skill to prevent ordering issues
-           actions = @validated_opts[:actions]
-           Enum.each(actions, &Code.ensure_compiled!/1)
+          # Ensure all action modules are compiled before this skill to prevent ordering issues
+          actions = @validated_opts[:actions]
+          Enum.each(actions, &Code.ensure_compiled!/1)
 
-           # Define metadata accessors
+          # Define metadata accessors
           @doc false
           def name, do: @validated_opts[:name]
 

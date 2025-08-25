@@ -170,7 +170,7 @@ defmodule Jido.Util do
   @doc """
   Validates that a module is a valid Elixir module that can be compiled.
   Used as a custom validator for NimbleOptions that handles compilation order.
-  
+
   Uses Code.ensure_compiled/1 which blocks until the module finishes compilation
   or returns an error, making it safe for parallel compilation scenarios.
 
@@ -194,8 +194,11 @@ defmodule Jido.Util do
   @spec validate_module_compiled(any()) :: {:ok, module()} | {:error, String.t()}
   def validate_module_compiled(module) when is_atom(module) do
     case Code.ensure_compiled(module) do
-      {:module, _} -> {:ok, module}
-      {:error, _reason} -> {:error, "Module #{inspect(module)} does not exist or could not be compiled"}
+      {:module, _} ->
+        {:ok, module}
+
+      {:error, _reason} ->
+        {:error, "Module #{inspect(module)} does not exist or could not be compiled"}
     end
   end
 
