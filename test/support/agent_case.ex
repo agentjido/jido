@@ -221,7 +221,6 @@ defmodule JidoTest.AgentCase do
     context
   end
 
-
   @doc """
   Assert that the agent's signal queue is empty and return context for chaining.
 
