@@ -70,13 +70,15 @@ defmodule Jido.Agent.Server.Skills do
 
     # Register the skill's actions with the agent
     agent_with_actions =
-      Enum.reduce(skill.actions(), updated_agent, fn action, acc ->
-        if action in acc.actions do
-          acc
-        else
-          %{acc | actions: [action | acc.actions]}
-        end
-      end)
+      case skill.actions() do
+        [] ->
+          updated_agent
+
+        actions ->
+          # Actions are pre-validated at compile time by the skill, so this should always succeed
+          {:ok, agent} = Jido.Agent.register_action(updated_agent, actions)
+          agent
+      end
 
     # Call the skill's mount callback to allow it to transform the agent
     case skill.mount(agent_with_actions, validated_opts) do

@@ -102,7 +102,11 @@ defmodule Jido.Tools.Tasks.Update do
         {:error, :task_not_found}
 
       task ->
-        updated_task = %Task{task | title: params.title, deadline: params.deadline}
+        updated_task = %Task{
+          task
+          | title: Map.get(params, :title, task.title),
+            deadline: Map.get(params, :deadline, task.deadline)
+        }
 
         tasks = Map.get(context.state, :tasks, %{})
         updated_tasks = Map.put(tasks, params.id, updated_task)

@@ -260,6 +260,10 @@ defmodule Jido.Agent.Server.SkillsTest do
     end
 
     test "handles skills with no actions gracefully", %{state: state} do
+      # Store original actions before processing skill
+      original_actions = state.agent.actions
+      original_action_count = length(original_actions)
+
       opts = [skills: [MockSkill]]
 
       assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
@@ -267,7 +271,9 @@ defmodule Jido.Agent.Server.SkillsTest do
 
       # MockSkill has no actions, so no additional actions should be registered
       # (only existing actions from the basic agent should remain)
-      assert is_list(updated_state.agent.actions)
+      assert length(updated_state.agent.actions) == original_action_count
+      assert updated_state.agent.actions == original_actions
+      refute Enum.any?(updated_state.agent.actions -- original_actions)
     end
 
     test "validates skill actions are valid modules", %{state: state} do
