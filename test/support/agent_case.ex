@@ -137,16 +137,47 @@ defmodule JidoTest.AgentCase do
   end
 
   defp validate_agent_module!(module) do
+    module
+    |> validate_module_type!()
+    |> validate_module_loadable!()
+    |> validate_agent_behavior!()
+    |> validate_new_function!()
+  end
+
+  defp validate_module_type!(module) do
     unless is_atom(module) do
       raise ArgumentError, "Expected agent module, got: #{inspect(module)}"
     end
 
+    module
+  end
+
+  defp validate_module_loadable!(module) do
+    unless Code.ensure_loaded?(module) do
+      raise ArgumentError, "Agent module #{inspect(module)} could not be loaded"
+    end
+
+    module
+  end
+
+  defp validate_agent_behavior!(module) do
+    unless function_exported?(module, :__agent_metadata__, 0) do
+      raise ArgumentError,
+            "Agent module #{inspect(module)} does not implement the Jido.Agent behavior (missing __agent_metadata__/0)"
+    end
+
+    module
+  end
+
+  defp validate_new_function!(module) do
     try do
       test_agent = module.new("test_#{System.unique_integer()}")
 
       unless is_struct(test_agent) do
-        raise "new/1 did not return a struct"
+        raise ArgumentError, "Agent module #{inspect(module)} new/1 did not return a struct"
       end
+
+      module
     rescue
       UndefinedFunctionError ->
         reraise ArgumentError.exception(
@@ -156,7 +187,7 @@ defmodule JidoTest.AgentCase do
 
       e ->
         reraise ArgumentError.exception(
-                  "Agent module #{inspect(module)} new/1 failed: #{inspect(e)}"
+                  "Agent module #{inspect(module)} new/1 failed: #{Exception.message(e)}"
                 ),
                 __STACKTRACE__
     end

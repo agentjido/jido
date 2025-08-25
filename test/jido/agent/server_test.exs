@@ -366,5 +366,17 @@ defmodule Jido.Agent.ServerTest do
       {:ok, state} = GenServer.call(result.server_pid, {:signal, state_signal})
       assert state.status == :idle
     end
+
+    test "spawn_agent validates agent modules properly" do
+      # Should raise error for non-agent modules
+      assert_raise ArgumentError, ~r/does not implement the Jido.Agent behavior/, fn ->
+        spawn_agent(String)
+      end
+
+      # Should raise error for non-existent modules  
+      assert_raise ArgumentError, ~r/could not be loaded/, fn ->
+        spawn_agent(NonExistentModule)
+      end
+    end
   end
 end
