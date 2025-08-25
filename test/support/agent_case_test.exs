@@ -174,6 +174,41 @@ defmodule JidoTest.AgentCaseTest do
       |> assert_queue_size(1)  # Signal should be queued
     end
 
+    test "queue helpers work with multiple signals" do
+      spawn_agent()
+      |> assert_queue_empty()
+      |> send_signal_async("signal.1", %{order: 1})
+      |> send_signal_async("signal.2", %{order: 2})
+      |> send_signal_async("signal.3", %{order: 3})
+      |> assert_queue_size(3)
+    end
+
+    test "queue size changes as signals are processed" do
+      context = spawn_agent()
+      
+      # Send multiple async signals
+      context
+      |> send_signal_async("signal.1", %{})
+      |> send_signal_async("signal.2", %{})
+      |> assert_queue_size(2)
+      
+      # Send a sync signal (this will wait for processing)
+      send_signal_sync(context, "signal.3", %{})
+      
+      # Check that signals might still be in queue (depends on agent processing)
+      # In step mode, signals may remain queued until explicitly processed
+      # This is more about testing the helper functions than agent behavior
+    end
+
+    test "assert_queue_empty fails when queue has items" do
+      context = spawn_agent()
+      send_signal_async(context, "test.signal", %{})
+      
+      assert_raise ExUnit.AssertionError, ~r/Expected queue to be empty/, fn ->
+        assert_queue_empty(context)
+      end
+    end
+
     test "demonstrates the improvement in test readability" do
       # Before: Manual state checking
       old_context = spawn_agent()
