@@ -4,22 +4,31 @@ defmodule JidoTest.AgentCase do
 
   ## Quick Start
 
-      test "user registration flow" do
+      test "user registration flow (async)" do
         spawn_agent(MyAgent)
-        |> send_signal("user.registered", %{id: 123})
-        |> send_signal("profile.completed", %{name: "John"})
-        |> send_signal("email.verified")
+        |> send_signal_async("user.registered", %{id: 123})
+        |> send_signal_async("profile.completed", %{name: "John"})
+        |> send_signal_async("email.verified")
+      end
+
+      test "user registration flow (sync)" do
+        spawn_agent(MyAgent)
+        |> send_signal_sync("user.registered", %{id: 123})
+        |> send_signal_sync("profile.completed", %{name: "John"})
+        |> send_signal_sync("email.verified")
       end
 
   ## Available Functions
 
   - `spawn_agent/2` - Spawn an agent with automatic cleanup
-  - `send_signal/3` - Send a signal and return context for chaining
+  - `send_signal_async/3` - Send a signal asynchronously (may cause race conditions)
+  - `send_signal_sync/3` - Send a signal and wait for idle state (prevents race conditions)
 
   """
 
   alias Jido.Agent.Server
   alias Jido.Signal
+  import ExUnit.Assertions
 
   @type agent_context :: %{agent: struct(), server_pid: pid()}
   @type agent_or_context :: agent_context() | struct()
@@ -27,7 +36,7 @@ defmodule JidoTest.AgentCase do
   @doc """
   Spawn an agent for testing with automatic cleanup.
 
-  Returns a context that can be chained with `send_signal/3`.
+  Returns a context that can be chained with `send_signal_async/3` or `send_signal_sync/3`.
   """
   @spec spawn_agent(module(), keyword()) :: agent_context()
   def spawn_agent(agent_module \\ JidoTest.TestAgents.BasicAgent, opts \\ []) do
@@ -51,12 +60,16 @@ defmodule JidoTest.AgentCase do
   end
 
   @doc """
-  Send a signal to an agent and return context for chaining.
-  """
-  @spec send_signal(agent_or_context(), String.t(), map()) :: agent_context()
-  def send_signal(context, signal_type, data \\ %{})
+  Send a signal to an agent asynchronously and return context for chaining.
 
-  def send_signal(%{agent: agent, server_pid: server_pid} = context, signal_type, data)
+  Does not wait for signal processing to complete, which may cause race
+  conditions in tests. Use `send_signal_sync/3` when you need to wait
+  for signal processing to complete.
+  """
+  @spec send_signal_async(agent_or_context(), String.t(), map()) :: agent_context()
+  def send_signal_async(context, signal_type, data \\ %{})
+
+  def send_signal_async(%{agent: agent, server_pid: server_pid} = context, signal_type, data)
       when is_binary(signal_type) and is_map(data) do
     validate_process!(server_pid)
 
@@ -66,11 +79,57 @@ defmodule JidoTest.AgentCase do
     context
   end
 
-  def send_signal(agent, signal_type, data) when is_struct(agent) do
+  def send_signal_async(agent, signal_type, data) when is_struct(agent) do
     # Handle direct agent struct - look up server by agent ID
     case Jido.resolve_pid(agent.id) do
       {:ok, server_pid} ->
-        send_signal(%{agent: agent, server_pid: server_pid}, signal_type, data)
+        send_signal_async(%{agent: agent, server_pid: server_pid}, signal_type, data)
+
+      {:error, _reason} ->
+        raise "Agent server not found for ID: #{agent.id}"
+    end
+  end
+
+  @doc """
+  Send a signal to an agent synchronously and wait for it to return to idle state.
+
+  This function waits for the agent to process the signal and return to idle
+  before returning the context, preventing race conditions in tests.
+  """
+  @spec send_signal_sync(agent_or_context(), String.t(), map(), keyword()) :: agent_context()
+  def send_signal_sync(context, signal_type, data \\ %{}, opts \\ [])
+
+  def send_signal_sync(%{agent: agent, server_pid: server_pid} = context, signal_type, data, opts)
+      when is_binary(signal_type) and is_map(data) do
+    validate_process!(server_pid)
+
+    {:ok, signal} = Signal.new(%{type: signal_type, data: data, source: "test", target: agent.id})
+    {:ok, _} = Server.cast(server_pid, signal)
+
+    # Wait for agent to return to idle state
+    timeout = Keyword.get(opts, :timeout, 1000)
+    check_interval = Keyword.get(opts, :check_interval, 10)
+
+    JidoTest.Helpers.Assertions.wait_for(
+      fn ->
+        {:ok, state_signal} =
+          Signal.new(%{type: "jido.agent.cmd.state", data: %{}, source: "test", target: agent.id})
+
+        {:ok, state} = GenServer.call(server_pid, {:signal, state_signal}, timeout)
+        assert state.status == :idle
+      end,
+      timeout: timeout,
+      check_interval: check_interval
+    )
+
+    context
+  end
+
+  def send_signal_sync(agent, signal_type, data, opts) when is_struct(agent) do
+    # Handle direct agent struct - look up server by agent ID
+    case Jido.resolve_pid(agent.id) do
+      {:ok, server_pid} ->
+        send_signal_sync(%{agent: agent, server_pid: server_pid}, signal_type, data, opts)
 
       {:error, _reason} ->
         raise "Agent server not found for ID: #{agent.id}"

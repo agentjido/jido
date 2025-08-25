@@ -315,9 +315,9 @@ defmodule Jido.Agent.ServerTest do
     test "pipeline signal sending" do
       result =
         spawn_agent()
-        |> send_signal("user.registered", %{user_id: 123, email: "test@example.com"})
-        |> send_signal("email.verification.sent", %{token: "abc123"})
-        |> send_signal("profile.completed", %{full_name: "John Doe"})
+        |> send_signal_async("user.registered", %{user_id: 123, email: "test@example.com"})
+        |> send_signal_async("email.verification.sent", %{token: "abc123"})
+        |> send_signal_async("profile.completed", %{full_name: "John Doe"})
 
       assert result.agent.__struct__ == JidoTest.TestAgents.BasicAgent
       assert is_pid(result.server_pid)
@@ -325,7 +325,7 @@ defmodule Jido.Agent.ServerTest do
     end
 
     test "single signal sending" do
-      result = send_signal(spawn_agent(), "order.created", %{id: "ord_456", amount: 100.0})
+      result = send_signal_async(spawn_agent(), "order.created", %{id: "ord_456", amount: 100.0})
 
       assert is_map(result)
       assert is_pid(result.server_pid)
@@ -337,12 +337,34 @@ defmodule Jido.Agent.ServerTest do
       result =
         custom_agent
         |> spawn_agent()
-        |> send_signal("system.startup", %{version: "1.0.0"})
-        |> send_signal("config.loaded", %{env: "test"})
+        |> send_signal_async("system.startup", %{version: "1.0.0"})
+        |> send_signal_async("config.loaded", %{env: "test"})
 
       assert result.agent.__struct__ == custom_agent
       assert is_pid(result.server_pid)
       assert Process.alive?(result.server_pid)
+    end
+
+    test "send_signal_sync waits for agent to return to idle" do
+      result =
+        spawn_agent()
+        |> send_signal_sync("user.registered", %{user_id: 123})
+
+      assert result.agent.__struct__ == JidoTest.TestAgents.BasicAgent
+      assert is_pid(result.server_pid)
+      assert Process.alive?(result.server_pid)
+
+      # Verify agent is in idle state after sync signal
+      {:ok, state_signal} =
+        Signal.new(%{
+          type: "jido.agent.cmd.state",
+          data: %{},
+          source: "test",
+          target: result.agent.id
+        })
+
+      {:ok, state} = GenServer.call(result.server_pid, {:signal, state_signal})
+      assert state.status == :idle
     end
   end
 end
