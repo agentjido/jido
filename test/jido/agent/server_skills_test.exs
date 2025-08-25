@@ -12,7 +12,9 @@ defmodule Jido.Agent.Server.SkillsTest do
     MockSkill,
     MockSkillWithSchema,
     MockSkillWithMount,
-    MockSkillWithListChildSpecs
+    MockSkillWithListChildSpecs,
+    MockSkillWithActions,
+    MockSkillWithActionsAndMount
   }
 
   describe "build/2" do
@@ -199,6 +201,89 @@ defmodule Jido.Agent.Server.SkillsTest do
         refute is_list(spec)
         assert is_tuple(spec) or is_map(spec)
       end)
+    end
+
+    test "registers skill actions with agent", %{state: state} do
+      opts = [skills: [MockSkillWithActions]]
+
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert [MockSkillWithActions] == updated_state.skills
+
+      # Check that the skill's actions were registered with the agent
+      agent_actions = updated_state.agent.actions
+      assert JidoTest.TestActions.BasicAction in agent_actions
+      assert JidoTest.TestActions.ErrorAction in agent_actions
+    end
+
+    test "registers actions from multiple skills", %{state: state} do
+      opts = [skills: [MockSkillWithActions, MockSkillWithMount]]
+
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert length(updated_state.skills) == 2
+
+      # Check that actions from both skills are registered
+      agent_actions = updated_state.agent.actions
+      assert JidoTest.TestActions.BasicAction in agent_actions
+      assert JidoTest.TestActions.ErrorAction in agent_actions
+    end
+
+    test "does not register duplicate actions from multiple skills", %{state: state} do
+      # Both skills register BasicAction
+      opts = [skills: [MockSkillWithActions, MockSkillWithActionsAndMount]]
+
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert length(updated_state.skills) == 2
+
+      # Check that BasicAction is only present once
+      agent_actions = updated_state.agent.actions
+      basic_action_count = Enum.count(agent_actions, &(&1 == JidoTest.TestActions.BasicAction))
+      assert basic_action_count == 1
+
+      # But ErrorAction should be present (from both skills)
+      error_action_count = Enum.count(agent_actions, &(&1 == JidoTest.TestActions.ErrorAction))
+      assert error_action_count == 1
+    end
+
+    test "combines skill actions with mount callback actions", %{state: state} do
+      opts = [skills: [MockSkillWithActionsAndMount]]
+
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert [MockSkillWithActionsAndMount] == updated_state.skills
+
+      # Check that actions from both configuration and mount callback are registered
+      agent_actions = updated_state.agent.actions
+      assert JidoTest.TestActions.BasicAction in agent_actions
+      assert JidoTest.TestActions.ErrorAction in agent_actions
+
+      # Check that the mount callback was called
+      assert updated_state.agent.state[:mount_called] == true
+    end
+
+    test "handles skills with no actions gracefully", %{state: state} do
+      # Store original actions before processing skill
+      original_actions = state.agent.actions
+      original_action_count = length(original_actions)
+
+      opts = [skills: [MockSkill]]
+
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert [MockSkill] == updated_state.skills
+
+      # MockSkill has no actions, so no additional actions should be registered
+      # (only existing actions from the basic agent should remain)
+      assert length(updated_state.agent.actions) == original_action_count
+      assert updated_state.agent.actions == original_actions
+      refute Enum.any?(updated_state.agent.actions -- original_actions)
+    end
+
+    test "validates skill actions are valid modules", %{state: state} do
+      # This test ensures that the validate_module function works correctly
+      # We'll test this indirectly by ensuring MockSkillWithActions compiles without errors
+      # since it references real test action modules
+
+      opts = [skills: [MockSkillWithActions]]
+      assert {:ok, updated_state, _updated_opts} = Skills.build(state, opts)
+      assert [MockSkillWithActions] == updated_state.skills
     end
   end
 end

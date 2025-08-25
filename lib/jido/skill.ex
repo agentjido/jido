@@ -31,11 +31,15 @@ defmodule Jido.Skill do
 
   ```elixir
   use Jido.Skill,
-    name: "weather_monitor",
-    signal_patterns: [
-      "weather.data.*",
-      "weather.alert.**"
-    ]
+  name: "weather_monitor",
+  signal_patterns: [
+  "weather.data.*",
+  "weather.alert.**"
+  ],
+     actions: [
+       MyApp.GetWeatherAction,
+       MyApp.SendAlertAction
+     ]
   ```
 
   Pattern rules:
@@ -81,20 +85,24 @@ defmodule Jido.Skill do
 
   ```elixir
   defmodule MyApp.WeatherSkill do
-    use Jido.Skill,
-      name: "weather_monitor",
-      description: "Monitors weather conditions and generates alerts",
-      category: "monitoring",
-      tags: ["weather", "alerts"],
-      vsn: "1.0.0",
-      opts_key: :weather,
-      signal_patterns: [
-        "weather.data.*",
-        "weather.alert.**"
-      ],
-      config: [
-        api_key: [type: :string, required: true]
-      ]
+  use Jido.Skill,
+  name: "weather_monitor",
+  description: "Monitors weather conditions and generates alerts",
+  category: "monitoring",
+  tags: ["weather", "alerts"],
+  vsn: "1.0.0",
+  opts_key: :weather,
+  signal_patterns: [
+  "weather.data.*",
+  "weather.alert.**"
+  ],
+  actions: [
+  MyApp.GetWeatherAction,
+    MyApp.SendAlertAction
+       ],
+       opts_schema: [
+         api_key: [type: :string, required: true]
+       ]
 
     def child_spec(config) do
       [
@@ -206,6 +214,7 @@ defmodule Jido.Skill do
     field(:opts_key, atom())
     field(:opts_schema, map())
     field(:signal_patterns, [String.t()], default: [])
+    field(:actions, [module()], default: [])
   end
 
   # Configuration schema validation
@@ -251,6 +260,11 @@ defmodule Jido.Skill do
                            default: ["**"],
                            doc:
                              "List of signal patterns this skill handles, defaults to matching all signals"
+                         ],
+                         actions: [
+                           type: {:list, {:custom, Jido.Util, :validate_module_compiled, []}},
+                           default: [],
+                           doc: "List of action modules required by this skill"
                          ]
                        )
 
@@ -290,6 +304,10 @@ defmodule Jido.Skill do
         {:ok, validated_opts} ->
           @validated_opts validated_opts
 
+          # Ensure all action modules are compiled before this skill to prevent ordering issues
+          actions = @validated_opts[:actions]
+          Enum.each(actions, &Code.ensure_compiled!/1)
+
           # Define metadata accessors
           @doc false
           def name, do: @validated_opts[:name]
@@ -316,6 +334,9 @@ defmodule Jido.Skill do
           def opts_schema, do: @validated_opts[:opts_schema]
 
           @doc false
+          def actions, do: @validated_opts[:actions]
+
+          @doc false
           def to_json do
             %{
               name: @validated_opts[:name],
@@ -325,7 +346,8 @@ defmodule Jido.Skill do
               vsn: @validated_opts[:vsn],
               opts_key: @validated_opts[:opts_key],
               opts_schema: @validated_opts[:opts_schema],
-              signal_patterns: @validated_opts[:signal_patterns]
+              signal_patterns: @validated_opts[:signal_patterns],
+              actions: @validated_opts[:actions]
             }
           end
 

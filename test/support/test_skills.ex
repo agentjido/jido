@@ -460,4 +460,93 @@ defmodule JidoTest.TestSkills do
       {:ok, updated_agent}
     end
   end
+
+  # Mock skill with actions configuration
+  defmodule MockSkillWithActions do
+    @moduledoc """
+    A mock skill that declares actions in its configuration.
+    """
+    use Jido.Skill,
+      name: "mock_skill_with_actions",
+      description: "Mock skill with actions configuration",
+      opts_key: :mock_skill_with_actions,
+      signal_patterns: [
+        "test.path.*"
+      ],
+      actions: [
+        JidoTest.TestActions.BasicAction,
+        JidoTest.TestActions.ErrorAction
+      ]
+
+    @impl true
+    def router(_opts \\ []) do
+      [
+        %Jido.Signal.Router.Route{
+          path: "test.path",
+          target: %Jido.Instruction{action: :test_handler},
+          priority: 0
+        }
+      ]
+    end
+
+    @impl true
+    def child_spec(_opts \\ []) do
+      %{
+        id: __MODULE__,
+        start: {__MODULE__, :start_link, []},
+        type: :worker
+      }
+    end
+  end
+
+  # Mock skill with mixed actions and mount implementation
+  defmodule MockSkillWithActionsAndMount do
+    @moduledoc """
+    A mock skill that declares actions in its configuration and has a custom mount implementation.
+    """
+    use Jido.Skill,
+      name: "mock_skill_with_actions_and_mount",
+      description: "Mock skill with both actions configuration and custom mount",
+      opts_key: :mock_skill_with_actions_and_mount,
+      signal_patterns: [
+        "test.path.*"
+      ],
+      actions: [
+        JidoTest.TestActions.BasicAction
+      ]
+
+    @impl true
+    def router(_opts \\ []) do
+      [
+        %Jido.Signal.Router.Route{
+          path: "test.path",
+          target: %Jido.Instruction{action: :test_handler},
+          priority: 0
+        }
+      ]
+    end
+
+    @impl true
+    def child_spec(_opts \\ []) do
+      %{
+        id: __MODULE__,
+        start: {__MODULE__, :start_link, []},
+        type: :worker
+      }
+    end
+
+    @impl true
+    def mount(agent, _opts) do
+      # Register an additional action via mount callback
+      {:ok, updated_agent} = Jido.Agent.register_action(agent, JidoTest.TestActions.ErrorAction)
+
+      # Update the agent state to verify the mount was called
+      updated_agent =
+        Map.update!(updated_agent, :state, fn state ->
+          Map.put(state, :mount_called, true)
+        end)
+
+      {:ok, updated_agent}
+    end
+  end
 end

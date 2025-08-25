@@ -155,6 +155,10 @@ end
 
 Jido provides several built-in Action modules:
 
+When you add `skills: [Jido.Skills.Basic, Jido.Skills.StateManager]`
+to an agent (or rely on the default list), all of the tools below are
+available automatically without extra registration.
+
 ### Basic Operations
 
 ```elixir
@@ -170,7 +174,7 @@ Basic.Log.run(%{level: :info, message: "Processing"}, %{})
 ### File Operations
 
 ```elixir
-alias Jido.Actions.Files
+alias Jido.Tools.Files
 
 # Write to a file
 Files.WriteFile.run(%{
@@ -183,7 +187,7 @@ Files.WriteFile.run(%{
 ### Arithmetic Operations
 
 ```elixir
-alias Jido.Actions.Arithmetic
+alias Jido.Tools.Arithmetic
 
 # Add numbers
 Arithmetic.Add.run(%{value: 5, amount: 3}, %{})

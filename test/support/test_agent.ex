@@ -39,10 +39,10 @@ defmodule JidoTest.TestAgents do
         JidoTest.TestActions.Multiply,
         JidoTest.TestActions.DelayAction,
         JidoTest.TestActions.ContextAction,
-        Jido.Actions.StateManager.Get,
-        Jido.Actions.StateManager.Set,
-        Jido.Actions.StateManager.Update,
-        Jido.Actions.StateManager.Delete
+        Jido.Tools.StateManager.Get,
+        Jido.Tools.StateManager.Set,
+        Jido.Tools.StateManager.Update,
+        Jido.Tools.StateManager.Delete
       ],
       schema: [
         value: [
@@ -406,10 +406,10 @@ defmodule JidoTest.TestAgents do
       tags: ["test", "tasks"],
       vsn: "1.0.0",
       actions: [
-        Jido.Actions.Tasks.CreateTask,
-        Jido.Actions.Tasks.UpdateTask,
-        Jido.Actions.Tasks.ToggleTask,
-        Jido.Actions.Tasks.DeleteTask
+        Jido.Tools.Tasks.Create,
+        Jido.Tools.Tasks.Update,
+        Jido.Tools.Tasks.Toggle,
+        Jido.Tools.Tasks.Delete
       ],
       schema: [
         tasks: [

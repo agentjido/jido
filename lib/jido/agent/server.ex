@@ -25,13 +25,11 @@ defmodule Jido.Agent.Server do
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Signal
   alias Jido.Instruction
-  # Default actions to register with every agent
-  @default_actions [
-    Jido.Tools.Basic.Log,
-    Jido.Tools.Basic.Sleep,
-    Jido.Tools.Basic.Noop,
-    Jido.Tools.Basic.Inspect,
-    Jido.Tools.Basic.Today
+
+  # Default skills to include with every agent
+  @default_skills [
+    Jido.Skills.Basic,
+    Jido.Skills.StateManager
   ]
 
   @type start_option ::
@@ -162,7 +160,7 @@ defmodule Jido.Agent.Server do
          {:ok, opts} <- ServerOptions.validate_server_opts(opts),
          {:ok, state} <- build_initial_state_from_opts(opts),
          {:ok, state} <- register_actions(state, opts[:actions]),
-         {:ok, state, opts} <- ServerSkills.build(state, opts),
+         {:ok, state, opts} <- ServerSkills.build(state, add_default_skills(opts)),
          {:ok, state} <- ServerRouter.build(state, opts),
          {:ok, state, _pids} <- ServerProcess.start(state, opts[:child_specs]),
          {:ok, state} <- ServerCallback.mount(state),
@@ -468,13 +466,17 @@ defmodule Jido.Agent.Server do
     end
   end
 
+  @spec add_default_skills(keyword()) :: keyword()
+  defp add_default_skills(opts) do
+    existing_skills = Keyword.get(opts, :skills, [])
+    all_skills = @default_skills ++ existing_skills
+    Keyword.put(opts, :skills, all_skills)
+  end
+
   defp register_actions(%ServerState{} = state, provided_actions)
        when is_list(provided_actions) do
-    # Combine default actions with provided actions
-    all_actions = @default_actions ++ provided_actions
-
-    # Register actions with the agent - this should always succeed for valid actions
-    {:ok, updated_agent} = Jido.Agent.register_action(state.agent, all_actions)
+    # Register provided actions with the agent - this should always succeed for valid actions
+    {:ok, updated_agent} = Jido.Agent.register_action(state.agent, provided_actions)
 
     {:ok, %{state | agent: updated_agent}}
   end

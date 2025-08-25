@@ -28,6 +28,12 @@ defmodule MyApp.WeatherMonitorSkill do
     vsn: "1.0.0",
     # An optional schema key to namespace the skill's state
     opts_key: :weather,
+    # NEW → automatically register local or external actions
+    actions: [
+      Actions.ProcessWeatherData,
+      Actions.GenerateWeatherAlert,
+      Jido.Tools.Basic.Log          # example of re-using a built-in tool
+    ],
     # An optional list of signals the skill will handle
     signals: [
       input: ["weather.data.received", "weather.alert.*"],
@@ -54,6 +60,11 @@ Let's break down each component:
 - `opts_key`: Atom key for state namespace isolation
 - `signals`: Input/output signal patterns the skill handles
 - `config`: Configuration schema for validation
+- `actions`: (Optional) list of Action/Tool modules the skill exposes.  
+        When present, Jido registers them automatically – you no
+        longer need to list them in the top-level `actions:` section of
+        your agent configuration.  The legacy root option continues to
+        work for mixed code-bases.
 
 ### 2. State Management
 
@@ -81,7 +92,27 @@ This state will be stored under the skill's `opts_key` in the agent's state map:
 }
 ```
 
-### 3. Signal Routing
+### 3. Automatic Action Registration
+
+Skills can bundle their own actions or reference external ones via the
+`actions:` field demonstrated above.  At boot time Jido:
+
+1. Ensures every module listed implements `Jido.Action`
+2. Registers it under the skill's name-spaced tool path
+3. Makes it discoverable by the planner/LLM
+
+Because of this, an agent that declares
+
+```elixir
+skills: [MyApp.WeatherMonitorSkill]
+```
+
+automatically gains all the actions defined in the skill without having
+to duplicate them in `actions:`.  For backwards compatibility you may
+keep using the root-level `actions:` entry; the two options
+co-exist gracefully.
+
+### 4. Signal Routing
 
 Skills define signal routing patterns using a combination of exact matches, wildcards, and pattern matching functions:
 
@@ -234,6 +265,19 @@ end
    - Handle crashes gracefully
    - Monitor resource usage
    - Consider distribution
+
+## Built-in Skills
+
+Every Jido project automatically ships with two skills that provide
+commonly-used tools:
+
+* **Basic** – logging, sleeping, math helpers, list utilities, etc.
+* **StateManager** – get/set/update/delete helpers for an agent's
+  persistent state.
+
+You can reference any of their tools directly (e.g.
+`Jido.Tools.Basic.Log`) or add them explicitly to your own skill's
+`actions:` list.
 
 ## Sharing and Distribution
 

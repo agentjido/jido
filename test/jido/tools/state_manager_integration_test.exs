@@ -1,7 +1,7 @@
-defmodule Jido.Actions.StateManagerIntegrationTest do
+defmodule Jido.Tools.StateManagerIntegrationTest do
   use JidoTest.Case, async: true
   alias JidoTest.TestAgents.FullFeaturedAgent
-  alias Jido.Actions.StateManager.{Set, Get, Update, Delete}
+  alias Jido.Tools.StateManager.{Set, Get, Update, Delete}
 
   @moduletag :capture_log
 

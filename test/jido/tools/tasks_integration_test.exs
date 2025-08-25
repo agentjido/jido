@@ -1,4 +1,4 @@
-defmodule Jido.Actions.TasksIntegrationTest do
+defmodule Jido.Tools.TasksIntegrationTest do
   use JidoTest.Case, async: true
   alias JidoTest.TestAgents.TaskManagementAgent
   alias Jido.Error
@@ -18,7 +18,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, final, []} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Initial Task", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Initial Task", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -38,7 +38,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, updated, []} =
         TaskManagementAgent.cmd(
           final,
-          {Jido.Actions.Tasks.UpdateTask,
+          {Jido.Tools.Tasks.Update,
            %{id: task_id, title: "Updated Task", deadline: new_deadline}},
           %{},
           runner: Jido.Runner.Chain,
@@ -55,7 +55,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, toggled, []} =
         TaskManagementAgent.cmd(
           updated,
-          {Jido.Actions.Tasks.ToggleTask, %{id: task_id}},
+          {Jido.Tools.Tasks.Toggle, %{id: task_id}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -70,7 +70,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, deleted, []} =
         TaskManagementAgent.cmd(
           toggled,
-          {Jido.Actions.Tasks.DeleteTask, %{id: task_id}},
+          {Jido.Tools.Tasks.Delete, %{id: task_id}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -88,9 +88,9 @@ defmodule Jido.Actions.TasksIntegrationTest do
         TaskManagementAgent.cmd(
           agent,
           [
-            {Jido.Actions.Tasks.CreateTask, %{title: "Task 1", deadline: deadline}},
-            {Jido.Actions.Tasks.CreateTask, %{title: "Task 2", deadline: deadline}},
-            {Jido.Actions.Tasks.CreateTask, %{title: "Task 3", deadline: deadline}}
+            {Jido.Tools.Tasks.Create, %{title: "Task 1", deadline: deadline}},
+            {Jido.Tools.Tasks.Create, %{title: "Task 2", deadline: deadline}},
+            {Jido.Tools.Tasks.Create, %{title: "Task 3", deadline: deadline}}
           ],
           %{},
           runner: Jido.Runner.Chain,
@@ -106,7 +106,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task1, []} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Task 1", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Task 1", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -115,7 +115,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task2, []} =
         TaskManagementAgent.cmd(
           with_task1,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Task 2", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Task 2", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -124,7 +124,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task3, []} =
         TaskManagementAgent.cmd(
           with_task2,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Task 3", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Task 3", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -142,8 +142,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, updated, []} =
         TaskManagementAgent.cmd(
           with_task3,
-          {Jido.Actions.Tasks.UpdateTask,
-           %{id: task2_id, title: "Updated Task 2", deadline: deadline}},
+          {Jido.Tools.Tasks.Update, %{id: task2_id, title: "Updated Task 2", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -162,7 +161,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, toggled, []} =
         TaskManagementAgent.cmd(
           updated,
-          {Jido.Actions.Tasks.ToggleTask, %{id: task1_id}},
+          {Jido.Tools.Tasks.Toggle, %{id: task1_id}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -180,7 +179,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, deleted, []} =
         TaskManagementAgent.cmd(
           toggled,
-          {Jido.Actions.Tasks.DeleteTask, %{id: task2_id}},
+          {Jido.Tools.Tasks.Delete, %{id: task2_id}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -198,7 +197,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:error, error} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.UpdateTask,
+          {Jido.Tools.Tasks.Update,
            %{id: "non-existent", title: "New Title", deadline: DateTime.utc_now()}},
           %{},
           runner: Jido.Runner.Chain,
@@ -213,7 +212,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:error, error} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.ToggleTask, %{id: "non-existent"}},
+          {Jido.Tools.Tasks.Toggle, %{id: "non-existent"}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -227,7 +226,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:error, error} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.DeleteTask, %{id: "non-existent"}},
+          {Jido.Tools.Tasks.Delete, %{id: "non-existent"}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -245,7 +244,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task1, []} =
         TaskManagementAgent.cmd(
           agent,
-          {Jido.Actions.Tasks.CreateTask, %{title: "First", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "First", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -254,7 +253,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task2, []} =
         TaskManagementAgent.cmd(
           with_task1,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Second", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Second", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -263,7 +262,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, with_task3, []} =
         TaskManagementAgent.cmd(
           with_task2,
-          {Jido.Actions.Tasks.CreateTask, %{title: "Third", deadline: deadline}},
+          {Jido.Tools.Tasks.Create, %{title: "Third", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -283,8 +282,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, updated, []} =
         TaskManagementAgent.cmd(
           with_task3,
-          {Jido.Actions.Tasks.UpdateTask,
-           %{id: task2_id, title: "Updated Second", deadline: deadline}},
+          {Jido.Tools.Tasks.Update, %{id: task2_id, title: "Updated Second", deadline: deadline}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true
@@ -303,7 +301,7 @@ defmodule Jido.Actions.TasksIntegrationTest do
       {:ok, toggled, []} =
         TaskManagementAgent.cmd(
           updated,
-          {Jido.Actions.Tasks.ToggleTask, %{id: task1_id}},
+          {Jido.Tools.Tasks.Toggle, %{id: task1_id}},
           %{},
           runner: Jido.Runner.Chain,
           apply_state: true

@@ -1,7 +1,7 @@
-defmodule Jido.Actions.TasksTest do
+defmodule Jido.Tools.TasksTest do
   use JidoTest.Case, async: true
-  alias Jido.Actions.Tasks
-  alias Jido.Actions.Tasks.Task
+  alias Jido.Tools.Tasks
+  alias Jido.Tools.Tasks.Task
   alias Jido.Agent.Directive.StateModification
 
   @moduletag :capture_log
@@ -12,7 +12,7 @@ defmodule Jido.Actions.TasksTest do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
 
       assert {:ok, task, [%StateModification{} = directive]} =
-               Tasks.CreateTask.run(%{title: title, deadline: deadline}, %{state: %{tasks: %{}}})
+               Tasks.Create.run(%{title: title, deadline: deadline}, %{state: %{tasks: %{}}})
 
       assert %Task{
                id: task_id,
@@ -38,10 +38,10 @@ defmodule Jido.Actions.TasksTest do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
 
       {:ok, _task1, [%StateModification{value: tasks1}]} =
-        Tasks.CreateTask.run(%{title: title1, deadline: deadline}, %{state: %{tasks: %{}}})
+        Tasks.Create.run(%{title: title1, deadline: deadline}, %{state: %{tasks: %{}}})
 
       {:ok, _task2, [%StateModification{value: tasks2}]} =
-        Tasks.CreateTask.run(%{title: title2, deadline: deadline}, %{state: %{tasks: tasks1}})
+        Tasks.Create.run(%{title: title2, deadline: deadline}, %{state: %{tasks: tasks1}})
 
       assert map_size(tasks2) == 2
 
@@ -55,7 +55,7 @@ defmodule Jido.Actions.TasksTest do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
 
       {:ok, task, [%StateModification{value: tasks}]} =
-        Tasks.CreateTask.run(%{title: "Original Title", deadline: deadline}, %{
+        Tasks.Create.run(%{title: "Original Title", deadline: deadline}, %{
           state: %{tasks: %{}}
         })
 
@@ -67,7 +67,7 @@ defmodule Jido.Actions.TasksTest do
       new_deadline = DateTime.utc_now() |> DateTime.add(7200, :second)
 
       assert {:ok, updated_task, [%StateModification{} = directive]} =
-               Tasks.UpdateTask.run(
+               Tasks.Update.run(
                  %{id: task_id, title: new_title, deadline: new_deadline},
                  %{state: %{tasks: tasks}}
                )
@@ -91,7 +91,7 @@ defmodule Jido.Actions.TasksTest do
 
     test "returns error when task not found", %{tasks: tasks} do
       assert {:error, :task_not_found} =
-               Tasks.UpdateTask.run(
+               Tasks.Update.run(
                  %{id: "non-existent-id", title: "New Title", deadline: DateTime.utc_now()},
                  %{state: %{tasks: tasks}}
                )
@@ -103,14 +103,14 @@ defmodule Jido.Actions.TasksTest do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
 
       {:ok, task, [%StateModification{value: tasks}]} =
-        Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+        Tasks.Create.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
 
       %{task_id: task.id, task: task, tasks: tasks}
     end
 
     test "toggles task completion status", %{task_id: task_id, tasks: tasks} do
       assert {:ok, updated_task, [%StateModification{} = directive]} =
-               Tasks.ToggleTask.run(%{id: task_id}, %{state: %{tasks: tasks}})
+               Tasks.Toggle.run(%{id: task_id}, %{state: %{tasks: tasks}})
 
       assert %Task{
                id: ^task_id,
@@ -130,7 +130,7 @@ defmodule Jido.Actions.TasksTest do
 
       # Toggle back
       assert {:ok, final_task, [%StateModification{value: final_tasks}]} =
-               Tasks.ToggleTask.run(%{id: task_id}, %{state: %{tasks: directive.value}})
+               Tasks.Toggle.run(%{id: task_id}, %{state: %{tasks: directive.value}})
 
       assert %Task{
                id: ^task_id,
@@ -146,7 +146,7 @@ defmodule Jido.Actions.TasksTest do
 
     test "returns error when task not found", %{tasks: tasks} do
       assert {:error, :task_not_found} =
-               Tasks.ToggleTask.run(%{id: "non-existent-id"}, %{state: %{tasks: tasks}})
+               Tasks.Toggle.run(%{id: "non-existent-id"}, %{state: %{tasks: tasks}})
     end
   end
 
@@ -155,14 +155,14 @@ defmodule Jido.Actions.TasksTest do
       deadline = DateTime.utc_now() |> DateTime.add(3600, :second)
 
       {:ok, task, [%StateModification{value: tasks}]} =
-        Tasks.CreateTask.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
+        Tasks.Create.run(%{title: "Test Task", deadline: deadline}, %{state: %{tasks: %{}}})
 
       %{task_id: task.id, task: task, tasks: tasks}
     end
 
     test "deletes an existing task", %{task_id: task_id, task: task, tasks: tasks} do
       assert {:ok, ^task, [%StateModification{} = directive]} =
-               Tasks.DeleteTask.run(%{id: task_id}, %{state: %{tasks: tasks}})
+               Tasks.Delete.run(%{id: task_id}, %{state: %{tasks: tasks}})
 
       # Verify directive
       assert directive.op == :set
@@ -173,7 +173,7 @@ defmodule Jido.Actions.TasksTest do
 
     test "returns error when task not found", %{tasks: tasks} do
       assert {:error, :task_not_found} =
-               Tasks.DeleteTask.run(%{id: "non-existent-id"}, %{state: %{tasks: tasks}})
+               Tasks.Delete.run(%{id: "non-existent-id"}, %{state: %{tasks: tasks}})
     end
   end
 
