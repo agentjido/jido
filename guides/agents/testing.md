@@ -225,12 +225,11 @@ describe "concurrency" do
       send_signal_async(agent, "process.item", %{id: i})
     end)
     
-    # Wait for processing to complete
-    wait_for_agent_status(agent, :idle, timeout: 5000)
-    
-    # Verify all items were processed
-    assert_agent_state(agent, processed_count: 10)
-    assert_queue_empty(agent)
+    # Wait for processing to complete and verify results
+    agent
+    |> wait_for_agent_status(:idle, timeout: 5000)
+    |> assert_agent_state(processed_count: 10)
+    |> assert_queue_empty()
   end
 end
 ```
@@ -399,10 +398,12 @@ test "handles high signal volume" do
     send_signal_async(agent, type, data)
   end)
   
-  wait_for_agent_status(agent, :idle, timeout: 30_000)
-  end_time = System.monotonic_time(:millisecond)
+  # Verify processing completed and performance
+  agent
+  |> wait_for_agent_status(:idle, timeout: 30_000)
+  |> assert_agent_state(processed_count: 1000)
   
-  assert_agent_state(agent, processed_count: 1000)
+  end_time = System.monotonic_time(:millisecond)
   assert end_time - start_time < 10_000  # Under 10 seconds
 end
 ```
@@ -419,8 +420,9 @@ test "agent responds to sensor signals" do
   send(sensor_pid, :trigger)
   
   # Verify agent received and processed signal
-  wait_for_agent_status(agent_context, :processing)
-  assert_agent_state(agent_context, sensor_data_received: true)
+  agent_context
+  |> wait_for_agent_status(:processing)
+  |> assert_agent_state(sensor_data_received: true)
 end
 ```
 
