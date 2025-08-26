@@ -13,6 +13,12 @@ defmodule Jido.Skills.Tasks do
     signal_patterns: [
       "jido.cmd.task.*",
       "jido.event.task.*"
+    ],
+    actions: [
+      Jido.Tools.Tasks.Create,
+      Jido.Tools.Tasks.Update,
+      Jido.Tools.Tasks.Toggle,
+      Jido.Tools.Tasks.Delete
     ]
 
   require Logger
@@ -20,39 +26,27 @@ defmodule Jido.Skills.Tasks do
   alias Jido.Instruction
 
   @impl true
-  def mount(agent, _opts) do
-    actions = [CreateTask, UpdateTask, ToggleTask, DeleteTask]
-
-    # Register the actions with the agent
-    Jido.Agent.register_action(agent, actions)
-  end
-
-  def run(input) do
-    {:ok, %{input: input, result: "Hello, World!"}}
-  end
-
-  @impl true
   @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
   def router(_opts) do
     [
       %Jido.Signal.Router.Route{
         path: "jido.cmd.task.create",
-        target: %Instruction{action: CreateTask},
+        target: %Instruction{action: Jido.Tools.Tasks.Create},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.cmd.task.update",
-        target: %Instruction{action: UpdateTask},
+        target: %Instruction{action: Jido.Tools.Tasks.Update},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.cmd.task.toggle",
-        target: %Instruction{action: ToggleTask},
+        target: %Instruction{action: Jido.Tools.Tasks.Toggle},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "jido.cmd.task.delete",
-        target: %Instruction{action: DeleteTask},
+        target: %Instruction{action: Jido.Tools.Tasks.Delete},
         priority: 0
       }
     ]

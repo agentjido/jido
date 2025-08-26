@@ -1,6 +1,6 @@
-defmodule Jido.Actions.StateManagerTest do
+defmodule Jido.Tools.StateManagerTest do
   use JidoTest.Case, async: true
-  alias Jido.Actions.StateManager
+  alias Jido.Tools.StateManager
   alias Jido.Agent.Directive.StateModification
 
   @moduletag :capture_log

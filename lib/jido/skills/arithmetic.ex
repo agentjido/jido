@@ -22,127 +22,17 @@ defmodule Jido.Skills.Arithmetic do
     ],
     signal_patterns: [
       "arithmetic.*"
+    ],
+    actions: [
+      Jido.Tools.Arithmetic.Add,
+      Jido.Tools.Arithmetic.Subtract,
+      Jido.Tools.Arithmetic.Multiply,
+      Jido.Tools.Arithmetic.Divide,
+      Jido.Tools.Arithmetic.Square
     ]
 
   alias Jido.Signal
   alias Jido.Instruction
-
-  defmodule Actions do
-    @moduledoc false
-    defmodule Add do
-      @moduledoc false
-      use Jido.Action,
-        name: "add",
-        description: "Adds two numbers",
-        schema: [
-          value: [type: :number, required: true, doc: "The first number to add"],
-          amount: [type: :number, required: true, doc: "The second number to add"]
-        ]
-
-      def run(%{value: value, amount: amount}, _context) do
-        {:ok, %{result: value + amount}}
-      end
-    end
-
-    defmodule Subtract do
-      @moduledoc false
-      use Jido.Action,
-        name: "subtract",
-        description: "Subtracts one number from another",
-        schema: [
-          value: [type: :number, required: true, doc: "The number to subtract from"],
-          amount: [type: :number, required: true, doc: "The number to subtract"]
-        ]
-
-      def run(%{value: value, amount: amount}, _context) do
-        {:ok, %{result: value - amount}}
-      end
-    end
-
-    defmodule Multiply do
-      @moduledoc false
-      use Jido.Action,
-        name: "multiply",
-        description: "Multiplies two numbers",
-        schema: [
-          value: [type: :number, required: true, doc: "The first number to multiply"],
-          amount: [type: :number, required: true, doc: "The second number to multiply"]
-        ]
-
-      def run(%{value: value, amount: amount}, _context) do
-        {:ok, %{result: value * amount}}
-      end
-    end
-
-    defmodule Divide do
-      @moduledoc false
-      use Jido.Action,
-        name: "divide",
-        description: "Divides one number by another",
-        schema: [
-          value: [type: :number, required: true, doc: "The number to be divided (dividend)"],
-          amount: [type: :number, required: true, doc: "The number to divide by (divisor)"]
-        ]
-
-      def run(%{value: _value, amount: 0}, _context) do
-        {:error, "Cannot divide by zero"}
-      end
-
-      def run(%{value: value, amount: amount}, _context) do
-        {:ok, %{result: value / amount}}
-      end
-    end
-
-    defmodule Square do
-      @moduledoc false
-      use Jido.Action,
-        name: "square",
-        description: "Squares a number",
-        schema: [
-          value: [type: :number, required: true, doc: "The number to be squared"]
-        ]
-
-      def run(%{value: value}, _context) do
-        {:ok, %{result: value * value}}
-      end
-    end
-
-    defmodule Eval do
-      @moduledoc false
-      use Jido.Action,
-        name: "eval",
-        description: "Evaluates a mathematical expression",
-        schema: [
-          expression: [
-            type: :string,
-            required: true,
-            doc: "The mathematical expression to evaluate"
-          ]
-        ]
-
-      @doc """
-      Performs the calculation specified in the expression and returns the response
-      to be used by the the LLM.
-      """
-      @spec run(args :: %{String.t() => any()}, context :: map()) ::
-              {:ok, map()} | {:error, String.t()}
-      def run(%{expression: expr}, _context) do
-        try do
-          case Abacus.eval(expr) do
-            {:ok, number} ->
-              {:ok, %{result: number}}
-
-            {:error, reason} ->
-              {:error,
-               "ERROR: #{inspect(expr)} is not a valid expression, Reason: #{inspect(reason)}"}
-          end
-        rescue
-          err ->
-            {:error, "ERROR: An invalid expression raised the exception #{inspect(err)}"}
-        end
-      end
-    end
-  end
 
   @doc """
   Skill: Arithmetic
@@ -153,43 +43,38 @@ defmodule Jido.Skills.Arithmetic do
     * arithmetic.multiply: Multiply two numbers
     * arithmetic.divide: Divide two numbers
     * arithmetic.square: Square a number
-    * arithmetic.eval: Evaluate a mathematical expression
   - Outgoing:
     * arithmetic.result: Result of arithmetic operation
     * arithmetic.error: Error from arithmetic operation
   """
+
   @impl true
   @spec router(keyword()) :: [Jido.Signal.Router.Route.t()]
   def router(_opts) do
     [
       %Jido.Signal.Router.Route{
         path: "arithmetic.add",
-        target: %Instruction{action: Actions.Add},
+        target: %Instruction{action: Jido.Tools.Arithmetic.Add},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "arithmetic.subtract",
-        target: %Instruction{action: Actions.Subtract},
+        target: %Instruction{action: Jido.Tools.Arithmetic.Subtract},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "arithmetic.multiply",
-        target: %Instruction{action: Actions.Multiply},
+        target: %Instruction{action: Jido.Tools.Arithmetic.Multiply},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "arithmetic.divide",
-        target: %Instruction{action: Actions.Divide},
+        target: %Instruction{action: Jido.Tools.Arithmetic.Divide},
         priority: 0
       },
       %Jido.Signal.Router.Route{
         path: "arithmetic.square",
-        target: %Instruction{action: Actions.Square},
-        priority: 0
-      },
-      %Jido.Signal.Router.Route{
-        path: "arithmetic.eval",
-        target: %Instruction{action: Actions.Eval},
+        target: %Instruction{action: Jido.Tools.Arithmetic.Square},
         priority: 0
       }
     ]

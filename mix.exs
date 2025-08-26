@@ -254,7 +254,7 @@ defmodule Jido.MixProject do
       {:quantum, "~> 3.5"},
       {:uniq, "~> 0.6.1"},
       # Skill & Action Dependencies for examples
-      {:abacus, "~> 2.1"},
+
       {:req, "~> 0.5.10"},
 
       # Development & Test Dependencies

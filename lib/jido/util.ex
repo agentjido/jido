@@ -134,6 +134,79 @@ defmodule Jido.Util do
   end
 
   @doc """
+  Validates that a module is a valid Elixir module that can be loaded.
+  Used as a custom validator for NimbleOptions.
+
+  ## Parameters
+
+  - `module`: A module atom to validate
+
+  ## Returns
+
+  - `{:ok, module}` if the module is valid
+  - `{:error, reason}` if the module is invalid
+
+  ## Examples
+
+      iex> Jido.Util.validate_module(Enum)
+      {:ok, Enum}
+
+      iex> Jido.Util.validate_module(:invalid_module)
+      {:error, "Module :invalid_module does not exist or cannot be loaded"}
+  """
+  @spec validate_module(any()) :: {:ok, module()} | {:error, String.t()}
+  def validate_module(module) when is_atom(module) do
+    if Code.ensure_loaded?(module) do
+      {:ok, module}
+    else
+      {:error, "Module #{inspect(module)} does not exist or cannot be loaded"}
+    end
+  end
+
+  def validate_module(_) do
+    {:error, "Module must be an atom"}
+  end
+
+  @doc """
+  Validates that a module is a valid Elixir module that can be compiled.
+  Used as a custom validator for NimbleOptions that handles compilation order.
+
+  Uses Code.ensure_compiled/1 which blocks until the module finishes compilation
+  or returns an error, making it safe for parallel compilation scenarios.
+
+  ## Parameters
+
+  - `module` - The module atom to validate
+
+  ## Returns
+
+  - `{:ok, module}` if the module can be compiled
+  - `{:error, reason}` if the module is invalid or cannot be compiled
+
+  ## Examples
+
+      iex> Jido.Util.validate_module_compiled(Enum)
+      {:ok, Enum}
+
+      iex> Jido.Util.validate_module_compiled(:invalid_module)
+      {:error, "Module :invalid_module does not exist or could not be compiled"}
+  """
+  @spec validate_module_compiled(any()) :: {:ok, module()} | {:error, String.t()}
+  def validate_module_compiled(module) when is_atom(module) do
+    case Code.ensure_compiled(module) do
+      {:module, _} ->
+        {:ok, module}
+
+      {:error, _reason} ->
+        {:error, "Module #{inspect(module)} does not exist or could not be compiled"}
+    end
+  end
+
+  def validate_module_compiled(_) do
+    {:error, "Module must be an atom"}
+  end
+
+  @doc """
   Validates that a module implements the Jido.Runner behavior.
 
   This function ensures that the provided module is a valid Jido.Runner implementation
