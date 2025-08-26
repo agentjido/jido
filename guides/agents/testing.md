@@ -181,13 +181,9 @@ end
 ```elixir
 describe "error handling" do
   test "handles invalid signals gracefully" do
-    context = spawn_agent()
-    
-    # Send invalid signal
-    send_signal_async(context, "invalid.signal", %{})
-    
-    # Agent should remain stable
-    assert_agent_state(context, status: :idle)
+    spawn_agent()
+    |> send_signal_async("invalid.signal", %{})
+    |> assert_agent_state(status: :idle)  # Agent should remain stable
   end
 
   test "recovers from processing errors" do
