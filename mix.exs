@@ -90,7 +90,6 @@ defmodule Jido.MixProject do
           "guides/actions/workflows.md",
           "guides/actions/instructions.md",
           "guides/actions/directives.md",
-          "guides/actions/runners.md",
           "guides/actions/actions-as-tools.md",
           "guides/actions/testing.md"
         ],
@@ -144,7 +143,6 @@ defmodule Jido.MixProject do
         {"guides/actions/workflows.md", title: "Executing Actions"},
         {"guides/actions/instructions.md", title: "Instructions"},
         {"guides/actions/directives.md", title: "Directives"},
-        {"guides/actions/runners.md", title: "Runners"},
         {"guides/actions/actions-as-tools.md", title: "Actions as LLM Tools"},
         {"guides/actions/testing.md", title: "Testing"},
 

@@ -206,52 +206,6 @@ defmodule Jido.Util do
     {:error, "Module must be an atom"}
   end
 
-  @doc """
-  Validates that a module implements the Jido.Runner behavior.
-
-  This function ensures that the provided module is a valid Jido.Runner implementation
-  by checking that it:
-  1. Is a valid Elixir module that can be loaded
-  2. Exports the required run/2 function that indicates Jido.Runner behavior
-
-  ## Parameters
-
-  - `module`: The module atom to validate
-
-  ## Returns
-
-  - `{:ok, module}` if the module is a valid Jido.Runner implementation
-  - `{:error, Jido.Error.t()}` if the module is invalid
-
-  ## Examples
-
-      iex> defmodule ValidRunner do
-      ...>   @behaviour Jido.Runner
-      ...>   def run(agent, opts), do: {:ok, agent}
-      ...> end
-      ...> Jido.Util.validate_runner(ValidRunner)
-      {:ok, ValidRunner}
-
-      iex> Jido.Util.validate_runner(InvalidModule)
-      {:error, %Jido.Error.InvalidInputError{message: "Runner module InvalidModule must exist and implement run/2"}}
-  """
-  @spec validate_runner(module()) :: {:ok, module()} | {:error, Jido.Error.t()}
-  def validate_runner(module) when is_atom(module) do
-    with true <- Code.ensure_loaded?(module),
-         true <- function_exported?(module, :run, 2) do
-      {:ok, module}
-    else
-      false ->
-        {:error,
-         Jido.Error.validation_error(
-           "Runner module #{inspect(module)} must exist and implement run/2",
-           %{
-             module: module
-           }
-         )}
-    end
-  end
-
   @doc false
   def pluck(enumerable, field) do
     Enum.map(enumerable, &Map.get(&1, field))

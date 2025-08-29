@@ -245,6 +245,6 @@ end
 
 - `Jido.Action` - Action behavior and implementation
 - `Jido.Instruction` - Working with Instructions and execution context
-- `Jido.Runner` - Action execution strategies
+- `Jido.Agent` - Agent-based action execution
 - `Jido.Error` - Error handling and compensation
 - `Jido.Telemetry` - Monitoring and metrics

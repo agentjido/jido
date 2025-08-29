@@ -96,7 +96,7 @@ For more details on configuration options, see [Agent Directives](directives.md)
 1. **Signal Reception**: Signals arrive via cast/call
 2. **Pattern Matching**: Signal matched against routes
 3. **Instruction Generation**: Matched routes create instructions
-4. **Execution**: Instructions processed by runner
+4. **Execution**: Instructions processed by agent logic
 5. **Result Handling**: Results processed through callbacks
 
 For more details on signal routing and processing, see [Signal Routing](../signals/routing.md) and [Signal Dispatching](../signals/dispatching.md).

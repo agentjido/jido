@@ -3,7 +3,6 @@ defmodule JidoTest.AgentDirectiveTest do
   use Mimic
 
   alias JidoTest.TestAgents.BasicAgent
-  alias Jido.Runner.Chain
 
   alias JidoTest.TestActions.{
     BasicAction,
@@ -32,7 +31,7 @@ defmodule JidoTest.AgentDirectiveTest do
              params: %{value: 42}
            }},
           %{},
-          runner: Jido.Runner.Simple
+          apply_state: true
         )
 
       # Verify action was enqueued
@@ -42,19 +41,29 @@ defmodule JidoTest.AgentDirectiveTest do
     end
 
     test "maintains queue order with multiple enqueues", %{agent: agent} do
-      instructions = [
-        {EnqueueAction, %{action: BasicAction, params: %{id: 1}}},
-        {EnqueueAction, %{action: BasicAction, params: %{id: 2}}}
-      ]
+      # Plan first enqueue action without executing
+      {:ok, agent_with_first} =
+        BasicAgent.plan(agent, {EnqueueAction, %{action: BasicAction, params: %{value: 1}}})
 
-      {:ok, final, []} = BasicAgent.cmd(agent, instructions, %{}, runner: Chain)
+      # Plan second enqueue action  
+      {:ok, agent_with_both} =
+        BasicAgent.plan(
+          agent_with_first,
+          {EnqueueAction, %{action: BasicAction, params: %{value: 2}}}
+        )
 
-      # Verify queue order
+      # Execute first EnqueueAction 
+      {:ok, agent_after_first, []} = BasicAgent.run(agent_with_both)
+
+      # Execute second EnqueueAction
+      {:ok, final, []} = BasicAgent.run(agent_after_first)
+
+      # Verify queue order - should have the originally enqueued actions plus the new ones
       {{:value, first}, queue} = :queue.out(final.pending_instructions)
       {{:value, second}, _} = :queue.out(queue)
 
-      assert first.params.id == 1
-      assert second.params.id == 2
+      assert first.params.value == 1
+      assert second.params.value == 2
     end
   end
 
@@ -83,12 +92,13 @@ defmodule JidoTest.AgentDirectiveTest do
     end
 
     test "registers multiple action modules", %{agent: agent} do
-      instructions = [
-        {RegisterAction, %{action_module: BasicAction}},
-        {RegisterAction, %{action_module: NoSchema}}
-      ]
+      # First registration
+      {:ok, agent_after_first, []} =
+        BasicAgent.cmd(agent, {RegisterAction, %{action_module: BasicAction}}, %{})
 
-      {:ok, final, []} = BasicAgent.cmd(agent, instructions, %{}, runner: Chain)
+      # Second registration
+      {:ok, final, []} =
+        BasicAgent.cmd(agent_after_first, {RegisterAction, %{action_module: NoSchema}}, %{})
 
       # Verify actions were registered
       assert BasicAction in final.actions
@@ -103,7 +113,7 @@ defmodule JidoTest.AgentDirectiveTest do
         {RegisterAction, %{action_module: BasicAction}}
       ]
 
-      {:ok, final, []} = BasicAgent.cmd(agent, instructions, %{}, runner: Chain)
+      {:ok, final, []} = BasicAgent.cmd(agent, instructions, %{})
 
       # Verify action was registered only once
       assert length(final.actions) == 2
@@ -124,8 +134,7 @@ defmodule JidoTest.AgentDirectiveTest do
         BasicAgent.cmd(
           agent,
           {DeregisterAction, %{action_module: BasicAction}},
-          %{},
-          runner: Chain
+          %{}
         )
 
       # Verify action was deregistered
@@ -137,8 +146,7 @@ defmodule JidoTest.AgentDirectiveTest do
         BasicAgent.cmd(
           agent,
           {DeregisterAction, %{action_module: UnknownModule}},
-          %{},
-          runner: Chain
+          %{}
         )
 
       # Verify actions unchanged
@@ -150,8 +158,7 @@ defmodule JidoTest.AgentDirectiveTest do
         BasicAgent.cmd(
           agent,
           {DeregisterAction, %{action_module: DeregisterAction}},
-          %{},
-          runner: Chain
+          %{}
         )
 
       assert error.message == :cannot_deregister_self

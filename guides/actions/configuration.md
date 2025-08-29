@@ -44,12 +44,12 @@ instruction = %Jido.Instruction{
 }
 ```
 
-#### 3. Runner-Level Timeouts
+#### 3. Agent Execution Timeouts
 
 ```elixir
-# Apply timeout to all instructions processed by runner
-{:ok, agent, directives} = Jido.Runner.Simple.run(agent, timeout: 45_000)
-{:ok, agent, directives} = Jido.Runner.Chain.run(agent, timeout: 120_000)
+# Apply timeout to agent execution
+{:ok, agent, directives} = MyAgent.run(agent, timeout: 45_000)
+{:ok, agent, directives} = MyAgent.cmd(agent, instructions, %{}, timeout: 120_000)
 ```
 
 #### 4. Global Configuration (Lowest Precedence)
@@ -62,8 +62,8 @@ The global configuration serves as the default when no other timeout is specifie
 # Global config: 30 seconds
 config :jido, default_timeout: 30_000
 
-# Runner timeout: 60 seconds (overrides global for instructions without timeout)
-runner_opts = [timeout: 60_000]
+# Agent execution timeout: 60 seconds (overrides global for instructions without timeout)
+agent_opts = [timeout: 60_000]
 
 instructions = [
   %Instruction{
@@ -72,7 +72,7 @@ instructions = [
   },
   %Instruction{
     action: NormalAction,
-    opts: []                  # Uses 60 seconds (runner-level)
+    opts: []                  # Uses 60 seconds (agent execution-level)
   }
 ]
 
@@ -116,41 +116,37 @@ batch_instruction = %Instruction{
 
 ## Agent Integration
 
-Agents can configure default timeouts for their runners:
+Agents can configure default execution timeouts:
 
-### Simple Agent Configuration
+### Agent Timeout Configuration
 
 ```elixir
 defmodule MyApp.ProcessingAgent do
   use Jido.Agent,
-    name: "processing_agent",
-    runner: Jido.Runner.Simple
+    name: "processing_agent"
 
   def start_link(opts \\ []) do
-    # Set default timeout for this agent's runner
-    runner_opts = [timeout: 90_000]  # 90 seconds
-    opts = Keyword.put(opts, :runner_opts, runner_opts)
+    # Set default timeout for this agent's execution
+    execution_opts = [timeout: 90_000]  # 90 seconds
+    opts = Keyword.put(opts, :execution_opts, execution_opts)
     super(opts)
   end
 end
 ```
 
-### Chain Agent Configuration
+### Workflow Agent Configuration
 
 ```elixir
 defmodule MyApp.WorkflowAgent do
   use Jido.Agent,
-    name: "workflow_agent", 
-    runner: Jido.Runner.Chain
+    name: "workflow_agent"
 
   def start_link(opts \\ []) do
     # Longer timeout for complex workflows
-    runner_opts = [
-      timeout: 300_000,        # 5 minutes per action
-      merge_results: true,     # Chain results between actions
-      apply_directives?: true  # Apply directives during execution
+    execution_opts = [
+      timeout: 300_000         # 5 minutes per action
     ]
-    opts = Keyword.put(opts, :runner_opts, runner_opts)
+    opts = Keyword.put(opts, :execution_opts, execution_opts)
     super(opts)
   end
 end
@@ -280,5 +276,5 @@ IO.puts("Instruction timeout: #{instruction.opts[:timeout]}ms")
 ## Next Steps
 
 - Learn about [Action Testing](testing.md) including timeout scenarios
-- Explore [Runner Configuration](runners.md) for advanced timeout handling
+- Explore [Agent Documentation](../agents/overview.md) for advanced execution configuration
 - Check out [Workflow Execution](workflows.md) for timeout in complex workflows

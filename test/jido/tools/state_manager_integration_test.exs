@@ -17,7 +17,7 @@ defmodule Jido.Tools.StateManagerIntegrationTest do
         agent,
         {action, params},
         %{},
-        Keyword.merge([runner: Jido.Runner.Chain, apply_state: true], opts)
+        Keyword.merge([apply_state: true], opts)
       )
     end
 

@@ -189,7 +189,7 @@ Mix.install([
 {"guides/actions/instructions.md", title: "Instructions"},
 {"guides/actions/directives.md", title: "Directives"},
 {"guides/actions/chaining.md", title: "Chaining Actions"},
-{"guides/actions/runners.md", title: "Runners"},
+
 {"guides/actions/actions-as-tools.md", title: "Actions as LLM Tools"},
 {"guides/actions/testing.md", title: "Testing"},
 

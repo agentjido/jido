@@ -5,8 +5,7 @@ defmodule JidoTest.AgentDefinitionTest do
     MinimalAgent,
     BasicAgent,
     FullFeaturedAgent,
-    ValidationAgent,
-    CustomRunnerAgent
+    ValidationAgent
   }
 
   alias Jido.Error
@@ -93,7 +92,7 @@ defmodule JidoTest.AgentDefinitionTest do
       assert is_list(metadata.tags)
       assert is_nil(metadata.vsn)
       assert is_list(metadata.actions)
-      assert metadata.runner == Jido.Runner.Simple
+      # Runner field removed - no longer part of agent metadata
     end
 
     test "initializes with default values from schema" do
@@ -140,7 +139,7 @@ defmodule JidoTest.AgentDefinitionTest do
                DeregisterAction
              ]
 
-      assert BasicAgent.runner() == Jido.Runner.Simple
+      # Runner function removed - no longer part of agent API
 
       metadata = BasicAgent.__agent_metadata__()
       assert metadata == BasicAgent.to_json()
@@ -153,7 +152,7 @@ defmodule JidoTest.AgentDefinitionTest do
       assert FullFeaturedAgent.tags() == ["test", "full", "features"]
       assert FullFeaturedAgent.vsn() == "1.0.0"
       assert length(FullFeaturedAgent.actions()) > 0
-      assert FullFeaturedAgent.runner() == Jido.Runner.Simple
+      # Runner function removed - no longer part of agent API
 
       metadata = FullFeaturedAgent.__agent_metadata__()
       assert metadata == FullFeaturedAgent.to_json()
@@ -166,7 +165,7 @@ defmodule JidoTest.AgentDefinitionTest do
       assert MinimalAgent.tags() == []
       assert MinimalAgent.vsn() == nil
       assert MinimalAgent.schema() == []
-      assert MinimalAgent.runner() == Jido.Runner.Simple
+      # Runner function removed - no longer part of agent API
 
       metadata = MinimalAgent.__agent_metadata__()
       assert metadata == MinimalAgent.to_json()
@@ -182,7 +181,7 @@ defmodule JidoTest.AgentDefinitionTest do
       assert is_list(json.schema)
       assert is_list(json.tags)
       assert is_list(json.actions)
-      assert json.runner == Jido.Runner.Simple
+      # Runner field removed from JSON serialization
       refute Map.has_key?(json, :id)
       refute Map.has_key?(json, :state)
       refute Map.has_key?(json, :pending_instructions)
@@ -199,7 +198,7 @@ defmodule JidoTest.AgentDefinitionTest do
       assert json.vsn == "1.0.0"
       assert is_list(json.schema)
       assert is_list(json.actions)
-      assert json.runner == Jido.Runner.Simple
+      # Runner field removed from JSON serialization
     end
 
     test "handles nil values in JSON serialization" do
@@ -239,12 +238,6 @@ defmodule JidoTest.AgentDefinitionTest do
         end
         """)
       end
-    end
-
-    test "handles custom runner module" do
-      assert CustomRunnerAgent.runner() == JidoTest.TestRunners.LoggingRunner
-      json = CustomRunnerAgent.to_json()
-      assert json.runner == JidoTest.TestRunners.LoggingRunner
     end
   end
 

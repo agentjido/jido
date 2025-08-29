@@ -11,6 +11,7 @@
 
 ### Breaking Changes
 - **Action module paths**: All action modules moved from `Jido.Actions.*` to `Jido.Tools.*` to align with the `jido_action` library
+- **Runner system removed**: The separate `Jido.Runner.Simple` and `Jido.Runner.Chain` modules have been deprecated. Agents now use built-in execution logic that processes one instruction at a time (equivalent to the former Simple Runner behavior)
 
 ### Changed
 - **Skill configuration**: Skills can now declare required actions using the `actions` field for automatic registration

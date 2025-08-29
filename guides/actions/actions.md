@@ -41,9 +41,9 @@ Jido's action system consists of three main components:
    - Support conditional branching
    - Provide error recovery
 
-3. **Chain Runner**: Runtime engine that:
+3. **Agent Execution**: Runtime engine that:
    - Executes action sequences
-   - Manages data flow
+   - Manages state flow
    - Handles errors and compensation
    - Provides telemetry and monitoring
 
@@ -483,7 +483,7 @@ end
 
 Explore these advanced topics:
 
-- Custom runners for specialized workflows
+- Custom agent patterns for specialized workflows
 - Distributed workflow execution
 - Complex compensation strategies
 - Advanced telemetry patterns

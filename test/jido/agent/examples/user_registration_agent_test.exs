@@ -158,9 +158,9 @@ defmodule JidoTest.Examples.UserAgentTest do
           EnrichUserData
         ])
 
-      # Set the chain runner to combine the results of each action
+      # Execute with state application to combine results
       {:ok, _result_agent, _directives} =
-        UserAgent.run(planned_agent, apply_state: true, runner: Jido.Runner.Chain)
+        UserAgent.run(planned_agent, apply_state: true)
 
       # From FormatUser
       # assert result_agent.result.formatted_name == "John Doe"
@@ -222,7 +222,7 @@ defmodule JidoTest.Examples.UserAgentTest do
       {:ok, agent, _directives} =
         UserAgent.cmd(agent, [{FormatUser, agent.state}, EnrichUserData], %{age: 30},
           apply_state: true,
-          runner: Jido.Runner.Chain
+          apply_state: true
         )
 
       # State is set

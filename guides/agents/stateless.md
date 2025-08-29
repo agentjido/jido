@@ -230,7 +230,7 @@ assert agent != agent_with_plan
 
 #### 3. Execution with `run/2`
 
-The `run/2` function executes pending instructions through a runner:
+The `run/2` function executes pending instructions using built-in logic:
 
 ```elixir
 @spec run(agent :: t(), opts :: keyword()) ::
@@ -241,7 +241,6 @@ Parameters:
 
 - `agent`: The agent struct containing pending instructions
 - `opts`: Execution options
-  - `:runner` - Custom runner module (default: agent's configured runner)
   - `:apply_state` - Merge results into agent state (default: true)
   - `:timeout` - Execution timeout in milliseconds
   - `:retry` - Enable automatic retries (default: false)
@@ -250,10 +249,9 @@ Parameters:
 
 The execution process:
 
-1. Validates runner configuration
-2. Executes pending instructions in order
-3. Handles any returned directives
-4. Returns new agent with results and directives
+1. Executes pending instructions in order
+2. Handles any returned directives
+3. Returns new agent with results and directives
 
 ````elixir
 # Basic execution
@@ -261,7 +259,6 @@ The execution process:
 
 # With custom options
 {:ok, agent, directives} = Jido.Agent.run(agent,
-  runner: CustomRunner,
   apply_state: false,
   timeout: 5000,
   retry: true,

@@ -147,7 +147,7 @@ defmodule JidoTest.TestAgents do
 
     @impl true
     def on_error(%{state: %{should_recover?: true}} = agent, result) do
-      # Convert error to map format that tests expect  
+      # Convert error to map format that tests expect
       error_map = Jido.Error.to_map(result)
 
       new_state =
@@ -268,14 +268,6 @@ defmodule JidoTest.TestAgents do
     def on_error(agent, _error) do
       {:ok, track_callback(agent, :on_error)}
     end
-  end
-
-  defmodule CustomRunnerAgent do
-    @moduledoc "Agent using a custom runner implementation"
-    use Jido.Agent,
-      name: "custom_runner_agent",
-      runner: JidoTest.TestRunners.LoggingRunner,
-      actions: [JidoTest.TestActions.BasicAction]
   end
 
   defmodule DirectiveAgent do

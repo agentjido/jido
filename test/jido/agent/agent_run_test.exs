@@ -62,10 +62,12 @@ defmodule JidoTest.AgentRunTest do
           ]
         )
 
-      {:ok, final, _directives} = FullFeaturedAgent.run(planned, runner: Jido.Runner.Chain)
+      {:ok, final, _directives} = FullFeaturedAgent.run(planned)
 
-      # (10 + 1) * 2 + 8
-      assert final.result.value == 30
+      # Now executes only first instruction: 10 + 1 = 11
+      assert final.result.value == 11
+      # Two instructions remain in queue  
+      assert FullFeaturedAgent.pending?(final) == 2
     end
 
     test "handles errors appropriately" do
@@ -124,15 +126,14 @@ defmodule JidoTest.AgentRunTest do
                "Invalid agent type. Expected #{BasicAgent}, got #{FullFeaturedAgent}"
     end
 
-    test "validates runner module existence" do
+    test "ignores runner option for backwards compatibility" do
       agent = BasicAgent.new()
-      {:ok, planned} = BasicAgent.plan(agent, TestActions.BasicAction)
-      {:error, error} = BasicAgent.run(planned, runner: NonExistentRunner)
+      {:ok, planned} = BasicAgent.plan(agent, {TestActions.BasicAction, %{value: 5}})
+      # Unknown options are ignored - execution proceeds normally
+      {:ok, final, _directives} = BasicAgent.run(planned, runner: NonExistentRunner)
 
-      assert Error.to_map(error).type == :validation_error
-
-      assert error.message =~
-               "Runner module #{inspect(NonExistentRunner)} must exist and implement run/2"
+      # Should execute the action normally since unknown options are ignored
+      assert final.result.value == 5
     end
 
     test "handles empty instruction queue gracefully", %{agent: _agent} do
@@ -141,13 +142,16 @@ defmodule JidoTest.AgentRunTest do
       assert final.state == agent.state
     end
 
-    test "processes large instruction queues without stack overflow", %{agent: agent} do
+    test "executes single instruction from large queue", %{agent: agent} do
       qty = 1000
       actions = List.duplicate({TestActions.Add, %{value: 0, amount: 1}}, qty)
       {:ok, planned} = FullFeaturedAgent.plan(agent, actions)
-      {:ok, final, _directives} = FullFeaturedAgent.run(planned, runner: Jido.Runner.Chain)
+      {:ok, final, _directives} = FullFeaturedAgent.run(planned)
 
-      assert final.result.value == qty
+      # Now only executes first instruction: 0 + 1 = 1
+      assert final.result.value == 1
+      # 999 instructions remain in queue
+      assert FullFeaturedAgent.pending?(final) == qty - 1
     end
   end
 
@@ -166,7 +170,7 @@ defmodule JidoTest.AgentRunTest do
         })
 
       # Run the enqueue action
-      {:ok, final, []} = BasicAgent.run(planned, runner: Jido.Runner.Simple)
+      {:ok, final, []} = BasicAgent.run(planned)
 
       # Verify the directive was applied by checking the pending instructions
       assert :queue.len(final.pending_instructions) > 0

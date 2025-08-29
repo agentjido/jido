@@ -20,7 +20,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           agent,
           {Jido.Tools.Tasks.Create, %{title: "Initial Task", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -41,7 +40,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           {Jido.Tools.Tasks.Update,
            %{id: task_id, title: "Updated Task", deadline: new_deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -57,7 +55,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           updated,
           {Jido.Tools.Tasks.Toggle, %{id: task_id}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -72,7 +69,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           toggled,
           {Jido.Tools.Tasks.Delete, %{id: task_id}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -93,7 +89,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
             {Jido.Tools.Tasks.Create, %{title: "Task 3", deadline: deadline}}
           ],
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -108,7 +103,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           agent,
           {Jido.Tools.Tasks.Create, %{title: "Task 1", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -117,7 +111,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task1,
           {Jido.Tools.Tasks.Create, %{title: "Task 2", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -126,7 +119,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task2,
           {Jido.Tools.Tasks.Create, %{title: "Task 3", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -144,7 +136,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task3,
           {Jido.Tools.Tasks.Update, %{id: task2_id, title: "Updated Task 2", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -163,7 +154,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           updated,
           {Jido.Tools.Tasks.Toggle, %{id: task1_id}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -181,7 +171,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           toggled,
           {Jido.Tools.Tasks.Delete, %{id: task2_id}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -200,7 +189,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           {Jido.Tools.Tasks.Update,
            %{id: "non-existent", title: "New Title", deadline: DateTime.utc_now()}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -214,7 +202,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           agent,
           {Jido.Tools.Tasks.Toggle, %{id: "non-existent"}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -228,7 +215,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           agent,
           {Jido.Tools.Tasks.Delete, %{id: "non-existent"}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -246,7 +232,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           agent,
           {Jido.Tools.Tasks.Create, %{title: "First", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -255,7 +240,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task1,
           {Jido.Tools.Tasks.Create, %{title: "Second", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -264,7 +248,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task2,
           {Jido.Tools.Tasks.Create, %{title: "Third", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -284,7 +267,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           with_task3,
           {Jido.Tools.Tasks.Update, %{id: task2_id, title: "Updated Second", deadline: deadline}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 
@@ -303,7 +285,6 @@ defmodule Jido.Tools.TasksIntegrationTest do
           updated,
           {Jido.Tools.Tasks.Toggle, %{id: task1_id}},
           %{},
-          runner: Jido.Runner.Chain,
           apply_state: true
         )
 

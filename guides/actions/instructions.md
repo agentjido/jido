@@ -148,17 +148,15 @@ instructions = [
 
 ## Instruction Execution
 
-Instructions are executed by Runners, which handle state management and error handling:
+Instructions are executed directly by agents through their built-in execution logic:
 
 ```elixir
-# Simple execution of a single instruction
-{:ok, result} = Jido.Runner.Simple.run(agent)
+# Execute pending instructions on an agent
+{:ok, agent, directives} = MyAgent.run(agent)
 
-# Chain multiple instructions together
-{:ok, result} = Jido.Runner.Chain.run(agent)
+# Execute specific instructions with parameters
+{:ok, agent, directives} = MyAgent.cmd(agent, instructions, %{})
 ```
-
-See the [Runners](actions/runners.md) guide for more details on how to execute instructions.
 
 ### Error Handling
 
@@ -280,5 +278,5 @@ No, instructions are immutable by design. Instead:
 ## See Also
 
 - [Actions Overview](actions/overview.md) - Learn about implementing actions
-- [Runners](actions/runners.md) - Understanding instruction execution
+
 - [Testing](actions/testing.md) - Comprehensive testing guide

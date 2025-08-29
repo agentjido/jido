@@ -15,7 +15,7 @@ defmodule Jido.Agent do
   * Agents are defined at compile-time using the `use Jido.Agent` macro
   * Each Agent instance is created at server with a guaranteed unique ID
   * Agents maintain their own state schema for validation
-  * Actions are registered with Agents and executed through a Runner
+  * Actions are registered with Agents and executed through built-in execution logic
   * Lifecycle hooks enable customization of validation, planning and execution flows
   * All operations follow a consistent pattern returning `{:ok, result} | {:error, reason}`
 
@@ -110,14 +110,13 @@ defmodule Jido.Agent do
     {:ok, agent} = OtherAgent.set(agent, attrs)  # Will fail - type mismatch
   ```
 
-  ## Runner Architecture
+  ## Execution Architecture
 
-  The Runner executes actions in the agent's pending_instructions queue.
+  The agent executes actions from its pending_instructions queue using built-in execution logic.
 
-  * Default implementation: `Jido.Runner.Simple`
-  * Custom runners must implement the `Jido.Runner` behavior
-  * Runners handle instruction execution and state management
-  * Support for different execution strategies (simple, chain, parallel)
+  * Agent.run/2 processes a single instruction from the queue
+  * Agent.cmd/3 adds instructions to the queue and optionally runs them
+  * Built-in execution with comprehensive error handling and state management
 
   ## Error Handling
 
@@ -162,7 +161,6 @@ defmodule Jido.Agent do
     field(:vsn, String.t())
     field(:schema, NimbleOptions.schema())
     field(:actions, [module()], default: [])
-    field(:runner, module())
     field(:dirty_state?, boolean(), default: false)
     field(:pending_instructions, :queue.queue(instruction()))
     field(:state, map(), default: %{})
@@ -202,12 +200,6 @@ defmodule Jido.Agent do
                                         default: [],
                                         doc:
                                           "A list of actions that this Agent implements. Actions must implement the Jido.Action behavior."
-                                      ],
-                                      runner: [
-                                        type: :atom,
-                                        required: false,
-                                        default: Jido.Runner.Simple,
-                                        doc: "Module implementing the Jido.Runner behavior"
                                       ],
                                       schema: [
                                         type: :keyword_list,
@@ -287,7 +279,6 @@ defmodule Jido.Agent do
           def tags, do: @validated_opts[:tags]
           def vsn, do: @validated_opts[:vsn]
           def actions, do: @validated_opts[:actions]
-          def runner, do: @validated_opts[:runner]
           def schema, do: @validated_opts[:schema]
 
           def to_json do
@@ -298,7 +289,6 @@ defmodule Jido.Agent do
               tags: @validated_opts[:tags],
               vsn: @validated_opts[:vsn],
               actions: @validated_opts[:actions],
-              runner: @validated_opts[:runner],
               schema: @validated_opts[:schema]
             }
           end
@@ -881,23 +871,88 @@ defmodule Jido.Agent do
             OK.success(%{agent | pending_instructions: new_queue, dirty_state?: true})
           end
 
+          # Built-in execution logic - executes a single instruction from the queue
+          defp run_single_instruction(agent, opts) do
+            case :queue.out(agent.pending_instructions) do
+              {{:value, %Instruction{} = instruction}, remaining} ->
+                agent = %{agent | pending_instructions: remaining}
+                execute_instruction(agent, instruction, opts)
+
+              {:empty, _} ->
+                {:ok, agent, []}
+            end
+          end
+
+          defp execute_instruction(agent, instruction, opts) do
+            # Inject agent state and merge runtime opts with instruction opts
+            # Instruction opts take precedence over execution opts
+            merged_opts = Keyword.merge(opts, instruction.opts)
+
+            instruction = %{
+              instruction
+              | context: Map.put(instruction.context, :state, agent.state),
+                opts: merged_opts
+            }
+
+            case Jido.Exec.run(instruction) do
+              {:ok, result, directives} when is_list(directives) ->
+                handle_directive_result(agent, result, directives, opts)
+
+              {:ok, result, directive} ->
+                handle_directive_result(agent, result, [directive], opts)
+
+              {:ok, result} ->
+                {:ok, %{agent | result: result}, []}
+
+              {:error, %_{} = error, _dirs} ->
+                {:error, error}
+
+              {:error, %_{} = error} ->
+                {:error, error}
+            end
+          end
+
+          defp handle_directive_result(agent, result, directives, opts) do
+            apply_directives? = Keyword.get(opts, :apply_directives?, true)
+
+            if apply_directives? do
+              case Directive.apply_agent_directive(agent, directives) do
+                {:ok, updated_agent, server_directives} ->
+                  {:ok, %{updated_agent | result: result}, server_directives}
+
+                {:error, %_{} = error} ->
+                  {:error, error}
+
+                {:error, reason} ->
+                  {:error, Error.new(:validation_error, "Invalid directive", %{reason: reason})}
+              end
+            else
+              {:ok, %{agent | result: result}, directives}
+            end
+          end
+
           @doc """
-          Executes pending instructions in the agent's queue through a multi-phase process.
+          Executes a single pending instruction from the agent's queue.
 
-          Instructions are executed with the help of a runner. Review `Jido.Runner` for more information.
-
-          Each phase can modify the agent's state and trigger callbacks.
-
-          ## Execution Flow
+          Each execution goes through a multi-phase process:
           1. Pre-execution callback (`on_before_run/1`)
-          2. Runner execution of pending instructions
+          2. Single instruction execution from pending queue
           3. Post-execution callback (`on_after_run/3`)
           4. Return agent with updated state and result
+
+          ## Execution Process
+          1. Dequeues the oldest instruction from the agent's queue
+          2. Executes the instruction through its action module
+          3. Processes any directives from the execution
+          4. Optionally applies state changes
+          5. Returns the updated agent with execution results and server directives
 
           ## Parameters
           * `agent` - The agent struct containing pending instructions
           * `opts` - Keyword list of options:
-            * `:runner` - Module implementing the Runner behavior (default: agent's configured runner)
+            * `:apply_directives?` - When true (default), applies directives during execution
+            * `:timeout` - Timeout in milliseconds for action execution
+            * `:log_level` - Log level for debugging output
 
           ## State Management
 
@@ -908,14 +963,14 @@ defmodule Jido.Agent do
           * `:reset` - Set path to nil: `%StateModification{op: :reset, path: [:cache]}`
 
           ## Directives
-          * Directives are applied after runner execution
+          * Directives are applied after instruction execution
           * Directives can modify agent state and result, such as adding or removing actions or enqueuing new instructions
           * Review `Jido.Agent.Directive` for more information
 
           ## Returns
           * `{:ok, updated_agent, directives}` - Execution completed successfully
           * `{:error, %Error{}}` - Execution failed with specific error type:
-            * `:execution_error` - Runner execution failed
+            * `:execution_error` - Instruction execution failed
             * Any other error wrapped as execution_error
 
           ## Examples
@@ -927,8 +982,8 @@ defmodule Jido.Agent do
               # Basic execution with state modification directives
               {:ok, agent, directives} = MyAgent.run(agent)
 
-              # Using custom runner
-              {:ok, agent, directives} = MyAgent.run(agent, runner: CustomRunner)
+              # Execute without applying directives
+              {:ok, agent, directives} = MyAgent.run(agent, apply_directives?: false)
 
               # Error handling
               case MyAgent.run(agent) do
@@ -947,21 +1002,18 @@ defmodule Jido.Agent do
           * `on_before_run/1` - Pre-execution preparation
           * `on_after_run/3` - Post-execution processing
 
-          See `Jido.Runner` for implementing custom runners and `plan/2` for queueing actions.
+          See `plan/2` for queueing actions.
           """
           @spec run(t() | Jido.server(), keyword()) :: agent_result_with_directives()
           def run(agent, opts \\ [])
 
           def run(%__MODULE__{} = agent, opts) do
-            runner = Keyword.get(opts, :runner, runner())
-
-            with {:ok, validated_runner} <- Jido.Util.validate_runner(runner),
-                 {:ok, agent} <- on_before_run(agent),
-                 {:ok, agent, directives} <- validated_runner.run(agent, opts),
+            with {:ok, agent} <- on_before_run(agent),
+                 {:ok, agent, directives} <- run_single_instruction(agent, opts),
                  {:ok, agent} <- on_after_run(agent, agent.result, directives) do
               {:ok, agent, directives}
             else
-              {:error, reason} = error ->
+              {:error, reason} ->
                 agent_with_error = %{agent | result: reason}
                 on_error(agent_with_error, reason)
             end
@@ -994,15 +1046,17 @@ defmodule Jido.Agent do
               * Mixed list of modules and tuples (e.g. [ValidateAction, {ProcessAction, %{file: "data.csv"}}])
             * `context` - Map of execution context data (default: %{})
             * `opts` - Keyword list of execution options:
-              * `:runner` - Custom runner module (default: agent's configured runner)
               * `:strict_validation` - Enable/disable param validation (default: false)
+              * `:apply_directives?` - When true (default), applies directives during execution
+              * `:timeout` - Timeout in milliseconds for action execution
+              * `:log_level` - Log level for debugging output
 
           ## Command Flow
           1. Optional parameter validation
           2. Instruction normalization
           3. State preparation and merging
           4. Action planning with context
-          5. Execution with configured runner
+          5. Single instruction execution from pending queue
           6. Result processing and state application through directives
 
           ## Returns
@@ -1035,7 +1089,7 @@ defmodule Jido.Agent do
                 agent,
                 {ProcessAction, %{file: "data.csv"}},
                 %{user_id: "123"},
-                runner: CustomRunner
+                apply_directives?: false
               )
 
               # Error handling
@@ -1055,7 +1109,6 @@ defmodule Jido.Agent do
 
           def cmd(%__MODULE__{} = agent, instructions, attrs, opts) do
             strict_validation = Keyword.get(opts, :strict_validation, false)
-            runner = Keyword.get(opts, :runner, runner())
             context = Keyword.get(opts, :context, %{})
 
             with {:ok, agent} <- set(agent, attrs, strict_validation: strict_validation),
