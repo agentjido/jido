@@ -11,7 +11,7 @@ defmodule Jido.Agent.Lifecycle do
 
   All functions support multiple agent reference formats:
   - Agent PIDs (`pid()`)
-  - Agent IDs (`String.t()` or `atom()`) 
+  - Agent IDs (`String.t()` or `atom()`)
   - `{:ok, pid()}` tuples from other functions
 
   ## Agent Reference Resolution
@@ -35,7 +35,7 @@ defmodule Jido.Agent.Lifecycle do
       # Start an agent
       {:ok, pid} = Jido.Agent.Lifecycle.start_agent(MyApp.Agent, id: "worker-1")
 
-      # Clone an existing agent  
+      # Clone an existing agent
       {:ok, clone_pid} = Jido.Agent.Lifecycle.clone_agent("worker-1", "worker-2")
 
       # Restart with new configuration
@@ -97,11 +97,11 @@ defmodule Jido.Agent.Lifecycle do
       agent = %Jido.Agent{id: "worker-1", name: "Worker Agent"}
       {:ok, pid} = Jido.Agent.Lifecycle.start_agent(agent)
 
-      # Start with module and options  
+      # Start with module and options
       {:ok, pid} = Jido.Agent.Lifecycle.start_agent(MyApp.WorkerAgent, id: "worker-1")
 
       # Start with custom configuration
-      {:ok, pid} = Jido.Agent.Lifecycle.start_agent(MyApp.WorkerAgent, 
+      {:ok, pid} = Jido.Agent.Lifecycle.start_agent(MyApp.WorkerAgent,
         id: "worker-1",
         log_level: :debug,
         max_queue_size: 1000
@@ -150,7 +150,7 @@ defmodule Jido.Agent.Lifecycle do
 
   ## Returns
 
-  - `{:ok, [pid]}` - All agents started successfully  
+  - `{:ok, [pid]}` - All agents started successfully
   - `{:error, [{spec, reason}]}` - One or more agents failed to start
 
   ## Examples
@@ -161,7 +161,7 @@ defmodule Jido.Agent.Lifecycle do
         {"worker-2", MyApp.WorkerAgent, [log_level: :debug]},
         {%Jido.Agent{id: "worker-3"}}
       ]
-      
+
       {:ok, [pid1, pid2, pid3]} = Jido.Agent.Lifecycle.start_agents(specs)
 
       # Handle partial failures
@@ -260,7 +260,7 @@ defmodule Jido.Agent.Lifecycle do
 
   - `agent_ref`: Agent PID, ID, or `{:ok, pid}` tuple
   - `opts`: Keyword list of options to override:
-    - `:timeout` - Stop timeout in milliseconds (default: `5000`) 
+    - `:timeout` - Stop timeout in milliseconds (default: `5000`)
     - Any other options to override in the restart
 
   ## Returns
@@ -307,7 +307,7 @@ defmodule Jido.Agent.Lifecycle do
 
       case stop_agent(pid, timeout: stop_timeout, reason: :restart) do
         :ok ->
-          # Merge current options with overrides  
+          # Merge current options with overrides
           restart_opts =
             current_opts
             |> Map.to_list()
@@ -340,10 +340,10 @@ defmodule Jido.Agent.Lifecycle do
   ## Examples
 
       {:ok, new_pid} = Jido.Agent.Lifecycle.clone_agent("source-agent", "cloned-agent")
-      
+
       # Clone with overrides
-      {:ok, new_pid} = Jido.Agent.Lifecycle.clone_agent("source-agent", "cloned-agent", 
-        log_level: :debug, 
+      {:ok, new_pid} = Jido.Agent.Lifecycle.clone_agent("source-agent", "cloned-agent",
+        log_level: :debug,
         max_queue_size: 5000
       )
   """
@@ -387,7 +387,7 @@ defmodule Jido.Agent.Lifecycle do
   end
 
   # ============================================================================
-  # Introspection & Monitoring  
+  # Introspection & Monitoring
   # ============================================================================
 
   @doc """
@@ -495,7 +495,7 @@ defmodule Jido.Agent.Lifecycle do
       true = Jido.Agent.Lifecycle.agent_alive?("worker-1")
 
       # Check by PID
-      {:ok, pid} = Jido.Agent.Lifecycle.get_agent("worker-1") 
+      {:ok, pid} = Jido.Agent.Lifecycle.get_agent("worker-1")
       true = Jido.Agent.Lifecycle.agent_alive?(pid)
 
       # Returns false for non-existent agents
@@ -714,7 +714,6 @@ defmodule Jido.Agent.Lifecycle do
           vsn: "1.0.0",
           schema: [],
           actions: [],
-          runner: Jido.Runner.Simple,
           dirty_state?: false,
           pending_instructions: :queue.new(),
           state: initial_state,
