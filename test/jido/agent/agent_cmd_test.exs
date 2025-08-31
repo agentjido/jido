@@ -56,7 +56,6 @@ defmodule JidoTest.AgentCmdTest do
           agent,
           {TestActions.Add, %{value: 42}},
           %{},
-          apply_state: false,
           apply_state: true
         )
 
@@ -278,7 +277,7 @@ defmodule JidoTest.AgentCmdTest do
           %{}
         )
 
-      # Now executes only first instruction: 0 + 1 = 1 
+      # Now executes only first instruction: 0 + 1 = 1
       assert final.result.value == 1
       # 999 instructions remain in queue
       assert FullFeaturedAgent.pending?(final) == 999
@@ -322,7 +321,7 @@ defmodule JidoTest.AgentCmdTest do
           %{}
         )
 
-      # Now executes only first instruction: 1 + default(1) = 2  
+      # Now executes only first instruction: 1 + default(1) = 2
       assert final.result.value == 2
       # One instruction remains in queue
       assert FullFeaturedAgent.pending?(final) == 1

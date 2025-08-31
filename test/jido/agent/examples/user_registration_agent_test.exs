@@ -221,7 +221,6 @@ defmodule JidoTest.Examples.UserAgentTest do
     test "can be used to set, plan and run instructions", %{agent: agent} do
       {:ok, agent, _directives} =
         UserAgent.cmd(agent, [{FormatUser, agent.state}, EnrichUserData], %{age: 30},
-          apply_state: true,
           apply_state: true
         )
 
