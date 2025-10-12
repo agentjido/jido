@@ -1210,7 +1210,15 @@ defmodule Jido.Agent do
                          on_before_plan: 3,
                          on_before_run: 1,
                          on_after_run: 3,
-                         on_error: 2
+                         on_error: 2,
+                         # Metadata accessors - allow downstream override
+                         name: 0,
+                         description: 0,
+                         category: 0,
+                         tags: 0,
+                         vsn: 0,
+                         actions: 0,
+                         schema: 0
 
         {:error, error} ->
           message = Error.format_nimble_config_error(error, "Agent", __MODULE__)
