@@ -1,0 +1,22 @@
+# Standardized CI workflow using central reusable workflows
+# See: https://github.com/jmanhype/github-actions (will transfer to agentjido/github-actions)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint
+    uses: jmanhype/github-actions/.github/workflows/elixir-lint.yml@v1
+
+  test:
+    name: Test
+    uses: jmanhype/github-actions/.github/workflows/elixir-test.yml@v1
