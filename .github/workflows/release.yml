@@ -12,5 +12,5 @@ permissions:
 jobs:
   release:
     name: Release
-    uses: jmanhype/github-actions/.github/workflows/elixir-release.yml@v1
+    uses: agentjido/github-actions/.github/workflows/elixir-release.yml@v1
     secrets: inherit
