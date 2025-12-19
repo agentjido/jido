@@ -1,0 +1,33 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (no git push, no tag, no GitHub release, no Hex publish)"
+        required: false
+        type: boolean
+        default: false
+      hex_dry_run:
+        description: "Hex dry run only (run all git/release steps, but skip actual Hex publish)"
+        required: false
+        type: boolean
+        default: false
+      skip_tests:
+        description: "Skip tests before release"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    uses: agentjido/github-actions/.github/workflows/elixir-release.yml@v2
+    with:
+      dry_run: ${{ inputs.dry_run }}
+      hex_dry_run: ${{ inputs.hex_dry_run }}
+      skip_tests: ${{ inputs.skip_tests }}
+    secrets: inherit

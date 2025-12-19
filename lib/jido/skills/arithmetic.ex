@@ -94,8 +94,6 @@ defmodule Jido.Skills.Arithmetic do
   Process the result of an arithmetic operation.
   """
   @impl true
-  @spec transform_result(Signal.t(), {:ok, map()} | {:error, String.t()}, Jido.Skill.t()) ::
-          {:ok, Signal.t()}
   def transform_result(%Signal{} = signal, {:ok, result}, _skill) do
     operation = signal.type |> String.split(".") |> List.last() |> String.to_atom()
 

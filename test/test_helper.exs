@@ -7,7 +7,8 @@ Enum.each(
     Jido.Supervisor,
     Jido.Agent.Lifecycle,
     Jido.Agent.Utilities,
-    Jido.Discovery
+    Jido.Discovery,
+    Jido.Signal.ID
   ],
   &Mimic.copy/1
 )

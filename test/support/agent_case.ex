@@ -18,8 +18,19 @@ defmodule JidoTest.AgentCase do
         |> send_signal_sync("email.verified")
       end
 
+      test "cross-process trace correlation" do
+        %{producer: producer, consumer: consumer} = setup_cross_process_agents()
+        
+        send_signal_sync(producer, :root, %{test_data: "cross-process"})
+        |> wait_for_cross_process_completion([consumer])
+        
+        assert_trace_propagation(producer, consumer)
+        |> then(fn {_p, c} -> assert_received_signal_count(c, 1) end)
+      end
+
   ## Available Functions
 
+  ### Basic Agent Testing
   - `spawn_agent/2` - Spawn an agent with automatic cleanup
   - `send_signal_async/3` - Send a signal asynchronously (may cause race conditions)
   - `send_signal_sync/3` - Send a signal and wait for idle state (prevents race conditions)
@@ -28,6 +39,27 @@ defmodule JidoTest.AgentCase do
   - `get_agent_state/1` - Get current agent state
   - `assert_queue_empty/1` - Assert agent's signal queue is empty
   - `assert_queue_size/2` - Assert agent's signal queue has expected size
+
+  ### Cross-Process Testing
+  - `spawn_producer_agent/1` - Spawn ProducerAgent for cross-process tests
+  - `spawn_consumer_agent/1` - Spawn ConsumerAgent for cross-process tests
+  - `setup_cross_process_agents/1` - Set up complete producer-consumer scenario
+  - `get_emitted_signals/1` - Get signals emitted by ProducerAgent
+  - `get_received_signals/1` - Get signals received by ConsumerAgent
+  - `get_latest_trace_context/1` - Get trace context from latest received signal
+  - `wait_for_signal/3` - Wait for agent to receive specific signal type
+  - `wait_for_cross_process_completion/2` - Wait for all agents to reach idle
+  - `assert_received_signal_count/2` - Assert expected number of received signals
+  - `assert_emitted_signal_count/2` - Assert expected number of emitted signals
+  - `assert_trace_propagation/2` - Assert trace context propagated between agents
+
+  ### Bus Spy (Signal Observation)
+  - `start_bus_spy/0` - Start observing signals crossing process boundaries
+  - `stop_bus_spy/1` - Stop the bus spy and cleanup
+  - `get_spy_signals/1` - Get all signals captured by the spy
+  - `get_spy_signals/2` - Get signals matching a type pattern  
+  - `wait_for_bus_signal/3` - Wait for a specific signal to cross the bus
+  - `assert_bus_signal_observed/2` - Assert a signal was observed crossing the bus
 
   """
 
@@ -260,6 +292,271 @@ defmodule JidoTest.AgentCase do
     context
   end
 
+  # Cross-process testing helpers
+
+  @doc """
+  Spawn a ProducerAgent for cross-process testing.
+
+  Returns a context that can be chained with other functions.
+  The ProducerAgent handles :root signals and emits child.event signals.
+
+  ## Examples
+
+      spawn_producer_agent()
+      |> send_signal_sync(:root, %{test_data: "hello"})
+      |> get_emitted_signals()
+  """
+  @spec spawn_producer_agent(keyword()) :: agent_context()
+  def spawn_producer_agent(opts \\ []) do
+    spawn_agent(JidoTest.TestAgents.ProducerAgent, opts)
+  end
+
+  @doc """
+  Spawn a ConsumerAgent for cross-process testing.
+
+  Returns a context that can be chained with other functions.
+  The ConsumerAgent handles child.event signals and stores trace context.
+
+  ## Examples
+
+      spawn_consumer_agent()
+      |> wait_for_signal("child.event", timeout: 2000)
+      |> get_received_signals()
+  """
+  @spec spawn_consumer_agent(keyword()) :: agent_context()
+  def spawn_consumer_agent(opts \\ []) do
+    spawn_agent(JidoTest.TestAgents.ConsumerAgent, opts)
+  end
+
+  @doc """
+  Get emitted signals from a ProducerAgent context for test assertions.
+
+  ## Examples
+
+      spawn_producer_agent()
+      |> send_signal_sync(:root, %{value: 42})
+      |> get_emitted_signals()
+      |> assert_length(1)
+  """
+  @spec get_emitted_signals(agent_context()) :: list()
+  def get_emitted_signals(%{server_pid: server_pid}) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    Map.get(state.agent.state, :emitted_signals, [])
+  end
+
+  @doc """
+  Get received signals from a ConsumerAgent context for test assertions.
+
+  ## Examples
+
+      consumer_context = spawn_consumer_agent()
+      # ... send signals ...
+      received = get_received_signals(consumer_context)
+      assert length(received) == 1
+  """
+  @spec get_received_signals(agent_context()) :: list()
+  def get_received_signals(%{server_pid: server_pid}) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    Map.get(state.agent.state, :received_signals, [])
+  end
+
+  @doc """
+  Get the trace context from the latest received signal in a ConsumerAgent.
+
+  Returns nil if no signals have been received.
+
+  ## Examples
+
+      consumer_context = spawn_consumer_agent()
+      # ... send traced signal ...
+      trace_context = get_latest_trace_context(consumer_context)
+      assert trace_context.trace_id == "expected-trace-id"
+  """
+  @spec get_latest_trace_context(agent_context()) :: map() | nil
+  def get_latest_trace_context(%{server_pid: server_pid}) do
+    validate_process!(server_pid)
+    {:ok, state} = Server.state(server_pid)
+    received_signals = Map.get(state.agent.state, :received_signals, [])
+
+    case received_signals do
+      [] -> nil
+      signals -> List.last(signals).trace_context
+    end
+  end
+
+  @doc """
+  Wait for an agent to receive a signal of a specific type and return context for chaining.
+
+  This function continuously polls the agent's received signals until a signal
+  of the expected type is found or timeout is reached.
+
+  ## Options
+
+  - `:timeout` - Maximum time to wait in milliseconds (default: 1000)
+  - `:check_interval` - How often to check in milliseconds (default: 10)
+
+  ## Examples
+
+      consumer_context = spawn_consumer_agent()
+      producer_context = spawn_producer_agent()
+      
+      spawn_task(fn ->
+        send_signal_sync(producer_context, :root, %{data: "test"})
+      end)
+      
+      wait_for_signal(consumer_context, "child.event", timeout: 2000)
+      |> assert_received_signal_count(1)
+  """
+  @spec wait_for_signal(agent_context(), String.t(), keyword()) :: agent_context()
+  def wait_for_signal(%{server_pid: server_pid} = context, expected_signal_type, opts \\ []) do
+    validate_process!(server_pid)
+    timeout = Keyword.get(opts, :timeout, 1000)
+    check_interval = Keyword.get(opts, :check_interval, 10)
+
+    JidoTest.Helpers.Assertions.wait_for(
+      fn ->
+        received_signals = get_received_signals(context)
+
+        signal_received =
+          Enum.any?(received_signals, fn signal ->
+            signal.signal_data[:type] == expected_signal_type
+          end)
+
+        assert signal_received,
+               "Expected to receive signal of type '#{expected_signal_type}', but no such signal found in #{length(received_signals)} received signals"
+      end,
+      timeout: timeout,
+      check_interval: check_interval
+    )
+
+    context
+  end
+
+  @doc """
+  Wait for signal processing to complete across multiple agents and return context for chaining.
+
+  This helper waits for all specified agents to return to idle status,
+  useful for ensuring cross-process signal propagation has finished.
+
+  ## Examples
+
+      producer_context = spawn_producer_agent()
+      consumer_context = spawn_consumer_agent()
+      
+      send_signal_async(producer_context, :root, %{data: "test"})
+      
+      wait_for_cross_process_completion([producer_context, consumer_context])
+      |> then(fn contexts -> assert_received_signal_count(Enum.at(contexts, 1), 1) end)
+  """
+  @spec wait_for_cross_process_completion(list(agent_context()), keyword()) ::
+          list(agent_context())
+  def wait_for_cross_process_completion(contexts, opts \\ []) when is_list(contexts) do
+    timeout = Keyword.get(opts, :timeout, 2000)
+
+    # Wait for all agents to reach idle status
+    Enum.each(contexts, fn context ->
+      wait_for_agent_status(context, :idle, timeout: timeout)
+    end)
+
+    contexts
+  end
+
+  @doc """
+  Assert that an agent has received the expected number of signals and return context for chaining.
+
+  ## Examples
+
+      consumer_context = spawn_consumer_agent()
+      # ... trigger signals ...
+      assert_received_signal_count(consumer_context, 1)
+  """
+  @spec assert_received_signal_count(agent_context(), non_neg_integer()) :: agent_context()
+  def assert_received_signal_count(context, expected_count) do
+    received_signals = get_received_signals(context)
+    actual_count = length(received_signals)
+
+    assert actual_count == expected_count,
+           "Expected #{expected_count} received signals, got #{actual_count}"
+
+    context
+  end
+
+  @doc """
+  Assert that an agent has emitted the expected number of signals and return context for chaining.
+
+  ## Examples
+
+      producer_context = spawn_producer_agent()
+      |> send_signal_sync(:root, %{data: "test"})
+      |> assert_emitted_signal_count(1)
+  """
+  @spec assert_emitted_signal_count(agent_context(), non_neg_integer()) :: agent_context()
+  def assert_emitted_signal_count(context, expected_count) do
+    emitted_signals = get_emitted_signals(context)
+    actual_count = length(emitted_signals)
+
+    assert actual_count == expected_count,
+           "Expected #{expected_count} emitted signals, got #{actual_count}"
+
+    context
+  end
+
+  @doc """
+  Assert that trace context propagated correctly between agents and return context for chaining.
+
+  Compares the trace_id from the producer's emitted signals with the consumer's received signals.
+
+  ## Examples
+
+      producer_context = spawn_producer_agent()
+      consumer_context = spawn_consumer_agent()
+      
+      # ... set up signal flow ...
+      
+      assert_trace_propagation(producer_context, consumer_context)
+  """
+  @spec assert_trace_propagation(agent_context(), agent_context()) ::
+          {agent_context(), agent_context()}
+  def assert_trace_propagation(producer_context, consumer_context) do
+    consumer_trace = get_latest_trace_context(consumer_context)
+
+    refute is_nil(consumer_trace), "Consumer should have received a signal with trace context"
+    assert is_binary(consumer_trace.trace_id), "Consumer should have a valid trace_id"
+
+    {producer_context, consumer_context}
+  end
+
+  @doc """
+  Create a complete cross-process test scenario with producer and consumer agents.
+
+  Returns a map with both agent contexts for easy access.
+
+  ## Examples
+
+      %{producer: producer_context, consumer: consumer_context} = 
+        setup_cross_process_agents()
+      
+      send_signal_sync(producer_context, :root, %{data: "test"})
+      |> wait_for_cross_process_completion([consumer_context])
+      
+      assert_trace_propagation(producer_context, consumer_context)
+  """
+  @spec setup_cross_process_agents(keyword()) :: %{
+          producer: agent_context(),
+          consumer: agent_context()
+        }
+  def setup_cross_process_agents(opts \\ []) do
+    producer_opts = Keyword.get(opts, :producer_opts, [])
+    consumer_opts = Keyword.get(opts, :consumer_opts, [])
+
+    %{
+      producer: spawn_producer_agent(producer_opts),
+      consumer: spawn_consumer_agent(consumer_opts)
+    }
+  end
+
   defp validate_agent_module!(module) do
     module
     |> validate_module_type!()
@@ -325,5 +622,131 @@ defmodule JidoTest.AgentCase do
 
   defp stop_test_agent(%{server_pid: server_pid}) do
     if Process.alive?(server_pid), do: GenServer.stop(server_pid, :normal, 1000)
+  end
+
+  # Bus Spy Functions - for observing signals crossing process boundaries
+
+  @doc """
+  Start a bus spy to observe signals crossing process boundaries via the signal bus.
+
+  Returns a spy reference that can be used with other bus spy functions.
+  The spy will automatically be stopped when the test finishes.
+
+  ## Examples
+
+      test "cross-process signal observation" do
+        spy = start_bus_spy()
+        
+        %{producer: producer, consumer: consumer} = setup_cross_process_agents()
+        send_signal_sync(producer, :root, %{test_data: "cross-process"})
+        wait_for_cross_process_completion([consumer])
+        
+        # Verify the signal was observed crossing the bus
+        assert_bus_signal_observed(spy, "child.event")
+        
+        dispatched_signals = get_spy_signals(spy)
+        assert length(dispatched_signals) > 0
+      end
+  """
+  @spec start_bus_spy() :: pid()
+  def start_bus_spy do
+    spy = Jido.Signal.BusSpy.start_spy()
+    ExUnit.Callbacks.on_exit(fn -> Jido.Signal.BusSpy.stop_spy(spy) end)
+    spy
+  end
+
+  @doc """
+  Stop a bus spy and clean up telemetry handlers.
+  """
+  @spec stop_bus_spy(pid()) :: :ok
+  def stop_bus_spy(spy_ref) do
+    Jido.Signal.BusSpy.stop_spy(spy_ref)
+  end
+
+  @doc """
+  Get all signals captured by the bus spy since it started.
+
+  Returns signals in chronological order (oldest first).
+
+  ## Examples
+
+      spy = start_bus_spy()
+      # ... perform cross-process operations ...
+      all_signals = get_spy_signals(spy)
+      assert length(all_signals) == 2
+  """
+  @spec get_spy_signals(pid()) :: [map()]
+  def get_spy_signals(spy_ref) do
+    Jido.Signal.BusSpy.get_dispatched_signals(spy_ref)
+  end
+
+  @doc """
+  Get signals captured by the spy that match a specific type pattern.
+
+  Supports glob-style patterns:
+  - "*" - matches all signals
+  - "user.*" - matches all signals starting with "user."
+  - "*.created" - matches all signals ending with ".created"
+  - "user.created" - exact match
+
+  ## Examples
+
+      spy = start_bus_spy()
+      # ... perform operations ...
+      user_signals = get_spy_signals(spy, "user.*")
+      child_signals = get_spy_signals(spy, "child.event")
+  """
+  @spec get_spy_signals(pid(), String.t()) :: [map()]
+  def get_spy_signals(spy_ref, signal_type_pattern) do
+    Jido.Signal.BusSpy.get_signals_by_type(spy_ref, signal_type_pattern)
+  end
+
+  @doc """
+  Wait for a signal matching the given type pattern to cross the bus.
+
+  Returns the matching signal event or times out.
+
+  ## Options
+
+  - `:timeout` - Maximum time to wait in milliseconds (default: 1000)
+
+  ## Examples
+
+      spy = start_bus_spy()
+      
+      Task.start(fn ->
+        # ... async operation that will emit signal ...
+      end)
+      
+      {:ok, signal_event} = wait_for_bus_signal(spy, "async.completed")
+      assert signal_event.signal.data.status == "done"
+  """
+  @spec wait_for_bus_signal(pid(), String.t(), keyword()) :: {:ok, map()} | :timeout
+  def wait_for_bus_signal(spy_ref, signal_type_pattern, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 1000)
+    Jido.Signal.BusSpy.wait_for_signal(spy_ref, signal_type_pattern, timeout)
+  end
+
+  @doc """
+  Assert that a signal of the given type was observed crossing the bus.
+
+  This is a convenience function that checks if any signal matching the pattern
+  has been captured by the spy.
+
+  ## Examples
+
+      spy = start_bus_spy()
+      # ... perform cross-process operations ...
+      assert_bus_signal_observed(spy, "child.event")
+      assert_bus_signal_observed(spy, "user.*")
+  """
+  @spec assert_bus_signal_observed(pid(), String.t()) :: :ok
+  def assert_bus_signal_observed(spy_ref, signal_type_pattern) do
+    signals = get_spy_signals(spy_ref, signal_type_pattern)
+
+    assert length(signals) > 0,
+           "Expected to observe signal matching pattern '#{signal_type_pattern}' crossing the bus, but none were found"
+
+    :ok
   end
 end

@@ -81,7 +81,7 @@ defmodule Jido.MixProject do
           "guides/about/alternatives.md",
           "CONTRIBUTING.md",
           "CHANGELOG.md",
-          "LICENSE.md"
+          "LICENSE"
         ],
         Examples: [
           "guides/examples/your-first-agent.livemd",
@@ -114,6 +114,9 @@ defmodule Jido.MixProject do
           "guides/agents/callbacks.md",
           "guides/agents/child-processes.md"
         ],
+        Development: [
+          "guides/debugging.livemd"
+        ],
         Skills: [
           "guides/skills/overview.md",
           "guides/skills/testing.md"
@@ -134,7 +137,7 @@ defmodule Jido.MixProject do
         {"guides/about/alternatives.md", title: "Alternatives"},
         {"CONTRIBUTING.md", title: "Contributing"},
         {"CHANGELOG.md", title: "Changelog"},
-        {"LICENSE.md", title: "Apache 2.0 License"},
+        {"LICENSE", title: "Apache 2.0 License"},
 
         # Examples
         {"guides/examples/hello-world.livemd", title: "Hello World"},
@@ -167,6 +170,9 @@ defmodule Jido.MixProject do
         {"guides/agents/callbacks.md", title: "Callbacks"},
         {"guides/agents/child-processes.md", title: "Child Processes"},
 
+        # Development
+        {"guides/debugging.livemd", title: "Debugging Agents"},
+
         # Skills
         {"guides/skills/overview.md", title: "Overview"},
         {"guides/skills/testing.md", title: "Testing Skills"}
@@ -175,7 +181,7 @@ defmodule Jido.MixProject do
       formatters: ["html"],
       skip_undefined_reference_warnings_on: [
         "CHANGELOG.md",
-        "LICENSE.md"
+        "LICENSE"
       ],
       groups_for_modules: [
         Core: [
@@ -222,12 +228,15 @@ defmodule Jido.MixProject do
 
   defp package do
     [
-      files: ["lib", "mix.exs", "README.md", "LICENSE.md", "usage-rules.md"],
+      files: ["lib", "mix.exs", "README.md", "LICENSE", "usage-rules.md"],
       maintainers: ["Mike Hostetler"],
       licenses: ["Apache-2.0"],
       links: %{
+        "Documentation" => "https://hexdocs.pm/jido",
         "GitHub" => "https://github.com/agentjido/jido",
-        "Agent Workbench" => "https://github.com/agentjido/jido_workbench"
+        "Website" => "https://agentjido.xyz",
+        "Discord" => "https://agentjido.xyz/discord",
+        "Changelog" => "https://github.com/agentjido/jido/blob/main/CHANGELOG.md"
       }
     ]
   end
@@ -235,8 +244,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      ws_dep(:jido_action, "../jido_action", github: "agentjido/jido_action"),
-      ws_dep(:jido_signal, "../jido_signal", github: "agentjido/jido_signal"),
+      jido_dep(:jido_action, "../jido_action", "~> 1.3.0"),
+      jido_dep(:jido_signal, "../jido_signal", "~> 1.3.0"),
 
       # Jido Deps
       {:backoff, "~> 1.1"},
@@ -261,6 +270,8 @@ defmodule Jido.MixProject do
       {:req, "~> 0.5.10"},
 
       # Development & Test Dependencies
+      {:git_ops, "~> 2.9", only: :dev, runtime: false},
+      {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
@@ -286,25 +297,25 @@ defmodule Jido.MixProject do
       # Run to check the quality of your code
       q: ["quality"],
       quality: [
-        "format",
         "format --check-formatted",
         "compile --warnings-as-errors",
-        "dialyzer --format dialyxir",
-        "credo --all"
+        "credo --min-priority higher",
+        "dialyzer"
       ]
     ]
   end
 
-  # Workspace dependency management helpers
-  defp workspace? do
-    System.get_env("JIDO_WORKSPACE") in ["1", "true"]
-  end
+  defp jido_dep(app, rel_path, hex_req, extra_opts \\ []) do
+    path = Path.expand(rel_path, __DIR__)
 
-  defp ws_dep(app, rel_path, remote_opts, extra_opts \\ []) do
-    if workspace?() and File.dir?(Path.expand(rel_path, __DIR__)) do
-      {app, [path: rel_path, override: true] ++ extra_opts}
+    if File.dir?(path) and File.exists?(Path.join(path, "mix.exs")) do
+      {app, Keyword.merge([path: rel_path, override: true], extra_opts)}
     else
-      {app, remote_opts ++ extra_opts}
+      {app, hex_req, extra_opts}
+    end
+    |> case do
+      {app, opts} when is_list(opts) -> {app, opts}
+      {app, req, opts} -> {app, req, opts}
     end
   end
 end

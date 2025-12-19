@@ -1067,4 +1067,122 @@ defmodule JidoTest.TestActions do
       {:ok, %{metadata: context.action_metadata}}
     end
   end
+
+  defmodule LoopingAction do
+    @moduledoc false
+    use Action,
+      name: "looping_action",
+      description: "Action that enqueues itself in a loop with decreasing counter",
+      schema: [
+        counter: [type: :integer, required: true, doc: "Number of iterations remaining"],
+        value: [type: :integer, default: 0, doc: "Accumulator value"]
+      ]
+
+    def run(%{counter: counter, value: value}, _context) when counter > 1 do
+      # Return the current iteration's result and enqueue next iteration
+      directive = %Jido.Agent.Directive.Enqueue{
+        action: __MODULE__,
+        params: %{counter: counter - 1, value: value + counter},
+        context: %{}
+      }
+
+      {:ok, %{iteration: counter, accumulated_value: value + counter}, directive}
+    end
+
+    def run(%{counter: counter, value: value}, _context) when counter == 1 do
+      # Final iteration - no more enqueuing
+      {:ok, %{iteration: counter, accumulated_value: value + counter, final: true}}
+    end
+
+    def run(%{counter: counter}, _context) when counter <= 0 do
+      # Invalid counter
+      {:error, "Counter must be positive"}
+    end
+  end
+
+  defmodule CounterCondition do
+    @moduledoc false
+    use Action,
+      name: "counter_condition",
+      description: "Conditional action that checks if a counter is above a threshold",
+      schema: [
+        counter: [type: :integer, required: true, doc: "Current counter value"],
+        threshold: [type: :integer, default: 0, doc: "Threshold to compare against"]
+      ]
+
+    def run(%{counter: counter, threshold: threshold}, _context) do
+      should_continue = counter > threshold
+      {:ok, %{counter: counter, threshold: threshold, continue: should_continue}}
+    end
+  end
+
+  defmodule ValueAccumulator do
+    @moduledoc false
+    use Action,
+      name: "value_accumulator",
+      description: "Action that accumulates a value and can be used as while loop body",
+      schema: [
+        value: [type: :integer, required: true, doc: "Current accumulated value"],
+        increment: [type: :integer, default: 1, doc: "Amount to add each iteration"]
+      ]
+
+    def run(%{value: value, increment: increment}, _context) do
+      new_value = value + increment
+      {:ok, %{value: new_value, increment: increment, previous: value}}
+    end
+  end
+
+  defmodule MaxValueCondition do
+    @moduledoc false
+    use Action,
+      name: "max_value_condition",
+      description: "Conditional action that checks if a value is below maximum",
+      schema: [
+        value: [type: :integer, required: true, doc: "Current value to check"],
+        max: [type: :integer, default: 100, doc: "Maximum allowed value"]
+      ]
+
+    def run(%{value: value, max: max}, _context) do
+      should_continue = value < max
+      {:ok, %{value: value, max: max, continue: should_continue}}
+    end
+  end
+
+  defmodule CountdownAction do
+    @moduledoc false
+    use Action,
+      name: "countdown_action",
+      description: "Decrements a counter and sets continue flag based on counter > 0",
+      schema: [
+        counter: [type: :integer, required: true, doc: "Current counter value"],
+        decrement: [type: :integer, default: 1, doc: "Amount to subtract"]
+      ]
+
+    def run(%{counter: counter, decrement: decrement}, _context) do
+      new_counter = counter - decrement
+      should_continue = new_counter > 0
+
+      # This action manages its own continue condition
+      {:ok, %{counter: new_counter, continue: should_continue, decremented_by: decrement}}
+    end
+  end
+
+  defmodule IncrementWithLimit do
+    @moduledoc false
+    use Action,
+      name: "increment_with_limit",
+      description: "Increments a value and sets continue flag based on limit",
+      schema: [
+        value: [type: :integer, required: true, doc: "Current value"],
+        increment: [type: :integer, default: 1, doc: "Amount to add"],
+        limit: [type: :integer, default: 10, doc: "Upper limit for continuation"]
+      ]
+
+    def run(%{value: value, increment: increment, limit: limit}, _context) do
+      new_value = value + increment
+      should_continue = new_value < limit
+
+      {:ok, %{value: new_value, increment: increment, limit: limit, continue: should_continue}}
+    end
+  end
 end

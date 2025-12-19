@@ -217,7 +217,7 @@ While we strive for 100% test coverage, we prioritize meaningful tests that veri
 
 ## License
 
-Apache License 2.0 - See [LICENSE.md](LICENSE.md) for details.
+Apache License 2.0 - See [LICENSE](LICENSE) for details.
 
 ## Support
 

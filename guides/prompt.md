@@ -170,7 +170,7 @@ Mix.install([
 {"guides/about/alternatives.md", title: "Alternatives"},
 {"CONTRIBUTING.md", title: "Contributing"},
 {"CHANGELOG.md", title: "Changelog"},
-{"LICENSE.md", title: "Apache 2.0 License"},
+{"LICENSE", title: "Apache 2.0 License"},
 
 # Examples
 

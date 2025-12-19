@@ -15,7 +15,7 @@ defmodule Jido.Agent.Server.Options do
                                 doc: "The Agent struct or module to be managed by this server"
                               ],
                               mode: [
-                                type: {:in, [:auto, :step]},
+                                type: {:in, [:auto, :step, :debug]},
                                 default: :auto,
                                 doc: "Server execution mode"
                               ],

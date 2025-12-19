@@ -26,6 +26,30 @@ defmodule JidoTest.TestAgents do
       ]
   end
 
+  defmodule LoopingAgent do
+    @moduledoc "Agent with looping actions for testing cascaded enqueuing"
+    use Jido.Agent,
+      name: "looping_agent",
+      actions: [
+        JidoTest.TestActions.BasicAction,
+        JidoTest.TestActions.Add,
+        JidoTest.TestActions.Multiply,
+        JidoTest.TestActions.NoSchema,
+        JidoTest.TestActions.EnqueueAction,
+        JidoTest.TestActions.RegisterAction,
+        JidoTest.TestActions.DeregisterAction,
+        JidoTest.TestActions.LoopingAction,
+        JidoTest.TestActions.CountdownAction,
+        JidoTest.TestActions.IncrementWithLimit,
+        Jido.Actions.Iterator,
+        Jido.Actions.While
+      ],
+      schema: [
+        location: [type: :atom, default: :home],
+        battery_level: [type: :integer, default: 100]
+      ]
+  end
+
   defmodule FullFeaturedAgent do
     @moduledoc "Agent with all features enabled and complex schema"
     use Jido.Agent,

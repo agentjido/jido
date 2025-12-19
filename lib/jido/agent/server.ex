@@ -218,6 +218,18 @@ defmodule Jido.Agent.Server do
     end
   end
 
+  def handle_call({:set_mode, mode}, _from, %ServerState{} = state) do
+    with {:ok, validated_mode} <- validate_mode(mode) do
+      handle_mode_change(state, validated_mode)
+    else
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call(:ping, _from, state) do
+    {:reply, :pong, state}
+  end
+
   def handle_call(_unhandled, _from, state) do
     {:reply, {:error, :unhandled_call}, state}
   end
@@ -482,4 +494,42 @@ defmodule Jido.Agent.Server do
   end
 
   defp register_actions(state, _), do: {:ok, state}
+
+  @spec validate_mode(term()) :: {:ok, ServerState.modes()} | {:error, :unsupported_mode}
+  defp validate_mode(mode) when mode in [:auto, :step, :debug] do
+    {:ok, mode}
+  end
+
+  defp validate_mode(_mode) do
+    {:error, :unsupported_mode}
+  end
+
+  @spec handle_mode_change(ServerState.t(), ServerState.modes()) ::
+          {:reply, {:ok, ServerState.modes()}, ServerState.t()}
+  defp handle_mode_change(state, validated_mode) when state.mode == validated_mode do
+    # Same mode, return success without emitting event
+    {:reply, {:ok, validated_mode}, state}
+  end
+
+  defp handle_mode_change(state, validated_mode) do
+    # Mode changed, emit event and update state
+    :mode_changed
+    |> ServerSignal.event_signal(state, %{from: state.mode, to: validated_mode})
+    |> ServerOutput.emit(state)
+
+    new_state = %{state | mode: validated_mode}
+
+    # If switching to :auto mode, trigger queue processing
+    maybe_trigger_queue_processing(new_state, validated_mode)
+
+    {:reply, {:ok, validated_mode}, new_state}
+  end
+
+  @spec maybe_trigger_queue_processing(ServerState.t(), ServerState.modes()) :: :ok
+  defp maybe_trigger_queue_processing(_state, :auto) do
+    Process.send_after(self(), :process_queue, 0)
+    :ok
+  end
+
+  defp maybe_trigger_queue_processing(_state, _mode), do: :ok
 end

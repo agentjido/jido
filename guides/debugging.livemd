@@ -1,0 +1,290 @@
+# Debugging Jido Agents
+
+Jido provides a comprehensive debugging system that allows developers to step through agent execution, inspect signal processing, and troubleshoot complex agent behaviors. This guide covers the built-in debugging features and how to use them effectively.
+
+## Overview
+
+The Jido debugging system consists of three main components:
+
+1. **Debug Mode** - A special execution mode that pauses after each signal
+2. **Debugger GenServer** - A process that can attach to and control agent execution
+3. **Debug Events** - Telemetry events emitted during debug execution for observability
+
+## Debug Modes
+
+Jido agents support three execution modes:
+
+- **`:auto`** (default) - Processes all queued signals automatically
+- **`:step`** - Processes one signal at a time, requiring manual continuation
+- **`:debug`** - Like `:step` mode but emits additional debugging events
+
+### Setting Debug Mode
+
+You can set an agent's mode when starting it:
+
+```elixir
+{:ok, agent_pid} = Jido.Agent.Server.start_link(
+  agent: my_agent,
+  mode: :debug
+)
+```
+
+Or change the mode at runtime:
+
+```elixir
+GenServer.call(agent_pid, {:set_mode, :debug})
+```
+
+## Using the Debugger
+
+The `Jido.Agent.Debugger` module provides a simple interface for debugging agents interactively.
+
+### Attaching to an Agent
+
+To start debugging an existing agent:
+
+```elixir
+# First, ensure the agent is in debug mode
+GenServer.call(agent_pid, {:set_mode, :debug})
+
+# Attach the debugger (this will suspend the agent)
+{:ok, debugger_pid} = Jido.Agent.Debugger.attach(agent_pid)
+```
+
+### Stepping Through Execution
+
+Once attached, you can step through signal processing:
+
+```elixir
+# Process one signal and pause
+:ok = Jido.Agent.Debugger.step(debugger_pid)
+
+# Check the agent's current state
+state = :sys.get_state(agent_pid)
+IO.inspect(state.current_signal)
+```
+
+### Detaching the Debugger
+
+When you're done debugging:
+
+```elixir
+# Detach and resume normal execution
+:ok = Jido.Agent.Debugger.detach(debugger_pid)
+```
+
+This will:
+- Stop the debugger process
+- Resume the agent (unsuspend it)
+- Restore the original execution mode
+
+## Debug Events
+
+When an agent runs in `:debug` mode, it emits special telemetry events that can be used for logging, monitoring, or building debugging tools.
+
+### Available Events
+
+1. **`:debugger_pre_signal`** - Emitted before processing a signal
+2. **`:debugger_post_signal`** - Emitted after processing a signal
+
+### Event Structure
+
+Debug events follow the standard Jido signal format:
+
+```elixir
+%Jido.Signal{
+  type: "jido.agent.event.debugger.pre.signal",
+  source: agent_id,
+  data: %{
+    signal_id: "signal-123"
+  }
+}
+```
+
+### Capturing Debug Events
+
+You can capture debug events for analysis:
+
+```elixir
+# Subscribe to debug events
+Phoenix.PubSub.subscribe(MyApp.PubSub, "jido.agent.event.debugger.*")
+
+# Handle incoming events
+def handle_info(%Jido.Signal{type: "jido.agent.event.debugger." <> _} = event, state) do
+  IO.puts("Debug event: #{event.type} for signal #{event.data.signal_id}")
+  {:noreply, state}
+end
+```
+
+## Debugging Workflows
+
+### Basic Debugging Session
+
+Here's a complete example of debugging an agent:
+
+```elixir
+# Start an agent with some signals queued
+{:ok, agent_pid} = Jido.Agent.Server.start_link(
+  agent: %Jido.Agent{id: "debug-example"},
+  mode: :auto
+)
+
+# Queue some signals
+GenServer.cast(agent_pid, {:signal, %Jido.Signal{type: "test.action1"}})
+GenServer.cast(agent_pid, {:signal, %Jido.Signal{type: "test.action2"}})
+
+# Switch to debug mode and attach debugger
+GenServer.call(agent_pid, {:set_mode, :debug})
+{:ok, debugger_pid} = Jido.Agent.Debugger.attach(agent_pid)
+
+# Step through each signal
+Jido.Agent.Debugger.step(debugger_pid)
+IO.inspect("Processed first signal")
+
+Jido.Agent.Debugger.step(debugger_pid)  
+IO.inspect("Processed second signal")
+
+# Clean up
+Jido.Agent.Debugger.detach(debugger_pid)
+```
+
+### Debugging Signal Processing Issues
+
+If signals aren't being processed as expected:
+
+```elixir
+# Check queue state before stepping
+state = :sys.get_state(agent_pid)
+queue_length = :queue.len(state.pending_signals)
+IO.puts("Signals in queue: #{queue_length}")
+
+# Step and check what happened
+Jido.Agent.Debugger.step(debugger_pid)
+
+# Check state after processing
+new_state = :sys.get_state(agent_pid)
+new_queue_length = :queue.len(new_state.pending_signals)
+IO.puts("Signals remaining: #{new_queue_length}")
+IO.inspect(new_state.current_signal)
+```
+
+### Building Debug Tools
+
+You can build custom debugging tools using the debugger API:
+
+```elixir
+defmodule MyApp.DebugConsole do
+  def start_interactive_debug(agent_pid) do
+    GenServer.call(agent_pid, {:set_mode, :debug})
+    {:ok, debugger_pid} = Jido.Agent.Debugger.attach(agent_pid)
+    
+    debug_loop(debugger_pid, agent_pid)
+  end
+  
+  defp debug_loop(debugger_pid, agent_pid) do
+    command = IO.gets("debug> ") |> String.trim()
+    
+    case command do
+      "s" ->
+        Jido.Agent.Debugger.step(debugger_pid)
+        IO.puts("Stepped one signal")
+        debug_loop(debugger_pid, agent_pid)
+        
+      "state" ->
+        state = :sys.get_state(agent_pid)
+        IO.inspect(state, label: "Agent State")
+        debug_loop(debugger_pid, agent_pid)
+        
+      "queue" ->
+        state = :sys.get_state(agent_pid)
+        queue_length = :queue.len(state.pending_signals)
+        IO.puts("Queue length: #{queue_length}")
+        debug_loop(debugger_pid, agent_pid)
+        
+      "q" ->
+        Jido.Agent.Debugger.detach(debugger_pid)
+        IO.puts("Debug session ended")
+        
+      _ ->
+        IO.puts("Commands: s (step), state, queue, q (quit)")
+        debug_loop(debugger_pid, agent_pid)
+    end
+  end
+end
+```
+
+## Best Practices
+
+### Performance Considerations
+
+- Debug mode adds overhead through event emission and pausing
+- Only use debug mode during development and troubleshooting
+- Remember to detach debuggers to avoid keeping agents suspended
+
+### Testing with Debug Mode
+
+Debug mode can be useful in tests for precise timing control:
+
+```elixir
+test "processes signals in correct order" do
+  {:ok, agent_pid} = start_agent(mode: :debug)
+  {:ok, debugger_pid} = Jido.Agent.Debugger.attach(agent_pid)
+  
+  # Queue signals
+  send_signal(agent_pid, signal1)
+  send_signal(agent_pid, signal2)
+  
+  # Process first signal
+  Jido.Agent.Debugger.step(debugger_pid)
+  assert_signal_processed(signal1)
+  
+  # Process second signal  
+  Jido.Agent.Debugger.step(debugger_pid)
+  assert_signal_processed(signal2)
+  
+  Jido.Agent.Debugger.detach(debugger_pid)
+end
+```
+
+### Error Handling
+
+Always ensure debuggers are properly detached, even when errors occur:
+
+```elixir
+def debug_with_cleanup(agent_pid, debug_fn) do
+  {:ok, debugger_pid} = Jido.Agent.Debugger.attach(agent_pid)
+  
+  try do
+    debug_fn.(debugger_pid)
+  after
+    Jido.Agent.Debugger.detach(debugger_pid)
+  end
+end
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Agent becomes unresponsive after debugging**
+- Ensure you call `Jido.Agent.Debugger.detach/1` to resume the agent
+- Check if the debugger process crashed without cleaning up
+
+**Debug events not being emitted**
+- Verify the agent is in `:debug` mode, not `:step` mode
+- Check that your PubSub subscriptions are correct
+
+**Stepping doesn't process signals**
+- Ensure there are signals in the queue using `:sys.get_state/1`
+- Verify the agent isn't in an error state
+
+### Getting Help
+
+For debugging complex agent behaviors, consider:
+
+1. Using the built-in debug events to trace signal flow
+2. Implementing custom telemetry handlers for your specific use case
+3. Building interactive debugging tools using the Debugger API
+4. Examining agent state and signal queues at each step
+
+The debugging system provides a solid foundation for understanding and troubleshooting agent behavior in Jido applications.

@@ -347,7 +347,9 @@ defmodule Jido.Skill do
               opts_key: @validated_opts[:opts_key],
               opts_schema: @validated_opts[:opts_schema],
               signal_patterns: @validated_opts[:signal_patterns],
-              actions: @validated_opts[:actions]
+              actions: @validated_opts[:actions],
+              action_count: length(@validated_opts[:actions]),
+              action_names: Enum.map(@validated_opts[:actions], fn action -> action.name() end)
             }
           end
 
@@ -371,6 +373,43 @@ defmodule Jido.Skill do
 
           @doc false
           def mount(agent, _opts), do: {:ok, agent}
+
+          @doc """
+          Converts this skill into LLM tool calling format.
+
+          Returns a list of function definitions compatible with LLM function calling APIs.
+          """
+          def to_tools do
+            actions()
+            |> Enum.map(fn action_module ->
+              %{
+                name: action_module.name(),
+                description: action_module.description(),
+                parameters: Jido.Action.Tool.build_parameters_schema(action_module.schema())
+              }
+            end)
+          end
+
+          @doc """
+          Gets all available tool names from this skill.
+          """
+          def tool_names do
+            actions()
+            |> Enum.map(fn action_module -> action_module.name() end)
+          end
+
+          @doc """
+          Executes a tool from this skill by name.
+          """
+          def execute_tool(tool_name, params, context \\ %{}) do
+            case Enum.find(actions(), fn action -> action.name() == tool_name end) do
+              nil ->
+                {:error, Jason.encode!(%{error: "Tool '#{tool_name}' not found in skill"})}
+
+              action_module ->
+                Jido.Action.Tool.execute_action(action_module, params, context)
+            end
+          end
 
           defoverridable child_spec: 1,
                          router: 1,

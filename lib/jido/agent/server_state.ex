@@ -71,7 +71,7 @@ defmodule Jido.Agent.Server.State do
   - `:paused` - Server execution is suspended
   """
   @type status :: :initializing | :idle | :planning | :running | :paused
-  @type modes :: :auto | :step
+  @type modes :: :auto | :step | :debug
   @type log_levels ::
           :debug | :info | :notice | :warning | :error | :critical | :alert | :emergency
   @type dispatch_config :: [

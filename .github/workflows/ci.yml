@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@v1
+
+  test:
+    name: Test
+    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v1
+    with:
+      otp_versions: '["27", "28"]'
+      elixir_versions: '["1.18", "1.19"]'
+      test_command: mix test

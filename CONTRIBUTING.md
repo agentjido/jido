@@ -159,6 +159,55 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
    - Handle large data sets efficiently
    - Consider memory usage in long-running processes
 
+## Git Hooks and Conventional Commits
+
+We use [`git_hooks`](https://hex.pm/packages/git_hooks) to enforce commit message conventions:
+
+```bash
+mix git_hooks.install
+```
+
+This installs a `commit-msg` hook that validates your commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
+
+### Commit Message Format
+
+```
+<type>[optional scope]: <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+
+| Type | Description |
+|------|-------------|
+| `feat` | A new feature |
+| `fix` | A bug fix |
+| `docs` | Documentation only changes |
+| `style` | Changes that don't affect code meaning |
+| `refactor` | Code change that neither fixes a bug nor adds a feature |
+| `perf` | Performance improvement |
+| `test` | Adding or correcting tests |
+| `chore` | Changes to build process or auxiliary tools |
+| `ci` | CI configuration changes |
+
+### Examples
+
+```bash
+# Feature
+git commit -m "feat(agents): add distributed execution support"
+
+# Bug fix
+git commit -m "fix(workflows): resolve race condition in parallel execution"
+
+# Breaking change
+git commit -m "feat(api)!: change action return type"
+```
+
+The hook will reject non-conforming commits, ensuring a clean changelog can be generated automatically.
+
 ## Pull Request Process
 
 1. **Before Submitting**
@@ -169,7 +218,7 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 
 2. **PR Guidelines**
    - Create a feature branch from `main`
-   - Use descriptive commit messages
+   - Use descriptive commit messages following conventional commits
    - Reference any related issues
    - Keep changes focused and atomic
 

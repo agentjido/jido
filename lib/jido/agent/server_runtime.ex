@@ -6,6 +6,7 @@ defmodule Jido.Agent.Server.Runtime do
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Instruction
+  alias Jido.Signal.TraceContext
   alias Jido.Agent.Server.Callback, as: ServerCallback
   alias Jido.Agent.Server.Router, as: ServerRouter
   alias Jido.Agent.Server.State, as: ServerState
@@ -18,10 +19,17 @@ defmodule Jido.Agent.Server.Runtime do
   Process all signals in the queue until empty.
   """
   @spec process_signals_in_queue(ServerState.t()) ::
-          {:ok, ServerState.t()} | {:error, term()}
+          {:ok, ServerState.t()} | {:error, term()} | {:debug_break, ServerState.t(), Signal.t()}
   def process_signals_in_queue(%ServerState{} = state) do
     case ServerState.dequeue(state) do
       {:ok, signal, new_state} ->
+        # In debug mode, emit pre-signal event
+        if new_state.mode == :debug do
+          :debugger_pre_signal
+          |> ServerSignal.event_signal(new_state, %{signal_id: signal.id}, %{})
+          |> ServerOutput.emit(new_state)
+        end
+
         # Process one signal
         case process_signal(new_state, signal) do
           {:ok, final_state, result} ->
@@ -34,10 +42,20 @@ defmodule Jido.Agent.Server.Runtime do
                 GenServer.reply(from, {:ok, result})
             end
 
-            # Only continue processing in auto mode
+            # In debug mode, emit post-signal event and return debug_break
             case final_state.mode do
-              :auto -> process_signals_in_queue(final_state)
-              :step -> {:ok, final_state}
+              :debug ->
+                :debugger_post_signal
+                |> ServerSignal.event_signal(final_state, %{signal_id: signal.id}, %{})
+                |> ServerOutput.emit(final_state)
+
+                {:debug_break, final_state, signal}
+
+              :auto ->
+                process_signals_in_queue(final_state)
+
+              :step ->
+                {:ok, final_state}
             end
 
           {:error, reason} ->
@@ -50,10 +68,20 @@ defmodule Jido.Agent.Server.Runtime do
                 GenServer.reply(from, {:error, reason})
             end
 
-            # Only continue processing in auto mode
+            # In debug mode, still emit post-signal event and return debug_break
             case new_state.mode do
-              :auto -> process_signals_in_queue(new_state)
-              :step -> {:ok, new_state}
+              :debug ->
+                :debugger_post_signal
+                |> ServerSignal.event_signal(new_state, %{signal_id: signal.id}, %{})
+                |> ServerOutput.emit(new_state)
+
+                {:debug_break, new_state, signal}
+
+              :auto ->
+                process_signals_in_queue(new_state)
+
+              :step ->
+                {:ok, new_state}
             end
         end
 
@@ -289,7 +317,9 @@ defmodule Jido.Agent.Server.Runtime do
     end
 
     defp set_current_signal(%ServerState{} = state, %Signal{} = signal) do
-      %{state | current_signal: signal}
+      state = %{state | current_signal: signal}
+      TraceContext.ensure_set_from_state(state)
+      state
     end
   end
 end

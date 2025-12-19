@@ -41,6 +41,19 @@ defmodule Jido.Agent.Server.OptionsTest do
       assert Keyword.get(validated, :registry) == MyRegistry
     end
 
+    test "validates debug mode" do
+      opts = [
+        agent: MinimalAgent,
+        id: "test-agent",
+        mode: :debug
+      ]
+
+      assert {:ok, validated} = Options.validate_server_opts(opts)
+      assert Keyword.get(validated, :agent) == MinimalAgent
+      assert Keyword.get(validated, :mode) == :debug
+      assert Keyword.get(validated, :log_level) == :info
+    end
+
     test "passes through unknown options" do
       opts = [
         agent: MinimalAgent,
