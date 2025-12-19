@@ -175,9 +175,10 @@ defmodule Jido.Agent.Server.Runtime do
       with {:ok, processed_result} <-
              ServerCallback.transform_result(state, state.current_signal, result) do
         # Use the signal's dispatch config if present, otherwise use server's default
+        # Use extension API instead of deprecated jido_dispatch field
         dispatch_config =
-          case state.current_signal do
-            %Signal{jido_dispatch: dispatch} when not is_nil(dispatch) ->
+          case Signal.get_extension(state.current_signal, "dispatch") do
+            dispatch when not is_nil(dispatch) ->
               dispatch
 
             _ ->
@@ -215,9 +216,10 @@ defmodule Jido.Agent.Server.Runtime do
         case state.current_signal_type do
           :async ->
             # Use the signal's dispatch config if present, otherwise use server's default
+            # Use extension API instead of deprecated jido_dispatch field
             dispatch_config =
-              case state.current_signal do
-                %Signal{jido_dispatch: dispatch} when not is_nil(dispatch) ->
+              case Signal.get_extension(state.current_signal, "dispatch") do
+                dispatch when not is_nil(dispatch) ->
                   dispatch
 
                 _ ->

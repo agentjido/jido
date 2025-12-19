@@ -76,7 +76,10 @@ defmodule Jido.Agent.Server.Output do
     level = get_level_for_signal(signal)
 
     # Configure dispatch with the appropriate level
-    base_dispatch = Keyword.get(opts, :dispatch) || signal.jido_dispatch || @default_dispatch
+    # Use extension API instead of deprecated jido_dispatch field
+    base_dispatch =
+      Keyword.get(opts, :dispatch) || Signal.get_extension(signal, "dispatch") || @default_dispatch
+
     dispatch_config = add_level_to_dispatch(base_dispatch, level)
 
     log(

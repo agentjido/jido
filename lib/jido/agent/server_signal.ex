@@ -197,17 +197,25 @@ defmodule Jido.Agent.Server.Signal do
     base = %{
       id: Jido.Util.generate_id(),
       subject: build_subject(agent_name, state.agent.id),
-      source: build_source(state),
-      jido_dispatch: state.dispatch
+      source: build_source(state)
     }
 
     type = join_type(attrs.type)
     attrs = Map.put(attrs, :type, type)
 
-    base
-    |> Map.merge(attrs)
-    |> Propagate.inject_trace_context(state)
-    |> Signal.new!()
+    signal =
+      base
+      |> Map.merge(attrs)
+      |> Propagate.inject_trace_context(state)
+      |> Signal.new!()
+
+    # Use extension API instead of deprecated jido_dispatch field
+    if state.dispatch do
+      {:ok, signal} = Signal.put_extension(signal, "dispatch", state.dispatch)
+      signal
+    else
+      signal
+    end
   end
 
   defp build(nil, attrs) do
