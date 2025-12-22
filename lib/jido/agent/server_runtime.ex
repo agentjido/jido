@@ -328,8 +328,7 @@ defmodule Jido.Agent.Server.Runtime do
 
     # Inject trace context from signal into instruction context so actions can access it
     # even when running in a separate Task process (which doesn't share process dictionary)
-    defp inject_trace_context_into_instructions(%Signal{} = signal, instructions)
-         when is_list(instructions) do
+    defp inject_trace_context_into_instructions(%Signal{} = signal, instructions) do
       trace_context = get_in(signal.extensions, ["correlation"]) || %{}
 
       Enum.map(instructions, fn
@@ -341,7 +340,5 @@ defmodule Jido.Agent.Server.Runtime do
           other
       end)
     end
-
-    defp inject_trace_context_into_instructions(_signal, instructions), do: instructions
   end
 end
