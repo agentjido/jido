@@ -267,7 +267,7 @@ defmodule Jido.MixProject do
       {:uniq, "~> 0.6.1"},
       # Skill & Action Dependencies for examples
 
-      {:req, "~> 0.5.10"},
+      {:req, "~> 0.5.16"},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
