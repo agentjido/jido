@@ -5,6 +5,7 @@ defmodule Jido.Agent.Server.Runtime do
 
   alias Jido.Error
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
   alias Jido.Instruction
   alias Jido.Signal.TraceContext
   alias Jido.Agent.Server.Callback, as: ServerCallback
@@ -118,6 +119,7 @@ defmodule Jido.Agent.Server.Runtime do
            {:ok, signal} <- ServerCallback.handle_signal(state, signal),
            {:ok, instructions} <- route_signal(state, signal),
            {:ok, instructions} <- apply_signal_to_first_instruction(signal, instructions),
+           instructions <- inject_trace_context_into_instructions(signal, instructions),
            {:ok, opts} <- extract_opts_from_first_instruction(instructions),
            {:ok, state, result} <- do_agent_cmd(state, instructions, opts),
            {:ok, state, result} <- handle_signal_result(state, signal, result) do
@@ -177,7 +179,7 @@ defmodule Jido.Agent.Server.Runtime do
         # Use the signal's dispatch config if present, otherwise use server's default
         # Use extension API instead of deprecated jido_dispatch field
         dispatch_config =
-          case Signal.get_extension(state.current_signal, "dispatch") do
+          case DispatchHelpers.get_dispatch(state.current_signal) do
             dispatch when not is_nil(dispatch) ->
               dispatch
 
@@ -218,7 +220,7 @@ defmodule Jido.Agent.Server.Runtime do
             # Use the signal's dispatch config if present, otherwise use server's default
             # Use extension API instead of deprecated jido_dispatch field
             dispatch_config =
-              case Signal.get_extension(state.current_signal, "dispatch") do
+              case DispatchHelpers.get_dispatch(state.current_signal) do
                 dispatch when not is_nil(dispatch) ->
                   dispatch
 
@@ -323,5 +325,23 @@ defmodule Jido.Agent.Server.Runtime do
       TraceContext.ensure_set_from_state(state)
       state
     end
+
+    # Inject trace context from signal into instruction context so actions can access it
+    # even when running in a separate Task process (which doesn't share process dictionary)
+    defp inject_trace_context_into_instructions(%Signal{} = signal, instructions)
+         when is_list(instructions) do
+      trace_context = get_in(signal.extensions, ["correlation"]) || %{}
+
+      Enum.map(instructions, fn
+        %Instruction{} = instruction ->
+          updated_context = Map.put(instruction.context || %{}, :trace_context, trace_context)
+          %{instruction | context: updated_context}
+
+        other ->
+          other
+      end)
+    end
+
+    defp inject_trace_context_into_instructions(_signal, instructions), do: instructions
   end
 end

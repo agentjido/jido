@@ -155,7 +155,7 @@ defmodule JidoTest.Agent.InteractionTest do
 
     test "sends signal with_dispatch", %{pid: pid} do
       result =
-        Interaction.send_signal(pid, "test_action", %{value: 42}, jido_dispatch: {:noop, []})
+        Interaction.send_signal(pid, "test_action", %{value: 42}, dispatch: {:noop, []})
 
       assert {:ok, correlation_id} = result
       assert is_binary(correlation_id)

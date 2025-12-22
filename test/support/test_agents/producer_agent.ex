@@ -41,29 +41,39 @@ defmodule JidoTest.TestAgents.ProducerAgent do
       ]
 
     def run(params, context) do
+      # Build the child signal data
+      child_signal_data = %{
+        root_data: params,
+        processed_at: DateTime.utc_now(),
+        producer_id: context[:agent_id]
+      }
+
       # Store the emitted signal data for test inspection
       emitted_signal = %{
         type: "child.event",
-        data: %{
-          root_data: params[:data],
-          processed_at: DateTime.utc_now(),
-          producer_id: context[:agent_id]
-        },
+        data: child_signal_data,
         emitted_at: DateTime.utc_now()
       }
 
-      # Return success with directive to update state - signal emission happens through standard result processing
+      # Return success with directives:
+      # 1. Emit the signal to the bus for cross-process communication
+      # 2. Store in state for test inspection
       {:ok, %{processed: true, child_signal_emitted: true},
        [
-         %Jido.Agent.Directive.StateModification{
-           op: :put,
-           path: [:emitted_signals],
-           value: {:append, emitted_signal}
+         %Jido.Agent.Directive.Emit{
+           type: "child.event",
+           data: child_signal_data,
+           bus: :test_bus
          },
          %Jido.Agent.Directive.StateModification{
-           op: :put,
+           op: :update,
+           path: [:emitted_signals],
+           value: fn signals -> signals ++ [emitted_signal] end
+         },
+         %Jido.Agent.Directive.StateModification{
+           op: :update,
            path: [:signal_count],
-           value: {:increment, 1}
+           value: fn count -> count + 1 end
          }
        ]}
     end
@@ -86,24 +96,14 @@ defmodule JidoTest.TestAgents.ProducerAgent do
   end
 
   @doc """
-  Helper function to clear emitted signals for test cleanup
+  Helper function to clear emitted signals for test cleanup.
+
+  Note: This is a placeholder - clearing would need to be implemented via signals.
   """
   def clear_emitted_signals(agent_pid) when is_pid(agent_pid) do
-    # Use state modification directive to clear signals
-    directive = %Jido.Agent.Directive.StateModification{
-      op: :set,
-      path: [:emitted_signals],
-      value: []
-    }
-
-    directive2 = %Jido.Agent.Directive.StateModification{
-      op: :set,
-      path: [:signal_count],
-      value: 0
-    }
-
-    # Apply directives through the agent (this would need proper API)
-    # For now, this is a placeholder - clearing would need to be implemented differently
+    # Placeholder - clearing state would require sending a signal with
+    # StateModification directives through the proper agent API
+    _ = agent_pid
     :ok
   end
 end

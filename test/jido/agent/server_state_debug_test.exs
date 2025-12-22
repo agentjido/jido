@@ -55,8 +55,7 @@ defmodule Jido.Agent.Server.StateDebugTest do
         Signal.new(%{
           type: "test.signal",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       # Test enqueue works with debug mode

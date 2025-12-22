@@ -226,12 +226,15 @@ end
 ### 1. Request-Response
 
 ```elixir
+alias Jido.Signal.DispatchHelpers
+
 # Client sends request
-request = %Signal{
+{:ok, request} = Signal.new(%{
   type: "get.user.profile",
   data: %{user_id: "123"},
-  jido_dispatch: {:pid, [target: self()]}
-}
+  source: "/client"
+})
+{:ok, request} = DispatchHelpers.put_dispatch(request, {:pid, [target: self()]})
 
 {:ok, response} = MyAgent.call(agent, request)
 ```
@@ -239,15 +242,18 @@ request = %Signal{
 ### 2. Event Broadcasting
 
 ```elixir
+alias Jido.Signal.DispatchHelpers
+
 # Broadcast event to multiple subscribers
-event = %Signal{
+{:ok, event} = Signal.new(%{
   type: "user.registered",
   data: %{user_id: "123"},
-  jido_dispatch: [
-    {:pubsub, [topic: "users"]},
-    {:bus, [stream: "audit"]}
-  ]
-}
+  source: "/users"
+})
+{:ok, event} = DispatchHelpers.put_dispatch(event, [
+  {:pubsub, [topic: "users"]},
+  {:bus, [stream: "audit"]}
+])
 
 MyAgent.cast(agent, event)
 ```

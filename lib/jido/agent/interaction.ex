@@ -135,7 +135,7 @@ defmodule Jido.Agent.Interaction do
   - `opts`: Optional signal options:
     - `:source` - Signal source identifier
     - `:subject` - Signal subject
-    - `:jido_dispatch` - Dispatch configuration
+    - `:dispatch` - Dispatch configuration (via extensions)
     - Other Signal fields (see `Jido.Signal`)
 
   ## Returns
@@ -279,13 +279,15 @@ defmodule Jido.Agent.Interaction do
       data: data
     }
 
-    # Add optional fields if provided in opts
+    # Extract dispatch config (support both :dispatch and legacy :jido_dispatch)
+    dispatch_config = Keyword.get(opts, :dispatch) || Keyword.get(opts, :jido_dispatch)
+
+    # Add optional CloudEvents-compliant fields if provided in opts
     final_attrs =
       opts
       |> Enum.reduce(signal_attrs, fn {key, value}, acc ->
         case key do
-          key
-          when key in [:source, :subject, :time, :datacontenttype, :dataschema, :jido_dispatch] ->
+          key when key in [:source, :subject, :time, :datacontenttype, :dataschema] ->
             Map.put(acc, key, value)
 
           _ ->
@@ -293,7 +295,13 @@ defmodule Jido.Agent.Interaction do
         end
       end)
 
-    Jido.Signal.new(final_attrs)
+    with {:ok, signal} <- Jido.Signal.new(final_attrs) do
+      if dispatch_config do
+        Jido.Signal.DispatchHelpers.put_dispatch(signal, dispatch_config)
+      else
+        {:ok, signal}
+      end
+    end
   end
 
   defp build_instruction(action, params, opts) do

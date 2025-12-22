@@ -65,6 +65,8 @@ defmodule JidoTest.AgentCase do
 
   alias Jido.Agent.Server
   alias Jido.Signal
+  alias JidoTest.TestAgents.{ProducerAgent, ConsumerAgent}
+  alias JidoTest.Support, as: TestSupport
   import ExUnit.Assertions
 
   # Import all functions from this module
@@ -150,17 +152,17 @@ defmodule JidoTest.AgentCase do
     {:ok, signal} = Signal.new(%{type: signal_type, data: data, source: "test", target: agent.id})
     {:ok, _} = Server.cast(server_pid, signal)
 
-    # Wait for agent to return to idle state
+    # Small delay to allow async :process_queue message to be delivered and processed
+    Process.sleep(50)
+
+    # Wait for agent to return to idle state with empty queue
     timeout = Keyword.get(opts, :timeout, 1000)
     check_interval = Keyword.get(opts, :check_interval, 10)
 
     JidoTest.Helpers.Assertions.wait_for(
       fn ->
-        {:ok, state_signal} =
-          Signal.new(%{type: "jido.agent.cmd.state", data: %{}, source: "test", target: agent.id})
-
-        {:ok, state} = GenServer.call(server_pid, {:signal, state_signal}, timeout)
-        assert state.status == :idle
+        {:ok, state} = Server.state(server_pid)
+        assert state.status == :idle, "Agent should be idle, but is #{state.status}"
       end,
       timeout: timeout,
       check_interval: check_interval
@@ -308,7 +310,9 @@ defmodule JidoTest.AgentCase do
   """
   @spec spawn_producer_agent(keyword()) :: agent_context()
   def spawn_producer_agent(opts \\ []) do
-    spawn_agent(JidoTest.TestAgents.ProducerAgent, opts)
+    routes = Keyword.get(opts, :routes, default_producer_routes())
+    opts = Keyword.put(opts, :routes, routes)
+    spawn_agent(ProducerAgent, opts)
   end
 
   @doc """
@@ -325,7 +329,9 @@ defmodule JidoTest.AgentCase do
   """
   @spec spawn_consumer_agent(keyword()) :: agent_context()
   def spawn_consumer_agent(opts \\ []) do
-    spawn_agent(JidoTest.TestAgents.ConsumerAgent, opts)
+    routes = Keyword.get(opts, :routes, default_consumer_routes())
+    opts = Keyword.put(opts, :routes, routes)
+    spawn_agent(ConsumerAgent, opts)
   end
 
   @doc """
@@ -545,16 +551,84 @@ defmodule JidoTest.AgentCase do
   """
   @spec setup_cross_process_agents(keyword()) :: %{
           producer: agent_context(),
-          consumer: agent_context()
+          consumer: agent_context(),
+          bus: pid()
         }
   def setup_cross_process_agents(opts \\ []) do
     producer_opts = Keyword.get(opts, :producer_opts, [])
     consumer_opts = Keyword.get(opts, :consumer_opts, [])
 
+    # Start the test bus for cross-process signal flow
+    # If a bus pid is provided, use it; otherwise start a new one
+    bus = Keyword.get_lazy(opts, :bus, fn -> start_test_bus() end)
+
+    # Spawn producer and consumer agents
+    producer = spawn_producer_agent(producer_opts)
+    consumer = spawn_consumer_agent(consumer_opts)
+
+    # Subscribe the consumer to receive child.event signals from the bus
+    subscribe_agent_to_bus(consumer, bus, "child.event")
+
     %{
-      producer: spawn_producer_agent(producer_opts),
-      consumer: spawn_consumer_agent(consumer_opts)
+      producer: producer,
+      consumer: consumer,
+      bus: bus
     }
+  end
+
+  @doc """
+  Start a test bus for cross-process signal flow.
+
+  The bus is automatically stopped when the test finishes.
+  """
+  @spec start_test_bus(atom()) :: pid()
+  def start_test_bus(name \\ :test_bus) do
+    {:ok, bus} = Jido.Signal.Bus.start_link(name: name)
+    ExUnit.Callbacks.on_exit(fn ->
+      try do
+        if Process.alive?(bus), do: GenServer.stop(bus, :normal, 1000)
+      catch
+        :exit, _ -> :ok
+      end
+    end)
+    bus
+  end
+
+  @doc """
+  Subscribe an agent to receive signals from a bus matching a path pattern.
+
+  The subscription dispatches signals directly to the agent's server process.
+  """
+  @spec subscribe_agent_to_bus(agent_context(), pid(), String.t()) :: :ok
+  def subscribe_agent_to_bus(%{server_pid: server_pid, agent: agent} = _context, bus, path) do
+    dispatch_config = {:pid, target: server_pid, delivery_mode: :async}
+
+    {:ok, _subscription_id} = Jido.Signal.Bus.subscribe(
+      bus,
+      path,
+      dispatch: dispatch_config,
+      subscriber_id: agent.id
+    )
+
+    :ok
+  end
+
+  defp default_producer_routes do
+    [
+      TestSupport.create_test_route(
+        "root_signal_action",
+        ProducerAgent.RootSignalAction
+      )
+    ]
+  end
+
+  defp default_consumer_routes do
+    [
+      TestSupport.create_test_route(
+        "child.event",
+        ConsumerAgent.ChildEventAction
+      )
+    ]
   end
 
   defp validate_agent_module!(module) do
@@ -651,7 +725,13 @@ defmodule JidoTest.AgentCase do
   @spec start_bus_spy() :: pid()
   def start_bus_spy do
     spy = Jido.Signal.BusSpy.start_spy()
-    ExUnit.Callbacks.on_exit(fn -> Jido.Signal.BusSpy.stop_spy(spy) end)
+    ExUnit.Callbacks.on_exit(fn ->
+      try do
+        Jido.Signal.BusSpy.stop_spy(spy)
+      catch
+        :exit, _ -> :ok
+      end
+    end)
     spy
   end
 

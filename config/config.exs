@@ -1,7 +1,7 @@
 import Config
 
 # Git hooks and git_ops configuration for conventional commits
-# Only configure when the dependencies are actually available (dev environment)
+# Only enabled in dev environment (git_ops is a dev-only dependency)
 if config_env() == :dev do
   config :git_hooks,
     auto_install: true,

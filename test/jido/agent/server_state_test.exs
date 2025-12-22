@@ -1,8 +1,9 @@
 defmodule Jido.Agent.Server.StateTest do
   use JidoTest.Case, async: true
   alias Jido.Agent.Server.State
-  alias JidoTest.TestAgents.BasicAgent
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
+  alias JidoTest.TestAgents.BasicAgent
 
   @moduletag :capture_log
 
@@ -12,9 +13,10 @@ defmodule Jido.Agent.Server.StateTest do
         id: "test-signal-123",
         type: "test.signal",
         source: "test-source",
-        subject: "test-subject",
-        jido_dispatch: {:logger, []}
+        subject: "test-subject"
       })
+
+    {:ok, current_signal} = DispatchHelpers.put_dispatch(current_signal, {:logger, []})
 
     state = %State{
       agent: %{id: "test-agent-123", __struct__: TestAgent},
@@ -181,8 +183,7 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       assert {:ok, new_state} = State.enqueue(state, signal)
@@ -194,16 +195,14 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal.1",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal2} =
         Signal.new(%{
           type: "test.signal.2",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, state_with_one} = State.enqueue(state, signal1)
@@ -225,16 +224,14 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal.1",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal2} =
         Signal.new(%{
           type: "test.signal.2",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       state = %{state | max_queue_size: 1}
@@ -247,37 +244,32 @@ defmodule Jido.Agent.Server.StateTest do
 
   describe "enqueue_front/2" do
     test "successfully enqueues signal at front of queue", %{state: state} do
-      # Create 4 test signals
       {:ok, signal1} =
         Signal.new(%{
           type: "test.signal.1",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal2} =
         Signal.new(%{
           type: "test.signal.2",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal3} =
         Signal.new(%{
           type: "test.signal.3",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal4} =
         Signal.new(%{
           type: "test.signal.4",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       # Build up queue with mix of enqueue and enqueue_front
@@ -311,16 +303,14 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal.1",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal2} =
         Signal.new(%{
           type: "test.signal.2",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       state = %{state | max_queue_size: 1}
@@ -337,8 +327,7 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, state_with_signal} = State.enqueue(state, signal)
@@ -358,16 +347,14 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal.1",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, signal2} =
         Signal.new(%{
           type: "test.signal.2",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, state_with_one} = State.enqueue(state, signal1)
@@ -391,8 +378,7 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       state = %{state | max_queue_size: 0}
@@ -404,8 +390,7 @@ defmodule Jido.Agent.Server.StateTest do
         Signal.new(%{
           type: "test.signal",
           source: "test-source",
-          subject: "test-subject",
-          jido_dispatch: {:logger, []}
+          subject: "test-subject"
         })
 
       {:ok, state_with_signal} = State.enqueue(state, signal)

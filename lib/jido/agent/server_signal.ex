@@ -1,6 +1,7 @@
 defmodule Jido.Agent.Server.Signal do
   @moduledoc false
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
   alias Jido.Signal.Trace.Propagate
 
   alias Jido.Agent.Server.State, as: ServerState
@@ -211,7 +212,7 @@ defmodule Jido.Agent.Server.Signal do
 
     # Use extension API instead of deprecated jido_dispatch field
     if state.dispatch do
-      {:ok, signal} = Signal.put_extension(signal, "dispatch", state.dispatch)
+      {:ok, signal} = DispatchHelpers.put_dispatch(signal, state.dispatch)
       signal
     else
       signal

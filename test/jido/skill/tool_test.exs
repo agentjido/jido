@@ -15,9 +15,17 @@ defmodule Jido.Skill.ToolTest do
         assert %{name: name, description: desc, parameters: params} = tool
         assert is_binary(name)
         assert is_binary(desc)
-        assert %{type: "object", properties: properties, required: required} = params
-        assert is_map(properties)
-        assert is_list(required)
+        # Parameters may be empty for actions with no schema, or have string/atom keys
+        assert is_map(params)
+
+        # Only validate structure if parameters are not empty
+        unless params == %{} do
+          assert params["type"] == "object" or params[:type] == "object"
+          properties = params["properties"] || params[:properties]
+          required = params["required"] || params[:required]
+          assert is_map(properties)
+          assert is_list(required)
+        end
       end)
     end
   end

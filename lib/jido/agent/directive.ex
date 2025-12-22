@@ -193,6 +193,37 @@ defmodule Jido.Agent.Directive do
     end
   end
 
+  defmodule Emit do
+    @moduledoc """
+    Directive to emit a signal to a signal bus for cross-process communication.
+
+    ## Fields
+
+    * `:type` - The signal type (e.g., "child.event", "user.created")
+    * `:data` - Data payload to include in the signal
+    * `:source` - Optional source identifier (defaults to agent ID)
+    * `:bus` - Bus name to publish to (default: :default)
+    * `:stream` - Optional stream name for the bus
+
+    ## Example
+
+        %Emit{
+          type: "child.event",
+          data: %{user_id: 123, action: "created"},
+          bus: :default
+        }
+    """
+    use TypedStruct
+
+    typedstruct do
+      field(:type, String.t(), enforce: true)
+      field(:data, map(), default: %{})
+      field(:source, String.t())
+      field(:bus, atom(), default: :default)
+      field(:stream, String.t())
+    end
+  end
+
   @type t ::
           Enqueue.t()
           | RegisterAction.t()
@@ -202,6 +233,7 @@ defmodule Jido.Agent.Directive do
           | StateModification.t()
           | AddRoute.t()
           | RemoveRoute.t()
+          | Emit.t()
           | Instruction.t()
           | [Instruction.t()]
 
@@ -416,6 +448,19 @@ defmodule Jido.Agent.Directive do
 
   defp validate_directive(%RemoveRoute{path: path}) when is_binary(path), do: :ok
   defp validate_directive(%RemoveRoute{}), do: {:error, :invalid_path}
+
+  defp validate_directive(%Emit{type: type, bus: bus}) do
+    cond do
+      not is_binary(type) or type == "" ->
+        {:error, Error.validation_error("Emit type must be a non-empty string", %{type: type})}
+
+      not is_atom(bus) ->
+        {:error, Error.validation_error("Emit bus must be an atom", %{bus: bus})}
+
+      true ->
+        :ok
+    end
+  end
 
   defp validate_directive(%Instruction{action: nil}), do: {:error, :invalid_action}
   defp validate_directive(%Instruction{action: action}) when is_atom(action), do: :ok

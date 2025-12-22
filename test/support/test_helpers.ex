@@ -12,6 +12,7 @@ defmodule JidoTest.Support do
   import ExUnit.Assertions
   alias Jido.Agent.Server
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
   alias JidoTest.TestAgents.BasicAgent
 
   @doc """
@@ -139,13 +140,15 @@ defmodule JidoTest.Support do
     subject = Keyword.get(opts, :subject, "test-subject")
     dispatch = Keyword.get(opts, :dispatch, {:logger, []})
 
-    Signal.new(%{
-      type: type,
-      data: data,
-      source: source,
-      subject: subject,
-      jido_dispatch: dispatch
-    })
+    with {:ok, signal} <-
+           Signal.new(%{
+             type: type,
+             data: data,
+             source: source,
+             subject: subject
+           }) do
+      DispatchHelpers.put_dispatch(signal, dispatch)
+    end
   end
 
   @doc """

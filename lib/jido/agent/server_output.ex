@@ -4,6 +4,7 @@ defmodule Jido.Agent.Server.Output do
 
   alias Jido.Signal
   alias Jido.Signal.Dispatch
+  alias Jido.Signal.DispatchHelpers
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Util
 
@@ -78,7 +79,8 @@ defmodule Jido.Agent.Server.Output do
     # Configure dispatch with the appropriate level
     # Use extension API instead of deprecated jido_dispatch field
     base_dispatch =
-      Keyword.get(opts, :dispatch) || Signal.get_extension(signal, "dispatch") || @default_dispatch
+      Keyword.get(opts, :dispatch) || DispatchHelpers.get_dispatch(signal) ||
+        @default_dispatch
 
     dispatch_config = add_level_to_dispatch(base_dispatch, level)
 

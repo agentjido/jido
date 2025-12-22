@@ -39,8 +39,9 @@ defmodule JidoTest.TestAgents.ConsumerAgent do
       ]
 
     def run(params, context) do
-      # Get current trace context for storage
-      current_trace_context = Jido.Signal.TraceContext.current() || %{}
+      # Get trace context from instruction context (injected by server_runtime)
+      # This works even when the action runs in a separate Task process
+      current_trace_context = context[:trace_context] || %{}
 
       # Store the received signal with trace context
       received_signal = %{
@@ -69,19 +70,19 @@ defmodule JidoTest.TestAgents.ConsumerAgent do
       {:ok, %{processed: true, grandchild_signal_emitted: true},
        [
          %Jido.Agent.Directive.StateModification{
-           op: :put,
+           op: :update,
            path: [:received_signals],
-           value: {:append, received_signal}
+           value: fn signals -> signals ++ [received_signal] end
          },
          %Jido.Agent.Directive.StateModification{
-           op: :put,
+           op: :update,
            path: [:emitted_grandchild_signals],
-           value: {:append, emitted_grandchild}
+           value: fn signals -> signals ++ [emitted_grandchild] end
          },
          %Jido.Agent.Directive.StateModification{
-           op: :put,
+           op: :update,
            path: [:signal_count],
-           value: {:increment, 1}
+           value: fn count -> count + 1 end
          }
        ]}
     end

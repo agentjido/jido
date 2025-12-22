@@ -17,6 +17,6 @@ Enum.each(
 require Logger
 Logger.configure(level: :debug)
 
-ExUnit.start()
+ExUnit.start(capture_log: true)
 
 ExUnit.configure(exclude: [:skip])

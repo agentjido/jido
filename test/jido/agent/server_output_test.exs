@@ -8,6 +8,7 @@ defmodule Jido.Agent.Server.OutputTest do
   alias Jido.Agent.Server.Output
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
   alias JidoTest.TestAgents.SignalOutputAgent
 
   @receive_timeout 500
@@ -118,14 +119,16 @@ defmodule Jido.Agent.Server.OutputTest do
       assert log =~ "Elixir.Jido.Agent.Server.OutputTest"
     end
 
-    test "handles signal with jido_dispatch dispatch config", %{state: state} do
+    test "handles signal with dispatch extension config", %{state: state} do
       {:ok, signal} =
         Signal.new(%{
           type: "test.signal",
           data: "test",
-          id: "test-id-456",
-          jido_dispatch: {:pid, [target: self(), delivery_mode: :async]}
+          id: "test-id-456"
         })
+
+      {:ok, signal} =
+        DispatchHelpers.put_dispatch(signal, {:pid, [target: self(), delivery_mode: :async]})
 
       capture_log([level: :info], fn ->
         assert :ok = Output.emit(signal, state)
@@ -135,17 +138,19 @@ defmodule Jido.Agent.Server.OutputTest do
       end)
     end
 
-    test "handles signal with multiple jido_dispatch dispatch configs", %{state: state} do
+    test "handles signal with multiple dispatch extension configs", %{state: state} do
       {:ok, signal} =
         Signal.new(%{
           type: "test.signal",
           data: "test",
-          id: "test-id-789",
-          jido_dispatch: [
-            {:pid, [target: self(), delivery_mode: :async]},
-            {:pid, [target: self(), delivery_mode: :async, test: true]}
-          ]
+          id: "test-id-789"
         })
+
+      {:ok, signal} =
+        DispatchHelpers.put_dispatch(signal, [
+          {:pid, [target: self(), delivery_mode: :async]},
+          {:pid, [target: self(), delivery_mode: :async, test: true]}
+        ])
 
       capture_log([level: :info], fn ->
         assert :ok = Output.emit(signal, state)

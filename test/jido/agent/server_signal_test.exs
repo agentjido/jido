@@ -4,16 +4,19 @@ defmodule JidoTest.Agent.Server.SignalTest do
   alias Jido.Agent.Server.State, as: ServerState
   alias Jido.Error
   alias Jido.Signal
+  alias Jido.Signal.DispatchHelpers
 
   setup do
-    current_signal = %Signal{
-      id: "test-signal-123",
-      type: "test.signal",
-      subject: "test-subject",
-      source: "test-source",
-      data: %{},
-      jido_dispatch: {:noop, []}
-    }
+    {:ok, current_signal} =
+      Signal.new(%{
+        id: "test-signal-123",
+        type: "test.signal",
+        subject: "test-subject",
+        source: "test-source",
+        data: %{}
+      })
+
+    {:ok, current_signal} = DispatchHelpers.put_dispatch(current_signal, {:noop, []})
 
     state = %ServerState{
       agent: %{
@@ -149,7 +152,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.set"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -161,7 +164,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.validate"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -173,7 +176,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.plan"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -183,7 +186,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
 
       assert signal.type == "jido.agent.cmd.run"
       assert signal.subject == "jido://agent/test-agent-123"
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -195,7 +198,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.cmd.cmd"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == %{param: "value"}
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -212,7 +215,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.event.started"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -223,28 +226,28 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.event.process.started"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
 
       signal = ServerSignal.event_signal(:process_terminated, state, params)
       assert signal.type == "jido.agent.event.process.terminated"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
 
       signal = ServerSignal.event_signal(:process_failed, state, params)
       assert signal.type == "jido.agent.event.process.failed"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
 
       signal = ServerSignal.event_signal(:process_restarted, state, params)
       assert signal.type == "jido.agent.event.process.restarted"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == params
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -261,7 +264,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.err.execution.error"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == error
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -279,7 +282,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.out.instruction.result"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == result
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
@@ -290,7 +293,7 @@ defmodule JidoTest.Agent.Server.SignalTest do
       assert signal.type == "jido.agent.out.signal.result"
       assert signal.subject == "jido://agent/test-agent-123"
       assert signal.data == result
-      assert signal.jido_dispatch == {:noop, []}
+      assert DispatchHelpers.get_dispatch(signal) == {:noop, []}
       assert is_binary(signal.id)
     end
 
