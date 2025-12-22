@@ -584,6 +584,7 @@ defmodule JidoTest.AgentCase do
   @spec start_test_bus(atom()) :: pid()
   def start_test_bus(name \\ :test_bus) do
     {:ok, bus} = Jido.Signal.Bus.start_link(name: name)
+
     ExUnit.Callbacks.on_exit(fn ->
       try do
         if Process.alive?(bus), do: GenServer.stop(bus, :normal, 1000)
@@ -591,6 +592,7 @@ defmodule JidoTest.AgentCase do
         :exit, _ -> :ok
       end
     end)
+
     bus
   end
 
@@ -603,12 +605,13 @@ defmodule JidoTest.AgentCase do
   def subscribe_agent_to_bus(%{server_pid: server_pid, agent: agent} = _context, bus, path) do
     dispatch_config = {:pid, target: server_pid, delivery_mode: :async}
 
-    {:ok, _subscription_id} = Jido.Signal.Bus.subscribe(
-      bus,
-      path,
-      dispatch: dispatch_config,
-      subscriber_id: agent.id
-    )
+    {:ok, _subscription_id} =
+      Jido.Signal.Bus.subscribe(
+        bus,
+        path,
+        dispatch: dispatch_config,
+        subscriber_id: agent.id
+      )
 
     :ok
   end
@@ -725,6 +728,7 @@ defmodule JidoTest.AgentCase do
   @spec start_bus_spy() :: pid()
   def start_bus_spy do
     spy = Jido.Signal.BusSpy.start_spy()
+
     ExUnit.Callbacks.on_exit(fn ->
       try do
         Jido.Signal.BusSpy.stop_spy(spy)
@@ -732,6 +736,7 @@ defmodule JidoTest.AgentCase do
         :exit, _ -> :ok
       end
     end)
+
     spy
   end
 

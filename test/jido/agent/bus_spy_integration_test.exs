@@ -43,7 +43,9 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
       assert length(received_signals) >= 1
 
       [received_signal] = received_signals
-      assert received_signal.trace_context.trace_id == signal_event.signal.extensions["correlation"].trace_id
+
+      assert received_signal.trace_context.trace_id ==
+               signal_event.signal.extensions["correlation"].trace_id
 
       assert signal_event.bus_name != nil
       assert signal_event.subscription_id != nil
@@ -57,10 +59,11 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
       %{producer: producer, consumer: consumer} = setup_cross_process_agents()
 
       # Use Task.async to ensure we wait for completion
-      task = Task.async(fn ->
-        Process.sleep(100)
-        send_signal_sync(producer, "root", %{async_test: true})
-      end)
+      task =
+        Task.async(fn ->
+          Process.sleep(100)
+          send_signal_sync(producer, "root", %{async_test: true})
+        end)
 
       assert {:ok, signal_event} = wait_for_bus_signal(spy, "child.event", timeout: 2000)
       assert signal_event.signal.data.root_data.async_test == true
@@ -164,7 +167,9 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
 
       [received_signal] = get_received_signals(consumer)
       assert received_signal.signal_data.root_data.trace_data == original_trace_data
-      assert received_signal.trace_context.trace_id == bus_signal.signal.extensions["correlation"].trace_id
+
+      assert received_signal.trace_context.trace_id ==
+               bus_signal.signal.extensions["correlation"].trace_id
     end
   end
 end

@@ -242,7 +242,13 @@ defmodule Jido.Agent.Server.Directive do
     Jido.Agent.Server.Router.remove(state, path)
   end
 
-  def execute(%ServerState{} = state, %Emit{type: type, data: data, source: source, bus: bus, stream: stream}) do
+  def execute(%ServerState{} = state, %Emit{
+        type: type,
+        data: data,
+        source: source,
+        bus: bus,
+        stream: stream
+      }) do
     signal_source = source || state.agent.id
 
     # Build signal attributes with trace context propagation
@@ -253,9 +259,10 @@ defmodule Jido.Agent.Server.Directive do
     }
 
     # Inject trace context from current state/signal
-    enriched_attrs = Jido.Signal.Trace.Propagate.inject_trace_context(signal_attrs, %{
-      current_signal: state.current_signal
-    })
+    enriched_attrs =
+      Jido.Signal.Trace.Propagate.inject_trace_context(signal_attrs, %{
+        current_signal: state.current_signal
+      })
 
     with {:ok, signal} <- Jido.Signal.new(enriched_attrs),
          :ok <- publish_to_bus(signal, bus, stream) do
@@ -278,7 +285,11 @@ defmodule Jido.Agent.Server.Directive do
         # Bus not found - this is OK in test scenarios where bus isn't started
         # Log at debug level and continue without publishing
         require Logger
-        Logger.debug("Emit directive: bus #{inspect(bus_name)} not found, signal #{signal.type} not published")
+
+        Logger.debug(
+          "Emit directive: bus #{inspect(bus_name)} not found, signal #{signal.type} not published"
+        )
+
         :ok
 
       {:ok, bus_pid} when is_pid(bus_pid) ->
