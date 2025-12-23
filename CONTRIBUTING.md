@@ -230,12 +230,16 @@ The hook will reject non-conforming commits, ensuring a clean changelog can be g
 
 ## Release Process
 
-1. **Version Numbers**
-   - Follow semantic versioning
-   - Update version in `mix.exs`
-   - Update CHANGELOG.md
+Releases are handled automatically by maintainers using `git_ops`. Contributors should:
 
-2. **Documentation**
+1. **Use Conventional Commits** - Your commit messages determine changelog entries:
+   - `feat:` commits create "Added" entries
+   - `fix:` commits create "Fixed" entries
+   - `docs:`, `chore:`, `ci:` commits are excluded
+
+2. **Do NOT edit `CHANGELOG.md`** - It is auto-generated during releases
+
+3. **Documentation**
    - Update guides if needed
    - Check all docstrings
    - Verify README is current
