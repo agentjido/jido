@@ -245,7 +245,7 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, "~> 1.0.0"},
-      {:jido_signal, "~> 1.1.0"},
+      {:jido_signal, "~> 1.2.0"},
 
       # Jido Deps
       {:backoff, "~> 1.1"},
