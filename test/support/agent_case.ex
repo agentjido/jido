@@ -48,6 +48,7 @@ defmodule JidoTest.AgentCase do
   - `get_received_signals/1` - Get signals received by ConsumerAgent
   - `get_latest_trace_context/1` - Get trace context from latest received signal
   - `wait_for_signal/3` - Wait for agent to receive specific signal type
+  - `wait_for_received_signals/3` - Wait for agent to receive a minimum count
   - `wait_for_cross_process_completion/2` - Wait for all agents to reach idle
   - `assert_received_signal_count/2` - Assert expected number of received signals
   - `assert_emitted_signal_count/2` - Assert expected number of emitted signals
@@ -90,15 +91,14 @@ defmodule JidoTest.AgentCase do
 
     agent = agent_module.new("test_agent_#{System.unique_integer([:positive])}")
 
-    {:ok, server_pid} =
-      Server.start_link(
-        [
-          agent: agent,
-          id: agent.id,
-          mode: :step,
-          registry: Jido.Registry
-        ] ++ opts
-      )
+    base_opts = [
+      agent: agent,
+      id: agent.id,
+      mode: :step,
+      registry: Jido.Registry
+    ]
+
+    {:ok, server_pid} = Server.start_link(Keyword.merge(base_opts, opts))
 
     context = %{agent: agent, server_pid: server_pid}
     ExUnit.Callbacks.on_exit(fn -> stop_test_agent(context) end)
@@ -149,20 +149,19 @@ defmodule JidoTest.AgentCase do
       when is_binary(signal_type) and is_map(data) do
     validate_process!(server_pid)
 
-    {:ok, signal} = Signal.new(%{type: signal_type, data: data, source: "test", target: agent.id})
-    {:ok, _} = Server.cast(server_pid, signal)
-
-    # Small delay to allow async :process_queue message to be delivered and processed
-    Process.sleep(50)
-
     # Wait for agent to return to idle state with empty queue
     timeout = Keyword.get(opts, :timeout, 1000)
     check_interval = Keyword.get(opts, :check_interval, 10)
+
+    {:ok, signal} = Signal.new(%{type: signal_type, data: data, source: "test", target: agent.id})
+    {:ok, _} = Server.cast(server_pid, signal)
+    maybe_process_queue(server_pid)
 
     JidoTest.Helpers.Assertions.wait_for(
       fn ->
         {:ok, state} = Server.state(server_pid)
         assert state.status == :idle, "Agent should be idle, but is #{state.status}"
+        assert :queue.is_empty(state.pending_signals), "Agent queue should be empty"
       end,
       timeout: timeout,
       check_interval: check_interval
@@ -311,7 +310,12 @@ defmodule JidoTest.AgentCase do
   @spec spawn_producer_agent(keyword()) :: agent_context()
   def spawn_producer_agent(opts \\ []) do
     routes = Keyword.get(opts, :routes, default_producer_routes())
-    opts = Keyword.put(opts, :routes, routes)
+
+    opts =
+      opts
+      |> Keyword.put(:routes, routes)
+      |> Keyword.put_new(:mode, :auto)
+
     spawn_agent(ProducerAgent, opts)
   end
 
@@ -330,7 +334,7 @@ defmodule JidoTest.AgentCase do
   @spec spawn_consumer_agent(keyword()) :: agent_context()
   def spawn_consumer_agent(opts \\ []) do
     routes = Keyword.get(opts, :routes, default_consumer_routes())
-    opts = Keyword.put(opts, :routes, routes)
+    opts = opts |> Keyword.put(:routes, routes) |> Keyword.put_new(:mode, :auto)
     spawn_agent(ConsumerAgent, opts)
   end
 
@@ -432,6 +436,45 @@ defmodule JidoTest.AgentCase do
 
         assert signal_received,
                "Expected to receive signal of type '#{expected_signal_type}', but no such signal found in #{length(received_signals)} received signals"
+      end,
+      timeout: timeout,
+      check_interval: check_interval
+    )
+
+    context
+  end
+
+  @doc """
+  Wait for an agent to receive at least a minimum number of signals.
+
+  This is useful for cross-process tests where signal delivery is asynchronous.
+
+  ## Options
+
+  - `:timeout` - Maximum time to wait in milliseconds (default: 1000)
+  - `:check_interval` - How often to check in milliseconds (default: 10)
+
+  ## Examples
+
+      consumer_context = spawn_consumer_agent()
+      # ... trigger signals ...
+      wait_for_received_signals(consumer_context, 1, timeout: 2000)
+  """
+  @spec wait_for_received_signals(agent_context(), non_neg_integer(), keyword()) ::
+          agent_context()
+  def wait_for_received_signals(%{server_pid: server_pid} = context, min_count, opts \\ [])
+      when is_integer(min_count) and min_count >= 0 do
+    validate_process!(server_pid)
+    timeout = Keyword.get(opts, :timeout, 1000)
+    check_interval = Keyword.get(opts, :check_interval, 10)
+
+    JidoTest.Helpers.Assertions.wait_for(
+      fn ->
+        received_signals = get_received_signals(context)
+        actual_count = length(received_signals)
+
+        assert actual_count >= min_count,
+               "Expected at least #{min_count} received signals, got #{actual_count}"
       end,
       timeout: timeout,
       check_interval: check_interval
@@ -697,8 +740,15 @@ defmodule JidoTest.AgentCase do
     end
   end
 
-  defp stop_test_agent(%{server_pid: server_pid}) do
-    if Process.alive?(server_pid), do: GenServer.stop(server_pid, :normal, 1000)
+  defp stop_test_agent(%{server_pid: pid}) when is_pid(pid),
+    do: TestSupport.cleanup_agent(%{pid: pid})
+
+  defp maybe_process_queue(server_pid) do
+    {:ok, state} = Server.state(server_pid)
+
+    if state.mode != :auto do
+      _ = GenServer.call(server_pid, :process_queue)
+    end
   end
 
   # Bus Spy Functions - for observing signals crossing process boundaries

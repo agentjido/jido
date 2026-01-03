@@ -210,7 +210,7 @@ defmodule Jido.Agent.Server do
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
         # Trigger queue processing
-        Process.send_after(self(), :process_queue, 0)
+        maybe_trigger_queue_processing(new_state)
         {:noreply, new_state}
 
       {:error, reason} ->
@@ -230,6 +230,18 @@ defmodule Jido.Agent.Server do
     {:reply, :pong, state}
   end
 
+  def handle_call(:process_queue, _from, %ServerState{} = state) do
+    processing_state = %{state | mode: :auto}
+
+    case ServerRuntime.process_signals_in_queue(processing_state) do
+      {:ok, new_state} ->
+        {:reply, :ok, %{new_state | mode: state.mode}}
+
+      {:debug_break, new_state, _signal} ->
+        {:reply, :ok, %{new_state | mode: state.mode}}
+    end
+  end
+
   def handle_call(_unhandled, _from, state) do
     {:reply, {:error, :unhandled_call}, state}
   end
@@ -240,7 +252,7 @@ defmodule Jido.Agent.Server do
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
         # Trigger queue processing
-        Process.send_after(self(), :process_queue, 0)
+        maybe_trigger_queue_processing(new_state)
         {:noreply, new_state}
 
       {:error, _reason} ->
@@ -271,7 +283,7 @@ defmodule Jido.Agent.Server do
     case ServerState.enqueue(state, signal) do
       {:ok, new_state} ->
         # Trigger queue processing
-        Process.send_after(self(), :process_queue, 0)
+        maybe_trigger_queue_processing(new_state)
         {:noreply, new_state}
 
       {:error, _reason} ->
@@ -295,10 +307,15 @@ defmodule Jido.Agent.Server do
     {:noreply, state}
   end
 
-  def handle_info(:process_queue, state) do
+  def handle_info(:process_queue, %ServerState{mode: :auto} = state) do
     case ServerRuntime.process_signals_in_queue(state) do
       {:ok, new_state} -> {:noreply, new_state}
+      {:debug_break, new_state, _signal} -> {:noreply, new_state}
     end
+  end
+
+  def handle_info(:process_queue, %ServerState{} = state) do
+    {:noreply, state}
   end
 
   def handle_info(_unhandled, state) do
@@ -532,4 +549,12 @@ defmodule Jido.Agent.Server do
   end
 
   defp maybe_trigger_queue_processing(_state, _mode), do: :ok
+
+  @spec maybe_trigger_queue_processing(ServerState.t()) :: :ok
+  defp maybe_trigger_queue_processing(%ServerState{mode: :auto}) do
+    Process.send_after(self(), :process_queue, 0)
+    :ok
+  end
+
+  defp maybe_trigger_queue_processing(%ServerState{}), do: :ok
 end
