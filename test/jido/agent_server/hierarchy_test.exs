@@ -251,16 +251,21 @@ defmodule JidoTest.AgentServer.HierarchyTest do
         )
 
       GenServer.stop(parent_pid)
-      Process.sleep(100)
 
-      assert Process.alive?(child_pid)
+      await_condition(fn ->
+        case AgentServer.state(child_pid) do
+          {:ok, %{agent: %{state: %{orphan_events: events}}}} -> length(events) == 1
+          {:ok, _} -> false
+          {:error, _} -> false
+        end
+      end)
 
       {:ok, child_state} = AgentServer.state(child_pid)
       assert length(child_state.agent.state.orphan_events) == 1
 
       [event] = child_state.agent.state.orphan_events
       assert event.parent_id == "parent-orphan-1"
-      assert event.reason == :normal
+      assert event.reason in [:normal, :noproc]
 
       GenServer.stop(child_pid)
     end

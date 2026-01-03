@@ -73,6 +73,16 @@ defmodule JidoTest.Case do
 
     {:ok, jido_pid} = Jido.start_link(name: jido_name)
 
+    on_exit(fn ->
+      if Process.alive?(jido_pid) do
+        try do
+          Supervisor.stop(jido_pid, :normal, 5_000)
+        catch
+          :exit, _ -> :ok
+        end
+      end
+    end)
+
     {:ok, Map.merge(context, %{jido: jido_name, jido_pid: jido_pid})}
   end
 end

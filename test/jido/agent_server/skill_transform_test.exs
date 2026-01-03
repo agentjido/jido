@@ -2,6 +2,7 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
   use JidoTest.Case, async: true
 
   alias Jido.Signal
+  alias JidoTest.WaitHelpers
 
   # Test action
   defmodule SetValueAction do
@@ -166,8 +167,15 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
       signal = Signal.new!("value.set", %{value: 33}, source: "/test")
       :ok = Jido.AgentServer.cast(pid, signal)
 
-      # Give time for async processing
-      Process.sleep(50)
+      WaitHelpers.wait_until(
+        fn ->
+          case Jido.AgentServer.state(pid) do
+            {:ok, state} -> state.agent.state[:value] == 33
+            _ -> false
+          end
+        end,
+        label: "cast to update state value"
+      )
 
       {:ok, state} = Jido.AgentServer.state(pid)
       assert state.agent.state[:value] == 33

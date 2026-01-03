@@ -7,6 +7,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
   alias Jido.AgentServer
   alias Jido.Agent.Directive
   alias Jido.Signal
+  alias JidoTest.WaitHelpers
 
   defmodule CronCountAction do
     @moduledoc false
@@ -76,7 +77,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_job(pid, :heartbeat)
 
       {:ok, state} = AgentServer.state(pid)
       assert Map.has_key?(state.cron_jobs, :heartbeat)
@@ -102,7 +103,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         :ok = AgentServer.cast(pid, register_signal)
       end
 
-      Process.sleep(100)
+      await_cron_jobs(pid, 3)
 
       {:ok, state} = AgentServer.state(pid)
       assert map_size(state.cron_jobs) == 3
@@ -130,7 +131,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal1)
-      Process.sleep(100)
+      await_cron_job(pid, :updatable)
 
       {:ok, state1} = AgentServer.state(pid)
       first_job_pid = state1.cron_jobs[:updatable]
@@ -144,7 +145,20 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal2)
-      Process.sleep(100)
+
+      WaitHelpers.wait_until(
+        fn ->
+          case AgentServer.state(pid) do
+            {:ok, state} ->
+              map_size(state.cron_jobs) == 1 and
+                Map.get(state.cron_jobs, :updatable) != first_job_pid
+
+            _ ->
+              false
+          end
+        end,
+        label: "cron job upsert to replace pid"
+      )
 
       {:ok, state2} = AgentServer.state(pid)
       assert map_size(state2.cron_jobs) == 1
@@ -173,7 +187,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_job(pid, :timezone_test)
 
       {:ok, state} = AgentServer.state(pid)
       assert Map.has_key?(state.cron_jobs, :timezone_test)
@@ -193,7 +207,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_jobs(pid, 1)
 
       {:ok, state} = AgentServer.state(pid)
       assert map_size(state.cron_jobs) == 1
@@ -217,13 +231,14 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_job(pid, :cancellable)
 
       {:ok, state1} = AgentServer.state(pid)
       assert Map.has_key?(state1.cron_jobs, :cancellable)
       job_pid = state1.cron_jobs[:cancellable]
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
+      ref = Process.monitor(job_pid)
 
       cancel_signal =
         Signal.new!(%{
@@ -233,13 +248,13 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, cancel_signal)
-      Process.sleep(100)
+      await_cron_job_removed(pid, :cancellable)
 
       {:ok, state2} = AgentServer.state(pid)
       refute Map.has_key?(state2.cron_jobs, :cancellable)
 
       # The job pid should no longer be alive
-      refute Process.alive?(job_pid)
+      assert_receive {:DOWN, ^ref, :process, ^job_pid, _reason}, 1000
 
       GenServer.stop(pid)
     end
@@ -255,7 +270,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, cancel_signal)
-      Process.sleep(100)
+      await_cron_jobs(pid, 0)
 
       {:ok, state} = AgentServer.state(pid)
       assert map_size(state.cron_jobs) == 0
@@ -274,7 +289,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_job(pid, :toggle)
 
       cancel_signal =
         Signal.new!(%{
@@ -284,7 +299,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, cancel_signal)
-      Process.sleep(100)
+      await_cron_job_removed(pid, :toggle)
 
       {:ok, state1} = AgentServer.state(pid)
       refute Map.has_key?(state1.cron_jobs, :toggle)
@@ -297,7 +312,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal2)
-      Process.sleep(100)
+      await_cron_job(pid, :toggle)
 
       {:ok, state2} = AgentServer.state(pid)
       assert Map.has_key?(state2.cron_jobs, :toggle)
@@ -319,18 +334,18 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         })
 
       :ok = AgentServer.cast(pid, register_signal)
-      Process.sleep(100)
+      await_cron_job(pid, :cleanup_test)
 
       {:ok, state} = AgentServer.state(pid)
       job_pid = state.cron_jobs[:cleanup_test]
       assert is_pid(job_pid)
       assert Process.alive?(job_pid)
+      ref = Process.monitor(job_pid)
 
       GenServer.stop(pid)
-      Process.sleep(100)
 
       # The job pid should no longer be alive after agent terminates
-      refute Process.alive?(job_pid)
+      assert_receive {:DOWN, ^ref, :process, ^job_pid, _reason}, 1000
     end
 
     test "multiple cron jobs are all cleaned up on termination", %{jido: jido} do
@@ -349,10 +364,11 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         :ok = AgentServer.cast(pid, register_signal)
       end
 
-      Process.sleep(100)
+      await_cron_jobs(pid, 3)
 
       {:ok, state} = AgentServer.state(pid)
       job_pids = Enum.map(job_ids, fn id -> state.cron_jobs[id] end)
+      refs = Enum.map(job_pids, &Process.monitor/1)
 
       # All pids should be alive before termination
       for job_pid <- job_pids do
@@ -361,12 +377,12 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       end
 
       GenServer.stop(pid)
-      Process.sleep(100)
 
       # All pids should be dead after termination
-      for job_pid <- job_pids do
-        refute Process.alive?(job_pid)
-      end
+      Enum.zip(refs, job_pids)
+      |> Enum.each(fn {ref, job_pid} ->
+        assert_receive {:DOWN, ^ref, :process, ^job_pid, _reason}, 1000
+      end)
     end
   end
 
@@ -386,7 +402,19 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         :ok = AgentServer.cast(pid, register_signal)
       end
 
-      Process.sleep(100)
+      WaitHelpers.wait_until(
+        fn ->
+          case {AgentServer.state(pid1), AgentServer.state(pid2)} do
+            {{:ok, state1}, {:ok, state2}} ->
+              Map.has_key?(state1.cron_jobs, :shared_name) and
+                Map.has_key?(state2.cron_jobs, :shared_name)
+
+            _ ->
+              false
+          end
+        end,
+        label: "cron job to register on both agents"
+      )
 
       {:ok, state1} = AgentServer.state(pid1)
       {:ok, state2} = AgentServer.state(pid2)
@@ -405,5 +433,41 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid1)
       GenServer.stop(pid2)
     end
+  end
+
+  defp await_cron_job(pid, job_id, opts \\ []) do
+    WaitHelpers.wait_until(
+      fn ->
+        case AgentServer.state(pid) do
+          {:ok, state} -> Map.has_key?(state.cron_jobs, job_id)
+          _ -> false
+        end
+      end,
+      Keyword.merge([label: "cron job #{inspect(job_id)} registration"], opts)
+    )
+  end
+
+  defp await_cron_jobs(pid, count, opts \\ []) do
+    WaitHelpers.wait_until(
+      fn ->
+        case AgentServer.state(pid) do
+          {:ok, state} -> map_size(state.cron_jobs) == count
+          _ -> false
+        end
+      end,
+      Keyword.merge([label: "cron job count #{count}"], opts)
+    )
+  end
+
+  defp await_cron_job_removed(pid, job_id, opts \\ []) do
+    WaitHelpers.wait_until(
+      fn ->
+        case AgentServer.state(pid) do
+          {:ok, state} -> not Map.has_key?(state.cron_jobs, job_id)
+          _ -> false
+        end
+      end,
+      Keyword.merge([label: "cron job #{inspect(job_id)} removal"], opts)
+    )
   end
 end

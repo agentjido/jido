@@ -322,13 +322,60 @@ defmodule Jido do
   """
   @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, :not_found}
   def stop_agent(jido_instance, pid) when is_atom(jido_instance) and is_pid(pid) do
-    DynamicSupervisor.terminate_child(agent_supervisor_name(jido_instance), pid)
+    ref = Process.monitor(pid)
+
+    case DynamicSupervisor.terminate_child(agent_supervisor_name(jido_instance), pid) do
+      :ok ->
+        await_process_down(ref, pid, 5_000)
+        :ok
+
+      {:error, :not_found} = error ->
+        Process.demonitor(ref, [:flush])
+        error
+    end
   end
 
   def stop_agent(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
     case whereis(jido_instance, id) do
-      nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid)
+      nil ->
+        {:error, :not_found}
+
+      pid ->
+        result = stop_agent(jido_instance, pid)
+
+        if result == :ok do
+          await_registry_clear(registry_name(jido_instance), id, 1_000)
+        end
+
+        result
+    end
+  end
+
+  defp await_process_down(ref, pid, timeout_ms) do
+    receive do
+      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+    after
+      timeout_ms ->
+        Process.demonitor(ref, [:flush])
+        :ok
+    end
+  end
+
+  defp await_registry_clear(registry, id, timeout_ms) do
+    deadline = System.monotonic_time(:millisecond) + timeout_ms
+    do_await_registry_clear(registry, id, deadline)
+  end
+
+  defp do_await_registry_clear(registry, id, deadline) do
+    if Registry.lookup(registry, id) == [] do
+      :ok
+    else
+      if System.monotonic_time(:millisecond) > deadline do
+        :ok
+      else
+        Process.sleep(5)
+        do_await_registry_clear(registry, id, deadline)
+      end
     end
   end
 

@@ -10,7 +10,20 @@ import Config
 # To enable verbose logging during debugging, set LOG_LEVEL env var:
 #   LOG_LEVEL=debug mix test test/my_test.exs
 #
-log_level = System.get_env("LOG_LEVEL", "debug") |> String.to_existing_atom()
+log_level =
+  System.get_env("LOG_LEVEL", "debug")
+  |> String.downcase()
+  |> case do
+    "debug" -> :debug
+    "info" -> :info
+    "notice" -> :notice
+    "warning" -> :warning
+    "error" -> :error
+    "critical" -> :critical
+    "alert" -> :alert
+    "emergency" -> :emergency
+    _ -> :debug
+  end
 
 config :logger,
   level: log_level,

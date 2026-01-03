@@ -4,6 +4,7 @@ defmodule JidoTest.AgentServer.StatusTest do
   alias Jido.AgentServer
   alias Jido.AgentServer.Status
   alias Jido.Signal
+  alias JidoTest.WaitHelpers
 
   # Test actions
   defmodule IncrementAction do
@@ -147,7 +148,16 @@ defmodule JidoTest.AgentServer.StatusTest do
       # Send increment signal
       signal = Signal.new!("test_increment", %{}, source: "test")
       AgentServer.cast(pid, signal)
-      Process.sleep(50)
+
+      WaitHelpers.wait_until(
+        fn ->
+          case AgentServer.status(pid) do
+            {:ok, status} -> status.raw_state.counter == 1
+            _ -> false
+          end
+        end,
+        label: "counter to increment"
+      )
 
       # Check updated state
       {:ok, status2} = AgentServer.status(pid)
@@ -158,7 +168,16 @@ defmodule JidoTest.AgentServer.StatusTest do
       # Complete the agent
       signal = Signal.new!("test.complete", %{}, source: "test")
       AgentServer.cast(pid, signal)
-      Process.sleep(50)
+
+      WaitHelpers.wait_until(
+        fn ->
+          case AgentServer.status(pid) do
+            {:ok, status} -> status.raw_state.status == :completed
+            _ -> false
+          end
+        end,
+        label: "agent to complete"
+      )
 
       {:ok, status} = AgentServer.status(pid)
       assert status.raw_state.status == :completed
@@ -192,11 +211,17 @@ defmodule JidoTest.AgentServer.StatusTest do
     end
 
     test "can monitor state changes via stream", %{pid: pid} do
+      parent = self()
+
       # Start streaming in a task
       task =
         Task.async(fn ->
           try do
             AgentServer.stream_status(pid, interval_ms: 20)
+            |> Stream.transform(false, fn status, started? ->
+              if not started?, do: send(parent, :stream_started)
+              {[status], true}
+            end)
             |> Enum.reduce_while([], fn status, acc ->
               new_acc = [status.raw_state[:counter] | acc]
 
@@ -211,13 +236,11 @@ defmodule JidoTest.AgentServer.StatusTest do
           end
         end)
 
-      # Send increments while streaming
-      Process.sleep(50)
+      assert_receive :stream_started, 1000
 
       for _i <- 1..3 do
         signal = Signal.new!("test_increment", %{}, source: "test")
         AgentServer.cast(pid, signal)
-        Process.sleep(50)
       end
 
       # Check we saw the progression
@@ -238,9 +261,15 @@ defmodule JidoTest.AgentServer.StatusTest do
     end
 
     test "stream can detect completion", %{pid: pid} do
+      parent = self()
+
       task =
         Task.async(fn ->
           AgentServer.stream_status(pid, interval_ms: 20)
+          |> Stream.transform(false, fn status, started? ->
+            if not started?, do: send(parent, :stream_started)
+            {[status], true}
+          end)
           |> Enum.reduce_while(nil, fn status, _acc ->
             if status.raw_state[:status] == :completed do
               {:halt, {:completed, status.raw_state[:result]}}
@@ -250,8 +279,7 @@ defmodule JidoTest.AgentServer.StatusTest do
           end)
         end)
 
-      # Let stream start
-      Process.sleep(50)
+      assert_receive :stream_started, 1000
 
       # Send completion signal
       signal = Signal.new!("test.complete", %{}, source: "test")

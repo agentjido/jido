@@ -6,6 +6,7 @@ defmodule JidoTest.AgentPoolTest do
   alias Jido.AgentPool
   alias Jido.AgentServer
   alias Jido.Signal
+  alias JidoTest.WaitHelpers
 
   defmodule IncrementAction do
     @moduledoc false
@@ -196,7 +197,17 @@ defmodule JidoTest.AgentPoolTest do
       signal = Signal.new!("increment", %{}, source: "/test")
       assert :ok = AgentPool.cast(jido_name, :test_pool, signal)
 
-      Process.sleep(50)
+      WaitHelpers.wait_until(
+        fn ->
+          get_signal = Signal.new!("get_count", %{}, source: "/test")
+
+          case AgentPool.call(jido_name, :test_pool, get_signal) do
+            {:ok, agent} -> agent.state.counter >= 1
+            _ -> false
+          end
+        end,
+        label: "pooled agent to process cast"
+      )
 
       get_signal = Signal.new!("get_count", %{}, source: "/test")
       {:ok, agent} = AgentPool.call(jido_name, :test_pool, get_signal)
