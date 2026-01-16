@@ -8,7 +8,7 @@ defmodule JidoTest.Agent.ServerRuntimeTest do
 
   alias Jido.Agent.Server.Runtime, as: ServerRuntime
   alias Jido.Agent.Server.Router, as: ServerRouter
-  alias Jido.{Signal, Instruction}
+  alias Jido.{Error, Signal, Instruction}
 
   @moduletag :capture_log
 

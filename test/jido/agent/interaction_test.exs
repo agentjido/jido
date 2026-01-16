@@ -342,11 +342,14 @@ defmodule JidoTest.Agent.InteractionTest do
     test "handles invalid agent references gracefully" do
       {:ok, signal} = Signal.new(%{type: "test_action", data: %{value: 42}})
 
+      # Test atom reference separately (fixed atom is fine - no collision risk)
+      assert {:error, :not_found} = Interaction.call(:non_existent_atom_agent, signal)
+
+      # Use unique IDs for string refs to avoid async test collisions
       invalid_refs = [
-        "non_existent_agent",
-        :non_existent_atom_agent,
-        "invalid1",
-        "invalid2"
+        Support.unique_id("non-existent"),
+        Support.unique_id("non-existent"),
+        Support.unique_id("non-existent")
       ]
 
       for ref <- invalid_refs do

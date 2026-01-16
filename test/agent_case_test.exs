@@ -4,6 +4,7 @@ defmodule JidoTest.AgentCaseTest do
 
   alias JidoTest.TestAgents.BasicAgent
   alias JidoTest.TestAgents.FullFeaturedAgent
+  alias JidoTest.Support
 
   @moduletag :capture_log
 
@@ -57,7 +58,7 @@ defmodule JidoTest.AgentCaseTest do
       context = %{agent: agent, server_pid: server_pid}
 
       ExUnit.Callbacks.on_exit(fn ->
-        if Process.alive?(server_pid), do: GenServer.stop(server_pid, :normal, 1000)
+        Support.cleanup_agent(%{pid: server_pid})
       end)
 
       context

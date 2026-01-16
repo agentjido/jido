@@ -24,6 +24,7 @@ defmodule Jido.Agent.TraceCrossProcessTest do
       send_signal_sync(producer, "root", %{test_data: "trace_flow"})
 
       wait_for_cross_process_completion([producer, consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       dispatched_signals = get_spy_signals(spy)
       assert length(dispatched_signals) >= 1
@@ -37,6 +38,7 @@ defmodule Jido.Agent.TraceCrossProcessTest do
 
       send_signal_sync(producer, "root", %{chain_test: "parent_child"})
       wait_for_cross_process_completion([producer, consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       emitted = get_emitted_signals(producer)
       received = get_received_signals(consumer)
@@ -75,6 +77,7 @@ defmodule Jido.Agent.TraceCrossProcessTest do
 
       send_signal_sync(producer, "root", %{bus_test: "trace_preservation"})
       wait_for_cross_process_completion([producer, consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       dispatched_signals = get_spy_signals(spy)
       assert length(dispatched_signals) >= 1
@@ -95,6 +98,7 @@ defmodule Jido.Agent.TraceCrossProcessTest do
 
       send_signal_sync(producer, "root", %{chain_operation: "full_trace"})
       wait_for_cross_process_completion([producer, consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       emitted_signals = get_emitted_signals(producer)
       received_signals = get_received_signals(consumer)
@@ -176,6 +180,7 @@ defmodule Jido.Agent.TraceCrossProcessTest do
       send_signal_sync(agent_a, "root", %{oracle_scenario: true, trace_data: "T"})
 
       wait_for_cross_process_completion([agent_a, agent_b])
+      wait_for_received_signals(agent_b, 1, timeout: 2000)
 
       emitted_by_a = get_emitted_signals(agent_a)
       assert length(emitted_by_a) == 1
