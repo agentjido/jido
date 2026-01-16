@@ -219,7 +219,7 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, github: "agentjido/jido_action", branch: "main"},
-      {:jido_signal, path: "../jido_signal"},
+      {:jido_signal, github: "agentjido/jido_signal", branch: "main"},
 
       # Jido Deps
       {:backoff, "~> 1.1"},
