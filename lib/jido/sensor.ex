@@ -94,10 +94,10 @@ defmodule Jido.Sensor do
               | {:error, reason :: term()}
 
   @doc """
-  Handle an incoming event and produce signals.
+  Handle an incoming event and produce directives.
 
   Called when the sensor receives an event from its connected source(s).
-  Should transform the event into zero or more signals.
+  Should return directives describing what actions to take.
 
   ## Parameters
 
@@ -106,14 +106,26 @@ defmodule Jido.Sensor do
 
   ## Returns
 
-  - `{:ok, state, signals}` - Updated state and signals to emit
-  - `{:ok, state, signals, directives}` - With additional directives
+  - `{:ok, state}` - Updated state with no directives
+  - `{:ok, state, directives}` - Updated state with directives to execute
   - `{:error, reason}` - Event handling failed
+
+  ## Directives
+
+  - `{:emit, signal}` - Emit a signal to the connected agent
+  - `{:schedule, interval_ms}` - Schedule a `:tick` event after interval
+  - `{:schedule, interval_ms, event}` - Schedule a custom event after interval
+
+  ## Example
+
+      def handle_event(:tick, state) do
+        signal = Jido.Signal.new!(%{source: "/sensor/example", type: "example.tick"})
+        {:ok, state, [{:emit, signal}, {:schedule, 1000}]}
+      end
   """
   @callback handle_event(event :: term(), state :: term()) ::
-              {:ok, state :: term(), signals :: [Jido.Signal.t()]}
-              | {:ok, state :: term(), signals :: [Jido.Signal.t()],
-                 directives :: [sensor_directive()]}
+              {:ok, state :: term()}
+              | {:ok, state :: term(), directives :: [sensor_directive()]}
               | {:error, reason :: term()}
 
   @doc """

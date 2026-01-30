@@ -544,4 +544,25 @@ defmodule JidoTest.Sensor.RuntimeTest do
       assert spec.id == :custom_sensor_id
     end
   end
+
+  describe "Jido.Sensors.Heartbeat integration" do
+    test "emits heartbeat signals and reschedules" do
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: Jido.Sensors.Heartbeat,
+          config: %{interval: 30, message: "test_heartbeat"},
+          context: %{agent_ref: self()}
+        )
+
+      assert_receive {:signal, signal1}, 200
+      assert signal1.type == "jido.sensor.heartbeat"
+      assert signal1.data.message == "test_heartbeat"
+
+      # Verify rescheduling works
+      assert_receive {:signal, signal2}, 200
+      assert signal2.type == "jido.sensor.heartbeat"
+
+      GenServer.stop(pid)
+    end
+  end
 end

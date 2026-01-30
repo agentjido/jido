@@ -56,6 +56,6 @@ defmodule Jido.Sensors.Heartbeat do
         }
       })
 
-    {:ok, state, [signal], [{:schedule, state.interval}]}
+    {:ok, state, [{:emit, signal}, {:schedule, state.interval}]}
   end
 end

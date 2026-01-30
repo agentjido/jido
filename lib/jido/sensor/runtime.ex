@@ -117,6 +117,7 @@ defmodule Jido.Sensor.Runtime do
     opts = normalize_opts(opts)
 
     with {:ok, sensor} <- get_required(opts, :sensor),
+         true <- Code.ensure_loaded?(sensor),
          {:ok, config} <- parse_config(sensor, opts[:config] || %{}),
          context = opts[:context] || %{},
          id = opts[:id] || Jido.Util.generate_id(),
