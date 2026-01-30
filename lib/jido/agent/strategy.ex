@@ -109,14 +109,23 @@ defmodule Jido.Agent.Strategy do
     - `details` - Additional strategy-specific metadata
     """
 
-    @type t :: %__MODULE__{
-            status: Jido.Agent.Strategy.status(),
-            done?: boolean(),
-            result: term() | nil,
-            details: map()
-          }
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                status: Zoi.atom(description: "Coarse execution status"),
+                done?: Zoi.boolean(description: "Whether strategy reached terminal state"),
+                result:
+                  Zoi.any(description: "Main output if strategy produces one") |> Zoi.optional(),
+                details:
+                  Zoi.map(Zoi.atom(), Zoi.any(), description: "Strategy-specific metadata")
+                  |> Zoi.default(%{})
+              },
+              coerce: true
+            )
 
-    defstruct [:status, :done?, :result, details: %{}]
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
 
     @doc "Returns true if the strategy has reached a terminal state."
     @spec terminal?(t()) :: boolean()
@@ -130,8 +139,23 @@ defmodule Jido.Agent.Strategy do
   # Deprecated: use Snapshot instead
   defmodule Public do
     @moduledoc false
-    defstruct [:status, :done?, :result, meta: %{}]
-    @type t :: Jido.Agent.Strategy.Snapshot.t()
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                status: Zoi.atom(description: "Execution status"),
+                done?: Zoi.boolean(description: "Whether strategy reached terminal state"),
+                result: Zoi.any(description: "Main output") |> Zoi.optional(),
+                meta:
+                  Zoi.map(Zoi.atom(), Zoi.any(), description: "Additional metadata")
+                  |> Zoi.default(%{})
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
   end
 
   @doc """

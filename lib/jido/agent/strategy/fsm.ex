@@ -83,19 +83,26 @@ defmodule Jido.Agent.Strategy.FSM do
     this module validates transitions dynamically based on the provided config.
     """
 
-    @type t :: %__MODULE__{
-            status: String.t(),
-            processed_count: non_neg_integer(),
-            last_result: term(),
-            error: term(),
-            transitions: map()
-          }
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                status: Zoi.string(description: "Current FSM state") |> Zoi.default("idle"),
+                processed_count:
+                  Zoi.integer(description: "Number of processed commands") |> Zoi.default(0),
+                last_result: Zoi.any(description: "Result of last command") |> Zoi.optional(),
+                error: Zoi.any(description: "Error from last command") |> Zoi.optional(),
+                transitions:
+                  Zoi.map(Zoi.string(), Zoi.list(Zoi.string()),
+                    description: "Allowed state transitions"
+                  )
+                  |> Zoi.default(%{})
+              },
+              coerce: true
+            )
 
-    defstruct status: "idle",
-              processed_count: 0,
-              last_result: nil,
-              error: nil,
-              transitions: %{}
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
 
     @doc "Creates a new machine with the given initial state and transitions."
     @spec new(String.t(), map()) :: t()
