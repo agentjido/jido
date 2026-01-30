@@ -41,6 +41,7 @@ defmodule Jido.AgentServer do
 
   ## Options
 
+  - `:jido` - Jido instance name for registry scoping (default: `Jido`)
   - `:agent` - Agent module or struct (required)
   - `:id` - Instance ID (auto-generated if not provided)
   - `:initial_state` - Initial state map for agent
@@ -67,6 +68,12 @@ defmodule Jido.AgentServer do
 
   ## Examples
 
+      # Using global Jido instance (default)
+      {:ok, pid} = AgentServer.start_link(agent: SimpleAgent)
+
+      # Using a named Jido instance
+      {:ok, pid} = AgentServer.start_link(jido: MyApp.Jido, agent: MyAgent)
+
       # Module with new/1 - receives id and state
       {:ok, pid} = AgentServer.start_link(
         agent: MyAgent,
@@ -74,15 +81,9 @@ defmodule Jido.AgentServer do
         initial_state: %{counter: 42}
       )
 
-      # Module with new/0 - id and state ignored
-      {:ok, pid} = AgentServer.start_link(agent: SimpleAgent)
-
       # Pre-built struct - requires agent_module
       agent = MyAgent.new(id: "prebuilt", state: %{value: 99})
-      {:ok, pid} = AgentServer.start_link(
-        agent: agent,
-        agent_module: MyAgent
-      )
+      {:ok, pid} = AgentServer.start_link(agent: agent, agent_module: MyAgent)
 
   ## Completion Detection
 
@@ -171,6 +172,7 @@ defmodule Jido.AgentServer do
 
       {:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent)
       {:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent, id: "custom-123")
+      {:ok, pid} = Jido.AgentServer.start_link(jido: MyApp.Jido, agent: MyAgent)
   """
   @spec start_link(keyword() | map()) :: GenServer.on_start()
   def start_link(opts) when is_list(opts) or is_map(opts) do
@@ -643,30 +645,34 @@ defmodule Jido.AgentServer do
         {:reply, {:ok, result}, state}
 
       :pending ->
-        ref = make_ref()
         {caller_pid, _tag} = from
-        Process.monitor(caller_pid)
+        monitor_ref = Process.monitor(caller_pid)
 
         waiter = %{
           from: from,
+          monitor_ref: monitor_ref,
           status_path: status_path,
           result_path: result_path,
           error_path: error_path
         }
 
-        new_waiters = Map.put(state.completion_waiters, ref, waiter)
+        new_waiters = Map.put(state.completion_waiters, monitor_ref, waiter)
         {:noreply, %{state | completion_waiters: new_waiters}}
     end
   end
 
   def handle_call({:attach, owner_pid}, _from, state) do
-    {:cont, state} = state.lifecycle.mod.handle_event({:attach, owner_pid}, state)
-    {:reply, :ok, state}
+    case state.lifecycle.mod.handle_event({:attach, owner_pid}, state) do
+      {:cont, new_state} -> {:reply, :ok, new_state}
+      {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
+    end
   end
 
   def handle_call({:detach, owner_pid}, _from, state) do
-    {:cont, state} = state.lifecycle.mod.handle_event({:detach, owner_pid}, state)
-    {:reply, :ok, state}
+    case state.lifecycle.mod.handle_event({:detach, owner_pid}, state) do
+      {:cont, new_state} -> {:reply, :ok, new_state}
+      {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
+    end
   end
 
   def handle_call(_msg, _from, state) do
@@ -675,8 +681,10 @@ defmodule Jido.AgentServer do
 
   @impl true
   def handle_cast(:touch, state) do
-    {:cont, state} = state.lifecycle.mod.handle_event(:touch, state)
-    {:noreply, state}
+    case state.lifecycle.mod.handle_event(:touch, state) do
+      {:cont, new_state} -> {:noreply, new_state}
+      {:stop, reason, new_state} -> {:stop, reason, new_state}
+    end
   end
 
   def handle_cast({:signal, %Signal{} = signal}, state) do
@@ -729,9 +737,15 @@ defmodule Jido.AgentServer do
   end
 
   def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
-    case process_signal(signal, state) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:error, _reason, new_state} -> {:noreply, new_state}
+    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+
+    try do
+      case process_signal(traced_signal, state) do
+        {:ok, new_state} -> {:noreply, new_state}
+        {:error, _reason, new_state} -> {:noreply, new_state}
+      end
+    after
+      TraceContext.clear()
     end
   end
 
@@ -746,12 +760,8 @@ defmodule Jido.AgentServer do
         end
 
       _ ->
-        # Not an attachment, check other monitors
-        new_waiters =
-          state.completion_waiters
-          |> Enum.reject(fn {_ref, %{from: {from_pid, _tag}}} -> from_pid == pid end)
-          |> Map.new()
-
+        # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
+        {_popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
         state = %{state | completion_waiters: new_waiters}
 
         if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
@@ -777,9 +787,15 @@ defmodule Jido.AgentServer do
   end
 
   def handle_info({:signal, %Signal{} = signal}, state) do
-    case process_signal(signal, state) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:error, _reason, new_state} -> {:noreply, new_state}
+    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+
+    try do
+      case process_signal(traced_signal, state) do
+        {:ok, new_state} -> {:noreply, new_state}
+        {:error, _reason, new_state} -> {:noreply, new_state}
+      end
+    after
+      TraceContext.clear()
     end
   end
 
@@ -1323,6 +1339,7 @@ defmodule Jido.AgentServer do
           waiter.error_path
         )
 
+      Process.demonitor(waiter.monitor_ref, [:flush])
       GenServer.reply(waiter.from, {:ok, result})
     end)
 

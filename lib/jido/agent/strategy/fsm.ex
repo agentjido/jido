@@ -174,13 +174,16 @@ defmodule Jido.Agent.Strategy.FSM do
   end
 
   defp process_instructions(agent, machine, instructions) do
-    Enum.reduce(instructions, {agent, machine, []}, fn instruction,
-                                                       {acc_agent, acc_machine, acc_directives} ->
-      {new_agent, new_machine, new_directives} =
-        run_instruction(acc_agent, acc_machine, instruction)
+    {final_agent, final_machine, reversed_directives} =
+      Enum.reduce(instructions, {agent, machine, []}, fn instruction,
+                                                         {acc_agent, acc_machine, acc_directives} ->
+        {new_agent, new_machine, new_directives} =
+          run_instruction(acc_agent, acc_machine, instruction)
 
-      {new_agent, new_machine, acc_directives ++ new_directives}
-    end)
+        {new_agent, new_machine, Enum.reverse(new_directives) ++ acc_directives}
+      end)
+
+    {final_agent, final_machine, Enum.reverse(reversed_directives)}
   end
 
   defp maybe_auto_transition(machine, false, _initial_state), do: machine

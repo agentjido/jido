@@ -124,11 +124,6 @@ defmodule Jido.Agent.InstanceManager do
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
 
-    children = [
-      {Registry, keys: :unique, name: registry_name(name)},
-      {DynamicSupervisor, strategy: :one_for_one, name: dynamic_supervisor_name(name)}
-    ]
-
     # Store config in persistent_term for fast access
     config = %{
       name: name,
@@ -139,6 +134,12 @@ defmodule Jido.Agent.InstanceManager do
     }
 
     :persistent_term.put({__MODULE__, name}, config)
+
+    children = [
+      {Registry, keys: :unique, name: registry_name(name)},
+      {DynamicSupervisor, strategy: :one_for_one, name: dynamic_supervisor_name(name)},
+      {Jido.Agent.InstanceManager.Cleanup, name}
+    ]
 
     Supervisor.init(children, strategy: :one_for_all)
   end

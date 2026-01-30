@@ -21,10 +21,13 @@ defmodule Jido.Agent.Strategy.Direct do
 
   @impl true
   def cmd(%Agent{} = agent, instructions, _ctx) when is_list(instructions) do
-    Enum.reduce(instructions, {agent, []}, fn instruction, {acc_agent, acc_directives} ->
-      {new_agent, new_directives} = run_instruction(acc_agent, instruction)
-      {new_agent, acc_directives ++ new_directives}
-    end)
+    {final_agent, reversed_directives} =
+      Enum.reduce(instructions, {agent, []}, fn instruction, {acc_agent, acc_directives} ->
+        {new_agent, new_directives} = run_instruction(acc_agent, instruction)
+        {new_agent, Enum.reverse(new_directives) ++ acc_directives}
+      end)
+
+    {final_agent, Enum.reverse(reversed_directives)}
   end
 
   defp run_instruction(agent, %Instruction{} = instruction) do

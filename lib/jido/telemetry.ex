@@ -223,7 +223,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :cmd, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[Agent] Command completed",
       agent_id: metadata[:agent_id],
@@ -234,7 +234,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :cmd, :exception], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[Agent] Command failed",
       agent_id: metadata[:agent_id],
@@ -252,7 +252,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :init, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[Strategy] Initialization completed",
       agent_id: metadata[:agent_id],
@@ -267,7 +267,7 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[Strategy] Initialization failed",
       agent_id: metadata[:agent_id],
@@ -286,7 +286,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :cmd, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[Strategy] Command execution completed",
       agent_id: metadata[:agent_id],
@@ -302,7 +302,7 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[Strategy] Command execution failed",
       agent_id: metadata[:agent_id],
@@ -320,7 +320,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :tick, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[Strategy] Tick completed",
       agent_id: metadata[:agent_id],
@@ -335,7 +335,7 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[Strategy] Tick failed",
       agent_id: metadata[:agent_id],
@@ -357,7 +357,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent_server, :signal, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[AgentServer] Signal processing completed",
       agent_id: metadata[:agent_id],
@@ -373,7 +373,7 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[AgentServer] Signal processing failed",
       agent_id: metadata[:agent_id],
@@ -391,7 +391,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent_server, :directive, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.debug("[AgentServer] Directive execution completed",
       agent_id: metadata[:agent_id],
@@ -407,7 +407,7 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0)
+    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
 
     Logger.warning("[AgentServer] Directive execution failed",
       agent_id: metadata[:agent_id],
@@ -537,5 +537,10 @@ defmodule Jido.Telemetry do
 
         :erlang.raise(kind, reason, stack)
     end
+  end
+
+  # Convert native monotonic time to microseconds for logging
+  defp to_microseconds(native_duration) do
+    System.convert_time_unit(native_duration, :native, :microsecond)
   end
 end

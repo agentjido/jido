@@ -41,29 +41,32 @@ defmodule Jido.Agent.StateOps do
   """
   @spec apply_state_ops(Agent.t(), [struct()]) :: {Agent.t(), [struct()]}
   def apply_state_ops(%Agent{} = agent, effects) do
-    Enum.reduce(effects, {agent, []}, fn
-      %StateOp.SetState{attrs: attrs}, {a, directives} ->
-        new_state = State.merge(a.state, attrs)
-        {%{a | state: new_state}, directives}
+    {final_agent, reversed_directives} =
+      Enum.reduce(effects, {agent, []}, fn
+        %StateOp.SetState{attrs: attrs}, {a, directives} ->
+          new_state = State.merge(a.state, attrs)
+          {%{a | state: new_state}, directives}
 
-      %StateOp.ReplaceState{state: new_state}, {a, directives} ->
-        {%{a | state: new_state}, directives}
+        %StateOp.ReplaceState{state: new_state}, {a, directives} ->
+          {%{a | state: new_state}, directives}
 
-      %StateOp.DeleteKeys{keys: keys}, {a, directives} ->
-        new_state = Map.drop(a.state, keys)
-        {%{a | state: new_state}, directives}
+        %StateOp.DeleteKeys{keys: keys}, {a, directives} ->
+          new_state = Map.drop(a.state, keys)
+          {%{a | state: new_state}, directives}
 
-      %StateOp.SetPath{path: path, value: value}, {a, directives} ->
-        new_state = deep_put_in(a.state, path, value)
-        {%{a | state: new_state}, directives}
+        %StateOp.SetPath{path: path, value: value}, {a, directives} ->
+          new_state = deep_put_in(a.state, path, value)
+          {%{a | state: new_state}, directives}
 
-      %StateOp.DeletePath{path: path}, {a, directives} ->
-        {_, new_state} = pop_in(a.state, path)
-        {%{a | state: new_state}, directives}
+        %StateOp.DeletePath{path: path}, {a, directives} ->
+          {_, new_state} = pop_in(a.state, path)
+          {%{a | state: new_state}, directives}
 
-      %_{} = directive, {a, directives} ->
-        {a, directives ++ [directive]}
-    end)
+        %_{} = directive, {a, directives} ->
+          {a, [directive | directives]}
+      end)
+
+    {final_agent, Enum.reverse(reversed_directives)}
   end
 
   @doc """
