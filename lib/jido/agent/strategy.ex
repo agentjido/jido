@@ -356,7 +356,8 @@ defmodule Jido.Agent.Strategy do
     params =
       case spec && spec[:schema] do
         nil ->
-          atomize_string_keys(instr.params)
+          # No schema - leave keys as-is to prevent atom table exhaustion
+          instr.params
 
         schema ->
           normalize_with_schema(instr.params, schema, instr.action)
@@ -366,11 +367,11 @@ defmodule Jido.Agent.Strategy do
   end
 
   defp normalize_with_schema(params, schema, action) do
-    atomized = atomize_string_keys(params)
-
     cond do
       is_struct(schema) ->
-        case Zoi.parse(schema, atomized) do
+        # Zoi with coerce: true handles string->atom conversion safely
+        # Only schema-defined keys become atoms; unknown keys are stripped
+        case Zoi.parse(schema, params) do
           {:ok, v} ->
             v
 
@@ -379,32 +380,13 @@ defmodule Jido.Agent.Strategy do
         end
 
       is_list(schema) ->
+        # ActionTool preserves unknown keys as strings (atom-safe)
         ActionTool.convert_params_using_schema(params, schema)
 
       true ->
-        atomized
+        # No schema - leave keys as-is to prevent atom table exhaustion
+        params
     end
-  end
-
-  defp atomize_string_keys(%{} = map) do
-    for {k, v} <- map, into: %{} do
-      key =
-        cond do
-          is_atom(k) -> k
-          is_binary(k) -> safe_to_atom(k)
-          true -> k
-        end
-
-      {key, v}
-    end
-  end
-
-  defp atomize_string_keys(other), do: other
-
-  defp safe_to_atom(str) when is_binary(str) do
-    String.to_existing_atom(str)
-  rescue
-    ArgumentError -> String.to_atom(str)
   end
 
   defmacro __using__(_opts) do

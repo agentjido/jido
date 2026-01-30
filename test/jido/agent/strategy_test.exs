@@ -19,7 +19,7 @@ defmodule JidoTest.Agent.StrategyTest do
     @impl true
     def action_spec(:special_action) do
       %{
-        schema: Zoi.object(%{value: Zoi.integer()}),
+        schema: Zoi.object(%{value: Zoi.integer()}, coerce: true),
         doc: "A special action",
         name: "special_action"
       }
@@ -112,7 +112,7 @@ defmodule JidoTest.Agent.StrategyTest do
   end
 
   describe "normalize_instruction/3" do
-    test "atomizes string keys when no action_spec" do
+    test "preserves string keys when no action_spec (atom-safe)" do
       {:ok, _agent} = Agent.new(%{id: "test"})
 
       instruction = %Jido.Instruction{
@@ -123,8 +123,9 @@ defmodule JidoTest.Agent.StrategyTest do
       ctx = %{agent_module: nil, strategy_opts: []}
       normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
 
-      assert normalized.params.foo == "bar"
-      assert normalized.params.nested == %{"key" => "value"}
+      # Keys remain as strings to prevent atom table exhaustion
+      assert normalized.params["foo"] == "bar"
+      assert normalized.params["nested"] == %{"key" => "value"}
     end
 
     test "normalizes with Zoi schema" do
@@ -265,8 +266,8 @@ defmodule JidoTest.Agent.StrategyTest do
     end
   end
 
-  describe "atomize edge cases" do
-    test "handles mixed key types" do
+  describe "atom-safe key handling" do
+    test "preserves mixed key types without atomization" do
       instruction = %Jido.Instruction{
         action: :unknown_action,
         params: %{
@@ -279,8 +280,9 @@ defmodule JidoTest.Agent.StrategyTest do
       ctx = %{agent_module: nil, strategy_opts: []}
       normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
 
+      # Existing atom keys remain atoms, string keys stay strings (atom-safe)
       assert normalized.params.atom_key == "value1"
-      assert normalized.params.string_key == "value2"
+      assert normalized.params["string_key"] == "value2"
       assert normalized.params[123] == "value3"
     end
   end
