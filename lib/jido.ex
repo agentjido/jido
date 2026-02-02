@@ -159,6 +159,66 @@ defmodule Jido do
 
   @type agent_id :: String.t() | atom()
 
+  # Default instance name for scripts/Livebook
+  @default_instance Jido.Default
+
+  @doc """
+  Returns the default Jido instance name.
+
+  Used by `Jido.start/1` for scripts and Livebook quick-start.
+  """
+  @spec default_instance() :: atom()
+  def default_instance, do: @default_instance
+
+  @doc """
+  Start the default Jido instance for scripts and Livebook.
+
+  This is an idempotent convenience function - safe to call multiple times
+  (returns `{:ok, pid}` even if already started).
+
+  ## Examples
+
+      # In a script or Livebook
+      {:ok, _} = Jido.start()
+      {:ok, pid} = Jido.start_agent(Jido.default_instance(), MyAgent)
+
+      # With custom options
+      {:ok, _} = Jido.start(max_tasks: 2000)
+
+  ## Options
+
+  Same as `start_link/1`, but `:name` defaults to `Jido.Default`.
+  """
+  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  def start(opts \\ []) do
+    opts = Keyword.put_new(opts, :name, @default_instance)
+
+    case start_link(opts) do
+      {:ok, pid} -> {:ok, pid}
+      {:error, {:already_started, pid}} -> {:ok, pid}
+      other -> other
+    end
+  end
+
+  @doc """
+  Stop a Jido instance.
+
+  Defaults to stopping the default instance (`Jido.Default`).
+
+  ## Examples
+
+      Jido.stop()
+      Jido.stop(MyApp.Jido)
+
+  """
+  @spec stop(atom()) :: :ok
+  def stop(name \\ @default_instance) do
+    case Process.whereis(name) do
+      nil -> :ok
+      pid -> Supervisor.stop(pid)
+    end
+  end
+
   @doc """
   Starts a Jido instance supervisor.
 

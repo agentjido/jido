@@ -1,10 +1,52 @@
 defmodule Jido.Telemetry do
   @moduledoc """
-  Handles telemetry events for Jido Agent and Strategy operations.
+  Production-ready telemetry for Jido Agent operations.
 
-  This module provides telemetry integration for agent command execution
-  and strategy lifecycle events. It tracks execution time, success/failure
-  rates, and provides debugging insights.
+  Provides structured, scannable logging with intelligent filtering to reduce noise
+  while preserving actionable debugging information.
+
+  ## Log Levels
+
+  The telemetry system uses three effective log levels:
+
+  - **INFO** - Developer narrative for user-facing interactions (request start/stop)
+  - **DEBUG** - Interesting events only (slow operations, signals with directives, errors)
+  - **TRACE** - Fine-grained internal churn (every signal/directive) - opt-in via config
+
+  ## Configuration
+
+  Configure via application environment:
+
+      config :jido, :telemetry,
+        log_level: :debug,                    # :trace | :debug | :info
+        slow_signal_threshold_ms: 10,         # Log signals slower than this
+        slow_directive_threshold_ms: 5,       # Log directives slower than this
+        interesting_signal_types: [           # Always log these signal types
+          "jido.agent.user_request",
+          "jido.tool.result",
+          "jido.llm.done"
+        ],
+        log_prompts: false,                   # Privacy: don't log LLM prompts
+        log_tool_args: :keys_only             # :keys_only | :full | :none
+
+  ## "Interestingness" Filtering
+
+  At DEBUG level, signals are only logged if they are "interesting":
+  - Duration exceeds `slow_signal_threshold_ms`
+  - Produced one or more directives
+  - Signal type is in `interesting_signal_types`
+  - An error occurred
+
+  This reduces log spam from high-frequency internal signals while preserving
+  visibility into operations that matter.
+
+  ## Structured Output
+
+  All log entries include structured metadata for filtering and correlation:
+  - `trace_id`, `span_id` - For distributed tracing
+  - `agent_id`, `agent_module` - Agent identification
+  - `signal_type`, `directive_count`, `directive_types` - What happened
+  - `duration` - Formatted timing (e.g., "12.3ms")
 
   ## Events
 
@@ -32,19 +74,13 @@ defmodule Jido.Telemetry do
   - `[:jido, :agent, :strategy, :tick, :start]` - Strategy tick started
   - `[:jido, :agent, :strategy, :tick, :stop]` - Strategy tick completed
   - `[:jido, :agent, :strategy, :tick, :exception]` - Strategy tick failed
-
-  ## Metadata
-
-  All events include metadata about the agent, action, and strategy:
-  - `:agent_id` - The agent's unique identifier
-  - `:agent_module` - The agent module name
-  - `:strategy` - The strategy module name
-  - `:action` - The action being executed (for cmd events)
-  - `:directive_count` - Number of directives produced (for stop events)
   """
 
   use GenServer
   require Logger
+
+  alias Jido.Telemetry.Config
+  alias Jido.Telemetry.Formatter
 
   @typedoc """
   Supported telemetry event names.
@@ -212,53 +248,80 @@ defmodule Jido.Telemetry do
 
   @doc """
   Handles telemetry events for agent and strategy operations.
+
+  Uses intelligent filtering to reduce noise while preserving actionable information.
+  Events are logged based on "interestingness" criteria configured via `Jido.Telemetry.Config`.
   """
   @spec handle_event(event_name(), measurements(), metadata(), config :: term()) :: :ok
-  def handle_event([:jido, :agent, :cmd, :start], _measurements, metadata, _config) do
-    Logger.debug("[Agent] Command started",
-      agent_id: metadata[:agent_id],
-      agent_module: metadata[:agent_module],
-      action: inspect(metadata[:action])
-    )
+
+  # ---------------------------------------------------------------------------
+  # Agent Command Events
+  # ---------------------------------------------------------------------------
+
+  def handle_event([:jido, :agent, :cmd, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent, :cmd, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
+    duration_ms = Formatter.to_ms(duration)
+    directive_count = metadata[:directive_count] || 0
 
-    Logger.debug("[Agent] Command completed",
-      agent_id: metadata[:agent_id],
-      agent_module: metadata[:agent_module],
-      duration_μs: duration,
-      directive_count: metadata[:directive_count]
-    )
+    if interesting_agent_cmd?(duration_ms, directive_count, metadata) do
+      Logger.debug(
+        fn ->
+          "[agent.cmd] #{format_module(metadata[:agent_module])} " <>
+            "action=#{Formatter.format_action(metadata[:action])} " <>
+            "directives=#{directive_count} " <>
+            "duration=#{Formatter.format_duration(duration)}"
+        end,
+        agent_id: metadata[:agent_id],
+        trace_id: metadata[:trace_id],
+        span_id: metadata[:span_id]
+      )
+    end
+
+    :ok
   end
 
   def handle_event([:jido, :agent, :cmd, :exception], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[Agent] Command failed",
+    Logger.warning(
+      "[agent.cmd.error] #{format_module(metadata[:agent_module])} " <>
+        "action=#{Formatter.format_action(metadata[:action])} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      agent_module: metadata[:agent_module],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      span_id: metadata[:span_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
-  def handle_event([:jido, :agent, :strategy, :init, :start], _measurements, metadata, _config) do
-    Logger.debug("[Strategy] Initialization started",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy]
-    )
+  # ---------------------------------------------------------------------------
+  # Strategy Events
+  # ---------------------------------------------------------------------------
+
+  def handle_event([:jido, :agent, :strategy, :init, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent, :strategy, :init, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.debug("[Strategy] Initialization completed",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration
-    )
+    if Config.trace_enabled?() do
+      Logger.debug(
+        fn ->
+          "[strategy.init] #{format_module(metadata[:strategy])} " <>
+            "duration=#{Formatter.format_duration(duration)}"
+        end,
+        agent_id: metadata[:agent_id],
+        trace_id: metadata[:trace_id]
+      )
+    end
+
+    :ok
   end
 
   def handle_event(
@@ -267,33 +330,40 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[Strategy] Initialization failed",
+    Logger.warning(
+      "[strategy.init.error] #{format_module(metadata[:strategy])} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
-  def handle_event([:jido, :agent, :strategy, :cmd, :start], _measurements, metadata, _config) do
-    Logger.debug("[Strategy] Command execution started",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      instruction_count: metadata[:instruction_count]
-    )
+  def handle_event([:jido, :agent, :strategy, :cmd, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent, :strategy, :cmd, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
+    duration_ms = Formatter.to_ms(duration)
+    directive_count = metadata[:directive_count] || 0
 
-    Logger.debug("[Strategy] Command execution completed",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration,
-      directive_count: metadata[:directive_count]
-    )
+    if interesting_strategy_cmd?(duration_ms, directive_count) do
+      Logger.debug(
+        fn ->
+          "[strategy.cmd] #{format_module(metadata[:strategy])} " <>
+            "directives=#{directive_count} " <>
+            "duration=#{Formatter.format_duration(duration)}"
+        end,
+        agent_id: metadata[:agent_id],
+        trace_id: metadata[:trace_id]
+      )
+    end
+
+    :ok
   end
 
   def handle_event(
@@ -302,31 +372,39 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[Strategy] Command execution failed",
+    Logger.warning(
+      "[strategy.cmd.error] #{format_module(metadata[:strategy])} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
-  def handle_event([:jido, :agent, :strategy, :tick, :start], _measurements, metadata, _config) do
-    Logger.debug("[Strategy] Tick started",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy]
-    )
+  def handle_event([:jido, :agent, :strategy, :tick, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent, :strategy, :tick, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
+    duration_ms = Formatter.to_ms(duration)
 
-    Logger.debug("[Strategy] Tick completed",
-      agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration
-    )
+    # Only log slow ticks - ticks are high frequency
+    if duration_ms > Config.slow_signal_threshold_ms() do
+      Logger.debug(
+        fn ->
+          "[strategy.tick] #{format_module(metadata[:strategy])} " <>
+            "duration=#{Formatter.format_duration(duration)} (slow)"
+        end,
+        agent_id: metadata[:agent_id],
+        trace_id: metadata[:trace_id]
+      )
+    end
+
+    :ok
   end
 
   def handle_event(
@@ -335,36 +413,47 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[Strategy] Tick failed",
+    Logger.warning(
+      "[strategy.tick.error] #{format_module(metadata[:strategy])} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      strategy: metadata[:strategy],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
   # ---------------------------------------------------------------------------
-  # AgentServer Event Handlers
+  # AgentServer Signal Events - The main source of log noise
   # ---------------------------------------------------------------------------
 
-  def handle_event([:jido, :agent_server, :signal, :start], _measurements, metadata, _config) do
-    Logger.debug("[AgentServer] Signal processing started",
-      agent_id: metadata[:agent_id],
-      signal_type: metadata[:signal_type]
-    )
+  def handle_event([:jido, :agent_server, :signal, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent_server, :signal, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
+    duration_ms = Formatter.to_ms(duration)
+    directive_count = metadata[:directive_count] || 0
+    signal_type = metadata[:signal_type]
 
-    Logger.debug("[AgentServer] Signal processing completed",
-      agent_id: metadata[:agent_id],
-      signal_type: metadata[:signal_type],
-      duration_μs: duration,
-      directive_count: metadata[:directive_count]
-    )
+    cond do
+      # At trace level, log everything
+      Config.trace_enabled?() ->
+        log_signal_stop(metadata, duration, directive_count)
+
+      # At debug level, only log "interesting" signals
+      Config.debug_enabled?() and interesting_signal?(signal_type, duration_ms, directive_count, metadata) ->
+        log_signal_stop(metadata, duration, directive_count)
+
+      # Otherwise, stay silent
+      true ->
+        :ok
+    end
+
+    :ok
   end
 
   def handle_event(
@@ -373,32 +462,47 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[AgentServer] Signal processing failed",
+    Logger.warning(
+      "[signal.error] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      signal_type: metadata[:signal_type],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      span_id: metadata[:span_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
-  def handle_event([:jido, :agent_server, :directive, :start], _measurements, metadata, _config) do
-    Logger.debug("[AgentServer] Directive execution started",
-      agent_id: metadata[:agent_id],
-      directive_type: metadata[:directive_type]
-    )
+  # ---------------------------------------------------------------------------
+  # AgentServer Directive Events
+  # ---------------------------------------------------------------------------
+
+  def handle_event([:jido, :agent_server, :directive, :start], _measurements, _metadata, _config) do
+    :ok
   end
 
   def handle_event([:jido, :agent_server, :directive, :stop], measurements, metadata, _config) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
+    duration_ms = Formatter.to_ms(duration)
+    directive_type = metadata[:directive_type]
 
-    Logger.debug("[AgentServer] Directive execution completed",
-      agent_id: metadata[:agent_id],
-      directive_type: metadata[:directive_type],
-      duration_μs: duration,
-      result: metadata[:result]
-    )
+    cond do
+      # At trace level, log everything
+      Config.trace_enabled?() ->
+        log_directive_stop(metadata, duration)
+
+      # At debug level, only log slow or interesting directives
+      Config.debug_enabled?() and interesting_directive?(directive_type, duration_ms, metadata) ->
+        log_directive_stop(metadata, duration)
+
+      # Otherwise, stay silent
+      true ->
+        :ok
+    end
+
+    :ok
   end
 
   def handle_event(
@@ -407,23 +511,108 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    duration = Map.get(measurements, :duration, 0) |> to_microseconds()
+    duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning("[AgentServer] Directive execution failed",
+    Logger.warning(
+      "[directive.error] type=#{metadata[:directive_type]} " <>
+        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+        "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      directive_type: metadata[:directive_type],
-      duration_μs: duration,
-      error: inspect(metadata[:error])
+      trace_id: metadata[:trace_id],
+      span_id: metadata[:span_id],
+      stacktrace: metadata[:stacktrace]
     )
   end
 
   def handle_event([:jido, :agent_server, :queue, :overflow], measurements, metadata, _config) do
-    Logger.warning("[AgentServer] Queue overflow",
+    Logger.warning(
+      "[queue.overflow] signal_type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
+        "queue_size=#{measurements[:queue_size]}",
       agent_id: metadata[:agent_id],
-      signal_type: metadata[:signal_type],
-      queue_size: measurements[:queue_size]
+      trace_id: metadata[:trace_id]
     )
   end
+
+  # ---------------------------------------------------------------------------
+  # Private: Logging Helpers
+  # ---------------------------------------------------------------------------
+
+  defp log_signal_stop(metadata, duration, directive_count) do
+    Logger.debug(
+      fn ->
+        "[signal] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
+          "directives=#{directive_count} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
+      agent_id: metadata[:agent_id],
+      trace_id: metadata[:trace_id],
+      span_id: metadata[:span_id]
+    )
+  end
+
+  defp log_directive_stop(metadata, duration) do
+    Logger.debug(
+      fn ->
+        "[directive] type=#{metadata[:directive_type]} " <>
+          "result=#{metadata[:result]} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
+      agent_id: metadata[:agent_id],
+      trace_id: metadata[:trace_id],
+      span_id: metadata[:span_id]
+    )
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private: Interestingness Checks
+  # ---------------------------------------------------------------------------
+
+  defp interesting_signal?(signal_type, duration_ms, directive_count, metadata) do
+    # A signal is interesting if any of these are true:
+    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+    has_directives = directive_count > 0
+    is_interesting_type = Config.interesting_signal_type?(to_string(signal_type))
+    has_error = metadata[:error] != nil
+
+    is_slow or has_directives or is_interesting_type or has_error
+  end
+
+  defp interesting_directive?(directive_type, duration_ms, metadata) do
+    is_slow = duration_ms > Config.slow_directive_threshold_ms()
+    has_error = metadata[:error] != nil
+
+    # Some directive types are always interesting
+    interesting_types = ["Tool", "LLM", "Await", "Spawn"]
+    is_interesting_type = directive_type in interesting_types
+
+    is_slow or has_error or is_interesting_type
+  end
+
+  defp interesting_agent_cmd?(duration_ms, directive_count, metadata) do
+    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+    has_directives = directive_count > 0
+    has_error = metadata[:error] != nil
+
+    is_slow or has_directives or has_error
+  end
+
+  defp interesting_strategy_cmd?(duration_ms, directive_count) do
+    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+    has_directives = directive_count > 0
+
+    is_slow or has_directives
+  end
+
+  defp format_module(nil), do: "unknown"
+
+  defp format_module(module) when is_atom(module) do
+    case to_string(module) do
+      "Elixir." <> rest -> rest
+      other -> other
+    end
+  end
+
+  defp format_module(other), do: Formatter.safe_inspect(other, 50)
 
   @doc """
   Executes an agent command while emitting telemetry events.
@@ -539,8 +728,4 @@ defmodule Jido.Telemetry do
     end
   end
 
-  # Convert native monotonic time to microseconds for logging
-  defp to_microseconds(native_duration) do
-    System.convert_time_unit(native_duration, :native, :microsecond)
-  end
 end

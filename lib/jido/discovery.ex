@@ -89,11 +89,6 @@ defmodule Jido.Discovery do
     Task.async(fn ->
       catalog = build_catalog()
       :persistent_term.put(@catalog_key, catalog)
-
-      Logger.info(
-        "[Jido.Discovery] Catalog initialized with #{count_components(catalog)} components"
-      )
-
       :ok
     end)
   end
@@ -105,10 +100,8 @@ defmodule Jido.Discovery do
   """
   @spec refresh() :: :ok
   def refresh do
-    Logger.info("[Jido.Discovery] Refreshing catalog...")
     catalog = build_catalog()
     :persistent_term.put(@catalog_key, catalog)
-    Logger.info("[Jido.Discovery] Catalog refreshed with #{count_components(catalog)} components")
     :ok
   end
 
@@ -238,13 +231,6 @@ defmodule Jido.Discovery do
         demos: discover_components(:__jido_demo__)
       }
     }
-  end
-
-  defp count_components(catalog) do
-    catalog.components
-    |> Map.values()
-    |> Enum.map(&length/1)
-    |> Enum.sum()
   end
 
   defp discover_components(metadata_fun) do

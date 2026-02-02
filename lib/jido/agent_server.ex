@@ -604,7 +604,6 @@ defmodule Jido.AgentServer do
 
     state = state.lifecycle.mod.init(lifecycle_opts, state)
 
-    Logger.debug("AgentServer #{state.id} initialized, status: idle")
     {:noreply, State.set_status(state, :idle)}
   end
 
@@ -815,7 +814,6 @@ defmodule Jido.AgentServer do
       end
     end)
 
-    Logger.debug("AgentServer #{state.id} terminating: #{inspect(reason)}")
     :ok
   end
 
