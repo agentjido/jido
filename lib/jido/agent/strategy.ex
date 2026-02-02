@@ -412,3 +412,9 @@ defmodule Jido.Agent.Strategy do
     end
   end
 end
+
+defimpl Inspect, for: Jido.Agent.Strategy.Snapshot do
+  def inspect(snapshot, _opts) do
+    "#Snapshot<:#{snapshot.status} done?=#{snapshot.done?}>"
+  end
+end

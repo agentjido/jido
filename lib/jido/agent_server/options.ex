@@ -71,7 +71,12 @@ defmodule Jido.AgentServer.Options do
                 |> Zoi.default(:infinity),
               persistence:
                 Zoi.any(description: "Persistence config [store: {Module, opts}]")
-                |> Zoi.optional()
+                |> Zoi.optional(),
+
+              # Debug mode
+              debug:
+                Zoi.boolean(description: "Enable debug mode with event buffer")
+                |> Zoi.default(false)
             },
             coerce: true
           )

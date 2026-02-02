@@ -111,7 +111,7 @@ defmodule JidoTest.AwaitTest do
       {:ok, pid} = AgentServer.start_link(agent: AwaitAgent, id: "await-timeout", jido: jido)
 
       result = Await.completion(pid, 50)
-      assert {:error, :timeout} = result
+      assert {:error, {:timeout, _details}} = result
 
       GenServer.stop(pid)
     end

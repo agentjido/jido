@@ -53,7 +53,7 @@ defmodule JidoTest.JidoTest do
       {:ok, pid} = Jido.start_agent(jido, Minimal, id: "await-delegate-test")
 
       result = Jido.await(pid, 50)
-      assert {:error, :timeout} = result
+      assert {:error, {:timeout, _details}} = result
     end
 
     test "await_all/3 delegates to Jido.Await.all", %{jido: jido} do

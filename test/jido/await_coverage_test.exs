@@ -88,7 +88,7 @@ defmodule JidoTest.AwaitCoverageTest do
       AgentServer.cast(pid, signal)
 
       result = Await.completion(pid, 50)
-      assert {:error, :timeout} = result
+      assert {:error, {:timeout, _details}} = result
 
       GenServer.stop(pid)
     end

@@ -86,4 +86,36 @@ defmodule Jido.AgentServer.Status do
   @doc "Returns strategy-specific details from the snapshot."
   @spec details(t()) :: map()
   def details(%__MODULE__{snapshot: s}), do: s.details
+
+  @doc "Returns the current iteration count from snapshot details."
+  @spec iteration(t()) :: non_neg_integer() | nil
+  def iteration(%__MODULE__{snapshot: s}), do: s.details[:iteration]
+
+  @doc "Returns the termination reason (e.g., :final_answer, :max_iterations, :error)."
+  @spec termination_reason(t()) :: atom() | nil
+  def termination_reason(%__MODULE__{snapshot: s}), do: s.details[:termination_reason]
+
+  @doc "Returns the directive queue length."
+  @spec queue_length(t()) :: non_neg_integer()
+  def queue_length(%__MODULE__{snapshot: s}), do: s.details[:queue_length] || 0
+
+  @doc "Returns active request tuples [{id, status}]."
+  @spec active_requests(t()) :: [{String.t(), atom()}]
+  def active_requests(%__MODULE__{snapshot: s}), do: s.details[:active_requests] || []
+end
+
+defimpl Inspect, for: Jido.AgentServer.Status do
+  def inspect(status, _opts) do
+    parts =
+      [
+        status.agent_id,
+        ":#{status.snapshot.status}",
+        status.snapshot.details[:iteration] && "iter=#{status.snapshot.details[:iteration]}",
+        "queue=#{status.snapshot.details[:queue_length] || 0}"
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join(" ")
+
+    "#Status<#{parts}>"
+  end
 end
