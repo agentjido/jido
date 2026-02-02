@@ -35,6 +35,7 @@ defmodule Jido.Telemetry.Formatter do
   """
   @spec format_duration(integer() | nil) :: String.t()
   def format_duration(nil), do: "0μs"
+
   def format_duration(native_time) when is_integer(native_time) do
     microseconds = System.convert_time_unit(native_time, :native, :microsecond)
 
@@ -69,6 +70,7 @@ defmodule Jido.Telemetry.Formatter do
   """
   @spec to_ms(integer() | nil) :: number()
   def to_ms(nil), do: 0
+
   def to_ms(native_time) when is_integer(native_time) do
     microseconds = System.convert_time_unit(native_time, :native, :microsecond)
     ms = microseconds / 1_000
@@ -105,6 +107,7 @@ defmodule Jido.Telemetry.Formatter do
   @spec format_metadata(map() | nil, keyword()) :: String.t()
   def format_metadata(metadata, opts \\ [])
   def format_metadata(nil, _opts), do: ""
+
   def format_metadata(metadata, opts) when is_map(metadata) do
     max_value_length = Keyword.get(opts, :max_value_length, @default_value_max_length)
 
@@ -139,6 +142,7 @@ defmodule Jido.Telemetry.Formatter do
   end
 
   defp truncate_string(str, max_length) when byte_size(str) <= max_length, do: str
+
   defp truncate_string(str, max_length) do
     String.slice(str, 0, max_length - 3) <> "..."
   end
@@ -157,6 +161,7 @@ defmodule Jido.Telemetry.Formatter do
   """
   @spec summarize_directives(list()) :: map()
   def summarize_directives(nil), do: %{}
+
   def summarize_directives(directives) when is_list(directives) do
     directives
     |> Enum.map(&extract_directive_type/1)
@@ -185,6 +190,7 @@ defmodule Jido.Telemetry.Formatter do
   @spec format_directive_types(map()) :: String.t()
   def format_directive_types(nil), do: ""
   def format_directive_types(summary) when map_size(summary) == 0, do: ""
+
   def format_directive_types(summary) when is_map(summary) do
     summary
     |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
@@ -307,6 +313,7 @@ defmodule Jido.Telemetry.Formatter do
   """
   @spec extract_keys(map() | nil) :: list(atom() | String.t())
   def extract_keys(nil), do: []
+
   def extract_keys(map) when is_map(map) do
     map |> Map.keys() |> Enum.sort()
   end

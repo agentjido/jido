@@ -445,7 +445,8 @@ defmodule Jido.Telemetry do
         log_signal_stop(metadata, duration, directive_count)
 
       # At debug level, only log "interesting" signals
-      Config.debug_enabled?() and interesting_signal?(signal_type, duration_ms, directive_count, metadata) ->
+      Config.debug_enabled?() and
+          interesting_signal?(signal_type, duration_ms, directive_count, metadata) ->
         log_signal_stop(metadata, duration, directive_count)
 
       # Otherwise, stay silent
@@ -727,5 +728,4 @@ defmodule Jido.Telemetry do
         :erlang.raise(kind, reason, stack)
     end
   end
-
 end
