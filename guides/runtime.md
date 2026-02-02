@@ -131,6 +131,60 @@ Jido.cancel(pid)                    # Cancel a running agent
 
 For detailed await patterns, fan-out coordination, and testing without `Process.sleep`, see the [Await & Coordination](await.md) guide.
 
+### Timeout Diagnostics
+
+When `await` times out, you get a diagnostic map to help troubleshoot:
+
+```elixir
+case Jido.await(pid, 5_000) do
+  {:ok, result} -> 
+    result
+  {:error, {:timeout, diag}} ->
+    Logger.warning("Agent await timed out", diag)
+    # diag includes: :hint, :server_status, :queue_length, :iteration, :waited_ms
+    {:error, :timeout}
+end
+```
+
+Use the `:hint` and `:server_status` to understand why the agent hasn't completed.
+
+## Debug Mode
+
+AgentServer can record recent events in an in-memory buffer to help diagnose agent behavior without configuring telemetry.
+
+### Enable Debug Mode
+
+At start:
+
+```elixir
+{:ok, pid} = MyApp.Jido.start_agent(MyAgent, debug: true)
+# or
+{:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent, debug: true)
+```
+
+Or toggle at runtime:
+
+```elixir
+:ok = Jido.AgentServer.set_debug(pid, true)
+```
+
+### Retrieve Events
+
+```elixir
+{:ok, events} = Jido.AgentServer.recent_events(pid, limit: 20)
+
+Enum.each(events, fn e ->
+  IO.inspect({e.type, e.data}, label: "event")
+end)
+```
+
+Events are returned newest-first. Each event has:
+- `:at` - monotonic timestamp in milliseconds
+- `:type` - event type (`:signal_received`, `:directive_started`)
+- `:data` - event-specific details
+
+The buffer holds up to 50 events. This is a development aid, not an audit log.
+
 ## Related
 
 - [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle

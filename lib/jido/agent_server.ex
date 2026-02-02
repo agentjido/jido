@@ -52,6 +52,7 @@ defmodule Jido.AgentServer do
   - `:parent` - Parent reference for hierarchy
   - `:on_parent_death` - Behavior when parent dies (`:stop`, `:continue`, `:emit_orphan`)
   - `:spawn_fun` - Custom function for spawning children
+  - `:debug` - Enable debug mode with event buffer (default: `false`)
 
   ## Agent Resolution
 
@@ -107,6 +108,48 @@ defmodule Jido.AgentServer do
   **Do NOT** use `{:stop, ...}` from DirectiveExec for normal completion—this
   causes race conditions with async work and skips lifecycle hooks.
   See `Jido.AgentServer.DirectiveExec` for details.
+
+  ## Debugging
+
+  AgentServer can record recent events in an in-memory ring buffer (max 50)
+  to help diagnose what happened inside a running agent.
+
+  Enable at start:
+
+      {:ok, pid} = AgentServer.start_link(agent: MyAgent, debug: true)
+
+  Or toggle at runtime:
+
+      :ok = AgentServer.set_debug(pid, true)
+
+  Retrieve recent events (newest-first):
+
+      {:ok, events} = AgentServer.recent_events(pid, limit: 10)
+
+  Each event has the shape `%{at: monotonic_ms, type: atom(), data: map()}`.
+  Event types include `:signal_received` and `:directive_started`.
+
+  Returns `{:error, :debug_not_enabled}` if debug mode is off.
+
+  > **Note:** This is a development aid, not an audit log. Events are not
+  > persisted and the buffer has fixed capacity.
+
+  ## Timeout Diagnostics
+
+  When `await_completion/2` times out, it returns a diagnostic map:
+
+      {:error, {:timeout, %{
+        hint: "Agent is idle but await_completion is blocking",
+        server_status: :idle,
+        queue_length: 0,
+        iteration: nil,
+        waited_ms: 5000
+      }}}
+
+  Use this to understand why the agent hasn't completed:
+  - `:idle` with empty queue → agent finished but state doesn't match await condition
+  - `:waiting` → strategy is waiting (e.g., for LLM response)
+  - `:running` → still processing directives
   """
 
   use GenServer
