@@ -130,3 +130,9 @@ Jido.cancel(pid)                    # Cancel a running agent
 ```
 
 For detailed await patterns, fan-out coordination, and testing without `Process.sleep`, see the [Await & Coordination](await.md) guide.
+
+## Related
+
+- [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle
+- [Worker Pools](worker-pools.md) — Pre-warmed agent pools for throughput
+- [Await & Coordination](await.md) — Waiting on agent completion

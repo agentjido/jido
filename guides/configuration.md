@@ -136,18 +136,20 @@ config :my_app, MyApp.Jido,
 
 ```elixir
 # Simple call - handles checkout/checkin automatically
-{:ok, result} = Jido.AgentPool.call(MyApp.Jido, :fast_search, signal)
+{:ok, result} = Jido.Agent.WorkerPool.call(MyApp.Jido, :fast_search, signal)
 
 # Transaction-style for multiple operations
-Jido.AgentPool.with_agent(MyApp.Jido, :fast_search, fn pid ->
+Jido.Agent.WorkerPool.with_agent(MyApp.Jido, :fast_search, fn pid ->
   Jido.AgentServer.call(pid, signal1)
   Jido.AgentServer.call(pid, signal2)
 end)
 
 # Check pool status
-status = Jido.AgentPool.status(MyApp.Jido, :fast_search)
+status = Jido.Agent.WorkerPool.status(MyApp.Jido, :fast_search)
 # => %{state: :ready, available: 5, overflow: 0, checked_out: 3}
 ```
+
+See [Worker Pools](worker-pools.md) for detailed pool configuration and usage patterns.
 
 ### Pool State Semantics
 
@@ -164,7 +166,7 @@ Configure timeouts based on your workload:
 Jido.AgentServer.call(pid, signal, 10_000)
 
 # Pool checkout timeout
-Jido.AgentPool.call(MyApp.Jido, :pool, signal, timeout: 10_000)
+Jido.Agent.WorkerPool.call(MyApp.Jido, :pool, signal, timeout: 10_000)
 ```
 
 ### Graceful Shutdown
@@ -304,6 +306,8 @@ See [Testing](testing.md) for more patterns.
 
 ## Related
 
-- [Runtime](runtime.md) - AgentServer and process-based execution
-- [Testing](testing.md) - Testing patterns and best practices
-- [Strategies](strategies.md) - Execution strategies configuration
+- [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle
+- [Worker Pools](worker-pools.md) — Pre-warmed agent pools for throughput
+- [Runtime](runtime.md) — AgentServer and process-based execution
+- [Testing](testing.md) — Testing patterns and best practices
+- [Strategies](strategies.md) — Execution strategies configuration

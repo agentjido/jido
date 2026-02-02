@@ -1,22 +1,35 @@
-# Storage
+# Persistence & Storage
 
-**After:** Your agents can hibernate to persistent storage and thaw on demand, with threads preserved as journals.
+**After:** Your agents can survive restarts, hibernate on idle, and preserve conversation history.
 
 ```elixir
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
-    storage: {Jido.Storage.ETS, table: :my_storage}
+    storage: {Jido.Storage.File, path: "priv/jido/storage"}
 end
 
-# Hibernate an agent (flushes thread, writes checkpoint)
+# Manual: Hibernate an agent (flushes thread, writes checkpoint)
 :ok = MyApp.Jido.hibernate(agent)
 
-# Thaw an agent (loads checkpoint, rehydrates thread)
+# Manual: Thaw an agent (loads checkpoint, rehydrates thread)
 {:ok, agent} = MyApp.Jido.thaw(MyAgent, "user-123")
+
+# Automatic: InstanceManager hibernates on idle, thaws on demand
+{:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123")
 ```
 
-This guide covers Jido Storage: the unified persistence layer for agent checkpoints and thread journals.
+This guide covers Jido's unified persistence system: checkpoints, thread journals, manual and automatic lifecycle management.
+
+## Choosing Your Persistence Model
+
+| Approach | When to Use | API |
+|----------|-------------|-----|
+| **Manual** | Explicit control over when to persist | `MyApp.Jido.hibernate/1`, `thaw/2` |
+| **Automatic** | Idle-based lifecycle for per-user/entity agents | `InstanceManager.get/3` with `idle_timeout` |
+| **None** | Stateless agents, cheap rebuilds, short-lived tasks | Skip storage config |
+
+Both manual and automatic approaches use the same underlying `Jido.Storage` behaviour.
 
 ## Overview
 
@@ -767,15 +780,119 @@ For now, consider periodic cleanup in your domain logic.
 | **Optimistic concurrency** | `expected_rev` option in `append_thread` — adapter rejects if current rev doesn't match |
 | **Thread memory bloat** | Never persist full thread in checkpoint; future: `load_thread_tail` for bounded loading |
 
-## Migration from Agent.Persistence
+## Automatic Lifecycle with InstanceManager
 
-If you're migrating from the older `Jido.Agent.Persistence` API:
+For per-user or per-entity agents, `Jido.Agent.InstanceManager` provides automatic hibernate/thaw based on idle timeouts.
+
+### Configuration
+
+```elixir
+# In your supervision tree
+children = [
+  Jido.Agent.InstanceManager.child_spec(
+    name: :sessions,
+    agent: MyApp.SessionAgent,
+    idle_timeout: :timer.minutes(15),
+    storage: {Jido.Storage.File, path: "priv/sessions"}
+  )
+]
+```
+
+### Lifecycle Flow
+
+1. **Get/Start**: `InstanceManager.get/3` looks up by key in Registry
+2. **Thaw**: If not running but storage exists, agent is restored via `thaw`
+3. **Fresh**: If no stored checkpoint, starts a fresh agent
+4. **Attach**: Callers track interest via `AgentServer.attach/1`
+5. **Idle**: When all attachments detach, idle timer starts
+6. **Hibernate**: On timeout, agent is persisted via `hibernate`, then process stops
+
+```elixir
+# Get or start an agent (thaws if hibernated)
+{:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123")
+
+# Track this caller's interest
+:ok = Jido.AgentServer.attach(pid)
+
+# When done, detach (starts idle timer if no other attachments)
+:ok = Jido.AgentServer.detach(pid)
+```
+
+### Example: Session Agent with Auto-Hibernate
+
+```elixir
+defmodule MyApp.SessionAgent do
+  use Jido.Agent,
+    name: "session_agent",
+    schema: [
+      user_id: [type: :string, required: true],
+      cart: [type: {:list, :map}, default: []]
+    ]
+
+  @impl true
+  def checkpoint(agent, _ctx) do
+    thread = agent.state[:__thread__]
+    {:ok, %{
+      version: 1,
+      agent_module: __MODULE__,
+      id: agent.id,
+      state: Map.drop(agent.state, [:__thread__]),
+      thread: thread && %{id: thread.id, rev: thread.rev}
+    }}
+  end
+
+  @impl true
+  def restore(data, _ctx) do
+    {:ok, agent} = new(id: data.id)
+    {:ok, %{agent | state: Map.merge(agent.state, data.state)}}
+  end
+end
+```
+
+Usage with InstanceManager:
+
+```elixir
+# Start session (or resume if hibernated)
+{:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123",
+  initial_state: %{user_id: "user-123"}
+)
+
+# Process requests - state persists on idle
+Jido.AgentServer.call(pid, Signal.new!("cart.add", %{item: "widget"}))
+
+# After app restart, agent resumes from last checkpoint
+{:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123")
+```
+
+## When NOT to Persist
+
+Skip persistence when:
+
+- **Agents are stateless** — they fetch state from external sources on start
+- **State is cheap to rebuild** — re-running init is faster than I/O
+- **Short-lived workers** — task duration < hibernate overhead
+- **Sensitive data** — secrets shouldn't hit disk/cache
+- **High-churn agents** — frequent start/stop makes persistence overhead costly
+
+```elixir
+# Fire-and-forget task agents (no storage config)
+Jido.Agent.InstanceManager.child_spec(
+  name: :tasks,
+  agent: MyApp.TaskAgent,
+  idle_timeout: :timer.seconds(30)
+  # No storage: - agent dies on idle, no restore
+)
+```
+
+## Migration from Legacy API
+
+If migrating from the older `Jido.Agent.Persistence` / `Jido.Agent.Store` API:
 
 | Old API | New API |
 |---------|---------|
 | `Jido.Agent.Persistence.hibernate/4` | `MyApp.Jido.hibernate/1` or `Jido.Persist.hibernate/2` |
 | `Jido.Agent.Persistence.thaw/3` | `MyApp.Jido.thaw/2` or `Jido.Persist.thaw/3` |
-| `Jido.Agent.Store` behaviour | `Jido.Storage` behaviour |
+| `Jido.Agent.Store` behaviour (3 callbacks) | `Jido.Storage` behaviour (6 callbacks) |
 | `dump/2` callback | `checkpoint/2` callback |
 | `load/2` callback | `restore/2` callback |
 
@@ -791,16 +908,15 @@ Key differences:
 | Question | Answer |
 |----------|--------|
 | **Configuration?** | `use Jido, otp_app: :my_app, storage: {Adapter, opts}` |
-| **API?** | `MyApp.Jido.hibernate(agent)` / `MyApp.Jido.thaw(MyAgent, key)` |
+| **Manual API?** | `MyApp.Jido.hibernate(agent)` / `thaw(MyAgent, key)` |
+| **Automatic API?** | `InstanceManager.get(:pool, key)` with `idle_timeout` |
 | **Default?** | `Jido.Storage.ETS` (ephemeral) |
 | **Production?** | Implement `Jido.Storage` behaviour with Ecto/Ash |
 | **Key invariant?** | Never persist full thread in checkpoint; use pointer |
 
-One storage adapter per Jido instance. Simple primitives—you compose with your backend.
-
 ## Related
 
-- [Persistence](persistence.md) — Legacy persistence with InstanceManager
 - [Agents](agents.md) — Agent module documentation
 - [Runtime](runtime.md) — AgentServer and process-based execution
 - [Configuration](configuration.md) — Jido instance configuration
+- [Worker Pools](worker-pools.md) — Pre-warmed agent pools for throughput

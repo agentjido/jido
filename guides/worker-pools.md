@@ -490,5 +490,6 @@ agent_pools: [
 ## Related
 
 - [Configuration](configuration.md) — Instance setup and pool configuration
+- [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle
 - [Runtime](runtime.md) — AgentServer process model
 - [Observability](observability-intro.md) — Monitoring and telemetry
