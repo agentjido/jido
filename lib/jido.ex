@@ -76,9 +76,15 @@ defmodule Jido do
   """
   defmacro __using__(opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
+    storage = Keyword.get(opts, :storage, {Jido.Storage.ETS, [table: :jido_storage]})
 
     quote location: :keep do
       @otp_app unquote(otp_app)
+      @jido_storage Jido.Storage.normalize_storage(unquote(Macro.escape(storage)))
+
+      @doc "Returns the storage configuration for this Jido instance."
+      @spec __jido_storage__() :: {module(), keyword()}
+      def __jido_storage__, do: @jido_storage
 
       @doc false
       def child_spec(init_arg \\ []) do
@@ -154,6 +160,18 @@ defmodule Jido do
       @doc "Returns the TaskSupervisor name for this Jido instance."
       @spec task_supervisor_name() :: atom()
       def task_supervisor_name, do: Jido.task_supervisor_name(__MODULE__)
+
+      @doc "Hibernate an agent to storage."
+      @spec hibernate(Jido.Agent.t()) :: :ok | {:error, term()}
+      def hibernate(agent) do
+        Jido.Persist.hibernate(__jido_storage__(), agent)
+      end
+
+      @doc "Thaw an agent from storage."
+      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+      def thaw(agent_module, key) do
+        Jido.Persist.thaw(__jido_storage__(), agent_module, key)
+      end
     end
   end
 
@@ -379,6 +397,22 @@ defmodule Jido do
     agent_supervisor_name(jido_instance)
     |> DynamicSupervisor.count_children()
     |> Map.get(:active, 0)
+  end
+
+  # ---------------------------------------------------------------------------
+  # Persistence
+  # ---------------------------------------------------------------------------
+
+  @doc "Hibernate an agent using the given Jido instance."
+  @spec hibernate(atom(), Jido.Agent.t()) :: :ok | {:error, term()}
+  def hibernate(jido_instance, agent) when is_atom(jido_instance) do
+    Jido.Persist.hibernate(jido_instance, agent)
+  end
+
+  @doc "Thaw an agent using the given Jido instance."
+  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+  def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
+    Jido.Persist.thaw(jido_instance, agent_module, key)
   end
 
   # ---------------------------------------------------------------------------

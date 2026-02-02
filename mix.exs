@@ -96,6 +96,7 @@ defmodule Jido.MixProject do
           "guides/testing.md",
           "guides/configuration.md",
           "guides/persistence.md",
+          "guides/storage.md",
           "guides/worker-pools.md",
           "guides/scheduling.md"
         ],
@@ -150,6 +151,7 @@ defmodule Jido.MixProject do
         {"guides/testing.md", title: "Testing"},
         {"guides/configuration.md", title: "Configuration"},
         {"guides/persistence.md", title: "Persistence"},
+        {"guides/storage.md", title: "Storage"},
         {"guides/worker-pools.md", title: "Worker Pools"},
         {"guides/scheduling.md", title: "Scheduling"},
 
@@ -232,6 +234,12 @@ defmodule Jido.MixProject do
           Jido.Observe.NoopTracer,
           Jido.Observe.SpanCtx,
           Jido.Telemetry
+        ],
+        Storage: [
+          Jido.Storage,
+          Jido.Storage.ETS,
+          Jido.Storage.File,
+          Jido.Persist
         ],
         Utilities: [
           Jido.Discovery,

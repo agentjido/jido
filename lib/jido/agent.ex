@@ -293,13 +293,64 @@ defmodule Jido.Agent do
   """
   @callback signal_routes() :: [Jido.Signal.Router.route_spec()]
 
-  @optional_callbacks [on_before_cmd: 2, on_after_cmd: 3, signal_routes: 0]
+  @doc """
+  Serializes the agent for persistence.
+
+  Called by `Jido.Persist.hibernate/2` before writing to storage.
+  The returned data should NOT include the full Thread - only a pointer.
+
+  If not implemented, a default serialization is used that:
+  - Excludes `:__thread__` from state
+  - Stores thread pointer as `%{id: thread.id, rev: thread.rev}`
+
+  ## Parameters
+
+  - `agent` - The agent to serialize
+  - `ctx` - Context map (may contain jido instance, options)
+
+  ## Returns
+
+  - `{:ok, serializable_data}` - Data to persist
+  - `{:error, reason}` - Serialization failed
+  """
+  @callback checkpoint(agent :: t(), ctx :: map()) :: {:ok, map()} | {:error, term()}
+
+  @doc """
+  Restores an agent from persisted data.
+
+  Called by `Jido.Persist.thaw/3` after loading from storage.
+  The Thread is reattached separately by Persist after restore.
+
+  If not implemented, a default restoration is used that:
+  - Creates a new agent with the persisted id
+  - Merges the persisted state
+
+  ## Parameters
+
+  - `data` - The persisted data (from checkpoint/2)
+  - `ctx` - Context map (may contain jido instance, options)
+
+  ## Returns
+
+  - `{:ok, agent}` - Restored agent (without thread attached)
+  - `{:error, reason}` - Restoration failed
+  """
+  @callback restore(data :: map(), ctx :: map()) :: {:ok, t()} | {:error, term()}
+
+  @optional_callbacks [
+    on_before_cmd: 2,
+    on_after_cmd: 3,
+    signal_routes: 0,
+    checkpoint: 2,
+    restore: 2
+  ]
 
   # Helper functions that generate quoted code for the __using__ macro.
   # This approach reduces the size of the main quote block to avoid
   # "long quote blocks" and "nested too deep" Credo warnings.
 
   @doc false
+  @spec __quoted_module_setup__() :: Macro.t()
   def __quoted_module_setup__ do
     quote location: :keep do
       @behaviour Jido.Agent
@@ -315,6 +366,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_basic_accessors__() :: Macro.t()
   def __quoted_basic_accessors__ do
     quote location: :keep do
       @doc "Returns the agent's name."
@@ -344,6 +396,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_skill_accessors__() :: Macro.t()
   def __quoted_skill_accessors__ do
     basic_skill_accessors = __quoted_basic_skill_accessors__()
     computed_skill_accessors = __quoted_computed_skill_accessors__()
@@ -435,6 +488,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_skill_config_accessors__() :: Macro.t()
   def __quoted_skill_config_accessors__ do
     skill_config_public = __quoted_skill_config_public__()
     skill_config_helpers = __quoted_skill_config_helpers__()
@@ -529,6 +583,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_strategy_accessors__() :: Macro.t()
   def __quoted_strategy_accessors__ do
     quote location: :keep do
       @doc "Returns the execution strategy module for this agent."
@@ -552,6 +607,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_new_function__() :: Macro.t()
   def __quoted_new_function__ do
     new_fn = __quoted_new_fn_definition__()
     mount_skills_fn = __quoted_mount_skills_definition__()
@@ -658,6 +714,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_cmd_function__() :: Macro.t()
   def __quoted_cmd_function__ do
     quote location: :keep do
       @doc """
@@ -705,6 +762,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_utility_functions__() :: Macro.t()
   def __quoted_utility_functions__ do
     quote location: :keep do
       @doc """
@@ -765,22 +823,54 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __quoted_callbacks__() :: Macro.t()
   def __quoted_callbacks__ do
     quote location: :keep do
       # Default callback implementations
 
+      @impl true
       @spec on_before_cmd(Agent.t(), Agent.action()) :: {:ok, Agent.t(), Agent.action()}
       def on_before_cmd(agent, action), do: {:ok, agent, action}
 
+      @impl true
       @spec on_after_cmd(Agent.t(), Agent.action(), [Agent.directive()]) ::
               {:ok, Agent.t(), [Agent.directive()]}
       def on_after_cmd(agent, _action, directives), do: {:ok, agent, directives}
 
+      @impl true
       @spec signal_routes() :: list()
       def signal_routes, do: []
 
+      @impl true
+      def checkpoint(agent, _ctx) do
+        thread = agent.state[:__thread__]
+
+        {:ok,
+         %{
+           version: 1,
+           agent_module: __MODULE__,
+           id: agent.id,
+           state: Map.delete(agent.state, :__thread__),
+           thread: thread && %{id: thread.id, rev: thread.rev}
+         }}
+      end
+
+      @impl true
+      def restore(data, _ctx) do
+        case new(id: data[:id] || data["id"]) do
+          {:ok, agent} ->
+            state = data[:state] || data["state"] || %{}
+            {:ok, %{agent | state: Map.merge(agent.state, state)}}
+
+          error ->
+            error
+        end
+      end
+
       defoverridable on_before_cmd: 2,
                      on_after_cmd: 3,
+                     checkpoint: 2,
+                     restore: 2,
                      signal_routes: 0,
                      name: 0,
                      description: 0,
@@ -947,6 +1037,7 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __normalize_skill_instances__([module() | {module(), map()}]) :: [SkillInstance.t()]
   def __normalize_skill_instances__(skills) do
     Enum.map(skills, &__validate_and_create_skill_instance__/1)
   end
