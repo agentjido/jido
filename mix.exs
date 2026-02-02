@@ -95,7 +95,6 @@ defmodule Jido.MixProject do
           "guides/observability.md",
           "guides/testing.md",
           "guides/configuration.md",
-          "guides/persistence.md",
           "guides/storage.md",
           "guides/worker-pools.md",
           "guides/scheduling.md"
@@ -150,8 +149,7 @@ defmodule Jido.MixProject do
         {"guides/observability.md", title: "Observability"},
         {"guides/testing.md", title: "Testing"},
         {"guides/configuration.md", title: "Configuration"},
-        {"guides/persistence.md", title: "Persistence"},
-        {"guides/storage.md", title: "Storage"},
+        {"guides/storage.md", title: "Persistence & Storage"},
         {"guides/worker-pools.md", title: "Worker Pools"},
         {"guides/scheduling.md", title: "Scheduling"},
 
@@ -193,10 +191,19 @@ defmodule Jido.MixProject do
           Jido.Agent.Strategy,
           Jido.Agent.Strategy.Direct,
           Jido.Agent.Strategy.FSM,
-          Jido.Agent.Strategy.State
+          Jido.Agent.Strategy.FSM.Machine,
+          Jido.Agent.Strategy.State,
+          Jido.Agent.Strategy.Snapshot
         ],
         Skills: [
-          Jido.Skill
+          Jido.Skill,
+          Jido.Skill.Config,
+          Jido.Skill.Instance,
+          Jido.Skill.Manifest,
+          Jido.Skill.Requirements,
+          Jido.Skill.Routes,
+          Jido.Skill.Schedules,
+          Jido.Skill.Spec
         ],
         Directives: [
           Jido.Agent.Directive,
@@ -210,22 +217,85 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.Cron,
           Jido.Agent.Directive.CronCancel
         ],
-        "Agent Components": [
+        "State Operations": [
+          Jido.Agent.StateOp,
+          Jido.Agent.StateOp.SetState,
+          Jido.Agent.StateOp.ReplaceState,
+          Jido.Agent.StateOp.DeleteKeys,
+          Jido.Agent.StateOp.SetPath,
+          Jido.Agent.StateOp.DeletePath,
+          Jido.Agent.StateOps
+        ],
+        "Agent Internals": [
           Jido.Agent.State,
           Jido.Agent.Schema,
-          Jido.Agent.StateOps,
-          Jido.Agent.StateOp,
           Jido.AgentServer.State,
+          Jido.AgentServer.State.Lifecycle,
           Jido.AgentServer.Status,
           Jido.AgentServer.Options,
           Jido.AgentServer.ErrorPolicy,
-          Jido.AgentServer.SignalRouter
+          Jido.AgentServer.SignalRouter,
+          Jido.AgentServer.ChildInfo,
+          Jido.AgentServer.DirectiveExec,
+          Jido.AgentServer.Lifecycle,
+          Jido.AgentServer.Lifecycle.Keyed,
+          Jido.AgentServer.Lifecycle.Noop,
+          Jido.AgentServer.Signal.ChildStarted,
+          Jido.AgentServer.Signal.ChildExit,
+          Jido.AgentServer.Signal.CronTick,
+          Jido.AgentServer.Signal.Orphaned,
+          Jido.AgentServer.Signal.Scheduled
         ],
         "Built-in Actions": [
           Jido.Actions.Control,
+          Jido.Actions.Control.Broadcast,
+          Jido.Actions.Control.Cancel,
+          Jido.Actions.Control.Forward,
+          Jido.Actions.Control.Noop,
+          Jido.Actions.Control.Reply,
           Jido.Actions.Lifecycle,
+          Jido.Actions.Lifecycle.NotifyParent,
+          Jido.Actions.Lifecycle.NotifyPid,
+          Jido.Actions.Lifecycle.SpawnChild,
+          Jido.Actions.Lifecycle.StopChild,
+          Jido.Actions.Lifecycle.StopSelf,
           Jido.Actions.Scheduling,
-          Jido.Actions.Status
+          Jido.Actions.Scheduling.CancelCron,
+          Jido.Actions.Scheduling.ScheduleCron,
+          Jido.Actions.Scheduling.ScheduleSignal,
+          Jido.Actions.Scheduling.ScheduleTimeout,
+          Jido.Actions.Status,
+          Jido.Actions.Status.MarkCompleted,
+          Jido.Actions.Status.MarkFailed,
+          Jido.Actions.Status.MarkIdle,
+          Jido.Actions.Status.MarkWorking,
+          Jido.Actions.Status.SetStatus
+        ],
+        Sensors: [
+          Jido.Sensor,
+          Jido.Sensor.Runtime,
+          Jido.Sensor.Spec,
+          Jido.Sensors.Heartbeat,
+          Jido.Sensors.Bus
+        ],
+        Thread: [
+          Jido.Thread,
+          Jido.Thread.Agent,
+          Jido.Thread.Entry,
+          Jido.Thread.Store,
+          Jido.Thread.Store.Adapters.InMemory,
+          Jido.Thread.Store.Adapters.JournalBacked
+        ],
+        Storage: [
+          Jido.Storage,
+          Jido.Storage.ETS,
+          Jido.Storage.File,
+          Jido.Persist,
+          Jido.Agent.InstanceManager,
+          Jido.Agent.Persistence,
+          Jido.Agent.Store,
+          Jido.Agent.Store.ETS,
+          Jido.Agent.Store.File
         ],
         Observability: [
           Jido.Observe,
@@ -233,13 +303,11 @@ defmodule Jido.MixProject do
           Jido.Observe.Tracer,
           Jido.Observe.NoopTracer,
           Jido.Observe.SpanCtx,
-          Jido.Telemetry
-        ],
-        Storage: [
-          Jido.Storage,
-          Jido.Storage.ETS,
-          Jido.Storage.File,
-          Jido.Persist
+          Jido.Telemetry,
+          Jido.Telemetry.Config,
+          Jido.Telemetry.Formatter,
+          Jido.Tracing.Context,
+          Jido.Tracing.Trace
         ],
         Utilities: [
           Jido.Discovery,
@@ -247,6 +315,14 @@ defmodule Jido.MixProject do
           Jido.Scheduler,
           Jido.Util,
           Jido.Agent.WorkerPool
+        ],
+        Exceptions: [
+          Jido.Error.CompensationError,
+          Jido.Error.ExecutionError,
+          Jido.Error.InternalError,
+          Jido.Error.RoutingError,
+          Jido.Error.TimeoutError,
+          Jido.Error.ValidationError
         ]
       ]
     ]
