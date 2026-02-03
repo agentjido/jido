@@ -727,20 +727,36 @@ defmodule Jido.Agent do
 
         * `MyAction` - Action module with no params
         * `{MyAction, %{param: 1}}` - Action with params
+        * `{MyAction, %{param: 1}, %{context: data}}` - Action with params and context
+        * `{MyAction, %{param: 1}, %{}, [timeout: 1000]}` - Action with opts
         * `%Instruction{}` - Full instruction struct
         * `[...]` - List of any of the above (processed in sequence)
+
+      ## Options
+
+      The optional third argument `opts` is a keyword list merged into all instructions:
+
+        * `:timeout` - Maximum time (in ms) for each action to complete
+        * `:max_retries` - Maximum retry attempts on failure
+        * `:backoff` - Initial backoff time in ms (doubles with each retry)
 
       ## Examples
 
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction)
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, {MyAction, %{value: 42}})
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, [Action1, Action2])
+
+          # With per-call options (merged into all instructions)
+          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction, timeout: 5000)
       """
       @spec cmd(Agent.t(), Agent.action()) :: Agent.cmd_result()
-      def cmd(%Agent{} = agent, action) do
+      def cmd(%Agent{} = agent, action), do: cmd(agent, action, [])
+
+      @spec cmd(Agent.t(), Agent.action(), keyword()) :: Agent.cmd_result()
+      def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
         {:ok, agent, action} = on_before_cmd(agent, action)
 
-        case Instruction.normalize(action, %{state: agent.state}, []) do
+        case Instruction.normalize(action, %{state: agent.state}, opts) do
           {:ok, instructions} ->
             ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
             strat = strategy()
