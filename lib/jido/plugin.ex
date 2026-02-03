@@ -317,7 +317,7 @@ defmodule Jido.Plugin do
                          {:error, errors} ->
                            raise CompileError,
                              description:
-                               "Invalid plugin configuration: #{inspect(Zoi.Error.format_errors(errors))}"
+                               "Invalid plugin configuration:\n#{Zoi.prettify_errors(errors)}"
                        end)
     end
   end
