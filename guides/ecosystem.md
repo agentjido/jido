@@ -1,24 +1,5 @@
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Comprehensive Analysis of the Jido Agentic Ecosystem
+# Comprehensive Overview of the Jido Agentic Ecosystem
 
 ## Overview of the Jido Ecosystem
 
@@ -444,16 +425,16 @@ In summary, the Jido ecosystem offers a comprehensive, well-architected solution
 
 # References
 
-[0] agentjido/jido: 🤖 Autonomous agent framework for Elixir. https://github.com/agentjido/jido
+[0] agentjido/jido: 🤖 Autonomous agent framework for Elixir. <https://github.com/agentjido/jido>
 
-[10] req_llm. https://github.com/agentjido/req_llm
+[10] req_llm. <https://github.com/agentjido/req_llm>
 
-[11] jido_action. https://github.com/agentjido/jido_action
+[11] jido_action. <https://github.com/agentjido/jido_action>
 
-[12] jido_ai. https://github.com/agentjido/jido_ai
+[12] jido_ai. <https://github.com/agentjido/jido_ai>
 
-[13] jido_signal. https://github.com/agentjido/jido_signal
+[13] jido_signal. <https://github.com/agentjido/jido_signal>
 
-[14] jido_browser. https://github.com/agentjido/jido_browser
+[14] jido_browser. <https://github.com/agentjido/jido_browser>
 
-[15] jido_coder_lib. https://github.com/agentjido/jido_coder_lib
+[15] jido_coder_lib. <https://github.com/agentjido/jido_coder_lib>
