@@ -1,20 +1,20 @@
 defmodule Jido.Agent.Schema do
   @moduledoc false
-  # Utilities for merging agent and skill schemas.
+  # Utilities for merging agent and plugin schemas.
   # Handles Zoi schema introspection and merging.
 
-  alias Jido.Skill.Spec
+  alias Jido.Plugin.Spec
 
   @doc """
-  Merges the agent's base schema with skill schemas.
+  Merges the agent's base schema with plugin schemas.
 
-  Each skill's schema is nested under its `state_key`.
-  Returns a Zoi object schema with base fields + skill fields.
+  Each plugin's schema is nested under its `state_key`.
+  Returns a Zoi object schema with base fields + plugin fields.
 
   ## Examples
 
       base = Zoi.object(%{mode: Zoi.atom()})
-      skills = [%Spec{state_key: :calc, schema: Zoi.object(%{x: Zoi.integer()})}]
+      plugins = [%Spec{state_key: :calc, schema: Zoi.object(%{x: Zoi.integer()})}]
       
       # Returns:
       # Zoi.object(%{
@@ -22,28 +22,28 @@ defmodule Jido.Agent.Schema do
       #   calc: Zoi.object(%{x: Zoi.integer()})
       # })
   """
-  @spec merge_with_skills(any(), [Spec.t()]) :: any()
-  def merge_with_skills(nil, []), do: nil
-  def merge_with_skills(base_schema, []), do: base_schema
+  @spec merge_with_plugins(any(), [Spec.t()]) :: any()
+  def merge_with_plugins(nil, []), do: nil
+  def merge_with_plugins(base_schema, []), do: base_schema
 
-  def merge_with_skills(base_schema, skill_specs) when is_list(skill_specs) do
-    skill_fields =
-      skill_specs
+  def merge_with_plugins(base_schema, plugin_specs) when is_list(plugin_specs) do
+    plugin_fields =
+      plugin_specs
       |> Enum.filter(& &1.schema)
       |> Enum.map(fn spec -> {spec.state_key, spec.schema} end)
       |> Map.new()
 
     case base_schema do
       nil ->
-        if map_size(skill_fields) == 0 do
+        if map_size(plugin_fields) == 0 do
           nil
         else
-          Zoi.object(skill_fields)
+          Zoi.object(plugin_fields)
         end
 
       base ->
         base_fields = extract_fields(base)
-        Zoi.object(Map.merge(base_fields, skill_fields))
+        Zoi.object(Map.merge(base_fields, plugin_fields))
     end
   end
 

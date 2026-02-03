@@ -362,40 +362,40 @@ defmodule JidoTest.AgentTest do
     end
   end
 
-  describe "skill routes" do
-    test "skill_routes/0 returns expanded routes with prefix" do
-      routes = TestAgents.AgentWithSkillRoutes.skill_routes()
+  describe "plugin routes" do
+    test "plugin_routes/0 returns expanded routes with prefix" do
+      routes = TestAgents.AgentWithPluginRoutes.plugin_routes()
 
       assert length(routes) == 2
-      assert {"test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
+      assert {"test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
     end
 
-    test "multi-instance skills get unique route prefixes" do
-      routes = TestAgents.AgentWithMultiInstanceSkills.skill_routes()
+    test "multi-instance plugins get unique route prefixes" do
+      routes = TestAgents.AgentWithMultiInstancePlugins.plugin_routes()
 
       assert length(routes) == 4
-      assert {"support.test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"support.test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
-      assert {"sales.test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"sales.test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
+      assert {"support.test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"support.test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
+      assert {"sales.test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"sales.test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
     end
 
     test "compile-time conflict detection raises error for duplicate routes" do
-      assert_raise CompileError, ~r/Route conflict|Duplicate skill state_keys/, fn ->
+      assert_raise CompileError, ~r/Route conflict|Duplicate plugin state_keys/, fn ->
         defmodule ConflictAgent do
           use Jido.Agent,
             name: "conflict_agent",
-            skills: [
-              TestAgents.TestSkillWithRoutes,
-              TestAgents.TestSkillWithRoutes
+            plugins: [
+              TestAgents.TestPluginWithRoutes,
+              TestAgents.TestPluginWithRoutes
             ]
         end
       end
     end
 
-    test "no route conflict when skills use different :as aliases" do
-      routes = TestAgents.AgentWithMultiInstanceSkills.skill_routes()
+    test "no route conflict when plugins use different :as aliases" do
+      routes = TestAgents.AgentWithMultiInstancePlugins.plugin_routes()
       assert length(routes) == 4
     end
   end

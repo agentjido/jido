@@ -581,14 +581,14 @@ defmodule Jido.AgentServer do
     signal_router = SignalRouter.build(state)
     state = %{state | signal_router: signal_router}
 
-    # Start skill children
-    state = start_skill_children(state)
+    # Start plugin children
+    state = start_plugin_children(state)
 
-    # Start skill subscription sensors
-    state = start_skill_subscriptions(state)
+    # Start plugin subscription sensors
+    state = start_plugin_subscriptions(state)
 
-    # Register skill schedules (cron jobs)
-    state = register_skill_schedules(state)
+    # Register plugin schedules (cron jobs)
+    state = register_plugin_schedules(state)
 
     notify_parent_of_startup(state)
 
@@ -619,7 +619,9 @@ defmodule Jido.AgentServer do
       case process_signal(traced_signal, state) do
         {:ok, new_state} ->
           # Run transform_result hooks on the call path
-          transformed_agent = run_skill_transform_hooks(new_state.agent, traced_signal, new_state)
+          transformed_agent =
+            run_plugin_transform_hooks(new_state.agent, traced_signal, new_state)
+
           {:reply, {:ok, transformed_agent}, new_state}
 
         {:error, reason, new_state} ->
@@ -857,9 +859,9 @@ defmodule Jido.AgentServer do
   end
 
   defp do_process_signal(signal, router, state, start_time, metadata) do
-    case run_skill_signal_hooks(signal, state) do
+    case run_plugin_signal_hooks(signal, state) do
       {:error, error} ->
-        handle_skill_hook_error(error, signal, state)
+        handle_plugin_hook_error(error, signal, state)
 
       {:override, action_spec} ->
         dispatch_action(signal, action_spec, state, start_time, metadata)
@@ -869,8 +871,8 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp handle_skill_hook_error(error, signal, state) do
-    error_directive = %Directive.Error{error: error, context: :skill_handle_signal}
+  defp handle_plugin_hook_error(error, signal, state) do
+    error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
     enqueue_error_directive(error, signal, [error_directive], state)
   end
 
@@ -985,34 +987,34 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Signal Hooks
+  # Internal: Plugin Signal Hooks
   # ---------------------------------------------------------------------------
 
-  defp run_skill_signal_hooks(%Signal{} = signal, %State{} = state) do
+  defp run_plugin_signal_hooks(%Signal{} = signal, %State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce_while(skill_specs, :continue, fn spec, acc ->
+    Enum.reduce_while(plugin_specs, :continue, fn spec, acc ->
       case acc do
         {:override, _} ->
           {:halt, acc}
 
         :continue ->
-          invoke_skill_handle_signal(spec, signal, state, agent_module)
+          invoke_plugin_handle_signal(spec, signal, state, agent_module)
       end
     end)
   end
 
-  defp invoke_skill_handle_signal(spec, signal, state, agent_module) do
+  defp invoke_plugin_handle_signal(spec, signal, state, agent_module) do
     context = %{
       agent: state.agent,
       agent_module: agent_module,
-      skill: spec.module,
-      skill_spec: spec,
+      plugin: spec.module,
+      plugin_spec: spec,
       config: spec.config || %{}
     }
 
@@ -1026,8 +1028,8 @@ defmodule Jido.AgentServer do
       {:error, reason} ->
         error =
           Jido.Error.execution_error(
-            "Skill handle_signal failed",
-            %{skill: spec.module, reason: reason}
+            "Plugin handle_signal failed",
+            %{plugin: spec.module, reason: reason}
           )
 
         {:halt, {:error, error}}
@@ -1035,23 +1037,23 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Transform Hooks
+  # Internal: Plugin Transform Hooks
   # ---------------------------------------------------------------------------
 
-  defp run_skill_transform_hooks(agent, action_or_signal, %State{} = state) do
+  defp run_plugin_transform_hooks(agent, action_or_signal, %State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce(skill_specs, agent, fn spec, agent_acc ->
+    Enum.reduce(plugin_specs, agent, fn spec, agent_acc ->
       context = %{
         agent: agent_acc,
         agent_module: agent_module,
-        skill: spec.module,
-        skill_spec: spec,
+        plugin: spec.module,
+        plugin_spec: spec,
         config: spec.config || %{}
       }
 
@@ -1060,58 +1062,58 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Children
+  # Internal: Plugin Children
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp start_skill_children(%State{} = state) do
+  defp start_plugin_children(%State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce(skill_specs, state, fn spec, acc_state ->
+    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       config = spec.config || %{}
-      start_skill_spec_children(acc_state, spec.module, config)
+      start_plugin_spec_children(acc_state, spec.module, config)
     end)
   end
 
-  defp start_skill_spec_children(state, skill_module, config) do
-    case skill_module.child_spec(config) do
+  defp start_plugin_spec_children(state, plugin_module, config) do
+    case plugin_module.child_spec(config) do
       nil ->
         state
 
       %{} = child_spec ->
-        start_skill_child(state, skill_module, child_spec)
+        start_plugin_child(state, plugin_module, child_spec)
 
       list when is_list(list) ->
         Enum.reduce(list, state, fn cs, s ->
-          start_skill_child(s, skill_module, cs)
+          start_plugin_child(s, plugin_module, cs)
         end)
 
       other ->
         Logger.warning(
-          "Invalid child_spec from skill #{inspect(skill_module)}: #{inspect(other)}"
+          "Invalid child_spec from plugin #{inspect(plugin_module)}: #{inspect(other)}"
         )
 
         state
     end
   end
 
-  defp start_skill_child(%State{} = state, skill_module, %{start: {m, f, a}} = spec) do
+  defp start_plugin_child(%State{} = state, plugin_module, %{start: {m, f, a}} = spec) do
     case apply(m, f, a) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
-        tag = {:skill, skill_module, spec[:id] || m}
+        tag = {:plugin, plugin_module, spec[:id] || m}
 
         child_info =
           ChildInfo.new!(%{
             pid: pid,
             ref: ref,
-            module: skill_module,
-            id: "#{skill_module}-#{inspect(pid)}",
+            module: plugin_module,
+            id: "#{plugin_module}-#{inspect(pid)}",
             tag: tag,
             meta: %{child_spec_id: spec[:id]}
           })
@@ -1120,39 +1122,39 @@ defmodule Jido.AgentServer do
         %{state | children: new_children}
 
       {:error, reason} ->
-        Logger.error("Failed to start skill child #{inspect(skill_module)}: #{inspect(reason)}")
+        Logger.error("Failed to start plugin child #{inspect(plugin_module)}: #{inspect(reason)}")
 
         state
     end
   end
 
-  defp start_skill_child(%State{} = state, skill_module, spec) do
+  defp start_plugin_child(%State{} = state, plugin_module, spec) do
     Logger.warning(
-      "Skill child_spec missing :start key for #{inspect(skill_module)}: #{inspect(spec)}"
+      "Plugin child_spec missing :start key for #{inspect(plugin_module)}: #{inspect(spec)}"
     )
 
     state
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Subscriptions
+  # Internal: Plugin Subscriptions
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp start_skill_subscriptions(%State{} = state) do
+  defp start_plugin_subscriptions(%State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce(skill_specs, state, fn spec, acc_state ->
+    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       context = %{
         agent_ref: via_tuple(acc_state.id, acc_state.registry),
         agent_id: acc_state.id,
         agent_module: agent_module,
-        skill_spec: spec,
+        plugin_spec: spec,
         jido_instance: acc_state.jido
       }
 
@@ -1171,7 +1173,7 @@ defmodule Jido.AgentServer do
 
   defp start_subscription_sensor(
          %State{} = state,
-         skill_module,
+         plugin_module,
          sensor_module,
          sensor_config,
          context
@@ -1185,16 +1187,16 @@ defmodule Jido.AgentServer do
     case SensorRuntime.start_link(opts) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
-        tag = {:sensor, skill_module, sensor_module}
+        tag = {:sensor, plugin_module, sensor_module}
 
         child_info =
           ChildInfo.new!(%{
             pid: pid,
             ref: ref,
             module: sensor_module,
-            id: "#{skill_module}-#{sensor_module}-#{inspect(pid)}",
+            id: "#{plugin_module}-#{sensor_module}-#{inspect(pid)}",
             tag: tag,
-            meta: %{skill: skill_module, sensor: sensor_module}
+            meta: %{plugin: plugin_module, sensor: sensor_module}
           })
 
         new_children = Map.put(state.children, tag, child_info)
@@ -1202,7 +1204,7 @@ defmodule Jido.AgentServer do
 
       {:error, reason} ->
         Logger.warning(
-          "Failed to start subscription sensor #{inspect(sensor_module)} for skill #{inspect(skill_module)}: #{inspect(reason)}"
+          "Failed to start subscription sensor #{inspect(sensor_module)} for plugin #{inspect(plugin_module)}: #{inspect(reason)}"
         )
 
         state
@@ -1210,21 +1212,21 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Schedules
+  # Internal: Plugin Schedules
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp register_skill_schedules(%State{skip_schedules: true} = state) do
-    Logger.debug("AgentServer #{state.id} skipping skill schedules")
+  defp register_plugin_schedules(%State{skip_schedules: true} = state) do
+    Logger.debug("AgentServer #{state.id} skipping plugin schedules")
     state
   end
 
-  defp register_skill_schedules(%State{} = state) do
+  defp register_plugin_schedules(%State{} = state) do
     agent_module = state.agent_module
 
     schedules =
-      if function_exported?(agent_module, :skill_schedules, 0),
-        do: agent_module.skill_schedules(),
+      if function_exported?(agent_module, :plugin_schedules, 0),
+        do: agent_module.plugin_schedules(),
         else: []
 
     Enum.reduce(schedules, state, fn schedule_spec, acc_state ->

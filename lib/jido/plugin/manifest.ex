@@ -1,38 +1,38 @@
-defmodule Jido.Skill.Manifest do
+defmodule Jido.Plugin.Manifest do
   @moduledoc """
-  The manifest representation of a skill's metadata and capabilities.
+  The manifest representation of a plugin's metadata and capabilities.
 
-  Contains all compile-time metadata about a skill for discovery,
-  introspection, and ecosystem tooling. Unlike `Jido.Skill.Spec`,
-  the manifest focuses on what the skill provides rather than
+  Contains all compile-time metadata about a plugin for discovery,
+  introspection, and ecosystem tooling. Unlike `Jido.Plugin.Spec`,
+  the manifest focuses on what the plugin provides rather than
   per-agent runtime configuration.
 
   ## Fields
 
-  - `module` - The skill module
-  - `name` - Skill name string
+  - `module` - The plugin module
+  - `name` - Plugin name string
   - `description` - Optional description
   - `category` - Optional category for organization
   - `tags` - List of tag strings for categorization
   - `vsn` - Optional version string
-  - `capabilities` - List of atoms describing what the skill provides
-  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:skill, :http}`
-  - `state_key` - Atom key for skill state in agent
-  - `schema` - Zoi schema for skill state
+  - `capabilities` - List of atoms describing what the plugin provides
+  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}`
+  - `state_key` - Atom key for plugin state in agent
+  - `schema` - Zoi schema for plugin state
   - `config_schema` - Zoi schema for per-agent config
   - `actions` - List of action modules
   - `routes` - List of route tuples like `{"post", ActionModule}`
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}`
   - `signal_patterns` - Legacy signal patterns for routing
-  - `subscriptions` - Sensor subscriptions provided by this skill
+  - `subscriptions` - Sensor subscriptions provided by this plugin
   """
 
   @schema Zoi.struct(
             __MODULE__,
             %{
-              module: Zoi.atom(description: "The skill module"),
-              name: Zoi.string(description: "The skill name"),
-              description: Zoi.string(description: "Description of the skill") |> Zoi.optional(),
+              module: Zoi.atom(description: "The plugin module"),
+              name: Zoi.string(description: "The plugin name"),
+              description: Zoi.string(description: "Description of the plugin") |> Zoi.optional(),
               category: Zoi.string(description: "Category for organization") |> Zoi.optional(),
               tags:
                 Zoi.list(Zoi.string(), description: "Tags for categorization") |> Zoi.default([]),
@@ -40,13 +40,13 @@ defmodule Jido.Skill.Manifest do
               otp_app:
                 Zoi.atom(description: "OTP application for config resolution") |> Zoi.optional(),
               capabilities:
-                Zoi.list(Zoi.atom(), description: "Capabilities provided by the skill")
+                Zoi.list(Zoi.atom(), description: "Capabilities provided by the plugin")
                 |> Zoi.default([]),
               requires:
                 Zoi.list(Zoi.any(), description: "Requirements like {:config, :key}")
                 |> Zoi.default([]),
-              state_key: Zoi.atom(description: "Key for skill state in agent"),
-              schema: Zoi.any(description: "Zoi schema for skill state") |> Zoi.optional(),
+              state_key: Zoi.atom(description: "Key for plugin state in agent"),
+              schema: Zoi.any(description: "Zoi schema for plugin state") |> Zoi.optional(),
               config_schema:
                 Zoi.any(description: "Zoi schema for per-agent config") |> Zoi.optional(),
               actions:
@@ -63,7 +63,7 @@ defmodule Jido.Skill.Manifest do
                 Zoi.list(Zoi.string(), description: "Legacy signal patterns")
                 |> Zoi.default([]),
               subscriptions:
-                Zoi.list(Zoi.any(), description: "Sensor subscriptions provided by this skill")
+                Zoi.list(Zoi.any(), description: "Sensor subscriptions provided by this plugin")
                 |> Zoi.default([])
             },
             coerce: true

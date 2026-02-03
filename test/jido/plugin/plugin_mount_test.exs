@@ -1,7 +1,7 @@
-defmodule JidoTest.SkillMountTest do
+defmodule JidoTest.PluginMountTest do
   use ExUnit.Case, async: true
 
-  # Test action for skills
+  # Test action for plugins
   defmodule TestAction do
     @moduledoc false
     use Jido.Action,
@@ -11,107 +11,107 @@ defmodule JidoTest.SkillMountTest do
     def run(_params, _context), do: {:ok, %{}}
   end
 
-  # Skill with custom mount that adds state
-  defmodule MountingSkill do
+  # Plugin with custom mount that adds state
+  defmodule MountingPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "mounting_skill",
+    use Jido.Plugin,
+      name: "mounting_plugin",
       state_key: :mounting,
-      actions: [JidoTest.SkillMountTest.TestAction],
+      actions: [JidoTest.PluginMountTest.TestAction],
       schema: Zoi.object(%{default_value: Zoi.integer() |> Zoi.default(0)})
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def mount(_agent, config) do
       {:ok, %{mounted: true, initialized_at: DateTime.utc_now(), config_value: config[:setting]}}
     end
   end
 
-  # Skill with default mount (no override)
-  defmodule DefaultMountSkill do
+  # Plugin with default mount (no override)
+  defmodule DefaultMountPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "default_mount_skill",
+    use Jido.Plugin,
+      name: "default_mount_plugin",
       state_key: :default_mount,
-      actions: [JidoTest.SkillMountTest.TestAction],
+      actions: [JidoTest.PluginMountTest.TestAction],
       schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(42)})
   end
 
-  # Skill that reads from previously mounted skill state
-  defmodule DependentSkill do
+  # Plugin that reads from previously mounted plugin state
+  defmodule DependentPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "dependent_skill",
+    use Jido.Plugin,
+      name: "dependent_plugin",
       state_key: :dependent,
-      actions: [JidoTest.SkillMountTest.TestAction]
+      actions: [JidoTest.PluginMountTest.TestAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def mount(agent, _config) do
-      # Read from :mounting skill state if available
+      # Read from :mounting plugin state if available
       mounting_state = Map.get(agent.state, :mounting, %{})
       was_mounted = Map.get(mounting_state, :mounted, false)
       {:ok, %{saw_mounting: was_mounted}}
     end
   end
 
-  # Skill that returns error from mount
-  defmodule ErrorMountSkill do
+  # Plugin that returns error from mount
+  defmodule ErrorMountPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "error_mount_skill",
+    use Jido.Plugin,
+      name: "error_mount_plugin",
       state_key: :error_mount,
-      actions: [JidoTest.SkillMountTest.TestAction]
+      actions: [JidoTest.PluginMountTest.TestAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def mount(_agent, _config) do
       {:error, :mount_failed_intentionally}
     end
   end
 
-  # Agent with mounting skill
+  # Agent with mounting plugin
   defmodule MountingAgent do
     @moduledoc false
     use Jido.Agent,
       name: "mounting_agent",
-      skills: [JidoTest.SkillMountTest.MountingSkill]
+      plugins: [JidoTest.PluginMountTest.MountingPlugin]
   end
 
-  # Agent with configured mounting skill
+  # Agent with configured mounting plugin
   defmodule ConfiguredMountingAgent do
     @moduledoc false
     use Jido.Agent,
       name: "configured_mounting_agent",
-      skills: [{JidoTest.SkillMountTest.MountingSkill, %{setting: "custom_value"}}]
+      plugins: [{JidoTest.PluginMountTest.MountingPlugin, %{setting: "custom_value"}}]
   end
 
-  # Agent with default mount skill
+  # Agent with default mount plugin
   defmodule DefaultMountAgent do
     @moduledoc false
     use Jido.Agent,
       name: "default_mount_agent",
-      skills: [JidoTest.SkillMountTest.DefaultMountSkill]
+      plugins: [JidoTest.PluginMountTest.DefaultMountPlugin]
   end
 
-  # Agent with two skills where second depends on first
-  defmodule DependentSkillsAgent do
+  # Agent with two plugins where second depends on first
+  defmodule DependentPluginsAgent do
     @moduledoc false
     use Jido.Agent,
-      name: "dependent_skills_agent",
-      skills: [
-        JidoTest.SkillMountTest.MountingSkill,
-        JidoTest.SkillMountTest.DependentSkill
+      name: "dependent_plugins_agent",
+      plugins: [
+        JidoTest.PluginMountTest.MountingPlugin,
+        JidoTest.PluginMountTest.DependentPlugin
       ]
   end
 
-  # Agent with error mounting skill
+  # Agent with error mounting plugin
   defmodule ErrorMountAgent do
     @moduledoc false
     use Jido.Agent,
       name: "error_mount_agent",
-      skills: [JidoTest.SkillMountTest.ErrorMountSkill]
+      plugins: [JidoTest.PluginMountTest.ErrorMountPlugin]
   end
 
   describe "mount/2 in Agent.new/1" do
-    test "skill with custom mount populates its state slice" do
+    test "plugin with custom mount populates its state slice" do
       agent = MountingAgent.new()
 
       assert agent.state[:mounting][:mounted] == true
@@ -120,31 +120,31 @@ defmodule JidoTest.SkillMountTest do
       assert agent.state[:mounting][:default_value] == 0
     end
 
-    test "skill mount receives config and can use it" do
+    test "plugin mount receives config and can use it" do
       agent = ConfiguredMountingAgent.new()
 
       assert agent.state[:mounting][:config_value] == "custom_value"
     end
 
-    test "skill with default mount/2 still gets schema defaults" do
+    test "plugin with default mount/2 still gets schema defaults" do
       agent = DefaultMountAgent.new()
 
       assert agent.state[:default_mount][:counter] == 42
       # Default mount returns empty map, so no additional fields
     end
 
-    test "skill mount can see previously mounted skill state" do
-      agent = DependentSkillsAgent.new()
+    test "plugin mount can see previously mounted plugin state" do
+      agent = DependentPluginsAgent.new()
 
-      # First skill should be mounted
+      # First plugin should be mounted
       assert agent.state[:mounting][:mounted] == true
 
-      # Second skill should have seen the first skill's state
+      # Second plugin should have seen the first plugin's state
       assert agent.state[:dependent][:saw_mounting] == true
     end
 
-    test "skill mount error raises with clear message" do
-      assert_raise Jido.Error.InternalError, ~r/Skill mount failed/, fn ->
+    test "plugin mount error raises with clear message" do
+      assert_raise Jido.Error.InternalError, ~r/Plugin mount failed/, fn ->
         ErrorMountAgent.new()
       end
     end

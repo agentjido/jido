@@ -44,27 +44,27 @@ defmodule Jido.Igniter.Templates do
   end
 
   @doc """
-  Returns the template for a Skill module.
+  Returns the template for a Plugin module.
   """
-  @spec skill_template(
+  @spec plugin_template(
           module :: String.t(),
           name :: String.t(),
           state_key :: String.t(),
           signal_patterns :: [String.t()]
         ) :: String.t()
-  def skill_template(module, name, state_key, signal_patterns) do
+  def plugin_template(module, name, state_key, signal_patterns) do
     patterns_str = Enum.map_join(signal_patterns, ", ", &~s("#{&1}"))
 
     """
     defmodule #{module} do
-      use Jido.Skill,
+      use Jido.Plugin,
         name: "#{name}",
         state_key: :#{state_key},
         actions: [],
         schema: Zoi.object(%{}),
         signal_patterns: [#{patterns_str}]
 
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def router(_config) do
         []
       end
@@ -73,10 +73,10 @@ defmodule Jido.Igniter.Templates do
   end
 
   @doc """
-  Returns the template for a Skill test module.
+  Returns the template for a Plugin test module.
   """
-  @spec skill_test_template(module :: String.t(), test_module :: String.t()) :: String.t()
-  def skill_test_template(module, test_module) do
+  @spec plugin_test_template(module :: String.t(), test_module :: String.t()) :: String.t()
+  def plugin_test_template(module, test_module) do
     alias_name = module |> String.split(".") |> List.last()
 
     """
@@ -85,9 +85,9 @@ defmodule Jido.Igniter.Templates do
 
       alias #{module}
 
-      describe "skill_spec/1" do
-        test "returns skill specification" do
-          spec = #{alias_name}.skill_spec(%{})
+      describe "plugin_spec/1" do
+        test "returns plugin specification" do
+          spec = #{alias_name}.plugin_spec(%{})
           assert spec.module == #{alias_name}
           assert spec.name == #{alias_name}.name()
         end

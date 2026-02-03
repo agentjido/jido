@@ -850,7 +850,7 @@ defmodule JidoTest.AgentServerTest do
     end
   end
 
-  describe "skill schedules" do
+  describe "plugin schedules" do
     defmodule ScheduledAction do
       @moduledoc false
       use Jido.Action,
@@ -861,32 +861,32 @@ defmodule JidoTest.AgentServerTest do
       def run(_params, _context), do: {:ok, %{scheduled: true}}
     end
 
-    defmodule ScheduledSkill do
+    defmodule ScheduledPlugin do
       @moduledoc false
-      use Jido.Skill,
-        name: "scheduled_skill",
-        state_key: :scheduled_skill,
+      use Jido.Plugin,
+        name: "scheduled_plugin",
+        state_key: :scheduled_plugin,
         actions: [ScheduledAction],
         schedules: [
           {"* * * * *", ScheduledAction}
         ]
     end
 
-    defmodule AgentWithScheduledSkill do
+    defmodule AgentWithScheduledPlugin do
       @moduledoc false
       use Jido.Agent,
-        name: "agent_with_scheduled_skill",
+        name: "agent_with_scheduled_plugin",
         schema: [],
-        skills: [ScheduledSkill]
+        plugins: [ScheduledPlugin]
     end
 
-    test "registers skill schedules on startup", %{jido: jido} do
-      {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledSkill, jido: jido)
+    test "registers plugin schedules on startup", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledPlugin, jido: jido)
       {:ok, state} = AgentServer.state(pid)
 
       assert map_size(state.cron_jobs) == 1
 
-      job_id = {:skill_schedule, :scheduled_skill, ScheduledAction}
+      job_id = {:plugin_schedule, :scheduled_plugin, ScheduledAction}
       assert Map.has_key?(state.cron_jobs, job_id)
 
       cron_pid = Map.get(state.cron_jobs, job_id)
@@ -898,7 +898,7 @@ defmodule JidoTest.AgentServerTest do
 
     test "skips schedules when skip_schedules option is true", %{jido: jido} do
       {:ok, pid} =
-        AgentServer.start_link(agent: AgentWithScheduledSkill, jido: jido, skip_schedules: true)
+        AgentServer.start_link(agent: AgentWithScheduledPlugin, jido: jido, skip_schedules: true)
 
       {:ok, state} = AgentServer.state(pid)
 
@@ -908,10 +908,10 @@ defmodule JidoTest.AgentServerTest do
     end
 
     test "cleans up cron jobs on termination", %{jido: jido} do
-      {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledSkill, jido: jido)
+      {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledPlugin, jido: jido)
       {:ok, state} = AgentServer.state(pid)
 
-      job_id = {:skill_schedule, :scheduled_skill, ScheduledAction}
+      job_id = {:plugin_schedule, :scheduled_plugin, ScheduledAction}
       cron_pid = Map.get(state.cron_jobs, job_id)
       assert Process.alive?(cron_pid)
 
@@ -922,19 +922,19 @@ defmodule JidoTest.AgentServerTest do
       refute Process.alive?(cron_pid)
     end
 
-    test "agent exposes skill_schedules/0 accessor" do
-      schedules = AgentWithScheduledSkill.skill_schedules()
+    test "agent exposes plugin_schedules/0 accessor" do
+      schedules = AgentWithScheduledPlugin.plugin_schedules()
 
       assert length(schedules) == 1
       [spec] = schedules
       assert spec.cron_expression == "* * * * *"
       assert spec.action == ScheduledAction
-      assert spec.job_id == {:skill_schedule, :scheduled_skill, ScheduledAction}
-      assert spec.signal_type == "scheduled_skill.__schedule__.scheduled_action"
+      assert spec.job_id == {:plugin_schedule, :scheduled_plugin, ScheduledAction}
+      assert spec.signal_type == "scheduled_plugin.__schedule__.scheduled_action"
     end
 
-    test "schedule routes are included in skill_routes/0" do
-      routes = AgentWithScheduledSkill.skill_routes()
+    test "schedule routes are included in plugin_routes/0" do
+      routes = AgentWithScheduledPlugin.plugin_routes()
 
       schedule_route =
         Enum.find(routes, fn {signal_type, _, _} ->
@@ -943,7 +943,7 @@ defmodule JidoTest.AgentServerTest do
 
       assert schedule_route != nil
       {signal_type, action, priority} = schedule_route
-      assert signal_type == "scheduled_skill.__schedule__.scheduled_action"
+      assert signal_type == "scheduled_plugin.__schedule__.scheduled_action"
       assert action == ScheduledAction
       assert priority < 0
     end

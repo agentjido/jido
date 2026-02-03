@@ -1,10 +1,10 @@
-defmodule Jido.Skill.Schedules do
+defmodule Jido.Plugin.Schedules do
   @moduledoc """
-  Utilities for expanding and managing skill schedules.
+  Utilities for expanding and managing plugin schedules.
 
   This module handles:
-  - Expanding schedule declarations from skill manifests
-  - Generating unique job IDs namespaced to skill instances
+  - Expanding schedule declarations from plugin manifests
+  - Generating unique job IDs namespaced to plugin instances
   - Generating signal types for schedule triggers
   - Managing timezone configuration
 
@@ -21,18 +21,18 @@ defmodule Jido.Skill.Schedules do
   By default, schedule signal types are auto-generated as:
   `"{route_prefix}.__schedule__.{action_name}"`
 
-  For example, a skill with route_prefix "slack" and action RefreshToken
+  For example, a plugin with route_prefix "slack" and action RefreshToken
   would generate signal type "slack.__schedule__.refresh_token".
 
   Custom signal types can be specified with the `:signal` option.
 
   ## Job ID Namespacing
 
-  Job IDs are namespaced as tuples to ensure uniqueness across skill instances:
-  `{:skill_schedule, state_key, ActionModule}`
+  Job IDs are namespaced as tuples to ensure uniqueness across plugin instances:
+  `{:plugin_schedule, state_key, ActionModule}`
   """
 
-  alias Jido.Skill.Instance
+  alias Jido.Plugin.Instance
 
   @schedule_route_priority -20
 
@@ -42,15 +42,15 @@ defmodule Jido.Skill.Schedules do
   @type schedule_spec :: %{
           cron_expression: String.t(),
           action: module(),
-          job_id: {:skill_schedule, atom(), module()},
+          job_id: {:plugin_schedule, atom(), module()},
           signal_type: String.t(),
           timezone: String.t()
         }
 
   @doc """
-  Expands schedules from a skill instance.
+  Expands schedules from a plugin instance.
 
-  Takes a skill instance and returns expanded schedule specifications
+  Takes a plugin instance and returns expanded schedule specifications
   with unique job IDs and auto-generated signal types.
 
   ## Input Formats
@@ -61,25 +61,25 @@ defmodule Jido.Skill.Schedules do
 
   ## Examples
 
-      iex> instance = Instance.new(SlackSkill)  # route_prefix: "slack"
+      iex> instance = Instance.new(SlackPlugin)  # route_prefix: "slack"
       iex> expand_schedules(instance)
       [
         %{
           cron_expression: "*/5 * * * *",
           action: SlackActions.RefreshToken,
-          job_id: {:skill_schedule, :slack, SlackActions.RefreshToken},
+          job_id: {:plugin_schedule, :slack, SlackActions.RefreshToken},
           signal_type: "slack.__schedule__.refresh_token",
           timezone: "Etc/UTC"
         }
       ]
 
-      iex> instance = Instance.new({SlackSkill, as: :support})
+      iex> instance = Instance.new({SlackPlugin, as: :support})
       iex> expand_schedules(instance)
       [
         %{
           cron_expression: "*/5 * * * *",
           action: SlackActions.RefreshToken,
-          job_id: {:skill_schedule, :slack_support, SlackActions.RefreshToken},
+          job_id: {:plugin_schedule, :slack_support, SlackActions.RefreshToken},
           signal_type: "support.slack.__schedule__.refresh_token",
           timezone: "Etc/UTC"
         }
@@ -137,7 +137,7 @@ defmodule Jido.Skill.Schedules do
         generate_signal_type(route_prefix, action)
       end
 
-    job_id = {:skill_schedule, state_key, action}
+    job_id = {:plugin_schedule, state_key, action}
 
     %{
       cron_expression: cron_expr,

@@ -9,12 +9,12 @@ if Code.ensure_loaded?(Igniter) do
 
     ## Options
 
-    - `--skills` - Comma-separated list of skill modules to attach (default: none)
+    - `--plugins` - Comma-separated list of plugin modules to attach (default: none)
 
     ## Examples
 
         $ mix jido.gen.agent MyApp.Agents.Coordinator
-        $ mix jido.gen.agent MyApp.Agents.Chat --skills=MyApp.Skills.Chat
+        $ mix jido.gen.agent MyApp.Agents.Chat --plugins=MyApp.Plugins.Chat
     """
 
     use Igniter.Mix.Task
@@ -28,10 +28,10 @@ if Code.ensure_loaded?(Igniter) do
         group: :jido,
         positional: [:module],
         schema: [
-          skills: :string
+          plugins: :string
         ],
         defaults: [
-          skills: nil
+          plugins: nil
         ],
         example: "mix jido.gen.agent MyApp.Agents.Coordinator"
       }
@@ -46,17 +46,17 @@ if Code.ensure_loaded?(Igniter) do
       module = IgniterModule.parse(module_name)
       name = Helpers.module_to_name(module_name)
 
-      skills =
-        options[:skills]
+      plugins =
+        options[:plugins]
         |> Helpers.parse_list()
         |> Enum.map(&String.to_atom/1)
 
-      skills_opt =
-        if Enum.empty?(skills) do
+      plugins_opt =
+        if Enum.empty?(plugins) do
           ""
         else
-          skills_str = Enum.map_join(skills, ", ", &inspect/1)
-          ",\n    skills: [#{skills_str}]"
+          plugins_str = Enum.map_join(plugins, ", ", &inspect/1)
+          ",\n    plugins: [#{plugins_str}]"
         end
 
       contents = """
@@ -64,7 +64,7 @@ if Code.ensure_loaded?(Igniter) do
         use Jido.Agent,
           name: "#{name}",
           description: "TODO: Add description",
-          schema: []#{skills_opt}
+          schema: []#{plugins_opt}
       end
       """
 

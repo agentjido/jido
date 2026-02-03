@@ -1,8 +1,8 @@
-defmodule JidoTest.Skill.RoutesTest do
+defmodule JidoTest.Plugin.RoutesTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Skill.Instance
-  alias Jido.Skill.Routes
+  alias Jido.Plugin.Instance
+  alias Jido.Plugin.Routes
 
   defmodule TestAction1 do
     @moduledoc false
@@ -34,11 +34,11 @@ defmodule JidoTest.Skill.RoutesTest do
     def run(_params, _context), do: {:ok, %{}}
   end
 
-  defmodule SkillWithRoutes do
+  defmodule PluginWithRoutes do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_routes",
-      state_key: :skill_routes,
+    use Jido.Plugin,
+      name: "plugin_with_routes",
+      state_key: :plugin_routes,
       actions: [TestAction1, TestAction2],
       routes: [
         {"post", TestAction1},
@@ -46,11 +46,11 @@ defmodule JidoTest.Skill.RoutesTest do
       ]
   end
 
-  defmodule SkillWithRoutesAndOptions do
+  defmodule PluginWithRoutesAndOptions do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_opts",
-      state_key: :skill_opts,
+    use Jido.Plugin,
+      name: "plugin_with_opts",
+      state_key: :plugin_opts,
       actions: [TestAction1, TestAction2],
       routes: [
         {"post", TestAction1, priority: 5},
@@ -58,65 +58,65 @@ defmodule JidoTest.Skill.RoutesTest do
       ]
   end
 
-  defmodule SkillWithPatterns do
+  defmodule PluginWithPatterns do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_patterns",
-      state_key: :skill_patterns,
+    use Jido.Plugin,
+      name: "plugin_with_patterns",
+      state_key: :plugin_patterns,
       actions: [TestAction1],
       signal_patterns: ["incoming.*"]
   end
 
-  defmodule SkillNoRoutes do
+  defmodule PluginNoRoutes do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_no_routes",
-      state_key: :skill_no_routes,
+    use Jido.Plugin,
+      name: "plugin_no_routes",
+      state_key: :plugin_no_routes,
       actions: [TestAction1]
   end
 
   describe "expand_routes/1" do
     test "expands routes with prefix from instance" do
-      instance = Instance.new(SkillWithRoutes)
+      instance = Instance.new(PluginWithRoutes)
 
       routes = Routes.expand_routes(instance)
 
       assert length(routes) == 2
-      assert {"skill_with_routes.post", TestAction1, []} in routes
-      assert {"skill_with_routes.list", TestAction2, []} in routes
+      assert {"plugin_with_routes.post", TestAction1, []} in routes
+      assert {"plugin_with_routes.list", TestAction2, []} in routes
     end
 
     test "preserves route options" do
-      instance = Instance.new(SkillWithRoutesAndOptions)
+      instance = Instance.new(PluginWithRoutesAndOptions)
 
       routes = Routes.expand_routes(instance)
 
       assert length(routes) == 2
-      assert {"skill_with_opts.post", TestAction1, [priority: 5]} in routes
-      assert {"skill_with_opts.list", TestAction2, [on_conflict: :replace]} in routes
+      assert {"plugin_with_opts.post", TestAction1, [priority: 5]} in routes
+      assert {"plugin_with_opts.list", TestAction2, [on_conflict: :replace]} in routes
     end
 
     test "applies alias prefix when using :as option" do
-      instance = Instance.new({SkillWithRoutes, as: :support})
+      instance = Instance.new({PluginWithRoutes, as: :support})
 
       routes = Routes.expand_routes(instance)
 
       assert length(routes) == 2
-      assert {"support.skill_with_routes.post", TestAction1, []} in routes
-      assert {"support.skill_with_routes.list", TestAction2, []} in routes
+      assert {"support.plugin_with_routes.post", TestAction1, []} in routes
+      assert {"support.plugin_with_routes.list", TestAction2, []} in routes
     end
 
     test "falls back to legacy signal_patterns when routes empty" do
-      instance = Instance.new(SkillWithPatterns)
+      instance = Instance.new(PluginWithPatterns)
 
       routes = Routes.expand_routes(instance)
 
       assert length(routes) == 1
-      assert {"skill_with_patterns.incoming.*", TestAction1, []} in routes
+      assert {"plugin_with_patterns.incoming.*", TestAction1, []} in routes
     end
 
     test "returns empty list when no routes and no patterns" do
-      instance = Instance.new(SkillNoRoutes)
+      instance = Instance.new(PluginNoRoutes)
 
       routes = Routes.expand_routes(instance)
 
@@ -124,16 +124,16 @@ defmodule JidoTest.Skill.RoutesTest do
     end
 
     test "legacy patterns generate routes for each action" do
-      defmodule MultiActionPatternSkill do
+      defmodule MultiActionPatternPlugin do
         @moduledoc false
-        use Jido.Skill,
+        use Jido.Plugin,
           name: "multi_action",
           state_key: :multi_action,
           actions: [TestAction1, TestAction2],
           signal_patterns: ["pattern1"]
       end
 
-      instance = Instance.new(MultiActionPatternSkill)
+      instance = Instance.new(MultiActionPatternPlugin)
 
       routes = Routes.expand_routes(instance)
 
@@ -142,22 +142,22 @@ defmodule JidoTest.Skill.RoutesTest do
       assert {"multi_action.pattern1", TestAction2, []} in routes
     end
 
-    test "returns empty when skill has custom router/1 callback" do
-      defmodule SkillWithCustomRouter do
+    test "returns empty when plugin has custom router/1 callback" do
+      defmodule PluginWithCustomRouter do
         @moduledoc false
-        use Jido.Skill,
+        use Jido.Plugin,
           name: "custom_router",
           state_key: :custom_router,
           actions: [TestAction1],
           signal_patterns: ["ignored.*"]
 
-        @impl Jido.Skill
+        @impl Jido.Plugin
         def router(_config) do
           [{"custom.route", TestAction1}]
         end
       end
 
-      instance = Instance.new(SkillWithCustomRouter)
+      instance = Instance.new(PluginWithCustomRouter)
 
       routes = Routes.expand_routes(instance)
 
@@ -165,19 +165,19 @@ defmodule JidoTest.Skill.RoutesTest do
     end
 
     test "falls back to patterns when router/1 returns nil" do
-      defmodule SkillWithNilRouter do
+      defmodule PluginWithNilRouter do
         @moduledoc false
-        use Jido.Skill,
+        use Jido.Plugin,
           name: "nil_router",
           state_key: :nil_router,
           actions: [TestAction1],
           signal_patterns: ["fallback.*"]
 
-        @impl Jido.Skill
+        @impl Jido.Plugin
         def router(_config), do: nil
       end
 
-      instance = Instance.new(SkillWithNilRouter)
+      instance = Instance.new(PluginWithNilRouter)
 
       routes = Routes.expand_routes(instance)
 
@@ -278,9 +278,9 @@ defmodule JidoTest.Skill.RoutesTest do
   end
 
   describe "integration: expand and detect" do
-    test "two instances of same skill with different :as don't conflict" do
-      support = Instance.new({SkillWithRoutes, as: :support})
-      sales = Instance.new({SkillWithRoutes, as: :sales})
+    test "two instances of same plugin with different :as don't conflict" do
+      support = Instance.new({PluginWithRoutes, as: :support})
+      sales = Instance.new({PluginWithRoutes, as: :sales})
 
       support_routes = Routes.expand_routes(support)
       sales_routes = Routes.expand_routes(sales)
@@ -291,9 +291,9 @@ defmodule JidoTest.Skill.RoutesTest do
       assert length(merged) == 4
     end
 
-    test "same skill without :as conflicts with itself" do
-      instance1 = Instance.new(SkillWithRoutes)
-      instance2 = Instance.new(SkillWithRoutes)
+    test "same plugin without :as conflicts with itself" do
+      instance1 = Instance.new(PluginWithRoutes)
+      instance2 = Instance.new(PluginWithRoutes)
 
       routes1 = Routes.expand_routes(instance1)
       routes2 = Routes.expand_routes(instance2)

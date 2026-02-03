@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.SkillTransformTest do
+defmodule JidoTest.AgentServer.PluginTransformTest do
   use JidoTest.Case, async: true
 
   alias Jido.Signal
@@ -17,42 +17,42 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
     end
   end
 
-  # Skill with default transform (identity)
-  defmodule DefaultTransformSkill do
+  # Plugin with default transform (identity)
+  defmodule DefaultTransformPlugin do
     @moduledoc false
-    use Jido.Skill,
+    use Jido.Plugin,
       name: "default_transform",
       state_key: :default_transform,
-      actions: [JidoTest.AgentServer.SkillTransformTest.SetValueAction],
+      actions: [JidoTest.AgentServer.PluginTransformTest.SetValueAction],
       signal_patterns: ["value.*"]
   end
 
-  # Skill that wraps agent with metadata
-  defmodule MetadataTransformSkill do
+  # Plugin that wraps agent with metadata
+  defmodule MetadataTransformPlugin do
     @moduledoc false
-    use Jido.Skill,
+    use Jido.Plugin,
       name: "metadata_transform",
       state_key: :metadata_transform,
-      actions: [JidoTest.AgentServer.SkillTransformTest.SetValueAction],
+      actions: [JidoTest.AgentServer.PluginTransformTest.SetValueAction],
       signal_patterns: ["value.*"]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def transform_result(_action, agent, _context) do
       new_state = Map.put(agent.state, :transformed_by, __MODULE__)
       %{agent | state: new_state}
     end
   end
 
-  # Skill that adds timestamp
-  defmodule TimestampTransformSkill do
+  # Plugin that adds timestamp
+  defmodule TimestampTransformPlugin do
     @moduledoc false
-    use Jido.Skill,
+    use Jido.Plugin,
       name: "timestamp_transform",
       state_key: :timestamp_transform,
-      actions: [JidoTest.AgentServer.SkillTransformTest.SetValueAction],
+      actions: [JidoTest.AgentServer.PluginTransformTest.SetValueAction],
       signal_patterns: ["value.*"]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def transform_result(_action, agent, _context) do
       new_state = Map.put(agent.state, :transformed_at, DateTime.utc_now())
       %{agent | state: new_state}
@@ -65,10 +65,10 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
     use Jido.Agent,
       name: "default_transform_agent",
       schema: [value: [type: :integer, default: 0]],
-      skills: [JidoTest.AgentServer.SkillTransformTest.DefaultTransformSkill]
+      plugins: [JidoTest.AgentServer.PluginTransformTest.DefaultTransformPlugin]
 
     def signal_routes do
-      [{"value.set", JidoTest.AgentServer.SkillTransformTest.SetValueAction}]
+      [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end
 
@@ -78,31 +78,31 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
     use Jido.Agent,
       name: "metadata_transform_agent",
       schema: [value: [type: :integer, default: 0]],
-      skills: [JidoTest.AgentServer.SkillTransformTest.MetadataTransformSkill]
+      plugins: [JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin]
 
     def signal_routes do
-      [{"value.set", JidoTest.AgentServer.SkillTransformTest.SetValueAction}]
+      [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end
 
-  # Agent with multiple transform skills (chained)
+  # Agent with multiple transform plugins (chained)
   defmodule ChainedTransformAgent do
     @moduledoc false
     use Jido.Agent,
       name: "chained_transform_agent",
       schema: [value: [type: :integer, default: 0]],
-      skills: [
-        JidoTest.AgentServer.SkillTransformTest.MetadataTransformSkill,
-        JidoTest.AgentServer.SkillTransformTest.TimestampTransformSkill
+      plugins: [
+        JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin,
+        JidoTest.AgentServer.PluginTransformTest.TimestampTransformPlugin
       ]
 
     def signal_routes do
-      [{"value.set", JidoTest.AgentServer.SkillTransformTest.SetValueAction}]
+      [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end
 
   describe "transform_result/3 with default implementation" do
-    test "agent returned unchanged when skill uses default transform", %{jido: jido} do
+    test "agent returned unchanged when plugin uses default transform", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: DefaultTransformAgent, jido: jido)
 
       signal = Signal.new!("value.set", %{value: 100}, source: "/test")
@@ -114,7 +114,7 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
   end
 
   describe "transform_result/3 with custom implementation" do
-    test "skill can add metadata to returned agent", %{jido: jido} do
+    test "plugin can add metadata to returned agent", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: MetadataTransformAgent, jido: jido)
 
       signal = Signal.new!("value.set", %{value: 50}, source: "/test")
@@ -123,7 +123,7 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
       assert agent.state[:value] == 50
 
       assert agent.state[:transformed_by] ==
-               JidoTest.AgentServer.SkillTransformTest.MetadataTransformSkill
+               JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin
     end
 
     test "transform only affects call path, not internal state", %{jido: jido} do
@@ -134,7 +134,7 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
 
       # Returned agent has transform applied
       assert returned_agent.state[:transformed_by] ==
-               JidoTest.AgentServer.SkillTransformTest.MetadataTransformSkill
+               JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin
 
       # Internal state does NOT have transform (transforms are for caller view only)
       {:ok, state} = Jido.AgentServer.state(pid)
@@ -143,8 +143,8 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
     end
   end
 
-  describe "transform_result/3 with multiple skills" do
-    test "transforms are chained across skills", %{jido: jido} do
+  describe "transform_result/3 with multiple plugins" do
+    test "transforms are chained across plugins", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ChainedTransformAgent, jido: jido)
 
       signal = Signal.new!("value.set", %{value: 25}, source: "/test")
@@ -153,7 +153,7 @@ defmodule JidoTest.AgentServer.SkillTransformTest do
       assert agent.state[:value] == 25
       # Both transforms should have run
       assert agent.state[:transformed_by] ==
-               JidoTest.AgentServer.SkillTransformTest.MetadataTransformSkill
+               JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin
 
       assert agent.state[:transformed_at] != nil
     end
