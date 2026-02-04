@@ -1,6 +1,7 @@
 defmodule JidoTest.Integration.HibernateThawTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Storage.ETS
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
 
@@ -22,7 +23,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
   end
 
   defp create_jido_instance(table) do
-    %{storage: {Jido.Storage.ETS, table: table}}
+    %{storage: {ETS, table: table}}
   end
 
   describe "basic round-trip: create agent → hibernate → thaw → verify" do
@@ -362,8 +363,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
 
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      {:ok, checkpoint} =
-        Jido.Storage.ETS.get_checkpoint({Jido.Agent, "invariant-1"}, table: table)
+      {:ok, checkpoint} = ETS.get_checkpoint({Jido.Agent, "invariant-1"}, table: table)
 
       refute is_struct(checkpoint.thread, Thread)
       assert checkpoint.thread == %{id: "invariant-thread", rev: 1}

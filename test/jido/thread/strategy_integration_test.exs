@@ -2,6 +2,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Strategy.FSM, as: StrategyFSM
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
 
@@ -56,7 +57,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "fsm_test_agent",
-      strategy: Jido.Agent.Strategy.FSM,
+      strategy: StrategyFSM,
       schema: [value: [type: :integer, default: 0]]
 
     def signal_routes, do: []
@@ -66,7 +67,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "fsm_thread_agent",
-      strategy: {Jido.Agent.Strategy.FSM, thread?: true},
+      strategy: {StrategyFSM, thread?: true},
       schema: [value: [type: :integer, default: 0]]
 
     def signal_routes, do: []
@@ -298,7 +299,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
         strategy_opts: [thread?: true, initial_state: "idle"]
       }
 
-      {agent, _directives} = Jido.Agent.Strategy.FSM.init(agent, ctx)
+      {agent, _directives} = StrategyFSM.init(agent, ctx)
 
       assert ThreadAgent.has_thread?(agent)
       thread = ThreadAgent.get(agent)
@@ -315,7 +316,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       {:ok, agent} = Agent.new(%{id: "test"})
       ctx = %{agent_module: FSMTestAgent, strategy_opts: []}
 
-      {agent, _directives} = Jido.Agent.Strategy.FSM.init(agent, ctx)
+      {agent, _directives} = StrategyFSM.init(agent, ctx)
 
       refute ThreadAgent.has_thread?(agent)
     end

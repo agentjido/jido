@@ -1,12 +1,12 @@
 defmodule JidoTest.PersistTest do
   use JidoTest.Case, async: true
 
-  alias Jido.Persist
-  alias Jido.Thread
   alias Jido.Agent
+  alias Jido.Persist
   alias Jido.Storage.ETS
-  alias JidoTest.PersistTest.TestAgent
+  alias Jido.Thread
   alias JidoTest.PersistTest.CustomAgent
+  alias JidoTest.PersistTest.TestAgent
 
   defmodule TestAgent do
     use Jido.Agent,
@@ -247,12 +247,12 @@ defmodule JidoTest.PersistTest do
     test "state is preserved correctly" do
       table = unique_table()
       agent = TestAgent.new(id: "roundtrip-2")
-      agent = %{agent | state: %{agent.state | counter: 12345, status: :hibernated}}
+      agent = %{agent | state: %{agent.state | counter: 12_345, status: :hibernated}}
 
       :ok = Persist.hibernate(storage(table), agent)
       {:ok, thawed} = Persist.thaw(storage(table), Agent, "roundtrip-2")
 
-      assert thawed.state.counter == 12345
+      assert thawed.state.counter == 12_345
       assert thawed.state.status == :hibernated
     end
 
