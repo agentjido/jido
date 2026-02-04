@@ -1,26 +1,26 @@
-defmodule Jido.Skill do
+defmodule Jido.Plugin do
   @moduledoc """
-  A Skill is a composable capability that can be attached to an agent.
+  A Plugin is a composable capability that can be attached to an agent.
 
-  Skills encapsulate:
+  Plugins encapsulate:
   - A set of actions the agent can perform
-  - State schema for skill-specific data (nested under `state_key`)
+  - State schema for plugin-specific data (nested under `state_key`)
   - Configuration schema for per-agent customization
   - Signal routing rules
   - Optional lifecycle hooks and child processes
 
   ## Lifecycle
 
-  1. **Compile-time**: Skill is declared in agent's `skills:` option
-  2. **Agent.new/1**: `mount/2` is called to initialize skill state (pure)
+  1. **Compile-time**: Plugin is declared in agent's `plugins:` option
+  2. **Agent.new/1**: `mount/2` is called to initialize plugin state (pure)
   3. **AgentServer.init/1**: `child_spec/1` processes are started and monitored
   4. **Signal processing**: `handle_signal/2` runs before routing, can override or abort
   5. **After cmd/2 (call path)**: `transform_result/3` wraps call results
 
-  ## Example Skill
+  ## Example Plugin
 
-      defmodule MyApp.ChatSkill do
-        use Jido.Skill,
+      defmodule MyApp.ChatPlugin do
+        use Jido.Plugin,
           name: "chat",
           state_key: :chat,
           actions: [MyApp.Actions.SendMessage, MyApp.Actions.ListHistory],
@@ -30,13 +30,13 @@ defmodule Jido.Skill do
           }),
           signal_patterns: ["chat.*"]
 
-        @impl Jido.Skill
+        @impl Jido.Plugin
         def mount(agent, config) do
           # Custom initialization beyond schema defaults
           {:ok, %{initialized_at: DateTime.utc_now()}}
         end
 
-        @impl Jido.Skill
+        @impl Jido.Plugin
         def router(config) do
           [
             {"chat.send", MyApp.Actions.SendMessage},
@@ -45,131 +45,131 @@ defmodule Jido.Skill do
         end
       end
 
-  ## Using Skills
+  ## Using Plugins
 
       defmodule MyAgent do
         use Jido.Agent,
           name: "my_agent",
-          skills: [
-            MyApp.ChatSkill,
-            {MyApp.DatabaseSkill, %{pool_size: 5}}
+          plugins: [
+            MyApp.ChatPlugin,
+            {MyApp.DatabasePlugin, %{pool_size: 5}}
           ]
       end
 
   ## Configuration Options
 
-  - `name` - Required. The skill name (letters, numbers, underscores).
-  - `state_key` - Required. Atom key for skill state in agent.
+  - `name` - Required. The plugin name (letters, numbers, underscores).
+  - `state_key` - Required. Atom key for plugin state in agent.
   - `actions` - Required. List of action modules.
   - `description` - Optional description.
   - `category` - Optional category.
   - `vsn` - Optional version string.
-  - `schema` - Optional Zoi schema for skill state.
+  - `schema` - Optional Zoi schema for plugin state.
   - `config_schema` - Optional Zoi schema for per-agent config.
   - `signal_patterns` - List of signal pattern strings (default: []).
   - `tags` - List of tag strings (default: []).
-  - `capabilities` - List of atoms describing what the skill provides (default: []).
-  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:skill, :http}` (default: []).
+  - `capabilities` - List of atoms describing what the plugin provides (default: []).
+  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
   - `routes` - List of route tuples like `{"post", ActionModule}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
   """
 
-  alias Jido.Skill.Manifest
-  alias Jido.Skill.Spec
+  alias Jido.Plugin.Manifest
+  alias Jido.Plugin.Spec
 
-  @skill_config_schema Zoi.object(
-                         %{
-                           name:
-                             Zoi.string(
-                               description:
-                                 "The name of the Skill. Must contain only letters, numbers, and underscores."
-                             )
-                             |> Zoi.refine({Jido.Util, :validate_name, []}),
-                           state_key:
-                             Zoi.atom(description: "The key for skill state in agent state."),
-                           actions:
-                             Zoi.list(Zoi.atom(), description: "List of action modules.")
-                             |> Zoi.refine({Jido.Util, :validate_actions, []}),
-                           description:
-                             Zoi.string(description: "A description of what the Skill does.")
-                             |> Zoi.optional(),
-                           category:
-                             Zoi.string(description: "The category of the Skill.")
-                             |> Zoi.optional(),
-                           vsn:
-                             Zoi.string(description: "Version")
-                             |> Zoi.optional(),
-                           otp_app:
-                             Zoi.atom(
-                               description:
-                                 "OTP application for loading config from Application.get_env."
-                             )
-                             |> Zoi.optional(),
-                           schema:
-                             Zoi.any(description: "Zoi schema for skill state.")
-                             |> Zoi.optional(),
-                           config_schema:
-                             Zoi.any(description: "Zoi schema for per-agent configuration.")
-                             |> Zoi.optional(),
-                           signal_patterns:
-                             Zoi.list(Zoi.string(), description: "Signal patterns for routing.")
-                             |> Zoi.default([]),
-                           tags:
-                             Zoi.list(Zoi.string(), description: "Tags for categorization.")
-                             |> Zoi.default([]),
-                           capabilities:
-                             Zoi.list(Zoi.atom(),
-                               description: "Capabilities provided by this skill."
-                             )
-                             |> Zoi.default([]),
-                           requires:
-                             Zoi.list(Zoi.any(),
-                               description:
-                                 "Requirements like {:config, :token}, {:app, :req}, {:skill, :http}."
-                             )
-                             |> Zoi.default([]),
-                           routes:
-                             Zoi.list(Zoi.any(),
-                               description: "Route tuples like {\"post\", ActionModule}."
-                             )
-                             |> Zoi.default([]),
-                           schedules:
-                             Zoi.list(Zoi.any(),
-                               description:
-                                 "Schedule tuples like {\"*/5 * * * *\", ActionModule}."
-                             )
-                             |> Zoi.default([])
-                         },
-                         coerce: true
-                       )
+  @plugin_config_schema Zoi.object(
+                          %{
+                            name:
+                              Zoi.string(
+                                description:
+                                  "The name of the Plugin. Must contain only letters, numbers, and underscores."
+                              )
+                              |> Zoi.refine({Jido.Util, :validate_name, []}),
+                            state_key:
+                              Zoi.atom(description: "The key for plugin state in agent state."),
+                            actions:
+                              Zoi.list(Zoi.atom(), description: "List of action modules.")
+                              |> Zoi.refine({Jido.Util, :validate_actions, []}),
+                            description:
+                              Zoi.string(description: "A description of what the Plugin does.")
+                              |> Zoi.optional(),
+                            category:
+                              Zoi.string(description: "The category of the Plugin.")
+                              |> Zoi.optional(),
+                            vsn:
+                              Zoi.string(description: "Version")
+                              |> Zoi.optional(),
+                            otp_app:
+                              Zoi.atom(
+                                description:
+                                  "OTP application for loading config from Application.get_env."
+                              )
+                              |> Zoi.optional(),
+                            schema:
+                              Zoi.any(description: "Zoi schema for plugin state.")
+                              |> Zoi.optional(),
+                            config_schema:
+                              Zoi.any(description: "Zoi schema for per-agent configuration.")
+                              |> Zoi.optional(),
+                            signal_patterns:
+                              Zoi.list(Zoi.string(), description: "Signal patterns for routing.")
+                              |> Zoi.default([]),
+                            tags:
+                              Zoi.list(Zoi.string(), description: "Tags for categorization.")
+                              |> Zoi.default([]),
+                            capabilities:
+                              Zoi.list(Zoi.atom(),
+                                description: "Capabilities provided by this plugin."
+                              )
+                              |> Zoi.default([]),
+                            requires:
+                              Zoi.list(Zoi.any(),
+                                description:
+                                  "Requirements like {:config, :token}, {:app, :req}, {:plugin, :http}."
+                              )
+                              |> Zoi.default([]),
+                            routes:
+                              Zoi.list(Zoi.any(),
+                                description: "Route tuples like {\"post\", ActionModule}."
+                              )
+                              |> Zoi.default([]),
+                            schedules:
+                              Zoi.list(Zoi.any(),
+                                description:
+                                  "Schedule tuples like {\"*/5 * * * *\", ActionModule}."
+                              )
+                              |> Zoi.default([])
+                          },
+                          coerce: true
+                        )
 
   @doc false
   @spec config_schema() :: Zoi.schema()
-  def config_schema, do: @skill_config_schema
+  def config_schema, do: @plugin_config_schema
 
   # Callbacks
 
   @doc """
-  Returns the skill specification with optional per-agent configuration.
+  Returns the plugin specification with optional per-agent configuration.
 
-  This is the primary interface for getting skill metadata and configuration.
+  This is the primary interface for getting plugin metadata and configuration.
   """
-  @callback skill_spec(config :: map()) :: Spec.t()
+  @callback plugin_spec(config :: map()) :: Spec.t()
 
   @doc """
-  Called when the skill is mounted to an agent during `new/1`.
+  Called when the plugin is mounted to an agent during `new/1`.
 
-  Use this to initialize skill-specific state beyond schema defaults.
+  Use this to initialize plugin-specific state beyond schema defaults.
   This is a pure function - no side effects allowed.
 
   ## Parameters
 
-  - `agent` - The agent struct (with state from previously mounted skills)
-  - `config` - Per-agent configuration for this skill
+  - `agent` - The agent struct (with state from previously mounted plugins)
+  - `config` - Per-agent configuration for this plugin
 
   ## Returns
 
-  - `{:ok, skill_state}` - Map to merge into skill's state slice
+  - `{:ok, plugin_state}` - Map to merge into plugin's state slice
   - `{:ok, nil}` - No additional state (schema defaults only)
   - `{:error, reason}` - Raises during agent creation
 
@@ -182,7 +182,7 @@ defmodule Jido.Skill do
   @callback mount(agent :: term(), config :: map()) :: {:ok, map() | nil} | {:error, term()}
 
   @doc """
-  Returns the signal router for this skill.
+  Returns the signal router for this plugin.
 
   The router determines how signals are routed to handlers.
   """
@@ -196,7 +196,7 @@ defmodule Jido.Skill do
   ## Parameters
 
   - `signal` - The incoming `Jido.Signal` struct
-  - `context` - Map with `:agent`, `:agent_module`, `:skill`, `:skill_spec`, `:config`
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, `:config`
 
   ## Returns
 
@@ -227,7 +227,7 @@ defmodule Jido.Skill do
 
   - `action` - The signal type or action module that was executed
   - `result` - The agent struct to transform
-  - `context` - Map with `:agent`, `:agent_module`, `:skill`, `:skill_spec`, `:config`
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, `:config`
 
   ## Returns
 
@@ -248,23 +248,23 @@ defmodule Jido.Skill do
   Returns child specification(s) for supervised processes.
 
   Called during `AgentServer.init/1`. Returned processes are
-  monitored by the AgentServer and tracked in its state.
+  started and monitored. If any crash, AgentServer receives exit signals.
 
   ## Parameters
 
-  - `config` - Per-agent configuration for this skill
+  - `config` - Per-agent configuration for this plugin
 
-  ## Return Values
+  ## Returns
 
-  - `nil` - No child processes needed
-  - `Supervisor.child_spec()` - Single child process
-  - `[Supervisor.child_spec()]` - Multiple child processes
+  - `nil` - No child processes
+  - `Supervisor.child_spec()` - Single child
+  - `[Supervisor.child_spec()]` - Multiple children
 
   ## Example
 
       def child_spec(config) do
         %{
-          id: MyWorker,
+          id: {__MODULE__, :worker},
           start: {MyWorker, :start_link, [config]}
         }
       end
@@ -273,104 +273,52 @@ defmodule Jido.Skill do
               nil | Supervisor.child_spec() | [Supervisor.child_spec()]
 
   @doc """
-  Returns sensor subscriptions for this skill.
+  Returns bus subscriptions for this plugin.
 
-  Called during `AgentServer.post_init/1` to determine which sensors
-  should be started for this skill. Each sensor is started with the
-  provided configuration.
+  Called during `AgentServer.init/1` to determine which bus adapters
+  to subscribe to and with what options.
 
   ## Parameters
 
-  - `config` - Per-agent configuration for this skill
-  - `context` - Map containing:
-    - `:agent_ref` - The agent reference (name or PID)
-    - `:agent_id` - The agent's unique identifier
-    - `:agent_module` - The agent module
-    - `:skill_spec` - The skill specification
-    - `:jido_instance` - The Jido instance name
+  - `config` - Per-agent configuration for this plugin
+  - `context` - Map with `:agent_id`, `:agent_module`
 
   ## Returns
 
-  A list of `{sensor_module, sensor_config}` tuples where:
-  - `sensor_module` - A module implementing sensor behavior
-  - `sensor_config` - Keyword list or map of sensor configuration
+  List of `{adapter_module, opts}` tuples. Each adapter's `subscribe/2`
+  will be called with the AgentServer pid.
 
   ## Example
 
       def subscriptions(_config, context) do
         [
-          {MyApp.Sensors.FileSensor, [path: "/tmp/watch", target: context.agent_ref]},
-          {MyApp.Sensors.TimerSensor, %{interval: 5000, target: context.agent_ref}}
+          {Jido.Bus.Adapters.Local, topic: "events.*"},
+          {Jido.Bus.Adapters.PubSub, pubsub: MyApp.PubSub, topic: context.agent_id}
         ]
       end
   """
   @callback subscriptions(config :: map(), context :: map()) ::
               [{module(), keyword() | map()}]
 
-  @optional_callbacks [
-    mount: 2,
-    router: 1,
-    handle_signal: 2,
-    transform_result: 3,
-    child_spec: 1,
-    subscriptions: 2
-  ]
-
-  # Helper functions that return quoted expressions to reduce the size of __using__/1
+  # Macro implementation
 
   @doc false
   defp generate_behaviour_and_validation(opts) do
     quote location: :keep do
-      @behaviour Jido.Skill
+      @behaviour Jido.Plugin
 
-      alias Jido.Skill
-      alias Jido.Skill.Spec
+      alias Jido.Plugin.Manifest
+      alias Jido.Plugin.Spec
 
-      # Validate config at compile time
-      @validated_opts (case Zoi.parse(Skill.config_schema(), Map.new(unquote(opts))) do
+      @validated_opts (case Zoi.parse(Jido.Plugin.config_schema(), Enum.into(unquote(opts), %{})) do
                          {:ok, validated} ->
                            validated
 
                          {:error, errors} ->
-                           message =
-                             "Invalid Skill configuration for #{inspect(__MODULE__)}: #{inspect(errors)}"
-
                            raise CompileError,
-                             description: message,
-                             file: __ENV__.file,
-                             line: __ENV__.line
+                             description:
+                               "Invalid plugin configuration:\n#{Zoi.prettify_errors(errors)}"
                        end)
-
-      # Validate actions exist at compile time
-      Skill.__validate_actions__(@validated_opts.actions, __ENV__)
-    end
-  end
-
-  @doc false
-  def __validate_actions__(actions, env) do
-    Enum.each(actions, &validate_single_action(&1, env))
-  end
-
-  defp validate_single_action(action_module, env) do
-    case Code.ensure_compiled(action_module) do
-      {:module, _} ->
-        validate_action_behaviour(action_module, env)
-
-      {:error, reason} ->
-        raise CompileError,
-          description:
-            "Action #{inspect(action_module)} could not be compiled: #{inspect(reason)}",
-          file: env.file,
-          line: env.line
-    end
-  end
-
-  defp validate_action_behaviour(action_module, env) do
-    unless function_exported?(action_module, :__action_metadata__, 0) do
-      raise CompileError,
-        description: "Action #{inspect(action_module)} does not implement Jido.Action behavior",
-        file: env.file,
-        line: env.line
     end
   end
 
@@ -385,15 +333,15 @@ defmodule Jido.Skill do
 
   defp generate_core_accessors do
     quote location: :keep do
-      @doc "Returns the skill's name."
+      @doc "Returns the plugin's name."
       @spec name() :: String.t()
       def name, do: @validated_opts.name
 
-      @doc "Returns the key used to store skill state in the agent."
+      @doc "Returns the key used to store plugin state in the agent."
       @spec state_key() :: atom()
       def state_key, do: @validated_opts.state_key
 
-      @doc "Returns the list of action modules provided by this skill."
+      @doc "Returns the list of action modules provided by this plugin."
       @spec actions() :: [module()]
       def actions, do: @validated_opts.actions
     end
@@ -401,15 +349,15 @@ defmodule Jido.Skill do
 
   defp generate_optional_accessors do
     quote location: :keep do
-      @doc "Returns the skill's description."
+      @doc "Returns the plugin's description."
       @spec description() :: String.t() | nil
       def description, do: @validated_opts[:description]
 
-      @doc "Returns the skill's category."
+      @doc "Returns the plugin's category."
       @spec category() :: String.t() | nil
       def category, do: @validated_opts[:category]
 
-      @doc "Returns the skill's version."
+      @doc "Returns the plugin's version."
       @spec vsn() :: String.t() | nil
       def vsn, do: @validated_opts[:vsn]
 
@@ -417,7 +365,7 @@ defmodule Jido.Skill do
       @spec otp_app() :: atom() | nil
       def otp_app, do: @validated_opts[:otp_app]
 
-      @doc "Returns the Zoi schema for skill state."
+      @doc "Returns the Zoi schema for plugin state."
       @spec schema() :: Zoi.schema() | nil
       def schema, do: @validated_opts[:schema]
 
@@ -436,15 +384,15 @@ defmodule Jido.Skill do
 
   defp generate_pattern_accessors do
     quote location: :keep do
-      @doc "Returns the signal patterns this skill handles."
+      @doc "Returns the signal patterns this plugin handles."
       @spec signal_patterns() :: [String.t()]
       def signal_patterns, do: @validated_opts[:signal_patterns] || []
 
-      @doc "Returns the skill's tags."
+      @doc "Returns the plugin's tags."
       @spec tags() :: [String.t()]
       def tags, do: @validated_opts[:tags] || []
 
-      @doc "Returns the capabilities provided by this skill."
+      @doc "Returns the capabilities provided by this plugin."
       @spec capabilities() :: [atom()]
       def capabilities, do: @validated_opts[:capabilities] || []
     end
@@ -452,15 +400,15 @@ defmodule Jido.Skill do
 
   defp generate_requirement_accessors do
     quote location: :keep do
-      @doc "Returns the requirements for this skill."
+      @doc "Returns the requirements for this plugin."
       @spec requires() :: [tuple()]
       def requires, do: @validated_opts[:requires] || []
 
-      @doc "Returns the routes for this skill."
+      @doc "Returns the routes for this plugin."
       @spec routes() :: [tuple()]
       def routes, do: @validated_opts[:routes] || []
 
-      @doc "Returns the schedules for this skill."
+      @doc "Returns the schedules for this plugin."
       @spec schedules() :: [tuple()]
       def schedules, do: @validated_opts[:schedules] || []
     end
@@ -470,16 +418,16 @@ defmodule Jido.Skill do
   defp generate_spec_and_manifest_functions do
     quote location: :keep do
       @doc """
-      Returns the skill specification with optional per-agent configuration.
+      Returns the plugin specification with optional per-agent configuration.
 
       ## Examples
 
-          spec = MyModule.skill_spec(%{})
-          spec = MyModule.skill_spec(%{custom_option: true})
+          spec = MyModule.plugin_spec(%{})
+          spec = MyModule.plugin_spec(%{custom_option: true})
       """
-      @spec skill_spec(map()) :: Spec.t()
-      @impl Jido.Skill
-      def skill_spec(config \\ %{}) do
+      @spec plugin_spec(map()) :: Spec.t()
+      @impl Jido.Plugin
+      def plugin_spec(config \\ %{}) do
         %Spec{
           module: __MODULE__,
           name: name(),
@@ -497,7 +445,7 @@ defmodule Jido.Skill do
       end
 
       @doc """
-      Returns the skill manifest with all metadata.
+      Returns the plugin manifest with all metadata.
 
       The manifest provides compile-time metadata for discovery
       and introspection, including capabilities, requirements,
@@ -528,11 +476,11 @@ defmodule Jido.Skill do
       @doc """
       Returns metadata for Jido.Discovery integration.
 
-      This function is used by `Jido.Discovery` to index skills
+      This function is used by `Jido.Discovery` to index plugins
       for fast lookup and filtering.
       """
-      @spec __skill_metadata__() :: map()
-      def __skill_metadata__ do
+      @spec __plugin_metadata__() :: map()
+      def __plugin_metadata__ do
         %{
           name: name(),
           description: description(),
@@ -548,33 +496,33 @@ defmodule Jido.Skill do
     quote location: :keep do
       @doc false
       @spec mount(term(), map()) :: {:ok, map() | nil} | {:error, term()}
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def mount(_agent, _config), do: {:ok, %{}}
 
       @doc false
       @spec router(map()) :: term()
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def router(_config), do: nil
 
       @doc false
       @spec handle_signal(term(), map()) ::
               {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def handle_signal(_signal, _context), do: {:ok, nil}
 
       @doc false
       @spec transform_result(module() | String.t(), term(), map()) :: term()
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def transform_result(_action, result, _context), do: result
 
       @doc false
       @spec child_spec(map()) :: nil | Supervisor.child_spec() | [Supervisor.child_spec()]
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def child_spec(_config), do: nil
 
       @doc false
       @spec subscriptions(map(), map()) :: [{module(), keyword() | map()}]
-      @impl Jido.Skill
+      @impl Jido.Plugin
       def subscriptions(_config, _context), do: []
     end
   end

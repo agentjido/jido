@@ -4,8 +4,8 @@ defmodule JidoTest.TestAgents do
   """
 
   # Ensure test actions are compiled before this module
-  # (required for compile-time validation in use Jido.Skill)
-  Code.ensure_compiled!(JidoTest.SkillTestAction)
+  # (required for compile-time validation in use Jido.Plugin)
+  Code.ensure_compiled!(JidoTest.PluginTestAction)
   Code.ensure_compiled!(JidoTest.TestActions.IncrementAction)
 
   defmodule Minimal do
@@ -159,45 +159,45 @@ defmodule JidoTest.TestAgents do
     def signal_routes, do: []
   end
 
-  defmodule TestSkillWithRoutes do
+  defmodule TestPluginWithRoutes do
     @moduledoc false
-    use Jido.Skill,
-      name: "test_routes_skill",
+    use Jido.Plugin,
+      name: "test_routes_plugin",
       state_key: :test_routes,
-      actions: [JidoTest.SkillTestAction],
+      actions: [JidoTest.PluginTestAction],
       routes: [
-        {"post", JidoTest.SkillTestAction},
-        {"list", JidoTest.SkillTestAction}
+        {"post", JidoTest.PluginTestAction},
+        {"list", JidoTest.PluginTestAction}
       ]
   end
 
-  defmodule TestSkillWithPriority do
+  defmodule TestPluginWithPriority do
     @moduledoc false
-    use Jido.Skill,
-      name: "priority_skill",
+    use Jido.Plugin,
+      name: "priority_plugin",
       state_key: :priority,
-      actions: [JidoTest.SkillTestAction],
+      actions: [JidoTest.PluginTestAction],
       routes: [
-        {"action", JidoTest.SkillTestAction, priority: 5}
+        {"action", JidoTest.PluginTestAction, priority: 5}
       ]
   end
 
-  defmodule AgentWithSkillRoutes do
+  defmodule AgentWithPluginRoutes do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_skill_routes",
-      skills: [JidoTest.TestAgents.TestSkillWithRoutes]
+      name: "agent_with_plugin_routes",
+      plugins: [JidoTest.TestAgents.TestPluginWithRoutes]
 
     def signal_routes, do: []
   end
 
-  defmodule AgentWithMultiInstanceSkills do
+  defmodule AgentWithMultiInstancePlugins do
     @moduledoc false
     use Jido.Agent,
       name: "agent_multi_instance",
-      skills: [
-        {JidoTest.TestAgents.TestSkillWithRoutes, as: :support},
-        {JidoTest.TestAgents.TestSkillWithRoutes, as: :sales}
+      plugins: [
+        {JidoTest.TestAgents.TestPluginWithRoutes, as: :support},
+        {JidoTest.TestAgents.TestPluginWithRoutes, as: :sales}
       ]
 
     def signal_routes, do: []

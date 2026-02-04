@@ -1,9 +1,9 @@
-defmodule Jido.Skill.Routes do
+defmodule Jido.Plugin.Routes do
   @moduledoc """
-  Utilities for expanding and validating skill routes.
+  Utilities for expanding and validating plugin routes.
 
   This module handles:
-  - Expanding skill routes with instance prefixes
+  - Expanding plugin routes with instance prefixes
   - Detecting route conflicts at compile time
   - Merging routes with priority-based resolution
 
@@ -24,17 +24,17 @@ defmodule Jido.Skill.Routes do
 
   ## Priority Levels
 
-  Default priority for skill routes is -10 (from signal router conventions).
+  Default priority for plugin routes is -10 (from signal router conventions).
   """
 
-  alias Jido.Skill.Instance
+  alias Jido.Plugin.Instance
 
-  @skill_default_priority -10
+  @plugin_default_priority -10
 
   @doc """
-  Expands routes from a skill instance, applying the route prefix.
+  Expands routes from a plugin instance, applying the route prefix.
 
-  Takes a skill instance and returns expanded route tuples where
+  Takes a plugin instance and returns expanded route tuples where
   each route path is prefixed with the instance's `route_prefix`.
 
   ## Route Input Formats
@@ -50,11 +50,11 @@ defmodule Jido.Skill.Routes do
 
   ## Examples
 
-      iex> instance = Instance.new(SlackSkill)  # route_prefix: "slack"
+      iex> instance = Instance.new(SlackPlugin)  # route_prefix: "slack"
       iex> expand_routes(instance)
       [{"slack.post", SlackActions.Post, []}, {"slack.list", SlackActions.List, []}]
 
-      iex> instance = Instance.new({SlackSkill, as: :support})  # route_prefix: "support.slack"
+      iex> instance = Instance.new({SlackPlugin, as: :support})  # route_prefix: "support.slack"
       iex> expand_routes(instance)
       [{"support.slack.post", SlackActions.Post, []}, ...]
   """
@@ -95,7 +95,7 @@ defmodule Jido.Skill.Routes do
   end
 
   @doc """
-  Detects conflicts in a list of expanded routes from all skill instances.
+  Detects conflicts in a list of expanded routes from all plugin instances.
 
   Returns `{:ok, merged_routes}` if no conflicts, or
   `{:error, conflicts}` with a list of conflict descriptions.
@@ -127,7 +127,7 @@ defmodule Jido.Skill.Routes do
   def detect_conflicts(routes) when is_list(routes) do
     routes_with_priority =
       Enum.map(routes, fn {path, target, opts} ->
-        priority = Keyword.get(opts, :priority, @skill_default_priority)
+        priority = Keyword.get(opts, :priority, @plugin_default_priority)
         on_conflict = Keyword.get(opts, :on_conflict)
         {path, target, priority, on_conflict}
       end)
@@ -160,10 +160,10 @@ defmodule Jido.Skill.Routes do
   end
 
   @doc """
-  Returns the default priority for skill routes.
+  Returns the default priority for plugin routes.
   """
   @spec default_priority() :: integer()
-  def default_priority, do: @skill_default_priority
+  def default_priority, do: @plugin_default_priority
 
   defp expand_route({path, target}, prefix) do
     {prefix_path(prefix, path), target, []}

@@ -1,40 +1,40 @@
-defmodule Jido.Skill.Instance do
+defmodule Jido.Plugin.Instance do
   @moduledoc """
-  Represents a normalized skill instance attached to an agent.
+  Represents a normalized plugin instance attached to an agent.
 
-  Supports multiple instances of the same skill with different configurations
+  Supports multiple instances of the same plugin with different configurations
   via the `as:` option. Each instance gets a unique derived state_key and
   route_prefix based on the `as:` value.
 
   ## Fields
 
-  - `module` - The skill module
+  - `module` - The plugin module
   - `as` - Optional instance alias atom (e.g., `:support`, `:sales`)
   - `config` - Resolved config map (overrides from agent declaration)
-  - `manifest` - The skill's manifest struct
+  - `manifest` - The plugin's manifest struct
   - `state_key` - Derived state key (e.g., `:slack` or `:slack_support` if `as: :support`)
   - `route_prefix` - Derived route prefix (e.g., `"slack"` or `"support.slack"`)
 
   ## Examples
 
       # Single instance (no alias)
-      Instance.new(MySkill)
-      Instance.new({MySkill, %{token: "abc"}})
+      Instance.new(MyPlugin)
+      Instance.new({MyPlugin, %{token: "abc"}})
 
       # Multiple instances with aliases
-      Instance.new({MySkill, as: :support, token: "support-token"})
-      Instance.new({MySkill, as: :sales, token: "sales-token"})
+      Instance.new({MyPlugin, as: :support, token: "support-token"})
+      Instance.new({MyPlugin, as: :sales, token: "sales-token"})
   """
 
-  alias Jido.Skill.Config
+  alias Jido.Plugin.Config
 
   @schema Zoi.struct(
             __MODULE__,
             %{
-              module: Zoi.atom(description: "The skill module"),
+              module: Zoi.atom(description: "The plugin module"),
               as: Zoi.atom(description: "Optional instance alias") |> Zoi.optional(),
               config: Zoi.map(description: "Resolved configuration") |> Zoi.default(%{}),
-              manifest: Zoi.any(description: "The skill's manifest struct"),
+              manifest: Zoi.any(description: "The plugin's manifest struct"),
               state_key: Zoi.atom(description: "Derived state key for agent state"),
               route_prefix: Zoi.string(description: "Derived route prefix for signal routing")
             },
@@ -50,36 +50,36 @@ defmodule Jido.Skill.Instance do
   def schema, do: @schema
 
   @doc """
-  Creates a new Instance from a skill declaration.
+  Creates a new Instance from a plugin declaration.
 
   Config resolution happens during instance creation:
-  1. Base config from `Application.get_env(otp_app, skill_module)`
+  1. Base config from `Application.get_env(otp_app, plugin_module)`
   2. Per-agent overrides from the declaration
-  3. Validation against the skill's `config_schema` if present
+  3. Validation against the plugin's `config_schema` if present
 
   ## Input Formats
 
-  - `SkillModule` - Module with no config
-  - `{SkillModule, %{key: value}}` - Module with config map
-  - `{SkillModule, [key: value]}` - Module with keyword list (may include `:as`)
+  - `PluginModule` - Module with no config
+  - `{PluginModule, %{key: value}}` - Module with config map
+  - `{PluginModule, [key: value]}` - Module with keyword list (may include `:as`)
 
   The `:as` option is extracted from the config and used to derive
   unique state_key and route_prefix for the instance.
 
   ## Examples
 
-      iex> Instance.new(MySkill)
-      %Instance{module: MySkill, as: nil, state_key: :my_skill, ...}
+      iex> Instance.new(MyPlugin)
+      %Instance{module: MyPlugin, as: nil, state_key: :my_plugin, ...}
 
-      iex> Instance.new({MySkill, as: :support, token: "abc"})
-      %Instance{module: MySkill, as: :support, state_key: :my_skill_support, ...}
+      iex> Instance.new({MyPlugin, as: :support, token: "abc"})
+      %Instance{module: MyPlugin, as: :support, state_key: :my_plugin_support, ...}
 
-      iex> Instance.new({MySkill, %{token: "abc"}})
-      %Instance{module: MySkill, as: nil, config: %{token: "abc"}, ...}
+      iex> Instance.new({MyPlugin, %{token: "abc"}})
+      %Instance{module: MyPlugin, as: nil, config: %{token: "abc"}, ...}
   """
   @spec new(module() | {module(), map() | keyword()}) :: t()
-  def new(skill_declaration) do
-    {module, as_opt, overrides} = normalize_declaration(skill_declaration)
+  def new(plugin_declaration) do
+    {module, as_opt, overrides} = normalize_declaration(plugin_declaration)
 
     manifest = module.manifest()
     base_state_key = manifest.state_key
@@ -119,7 +119,7 @@ defmodule Jido.Skill.Instance do
   end
 
   @doc """
-  Derives the route prefix from the skill name and optional `as:` alias.
+  Derives the route prefix from the plugin name and optional `as:` alias.
 
   ## Examples
 
@@ -136,7 +136,7 @@ defmodule Jido.Skill.Instance do
     "#{as_alias}.#{base_name}"
   end
 
-  # Normalizes skill declaration to {module, as_option, config_map}
+  # Normalizes plugin declaration to {module, as_option, config_map}
   defp normalize_declaration(module) when is_atom(module) do
     {module, nil, %{}}
   end

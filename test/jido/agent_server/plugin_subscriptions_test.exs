@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
+defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   use JidoTest.Case, async: false
 
   alias Jido.Sensor.Runtime
@@ -13,7 +13,7 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
     @moduledoc false
     use Jido.Sensor,
       name: "test_sensor",
-      description: "A sensor for testing skill subscriptions",
+      description: "A sensor for testing plugin subscriptions",
       schema:
         Zoi.object(
           %{
@@ -108,103 +108,103 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
   end
 
   # ---------------------------------------------------------------------------
-  # Test Skill Modules
+  # Test Plugin Modules
   # ---------------------------------------------------------------------------
 
-  defmodule SkillWithSensor do
+  defmodule PluginWithSensor do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_sensor",
+    use Jido.Plugin,
+      name: "plugin_with_sensor",
       state_key: :with_sensor,
-      actions: [JidoTest.AgentServer.SkillSubscriptionsTest.SimpleAction]
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def subscriptions(_config, context) do
       [
-        {JidoTest.AgentServer.SkillSubscriptionsTest.TestSensor,
-         %{emit_on_init: true, signal_type: "skill.sensor.ready", agent_ref: context.agent_ref}}
+        {JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
+         %{emit_on_init: true, signal_type: "plugin.sensor.ready", agent_ref: context.agent_ref}}
       ]
     end
   end
 
-  defmodule SkillWithMultipleSensors do
+  defmodule PluginWithMultipleSensors do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_multiple_sensors",
+    use Jido.Plugin,
+      name: "plugin_with_multiple_sensors",
       state_key: :multi_sensors,
-      actions: [JidoTest.AgentServer.SkillSubscriptionsTest.SimpleAction]
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def subscriptions(_config, context) do
       [
-        {JidoTest.AgentServer.SkillSubscriptionsTest.TestSensor,
+        {JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
          %{emit_on_init: true, signal_type: "first.sensor.event", agent_ref: context.agent_ref}},
-        {JidoTest.AgentServer.SkillSubscriptionsTest.SecondTestSensor,
+        {JidoTest.AgentServer.PluginSubscriptionsTest.SecondTestSensor,
          %{sensor_id: "multi-test", agent_ref: context.agent_ref}}
       ]
     end
   end
 
-  defmodule SkillWithNoSubscriptions do
+  defmodule PluginWithNoSubscriptions do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_no_subscriptions",
+    use Jido.Plugin,
+      name: "plugin_with_no_subscriptions",
       state_key: :no_subs,
-      actions: [JidoTest.AgentServer.SkillSubscriptionsTest.SimpleAction]
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def subscriptions(_config, _context) do
       []
     end
   end
 
-  defmodule SkillWithoutSubscriptionsCallback do
+  defmodule PluginWithoutSubscriptionsCallback do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_without_subscriptions_callback",
+    use Jido.Plugin,
+      name: "plugin_without_subscriptions_callback",
       state_key: :no_callback,
-      actions: [JidoTest.AgentServer.SkillSubscriptionsTest.SimpleAction]
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
   end
 
   # ---------------------------------------------------------------------------
   # Test Agent Modules
   # ---------------------------------------------------------------------------
 
-  defmodule AgentWithSensorSkill do
+  defmodule AgentWithSensorPlugin do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_sensor_skill",
-      skills: [JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithSensor]
+      name: "agent_with_sensor_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor]
   end
 
-  defmodule AgentWithMultiSensorSkill do
+  defmodule AgentWithMultiSensorPlugin do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_multi_sensor_skill",
-      skills: [JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithMultipleSensors]
+      name: "agent_with_multi_sensor_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithMultipleSensors]
   end
 
-  defmodule AgentWithNoSubscriptionsSkill do
+  defmodule AgentWithNoSubscriptionsPlugin do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_no_subs_skill",
-      skills: [JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithNoSubscriptions]
+      name: "agent_with_no_subs_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithNoSubscriptions]
   end
 
-  defmodule AgentWithSkillWithoutCallback do
+  defmodule AgentWithPluginWithoutCallback do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_skill_without_callback",
-      skills: [JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithoutSubscriptionsCallback]
+      name: "agent_with_plugin_without_callback",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithoutSubscriptionsCallback]
   end
 
-  defmodule AgentWithMultipleSkills do
+  defmodule AgentWithMultiplePlugins do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_multiple_skills",
-      skills: [
-        JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithSensor,
-        JidoTest.AgentServer.SkillSubscriptionsTest.SkillWithMultipleSensors
+      name: "agent_with_multiple_plugins",
+      plugins: [
+        JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor,
+        JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithMultipleSensors
       ]
   end
 
@@ -212,9 +212,9 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
   # Tests
   # ---------------------------------------------------------------------------
 
-  describe "skill subscription sensors during post_init" do
+  describe "plugin subscription sensors during post_init" do
     test "starts subscription sensor during post_init", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -227,14 +227,14 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
       assert length(sensor_children) == 1
 
       [{tag, child_info}] = sensor_children
-      assert {:sensor, SkillWithSensor, TestSensor} = tag
+      assert {:sensor, PluginWithSensor, TestSensor} = tag
       assert Process.alive?(child_info.pid)
 
       GenServer.stop(pid)
     end
 
     test "sensor is monitored by AgentServer", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -260,10 +260,10 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
   end
 
   describe "sensor context" do
-    test "sensor receives correct context with agent_ref, agent_id, agent_module, skill_spec", %{
+    test "sensor receives correct context with agent_ref, agent_id, agent_module, plugin_spec", %{
       jido: jido
     } do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -277,10 +277,10 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
       assert is_map(sensor_state.context)
       assert is_binary(sensor_state.context.agent_id)
-      assert sensor_state.context.agent_module == AgentWithSensorSkill
+      assert sensor_state.context.agent_module == AgentWithSensorPlugin
       assert is_tuple(sensor_state.context.agent_ref)
-      assert sensor_state.context.skill_spec != nil
-      assert sensor_state.context.skill_spec.module == SkillWithSensor
+      assert sensor_state.context.plugin_spec != nil
+      assert sensor_state.context.plugin_spec.module == PluginWithSensor
       assert sensor_state.context.jido_instance == jido
 
       GenServer.stop(pid)
@@ -289,7 +289,7 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
   describe "signal delivery to agent" do
     test "sensor signals are delivered to the agent", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -307,9 +307,9 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
     end
   end
 
-  describe "multiple sensors from same skill" do
-    test "starts all sensors from skill with multiple subscriptions", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultiSensorSkill, jido: jido)
+  describe "multiple sensors from same plugin" do
+    test "starts all sensors from plugin with multiple subscriptions", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultiSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -321,7 +321,7 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
       sensor_modules =
         sensor_children
-        |> Enum.map(fn {{:sensor, _skill, sensor_mod}, _} -> sensor_mod end)
+        |> Enum.map(fn {{:sensor, _plugin, sensor_mod}, _} -> sensor_mod end)
         |> Enum.sort()
 
       assert sensor_modules == [SecondTestSensor, TestSensor]
@@ -334,9 +334,9 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
     end
   end
 
-  describe "multiple skills with sensors" do
-    test "starts sensors from all skills", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultipleSkills, jido: jido)
+  describe "multiple plugins with sensors" do
+    test "starts sensors from all plugins", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultiplePlugins, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -346,22 +346,22 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
       assert length(sensor_children) == 3
 
-      skill_sensor_pairs =
+      plugin_sensor_pairs =
         sensor_children
-        |> Enum.map(fn {{:sensor, skill, sensor}, _} -> {skill, sensor} end)
+        |> Enum.map(fn {{:sensor, plugin, sensor}, _} -> {plugin, sensor} end)
         |> Enum.sort()
 
-      assert {SkillWithMultipleSensors, SecondTestSensor} in skill_sensor_pairs
-      assert {SkillWithMultipleSensors, TestSensor} in skill_sensor_pairs
-      assert {SkillWithSensor, TestSensor} in skill_sensor_pairs
+      assert {PluginWithMultipleSensors, SecondTestSensor} in plugin_sensor_pairs
+      assert {PluginWithMultipleSensors, TestSensor} in plugin_sensor_pairs
+      assert {PluginWithSensor, TestSensor} in plugin_sensor_pairs
 
       GenServer.stop(pid)
     end
   end
 
-  describe "skill with empty subscriptions" do
-    test "skill returning empty list works fine", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithNoSubscriptionsSkill, jido: jido)
+  describe "plugin with empty subscriptions" do
+    test "plugin returning empty list works fine", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithNoSubscriptionsPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -374,8 +374,8 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
       GenServer.stop(pid)
     end
 
-    test "skill without subscriptions callback works fine", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSkillWithoutCallback, jido: jido)
+    test "plugin without subscriptions callback works fine", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithPluginWithoutCallback, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -391,16 +391,16 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
   describe "sensor child tracking" do
     test "sensors are tracked in agent's children map", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
-      tag = {:sensor, SkillWithSensor, TestSensor}
+      tag = {:sensor, PluginWithSensor, TestSensor}
       assert Map.has_key?(state.children, tag)
 
       child_info = Map.get(state.children, tag)
       assert child_info.module == TestSensor
-      assert child_info.meta.skill == SkillWithSensor
+      assert child_info.meta.plugin == PluginWithSensor
       assert child_info.meta.sensor == TestSensor
 
       GenServer.stop(pid)
@@ -409,7 +409,7 @@ defmodule JidoTest.AgentServer.SkillSubscriptionsTest do
 
   describe "sensor cleanup on AgentServer stop" do
     test "sensors are cleaned up when AgentServer stops", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorSkill, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 

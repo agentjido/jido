@@ -1,25 +1,25 @@
-defmodule JidoTest.Skill.ManifestTest do
+defmodule JidoTest.Plugin.ManifestTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Skill.Manifest
+  alias Jido.Plugin.Manifest
 
   describe "Manifest struct creation" do
     test "creates manifest with required fields" do
       manifest = %Manifest{
-        module: SomeSkill,
-        name: "some_skill",
+        module: SomePlugin,
+        name: "some_plugin",
         state_key: :some
       }
 
-      assert manifest.module == SomeSkill
-      assert manifest.name == "some_skill"
+      assert manifest.module == SomePlugin
+      assert manifest.name == "some_plugin"
       assert manifest.state_key == :some
     end
 
     test "optional fields default correctly" do
       manifest = %Manifest{
-        module: SomeSkill,
-        name: "some_skill",
+        module: SomePlugin,
+        name: "some_plugin",
         state_key: :some
       }
 
@@ -42,9 +42,9 @@ defmodule JidoTest.Skill.ManifestTest do
       config_schema = Zoi.object(%{enabled: Zoi.boolean()})
 
       manifest = %Manifest{
-        module: FullSkill,
-        name: "full_skill",
-        description: "A full skill",
+        module: FullPlugin,
+        name: "full_plugin",
+        description: "A full plugin",
         category: "test",
         tags: ["tag1", "tag2"],
         vsn: "1.0.0",
@@ -56,12 +56,12 @@ defmodule JidoTest.Skill.ManifestTest do
         actions: [SomeAction, AnotherAction],
         routes: [{"post", SomeAction}, {"get", AnotherAction}],
         schedules: [{"*/5 * * * *", SomeAction}],
-        signal_patterns: ["skill.*"]
+        signal_patterns: ["plugin.*"]
       }
 
-      assert manifest.module == FullSkill
-      assert manifest.name == "full_skill"
-      assert manifest.description == "A full skill"
+      assert manifest.module == FullPlugin
+      assert manifest.name == "full_plugin"
+      assert manifest.description == "A full plugin"
       assert manifest.category == "test"
       assert manifest.tags == ["tag1", "tag2"]
       assert manifest.vsn == "1.0.0"
@@ -73,7 +73,7 @@ defmodule JidoTest.Skill.ManifestTest do
       assert manifest.actions == [SomeAction, AnotherAction]
       assert manifest.routes == [{"post", SomeAction}, {"get", AnotherAction}]
       assert manifest.schedules == [{"*/5 * * * *", SomeAction}]
-      assert manifest.signal_patterns == ["skill.*"]
+      assert manifest.signal_patterns == ["plugin.*"]
     end
   end
 
@@ -87,7 +87,7 @@ defmodule JidoTest.Skill.ManifestTest do
   describe "type specs" do
     test "manifest is a struct type" do
       manifest = %Manifest{
-        module: SomeSkill,
+        module: SomePlugin,
         name: "test",
         state_key: :test
       }

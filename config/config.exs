@@ -18,6 +18,9 @@ config :logger, :default_formatter,
     :queue_size,
     :result,
     :signal_type,
+    :span_id,
+    :stacktrace,
+    :trace_id,
     :strategy
   ]
 

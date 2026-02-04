@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.SkillSignalHooksTest do
+defmodule JidoTest.AgentServer.PluginSignalHooksTest do
   use JidoTest.Case, async: true
 
   alias Jido.Signal
@@ -32,68 +32,68 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
     end
   end
 
-  # Skill with default handle_signal (continues to router)
-  defmodule DefaultHandleSignalSkill do
+  # Plugin with default handle_signal (continues to router)
+  defmodule DefaultHandleSignalPlugin do
     @moduledoc false
-    use Jido.Skill,
+    use Jido.Plugin,
       name: "default_handle_signal",
       state_key: :default_hs,
-      actions: [JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction]
   end
 
-  # Skill that overrides routing for specific signals
-  defmodule OverrideSkill do
+  # Plugin that overrides routing for specific signals
+  defmodule OverridePlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "override_skill",
+    use Jido.Plugin,
+      name: "override_plugin",
       state_key: :override,
       actions: [
-        JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction,
-        JidoTest.AgentServer.SkillSignalHooksTest.OverrideAction
+        JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction,
+        JidoTest.AgentServer.PluginSignalHooksTest.OverrideAction
       ]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def handle_signal(signal, _context) do
       if signal.type == "counter.override" do
-        {:ok, {:override, JidoTest.AgentServer.SkillSignalHooksTest.OverrideAction}}
+        {:ok, {:override, JidoTest.AgentServer.PluginSignalHooksTest.OverrideAction}}
       else
         {:ok, :continue}
       end
     end
   end
 
-  # Skill that returns error for specific signals
-  defmodule ErrorSkill do
+  # Plugin that returns error for specific signals
+  defmodule ErrorPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "error_skill",
-      state_key: :error_skill,
-      actions: [JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction]
+    use Jido.Plugin,
+      name: "error_plugin",
+      state_key: :error_plugin,
+      actions: [JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def handle_signal(signal, _context) do
       if signal.type == "counter.error" do
-        {:error, :skill_rejected_signal}
+        {:error, :plugin_rejected_signal}
       else
         {:ok, :continue}
       end
     end
   end
 
-  # Agent with default handle_signal skill
+  # Agent with default handle_signal plugin
   defmodule DefaultHandleSignalAgent do
     @moduledoc false
     use Jido.Agent,
       name: "default_handle_signal_agent",
       schema: [counter: [type: :integer, default: 0]],
-      skills: [JidoTest.AgentServer.SkillSignalHooksTest.DefaultHandleSignalSkill]
+      plugins: [JidoTest.AgentServer.PluginSignalHooksTest.DefaultHandleSignalPlugin]
 
     def signal_routes do
-      [{"counter.increment", JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction}]
+      [{"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}]
     end
   end
 
-  # Agent with override skill
+  # Agent with override plugin
   defmodule OverrideAgent do
     @moduledoc false
     use Jido.Agent,
@@ -102,34 +102,34 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
         counter: [type: :integer, default: 0],
         overridden: [type: :boolean, default: false]
       ],
-      skills: [JidoTest.AgentServer.SkillSignalHooksTest.OverrideSkill]
+      plugins: [JidoTest.AgentServer.PluginSignalHooksTest.OverridePlugin]
 
     def signal_routes do
       [
-        {"counter.increment", JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction},
-        {"counter.override", JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction}
+        {"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction},
+        {"counter.override", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}
       ]
     end
   end
 
-  # Agent with error skill
+  # Agent with error plugin
   defmodule ErrorAgent do
     @moduledoc false
     use Jido.Agent,
       name: "error_agent",
       schema: [counter: [type: :integer, default: 0]],
-      skills: [JidoTest.AgentServer.SkillSignalHooksTest.ErrorSkill]
+      plugins: [JidoTest.AgentServer.PluginSignalHooksTest.ErrorPlugin]
 
     def signal_routes do
       [
-        {"counter.increment", JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction},
-        {"counter.error", JidoTest.AgentServer.SkillSignalHooksTest.IncrementAction}
+        {"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction},
+        {"counter.error", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}
       ]
     end
   end
 
   describe "handle_signal/2 with default implementation" do
-    test "signals route normally when skill uses default handle_signal", %{jido: jido} do
+    test "signals route normally when plugin uses default handle_signal", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: DefaultHandleSignalAgent, jido: jido)
 
       signal = Signal.new!("counter.increment", %{amount: 5}, source: "/test")
@@ -140,10 +140,10 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
   end
 
   describe "handle_signal/2 with override" do
-    test "skill can override routing by returning {:ok, {:override, action}}", %{jido: jido} do
+    test "plugin can override routing by returning {:ok, {:override, action}}", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: OverrideAgent, jido: jido)
 
-      # This would normally route to IncrementAction, but skill overrides it
+      # This would normally route to IncrementAction, but plugin overrides it
       signal = Signal.new!("counter.override", %{}, source: "/test")
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
@@ -153,7 +153,7 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
       assert agent.state[:counter] == 0
     end
 
-    test "skill continues to normal routing when not overriding", %{jido: jido} do
+    test "plugin continues to normal routing when not overriding", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: OverrideAgent, jido: jido)
 
       signal = Signal.new!("counter.increment", %{amount: 10}, source: "/test")
@@ -165,7 +165,7 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
   end
 
   describe "handle_signal/2 with error" do
-    test "skill can abort signal processing by returning error", %{jido: jido} do
+    test "plugin can abort signal processing by returning error", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ErrorAgent, jido: jido)
 
       signal = Signal.new!("counter.error", %{}, source: "/test")
@@ -173,7 +173,7 @@ defmodule JidoTest.AgentServer.SkillSignalHooksTest do
 
       # Should return error
       assert {:error, error} = result
-      assert error.message == "Skill handle_signal failed"
+      assert error.message == "Plugin handle_signal failed"
 
       # Agent state should be unchanged
       {:ok, state} = Jido.AgentServer.state(pid)

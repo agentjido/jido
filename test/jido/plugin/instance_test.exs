@@ -1,62 +1,62 @@
-defmodule JidoTest.Skill.InstanceTest do
+defmodule JidoTest.Plugin.InstanceTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Skill.Instance
+  alias Jido.Plugin.Instance
 
-  defmodule TestSkill do
+  defmodule TestPlugin do
     @moduledoc false
-    use Jido.Skill,
-      name: "test_skill",
+    use Jido.Plugin,
+      name: "test_plugin",
       state_key: :test,
-      actions: [JidoTest.SkillTestAction],
+      actions: [JidoTest.PluginTestAction],
       schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
-  defmodule SlackSkill do
+  defmodule SlackPlugin do
     @moduledoc false
-    use Jido.Skill,
+    use Jido.Plugin,
       name: "slack",
       state_key: :slack,
-      actions: [JidoTest.SkillTestAction],
+      actions: [JidoTest.PluginTestAction],
       schema: Zoi.object(%{token: Zoi.string() |> Zoi.optional()})
   end
 
   describe "new/1" do
     test "creates instance from module alone" do
-      instance = Instance.new(TestSkill)
+      instance = Instance.new(TestPlugin)
 
-      assert instance.module == TestSkill
+      assert instance.module == TestPlugin
       assert instance.as == nil
       assert instance.config == %{}
       assert instance.state_key == :test
-      assert instance.route_prefix == "test_skill"
-      assert instance.manifest.name == "test_skill"
+      assert instance.route_prefix == "test_plugin"
+      assert instance.manifest.name == "test_plugin"
     end
 
     test "creates instance from {module, map} tuple" do
-      instance = Instance.new({TestSkill, %{custom: "value"}})
+      instance = Instance.new({TestPlugin, %{custom: "value"}})
 
-      assert instance.module == TestSkill
+      assert instance.module == TestPlugin
       assert instance.as == nil
       assert instance.config == %{custom: "value"}
       assert instance.state_key == :test
-      assert instance.route_prefix == "test_skill"
+      assert instance.route_prefix == "test_plugin"
     end
 
     test "creates instance from {module, keyword_list} without :as" do
-      instance = Instance.new({TestSkill, [custom: "value", other: 123]})
+      instance = Instance.new({TestPlugin, [custom: "value", other: 123]})
 
-      assert instance.module == TestSkill
+      assert instance.module == TestPlugin
       assert instance.as == nil
       assert instance.config == %{custom: "value", other: 123}
       assert instance.state_key == :test
-      assert instance.route_prefix == "test_skill"
+      assert instance.route_prefix == "test_plugin"
     end
 
     test "creates instance with :as option from keyword list" do
-      instance = Instance.new({SlackSkill, as: :support, token: "support-token"})
+      instance = Instance.new({SlackPlugin, as: :support, token: "support-token"})
 
-      assert instance.module == SlackSkill
+      assert instance.module == SlackPlugin
       assert instance.as == :support
       assert instance.config == %{token: "support-token"}
       assert instance.state_key == :slack_support
@@ -64,20 +64,20 @@ defmodule JidoTest.Skill.InstanceTest do
     end
 
     test "creates instance with only :as option" do
-      instance = Instance.new({SlackSkill, as: :sales})
+      instance = Instance.new({SlackPlugin, as: :sales})
 
-      assert instance.module == SlackSkill
+      assert instance.module == SlackPlugin
       assert instance.as == :sales
       assert instance.config == %{}
       assert instance.state_key == :slack_sales
       assert instance.route_prefix == "sales.slack"
     end
 
-    test "manifest is populated from skill module" do
-      instance = Instance.new(TestSkill)
+    test "manifest is populated from plugin module" do
+      instance = Instance.new(TestPlugin)
 
-      assert instance.manifest.module == TestSkill
-      assert instance.manifest.name == "test_skill"
+      assert instance.manifest.module == TestPlugin
+      assert instance.manifest.name == "test_plugin"
       assert instance.manifest.state_key == :test
     end
   end
@@ -108,11 +108,11 @@ defmodule JidoTest.Skill.InstanceTest do
     end
   end
 
-  describe "multiple instances of same skill" do
-    test "same skill with different :as values get different state keys" do
-      support_instance = Instance.new({SlackSkill, as: :support})
-      sales_instance = Instance.new({SlackSkill, as: :sales})
-      default_instance = Instance.new(SlackSkill)
+  describe "multiple instances of same plugin" do
+    test "same plugin with different :as values get different state keys" do
+      support_instance = Instance.new({SlackPlugin, as: :support})
+      sales_instance = Instance.new({SlackPlugin, as: :sales})
+      default_instance = Instance.new(SlackPlugin)
 
       assert support_instance.state_key == :slack_support
       assert sales_instance.state_key == :slack_sales
@@ -123,10 +123,10 @@ defmodule JidoTest.Skill.InstanceTest do
       assert sales_instance.state_key != default_instance.state_key
     end
 
-    test "same skill with different :as values get different route prefixes" do
-      support_instance = Instance.new({SlackSkill, as: :support})
-      sales_instance = Instance.new({SlackSkill, as: :sales})
-      default_instance = Instance.new(SlackSkill)
+    test "same plugin with different :as values get different route prefixes" do
+      support_instance = Instance.new({SlackPlugin, as: :support})
+      sales_instance = Instance.new({SlackPlugin, as: :sales})
+      default_instance = Instance.new(SlackPlugin)
 
       assert support_instance.route_prefix == "support.slack"
       assert sales_instance.route_prefix == "sales.slack"
@@ -134,8 +134,8 @@ defmodule JidoTest.Skill.InstanceTest do
     end
 
     test "different configs are preserved per instance" do
-      support_instance = Instance.new({SlackSkill, as: :support, token: "support-token"})
-      sales_instance = Instance.new({SlackSkill, as: :sales, token: "sales-token"})
+      support_instance = Instance.new({SlackPlugin, as: :support, token: "support-token"})
+      sales_instance = Instance.new({SlackPlugin, as: :sales, token: "sales-token"})
 
       assert support_instance.config == %{token: "support-token"}
       assert sales_instance.config == %{token: "sales-token"}

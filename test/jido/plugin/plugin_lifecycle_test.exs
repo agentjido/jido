@@ -1,6 +1,6 @@
-defmodule JidoTest.SkillLifecycleTest do
+defmodule JidoTest.PluginLifecycleTest do
   @moduledoc """
-  End-to-end integration tests for Jido Skill lifecycle.
+  End-to-end integration tests for Jido Plugin lifecycle.
 
   Tests all 4 callbacks working together:
   - mount/2 - Pure initialization during Agent.new/1
@@ -72,25 +72,25 @@ defmodule JidoTest.SkillLifecycleTest do
   end
 
   # =============================================================================
-  # Full-Featured Chat Skill
+  # Full-Featured Chat Plugin
   # =============================================================================
 
-  defmodule ChatSkill do
+  defmodule ChatPlugin do
     @moduledoc """
-    A comprehensive chat skill demonstrating all callbacks.
+    A comprehensive chat plugin demonstrating all callbacks.
 
     - mount/2: Initializes conversation metadata
     - handle_signal/2: Rate limits and logs signals
     - transform_result/3: Adds response metadata
     - child_spec/1: Starts a message counter worker
     """
-    use Jido.Skill,
-      name: "chat_skill",
+    use Jido.Plugin,
+      name: "chat_plugin",
       state_key: :chat,
       actions: [
-        JidoTest.SkillLifecycleTest.AddMessageAction,
-        JidoTest.SkillLifecycleTest.ClearMessagesAction,
-        JidoTest.SkillLifecycleTest.GetStatsAction
+        JidoTest.PluginLifecycleTest.AddMessageAction,
+        JidoTest.PluginLifecycleTest.ClearMessagesAction,
+        JidoTest.PluginLifecycleTest.GetStatsAction
       ],
       schema:
         Zoi.object(%{
@@ -100,7 +100,7 @@ defmodule JidoTest.SkillLifecycleTest do
         }),
       signal_patterns: ["chat.*"]
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def mount(_agent, config) do
       {:ok,
        %{
@@ -110,20 +110,20 @@ defmodule JidoTest.SkillLifecycleTest do
        }}
     end
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def router(_config) do
       [
-        {"chat.message", JidoTest.SkillLifecycleTest.AddMessageAction},
-        {"chat.clear", JidoTest.SkillLifecycleTest.ClearMessagesAction},
-        {"chat.stats", JidoTest.SkillLifecycleTest.GetStatsAction}
+        {"chat.message", JidoTest.PluginLifecycleTest.AddMessageAction},
+        {"chat.clear", JidoTest.PluginLifecycleTest.ClearMessagesAction},
+        {"chat.stats", JidoTest.PluginLifecycleTest.GetStatsAction}
       ]
     end
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def handle_signal(signal, context) do
       # Log all signals
-      skill_state = Map.get(context.agent.state, :chat, %{})
-      message_count = length(skill_state[:messages] || [])
+      plugin_state = Map.get(context.agent.state, :chat, %{})
+      message_count = length(plugin_state[:messages] || [])
 
       # Rate limit: reject if too many messages
       max_messages = context.config[:max_messages] || 100
@@ -135,14 +135,14 @@ defmodule JidoTest.SkillLifecycleTest do
       end
     end
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def transform_result(_action, agent, _context) do
       # Add response metadata to the returned agent
       chat_state = Map.get(agent.state, :chat, %{})
       message_count = length(chat_state[:messages] || [])
 
       metadata = %{
-        skill: __MODULE__,
+        plugin: __MODULE__,
         session_id: chat_state[:session_id],
         message_count: message_count,
         processed_at: DateTime.utc_now()
@@ -152,7 +152,7 @@ defmodule JidoTest.SkillLifecycleTest do
       %{agent | state: new_state}
     end
 
-    @impl Jido.Skill
+    @impl Jido.Plugin
     def child_spec(config) do
       # Start a simple counter agent to track total messages processed
       %{
@@ -180,15 +180,15 @@ defmodule JidoTest.SkillLifecycleTest do
     @moduledoc false
     use Jido.Agent,
       name: "chat_agent",
-      skills: [JidoTest.SkillLifecycleTest.ChatSkill]
+      plugins: [JidoTest.PluginLifecycleTest.ChatPlugin]
   end
 
   defmodule ConfiguredChatAgent do
     @moduledoc false
     use Jido.Agent,
       name: "configured_chat_agent",
-      skills: [
-        {JidoTest.SkillLifecycleTest.ChatSkill, %{session_id: "test-session", max_messages: 5}}
+      plugins: [
+        {JidoTest.PluginLifecycleTest.ChatPlugin, %{session_id: "test-session", max_messages: 5}}
       ]
   end
 
@@ -197,7 +197,7 @@ defmodule JidoTest.SkillLifecycleTest do
   # =============================================================================
 
   describe "mount/2 lifecycle" do
-    test "mount initializes skill state with schema defaults and custom fields" do
+    test "mount initializes plugin state with schema defaults and custom fields" do
       agent = ChatAgent.new()
 
       # Schema defaults
@@ -209,7 +209,7 @@ defmodule JidoTest.SkillLifecycleTest do
       assert agent.state[:chat][:session_id] != nil
     end
 
-    test "mount receives skill config" do
+    test "mount receives plugin config" do
       agent = ConfiguredChatAgent.new()
 
       assert agent.state[:chat][:session_id] == "test-session"
@@ -274,7 +274,7 @@ defmodule JidoTest.SkillLifecycleTest do
       # Transform should have added metadata
       metadata = agent.state[:__chat_metadata__]
       assert metadata != nil
-      assert metadata[:skill] == JidoTest.SkillLifecycleTest.ChatSkill
+      assert metadata[:plugin] == JidoTest.PluginLifecycleTest.ChatPlugin
       assert metadata[:message_count] == 1
       assert metadata[:processed_at] != nil
 
@@ -300,7 +300,7 @@ defmodule JidoTest.SkillLifecycleTest do
   # =============================================================================
 
   describe "child_spec/1 lifecycle" do
-    test "skill child is started during AgentServer init", %{jido: jido} do
+    test "plugin child is started during AgentServer init", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ChatAgent, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
@@ -309,7 +309,7 @@ defmodule JidoTest.SkillLifecycleTest do
       assert map_size(state.children) == 1
 
       [{tag, child_info}] = Map.to_list(state.children)
-      assert {:skill, JidoTest.SkillLifecycleTest.ChatSkill, _} = tag
+      assert {:plugin, JidoTest.PluginLifecycleTest.ChatPlugin, _} = tag
       assert Process.alive?(child_info.pid)
 
       # Verify child state
@@ -375,31 +375,31 @@ defmodule JidoTest.SkillLifecycleTest do
       GenServer.stop(pid)
     end
 
-    test "agent without skills still works normally", %{jido: jido} do
-      defmodule NoSkillAction do
+    test "agent without plugins still works normally", %{jido: jido} do
+      defmodule NoPluginAction do
         use Jido.Action,
-          name: "no_skill_action",
+          name: "no_plugin_action",
           schema: []
 
         def run(_params, _context), do: {:ok, %{executed: true}}
       end
 
-      defmodule NoSkillAgent do
+      defmodule NoPluginAgent do
         use Jido.Agent,
-          name: "no_skill_agent",
+          name: "no_plugin_agent",
           schema: [counter: [type: :integer, default: 0]]
 
         def signal_routes do
-          [{"test.action", JidoTest.SkillLifecycleTest.NoSkillAction}]
+          [{"test.action", JidoTest.PluginLifecycleTest.NoPluginAction}]
         end
       end
 
-      {:ok, pid} = Jido.AgentServer.start_link(agent: NoSkillAgent, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: NoPluginAgent, jido: jido)
 
       signal = Signal.new!("test.action", %{}, source: "/test")
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
-      # Agent works without skills
+      # Agent works without plugins
       assert agent.id != nil
 
       {:ok, state} = Jido.AgentServer.state(pid)
@@ -414,7 +414,7 @@ defmodule JidoTest.SkillLifecycleTest do
   # =============================================================================
 
   describe "pure agent usage (without AgentServer)" do
-    test "cmd/2 works with skill actions" do
+    test "cmd/2 works with plugin actions" do
       agent = ChatAgent.new()
 
       {agent, _directives} =
@@ -424,10 +424,10 @@ defmodule JidoTest.SkillLifecycleTest do
       assert hd(agent.state[:chat][:messages])[:content] == "Hello"
     end
 
-    test "skill state is accessible via skill_state/2" do
+    test "plugin state is accessible via plugin_state/2" do
       agent = ChatAgent.new()
 
-      chat_state = ChatAgent.skill_state(agent, ChatSkill)
+      chat_state = ChatAgent.plugin_state(agent, ChatPlugin)
 
       assert chat_state[:messages] == []
       assert chat_state[:model] == "gpt-4"
