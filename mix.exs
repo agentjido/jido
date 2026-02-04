@@ -32,7 +32,10 @@ defmodule Jido.MixProject do
         summary: [threshold: 80],
         export: "cov",
         ignore_modules: [~r/^JidoTest\./]
-      ]
+      ],
+
+      # Dialyzer
+      dialyzer: [plt_add_apps: [:mix]]
     ]
   end
 

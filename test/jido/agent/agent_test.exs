@@ -195,6 +195,64 @@ defmodule JidoTest.AgentTest do
     end
   end
 
+  describe "cmd/3 with opts" do
+    test "passes timeout option to instruction" do
+      agent = TestAgents.Basic.new()
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(agent, {TestActions.SlowAction, %{delay_ms: 200}}, timeout: 10)
+
+      assert [%Jido.Agent.Directive.Error{error: error}] = directives
+      assert error.message == "Instruction failed"
+    end
+
+    test "passes max_retries option to disable retries" do
+      agent = TestAgents.Basic.new()
+
+      start_time = System.monotonic_time(:millisecond)
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(
+          agent,
+          {TestActions.SlowAction, %{delay_ms: 200}},
+          timeout: 10,
+          max_retries: 0
+        )
+
+      elapsed = System.monotonic_time(:millisecond) - start_time
+
+      assert [%Jido.Agent.Directive.Error{}] = directives
+      assert elapsed < 100
+    end
+
+    test "cmd/2 delegates to cmd/3 with empty opts" do
+      agent = TestAgents.Basic.new()
+
+      {updated1, directives1} = TestAgents.Basic.cmd(agent, TestActions.NoSchema)
+      {updated2, directives2} = TestAgents.Basic.cmd(agent, TestActions.NoSchema, [])
+
+      assert updated1.state == updated2.state
+      assert directives1 == directives2
+    end
+
+    test "opts are merged into all instructions in a list" do
+      agent = TestAgents.Basic.new()
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(
+          agent,
+          [
+            {TestActions.SlowAction, %{delay_ms: 200}},
+            {TestActions.SlowAction, %{delay_ms: 200}}
+          ],
+          timeout: 10,
+          max_retries: 0
+        )
+
+      assert [%Jido.Agent.Directive.Error{}, %Jido.Agent.Directive.Error{}] = directives
+    end
+  end
+
   describe "lifecycle hooks" do
     test "on_after_cmd is called after processing" do
       agent = TestAgents.Hook.new()

@@ -727,20 +727,36 @@ defmodule Jido.Agent do
 
         * `MyAction` - Action module with no params
         * `{MyAction, %{param: 1}}` - Action with params
+        * `{MyAction, %{param: 1}, %{context: data}}` - Action with params and context
+        * `{MyAction, %{param: 1}, %{}, [timeout: 1000]}` - Action with opts
         * `%Instruction{}` - Full instruction struct
         * `[...]` - List of any of the above (processed in sequence)
+
+      ## Options
+
+      The optional third argument `opts` is a keyword list merged into all instructions:
+
+        * `:timeout` - Maximum time (in ms) for each action to complete
+        * `:max_retries` - Maximum retry attempts on failure
+        * `:backoff` - Initial backoff time in ms (doubles with each retry)
 
       ## Examples
 
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction)
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, {MyAction, %{value: 42}})
           {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, [Action1, Action2])
+
+          # With per-call options (merged into all instructions)
+          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction, timeout: 5000)
       """
       @spec cmd(Agent.t(), Agent.action()) :: Agent.cmd_result()
-      def cmd(%Agent{} = agent, action) do
+      def cmd(%Agent{} = agent, action), do: cmd(agent, action, [])
+
+      @spec cmd(Agent.t(), Agent.action(), keyword()) :: Agent.cmd_result()
+      def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
         {:ok, agent, action} = on_before_cmd(agent, action)
 
-        case Instruction.normalize(action, %{state: agent.state}, []) do
+        case Instruction.normalize(action, %{state: agent.state}, opts) do
           {:ok, instructions} ->
             ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
             strat = strategy()
@@ -825,6 +841,24 @@ defmodule Jido.Agent do
   @doc false
   @spec __quoted_callbacks__() :: Macro.t()
   def __quoted_callbacks__ do
+    before_after = __quoted_callback_before_after__()
+    routes = __quoted_callback_routes__()
+    checkpoint = __quoted_callback_checkpoint__()
+    restore = __quoted_callback_restore__()
+    overridables = __quoted_callback_overridables__()
+    helpers = __quoted_callback_helpers__()
+
+    quote location: :keep do
+      unquote(before_after)
+      unquote(routes)
+      unquote(checkpoint)
+      unquote(restore)
+      unquote(overridables)
+      unquote(helpers)
+    end
+  end
+
+  defp __quoted_callback_before_after__ do
     quote location: :keep do
       # Default callback implementations
 
@@ -836,11 +870,19 @@ defmodule Jido.Agent do
       @spec on_after_cmd(Agent.t(), Agent.action(), [Agent.directive()]) ::
               {:ok, Agent.t(), [Agent.directive()]}
       def on_after_cmd(agent, _action, directives), do: {:ok, agent, directives}
+    end
+  end
 
+  defp __quoted_callback_routes__ do
+    quote location: :keep do
       @impl true
       @spec signal_routes() :: list()
       def signal_routes, do: []
+    end
+  end
 
+  defp __quoted_callback_checkpoint__ do
+    quote location: :keep do
       @impl true
       def checkpoint(agent, _ctx) do
         thread = agent.state[:__thread__]
@@ -854,7 +896,11 @@ defmodule Jido.Agent do
            thread: thread && %{id: thread.id, rev: thread.rev}
          }}
       end
+    end
+  end
 
+  defp __quoted_callback_restore__ do
+    quote location: :keep do
       @impl true
       def restore(data, _ctx) do
         case new(id: data[:id] || data["id"]) do
@@ -866,7 +912,11 @@ defmodule Jido.Agent do
             error
         end
       end
+    end
+  end
 
+  defp __quoted_callback_overridables__ do
+    quote location: :keep do
       defoverridable on_before_cmd: 2,
                      on_after_cmd: 3,
                      checkpoint: 2,
@@ -890,7 +940,11 @@ defmodule Jido.Agent do
                      plugin_state: 2,
                      plugin_routes: 0,
                      plugin_schedules: 0
+    end
+  end
 
+  defp __quoted_callback_helpers__ do
+    quote location: :keep do
       # Private helper for after hook dispatch
       defp __do_after_cmd__(agent, msg, directives) do
         {:ok, agent, directives} = on_after_cmd(agent, msg, directives)
