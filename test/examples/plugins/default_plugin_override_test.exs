@@ -97,12 +97,12 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
   # ===========================================================================
 
   describe "default plugins are auto-included" do
-    test "default agent includes Thread.Plugin in plugin_specs" do
+    test "default agent includes Thread.Plugin and Identity.Plugin in plugin_specs" do
       specs = DefaultAgent.plugin_specs()
+      modules = Enum.map(specs, & &1.module)
 
-      assert length(specs) == 1
-      assert hd(specs).module == Jido.Thread.Plugin
-      assert hd(specs).state_key == :__thread__
+      assert Jido.Thread.Plugin in modules
+      assert Jido.Identity.Plugin in modules
     end
   end
 
@@ -127,8 +127,10 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
   describe "disabling default plugins" do
     test "disabled agent does not have :__thread__ in state" do
       agent = DisabledAgent.new()
+      specs = DisabledAgent.plugin_specs()
+      modules = Enum.map(specs, & &1.module)
 
-      assert DisabledAgent.plugin_specs() == []
+      refute Jido.Thread.Plugin in modules
       refute Map.has_key?(agent.state, :__thread__)
     end
 
