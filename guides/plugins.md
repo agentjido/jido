@@ -176,6 +176,98 @@ end
 
 Each plugin maintains its own state slice and routing rules. Plugins are mounted in order, so later plugins can depend on state from earlier ones.
 
+## Default Plugins
+
+Jido ships with **default plugins** that are automatically included in every agent. These are framework-provided singleton plugins that handle core concerns.
+
+### Built-in Defaults
+
+| Plugin | State Key | Purpose |
+|--------|-----------|---------|
+| `Jido.Identity.Plugin` | `:__identity__` | Agent self-model: profile, lifecycle facts |
+| `Jido.Thread.Plugin` | `:__thread__` | Conversation thread management |
+
+Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Identity.Agent.ensure/2`.
+
+### Identity Plugin
+
+The Identity plugin gives every agent a first-class identity primitive stored at `agent.state[:__identity__]`. Identity tracks profile facts (age, origin, generation) and a monotonic revision counter.
+
+```elixir
+alias Jido.Identity.Agent, as: IdentityAgent
+alias Jido.Identity.Profile
+
+agent = MyAgent.new()
+
+# Identity is not initialized until you ask for it
+refute IdentityAgent.has_identity?(agent)
+
+# Initialize on demand
+agent = IdentityAgent.ensure(agent, profile: %{age: 0, origin: :spawned})
+
+# Read profile data
+Profile.age(agent)    #=> 0
+Profile.get(agent, :origin)  #=> :spawned
+
+# Evolve identity over simulated time
+{agent, []} = MyAgent.cmd(agent, {Jido.Identity.Actions.Evolve, %{years: 3}})
+Profile.age(agent)    #=> 3
+```
+
+To fully replace the default identity with your own implementation, define a custom plugin that uses the same state key:
+
+```elixir
+defmodule MyApp.CustomIdentityPlugin do
+  use Jido.Plugin,
+    name: "custom_identity",
+    state_key: :__identity__,
+    actions: [],
+    description: "Custom identity with auto-initialization."
+
+  @impl Jido.Plugin
+  def mount(_agent, config) do
+    profile = Map.get(config, :profile, %{age: 0})
+    {:ok, Jido.Identity.new(profile: profile)}
+  end
+end
+
+defmodule MyAgent do
+  use Jido.Agent,
+    name: "my_agent",
+    default_plugins: %{
+      __identity__: {MyApp.CustomIdentityPlugin, %{profile: %{age: 5, origin: :configured}}}
+    }
+end
+```
+
+### Overriding and Disabling Defaults
+
+Default plugins can be controlled per-agent using the `default_plugins:` option with a map keyed by state key:
+
+```elixir
+# Disable identity (keep thread)
+use Jido.Agent,
+  name: "minimal",
+  default_plugins: %{__identity__: false}
+
+# Replace with custom module
+use Jido.Agent,
+  name: "custom",
+  default_plugins: %{__identity__: MyApp.CustomIdentityPlugin}
+
+# Replace with custom module and config
+use Jido.Agent,
+  name: "configured",
+  default_plugins: %{__identity__: {MyApp.CustomIdentityPlugin, %{profile: %{age: 10}}}}
+
+# Disable all defaults
+use Jido.Agent,
+  name: "bare",
+  default_plugins: false
+```
+
+> **Note:** `default_plugins:` only controls built-in defaults. To add new plugins, use the `plugins:` option.
+
 ## See Also
 
 See `Jido.Plugin` moduledoc for complete API reference and advanced patterns.

@@ -20,7 +20,7 @@ defmodule MyAgent do
     ],
     strategy: Jido.Agent.Strategy.Direct,    # Default
     plugins: [MyPlugin],                     # Default: []
-    default_plugins: true                    # Load default plugins (Default: true)
+    default_plugins: true                    # Load built-in plugins (Default: true)
 end
 ```
 
@@ -189,4 +189,5 @@ agent = MyAgent.new(state: %{counter: 10})
 - [State Operations](state-ops.md) — Internal state transitions during `cmd/2`
 - [Directives](directives.md) — External effects emitted by agents
 - [Strategies](strategies.md) — Execution strategies for `cmd/2`
+- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (Identity, Thread) and how to override them
 - `Jido.Agent` — Full module documentation

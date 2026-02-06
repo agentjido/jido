@@ -208,6 +208,13 @@ defmodule Jido.MixProject do
           Jido.Plugin.Schedules,
           Jido.Plugin.Spec
         ],
+        Identity: [
+          Jido.Identity,
+          Jido.Identity.Plugin,
+          Jido.Identity.Agent,
+          Jido.Identity.Profile,
+          Jido.Identity.Actions.Evolve
+        ],
         Directives: [
           Jido.Agent.Directive,
           Jido.Agent.Directive.Emit,
@@ -230,6 +237,7 @@ defmodule Jido.MixProject do
           Jido.Agent.StateOps
         ],
         "Agent Internals": [
+          Jido.Agent.DefaultPlugins,
           Jido.Agent.State,
           Jido.Agent.Schema,
           Jido.AgentServer.State,
