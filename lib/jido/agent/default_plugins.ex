@@ -13,7 +13,7 @@ defmodule Jido.Agent.DefaultPlugins do
 
   The framework provides these default plugins:
 
-      [Jido.Thread.Plugin, Jido.Identity.Plugin]
+      [Jido.Thread.Plugin, Jido.Identity.Plugin, Jido.Memory.Plugin]
 
   ## Instance-Level Override
 
@@ -48,7 +48,7 @@ defmodule Jido.Agent.DefaultPlugins do
       use Jido.Agent, name: "bare", default_plugins: false
   """
 
-  @package_defaults [Jido.Thread.Plugin, Jido.Identity.Plugin]
+  @package_defaults [Jido.Thread.Plugin, Jido.Identity.Plugin, Jido.Memory.Plugin]
 
   @doc "Returns the framework's default plugin list."
   @spec package_defaults() :: [module()]

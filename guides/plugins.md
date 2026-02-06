@@ -186,8 +186,9 @@ Jido ships with **default plugins** that are automatically included in every age
 |--------|-----------|---------|
 | `Jido.Identity.Plugin` | `:__identity__` | Agent self-model: profile, lifecycle facts |
 | `Jido.Thread.Plugin` | `:__thread__` | Conversation thread management |
+| `Jido.Memory.Plugin` | `:__memory__` | On-demand memory container for agent cognitive state |
 
-Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Identity.Agent.ensure/2`.
+Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Identity.Agent.ensure/2` and `Jido.Memory.Agent.ensure/2`.
 
 ### Identity Plugin
 
@@ -240,6 +241,29 @@ defmodule MyAgent do
 end
 ```
 
+### Memory Plugin
+
+The Memory plugin gives every agent an on-demand cognitive memory container stored at `agent.state[:__memory__]`. Memory is organized into **spaces** — named containers holding either map (key-value) or list (ordered items) data. Two reserved spaces, `:world` and `:tasks`, are created by default. Domain-specific wrappers should be built in your own modules on top of the generic space primitives.
+
+```elixir
+alias Jido.Memory.Agent, as: MemoryAgent
+
+agent = MyAgent.new()
+
+# Memory is not initialized until you ask for it
+refute MemoryAgent.has_memory?(agent)
+
+# Initialize on demand
+agent = MemoryAgent.ensure(agent)
+
+# Work with map spaces (e.g. :world)
+agent = MemoryAgent.put_in_space(agent, :world, :temperature, 22)
+MemoryAgent.get_in_space(agent, :world, :temperature)  #=> 22
+
+# Work with list spaces (e.g. :tasks)
+agent = MemoryAgent.append_to_space(agent, :tasks, %{id: "t1", text: "Check sensor"})
+```
+
 ### Overriding and Disabling Defaults
 
 Default plugins can be controlled per-agent using the `default_plugins:` option with a map keyed by state key:
@@ -259,6 +283,11 @@ use Jido.Agent,
 use Jido.Agent,
   name: "configured",
   default_plugins: %{__identity__: {MyApp.CustomIdentityPlugin, %{profile: %{age: 10}}}}
+
+# Disable memory (keep others)
+use Jido.Agent,
+  name: "no_memory",
+  default_plugins: %{__memory__: false}
 
 # Disable all defaults
 use Jido.Agent,

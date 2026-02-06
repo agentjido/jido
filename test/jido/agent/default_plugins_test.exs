@@ -39,8 +39,12 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
   end
 
   describe "package_defaults/0" do
-    test "returns list with Thread.Plugin" do
-      assert DefaultPlugins.package_defaults() == [Jido.Thread.Plugin, Jido.Identity.Plugin]
+    test "returns list with Thread.Plugin, Identity.Plugin, and Memory.Plugin" do
+      assert DefaultPlugins.package_defaults() == [
+               Jido.Thread.Plugin,
+               Jido.Identity.Plugin,
+               Jido.Memory.Plugin
+             ]
     end
   end
 
@@ -137,10 +141,11 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
       end
 
       instances = AgentNoDefaults.plugin_instances()
-      assert length(instances) == 2
+      assert length(instances) == 3
       modules = Enum.map(instances, & &1.module)
       assert Jido.Thread.Plugin in modules
       assert Jido.Identity.Plugin in modules
+      assert Jido.Memory.Plugin in modules
     end
 
     test "agent with default_plugins: false gets no defaults" do
