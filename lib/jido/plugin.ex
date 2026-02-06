@@ -196,17 +196,24 @@ defmodule Jido.Plugin do
   @doc """
   Pre-routing hook called before signal routing in AgentServer.
 
-  Can inspect, log, or override which action runs for a signal.
+  Can inspect, log, transform, or override which action runs for a signal.
+  Hooks execute in plugin declaration order. The first `{:override, ...}`
+  short-circuits; the first `{:error, ...}` aborts. Plugins with non-empty
+  `signal_patterns` only receive signals matching those patterns; plugins
+  with empty patterns act as global middleware.
 
   ## Parameters
 
-  - `signal` - The incoming `Jido.Signal` struct
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, `:config`
+  - `signal` - The incoming `Jido.Signal` struct (may be modified by earlier plugins)
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
+    `:plugin_instance`, `:config`
 
   ## Returns
 
   - `{:ok, nil}` or `{:ok, :continue}` - Continue to normal routing
+  - `{:ok, {:continue, %Signal{}}}` - Rewrite the signal and continue routing
   - `{:ok, {:override, action_spec}}` - Bypass router, use this action instead
+  - `{:ok, {:override, action_spec, %Signal{}}}` - Bypass router with rewritten signal
   - `{:error, reason}` - Abort signal processing with error
 
   ## Example
@@ -223,16 +230,20 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
 
   @doc """
-  Transform the agent returned from `AgentServer.call/3`.
+  Caller view transform for the agent returned from `AgentServer.call/3`.
 
-  Called after signal processing on the synchronous call path only.
-  Does not affect `cast/2` or internal state - only the returned agent.
+  Called after signal processing on the **synchronous call path only**.
+  Does not affect `cast/2`, `handle_info`, or internal server state — only
+  the agent struct returned to the caller. Transforms chain through all
+  plugins in declaration order.
 
   ## Parameters
 
-  - `action` - The signal type or action module that was executed
+  - `action` - The resolved action module that was executed, or the signal
+    type string when no single module can be determined
   - `result` - The agent struct to transform
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, `:config`
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
+    `:plugin_instance`, `:config`
 
   ## Returns
 

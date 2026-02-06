@@ -731,10 +731,9 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} ->
-          # Run transform_result hooks on the call path
+        {:ok, new_state, resolved_action} ->
           transformed_agent =
-            run_plugin_transform_hooks(new_state.agent, traced_signal, new_state)
+            run_plugin_transform_hooks(new_state.agent, resolved_action, traced_signal, new_state)
 
           {:reply, {:ok, transformed_agent}, new_state}
 
@@ -821,7 +820,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -870,7 +869,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -920,7 +919,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -998,11 +997,12 @@ defmodule Jido.AgentServer do
       {:error, error} ->
         handle_plugin_hook_error(error, signal, state)
 
-      {:override, action_spec} ->
-        dispatch_action(signal, action_spec, state, start_time, metadata)
+      {:override, action_spec, modified_signal} ->
+        effective_signal = modified_signal || signal
+        dispatch_action(effective_signal, action_spec, state, start_time, metadata)
 
-      :continue ->
-        handle_signal_routing(signal, router, state, start_time, metadata)
+      {:continue, modified_signal} ->
+        handle_signal_routing(modified_signal, router, state, start_time, metadata)
     end
   end
 
@@ -1069,7 +1069,7 @@ defmodule Jido.AgentServer do
 
     case State.enqueue_all(state, signal, directives) do
       {:ok, enq_state} ->
-        {:ok, start_drain_if_idle(enq_state)}
+        {:ok, start_drain_if_idle(enq_state), action_arg}
 
       {:error, :queue_overflow} ->
         emit_telemetry(
@@ -1128,43 +1128,128 @@ defmodule Jido.AgentServer do
   defp run_plugin_signal_hooks(%Signal{} = signal, %State{} = state) do
     agent_module = state.agent_module
 
-    plugin_specs =
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
+
+    Enum.reduce_while(specs_and_instances, {:continue, signal}, fn {spec, instance},
+                                                                   {_, current_signal} ->
+      if signal_matches_plugin?(current_signal, spec) do
+        case invoke_plugin_handle_signal(instance, spec, current_signal, state, agent_module) do
+          {:cont, :continue} ->
+            {:cont, {:continue, current_signal}}
+
+          {:cont, {:continue, new_signal}} ->
+            {:cont, {:continue, new_signal}}
+
+          {:halt, {:override, action_spec}} ->
+            {:halt, {:override, action_spec}}
+
+          {:halt, {:override, action_spec, new_signal}} ->
+            {:halt, {:override, action_spec, new_signal}}
+
+          {:halt, {:error, error}} ->
+            {:halt, {:error, error}}
+        end
+      else
+        {:cont, {:continue, current_signal}}
+      end
+    end)
+    |> normalize_hook_result()
+  end
+
+  defp normalize_hook_result({:continue, signal}), do: {:continue, signal}
+  defp normalize_hook_result({:override, action_spec}), do: {:override, action_spec, nil}
+
+  defp normalize_hook_result({:override, action_spec, signal}),
+    do: {:override, action_spec, signal}
+
+  defp normalize_hook_result({:error, error}), do: {:error, error}
+
+  defp signal_matches_plugin?(_signal, %{signal_patterns: []}), do: true
+  defp signal_matches_plugin?(_signal, %{signal_patterns: nil}), do: true
+
+  defp signal_matches_plugin?(%Signal{type: type}, %{signal_patterns: patterns}) do
+    Enum.any?(patterns, &signal_type_matches?(type, &1))
+  end
+
+  defp signal_type_matches?(type, pattern) do
+    cond do
+      pattern == type ->
+        true
+
+      String.ends_with?(pattern, ".*") ->
+        prefix = String.trim_trailing(pattern, ".*")
+        String.starts_with?(type, prefix <> ".")
+
+      String.contains?(pattern, "*") ->
+        pattern_regex =
+          pattern
+          |> Regex.escape()
+          |> String.replace("\\*", "[^.]*")
+
+        Regex.match?(~r/^#{pattern_regex}$/, type)
+
+      true ->
+        false
+    end
+  end
+
+  defp get_plugin_specs_and_instances(agent_module) do
+    specs =
       if function_exported?(agent_module, :plugin_specs, 0),
         do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce_while(plugin_specs, :continue, fn spec, acc ->
-      case acc do
-        {:override, _} ->
-          {:halt, acc}
+    instances =
+      if function_exported?(agent_module, :plugin_instances, 0),
+        do: agent_module.plugin_instances(),
+        else: []
 
-        :continue ->
-          invoke_plugin_handle_signal(spec, signal, state, agent_module)
-      end
-    end)
+    Enum.zip(specs, instances)
   end
 
-  defp invoke_plugin_handle_signal(spec, signal, state, agent_module) do
+  defp invoke_plugin_handle_signal(instance, spec, signal, state, agent_module) do
     context = %{
       agent: state.agent,
       agent_module: agent_module,
       plugin: spec.module,
       plugin_spec: spec,
+      plugin_instance: instance,
       config: spec.config || %{}
     }
 
-    case spec.module.handle_signal(signal, context) do
-      {:ok, {:override, action_spec}} ->
-        {:halt, {:override, action_spec}}
+    try do
+      case spec.module.handle_signal(signal, context) do
+        {:ok, {:override, action_spec}} ->
+          {:halt, {:override, action_spec}}
 
-      {:ok, _} ->
-        {:cont, :continue}
+        {:ok, {:continue, %Signal{} = new_signal}} ->
+          {:cont, {:continue, new_signal}}
 
-      {:error, reason} ->
+        {:ok, {:override, action_spec, %Signal{} = new_signal}} ->
+          {:halt, {:override, action_spec, new_signal}}
+
+        {:ok, _} ->
+          {:cont, :continue}
+
+        {:error, reason} ->
+          error =
+            Jido.Error.execution_error(
+              "Plugin handle_signal failed",
+              %{plugin: spec.module, reason: reason}
+            )
+
+          {:halt, {:error, error}}
+      end
+    rescue
+      e ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
+        )
+
         error =
           Jido.Error.execution_error(
-            "Plugin handle_signal failed",
-            %{plugin: spec.module, reason: reason}
+            "Plugin handle_signal crashed",
+            %{plugin: spec.module, exception: Exception.message(e)}
           )
 
         {:halt, {:error, error}}
@@ -1175,25 +1260,44 @@ defmodule Jido.AgentServer do
   # Internal: Plugin Transform Hooks
   # ---------------------------------------------------------------------------
 
-  defp run_plugin_transform_hooks(agent, action_or_signal, %State{} = state) do
+  defp run_plugin_transform_hooks(agent, resolved_action, original_signal, %State{} = state) do
     agent_module = state.agent_module
 
-    plugin_specs =
-      if function_exported?(agent_module, :plugin_specs, 0),
-        do: agent_module.plugin_specs(),
-        else: []
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
 
-    Enum.reduce(plugin_specs, agent, fn spec, agent_acc ->
+    action_term = normalize_action_for_transform(resolved_action, original_signal)
+
+    Enum.reduce(specs_and_instances, agent, fn {spec, instance}, agent_acc ->
       context = %{
         agent: agent_acc,
         agent_module: agent_module,
         plugin: spec.module,
         plugin_spec: spec,
+        plugin_instance: instance,
         config: spec.config || %{}
       }
 
-      spec.module.transform_result(action_or_signal.type, agent_acc, context)
+      try do
+        spec.module.transform_result(action_term, agent_acc, context)
+      rescue
+        e ->
+          Logger.error(
+            "Plugin #{inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
+          )
+
+          agent_acc
+      end
     end)
+  end
+
+  defp normalize_action_for_transform(resolved_action, original_signal) do
+    case resolved_action do
+      mod when is_atom(mod) and not is_nil(mod) -> mod
+      {mod, _params} when is_atom(mod) -> mod
+      [{mod, _params} | _] when is_atom(mod) -> mod
+      [mod | _] when is_atom(mod) -> mod
+      _ -> original_signal.type
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -1612,7 +1716,7 @@ defmodule Jido.AgentServer do
       end
 
     case process_signal(traced_signal, state) do
-      {:ok, new_state} -> {:noreply, new_state}
+      {:ok, new_state, _resolved_action} -> {:noreply, new_state}
       {:error, _reason, ns} -> {:noreply, ns}
     end
   end
@@ -1636,7 +1740,7 @@ defmodule Jido.AgentServer do
         end
 
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, ns} -> {:noreply, ns}
       end
     else
