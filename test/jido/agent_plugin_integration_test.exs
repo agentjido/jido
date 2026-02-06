@@ -139,6 +139,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "single_skill_agent",
+      default_plugins: false,
       plugins: [JidoTest.AgentPluginIntegrationTest.CounterPlugin]
   end
 
@@ -146,6 +147,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "multi_skill_agent",
+      default_plugins: false,
       plugins: [
         JidoTest.AgentPluginIntegrationTest.CounterPlugin,
         JidoTest.AgentPluginIntegrationTest.GreeterPlugin
@@ -156,6 +158,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "configured_skill_agent",
+      default_plugins: false,
       plugins: [
         {JidoTest.AgentPluginIntegrationTest.ConfigurablePlugin,
          %{enabled: false, max_retries: 5}}
@@ -166,6 +169,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "mixed_schema_agent",
+      default_plugins: false,
       schema: [
         base_counter: [type: :integer, default: 100],
         base_mode: [type: :atom, default: :initial]
@@ -177,6 +181,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "three_skill_agent",
+      default_plugins: false,
       plugins: [
         JidoTest.AgentPluginIntegrationTest.CounterPlugin,
         JidoTest.AgentPluginIntegrationTest.GreeterPlugin,
@@ -188,6 +193,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "minimal_skill_agent",
+      default_plugins: false,
       plugins: [JidoTest.AgentPluginIntegrationTest.MinimalPlugin]
   end
 
@@ -438,7 +444,8 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     test "actions/0 returns empty list for agent without plugins" do
       defmodule NoPluginAgent do
         use Jido.Agent,
-          name: "no_skill_agent"
+          name: "no_skill_agent",
+          default_plugins: false
       end
 
       assert NoPluginAgent.actions() == []
@@ -519,6 +526,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       @moduledoc false
       use Jido.Agent,
         name: "capability_agent",
+        default_plugins: false,
         plugins: [
           JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin,
           JidoTest.AgentPluginIntegrationTest.OpenAICapabilityPlugin
@@ -551,6 +559,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
         @moduledoc false
         use Jido.Agent,
           name: "aliased_cap_agent",
+          default_plugins: false,
           plugins: [
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :support},
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :sales}
@@ -570,6 +579,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
         @moduledoc false
         use Jido.Agent,
           name: "multi_instance_cap_agent",
+          default_plugins: false,
           plugins: [
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :support},
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :sales},
@@ -589,6 +599,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
         @moduledoc false
         use Jido.Agent,
           name: "multi_instance_cap_agent2",
+          default_plugins: false,
           plugins: [
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :support},
             {JidoTest.AgentPluginIntegrationTest.SlackCapabilityPlugin, as: :sales}
@@ -748,6 +759,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       defmodule DupAgent do
         use Jido.Agent,
           name: "dup_agent",
+          default_plugins: false,
           plugins: [JidoTest.AgentPluginIntegrationTest.DuplicateActionPlugin]
       end
 
@@ -774,6 +786,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       defmodule SharedActionAgent do
         use Jido.Agent,
           name: "shared_action_agent",
+          default_plugins: false,
           plugins: [
             JidoTest.AgentPluginIntegrationTest.SharedActionPluginA,
             JidoTest.AgentPluginIntegrationTest.SharedActionPluginB
@@ -815,6 +828,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       @moduledoc false
       use Jido.Agent,
         name: "multi_slack_agent",
+        default_plugins: false,
         plugins: [
           {JidoTest.AgentPluginIntegrationTest.SlackPlugin, as: :support, token: "support-token"},
           {JidoTest.AgentPluginIntegrationTest.SlackPlugin, as: :sales, token: "sales-token"}
@@ -825,6 +839,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       @moduledoc false
       use Jido.Agent,
         name: "mixed_instance_agent",
+        default_plugins: false,
         plugins: [
           JidoTest.AgentPluginIntegrationTest.SlackPlugin,
           {JidoTest.AgentPluginIntegrationTest.SlackPlugin, as: :support, token: "support-token"}
@@ -927,6 +942,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       defmodule DifferentAsAgent do
         use Jido.Agent,
           name: "different_as_agent",
+          default_plugins: false,
           plugins: [
             {JidoTest.AgentPluginIntegrationTest.CounterPlugin, as: :primary},
             {JidoTest.AgentPluginIntegrationTest.CounterPlugin, as: :secondary}

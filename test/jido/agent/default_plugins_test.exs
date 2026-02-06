@@ -39,8 +39,8 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
   end
 
   describe "framework_defaults/0" do
-    test "returns empty list (no defaults yet)" do
-      assert DefaultPlugins.framework_defaults() == []
+    test "returns list with Thread.Plugin" do
+      assert DefaultPlugins.framework_defaults() == [Jido.Thread.Plugin]
     end
   end
 
@@ -136,7 +136,9 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
         use Jido.Agent, name: "dp_agent_no_defaults"
       end
 
-      assert AgentNoDefaults.plugin_instances() == []
+      instances = AgentNoDefaults.plugin_instances()
+      assert length(instances) == 1
+      assert hd(instances).module == Jido.Thread.Plugin
     end
 
     test "agent with default_plugins: false gets no defaults" do

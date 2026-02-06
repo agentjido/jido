@@ -23,6 +23,7 @@ defmodule JidoTest.Plugin.SingletonCompileTest do
       defmodule ValidSingletonAgent do
         use Jido.Agent,
           name: "valid_singleton",
+          default_plugins: false,
           plugins: [SingletonFixture]
       end
 
@@ -33,6 +34,7 @@ defmodule JidoTest.Plugin.SingletonCompileTest do
       defmodule MixedPluginAgent do
         use Jido.Agent,
           name: "mixed_plugins",
+          default_plugins: false,
           plugins: [SingletonFixture, RegularFixture]
       end
 
@@ -63,6 +65,7 @@ defmodule JidoTest.Plugin.SingletonCompileTest do
       defmodule AliasedRegularAgent do
         use Jido.Agent,
           name: "aliased_regular",
+          default_plugins: false,
           plugins: [{RegularFixture, as: :alias1}]
       end
 

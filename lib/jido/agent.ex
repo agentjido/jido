@@ -678,8 +678,10 @@ defmodule Jido.Agent do
         base_defaults = AgentState.defaults_from_schema(@validated_opts[:schema])
 
         # Build plugin defaults nested under their state_keys
+        # Skip plugins with nil schema (they manage their own state lifecycle)
         plugin_defaults =
           @plugin_specs
+          |> Enum.reject(fn spec -> spec.schema == nil end)
           |> Enum.map(fn spec ->
             plugin_state_defaults = Jido.Agent.Schema.defaults_from_zoi_schema(spec.schema)
             {spec.state_key, plugin_state_defaults}

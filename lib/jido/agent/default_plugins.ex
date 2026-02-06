@@ -48,7 +48,7 @@ defmodule Jido.Agent.DefaultPlugins do
       use Jido.Agent, name: "bare", default_plugins: false
   """
 
-  @framework_defaults []
+  @framework_defaults [Jido.Thread.Plugin]
 
   @doc "Returns the framework's default plugin list."
   @spec framework_defaults() :: [module()]
