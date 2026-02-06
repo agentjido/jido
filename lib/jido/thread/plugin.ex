@@ -30,6 +30,18 @@ defmodule Jido.Thread.Plugin do
     description: "Thread state management for agent conversation history.",
     capabilities: [:thread]
 
+  alias Jido.Thread
+
   @impl Jido.Plugin
   def mount(_agent, _config), do: {:ok, nil}
+
+  @impl Jido.Plugin
+  def on_checkpoint(%Thread{id: id, rev: rev}, _ctx) do
+    {:externalize, :thread, %{id: id, rev: rev}}
+  end
+
+  def on_checkpoint(nil, _ctx), do: :keep
+
+  @impl Jido.Plugin
+  def on_restore(_pointer, _ctx), do: {:ok, nil}
 end

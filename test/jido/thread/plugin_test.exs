@@ -48,6 +48,37 @@ defmodule JidoTest.Thread.PluginTest do
     end
   end
 
+  describe "on_checkpoint/2" do
+    test "externalizes a thread struct" do
+      thread = Thread.new(id: "t-1")
+      thread = Thread.append(thread, %{kind: :message, payload: %{text: "hello"}})
+
+      assert {:externalize, :thread, %{id: "t-1", rev: 1}} =
+               ThreadPlugin.on_checkpoint(thread, %{})
+    end
+
+    test "keeps nil state" do
+      assert :keep = ThreadPlugin.on_checkpoint(nil, %{})
+    end
+
+    test "externalizes thread with correct rev count" do
+      thread =
+        Thread.new(id: "t-2")
+        |> Thread.append(%{kind: :message, payload: %{text: "one"}})
+        |> Thread.append(%{kind: :message, payload: %{text: "two"}})
+        |> Thread.append(%{kind: :message, payload: %{text: "three"}})
+
+      assert {:externalize, :thread, %{id: "t-2", rev: 3}} =
+               ThreadPlugin.on_checkpoint(thread, %{})
+    end
+  end
+
+  describe "on_restore/2" do
+    test "returns {:ok, nil} (persist handles IO rehydration)" do
+      assert {:ok, nil} = ThreadPlugin.on_restore(%{id: "t-1", rev: 5}, %{})
+    end
+  end
+
   describe "agent integration" do
     defmodule AgentWithThread do
       use Jido.Agent, name: "thread_plugin_test_agent"
