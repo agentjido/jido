@@ -37,6 +37,27 @@ defmodule JidoTest.Plugin.ManifestTest do
       assert manifest.signal_patterns == []
     end
 
+    test "singleton field defaults to false" do
+      manifest = %Manifest{
+        module: SomePlugin,
+        name: "some_plugin",
+        state_key: :some
+      }
+
+      assert manifest.singleton == false
+    end
+
+    test "singleton field can be set to true" do
+      manifest = %Manifest{
+        module: SomePlugin,
+        name: "some_plugin",
+        state_key: :some,
+        singleton: true
+      }
+
+      assert manifest.singleton == true
+    end
+
     test "creates manifest with all fields" do
       schema = Zoi.object(%{counter: Zoi.integer()})
       config_schema = Zoi.object(%{enabled: Zoi.boolean()})

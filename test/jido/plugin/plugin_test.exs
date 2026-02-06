@@ -78,6 +78,15 @@ defmodule JidoTest.PluginTest do
     end
   end
 
+  defmodule SingletonPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "singleton_plugin",
+      state_key: :singleton_state,
+      actions: [JidoTest.PluginTestAction],
+      singleton: true
+  end
+
   describe "plugin definition with required fields" do
     test "defines a basic plugin with required fields" do
       assert BasicPlugin.name() == "basic_plugin"
@@ -488,6 +497,22 @@ defmodule JidoTest.PluginTest do
       assert %Spec{} = spec
       assert spec.module == FullPlugin
       assert spec.config == %{custom: true}
+    end
+  end
+
+  describe "singleton option" do
+    test "singleton defaults to false for regular plugins" do
+      refute BasicPlugin.singleton?()
+      refute FullPlugin.singleton?()
+    end
+
+    test "singleton? returns true when configured" do
+      assert SingletonPlugin.singleton?()
+    end
+
+    test "singleton is included in manifest" do
+      assert SingletonPlugin.manifest().singleton == true
+      assert BasicPlugin.manifest().singleton == false
     end
   end
 end

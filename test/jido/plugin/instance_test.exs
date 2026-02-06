@@ -21,6 +21,15 @@ defmodule JidoTest.Plugin.InstanceTest do
       schema: Zoi.object(%{token: Zoi.string() |> Zoi.optional()})
   end
 
+  defmodule SingletonPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "singleton_plugin",
+      state_key: :singleton_state,
+      actions: [JidoTest.PluginTestAction],
+      singleton: true
+  end
+
   describe "new/1" do
     test "creates instance from module alone" do
       instance = Instance.new(TestPlugin)
@@ -139,6 +148,41 @@ defmodule JidoTest.Plugin.InstanceTest do
 
       assert support_instance.config == %{token: "support-token"}
       assert sales_instance.config == %{token: "sales-token"}
+    end
+  end
+
+  describe "singleton guardrail" do
+    test "singleton plugin can be created without alias" do
+      instance = Instance.new(SingletonPlugin)
+
+      assert instance.module == SingletonPlugin
+      assert instance.as == nil
+      assert instance.state_key == :singleton_state
+    end
+
+    test "singleton plugin with config map works (no alias)" do
+      instance = Instance.new({SingletonPlugin, %{custom: "value"}})
+
+      assert instance.module == SingletonPlugin
+      assert instance.as == nil
+      assert instance.config == %{custom: "value"}
+    end
+
+    test "singleton plugin raises when aliased with as:" do
+      assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
+        Instance.new({SingletonPlugin, as: :custom_alias})
+      end
+    end
+
+    test "singleton plugin raises with as: and config" do
+      assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
+        Instance.new({SingletonPlugin, as: :custom_alias, token: "abc"})
+      end
+    end
+
+    test "non-singleton plugin can still be aliased" do
+      instance = Instance.new({SlackPlugin, as: :support})
+      assert instance.as == :support
     end
   end
 end

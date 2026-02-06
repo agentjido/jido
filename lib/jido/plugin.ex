@@ -138,7 +138,12 @@ defmodule Jido.Plugin do
                                 description:
                                   "Schedule tuples like {\"*/5 * * * *\", ActionModule}."
                               )
-                              |> Zoi.default([])
+                              |> Zoi.default([]),
+                            singleton:
+                              Zoi.boolean(
+                                description: "If true, plugin cannot be aliased or duplicated."
+                              )
+                              |> Zoi.default(false)
                           },
                           coerce: true
                         )
@@ -395,6 +400,10 @@ defmodule Jido.Plugin do
       @doc "Returns the capabilities provided by this plugin."
       @spec capabilities() :: [atom()]
       def capabilities, do: @validated_opts[:capabilities] || []
+
+      @doc "Returns whether this plugin is a singleton."
+      @spec singleton?() :: boolean()
+      def singleton?, do: @validated_opts[:singleton] || false
     end
   end
 
@@ -469,7 +478,8 @@ defmodule Jido.Plugin do
           actions: actions(),
           routes: routes(),
           schedules: schedules(),
-          signal_patterns: signal_patterns()
+          signal_patterns: signal_patterns(),
+          singleton: singleton?()
         }
       end
 
@@ -550,7 +560,8 @@ defmodule Jido.Plugin do
                      capabilities: 0,
                      requires: 0,
                      routes: 0,
-                     schedules: 0
+                     schedules: 0,
+                     singleton?: 0
     end
   end
 

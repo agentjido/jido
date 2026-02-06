@@ -62,6 +62,9 @@ defmodule Jido.Plugin.Manifest do
               signal_patterns:
                 Zoi.list(Zoi.string(), description: "Legacy signal patterns")
                 |> Zoi.default([]),
+              singleton:
+                Zoi.boolean(description: "Whether plugin is singleton")
+                |> Zoi.default(false),
               subscriptions:
                 Zoi.list(Zoi.any(), description: "Sensor subscriptions provided by this plugin")
                 |> Zoi.default([])

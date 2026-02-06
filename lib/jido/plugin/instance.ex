@@ -81,6 +81,11 @@ defmodule Jido.Plugin.Instance do
   def new(plugin_declaration) do
     {module, as_opt, overrides} = normalize_declaration(plugin_declaration)
 
+    if function_exported?(module, :singleton?, 0) and module.singleton?() and as_opt != nil do
+      raise ArgumentError,
+            "Cannot alias singleton plugin #{inspect(module)} with `as: #{inspect(as_opt)}`"
+    end
+
     manifest = module.manifest()
     base_state_key = manifest.state_key
     base_name = manifest.name
