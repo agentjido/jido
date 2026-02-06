@@ -309,11 +309,9 @@ defmodule Jido.Agent do
   Serializes the agent for persistence.
 
   Called by `Jido.Persist.hibernate/2` before writing to storage.
-  The returned data should NOT include the full Thread - only a pointer.
-
-  If not implemented, a default serialization is used that:
-  - Excludes `:__thread__` from state
-  - Stores thread pointer as `%{id: thread.id, rev: thread.rev}`
+  The default implementation passes the full agent state through.
+  `Jido.Persist` enforces invariants (e.g., stripping `:__thread__`
+  and storing a pointer) after this callback returns.
 
   ## Parameters
 
@@ -899,15 +897,12 @@ defmodule Jido.Agent do
     quote location: :keep do
       @impl true
       def checkpoint(agent, _ctx) do
-        thread = agent.state[:__thread__]
-
         {:ok,
          %{
            version: 1,
            agent_module: __MODULE__,
            id: agent.id,
-           state: Map.delete(agent.state, :__thread__),
-           thread: thread && %{id: thread.id, rev: thread.rev}
+           state: agent.state
          }}
       end
     end
