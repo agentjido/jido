@@ -305,6 +305,64 @@ defmodule Jido.Plugin do
   @callback subscriptions(config :: map(), context :: map()) ::
               [{module(), keyword() | map()}]
 
+  @doc """
+  Called during checkpoint to determine how this plugin's state should be persisted.
+
+  Plugins can declare one of three strategies for their state slice:
+
+  - `:keep` — Include in checkpoint state as-is (default)
+  - `:drop` — Exclude from checkpoint (transient/ephemeral state)
+  - `{:externalize, key, pointer}` — Strip from checkpoint state and store a
+    pointer separately. The pointer is a lightweight reference (e.g., `%{id, rev}`)
+    that can be used to rehydrate the full state on restore.
+
+  ## Parameters
+
+  - `plugin_state` - The plugin's current state slice (may be nil)
+  - `context` - Map with checkpoint context (e.g., `:config`)
+
+  ## Returns
+
+  - `:keep` — Include plugin state in checkpoint (default)
+  - `:drop` — Exclude from checkpoint
+  - `{:externalize, key, pointer}` — Store pointer under `key` in checkpoint
+
+  ## Example
+
+      def on_checkpoint(%Thread{} = thread, _ctx) do
+        {:externalize, :thread, %{id: thread.id, rev: thread.rev}}
+      end
+
+      def on_checkpoint(nil, _ctx), do: :keep
+  """
+  @callback on_checkpoint(plugin_state :: term(), context :: map()) ::
+              {:externalize, key :: atom(), pointer :: term()} | :keep | :drop
+
+  @doc """
+  Called during restore to rehydrate externalized plugin state.
+
+  When a plugin's `on_checkpoint/2` returns `{:externalize, key, pointer}`,
+  the pointer is stored in the checkpoint. During restore, `on_restore/2`
+  is called with that pointer to allow the plugin to reconstruct its state.
+
+  For plugins that require IO to restore (e.g., loading a thread from storage),
+  returning `{:ok, nil}` signals that the state will be rehydrated by the
+  persistence layer (e.g., `Jido.Persist`).
+
+  ## Parameters
+
+  - `pointer` - The pointer stored during checkpoint (from `on_checkpoint/2`)
+  - `context` - Map with restore context (e.g., `:config`)
+
+  ## Returns
+
+  - `{:ok, restored_state}` — The restored plugin state
+  - `{:ok, nil}` — State will be rehydrated externally (e.g., by Persist)
+  - `{:error, reason}` — Restore failed
+  """
+  @callback on_restore(pointer :: term(), context :: map()) ::
+              {:ok, term()} | {:error, term()}
+
   # Macro implementation
 
   @doc false
@@ -534,6 +592,17 @@ defmodule Jido.Plugin do
       @spec subscriptions(map(), map()) :: [{module(), keyword() | map()}]
       @impl Jido.Plugin
       def subscriptions(_config, _context), do: []
+
+      @doc false
+      @spec on_checkpoint(term(), map()) ::
+              {:externalize, atom(), term()} | :keep | :drop
+      @impl Jido.Plugin
+      def on_checkpoint(_plugin_state, _context), do: :keep
+
+      @doc false
+      @spec on_restore(term(), map()) :: {:ok, term()} | {:error, term()}
+      @impl Jido.Plugin
+      def on_restore(_pointer, _context), do: {:ok, nil}
     end
   end
 
@@ -546,6 +615,8 @@ defmodule Jido.Plugin do
                      transform_result: 3,
                      child_spec: 1,
                      subscriptions: 2,
+                     on_checkpoint: 2,
+                     on_restore: 2,
                      name: 0,
                      state_key: 0,
                      actions: 0,

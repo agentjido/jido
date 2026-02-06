@@ -500,6 +500,66 @@ defmodule JidoTest.PluginTest do
     end
   end
 
+  defmodule ExternalizePlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "externalize_plugin",
+      state_key: :ext,
+      actions: []
+
+    @impl Jido.Plugin
+    def on_checkpoint(%{id: id, rev: rev}, _ctx) do
+      {:externalize, :ext_pointer, %{id: id, rev: rev}}
+    end
+
+    def on_checkpoint(nil, _ctx), do: :keep
+
+    @impl Jido.Plugin
+    def on_restore(%{id: id}, _ctx) do
+      {:ok, %{id: id, restored: true}}
+    end
+  end
+
+  defmodule DropPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "drop_plugin",
+      state_key: :transient,
+      actions: []
+
+    @impl Jido.Plugin
+    def on_checkpoint(_state, _ctx), do: :drop
+  end
+
+  describe "checkpoint hooks" do
+    test "default on_checkpoint returns :keep" do
+      assert BasicPlugin.on_checkpoint(%{some: :state}, %{}) == :keep
+    end
+
+    test "default on_restore returns {:ok, nil}" do
+      assert BasicPlugin.on_restore(%{id: "123"}, %{}) == {:ok, nil}
+    end
+
+    test "plugin can externalize state during checkpoint" do
+      state = %{id: "thread-1", rev: 5}
+      assert {:externalize, :ext_pointer, %{id: "thread-1", rev: 5}} =
+               ExternalizePlugin.on_checkpoint(state, %{})
+    end
+
+    test "plugin can keep nil state during checkpoint" do
+      assert :keep = ExternalizePlugin.on_checkpoint(nil, %{})
+    end
+
+    test "plugin can restore from pointer" do
+      assert {:ok, %{id: "thread-1", restored: true}} =
+               ExternalizePlugin.on_restore(%{id: "thread-1"}, %{})
+    end
+
+    test "plugin can drop state during checkpoint" do
+      assert :drop = DropPlugin.on_checkpoint(%{temp: :data}, %{})
+    end
+  end
+
   describe "singleton option" do
     test "singleton defaults to false for regular plugins" do
       refute BasicPlugin.singleton?()
