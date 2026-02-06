@@ -69,7 +69,6 @@ defmodule JidoTest.IdentityTest do
 
       assert identity.profile[:origin] == "lab"
     end
-
   end
 
   describe "snapshot/1" do
