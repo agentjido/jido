@@ -988,6 +988,32 @@ defmodule Jido.Agent do
                             @validated_opts[:plugins] || []
                           )
 
+        @singleton_alias_violations @plugin_instances
+                                    |> Enum.filter(fn inst ->
+                                      inst.module.singleton?() and inst.as != nil
+                                    end)
+        if @singleton_alias_violations != [] do
+          modules =
+            Enum.map(@singleton_alias_violations, & &1.module) |> Enum.map(&inspect/1)
+
+          raise CompileError,
+            description: "Cannot alias singleton plugins: #{Enum.join(modules, ", ")}",
+            file: __ENV__.file,
+            line: __ENV__.line
+        end
+
+        @singleton_modules @plugin_instances
+                           |> Enum.filter(fn inst -> inst.module.singleton?() end)
+                           |> Enum.map(& &1.module)
+        @duplicate_singletons @singleton_modules -- Enum.uniq(@singleton_modules)
+        if @duplicate_singletons != [] do
+          raise CompileError,
+            description:
+              "Duplicate singleton plugins: #{inspect(Enum.uniq(@duplicate_singletons))}",
+            file: __ENV__.file,
+            line: __ENV__.line
+        end
+
         # Build plugin specs from instances (for backward compatibility)
         @plugin_specs Enum.map(@plugin_instances, fn instance ->
                         instance.module.plugin_spec(instance.config)
