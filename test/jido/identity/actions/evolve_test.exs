@@ -5,9 +5,9 @@ defmodule JidoTest.Identity.Actions.EvolveTest do
   alias Jido.Identity.Actions.Evolve
 
   describe "run/2" do
-    test "returns error when no identity in state" do
-      assert {:error, "No identity found in agent state"} =
-               Evolve.run(%{days: 0, years: 0}, %{state: %{}})
+    test "initializes identity when missing" do
+      assert {:ok, %{__identity__: evolved}} = Evolve.run(%{days: 0, years: 0}, %{state: %{}})
+      assert evolved.profile[:age] == 0
     end
 
     test "evolves identity by years" do
@@ -41,17 +41,6 @@ defmodule JidoTest.Identity.Actions.EvolveTest do
       assert identity.rev == 0
       assert {:ok, %{__identity__: evolved}} = Evolve.run(%{days: 0, years: 1}, ctx)
       assert evolved.rev == 1
-    end
-
-    test "preserves capabilities and extensions through evolution" do
-      capabilities = %{actions: [:speak], tags: [:test], io: %{}, limits: %{}}
-      extensions = %{custom: %{data: "preserved"}}
-      identity = Identity.new(capabilities: capabilities, extensions: extensions)
-      ctx = %{state: %{__identity__: identity}}
-
-      assert {:ok, %{__identity__: evolved}} = Evolve.run(%{days: 0, years: 1}, ctx)
-      assert evolved.capabilities == capabilities
-      assert evolved.extensions == extensions
     end
   end
 end

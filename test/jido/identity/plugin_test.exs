@@ -48,25 +48,6 @@ defmodule JidoTest.Identity.PluginTest do
     end
   end
 
-  describe "on_checkpoint/2" do
-    test "externalizes identity struct" do
-      identity = Identity.new() |> Identity.evolve()
-
-      assert {:externalize, :identity, %{rev: 1}} =
-               IdentityPlugin.on_checkpoint(identity, %{})
-    end
-
-    test "keeps nil state" do
-      assert :keep = IdentityPlugin.on_checkpoint(nil, %{})
-    end
-  end
-
-  describe "on_restore/2" do
-    test "returns {:ok, nil}" do
-      assert {:ok, nil} = IdentityPlugin.on_restore(%{rev: 5}, %{})
-    end
-  end
-
   describe "agent integration" do
     defmodule AgentWithIdentity do
       use Jido.Agent, name: "identity_plugin_test_agent"

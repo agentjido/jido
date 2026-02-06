@@ -16,13 +16,8 @@ defmodule Jido.Identity.Actions.Evolve do
     ]
 
   def run(params, ctx) do
-    case ctx.state[:__identity__] do
-      nil ->
-        {:error, "No identity found in agent state"}
-
-      identity ->
-        evolved = Jido.Identity.evolve(identity, Map.to_list(params))
-        {:ok, %{__identity__: evolved}}
-    end
+    identity = ctx.state[:__identity__] || Jido.Identity.new()
+    evolved = Jido.Identity.evolve(identity, Map.to_list(params))
+    {:ok, %{__identity__: evolved}}
   end
 end

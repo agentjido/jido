@@ -3,7 +3,7 @@ defmodule Jido.Identity do
   A first-class agent primitive representing who the agent is.
 
   Identity is stored at the `:__identity__` key in agent state and captures
-  lifecycle facts (profile), routing capabilities, and plugin-owned extensions.
+  lifecycle facts (profile).
 
   Identity is immutable — updates produce a new struct with a bumped revision.
   """
@@ -17,12 +17,6 @@ defmodule Jido.Identity do
               profile:
                 Zoi.map(description: "Lifecycle facts")
                 |> Zoi.default(%{age: nil}),
-              capabilities:
-                Zoi.map(description: "Routing manifest")
-                |> Zoi.default(%{actions: [], tags: [], io: %{}, limits: %{}}),
-              extensions:
-                Zoi.map(description: "Plugin-owned identity data")
-                |> Zoi.default(%{}),
               created_at: Zoi.integer(description: "Creation timestamp (ms)"),
               updated_at: Zoi.integer(description: "Last update timestamp (ms)")
             },
@@ -41,8 +35,6 @@ defmodule Jido.Identity do
     %__MODULE__{
       rev: 0,
       profile: opts[:profile] || %{age: nil},
-      capabilities: opts[:capabilities] || %{actions: [], tags: [], io: %{}, limits: %{}},
-      extensions: opts[:extensions] || %{},
       created_at: now,
       updated_at: now
     }
@@ -59,24 +51,23 @@ defmodule Jido.Identity do
 
     %{
       identity
-      | rev: identity.rev + 1,
-        profile: Map.put(identity.profile, :age, current_age + age_increment),
-        updated_at: now
+      | profile: Map.put(identity.profile, :age, current_age + age_increment)
     }
+    |> bump(now: now)
   end
 
   @doc "Return a public snapshot of the identity"
   @spec snapshot(t()) :: map()
   def snapshot(%__MODULE__{} = identity) do
-    public_extensions =
-      identity.extensions
-      |> Enum.filter(fn {_k, v} -> is_map(v) and Map.has_key?(v, :__public__) end)
-      |> Enum.into(%{}, fn {k, v} -> {k, v[:__public__]} end)
-
     %{
-      capabilities: identity.capabilities,
-      profile: Map.take(identity.profile, [:age, :generation, :origin]),
-      extensions: public_extensions
+      profile: Map.take(identity.profile, [:age, :generation, :origin])
     }
+  end
+
+  @doc "Bump identity revision and updated_at timestamp"
+  @spec bump(t(), keyword()) :: t()
+  def bump(%__MODULE__{} = identity, opts \\ []) do
+    now = opts[:now] || System.system_time(:millisecond)
+    %{identity | rev: identity.rev + 1, updated_at: now}
   end
 end

@@ -16,7 +16,7 @@ defmodule Jido.Identity.Plugin do
 
   ## State Key
   The identity is stored at `agent.state[:__identity__]` as a `Jido.Identity` struct.
-  Access helpers are provided by `Jido.Identity.Agent`.
+  Access helpers are provided by `Jido.Identity.Agent` and related modules.
   """
 
   use Jido.Plugin,
@@ -24,21 +24,9 @@ defmodule Jido.Identity.Plugin do
     state_key: :__identity__,
     actions: [],
     singleton: true,
-    description: "Identity state management for agent self-model and capabilities.",
+    description: "Identity state management for agent self-model.",
     capabilities: [:identity]
-
-  alias Jido.Identity
 
   @impl Jido.Plugin
   def mount(_agent, _config), do: {:ok, nil}
-
-  @impl Jido.Plugin
-  def on_checkpoint(%Identity{rev: rev}, _ctx) do
-    {:externalize, :identity, %{rev: rev}}
-  end
-
-  def on_checkpoint(nil, _ctx), do: :keep
-
-  @impl Jido.Plugin
-  def on_restore(_pointer, _ctx), do: {:ok, nil}
 end

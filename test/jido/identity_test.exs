@@ -9,28 +9,12 @@ defmodule JidoTest.IdentityTest do
 
       assert identity.rev == 0
       assert identity.profile == %{age: nil}
-      assert identity.capabilities == %{actions: [], tags: [], io: %{}, limits: %{}}
-      assert identity.extensions == %{}
     end
 
     test "accepts custom profile" do
       identity = Identity.new(profile: %{age: 5, origin: "lab"})
 
       assert identity.profile == %{age: 5, origin: "lab"}
-    end
-
-    test "accepts custom capabilities" do
-      caps = %{actions: [:move], tags: [:fast], io: %{vision: true}, limits: %{speed: 10}}
-      identity = Identity.new(capabilities: caps)
-
-      assert identity.capabilities == caps
-    end
-
-    test "accepts custom extensions" do
-      exts = %{memory: %{size: 100}}
-      identity = Identity.new(extensions: exts)
-
-      assert identity.extensions == exts
     end
 
     test "sets created_at and updated_at timestamps" do
@@ -86,22 +70,14 @@ defmodule JidoTest.IdentityTest do
       assert identity.profile[:origin] == "lab"
     end
 
-    test "preserves capabilities and extensions" do
-      caps = %{actions: [:move], tags: [], io: %{}, limits: %{}}
-      exts = %{memory: %{size: 100}}
-      identity = Identity.new(capabilities: caps, extensions: exts) |> Identity.evolve()
-
-      assert identity.capabilities == caps
-      assert identity.extensions == exts
-    end
   end
 
   describe "snapshot/1" do
-    test "returns capabilities, profile, and extensions" do
+    test "returns profile" do
       identity = Identity.new()
       snap = Identity.snapshot(identity)
 
-      assert Map.keys(snap) |> Enum.sort() == [:capabilities, :extensions, :profile]
+      assert Map.keys(snap) == [:profile]
     end
 
     test "filters profile to only age, generation, origin keys" do
@@ -109,34 +85,6 @@ defmodule JidoTest.IdentityTest do
       snap = Identity.snapshot(identity)
 
       assert snap.profile == %{age: 5, generation: 2, origin: "lab"}
-    end
-
-    test "only includes extensions with __public__ key" do
-      exts = %{
-        visible: %{__public__: %{name: "ext1"}, private_data: "secret"},
-        hidden: %{private_data: "secret"}
-      }
-
-      identity = Identity.new(extensions: exts)
-      snap = Identity.snapshot(identity)
-
-      assert Map.has_key?(snap.extensions, :visible)
-      refute Map.has_key?(snap.extensions, :hidden)
-    end
-
-    test "uses __public__ value in snapshot" do
-      exts = %{visible: %{__public__: %{name: "ext1"}, private_data: "secret"}}
-      identity = Identity.new(extensions: exts)
-      snap = Identity.snapshot(identity)
-
-      assert snap.extensions[:visible] == %{name: "ext1"}
-    end
-
-    test "handles empty extensions" do
-      identity = Identity.new()
-      snap = Identity.snapshot(identity)
-
-      assert snap.extensions == %{}
     end
   end
 end
