@@ -150,7 +150,8 @@ defmodule JidoExampleTest.IdentityPluginTest do
       name: "pre_configured",
       description: "Agent with custom identity plugin that auto-initializes",
       default_plugins: %{
-        __identity__: {CustomIdentityPlugin, %{profile: %{age: 5, origin: :spawned}, tags: [:web]}}
+        __identity__:
+          {CustomIdentityPlugin, %{profile: %{age: 5, origin: :spawned}, tags: [:web]}}
       },
       schema: [
         status: [type: :atom, default: :idle]
