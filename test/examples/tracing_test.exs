@@ -148,7 +148,7 @@ defmodule JidoExampleTest.TracingTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"start_workflow", StartWorkflowAction},
         {"process_step", ProcessStepAction},

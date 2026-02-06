@@ -20,7 +20,7 @@ defmodule JidoTest.AgentServerStopLogTest do
     @moduledoc false
     use Jido.Agent, name: "test_agent", schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"stop_test", StopTestAction}]
     end
   end

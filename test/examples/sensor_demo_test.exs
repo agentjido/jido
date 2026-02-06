@@ -3,7 +3,7 @@ defmodule JidoExampleTest.SensorDemoTest do
   Example test demonstrating Jido Sensors and signal routing.
 
   This test converts examples/sensor_demo.exs into a proper ExUnit test that:
-  - Verifies sensor signals are routed through signal_routes/0
+  - Verifies sensor signals are routed through signal_routes/1
   - Verifies webhook injection works correctly
   - Asserts actual state changes (not just "runs without crash")
 
@@ -122,7 +122,7 @@ defmodule JidoExampleTest.SensorDemoTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"sensor.quote", HandleQuoteAction},
         {"webhook.github", HandleGitHubWebhookAction},

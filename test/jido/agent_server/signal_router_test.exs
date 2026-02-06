@@ -74,7 +74,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       actions: [JidoTest.AgentServer.SignalRouterTest.TestAction]
 
     @impl Jido.Plugin
-    def router(_config) do
+    def signal_routes(_config) do
       [
         {"plugin.custom", JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"plugin.priority", JidoTest.AgentServer.SignalRouterTest.TestAction, -20}
@@ -91,7 +91,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       signal_patterns: ["nil.*"]
 
     @impl Jido.Plugin
-    def router(_config), do: nil
+    def signal_routes(_config), do: []
   end
 
   defmodule PluginReturningNonList do
@@ -103,7 +103,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       signal_patterns: ["nonlist.*"]
 
     @impl Jido.Plugin
-    def router(_config), do: :not_a_list
+    def signal_routes(_config), do: :not_a_list
   end
 
   defmodule PluginWithPatterns do
@@ -115,7 +115,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
         JidoTest.AgentServer.SignalRouterTest.TestAction,
         JidoTest.AgentServer.SignalRouterTest.AnotherAction
       ],
-      routes: [
+      signal_routes: [
         {"pattern.one", JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"pattern.two", JidoTest.AgentServer.SignalRouterTest.AnotherAction}
       ]
@@ -131,7 +131,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       name: "agent_with_routes",
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"agent.action", JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"agent.priority", JidoTest.AgentServer.SignalRouterTest.TestAction, 10}
@@ -140,7 +140,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   end
 
   defmodule AgentWithoutRoutes do
-    @moduledoc "Agent that does NOT export signal_routes/0"
+    @moduledoc "Agent that does NOT export signal_routes/1"
     use Jido.Agent,
       name: "agent_without_routes",
       schema: []
@@ -153,7 +153,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes,
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"agent.route", JidoTest.AgentServer.SignalRouterTest.TestAction}]
     end
   end
@@ -165,7 +165,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithoutRoutes,
       schema: []
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithPlugins do
@@ -178,7 +178,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
         JidoTest.AgentServer.SignalRouterTest.PluginWithPatterns
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithNilRouterPlugin do
@@ -188,7 +188,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       schema: [],
       plugins: [JidoTest.AgentServer.SignalRouterTest.PluginReturningNil]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithNonListRouterPlugin do
@@ -198,7 +198,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       schema: [],
       plugins: [JidoTest.AgentServer.SignalRouterTest.PluginReturningNonList]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithMatchFnRoutes do
@@ -207,7 +207,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       name: "agent_with_match_fn_routes",
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"match.three", &match_large_amount/1, JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"match.four", &match_large_amount/1, JidoTest.AgentServer.SignalRouterTest.TestAction,
@@ -261,7 +261,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   # =============================================================================
 
   describe "build/1 with agent routes" do
-    test "builds router from agent signal_routes/0" do
+    test "builds router from agent signal_routes/1" do
       state = build_test_state(AgentWithRoutes)
       router = SignalRouter.build(state)
 
@@ -269,7 +269,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert router.route_count > 0
     end
 
-    test "returns empty router when agent doesn't export signal_routes/0" do
+    test "returns empty router when agent doesn't export signal_routes/1" do
       state = build_test_state(AgentWithoutRoutes)
       router = SignalRouter.build(state)
 
@@ -298,16 +298,16 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   end
 
   describe "build/1 with plugin routes" do
-    test "builds router from plugin router/1 function" do
+    test "builds router from plugin signal_routes/1 function" do
       state = build_test_state(AgentWithPlugins)
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      # Should have routes from plugin router and pattern-based routes
+      # Should have routes from plugin signal_routes and pattern-based routes
       assert router.route_count > 0
     end
 
-    test "handles plugin router/1 returning nil - falls back to pattern routes" do
+    test "handles plugin signal_routes/1 returning empty list - falls back to pattern routes" do
       state = build_test_state(AgentWithNilRouterPlugin)
       router = SignalRouter.build(state)
 
@@ -317,7 +317,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert router.route_count == 1
     end
 
-    test "handles plugin router/1 returning non-list value - falls back to pattern routes" do
+    test "handles plugin signal_routes/1 returning non-list value - falls back to pattern routes" do
       state = build_test_state(AgentWithNonListRouterPlugin)
       router = SignalRouter.build(state)
 
@@ -429,7 +429,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
           schema: [],
           plugins: [JidoTest.AgentServer.SignalRouterTest.PluginWithRouter]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"combined.agent", JidoTest.AgentServer.SignalRouterTest.TestAction}]
         end
       end

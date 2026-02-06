@@ -30,7 +30,10 @@ defmodule JidoTest.PluginTest do
       tags: ["test", "full"],
       capabilities: [:messaging, :notifications],
       requires: [{:config, :api_key}, {:app, :req}],
-      routes: [{"post", JidoTest.PluginTestAction}, {"get", JidoTest.PluginTestAnotherAction}],
+      signal_routes: [
+        {"post", JidoTest.PluginTestAction},
+        {"get", JidoTest.PluginTestAnotherAction}
+      ],
       schedules: [{"*/5 * * * *", JidoTest.PluginTestAction}]
   end
 
@@ -47,7 +50,7 @@ defmodule JidoTest.PluginTest do
     end
 
     @impl Jido.Plugin
-    def router(_config), do: [:custom_router]
+    def signal_routes(_config), do: [:custom_router]
 
     @impl Jido.Plugin
     def handle_signal(signal, context) do
@@ -104,7 +107,7 @@ defmodule JidoTest.PluginTest do
       assert BasicPlugin.tags() == []
       assert BasicPlugin.capabilities() == []
       assert BasicPlugin.requires() == []
-      assert BasicPlugin.routes() == []
+      assert BasicPlugin.signal_routes() == []
       assert BasicPlugin.schedules() == []
     end
   end
@@ -124,7 +127,7 @@ defmodule JidoTest.PluginTest do
       assert FullPlugin.capabilities() == [:messaging, :notifications]
       assert FullPlugin.requires() == [{:config, :api_key}, {:app, :req}]
 
-      assert FullPlugin.routes() == [
+      assert FullPlugin.signal_routes() == [
                {"post", JidoTest.PluginTestAction},
                {"get", JidoTest.PluginTestAnotherAction}
              ]
@@ -293,9 +296,9 @@ defmodule JidoTest.PluginTest do
       assert result == {:ok, %{}}
     end
 
-    test "default router/1 returns nil" do
-      result = BasicPlugin.router(%{})
-      assert result == nil
+    test "default signal_routes/1 returns empty list" do
+      result = BasicPlugin.signal_routes(%{})
+      assert result == []
     end
 
     test "default handle_signal/2 returns {:ok, nil}" do
@@ -329,8 +332,8 @@ defmodule JidoTest.PluginTest do
       assert result == {:error, :mount_failed}
     end
 
-    test "custom router/1 returns custom router" do
-      result = CustomCallbackPlugin.router(%{some: :config})
+    test "custom signal_routes/1 returns custom routes" do
+      result = CustomCallbackPlugin.signal_routes(%{some: :config})
       assert result == [:custom_router]
     end
 
@@ -392,7 +395,7 @@ defmodule JidoTest.PluginTest do
       assert manifest.tags == []
       assert manifest.capabilities == []
       assert manifest.requires == []
-      assert manifest.routes == []
+      assert manifest.signal_routes == []
       assert manifest.schedules == []
     end
 
@@ -414,7 +417,7 @@ defmodule JidoTest.PluginTest do
       assert manifest.capabilities == [:messaging, :notifications]
       assert manifest.requires == [{:config, :api_key}, {:app, :req}]
 
-      assert manifest.routes == [
+      assert manifest.signal_routes == [
                {"post", JidoTest.PluginTestAction},
                {"get", JidoTest.PluginTestAnotherAction}
              ]
@@ -467,10 +470,10 @@ defmodule JidoTest.PluginTest do
       assert FullPlugin.requires() == [{:config, :api_key}, {:app, :req}]
     end
 
-    test "routes/0 returns correct values" do
-      assert BasicPlugin.routes() == []
+    test "signal_routes/0 returns correct values" do
+      assert BasicPlugin.signal_routes() == []
 
-      assert FullPlugin.routes() == [
+      assert FullPlugin.signal_routes() == [
                {"post", JidoTest.PluginTestAction},
                {"get", JidoTest.PluginTestAnotherAction}
              ]
@@ -488,7 +491,7 @@ defmodule JidoTest.PluginTest do
       assert BasicPlugin.state_key() == :basic
       assert BasicPlugin.actions() == [JidoTest.PluginTestAction]
       assert BasicPlugin.signal_patterns() == []
-      assert BasicPlugin.router(%{}) == nil
+      assert BasicPlugin.signal_routes(%{}) == []
     end
 
     test "plugin_spec still works correctly" do

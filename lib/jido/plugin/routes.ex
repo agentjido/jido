@@ -45,7 +45,7 @@ defmodule Jido.Plugin.Routes do
 
   ## Legacy Support
 
-  If `manifest.routes` is empty but `manifest.signal_patterns` exists,
+  If `manifest.signal_routes` is empty but `manifest.signal_patterns` exists,
   routes are generated from patterns + actions.
 
   ## Examples
@@ -64,14 +64,14 @@ defmodule Jido.Plugin.Routes do
     prefix = instance.route_prefix
     module = instance.module
 
-    routes = manifest.routes || []
+    routes = manifest.signal_routes || []
 
     expanded =
       cond do
         routes != [] ->
           Enum.map(routes, fn route -> expand_route(route, prefix) end)
 
-        has_custom_router?(module) ->
+        has_custom_signal_routes?(module) ->
           []
 
         true ->
@@ -81,10 +81,9 @@ defmodule Jido.Plugin.Routes do
     expanded
   end
 
-  defp has_custom_router?(module) do
-    if function_exported?(module, :router, 1) do
-      case module.router(%{}) do
-        nil -> false
+  defp has_custom_signal_routes?(module) do
+    if function_exported?(module, :signal_routes, 1) do
+      case module.signal_routes(%{}) do
         [] -> false
         routes when is_list(routes) -> true
         _ -> false
@@ -164,6 +163,25 @@ defmodule Jido.Plugin.Routes do
   """
   @spec default_priority() :: integer()
   def default_priority, do: @plugin_default_priority
+
+  @doc """
+  Generates route tuples from a cartesian product of signal patterns and action modules.
+
+  This is the explicit replacement for the implicit `signal_patterns × actions`
+  expansion that was previously built into the plugin compile-time option.
+
+  ## Examples
+
+      iex> Routes.from_patterns(["chat.*"], [SendMessage, ListHistory])
+      [{"chat.*", SendMessage}, {"chat.*", ListHistory}]
+
+      iex> Routes.from_patterns(["chat.send"], [SendMessage])
+      [{"chat.send", SendMessage}]
+  """
+  @spec from_patterns([String.t()], [module()]) :: [{String.t(), module()}]
+  def from_patterns(patterns, actions) when is_list(patterns) and is_list(actions) do
+    for pattern <- patterns, action <- actions, do: {pattern, action}
+  end
 
   defp expand_route({path, target}, prefix) do
     {prefix_path(prefix, path), target, []}

@@ -154,7 +154,7 @@ defmodule JidoExampleTest.EmitDirectiveTest do
         emitted_count: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"create_order", CreateOrderAction},
         {"process_payment", ProcessPaymentAction},

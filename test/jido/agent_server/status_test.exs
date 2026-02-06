@@ -25,7 +25,7 @@ defmodule JidoTest.AgentServer.StatusTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"test_increment", TestActions.IncrementAction},
         {"test.complete", CompleteAction}

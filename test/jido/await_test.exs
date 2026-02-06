@@ -58,7 +58,7 @@ defmodule JidoTest.AwaitTest do
         error: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"complete", CompletingAction},
         {"fail", FailingAction},
@@ -77,7 +77,7 @@ defmodule JidoTest.AwaitTest do
         last_answer: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"complete", CompletingAction}]
     end
   end

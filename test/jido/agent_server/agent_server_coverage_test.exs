@@ -29,7 +29,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
     end
   end
@@ -45,7 +45,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         intercepted_action: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
     end
 
@@ -69,7 +69,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         after_called: [type: :boolean, default: false]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
     end
 
@@ -89,7 +89,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         after_called: [type: :boolean, default: false]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
     end
 
@@ -133,7 +133,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         directive_count: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"many_directives", ManyDirectivesAction}]
     end
   end
@@ -180,7 +180,7 @@ defmodule JidoTest.AgentServerCoverageTest do
         error: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"complete", CompleteAction},
         {"fail", FailAction},

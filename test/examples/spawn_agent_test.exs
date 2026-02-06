@@ -155,7 +155,7 @@ defmodule JidoExampleTest.SpawnAgentTest do
         worker_results: [type: {:list, :map}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"spawn_worker", SpawnWorkerAction},
         {"jido.agent.child.started", ChildStartedAction},
@@ -174,7 +174,7 @@ defmodule JidoExampleTest.SpawnAgentTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"do_work", JidoExampleTest.SpawnAgentTest.DoWorkAction}
       ]

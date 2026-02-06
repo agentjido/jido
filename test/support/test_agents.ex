@@ -13,7 +13,7 @@ defmodule JidoTest.TestAgents do
     use Jido.Agent,
       name: "minimal_agent"
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule Counter do
@@ -35,7 +35,7 @@ defmodule JidoTest.TestAgents do
         messages: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", JidoTest.TestActions.IncrementAction},
         {"decrement", JidoTest.TestActions.DecrementAction},
@@ -59,7 +59,7 @@ defmodule JidoTest.TestAgents do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule Hook do
@@ -70,7 +70,7 @@ defmodule JidoTest.TestAgents do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
 
     def on_after_cmd(agent, _action, directives) do
       {:ok, %{agent | state: Map.put(agent.state, :hook_called, true)}, directives}
@@ -122,7 +122,7 @@ defmodule JidoTest.TestAgents do
       name: "custom_strategy_agent",
       strategy: JidoTest.TestAgents.CountingStrategy
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule StrategyWithOpts do
@@ -131,7 +131,7 @@ defmodule JidoTest.TestAgents do
       name: "strategy_opts_agent",
       strategy: {JidoTest.TestAgents.CountingStrategy, max_depth: 5}
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule ZoiSchema do
@@ -144,7 +144,7 @@ defmodule JidoTest.TestAgents do
           count: Zoi.integer() |> Zoi.default(0)
         })
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule WithCustomStrategy do
@@ -156,7 +156,7 @@ defmodule JidoTest.TestAgents do
         value: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule TestPluginWithRoutes do
@@ -165,7 +165,7 @@ defmodule JidoTest.TestAgents do
       name: "test_routes_plugin",
       state_key: :test_routes,
       actions: [JidoTest.PluginTestAction],
-      routes: [
+      signal_routes: [
         {"post", JidoTest.PluginTestAction},
         {"list", JidoTest.PluginTestAction}
       ]
@@ -177,7 +177,7 @@ defmodule JidoTest.TestAgents do
       name: "priority_plugin",
       state_key: :priority,
       actions: [JidoTest.PluginTestAction],
-      routes: [
+      signal_routes: [
         {"action", JidoTest.PluginTestAction, priority: 5}
       ]
   end
@@ -188,7 +188,7 @@ defmodule JidoTest.TestAgents do
       name: "agent_with_plugin_routes",
       plugins: [JidoTest.TestAgents.TestPluginWithRoutes]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithMultiInstancePlugins do
@@ -200,6 +200,6 @@ defmodule JidoTest.TestAgents do
         {JidoTest.TestAgents.TestPluginWithRoutes, as: :sales}
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 end

@@ -360,7 +360,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
         tasks_completed: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"task.execute", ExecuteTaskAction}
       ]
@@ -377,7 +377,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
         completed_jobs: [type: {:list, :string}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"job.assign", HandleJobAssignAction},
         {"jido.agent.child.started", CoordinatorChildStartedAction},
@@ -396,7 +396,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
         last_submitted: [type: :string, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"submit_job", SubmitJobAction},
         {"jido.agent.child.started", OrchestratorChildStartedAction},

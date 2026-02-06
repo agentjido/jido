@@ -55,7 +55,7 @@ defmodule JidoTest.AwaitCoverageTest do
         last_answer: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"complete", CompletingAction}]
     end
   end
@@ -70,7 +70,7 @@ defmodule JidoTest.AwaitCoverageTest do
         error: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"never_complete", NeverCompletesAction},
         {"complete", CompletingAction},

@@ -187,7 +187,7 @@ defmodule JidoExampleTest.ParentChildTest do
         workers_spawned: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"spawn_worker", SpawnWorkerAction},
         {"jido.agent.child.started", HandleChildStartedAction},
@@ -205,7 +205,7 @@ defmodule JidoExampleTest.ParentChildTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"work.request", ProcessWorkAction}
       ]

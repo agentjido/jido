@@ -200,7 +200,7 @@ defmodule JidoExampleTest.ErrorHandlingTest do
         error_context: [type: :atom, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"validate", ValidateAction},
         {"retry", HandleRetryAction},

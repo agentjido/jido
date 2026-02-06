@@ -37,7 +37,7 @@ defmodule Jido.Plugin do
         end
 
         @impl Jido.Plugin
-        def router(config) do
+        def signal_routes(_ctx) do
           [
             {"chat.send", MyApp.Actions.SendMessage},
             {"chat.history", MyApp.Actions.ListHistory}
@@ -70,7 +70,7 @@ defmodule Jido.Plugin do
   - `tags` - List of tag strings (default: []).
   - `capabilities` - List of atoms describing what the plugin provides (default: []).
   - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
-  - `routes` - List of route tuples like `{"post", ActionModule}` (default: []).
+  - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
   """
 
@@ -128,9 +128,9 @@ defmodule Jido.Plugin do
                                   "Requirements like {:config, :token}, {:app, :req}, {:plugin, :http}."
                               )
                               |> Zoi.default([]),
-                            routes:
+                            signal_routes:
                               Zoi.list(Zoi.any(),
-                                description: "Route tuples like {\"post\", ActionModule}."
+                                description: "Signal route tuples like {\"post\", ActionModule}."
                               )
                               |> Zoi.default([]),
                             schedules:
@@ -187,11 +187,11 @@ defmodule Jido.Plugin do
   @callback mount(agent :: term(), config :: map()) :: {:ok, map() | nil} | {:error, term()}
 
   @doc """
-  Returns the signal router for this plugin.
+  Returns the signal routes for this plugin.
 
-  The router determines how signals are routed to handlers.
+  The signal routes determine how signals are routed to handlers.
   """
-  @callback router(config :: map()) :: term()
+  @callback signal_routes(config :: map()) :: term()
 
   @doc """
   Pre-routing hook called before signal routing in AgentServer.
@@ -471,9 +471,9 @@ defmodule Jido.Plugin do
       @spec requires() :: [tuple()]
       def requires, do: @validated_opts[:requires] || []
 
-      @doc "Returns the routes for this plugin."
-      @spec routes() :: [tuple()]
-      def routes, do: @validated_opts[:routes] || []
+      @doc "Returns the signal routes for this plugin."
+      @spec signal_routes() :: [tuple()]
+      def signal_routes, do: @validated_opts[:signal_routes] || []
 
       @doc "Returns the schedules for this plugin."
       @spec schedules() :: [tuple()]
@@ -516,7 +516,7 @@ defmodule Jido.Plugin do
 
       The manifest provides compile-time metadata for discovery
       and introspection, including capabilities, requirements,
-      routes, and schedules.
+      signal routes, and schedules.
       """
       @spec manifest() :: Manifest.t()
       def manifest do
@@ -534,7 +534,7 @@ defmodule Jido.Plugin do
           schema: schema(),
           config_schema: config_schema(),
           actions: actions(),
-          routes: routes(),
+          signal_routes: signal_routes(),
           schedules: schedules(),
           signal_patterns: signal_patterns(),
           singleton: singleton?()
@@ -568,9 +568,9 @@ defmodule Jido.Plugin do
       def mount(_agent, _config), do: {:ok, %{}}
 
       @doc false
-      @spec router(map()) :: term()
+      @spec signal_routes(map()) :: [tuple()]
       @impl Jido.Plugin
-      def router(_config), do: nil
+      def signal_routes(_config), do: []
 
       @doc false
       @spec handle_signal(term(), map()) ::
@@ -609,30 +609,32 @@ defmodule Jido.Plugin do
   @doc false
   defp generate_defoverridable do
     quote location: :keep do
-      defoverridable mount: 2,
-                     router: 1,
-                     handle_signal: 2,
-                     transform_result: 3,
-                     child_spec: 1,
-                     subscriptions: 2,
-                     on_checkpoint: 2,
-                     on_restore: 2,
-                     name: 0,
-                     state_key: 0,
-                     actions: 0,
-                     description: 0,
-                     category: 0,
-                     vsn: 0,
-                     otp_app: 0,
-                     schema: 0,
-                     config_schema: 0,
-                     signal_patterns: 0,
-                     tags: 0,
-                     capabilities: 0,
-                     requires: 0,
-                     routes: 0,
-                     schedules: 0,
-                     singleton?: 0
+      defoverridable [
+        {:mount, 2},
+        {:signal_routes, 0},
+        {:signal_routes, 1},
+        {:handle_signal, 2},
+        {:transform_result, 3},
+        {:child_spec, 1},
+        {:subscriptions, 2},
+        {:on_checkpoint, 2},
+        {:on_restore, 2},
+        {:name, 0},
+        {:state_key, 0},
+        {:actions, 0},
+        {:description, 0},
+        {:category, 0},
+        {:vsn, 0},
+        {:otp_app, 0},
+        {:schema, 0},
+        {:config_schema, 0},
+        {:signal_patterns, 0},
+        {:tags, 0},
+        {:capabilities, 0},
+        {:requires, 0},
+        {:schedules, 0},
+        {:singleton?, 0}
+      ]
     end
   end
 

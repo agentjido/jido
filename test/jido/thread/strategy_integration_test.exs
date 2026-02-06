@@ -40,7 +40,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       strategy: Jido.Agent.Strategy.Direct,
       schema: [value: [type: :integer, default: 0]]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule DirectThreadAgent do
@@ -50,7 +50,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       strategy: {Jido.Agent.Strategy.Direct, thread?: true},
       schema: [value: [type: :integer, default: 0]]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule FSMTestAgent do
@@ -60,7 +60,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       strategy: StrategyFSM,
       schema: [value: [type: :integer, default: 0]]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule FSMThreadAgent do
@@ -70,7 +70,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       strategy: {StrategyFSM, thread?: true},
       schema: [value: [type: :integer, default: 0]]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   describe "Direct strategy without thread?" do

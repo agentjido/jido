@@ -188,7 +188,7 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
         started_at: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"start_timer", StartTimerAction},
         {"timer.tick", HandleTickAction},

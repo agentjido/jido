@@ -61,7 +61,7 @@ if Code.ensure_loaded?(Igniter) do
           signal_patterns: [#{patterns_str}]
 
         @impl Jido.Plugin
-        def router(_config) do
+        def signal_routes(_config) do
           []
         end
       end

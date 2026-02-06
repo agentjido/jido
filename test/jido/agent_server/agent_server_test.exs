@@ -60,7 +60,7 @@ defmodule JidoTest.AgentServerTest do
 
     alias JidoTest.TestActions
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", TestActions.IncrementAction},
         {"decrement", TestActions.DecrementAction},
@@ -430,7 +430,7 @@ defmodule JidoTest.AgentServerTest do
           name: "slow_agent",
           schema: [value: [type: :integer, default: 0]]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"slow", SlowAction}]
         end
       end
@@ -499,7 +499,7 @@ defmodule JidoTest.AgentServerTest do
             pings: [type: :integer, default: 0]
           ]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [
             {"start_schedule", StartScheduleAction},
             {"scheduled.ping", ScheduledPingAction}
@@ -556,7 +556,7 @@ defmodule JidoTest.AgentServerTest do
             events: [type: {:list, :any}, default: []]
           ]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [
             {"schedule_many", ScheduleManyAction},
             {"tick", TickAction}
@@ -605,7 +605,7 @@ defmodule JidoTest.AgentServerTest do
             received: [type: :any, default: nil]
           ]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [
             {"schedule_atom", ScheduleAtomAction},
             {"jido.scheduled", JidoScheduledAction}
@@ -803,7 +803,7 @@ defmodule JidoTest.AgentServerTest do
           name: "counter_agent",
           schema: [drain_count: [type: :integer, default: 0]]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"slow", SlowAction2}]
         end
       end

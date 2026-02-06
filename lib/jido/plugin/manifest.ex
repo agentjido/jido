@@ -21,7 +21,7 @@ defmodule Jido.Plugin.Manifest do
   - `schema` - Zoi schema for plugin state
   - `config_schema` - Zoi schema for per-agent config
   - `actions` - List of action modules
-  - `routes` - List of route tuples like `{"post", ActionModule}`
+  - `signal_routes` - List of signal route tuples like `{"post", ActionModule}`
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}`
   - `signal_patterns` - Legacy signal patterns for routing
   - `subscriptions` - Sensor subscriptions provided by this plugin
@@ -51,8 +51,10 @@ defmodule Jido.Plugin.Manifest do
                 Zoi.any(description: "Zoi schema for per-agent config") |> Zoi.optional(),
               actions:
                 Zoi.list(Zoi.atom(), description: "List of action modules") |> Zoi.default([]),
-              routes:
-                Zoi.list(Zoi.any(), description: "Route tuples like {\"post\", ActionModule}")
+              signal_routes:
+                Zoi.list(Zoi.any(),
+                  description: "Signal route tuples like {\"post\", ActionModule}"
+                )
                 |> Zoi.default([]),
               schedules:
                 Zoi.list(Zoi.any(),

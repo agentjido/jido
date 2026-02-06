@@ -52,7 +52,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         ticks: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"register_cron", RegisterCronAction},
         {"cancel_cron", CancelCronAction},

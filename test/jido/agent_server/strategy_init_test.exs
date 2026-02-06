@@ -65,7 +65,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"test", JidoTest.AgentServer.StrategyInitTest.NoopAction}
       ]
@@ -81,7 +81,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
         value: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule DefaultStrategyAgent do
@@ -92,7 +92,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   describe "strategy.init/2 lifecycle" do

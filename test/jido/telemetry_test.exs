@@ -12,7 +12,7 @@ defmodule JidoTest.TelemetryTest do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   describe "start_link/1" do

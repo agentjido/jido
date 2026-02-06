@@ -111,7 +111,7 @@ defmodule JidoTest.PluginLifecycleTest do
     end
 
     @impl Jido.Plugin
-    def router(_config) do
+    def signal_routes(_config) do
       [
         {"chat.message", JidoTest.PluginLifecycleTest.AddMessageAction},
         {"chat.clear", JidoTest.PluginLifecycleTest.ClearMessagesAction},
@@ -389,7 +389,7 @@ defmodule JidoTest.PluginLifecycleTest do
           name: "no_plugin_agent",
           schema: [counter: [type: :integer, default: 0]]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"test.action", JidoTest.PluginLifecycleTest.NoPluginAction}]
         end
       end

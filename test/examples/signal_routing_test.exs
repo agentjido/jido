@@ -1,9 +1,9 @@
 defmodule JidoExampleTest.SignalRoutingTest do
   @moduledoc """
-  Example test demonstrating signal routing via signal_routes/0.
+  Example test demonstrating signal routing via signal_routes/1.
 
   This test shows:
-  - How to define signal_routes/0 to map signal types to actions
+  - How to define signal_routes/1 to map signal types to actions
   - How signals are processed through AgentServer
   - How unhandled signals behave
   - Multiple signal types routed to different actions
@@ -85,7 +85,7 @@ defmodule JidoExampleTest.SignalRoutingTest do
         events: [type: {:list, :map}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", IncrementAction},
         {"set_name", SetNameAction},

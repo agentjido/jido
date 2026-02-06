@@ -40,7 +40,7 @@ defmodule JidoTest.Plugin.RoutesTest do
       name: "plugin_with_routes",
       state_key: :plugin_routes,
       actions: [TestAction1, TestAction2],
-      routes: [
+      signal_routes: [
         {"post", TestAction1},
         {"list", TestAction2}
       ]
@@ -52,7 +52,7 @@ defmodule JidoTest.Plugin.RoutesTest do
       name: "plugin_with_opts",
       state_key: :plugin_opts,
       actions: [TestAction1, TestAction2],
-      routes: [
+      signal_routes: [
         {"post", TestAction1, priority: 5},
         {"list", TestAction2, on_conflict: :replace}
       ]
@@ -142,7 +142,7 @@ defmodule JidoTest.Plugin.RoutesTest do
       assert {"multi_action.pattern1", TestAction2, []} in routes
     end
 
-    test "returns empty when plugin has custom router/1 callback" do
+    test "returns empty when plugin has custom signal_routes/1 callback" do
       defmodule PluginWithCustomRouter do
         @moduledoc false
         use Jido.Plugin,
@@ -152,7 +152,7 @@ defmodule JidoTest.Plugin.RoutesTest do
           signal_patterns: ["ignored.*"]
 
         @impl Jido.Plugin
-        def router(_config) do
+        def signal_routes(_config) do
           [{"custom.route", TestAction1}]
         end
       end
@@ -164,7 +164,7 @@ defmodule JidoTest.Plugin.RoutesTest do
       assert routes == []
     end
 
-    test "falls back to patterns when router/1 returns nil" do
+    test "falls back to patterns when signal_routes/1 returns empty list" do
       defmodule PluginWithNilRouter do
         @moduledoc false
         use Jido.Plugin,
@@ -174,7 +174,7 @@ defmodule JidoTest.Plugin.RoutesTest do
           signal_patterns: ["fallback.*"]
 
         @impl Jido.Plugin
-        def router(_config), do: nil
+        def signal_routes(_config), do: []
       end
 
       instance = Instance.new(PluginWithNilRouter)

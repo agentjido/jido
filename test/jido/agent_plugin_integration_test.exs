@@ -503,7 +503,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
         state_key: :slack_cap,
         actions: [JidoTest.AgentPluginIntegrationTest.SimpleAction],
         capabilities: [:messaging, :channel_management],
-        routes: [
+        signal_routes: [
           {"post", JidoTest.AgentPluginIntegrationTest.SimpleAction},
           {"channels.list", JidoTest.AgentPluginIntegrationTest.SimpleAction}
         ]
@@ -516,7 +516,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
         state_key: :openai_cap,
         actions: [JidoTest.AgentPluginIntegrationTest.SimpleAction],
         capabilities: [:chat, :embeddings, :messaging],
-        routes: [
+        signal_routes: [
           {"chat", JidoTest.AgentPluginIntegrationTest.SimpleAction},
           {"embeddings", JidoTest.AgentPluginIntegrationTest.SimpleAction}
         ]

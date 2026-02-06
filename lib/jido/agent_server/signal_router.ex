@@ -42,8 +42,8 @@ defmodule Jido.AgentServer.SignalRouter do
 
   Collects routes from:
   - Strategy routes (priority 50+) via `strategy.signal_routes/1`
-  - Agent routes (priority 0) via `agent_module.signal_routes/0`
-  - Plugin routes (priority -10) via plugin `signal_patterns` and `router/1`
+  - Agent routes (priority 0) via `agent_module.signal_routes/1`
+  - Plugin routes (priority -10) via plugin `signal_patterns` and `signal_routes/1`
 
   Returns an empty router if no routes are found or if building fails.
   """
@@ -75,10 +75,11 @@ defmodule Jido.AgentServer.SignalRouter do
     end
   end
 
-  # Collects routes from agent_module.signal_routes/0
+  # Collects routes from agent_module.signal_routes/1
   defp add_agent_routes(routes, %State{agent_module: agent_module}) do
-    if function_exported?(agent_module, :signal_routes, 0) do
-      agent_routes = agent_module.signal_routes()
+    if function_exported?(agent_module, :signal_routes, 1) do
+      ctx = %{agent_module: agent_module}
+      agent_routes = agent_module.signal_routes(ctx)
       normalized = normalize_routes(agent_routes, @agent_default_priority)
       routes ++ normalized
     else
@@ -86,7 +87,7 @@ defmodule Jido.AgentServer.SignalRouter do
     end
   end
 
-  # Collects routes from plugins via plugin_routes/0 (pre-expanded) or fallback to router/1
+  # Collects routes from plugins via plugin_routes/0 (pre-expanded) or fallback to signal_routes/1
   defp add_plugin_routes(routes, %State{agent_module: agent_module}) do
     # First, try to get pre-expanded routes from plugin_routes/0 (Phase 3 approach)
     pre_expanded_routes =
@@ -96,7 +97,7 @@ defmodule Jido.AgentServer.SignalRouter do
         []
       end
 
-    # Get custom routes from plugins that define router/1 callback (legacy support)
+    # Get custom routes from plugins that define signal_routes/1 callback (legacy support)
     plugin_specs =
       if function_exported?(agent_module, :plugin_specs, 0) do
         agent_module.plugin_specs()
@@ -119,9 +120,9 @@ defmodule Jido.AgentServer.SignalRouter do
   defp get_plugin_custom_routes(spec) do
     plugin_module = spec.module
 
-    if function_exported?(plugin_module, :router, 1) do
-      case plugin_module.router(spec.config) do
-        nil -> []
+    if function_exported?(plugin_module, :signal_routes, 1) do
+      case plugin_module.signal_routes(spec.config) do
+        [] -> []
         routes when is_list(routes) -> routes
         _other -> []
       end

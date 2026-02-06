@@ -15,7 +15,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       ]
 
     @impl true
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defp unique_table do

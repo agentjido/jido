@@ -32,7 +32,7 @@ defmodule JidoTest.Plugin.ManifestTest do
       assert manifest.capabilities == []
       assert manifest.requires == []
       assert manifest.actions == []
-      assert manifest.routes == []
+      assert manifest.signal_routes == []
       assert manifest.schedules == []
       assert manifest.signal_patterns == []
     end
@@ -75,7 +75,7 @@ defmodule JidoTest.Plugin.ManifestTest do
         schema: schema,
         config_schema: config_schema,
         actions: [SomeAction, AnotherAction],
-        routes: [{"post", SomeAction}, {"get", AnotherAction}],
+        signal_routes: [{"post", SomeAction}, {"get", AnotherAction}],
         schedules: [{"*/5 * * * *", SomeAction}],
         signal_patterns: ["plugin.*"]
       }
@@ -92,7 +92,7 @@ defmodule JidoTest.Plugin.ManifestTest do
       assert manifest.schema == schema
       assert manifest.config_schema == config_schema
       assert manifest.actions == [SomeAction, AnotherAction]
-      assert manifest.routes == [{"post", SomeAction}, {"get", AnotherAction}]
+      assert manifest.signal_routes == [{"post", SomeAction}, {"get", AnotherAction}]
       assert manifest.schedules == [{"*/5 * * * *", SomeAction}]
       assert manifest.signal_patterns == ["plugin.*"]
     end

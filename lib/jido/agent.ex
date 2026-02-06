@@ -293,9 +293,16 @@ defmodule Jido.Agent do
   - `{path, match_fn, ActionModule}` - With pattern matching
   - `{path, match_fn, ActionModule, priority}` - Full spec
 
+  ## Context
+
+  The context map contains:
+  - `agent_module` - The agent module
+  - `strategy` - The strategy module
+  - `strategy_opts` - Strategy options
+
   ## Examples
 
-      def signal_routes do
+      def signal_routes(_ctx) do
         [
           {"user.created", HandleUserCreatedAction},
           {"counter.increment", IncrementAction},
@@ -303,7 +310,7 @@ defmodule Jido.Agent do
         ]
       end
   """
-  @callback signal_routes() :: [Jido.Signal.Router.route_spec()]
+  @callback signal_routes(ctx :: map()) :: [Jido.Signal.Router.route_spec()]
 
   @doc """
   Serializes the agent for persistence.
@@ -350,7 +357,7 @@ defmodule Jido.Agent do
   @optional_callbacks [
     on_before_cmd: 2,
     on_after_cmd: 3,
-    signal_routes: 0,
+    signal_routes: 1,
     checkpoint: 2,
     restore: 2
   ]
@@ -888,8 +895,8 @@ defmodule Jido.Agent do
   defp __quoted_callback_routes__ do
     quote location: :keep do
       @impl true
-      @spec signal_routes() :: list()
-      def signal_routes, do: []
+      @spec signal_routes(map()) :: list()
+      def signal_routes(_ctx), do: []
     end
   end
 
@@ -950,7 +957,7 @@ defmodule Jido.Agent do
                      on_after_cmd: 3,
                      checkpoint: 2,
                      restore: 2,
-                     signal_routes: 0,
+                     signal_routes: 1,
                      name: 0,
                      description: 0,
                      category: 0,

@@ -17,7 +17,7 @@ defmodule JidoTest.PersistTest do
       ]
 
     @impl true
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule CustomAgent do
@@ -33,7 +33,7 @@ defmodule JidoTest.PersistTest do
       schema: [value: [type: :string, default: ""]]
 
     @impl true
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defp unique_table do

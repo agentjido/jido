@@ -67,7 +67,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
       schema: [value: [type: :integer, default: 0]],
       plugins: [JidoTest.AgentServer.PluginTransformTest.DefaultTransformPlugin]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end
@@ -80,7 +80,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
       schema: [value: [type: :integer, default: 0]],
       plugins: [JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end
@@ -96,7 +96,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
         JidoTest.AgentServer.PluginTransformTest.TimestampTransformPlugin
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"value.set", JidoTest.AgentServer.PluginTransformTest.SetValueAction}]
     end
   end

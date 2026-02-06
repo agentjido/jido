@@ -59,7 +59,7 @@ defmodule JidoTest.AgentServer.HierarchyTest do
         child_events: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"jido.agent.child.exit", ChildExitAction},
         {"child_exit", ChildExitAction},
@@ -77,7 +77,7 @@ defmodule JidoTest.AgentServer.HierarchyTest do
         orphan_events: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"jido.agent.orphaned", OrphanedAction},
         {"orphaned", OrphanedAction}

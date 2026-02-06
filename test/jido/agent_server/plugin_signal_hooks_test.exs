@@ -88,7 +88,7 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
       schema: [counter: [type: :integer, default: 0]],
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.DefaultHandleSignalPlugin]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}]
     end
   end
@@ -104,7 +104,7 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
       ],
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.OverridePlugin]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction},
         {"counter.override", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}
@@ -120,7 +120,7 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
       schema: [counter: [type: :integer, default: 0]],
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.ErrorPlugin]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"counter.increment", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction},
         {"counter.error", JidoTest.AgentServer.PluginSignalHooksTest.IncrementAction}
