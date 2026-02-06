@@ -224,6 +224,6 @@ You've learned the core Jido workflow:
 ## Next Steps
 
 - **[Core Loop](core-loop.md)** — Understand "Signal → Action → cmd/2 → {agent, directives}"
-- **[Your First Skill](your-first-skill.md)** — Package actions with isolated state
+- **[Your First Plugin](your-first-plugin.md)** — Package actions with isolated state
 - **[Your First Sensor](your-first-sensor.md)** — Feed external events into your agent
 - **[Seeing What Happened](observability-intro.md)** — Debug with logs and telemetry

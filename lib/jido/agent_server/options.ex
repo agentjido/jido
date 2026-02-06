@@ -51,7 +51,7 @@ defmodule Jido.AgentServer.Options do
               spawn_fun:
                 Zoi.any(description: "Custom function for spawning children") |> Zoi.optional(),
               skip_schedules:
-                Zoi.boolean(description: "Skip registering skill schedules (useful for tests)")
+                Zoi.boolean(description: "Skip registering plugin schedules (useful for tests)")
                 |> Zoi.default(false),
 
               # InstanceManager integration (set by Jido.Agent.InstanceManager)

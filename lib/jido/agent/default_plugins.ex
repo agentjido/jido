@@ -5,15 +5,15 @@ defmodule Jido.Agent.DefaultPlugins do
   Default plugins are framework-provided singleton plugins that are automatically
   included in agents. They can be customized at three levels:
 
-  1. **Framework level** — Jido ships sensible defaults
+  1. **Package level** — Jido ships sensible defaults
   2. **Jido instance level** — `use Jido, default_plugins: [...]` or app config
   3. **Agent level** — `default_plugins: %{state_key: false | Module | {Module, config}}`
 
   ## Framework Defaults
 
-  The framework provides these default plugins (currently empty, populated in Phase B/C):
+  The framework provides these default plugins:
 
-      []
+      [Jido.Thread.Plugin]
 
   ## Instance-Level Override
 
@@ -48,11 +48,11 @@ defmodule Jido.Agent.DefaultPlugins do
       use Jido.Agent, name: "bare", default_plugins: false
   """
 
-  @framework_defaults [Jido.Thread.Plugin]
+  @package_defaults [Jido.Thread.Plugin]
 
   @doc "Returns the framework's default plugin list."
-  @spec framework_defaults() :: [module()]
-  def framework_defaults, do: @framework_defaults
+  @spec package_defaults() :: [module()]
+  def package_defaults, do: @package_defaults
 
   @doc """
   Resolves default plugins for a Jido instance.
@@ -66,7 +66,7 @@ defmodule Jido.Agent.DefaultPlugins do
   3. Framework defaults
   """
   defmacro resolve_instance_defaults(otp_app, jido_module, explicit_defaults) do
-    framework_defaults = @framework_defaults
+    package_defaults = @package_defaults
 
     quote do
       cond do
@@ -75,7 +75,7 @@ defmodule Jido.Agent.DefaultPlugins do
 
         true ->
           app_config = Application.compile_env(unquote(otp_app), unquote(jido_module), [])
-          Keyword.get(app_config, :default_plugins, unquote(Macro.escape(framework_defaults)))
+          Keyword.get(app_config, :default_plugins, unquote(Macro.escape(package_defaults)))
       end
     end
   end

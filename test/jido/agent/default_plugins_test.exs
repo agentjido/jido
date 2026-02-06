@@ -38,9 +38,9 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
       actions: [JidoTest.PluginTestAction]
   end
 
-  describe "framework_defaults/0" do
+  describe "package_defaults/0" do
     test "returns list with Thread.Plugin" do
-      assert DefaultPlugins.framework_defaults() == [Jido.Thread.Plugin]
+      assert DefaultPlugins.package_defaults() == [Jido.Thread.Plugin]
     end
   end
 

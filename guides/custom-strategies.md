@@ -246,7 +246,7 @@ end
 - You need state machine transitions → Use `FSM`
 - You want to modify action behavior → Write a different Action, not a Strategy
 - You want pre/post processing → Use agent hooks (`on_before_cmd/2`, `on_after_cmd/3`)
-- You want to route signals differently → Use skill `router/1` callbacks
+- You want to route signals differently → Use plugin `router/1` callbacks
 
 **Write a custom strategy when:**
 

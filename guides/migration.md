@@ -22,7 +22,7 @@ This guide helps you migrate existing Jido applications to version 2.0. The migr
 Choose your migration depth based on your timeline and needs:
 
 1. **Minimal** (1-2 hours): Add supervision tree, update agent starts
-2. **Intermediate** (1 day): Adopt Skills, use Directives for side effects
+2. **Intermediate** (1 day): Adopt Plugins, use Directives for side effects
 3. **Full** (1-2 weeks): Pure `cmd/2`, Zoi schemas, Strategies, Plans
 
 ## Step 1: Add Jido to Your Supervision Tree
@@ -412,14 +412,14 @@ end
 Directive.emit_to_parent(child_agent, signal)
 ```
 
-### Skills System
+### Plugin System
 
 ```elixir
 defmodule MyAgent do
   use Jido.Agent,
-    skills: [
-      MyApp.Skills.WebSearch,
-      MyApp.Skills.DataAnalysis
+    plugins: [
+      MyApp.Plugins.WebSearch,
+      MyApp.Plugins.DataAnalysis
     ]
 end
 ```

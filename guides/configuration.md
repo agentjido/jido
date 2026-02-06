@@ -256,7 +256,7 @@ MyApp.Jido.start_agent(MyApp.Agent,
   id: "agent-1",
   initial_state: %{count: 0},
   strategy_opts: %{batch_size: 20},
-  skill_configs: %{
+  plugin_configs: %{
     cache: %{max_size: 5000},
     logging: %{level: :debug}
   }

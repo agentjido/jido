@@ -43,7 +43,7 @@ defmodule Jido.AgentServer.State do
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
               skip_schedules:
-                Zoi.boolean(description: "Skip registering skill schedules")
+                Zoi.boolean(description: "Skip registering plugin schedules")
                 |> Zoi.default(false),
 
               # Configuration

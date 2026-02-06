@@ -19,7 +19,8 @@ defmodule MyAgent do
       counter: [type: :integer, default: 0]
     ],
     strategy: Jido.Agent.Strategy.Direct,    # Default
-    skills: [MySkill]                        # Default: []
+    plugins: [MyPlugin],                     # Default: []
+    default_plugins: true                    # Load default plugins (Default: true)
 end
 ```
 

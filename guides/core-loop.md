@@ -129,7 +129,7 @@ assert match?([%Directive.Emit{}], directives)
 
 - [Agents](agents.md) — Defining agents with schemas and hooks
 - [Directives](directives.md) — Available effect descriptions
-- [Skills](skills.md) — Composable capability modules
+- [Plugins](plugins.md) — Composable capability modules
 - [Runtime](runtime.md) — AgentServer and process management
 - [Strategies](strategies.md) — Execution patterns
 

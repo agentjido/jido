@@ -89,7 +89,7 @@ When a signal arrives at an agent, the `SignalRouter` determines which action to
 
 1. **Strategy routes** (priority 50+) — via `strategy.signal_routes/1`
 2. **Agent routes** (priority 0) — via `agent_module.signal_routes/0`
-3. **Skill routes** (priority -10) — via skill `signal_patterns` and `router/1`
+3. **Plugin routes** (priority -10) — via plugin `signal_patterns` and `router/1`
 
 ### Agent Signal Routes
 
@@ -129,13 +129,13 @@ defmodule MyStrategy do
 end
 ```
 
-### Skill Signal Patterns
+### Plugin Signal Patterns
 
-Skills use `signal_patterns` to declare which signals they handle:
+Plugins use `signal_patterns` to declare which signals they handle:
 
 ```elixir
-defmodule MyApp.ChatSkill do
-  use Jido.Skill,
+defmodule MyApp.ChatPlugin do
+  use Jido.Plugin,
     name: "chat",
     state_key: :chat,
     actions: [MyApp.Actions.SendMessage, MyApp.Actions.ClearHistory],
@@ -147,7 +147,7 @@ Pattern matching:
 - `"chat.*"` — matches `chat.message`, `chat.clear`, etc.
 - `"chat.**"` — matches `chat.message`, `chat.room.join`, etc.
 
-Skills can also implement a `router/1` callback for dynamic routing.
+Plugins can also implement a `router/1` callback for dynamic routing.
 
 ## Emitting Signals (Directive.Emit)
 
@@ -203,7 +203,7 @@ Directive.emit_to_parent(agent, signal)
 ┌─────────────────────────────────────────────────────────────────┐
 │                         AgentServer                              │
 │  Signal → AgentServer.call/cast                                  │
-│  → route_signal_to_action (via signal_routes or skill patterns)  │
+│  → route_signal_to_action (via signal_routes or plugin patterns) │
 │  → Agent.cmd/2                                                   │
 │  → process directives                                            │
 └───────────────────────────────┬─────────────────────────────────┘
@@ -258,5 +258,5 @@ agent.state.counter
 - [Core Loop](core-loop.md) — Agent fundamentals
 - [Directives](directives.md) — The Emit directive and others
 - [Strategies](strategies.md) — Strategy signal routing
-- [Skills](skills.md) — Skill signal patterns
+- [Plugins](plugins.md) — Plugin signal patterns
 - [jido_signal documentation](https://hexdocs.pm/jido_signal) — Full Signal API

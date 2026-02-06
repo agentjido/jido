@@ -1,14 +1,14 @@
-# Your First Skill
+# Your First Plugin
 
-**After:** You can refactor "stuff your agent does" into a Skill with isolated state and routing.
+**After:** You can refactor "stuff your agent does" into a Plugin with isolated state and routing.
 
 ## The Result
 
-Here's what you'll build—a `CounterSkill` that tracks a counter in isolated state and routes signals to increment it:
+Here's what you'll build—a `CounterPlugin` that tracks a counter in isolated state and routes signals to increment it:
 
 ```elixir
-defmodule MyApp.CounterSkill do
-  use Jido.Skill,
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin,
     name: "counter",
     state_key: :counter,
     actions: [MyApp.IncrementAction],
@@ -18,7 +18,7 @@ defmodule MyApp.CounterSkill do
     }),
     signal_patterns: ["counter.*"]
 
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [{"counter.increment", MyApp.IncrementAction}]
   end
@@ -31,7 +31,7 @@ Attach it to an agent:
 defmodule MyApp.MyAgent do
   use Jido.Agent,
     name: "my_agent",
-    skills: [MyApp.CounterSkill]
+    plugins: [MyApp.CounterPlugin]
 end
 ```
 
@@ -47,7 +47,7 @@ agent.state.counter.value
 #=> 5
 ```
 
-The skill owns `agent.state.counter`—isolated from other skills.
+The plugin owns `agent.state.counter`—isolated from other plugins.
 
 ## Building It Step by Step
 
@@ -75,13 +75,13 @@ defmodule MyApp.IncrementAction do
 end
 ```
 
-### Step 2: Define the Skill
+### Step 2: Define the Plugin
 
-Wrap the action in a skill with state and routing:
+Wrap the action in a plugin with state and routing:
 
 ```elixir
-defmodule MyApp.CounterSkill do
-  use Jido.Skill,
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin,
     name: "counter",
     state_key: :counter,
     actions: [MyApp.IncrementAction],
@@ -91,7 +91,7 @@ defmodule MyApp.CounterSkill do
     }),
     signal_patterns: ["counter.*"]
 
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def router(_config) do
     [{"counter.increment", MyApp.IncrementAction}]
   end
@@ -102,16 +102,16 @@ end
 
 | Option | Description |
 |--------|-------------|
-| `name` | Skill name (letters, numbers, underscores) |
-| `state_key` | Atom key for skill state in agent |
-| `actions` | List of action modules the skill provides |
+| `name` | Plugin name (letters, numbers, underscores) |
+| `state_key` | Atom key for plugin state in agent |
+| `actions` | List of action modules the plugin provides |
 
 **Key optional options:**
 
 | Option | Description |
 |--------|-------------|
-| `schema` | Zoi schema for skill state with defaults |
-| `signal_patterns` | Patterns this skill handles (e.g., `"counter.*"`) |
+| `schema` | Zoi schema for plugin state with defaults |
+| `signal_patterns` | Patterns this plugin handles (e.g., `"counter.*"`) |
 
 ### Step 3: Attach to an Agent
 
@@ -119,54 +119,54 @@ end
 defmodule MyApp.MyAgent do
   use Jido.Agent,
     name: "my_agent",
-    skills: [MyApp.CounterSkill]
+    plugins: [MyApp.CounterPlugin]
 end
 ```
 
-When the agent is created, the skill's state is initialized under its `state_key`.
+When the agent is created, the plugin's state is initialized under its `state_key`.
 
 ## State Isolation
 
-Each skill gets its own namespace in `agent.state`:
+Each plugin gets its own namespace in `agent.state`:
 
 ```elixir
 agent = MyApp.MyAgent.new()
 
 agent.state
 #=> %{
-#=>   counter: %{value: 0, last_updated: nil}  # CounterSkill state
+#=>   counter: %{value: 0, last_updated: nil}  # CounterPlugin state
 #=> }
 ```
 
-With multiple skills:
+With multiple plugins:
 
 ```elixir
-defmodule MyApp.MultiSkillAgent do
+defmodule MyApp.MultiPluginAgent do
   use Jido.Agent,
     name: "multi_agent",
-    skills: [
-      MyApp.CounterSkill,
-      MyApp.ChatSkill
+    plugins: [
+      MyApp.CounterPlugin,
+      MyApp.ChatPlugin
     ]
 end
 
-agent = MyApp.MultiSkillAgent.new()
+agent = MyApp.MultiPluginAgent.new()
 
 agent.state
 #=> %{
-#=>   counter: %{value: 0, last_updated: nil},  # CounterSkill
-#=>   chat: %{messages: [], model: "gpt-4"}     # ChatSkill
+#=>   counter: %{value: 0, last_updated: nil},  # CounterPlugin
+#=>   chat: %{messages: [], model: "gpt-4"}     # ChatPlugin
 #=> }
 ```
 
-Skills can't accidentally overwrite each other's state.
+Plugins can't accidentally overwrite each other's state.
 
 ## Signal Routing
 
 The `router/1` callback maps signal types to actions:
 
 ```elixir
-@impl Jido.Skill
+@impl Jido.Plugin
 def router(_config) do
   [
     {"counter.increment", MyApp.IncrementAction},
@@ -204,11 +204,11 @@ agent.state.counter.value
 
 ## Configuration
 
-Pass per-agent configuration with the `{Skill, config}` form:
+Pass per-agent configuration with the `{Plugin, config}` form:
 
 ```elixir
-defmodule MyApp.ConfigurableSkill do
-  use Jido.Skill,
+defmodule MyApp.ConfigurablePlugin do
+  use Jido.Plugin,
     name: "configurable",
     state_key: :configurable,
     actions: [MyApp.SomeAction],
@@ -216,7 +216,7 @@ defmodule MyApp.ConfigurableSkill do
       max_value: Zoi.integer() |> Zoi.default(100)
     })
 
-  @impl Jido.Skill
+  @impl Jido.Plugin
   def mount(_agent, config) do
     {:ok, %{initialized_at: DateTime.utc_now(), max: config[:max_value]}}
   end
@@ -229,8 +229,8 @@ Attach with config:
 defmodule MyApp.ConfiguredAgent do
   use Jido.Agent,
     name: "configured_agent",
-    skills: [
-      {MyApp.ConfigurableSkill, %{max_value: 500}}
+    plugins: [
+      {MyApp.ConfigurablePlugin, %{max_value: 500}}
     ]
 end
 
@@ -243,6 +243,6 @@ The `mount/2` callback receives the config and can use it to initialize state.
 
 ## Next Steps
 
-- [Skills Reference](skills.md) — Full API reference and lifecycle callbacks
+- [Plugins Reference](plugins.md) — Full API reference and lifecycle callbacks
 - [Signals & Routing](signals.md) — Signal patterns and routing rules
 - [Actions](actions.md) — How actions transform state and emit directives

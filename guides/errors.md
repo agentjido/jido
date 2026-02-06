@@ -94,7 +94,7 @@ The `context` field indicates where the error originated:
 - `:instruction` — Error during action instruction execution
 - `:fsm_transition` — Error during FSM state transition
 - `:routing` — Error during signal routing
-- `:skill_handle_signal` — Error in skill signal handler
+- `:plugin_handle_signal` — Error in plugin signal handler
 
 ## Action Errors
 

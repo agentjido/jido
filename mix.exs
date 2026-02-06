@@ -76,7 +76,7 @@ defmodule Jido.MixProject do
         "Start Here": [
           "guides/getting-started.livemd",
           "guides/core-loop.md",
-          "guides/your-first-skill.md",
+          "guides/your-first-plugin.md",
           "guides/your-first-sensor.md",
           "guides/observability-intro.md"
         ],
@@ -86,7 +86,7 @@ defmodule Jido.MixProject do
           "guides/signals.md",
           "guides/directives.md",
           "guides/state-ops.md",
-          "guides/skills.md",
+          "guides/plugins.md",
           "guides/strategies.md",
           "guides/runtime.md"
         ],
@@ -130,7 +130,7 @@ defmodule Jido.MixProject do
         # Start Here
         {"guides/getting-started.livemd", title: "Quick Start"},
         {"guides/core-loop.md", title: "Core Loop"},
-        {"guides/your-first-skill.md", title: "Your First Skill"},
+        {"guides/your-first-plugin.md", title: "Your First Plugin"},
         {"guides/your-first-sensor.md", title: "Your First Sensor"},
         {"guides/observability-intro.md", title: "Seeing What Happened"},
 
@@ -140,7 +140,7 @@ defmodule Jido.MixProject do
         {"guides/signals.md", title: "Signals & Routing"},
         {"guides/directives.md", title: "Directives"},
         {"guides/state-ops.md", title: "State Operations"},
-        {"guides/skills.md", title: "Skills"},
+        {"guides/plugins.md", title: "Plugins"},
         {"guides/strategies.md", title: "Strategies"},
         {"guides/runtime.md", title: "Runtime"},
 
@@ -198,15 +198,15 @@ defmodule Jido.MixProject do
           Jido.Agent.Strategy.State,
           Jido.Agent.Strategy.Snapshot
         ],
-        Skills: [
-          Jido.Skill,
-          Jido.Skill.Config,
-          Jido.Skill.Instance,
-          Jido.Skill.Manifest,
-          Jido.Skill.Requirements,
-          Jido.Skill.Routes,
-          Jido.Skill.Schedules,
-          Jido.Skill.Spec
+        Plugins: [
+          Jido.Plugin,
+          Jido.Plugin.Config,
+          Jido.Plugin.Instance,
+          Jido.Plugin.Manifest,
+          Jido.Plugin.Requirements,
+          Jido.Plugin.Routes,
+          Jido.Plugin.Schedules,
+          Jido.Plugin.Spec
         ],
         Directives: [
           Jido.Agent.Directive,

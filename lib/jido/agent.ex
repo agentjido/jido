@@ -1167,7 +1167,7 @@ defmodule Jido.Agent do
       if jido_module != nil and function_exported?(jido_module, :__default_plugins__, 0) do
         jido_module.__default_plugins__()
       else
-        Jido.Agent.DefaultPlugins.framework_defaults()
+        Jido.Agent.DefaultPlugins.package_defaults()
       end
 
     Jido.Agent.DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
