@@ -229,7 +229,19 @@ defmodule Jido.Agent do
                              Zoi.list(Zoi.any(),
                                description: "Plugin modules or {module, config} tuples"
                              )
-                             |> Zoi.default([])
+                             |> Zoi.default([]),
+                           default_plugins:
+                             Zoi.any(
+                               description:
+                                 "Override default plugins. false to disable all, or map of %{state_key => false | Module | {Module, config}}"
+                             )
+                             |> Zoi.optional(),
+                           jido:
+                             Zoi.atom(
+                               description:
+                                 "Jido instance module for resolving default plugins at compile time"
+                             )
+                             |> Zoi.optional()
                          },
                          coerce: true
                        )
@@ -983,10 +995,9 @@ defmodule Jido.Agent do
                                line: __ENV__.line
                          end)
 
-        # Normalize plugins to Instance structs
-        @plugin_instances Jido.Agent.__normalize_plugin_instances__(
-                            @validated_opts[:plugins] || []
-                          )
+        @default_plugin_list Jido.Agent.__resolve_default_plugins__(@validated_opts)
+        @all_plugin_decls @default_plugin_list ++ (@validated_opts[:plugins] || [])
+        @plugin_instances Jido.Agent.__normalize_plugin_instances__(@all_plugin_decls)
 
         @singleton_alias_violations @plugin_instances
                                     |> Enum.filter(fn inst ->
@@ -1128,6 +1139,21 @@ defmodule Jido.Agent do
   @spec __normalize_plugin_instances__([module() | {module(), map()}]) :: [PluginInstance.t()]
   def __normalize_plugin_instances__(plugins) do
     Enum.map(plugins, &__validate_and_create_plugin_instance__/1)
+  end
+
+  @doc false
+  @spec __resolve_default_plugins__(map()) :: [module() | {module(), map()}]
+  def __resolve_default_plugins__(agent_opts) do
+    jido_module = agent_opts[:jido]
+
+    base_defaults =
+      if jido_module != nil and function_exported?(jido_module, :__default_plugins__, 0) do
+        jido_module.__default_plugins__()
+      else
+        Jido.Agent.DefaultPlugins.framework_defaults()
+      end
+
+    Jido.Agent.DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
   end
 
   defp __validate_and_create_plugin_instance__(plugin_decl) do

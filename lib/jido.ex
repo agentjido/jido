@@ -77,6 +77,7 @@ defmodule Jido do
   defmacro __using__(opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
     storage = Keyword.get(opts, :storage, {Jido.Storage.ETS, [table: :jido_storage]})
+    default_plugins = Keyword.get(opts, :default_plugins, nil)
 
     quote location: :keep do
       @otp_app unquote(otp_app)
@@ -85,6 +86,18 @@ defmodule Jido do
       @doc "Returns the storage configuration for this Jido instance."
       @spec __jido_storage__() :: {module(), keyword()}
       def __jido_storage__, do: @jido_storage
+
+      require Jido.Agent.DefaultPlugins
+
+      @default_plugins Jido.Agent.DefaultPlugins.resolve_instance_defaults(
+                         @otp_app,
+                         __MODULE__,
+                         unquote(Macro.escape(default_plugins))
+                       )
+
+      @doc "Returns the default plugins for agents bound to this Jido instance."
+      @spec __default_plugins__() :: [module() | {module(), map()}]
+      def __default_plugins__, do: @default_plugins
 
       @doc false
       def child_spec(init_arg \\ []) do
