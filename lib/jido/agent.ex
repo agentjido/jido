@@ -896,14 +896,34 @@ defmodule Jido.Agent do
   defp __quoted_callback_checkpoint__ do
     quote location: :keep do
       @impl true
-      def checkpoint(agent, _ctx) do
+      def checkpoint(agent, ctx) do
+        {state, externalized} =
+          Enum.reduce(@plugin_instances, {agent.state, %{}}, fn instance, {state_acc, ext_acc} ->
+            plugin_state = Map.get(state_acc, instance.state_key)
+            config = instance.config || %{}
+
+            case instance.module.on_checkpoint(plugin_state, Map.put(ctx, :config, config)) do
+              {:externalize, key, pointer} ->
+                {Map.delete(state_acc, instance.state_key), Map.put(ext_acc, key, pointer)}
+
+              :drop ->
+                {Map.delete(state_acc, instance.state_key), ext_acc}
+
+              :keep ->
+                {state_acc, ext_acc}
+            end
+          end)
+
         {:ok,
-         %{
-           version: 1,
-           agent_module: __MODULE__,
-           id: agent.id,
-           state: agent.state
-         }}
+         Map.merge(
+           %{
+             version: 1,
+             agent_module: __MODULE__,
+             id: agent.id,
+             state: state
+           },
+           externalized
+         )}
       end
     end
   end

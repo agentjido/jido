@@ -542,6 +542,7 @@ defmodule JidoTest.PluginTest do
 
     test "plugin can externalize state during checkpoint" do
       state = %{id: "thread-1", rev: 5}
+
       assert {:externalize, :ext_pointer, %{id: "thread-1", rev: 5}} =
                ExternalizePlugin.on_checkpoint(state, %{})
     end
