@@ -14,6 +14,18 @@ config :logger, level: :debug
 
 Now when you run `cmd/2` or start an `AgentServer`, you'll see structured log output.
 
+### Instance-Scoped Debug (Recommended for Development)
+
+The fastest way to see what's happening during development is instance-level debug mode:
+
+```elixir
+MyApp.Jido.debug(:on)       # developer-friendly verbosity for this instance
+MyApp.Jido.debug(:verbose)  # maximum detail — trace-level, full args
+MyApp.Jido.debug(:off)      # back to configured defaults
+```
+
+This enables debug logging and event recording for all agents in the instance without changing the global logger level. You still need `config :logger, level: :debug` in your `config/dev.exs` so the Logger doesn't filter out debug messages before Jido sees them.
+
 ## What Gets Logged
 
 When you execute a command:
@@ -56,6 +68,7 @@ All events include metadata:
 
 - `:agent_id` — the agent's unique identifier
 - `:agent_module` — the agent module name
+- `:jido_instance` — the Jido instance that owns this agent (or `nil` in non-instance contexts)
 - `:duration` — execution time (nanoseconds, on `:stop` events)
 - `:directive_count` — number of directives produced
 
@@ -85,6 +98,7 @@ defmodule MyApp.JidoMetrics do
 
     Logger.info("Agent command completed",
       agent_id: metadata.agent_id,
+      jido_instance: metadata.jido_instance,
       duration_ms: duration_ms,
       directives: metadata.directive_count
     )
@@ -134,24 +148,53 @@ end
 
 ## Local Introspection (Debug Mode)
 
-For quick debugging without setting up telemetry handlers, AgentServer has a built-in debug mode that records recent events in memory:
+For quick debugging without setting up telemetry handlers, debug mode records recent events in an in-memory ring buffer (500 events by default, configurable via `debug_max_events`).
+
+### Instance-Level Debug (Primary Workflow)
+
+Enable debug for an entire instance — all agents in that instance start recording events immediately:
 
 ```elixir
-{:ok, pid} = MyApp.Jido.start_agent(MyAgent, debug: true)
+MyApp.Jido.debug(:on)
 
 # ... run some operations ...
 
-{:ok, events} = Jido.AgentServer.recent_events(pid, limit: 10)
+{:ok, events} = MyApp.Jido.recent(pid, 10)
+```
+
+Check the current debug state with:
+
+```elixir
+MyApp.Jido.debug_status()
+```
+
+### Per-Agent Debug
+
+For surgical debugging of a single agent, per-agent opt-in still works:
+
+```elixir
+{:ok, pid} = MyApp.Jido.start_agent(MyAgent, debug: true)
+```
+
+### Boot-Time Config
+
+Enable debug at startup via application config:
+
+```elixir
+# config/dev.exs
+config :my_app, MyApp.Jido, debug: true
 ```
 
 See [Runtime - Debug Mode](runtime.md#debug-mode) for details.
 
 ## Next Steps
 
-This guide covers development observability. For production monitoring with custom metrics, OpenTelemetry integration, and performance dashboards, see [Observability](observability.md).
+This guide covers development observability. For a step-by-step debugging workflow, see [Debugging](debugging.md). For production monitoring with custom metrics, OpenTelemetry integration, and performance dashboards, see [Observability](observability.md).
 
 Key modules:
 
 - `Jido.Telemetry` — built-in telemetry handler and event definitions
 - `Jido.Observe` — unified observability façade with span helpers
+- `Jido.Observe.Config` — per-instance observability config resolution
+- `Jido.Debug` — per-instance runtime debug mode
 - `Jido.Tracing.Context` — correlation ID propagation

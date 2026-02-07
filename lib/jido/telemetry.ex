@@ -112,7 +112,7 @@ defmodule Jido.Telemetry do
 
   @doc """
   Attaches telemetry handlers. Idempotent — safe to call multiple times.
-  Called from `Jido.Application.start/2`.
+  Called from application startup.
   """
   @spec setup() :: :ok
   def setup do
