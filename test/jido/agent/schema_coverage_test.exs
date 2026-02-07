@@ -6,7 +6,7 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
   - known_keys with list-based fields (Map/Struct types via Zoi API)
   - known_keys with map-based fields (directly constructed structs)
   - defaults_from_zoi_schema with Map/Struct types
-  - extract_fields with various field structures (via merge_with_skills)
+  - extract_fields with various field structures (via merge_with_plugins)
   """
   use JidoTest.Case, async: true
 
@@ -182,178 +182,178 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
     end
   end
 
-  describe "merge_with_skills/2 with various schema types" do
-    test "merges base schema with skills" do
+  describe "merge_with_plugins/2 with various schema types" do
+    test "merges base schema with plugins" do
       base = Zoi.map(%{mode: Zoi.atom(), counter: Zoi.integer()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "skill_one",
-        state_key: :skill_one,
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "plugin_one",
+        state_key: :plugin_one,
         schema: Zoi.map(%{value: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :mode in keys
       assert :counter in keys
-      assert :skill_one in keys
+      assert :plugin_one in keys
     end
 
-    test "merges nil base with skills" do
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "my_skill",
+    test "merges nil base with plugins" do
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "my_plugin",
         state_key: :data,
         schema: Zoi.map(%{count: Zoi.integer(), name: Zoi.string()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(nil, [skill_spec])
+      result = Schema.merge_with_plugins(nil, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :data in keys
     end
 
-    test "merges struct-based schema with skills" do
+    test "merges struct-based schema with plugins" do
       base = Zoi.struct(TestStruct, %{field_a: Zoi.string()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "my_skill",
-        state_key: :skill_data,
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "my_plugin",
+        state_key: :plugin_data,
         schema: Zoi.map(%{x: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :field_a in keys
-      assert :skill_data in keys
+      assert :plugin_data in keys
     end
 
-    test "merges Map type base with skill" do
+    test "merges Map type base with plugin" do
       base = Zoi.map(%{base_key: Zoi.atom()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "skill",
-        state_key: :skill,
-        schema: Zoi.map(%{skill_val: Zoi.integer()}),
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "plugin",
+        state_key: :plugin,
+        schema: Zoi.map(%{plugin_val: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :base_key in keys
-      assert :skill in keys
+      assert :plugin in keys
     end
 
-    test "merges Map type base with another skill" do
+    test "merges Map type base with another plugin" do
       base = Zoi.map(%{base_key: Zoi.atom()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "skill",
-        state_key: :skill,
-        schema: Zoi.map(%{skill_val: Zoi.integer()}),
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "plugin",
+        state_key: :plugin,
+        schema: Zoi.map(%{plugin_val: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :base_key in keys
-      assert :skill in keys
+      assert :plugin in keys
     end
 
-    test "merges Struct type base with skill" do
+    test "merges Struct type base with plugin" do
       base = Zoi.struct(TestStruct, %{field_a: Zoi.string()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "skill",
-        state_key: :skill,
-        schema: Zoi.map(%{skill_val: Zoi.integer()}),
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "plugin",
+        state_key: :plugin,
+        schema: Zoi.map(%{plugin_val: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :field_a in keys
-      assert :skill in keys
+      assert :plugin in keys
     end
 
-    test "merges Struct type base with another skill" do
+    test "merges Struct type base with another plugin" do
       base = Zoi.struct(TestStruct, %{field_a: Zoi.string()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "skill",
-        state_key: :skill,
-        schema: Zoi.map(%{skill_val: Zoi.integer()}),
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "plugin",
+        state_key: :plugin,
+        schema: Zoi.map(%{plugin_val: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :field_a in keys
-      assert :skill in keys
+      assert :plugin in keys
     end
 
-    test "handles multiple skills" do
+    test "handles multiple plugins" do
       base = Zoi.map(%{base_field: Zoi.atom()})
 
-      skill1 = %Jido.Skill.Spec{
-        module: SkillA,
-        name: "skill_a",
-        state_key: :skill_a,
+      plugin1 = %Jido.Plugin.Spec{
+        module: PluginA,
+        name: "plugin_a",
+        state_key: :plugin_a,
         schema: Zoi.map(%{a: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      skill2 = %Jido.Skill.Spec{
-        module: SkillB,
-        name: "skill_b",
-        state_key: :skill_b,
+      plugin2 = %Jido.Plugin.Spec{
+        module: PluginB,
+        name: "plugin_b",
+        state_key: :plugin_b,
         schema: Zoi.map(%{b: Zoi.string()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill1, skill2])
+      result = Schema.merge_with_plugins(base, [plugin1, plugin2])
 
       keys = Schema.known_keys(result)
       assert :base_field in keys
-      assert :skill_a in keys
-      assert :skill_b in keys
+      assert :plugin_a in keys
+      assert :plugin_b in keys
     end
 
-    test "nil base with skills without schemas returns nil" do
-      skill_without_schema = %Jido.Skill.Spec{
-        module: SkillA,
-        name: "skill_a",
-        state_key: :skill_a,
+    test "nil base with plugins without schemas returns nil" do
+      plugin_without_schema = %Jido.Plugin.Spec{
+        module: PluginA,
+        name: "plugin_a",
+        state_key: :plugin_a,
         schema: nil,
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(nil, [skill_without_schema])
+      result = Schema.merge_with_plugins(nil, [plugin_without_schema])
       assert result == nil
     end
   end
@@ -373,12 +373,12 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
       assert Schema.defaults_from_zoi_schema(fn -> :ok end) == %{}
     end
 
-    test "merge_with_skills preserves skill schema ordering" do
-      skills =
+    test "merge_with_plugins preserves plugin schema ordering" do
+      plugins =
         for i <- 1..5 do
-          %Jido.Skill.Spec{
-            module: Module.concat(Skill, "S#{i}"),
-            name: "skill_#{i}",
+          %Jido.Plugin.Spec{
+            module: Module.concat(Plugin, "S#{i}"),
+            name: "plugin_#{i}",
             state_key: String.to_atom("s#{i}"),
             schema: Zoi.map(%{value: Zoi.integer()}),
             actions: [],
@@ -386,7 +386,7 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
           }
         end
 
-      result = Schema.merge_with_skills(nil, skills)
+      result = Schema.merge_with_plugins(nil, plugins)
 
       keys = Schema.known_keys(result)
       assert :s1 in keys
@@ -396,27 +396,27 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
       assert :s5 in keys
     end
 
-    test "merge_with_skills with mixed nil and valid skill schemas" do
-      skills = [
-        %Jido.Skill.Spec{
-          module: SkillA,
-          name: "skill_a",
+    test "merge_with_plugins with mixed nil and valid plugin schemas" do
+      plugins = [
+        %Jido.Plugin.Spec{
+          module: PluginA,
+          name: "plugin_a",
           state_key: :a,
           schema: Zoi.map(%{x: Zoi.integer()}),
           actions: [],
           config: %{}
         },
-        %Jido.Skill.Spec{
-          module: SkillB,
-          name: "skill_b",
+        %Jido.Plugin.Spec{
+          module: PluginB,
+          name: "plugin_b",
           state_key: :b,
           schema: nil,
           actions: [],
           config: %{}
         },
-        %Jido.Skill.Spec{
-          module: SkillC,
-          name: "skill_c",
+        %Jido.Plugin.Spec{
+          module: PluginC,
+          name: "plugin_c",
           state_key: :c,
           schema: Zoi.map(%{y: Zoi.string()}),
           actions: [],
@@ -424,7 +424,7 @@ defmodule JidoTest.Agent.SchemaCoverageTest do
         }
       ]
 
-      result = Schema.merge_with_skills(nil, skills)
+      result = Schema.merge_with_plugins(nil, plugins)
 
       keys = Schema.known_keys(result)
       assert :a in keys

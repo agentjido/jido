@@ -34,7 +34,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
         messages: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", TestActions.IncrementAction},
         {"decrement", TestActions.DecrementAction},
@@ -54,7 +54,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
         last_action_type: [type: :string, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", TestActions.IncrementAction},
         {"decrement", TestActions.DecrementAction}
@@ -178,7 +178,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
 
         alias JidoTest.TestActions
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [
             {"increment", TestActions.IncrementAction}
           ]

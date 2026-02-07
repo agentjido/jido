@@ -50,13 +50,22 @@ defmodule Jido.Thread.Entry do
   def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
 
   def new(attrs) when is_map(attrs) do
+    now = System.system_time(:millisecond)
+
     %__MODULE__{
-      id: attrs[:id] || Map.get(attrs, "id"),
-      seq: attrs[:seq] || Map.get(attrs, "seq") || 0,
-      at: attrs[:at] || Map.get(attrs, "at") || System.system_time(:millisecond),
-      kind: attrs[:kind] || Map.get(attrs, "kind") || :note,
-      payload: attrs[:payload] || Map.get(attrs, "payload") || %{},
-      refs: attrs[:refs] || Map.get(attrs, "refs") || %{}
+      id: fetch_attr(attrs, :id),
+      seq: fetch_attr(attrs, :seq, 0),
+      at: fetch_attr(attrs, :at, now),
+      kind: fetch_attr(attrs, :kind, :note),
+      payload: fetch_attr(attrs, :payload, %{}),
+      refs: fetch_attr(attrs, :refs, %{})
     }
+  end
+
+  defp fetch_attr(attrs, key, default \\ nil) do
+    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
+      nil -> default
+      value -> value
+    end
   end
 end

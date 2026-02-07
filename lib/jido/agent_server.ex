@@ -52,6 +52,7 @@ defmodule Jido.AgentServer do
   - `:parent` - Parent reference for hierarchy
   - `:on_parent_death` - Behavior when parent dies (`:stop`, `:continue`, `:emit_orphan`)
   - `:spawn_fun` - Custom function for spawning children
+  - `:debug` - Enable debug mode with event buffer (default: `false`)
 
   ## Agent Resolution
 
@@ -107,6 +108,48 @@ defmodule Jido.AgentServer do
   **Do NOT** use `{:stop, ...}` from DirectiveExec for normal completion—this
   causes race conditions with async work and skips lifecycle hooks.
   See `Jido.AgentServer.DirectiveExec` for details.
+
+  ## Debugging
+
+  AgentServer can record recent events in an in-memory ring buffer (max 50)
+  to help diagnose what happened inside a running agent.
+
+  Enable at start:
+
+      {:ok, pid} = AgentServer.start_link(agent: MyAgent, debug: true)
+
+  Or toggle at runtime:
+
+      :ok = AgentServer.set_debug(pid, true)
+
+  Retrieve recent events (newest-first):
+
+      {:ok, events} = AgentServer.recent_events(pid, limit: 10)
+
+  Each event has the shape `%{at: monotonic_ms, type: atom(), data: map()}`.
+  Event types include `:signal_received` and `:directive_started`.
+
+  Returns `{:error, :debug_not_enabled}` if debug mode is off.
+
+  > **Note:** This is a development aid, not an audit log. Events are not
+  > persisted and the buffer has fixed capacity.
+
+  ## Timeout Diagnostics
+
+  When `await_completion/2` times out, it returns a diagnostic map:
+
+      {:error, {:timeout, %{
+        hint: "Agent is idle but await_completion is blocking",
+        server_status: :idle,
+        queue_length: 0,
+        iteration: nil,
+        waited_ms: 5000
+      }}}
+
+  Use this to understand why the agent hasn't completed:
+  - `:idle` with empty queue → agent finished but state doesn't match await condition
+  - `:waiting` → strategy is waiting (e.g., for LLM response)
+  - `:running` → still processing directives
   """
 
   use GenServer
@@ -308,7 +351,34 @@ defmodule Jido.AgentServer do
     timeout = Keyword.get(opts, :timeout, 10_000)
 
     with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:await_completion, opts}, timeout)
+      try do
+        GenServer.call(pid, {:await_completion, opts}, timeout)
+      catch
+        :exit, {:timeout, _} ->
+          case status(server) do
+            {:ok, s} -> {:error, {:timeout, build_timeout_diagnostic(s, timeout)}}
+            _ -> {:error, :timeout}
+          end
+      end
+    end
+  end
+
+  defp build_timeout_diagnostic(status, timeout_ms) do
+    %{
+      waited_ms: timeout_ms,
+      server_status: status.snapshot.status,
+      queue_length: Status.queue_length(status),
+      iteration: Status.iteration(status),
+      hint: infer_timeout_hint(status)
+    }
+  end
+
+  defp infer_timeout_hint(status) do
+    case status.snapshot.status do
+      :waiting -> "Strategy is waiting (possibly for LLM response)"
+      :running -> "Strategy is running (processing directives)"
+      :idle -> "Agent is idle but await_completion is blocking"
+      _ -> nil
     end
   end
 
@@ -399,6 +469,50 @@ defmodule Jido.AgentServer do
           raise "Failed to get status: #{inspect(reason)}"
       end
     end)
+  end
+
+  @doc """
+  Enables or disables debug mode at runtime.
+
+  When debug mode is enabled, the agent records recent events in a ring buffer
+  for diagnostic purposes.
+
+  ## Examples
+
+      :ok = AgentServer.set_debug(pid, true)
+      # ... run some operations ...
+      {:ok, events} = AgentServer.recent_events(pid)
+  """
+  @spec set_debug(server(), boolean()) :: :ok | {:error, term()}
+  def set_debug(server, enabled) when is_boolean(enabled) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:set_debug, enabled})
+    end
+  end
+
+  @doc """
+  Retrieves recent debug events from the agent's event buffer.
+
+  Events are returned newest-first. Each event includes:
+  - `:at` - Monotonic timestamp in milliseconds
+  - `:type` - Event type atom (e.g., `:signal_received`, `:directive_started`)
+  - `:data` - Event-specific data map
+
+  Returns `{:error, :debug_not_enabled}` if debug mode is off.
+
+  ## Options
+
+  - `:limit` - Maximum number of events to return (default: all, max 50)
+
+  ## Examples
+
+      {:ok, events} = AgentServer.recent_events(pid, limit: 10)
+  """
+  @spec recent_events(server(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  def recent_events(server, opts \\ []) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:recent_events, opts})
+    end
   end
 
   @doc """
@@ -581,14 +695,14 @@ defmodule Jido.AgentServer do
     signal_router = SignalRouter.build(state)
     state = %{state | signal_router: signal_router}
 
-    # Start skill children
-    state = start_skill_children(state)
+    # Start plugin children
+    state = start_plugin_children(state)
 
-    # Start skill subscription sensors
-    state = start_skill_subscriptions(state)
+    # Start plugin subscription sensors
+    state = start_plugin_subscriptions(state)
 
-    # Register skill schedules (cron jobs)
-    state = register_skill_schedules(state)
+    # Register plugin schedules (cron jobs)
+    state = register_plugin_schedules(state)
 
     notify_parent_of_startup(state)
 
@@ -617,9 +731,10 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} ->
-          # Run transform_result hooks on the call path
-          transformed_agent = run_skill_transform_hooks(new_state.agent, traced_signal, new_state)
+        {:ok, new_state, resolved_action} ->
+          transformed_agent =
+            run_plugin_transform_hooks(new_state.agent, resolved_action, traced_signal, new_state)
+
           {:reply, {:ok, transformed_agent}, new_state}
 
         {:error, reason, new_state} ->
@@ -632,6 +747,20 @@ defmodule Jido.AgentServer do
 
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
+  end
+
+  def handle_call({:set_debug, enabled}, _from, %State{} = state) do
+    new_state = State.set_debug(state, enabled)
+    {:reply, :ok, new_state}
+  end
+
+  def handle_call({:recent_events, _opts}, _from, %State{debug: false} = state) do
+    {:reply, {:error, :debug_not_enabled}, state}
+  end
+
+  def handle_call({:recent_events, opts}, _from, %State{} = state) do
+    events = State.get_debug_events(state, opts)
+    {:reply, {:ok, events}, state}
   end
 
   def handle_call({:await_completion, opts}, from, %State{} = state) do
@@ -691,7 +820,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -740,7 +869,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -790,7 +919,7 @@ defmodule Jido.AgentServer do
 
     try do
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, new_state} -> {:noreply, new_state}
       end
     after
@@ -825,6 +954,13 @@ defmodule Jido.AgentServer do
     start_time = System.monotonic_time()
     metadata = build_signal_metadata(state, signal)
 
+    # Record debug event for signal received
+    state =
+      State.record_debug_event(state, :signal_received, %{
+        type: signal.type,
+        id: signal.id
+      })
+
     emit_telemetry(
       [:jido, :agent_server, :signal, :start],
       %{system_time: System.system_time()},
@@ -857,20 +993,21 @@ defmodule Jido.AgentServer do
   end
 
   defp do_process_signal(signal, router, state, start_time, metadata) do
-    case run_skill_signal_hooks(signal, state) do
+    case run_plugin_signal_hooks(signal, state) do
       {:error, error} ->
-        handle_skill_hook_error(error, signal, state)
+        handle_plugin_hook_error(error, signal, state)
 
-      {:override, action_spec} ->
-        dispatch_action(signal, action_spec, state, start_time, metadata)
+      {:override, action_spec, modified_signal} ->
+        effective_signal = modified_signal || signal
+        dispatch_action(effective_signal, action_spec, state, start_time, metadata)
 
-      :continue ->
-        handle_signal_routing(signal, router, state, start_time, metadata)
+      {:continue, modified_signal} ->
+        handle_signal_routing(modified_signal, router, state, start_time, metadata)
     end
   end
 
-  defp handle_skill_hook_error(error, signal, state) do
-    error_directive = %Directive.Error{error: error, context: :skill_handle_signal}
+  defp handle_plugin_hook_error(error, signal, state) do
+    error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
     enqueue_error_directive(error, signal, [error_directive], state)
   end
 
@@ -932,7 +1069,7 @@ defmodule Jido.AgentServer do
 
     case State.enqueue_all(state, signal, directives) do
       {:ok, enq_state} ->
-        {:ok, start_drain_if_idle(enq_state)}
+        {:ok, start_drain_if_idle(enq_state), action_arg}
 
       {:error, :queue_overflow} ->
         emit_telemetry(
@@ -985,49 +1122,134 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Signal Hooks
+  # Internal: Plugin Signal Hooks
   # ---------------------------------------------------------------------------
 
-  defp run_skill_signal_hooks(%Signal{} = signal, %State{} = state) do
+  defp run_plugin_signal_hooks(%Signal{} = signal, %State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
-        else: []
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
 
-    Enum.reduce_while(skill_specs, :continue, fn spec, acc ->
-      case acc do
-        {:override, _} ->
-          {:halt, acc}
+    Enum.reduce_while(specs_and_instances, {:continue, signal}, fn {spec, instance},
+                                                                   {_, current_signal} ->
+      if signal_matches_plugin?(current_signal, spec) do
+        case invoke_plugin_handle_signal(instance, spec, current_signal, state, agent_module) do
+          {:cont, :continue} ->
+            {:cont, {:continue, current_signal}}
 
-        :continue ->
-          invoke_skill_handle_signal(spec, signal, state, agent_module)
+          {:cont, {:continue, new_signal}} ->
+            {:cont, {:continue, new_signal}}
+
+          {:halt, {:override, action_spec}} ->
+            {:halt, {:override, action_spec}}
+
+          {:halt, {:override, action_spec, new_signal}} ->
+            {:halt, {:override, action_spec, new_signal}}
+
+          {:halt, {:error, error}} ->
+            {:halt, {:error, error}}
+        end
+      else
+        {:cont, {:continue, current_signal}}
       end
     end)
+    |> normalize_hook_result()
   end
 
-  defp invoke_skill_handle_signal(spec, signal, state, agent_module) do
+  defp normalize_hook_result({:continue, signal}), do: {:continue, signal}
+  defp normalize_hook_result({:override, action_spec}), do: {:override, action_spec, nil}
+
+  defp normalize_hook_result({:override, action_spec, signal}),
+    do: {:override, action_spec, signal}
+
+  defp normalize_hook_result({:error, error}), do: {:error, error}
+
+  defp signal_matches_plugin?(_signal, %{signal_patterns: []}), do: true
+  defp signal_matches_plugin?(_signal, %{signal_patterns: nil}), do: true
+
+  defp signal_matches_plugin?(%Signal{type: type}, %{signal_patterns: patterns}) do
+    Enum.any?(patterns, &signal_type_matches?(type, &1))
+  end
+
+  defp signal_type_matches?(type, pattern) do
+    cond do
+      pattern == type ->
+        true
+
+      String.ends_with?(pattern, ".*") ->
+        prefix = String.trim_trailing(pattern, ".*")
+        String.starts_with?(type, prefix <> ".")
+
+      String.contains?(pattern, "*") ->
+        pattern_regex =
+          pattern
+          |> Regex.escape()
+          |> String.replace("\\*", "[^.]*")
+
+        Regex.match?(~r/^#{pattern_regex}$/, type)
+
+      true ->
+        false
+    end
+  end
+
+  defp get_plugin_specs_and_instances(agent_module) do
+    specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
+        else: []
+
+    instances =
+      if function_exported?(agent_module, :plugin_instances, 0),
+        do: agent_module.plugin_instances(),
+        else: []
+
+    Enum.zip(specs, instances)
+  end
+
+  defp invoke_plugin_handle_signal(instance, spec, signal, state, agent_module) do
     context = %{
       agent: state.agent,
       agent_module: agent_module,
-      skill: spec.module,
-      skill_spec: spec,
+      plugin: spec.module,
+      plugin_spec: spec,
+      plugin_instance: instance,
       config: spec.config || %{}
     }
 
-    case spec.module.handle_signal(signal, context) do
-      {:ok, {:override, action_spec}} ->
-        {:halt, {:override, action_spec}}
+    try do
+      case spec.module.handle_signal(signal, context) do
+        {:ok, {:override, action_spec}} ->
+          {:halt, {:override, action_spec}}
 
-      {:ok, _} ->
-        {:cont, :continue}
+        {:ok, {:continue, %Signal{} = new_signal}} ->
+          {:cont, {:continue, new_signal}}
 
-      {:error, reason} ->
+        {:ok, {:override, action_spec, %Signal{} = new_signal}} ->
+          {:halt, {:override, action_spec, new_signal}}
+
+        {:ok, _} ->
+          {:cont, :continue}
+
+        {:error, reason} ->
+          error =
+            Jido.Error.execution_error(
+              "Plugin handle_signal failed",
+              %{plugin: spec.module, reason: reason}
+            )
+
+          {:halt, {:error, error}}
+      end
+    rescue
+      e ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
+        )
+
         error =
           Jido.Error.execution_error(
-            "Skill handle_signal failed",
-            %{skill: spec.module, reason: reason}
+            "Plugin handle_signal crashed",
+            %{plugin: spec.module, exception: Exception.message(e)}
           )
 
         {:halt, {:error, error}}
@@ -1035,83 +1257,102 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Transform Hooks
+  # Internal: Plugin Transform Hooks
   # ---------------------------------------------------------------------------
 
-  defp run_skill_transform_hooks(agent, action_or_signal, %State{} = state) do
+  defp run_plugin_transform_hooks(agent, resolved_action, original_signal, %State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
-        else: []
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
 
-    Enum.reduce(skill_specs, agent, fn spec, agent_acc ->
+    action_term = normalize_action_for_transform(resolved_action, original_signal)
+
+    Enum.reduce(specs_and_instances, agent, fn {spec, instance}, agent_acc ->
       context = %{
         agent: agent_acc,
         agent_module: agent_module,
-        skill: spec.module,
-        skill_spec: spec,
+        plugin: spec.module,
+        plugin_spec: spec,
+        plugin_instance: instance,
         config: spec.config || %{}
       }
 
-      spec.module.transform_result(action_or_signal.type, agent_acc, context)
+      try do
+        spec.module.transform_result(action_term, agent_acc, context)
+      rescue
+        e ->
+          Logger.error(
+            "Plugin #{inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
+          )
+
+          agent_acc
+      end
     end)
   end
 
+  defp normalize_action_for_transform(resolved_action, original_signal) do
+    case resolved_action do
+      mod when is_atom(mod) and not is_nil(mod) -> mod
+      {mod, _params} when is_atom(mod) -> mod
+      [{mod, _params} | _] when is_atom(mod) -> mod
+      [mod | _] when is_atom(mod) -> mod
+      _ -> original_signal.type
+    end
+  end
+
   # ---------------------------------------------------------------------------
-  # Internal: Skill Children
+  # Internal: Plugin Children
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp start_skill_children(%State{} = state) do
+  defp start_plugin_children(%State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce(skill_specs, state, fn spec, acc_state ->
+    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       config = spec.config || %{}
-      start_skill_spec_children(acc_state, spec.module, config)
+      start_plugin_spec_children(acc_state, spec.module, config)
     end)
   end
 
-  defp start_skill_spec_children(state, skill_module, config) do
-    case skill_module.child_spec(config) do
+  defp start_plugin_spec_children(state, plugin_module, config) do
+    case plugin_module.child_spec(config) do
       nil ->
         state
 
       %{} = child_spec ->
-        start_skill_child(state, skill_module, child_spec)
+        start_plugin_child(state, plugin_module, child_spec)
 
       list when is_list(list) ->
         Enum.reduce(list, state, fn cs, s ->
-          start_skill_child(s, skill_module, cs)
+          start_plugin_child(s, plugin_module, cs)
         end)
 
       other ->
         Logger.warning(
-          "Invalid child_spec from skill #{inspect(skill_module)}: #{inspect(other)}"
+          "Invalid child_spec from plugin #{inspect(plugin_module)}: #{inspect(other)}"
         )
 
         state
     end
   end
 
-  defp start_skill_child(%State{} = state, skill_module, %{start: {m, f, a}} = spec) do
+  defp start_plugin_child(%State{} = state, plugin_module, %{start: {m, f, a}} = spec) do
     case apply(m, f, a) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
-        tag = {:skill, skill_module, spec[:id] || m}
+        tag = {:plugin, plugin_module, spec[:id] || m}
 
         child_info =
           ChildInfo.new!(%{
             pid: pid,
             ref: ref,
-            module: skill_module,
-            id: "#{skill_module}-#{inspect(pid)}",
+            module: plugin_module,
+            id: "#{plugin_module}-#{inspect(pid)}",
             tag: tag,
             meta: %{child_spec_id: spec[:id]}
           })
@@ -1120,39 +1361,39 @@ defmodule Jido.AgentServer do
         %{state | children: new_children}
 
       {:error, reason} ->
-        Logger.error("Failed to start skill child #{inspect(skill_module)}: #{inspect(reason)}")
+        Logger.error("Failed to start plugin child #{inspect(plugin_module)}: #{inspect(reason)}")
 
         state
     end
   end
 
-  defp start_skill_child(%State{} = state, skill_module, spec) do
+  defp start_plugin_child(%State{} = state, plugin_module, spec) do
     Logger.warning(
-      "Skill child_spec missing :start key for #{inspect(skill_module)}: #{inspect(spec)}"
+      "Plugin child_spec missing :start key for #{inspect(plugin_module)}: #{inspect(spec)}"
     )
 
     state
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Subscriptions
+  # Internal: Plugin Subscriptions
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp start_skill_subscriptions(%State{} = state) do
+  defp start_plugin_subscriptions(%State{} = state) do
     agent_module = state.agent_module
 
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0),
-        do: agent_module.skill_specs(),
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0),
+        do: agent_module.plugin_specs(),
         else: []
 
-    Enum.reduce(skill_specs, state, fn spec, acc_state ->
+    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       context = %{
         agent_ref: via_tuple(acc_state.id, acc_state.registry),
         agent_id: acc_state.id,
         agent_module: agent_module,
-        skill_spec: spec,
+        plugin_spec: spec,
         jido_instance: acc_state.jido
       }
 
@@ -1171,7 +1412,7 @@ defmodule Jido.AgentServer do
 
   defp start_subscription_sensor(
          %State{} = state,
-         skill_module,
+         plugin_module,
          sensor_module,
          sensor_config,
          context
@@ -1185,16 +1426,16 @@ defmodule Jido.AgentServer do
     case SensorRuntime.start_link(opts) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
-        tag = {:sensor, skill_module, sensor_module}
+        tag = {:sensor, plugin_module, sensor_module}
 
         child_info =
           ChildInfo.new!(%{
             pid: pid,
             ref: ref,
             module: sensor_module,
-            id: "#{skill_module}-#{sensor_module}-#{inspect(pid)}",
+            id: "#{plugin_module}-#{sensor_module}-#{inspect(pid)}",
             tag: tag,
-            meta: %{skill: skill_module, sensor: sensor_module}
+            meta: %{plugin: plugin_module, sensor: sensor_module}
           })
 
         new_children = Map.put(state.children, tag, child_info)
@@ -1202,7 +1443,7 @@ defmodule Jido.AgentServer do
 
       {:error, reason} ->
         Logger.warning(
-          "Failed to start subscription sensor #{inspect(sensor_module)} for skill #{inspect(skill_module)}: #{inspect(reason)}"
+          "Failed to start subscription sensor #{inspect(sensor_module)} for plugin #{inspect(plugin_module)}: #{inspect(reason)}"
         )
 
         state
@@ -1210,21 +1451,21 @@ defmodule Jido.AgentServer do
   end
 
   # ---------------------------------------------------------------------------
-  # Internal: Skill Schedules
+  # Internal: Plugin Schedules
   # ---------------------------------------------------------------------------
 
   @doc false
-  defp register_skill_schedules(%State{skip_schedules: true} = state) do
-    Logger.debug("AgentServer #{state.id} skipping skill schedules")
+  defp register_plugin_schedules(%State{skip_schedules: true} = state) do
+    Logger.debug("AgentServer #{state.id} skipping plugin schedules")
     state
   end
 
-  defp register_skill_schedules(%State{} = state) do
+  defp register_plugin_schedules(%State{} = state) do
     agent_module = state.agent_module
 
     schedules =
-      if function_exported?(agent_module, :skill_schedules, 0),
-        do: agent_module.skill_schedules(),
+      if function_exported?(agent_module, :plugin_schedules, 0),
+        do: agent_module.plugin_schedules(),
         else: []
 
     Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
@@ -1475,7 +1716,7 @@ defmodule Jido.AgentServer do
       end
 
     case process_signal(traced_signal, state) do
-      {:ok, new_state} -> {:noreply, new_state}
+      {:ok, new_state, _resolved_action} -> {:noreply, new_state}
       {:error, _reason, ns} -> {:noreply, ns}
     end
   end
@@ -1499,7 +1740,7 @@ defmodule Jido.AgentServer do
         end
 
       case process_signal(traced_signal, state) do
-        {:ok, new_state} -> {:noreply, new_state}
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, ns} -> {:noreply, ns}
       end
     else
@@ -1525,6 +1766,13 @@ defmodule Jido.AgentServer do
 
     directive_type =
       directive.__struct__ |> Module.split() |> List.last()
+
+    # Record debug event for directive execution
+    state =
+      State.record_debug_event(state, :directive_started, %{
+        type: directive_type,
+        signal_type: signal.type
+      })
 
     trace_metadata = TraceContext.to_telemetry_metadata()
 

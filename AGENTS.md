@@ -145,7 +145,7 @@ Use **Conventional Commits** format for all commit messages:
 feat(agent): add new directive for child process management
 fix(server): handle timeout edge case in signal dispatch
 docs: update architecture overview
-test(skill): add skill integration tests
+test(plugin): add plugin integration tests
 chore(deps): bump jido_action to 2.0.0-rc.0
 ```
 

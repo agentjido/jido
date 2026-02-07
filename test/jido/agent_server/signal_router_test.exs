@@ -63,59 +63,59 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   end
 
   # =============================================================================
-  # Test Fixtures - Skills
+  # Test Fixtures - Plugins
   # =============================================================================
 
-  defmodule SkillWithRouter do
+  defmodule PluginWithRouter do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_router",
-      state_key: :router_skill,
+    use Jido.Plugin,
+      name: "plugin_with_router",
+      state_key: :router_plugin,
       actions: [JidoTest.AgentServer.SignalRouterTest.TestAction]
 
-    @impl Jido.Skill
-    def router(_config) do
+    @impl Jido.Plugin
+    def signal_routes(_config) do
       [
-        {"skill.custom", JidoTest.AgentServer.SignalRouterTest.TestAction},
-        {"skill.priority", JidoTest.AgentServer.SignalRouterTest.TestAction, -20}
+        {"plugin.custom", JidoTest.AgentServer.SignalRouterTest.TestAction},
+        {"plugin.priority", JidoTest.AgentServer.SignalRouterTest.TestAction, -20}
       ]
     end
   end
 
-  defmodule SkillReturningNil do
+  defmodule PluginReturningNil do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_returning_nil",
-      state_key: :nil_skill,
+    use Jido.Plugin,
+      name: "plugin_returning_nil",
+      state_key: :nil_plugin,
       actions: [JidoTest.AgentServer.SignalRouterTest.TestAction],
       signal_patterns: ["nil.*"]
 
-    @impl Jido.Skill
-    def router(_config), do: nil
+    @impl Jido.Plugin
+    def signal_routes(_config), do: []
   end
 
-  defmodule SkillReturningNonList do
+  defmodule PluginReturningNonList do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_returning_non_list",
-      state_key: :non_list_skill,
+    use Jido.Plugin,
+      name: "plugin_returning_non_list",
+      state_key: :non_list_plugin,
       actions: [JidoTest.AgentServer.SignalRouterTest.TestAction],
       signal_patterns: ["nonlist.*"]
 
-    @impl Jido.Skill
-    def router(_config), do: :not_a_list
+    @impl Jido.Plugin
+    def signal_routes(_config), do: :not_a_list
   end
 
-  defmodule SkillWithPatterns do
+  defmodule PluginWithPatterns do
     @moduledoc false
-    use Jido.Skill,
-      name: "skill_with_patterns",
-      state_key: :pattern_skill,
+    use Jido.Plugin,
+      name: "plugin_with_patterns",
+      state_key: :pattern_plugin,
       actions: [
         JidoTest.AgentServer.SignalRouterTest.TestAction,
         JidoTest.AgentServer.SignalRouterTest.AnotherAction
       ],
-      routes: [
+      signal_routes: [
         {"pattern.one", JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"pattern.two", JidoTest.AgentServer.SignalRouterTest.AnotherAction}
       ]
@@ -131,7 +131,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       name: "agent_with_routes",
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"agent.action", JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"agent.priority", JidoTest.AgentServer.SignalRouterTest.TestAction, 10}
@@ -140,7 +140,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   end
 
   defmodule AgentWithoutRoutes do
-    @moduledoc "Agent that does NOT export signal_routes/0"
+    @moduledoc "Agent that does NOT export signal_routes/1"
     use Jido.Agent,
       name: "agent_without_routes",
       schema: []
@@ -153,7 +153,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes,
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"agent.route", JidoTest.AgentServer.SignalRouterTest.TestAction}]
     end
   end
@@ -165,40 +165,40 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithoutRoutes,
       schema: []
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
-  defmodule AgentWithSkills do
+  defmodule AgentWithPlugins do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_skills",
+      name: "agent_with_plugins",
       schema: [],
-      skills: [
-        JidoTest.AgentServer.SignalRouterTest.SkillWithRouter,
-        JidoTest.AgentServer.SignalRouterTest.SkillWithPatterns
+      plugins: [
+        JidoTest.AgentServer.SignalRouterTest.PluginWithRouter,
+        JidoTest.AgentServer.SignalRouterTest.PluginWithPatterns
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
-  defmodule AgentWithNilRouterSkill do
+  defmodule AgentWithNilRouterPlugin do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_nil_router_skill",
+      name: "agent_with_nil_router_plugin",
       schema: [],
-      skills: [JidoTest.AgentServer.SignalRouterTest.SkillReturningNil]
+      plugins: [JidoTest.AgentServer.SignalRouterTest.PluginReturningNil]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
-  defmodule AgentWithNonListRouterSkill do
+  defmodule AgentWithNonListRouterPlugin do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_non_list_router_skill",
+      name: "agent_with_non_list_router_plugin",
       schema: [],
-      skills: [JidoTest.AgentServer.SignalRouterTest.SkillReturningNonList]
+      plugins: [JidoTest.AgentServer.SignalRouterTest.PluginReturningNonList]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule AgentWithMatchFnRoutes do
@@ -207,7 +207,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       name: "agent_with_match_fn_routes",
       schema: []
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"match.three", &match_large_amount/1, JidoTest.AgentServer.SignalRouterTest.TestAction},
         {"match.four", &match_large_amount/1, JidoTest.AgentServer.SignalRouterTest.TestAction,
@@ -261,7 +261,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   # =============================================================================
 
   describe "build/1 with agent routes" do
-    test "builds router from agent signal_routes/0" do
+    test "builds router from agent signal_routes/1" do
       state = build_test_state(AgentWithRoutes)
       router = SignalRouter.build(state)
 
@@ -269,7 +269,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert router.route_count > 0
     end
 
-    test "returns empty router when agent doesn't export signal_routes/0" do
+    test "returns empty router when agent doesn't export signal_routes/1" do
       state = build_test_state(AgentWithoutRoutes)
       router = SignalRouter.build(state)
 
@@ -297,18 +297,18 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
     end
   end
 
-  describe "build/1 with skill routes" do
-    test "builds router from skill router/1 function" do
-      state = build_test_state(AgentWithSkills)
+  describe "build/1 with plugin routes" do
+    test "builds router from plugin signal_routes/1 function" do
+      state = build_test_state(AgentWithPlugins)
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      # Should have routes from skill router and pattern-based routes
+      # Should have routes from plugin signal_routes and pattern-based routes
       assert router.route_count > 0
     end
 
-    test "handles skill router/1 returning nil - falls back to pattern routes" do
-      state = build_test_state(AgentWithNilRouterSkill)
+    test "handles plugin signal_routes/1 returning empty list - falls back to pattern routes" do
+      state = build_test_state(AgentWithNilRouterPlugin)
       router = SignalRouter.build(state)
 
       # Should generate pattern-based routes instead
@@ -317,8 +317,8 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert router.route_count == 1
     end
 
-    test "handles skill router/1 returning non-list value - falls back to pattern routes" do
-      state = build_test_state(AgentWithNonListRouterSkill)
+    test "handles plugin signal_routes/1 returning non-list value - falls back to pattern routes" do
+      state = build_test_state(AgentWithNonListRouterPlugin)
       router = SignalRouter.build(state)
 
       # Should generate pattern-based routes instead
@@ -327,13 +327,13 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert router.route_count == 1
     end
 
-    test "generates routes from skill routes definition" do
-      # SkillWithPatterns has 2 explicit routes, SkillWithRouter has 2 custom router routes
-      state = build_test_state(AgentWithSkills)
+    test "generates routes from plugin routes definition" do
+      # PluginWithPatterns has 2 explicit routes, PluginWithRouter has 2 custom router routes
+      state = build_test_state(AgentWithPlugins)
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      # SkillWithRouter has 2 custom routes, SkillWithPatterns has 2 explicit routes
+      # PluginWithRouter has 2 custom routes, PluginWithPatterns has 2 explicit routes
       # Total: 2 + 2 = 4 routes
       assert router.route_count == 4
     end
@@ -407,11 +407,11 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert TestAction in targets
     end
 
-    test "applies default skill priority (-10) to routes without explicit priority" do
-      state = build_test_state(AgentWithSkills)
+    test "applies default plugin priority (-10) to routes without explicit priority" do
+      state = build_test_state(AgentWithPlugins)
       router = SignalRouter.build(state)
 
-      signal = Jido.Signal.new!("skill.custom", %{}, source: "/test")
+      signal = Jido.Signal.new!("plugin.custom", %{}, source: "/test")
       {:ok, targets} = JidoRouter.route(router, signal)
 
       assert TestAction in targets
@@ -419,17 +419,17 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
   end
 
   describe "build/1 combined routes" do
-    test "combines routes from strategy, agent, and skills" do
-      # Create an agent that has strategy routes, agent routes, and skill routes
+    test "combines routes from strategy, agent, and plugins" do
+      # Create an agent that has strategy routes, agent routes, and plugin routes
       defmodule CombinedAgent do
         @moduledoc false
         use Jido.Agent,
           name: "combined_agent",
           strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes,
           schema: [],
-          skills: [JidoTest.AgentServer.SignalRouterTest.SkillWithRouter]
+          plugins: [JidoTest.AgentServer.SignalRouterTest.PluginWithRouter]
 
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"combined.agent", JidoTest.AgentServer.SignalRouterTest.TestAction}]
         end
       end
@@ -438,7 +438,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      # Strategy: 2 routes, Agent: 1 route, Skill: 2 routes = 5 total
+      # Strategy: 2 routes, Agent: 1 route, Plugin: 2 routes = 5 total
       assert router.route_count == 5
     end
   end

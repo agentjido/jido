@@ -28,7 +28,7 @@ defmodule JidoTest.AgentPoolTest do
         last_count: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", TestActions.IncrementAction},
         {"get_count", GetCountAction}

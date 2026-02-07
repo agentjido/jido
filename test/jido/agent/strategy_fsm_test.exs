@@ -83,7 +83,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
       strategy: Jido.Agent.Strategy.FSM,
       schema: [value: [type: :integer, default: 0]]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule CustomFSMAgent do
@@ -100,7 +100,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
          }},
       schema: []
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule NoAutoTransitionAgent do
@@ -117,7 +117,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
          }},
       schema: []
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   describe "FSM.Machine" do

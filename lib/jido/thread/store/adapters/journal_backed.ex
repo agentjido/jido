@@ -80,40 +80,11 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
 
   @impl true
   def append(%{journal: journal} = state, thread_id, entries) do
-    {base_seq, existing_entries} =
-      case load(state, thread_id) do
-        {:ok, _, thread} -> {length(thread.entries), thread.entries}
-        {:error, _, :not_found} -> {0, []}
-      end
-
+    {base_seq, existing_entries} = load_existing_entries(state, thread_id)
     now = System.system_time(:millisecond)
+    prepared = prepare_entries(entries, base_seq, now)
 
-    prepared =
-      entries
-      |> Enum.with_index()
-      |> Enum.map(fn {entry, idx} ->
-        %Entry{
-          id: get_entry_id(entry) || generate_id(),
-          seq: base_seq + idx,
-          at: get_entry_at(entry) || now,
-          kind: get_entry_kind(entry) || :note,
-          payload: get_entry_payload(entry) || %{},
-          refs: get_entry_refs(entry) || %{}
-        }
-      end)
-
-    result =
-      prepared
-      |> Enum.reduce_while({:ok, journal}, fn entry, {:ok, j} ->
-        signal = encode_entry(thread_id, entry)
-
-        case Journal.record(j, signal) do
-          {:ok, j} -> {:cont, {:ok, j}}
-          error -> {:halt, error}
-        end
-      end)
-
-    case result do
+    case record_entries(journal, thread_id, prepared) do
       {:ok, journal} ->
         thread = reconstruct_thread(thread_id, existing_entries ++ prepared)
         {:ok, %{state | journal: journal}, thread}
@@ -121,6 +92,43 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
       {:error, reason} ->
         {:error, state, reason}
     end
+  end
+
+  defp load_existing_entries(state, thread_id) do
+    case load(state, thread_id) do
+      {:ok, _, thread} -> {length(thread.entries), thread.entries}
+      {:error, _, :not_found} -> {0, []}
+    end
+  end
+
+  defp prepare_entries(entries, base_seq, now) do
+    entries
+    |> Enum.with_index()
+    |> Enum.map(fn {entry, idx} ->
+      build_entry(entry, base_seq + idx, now)
+    end)
+  end
+
+  defp record_entries(journal, thread_id, entries) do
+    Enum.reduce_while(entries, {:ok, journal}, fn entry, {:ok, j} ->
+      signal = encode_entry(thread_id, entry)
+
+      case Journal.record(j, signal) do
+        {:ok, j} -> {:cont, {:ok, j}}
+        error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp build_entry(entry, seq, now) do
+    %Entry{
+      id: get_entry_id(entry) || generate_id(),
+      seq: seq,
+      at: get_entry_at(entry) || now,
+      kind: get_entry_kind(entry) || :note,
+      payload: get_entry_payload(entry) || %{},
+      refs: get_entry_refs(entry) || %{}
+    }
   end
 
   defp get_entry_id(%Entry{id: id}), do: id
@@ -179,11 +187,9 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   defp to_atom(atom) when is_atom(atom), do: atom
 
   defp to_atom(string) when is_binary(string) do
-    try do
-      String.to_existing_atom(string)
-    rescue
-      _ -> String.to_atom(string)
-    end
+    String.to_existing_atom(string)
+  rescue
+    ArgumentError -> String.to_atom(string)
   end
 
   defp to_atom(_), do: :unknown

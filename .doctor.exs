@@ -3,6 +3,7 @@
     # These modules use macros that generate code inside quote blocks.
     # Doctor incorrectly counts def statements inside quote as module functions.
     Jido.Agent,
+    Jido.Plugin,
     Jido.Skill
   ],
   ignore_paths: [],

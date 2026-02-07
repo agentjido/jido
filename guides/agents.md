@@ -1,8 +1,8 @@
 # Agents
 
-**After:** You can define agents with schemas, hooks, and the `cmd/2` contract.
+**After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
 
-Agents are immutable data structures that hold state and respond to actions. The core operation is `cmd/2`, which processes actions and returns an updated agent plus directives for external effects.
+Agents are immutable data structures that hold state and respond to actions. The core operation is `cmd/2` (or `cmd/3` with options), which processes actions and returns an updated agent plus directives for external effects.
 
 ## Defining an Agent
 
@@ -19,23 +19,25 @@ defmodule MyAgent do
       counter: [type: :integer, default: 0]
     ],
     strategy: Jido.Agent.Strategy.Direct,    # Default
-    skills: [MySkill]                        # Default: []
+    plugins: [MyPlugin],                     # Default: []
+    default_plugins: true                    # Load built-in plugins (Default: true)
 end
 ```
 
-## The `cmd/2` Contract
+## The `cmd/2` and `cmd/3` Contract
 
 The fundamental operation:
 
 ```elixir
 {agent, directives} = MyAgent.cmd(agent, action)
+{agent, directives} = MyAgent.cmd(agent, action, opts)
 ```
 
 **Key invariants:**
 
 - The returned `agent` is always complete—no "apply directives" step needed
 - `directives` describe external effects only—they never modify agent state
-- `cmd/2` is a pure function—given same inputs, always same outputs
+- `cmd/2` and `cmd/3` are pure functions—given same inputs, always same outputs
 
 **Action formats:**
 
@@ -46,12 +48,38 @@ The fundamental operation:
 # Action with params
 {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
 
+# Action with params and context
+{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{user_id: 123}})
+
+# Action with params, context, and per-instruction opts
+{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{}, [timeout: 5000]})
+
 # Full instruction struct
 {agent, directives} = MyAgent.cmd(agent, %Instruction{action: MyAction, params: %{}})
 
 # List of actions (processed in sequence)
 {agent, directives} = MyAgent.cmd(agent, [Action1, {Action2, %{x: 1}}])
 ```
+
+**Execution options via `cmd/3`:**
+
+Pass options that apply to all actions in the command:
+
+```elixir
+# With timeout (5 second limit per action)
+{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 5000)
+
+# With timeout and no retries
+{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 1000, max_retries: 0)
+
+# Options applied to all actions in a list
+{agent, directives} = MyAgent.cmd(agent, [Action1, Action2], timeout: 5000)
+```
+
+Supported options:
+- `:timeout` — Maximum time (in ms) for each action to complete
+- `:max_retries` — Maximum retry attempts on failure
+- `:backoff` — Initial backoff time in ms (doubles with each retry)
 
 ## State Management
 
@@ -161,4 +189,5 @@ agent = MyAgent.new(state: %{counter: 10})
 - [State Operations](state-ops.md) — Internal state transitions during `cmd/2`
 - [Directives](directives.md) — External effects emitted by agents
 - [Strategies](strategies.md) — Execution strategies for `cmd/2`
+- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (Identity, Thread) and how to override them
 - `Jido.Agent` — Full module documentation

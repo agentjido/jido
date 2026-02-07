@@ -3,77 +3,77 @@ defmodule JidoTest.Agent.SchemaTest do
 
   alias Jido.Agent.Schema
 
-  describe "merge_with_skills/2" do
-    test "nil base with no skills returns nil" do
-      assert Schema.merge_with_skills(nil, []) == nil
+  describe "merge_with_plugins/2" do
+    test "nil base with no plugins returns nil" do
+      assert Schema.merge_with_plugins(nil, []) == nil
     end
 
-    test "base schema with no skills returns base" do
+    test "base schema with no plugins returns base" do
       base = Zoi.object(%{mode: Zoi.atom()})
-      result = Schema.merge_with_skills(base, [])
+      result = Schema.merge_with_plugins(base, [])
       assert result == base
     end
 
-    test "nil base with skills returns skill fields only" do
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "my_skill",
-        state_key: :my_skill,
+    test "nil base with plugins returns plugin fields only" do
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "my_plugin",
+        state_key: :my_plugin,
         schema: Zoi.object(%{count: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(nil, [skill_spec])
+      result = Schema.merge_with_plugins(nil, [plugin_spec])
 
       assert result != nil
       keys = Schema.known_keys(result)
-      assert :my_skill in keys
+      assert :my_plugin in keys
     end
 
-    test "base with skills merges both" do
+    test "base with plugins merges both" do
       base = Zoi.object(%{mode: Zoi.atom()})
 
-      skill_spec = %Jido.Skill.Spec{
-        module: MySkill,
-        name: "my_skill",
-        state_key: :skill_data,
+      plugin_spec = %Jido.Plugin.Spec{
+        module: MyPlugin,
+        name: "my_plugin",
+        state_key: :plugin_data,
         schema: Zoi.object(%{value: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(base, [skill_spec])
+      result = Schema.merge_with_plugins(base, [plugin_spec])
 
       keys = Schema.known_keys(result)
       assert :mode in keys
-      assert :skill_data in keys
+      assert :plugin_data in keys
     end
 
-    test "filters out skills without schema" do
-      skill_with_schema = %Jido.Skill.Spec{
-        module: SkillA,
-        name: "skill_a",
-        state_key: :skill_a,
+    test "filters out plugins without schema" do
+      plugin_with_schema = %Jido.Plugin.Spec{
+        module: PluginA,
+        name: "plugin_a",
+        state_key: :plugin_a,
         schema: Zoi.object(%{a: Zoi.integer()}),
         actions: [],
         config: %{}
       }
 
-      skill_without_schema = %Jido.Skill.Spec{
-        module: SkillB,
-        name: "skill_b",
-        state_key: :skill_b,
+      plugin_without_schema = %Jido.Plugin.Spec{
+        module: PluginB,
+        name: "plugin_b",
+        state_key: :plugin_b,
         schema: nil,
         actions: [],
         config: %{}
       }
 
-      result = Schema.merge_with_skills(nil, [skill_with_schema, skill_without_schema])
+      result = Schema.merge_with_plugins(nil, [plugin_with_schema, plugin_without_schema])
 
       keys = Schema.known_keys(result)
-      assert :skill_a in keys
-      refute :skill_b in keys
+      assert :plugin_a in keys
+      refute :plugin_b in keys
     end
   end
 

@@ -78,9 +78,9 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 - Signal routing with configurable strategies
 - Instance-scoped supervision for multi-tenant deployments
 
-### Composable Skills
-- Reusable behavior modules that extend agents
-- State isolation per skill with automatic schema merging
+### Composable Plugins
+- Reusable capability modules that extend agents
+- State isolation per plugin with automatic schema merging
 - Lifecycle hooks for initialization and signal handling
 
 ### Execution Strategies
@@ -273,7 +273,7 @@ State operations are internal state transitions handled by the strategy layer du
 - [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
 - [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
 - [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
-- [Skills](guides/skills.md) - Composable capability bundles
+- [Plugins](guides/plugins.md) - Composable capability bundles
 - [Strategies](guides/strategies.md) - Execution strategies (Direct, FSM)
 
 **Advanced:**

@@ -1,9 +1,9 @@
 defmodule Jido.AgentServer.SignalRouter do
   @moduledoc """
-  Builds a unified Jido.Signal.Router from strategy, agent, and skill routes.
+  Builds a unified Jido.Signal.Router from strategy, agent, and plugin routes.
 
   This module is responsible for:
-  1. Collecting routes from all sources (strategy, agent, skills)
+  1. Collecting routes from all sources (strategy, agent, plugins)
   2. Normalizing route specs with appropriate priorities
   3. Building the trie-based router for efficient signal routing
 
@@ -13,7 +13,7 @@ defmodule Jido.AgentServer.SignalRouter do
   |----------|------------------|----------|
   | Strategy | 50               | 50-100   |
   | Agent    | 0                | -25 to 25|
-  | Skill    | -10              | -50 to -10|
+  | Plugin   | -10              | -50 to -10|
 
   ## Route Spec Formats
 
@@ -35,15 +35,15 @@ defmodule Jido.AgentServer.SignalRouter do
 
   @strategy_default_priority 50
   @agent_default_priority 0
-  @skill_default_priority -10
+  @plugin_default_priority -10
 
   @doc """
   Builds a unified router from all route sources in the agent state.
 
   Collects routes from:
   - Strategy routes (priority 50+) via `strategy.signal_routes/1`
-  - Agent routes (priority 0) via `agent_module.signal_routes/0`
-  - Skill routes (priority -10) via skill `signal_patterns` and `router/1`
+  - Agent routes (priority 0) via `agent_module.signal_routes/1`
+  - Plugin routes (priority -10) via plugin `signal_patterns` and `signal_routes/1`
 
   Returns an empty router if no routes are found or if building fails.
   """
@@ -53,7 +53,7 @@ defmodule Jido.AgentServer.SignalRouter do
       []
       |> add_strategy_routes(state)
       |> add_agent_routes(state)
-      |> add_skill_routes(state)
+      |> add_plugin_routes(state)
 
     case SignalRouter.new(routes) do
       {:ok, router} -> router
@@ -75,10 +75,11 @@ defmodule Jido.AgentServer.SignalRouter do
     end
   end
 
-  # Collects routes from agent_module.signal_routes/0
+  # Collects routes from agent_module.signal_routes/1
   defp add_agent_routes(routes, %State{agent_module: agent_module}) do
-    if function_exported?(agent_module, :signal_routes, 0) do
-      agent_routes = agent_module.signal_routes()
+    if function_exported?(agent_module, :signal_routes, 1) do
+      ctx = %{agent_module: agent_module}
+      agent_routes = agent_module.signal_routes(ctx)
       normalized = normalize_routes(agent_routes, @agent_default_priority)
       routes ++ normalized
     else
@@ -86,42 +87,42 @@ defmodule Jido.AgentServer.SignalRouter do
     end
   end
 
-  # Collects routes from skills via skill_routes/0 (pre-expanded) or fallback to router/1
-  defp add_skill_routes(routes, %State{agent_module: agent_module}) do
-    # First, try to get pre-expanded routes from skill_routes/0 (Phase 3 approach)
+  # Collects routes from plugins via plugin_routes/0 (pre-expanded) or fallback to signal_routes/1
+  defp add_plugin_routes(routes, %State{agent_module: agent_module}) do
+    # First, try to get pre-expanded routes from plugin_routes/0 (Phase 3 approach)
     pre_expanded_routes =
-      if function_exported?(agent_module, :skill_routes, 0) do
-        agent_module.skill_routes()
+      if function_exported?(agent_module, :plugin_routes, 0) do
+        agent_module.plugin_routes()
       else
         []
       end
 
-    # Get custom routes from skills that define router/1 callback (legacy support)
-    skill_specs =
-      if function_exported?(agent_module, :skill_specs, 0) do
-        agent_module.skill_specs()
+    # Get custom routes from plugins that define signal_routes/1 callback (legacy support)
+    plugin_specs =
+      if function_exported?(agent_module, :plugin_specs, 0) do
+        agent_module.plugin_specs()
       else
         []
       end
 
     custom_routes =
-      Enum.flat_map(skill_specs, fn spec ->
-        get_skill_custom_routes(spec)
+      Enum.flat_map(plugin_specs, fn spec ->
+        get_plugin_custom_routes(spec)
       end)
 
     # Combine: pre-expanded routes are already normalized with priority
     # Custom routes need normalization
-    normalized_custom = normalize_routes(custom_routes, @skill_default_priority)
+    normalized_custom = normalize_routes(custom_routes, @plugin_default_priority)
 
     routes ++ pre_expanded_routes ++ normalized_custom
   end
 
-  defp get_skill_custom_routes(spec) do
-    skill_module = spec.module
+  defp get_plugin_custom_routes(spec) do
+    plugin_module = spec.module
 
-    if function_exported?(skill_module, :router, 1) do
-      case skill_module.router(spec.config) do
-        nil -> []
+    if function_exported?(plugin_module, :signal_routes, 1) do
+      case plugin_module.signal_routes(spec.config) do
+        [] -> []
         routes when is_list(routes) -> routes
         _other -> []
       end

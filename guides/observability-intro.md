@@ -132,6 +132,20 @@ def handle_event(event, measurements, metadata, _config) do
 end
 ```
 
+## Local Introspection (Debug Mode)
+
+For quick debugging without setting up telemetry handlers, AgentServer has a built-in debug mode that records recent events in memory:
+
+```elixir
+{:ok, pid} = MyApp.Jido.start_agent(MyAgent, debug: true)
+
+# ... run some operations ...
+
+{:ok, events} = Jido.AgentServer.recent_events(pid, limit: 10)
+```
+
+See [Runtime - Debug Mode](runtime.md#debug-mode) for details.
+
 ## Next Steps
 
 This guide covers development observability. For production monitoring with custom metrics, OpenTelemetry integration, and performance dashboards, see [Observability](observability.md).

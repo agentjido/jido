@@ -43,7 +43,7 @@ defmodule Jido.AgentServer.State do
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
               skip_schedules:
-                Zoi.boolean(description: "Skip registering skill schedules")
+                Zoi.boolean(description: "Skip registering plugin schedules")
                 |> Zoi.default(false),
 
               # Configuration
@@ -70,7 +70,14 @@ defmodule Jido.AgentServer.State do
                 |> Zoi.default(%{}),
 
               # Lifecycle (InstanceManager integration: attachment tracking, idle timeout, persistence)
-              lifecycle: Zoi.any(description: "Lifecycle state (State.Lifecycle.t())")
+              lifecycle: Zoi.any(description: "Lifecycle state (State.Lifecycle.t())"),
+
+              # Debug mode
+              debug:
+                Zoi.boolean(description: "Whether debug mode is enabled") |> Zoi.default(false),
+              debug_events:
+                Zoi.list(Zoi.any(), description: "Ring buffer of debug events (max 50)")
+                |> Zoi.default([])
             },
             coerce: true
           )
@@ -123,7 +130,9 @@ defmodule Jido.AgentServer.State do
         error_count: 0,
         metrics: %{},
         completion_waiters: %{},
-        lifecycle: lifecycle
+        lifecycle: lifecycle,
+        debug: opts.debug,
+        debug_events: []
       }
 
       Zoi.parse(@schema, attrs)
@@ -253,5 +262,55 @@ defmodule Jido.AgentServer.State do
   @spec increment_error_count(t()) :: t()
   def increment_error_count(%__MODULE__{error_count: count} = state) do
     %{state | error_count: count + 1}
+  end
+
+  # Debug mode constants
+  @max_debug_events 50
+
+  @doc """
+  Records a debug event if debug mode is enabled.
+
+  Events are stored in a ring buffer (max #{@max_debug_events} entries).
+  Each event includes a monotonic timestamp for relative timing.
+  """
+  @spec record_debug_event(t(), atom(), map()) :: t()
+  def record_debug_event(%__MODULE__{debug: false} = state, _type, _data), do: state
+
+  def record_debug_event(%__MODULE__{debug: true, debug_events: events} = state, type, data) do
+    event = %{
+      at: System.monotonic_time(:millisecond),
+      type: type,
+      data: data
+    }
+
+    # Keep only last N events (ring buffer behavior)
+    new_events = Enum.take([event | events], @max_debug_events)
+    %{state | debug_events: new_events}
+  end
+
+  @doc """
+  Returns recent debug events, newest first.
+
+  ## Options
+
+  - `:limit` - Maximum number of events to return (default: all)
+  """
+  @spec get_debug_events(t(), keyword()) :: [map()]
+  def get_debug_events(%__MODULE__{debug_events: events}, opts \\ []) do
+    limit = Keyword.get(opts, :limit)
+
+    case limit do
+      nil -> events
+      n when is_integer(n) and n > 0 -> Enum.take(events, n)
+      _ -> events
+    end
+  end
+
+  @doc """
+  Enables or disables debug mode at runtime.
+  """
+  @spec set_debug(t(), boolean()) :: t()
+  def set_debug(%__MODULE__{} = state, enabled) when is_boolean(enabled) do
+    %{state | debug: enabled}
   end
 end

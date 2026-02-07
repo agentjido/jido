@@ -33,7 +33,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", TestActions.IncrementAction},
         {"emit_directive", EmitDirectiveAction},

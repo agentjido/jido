@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.0.0-rc.2"
+  @version "2.0.0-rc.4"
 
   def vsn do
     @version
@@ -32,7 +32,10 @@ defmodule Jido.MixProject do
         summary: [threshold: 80],
         export: "cov",
         ignore_modules: [~r/^JidoTest\./]
-      ]
+      ],
+
+      # Dialyzer
+      dialyzer: [plt_add_apps: [:mix]]
     ]
   end
 
@@ -73,7 +76,7 @@ defmodule Jido.MixProject do
         "Start Here": [
           "guides/getting-started.livemd",
           "guides/core-loop.md",
-          "guides/your-first-skill.md",
+          "guides/your-first-plugin.md",
           "guides/your-first-sensor.md",
           "guides/observability-intro.md"
         ],
@@ -83,7 +86,7 @@ defmodule Jido.MixProject do
           "guides/signals.md",
           "guides/directives.md",
           "guides/state-ops.md",
-          "guides/skills.md",
+          "guides/plugins.md",
           "guides/strategies.md",
           "guides/runtime.md"
         ],
@@ -127,7 +130,7 @@ defmodule Jido.MixProject do
         # Start Here
         {"guides/getting-started.livemd", title: "Quick Start"},
         {"guides/core-loop.md", title: "Core Loop"},
-        {"guides/your-first-skill.md", title: "Your First Skill"},
+        {"guides/your-first-plugin.md", title: "Your First Plugin"},
         {"guides/your-first-sensor.md", title: "Your First Sensor"},
         {"guides/observability-intro.md", title: "Seeing What Happened"},
 
@@ -137,7 +140,7 @@ defmodule Jido.MixProject do
         {"guides/signals.md", title: "Signals & Routing"},
         {"guides/directives.md", title: "Directives"},
         {"guides/state-ops.md", title: "State Operations"},
-        {"guides/skills.md", title: "Skills"},
+        {"guides/plugins.md", title: "Plugins"},
         {"guides/strategies.md", title: "Strategies"},
         {"guides/runtime.md", title: "Runtime"},
 
@@ -195,15 +198,22 @@ defmodule Jido.MixProject do
           Jido.Agent.Strategy.State,
           Jido.Agent.Strategy.Snapshot
         ],
-        Skills: [
-          Jido.Skill,
-          Jido.Skill.Config,
-          Jido.Skill.Instance,
-          Jido.Skill.Manifest,
-          Jido.Skill.Requirements,
-          Jido.Skill.Routes,
-          Jido.Skill.Schedules,
-          Jido.Skill.Spec
+        Plugins: [
+          Jido.Plugin,
+          Jido.Plugin.Config,
+          Jido.Plugin.Instance,
+          Jido.Plugin.Manifest,
+          Jido.Plugin.Requirements,
+          Jido.Plugin.Routes,
+          Jido.Plugin.Schedules,
+          Jido.Plugin.Spec
+        ],
+        Identity: [
+          Jido.Identity,
+          Jido.Identity.Plugin,
+          Jido.Identity.Agent,
+          Jido.Identity.Profile,
+          Jido.Identity.Actions.Evolve
         ],
         Directives: [
           Jido.Agent.Directive,
@@ -227,6 +237,7 @@ defmodule Jido.MixProject do
           Jido.Agent.StateOps
         ],
         "Agent Internals": [
+          Jido.Agent.DefaultPlugins,
           Jido.Agent.State,
           Jido.Agent.Schema,
           Jido.AgentServer.State,
@@ -346,8 +357,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.0.0-rc.2"},
-      {:jido_signal, "~> 2.0.0-rc.2"},
+      {:jido_action, "~> 2.0.0-rc.4"},
+      {:jido_signal, "~> 2.0.0-rc.4"},
 
       # Jido Deps
       {:deep_merge, "~> 1.0"},
@@ -361,13 +372,6 @@ defmodule Jido.MixProject do
       {:telemetry_metrics, "~> 1.1"},
       {:sched_ex, "~> 1.1"},
       {:uniq, "~> 0.6.1"},
-
-      # Skill & Action Dependencies for examples
-      # {:req, "~> 0.5.16"},
-
-      # ReAct example dependency (optional - requires API key)
-      # Using GitHub main for upcoming tool call extraction improvements
-      # {:req_llm, github: "agentjido/req_llm", branch: "main"},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},

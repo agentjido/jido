@@ -202,14 +202,14 @@ end
 # Result: %{counter: 10, name: "test"}
 ```
 
-**Skill state** (if using skills) lives under a namespaced key:
+**Plugin state** (if using plugins) lives under a namespaced key:
 
 ```elixir
-# Agent with :chat skill mounted
+# Agent with :chat plugin mounted
 # agent.state = %{counter: 0, chat: %{history: []}}
 ```
 
-Actions updating skill state should target the skill's key:
+Actions updating plugin state should target the plugin's key:
 
 ```elixir
 {:ok, %{chat: %{history: updated_history}}}

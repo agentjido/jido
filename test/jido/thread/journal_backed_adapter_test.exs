@@ -2,9 +2,9 @@ defmodule Jido.Thread.Store.Adapters.JournalBackedTest do
   use ExUnit.Case, async: true
 
   alias Jido.Thread
+  alias Jido.Thread.Entry
   alias Jido.Thread.Store
   alias Jido.Thread.Store.Adapters.JournalBacked
-  alias Jido.Thread.Entry
 
   describe "init/1" do
     test "initializes with Journal and default InMemory adapter" do

@@ -21,7 +21,7 @@ end
 
 Discovery scans all loaded applications for modules that export metadata functions (`__action_metadata__/0`, `__sensor_metadata__/0`, etc.). Results are cached in `:persistent_term` for fast, concurrent reads.
 
-Components are indexed automatically when you call `use Jido.Action`, `use Jido.Sensor`, `use Jido.Agent`, or `use Jido.Skill`.
+Components are indexed automatically when you call `use Jido.Action`, `use Jido.Sensor`, `use Jido.Agent`, or `use Jido.Plugin`.
 
 ## Initialization
 
@@ -60,8 +60,8 @@ Jido.Discovery.list_sensors()
 # List all agents
 Jido.Discovery.list_agents()
 
-# List all skills
-Jido.Discovery.list_skills()
+# List all plugins
+Jido.Discovery.list_plugins()
 
 # List all demos
 Jido.Discovery.list_demos()
@@ -130,7 +130,7 @@ Jido.Discovery.get_action_by_slug("abc123de")
 
 Jido.Discovery.get_sensor_by_slug("x7y8z9ab")
 Jido.Discovery.get_agent_by_slug("def456gh")
-Jido.Discovery.get_skill_by_slug("ijk789lm")
+Jido.Discovery.get_plugin_by_slug("ijk789lm")
 Jido.Discovery.get_demo_by_slug("nop012qr")
 ```
 
@@ -238,7 +238,7 @@ defmodule MyAppWeb.DiscoveryLive do
       actions: Jido.Discovery.list_actions(),
       sensors: Jido.Discovery.list_sensors(),
       agents: Jido.Discovery.list_agents(),
-      skills: Jido.Discovery.list_skills()
+      plugins: Jido.Discovery.list_plugins()
     )}
   end
 
@@ -302,4 +302,4 @@ For most applications, initialize once at startup and refresh only when deployin
 
 - [Actions Guide](actions.md) — Implement actions that appear in discovery
 - [Sensors Guide](your-first-sensor.md) — Create sensors that get indexed
-- [Skills Guide](skills.md) — Package capabilities as discoverable skills
+- [Plugins Guide](plugins.md) — Package capabilities as discoverable plugins

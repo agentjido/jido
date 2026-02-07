@@ -114,11 +114,10 @@ defmodule Jido.Telemetry.Formatter do
     metadata
     |> Enum.reject(fn {_k, v} -> is_nil(v) end)
     |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
-    |> Enum.map(fn {k, v} ->
+    |> Enum.map_join(" ", fn {k, v} ->
       formatted_value = format_value(v, max_value_length)
       "#{k}=#{formatted_value}"
     end)
-    |> Enum.join(" ")
   end
 
   def format_metadata(_, _opts), do: ""
@@ -194,11 +193,10 @@ defmodule Jido.Telemetry.Formatter do
   def format_directive_types(summary) when is_map(summary) do
     summary
     |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
-    |> Enum.map(fn {type, count} ->
+    |> Enum.map_join(" ", fn {type, count} ->
       formatted_type = type |> to_string() |> String.capitalize()
       "#{formatted_type}=#{count}"
     end)
-    |> Enum.join(" ")
   end
 
   def format_directive_types(_), do: ""

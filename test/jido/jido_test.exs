@@ -53,7 +53,7 @@ defmodule JidoTest.JidoTest do
       {:ok, pid} = Jido.start_agent(jido, Minimal, id: "await-delegate-test")
 
       result = Jido.await(pid, 50)
-      assert {:error, :timeout} = result
+      assert {:error, {:timeout, _details}} = result
     end
 
     test "await_all/3 delegates to Jido.Await.all", %{jido: jido} do
@@ -111,9 +111,9 @@ defmodule JidoTest.JidoTest do
       assert is_list(sensors)
     end
 
-    test "list_skills/1 delegates to Jido.Discovery" do
-      skills = Jido.list_skills()
-      assert is_list(skills)
+    test "list_plugins/1 delegates to Jido.Discovery" do
+      plugins = Jido.list_plugins()
+      assert is_list(plugins)
     end
 
     test "list_demos/1 delegates to Jido.Discovery" do
@@ -131,8 +131,8 @@ defmodule JidoTest.JidoTest do
       assert result == nil or is_map(result)
     end
 
-    test "get_skill_by_slug/1 delegates to Jido.Discovery" do
-      result = Jido.get_skill_by_slug("nonexistent-skill-slug")
+    test "get_plugin_by_slug/1 delegates to Jido.Discovery" do
+      result = Jido.get_plugin_by_slug("nonexistent-plugin-slug")
       assert result == nil or is_map(result)
     end
 

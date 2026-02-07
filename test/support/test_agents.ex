@@ -4,8 +4,8 @@ defmodule JidoTest.TestAgents do
   """
 
   # Ensure test actions are compiled before this module
-  # (required for compile-time validation in use Jido.Skill)
-  Code.ensure_compiled!(JidoTest.SkillTestAction)
+  # (required for compile-time validation in use Jido.Plugin)
+  Code.ensure_compiled!(JidoTest.PluginTestAction)
   Code.ensure_compiled!(JidoTest.TestActions.IncrementAction)
 
   defmodule Minimal do
@@ -13,7 +13,7 @@ defmodule JidoTest.TestAgents do
     use Jido.Agent,
       name: "minimal_agent"
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule Counter do
@@ -35,7 +35,7 @@ defmodule JidoTest.TestAgents do
         messages: [type: {:list, :any}, default: []]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"increment", JidoTest.TestActions.IncrementAction},
         {"decrement", JidoTest.TestActions.DecrementAction},
@@ -59,7 +59,7 @@ defmodule JidoTest.TestAgents do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule Hook do
@@ -70,7 +70,7 @@ defmodule JidoTest.TestAgents do
         counter: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
 
     def on_after_cmd(agent, _action, directives) do
       {:ok, %{agent | state: Map.put(agent.state, :hook_called, true)}, directives}
@@ -122,7 +122,7 @@ defmodule JidoTest.TestAgents do
       name: "custom_strategy_agent",
       strategy: JidoTest.TestAgents.CountingStrategy
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule StrategyWithOpts do
@@ -131,7 +131,7 @@ defmodule JidoTest.TestAgents do
       name: "strategy_opts_agent",
       strategy: {JidoTest.TestAgents.CountingStrategy, max_depth: 5}
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule ZoiSchema do
@@ -144,7 +144,7 @@ defmodule JidoTest.TestAgents do
           count: Zoi.integer() |> Zoi.default(0)
         })
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
   defmodule WithCustomStrategy do
@@ -156,50 +156,50 @@ defmodule JidoTest.TestAgents do
         value: [type: :integer, default: 0]
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
-  defmodule TestSkillWithRoutes do
+  defmodule TestPluginWithRoutes do
     @moduledoc false
-    use Jido.Skill,
-      name: "test_routes_skill",
+    use Jido.Plugin,
+      name: "test_routes_plugin",
       state_key: :test_routes,
-      actions: [JidoTest.SkillTestAction],
-      routes: [
-        {"post", JidoTest.SkillTestAction},
-        {"list", JidoTest.SkillTestAction}
+      actions: [JidoTest.PluginTestAction],
+      signal_routes: [
+        {"post", JidoTest.PluginTestAction},
+        {"list", JidoTest.PluginTestAction}
       ]
   end
 
-  defmodule TestSkillWithPriority do
+  defmodule TestPluginWithPriority do
     @moduledoc false
-    use Jido.Skill,
-      name: "priority_skill",
+    use Jido.Plugin,
+      name: "priority_plugin",
       state_key: :priority,
-      actions: [JidoTest.SkillTestAction],
-      routes: [
-        {"action", JidoTest.SkillTestAction, priority: 5}
+      actions: [JidoTest.PluginTestAction],
+      signal_routes: [
+        {"action", JidoTest.PluginTestAction, priority: 5}
       ]
   end
 
-  defmodule AgentWithSkillRoutes do
+  defmodule AgentWithPluginRoutes do
     @moduledoc false
     use Jido.Agent,
-      name: "agent_with_skill_routes",
-      skills: [JidoTest.TestAgents.TestSkillWithRoutes]
+      name: "agent_with_plugin_routes",
+      plugins: [JidoTest.TestAgents.TestPluginWithRoutes]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 
-  defmodule AgentWithMultiInstanceSkills do
+  defmodule AgentWithMultiInstancePlugins do
     @moduledoc false
     use Jido.Agent,
       name: "agent_multi_instance",
-      skills: [
-        {JidoTest.TestAgents.TestSkillWithRoutes, as: :support},
-        {JidoTest.TestAgents.TestSkillWithRoutes, as: :sales}
+      plugins: [
+        {JidoTest.TestAgents.TestPluginWithRoutes, as: :support},
+        {JidoTest.TestAgents.TestPluginWithRoutes, as: :sales}
       ]
 
-    def signal_routes, do: []
+    def signal_routes(_ctx), do: []
   end
 end

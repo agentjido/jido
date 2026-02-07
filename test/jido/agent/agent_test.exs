@@ -17,7 +17,8 @@ defmodule JidoTest.AgentTest do
     test "minimal agent has default values" do
       assert TestAgents.Minimal.name() == "minimal_agent"
       assert TestAgents.Minimal.description() == nil
-      assert TestAgents.Minimal.schema() == []
+      schema = TestAgents.Minimal.schema()
+      assert is_struct(schema) or schema == []
     end
   end
 
@@ -195,6 +196,64 @@ defmodule JidoTest.AgentTest do
     end
   end
 
+  describe "cmd/3 with opts" do
+    test "passes timeout option to instruction" do
+      agent = TestAgents.Basic.new()
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(agent, {TestActions.SlowAction, %{delay_ms: 200}}, timeout: 10)
+
+      assert [%Jido.Agent.Directive.Error{error: error}] = directives
+      assert error.message == "Instruction failed"
+    end
+
+    test "passes max_retries option to disable retries" do
+      agent = TestAgents.Basic.new()
+
+      start_time = System.monotonic_time(:millisecond)
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(
+          agent,
+          {TestActions.SlowAction, %{delay_ms: 200}},
+          timeout: 10,
+          max_retries: 0
+        )
+
+      elapsed = System.monotonic_time(:millisecond) - start_time
+
+      assert [%Jido.Agent.Directive.Error{}] = directives
+      assert elapsed < 100
+    end
+
+    test "cmd/2 delegates to cmd/3 with empty opts" do
+      agent = TestAgents.Basic.new()
+
+      {updated1, directives1} = TestAgents.Basic.cmd(agent, TestActions.NoSchema)
+      {updated2, directives2} = TestAgents.Basic.cmd(agent, TestActions.NoSchema, [])
+
+      assert updated1.state == updated2.state
+      assert directives1 == directives2
+    end
+
+    test "opts are merged into all instructions in a list" do
+      agent = TestAgents.Basic.new()
+
+      {_updated, directives} =
+        TestAgents.Basic.cmd(
+          agent,
+          [
+            {TestActions.SlowAction, %{delay_ms: 200}},
+            {TestActions.SlowAction, %{delay_ms: 200}}
+          ],
+          timeout: 10,
+          max_retries: 0
+        )
+
+      assert [%Jido.Agent.Directive.Error{}, %Jido.Agent.Directive.Error{}] = directives
+    end
+  end
+
   describe "lifecycle hooks" do
     test "on_after_cmd is called after processing" do
       agent = TestAgents.Hook.new()
@@ -362,40 +421,40 @@ defmodule JidoTest.AgentTest do
     end
   end
 
-  describe "skill routes" do
-    test "skill_routes/0 returns expanded routes with prefix" do
-      routes = TestAgents.AgentWithSkillRoutes.skill_routes()
+  describe "plugin routes" do
+    test "plugin_routes/0 returns expanded routes with prefix" do
+      routes = TestAgents.AgentWithPluginRoutes.plugin_routes()
 
       assert length(routes) == 2
-      assert {"test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
+      assert {"test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
     end
 
-    test "multi-instance skills get unique route prefixes" do
-      routes = TestAgents.AgentWithMultiInstanceSkills.skill_routes()
+    test "multi-instance plugins get unique route prefixes" do
+      routes = TestAgents.AgentWithMultiInstancePlugins.plugin_routes()
 
       assert length(routes) == 4
-      assert {"support.test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"support.test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
-      assert {"sales.test_routes_skill.post", JidoTest.SkillTestAction, -10} in routes
-      assert {"sales.test_routes_skill.list", JidoTest.SkillTestAction, -10} in routes
+      assert {"support.test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"support.test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
+      assert {"sales.test_routes_plugin.post", JidoTest.PluginTestAction, -10} in routes
+      assert {"sales.test_routes_plugin.list", JidoTest.PluginTestAction, -10} in routes
     end
 
     test "compile-time conflict detection raises error for duplicate routes" do
-      assert_raise CompileError, ~r/Route conflict|Duplicate skill state_keys/, fn ->
+      assert_raise CompileError, ~r/Route conflict|Duplicate plugin state_keys/, fn ->
         defmodule ConflictAgent do
           use Jido.Agent,
             name: "conflict_agent",
-            skills: [
-              TestAgents.TestSkillWithRoutes,
-              TestAgents.TestSkillWithRoutes
+            plugins: [
+              TestAgents.TestPluginWithRoutes,
+              TestAgents.TestPluginWithRoutes
             ]
         end
       end
     end
 
-    test "no route conflict when skills use different :as aliases" do
-      routes = TestAgents.AgentWithMultiInstanceSkills.skill_routes()
+    test "no route conflict when plugins use different :as aliases" do
+      routes = TestAgents.AgentWithMultiInstancePlugins.plugin_routes()
       assert length(routes) == 4
     end
   end

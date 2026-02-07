@@ -55,7 +55,7 @@ defmodule JidoTest.AwaitCoverageTest do
         last_answer: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [{"complete", CompletingAction}]
     end
   end
@@ -70,7 +70,7 @@ defmodule JidoTest.AwaitCoverageTest do
         error: [type: :any, default: nil]
       ]
 
-    def signal_routes do
+    def signal_routes(_ctx) do
       [
         {"never_complete", NeverCompletesAction},
         {"complete", CompletingAction},
@@ -88,7 +88,7 @@ defmodule JidoTest.AwaitCoverageTest do
       AgentServer.cast(pid, signal)
 
       result = Await.completion(pid, 50)
-      assert {:error, :timeout} = result
+      assert {:error, {:timeout, _details}} = result
 
       GenServer.stop(pid)
     end

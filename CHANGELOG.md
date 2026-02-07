@@ -2,6 +2,51 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
+## 2.0.0-rc.4 - 2026-02-06
+
+### Added
+- Memory plugin: implement `Jido.Memory` as default plugin under `__memory__` key (#125)
+- Identity plugin: add `Jido.Identity` as default agent plugin (#126)
+- Plugin singleton flag in plugin config schema (#120)
+- Plugin signal middleware improvements (#123)
+
+### Changed
+- Update `signal_routes` to accept context parameter (#121)
+
+### Fixed
+- Wire `on_restore/2` into generated `restore/2` callback (#122)
+
+### Tests & Chores
+- Add memory plugin and default plugins persistence examples (#127)
+- Organize example tests into subdirectories (#124)
+- Add `Jido.Plugin` to doctor ignore_modules for macro-generated defs
+- Remove AI cruft and build artifacts
+
+### Dependencies
+- Bump `jido_action` and `jido_signal` to 2.0.0-rc.4
+
+---
+
+## 2.0.0-rc.3 - 2026-02-04
+
+### Added
+- `cmd/3` to support per-action timeout opts (#117)
+- Unified persistence layer for agent checkpoints and thread journals (#110)
+- Telemetry infrastructure with span tracking and metrics (#109)
+- Debug helpers and improved timeout errors (#111)
+
+### Changed
+- **BREAKING**: Renamed `Jido.Skill` to `Jido.Plugin` (#115)
+
+### Fixed
+- Dialyzer/Credo: add :mix to PLT, remove unnecessary ignores (#118)
+
+### Dependencies
+- Bump `jido_action` and `jido_signal` to 2.0.0-rc.3
+- Bump `ex_doc` from 0.40.0 to 0.40.1 (#112)
+
+---
+
 ## 2.0.0-rc.2 - 2025-01-30
 
 ### Changed

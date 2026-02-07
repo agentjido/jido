@@ -1,16 +1,16 @@
-defmodule JidoTest.SkillTestAction do
+defmodule JidoTest.PluginTestAction do
   @moduledoc false
   use Jido.Action,
-    name: "skill_test_action",
+    name: "plugin_test_action",
     schema: []
 
   def run(_params, _context), do: {:ok, %{}}
 end
 
-defmodule JidoTest.SkillTestAnotherAction do
+defmodule JidoTest.PluginTestAnotherAction do
   @moduledoc false
   use Jido.Action,
-    name: "skill_test_another_action",
+    name: "plugin_test_another_action",
     schema: [value: [type: :integer, default: 0]]
 
   def run(%{value: value}, _context), do: {:ok, %{value: value}}

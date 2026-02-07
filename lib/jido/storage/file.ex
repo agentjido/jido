@@ -201,73 +201,100 @@ defmodule Jido.Storage.File do
     meta_file = Path.join(thread_dir, "meta.term")
     entries_file = Path.join(thread_dir, "entries.log")
 
-    # Load existing or create new
     {current_rev, current_entries, created_at, metadata} =
-      case load_existing_thread(meta_file, entries_file) do
-        {:ok, rev, existing_entries, created, meta} ->
-          {rev, existing_entries, created, meta}
+      load_thread_or_new(meta_file, entries_file)
 
-        :not_found ->
-          now = System.system_time(:millisecond)
-          {0, [], now, %{}}
-      end
-
-    # Check expected revision
-    if expected_rev && expected_rev != current_rev do
-      {:error, :conflict}
+    with :ok <- validate_expected_rev(expected_rev, current_rev),
+         :ok <- ensure_thread_dir(thread_dir),
+         {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
+         :ok <- append_to_file(entries_file, encode_entries(prepared_entries)),
+         {:ok, thread} <-
+           persist_thread_meta(
+             meta_file,
+             thread_id,
+             current_rev,
+             current_entries,
+             prepared_entries,
+             created_at,
+             metadata,
+             now
+           ) do
+      {:ok, thread}
     else
-      # Ensure directory exists
-      ensure_thread_dir(thread_dir)
+      {:error, reason} -> {:error, reason}
+    end
+  end
 
-      # Prepare new entries with correct seq numbers
-      now = System.system_time(:millisecond)
-      base_seq = length(current_entries)
+  defp load_thread_or_new(meta_file, entries_file) do
+    case load_existing_thread(meta_file, entries_file) do
+      {:ok, rev, existing_entries, created, meta} ->
+        {rev, existing_entries, created, meta}
 
-      prepared_entries =
-        entries
-        |> Enum.with_index()
-        |> Enum.map(fn {entry, idx} ->
-          %Entry{
-            id: entry.id || generate_entry_id(),
-            seq: base_seq + idx,
-            at: entry.at || now,
-            kind: entry.kind,
-            payload: entry.payload || %{},
-            refs: entry.refs || %{}
-          }
-        end)
+      :not_found ->
+        now = System.system_time(:millisecond)
+        {0, [], now, %{}}
+    end
+  end
 
-      # Encode new entries and append to log
-      new_entries_binary = encode_entries(prepared_entries)
+  defp validate_expected_rev(nil, _current_rev), do: :ok
+  defp validate_expected_rev(expected_rev, expected_rev), do: :ok
+  defp validate_expected_rev(_expected_rev, _current_rev), do: {:error, :conflict}
 
-      with :ok <- append_to_file(entries_file, new_entries_binary) do
-        # Update meta atomically
-        all_entries = current_entries ++ prepared_entries
-        new_rev = current_rev + length(prepared_entries)
+  defp build_prepared_entries(entries, current_entries) do
+    now = System.system_time(:millisecond)
+    base_seq = length(current_entries)
 
-        meta = {new_rev, created_at, now, metadata}
-        meta_binary = :erlang.term_to_binary(meta)
-        tmp_meta = meta_file <> ".tmp"
+    prepared_entries =
+      entries
+      |> Enum.with_index()
+      |> Enum.map(fn {entry, idx} ->
+        %Entry{
+          id: entry.id || generate_entry_id(),
+          seq: base_seq + idx,
+          at: entry.at || now,
+          kind: entry.kind,
+          payload: entry.payload || %{},
+          refs: entry.refs || %{}
+        }
+      end)
 
-        with :ok <- File.write(tmp_meta, meta_binary),
-             :ok <- File.rename(tmp_meta, meta_file) do
-          thread = %Thread{
-            id: thread_id,
-            rev: new_rev,
-            entries: all_entries,
-            created_at: created_at,
-            updated_at: now,
-            metadata: metadata,
-            stats: %{entry_count: length(all_entries)}
-          }
+    {:ok, prepared_entries, now}
+  end
 
-          {:ok, thread}
-        else
-          {:error, reason} ->
-            File.rm(tmp_meta)
-            {:error, reason}
-        end
-      end
+  defp persist_thread_meta(
+         meta_file,
+         thread_id,
+         current_rev,
+         current_entries,
+         prepared_entries,
+         created_at,
+         metadata,
+         now
+       ) do
+    all_entries = current_entries ++ prepared_entries
+    new_rev = current_rev + length(prepared_entries)
+
+    meta = {new_rev, created_at, now, metadata}
+    meta_binary = :erlang.term_to_binary(meta)
+    tmp_meta = meta_file <> ".tmp"
+
+    with :ok <- File.write(tmp_meta, meta_binary),
+         :ok <- File.rename(tmp_meta, meta_file) do
+      thread = %Thread{
+        id: thread_id,
+        rev: new_rev,
+        entries: all_entries,
+        created_at: created_at,
+        updated_at: now,
+        metadata: metadata,
+        stats: %{entry_count: length(all_entries)}
+      }
+
+      {:ok, thread}
+    else
+      {:error, reason} ->
+        File.rm(tmp_meta)
+        {:error, reason}
     end
   end
 
@@ -332,6 +359,8 @@ defmodule Jido.Storage.File do
     unless File.exists?(entries_file) do
       File.write!(entries_file, <<>>)
     end
+
+    :ok
   end
 
   defp with_thread_lock(thread_id, fun) do
