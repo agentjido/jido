@@ -15,23 +15,10 @@ defmodule JidoTest.TelemetryTest do
     def signal_routes(_ctx), do: []
   end
 
-  describe "start_link/1" do
-    test "starts the telemetry handler" do
-      try do
-        :telemetry.detach("jido-agent-metrics")
-      catch
-        :error, _ -> :ok
-      end
-
-      case GenServer.whereis(Telemetry) do
-        nil ->
-          assert {:ok, pid} = Telemetry.start_link([])
-          assert Process.alive?(pid)
-          GenServer.stop(pid)
-
-        existing_pid ->
-          assert Process.alive?(existing_pid)
-      end
+  describe "setup/0" do
+    test "attaches telemetry handlers idempotently" do
+      assert :ok = Telemetry.setup()
+      assert :ok = Telemetry.setup()
     end
   end
 
@@ -64,9 +51,7 @@ defmodule JidoTest.TelemetryTest do
       {:ok, agent} = Agent.new(%{id: "test-span-cmd"})
 
       result =
-        Telemetry.span_agent_cmd(agent, :test_action, fn ->
-          {agent, []}
-        end)
+        apply(Telemetry, :span_agent_cmd, [agent, :test_action, fn -> {agent, []} end])
 
       assert {^agent, []} = result
 
@@ -84,9 +69,11 @@ defmodule JidoTest.TelemetryTest do
     test "includes directive count in stop event" do
       {:ok, agent} = Agent.new(%{id: "test-span-directives"})
 
-      Telemetry.span_agent_cmd(agent, :test_action, fn ->
-        {agent, [:directive1, :directive2, :directive3]}
-      end)
+      apply(Telemetry, :span_agent_cmd, [
+        agent,
+        :test_action,
+        fn -> {agent, [:directive1, :directive2, :directive3]} end
+      ])
 
       assert_receive {:telemetry_event, [:jido, :agent, :cmd, :stop], _measurements, metadata}
       assert metadata.directive_count == 3
@@ -96,9 +83,11 @@ defmodule JidoTest.TelemetryTest do
       {:ok, agent} = Agent.new(%{id: "test-span-error"})
 
       assert_raise RuntimeError, "test error", fn ->
-        Telemetry.span_agent_cmd(agent, :failing_action, fn ->
-          raise "test error"
-        end)
+        apply(Telemetry, :span_agent_cmd, [
+          agent,
+          :failing_action,
+          fn -> raise "test error" end
+        ])
       end
 
       assert_receive {:telemetry_event, [:jido, :agent, :cmd, :start], _, _}
@@ -144,9 +133,7 @@ defmodule JidoTest.TelemetryTest do
     test "emits init start and stop events" do
       {:ok, agent} = Agent.new(%{id: "test-strategy-init"})
 
-      Telemetry.span_strategy(agent, :init, TestAgent, fn ->
-        {agent, []}
-      end)
+      apply(Telemetry, :span_strategy, [agent, :init, TestAgent, fn -> {agent, []} end])
 
       assert_receive {:telemetry_event, [:jido, :agent, :strategy, :init, :start], measurements,
                       metadata}
@@ -165,9 +152,12 @@ defmodule JidoTest.TelemetryTest do
     test "emits cmd start and stop events" do
       {:ok, agent} = Agent.new(%{id: "test-strategy-cmd"})
 
-      Telemetry.span_strategy(agent, :cmd, TestAgent, fn ->
-        {agent, [:d1, :d2]}
-      end)
+      apply(Telemetry, :span_strategy, [
+        agent,
+        :cmd,
+        TestAgent,
+        fn -> {agent, [:d1, :d2]} end
+      ])
 
       assert_receive {:telemetry_event, [:jido, :agent, :strategy, :cmd, :start], _, metadata}
       assert metadata.strategy == TestAgent
@@ -179,9 +169,7 @@ defmodule JidoTest.TelemetryTest do
     test "emits tick start and stop events" do
       {:ok, agent} = Agent.new(%{id: "test-strategy-tick"})
 
-      Telemetry.span_strategy(agent, :tick, TestAgent, fn ->
-        :ok
-      end)
+      apply(Telemetry, :span_strategy, [agent, :tick, TestAgent, fn -> :ok end])
 
       assert_receive {:telemetry_event, [:jido, :agent, :strategy, :tick, :start], _, _}
       assert_receive {:telemetry_event, [:jido, :agent, :strategy, :tick, :stop], _, _}
@@ -191,9 +179,12 @@ defmodule JidoTest.TelemetryTest do
       {:ok, agent} = Agent.new(%{id: "test-strategy-exception"})
 
       assert_raise RuntimeError, "strategy error", fn ->
-        Telemetry.span_strategy(agent, :cmd, TestAgent, fn ->
-          raise "strategy error"
-        end)
+        apply(Telemetry, :span_strategy, [
+          agent,
+          :cmd,
+          TestAgent,
+          fn -> raise "strategy error" end
+        ])
       end
 
       assert_receive {:telemetry_event, [:jido, :agent, :strategy, :cmd, :start], _, _}
@@ -210,9 +201,7 @@ defmodule JidoTest.TelemetryTest do
       {:ok, agent} = Agent.new(%{id: "test-strategy-non-tuple"})
 
       result =
-        Telemetry.span_strategy(agent, :tick, TestAgent, fn ->
-          :just_ok
-        end)
+        apply(Telemetry, :span_strategy, [agent, :tick, TestAgent, fn -> :just_ok end])
 
       assert result == :just_ok
 

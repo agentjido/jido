@@ -95,6 +95,7 @@ defmodule Jido.MixProject do
           "guides/orchestration.md"
         ],
         Operations: [
+          "guides/debugging.md",
           "guides/observability.md",
           "guides/testing.md",
           "guides/configuration.md",
@@ -149,6 +150,7 @@ defmodule Jido.MixProject do
         {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
 
         # Operations
+        {"guides/debugging.md", title: "Debugging"},
         {"guides/observability.md", title: "Observability"},
         {"guides/testing.md", title: "Testing"},
         {"guides/configuration.md", title: "Configuration"},
@@ -293,9 +295,16 @@ defmodule Jido.MixProject do
           Jido.Thread,
           Jido.Thread.Agent,
           Jido.Thread.Entry,
+          Jido.Thread.Plugin,
           Jido.Thread.Store,
           Jido.Thread.Store.Adapters.InMemory,
           Jido.Thread.Store.Adapters.JournalBacked
+        ],
+        Memory: [
+          Jido.Memory,
+          Jido.Memory.Agent,
+          Jido.Memory.Plugin,
+          Jido.Memory.Space
         ],
         Storage: [
           Jido.Storage,
@@ -310,10 +319,12 @@ defmodule Jido.MixProject do
         ],
         Observability: [
           Jido.Observe,
+          Jido.Observe.Config,
           Jido.Observe.Log,
           Jido.Observe.Tracer,
           Jido.Observe.NoopTracer,
           Jido.Observe.SpanCtx,
+          Jido.Debug,
           Jido.Telemetry,
           Jido.Telemetry.Config,
           Jido.Telemetry.Formatter,

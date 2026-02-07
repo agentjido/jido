@@ -76,8 +76,11 @@ defmodule Jido.AgentServer.State do
               debug:
                 Zoi.boolean(description: "Whether debug mode is enabled") |> Zoi.default(false),
               debug_events:
-                Zoi.list(Zoi.any(), description: "Ring buffer of debug events (max 50)")
-                |> Zoi.default([])
+                Zoi.list(Zoi.any(), description: "Ring buffer of debug events (max 500)")
+                |> Zoi.default([]),
+              debug_max_events:
+                Zoi.integer(description: "Max debug events in ring buffer")
+                |> Zoi.default(500)
             },
             coerce: true
           )
@@ -132,7 +135,8 @@ defmodule Jido.AgentServer.State do
         completion_waiters: %{},
         lifecycle: lifecycle,
         debug: opts.debug,
-        debug_events: []
+        debug_events: [],
+        debug_max_events: Jido.Observe.Config.debug_max_events(opts.jido)
       }
 
       Zoi.parse(@schema, attrs)
@@ -264,28 +268,26 @@ defmodule Jido.AgentServer.State do
     %{state | error_count: count + 1}
   end
 
-  # Debug mode constants
-  @max_debug_events 50
-
   @doc """
   Records a debug event if debug mode is enabled.
 
-  Events are stored in a ring buffer (max #{@max_debug_events} entries).
+  Events are stored in a ring buffer (max 500 entries).
   Each event includes a monotonic timestamp for relative timing.
   """
   @spec record_debug_event(t(), atom(), map()) :: t()
-  def record_debug_event(%__MODULE__{debug: false} = state, _type, _data), do: state
+  def record_debug_event(%__MODULE__{} = state, type, data) do
+    if state.debug || Jido.Debug.enabled?(state.jido) do
+      event = %{
+        at: System.monotonic_time(:millisecond),
+        type: type,
+        data: data
+      }
 
-  def record_debug_event(%__MODULE__{debug: true, debug_events: events} = state, type, data) do
-    event = %{
-      at: System.monotonic_time(:millisecond),
-      type: type,
-      data: data
-    }
-
-    # Keep only last N events (ring buffer behavior)
-    new_events = Enum.take([event | events], @max_debug_events)
-    %{state | debug_events: new_events}
+      new_events = Enum.take([event | state.debug_events], state.debug_max_events)
+      %{state | debug_events: new_events}
+    else
+      state
+    end
   end
 
   @doc """

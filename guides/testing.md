@@ -550,6 +550,34 @@ test "child stops when parent dies", %{jido: jido} do
 end
 ```
 
+## Debugging Failing Tests
+
+Use instance-level debug to capture events when diagnosing test failures:
+
+```elixir
+test "diagnose agent behavior", %{jido: jido} do
+  Jido.Debug.enable(jido, :on)
+
+  {:ok, pid} = Jido.start_agent(jido, MyAgent)
+  signal = Signal.new!("process", %{}, source: "/test")
+  AgentServer.cast(pid, signal)
+  Process.sleep(50)
+
+  {:ok, events} = Jido.AgentServer.recent_events(pid)
+  IO.inspect(events, label: "debug events")
+end
+```
+
+Debug overrides use `:persistent_term` and will leak between tests if not reset. Always reset in `setup` or `on_exit` when using `Jido.Debug.enable/3`:
+
+```elixir
+setup %{jido: jido} = context do
+  Jido.Debug.reset(jido)
+  on_exit(fn -> Jido.Debug.reset(jido) end)
+  context
+end
+```
+
 ## Summary
 
 | Scenario | Approach |

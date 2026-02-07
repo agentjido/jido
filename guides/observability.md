@@ -21,13 +21,27 @@ config :logger, :default_handler,
 
 config :logger,
   level: :info,
-  metadata: [:agent_id, :trace_id, :span_id, :signal_type, :duration_ms]
+  metadata: [:agent_id, :jido_trace_id, :jido_span_id, :jido_instance, :signal_type, :duration_ms]
 
 config :jido, :observability,
   log_level: :info,
   debug_events: :off,
   redact_sensitive: true
 ```
+
+Per-instance observability tuning allows different Jido instances to use different verbosity and redaction settings:
+
+```elixir
+config :my_app, MyApp.PublicJido,
+  telemetry: [log_level: :info],
+  observability: [debug_events: :off, redact_sensitive: true]
+
+config :my_app, MyApp.InternalJido,
+  telemetry: [log_level: :debug, log_args: :full],
+  observability: [debug_events: :all, redact_sensitive: false, tracer: MyApp.OtelTracer]
+```
+
+Settings resolve in this order: Debug override → instance config → global config → default.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
 
@@ -39,35 +53,35 @@ Jido emits telemetry events for all core operations. Use these for metrics colle
 
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
-| `[:jido, :agent, :cmd, :start]` | Command execution started | `system_time` | `agent_id`, `agent_module`, `action` |
-| `[:jido, :agent, :cmd, :stop]` | Command completed | `duration`, `directive_count` | `agent_id`, `agent_module`, `directive_count` |
-| `[:jido, :agent, :cmd, :exception]` | Command failed | `duration` | `agent_id`, `agent_module`, `error`, `stacktrace` |
+| `[:jido, :agent, :cmd, :start]` | Command execution started | `system_time` | `agent_id`, `agent_module`, `action`, `jido_instance` |
+| `[:jido, :agent, :cmd, :stop]` | Command completed | `duration`, `directive_count` | `agent_id`, `agent_module`, `directive_count`, `jido_instance` |
+| `[:jido, :agent, :cmd, :exception]` | Command failed | `duration` | `agent_id`, `agent_module`, `error`, `stacktrace`, `jido_instance` |
 
 ### AgentServer Events
 
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
-| `[:jido, :agent_server, :signal, :start]` | Signal processing started | `system_time` | `agent_id`, `signal_type` |
-| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count` |
-| `[:jido, :agent_server, :signal, :exception]` | Signal processing failed | `duration` | `agent_id`, `signal_type`, `error` |
-| `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type` |
-| `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `result` |
-| `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `error` |
-| `[:jido, :agent_server, :queue, :overflow]` | Directive queue overflow | `queue_size` | `agent_id`, `signal_type` |
+| `[:jido, :agent_server, :signal, :start]` | Signal processing started | `system_time` | `agent_id`, `signal_type`, `jido_instance` |
+| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `jido_instance` |
+| `[:jido, :agent_server, :signal, :exception]` | Signal processing failed | `duration` | `agent_id`, `signal_type`, `error`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `result`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `error`, `jido_instance` |
+| `[:jido, :agent_server, :queue, :overflow]` | Directive queue overflow | `queue_size` | `agent_id`, `signal_type`, `jido_instance` |
 
 ### Strategy Events
 
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
-| `[:jido, :agent, :strategy, :init, :start]` | Strategy initialization started | `system_time` | `agent_id`, `strategy` |
-| `[:jido, :agent, :strategy, :init, :stop]` | Strategy initialization completed | `duration` | `agent_id`, `strategy` |
-| `[:jido, :agent, :strategy, :init, :exception]` | Strategy initialization failed | `duration` | `agent_id`, `strategy`, `error` |
-| `[:jido, :agent, :strategy, :cmd, :start]` | Strategy command started | `system_time` | `agent_id`, `strategy` |
-| `[:jido, :agent, :strategy, :cmd, :stop]` | Strategy command completed | `duration` | `agent_id`, `strategy`, `directive_count` |
-| `[:jido, :agent, :strategy, :cmd, :exception]` | Strategy command failed | `duration` | `agent_id`, `strategy`, `error` |
-| `[:jido, :agent, :strategy, :tick, :start]` | Strategy tick started | `system_time` | `agent_id`, `strategy` |
-| `[:jido, :agent, :strategy, :tick, :stop]` | Strategy tick completed | `duration` | `agent_id`, `strategy` |
-| `[:jido, :agent, :strategy, :tick, :exception]` | Strategy tick failed | `duration` | `agent_id`, `strategy`, `error` |
+| `[:jido, :agent, :strategy, :init, :start]` | Strategy initialization started | `system_time` | `agent_id`, `strategy`, `jido_instance` |
+| `[:jido, :agent, :strategy, :init, :stop]` | Strategy initialization completed | `duration` | `agent_id`, `strategy`, `jido_instance` |
+| `[:jido, :agent, :strategy, :init, :exception]` | Strategy initialization failed | `duration` | `agent_id`, `strategy`, `error`, `jido_instance` |
+| `[:jido, :agent, :strategy, :cmd, :start]` | Strategy command started | `system_time` | `agent_id`, `strategy`, `jido_instance` |
+| `[:jido, :agent, :strategy, :cmd, :stop]` | Strategy command completed | `duration` | `agent_id`, `strategy`, `directive_count`, `jido_instance` |
+| `[:jido, :agent, :strategy, :cmd, :exception]` | Strategy command failed | `duration` | `agent_id`, `strategy`, `error`, `jido_instance` |
+| `[:jido, :agent, :strategy, :tick, :start]` | Strategy tick started | `system_time` | `agent_id`, `strategy`, `jido_instance` |
+| `[:jido, :agent, :strategy, :tick, :stop]` | Strategy tick completed | `duration` | `agent_id`, `strategy`, `jido_instance` |
+| `[:jido, :agent, :strategy, :tick, :exception]` | Strategy tick failed | `duration` | `agent_id`, `strategy`, `error`, `jido_instance` |
 
 ### Correlation Metadata
 
@@ -151,6 +165,14 @@ defmodule MyApp.Telemetry do
     ]
   end
 end
+```
+
+Alternatively, use Jido's built-in metric definitions which include automatic per-instance scoping:
+
+```elixir
+children = [
+  {TelemetryMetricsPrometheus, metrics: Jido.Telemetry.metrics()}
+]
 ```
 
 Add to your application supervision tree:
@@ -254,13 +276,16 @@ defmodule MyApp.JidoTelemetryHandler do
       Logger.warning("Slow agent command",
         agent_id: metadata.agent_id,
         agent_module: metadata.agent_module,
+        jido_instance: metadata[:jido_instance],
+        jido_trace_id: metadata[:jido_trace_id],
+        jido_span_id: metadata[:jido_span_id],
         duration_ms: duration_ms
       )
     end
 
-    # Send to custom metrics system
     MyMetrics.histogram("jido.cmd.duration", duration_ms, %{
-      agent_module: to_string(metadata.agent_module)
+      agent_module: to_string(metadata.agent_module),
+      jido_instance: to_string(metadata[:jido_instance])
     })
   end
 
@@ -270,18 +295,22 @@ defmodule MyApp.JidoTelemetryHandler do
     Logger.error("Agent command failed",
       agent_id: metadata.agent_id,
       agent_module: metadata.agent_module,
+      jido_instance: metadata[:jido_instance],
+      jido_trace_id: metadata[:jido_trace_id],
       error: inspect(metadata.error),
       duration_ms: duration_ms
     )
 
     MyMetrics.increment("jido.cmd.errors", %{
-      agent_module: to_string(metadata.agent_module)
+      agent_module: to_string(metadata.agent_module),
+      jido_instance: to_string(metadata[:jido_instance])
     })
   end
 
   def handle_event([:jido, :agent_server, :queue, :overflow], measurements, metadata, _config) do
     Logger.error("Agent queue overflow",
       agent_id: metadata.agent_id,
+      jido_instance: metadata[:jido_instance],
       queue_size: measurements.queue_size
     )
 
@@ -425,10 +454,11 @@ def handle_event([:jido, :agent_server, :signal, :stop], _measurements, metadata
   Logger.info("Signal processed",
     agent_id: metadata.agent_id,
     signal_type: metadata.signal_type,
-    trace_id: metadata[:jido_trace_id],
-    span_id: metadata[:jido_span_id],
-    parent_span_id: metadata[:jido_parent_span_id],
-    causation_id: metadata[:jido_causation_id]
+    jido_instance: metadata[:jido_instance],
+    jido_trace_id: metadata[:jido_trace_id],
+    jido_span_id: metadata[:jido_span_id],
+    jido_parent_span_id: metadata[:jido_parent_span_id],
+    jido_causation_id: metadata[:jido_causation_id]
   )
 end
 ```
@@ -487,25 +517,25 @@ end)
 **Command Latency Distribution:**
 ```promql
 histogram_quantile(0.99, 
-  sum(rate(jido_agent_cmd_duration_bucket[5m])) by (le, agent_module)
+  sum(rate(jido_agent_cmd_duration_bucket[5m])) by (le, jido_instance, agent_module)
 )
 ```
 
 **Error Rate by Agent:**
 ```promql
-sum(rate(jido_agent_cmd_exception_count[5m])) by (agent_module)
+sum(rate(jido_agent_cmd_exception_count[5m])) by (jido_instance, agent_module)
 / 
-sum(rate(jido_agent_cmd_stop_count[5m])) by (agent_module)
+sum(rate(jido_agent_cmd_stop_count[5m])) by (jido_instance, agent_module)
 ```
 
 **Signal Throughput:**
 ```promql
-sum(rate(jido_agent_server_signal_stop_count[1m])) by (signal_type)
+sum(rate(jido_agent_server_signal_stop_count[1m])) by (jido_instance, signal_type)
 ```
 
 **Directive Execution Rate:**
 ```promql
-sum(rate(jido_agent_server_directive_stop_count[1m])) by (directive_type)
+sum(rate(jido_agent_server_directive_stop_count[1m])) by (jido_instance, directive_type)
 ```
 
 ## Alerting Patterns
@@ -572,13 +602,21 @@ config :jido, :observability,
   redact_sensitive: false
 ```
 
+Toggle debug mode at runtime for a specific instance:
+
+```elixir
+MyApp.Jido.debug(:on)       # sets debug_events to :minimal
+MyApp.Jido.debug(:verbose)  # sets debug_events to :all
+MyApp.Jido.debug(:off)      # back to configured defaults
+```
+
 Emit debug events from custom code:
 
 ```elixir
 Jido.Observe.emit_debug_event(
   [:my_app, :custom, :step],
   %{duration: 1234},
-  %{agent_id: agent.id, step: 3, status: :processing}
+  %{agent_id: agent.id, jido_instance: MyApp.Jido, step: 3, status: :processing}
 )
 ```
 
@@ -587,6 +625,8 @@ Debug events are no-ops when `:debug_events` is `:off` (production default).
 ## Key Modules
 
 - `Jido.Observe` — Unified observability façade with span helpers
+- `Jido.Observe.Config` — Per-instance config resolution (debug override → instance → global → default)
+- `Jido.Debug` — Per-instance runtime debug mode
 - `Jido.Telemetry` — Built-in telemetry handler and metrics definitions
 - `Jido.Tracing.Context` — Correlation ID propagation
 - `Jido.Observe.Tracer` — Behaviour for OpenTelemetry integration

@@ -56,6 +56,37 @@ config :my_app, MyApp.Jido,
 | `:max_tasks` | integer | 1000 | Maximum concurrent tasks for `Task.Supervisor` |
 | `:agent_pools` | list | `[]` | Pre-configured agent pool definitions |
 
+### Observability Configuration
+
+Each Jido instance can carry its own observability tuning:
+
+```elixir
+config :my_app, MyApp.Jido,
+  debug: true,
+  telemetry: [
+    log_level: :debug,
+    log_args: :keys_only,
+    slow_signal_threshold_ms: 10,
+    slow_directive_threshold_ms: 5,
+    debug_max_events: 500
+  ],
+  observability: [
+    log_level: :info,
+    debug_events: :off,
+    redact_sensitive: false,
+    tracer: Jido.Observe.NoopTracer
+  ]
+```
+
+Instances without per-instance config inherit from global `config :jido, :telemetry` and `config :jido, :observability`. See [Observability](observability.md) for details.
+
+Settings resolve in this order:
+
+1. `Jido.Debug` runtime override (e.g. `MyApp.Jido.debug(:on)`)
+2. Per-instance app config (`config :my_app, MyApp.Jido, telemetry: [...]`)
+3. Global app config (`config :jido, :telemetry` / `config :jido, :observability`)
+4. Hardcoded defaults
+
 ### Runtime Configuration
 
 Override configuration at startup by passing options directly:
@@ -207,13 +238,13 @@ The `DynamicSupervisor` for agents is configured with:
 Jido emits telemetry events that you can attach to for monitoring:
 
 ```elixir
-# In your application startup
 :telemetry.attach_many(
   "jido-metrics",
   [
-    [:jido, :agent, :start],
-    [:jido, :agent, :stop],
-    [:jido, :signal, :dispatch]
+    [:jido, :agent, :cmd, :stop],
+    [:jido, :agent, :cmd, :exception],
+    [:jido, :agent_server, :signal, :stop],
+    [:jido, :agent_server, :directive, :stop]
   ],
   &MyApp.Metrics.handle_event/4,
   nil
@@ -221,9 +252,10 @@ Jido emits telemetry events that you can attach to for monitoring:
 ```
 
 Monitor these metrics in production:
-- Agent count per instance
-- Pool checkout latency and queue depth
-- Task supervisor utilization
+- Agent command latency and error rate
+- Signal processing duration
+- Directive execution failures
+- Queue overflow events
 
 ## Environment-Based Configuration
 
