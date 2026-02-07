@@ -76,10 +76,9 @@ defmodule Jido.Telemetry do
   - `[:jido, :agent, :strategy, :tick, :exception]` - Strategy tick failed
   """
 
-  use GenServer
   require Logger
 
-  alias Jido.Telemetry.Config
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Telemetry.Formatter
 
   @typedoc """
@@ -109,141 +108,98 @@ defmodule Jido.Telemetry do
           atom() => term()
         }
 
+  @handler_id "jido-agent-metrics"
+
   @doc """
-  Starts the telemetry handler.
+  Attaches telemetry handlers. Idempotent — safe to call multiple times.
+  Called from `Jido.Application.start/2`.
   """
-  @spec start_link(keyword()) :: GenServer.on_start()
-  def start_link(opts) do
-    GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  @spec setup() :: :ok
+  def setup do
+    _ = :telemetry.detach(@handler_id)
+    :telemetry.attach_many(@handler_id, events(), &__MODULE__.handle_event/4, nil)
+    :ok
   end
 
-  @impl true
-  def init(opts) do
-    # Define metrics
+  @doc """
+  Returns telemetry metric definitions with automatic per-instance scoping.
+
+  Wire these into your reporter in your application:
+
+      TelemetryMetricsPrometheus.init(Jido.Telemetry.metrics())
+  """
+  @spec metrics() :: [Telemetry.Metrics.t()]
+  def metrics do
+    tag_values = &instance_tag_values/1
+
     [
-      # Agent command metrics
-      Telemetry.Metrics.counter(
-        "jido.agent.cmd.count",
+      Telemetry.Metrics.counter("jido.agent.cmd.stop.count",
+        event_name: [:jido, :agent, :cmd, :stop],
+        tags: [:jido_instance],
+        tag_values: tag_values,
         description: "Total number of agent commands executed"
       ),
-      Telemetry.Metrics.sum(
-        "jido.agent.cmd.duration",
+      Telemetry.Metrics.summary("jido.agent.cmd.stop.duration",
+        tags: [:jido_instance],
+        tag_values: tag_values,
         unit: {:native, :millisecond},
-        description: "Total duration of agent commands"
+        description: "Agent command duration summary"
       ),
-      Telemetry.Metrics.counter(
-        "jido.agent.cmd.exception.count",
-        description: "Total number of agent command failures"
+      Telemetry.Metrics.counter("jido.agent_server.signal.stop.count",
+        event_name: [:jido, :agent_server, :signal, :stop],
+        tags: [:jido_instance, :signal_type],
+        tag_values: tag_values,
+        description: "Total signals processed"
       ),
-      Telemetry.Metrics.last_value(
-        "jido.agent.cmd.duration.max",
+      Telemetry.Metrics.summary("jido.agent_server.signal.stop.duration",
+        tags: [:jido_instance, :signal_type],
+        tag_values: tag_values,
         unit: {:native, :millisecond},
-        description: "Maximum duration of agent commands"
+        description: "Signal processing duration summary"
       ),
-      Telemetry.Metrics.sum(
-        "jido.agent.cmd.directives.total",
-        description: "Total number of directives produced"
+      Telemetry.Metrics.counter("jido.agent_server.directive.stop.count",
+        event_name: [:jido, :agent_server, :directive, :stop],
+        tags: [:jido_instance, :directive_type],
+        tag_values: tag_values,
+        description: "Total directives executed"
       ),
-
-      # Strategy init metrics
-      Telemetry.Metrics.counter(
-        "jido.agent.strategy.init.count",
-        description: "Total number of strategy initializations"
-      ),
-      Telemetry.Metrics.sum(
-        "jido.agent.strategy.init.duration",
-        unit: {:native, :millisecond},
-        description: "Total duration of strategy initializations"
-      ),
-
-      # Strategy cmd metrics
-      Telemetry.Metrics.counter(
-        "jido.agent.strategy.cmd.count",
-        description: "Total number of strategy command executions"
-      ),
-      Telemetry.Metrics.sum(
-        "jido.agent.strategy.cmd.duration",
-        unit: {:native, :millisecond},
-        description: "Total duration of strategy commands"
-      ),
-
-      # Strategy tick metrics
-      Telemetry.Metrics.counter(
-        "jido.agent.strategy.tick.count",
-        description: "Total number of strategy ticks"
-      ),
-      Telemetry.Metrics.sum(
-        "jido.agent.strategy.tick.duration",
-        unit: {:native, :millisecond},
-        description: "Total duration of strategy ticks"
-      ),
-
-      # AgentServer signal metrics
-      Telemetry.Metrics.counter(
-        "jido.agent_server.signal.count",
-        description: "Total number of signals processed"
-      ),
-      Telemetry.Metrics.sum(
-        "jido.agent_server.signal.duration",
-        unit: {:native, :millisecond},
-        description: "Total duration of signal processing"
-      ),
-      Telemetry.Metrics.counter(
-        "jido.agent_server.signal.exception.count",
-        description: "Total number of signal processing failures"
-      ),
-
-      # AgentServer directive metrics
-      Telemetry.Metrics.counter(
-        "jido.agent_server.directive.count",
-        description: "Total number of directives executed"
-      ),
-      Telemetry.Metrics.sum(
-        "jido.agent_server.directive.duration",
-        unit: {:native, :millisecond},
-        description: "Total duration of directive execution"
-      ),
-      Telemetry.Metrics.counter(
-        "jido.agent_server.directive.exception.count",
-        description: "Total number of directive execution failures"
-      ),
-
-      # AgentServer queue metrics
-      Telemetry.Metrics.counter(
-        "jido.agent_server.queue.overflow.count",
-        description: "Total number of queue overflows"
+      Telemetry.Metrics.counter("jido.agent_server.queue.overflow.count",
+        event_name: [:jido, :agent_server, :queue, :overflow],
+        tags: [:jido_instance],
+        tag_values: tag_values,
+        description: "Queue overflow count"
       )
     ]
+  end
 
-    # Attach custom handlers
-    :telemetry.attach_many(
-      "jido-agent-metrics",
-      [
-        [:jido, :agent, :cmd, :start],
-        [:jido, :agent, :cmd, :stop],
-        [:jido, :agent, :cmd, :exception],
-        [:jido, :agent, :strategy, :init, :start],
-        [:jido, :agent, :strategy, :init, :stop],
-        [:jido, :agent, :strategy, :init, :exception],
-        [:jido, :agent, :strategy, :cmd, :start],
-        [:jido, :agent, :strategy, :cmd, :stop],
-        [:jido, :agent, :strategy, :cmd, :exception],
-        [:jido, :agent, :strategy, :tick, :start],
-        [:jido, :agent, :strategy, :tick, :stop],
-        [:jido, :agent, :strategy, :tick, :exception],
-        [:jido, :agent_server, :signal, :start],
-        [:jido, :agent_server, :signal, :stop],
-        [:jido, :agent_server, :signal, :exception],
-        [:jido, :agent_server, :directive, :start],
-        [:jido, :agent_server, :directive, :stop],
-        [:jido, :agent_server, :directive, :exception],
-        [:jido, :agent_server, :queue, :overflow]
-      ],
-      &__MODULE__.handle_event/4,
-      nil
-    )
+  defp instance_tag_values(meta) do
+    meta
+    |> Map.new()
+    |> Map.put_new(:jido_instance, :global)
+  end
 
-    {:ok, opts}
+  defp events do
+    [
+      [:jido, :agent, :cmd, :start],
+      [:jido, :agent, :cmd, :stop],
+      [:jido, :agent, :cmd, :exception],
+      [:jido, :agent, :strategy, :init, :start],
+      [:jido, :agent, :strategy, :init, :stop],
+      [:jido, :agent, :strategy, :init, :exception],
+      [:jido, :agent, :strategy, :cmd, :start],
+      [:jido, :agent, :strategy, :cmd, :stop],
+      [:jido, :agent, :strategy, :cmd, :exception],
+      [:jido, :agent, :strategy, :tick, :start],
+      [:jido, :agent, :strategy, :tick, :stop],
+      [:jido, :agent, :strategy, :tick, :exception],
+      [:jido, :agent_server, :signal, :start],
+      [:jido, :agent_server, :signal, :stop],
+      [:jido, :agent_server, :signal, :exception],
+      [:jido, :agent_server, :directive, :start],
+      [:jido, :agent_server, :directive, :stop],
+      [:jido, :agent_server, :directive, :exception],
+      [:jido, :agent_server, :queue, :overflow]
+    ]
   end
 
   @doc """
@@ -263,11 +219,12 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :cmd, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
     duration_ms = Formatter.to_ms(duration)
     directive_count = metadata[:directive_count] || 0
 
-    if interesting_agent_cmd?(duration_ms, directive_count, metadata) do
+    if interesting_agent_cmd?(instance, duration_ms, directive_count, metadata) do
       Logger.debug(
         fn ->
           "[agent.cmd] #{format_module(metadata[:agent_module])} " <>
@@ -276,8 +233,8 @@ defmodule Jido.Telemetry do
             "duration=#{Formatter.format_duration(duration)}"
         end,
         agent_id: metadata[:agent_id],
-        trace_id: metadata[:trace_id],
-        span_id: metadata[:span_id]
+        trace_id: metadata[:jido_trace_id],
+        span_id: metadata[:jido_span_id]
       )
     end
 
@@ -293,8 +250,8 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
-      span_id: metadata[:span_id],
+      trace_id: metadata[:jido_trace_id],
+      span_id: metadata[:jido_span_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -308,16 +265,17 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :init, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
 
-    if Config.trace_enabled?() do
+    if ObserveConfig.trace_enabled?(instance) do
       Logger.debug(
         fn ->
           "[strategy.init] #{format_module(metadata[:strategy])} " <>
             "duration=#{Formatter.format_duration(duration)}"
         end,
         agent_id: metadata[:agent_id],
-        trace_id: metadata[:trace_id]
+        trace_id: metadata[:jido_trace_id]
       )
     end
 
@@ -337,7 +295,7 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
+      trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -347,11 +305,12 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :cmd, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
     duration_ms = Formatter.to_ms(duration)
     directive_count = metadata[:directive_count] || 0
 
-    if interesting_strategy_cmd?(duration_ms, directive_count) do
+    if interesting_strategy_cmd?(instance, duration_ms, directive_count) do
       Logger.debug(
         fn ->
           "[strategy.cmd] #{format_module(metadata[:strategy])} " <>
@@ -359,7 +318,7 @@ defmodule Jido.Telemetry do
             "duration=#{Formatter.format_duration(duration)}"
         end,
         agent_id: metadata[:agent_id],
-        trace_id: metadata[:trace_id]
+        trace_id: metadata[:jido_trace_id]
       )
     end
 
@@ -379,7 +338,7 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
+      trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -389,18 +348,19 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent, :strategy, :tick, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
     duration_ms = Formatter.to_ms(duration)
 
     # Only log slow ticks - ticks are high frequency
-    if duration_ms > Config.slow_signal_threshold_ms() do
+    if duration_ms > ObserveConfig.slow_signal_threshold_ms(instance) do
       Logger.debug(
         fn ->
           "[strategy.tick] #{format_module(metadata[:strategy])} " <>
             "duration=#{Formatter.format_duration(duration)} (slow)"
         end,
         agent_id: metadata[:agent_id],
-        trace_id: metadata[:trace_id]
+        trace_id: metadata[:jido_trace_id]
       )
     end
 
@@ -420,7 +380,7 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
+      trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -434,6 +394,7 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent_server, :signal, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
     duration_ms = Formatter.to_ms(duration)
     directive_count = metadata[:directive_count] || 0
@@ -441,12 +402,12 @@ defmodule Jido.Telemetry do
 
     cond do
       # At trace level, log everything
-      Config.trace_enabled?() ->
+      ObserveConfig.trace_enabled?(instance) ->
         log_signal_stop(metadata, duration, directive_count)
 
       # At debug level, only log "interesting" signals
-      Config.debug_enabled?() and
-          interesting_signal?(signal_type, duration_ms, directive_count, metadata) ->
+      ObserveConfig.debug_enabled?(instance) and
+          interesting_signal?(instance, signal_type, duration_ms, directive_count, metadata) ->
         log_signal_stop(metadata, duration, directive_count)
 
       # Otherwise, stay silent
@@ -470,8 +431,8 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
-      span_id: metadata[:span_id],
+      trace_id: metadata[:jido_trace_id],
+      span_id: metadata[:jido_span_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -485,17 +446,19 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent_server, :directive, :stop], measurements, metadata, _config) do
+    instance = metadata[:jido_instance]
     duration = Map.get(measurements, :duration, 0)
     duration_ms = Formatter.to_ms(duration)
     directive_type = metadata[:directive_type]
 
     cond do
       # At trace level, log everything
-      Config.trace_enabled?() ->
+      ObserveConfig.trace_enabled?(instance) ->
         log_directive_stop(metadata, duration)
 
       # At debug level, only log slow or interesting directives
-      Config.debug_enabled?() and interesting_directive?(directive_type, duration_ms, metadata) ->
+      ObserveConfig.debug_enabled?(instance) and
+          interesting_directive?(instance, directive_type, duration_ms, metadata) ->
         log_directive_stop(metadata, duration)
 
       # Otherwise, stay silent
@@ -519,8 +482,8 @@ defmodule Jido.Telemetry do
         "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
         "duration=#{Formatter.format_duration(duration)}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
-      span_id: metadata[:span_id],
+      trace_id: metadata[:jido_trace_id],
+      span_id: metadata[:jido_span_id],
       stacktrace: metadata[:stacktrace]
     )
   end
@@ -530,7 +493,7 @@ defmodule Jido.Telemetry do
       "[queue.overflow] signal_type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
         "queue_size=#{measurements[:queue_size]}",
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id]
+      trace_id: metadata[:jido_trace_id]
     )
   end
 
@@ -546,8 +509,8 @@ defmodule Jido.Telemetry do
           "duration=#{Formatter.format_duration(duration)}"
       end,
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
-      span_id: metadata[:span_id]
+      trace_id: metadata[:jido_trace_id],
+      span_id: metadata[:jido_span_id]
     )
   end
 
@@ -559,8 +522,8 @@ defmodule Jido.Telemetry do
           "duration=#{Formatter.format_duration(duration)}"
       end,
       agent_id: metadata[:agent_id],
-      trace_id: metadata[:trace_id],
-      span_id: metadata[:span_id]
+      trace_id: metadata[:jido_trace_id],
+      span_id: metadata[:jido_span_id]
     )
   end
 
@@ -568,37 +531,34 @@ defmodule Jido.Telemetry do
   # Private: Interestingness Checks
   # ---------------------------------------------------------------------------
 
-  defp interesting_signal?(signal_type, duration_ms, directive_count, metadata) do
-    # A signal is interesting if any of these are true:
-    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+  defp interesting_signal?(instance, signal_type, duration_ms, directive_count, metadata) do
+    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
     has_directives = directive_count > 0
-    is_interesting_type = Config.interesting_signal_type?(to_string(signal_type))
+    is_interesting_type = ObserveConfig.interesting_signal_type?(instance, to_string(signal_type))
     has_error = metadata[:error] != nil
 
     is_slow or has_directives or is_interesting_type or has_error
   end
 
-  defp interesting_directive?(directive_type, duration_ms, metadata) do
-    is_slow = duration_ms > Config.slow_directive_threshold_ms()
+  defp interesting_directive?(instance, directive_type, duration_ms, metadata) do
+    is_slow = duration_ms > ObserveConfig.slow_directive_threshold_ms(instance)
     has_error = metadata[:error] != nil
-
-    # Some directive types are always interesting
     interesting_types = ["Tool", "LLM", "Await", "Spawn"]
     is_interesting_type = directive_type in interesting_types
 
     is_slow or has_error or is_interesting_type
   end
 
-  defp interesting_agent_cmd?(duration_ms, directive_count, metadata) do
-    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+  defp interesting_agent_cmd?(instance, duration_ms, directive_count, metadata) do
+    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
     has_directives = directive_count > 0
     has_error = metadata[:error] != nil
 
     is_slow or has_directives or has_error
   end
 
-  defp interesting_strategy_cmd?(duration_ms, directive_count) do
-    is_slow = duration_ms > Config.slow_signal_threshold_ms()
+  defp interesting_strategy_cmd?(instance, duration_ms, directive_count) do
+    is_slow = duration_ms > ObserveConfig.slow_signal_threshold_ms(instance)
     has_directives = directive_count > 0
 
     is_slow or has_directives
@@ -615,6 +575,7 @@ defmodule Jido.Telemetry do
 
   defp format_module(other), do: Formatter.safe_inspect(other, 50)
 
+  @deprecated "Use Jido.Observe.with_span/3 instead"
   @doc """
   Executes an agent command while emitting telemetry events.
 
@@ -632,7 +593,8 @@ defmodule Jido.Telemetry do
     metadata = %{
       agent_id: agent.id,
       agent_module: agent.name,
-      action: action
+      action: action,
+      jido_instance: nil
     }
 
     :telemetry.execute(
@@ -668,6 +630,7 @@ defmodule Jido.Telemetry do
     end
   end
 
+  @deprecated "Use Jido.Observe.with_span/3 instead"
   @doc """
   Executes a strategy operation while emitting telemetry events.
 
@@ -685,7 +648,8 @@ defmodule Jido.Telemetry do
 
     metadata = %{
       agent_id: agent.id,
-      strategy: strategy_module
+      strategy: strategy_module,
+      jido_instance: nil
     }
 
     :telemetry.execute(

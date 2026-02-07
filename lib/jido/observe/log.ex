@@ -41,8 +41,7 @@ defmodule Jido.Observe.Log do
   """
   @spec threshold() :: level()
   def threshold do
-    Application.get_env(:jido, :observability, [])
-    |> Keyword.get(:log_level, :info)
+    Jido.Observe.Config.observe_log_level(nil)
   end
 
   @doc """
@@ -67,6 +66,8 @@ defmodule Jido.Observe.Log do
   """
   @spec log(level(), Logger.message(), keyword()) :: :ok
   def log(level, message, metadata \\ []) do
-    Jido.Util.cond_log(threshold(), level, message, metadata)
+    instance = Keyword.get(metadata, :jido_instance)
+    threshold = Jido.Observe.Config.observe_log_level(instance)
+    Jido.Util.cond_log(threshold, level, message, metadata)
   end
 end

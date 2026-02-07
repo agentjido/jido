@@ -78,6 +78,7 @@ defmodule Jido.Observe do
 
   require Logger
 
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Observe.Log
   alias Jido.Observe.SpanCtx
   alias Jido.Tracing.Context, as: TracingContext
@@ -168,7 +169,7 @@ defmodule Jido.Observe do
 
     tracer_ctx =
       try do
-        tracer().span_start(event_prefix, enriched_metadata)
+        tracer(enriched_metadata).span_start(event_prefix, enriched_metadata)
       rescue
         e ->
           Logger.warning("Jido.Observe tracer span_start/2 failed: #{inspect(e)}")
@@ -218,7 +219,7 @@ defmodule Jido.Observe do
     )
 
     try do
-      tracer().span_stop(tracer_ctx, measurements)
+      tracer(metadata).span_stop(tracer_ctx, measurements)
     rescue
       e ->
         Logger.warning("Jido.Observe tracer span_stop/2 failed: #{inspect(e)}")
@@ -269,7 +270,7 @@ defmodule Jido.Observe do
     )
 
     try do
-      tracer().span_exception(tracer_ctx, kind, reason, stacktrace)
+      tracer(metadata).span_exception(tracer_ctx, kind, reason, stacktrace)
     rescue
       e ->
         Logger.warning("Jido.Observe tracer span_exception/4 failed: #{inspect(e)}")
@@ -324,7 +325,9 @@ defmodule Jido.Observe do
   """
   @spec emit_debug_event(event_prefix(), measurements(), metadata()) :: :ok
   def emit_debug_event(event_prefix, measurements \\ %{}, metadata \\ %{}) do
-    if debug_enabled?() do
+    instance = Map.get(metadata, :jido_instance)
+
+    if ObserveConfig.debug_events_enabled?(instance) do
       :telemetry.execute(event_prefix, measurements, metadata)
     end
 
@@ -340,11 +343,7 @@ defmodule Jido.Observe do
   """
   @spec debug_enabled?() :: boolean()
   def debug_enabled? do
-    case observability_config()[:debug_events] do
-      :off -> false
-      nil -> false
-      _ -> true
-    end
+    ObserveConfig.debug_events_enabled?(nil)
   end
 
   @doc """
@@ -385,7 +384,8 @@ defmodule Jido.Observe do
   @spec redact(term(), keyword()) :: term()
   def redact(value, opts \\ []) do
     force_redact = Keyword.get(opts, :force_redact, false)
-    should_redact = force_redact || observability_config()[:redact_sensitive] == true
+    instance = Keyword.get(opts, :jido_instance)
+    should_redact = force_redact || ObserveConfig.redact_sensitive?(instance)
 
     if should_redact do
       "[REDACTED]"
@@ -394,13 +394,9 @@ defmodule Jido.Observe do
     end
   end
 
-  defp tracer do
-    observability_config()
-    |> Keyword.get(:tracer, Jido.Observe.NoopTracer)
-  end
-
-  defp observability_config do
-    Application.get_env(:jido, :observability, [])
+  defp tracer(metadata) when is_map(metadata) do
+    instance = Map.get(metadata, :jido_instance)
+    ObserveConfig.tracer(instance)
   end
 
   defp enrich_with_correlation(metadata) do
