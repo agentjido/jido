@@ -147,8 +147,12 @@ defmodule JidoTest.Agent.StrategyFSMTest do
       transitions = %{"idle" => ["processing"], "processing" => ["idle"]}
       machine = FSM.Machine.new("idle", transitions)
 
-      assert {:error, msg} = FSM.Machine.transition(machine, "completed")
-      assert msg =~ "invalid transition"
+      assert {:error, %Jido.Error.ExecutionError{} = err} =
+               FSM.Machine.transition(machine, "completed")
+
+      assert err.message == "FSM invalid transition"
+      assert err.details.from == "idle"
+      assert err.details.to == "completed"
     end
   end
 

@@ -120,7 +120,8 @@ defmodule Jido.Plugin.Instance do
   def derive_state_key(base_key, nil), do: base_key
 
   def derive_state_key(base_key, as_alias) when is_atom(as_alias) do
-    String.to_atom("#{base_key}_#{as_alias}")
+    alias_text = validate_alias!(as_alias)
+    derive_or_create_state_key_atom("#{base_key}_#{alias_text}")
   end
 
   @doc """
@@ -138,7 +139,89 @@ defmodule Jido.Plugin.Instance do
   def derive_route_prefix(base_name, nil), do: base_name
 
   def derive_route_prefix(base_name, as_alias) when is_atom(as_alias) do
-    "#{as_alias}.#{base_name}"
+    alias_text = validate_alias!(as_alias)
+    "#{alias_text}.#{base_name}"
+  end
+
+  @alias_regex ~r/^[a-z][a-z0-9_]*$/
+  @max_alias_length 64
+  @derived_state_key_guard_table :jido_plugin_derived_state_keys
+  @max_derived_state_keys 4_096
+
+  defp validate_alias!(as_alias) do
+    alias_text = Atom.to_string(as_alias)
+
+    if byte_size(alias_text) > @max_alias_length or not Regex.match?(@alias_regex, alias_text) do
+      raise ArgumentError,
+            "invalid plugin alias #{inspect(as_alias)}; aliases must match #{inspect(@alias_regex)} and be at most #{@max_alias_length} characters"
+    end
+
+    alias_text
+  end
+
+  defp derive_or_create_state_key_atom(key_text) when is_binary(key_text) do
+    case safe_to_existing_atom(key_text) do
+      {:ok, existing} ->
+        existing
+
+      :error ->
+        create_bounded_state_key_atom(key_text)
+    end
+  end
+
+  defp create_bounded_state_key_atom(key_text) do
+    lock_key = {__MODULE__, :derive_state_key}
+
+    :global.trans(lock_key, fn ->
+      case safe_to_existing_atom(key_text) do
+        {:ok, existing} ->
+          existing
+
+        :error ->
+          table = ensure_derived_state_key_guard_table!()
+          enforce_derived_state_key_limit!(table)
+
+          atom = String.to_atom(key_text)
+          true = :ets.insert(table, {key_text, atom})
+          atom
+      end
+    end)
+  end
+
+  defp safe_to_existing_atom(key_text) do
+    {:ok, String.to_existing_atom(key_text)}
+  rescue
+    ArgumentError -> :error
+  end
+
+  defp ensure_derived_state_key_guard_table! do
+    case :ets.whereis(@derived_state_key_guard_table) do
+      :undefined ->
+        try do
+          :ets.new(@derived_state_key_guard_table, [
+            :named_table,
+            :public,
+            :set,
+            read_concurrency: true,
+            write_concurrency: true
+          ])
+        rescue
+          ArgumentError ->
+            @derived_state_key_guard_table
+        end
+
+      table ->
+        table
+    end
+  end
+
+  defp enforce_derived_state_key_limit!(table) do
+    count = :ets.info(table, :size)
+
+    if count >= @max_derived_state_keys do
+      raise ArgumentError,
+            "exceeded max derived plugin state keys (#{@max_derived_state_keys}); refusing to create additional runtime atoms"
+    end
   end
 
   # Normalizes plugin declaration to {module, as_option, config_map}

@@ -122,6 +122,16 @@ defmodule JidoTest.AgentServerTest do
       assert AgentServer.whereis(Jido.registry_name(jido), "dynamic-test") == pid
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), pid)
     end
+
+    test "returns already_started when id is already registered", %{jido: jido} do
+      id = "duplicate-id-#{System.unique_integer([:positive])}"
+      {:ok, pid} = AgentServer.start(agent: TestAgent, id: id, jido: jido)
+
+      assert {:error, {:already_started, ^pid}} =
+               AgentServer.start(agent: TestAgent, id: id, jido: jido)
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), pid)
+    end
   end
 
   describe "call/3 (sync)" do
@@ -198,6 +208,7 @@ defmodule JidoTest.AgentServerTest do
   describe "state/1" do
     test "returns full State struct", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, id: "state-test", jido: jido)
+      eventually_state(pid, fn state -> state.status == :idle end)
       {:ok, state} = AgentServer.state(pid)
 
       assert %State{} = state
@@ -210,6 +221,7 @@ defmodule JidoTest.AgentServerTest do
 
     test "works with agent ID string", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, id: "state-id-test", jido: jido)
+      eventually_state(pid, fn state -> state.status == :idle end)
       {:ok, state} = AgentServer.state(pid)
 
       assert state.id == "state-id-test"
@@ -328,7 +340,9 @@ defmodule JidoTest.AgentServerTest do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
 
       signal = Signal.new!("unknown.signal.type", %{}, source: "/test")
-      {:error, :no_matching_route} = AgentServer.call(pid, signal)
+      assert {:error, %Jido.Error.RoutingError{} = error} = AgentServer.call(pid, signal)
+      assert error.message == "No route for signal"
+      assert error.details.reason == :no_matching_route
 
       GenServer.stop(pid)
     end
@@ -360,6 +374,7 @@ defmodule JidoTest.AgentServerTest do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
 
       # Initially idle
+      eventually_state(pid, fn state -> state.status == :idle end)
       {:ok, state} = AgentServer.state(pid)
       assert state.status == :idle
 
@@ -407,19 +422,32 @@ defmodule JidoTest.AgentServerTest do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
 
       # After post_init continue, should be idle
+      eventually_state(pid, fn state -> state.status == :idle end)
       {:ok, state} = AgentServer.state(pid)
       assert state.status == :idle
 
       GenServer.stop(pid)
     end
 
-    test "transitions to processing during signal handling", %{jido: jido} do
+    test "serializes blocking call handling inside the server process", %{jido: jido} do
       defmodule SlowAction do
         @moduledoc false
-        use Jido.Action, name: "slow", schema: []
+        use Jido.Action,
+          name: "slow",
+          schema: [
+            test_pid: [type: :any, required: false],
+            unblock_ref: [type: :any, required: false]
+          ]
 
-        def run(_params, _context) do
-          Process.sleep(100)
+        def run(%{test_pid: test_pid, unblock_ref: unblock_ref}, _context) do
+          send(test_pid, {:slow_action_started, unblock_ref, self()})
+
+          receive do
+            {:unblock_slow_action, ^unblock_ref} -> :ok
+          after
+            2_000 -> :ok
+          end
+
           {:ok, %{}}
         end
       end
@@ -436,19 +464,19 @@ defmodule JidoTest.AgentServerTest do
       end
 
       {:ok, pid} = AgentServer.start_link(agent: SlowAgent, jido: jido)
+      unblock_ref = make_ref()
 
       # Start async processing
-      signal = Signal.new!("slow", %{}, source: "/test")
+      signal = Signal.new!("slow", %{test_pid: self(), unblock_ref: unblock_ref}, source: "/test")
       task = Task.async(fn -> AgentServer.call(pid, signal) end)
 
-      # Either catch processing in progress, or it completes quickly - either is valid
-      # The key is the server doesn't crash and returns to idle after processing
-      eventually_state(pid, fn state ->
-        state.status in [:idle, :processing]
-      end)
+      assert_receive {:slow_action_started, ^unblock_ref, action_pid}, 500
 
-      # Wait for task to complete
-      Task.await(task)
+      assert Task.yield(task, 0) == nil
+      assert {:timeout, _} = catch_exit(GenServer.call(pid, :get_state, 50))
+
+      send(action_pid, {:unblock_slow_action, unblock_ref})
+      Task.await(task, 2_000)
 
       # After processing completes, status should be idle
       eventually_state(pid, fn state -> state.status == :idle end)
@@ -512,12 +540,20 @@ defmodule JidoTest.AgentServerTest do
       signal = Signal.new!("start_schedule", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal)
 
+      eventually_state(pid, fn state ->
+        map_size(Map.get(state, :scheduled_timers, %{})) == 1
+      end)
+
       # Before delay
       {:ok, state1} = AgentServer.state(pid)
       assert state1.agent.state.pings == 0
 
       # Wait for scheduled signal (50ms delay + processing)
       eventually_state(pid, fn state -> state.agent.state.pings == 1 end, timeout: 200)
+
+      eventually_state(pid, fn state ->
+        map_size(Map.get(state, :scheduled_timers, %{})) == 0
+      end)
 
       GenServer.stop(pid)
     end
@@ -774,6 +810,39 @@ defmodule JidoTest.AgentServerTest do
   end
 
   describe "termination" do
+    defmodule TerminateChildPlugin do
+      @moduledoc false
+      use Jido.Plugin,
+        name: "terminate_child_plugin",
+        state_key: :terminate_child_plugin,
+        actions: []
+
+      @impl Jido.Plugin
+      def child_spec(_config) do
+        %{
+          id: {__MODULE__, :worker},
+          start:
+            {Task, :start_link,
+             [
+               fn ->
+                 receive do
+                 after
+                   86_400_000 -> :ok
+                 end
+               end
+             ]}
+        }
+      end
+    end
+
+    defmodule AgentWithTerminateChildPlugin do
+      @moduledoc false
+      use Jido.Agent,
+        name: "agent_with_terminate_child_plugin",
+        schema: [],
+        plugins: [TerminateChildPlugin]
+    end
+
     test "terminates cleanly with :normal reason", %{jido: jido} do
       Process.flag(:trap_exit, true)
 
@@ -783,17 +852,53 @@ defmodule JidoTest.AgentServerTest do
       assert_receive {:EXIT, ^pid, :normal}, 100
       refute Process.alive?(pid)
     end
+
+    test "stops tracked child processes on terminate", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: AgentWithTerminateChildPlugin, jido: jido)
+
+      eventually_state(pid, fn state ->
+        map_size(state.children) == 1
+      end)
+
+      {:ok, state} = AgentServer.state(pid)
+      [{_tag, child}] = Map.to_list(state.children)
+      child_pid = child.pid
+      child_ref = Process.monitor(child_pid)
+
+      GenServer.stop(pid)
+
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, _reason}, 1000
+      refute Process.alive?(child_pid)
+    end
   end
 
   describe "drain loop invariant" do
     test "only one drain loop runs at a time", %{jido: jido} do
       defmodule SlowAction2 do
         @moduledoc false
-        use Jido.Action, name: "slow", schema: []
+        use Jido.Action,
+          name: "slow",
+          schema: [
+            test_pid: [type: :any, required: false],
+            unblock_ref: [type: :any, required: false]
+          ]
 
-        def run(_params, _context) do
-          Process.sleep(100)
-          {:ok, %{processed: true}}
+        def run(params, context) do
+          if Map.get(context.state, :blocked_once, false) do
+            {:ok, %{processed: true}}
+          else
+            test_pid = Map.get(params, :test_pid)
+            unblock_ref = Map.get(params, :unblock_ref)
+            send(test_pid, {:drain_block_started, unblock_ref, self()})
+
+            receive do
+              {:unblock_drain, ^unblock_ref} -> :ok
+            after
+              2_000 -> :ok
+            end
+
+            {:ok, %{processed: true, blocked_once: true}}
+          end
         end
       end
 
@@ -801,7 +906,10 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "counter_agent",
-          schema: [drain_count: [type: :integer, default: 0]]
+          schema: [
+            drain_count: [type: :integer, default: 0],
+            blocked_once: [type: :boolean, default: false]
+          ]
 
         def signal_routes(_ctx) do
           [{"slow", SlowAction2}]
@@ -809,13 +917,17 @@ defmodule JidoTest.AgentServerTest do
       end
 
       {:ok, pid} = AgentServer.start_link(agent: CounterAgent, jido: jido)
+      unblock_ref = make_ref()
 
       signals =
         for _ <- 1..10 do
-          Signal.new!("slow", %{}, source: "/test")
+          Signal.new!("slow", %{test_pid: self(), unblock_ref: unblock_ref}, source: "/test")
         end
 
       Enum.each(signals, fn sig -> AgentServer.cast(pid, sig) end)
+      assert_receive {:drain_block_started, ^unblock_ref, blocker_pid}, 500
+
+      send(blocker_pid, {:unblock_drain, unblock_ref})
 
       eventually_state(
         pid,
@@ -880,8 +992,41 @@ defmodule JidoTest.AgentServerTest do
         plugins: [ScheduledPlugin]
     end
 
+    defmodule FastScheduledAction do
+      @moduledoc false
+      use Jido.Action,
+        name: "fast_scheduled_action",
+        schema: []
+
+      @impl true
+      def run(_params, context) do
+        count = Map.get(context.state, :scheduled_count, 0)
+        {:ok, %{scheduled_count: count + 1}}
+      end
+    end
+
+    defmodule FastScheduledPlugin do
+      @moduledoc false
+      use Jido.Plugin,
+        name: "fast_scheduled_plugin",
+        state_key: :fast_scheduled_plugin,
+        actions: [FastScheduledAction],
+        schedules: [
+          {"*/1 * * * * *", FastScheduledAction}
+        ]
+    end
+
+    defmodule AgentWithFastScheduledPlugin do
+      @moduledoc false
+      use Jido.Agent,
+        name: "agent_with_fast_scheduled_plugin",
+        schema: [scheduled_count: [type: :integer, default: 0]],
+        plugins: [FastScheduledPlugin]
+    end
+
     test "registers plugin schedules on startup", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledPlugin, jido: jido)
+      eventually_state(pid, fn state -> map_size(state.cron_jobs) == 1 end)
       {:ok, state} = AgentServer.state(pid)
 
       assert map_size(state.cron_jobs) == 1
@@ -892,6 +1037,21 @@ defmodule JidoTest.AgentServerTest do
       cron_pid = Map.get(state.cron_jobs, job_id)
       assert is_pid(cron_pid)
       assert Process.alive?(cron_pid)
+
+      GenServer.stop(pid)
+    end
+
+    test "delivers plugin schedule ticks to the agent", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: AgentWithFastScheduledPlugin, jido: jido)
+
+      eventually_state(
+        pid,
+        fn state -> map_size(state.cron_jobs) == 1 and state.agent.state.scheduled_count >= 1 end,
+        timeout: 2_500
+      )
+
+      {:ok, state} = AgentServer.state(pid)
+      assert state.agent.state.scheduled_count >= 1
 
       GenServer.stop(pid)
     end
@@ -909,6 +1069,7 @@ defmodule JidoTest.AgentServerTest do
 
     test "cleans up cron jobs on termination", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: AgentWithScheduledPlugin, jido: jido)
+      eventually_state(pid, fn state -> map_size(state.cron_jobs) == 1 end)
       {:ok, state} = AgentServer.state(pid)
 
       job_id = {:plugin_schedule, :scheduled_plugin, ScheduledAction}

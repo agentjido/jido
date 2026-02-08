@@ -59,6 +59,8 @@ defmodule Jido.Agent.WorkerPool do
       end
   """
 
+  alias Jido.RuntimeDefaults
+
   @type instance :: atom()
   @type pool_name :: atom()
 
@@ -85,7 +87,7 @@ defmodule Jido.Agent.WorkerPool do
   @spec with_agent(instance(), pool_name(), (pid() -> result), keyword()) :: result
         when result: term()
   def with_agent(jido_instance, pool_name, fun, opts \\ []) when is_function(fun, 1) do
-    timeout = Keyword.get(opts, :timeout, 5_000)
+    timeout = Keyword.get(opts, :timeout, RuntimeDefaults.worker_pool_timeout())
     pool = Jido.agent_pool_name(jido_instance, pool_name)
 
     :poolboy.transaction(
@@ -114,7 +116,7 @@ defmodule Jido.Agent.WorkerPool do
   """
   @spec call(instance(), pool_name(), term(), keyword()) :: term()
   def call(jido_instance, pool_name, signal, opts \\ []) do
-    call_timeout = Keyword.get(opts, :call_timeout, 5_000)
+    call_timeout = Keyword.get(opts, :call_timeout, RuntimeDefaults.worker_pool_call_timeout())
 
     with_agent(
       jido_instance,
@@ -172,7 +174,7 @@ defmodule Jido.Agent.WorkerPool do
   """
   @spec checkout(instance(), pool_name(), keyword()) :: pid()
   def checkout(jido_instance, pool_name, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 5_000)
+    timeout = Keyword.get(opts, :timeout, RuntimeDefaults.worker_pool_timeout())
     block = Keyword.get(opts, :block, true)
     pool = Jido.agent_pool_name(jido_instance, pool_name)
     :poolboy.checkout(pool, block, timeout)

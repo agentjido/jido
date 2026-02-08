@@ -5,7 +5,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   Handles:
   - Attachment tracking (attach/detach/monitor owner processes)
   - Idle timer management (start/cancel/reset)
-  - Hibernate on shutdown (calls Jido.Agent.Persistence)
+  - Hibernate on shutdown (calls Jido.Persist)
 
   ## State
 
@@ -16,7 +16,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   - `idle_timeout` - timeout value in milliseconds
   - `pool` - pool name (for logging)
   - `pool_key` - pool key
-  - `persistence` - persistence config
+  - `storage` - storage config
 
   ## Events
 
@@ -31,10 +31,11 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
   require Logger
 
-  alias Jido.Agent.Persistence
+  alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
+  alias Jido.Persist
 
   @impl true
-  def init(_opts, state) do
+  def init(_lifecycle, state) do
     # The lifecycle struct is already populated by State.from_options
     # Just start the idle timer if appropriate
     maybe_start_idle_timer(state)
@@ -147,7 +148,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   def terminate(reason, state) do
     lifecycle = state.lifecycle
 
-    if clean_shutdown?(reason) && lifecycle.persistence do
+    cleanup_runtime_refs(lifecycle)
+
+    if clean_shutdown?(reason) && lifecycle.storage do
       hibernate_agent(state)
     end
 
@@ -161,12 +164,11 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
   defp hibernate_agent(state) do
     lifecycle = state.lifecycle
-    persistence = lifecycle.persistence
+    storage = lifecycle.storage
     pool_key = lifecycle.pool_key
     agent = state.agent
-    agent_module = state.agent_module
 
-    case Persistence.hibernate(persistence, agent_module, pool_key, agent) do
+    case Persist.hibernate(storage, agent) do
       :ok ->
         Logger.debug("Lifecycle hibernated agent for #{lifecycle.pool}/#{inspect(pool_key)}")
 
@@ -175,6 +177,8 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
           "Lifecycle hibernate failed for #{lifecycle.pool}/#{inspect(pool_key)}: #{inspect(reason)}"
         )
     end
+
+    :ok
   end
 
   defp maybe_start_idle_timer(state) do
@@ -200,7 +204,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
     if lifecycle.idle_timer do
       :erlang.cancel_timer(lifecycle.idle_timer)
-      %{state | lifecycle: %{lifecycle | idle_timer: nil}}
+      %{state | lifecycle: LifecycleState.clear_idle_timer(lifecycle)}
     else
       state
     end
@@ -211,5 +215,17 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
       {ref, _pid} -> {ref, Map.delete(monitors, ref)}
       nil -> {nil, monitors}
     end
+  end
+
+  defp cleanup_runtime_refs(lifecycle) do
+    Enum.each(lifecycle.attachment_monitors, fn {ref, _pid} ->
+      Process.demonitor(ref, [:flush])
+    end)
+
+    if lifecycle.idle_timer do
+      :erlang.cancel_timer(lifecycle.idle_timer)
+    end
+
+    :ok
   end
 end

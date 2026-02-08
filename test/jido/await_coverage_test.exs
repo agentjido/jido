@@ -99,7 +99,8 @@ defmodule JidoTest.AwaitCoverageTest do
       fake_pid = spawn(fn -> :ok end)
       eventually(fn -> not Process.alive?(fake_pid) end)
 
-      assert catch_exit(Await.child(fake_pid, :some_child, 100)) != nil
+      result = Await.child(fake_pid, :some_child, 100)
+      assert result in [{:error, :not_found}, {:error, :timeout}]
     end
   end
 
@@ -221,7 +222,7 @@ defmodule JidoTest.AwaitCoverageTest do
       fake_pid = spawn(fn -> :ok end)
       eventually(fn -> not Process.alive?(fake_pid) end)
 
-      assert catch_exit(Await.alive?(fake_pid)) != nil
+      assert Await.alive?(fake_pid) == false
     end
   end
 
@@ -230,7 +231,7 @@ defmodule JidoTest.AwaitCoverageTest do
       fake_pid = spawn(fn -> :ok end)
       eventually(fn -> not Process.alive?(fake_pid) end)
 
-      assert catch_exit(Await.get_children(fake_pid)) != nil
+      assert {:error, :not_found} = Await.get_children(fake_pid)
     end
 
     test "get_children returns empty map for agent with no children", %{jido: jido} do
@@ -248,7 +249,7 @@ defmodule JidoTest.AwaitCoverageTest do
       fake_pid = spawn(fn -> :ok end)
       eventually(fn -> not Process.alive?(fake_pid) end)
 
-      assert catch_exit(Await.get_child(fake_pid, :some_tag)) != nil
+      assert {:error, :not_found} = Await.get_child(fake_pid, :some_tag)
     end
 
     test "get_child returns :child_not_found for nonexistent child", %{jido: jido} do

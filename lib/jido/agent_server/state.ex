@@ -12,6 +12,7 @@ defmodule Jido.AgentServer.State do
 
   alias Jido.AgentServer.{ChildInfo, Options}
   alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
+  alias Jido.RuntimeDefaults
 
   @type status :: :initializing | :idle | :processing | :stopping
 
@@ -21,7 +22,9 @@ defmodule Jido.AgentServer.State do
               # Core identity
               id: Zoi.string(description: "Instance ID"),
               agent_module: Zoi.atom(description: "Agent module"),
-              agent: Zoi.any(description: "The Jido.Agent struct"),
+              agent:
+                Zoi.any(description: "The Jido.Agent struct")
+                |> Zoi.refine({__MODULE__, :validate_agent_refinement, []}),
 
               # Status and processing
               status:
@@ -35,6 +38,8 @@ defmodule Jido.AgentServer.State do
 
               # Hierarchy
               parent: Zoi.any(description: "Parent reference") |> Zoi.optional(),
+              parent_monitor_ref:
+                Zoi.any(description: "Monitor reference for parent process") |> Zoi.optional(),
               children: Zoi.map(description: "Map of tag => ChildInfo") |> Zoi.default(%{}),
               on_parent_death:
                 Zoi.atom(description: "Behavior on parent death") |> Zoi.default(:stop),
@@ -42,6 +47,9 @@ defmodule Jido.AgentServer.State do
               # Cron jobs
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
+              cron_monitors:
+                Zoi.map(description: "Map of monitor_ref => scheduler job_id")
+                |> Zoi.default(%{}),
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules")
                 |> Zoi.default(false),
@@ -51,7 +59,9 @@ defmodule Jido.AgentServer.State do
               default_dispatch: Zoi.any(description: "Default dispatch config") |> Zoi.optional(),
               error_policy:
                 Zoi.any(description: "Error handling policy") |> Zoi.default(:log_only),
-              max_queue_size: Zoi.integer(description: "Max queue size") |> Zoi.default(10_000),
+              max_queue_size:
+                Zoi.integer(description: "Max queue size")
+                |> Zoi.default(RuntimeDefaults.max_queue_size()),
               registry: Zoi.atom(description: "Registry module"),
               spawn_fun: Zoi.any(description: "Custom spawn function") |> Zoi.optional(),
 
@@ -68,8 +78,11 @@ defmodule Jido.AgentServer.State do
               completion_waiters:
                 Zoi.map(description: "Map of ref => waiter for completion notifications")
                 |> Zoi.default(%{}),
+              scheduled_timers:
+                Zoi.map(description: "Map of schedule message ref => timer ref")
+                |> Zoi.default(%{}),
 
-              # Lifecycle (InstanceManager integration: attachment tracking, idle timeout, persistence)
+              # Lifecycle (InstanceManager integration: attachment tracking, idle timeout, storage)
               lifecycle: Zoi.any(description: "Lifecycle state (State.Lifecycle.t())"),
 
               # Debug mode
@@ -105,7 +118,7 @@ defmodule Jido.AgentServer.State do
       pool: opts.pool,
       pool_key: opts.pool_key,
       idle_timeout: opts.idle_timeout,
-      persistence: opts.persistence
+      storage: opts.storage
     ]
 
     with {:ok, lifecycle} <- LifecycleState.new(lifecycle_opts) do
@@ -117,6 +130,7 @@ defmodule Jido.AgentServer.State do
         processing: false,
         queue: :queue.new(),
         parent: opts.parent,
+        parent_monitor_ref: nil,
         children: %{},
         on_parent_death: opts.on_parent_death,
         jido: opts.jido,
@@ -126,10 +140,12 @@ defmodule Jido.AgentServer.State do
         registry: opts.registry,
         spawn_fun: opts.spawn_fun,
         cron_jobs: %{},
+        cron_monitors: %{},
         skip_schedules: opts.skip_schedules,
         error_count: 0,
         metrics: %{},
         completion_waiters: %{},
+        scheduled_timers: %{},
         lifecycle: lifecycle,
         debug: opts.debug,
         debug_events: []
@@ -161,6 +177,24 @@ defmodule Jido.AgentServer.State do
   def set_status(%__MODULE__{} = state, status)
       when status in [:initializing, :idle, :processing, :stopping] do
     %{state | status: status}
+  end
+
+  @doc """
+  Marks the server as actively processing work.
+  """
+  @spec start_processing(t()) :: t()
+  def start_processing(%__MODULE__{} = state) do
+    %{state | processing: true}
+    |> set_status(:processing)
+  end
+
+  @doc """
+  Marks the server as idle after processing completes.
+  """
+  @spec finish_processing(t()) :: t()
+  def finish_processing(%__MODULE__{} = state) do
+    %{state | processing: false}
+    |> set_status(:idle)
   end
 
   @doc """
@@ -264,13 +298,39 @@ defmodule Jido.AgentServer.State do
     %{state | error_count: count + 1}
   end
 
-  # Debug mode constants
-  @max_debug_events 50
+  @doc """
+  Tracks a scheduled timer by message reference.
+  """
+  @spec put_scheduled_timer(t(), reference(), reference()) :: t()
+  def put_scheduled_timer(%__MODULE__{} = state, message_ref, timer_ref)
+      when is_reference(message_ref) and is_reference(timer_ref) do
+    %{state | scheduled_timers: Map.put(state.scheduled_timers, message_ref, timer_ref)}
+  end
+
+  @doc """
+  Removes a scheduled timer by message reference.
+  """
+  @spec pop_scheduled_timer(t(), reference()) :: {reference() | nil, t()}
+  def pop_scheduled_timer(%__MODULE__{} = state, message_ref) when is_reference(message_ref) do
+    {timer_ref, remaining} = Map.pop(state.scheduled_timers, message_ref)
+    {timer_ref, %{state | scheduled_timers: remaining}}
+  end
+
+  @doc false
+  @spec validate_agent_refinement(any()) :: :ok | {:error, String.t()}
+  @spec validate_agent_refinement(any(), keyword()) :: :ok | {:error, String.t()}
+  def validate_agent_refinement(agent, _opts \\ [])
+  def validate_agent_refinement(agent, _opts) when is_struct(agent), do: :ok
+  def validate_agent_refinement(_agent, _opts), do: {:error, "agent must be a struct"}
+
+  defp max_debug_events do
+    RuntimeDefaults.debug_event_buffer_size()
+  end
 
   @doc """
   Records a debug event if debug mode is enabled.
 
-  Events are stored in a ring buffer (max #{@max_debug_events} entries).
+  Events are stored in a ring buffer (runtime configurable).
   Each event includes a monotonic timestamp for relative timing.
   """
   @spec record_debug_event(t(), atom(), map()) :: t()
@@ -284,7 +344,7 @@ defmodule Jido.AgentServer.State do
     }
 
     # Keep only last N events (ring buffer behavior)
-    new_events = Enum.take([event | events], @max_debug_events)
+    new_events = Enum.take([event | events], max_debug_events())
     %{state | debug_events: new_events}
   end
 

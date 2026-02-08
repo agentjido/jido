@@ -102,6 +102,20 @@ defmodule JidoTest.Plugin.InstanceTest do
       assert Instance.derive_state_key(:slack, :sales) == :slack_sales
       assert Instance.derive_state_key(:database, :primary) == :database_primary
     end
+
+    test "rejects aliases with invalid characters" do
+      assert_raise ArgumentError, ~r/invalid plugin alias/i, fn ->
+        Instance.derive_state_key(:slack, :"bad-alias")
+      end
+    end
+
+    test "rejects aliases that exceed maximum length" do
+      long_alias = String.duplicate("a", 65) |> String.to_atom()
+
+      assert_raise ArgumentError, ~r/invalid plugin alias/i, fn ->
+        Instance.derive_state_key(:slack, long_alias)
+      end
+    end
   end
 
   describe "derive_route_prefix/2" do

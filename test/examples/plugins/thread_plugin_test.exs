@@ -16,9 +16,9 @@ defmodule JidoExampleTest.ThreadPluginTest do
   @moduletag :example
   @moduletag timeout: 15_000
 
+  alias Jido.AgentServer
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
-  alias Jido.AgentServer
 
   # ===========================================================================
   # ACTIONS: Conversation history via Thread
@@ -164,7 +164,7 @@ defmodule JidoExampleTest.ThreadPluginTest do
       assert Thread.entry_count(thread) > 3
 
       instruction_starts = Thread.filter_by_kind(thread, :instruction_start)
-      assert length(instruction_starts) > 0
+      assert instruction_starts != []
 
       {agent, []} = ChatAgent.cmd(agent, SummarizeAction)
       assert agent.state.summary == "3 messages in thread"

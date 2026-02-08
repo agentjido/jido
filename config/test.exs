@@ -17,5 +17,10 @@ config :logger,
   handle_otp_reports: false,
   handle_sasl_reports: false
 
+# Keep error-path tests fast unless they explicitly opt into retries.
+config :jido_action,
+  default_max_retries: 0,
+  default_backoff: 0
+
 # Disable default console handler (OTP 21+ / Elixir 1.15+)
 config :logger, :default_handler, false

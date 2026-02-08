@@ -137,7 +137,7 @@ defmodule JidoExampleTest.ContextAwareRoutingTest do
       routes = GatedAgent.signal_routes(ctx)
 
       assert is_list(routes)
-      assert length(routes) > 0
+      assert routes != []
 
       route_paths = Enum.map(routes, fn route -> elem(route, 0) end)
       assert "process" in route_paths

@@ -34,10 +34,13 @@ defmodule Jido.Await do
   """
 
   alias Jido.AgentServer
+  alias Jido.Runtime.Tasking
+  alias Jido.RuntimeDefaults
 
   @type server :: AgentServer.server()
   @type status :: :completed | :failed | atom()
   @type completion :: %{status: status(), result: any()}
+  @system_task_supervisor Jido.SystemTaskSupervisor
 
   # ---------------------------------------------------------------------------
   # Single Agent Completion
@@ -75,7 +78,7 @@ defmodule Jido.Await do
   """
   @spec completion(server(), non_neg_integer(), Keyword.t()) ::
           {:ok, completion()} | {:error, term()}
-  def completion(server, timeout_ms \\ 10_000, opts \\ []) do
+  def completion(server, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ []) do
     opts = Keyword.put(opts, :timeout, timeout_ms)
 
     try do
@@ -113,7 +116,12 @@ defmodule Jido.Await do
   """
   @spec child(server(), term(), non_neg_integer(), Keyword.t()) ::
           {:ok, completion()} | {:error, term()}
-  def child(parent_server, child_tag, timeout_ms \\ 10_000, opts \\ []) do
+  def child(
+        parent_server,
+        child_tag,
+        timeout_ms \\ RuntimeDefaults.await_child_timeout(),
+        opts \\ []
+      ) do
     deadline = now_ms() + timeout_ms
 
     with {:ok, child_pid} <- poll_for_child(parent_server, child_tag, deadline, 50) do
@@ -180,28 +188,17 @@ defmodule Jido.Await do
   """
   @spec all([server()], non_neg_integer(), Keyword.t()) ::
           {:ok, %{server() => completion()}} | {:error, :timeout} | {:error, {server(), term()}}
-  def all(servers, timeout_ms \\ 10_000, opts \\ [])
+  def all(servers, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ [])
   def all([], _timeout_ms, _opts), do: {:ok, %{}}
 
   def all(servers, timeout_ms, opts) do
     caller = self()
     deadline = now_ms() + timeout_ms
 
-    waiters =
-      for server <- servers, into: %{} do
-        ref = make_ref()
-
-        pid =
-          spawn(fn ->
-            remaining = max(0, deadline - now_ms())
-            result = completion(server, remaining, opts)
-            send(caller, {:await_result, ref, server, result})
-          end)
-
-        {ref, {server, pid}}
-      end
-
-    collect_all(waiters, %{}, deadline)
+    case start_waiters(servers, caller, deadline, opts) do
+      {:ok, waiters} -> collect_all(waiters, %{}, deadline)
+      {:error, {server, reason}} -> {:error, {server, reason}}
+    end
   end
 
   defp collect_all(waiters, acc, _deadline) when map_size(waiters) == 0 do
@@ -216,6 +213,10 @@ defmodule Jido.Await do
         collect_all(Map.delete(waiters, ref), Map.put(acc, server, result), deadline)
 
       {:await_result, ref, _server, {:error, :timeout}} ->
+        kill_waiters(Map.delete(waiters, ref))
+        {:error, :timeout}
+
+      {:await_result, ref, _server, {:error, {:timeout, _diagnostic}}} ->
         kill_waiters(Map.delete(waiters, ref))
         {:error, :timeout}
 
@@ -250,28 +251,17 @@ defmodule Jido.Await do
   """
   @spec any([server()], non_neg_integer(), Keyword.t()) ::
           {:ok, {server(), completion()}} | {:error, :timeout} | {:error, {server(), term()}}
-  def any(servers, timeout_ms \\ 10_000, opts \\ [])
+  def any(servers, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ [])
   def any([], _timeout_ms, _opts), do: {:error, :timeout}
 
   def any(servers, timeout_ms, opts) do
     caller = self()
     deadline = now_ms() + timeout_ms
 
-    waiters =
-      for server <- servers, into: %{} do
-        ref = make_ref()
-
-        pid =
-          spawn(fn ->
-            remaining = max(0, deadline - now_ms())
-            result = completion(server, remaining, opts)
-            send(caller, {:await_result, ref, server, result})
-          end)
-
-        {ref, {server, pid}}
-      end
-
-    wait_for_any(waiters, deadline)
+    case start_waiters(servers, caller, deadline, opts) do
+      {:ok, waiters} -> wait_for_any(waiters, deadline)
+      {:error, {server, reason}} -> {:error, {server, reason}}
+    end
   end
 
   defp wait_for_any(waiters, deadline) do
@@ -286,6 +276,10 @@ defmodule Jido.Await do
         kill_waiters(Map.delete(waiters, ref))
         {:error, :timeout}
 
+      {:await_result, ref, _server, {:error, {:timeout, _diagnostic}}} ->
+        kill_waiters(Map.delete(waiters, ref))
+        {:error, :timeout}
+
       {:await_result, ref, server, {:error, reason}} ->
         kill_waiters(Map.delete(waiters, ref))
         {:error, {server, reason}}
@@ -297,9 +291,36 @@ defmodule Jido.Await do
   end
 
   defp kill_waiters(waiters) do
-    Enum.each(waiters, fn {_ref, {_server, pid}} ->
+    Enum.each(waiters, fn {_ref, %{pid: pid}} ->
       Process.exit(pid, :kill)
     end)
+  end
+
+  defp start_waiters(servers, caller, deadline, opts) do
+    Enum.reduce_while(servers, {:ok, %{}}, fn server, {:ok, waiters} ->
+      ref = make_ref()
+
+      case start_waiter(caller, ref, server, deadline, opts) do
+        {:ok, pid} ->
+          waiter = %{server: server, pid: pid}
+          {:cont, {:ok, Map.put(waiters, ref, waiter)}}
+
+        {:error, reason} ->
+          kill_waiters(waiters)
+          {:halt, {:error, {server, reason}}}
+      end
+    end)
+  end
+
+  defp start_waiter(caller, ref, server, deadline, opts) do
+    task =
+      fn ->
+        remaining = max(0, deadline - now_ms())
+        result = completion(server, remaining, opts)
+        send(caller, {:await_result, ref, server, result})
+      end
+
+    Tasking.start_child(task, candidates: [@system_task_supervisor])
   end
 
   # ---------------------------------------------------------------------------

@@ -82,7 +82,7 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   def append(%{journal: journal} = state, thread_id, entries) do
     {base_seq, existing_entries} = load_existing_entries(state, thread_id)
     now = System.system_time(:millisecond)
-    prepared = prepare_entries(entries, base_seq, now)
+    prepared = Thread.prepare_entries(entries, base_seq, now)
 
     case record_entries(journal, thread_id, prepared) do
       {:ok, journal} ->
@@ -101,14 +101,6 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
     end
   end
 
-  defp prepare_entries(entries, base_seq, now) do
-    entries
-    |> Enum.with_index()
-    |> Enum.map(fn {entry, idx} ->
-      build_entry(entry, base_seq + idx, now)
-    end)
-  end
-
   defp record_entries(journal, thread_id, entries) do
     Enum.reduce_while(entries, {:ok, journal}, fn entry, {:ok, j} ->
       signal = encode_entry(thread_id, entry)
@@ -119,37 +111,6 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
       end
     end)
   end
-
-  defp build_entry(entry, seq, now) do
-    %Entry{
-      id: get_entry_id(entry) || generate_id(),
-      seq: seq,
-      at: get_entry_at(entry) || now,
-      kind: get_entry_kind(entry) || :note,
-      payload: get_entry_payload(entry) || %{},
-      refs: get_entry_refs(entry) || %{}
-    }
-  end
-
-  defp get_entry_id(%Entry{id: id}), do: id
-  defp get_entry_id(%{id: id}), do: id
-  defp get_entry_id(_), do: nil
-
-  defp get_entry_at(%Entry{at: at}), do: at
-  defp get_entry_at(%{at: at}), do: at
-  defp get_entry_at(_), do: nil
-
-  defp get_entry_kind(%Entry{kind: kind}), do: kind
-  defp get_entry_kind(%{kind: kind}), do: kind
-  defp get_entry_kind(_), do: nil
-
-  defp get_entry_payload(%Entry{payload: payload}), do: payload
-  defp get_entry_payload(%{payload: payload}), do: payload
-  defp get_entry_payload(_), do: nil
-
-  defp get_entry_refs(%Entry{refs: refs}), do: refs
-  defp get_entry_refs(%{refs: refs}), do: refs
-  defp get_entry_refs(_), do: nil
 
   defp encode_entry(thread_id, %Entry{} = entry) do
     Signal.new!(%{
@@ -189,31 +150,12 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   defp to_atom(string) when is_binary(string) do
     String.to_existing_atom(string)
   rescue
-    ArgumentError -> String.to_atom(string)
+    ArgumentError -> :unknown
   end
 
   defp to_atom(_), do: :unknown
 
   defp reconstruct_thread(thread_id, entries) do
-    timestamps = Enum.map(entries, & &1.at)
-    now = System.system_time(:millisecond)
-
-    %Thread{
-      id: thread_id,
-      rev: length(entries),
-      entries: entries,
-      created_at: Enum.min(timestamps, fn -> now end),
-      updated_at: Enum.max(timestamps, fn -> now end),
-      metadata: %{},
-      stats: %{entry_count: length(entries)}
-    }
-  end
-
-  defp generate_id, do: "entry_" <> random_string(12)
-
-  defp random_string(length) do
-    :crypto.strong_rand_bytes(length)
-    |> Base.url_encode64()
-    |> binary_part(0, length)
+    Thread.from_entries(thread_id, entries, metadata: %{})
   end
 end

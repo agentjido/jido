@@ -138,7 +138,7 @@ defmodule JidoTest.PersistTest do
       ETS.put_checkpoint({Agent, "nonexistent"}, %{}, table: table)
       ETS.delete_checkpoint({Agent, "nonexistent"}, table: table)
 
-      assert :not_found = Persist.thaw(storage(table), Agent, "nonexistent")
+      assert {:error, :not_found} = Persist.thaw(storage(table), Agent, "nonexistent")
     end
 
     test "thaws agent without thread" do
@@ -351,10 +351,10 @@ defmodule JidoTest.PersistTest do
 
       :ok = Persist.hibernate(storage(table), agent)
 
-      assert :not_found = ETS.load_thread("empty-thread", table: table)
+      assert {:error, :not_found} = ETS.load_thread("empty-thread", table: table)
     end
 
-    test "thread with entries but no expected_rev conflict" do
+    test "thread with entries can be hibernated repeatedly without duplicates" do
       table = unique_table()
       agent = TestAgent.new(id: "conflict-1")
 
@@ -369,6 +369,30 @@ defmodule JidoTest.PersistTest do
 
       {:ok, loaded} = ETS.load_thread("conflict-thread", table: table)
       assert Thread.entry_count(loaded) == 1
+    end
+
+    test "subsequent hibernate appends only new thread entries" do
+      table = unique_table()
+      agent = TestAgent.new(id: "delta-1")
+
+      thread_v1 =
+        Thread.new(id: "delta-thread")
+        |> Thread.append(%{kind: :message, payload: %{content: "v1"}})
+
+      agent_v1 = %{agent | state: Map.put(agent.state, :__thread__, thread_v1)}
+      :ok = Persist.hibernate(storage(table), agent_v1)
+
+      {:ok, stored_v1} = ETS.load_thread("delta-thread", table: table)
+      assert Thread.entry_count(stored_v1) == 1
+
+      thread_v2 = Thread.append(thread_v1, %{kind: :message, payload: %{content: "v2"}})
+      agent_v2 = %{agent_v1 | state: Map.put(agent_v1.state, :__thread__, thread_v2)}
+
+      :ok = Persist.hibernate(storage(table), agent_v2)
+
+      {:ok, stored_v2} = ETS.load_thread("delta-thread", table: table)
+      assert Thread.entry_count(stored_v2) == 2
+      assert stored_v2.rev == 2
     end
 
     test "checkpoint with thread enforces invariants (no __thread__ in state)" do

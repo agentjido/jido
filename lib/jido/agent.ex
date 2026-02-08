@@ -131,6 +131,7 @@ defmodule Jido.Agent do
 
   alias Jido.Action.Schema
   alias Jido.Agent
+  alias Jido.Agent.DefaultPlugins
   alias Jido.Agent.Directive
   alias Jido.Agent.State, as: StateHelper
   alias Jido.Error
@@ -143,9 +144,7 @@ defmodule Jido.Agent do
   @schema Zoi.struct(
             __MODULE__,
             %{
-              id:
-                Zoi.string(description: "Unique agent identifier")
-                |> Zoi.optional(),
+              id: Zoi.string(description: "Unique agent identifier"),
               name:
                 Zoi.string(description: "Agent name")
                 |> Zoi.optional(),
@@ -199,7 +198,7 @@ defmodule Jido.Agent do
                                description:
                                  "The name of the Agent. Must contain only letters, numbers, and underscores."
                              )
-                             |> Zoi.refine({Jido.Util, :validate_name, []}),
+                             |> Zoi.refine({Jido.Util, :validate_name_refinement, []}),
                            description:
                              Zoi.string(description: "A description of what the Agent does.")
                              |> Zoi.optional(),
@@ -941,6 +940,8 @@ defmodule Jido.Agent do
     end
   end
 
+  # credo:disable-for-lines:60 Credo.Check.Refactor.CyclomaticComplexity
+  # credo:disable-for-lines:60 Credo.Check.Refactor.Nesting
   defp __quoted_callback_restore__ do
     quote location: :keep do
       @impl true
@@ -1216,10 +1217,10 @@ defmodule Jido.Agent do
       if jido_module != nil and function_exported?(jido_module, :__default_plugins__, 0) do
         jido_module.__default_plugins__()
       else
-        Jido.Agent.DefaultPlugins.package_defaults()
+        DefaultPlugins.package_defaults()
       end
 
-    Jido.Agent.DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
+    DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
   end
 
   defp __validate_and_create_plugin_instance__(plugin_decl) do
@@ -1261,7 +1262,7 @@ defmodule Jido.Agent do
   def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
 
   def new(attrs) when is_map(attrs) do
-    attrs_with_id = Map.put_new_lazy(attrs, :id, &Jido.Util.generate_id/0)
+    attrs_with_id = ensure_agent_id(attrs)
 
     case Zoi.parse(@schema, attrs_with_id) do
       {:ok, agent} ->
@@ -1269,6 +1270,19 @@ defmodule Jido.Agent do
 
       {:error, errors} ->
         {:error, Error.validation_error("Agent validation failed", %{errors: errors})}
+    end
+  end
+
+  defp ensure_agent_id(attrs) when is_map(attrs) do
+    atom_id = Map.get(attrs, :id, :__missing__)
+    string_id = Map.get(attrs, "id", :__missing__)
+    id_value = if atom_id == :__missing__, do: string_id, else: atom_id
+
+    case id_value do
+      :__missing__ -> Map.put(attrs, :id, Jido.Util.generate_id())
+      nil -> Map.put(attrs, :id, Jido.Util.generate_id())
+      "" -> Map.put(attrs, :id, Jido.Util.generate_id())
+      _other -> attrs
     end
   end
 

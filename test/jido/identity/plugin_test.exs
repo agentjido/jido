@@ -3,6 +3,7 @@ defmodule JidoTest.Identity.PluginTest do
 
   alias Jido.Identity
   alias Jido.Identity.Plugin, as: IdentityPlugin
+  alias Jido.Plugin.Instance, as: PluginInstance
 
   describe "plugin metadata" do
     test "name is identity" do
@@ -82,7 +83,7 @@ defmodule JidoTest.Identity.PluginTest do
 
     test "cannot alias identity plugin" do
       assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
-        Jido.Plugin.Instance.new({Jido.Identity.Plugin, as: :my_identity})
+        PluginInstance.new({Jido.Identity.Plugin, as: :my_identity})
       end
     end
   end

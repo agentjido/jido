@@ -422,6 +422,81 @@ defmodule JidoTest.Sensor.RuntimeTest do
   end
 
   describe "timer-based events" do
+    test "tracks scheduled tick timer refs in runtime state" do
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: SchedulingSensor,
+          config: %{interval: 200},
+          context: %{agent_ref: self()}
+        )
+
+      state = :sys.get_state(pid)
+      assert map_size(state.timers) == 1
+      assert is_reference(state.timers[:tick])
+
+      GenServer.stop(pid)
+    end
+
+    test "tracks custom scheduled event timer refs in runtime state" do
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: CustomEventSchedulingSensor,
+          config: %{interval: 200},
+          context: %{agent_ref: self()}
+        )
+
+      state = :sys.get_state(pid)
+      assert map_size(state.timers) == 1
+      assert is_reference(state.timers[{:scheduled_event, :custom_event}])
+
+      GenServer.stop(pid)
+    end
+
+    test "ignores stale tick timeout refs" do
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: SchedulingSensor,
+          config: %{interval: 200},
+          context: %{agent_ref: self()}
+        )
+
+      state = :sys.get_state(pid)
+      active_ref = state.timers[:tick]
+
+      send(pid, {:timeout, make_ref(), {:sensor_timer, :tick, :tick}})
+
+      refute_receive {:signal, _}, 50
+
+      refreshed_state = :sys.get_state(pid)
+      assert refreshed_state.timers[:tick] == active_ref
+
+      GenServer.stop(pid)
+    end
+
+    test "ignores stale custom event timeout refs" do
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: CustomEventSchedulingSensor,
+          config: %{interval: 200},
+          context: %{agent_ref: self()}
+        )
+
+      state = :sys.get_state(pid)
+      active_ref = state.timers[{:scheduled_event, :custom_event}]
+
+      send(
+        pid,
+        {:timeout, make_ref(), {:sensor_timer, {:scheduled_event, :custom_event}, :custom_event}}
+      )
+
+      refute_receive {:signal, _}, 50
+
+      refreshed_state = :sys.get_state(pid)
+      assert refreshed_state.timers[{:scheduled_event, :custom_event}] == active_ref
+
+      GenServer.stop(pid)
+    end
+
     test "schedules and receives tick events" do
       {:ok, pid} =
         Runtime.start_link(

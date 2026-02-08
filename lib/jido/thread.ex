@@ -66,21 +66,57 @@ defmodule Jido.Thread do
   def append(%__MODULE__{} = thread, entries) do
     entries = List.wrap(entries)
     now = System.system_time(:millisecond)
-    base_seq = length(thread.entries)
+    prepared_entries = prepare_entries(entries, length(thread.entries), now)
 
-    prepared_entries =
-      entries
-      |> Enum.with_index()
-      |> Enum.map(fn {entry, idx} ->
-        prepare_entry(entry, base_seq + idx, now)
-      end)
+    from_entries(thread.id, thread.entries ++ prepared_entries,
+      metadata: thread.metadata,
+      created_at: thread.created_at,
+      updated_at: now
+    )
+  end
 
-    %{
-      thread
-      | entries: thread.entries ++ prepared_entries,
-        rev: thread.rev + length(prepared_entries),
-        updated_at: now,
-        stats: %{thread.stats | entry_count: thread.stats.entry_count + length(prepared_entries)}
+  @doc """
+  Prepares entries for append by assigning IDs, sequence numbers, and timestamps.
+  """
+  @spec prepare_entries([Entry.t() | map()], non_neg_integer(), integer()) :: [Entry.t()]
+  def prepare_entries(entries, base_seq, now)
+      when is_list(entries) and is_integer(base_seq) and base_seq >= 0 and is_integer(now) do
+    entries
+    |> Enum.with_index()
+    |> Enum.map(fn {entry, idx} ->
+      prepare_entry(entry, base_seq + idx, now)
+    end)
+  end
+
+  @doc """
+  Reconstructs a thread from a list of entries and optional metadata/timestamps.
+  """
+  @spec from_entries(String.t(), [Entry.t()], keyword()) :: t()
+  def from_entries(thread_id, entries, opts \\ [])
+      when is_binary(thread_id) and is_list(entries) and is_list(opts) do
+    now = Keyword.get(opts, :now, System.system_time(:millisecond))
+    metadata = Keyword.get(opts, :metadata, %{})
+
+    created_at =
+      Keyword.get(opts, :created_at) ||
+        first_entry_timestamp(entries) ||
+        now
+
+    updated_at =
+      Keyword.get(opts, :updated_at) ||
+        last_entry_timestamp(entries) ||
+        created_at
+
+    entry_count = length(entries)
+
+    %__MODULE__{
+      id: thread_id,
+      rev: entry_count,
+      entries: entries,
+      created_at: created_at,
+      updated_at: updated_at,
+      metadata: metadata,
+      stats: %{entry_count: entry_count}
     }
   end
 
@@ -120,7 +156,7 @@ defmodule Jido.Thread do
   defp prepare_entry(%Entry{} = entry, seq, now) do
     %{
       entry
-      | id: entry.id || generate_entry_id(),
+      | id: entry.id || Entry.generate_id(),
         seq: seq,
         at: entry.at || now
     }
@@ -128,7 +164,7 @@ defmodule Jido.Thread do
 
   defp prepare_entry(attrs, seq, now) when is_map(attrs) do
     %Entry{
-      id: fetch_entry_attr(attrs, :id, &generate_entry_id/0),
+      id: fetch_entry_attr(attrs, :id, &Entry.generate_id/0),
       seq: seq,
       at: fetch_entry_attr(attrs, :at, fn -> now end),
       kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
@@ -148,7 +184,15 @@ defmodule Jido.Thread do
     "thread_" <> Jido.Util.generate_id()
   end
 
-  defp generate_entry_id do
-    "entry_" <> Jido.Util.generate_id()
+  defp first_entry_timestamp(entries) do
+    entries
+    |> Enum.map(& &1.at)
+    |> Enum.min(fn -> nil end)
+  end
+
+  defp last_entry_timestamp(entries) do
+    entries
+    |> Enum.map(& &1.at)
+    |> Enum.max(fn -> nil end)
   end
 end

@@ -280,7 +280,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = WorkflowAgent.new(id: "exists")
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      assert :not_found = Jido.Persist.thaw(jido, Jido.Agent, "does-not-exist")
+      assert {:error, :not_found} = Jido.Persist.thaw(jido, Jido.Agent, "does-not-exist")
     end
   end
 

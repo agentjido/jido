@@ -143,7 +143,7 @@ defmodule Jido.AgentServer do
         server_status: :idle,
         queue_length: 0,
         iteration: nil,
-        waited_ms: 5000
+        waited_ms: timeout_ms
       }}}
 
   Use this to understand why the agent hasn't completed:
@@ -168,14 +168,16 @@ defmodule Jido.AgentServer do
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
+  alias Jido.AgentServer.State.Lifecycle
+  alias Jido.Runtime.Tasking
+  alias Jido.RuntimeDefaults
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
   alias Jido.Signal.Router, as: JidoRouter
   alias Jido.Tracing.Context, as: TraceContext
   alias Jido.Tracing.Trace
 
-  @type server :: pid() | atom() | {:via, module(), term()} | String.t()
-
+  @type server :: pid() | atom() | {:via, module(), term()}
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
@@ -190,18 +192,49 @@ defmodule Jido.AgentServer do
   """
   @spec start(keyword() | map()) :: DynamicSupervisor.on_start_child()
   def start(opts) do
-    child_spec = {__MODULE__, opts}
+    {child_spec_overrides, start_opts} = extract_child_spec_overrides(opts)
+    child_spec = build_child_spec(start_opts, child_spec_overrides)
+    supervisor = resolve_supervisor(start_opts)
+    start_under_supervisor(supervisor, child_spec)
+  end
 
+  defp build_child_spec(start_opts, []), do: {__MODULE__, start_opts}
+
+  defp build_child_spec(start_opts, overrides),
+    do: Supervisor.child_spec({__MODULE__, start_opts}, overrides)
+
+  defp resolve_supervisor(start_opts) do
     jido_instance =
-      if is_list(opts), do: Keyword.get(opts, :jido), else: Map.get(opts, :jido)
+      if is_list(start_opts), do: Keyword.get(start_opts, :jido), else: Map.get(start_opts, :jido)
 
-    supervisor =
-      case jido_instance do
-        nil -> Jido.AgentSupervisor
-        instance -> Jido.agent_supervisor_name(instance)
+    case jido_instance do
+      nil -> Jido.AgentSupervisor
+      instance -> Jido.agent_supervisor_name(instance)
+    end
+  end
+
+  defp start_under_supervisor(supervisor, child_spec) do
+    with {:ok, _pid} <- maybe_whereis_supervisor(supervisor),
+         result <- safe_dynamic_supervisor_start_child(supervisor, child_spec) do
+      case result do
+        {:error, :not_found} -> {:error, {:missing_supervisor, supervisor}}
+        other -> other
       end
+    else
+      {:error, :not_found} -> {:error, {:missing_supervisor, supervisor}}
+    end
+  end
 
-    DynamicSupervisor.start_child(supervisor, child_spec)
+  defp extract_child_spec_overrides(opts) when is_list(opts) do
+    {restart, start_opts} = Keyword.pop(opts, :restart)
+    overrides = if is_nil(restart), do: [], else: [restart: restart]
+    {overrides, start_opts}
+  end
+
+  defp extract_child_spec_overrides(opts) when is_map(opts) do
+    {restart, start_opts} = Map.pop(opts, :restart)
+    overrides = if is_nil(restart), do: [], else: [restart: restart]
+    {overrides, start_opts}
   end
 
   @doc """
@@ -248,7 +281,7 @@ defmodule Jido.AgentServer do
     %{
       id: id,
       start: {__MODULE__, :start_link, [opts]},
-      shutdown: 5_000,
+      shutdown: RuntimeDefaults.agent_server_shutdown_timeout(),
       restart: :permanent,
       type: :worker
     }
@@ -270,12 +303,17 @@ defmodule Jido.AgentServer do
   ## Examples
 
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
-      {:ok, agent} = Jido.AgentServer.call("agent-id", signal, 10_000)
+
+      server = Jido.AgentServer.via_tuple("agent-id", Jido.Registry)
+      {:ok, agent} = Jido.AgentServer.call(server, signal, 10_000)
+
+      {:ok, pid} = Jido.AgentServer.whereis("agent-id")
+      {:ok, agent} = Jido.AgentServer.call(pid, signal, 10_000)
   """
   @spec call(server(), Signal.t(), timeout()) :: {:ok, struct()} | {:error, term()}
-  def call(server, %Signal{} = signal, timeout \\ 5_000) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:signal, signal}, timeout)
+  def call(server, %Signal{} = signal, timeout \\ RuntimeDefaults.agent_server_call_timeout()) do
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_call(server_ref, {:signal, signal}, timeout)
     end
   end
 
@@ -293,12 +331,17 @@ defmodule Jido.AgentServer do
   ## Examples
 
       :ok = Jido.AgentServer.cast(pid, signal)
-      :ok = Jido.AgentServer.cast("agent-id", signal)
+
+      server = Jido.AgentServer.via_tuple("agent-id", Jido.Registry)
+      :ok = Jido.AgentServer.cast(server, signal)
+
+      {:ok, pid} = Jido.AgentServer.whereis("agent-id")
+      :ok = Jido.AgentServer.cast(pid, signal)
   """
   @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
   def cast(server, %Signal{} = signal) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, {:signal, signal})
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_cast(server_ref, {:signal, signal})
     end
   end
 
@@ -314,12 +357,17 @@ defmodule Jido.AgentServer do
   ## Examples
 
       {:ok, state} = Jido.AgentServer.state(pid)
-      {:ok, state} = Jido.AgentServer.state("agent-id")
+
+      server = Jido.AgentServer.via_tuple("agent-id", Jido.Registry)
+      {:ok, state} = Jido.AgentServer.state(server)
+
+      {:ok, pid} = Jido.AgentServer.whereis("agent-id")
+      {:ok, state} = Jido.AgentServer.state(pid)
   """
   @spec state(server()) :: {:ok, State.t()} | {:error, term()}
   def state(server) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, :get_state)
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_call(server_ref, :get_state)
     end
   end
 
@@ -340,7 +388,7 @@ defmodule Jido.AgentServer do
 
   - `{:ok, %{status: :completed | :failed, result: any()}}` - Agent reached terminal status
   - `{:error, :not_found}` - Server not found
-  - Exits with `{:timeout, ...}` if GenServer.call times out
+  - `{:error, {:timeout, map()}}` - Completion timeout with diagnostics
 
   ## Examples
 
@@ -348,33 +396,32 @@ defmodule Jido.AgentServer do
   """
   @spec await_completion(server(), keyword()) :: {:ok, map()} | {:error, term()}
   def await_completion(server, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 10_000)
-
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, server_ref} <- resolve_server(server) do
       try do
-        GenServer.call(pid, {:await_completion, opts}, timeout)
+        # Timeout semantics are handled by server-side waiter expiry to avoid
+        # GenServer.call timeout reply leaks in caller mailboxes.
+        GenServer.call(server_ref, {:await_completion, opts}, :infinity)
       catch
         :exit, {:timeout, _} ->
-          case status(server) do
-            {:ok, s} -> {:error, {:timeout, build_timeout_diagnostic(s, timeout)}}
-            _ -> {:error, :timeout}
-          end
+          {:error, :timeout}
+
+        :exit, {:noproc, _} ->
+          {:error, :not_found}
+
+        :exit, {:normal, _} ->
+          {:error, :not_found}
+
+        :exit, {:shutdown, _} ->
+          {:error, :not_found}
+
+        :exit, :shutdown ->
+          {:error, :not_found}
       end
     end
   end
 
-  defp build_timeout_diagnostic(status, timeout_ms) do
-    %{
-      waited_ms: timeout_ms,
-      server_status: status.snapshot.status,
-      queue_length: Status.queue_length(status),
-      iteration: Status.iteration(status),
-      hint: infer_timeout_hint(status)
-    }
-  end
-
   defp infer_timeout_hint(status) do
-    case status.snapshot.status do
+    case status do
       :waiting -> "Strategy is waiting (possibly for LLM response)"
       :running -> "Strategy is running (processing directives)"
       :idle -> "Agent is idle but await_completion is blocking"
@@ -413,16 +460,16 @@ defmodule Jido.AgentServer do
   """
   @spec status(server()) :: {:ok, Status.t()} | {:error, term()}
   def status(server) do
-    with {:ok, pid} <- resolve_server(server),
+    with {:ok, server_ref} <- resolve_server(server),
          {:ok, %State{agent: agent, agent_module: agent_module} = state} <-
-           GenServer.call(pid, :get_state) do
+           safe_call(server_ref, :get_state, RuntimeDefaults.status_call_timeout()) do
       snapshot = agent_module.strategy_snapshot(agent)
 
       {:ok,
        %Status{
          agent_module: agent_module,
          agent_id: state.id,
-         pid: pid,
+         pid: normalize_status_pid(server_ref),
          snapshot: snapshot,
          raw_state: agent.state
        }}
@@ -437,7 +484,8 @@ defmodule Jido.AgentServer do
 
   ## Options
 
-  - `:interval_ms` - Polling interval in milliseconds (default: 100)
+  - `:interval_ms` - Polling interval in milliseconds (default: runtime default, min 50ms)
+  - `:on_error` - `:raise` (default), `:halt`, or `:emit`
 
   ## Examples
 
@@ -457,18 +505,29 @@ defmodule Jido.AgentServer do
   """
   @spec stream_status(server(), keyword()) :: Enumerable.t()
   def stream_status(server, opts \\ []) do
-    interval_ms = Keyword.get(opts, :interval_ms, 100)
+    interval_ms =
+      max(50, Keyword.get(opts, :interval_ms, RuntimeDefaults.stream_status_interval_ms()))
 
-    Stream.repeatedly(fn ->
-      case status(server) do
-        {:ok, status} ->
-          Process.sleep(interval_ms)
-          status
+    on_error = Keyword.get(opts, :on_error, :raise)
 
-        {:error, reason} ->
-          raise "Failed to get status: #{inspect(reason)}"
-      end
-    end)
+    Stream.resource(
+      fn -> :running end,
+      fn
+        :halt ->
+          {:halt, :halt}
+
+        :running ->
+          case status(server) do
+            {:ok, agent_status} ->
+              Process.sleep(interval_ms)
+              {[agent_status], :running}
+
+            {:error, reason} ->
+              stream_status_error(on_error, reason)
+          end
+      end,
+      fn _ -> :ok end
+    )
   end
 
   @doc """
@@ -485,8 +544,8 @@ defmodule Jido.AgentServer do
   """
   @spec set_debug(server(), boolean()) :: :ok | {:error, term()}
   def set_debug(server, enabled) when is_boolean(enabled) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:set_debug, enabled})
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_call(server_ref, {:set_debug, enabled})
     end
   end
 
@@ -510,8 +569,8 @@ defmodule Jido.AgentServer do
   """
   @spec recent_events(server(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def recent_events(server, opts \\ []) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:recent_events, opts})
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_call(server_ref, {:recent_events, opts})
     end
   end
 
@@ -527,7 +586,7 @@ defmodule Jido.AgentServer do
   """
   @spec whereis(module(), String.t()) :: pid() | nil
   def whereis(registry, id) when is_atom(registry) and is_binary(id) do
-    case Registry.lookup(registry, id) do
+    case safe_registry_lookup(registry, id) do
       [{pid, _}] -> pid
       [] -> nil
     end
@@ -553,8 +612,8 @@ defmodule Jido.AgentServer do
   def alive?(server) when is_pid(server), do: Process.alive?(server)
 
   def alive?(server) do
-    case resolve_server(server) do
-      {:ok, pid} -> Process.alive?(pid)
+    case status(server) do
+      {:ok, _status} -> true
       {:error, _} -> false
     end
   end
@@ -582,9 +641,9 @@ defmodule Jido.AgentServer do
   """
   @spec attach(server(), pid()) :: :ok | {:error, term()}
   def attach(server, owner_pid \\ self()) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, server_ref} <- resolve_server(server) do
       try do
-        GenServer.call(pid, {:attach, owner_pid})
+        GenServer.call(server_ref, {:attach, owner_pid})
       catch
         :exit, {:noproc, _} -> {:error, :not_found}
         :exit, {:timeout, _} -> {:error, :timeout}
@@ -608,9 +667,9 @@ defmodule Jido.AgentServer do
   """
   @spec detach(server(), pid()) :: :ok | {:error, term()}
   def detach(server, owner_pid \\ self()) do
-    with {:ok, pid} <- resolve_server(server) do
+    with {:ok, server_ref} <- resolve_server(server) do
       try do
-        GenServer.call(pid, {:detach, owner_pid})
+        GenServer.call(server_ref, {:detach, owner_pid})
       catch
         :exit, {:noproc, _} -> {:error, :not_found}
         :exit, {:timeout, _} -> {:error, :timeout}
@@ -633,8 +692,8 @@ defmodule Jido.AgentServer do
   """
   @spec touch(server()) :: :ok | {:error, term()}
   def touch(server) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, :touch)
+    with {:ok, server_ref} <- resolve_server(server) do
+      safe_cast(server_ref, :touch)
     end
   end
 
@@ -644,13 +703,16 @@ defmodule Jido.AgentServer do
 
   @impl true
   def init(raw_opts) do
+    Process.flag(:trap_exit, true)
+
     opts = if is_map(raw_opts), do: Map.to_list(raw_opts), else: raw_opts
 
     with {:ok, options} <- Options.new(opts),
          {:ok, agent_module, agent} <- resolve_agent(options),
-         {:ok, state} <- State.from_options(options, agent_module, agent) do
+         {:ok, state} <- State.from_options(options, agent_module, agent),
+         :ok <- register_server(state) do
       # Register in Registry
-      Registry.register(state.registry, state.id, %{})
+      :ok
 
       # Monitor parent if present
       state = maybe_monitor_parent(state)
@@ -662,86 +724,80 @@ defmodule Jido.AgentServer do
     end
   end
 
+  defp register_server(%State{} = state) do
+    case Registry.register(state.registry, state.id, %{}) do
+      {:ok, _} ->
+        :ok
+
+      {:error, {:already_registered, pid}} when pid == self() ->
+        :ok
+
+      {:error, {:already_registered, pid}} when is_pid(pid) ->
+        {:error, {:already_started, pid}}
+    end
+  rescue
+    ArgumentError ->
+      {:error, :invalid_registry}
+  end
+
   @impl true
   def handle_continue(:post_init, state) do
-    agent_module = state.agent_module
-
     state =
-      if function_exported?(agent_module, :strategy, 0) do
-        strategy = agent_module.strategy()
+      state
+      |> initialize_strategy()
+      |> build_signal_router()
 
-        strategy_opts =
-          if function_exported?(agent_module, :strategy_opts, 0),
-            do: agent_module.strategy_opts(),
-            else: []
-
-        ctx = %{agent_module: agent_module, strategy_opts: strategy_opts}
-        {agent, directives} = strategy.init(state.agent, ctx)
-
-        state = State.update_agent(state, agent)
-
-        case State.enqueue_all(state, init_signal(), List.wrap(directives)) do
-          {:ok, enq_state} ->
-            enq_state
-
-          {:error, :queue_overflow} ->
-            Logger.warning("AgentServer #{state.id} queue overflow during strategy init")
-            state
-        end
-      else
-        state
-      end
-
-    signal_router = SignalRouter.build(state)
-    state = %{state | signal_router: signal_router}
-
-    # Start plugin children
-    state = start_plugin_children(state)
-
-    # Start plugin subscription sensors
-    state = start_plugin_subscriptions(state)
-
-    # Register plugin schedules (cron jobs)
-    state = register_plugin_schedules(state)
-
-    notify_parent_of_startup(state)
-
-    state = start_drain_if_idle(state)
-
-    # Initialize lifecycle module (starts idle timer if needed)
-    lifecycle_opts = [
-      idle_timeout: state.lifecycle.idle_timeout,
-      pool: state.lifecycle.pool,
-      pool_key: state.lifecycle.pool_key,
-      persistence: state.lifecycle.persistence
-    ]
-
-    state = state.lifecycle.mod.init(lifecycle_opts, state)
-
-    {:noreply, State.set_status(state, :idle)}
+    Process.send_after(self(), :post_init_start_children, 1)
+    {:noreply, state}
   end
 
   defp init_signal do
     Signal.new!("jido.strategy.init", %{}, source: "/agent/system")
   end
 
+  defp initialize_strategy(%State{} = state) do
+    agent_module = state.agent_module
+
+    if function_exported?(agent_module, :strategy, 0) do
+      strategy = agent_module.strategy()
+
+      strategy_opts =
+        if function_exported?(agent_module, :strategy_opts, 0),
+          do: agent_module.strategy_opts(),
+          else: []
+
+      ctx = %{agent_module: agent_module, strategy_opts: strategy_opts}
+      {agent, directives} = strategy.init(state.agent, ctx)
+
+      state = State.update_agent(state, agent)
+
+      case State.enqueue_all(state, init_signal(), List.wrap(directives)) do
+        {:ok, enq_state} ->
+          enq_state
+
+        {:error, :queue_overflow} ->
+          Logger.warning("AgentServer #{state.id} queue overflow during strategy init")
+          state
+      end
+    else
+      state
+    end
+  end
+
+  defp build_signal_router(%State{} = state) do
+    %{state | signal_router: SignalRouter.build(state)}
+  end
+
   @impl true
   def handle_call({:signal, %Signal{} = signal}, _from, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+    result = process_call_signal_with_trace(signal, state)
 
-    try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, resolved_action} ->
-          transformed_agent =
-            run_plugin_transform_hooks(new_state.agent, resolved_action, traced_signal, new_state)
+    case apply_call_signal_result(result, state) do
+      {:ok, transformed_agent, new_state} ->
+        {:reply, {:ok, transformed_agent}, new_state}
 
-          {:reply, {:ok, transformed_agent}, new_state}
-
-        {:error, reason, new_state} ->
-          {:reply, {:error, reason}, new_state}
-      end
-    after
-      TraceContext.clear()
+      {:error, reason, new_state} ->
+        {:reply, {:error, reason}, new_state}
     end
   end
 
@@ -767,6 +823,7 @@ defmodule Jido.AgentServer do
     status_path = Keyword.get(opts, :status_path, [:status])
     result_path = Keyword.get(opts, :result_path, [:last_answer])
     error_path = Keyword.get(opts, :error_path, [:error])
+    timeout = Keyword.get(opts, :timeout, RuntimeDefaults.await_timeout())
 
     case completion_from_agent_state(state.agent.state, status_path, result_path, error_path) do
       {:ok, result} ->
@@ -775,13 +832,16 @@ defmodule Jido.AgentServer do
       :pending ->
         {caller_pid, _tag} = from
         monitor_ref = Process.monitor(caller_pid)
+        expiry_ref = maybe_schedule_waiter_expiry(timeout, monitor_ref)
 
         waiter = %{
           from: from,
           monitor_ref: monitor_ref,
+          expiry_ref: expiry_ref,
           status_path: status_path,
           result_path: result_path,
-          error_path: error_path
+          error_path: error_path,
+          timeout: timeout
         }
 
         new_waiters = Map.put(state.completion_waiters, monitor_ref, waiter)
@@ -816,16 +876,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_cast({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
-      end
-    after
-      TraceContext.clear()
-    end
+    handle_signal_async(signal, state)
   end
 
   def handle_cast(_msg, state) do
@@ -836,9 +887,7 @@ defmodule Jido.AgentServer do
   def handle_info(:drain, state) do
     case State.dequeue(state) do
       {:empty, s} ->
-        s = %{s | processing: false}
-        s = State.set_status(s, :idle)
-        {:noreply, s}
+        {:noreply, State.finish_processing(s)}
 
       {{:value, {signal, directive}}, s1} ->
         TraceContext.set_from_signal(signal)
@@ -864,46 +913,93 @@ defmodule Jido.AgentServer do
     end
   end
 
-  def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+  def handle_info({:scheduled_signal, message_ref, %Signal{} = signal}, state)
+      when is_reference(message_ref) do
+    {_timer_ref, state} = State.pop_scheduled_timer(state, message_ref)
+    handle_signal_async(signal, state)
+  end
 
-    try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
-      end
-    after
-      TraceContext.clear()
-    end
+  def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
+    handle_signal_async(signal, state)
+  end
+
+  def handle_info(:post_init_start_children, state) do
+    state = start_plugin_children(state)
+    send(self(), :post_init_start_subscriptions)
+    {:noreply, state}
+  end
+
+  def handle_info(:post_init_start_subscriptions, state) do
+    state = start_plugin_subscriptions(state)
+    send(self(), :post_init_register_schedules)
+    {:noreply, state}
+  end
+
+  def handle_info(:post_init_register_schedules, state) do
+    state = register_plugin_schedules(state)
+    send(self(), :post_init_finalize)
+    {:noreply, state}
+  end
+
+  def handle_info(:post_init_finalize, state) do
+    notify_parent_of_startup(state)
+    state = start_drain_if_idle(state)
+    state = state.lifecycle.mod.init(state.lifecycle, state)
+    {:noreply, State.finish_processing(state)}
   end
 
   def handle_info({:DOWN, ref, :process, pid, reason}, state) do
-    # First check if this is an attachment monitor
-    case Map.get(state.lifecycle.attachment_monitors, ref) do
-      ^pid ->
-        # Attachment process died, delegate to lifecycle
-        case state.lifecycle.mod.handle_event({:down, ref, pid}, state) do
-          {:cont, state} -> {:noreply, state}
-          {:stop, reason, state} -> {:stop, reason, state}
-        end
+    case Map.get(state.cron_monitors, ref) do
+      job_id when not is_nil(job_id) ->
+        new_state = %{
+          state
+          | cron_monitors: Map.delete(state.cron_monitors, ref),
+            cron_jobs: Map.delete(state.cron_jobs, job_id)
+        }
 
-      _ ->
-        # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
-        {_popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
-        state = %{state | completion_waiters: new_waiters}
+        {:noreply, new_state}
 
-        if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
-          handle_parent_down(state, pid, reason)
-        else
-          handle_child_down(state, pid, reason)
-        end
+      nil ->
+        handle_non_cron_down(ref, pid, reason, state)
+    end
+  end
+
+  def handle_info({:await_expired, monitor_ref}, state) do
+    case Map.pop(state.completion_waiters, monitor_ref) do
+      {nil, _waiters} ->
+        {:noreply, state}
+
+      {waiter, waiters} ->
+        Process.demonitor(waiter.monitor_ref, [:flush])
+
+        diagnostic = build_timeout_diagnostic_from_state(state, waiter.timeout)
+        GenServer.reply(waiter.from, {:error, {:timeout, diagnostic}})
+
+        {:noreply, %{state | completion_waiters: waiters}}
+    end
+  end
+
+  def handle_info({:EXIT, pid, reason}, state) do
+    cond do
+      match?(%{parent: %ParentRef{pid: ^pid}}, state) ->
+        handle_parent_down(state, pid, reason)
+
+      linked_child_pid?(state, pid) ->
+        handle_child_down(state, pid, reason)
+
+      ancestor_pid?(pid) ->
+        {:stop, reason, state}
+
+      true ->
+        {:noreply, state}
     end
   end
 
   def handle_info({:timeout, ref, :lifecycle_idle_timeout}, state) do
     if state.lifecycle.idle_timer == ref do
       # Clear the timer so stale messages don't trigger after cancel/reset.
-      state = %{state | lifecycle: %{state.lifecycle | idle_timer: nil}}
+      state =
+        %{state | lifecycle: Lifecycle.clear_idle_timer(state.lifecycle)}
 
       case state.lifecycle.mod.handle_event(:idle_timeout, state) do
         {:cont, state} -> {:noreply, state}
@@ -915,30 +1011,61 @@ defmodule Jido.AgentServer do
   end
 
   def handle_info({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
-      end
-    after
-      TraceContext.clear()
-    end
+    handle_signal_async(signal, state)
   end
 
   def handle_info(_msg, state) do
     {:noreply, state}
   end
 
+  defp handle_non_cron_down(ref, pid, reason, state) do
+    # First check if this is an attachment monitor
+    case Map.get(state.lifecycle.attachment_monitors, ref) do
+      ^pid ->
+        # Attachment process died, delegate to lifecycle
+        case state.lifecycle.mod.handle_event({:down, ref, pid}, state) do
+          {:cont, state} -> {:noreply, state}
+          {:stop, reason, state} -> {:stop, reason, state}
+        end
+
+      _ ->
+        # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
+        {popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
+        cancel_waiter_expiry(popped_waiter)
+        state = %{state | completion_waiters: new_waiters}
+
+        if state.parent_monitor_ref == ref and match?(%{parent: %ParentRef{pid: ^pid}}, state) do
+          handle_parent_down(state, pid, reason)
+        else
+          handle_child_down(state, pid, reason)
+        end
+    end
+  end
+
   @impl true
   def terminate(reason, state) do
+    reply_shutdown_to_completion_waiters(state.completion_waiters)
+
+    Enum.each(state.scheduled_timers, fn {_message_ref, timer_ref} ->
+      Process.cancel_timer(timer_ref)
+    end)
+
+    if is_reference(state.parent_monitor_ref) do
+      Process.demonitor(state.parent_monitor_ref, [:flush])
+    end
+
+    cleanup_tracked_children(state)
+
     # Delegate to lifecycle module for persistence/hibernation
     state.lifecycle.mod.terminate(reason, state)
 
+    Enum.each(state.cron_monitors, fn {ref, _job_id} ->
+      Process.demonitor(ref, [:flush])
+    end)
+
     # Clean up all cron jobs owned by this agent
     Enum.each(state.cron_jobs, fn {_job_id, pid} ->
-      if is_pid(pid) and Process.alive?(pid) do
+      if is_pid(pid) do
         Jido.Scheduler.cancel(pid)
       end
     end)
@@ -950,8 +1077,159 @@ defmodule Jido.AgentServer do
   # Internal: Signal Processing
   # ---------------------------------------------------------------------------
 
+  defp handle_signal_async(%Signal{} = signal, state) do
+    case process_signal_with_trace(signal, state) do
+      {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+      {:error, _reason, new_state} -> {:noreply, new_state}
+    end
+  end
+
+  defp process_signal_with_trace(%Signal{} = signal, state) do
+    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+
+    try do
+      process_signal(traced_signal, state)
+    after
+      TraceContext.clear()
+    end
+  end
+
+  defp process_call_signal_with_trace(%Signal{} = signal, state) do
+    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+
+    try do
+      process_call_signal(traced_signal, state)
+    after
+      TraceContext.clear()
+    end
+  end
+
+  defp process_call_signal(%Signal{} = signal, %State{signal_router: router} = state) do
+    metadata = build_signal_metadata(state, signal)
+
+    with_telemetry_span([:jido, :agent_server, :signal], metadata, fn start_time ->
+      do_process_call_signal(signal, router, state, start_time, metadata)
+    end)
+  catch
+    kind, reason ->
+      error =
+        Jido.Error.execution_error(
+          "Call signal processing crashed",
+          %{kind: kind, reason: inspect(reason)}
+        )
+
+      {:error, error, [], signal}
+  end
+
+  defp do_process_call_signal(signal, router, state, start_time, metadata) do
+    case run_plugin_signal_hooks(signal, state) do
+      {:error, error} ->
+        emit_telemetry(
+          [:jido, :agent_server, :signal, :stop],
+          %{duration: System.monotonic_time() - start_time},
+          Map.merge(metadata, %{error: error})
+        )
+
+        error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
+        {:error, error, [error_directive], signal}
+
+      {:override, action_spec, modified_signal} ->
+        effective_signal = modified_signal || signal
+        execute_call_action(effective_signal, action_spec, state, start_time, metadata)
+
+      {:continue, modified_signal} ->
+        case route_to_actions(router, modified_signal) do
+          {:ok, actions} ->
+            execute_call_action(modified_signal, actions, state, start_time, metadata)
+
+          {:error, reason} ->
+            error =
+              Jido.Error.routing_error("No route for signal", %{
+                signal_type: modified_signal.type,
+                details: %{reason: reason}
+              })
+
+            emit_telemetry(
+              [:jido, :agent_server, :signal, :stop],
+              %{duration: System.monotonic_time() - start_time},
+              Map.merge(metadata, %{error: error})
+            )
+
+            error_directive = %Directive.Error{error: error, context: :routing}
+            {:error, error, [error_directive], modified_signal}
+        end
+    end
+  end
+
+  defp execute_call_action(signal, action_spec, state, start_time, metadata) do
+    action_arg =
+      case action_spec do
+        [single] -> single
+        list when is_list(list) -> list
+        other -> other
+      end
+
+    {agent, directives} = state.agent_module.cmd(state.agent, action_arg)
+    directives = List.wrap(directives)
+
+    emit_telemetry(
+      [:jido, :agent_server, :signal, :stop],
+      %{duration: System.monotonic_time() - start_time},
+      Map.merge(metadata, %{directive_count: length(directives)})
+    )
+
+    {:ok, agent, directives, action_arg, signal}
+  end
+
+  defp apply_call_signal_result(
+         {:ok, agent, directives, resolved_action, %Signal{} = signal},
+         %State{} = state
+       ) do
+    state =
+      State.record_debug_event(state, :signal_received, %{
+        type: signal.type,
+        id: signal.id
+      })
+
+    state =
+      state
+      |> State.update_agent(agent)
+      |> maybe_notify_completion_waiters()
+
+    case State.enqueue_all(state, signal, directives) do
+      {:ok, enq_state} ->
+        new_state = start_drain_if_idle(enq_state)
+
+        transformed_agent =
+          run_plugin_transform_hooks(new_state.agent, resolved_action, signal, new_state)
+
+        {:ok, transformed_agent, new_state}
+
+      {:error, :queue_overflow} ->
+        {:error, queue_overflow_error(state, signal, directives), state}
+    end
+  end
+
+  defp apply_call_signal_result(
+         {:error, reason, directives, %Signal{} = signal},
+         %State{} = state
+       ) do
+    state =
+      State.record_debug_event(state, :signal_received, %{
+        type: signal.type,
+        id: signal.id
+      })
+
+    new_state =
+      case State.enqueue_all(state, signal, directives) do
+        {:ok, enq_state} -> start_drain_if_idle(enq_state)
+        {:error, :queue_overflow} -> state
+      end
+
+    {:error, reason, new_state}
+  end
+
   defp process_signal(%Signal{} = signal, %State{signal_router: router} = state) do
-    start_time = System.monotonic_time()
     metadata = build_signal_metadata(state, signal)
 
     # Record debug event for signal received
@@ -961,24 +1239,9 @@ defmodule Jido.AgentServer do
         id: signal.id
       })
 
-    emit_telemetry(
-      [:jido, :agent_server, :signal, :start],
-      %{system_time: System.system_time()},
-      metadata
-    )
-
-    try do
+    with_telemetry_span([:jido, :agent_server, :signal], metadata, fn start_time ->
       do_process_signal(signal, router, state, start_time, metadata)
-    catch
-      kind, reason ->
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :exception],
-          %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason})
-        )
-
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    end)
   end
 
   defp build_signal_metadata(state, signal) do
@@ -1022,20 +1285,20 @@ defmodule Jido.AgentServer do
   end
 
   defp handle_routing_error(reason, signal, state, start_time, metadata) do
-    emit_telemetry(
-      [:jido, :agent_server, :signal, :stop],
-      %{duration: System.monotonic_time() - start_time},
-      Map.merge(metadata, %{error: reason})
-    )
-
     error =
       Jido.Error.routing_error("No route for signal", %{
         signal_type: signal.type,
-        reason: reason
+        details: %{reason: reason}
       })
 
+    emit_telemetry(
+      [:jido, :agent_server, :signal, :stop],
+      %{duration: System.monotonic_time() - start_time},
+      Map.merge(metadata, %{error: error})
+    )
+
     error_directive = %Directive.Error{error: error, context: :routing}
-    enqueue_error_directive(reason, signal, [error_directive], state)
+    enqueue_error_directive(error, signal, [error_directive], state)
   end
 
   defp enqueue_error_directive(error, signal, directives, state) do
@@ -1132,28 +1395,38 @@ defmodule Jido.AgentServer do
 
     Enum.reduce_while(specs_and_instances, {:continue, signal}, fn {spec, instance},
                                                                    {_, current_signal} ->
-      if signal_matches_plugin?(current_signal, spec) do
-        case invoke_plugin_handle_signal(instance, spec, current_signal, state, agent_module) do
-          {:cont, :continue} ->
-            {:cont, {:continue, current_signal}}
-
-          {:cont, {:continue, new_signal}} ->
-            {:cont, {:continue, new_signal}}
-
-          {:halt, {:override, action_spec}} ->
-            {:halt, {:override, action_spec}}
-
-          {:halt, {:override, action_spec, new_signal}} ->
-            {:halt, {:override, action_spec, new_signal}}
-
-          {:halt, {:error, error}} ->
-            {:halt, {:error, error}}
-        end
-      else
-        {:cont, {:continue, current_signal}}
-      end
+      run_single_plugin_signal_hook(
+        spec,
+        instance,
+        current_signal,
+        state,
+        agent_module
+      )
     end)
     |> normalize_hook_result()
+  end
+
+  defp run_single_plugin_signal_hook(spec, instance, current_signal, state, agent_module) do
+    if signal_matches_plugin?(current_signal, spec) do
+      case invoke_plugin_handle_signal(instance, spec, current_signal, state, agent_module) do
+        {:cont, :continue} ->
+          {:cont, {:continue, current_signal}}
+
+        {:cont, {:continue, new_signal}} ->
+          {:cont, {:continue, new_signal}}
+
+        {:halt, {:override, action_spec}} ->
+          {:halt, {:override, action_spec}}
+
+        {:halt, {:override, action_spec, new_signal}} ->
+          {:halt, {:override, action_spec, new_signal}}
+
+        {:halt, {:error, error}} ->
+          {:halt, {:error, error}}
+      end
+    else
+      {:cont, {:continue, current_signal}}
+    end
   end
 
   defp normalize_hook_result({:continue, signal}), do: {:continue, signal}
@@ -1217,39 +1490,46 @@ defmodule Jido.AgentServer do
       config: spec.config || %{}
     }
 
-    try do
-      case spec.module.handle_signal(signal, context) do
-        {:ok, {:override, action_spec}} ->
-          {:halt, {:override, action_spec}}
+    case run_plugin_callback_with_timeout(state, spec.module, :handle_signal, fn ->
+           spec.module.handle_signal(signal, context)
+         end) do
+      {:ok, {:ok, {:override, action_spec}}} ->
+        {:halt, {:override, action_spec}}
 
-        {:ok, {:continue, %Signal{} = new_signal}} ->
-          {:cont, {:continue, new_signal}}
+      {:ok, {:ok, {:continue, %Signal{} = new_signal}}} ->
+        {:cont, {:continue, new_signal}}
 
-        {:ok, {:override, action_spec, %Signal{} = new_signal}} ->
-          {:halt, {:override, action_spec, new_signal}}
+      {:ok, {:ok, {:override, action_spec, %Signal{} = new_signal}}} ->
+        {:halt, {:override, action_spec, new_signal}}
 
-        {:ok, _} ->
-          {:cont, :continue}
+      {:ok, {:ok, _}} ->
+        {:cont, :continue}
 
-        {:error, reason} ->
-          error =
-            Jido.Error.execution_error(
-              "Plugin handle_signal failed",
-              %{plugin: spec.module, reason: reason}
-            )
+      {:ok, {:error, reason}} ->
+        error =
+          Jido.Error.execution_error(
+            "Plugin handle_signal failed",
+            %{plugin: spec.module, reason: reason}
+          )
 
-          {:halt, {:error, error}}
-      end
-    rescue
-      e ->
-        Logger.error(
-          "Plugin #{inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
-        )
+        {:halt, {:error, error}}
+
+      {:error, {:timeout, timeout_ms}} ->
+        error =
+          Jido.Error.timeout_error(
+            "Plugin handle_signal timed out",
+            %{plugin: spec.module, timeout_ms: timeout_ms}
+          )
+
+        {:halt, {:error, error}}
+
+      {:error, {:exit, reason}} ->
+        Logger.error("Plugin #{inspect(spec.module)} handle_signal crashed: #{inspect(reason)}")
 
         error =
           Jido.Error.execution_error(
             "Plugin handle_signal crashed",
-            %{plugin: spec.module, exception: Exception.message(e)}
+            %{plugin: spec.module, exception: inspect(reason)}
           )
 
         {:halt, {:error, error}}
@@ -1277,17 +1557,31 @@ defmodule Jido.AgentServer do
         config: spec.config || %{}
       }
 
-      try do
-        spec.module.transform_result(action_term, agent_acc, context)
-      rescue
-        e ->
-          Logger.error(
-            "Plugin #{inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
-          )
-
-          agent_acc
-      end
+      run_transform_hook(state, spec, action_term, context, agent_acc)
     end)
+  end
+
+  defp run_transform_hook(state, spec, action_term, context, agent_acc) do
+    case run_plugin_callback_with_timeout(state, spec.module, :transform_result, fn ->
+           spec.module.transform_result(action_term, agent_acc, context)
+         end) do
+      {:ok, transformed_agent} ->
+        transformed_agent
+
+      {:error, {:timeout, timeout_ms}} ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} transform_result timed out after #{timeout_ms}ms"
+        )
+
+        agent_acc
+
+      {:error, {:exit, reason}} ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} transform_result crashed: #{inspect(reason)}"
+        )
+
+        agent_acc
+    end
   end
 
   defp normalize_action_for_transform(resolved_action, original_signal) do
@@ -1315,8 +1609,26 @@ defmodule Jido.AgentServer do
 
     Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       config = spec.config || %{}
-      start_plugin_spec_children(acc_state, spec.module, config)
+      safe_start_plugin_spec_children(acc_state, spec.module, config)
     end)
+  end
+
+  defp safe_start_plugin_spec_children(%State{} = state, plugin_module, config) do
+    start_plugin_spec_children(state, plugin_module, config)
+  rescue
+    error ->
+      Logger.error(
+        "Plugin #{inspect(plugin_module)} child_spec startup crashed: #{Exception.message(error)}"
+      )
+
+      state
+  catch
+    kind, reason ->
+      Logger.error(
+        "Plugin #{inspect(plugin_module)} child_spec startup #{kind}: #{inspect(reason)}"
+      )
+
+      state
   end
 
   defp start_plugin_spec_children(state, plugin_module, config) do
@@ -1341,9 +1653,28 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp start_plugin_child(%State{} = state, plugin_module, %{start: {m, f, a}} = spec) do
-    case apply(m, f, a) do
+  defp start_plugin_child(%State{} = state, plugin_module, %{start: {m, _f, _a}} = spec) do
+    child_spec = supervised_runtime_child_spec(spec)
+
+    case start_runtime_child(state, child_spec) do
       {:ok, pid} ->
+        ref = Process.monitor(pid)
+        tag = {:plugin, plugin_module, spec[:id] || m}
+
+        child_info =
+          ChildInfo.new!(%{
+            pid: pid,
+            ref: ref,
+            module: plugin_module,
+            id: "#{plugin_module}-#{inspect(pid)}",
+            tag: tag,
+            meta: %{child_spec_id: spec[:id]}
+          })
+
+        new_children = Map.put(state.children, tag, child_info)
+        %{state | children: new_children}
+
+      {:ok, pid, _info} ->
         ref = Process.monitor(pid)
         tag = {:plugin, plugin_module, spec[:id] || m}
 
@@ -1389,25 +1720,43 @@ defmodule Jido.AgentServer do
         else: []
 
     Enum.reduce(plugin_specs, state, fn spec, acc_state ->
-      context = %{
-        agent_ref: via_tuple(acc_state.id, acc_state.registry),
-        agent_id: acc_state.id,
-        agent_module: agent_module,
-        plugin_spec: spec,
-        jido_instance: acc_state.jido
-      }
-
-      config = spec.config || %{}
-
-      subscriptions =
-        if function_exported?(spec.module, :subscriptions, 2),
-          do: spec.module.subscriptions(config, context),
-          else: []
-
-      Enum.reduce(subscriptions, acc_state, fn {sensor_module, sensor_config}, inner_state ->
-        start_subscription_sensor(inner_state, spec.module, sensor_module, sensor_config, context)
-      end)
+      safe_start_plugin_subscriptions(acc_state, agent_module, spec)
     end)
+  end
+
+  defp safe_start_plugin_subscriptions(%State{} = state, agent_module, spec) do
+    context = %{
+      agent_ref: via_tuple(state.id, state.registry),
+      agent_id: state.id,
+      agent_module: agent_module,
+      plugin_spec: spec,
+      jido_instance: state.jido
+    }
+
+    config = spec.config || %{}
+
+    subscriptions =
+      if function_exported?(spec.module, :subscriptions, 2),
+        do: spec.module.subscriptions(config, context),
+        else: []
+
+    Enum.reduce(subscriptions, state, fn {sensor_module, sensor_config}, acc_state ->
+      start_subscription_sensor(acc_state, spec.module, sensor_module, sensor_config, context)
+    end)
+  rescue
+    error ->
+      Logger.warning(
+        "Plugin #{inspect(spec.module)} subscriptions startup crashed: #{Exception.message(error)}"
+      )
+
+      state
+  catch
+    kind, reason ->
+      Logger.warning(
+        "Plugin #{inspect(spec.module)} subscriptions startup #{kind}: #{inspect(reason)}"
+      )
+
+      state
   end
 
   defp start_subscription_sensor(
@@ -1423,8 +1772,27 @@ defmodule Jido.AgentServer do
       context: context
     ]
 
-    case SensorRuntime.start_link(opts) do
+    child_spec = supervised_runtime_child_spec({SensorRuntime, opts})
+
+    case start_runtime_child(state, child_spec) do
       {:ok, pid} ->
+        ref = Process.monitor(pid)
+        tag = {:sensor, plugin_module, sensor_module}
+
+        child_info =
+          ChildInfo.new!(%{
+            pid: pid,
+            ref: ref,
+            module: sensor_module,
+            id: "#{plugin_module}-#{sensor_module}-#{inspect(pid)}",
+            tag: tag,
+            meta: %{plugin: plugin_module, sensor: sensor_module}
+          })
+
+        new_children = Map.put(state.children, tag, child_info)
+        %{state | children: new_children}
+
+      {:ok, pid, _info} ->
         ref = Process.monitor(pid)
         tag = {:sensor, plugin_module, sensor_module}
 
@@ -1469,8 +1837,20 @@ defmodule Jido.AgentServer do
         else: []
 
     Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
-      register_schedule(acc_state, schedule_spec)
+      safe_register_schedule(acc_state, schedule_spec)
     end)
+  end
+
+  defp safe_register_schedule(%State{} = state, schedule_spec) do
+    register_schedule(state, schedule_spec)
+  rescue
+    error ->
+      Logger.error("Failed to register plugin schedule: #{Exception.message(error)}")
+      state
+  catch
+    kind, reason ->
+      Logger.error("Failed to register plugin schedule (#{kind}): #{inspect(reason)}")
+      state
   end
 
   defp register_schedule(%State{} = state, schedule_spec) do
@@ -1483,6 +1863,7 @@ defmodule Jido.AgentServer do
     } = schedule_spec
 
     agent_id = state.id
+    agent_ref = via_tuple(agent_id, state.registry)
 
     signal = Signal.new!(signal_type, %{}, source: "/agent/#{agent_id}/schedule")
 
@@ -1491,7 +1872,18 @@ defmodule Jido.AgentServer do
     result =
       Jido.Scheduler.run_every(
         fn ->
-          _ = Jido.AgentServer.cast(agent_id, signal)
+          case cast(agent_ref, signal) do
+            :ok ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "AgentServer #{agent_id} failed to deliver schedule #{inspect(job_id)} tick: #{inspect(reason)}"
+              )
+
+              :ok
+          end
+
           :ok
         end,
         cron_expr,
@@ -1504,8 +1896,8 @@ defmodule Jido.AgentServer do
           "AgentServer #{agent_id} registered schedule #{inspect(job_id)}: #{cron_expr}"
         )
 
-        new_cron_jobs = Map.put(state.cron_jobs, job_id, pid)
-        %{state | cron_jobs: new_cron_jobs}
+        {cron_jobs, cron_monitors} = track_cron_job(state, job_id, pid)
+        %{state | cron_jobs: cron_jobs, cron_monitors: cron_monitors}
 
       {:error, reason} ->
         Logger.error(
@@ -1516,23 +1908,45 @@ defmodule Jido.AgentServer do
     end
   end
 
+  defp track_cron_job(%State{} = state, job_id, pid) when is_pid(pid) do
+    {existing_pid, cron_jobs} = Map.pop(state.cron_jobs, job_id)
+
+    if is_pid(existing_pid) and existing_pid != pid do
+      Jido.Scheduler.cancel(existing_pid)
+    end
+
+    {existing_ref, cron_monitors} =
+      Enum.find(state.cron_monitors, fn {_ref, existing_job_id} -> existing_job_id == job_id end)
+      |> case do
+        {ref, _} -> {ref, Map.delete(state.cron_monitors, ref)}
+        nil -> {nil, state.cron_monitors}
+      end
+
+    if is_reference(existing_ref) do
+      Process.demonitor(existing_ref, [:flush])
+    end
+
+    ref = Process.monitor(pid)
+    {Map.put(cron_jobs, job_id, pid), Map.put(cron_monitors, ref, job_id)}
+  end
+
   # ---------------------------------------------------------------------------
   # Internal: Drain Loop
   # ---------------------------------------------------------------------------
 
   defp start_drain_if_idle(%State{processing: false} = state) do
     send(self(), :drain)
-    %{state | processing: true, status: :processing}
+    State.start_processing(state)
   end
 
   defp start_drain_if_idle(%State{} = state), do: state
 
   defp continue_draining(state) do
     if State.queue_empty?(state) do
-      {:noreply, %{state | processing: false} |> State.set_status(:idle)}
+      {:noreply, State.finish_processing(state)}
     else
       send(self(), :drain)
-      {:noreply, %{state | processing: true, status: :processing}}
+      {:noreply, State.start_processing(state)}
     end
   end
 
@@ -1578,11 +1992,38 @@ defmodule Jido.AgentServer do
           waiter.error_path
         )
 
+      cancel_waiter_expiry(waiter)
       Process.demonitor(waiter.monitor_ref, [:flush])
       GenServer.reply(waiter.from, {:ok, result})
     end)
 
     %{state | completion_waiters: Map.new(still_waiting)}
+  end
+
+  defp maybe_schedule_waiter_expiry(timeout, monitor_ref)
+       when is_integer(timeout) and timeout > 0 do
+    Process.send_after(self(), {:await_expired, monitor_ref}, timeout)
+  end
+
+  defp maybe_schedule_waiter_expiry(_timeout, _monitor_ref), do: nil
+
+  defp cancel_waiter_expiry(%{expiry_ref: expiry_ref}) when is_reference(expiry_ref) do
+    Process.cancel_timer(expiry_ref)
+    :ok
+  end
+
+  defp cancel_waiter_expiry(_), do: :ok
+
+  defp build_timeout_diagnostic_from_state(%State{} = state, timeout_ms) do
+    snapshot = state.agent_module.strategy_snapshot(state.agent)
+
+    %{
+      waited_ms: timeout_ms,
+      server_status: snapshot.status,
+      queue_length: State.queue_length(state),
+      iteration: Map.get(snapshot, :iteration),
+      hint: infer_timeout_hint(snapshot.status)
+    }
   end
 
   # ---------------------------------------------------------------------------
@@ -1624,19 +2065,21 @@ defmodule Jido.AgentServer do
   # Internal: Server Resolution
   # ---------------------------------------------------------------------------
 
-  defp resolve_server(pid) when is_pid(pid), do: {:ok, pid}
+  defp resolve_server(pid) when is_pid(pid) do
+    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :not_found}
+  end
 
   defp resolve_server({:via, _, _} = via) do
-    case GenServer.whereis(via) do
+    case safe_whereis(via) do
       nil -> {:error, :not_found}
-      pid -> {:ok, pid}
+      _pid -> {:ok, via}
     end
   end
 
   defp resolve_server(name) when is_atom(name) do
-    case GenServer.whereis(name) do
+    case safe_whereis(name) do
       nil -> {:error, :not_found}
-      pid -> {:ok, pid}
+      _pid -> {:ok, name}
     end
   end
 
@@ -1649,16 +2092,54 @@ defmodule Jido.AgentServer do
 
   defp resolve_server(_), do: {:error, :invalid_server}
 
+  defp safe_whereis(server_ref) do
+    GenServer.whereis(server_ref)
+  rescue
+    ArgumentError -> nil
+  catch
+    :exit, _ -> nil
+  end
+
+  defp safe_registry_lookup(registry, id) do
+    Registry.lookup(registry, id)
+  rescue
+    ArgumentError -> []
+  end
+
   # ---------------------------------------------------------------------------
   # Internal: Hierarchy
   # ---------------------------------------------------------------------------
 
   defp maybe_monitor_parent(%State{parent: %ParentRef{pid: pid}} = state) when is_pid(pid) do
-    Process.monitor(pid)
-    state
+    parent_monitor_ref = Process.monitor(pid)
+    %{state | parent_monitor_ref: parent_monitor_ref}
   end
 
   defp maybe_monitor_parent(state), do: state
+
+  defp runtime_child_supervisor_name(%State{jido: jido}) when is_atom(jido),
+    do: Jido.agent_supervisor_name(jido)
+
+  defp runtime_child_supervisor_name(_state), do: Jido.AgentSupervisor
+
+  defp supervised_runtime_child_spec(spec) do
+    Supervisor.child_spec(spec, [])
+  end
+
+  defp start_runtime_child(%State{} = state, child_spec) do
+    supervisor = runtime_child_supervisor_name(state)
+
+    case maybe_whereis_supervisor(supervisor) do
+      {:ok, _pid} ->
+        case safe_dynamic_supervisor_start_child(supervisor, child_spec) do
+          {:error, :not_found} -> {:error, :missing_supervisor}
+          other -> other
+        end
+
+      {:error, :not_found} ->
+        {:error, :missing_supervisor}
+    end
+  end
 
   defp notify_parent_of_startup(%State{parent: %ParentRef{} = parent} = state)
        when is_pid(parent.pid) do
@@ -1675,13 +2156,7 @@ defmodule Jido.AgentServer do
         source: "/agent/#{state.id}"
       )
 
-    traced_child_started =
-      case Trace.put(child_started, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> child_started
-      end
-
-    _ = cast(parent.pid, traced_child_started)
+    _ = cast(parent.pid, ensure_traced_signal(child_started))
     :ok
   end
 
@@ -1709,13 +2184,7 @@ defmodule Jido.AgentServer do
         source: "/agent/#{state.id}"
       )
 
-    traced_signal =
-      case Trace.put(signal, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    case process_signal(traced_signal, state) do
+    case process_signal(ensure_traced_signal(signal), state) do
       {:ok, new_state, _resolved_action} -> {:noreply, new_state}
       {:error, _reason, ns} -> {:noreply, ns}
     end
@@ -1733,13 +2202,7 @@ defmodule Jido.AgentServer do
           source: "/agent/#{state.id}"
         )
 
-      traced_signal =
-        case Trace.put(signal, Trace.new_root()) do
-          {:ok, s} -> s
-          {:error, _} -> signal
-        end
-
-      case process_signal(traced_signal, state) do
+      case process_signal(ensure_traced_signal(signal), state) do
         {:ok, new_state, _resolved_action} -> {:noreply, new_state}
         {:error, _reason, ns} -> {:noreply, ns}
       end
@@ -1757,13 +2220,22 @@ defmodule Jido.AgentServer do
   defp wrap_parent_down_reason({:shutdown, _} = r), do: {:shutdown, {:parent_down, r}}
   defp wrap_parent_down_reason(reason), do: {:parent_down, reason}
 
+  defp linked_child_pid?(%State{children: children}, pid) when is_pid(pid) do
+    Enum.any?(children, fn {_tag, child} -> child.pid == pid end)
+  end
+
+  defp ancestor_pid?(pid) when is_pid(pid) do
+    case Process.get(:"$ancestors") do
+      ancestors when is_list(ancestors) -> pid in ancestors
+      _ -> false
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Internal: Telemetry
   # ---------------------------------------------------------------------------
 
   defp exec_directive_with_telemetry(directive, signal, state) do
-    start_time = System.monotonic_time()
-
     directive_type =
       directive.__struct__ |> Module.split() |> List.last()
 
@@ -1785,13 +2257,7 @@ defmodule Jido.AgentServer do
       }
       |> Map.merge(trace_metadata)
 
-    emit_telemetry(
-      [:jido, :agent_server, :directive, :start],
-      %{system_time: System.system_time()},
-      metadata
-    )
-
-    try do
+    with_telemetry_span([:jido, :agent_server, :directive], metadata, fn start_time ->
       result = DirectiveExec.exec(directive, signal, state)
 
       emit_telemetry(
@@ -1801,16 +2267,7 @@ defmodule Jido.AgentServer do
       )
 
       result
-    catch
-      kind, reason ->
-        emit_telemetry(
-          [:jido, :agent_server, :directive, :exception],
-          %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason})
-        )
-
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    end)
   end
 
   defp result_type({:ok, _}), do: :ok
@@ -1819,6 +2276,29 @@ defmodule Jido.AgentServer do
 
   defp emit_telemetry(event, measurements, metadata) do
     :telemetry.execute(event, measurements, metadata)
+  end
+
+  defp with_telemetry_span(event_prefix, metadata, fun) when is_list(event_prefix) do
+    start_time = System.monotonic_time()
+
+    emit_telemetry(
+      event_prefix ++ [:start],
+      %{system_time: System.system_time()},
+      metadata
+    )
+
+    try do
+      fun.(start_time)
+    catch
+      kind, reason ->
+        emit_telemetry(
+          event_prefix ++ [:exception],
+          %{duration: System.monotonic_time() - start_time},
+          Map.merge(metadata, %{kind: kind, error: reason})
+        )
+
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
   end
 
   # Warn when {:stop, ...} is used with normal-looking reasons.
@@ -1840,4 +2320,198 @@ defmodule Jido.AgentServer do
   end
 
   defp warn_if_normal_stop(_reason, _directive, _state), do: :ok
+
+  defp safe_call(server_ref, request, timeout \\ RuntimeDefaults.agent_server_call_timeout()) do
+    GenServer.call(server_ref, request, timeout)
+  catch
+    :exit, {:noproc, _} ->
+      {:error, :not_found}
+
+    :exit, {:normal, _} ->
+      {:error, :not_found}
+
+    :exit, {:shutdown, _} ->
+      {:error, :not_found}
+
+    :exit, :shutdown ->
+      {:error, :not_found}
+
+    :exit, {:timeout, _} ->
+      {:error, :timeout}
+  end
+
+  defp safe_cast(server_ref, message) do
+    GenServer.cast(server_ref, message)
+    :ok
+  catch
+    :exit, {:noproc, _} -> {:error, :not_found}
+    :exit, {:normal, _} -> {:error, :not_found}
+    :exit, {:shutdown, _} -> {:error, :not_found}
+    :exit, :shutdown -> {:error, :not_found}
+  end
+
+  defp reply_shutdown_to_completion_waiters(waiters) do
+    Enum.each(waiters, fn {_ref, waiter} ->
+      cancel_waiter_expiry(waiter)
+      Process.demonitor(waiter.monitor_ref, [:flush])
+      GenServer.reply(waiter.from, {:error, :shutdown})
+    end)
+  end
+
+  defp stream_status_error(:halt, _reason), do: {:halt, :halt}
+  defp stream_status_error(:emit, reason), do: {[{:error, reason}], :halt}
+
+  defp stream_status_error(_on_error, reason) do
+    raise "Failed to get status: #{inspect(reason)}"
+  end
+
+  defp cleanup_tracked_children(%State{} = state) do
+    Enum.each(state.children, fn {_tag, child} ->
+      if is_reference(child.ref) do
+        Process.demonitor(child.ref, [:flush])
+      end
+
+      unless skip_child_cleanup?(child) do
+        maybe_stop_tracked_child(state, child.pid)
+      end
+    end)
+  end
+
+  defp skip_child_cleanup?(%ChildInfo{meta: %{directive: :spawn_agent}}), do: true
+  defp skip_child_cleanup?(_child), do: false
+
+  defp maybe_stop_tracked_child(_state, pid) when not is_pid(pid), do: :ok
+
+  defp maybe_stop_tracked_child(%State{} = state, pid) do
+    supervisor = runtime_child_supervisor_name(state)
+
+    case maybe_whereis_supervisor(supervisor) do
+      {:ok, _sup_pid} ->
+        case safe_dynamic_supervisor_terminate_child(supervisor, pid) do
+          :ok -> :ok
+          {:error, :not_found} -> safe_process_exit(pid, :shutdown)
+        end
+
+      {:error, :not_found} ->
+        safe_process_exit(pid, :shutdown)
+    end
+  end
+
+  defp safe_process_exit(pid, reason) when is_pid(pid) do
+    Process.exit(pid, reason)
+    :ok
+  rescue
+    _ -> :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  defp run_plugin_callback_with_timeout(%State{jido: jido}, plugin, callback, fun)
+       when is_function(fun, 0) do
+    timeout_ms = RuntimeDefaults.plugin_hook_timeout()
+
+    case Tasking.resolve_task_supervisor(jido: jido) do
+      {:ok, task_supervisor} ->
+        run_plugin_callback_task(task_supervisor, plugin, callback, timeout_ms, fun)
+
+      {:error, :task_supervisor_not_found} ->
+        # Fallback path for bootstrap/runtime edge cases.
+        {:ok, fun.()}
+    end
+  end
+
+  defp run_plugin_callback_task(task_supervisor, plugin, callback, timeout_ms, fun)
+       when is_atom(task_supervisor) and is_integer(timeout_ms) and is_function(fun, 0) do
+    parent = self()
+    result_ref = make_ref()
+
+    case Task.Supervisor.start_child(task_supervisor, fn ->
+           send(parent, {:plugin_hook_result, result_ref, fun.()})
+         end) do
+      {:ok, pid} ->
+        await_plugin_callback_result(pid, result_ref, plugin, callback, timeout_ms)
+
+      {:error, reason} ->
+        {:error, {:exit, reason}}
+    end
+  end
+
+  defp await_plugin_callback_result(pid, result_ref, plugin, callback, timeout_ms)
+       when is_pid(pid) and is_reference(result_ref) and is_integer(timeout_ms) do
+    monitor_ref = Process.monitor(pid)
+
+    receive do
+      {:plugin_hook_result, ^result_ref, result} ->
+        Process.demonitor(monitor_ref, [:flush])
+        {:ok, result}
+
+      {:DOWN, ^monitor_ref, :process, ^pid, reason} ->
+        {:error, {:exit, reason}}
+    after
+      timeout_ms ->
+        Process.demonitor(monitor_ref, [:flush])
+        Process.exit(pid, :kill)
+        flush_plugin_result(result_ref)
+
+        Logger.warning("Plugin #{inspect(plugin)} #{callback} timed out after #{timeout_ms}ms")
+
+        {:error, {:timeout, timeout_ms}}
+    end
+  end
+
+  defp flush_plugin_result(result_ref) do
+    receive do
+      {:plugin_hook_result, ^result_ref, _result} -> :ok
+    after
+      0 -> :ok
+    end
+  end
+
+  defp queue_overflow_error(state, %Signal{} = signal, directives) do
+    Jido.Error.execution_error(
+      "Directive queue overflow",
+      details: %{
+        reason: :queue_overflow,
+        signal_type: signal.type,
+        max_queue_size: state.max_queue_size,
+        directive_count: length(List.wrap(directives))
+      }
+    )
+  end
+
+  defp maybe_whereis_supervisor(supervisor) when is_atom(supervisor) do
+    case Process.whereis(supervisor) do
+      pid when is_pid(pid) -> {:ok, pid}
+      nil -> {:error, :not_found}
+    end
+  end
+
+  defp safe_dynamic_supervisor_start_child(supervisor, child_spec) when is_atom(supervisor) do
+    DynamicSupervisor.start_child(supervisor, child_spec)
+  catch
+    :exit, {:noproc, _} -> {:error, :not_found}
+    :exit, {:normal, _} -> {:error, :not_found}
+    :exit, {:shutdown, _} -> {:error, :not_found}
+  end
+
+  defp safe_dynamic_supervisor_terminate_child(supervisor, pid) when is_atom(supervisor) do
+    DynamicSupervisor.terminate_child(supervisor, pid)
+  catch
+    :exit, {:noproc, _} -> {:error, :not_found}
+    :exit, {:normal, _} -> {:error, :not_found}
+    :exit, {:shutdown, _} -> {:error, :not_found}
+  end
+
+  defp normalize_status_pid(pid) when is_pid(pid), do: pid
+
+  defp normalize_status_pid(server_ref) do
+    safe_whereis(server_ref)
+  end
+
+  defp ensure_traced_signal(%Signal{} = signal) do
+    case Trace.put(signal, Trace.new_root()) do
+      {:ok, traced_signal} -> traced_signal
+      {:error, _} -> signal
+    end
+  end
 end

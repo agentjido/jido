@@ -11,6 +11,7 @@ defmodule Jido.AgentServer.Options do
   """
 
   alias Jido.AgentServer.ParentRef
+  alias Jido.RuntimeDefaults
 
   @type error_policy ::
           :log_only
@@ -43,7 +44,7 @@ defmodule Jido.AgentServer.Options do
               max_queue_size:
                 Zoi.integer(description: "Max directive queue size")
                 |> Zoi.min(1)
-                |> Zoi.default(10_000),
+                |> Zoi.default(RuntimeDefaults.max_queue_size()),
               parent: Zoi.any(description: "Parent reference for hierarchy") |> Zoi.optional(),
               on_parent_death:
                 Zoi.atom(description: "Behavior when parent dies")
@@ -69,8 +70,8 @@ defmodule Jido.AgentServer.Options do
                   description: "Idle timeout in ms before hibernate/stop (:infinity to disable)"
                 )
                 |> Zoi.default(:infinity),
-              persistence:
-                Zoi.any(description: "Persistence config [store: {Module, opts}]")
+              storage:
+                Zoi.any(description: "Storage config {Adapter, opts}")
                 |> Zoi.optional(),
 
               # Debug mode
@@ -140,7 +141,7 @@ defmodule Jido.AgentServer.Options do
       end
 
     jido_instance = Map.get(attrs, :jido, Jido)
-    registry = Jido.registry_name(jido_instance)
+    registry = Map.get(attrs, :registry, Jido.registry_name(jido_instance))
     attrs = Map.put(attrs, :jido, jido_instance)
 
     attrs

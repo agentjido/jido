@@ -94,6 +94,28 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     end
   end
 
+  defmodule CrashSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "crash_sensor",
+      description: "A sensor that crashes on demand",
+      schema: Zoi.object(%{}, coerce: true)
+
+    @impl Jido.Sensor
+    def init(_config, context) do
+      {:ok, %{context: context}}
+    end
+
+    @impl Jido.Sensor
+    def handle_event(:crash, _state) do
+      raise "intentional crash for trap_exit test"
+    end
+
+    def handle_event(_event, state) do
+      {:ok, state}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Action Module
   # ---------------------------------------------------------------------------
@@ -166,6 +188,19 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
   end
 
+  defmodule PluginWithCrashSensor do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_crash_sensor",
+      state_key: :crash_sensor_plugin,
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
+
+    @impl Jido.Plugin
+    def subscriptions(_config, _context) do
+      [{JidoTest.AgentServer.PluginSubscriptionsTest.CrashSensor, %{}}]
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Agent Modules
   # ---------------------------------------------------------------------------
@@ -208,6 +243,26 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       ]
   end
 
+  defmodule AgentWithCrashSensorPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_crash_sensor_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithCrashSensor]
+  end
+
+  defp sensor_children(state) do
+    Enum.filter(state.children, fn {tag, _child_info} -> match?({:sensor, _, _}, tag) end)
+  end
+
+  defp await_sensor_children(pid, expected_count) do
+    eventually_state(pid, fn state ->
+      length(sensor_children(state)) == expected_count
+    end)
+
+    {:ok, state} = Jido.AgentServer.state(pid)
+    sensor_children(state)
+  end
+
   # ---------------------------------------------------------------------------
   # Tests
   # ---------------------------------------------------------------------------
@@ -216,13 +271,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     test "starts subscription sensor during post_init", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} ->
-          match?({:sensor, _, _}, tag)
-        end)
+      sensor_children = await_sensor_children(pid, 1)
 
       assert length(sensor_children) == 1
 
@@ -236,13 +285,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     test "sensor is monitored by AgentServer", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
 
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
-
-      [{_tag, child_info}] = sensor_children
+      [{_tag, child_info}] = await_sensor_children(pid, 1)
       assert child_info.ref != nil
 
       GenServer.stop(child_info.pid)
@@ -257,6 +300,17 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       GenServer.stop(pid)
     end
+
+    test "sensor runtime is started under supervisor and not linked to AgentServer", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
+
+      [{_tag, child_info}] = await_sensor_children(pid, 1)
+
+      links = Process.info(child_info.pid, :links) |> elem(1)
+      refute pid in links
+
+      GenServer.stop(pid)
+    end
   end
 
   describe "sensor context" do
@@ -264,14 +318,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       jido: jido
     } do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
-
-      [{_tag, child_info}] = sensor_children
+      [{_tag, child_info}] = await_sensor_children(pid, 1)
 
       sensor_state = :sys.get_state(child_info.pid)
 
@@ -290,18 +337,14 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "signal delivery to agent" do
     test "sensor signals are delivered to the agent", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
-
-      [{_tag, child_info}] = sensor_children
+      [{_tag, child_info}] = await_sensor_children(pid, 1)
 
       Runtime.event(child_info.pid, {:trigger, :test_value})
 
-      Process.sleep(50)
+      eventually(fn ->
+        runtime_state = :sys.get_state(child_info.pid)
+        runtime_state.sensor_state.event_count == 1
+      end)
 
       GenServer.stop(pid)
     end
@@ -310,12 +353,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "multiple sensors from same plugin" do
     test "starts all sensors from plugin with multiple subscriptions", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultiSensorPlugin, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+      sensor_children = await_sensor_children(pid, 2)
 
       assert length(sensor_children) == 2
 
@@ -337,12 +375,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "multiple plugins with sensors" do
     test "starts sensors from all plugins", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithMultiplePlugins, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+      sensor_children = await_sensor_children(pid, 3)
 
       assert length(sensor_children) == 3
 
@@ -362,28 +395,14 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "plugin with empty subscriptions" do
     test "plugin returning empty list works fine", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithNoSubscriptionsPlugin, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
-
-      assert sensor_children == []
+      assert await_sensor_children(pid, 0) == []
 
       GenServer.stop(pid)
     end
 
     test "plugin without subscriptions callback works fine", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithPluginWithoutCallback, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
-
-      assert sensor_children == []
+      assert await_sensor_children(pid, 0) == []
 
       GenServer.stop(pid)
     end
@@ -392,7 +411,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "sensor child tracking" do
     test "sensors are tracked in agent's children map", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
-
+      _ = await_sensor_children(pid, 1)
       {:ok, state} = Jido.AgentServer.state(pid)
 
       tag = {:sensor, PluginWithSensor, TestSensor}
@@ -410,12 +429,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
   describe "sensor cleanup on AgentServer stop" do
     test "sensors are cleaned up when AgentServer stops", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-
-      sensor_children =
-        state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+      sensor_children = await_sensor_children(pid, 1)
 
       sensor_pids = Enum.map(sensor_children, fn {_, info} -> info.pid end)
 
@@ -426,6 +440,30 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       eventually(fn ->
         not Process.alive?(pid)
       end)
+    end
+  end
+
+  describe "linked sensor crashes" do
+    test "crashing sensor does not crash AgentServer", %{jido: jido} do
+      Process.flag(:trap_exit, true)
+
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithCrashSensorPlugin, jido: jido)
+      [{_tag, child_info}] = await_sensor_children(pid, 1)
+
+      Runtime.event(child_info.pid, :crash)
+
+      eventually(fn -> not Process.alive?(child_info.pid) end)
+
+      refute_receive {:EXIT, ^pid, _reason}, 100
+      assert Process.alive?(pid)
+
+      eventually_state(pid, fn latest_state ->
+        latest_state.children
+        |> Enum.count(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Kernel.==(0)
+      end)
+
+      GenServer.stop(pid)
     end
   end
 end

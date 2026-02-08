@@ -22,6 +22,8 @@ if Code.ensure_loaded?(Igniter) do
     alias Igniter.Project.Module, as: IgniterModule
     alias Jido.Igniter.Helpers
 
+    @module_name_regex ~r/^[A-Z][A-Za-z0-9_]*(\.[A-Z][A-Za-z0-9_]*)*$/
+
     @impl Igniter.Mix.Task
     def info(_argv, _composing_task) do
       %Igniter.Mix.Task.Info{
@@ -47,15 +49,13 @@ if Code.ensure_loaded?(Igniter) do
       name = Helpers.module_to_name(module_name)
 
       plugins =
-        options[:plugins]
-        |> Helpers.parse_list()
-        |> Enum.map(&String.to_atom/1)
+        normalize_plugin_modules!(options[:plugins])
 
       plugins_opt =
         if Enum.empty?(plugins) do
           ""
         else
-          plugins_str = Enum.map_join(plugins, ", ", &inspect/1)
+          plugins_str = Enum.join(plugins, ", ")
           ",\n    plugins: [#{plugins_str}]"
         end
 
@@ -96,6 +96,22 @@ if Code.ensure_loaded?(Igniter) do
       igniter
       |> IgniterModule.create_module(module, contents)
       |> IgniterModule.create_module(test_module, test_contents, location: :test)
+    end
+
+    @doc false
+    @spec normalize_plugin_modules!(String.t() | nil) :: [String.t()]
+    def normalize_plugin_modules!(plugins_opt) do
+      plugins_opt
+      |> Helpers.parse_list()
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.map(fn plugin ->
+        if Regex.match?(@module_name_regex, plugin) do
+          plugin
+        else
+          raise ArgumentError, "invalid plugin module name: #{inspect(plugin)}"
+        end
+      end)
     end
   end
 end

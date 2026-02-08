@@ -161,7 +161,8 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       child_spec = {Task, fn -> :ok end}
       directive = %Directive.Spawn{child_spec: child_spec, tag: :worker}
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert Map.has_key?(new_state.children, :worker)
       assert_receive {:spawn_called, ^child_spec}
     end
 
@@ -187,7 +188,14 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       child_spec = {Task, fn -> :ok end}
       directive = %Directive.Spawn{child_spec: child_spec, tag: :worker}
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert State.queue_length(new_state) == 1
+
+      assert {{:value, {^input_signal, %Directive.Error{context: :spawn} = error_directive}},
+              dequeued_state} = State.dequeue(new_state)
+
+      assert {:ok, ^dequeued_state} =
+               DirectiveExec.exec(error_directive, input_signal, dequeued_state)
     end
 
     test "handles spawn returning {:ok, pid, info} tuple", %{
@@ -215,7 +223,8 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       child_spec = {Task, fn -> :ok end}
       directive = %Directive.Spawn{child_spec: child_spec, tag: :worker}
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert Map.has_key?(new_state.children, :worker)
       assert_receive {:spawn_called, ^child_spec}
     end
 
@@ -243,6 +252,73 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
       assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
     end
+
+    test "does not fallback to legacy global supervisor when jido instance supervisor is missing",
+         %{
+           input_signal: input_signal,
+           agent: agent
+         } do
+      # Simulate an unrelated legacy global supervisor being present.
+      {:ok, _legacy_sup} =
+        start_supervised(
+          {DynamicSupervisor, strategy: :one_for_one, name: Jido.AgentSupervisor},
+          id: {:legacy_agent_supervisor, System.unique_integer([:positive])}
+        )
+
+      missing_jido = :"missing_jido_#{System.unique_integer([:positive])}"
+
+      {:ok, opts} =
+        Options.new(%{
+          agent: agent,
+          id: "test-agent-no-fallback",
+          jido: missing_jido
+        })
+
+      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+
+      child_spec = {Task, fn -> :ok end}
+      directive = %Directive.Spawn{child_spec: child_spec, tag: :worker}
+
+      # Contract: missing instance supervisor should not silently fallback.
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      refute Map.has_key?(new_state.children, :worker)
+      assert State.queue_length(new_state) == 1
+    end
+
+    test "tracks spawned child even when tag is nil", %{
+      input_signal: input_signal,
+      agent: agent,
+      jido: jido
+    } do
+      {:ok, opts} =
+        Options.new(%{
+          agent: agent,
+          id: "test-agent-spawn-auto-tag",
+          jido: jido
+        })
+
+      {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+
+      child_spec =
+        {Task,
+         fn ->
+           receive do
+           after
+             86_400_000 -> :ok
+           end
+         end}
+
+      directive = %Directive.Spawn{child_spec: child_spec, tag: nil}
+
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert map_size(new_state.children) == 1
+
+      [{tag, child_info}] = Map.to_list(new_state.children)
+      assert match?({:spawn, _}, tag)
+      assert is_pid(child_info.pid)
+
+      Process.exit(child_info.pid, :kill)
+    end
   end
 
   describe "Schedule directive" do
@@ -250,16 +326,18 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       signal = Signal.new!(%{type: "scheduled.ping", source: "/test", data: %{}})
       directive = %Directive.Schedule{delay_ms: 10, message: signal}
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
-      assert_receive {:scheduled_signal, received_signal}, 100
+      assert {:ok, scheduled_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert map_size(scheduled_state.scheduled_timers) == 1
+      assert_receive {:scheduled_signal, _message_ref, received_signal}, 100
       assert received_signal.type == "scheduled.ping"
     end
 
     test "wraps non-signal message in signal", %{state: state, input_signal: input_signal} do
       directive = %Directive.Schedule{delay_ms: 10, message: :timeout}
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
-      assert_receive {:scheduled_signal, received_signal}, 100
+      assert {:ok, scheduled_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert map_size(scheduled_state.scheduled_timers) == 1
+      assert_receive {:scheduled_signal, _message_ref, received_signal}, 100
       assert received_signal.type == "jido.scheduled"
       assert received_signal.data.message == :timeout
     end
@@ -294,10 +372,37 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       child_info = new_state.children[:child_worker]
       assert child_info.module == TestAgent
       assert child_info.tag == :child_worker
-      assert child_info.meta == %{role: :worker}
+      assert child_info.meta.role == :worker
+      assert child_info.meta.directive == :spawn_agent
       assert is_pid(child_info.pid)
 
       GenServer.stop(child_info.pid)
+    end
+
+    test "spawns child agent with temporary restart semantics", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      directive = %Directive.SpawnAgent{
+        agent: TestAgent,
+        tag: :temporary_child,
+        opts: %{},
+        meta: %{}
+      }
+
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+
+      child_info = new_state.children[:temporary_child]
+      child_pid = child_info.pid
+      child_id = child_info.id
+      child_ref = Process.monitor(child_pid)
+
+      Process.exit(child_pid, :kill)
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :killed}, 1_000
+
+      eventually(fn ->
+        Jido.AgentServer.whereis(state.registry, child_id) == nil
+      end)
     end
 
     test "spawns child agent with struct agent (resolve_agent_module for struct)", %{
@@ -334,8 +439,12 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
         meta: %{}
       }
 
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
-      refute Map.has_key?(state.children, :failing_child)
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      refute Map.has_key?(new_state.children, :failing_child)
+      assert State.queue_length(new_state) == 1
+
+      assert {{:value, {^input_signal, %Directive.Error{context: :spawn_agent}}}, _dequeued} =
+               State.dequeue(new_state)
     end
 
     test "resolve_agent_module handles non-module non-struct agent (unknown type)", %{
@@ -351,7 +460,8 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       }
 
       # This will fail to spawn but should handle gracefully
-      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+      assert State.queue_length(new_state) == 1
     end
   end
 

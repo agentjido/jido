@@ -302,11 +302,7 @@ defmodule Jido.MixProject do
           Jido.Storage.ETS,
           Jido.Storage.File,
           Jido.Persist,
-          Jido.Agent.InstanceManager,
-          Jido.Agent.Persistence,
-          Jido.Agent.Store,
-          Jido.Agent.Store.ETS,
-          Jido.Agent.Store.File
+          Jido.Agent.InstanceManager
         ],
         Observability: [
           Jido.Observe,
@@ -357,8 +353,12 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.0.0-rc.4"},
-      {:jido_signal, "~> 2.0.0-rc.4"},
+      {:jido_action,
+       git: "https://github.com/nshkrdotcom/jido_action.git", branch: "refactor/otp-cleanup"},
+      # {:jido_action, "~> 2.0.0-rc.5"},
+      {:jido_signal,
+       git: "https://github.com/nshkrdotcom/jido_signal.git", branch: "refactor/otp-cleanup"},
+      # {:jido_signal, "~> 2.0.0-rc.5"},
 
       # Jido Deps
       {:deep_merge, "~> 1.0"},
@@ -371,7 +371,7 @@ defmodule Jido.MixProject do
       {:poolboy, "~> 1.5"},
       {:telemetry_metrics, "~> 1.1"},
       {:sched_ex, "~> 1.1"},
-      {:uniq, "~> 0.6.1"},
+      {:uniq, "~> 0.6.0"},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
@@ -380,7 +380,7 @@ defmodule Jido.MixProject do
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
-      {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
+      {:excoveralls, "~> 0.18", only: [:dev, :test]},
       {:expublish, "~> 2.7", only: [:dev], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
       {:mock, "~> 0.3.0", only: :test},

@@ -46,7 +46,7 @@ defmodule Jido.Telemetry.Config do
       end
   """
 
-  @default_log_level :debug
+  @default_log_level :info
   @default_slow_signal_threshold_ms 10
   @default_slow_directive_threshold_ms 5
   @default_interesting_signal_types [
@@ -63,9 +63,6 @@ defmodule Jido.Telemetry.Config do
     error: 4
   }
 
-  # Compile-time defaults for efficiency
-  @compile_log_level Application.compile_env(:jido, [:telemetry, :log_level], @default_log_level)
-
   @doc """
   Returns the current log level.
 
@@ -76,7 +73,9 @@ defmodule Jido.Telemetry.Config do
   """
   @spec log_level() :: :trace | :debug | :info | :warning | :error
   def log_level do
-    get_config(:log_level, @compile_log_level)
+    :log_level
+    |> get_config(@default_log_level)
+    |> normalize_log_level()
   end
 
   @doc """
@@ -138,7 +137,9 @@ defmodule Jido.Telemetry.Config do
   """
   @spec slow_signal_threshold_ms() :: non_neg_integer()
   def slow_signal_threshold_ms do
-    get_config(:slow_signal_threshold_ms, @default_slow_signal_threshold_ms)
+    :slow_signal_threshold_ms
+    |> get_config(@default_slow_signal_threshold_ms)
+    |> normalize_threshold(@default_slow_signal_threshold_ms)
   end
 
   @doc """
@@ -155,7 +156,9 @@ defmodule Jido.Telemetry.Config do
   """
   @spec slow_directive_threshold_ms() :: non_neg_integer()
   def slow_directive_threshold_ms do
-    get_config(:slow_directive_threshold_ms, @default_slow_directive_threshold_ms)
+    :slow_directive_threshold_ms
+    |> get_config(@default_slow_directive_threshold_ms)
+    |> normalize_threshold(@default_slow_directive_threshold_ms)
   end
 
   @doc """
@@ -207,7 +210,9 @@ defmodule Jido.Telemetry.Config do
   """
   @spec log_args?() :: :keys_only | :full | :none
   def log_args? do
-    get_config(:log_args, @default_log_args)
+    :log_args
+    |> get_config(@default_log_args)
+    |> normalize_log_args()
   end
 
   # Private helpers
@@ -216,4 +221,15 @@ defmodule Jido.Telemetry.Config do
     Application.get_env(:jido, :telemetry, [])
     |> Keyword.get(key, default)
   end
+
+  defp normalize_log_level(level) when level in [:trace, :debug, :info, :warning, :error],
+    do: level
+
+  defp normalize_log_level(_invalid), do: @default_log_level
+
+  defp normalize_threshold(value, _default) when is_integer(value) and value >= 0, do: value
+  defp normalize_threshold(_invalid, default), do: default
+
+  defp normalize_log_args(mode) when mode in [:keys_only, :full, :none], do: mode
+  defp normalize_log_args(_invalid), do: @default_log_args
 end

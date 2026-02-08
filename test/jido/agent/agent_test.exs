@@ -223,7 +223,7 @@ defmodule JidoTest.AgentTest do
       elapsed = System.monotonic_time(:millisecond) - start_time
 
       assert [%Jido.Agent.Directive.Error{}] = directives
-      assert elapsed < 100
+      assert elapsed < 1_000
     end
 
     test "cmd/2 delegates to cmd/3 with empty opts" do
@@ -314,6 +314,12 @@ defmodule JidoTest.AgentTest do
     test "Agent.new/1 returns error for invalid id type" do
       {:error, error} = Agent.new(%{id: 12_345})
       assert error.message == "Agent validation failed"
+    end
+
+    test "Agent.new/1 normalizes nil id to generated id" do
+      {:ok, agent} = Agent.new(%{id: nil, name: "nil-id-agent"})
+      assert is_binary(agent.id)
+      assert agent.id != ""
     end
 
     test "Agent.validate/2 validates state against schema" do

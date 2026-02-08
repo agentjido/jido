@@ -47,11 +47,11 @@ defmodule Jido.Storage.File do
   @doc """
   Retrieve a checkpoint by key.
 
-  Returns `{:ok, data}` if found, `:not_found` if the file doesn't exist,
+  Returns `{:ok, data}` if found, `{:error, :not_found}` if the file doesn't exist,
   or `{:error, reason}` on failure.
   """
   @impl true
-  @spec get_checkpoint(key(), opts()) :: {:ok, term()} | :not_found | {:error, term()}
+  @spec get_checkpoint(key(), opts()) :: {:ok, term()} | {:error, :not_found | term()}
   def get_checkpoint(key, opts) do
     path = Keyword.fetch!(opts, :path)
     file_path = checkpoint_path(path, key)
@@ -61,7 +61,7 @@ defmodule Jido.Storage.File do
         {:ok, :erlang.binary_to_term(binary, [:safe])}
 
       {:error, :enoent} ->
-        :not_found
+        {:error, :not_found}
 
       {:error, reason} ->
         {:error, reason}
@@ -120,10 +120,10 @@ defmodule Jido.Storage.File do
   Load a thread from disk.
 
   Reads the meta file and entries log, reconstructing a `%Jido.Thread{}`.
-  Returns `:not_found` if the thread directory doesn't exist.
+  Returns `{:error, :not_found}` if the thread directory doesn't exist.
   """
   @impl true
-  @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | :not_found | {:error, term()}
+  @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | {:error, :not_found | term()}
   def load_thread(thread_id, opts) do
     path = Keyword.fetch!(opts, :path)
     thread_dir = thread_path(path, thread_id)
@@ -135,19 +135,16 @@ defmodule Jido.Storage.File do
       {rev, created_at, updated_at, metadata} = :erlang.binary_to_term(meta_binary, [:safe])
       entries = decode_entries(entries_binary)
 
-      thread = %Thread{
-        id: thread_id,
-        rev: rev,
-        entries: entries,
-        created_at: created_at,
-        updated_at: updated_at,
-        metadata: metadata,
-        stats: %{entry_count: length(entries)}
-      }
+      thread =
+        Thread.from_entries(thread_id, entries,
+          created_at: created_at,
+          updated_at: updated_at,
+          metadata: metadata
+        )
 
-      {:ok, thread}
+      {:ok, %{thread | rev: rev}}
     else
-      {:error, :enoent} -> :not_found
+      {:error, :enoent} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
   rescue
@@ -230,7 +227,7 @@ defmodule Jido.Storage.File do
       {:ok, rev, existing_entries, created, meta} ->
         {rev, existing_entries, created, meta}
 
-      :not_found ->
+      {:error, :not_found} ->
         now = System.system_time(:millisecond)
         {0, [], now, %{}}
     end
@@ -242,21 +239,7 @@ defmodule Jido.Storage.File do
 
   defp build_prepared_entries(entries, current_entries) do
     now = System.system_time(:millisecond)
-    base_seq = length(current_entries)
-
-    prepared_entries =
-      entries
-      |> Enum.with_index()
-      |> Enum.map(fn {entry, idx} ->
-        %Entry{
-          id: entry.id || generate_entry_id(),
-          seq: base_seq + idx,
-          at: entry.at || now,
-          kind: entry.kind,
-          payload: entry.payload || %{},
-          refs: entry.refs || %{}
-        }
-      end)
+    prepared_entries = Thread.prepare_entries(entries, length(current_entries), now)
 
     {:ok, prepared_entries, now}
   end
@@ -280,17 +263,14 @@ defmodule Jido.Storage.File do
 
     with :ok <- File.write(tmp_meta, meta_binary),
          :ok <- File.rename(tmp_meta, meta_file) do
-      thread = %Thread{
-        id: thread_id,
-        rev: new_rev,
-        entries: all_entries,
-        created_at: created_at,
-        updated_at: now,
-        metadata: metadata,
-        stats: %{entry_count: length(all_entries)}
-      }
+      thread =
+        Thread.from_entries(thread_id, all_entries,
+          created_at: created_at,
+          updated_at: now,
+          metadata: metadata
+        )
 
-      {:ok, thread}
+      {:ok, %{thread | rev: new_rev}}
     else
       {:error, reason} ->
         File.rm(tmp_meta)
@@ -305,8 +285,8 @@ defmodule Jido.Storage.File do
       entries = decode_entries(entries_binary)
       {:ok, rev, entries, created_at, metadata}
     else
-      {:error, :enoent} -> :not_found
-      {:error, _reason} -> :not_found
+      {:error, :enoent} -> {:error, :not_found}
+      {:error, _reason} -> {:error, :not_found}
     end
   end
 
@@ -369,9 +349,5 @@ defmodule Jido.Storage.File do
     :global.trans(lock_id, fn ->
       fun.()
     end)
-  end
-
-  defp generate_entry_id do
-    "entry_" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
   end
 end

@@ -22,10 +22,18 @@ defmodule JidoTest.Storage.ETSTest do
   end
 
   describe "checkpoint operations" do
+    test "rejects non-atom table names to avoid dynamic atom creation" do
+      opts = [table: "runtime_user_input"]
+
+      assert {:error, :invalid_table_name} = ETS.get_checkpoint(:key, opts)
+      assert {:error, :invalid_table_name} = ETS.put_checkpoint(:key, %{state: "saved"}, opts)
+      assert {:error, :invalid_table_name} = ETS.delete_checkpoint(:key, opts)
+    end
+
     test "get_checkpoint/2 returns :not_found for missing key" do
       opts = [table: unique_table(:get_missing)]
 
-      assert :not_found = ETS.get_checkpoint(:nonexistent_key, opts)
+      assert {:error, :not_found} = ETS.get_checkpoint(:nonexistent_key, opts)
     end
 
     test "put_checkpoint/3 stores and get_checkpoint/2 retrieves data" do
@@ -52,7 +60,7 @@ defmodule JidoTest.Storage.ETSTest do
       assert {:ok, _} = ETS.get_checkpoint(:to_delete, opts)
 
       assert :ok = ETS.delete_checkpoint(:to_delete, opts)
-      assert :not_found = ETS.get_checkpoint(:to_delete, opts)
+      assert {:error, :not_found} = ETS.get_checkpoint(:to_delete, opts)
     end
 
     test "delete_checkpoint/2 succeeds even if key doesn't exist" do
@@ -75,10 +83,18 @@ defmodule JidoTest.Storage.ETSTest do
   end
 
   describe "thread operations" do
+    test "thread operations reject non-atom table names" do
+      opts = [table: "runtime_user_input"]
+
+      assert {:error, :invalid_table_name} = ETS.load_thread("t-1", opts)
+      assert {:error, :invalid_table_name} = ETS.append_thread("t-1", [%{kind: :note}], opts)
+      assert {:error, :invalid_table_name} = ETS.delete_thread("t-1", opts)
+    end
+
     test "load_thread/2 returns :not_found for missing thread" do
       opts = [table: unique_table(:load_missing)]
 
-      assert :not_found = ETS.load_thread("nonexistent_thread", opts)
+      assert {:error, :not_found} = ETS.load_thread("nonexistent_thread", opts)
     end
 
     test "append_thread/3 creates thread with entries" do
@@ -178,7 +194,7 @@ defmodule JidoTest.Storage.ETSTest do
       assert {:ok, _} = ETS.load_thread(thread_id, opts)
 
       assert :ok = ETS.delete_thread(thread_id, opts)
-      assert :not_found = ETS.load_thread(thread_id, opts)
+      assert {:error, :not_found} = ETS.load_thread(thread_id, opts)
     end
 
     test "delete_thread/2 succeeds even if thread doesn't exist" do
@@ -227,6 +243,27 @@ defmodule JidoTest.Storage.ETSTest do
 
       {:ok, loaded} = ETS.load_thread(thread_id, opts)
       assert loaded.rev == 4
+    end
+
+    test "concurrent appends serialize and preserve all entries" do
+      opts = [table: unique_table(:concurrent_append)]
+      thread_id = "thread_#{System.unique_integer([:positive])}"
+      count = 25
+
+      tasks =
+        for n <- 1..count do
+          Task.async(fn ->
+            ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: n}}], opts)
+          end)
+        end
+
+      results = Enum.map(tasks, &Task.await(&1, 5_000))
+      assert Enum.all?(results, &match?({:ok, %Thread{}}, &1))
+
+      {:ok, loaded} = ETS.load_thread(thread_id, opts)
+      assert loaded.rev == count
+      assert Thread.entry_count(loaded) == count
+      assert Enum.map(loaded.entries, & &1.seq) == Enum.to_list(0..(count - 1))
     end
 
     test "entries get unique IDs assigned" do
@@ -317,6 +354,28 @@ defmodule JidoTest.Storage.ETSTest do
   end
 
   describe "table isolation" do
+    test "tables are created under dedicated owner/heir policy" do
+      base_table = unique_table(:ownership_policy)
+      opts = [table: base_table]
+
+      assert :ok = ETS.put_checkpoint(:policy_key, %{ok: true}, opts)
+
+      owner_pid = Process.whereis(Jido.Storage.ETS.Owner)
+      heir_pid = Process.whereis(Jido.Storage.ETS.Heir)
+
+      checkpoints = :"#{base_table}_checkpoints"
+      threads = :"#{base_table}_threads"
+      meta = :"#{base_table}_thread_meta"
+
+      assert owner_pid == :ets.info(checkpoints, :owner)
+      assert owner_pid == :ets.info(threads, :owner)
+      assert owner_pid == :ets.info(meta, :owner)
+
+      assert heir_pid == :ets.info(checkpoints, :heir)
+      assert heir_pid == :ets.info(threads, :heir)
+      assert heir_pid == :ets.info(meta, :heir)
+    end
+
     test "different table names are isolated" do
       opts1 = [table: unique_table(:isolation1)]
       opts2 = [table: unique_table(:isolation2)]

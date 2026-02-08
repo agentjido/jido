@@ -31,7 +31,11 @@ defmodule Jido.Observe.Log do
 
   require Logger
 
-  @type level :: Logger.level()
+  @default_log_level :info
+  @telemetry_compatible_levels [:trace, :debug, :info, :warning, :error]
+  @logger_levels Logger.levels()
+
+  @type level :: :trace | :debug | :info | :warning | :error
 
   @doc """
   Returns the current observability log threshold.
@@ -41,8 +45,9 @@ defmodule Jido.Observe.Log do
   """
   @spec threshold() :: level()
   def threshold do
-    Application.get_env(:jido, :observability, [])
-    |> Keyword.get(:log_level, :info)
+    Jido.Observe.observability_config()
+    |> Keyword.get(:log_level, @default_log_level)
+    |> normalize_level()
   end
 
   @doc """
@@ -67,6 +72,22 @@ defmodule Jido.Observe.Log do
   """
   @spec log(level(), Logger.message(), keyword()) :: :ok
   def log(level, message, metadata \\ []) do
-    Jido.Util.cond_log(threshold(), level, message, metadata)
+    Jido.Util.cond_log(
+      normalize_for_logger(threshold()),
+      normalize_for_logger(level),
+      message,
+      metadata
+    )
   end
+
+  defp normalize_level(level) when level in @telemetry_compatible_levels, do: level
+  defp normalize_level(_), do: @default_log_level
+
+  defp normalize_for_logger(:trace), do: :debug
+
+  defp normalize_for_logger(level) when level in @logger_levels do
+    level
+  end
+
+  defp normalize_for_logger(_), do: @default_log_level
 end

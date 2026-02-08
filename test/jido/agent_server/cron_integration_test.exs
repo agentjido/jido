@@ -114,6 +114,34 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       GenServer.stop(pid)
     end
 
+    test "cron ticks are delivered to the owning agent", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: CronTestAgent, id: "cron-test-delivery", jido: jido)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :delivery_test, cron: "*/1 * * * * *"}
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      eventually_state(
+        pid,
+        fn state ->
+          Map.has_key?(state.cron_jobs, :delivery_test) and state.agent.state.tick_count >= 1
+        end,
+        timeout: 2_500
+      )
+
+      {:ok, state} = AgentServer.state(pid)
+      assert state.agent.state.tick_count >= 1
+      assert state.agent.state.ticks != []
+
+      GenServer.stop(pid)
+    end
+
     test "registering same job_id updates existing job (upsert)", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-3", jido: jido)
 

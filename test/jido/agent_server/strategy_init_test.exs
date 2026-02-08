@@ -95,10 +95,20 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     def signal_routes(_ctx), do: []
   end
 
+  defp await_strategy_initialized(pid) do
+    eventually_state(pid, fn state ->
+      strategy_state = Map.get(state.agent.state, :__strategy__, %{})
+      Map.get(strategy_state, :initialized) == true
+    end)
+
+    {:ok, state} = AgentServer.state(pid)
+    state
+  end
+
   describe "strategy.init/2 lifecycle" do
     test "strategy.init/2 is called on AgentServer startup", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TrackingAgent, jido: jido)
-      {:ok, state} = AgentServer.state(pid)
+      state = await_strategy_initialized(pid)
 
       assert state.agent.state.__strategy__.initialized == true
 
@@ -107,7 +117,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
 
     test "strategy_opts are passed to init/2", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TrackingAgent, jido: jido)
-      {:ok, state} = AgentServer.state(pid)
+      state = await_strategy_initialized(pid)
 
       assert state.agent.state.__strategy__.opts == [max_iterations: 5]
 
@@ -117,7 +127,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     test "strategy state is initialized before first signal", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TrackingAgent, jido: jido)
 
-      {:ok, state} = AgentServer.state(pid)
+      state = await_strategy_initialized(pid)
       assert state.agent.state.__strategy__.initialized == true
 
       signal = Signal.new!("test", %{}, source: "/test")
@@ -138,6 +148,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
 
     test "default Direct strategy works (no-op init)", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: DefaultStrategyAgent, jido: jido)
+      eventually_state(pid, fn state -> state.status == :idle end)
       {:ok, state} = AgentServer.state(pid)
 
       assert state.status == :idle
@@ -149,7 +160,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     test "strategy init works with pre-built agent", %{jido: jido} do
       agent = TrackingAgent.new(id: "prebuilt")
       {:ok, pid} = AgentServer.start_link(agent: agent, agent_module: TrackingAgent, jido: jido)
-      {:ok, state} = AgentServer.state(pid)
+      state = await_strategy_initialized(pid)
 
       assert state.agent.state.__strategy__.initialized == true
 
@@ -164,7 +175,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
           jido: jido
         )
 
-      {:ok, state} = AgentServer.state(pid)
+      state = await_strategy_initialized(pid)
 
       assert state.agent.state.counter == 42
       assert state.agent.state.__strategy__.initialized == true

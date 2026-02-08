@@ -8,6 +8,8 @@ defmodule JidoTest.ThreadTest do
     test "creates entry with defaults" do
       entry = Entry.new(%{})
 
+      assert is_binary(entry.id)
+      assert String.starts_with?(entry.id, "entry_")
       assert entry.seq == 0
       assert entry.kind == :note
       assert entry.payload == %{}
@@ -48,6 +50,19 @@ defmodule JidoTest.ThreadTest do
 
       assert entry.kind == :error
       assert entry.payload == %{"msg" => "failed"}
+    end
+  end
+
+  describe "Entry.generate_id/0" do
+    test "returns unique entry-prefixed identifiers" do
+      id1 = Entry.generate_id()
+      id2 = Entry.generate_id()
+
+      assert is_binary(id1)
+      assert is_binary(id2)
+      assert String.starts_with?(id1, "entry_")
+      assert String.starts_with?(id2, "entry_")
+      refute id1 == id2
     end
   end
 
@@ -343,6 +358,55 @@ defmodule JidoTest.ThreadTest do
 
       assert Thread.entry_count(original) == 0
       assert Thread.entry_count(updated) == 1
+    end
+  end
+
+  describe "Thread.prepare_entries/3 and Thread.from_entries/2" do
+    test "prepare_entries assigns ids, seq, and timestamps consistently" do
+      now = System.system_time(:millisecond)
+
+      [first, second] =
+        Thread.prepare_entries(
+          [
+            %{kind: :message, payload: %{content: "one"}},
+            Entry.new(kind: :message, payload: %{content: "two"})
+          ],
+          5,
+          now
+        )
+
+      assert first.seq == 5
+      assert second.seq == 6
+      assert first.at == now
+      assert second.at >= now
+      assert String.starts_with?(first.id, "entry_")
+      assert String.starts_with?(second.id, "entry_")
+    end
+
+    test "from_entries reconstructs thread with metadata and timestamps" do
+      entries =
+        Thread.prepare_entries(
+          [
+            %{kind: :message, payload: %{content: "a"}},
+            %{kind: :message, payload: %{content: "b"}}
+          ],
+          0,
+          1_700_000_000_000
+        )
+
+      thread =
+        Thread.from_entries("thread_from_entries", entries,
+          metadata: %{source: :test},
+          created_at: 1_700_000_000_000,
+          updated_at: 1_700_000_000_999
+        )
+
+      assert thread.id == "thread_from_entries"
+      assert thread.rev == 2
+      assert thread.stats.entry_count == 2
+      assert thread.metadata == %{source: :test}
+      assert thread.created_at == 1_700_000_000_000
+      assert thread.updated_at == 1_700_000_000_999
     end
   end
 end

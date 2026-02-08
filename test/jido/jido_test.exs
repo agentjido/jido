@@ -42,9 +42,108 @@ defmodule JidoTest.JidoTest do
     end
   end
 
+  describe "script convenience APIs" do
+    test "default_instance/0 and start/1 wrappers are idempotent" do
+      assert Jido.default_instance() == Jido.Default
+
+      name = :"jido_start_wrapper_#{System.unique_integer([:positive])}"
+      assert {:ok, pid} = Jido.start(name: name)
+      assert {:ok, ^pid} = Jido.start(name: name)
+      assert :ok = Jido.stop(name)
+    end
+  end
+
   describe "stop_agent/2 with non-existent id" do
-    test "returns error when agent not found", %{jido: jido} do
-      assert {:error, :not_found} = Jido.stop_agent(jido, "non-existent-agent-id")
+    test "is idempotent when agent is not found", %{jido: jido} do
+      assert :ok = Jido.stop_agent(jido, "non-existent-agent-id")
+    end
+  end
+
+  describe "stop/1" do
+    test "returns :ok for unknown instance and stops a running instance" do
+      missing = :"jido_missing_#{System.unique_integer([:positive])}"
+      assert :ok = Jido.stop(missing)
+
+      running = :"jido_running_#{System.unique_integer([:positive])}"
+      {:ok, pid} = Jido.start_link(name: running)
+      assert Process.alive?(pid)
+
+      assert :ok = Jido.stop(running)
+      refute Process.alive?(pid)
+      assert :ok = Jido.stop(running)
+    end
+  end
+
+  describe "supervisor race hardening" do
+    test "start_agent/3 returns explicit missing supervisor error for unknown instance" do
+      missing_instance = :"missing_jido_#{System.unique_integer([:positive])}"
+      expected_sup = Jido.agent_supervisor_name(missing_instance)
+
+      assert {:error, {:missing_supervisor, ^expected_sup}} =
+               Jido.start_agent(missing_instance, Minimal, id: "missing-start")
+    end
+
+    test "stop_agent/2 by pid returns :not_found when instance supervisor is unavailable" do
+      missing_instance = :"missing_jido_#{System.unique_integer([:positive])}"
+      pid = self()
+
+      assert {:error, :not_found} = Jido.stop_agent(missing_instance, pid)
+    end
+  end
+
+  describe "dynamic supervisor guardrails" do
+    test "respects configured max_agents limit" do
+      instance = :"jido_max_children_#{System.unique_integer([:positive])}"
+      {:ok, _pid} = start_supervised({Jido, name: instance, max_agents: 1})
+
+      assert {:ok, _} = Jido.start_agent(instance, Minimal, id: "max-agents-1")
+      assert {:error, :max_children} = Jido.start_agent(instance, Minimal, id: "max-agents-2")
+    end
+
+    test "init/1 applies configurable restart intensity settings" do
+      instance = :"jido_restart_cfg_#{System.unique_integer([:positive])}"
+
+      assert {:ok, {_flags, children}} =
+               Jido.init(name: instance, max_restarts: 77, max_seconds: 11)
+
+      agent_sup_name = Jido.agent_supervisor_name(instance)
+      spec = Enum.find(children, &(&1.id == agent_sup_name))
+
+      assert %{start: {DynamicSupervisor, :start_link, [opts]}} = spec
+      assert opts[:max_restarts] == 77
+      assert opts[:max_seconds] == 11
+    end
+  end
+
+  describe "registry and counting helpers" do
+    test "whereis/list_agents/agent_count reflect running agents", %{jido: jido} do
+      id1 = "helper-agent-1"
+      id2 = "helper-agent-2"
+
+      assert Jido.agent_count(jido) == 0
+
+      {:ok, pid1} = Jido.start_agent(jido, Minimal, id: id1)
+      {:ok, pid2} = Jido.start_agent(jido, Minimal, id: id2)
+
+      assert Jido.whereis(jido, id1) == pid1
+      assert Jido.whereis(jido, id2) == pid2
+      assert Jido.whereis(jido, "unknown-id") == nil
+
+      assert {id1, pid1} in Jido.list_agents(jido)
+      assert {id2, pid2} in Jido.list_agents(jido)
+      assert Jido.agent_count(jido) == 2
+    end
+
+    test "agent_count/1 returns zero for missing instance supervisor" do
+      missing = :"jido_missing_sup_#{System.unique_integer([:positive])}"
+      assert Jido.agent_count(missing) == 0
+    end
+  end
+
+  describe "start_agent/2 default options" do
+    test "starts an agent without explicit opts", %{jido: jido} do
+      assert {:ok, pid} = Jido.start_agent(jido, Minimal)
+      assert is_pid(pid)
     end
   end
 

@@ -24,10 +24,17 @@ defmodule Jido.Storage.ETS do
 
   Thread operations use atomic ETS operations. The `expected_rev` option in
   `append_thread/3` provides optimistic concurrency control.
+
+  ## Table Ownership Policy
+
+  Tables are created through `Jido.Storage.ETS.Owner`, with
+  `Jido.Storage.ETS.Heir` configured as ETS heir. This avoids accidental table
+  loss when a random caller process exits.
   """
 
   @behaviour Jido.Storage
 
+  alias Jido.Storage.ETS.Owner
   alias Jido.Thread
   alias Jido.Thread.Entry
 
@@ -39,19 +46,19 @@ defmodule Jido.Storage.ETS do
   @doc """
   Retrieve a checkpoint by key.
 
-  Returns `{:ok, data}` if found, `:not_found` otherwise.
+  Returns `{:ok, data}` if found, `{:error, :not_found}` otherwise.
   """
-  @spec get_checkpoint(term(), opts()) :: {:ok, term()} | :not_found | {:error, term()}
+  @spec get_checkpoint(term(), opts()) :: {:ok, term()} | {:error, :not_found | term()}
   def get_checkpoint(key, opts) do
-    table = checkpoint_table(opts)
-    ensure_tables(opts)
-
-    case :ets.lookup(table, key) do
-      [{^key, data}] -> {:ok, data}
-      [] -> :not_found
+    with {:ok, table} <- checkpoint_table(opts),
+         :ok <- ensure_tables(opts) do
+      case :ets.lookup(table, key) do
+        [{^key, data}] -> {:ok, data}
+        [] -> {:error, :not_found}
+      end
     end
   rescue
-    ArgumentError -> :not_found
+    ArgumentError -> {:error, :not_found}
   end
 
   @impl true
@@ -60,10 +67,11 @@ defmodule Jido.Storage.ETS do
   """
   @spec put_checkpoint(term(), term(), opts()) :: :ok | {:error, term()}
   def put_checkpoint(key, data, opts) do
-    table = checkpoint_table(opts)
-    ensure_tables(opts)
-    :ets.insert(table, {key, data})
-    :ok
+    with {:ok, table} <- checkpoint_table(opts),
+         :ok <- ensure_tables(opts) do
+      :ets.insert(table, {key, data})
+      :ok
+    end
   rescue
     ArgumentError -> {:error, :table_not_found}
   end
@@ -74,10 +82,11 @@ defmodule Jido.Storage.ETS do
   """
   @spec delete_checkpoint(term(), opts()) :: :ok | {:error, term()}
   def delete_checkpoint(key, opts) do
-    table = checkpoint_table(opts)
-    ensure_tables(opts)
-    :ets.delete(table, key)
-    :ok
+    with {:ok, table} <- checkpoint_table(opts),
+         :ok <- ensure_tables(opts) do
+      :ets.delete(table, key)
+      :ok
+    end
   rescue
     ArgumentError -> :ok
   end
@@ -86,31 +95,31 @@ defmodule Jido.Storage.ETS do
   @doc """
   Load a thread by ID, reconstructing from stored entries.
 
-  Returns `{:ok, thread}` if entries exist, `:not_found` otherwise.
+  Returns `{:ok, thread}` if entries exist, `{:error, :not_found}` otherwise.
   """
-  @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | :not_found | {:error, term()}
+  @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | {:error, :not_found | term()}
   def load_thread(thread_id, opts) do
-    threads_table = threads_table(opts)
-    meta_table = meta_table(opts)
-    ensure_tables(opts)
+    with {:ok, threads_table} <- threads_table(opts),
+         {:ok, meta_table} <- meta_table(opts),
+         :ok <- ensure_tables(opts) do
+      entries =
+        :ets.select(threads_table, [
+          {{{thread_id, :_}, :_}, [], [:"$_"]}
+        ])
+        |> Enum.sort_by(fn {{_id, seq}, _entry} -> seq end)
+        |> Enum.map(fn {_key, entry} -> entry end)
 
-    entries =
-      :ets.select(threads_table, [
-        {{{thread_id, :_}, :_}, [], [:"$_"]}
-      ])
-      |> Enum.sort_by(fn {{_id, seq}, _entry} -> seq end)
-      |> Enum.map(fn {_key, entry} -> entry end)
+      case entries do
+        [] ->
+          {:error, :not_found}
 
-    case entries do
-      [] ->
-        :not_found
-
-      entries ->
-        meta = get_thread_meta(meta_table, thread_id)
-        {:ok, reconstruct_thread(thread_id, entries, meta)}
+        entries ->
+          meta = get_thread_meta(meta_table, thread_id)
+          {:ok, thread_from_entries(thread_id, entries, meta)}
+      end
     end
   rescue
-    ArgumentError -> :not_found
+    ArgumentError -> {:error, :not_found}
   end
 
   @impl true
@@ -126,10 +135,17 @@ defmodule Jido.Storage.ETS do
   @spec append_thread(String.t(), [Entry.t()], opts()) ::
           {:ok, Thread.t()} | {:error, term()}
   def append_thread(thread_id, entries, opts) do
-    threads_table = threads_table(opts)
-    meta_table = meta_table(opts)
-    ensure_tables(opts)
+    with {:ok, threads_table} <- threads_table(opts),
+         :ok <- ensure_tables(opts) do
+      run_locked_append(thread_id, entries, opts, threads_table)
+    end
+  rescue
+    ArgumentError -> {:error, :table_not_found}
+  end
 
+  defp do_append_thread(thread_id, entries, opts) do
+    {:ok, threads_table} = threads_table(opts)
+    {:ok, meta_table} = meta_table(opts)
     expected_rev = Keyword.get(opts, :expected_rev)
     now = System.system_time(:millisecond)
 
@@ -142,12 +158,7 @@ defmodule Jido.Storage.ETS do
       is_new = current_rev == 0
 
       prepared_entries =
-        entries
-        |> Enum.with_index()
-        |> Enum.map(fn {entry, idx} ->
-          seq = base_seq + idx
-          prepare_entry(entry, seq, now)
-        end)
+        Thread.prepare_entries(entries, base_seq, now)
 
       ets_entries =
         Enum.map(prepared_entries, fn entry ->
@@ -170,10 +181,8 @@ defmodule Jido.Storage.ETS do
           update_thread_meta(meta_table, thread_id, now)
         end
 
-      {:ok, reconstruct_thread(thread_id, load_all_entries(threads_table, thread_id), meta)}
+      {:ok, thread_from_entries(thread_id, load_all_entries(threads_table, thread_id), meta)}
     end
-  rescue
-    ArgumentError -> {:error, :table_not_found}
   end
 
   @impl true
@@ -182,49 +191,88 @@ defmodule Jido.Storage.ETS do
   """
   @spec delete_thread(String.t(), opts()) :: :ok | {:error, term()}
   def delete_thread(thread_id, opts) do
-    threads_table = threads_table(opts)
-    meta_table = meta_table(opts)
-    ensure_tables(opts)
+    with {:ok, threads_table} <- threads_table(opts),
+         {:ok, meta_table} <- meta_table(opts),
+         :ok <- ensure_tables(opts) do
+      :ets.select_delete(threads_table, [
+        {{{thread_id, :_}, :_}, [], [true]}
+      ])
 
-    :ets.select_delete(threads_table, [
-      {{{thread_id, :_}, :_}, [], [true]}
-    ])
+      :ets.delete(meta_table, thread_id)
 
-    :ets.delete(meta_table, thread_id)
-
-    :ok
+      :ok
+    end
   rescue
     ArgumentError -> :ok
   end
 
+  @doc """
+  Deletes all ETS tables for a storage base name.
+
+  This is primarily intended for tests or explicit lifecycle cleanup.
+  """
+  @spec cleanup(opts()) :: :ok | {:error, term()}
+  def cleanup(opts) do
+    with {:ok, checkpoints} <- checkpoint_table(opts),
+         {:ok, threads} <- threads_table(opts),
+         {:ok, meta} <- meta_table(opts) do
+      [checkpoints, threads, meta]
+      |> Enum.each(&delete_table_if_exists/1)
+
+      :ok
+    end
+  end
+
   defp checkpoint_table(opts) do
-    base = Keyword.get(opts, :table, @default_table)
-    :"#{base}_checkpoints"
+    with {:ok, base} <- table_base(opts) do
+      {:ok, :"#{base}_checkpoints"}
+    end
   end
 
   defp threads_table(opts) do
-    base = Keyword.get(opts, :table, @default_table)
-    :"#{base}_threads"
+    with {:ok, base} <- table_base(opts) do
+      {:ok, :"#{base}_threads"}
+    end
   end
 
   defp meta_table(opts) do
-    base = Keyword.get(opts, :table, @default_table)
-    :"#{base}_thread_meta"
+    with {:ok, base} <- table_base(opts) do
+      {:ok, :"#{base}_thread_meta"}
+    end
+  end
+
+  defp table_base(opts) do
+    case Keyword.get(opts, :table, @default_table) do
+      base when is_atom(base) -> {:ok, base}
+      _ -> {:error, :invalid_table_name}
+    end
   end
 
   defp ensure_tables(opts) do
-    ensure_table(checkpoint_table(opts), [:set])
-    ensure_table(threads_table(opts), [:ordered_set])
-    ensure_table(meta_table(opts), [:set])
+    with {:ok, checkpoints} <- checkpoint_table(opts),
+         {:ok, threads} <- threads_table(opts),
+         {:ok, meta} <- meta_table(opts),
+         :ok <- Owner.ensure_table(checkpoints, [:set]),
+         :ok <- Owner.ensure_table(threads, [:ordered_set]) do
+      Owner.ensure_table(meta, [:set])
+    end
   end
 
-  defp ensure_table(name, extra_opts) do
-    case :ets.whereis(name) do
-      :undefined ->
-        :ets.new(name, [:named_table, :public, read_concurrency: true] ++ extra_opts)
+  defp run_locked_append(thread_id, entries, opts, threads_table) do
+    # :global.trans/2 expects {resource_id, requester_id}. The resource part must stay
+    # stable for contention, while requester_id tracks lock ownership per caller pid.
+    lock_key = {{__MODULE__, threads_table, thread_id}, self()}
 
-      _ref ->
-        :ok
+    case :global.trans(lock_key, fn -> do_append_thread(thread_id, entries, opts) end) do
+      {:aborted, reason} -> {:error, reason}
+      result -> result
+    end
+  end
+
+  defp delete_table_if_exists(name) when is_atom(name) do
+    case :ets.whereis(name) do
+      :undefined -> :ok
+      _table_ref -> :ets.delete(name)
     end
   rescue
     ArgumentError -> :ok
@@ -265,50 +313,11 @@ defmodule Jido.Storage.ETS do
     end
   end
 
-  defp prepare_entry(%Entry{} = entry, seq, now) do
-    %Entry{
-      id: entry.id || generate_entry_id(),
-      seq: seq,
-      at: entry.at || now,
-      kind: entry.kind,
-      payload: entry.payload,
-      refs: entry.refs
-    }
-  end
-
-  defp prepare_entry(attrs, seq, now) when is_map(attrs) do
-    %Entry{
-      id: fetch_entry_attr(attrs, :id, &generate_entry_id/0),
-      seq: seq,
-      at: fetch_entry_attr(attrs, :at, fn -> now end),
-      kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
-      payload: fetch_entry_attr(attrs, :payload, fn -> %{} end),
-      refs: fetch_entry_attr(attrs, :refs, fn -> %{} end)
-    }
-  end
-
-  defp fetch_entry_attr(attrs, key, default_fun) when is_function(default_fun, 0) do
-    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
-      nil -> default_fun.()
-      value -> value
-    end
-  end
-
-  defp reconstruct_thread(thread_id, entries, meta) do
-    entry_count = length(entries)
-
-    %Thread{
-      id: thread_id,
-      rev: entry_count,
-      entries: entries,
-      created_at: meta[:created_at] || (List.first(entries) && List.first(entries).at),
-      updated_at: meta[:updated_at] || (List.last(entries) && List.last(entries).at),
+  defp thread_from_entries(thread_id, entries, meta) do
+    Thread.from_entries(thread_id, entries,
       metadata: meta[:metadata] || %{},
-      stats: %{entry_count: entry_count}
-    }
-  end
-
-  defp generate_entry_id do
-    "entry_" <> Jido.Util.generate_id()
+      created_at: meta[:created_at],
+      updated_at: meta[:updated_at]
+    )
   end
 end

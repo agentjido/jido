@@ -44,6 +44,11 @@ defmodule JidoTest.UtilTest do
                "expected #{inspect(name)} to be rejected with validate: true"
       end
     end
+
+    test "returns structured validation errors" do
+      assert {:error, %Jido.Error.ValidationError{} = err} = Util.validate_name("invalid-name")
+      assert err.message =~ "must start with a letter"
+    end
   end
 
   describe "validate_actions/1" do
@@ -63,6 +68,11 @@ defmodule JidoTest.UtilTest do
         assert {:error, _} = Util.validate_actions(invalid),
                "expected #{inspect(invalid)} to be rejected"
       end
+    end
+
+    test "returns structured validation errors for invalid actions" do
+      assert {:error, %Jido.Error.ValidationError{} = err} = Util.validate_actions([Enum])
+      assert err.kind == :action
     end
   end
 

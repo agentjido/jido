@@ -98,6 +98,8 @@ defmodule Jido.Scheduler do
   @spec cancel(pid()) :: :ok
   def cancel(pid) when is_pid(pid) do
     SchedEx.cancel(pid)
+  catch
+    :exit, _ -> :ok
   end
 
   @doc """

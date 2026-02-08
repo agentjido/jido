@@ -84,12 +84,12 @@ defmodule Jido.Plugin do
                                 description:
                                   "The name of the Plugin. Must contain only letters, numbers, and underscores."
                               )
-                              |> Zoi.refine({Jido.Util, :validate_name, []}),
+                              |> Zoi.refine({Jido.Util, :validate_name_refinement, []}),
                             state_key:
                               Zoi.atom(description: "The key for plugin state in agent state."),
                             actions:
                               Zoi.list(Zoi.atom(), description: "List of action modules.")
-                              |> Zoi.refine({Jido.Util, :validate_actions, []}),
+                              |> Zoi.refine({Jido.Util, :validate_actions_refinement, []}),
                             description:
                               Zoi.string(description: "A description of what the Plugin does.")
                               |> Zoi.optional(),

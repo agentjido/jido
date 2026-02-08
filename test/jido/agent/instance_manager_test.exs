@@ -7,8 +7,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   @moduletag :integration
 
   alias Jido.Agent.InstanceManager
-  alias Jido.Agent.Store.ETS
   alias Jido.AgentServer
+  alias Jido.Storage.ETS, as: StorageETS
 
   # Use module attribute for manager naming to avoid atom leaks
   # Each test gets a unique integer suffix but we clean up persistent_term
@@ -83,7 +83,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     end
 
     test "get/3 starts agent if not running", %{manager: manager} do
-      assert InstanceManager.lookup(manager, "key-1") == :error
+      assert InstanceManager.lookup(manager, "key-1") == {:error, :not_found}
 
       {:ok, pid} = InstanceManager.get(manager, "key-1")
       assert is_pid(pid)
@@ -146,7 +146,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1000
 
       # Lookup should return error
-      assert InstanceManager.lookup(manager, "stop-key") == :error
+      eventually(fn -> InstanceManager.lookup(manager, "stop-key") == {:error, :not_found} end)
     end
 
     test "stop/2 returns error for non-existent key", %{manager: manager} do
@@ -258,7 +258,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     end
   end
 
-  describe "persistence with ETS store" do
+  describe "storage-backed hibernate/thaw" do
     setup do
       manager_name = :"#{@manager_prefix}_persist_#{:erlang.unique_integer([:positive])}"
       table_name = :"#{@manager_prefix}_cache_#{:erlang.unique_integer([:positive])}"
@@ -269,9 +269,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
             name: manager_name,
             agent: TestAgent,
             idle_timeout: 200,
-            persistence: [
-              store: {Jido.Agent.Store.ETS, table: table_name}
-            ],
+            storage: {Jido.Storage.ETS, table: table_name},
             agent_opts: [jido: JidoTest.InstanceManagerTestJido]
           )
         )
@@ -279,11 +277,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       on_exit(fn ->
         :persistent_term.erase({InstanceManager, manager_name})
 
-        try do
-          :ets.delete(table_name)
-        rescue
-          _ -> :ok
-        end
+        :ok = StorageETS.cleanup(table: table_name)
       end)
 
       {:ok, manager: manager_name, table: table_name}
@@ -342,17 +336,22 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       # Wait for process to terminate
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1000
 
-      # Verify state was persisted to ETS
-      store_key = {TestAgent, "stop-persist-key"}
+      # Verify state was persisted to storage checkpoint.
+      # Persistence may complete asynchronously during terminate.
+      checkpoint_key = {Jido.Agent, "stop-persist-key"}
 
-      case ETS.get(store_key, table: table) do
-        {:ok, persisted} ->
-          # Persisted data should contain the counter
-          assert persisted.state.counter == 42
+      assert {:ok, persisted} =
+               eventually(
+                 fn ->
+                   case StorageETS.get_checkpoint(checkpoint_key, table: table) do
+                     {:ok, checkpoint} -> {:ok, checkpoint}
+                     {:error, :not_found} -> false
+                   end
+                 end,
+                 timeout: 2_000
+               )
 
-        :not_found ->
-          flunk("Agent state was not persisted on stop")
-      end
+      assert persisted.state.counter == 42
     end
   end
 
@@ -398,6 +397,22 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       # Stats are separate
       assert InstanceManager.stats(manager_a).count == 1
       assert InstanceManager.stats(manager_b).count == 1
+    end
+  end
+
+  describe "manager naming guards" do
+    test "rejects non-atom manager names for generated process names" do
+      assert_raise ArgumentError, ~r/manager must be an atom/i, fn ->
+        InstanceManager.supervisor_name("sessions")
+      end
+
+      assert_raise ArgumentError, ~r/manager must be an atom/i, fn ->
+        InstanceManager.registry_name("sessions")
+      end
+
+      assert_raise ArgumentError, ~r/manager must be an atom/i, fn ->
+        InstanceManager.dynamic_supervisor_name("sessions")
+      end
     end
   end
 end

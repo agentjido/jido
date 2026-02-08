@@ -48,7 +48,10 @@ defmodule Jido.Sensor.Runtime do
 
   require Logger
 
+  alias Jido.Runtime.Tasking
+  alias Jido.RuntimeDefaults
   alias Jido.Signal.Dispatch
+  @system_task_supervisor Jido.SystemTaskSupervisor
 
   @type server :: pid() | atom() | {:via, module(), term()}
 
@@ -87,7 +90,7 @@ defmodule Jido.Sensor.Runtime do
     %{
       id: id,
       start: {__MODULE__, :start_link, [opts]},
-      shutdown: 5_000,
+      shutdown: RuntimeDefaults.sensor_runtime_shutdown_timeout(),
       restart: :permanent,
       type: :worker
     }
@@ -146,12 +149,27 @@ defmodule Jido.Sensor.Runtime do
   end
 
   @impl GenServer
+  def handle_info({:timeout, timer_ref, {:sensor_timer, key, event}}, state)
+      when is_reference(timer_ref) do
+    case Map.get(state.timers, key) do
+      ^timer_ref ->
+        state = clear_timer_ref(state, key)
+        handle_sensor_event(event, state)
+
+      _other_ref ->
+        {:noreply, state}
+    end
+  end
+
+  @impl GenServer
   def handle_info(:tick, state) do
+    state = clear_timer_ref(state, :tick)
     handle_sensor_event(:tick, state)
   end
 
   @impl GenServer
   def handle_info({:scheduled_event, event}, state) do
+    state = clear_timer_ref(state, {:scheduled_event, event})
     handle_sensor_event(event, state)
   end
 
@@ -163,6 +181,8 @@ defmodule Jido.Sensor.Runtime do
 
   @impl GenServer
   def terminate(reason, state) do
+    cancel_all_timers(state.timers)
+
     if function_exported?(state.sensor, :terminate, 2) do
       state.sensor.terminate(reason, state.sensor_state)
     end
@@ -255,14 +275,14 @@ defmodule Jido.Sensor.Runtime do
     Enum.reduce(directives, state, &apply_directive/2)
   end
 
-  defp apply_directive({:schedule, interval_ms}, state) when is_integer(interval_ms) do
-    schedule_event(:tick, interval_ms)
-    state
+  defp apply_directive({:schedule, interval_ms}, state)
+       when is_integer(interval_ms) and interval_ms > 0 do
+    schedule_event(state, :tick, interval_ms)
   end
 
-  defp apply_directive({:schedule, interval_ms, event}, state) when is_integer(interval_ms) do
-    schedule_event(event, interval_ms)
-    state
+  defp apply_directive({:schedule, interval_ms, event}, state)
+       when is_integer(interval_ms) and interval_ms > 0 do
+    schedule_event(state, event, interval_ms)
   end
 
   defp apply_directive({:emit, signal}, state) do
@@ -276,12 +296,15 @@ defmodule Jido.Sensor.Runtime do
     state
   end
 
-  defp schedule_event(:tick, interval_ms) do
-    Process.send_after(self(), :tick, interval_ms)
+  defp schedule_event(state, :tick, interval_ms) do
+    timer_ref = :erlang.start_timer(interval_ms, self(), {:sensor_timer, :tick, :tick})
+    put_timer_ref(state, :tick, timer_ref)
   end
 
-  defp schedule_event(event, interval_ms) do
-    Process.send_after(self(), {:scheduled_event, event}, interval_ms)
+  defp schedule_event(state, event, interval_ms) do
+    key = {:scheduled_event, event}
+    timer_ref = :erlang.start_timer(interval_ms, self(), {:sensor_timer, key, event})
+    put_timer_ref(state, key, timer_ref)
   end
 
   # ---------------------------------------------------------------------------
@@ -297,7 +320,7 @@ defmodule Jido.Sensor.Runtime do
 
       agent_ref != nil ->
         if Code.ensure_loaded?(Dispatch) do
-          Dispatch.dispatch(signal, agent_ref)
+          dispatch_async(signal, agent_ref)
         else
           Logger.warning("Jido.Signal.Dispatch not available, cannot deliver signal")
         end
@@ -305,5 +328,46 @@ defmodule Jido.Sensor.Runtime do
       true ->
         Logger.debug("Sensor.Runtime #{state.id} has no agent_ref, signal not delivered")
     end
+  end
+
+  defp dispatch_async(signal, agent_ref) do
+    case Tasking.start_child(
+           fn ->
+             Dispatch.dispatch(signal, agent_ref)
+           end,
+           candidates: [@system_task_supervisor]
+         ) do
+      {:ok, _task_pid} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning("Sensor dispatch dropped: failed to start async task (#{inspect(reason)})")
+    end
+  end
+
+  defp put_timer_ref(state, key, timer_ref) do
+    state = cancel_timer_ref(state, key)
+    %{state | timers: Map.put(state.timers, key, timer_ref)}
+  end
+
+  defp clear_timer_ref(state, key) do
+    %{state | timers: Map.delete(state.timers, key)}
+  end
+
+  defp cancel_timer_ref(state, key) do
+    case Map.pop(state.timers, key) do
+      {nil, _timers} ->
+        state
+
+      {timer_ref, timers} ->
+        Process.cancel_timer(timer_ref)
+        %{state | timers: timers}
+    end
+  end
+
+  defp cancel_all_timers(timers) do
+    Enum.each(timers, fn {_key, timer_ref} ->
+      Process.cancel_timer(timer_ref)
+    end)
   end
 end

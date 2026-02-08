@@ -44,9 +44,9 @@ defprotocol Jido.AgentServer.DirectiveExec do
 
       defimpl Jido.AgentServer.DirectiveExec, for: MyApp.Directive.CallLLM do
         def exec(%{model: model, prompt: prompt}, _input_signal, state) do
-          Task.Supervisor.start_child(Jido.TaskSupervisor, fn ->
+          Jido.Runtime.Tasking.start_child(fn ->
             MyApp.LLM.call(model, prompt)
-          end)
+          end, jido: state.jido)
           {:async, nil, state}
         end
       end

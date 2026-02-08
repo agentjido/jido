@@ -389,6 +389,11 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, tracer: SomeTracer)
       assert Log.threshold() == :info
     end
+
+    test "defaults to :info when configured log_level is invalid" do
+      Application.put_env(:jido, :observability, log_level: :verbose)
+      assert Log.threshold() == :info
+    end
   end
 
   describe "Jido.Observe.Log.log/3" do
@@ -461,6 +466,17 @@ defmodule JidoTest.ObserveTest do
         end)
 
       assert log =~ "debug level message"
+    end
+
+    test "treats :trace threshold as most verbose level" do
+      Application.put_env(:jido, :observability, log_level: :trace)
+
+      log =
+        capture_log(fn ->
+          Log.log(:debug, "trace threshold debug message")
+        end)
+
+      assert log =~ "trace threshold debug message"
     end
   end
 

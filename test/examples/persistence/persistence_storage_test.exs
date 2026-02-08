@@ -67,7 +67,7 @@ defmodule JidoExampleTest.PersistenceStorageTest do
     test "thaw returns :not_found for non-existent agent" do
       table = unique_table()
 
-      assert :not_found = Persist.thaw(storage(table), Agent, "does-not-exist")
+      assert {:error, :not_found} = Persist.thaw(storage(table), Agent, "does-not-exist")
     end
 
     test "state mutations before hibernate are preserved after thaw" do

@@ -2,6 +2,7 @@ defmodule Jido do
   use Supervisor
 
   alias Jido.Agent.WorkerPool
+  alias Jido.RuntimeDefaults
 
   @moduledoc """
   自動 (Jido) - A foundational framework for building autonomous, distributed agent systems in Elixir.
@@ -71,7 +72,7 @@ defmodule Jido do
   Optionally configure in `config/config.exs` to customize defaults:
 
       config :my_app, MyApp.Jido,
-        max_tasks: 2000,
+        max_tasks: 1000,
         agent_pools: []
   """
   defmacro __using__(opts) do
@@ -181,7 +182,7 @@ defmodule Jido do
       end
 
       @doc "Thaw an agent from storage."
-      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | {:error, :not_found | term()}
       def thaw(agent_module, key) do
         Jido.Persist.thaw(__jido_storage__(), agent_module, key)
       end
@@ -214,7 +215,7 @@ defmodule Jido do
       {:ok, pid} = Jido.start_agent(Jido.default_instance(), MyAgent)
 
       # With custom options
-      {:ok, _} = Jido.start(max_tasks: 2000)
+      {:ok, _} = Jido.start(max_tasks: 1000)
 
   ## Options
 
@@ -245,8 +246,16 @@ defmodule Jido do
   @spec stop(atom()) :: :ok
   def stop(name \\ @default_instance) do
     case Process.whereis(name) do
-      nil -> :ok
-      pid -> Supervisor.stop(pid)
+      nil ->
+        :ok
+
+      pid ->
+        try do
+          Supervisor.stop(pid)
+        catch
+          :exit, {:noproc, _} -> :ok
+          :exit, {:normal, _} -> :ok
+        end
     end
   end
 
@@ -274,7 +283,7 @@ defmodule Jido do
       start: {__MODULE__, :start_link, [opts]},
       type: :supervisor,
       restart: :permanent,
-      shutdown: 10_000
+      shutdown: RuntimeDefaults.jido_supervisor_shutdown_timeout()
     }
   end
 
@@ -284,13 +293,17 @@ defmodule Jido do
 
     base_children = [
       {Task.Supervisor,
-       name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
+       name: task_supervisor_name(name),
+       max_children: Keyword.get(opts, :max_tasks, RuntimeDefaults.max_tasks())},
       {Registry, keys: :unique, name: registry_name(name)},
       {DynamicSupervisor,
        name: agent_supervisor_name(name),
        strategy: :one_for_one,
-       max_restarts: 1000,
-       max_seconds: 5}
+       max_children: Keyword.get(opts, :max_agents, RuntimeDefaults.max_agents()),
+       max_restarts:
+         Keyword.get(opts, :max_restarts, RuntimeDefaults.agent_supervisor_max_restarts()),
+       max_seconds:
+         Keyword.get(opts, :max_seconds, RuntimeDefaults.agent_supervisor_max_seconds())}
     ]
 
     pool_children =
@@ -340,8 +353,16 @@ defmodule Jido do
   """
   @spec start_agent(atom(), module() | struct(), keyword()) :: DynamicSupervisor.on_start_child()
   def start_agent(jido_instance, agent, opts \\ []) when is_atom(jido_instance) do
+    supervisor = agent_supervisor_name(jido_instance)
     child_spec = {Jido.AgentServer, Keyword.merge(opts, agent: agent, jido: jido_instance)}
-    DynamicSupervisor.start_child(agent_supervisor_name(jido_instance), child_spec)
+
+    case ensure_supervisor_running(supervisor) do
+      :ok ->
+        safe_start_child(supervisor, child_spec)
+
+      {:error, :not_found} ->
+        {:error, {:missing_supervisor, supervisor}}
+    end
   end
 
   @doc """
@@ -354,12 +375,14 @@ defmodule Jido do
   """
   @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, :not_found}
   def stop_agent(jido_instance, pid) when is_atom(jido_instance) and is_pid(pid) do
-    DynamicSupervisor.terminate_child(agent_supervisor_name(jido_instance), pid)
+    jido_instance
+    |> agent_supervisor_name()
+    |> safe_terminate_child(pid)
   end
 
   def stop_agent(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
     case whereis(jido_instance, id) do
-      nil -> {:error, :not_found}
+      nil -> :ok
       pid -> stop_agent(jido_instance, pid)
     end
   end
@@ -407,9 +430,12 @@ defmodule Jido do
   """
   @spec agent_count(atom()) :: non_neg_integer()
   def agent_count(jido_instance) when is_atom(jido_instance) do
-    agent_supervisor_name(jido_instance)
-    |> DynamicSupervisor.count_children()
-    |> Map.get(:active, 0)
+    supervisor = agent_supervisor_name(jido_instance)
+
+    case safe_count_children(supervisor) do
+      {:ok, counts} -> Map.get(counts, :active, 0)
+      {:error, :not_found} -> 0
+    end
   end
 
   # ---------------------------------------------------------------------------
@@ -423,7 +449,7 @@ defmodule Jido do
   end
 
   @doc "Thaw an agent using the given Jido instance."
-  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | {:error, :not_found | term()}
   def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
     Jido.Persist.thaw(jido_instance, agent_module, key)
   end
@@ -465,36 +491,53 @@ defmodule Jido do
 
   See `Jido.Await.completion/3` for details.
   """
-  defdelegate await(server, timeout_ms \\ 10_000, opts \\ []),
-    to: Jido.Await,
-    as: :completion
+  @spec await(Jido.Await.server(), timeout(), keyword()) ::
+          {:ok, Jido.Await.completion()} | {:error, term()}
+  def await(server, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ []) do
+    Jido.Await.completion(server, timeout_ms, opts)
+  end
 
   @doc """
   Wait for a child agent to reach a terminal status.
 
   See `Jido.Await.child/4` for details.
   """
-  defdelegate await_child(server, child_tag, timeout_ms \\ 30_000, opts \\ []),
-    to: Jido.Await,
-    as: :child
+  @spec await_child(Jido.Await.server(), term(), timeout(), keyword()) ::
+          {:ok, Jido.Await.completion()} | {:error, term()}
+  def await_child(
+        server,
+        child_tag,
+        timeout_ms \\ RuntimeDefaults.await_child_timeout(),
+        opts \\ []
+      ) do
+    Jido.Await.child(server, child_tag, timeout_ms, opts)
+  end
 
   @doc """
   Wait for all agents to reach terminal status.
 
   See `Jido.Await.all/3` for details.
   """
-  defdelegate await_all(servers, timeout_ms \\ 10_000, opts \\ []),
-    to: Jido.Await,
-    as: :all
+  @spec await_all([Jido.Await.server()], timeout(), keyword()) ::
+          {:ok, %{Jido.Await.server() => Jido.Await.completion()}}
+          | {:error, :timeout}
+          | {:error, {Jido.Await.server(), term()}}
+  def await_all(servers, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ []) do
+    Jido.Await.all(servers, timeout_ms, opts)
+  end
 
   @doc """
   Wait for any agent to reach terminal status.
 
   See `Jido.Await.any/3` for details.
   """
-  defdelegate await_any(servers, timeout_ms \\ 10_000, opts \\ []),
-    to: Jido.Await,
-    as: :any
+  @spec await_any([Jido.Await.server()], timeout(), keyword()) ::
+          {:ok, {Jido.Await.server(), Jido.Await.completion()}}
+          | {:error, :timeout}
+          | {:error, {Jido.Await.server(), term()}}
+  def await_any(servers, timeout_ms \\ RuntimeDefaults.await_timeout(), opts \\ []) do
+    Jido.Await.any(servers, timeout_ms, opts)
+  end
 
   @doc """
   Get the PIDs of all children of a parent agent.
@@ -523,4 +566,39 @@ defmodule Jido do
   See `Jido.Await.cancel/2` for details.
   """
   defdelegate cancel(server, opts \\ []), to: Jido.Await
+
+  # ---------------------------------------------------------------------------
+  # Internal
+  # ---------------------------------------------------------------------------
+
+  defp ensure_supervisor_running(supervisor) when is_atom(supervisor) do
+    case Process.whereis(supervisor) do
+      pid when is_pid(pid) -> :ok
+      nil -> {:error, :not_found}
+    end
+  end
+
+  defp safe_start_child(supervisor, child_spec) when is_atom(supervisor) do
+    DynamicSupervisor.start_child(supervisor, child_spec)
+  catch
+    :exit, {:noproc, _} -> {:error, {:missing_supervisor, supervisor}}
+    :exit, {:normal, _} -> {:error, {:missing_supervisor, supervisor}}
+    :exit, {:shutdown, _} -> {:error, {:missing_supervisor, supervisor}}
+  end
+
+  defp safe_terminate_child(supervisor, pid) when is_atom(supervisor) and is_pid(pid) do
+    DynamicSupervisor.terminate_child(supervisor, pid)
+  catch
+    :exit, {:noproc, _} -> {:error, :not_found}
+    :exit, {:normal, _} -> {:error, :not_found}
+    :exit, {:shutdown, _} -> {:error, :not_found}
+  end
+
+  defp safe_count_children(supervisor) when is_atom(supervisor) do
+    {:ok, DynamicSupervisor.count_children(supervisor)}
+  catch
+    :exit, {:noproc, _} -> {:error, :not_found}
+    :exit, {:normal, _} -> {:error, :not_found}
+    :exit, {:shutdown, _} -> {:error, :not_found}
+  end
 end

@@ -21,7 +21,7 @@ defmodule JidoTest.Storage.FileTest do
 
   describe "checkpoint operations" do
     test "get_checkpoint/2 returns :not_found for missing key", %{opts: opts} do
-      assert :not_found = FileStorage.get_checkpoint(:missing_key, opts)
+      assert {:error, :not_found} = FileStorage.get_checkpoint(:missing_key, opts)
     end
 
     test "put_checkpoint/3 stores and get_checkpoint/2 retrieves data", %{opts: opts} do
@@ -49,7 +49,7 @@ defmodule JidoTest.Storage.FileTest do
       assert {:ok, _} = FileStorage.get_checkpoint(key, opts)
 
       assert :ok = FileStorage.delete_checkpoint(key, opts)
-      assert :not_found = FileStorage.get_checkpoint(key, opts)
+      assert {:error, :not_found} = FileStorage.get_checkpoint(key, opts)
     end
 
     test "delete_checkpoint/2 succeeds even if key doesn't exist", %{opts: opts} do
@@ -88,7 +88,7 @@ defmodule JidoTest.Storage.FileTest do
 
   describe "thread operations" do
     test "load_thread/2 returns :not_found for missing thread", %{opts: opts} do
-      assert :not_found = FileStorage.load_thread("nonexistent_thread", opts)
+      assert {:error, :not_found} = FileStorage.load_thread("nonexistent_thread", opts)
     end
 
     test "append_thread/3 creates thread with entries", %{opts: opts} do
@@ -249,7 +249,7 @@ defmodule JidoTest.Storage.FileTest do
 
       assert :ok = FileStorage.delete_thread(thread_id, opts)
       refute File.exists?(thread_dir)
-      assert :not_found = FileStorage.load_thread(thread_id, opts)
+      assert {:error, :not_found} = FileStorage.load_thread(thread_id, opts)
     end
 
     test "thread entries have correct seq numbers", %{opts: opts} do

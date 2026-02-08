@@ -64,7 +64,10 @@ defmodule Jido.Discovery do
 
   require Logger
 
+  alias Jido.Runtime.Tasking
+
   @catalog_key :jido_discovery_catalog
+  @system_task_supervisor Jido.SystemTaskSupervisor
 
   @type component_type :: :actions | :sensors | :agents | :plugins | :demos
   @type component_metadata :: %{
@@ -84,9 +87,9 @@ defmodule Jido.Discovery do
   Call this from your application supervisor's start callback.
   The catalog will be built in the background without blocking startup.
   """
-  @spec init_async() :: Task.t()
+  @spec init_async() :: {:ok, pid()} | {:error, term()}
   def init_async do
-    Task.async(fn ->
+    start_async_task(fn ->
       catalog = build_catalog()
       :persistent_term.put(@catalog_key, catalog)
       :ok
@@ -100,8 +103,19 @@ defmodule Jido.Discovery do
   """
   @spec refresh() :: :ok
   def refresh do
-    catalog = build_catalog()
-    :persistent_term.put(@catalog_key, catalog)
+    components = build_components()
+
+    case get_catalog() do
+      {:ok, %{components: ^components}} ->
+        :ok
+
+      _ ->
+        :persistent_term.put(@catalog_key, %{
+          last_updated: DateTime.utc_now(),
+          components: components
+        })
+    end
+
     :ok
   end
 
@@ -220,16 +234,24 @@ defmodule Jido.Discovery do
     ArgumentError -> {:error, :not_initialized}
   end
 
+  defp start_async_task(fun) when is_function(fun, 0) do
+    Tasking.start_child(fun, candidates: [@system_task_supervisor])
+  end
+
   defp build_catalog do
     %{
       last_updated: DateTime.utc_now(),
-      components: %{
-        actions: discover_components(:__action_metadata__),
-        sensors: discover_components(:__sensor_metadata__),
-        agents: discover_components(:__agent_metadata__),
-        plugins: discover_components(:__plugin_metadata__),
-        demos: discover_components(:__jido_demo__)
-      }
+      components: build_components()
+    }
+  end
+
+  defp build_components do
+    %{
+      actions: discover_components(:__action_metadata__),
+      sensors: discover_components(:__sensor_metadata__),
+      agents: discover_components(:__agent_metadata__),
+      plugins: discover_components(:__plugin_metadata__),
+      demos: discover_components(:__jido_demo__)
     }
   end
 

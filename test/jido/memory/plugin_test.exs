@@ -3,6 +3,7 @@ defmodule JidoTest.Memory.PluginTest do
 
   alias Jido.Memory
   alias Jido.Memory.Plugin, as: MemoryPlugin
+  alias Jido.Plugin.Instance, as: PluginInstance
 
   describe "plugin metadata" do
     test "name is memory" do
@@ -93,7 +94,7 @@ defmodule JidoTest.Memory.PluginTest do
 
     test "cannot alias memory plugin" do
       assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
-        Jido.Plugin.Instance.new({Jido.Memory.Plugin, as: :my_memory})
+        PluginInstance.new({Jido.Memory.Plugin, as: :my_memory})
       end
     end
   end

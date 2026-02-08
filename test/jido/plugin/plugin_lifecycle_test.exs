@@ -260,6 +260,12 @@ defmodule JidoTest.PluginLifecycleTest do
     end
   end
 
+  defp await_children(pid, expected_count) do
+    eventually_state(pid, fn state -> map_size(state.children) == expected_count end)
+    {:ok, state} = Jido.AgentServer.state(pid)
+    state
+  end
+
   # =============================================================================
   # Tests: transform_result/3 Lifecycle
   # =============================================================================
@@ -302,8 +308,7 @@ defmodule JidoTest.PluginLifecycleTest do
   describe "child_spec/1 lifecycle" do
     test "plugin child is started during AgentServer init", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ChatAgent, jido: jido)
-
-      {:ok, state} = Jido.AgentServer.state(pid)
+      state = await_children(pid, 1)
 
       # Should have one child (the counter agent)
       assert map_size(state.children) == 1
@@ -331,7 +336,7 @@ defmodule JidoTest.PluginLifecycleTest do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ConfiguredChatAgent, jido: jido)
 
       # 2. Verify child started - child_spec/1 ran
-      {:ok, initial_state} = Jido.AgentServer.state(pid)
+      initial_state = await_children(pid, 1)
       assert map_size(initial_state.children) == 1
 
       # 3. Verify mount state

@@ -13,6 +13,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
   alias Jido.Agent.Directive.Error, as: ErrorDirective
   alias Jido.AgentServer.State
+  alias Jido.Runtime.Tasking
   alias Jido.Signal.Dispatch, as: SignalDispatch
 
   @type result :: {:ok, State.t()} | {:stop, term(), State.t()}
@@ -63,14 +64,26 @@ defmodule Jido.AgentServer.ErrorPolicy do
     signal = build_error_signal(error, context, state)
 
     if Code.ensure_loaded?(SignalDispatch) do
-      task_supervisor =
-        if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
-
-      Task.Supervisor.start_child(task_supervisor, fn ->
-        SignalDispatch.dispatch(signal, dispatch_cfg)
-      end)
+      start_error_signal_task(signal, dispatch_cfg, state)
     else
       Logger.warning("Jido.Signal.Dispatch not available, skipping error signal emit")
+    end
+  end
+
+  defp start_error_signal_task(signal, dispatch_cfg, state) do
+    case Tasking.start_child(
+           fn ->
+             SignalDispatch.dispatch(signal, dispatch_cfg)
+           end,
+           jido: state.jido
+         ) do
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "Agent #{state.id} failed to emit error signal asynchronously: #{inspect(reason)}"
+        )
     end
   end
 

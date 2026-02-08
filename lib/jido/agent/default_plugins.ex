@@ -69,13 +69,11 @@ defmodule Jido.Agent.DefaultPlugins do
     package_defaults = @package_defaults
 
     quote do
-      cond do
-        unquote(explicit_defaults) != nil ->
-          unquote(explicit_defaults)
-
-        true ->
-          app_config = Application.compile_env(unquote(otp_app), unquote(jido_module), [])
-          Keyword.get(app_config, :default_plugins, unquote(Macro.escape(package_defaults)))
+      if unquote(explicit_defaults) != nil do
+        unquote(explicit_defaults)
+      else
+        app_config = Application.compile_env(unquote(otp_app), unquote(jido_module), [])
+        Keyword.get(app_config, :default_plugins, unquote(Macro.escape(package_defaults)))
       end
     end
   end
@@ -130,7 +128,7 @@ defmodule Jido.Agent.DefaultPlugins do
     invalid_keys = Map.keys(overrides) -- Map.keys(default_state_keys)
 
     if invalid_keys != [] do
-      valid_keys = Map.keys(default_state_keys) |> Enum.map(&inspect/1) |> Enum.join(", ")
+      valid_keys = Enum.map_join(Map.keys(default_state_keys), ", ", &inspect/1)
 
       raise CompileError,
         description:

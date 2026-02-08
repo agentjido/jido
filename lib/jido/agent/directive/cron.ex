@@ -62,6 +62,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
         state
       ) do
     agent_id = state.id
+    agent_ref = Jido.AgentServer.via_tuple(agent_id, state.registry)
     logical_id = logical_id || make_ref()
     signal = build_signal(message, logical_id, agent_id)
 
@@ -71,7 +72,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
 
     Jido.Scheduler.run_every(
       fn ->
-        _ = Jido.AgentServer.cast(agent_id, signal)
+        dispatch_tick(agent_ref, agent_id, logical_id, signal)
         :ok
       end,
       cron_expr,
@@ -98,6 +99,20 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
 
   defp build_scheduler_opts(nil), do: []
   defp build_scheduler_opts(tz), do: [timezone: tz]
+
+  defp dispatch_tick(agent_ref, agent_id, logical_id, signal) do
+    case Jido.AgentServer.cast(agent_ref, signal) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "AgentServer #{agent_id} failed to deliver cron job #{inspect(logical_id)} tick: #{inspect(reason)}"
+        )
+
+        :ok
+    end
+  end
 
   defp handle_scheduler_result({:ok, pid}, state, agent_id, logical_id, cron_expr) do
     Logger.debug(

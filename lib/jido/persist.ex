@@ -31,7 +31,7 @@ defmodule Jido.Persist do
   ## thaw/3 Flow
 
   1. Call `adapter.get_checkpoint/2`
-  2. If `:not_found`, return `:not_found`
+  2. If `{:error, :not_found}`, return `{:error, :not_found}`
   3. Call `agent_module.restore/2` if implemented, else use default
   4. If checkpoint has thread pointer, load and attach thread
   5. Verify loaded thread.rev matches checkpoint pointer rev
@@ -56,7 +56,7 @@ defmodule Jido.Persist do
       # Thaw an agent
       case Jido.Persist.thaw(storage, MyAgent, "agent-123") do
         {:ok, agent} -> agent
-        :not_found -> start_fresh()
+        {:error, :not_found} -> start_fresh()
         {:error, :missing_thread} -> handle_missing_thread()
         {:error, :thread_mismatch} -> handle_mismatch()
       end
@@ -126,13 +126,13 @@ defmodule Jido.Persist do
   ## Returns
 
   - `{:ok, agent}` - Successfully thawed
-  - `:not_found` - No checkpoint exists for this key
+  - `{:error, :not_found}` - No checkpoint exists for this key
   - `{:error, :missing_thread}` - Checkpoint references thread that doesn't exist
   - `{:error, :thread_mismatch}` - Loaded thread.rev != checkpoint thread.rev
   - `{:error, reason}` - Other errors
   """
   @spec thaw(storage_config() | module() | struct(), agent_module(), key()) ::
-          {:ok, agent()} | :not_found | {:error, term()}
+          {:ok, agent()} | {:error, :not_found | term()}
   def thaw(storage_or_instance, agent_module, key)
 
   def thaw({adapter, opts}, agent_module, key) when is_atom(adapter) do
@@ -174,7 +174,7 @@ defmodule Jido.Persist do
   end
 
   @spec do_thaw(module(), keyword(), agent_module(), key()) ::
-          {:ok, agent()} | :not_found | {:error, term()}
+          {:ok, agent()} | {:error, :not_found | term()}
   defp do_thaw(adapter, opts, agent_module, key) do
     checkpoint_key = make_checkpoint_key(agent_module, key)
 
@@ -184,9 +184,9 @@ defmodule Jido.Persist do
       {:ok, checkpoint} ->
         restore_from_checkpoint(adapter, opts, agent_module, checkpoint)
 
-      :not_found ->
+      {:error, :not_found} ->
         Logger.debug("Persist.thaw: checkpoint not found for #{inspect(checkpoint_key)}")
-        :not_found
+        {:error, :not_found}
 
       {:error, reason} = error ->
         Logger.error(
@@ -202,22 +202,64 @@ defmodule Jido.Persist do
   defp flush_journal(_adapter, _opts, %Thread{entries: []}), do: :ok
 
   defp flush_journal(adapter, opts, %Thread{} = thread) do
-    Logger.debug("Persist: flushing #{length(thread.entries)} entries for thread #{thread.id}")
-
-    case adapter.append_thread(thread.id, thread.entries, [{:expected_rev, 0} | opts]) do
-      {:ok, _updated_thread} ->
-        :ok
-
-      {:error, :conflict} ->
-        Logger.debug("Persist: conflict on append, thread may already be persisted")
-        :ok
-
+    with {:ok, persisted_rev} <- current_persisted_rev(adapter, opts, thread.id),
+         :ok <- validate_flush_rev(thread, persisted_rev),
+         delta_entries <- Enum.drop(thread.entries, persisted_rev),
+         :ok <- append_thread_delta(adapter, opts, thread, persisted_rev, delta_entries) do
+      :ok
+    else
       {:error, reason} = error ->
         Logger.error(
           "Persist: failed to flush journal for thread #{thread.id}: #{inspect(reason)}"
         )
 
         error
+    end
+  end
+
+  defp current_persisted_rev(adapter, opts, thread_id) do
+    case adapter.load_thread(thread_id, opts) do
+      {:ok, %Thread{rev: rev}} when is_integer(rev) and rev >= 0 ->
+        {:ok, rev}
+
+      {:error, :not_found} ->
+        {:ok, 0}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp validate_flush_rev(%Thread{rev: in_memory_rev}, persisted_rev)
+       when is_integer(in_memory_rev) and persisted_rev > in_memory_rev do
+    {:error, :thread_mismatch}
+  end
+
+  defp validate_flush_rev(_thread, _persisted_rev), do: :ok
+
+  defp append_thread_delta(_adapter, _opts, %Thread{id: thread_id}, persisted_rev, [])
+       when is_integer(persisted_rev) do
+    Logger.debug("Persist: thread #{thread_id} already flushed at rev=#{persisted_rev}")
+    :ok
+  end
+
+  defp append_thread_delta(adapter, opts, %Thread{} = thread, persisted_rev, delta_entries) do
+    Logger.debug(
+      "Persist: flushing #{length(delta_entries)} delta entries for thread #{thread.id} from rev=#{persisted_rev}"
+    )
+
+    case adapter.append_thread(thread.id, delta_entries, [{:expected_rev, persisted_rev} | opts]) do
+      {:ok, %Thread{rev: rev}} when rev == thread.rev ->
+        :ok
+
+      {:ok, %Thread{rev: _rev}} ->
+        {:error, :thread_mismatch}
+
+      {:error, :conflict} ->
+        {:error, :conflict}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -330,7 +372,7 @@ defmodule Jido.Persist do
 
         {:error, :thread_mismatch}
 
-      :not_found ->
+      {:error, :not_found} ->
         Logger.error("Persist: thread #{thread_id} not found but referenced in checkpoint")
         {:error, :missing_thread}
 

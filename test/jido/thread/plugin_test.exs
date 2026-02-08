@@ -1,6 +1,7 @@
 defmodule JidoTest.Thread.PluginTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Plugin.Instance, as: PluginInstance
   alias Jido.Thread
   alias Jido.Thread.Plugin, as: ThreadPlugin
 
@@ -113,7 +114,7 @@ defmodule JidoTest.Thread.PluginTest do
 
     test "cannot alias thread plugin" do
       assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
-        Jido.Plugin.Instance.new({Jido.Thread.Plugin, as: :my_thread})
+        PluginInstance.new({Jido.Thread.Plugin, as: :my_thread})
       end
     end
   end

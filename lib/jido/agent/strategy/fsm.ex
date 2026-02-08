@@ -115,14 +115,18 @@ defmodule Jido.Agent.Strategy.FSM do
     end
 
     @doc "Attempts to transition to a new state."
-    @spec transition(t(), String.t()) :: {:ok, t()} | {:error, String.t()}
+    @spec transition(t(), String.t()) :: {:ok, t()} | {:error, Jido.Error.ExecutionError.t()}
     def transition(%__MODULE__{status: current, transitions: transitions} = machine, new_status) do
       allowed = Map.get(transitions, current, [])
 
       if new_status in allowed do
         {:ok, %{machine | status: new_status}}
       else
-        {:error, "invalid transition from #{current} to #{new_status}"}
+        {:error,
+         Jido.Error.execution_error(
+           "FSM invalid transition",
+           details: %{from: current, to: new_status}
+         )}
       end
     end
   end
@@ -182,8 +186,7 @@ defmodule Jido.Agent.Strategy.FSM do
         agent = StratState.put(agent, %{state | machine: machine})
         {agent, directives}
 
-      {:error, reason} ->
-        error = Error.execution_error("FSM transition failed", %{reason: reason})
+      {:error, %Error.ExecutionError{} = error} ->
         {agent, [%Directive.Error{error: error, context: :fsm_transition}]}
     end
   end

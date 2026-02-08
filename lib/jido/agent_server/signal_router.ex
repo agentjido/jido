@@ -20,8 +20,10 @@ defmodule Jido.AgentServer.SignalRouter do
   Routes can be specified in several formats:
   - `{path, target}` - Simple route with default priority
   - `{path, target, priority}` - Route with explicit priority
+  - `{path, target, opts}` - Route with keyword opts (supports `priority:`)
   - `{path, match_fn, target}` - Route with match function
   - `{path, match_fn, target, priority}` - Route with match function and priority
+  - `{path, match_fn, target, opts}` - Match function route with keyword opts
 
   ## Target Types
 
@@ -133,8 +135,8 @@ defmodule Jido.AgentServer.SignalRouter do
 
   defp normalize_routes(routes, default_priority) do
     Enum.map(routes, fn
-      {path, target, priority} when is_integer(priority) ->
-        {path, target, priority}
+      {path, match_fn, target, opts} when is_function(match_fn, 1) and is_list(opts) ->
+        {path, match_fn, target, route_priority(opts, default_priority)}
 
       {path, match_fn, target, priority} when is_function(match_fn, 1) and is_integer(priority) ->
         {path, match_fn, target, priority}
@@ -142,8 +144,22 @@ defmodule Jido.AgentServer.SignalRouter do
       {path, match_fn, target} when is_function(match_fn, 1) ->
         {path, match_fn, target, default_priority}
 
+      {path, target, opts} when is_list(opts) ->
+        {path, target, route_priority(opts, default_priority)}
+
+      {path, target, priority} when is_integer(priority) ->
+        {path, target, priority}
+
       {path, target} ->
         {path, target, default_priority}
     end)
+  end
+
+  defp route_priority(opts, default_priority) do
+    if Keyword.keyword?(opts) do
+      Keyword.get(opts, :priority, default_priority)
+    else
+      default_priority
+    end
   end
 end

@@ -151,7 +151,7 @@ defmodule Jido.Sensor do
                                 description:
                                   "The name of the Sensor. Must contain only letters, numbers, and underscores."
                               )
-                              |> Zoi.refine({Jido.Util, :validate_name, []}),
+                              |> Zoi.refine({Jido.Util, :validate_name_refinement, []}),
                             description:
                               Zoi.string(description: "A description of what the Sensor does.")
                               |> Zoi.optional(),

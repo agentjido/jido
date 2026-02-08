@@ -82,6 +82,21 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
     end
   end
 
+  defmodule PluginWithRouterOpts do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_router_opts",
+      state_key: :router_opts_plugin,
+      actions: [JidoTest.AgentServer.SignalRouterTest.TestAction]
+
+    @impl Jido.Plugin
+    def signal_routes(_config) do
+      [
+        {"plugin.opts", JidoTest.AgentServer.SignalRouterTest.TestAction, priority: -30}
+      ]
+    end
+  end
+
   defmodule PluginReturningNil do
     @moduledoc false
     use Jido.Plugin,
@@ -187,6 +202,16 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       name: "agent_with_nil_router_plugin",
       schema: [],
       plugins: [JidoTest.AgentServer.SignalRouterTest.PluginReturningNil]
+
+    def signal_routes(_ctx), do: []
+  end
+
+  defmodule AgentWithPluginRouteOpts do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_plugin_route_opts",
+      schema: [],
+      plugins: [JidoTest.AgentServer.SignalRouterTest.PluginWithRouterOpts]
 
     def signal_routes(_ctx), do: []
   end
@@ -325,6 +350,17 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert %JidoRouter.Router{} = router
       # Pattern routes: signal_patterns ["nonlist.*"] x actions [TestAction]
       assert router.route_count == 1
+    end
+
+    test "supports plugin signal_routes/1 tuples with keyword opts" do
+      state = build_test_state(AgentWithPluginRouteOpts)
+      router = SignalRouter.build(state)
+
+      assert %JidoRouter.Router{} = router
+      assert router.route_count == 1
+
+      signal = Jido.Signal.new!("plugin.opts", %{}, source: "/test")
+      assert {:ok, [TestAction]} = JidoRouter.route(router, signal)
     end
 
     test "generates routes from plugin routes definition" do

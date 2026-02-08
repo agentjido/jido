@@ -44,7 +44,7 @@ defmodule Jido.Observe do
 
       span_ctx = Jido.Observe.start_span([:jido, :agent, :async, :request], %{agent_id: id})
 
-      Task.start(fn ->
+      Task.Supervisor.start_child(MyApp.TaskSupervisor, fn ->
         try do
           result = do_async_work()
           Jido.Observe.finish_span(span_ctx, %{result_size: byte_size(result)})
@@ -148,7 +148,7 @@ defmodule Jido.Observe do
 
       span_ctx = Jido.Observe.start_span([:jido, :ai, :llm, :request], %{model: "claude"})
 
-      Task.start(fn ->
+      Task.Supervisor.start_child(MyApp.TaskSupervisor, fn ->
         result = do_work()
         Jido.Observe.finish_span(span_ctx, %{output_bytes: byte_size(result)})
       end)
@@ -399,7 +399,9 @@ defmodule Jido.Observe do
     |> Keyword.get(:tracer, Jido.Observe.NoopTracer)
   end
 
-  defp observability_config do
+  @doc false
+  @spec observability_config() :: keyword()
+  def observability_config do
     Application.get_env(:jido, :observability, [])
   end
 

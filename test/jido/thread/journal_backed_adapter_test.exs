@@ -150,6 +150,29 @@ defmodule Jido.Thread.Store.Adapters.JournalBackedTest do
       loaded_kinds = loaded |> Thread.to_list() |> Enum.map(& &1.kind)
       assert loaded_kinds == kinds
     end
+
+    test "unknown string kind decodes safely without creating atoms" do
+      {:ok, store} = Store.new(JournalBacked)
+      thread_id = "unknown-kind-#{System.unique_integer([:positive])}"
+      unknown_kind = "kind_#{System.unique_integer([:positive])}"
+
+      {:ok, store, _thread} =
+        Store.append(store, thread_id, %{kind: unknown_kind, payload: %{safe: true}})
+
+      {:ok, _store, loaded} = Store.load(store, thread_id)
+      assert Thread.last(loaded).kind == :unknown
+    end
+
+    test "known string kind decodes to existing atom" do
+      {:ok, store} = Store.new(JournalBacked)
+      thread_id = "known-kind-#{System.unique_integer([:positive])}"
+
+      {:ok, store, _thread} =
+        Store.append(store, thread_id, %{kind: "message", payload: %{safe: true}})
+
+      {:ok, _store, loaded} = Store.load(store, thread_id)
+      assert Thread.last(loaded).kind == :message
+    end
   end
 
   describe "multiple threads" do

@@ -389,6 +389,8 @@ defmodule JidoTest.AgentServer.HierarchyTest do
 
       # Wait for child to be fully initialized before killing parent
       {:ok, _state} = AgentServer.state(child_pid)
+      {:ok, child_state} = AgentServer.state(child_pid)
+      assert is_reference(Map.get(child_state, :parent_monitor_ref))
 
       child_ref = Process.monitor(child_pid)
 

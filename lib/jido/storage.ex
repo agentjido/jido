@@ -47,14 +47,14 @@ defmodule Jido.Storage do
 
   alias Jido.Thread
   alias Jido.Thread.Entry
+  @type fetch_result(value) :: {:ok, value} | {:error, :not_found | term()}
 
   @doc """
   Retrieve a checkpoint by key.
 
-  Returns `{:ok, data}` if found, `:not_found` if the key doesn't exist.
+  Returns `{:ok, data}` if found, `{:error, :not_found}` if the key doesn't exist.
   """
-  @callback get_checkpoint(key :: term(), opts :: keyword()) ::
-              {:ok, term()} | :not_found | {:error, term()}
+  @callback get_checkpoint(key :: term(), opts :: keyword()) :: fetch_result(term())
 
   @doc """
   Store a checkpoint, overwriting any existing value for the key.
@@ -73,11 +73,10 @@ defmodule Jido.Storage do
   @doc """
   Load a thread by ID, reconstructing from stored entries.
 
-  Returns `{:ok, thread}` if entries exist, `:not_found` if the thread
+  Returns `{:ok, thread}` if entries exist, `{:error, :not_found}` if the thread
   has no entries.
   """
-  @callback load_thread(thread_id :: String.t(), opts :: keyword()) ::
-              {:ok, Thread.t()} | :not_found | {:error, term()}
+  @callback load_thread(thread_id :: String.t(), opts :: keyword()) :: fetch_result(Thread.t())
 
   @doc """
   Append entries to a thread.

@@ -490,6 +490,32 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
   end
 
+  defmodule SlowHandleSignalPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "slow_handle_signal",
+      state_key: :slow_hs,
+      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+
+    @impl Jido.Plugin
+    def handle_signal(_signal, _context) do
+      Process.sleep(1_200)
+      {:ok, :continue}
+    end
+  end
+
+  defmodule SlowHandleSignalAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "slow_handle_signal_agent",
+      schema: [counter: [type: :integer, default: 0]],
+      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.SlowHandleSignalPlugin]
+
+    def signal_routes(_ctx) do
+      [{"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}]
+    end
+  end
+
   describe "Gap 6: exception safety" do
     @tag capture_log: true
     test "handle_signal crash returns error without crashing server", %{jido: jido} do
@@ -523,6 +549,16 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
       assert agent.state[:counter] == 10
+      assert Process.alive?(pid)
+    end
+
+    @tag capture_log: true
+    test "handle_signal timeout returns structured timeout error", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: SlowHandleSignalAgent, jido: jido)
+
+      signal = Signal.new!("counter.increment", %{amount: 2}, source: "/test")
+      assert {:error, error} = Jido.AgentServer.call(pid, signal)
+      assert error.message == "Plugin handle_signal timed out"
       assert Process.alive?(pid)
     end
   end

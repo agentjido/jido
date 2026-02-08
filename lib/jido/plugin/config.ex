@@ -24,6 +24,8 @@ defmodule Jido.Plugin.Config do
       %{token: "default-token", channel: "#support"}
   """
 
+  require Logger
+
   @doc """
   Resolves configuration for a plugin module by merging app env with overrides.
 
@@ -110,6 +112,12 @@ defmodule Jido.Plugin.Config do
         {:error, errors} -> {:error, errors}
       end
     else
+      if map_size(config) > 0 do
+        Logger.warning(
+          "Plugin #{inspect(plugin_module)} has config values but no config_schema/0; config keys are not validated"
+        )
+      end
+
       {:ok, config}
     end
   end
