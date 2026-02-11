@@ -34,6 +34,24 @@ defmodule JidoTest.AgentTest do
       assert agent.id == "custom-123"
     end
 
+    test "generates unique ids for each instance" do
+      agent1 = TestAgents.Minimal.new()
+      agent2 = TestAgents.Minimal.new()
+      assert agent1.id != agent2.id
+    end
+
+    test "generates id when nil is passed" do
+      agent = TestAgents.Minimal.new(id: nil)
+      assert is_binary(agent.id)
+      assert String.length(agent.id) > 0
+    end
+
+    test "generates id when empty string is passed" do
+      agent = TestAgents.Minimal.new(id: "")
+      assert is_binary(agent.id)
+      assert String.length(agent.id) > 0
+    end
+
     test "creates agent with initial state" do
       agent = TestAgents.Basic.new(state: %{counter: 10})
       assert agent.state.counter == 10
@@ -303,6 +321,24 @@ defmodule JidoTest.AgentTest do
       {:ok, agent} = Agent.new(name: "test_agent", id: "kw-123")
       assert agent.id == "kw-123"
       assert agent.name == "test_agent"
+    end
+
+    test "Agent.new/1 auto-generates id when not provided" do
+      {:ok, agent} = Agent.new(%{name: "test_agent"})
+      assert is_binary(agent.id)
+      assert String.length(agent.id) > 0
+    end
+
+    test "Agent.new/1 generates id when nil is passed" do
+      {:ok, agent} = Agent.new(%{id: nil, name: "test_agent"})
+      assert is_binary(agent.id)
+      assert String.length(agent.id) > 0
+    end
+
+    test "Agent.new/1 generates id when empty string is passed" do
+      {:ok, agent} = Agent.new(%{id: "", name: "test_agent"})
+      assert is_binary(agent.id)
+      assert String.length(agent.id) > 0
     end
 
     test "Agent.set/2 updates state" do
