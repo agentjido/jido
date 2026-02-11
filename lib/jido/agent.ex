@@ -655,7 +655,14 @@ defmodule Jido.Agent do
         opts = if is_list(opts), do: Map.new(opts), else: opts
 
         initial_state = __build_initial_state__(opts)
-        id = opts[:id] || Jido.Util.generate_id()
+
+        id =
+          case opts[:id] do
+            nil -> Jido.Util.generate_id()
+            "" -> Jido.Util.generate_id()
+            id when is_binary(id) -> id
+            other -> to_string(other)
+          end
 
         agent = %Agent{
           id: id,
@@ -1261,7 +1268,7 @@ defmodule Jido.Agent do
   def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
 
   def new(attrs) when is_map(attrs) do
-    attrs_with_id = Map.put_new_lazy(attrs, :id, &Jido.Util.generate_id/0)
+    attrs_with_id = normalize_agent_id(attrs)
 
     case Zoi.parse(@schema, attrs_with_id) do
       {:ok, agent} ->
@@ -1293,6 +1300,14 @@ defmodule Jido.Agent do
       {:error, reason} ->
         Error.validation_error("State validation failed", %{reason: reason})
         |> OK.failure()
+    end
+  end
+
+  defp normalize_agent_id(attrs) do
+    case Map.get(attrs, :id) do
+      nil -> Map.put(attrs, :id, Jido.Util.generate_id())
+      "" -> Map.put(attrs, :id, Jido.Util.generate_id())
+      _ -> attrs
     end
   end
 end
