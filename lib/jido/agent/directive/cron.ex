@@ -62,6 +62,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
         state
       ) do
     agent_id = state.id
+    # Capture the AgentServer PID at registration time so cron ticks
+    # route back to this process. Using the string `agent_id` would fail
+    # because `resolve_server/1` rejects binary IDs. (See issue #136)
+    agent_pid = self()
     logical_id = logical_id || make_ref()
     signal = build_signal(message, logical_id, agent_id)
 
@@ -71,7 +75,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
 
     Jido.Scheduler.run_every(
       fn ->
-        _ = Jido.AgentServer.cast(agent_id, signal)
+        if Process.alive?(agent_pid) do
+          _ = Jido.AgentServer.cast(agent_pid, signal)
+        end
+
         :ok
       end,
       cron_expr,
