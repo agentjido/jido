@@ -273,6 +273,7 @@ State operations are internal state transitions handled by the strategy layer du
 - [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
 - [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
 - [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
+- [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
 - [Plugins](guides/plugins.md) - Composable capability bundles
 - [Strategies](guides/strategies.md) - Execution strategies (Direct, FSM)
 
