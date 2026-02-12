@@ -1483,6 +1483,10 @@ defmodule Jido.AgentServer do
     } = schedule_spec
 
     agent_id = state.id
+    # Capture the AgentServer PID at registration time so scheduled ticks
+    # route back to this process instead of using the string agent_id,
+    # which resolve_server/1 rejects. (See issue #136)
+    agent_pid = self()
 
     signal = Signal.new!(signal_type, %{}, source: "/agent/#{agent_id}/schedule")
 
@@ -1491,7 +1495,10 @@ defmodule Jido.AgentServer do
     result =
       Jido.Scheduler.run_every(
         fn ->
-          _ = Jido.AgentServer.cast(agent_id, signal)
+          if Process.alive?(agent_pid) do
+            _ = Jido.AgentServer.cast(agent_pid, signal)
+          end
+
           :ok
         end,
         cron_expr,
