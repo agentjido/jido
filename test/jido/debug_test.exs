@@ -151,6 +151,16 @@ defmodule JidoTest.DebugTest do
 
       Application.delete_env(:jido_test, @test_instance)
     end
+
+    test "disables stale runtime override when debug config is absent" do
+      Debug.enable(@test_instance, :on)
+      Application.put_env(:jido_test, @test_instance, [])
+
+      Debug.maybe_enable_from_config(:jido_test, @test_instance)
+      assert Debug.level(@test_instance) == :off
+
+      Application.delete_env(:jido_test, @test_instance)
+    end
   end
 
   describe "per-instance isolation" do

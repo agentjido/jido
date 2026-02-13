@@ -97,7 +97,7 @@ defmodule Jido.Debug do
     case Keyword.get(config, :debug) do
       true -> enable(instance, :on)
       :verbose -> enable(instance, :verbose)
-      _ -> :ok
+      _ -> disable(instance)
     end
   end
 
