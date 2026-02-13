@@ -236,6 +236,12 @@ defmodule Jido.Agent do
                                  "Override default plugins. false to disable all, or map of %{state_key => false | Module | {Module, config}}"
                              )
                              |> Zoi.optional(),
+                           schedules:
+                             Zoi.list(Zoi.any(),
+                               description:
+                                 "Declarative cron schedules as {cron_expr, signal_type} or {cron_expr, signal_type, opts}"
+                             )
+                             |> Zoi.default([]),
                            jido:
                              Zoi.atom(
                                description:
@@ -498,9 +504,9 @@ defmodule Jido.Agent do
       @spec plugin_routes() :: [{String.t(), module(), integer()}]
       def plugin_routes, do: @validated_plugin_routes
 
-      @doc "Returns the expanded plugin schedules."
+      @doc "Returns the expanded plugin and agent schedules."
       @spec plugin_schedules() :: [Jido.Plugin.Schedules.schedule_spec()]
-      def plugin_schedules, do: @expanded_plugin_schedules
+      def plugin_schedules, do: @expanded_plugin_schedules ++ @expanded_agent_schedules
     end
   end
 
@@ -952,50 +958,38 @@ defmodule Jido.Agent do
     quote location: :keep do
       @impl true
       def restore(data, ctx) do
-        result =
-          case new(id: data[:id] || data["id"]) do
-            {:ok, agent} -> {:ok, agent}
-            agent when is_struct(agent) -> {:ok, agent}
-            {:error, _} = error -> error
-          end
+        agent = new(id: data[:id] || data["id"])
+        base_state = data[:state] || data["state"] || %{}
+        agent = %{agent | state: Map.merge(agent.state, base_state)}
+        externalized_keys = data[:externalized_keys] || %{}
 
-        case result do
-          {:ok, agent} ->
-            base_state = data[:state] || data["state"] || %{}
-            agent = %{agent | state: Map.merge(agent.state, base_state)}
-            externalized_keys = data[:externalized_keys] || %{}
+        Enum.reduce_while(@plugin_instances, {:ok, agent}, fn instance, {:ok, acc} ->
+          config = instance.config || %{}
+          restore_ctx = Map.put(ctx, :config, config)
 
-            Enum.reduce_while(@plugin_instances, {:ok, agent}, fn instance, {:ok, acc} ->
-              config = instance.config || %{}
-              restore_ctx = Map.put(ctx, :config, config)
-
-              ext_key =
-                Enum.find_value(externalized_keys, fn {k, v} ->
-                  if v == instance.state_key, do: k
-                end)
-
-              pointer = if ext_key, do: data[ext_key]
-
-              if pointer do
-                case instance.module.on_restore(pointer, restore_ctx) do
-                  {:ok, nil} ->
-                    {:cont, {:ok, acc}}
-
-                  {:ok, restored_state} ->
-                    {:cont,
-                     {:ok, %{acc | state: Map.put(acc.state, instance.state_key, restored_state)}}}
-
-                  {:error, reason} ->
-                    {:halt, {:error, reason}}
-                end
-              else
-                {:cont, {:ok, acc}}
-              end
+          ext_key =
+            Enum.find_value(externalized_keys, fn {k, v} ->
+              if v == instance.state_key, do: k
             end)
 
-          error ->
-            error
-        end
+          pointer = if ext_key, do: data[ext_key]
+
+          if pointer do
+            case instance.module.on_restore(pointer, restore_ctx) do
+              {:ok, nil} ->
+                {:cont, {:ok, acc}}
+
+              {:ok, restored_state} ->
+                {:cont,
+                 {:ok, %{acc | state: Map.put(acc.state, instance.state_key, restored_state)}}}
+
+              {:error, reason} ->
+                {:halt, {:error, reason}}
+            end
+          else
+            {:cont, {:ok, acc}}
+          end
+        end)
       end
     end
   end
@@ -1152,8 +1146,17 @@ defmodule Jido.Agent do
                            &Jido.Plugin.Schedules.schedule_routes/1
                          )
 
+        # Expand agent-level schedules from the `schedules:` option
+        @expanded_agent_schedules Jido.Agent.Schedules.expand_schedules(
+                                    @validated_opts[:schedules] || [],
+                                    @validated_opts[:name]
+                                  )
+
+        # Generate routes for agent schedule signal types
+        @agent_schedule_routes Jido.Agent.Schedules.schedule_routes(@expanded_agent_schedules)
+
         # Combine routes and schedule routes for conflict detection
-        @all_plugin_routes @expanded_plugin_routes ++ @schedule_routes
+        @all_plugin_routes @expanded_plugin_routes ++ @schedule_routes ++ @agent_schedule_routes
 
         @plugin_routes_result Jido.Plugin.Routes.detect_conflicts(@all_plugin_routes)
         case @plugin_routes_result do

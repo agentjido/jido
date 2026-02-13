@@ -20,7 +20,10 @@ defmodule MyAgent do
     ],
     strategy: Jido.Agent.Strategy.Direct,    # Default
     plugins: [MyPlugin],                     # Default: []
-    default_plugins: true                    # Load built-in plugins (Default: true)
+    default_plugins: true,                   # Load built-in plugins (Default: true)
+    schedules: [                             # Declarative cron schedules (Default: [])
+      {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat}
+    ]
 end
 ```
 
