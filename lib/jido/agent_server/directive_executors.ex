@@ -115,14 +115,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
       effects: List.wrap(effects)
     }
   end
-
-  defp normalize_result_payload(other) do
-    %{
-      status: :error,
-      reason: Jido.Error.execution_error("Unexpected execution result", %{result: other}),
-      effects: []
-    }
-  end
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Spawn do
