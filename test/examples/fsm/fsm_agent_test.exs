@@ -30,6 +30,7 @@ defmodule JidoExampleTest.FSMAgentTest do
   use JidoTest.Case, async: true
 
   alias Jido.Agent.Strategy.FSM
+  alias JidoTest.Support.FSMRuntimeHelper
 
   @moduletag :example
   @moduletag timeout: 15_000
@@ -138,6 +139,10 @@ defmodule JidoExampleTest.FSMAgentTest do
       ]
   end
 
+  defp run_cmd(agent_module, agent, action) do
+    FSMRuntimeHelper.run_cmd(agent_module, agent, action)
+  end
+
   # ===========================================================================
   # TESTS
   # ===========================================================================
@@ -166,7 +171,8 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "running an action transitions through states and back to idle" do
       agent = SimpleFSMAgent.new()
 
-      {agent, directives} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "task-1"}})
+      {agent, directives} =
+        run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "task-1"}})
 
       assert directives == []
       assert agent.state.processed_items == ["task-1"]
@@ -181,7 +187,8 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "FSM without auto_transition stays in processing state" do
       agent = NoAutoTransitionAgent.new()
 
-      {agent, _directives} = NoAutoTransitionAgent.cmd(agent, {IncrementCounter, %{amount: 5}})
+      {agent, _directives} =
+        run_cmd(NoAutoTransitionAgent, agent, {IncrementCounter, %{amount: 5}})
 
       snapshot = FSM.snapshot(agent, %{})
       assert snapshot.status == :running
@@ -191,7 +198,8 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "custom transitions work correctly" do
       agent = CustomTransitionAgent.new()
 
-      {agent, _directives} = CustomTransitionAgent.cmd(agent, {IncrementCounter, %{amount: 10}})
+      {agent, _directives} =
+        run_cmd(CustomTransitionAgent, agent, {IncrementCounter, %{amount: 10}})
 
       assert agent.state.counter == 10
 
@@ -205,7 +213,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "snapshot returns status, done?, and details" do
       agent = SimpleFSMAgent.new()
 
-      {agent, _} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "item-1"}})
+      {agent, _} = run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "item-1"}})
 
       snapshot = FSM.snapshot(agent, %{})
 
@@ -219,7 +227,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "snapshot tracks last_result" do
       agent = SimpleFSMAgent.new()
 
-      {agent, _} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "my-work"}})
+      {agent, _} = run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "my-work"}})
 
       snapshot = FSM.snapshot(agent, %{})
       assert snapshot.result == %{processed_items: ["my-work"], last_item: "my-work"}
@@ -230,13 +238,13 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "multiple cmd/2 calls accumulate processed_count" do
       agent = SimpleFSMAgent.new()
 
-      {agent, []} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "item-1"}})
+      {agent, []} = run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "item-1"}})
       assert FSM.snapshot(agent, %{}).details.processed_count == 1
 
-      {agent, []} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "item-2"}})
+      {agent, []} = run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "item-2"}})
       assert FSM.snapshot(agent, %{}).details.processed_count == 2
 
-      {agent, []} = SimpleFSMAgent.cmd(agent, {ProcessWorkAction, %{work_item: "item-3"}})
+      {agent, []} = run_cmd(SimpleFSMAgent, agent, {ProcessWorkAction, %{work_item: "item-3"}})
       assert FSM.snapshot(agent, %{}).details.processed_count == 3
 
       assert agent.state.processed_items == ["item-1", "item-2", "item-3"]
@@ -246,7 +254,7 @@ defmodule JidoExampleTest.FSMAgentTest do
       agent = TaskFSMAgent.new()
 
       {agent, directives} =
-        TaskFSMAgent.cmd(agent, [
+        run_cmd(TaskFSMAgent, agent, [
           {CompleteTaskAction, %{task_id: 1}},
           {CompleteTaskAction, %{task_id: 2}},
           {CompleteTaskAction, %{task_id: 3}}
@@ -264,7 +272,7 @@ defmodule JidoExampleTest.FSMAgentTest do
       agent = SimpleFSMAgent.new()
 
       {agent, []} =
-        SimpleFSMAgent.cmd(agent, [
+        run_cmd(SimpleFSMAgent, agent, [
           {IncrementCounter, %{amount: 10}},
           {ProcessWorkAction, %{work_item: "work-a"}},
           {IncrementCounter, %{amount: 5}},
@@ -283,7 +291,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "auto_transition: true returns FSM to initial state after processing" do
       agent = SimpleFSMAgent.new()
 
-      {agent, _} = SimpleFSMAgent.cmd(agent, {IncrementCounter, %{amount: 1}})
+      {agent, _} = run_cmd(SimpleFSMAgent, agent, {IncrementCounter, %{amount: 1}})
 
       snapshot = FSM.snapshot(agent, %{})
       assert snapshot.details.fsm_state == "idle"
@@ -293,7 +301,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     test "auto_transition: false keeps FSM in processing state" do
       agent = NoAutoTransitionAgent.new()
 
-      {agent, _} = NoAutoTransitionAgent.cmd(agent, {IncrementCounter, %{amount: 1}})
+      {agent, _} = run_cmd(NoAutoTransitionAgent, agent, {IncrementCounter, %{amount: 1}})
 
       snapshot = FSM.snapshot(agent, %{})
       assert snapshot.details.fsm_state == "processing"

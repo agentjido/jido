@@ -4,6 +4,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   alias Jido.Agent
   alias Jido.Agent.Strategy.FSM
   alias Jido.Agent.Strategy.State, as: StratState
+  alias JidoTest.Support.FSMRuntimeHelper
 
   defmodule SimpleAction do
     @moduledoc false
@@ -120,6 +121,10 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     def signal_routes(_ctx), do: []
   end
 
+  defp run_cmd(agent_module, agent, action) do
+    FSMRuntimeHelper.run_cmd(agent_module, agent, action)
+  end
+
   describe "FSM.Machine" do
     test "new/2 creates machine with initial state and transitions" do
       transitions = %{"a" => ["b"], "b" => ["a"]}
@@ -197,9 +202,20 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   end
 
   describe "cmd/3 with default agent" do
-    test "executes simple action" do
+    test "emits RunInstruction and keeps cmd/2 pure" do
       agent = FSMTestAgent.new()
       {updated, directives} = FSMTestAgent.cmd(agent, SimpleAction)
+
+      refute Map.has_key?(updated.state, :executed)
+      assert [%Jido.Agent.Directive.RunInstruction{}] = directives
+
+      state = StratState.get(updated)
+      assert state.machine.status == "processing"
+    end
+
+    test "executes simple action" do
+      agent = FSMTestAgent.new()
+      {updated, directives} = run_cmd(FSMTestAgent, agent, SimpleAction)
 
       assert updated.state.executed == true
       assert directives == []
@@ -207,7 +223,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "executes action with params" do
       agent = FSMTestAgent.new()
-      {updated, _} = FSMTestAgent.cmd(agent, {ValueAction, %{value: 42}})
+      {updated, _} = run_cmd(FSMTestAgent, agent, {ValueAction, %{value: 42}})
 
       assert updated.state.value == 42
     end
@@ -216,7 +232,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
       agent = FSMTestAgent.new()
 
       {updated, _} =
-        FSMTestAgent.cmd(agent, [
+        run_cmd(FSMTestAgent, agent, [
           SimpleAction,
           {ValueAction, %{value: 100}}
         ])
@@ -229,7 +245,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
       agent = FSMTestAgent.new()
 
       {updated, _} =
-        FSMTestAgent.cmd(agent, [
+        run_cmd(FSMTestAgent, agent, [
           SimpleAction,
           SimpleAction,
           SimpleAction
@@ -241,7 +257,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "returns to initial state after processing" do
       agent = FSMTestAgent.new()
-      {updated, _} = FSMTestAgent.cmd(agent, SimpleAction)
+      {updated, _} = run_cmd(FSMTestAgent, agent, SimpleAction)
 
       state = StratState.get(updated)
       assert state.machine.status == "idle"
@@ -258,7 +274,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "transitions through custom states" do
       agent = CustomFSMAgent.new()
-      {updated, _} = CustomFSMAgent.cmd(agent, SimpleAction)
+      {updated, _} = run_cmd(CustomFSMAgent, agent, SimpleAction)
 
       state = StratState.get(updated)
       assert state.machine.status == "ready"
@@ -268,7 +284,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   describe "cmd/3 with auto_transition disabled" do
     test "stays in processing state after cmd" do
       agent = NoAutoTransitionAgent.new()
-      {updated, _} = NoAutoTransitionAgent.cmd(agent, SimpleAction)
+      {updated, _} = run_cmd(NoAutoTransitionAgent, agent, SimpleAction)
 
       state = StratState.get(updated)
       assert state.machine.status == "processing"
@@ -278,14 +294,14 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   describe "cmd/3 error handling" do
     test "returns error directive on action failure" do
       agent = FSMTestAgent.new()
-      {_updated, directives} = FSMTestAgent.cmd(agent, FailingAction)
+      {_updated, directives} = run_cmd(FSMTestAgent, agent, FailingAction)
 
       assert [%Jido.Agent.Directive.Error{context: :instruction}] = directives
     end
 
     test "stores error in machine state" do
       agent = FSMTestAgent.new()
-      {updated, _} = FSMTestAgent.cmd(agent, FailingAction)
+      {updated, _} = run_cmd(FSMTestAgent, agent, FailingAction)
 
       state = StratState.get(updated)
       assert state.machine.error != nil
@@ -296,7 +312,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   describe "cmd/3 with effects" do
     test "handles mixed internal effects and external directives" do
       agent = FSMTestAgent.new()
-      {updated, directives} = FSMTestAgent.cmd(agent, EffectAction)
+      {updated, directives} = run_cmd(FSMTestAgent, agent, EffectAction)
 
       assert updated.state.primary == "result"
       assert updated.state.extra == "data"
@@ -306,7 +322,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "handles SetPath effect" do
       agent = FSMTestAgent.new()
-      {updated, directives} = FSMTestAgent.cmd(agent, SetPathAction)
+      {updated, directives} = run_cmd(FSMTestAgent, agent, SetPathAction)
 
       assert updated.state.nested.value == 42
       assert directives == []
@@ -314,7 +330,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "handles DeletePath effect" do
       agent = FSMTestAgent.new(state: %{to_remove: %{nested: "gone", keep: "here"}})
-      {updated, directives} = FSMTestAgent.cmd(agent, DeletePathAction)
+      {updated, directives} = run_cmd(FSMTestAgent, agent, DeletePathAction)
 
       refute Map.has_key?(updated.state.to_remove, :nested)
       assert updated.state.to_remove.keep == "here"
@@ -339,7 +355,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "returns snapshot after processing" do
       agent = FSMTestAgent.new()
-      {agent, _} = FSMTestAgent.cmd(agent, SimpleAction)
+      {agent, _} = run_cmd(FSMTestAgent, agent, SimpleAction)
       ctx = %{agent_module: FSMTestAgent, strategy_opts: []}
 
       snapshot = FSM.snapshot(agent, ctx)

@@ -47,6 +47,84 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Error do
   end
 end
 
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction do
+  @moduledoc false
+
+  require Logger
+
+  alias Jido.AgentServer.State
+
+  def exec(
+        %{instruction: instruction, result_action: result_action, meta: meta},
+        input_signal,
+        state
+      ) do
+    enriched_instruction = %{
+      instruction
+      | context: Map.put(instruction.context || %{}, :state, state.agent.state)
+    }
+
+    execution_payload =
+      enriched_instruction
+      |> Jido.Exec.run()
+      |> normalize_result_payload()
+      |> Map.put(:instruction, instruction)
+      |> Map.put(:meta, meta || %{})
+
+    {agent, directives} = state.agent_module.cmd(state.agent, {result_action, execution_payload})
+    state = State.update_agent(state, agent)
+
+    case State.enqueue_all(state, input_signal, List.wrap(directives)) do
+      {:ok, state} ->
+        {:ok, state}
+
+      {:error, :queue_overflow} ->
+        Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+        {:ok, state}
+    end
+  end
+
+  defp normalize_result_payload({:ok, result}) do
+    %{
+      status: :ok,
+      result: result,
+      effects: []
+    }
+  end
+
+  defp normalize_result_payload({:ok, result, effects}) do
+    %{
+      status: :ok,
+      result: result,
+      effects: List.wrap(effects)
+    }
+  end
+
+  defp normalize_result_payload({:error, reason}) do
+    %{
+      status: :error,
+      reason: reason,
+      effects: []
+    }
+  end
+
+  defp normalize_result_payload({:error, reason, effects}) do
+    %{
+      status: :error,
+      reason: reason,
+      effects: List.wrap(effects)
+    }
+  end
+
+  defp normalize_result_payload(other) do
+    %{
+      status: :error,
+      reason: Jido.Error.execution_error("Unexpected execution result", %{result: other}),
+      effects: []
+    }
+  end
+end
+
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Spawn do
   @moduledoc false
 

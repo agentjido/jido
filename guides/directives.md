@@ -4,7 +4,7 @@
 
 Directives are **pure descriptions of external effects**. Agents emit them from `cmd/2` callbacks; the runtime (`AgentServer`) executes them.
 
-**Key principle**: Directives never modify agent state — state changes happen in the returned agent struct.
+**Key principle**: Directives never mutate state directly; state changes happen through `cmd/2` return values (including `result_action` callbacks used by `RunInstruction`).
 
 ## Directives vs State Operations
 
@@ -35,6 +35,7 @@ end
 | `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals) |
 | `StopChild` | Gracefully stop a tracked child agent | Uses children map |
 | `Schedule` | Schedule a delayed message | — |
+| `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
 | `Stop` | Stop the agent process (self) | — |
 | `Cron` | Recurring scheduled execution | — |
 | `CronCancel` | Cancel a cron job | — |
@@ -65,9 +66,18 @@ Directive.schedule(5000, :timeout)
 Directive.cron("*/5 * * * *", :tick, job_id: :heartbeat)
 Directive.cron_cancel(:heartbeat)
 
+# Runtime instruction execution
+Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
+
 # Errors
 Directive.error(Jido.Error.validation_error("Invalid input"))
 ```
+
+## RunInstruction
+
+`RunInstruction` is used by strategies that keep `cmd/2` pure. Instead of calling
+`Jido.Exec.run/1` inline, the strategy emits `%Directive.RunInstruction{}` and the
+runtime executes it, then routes the result back through `cmd/2` using `result_action`.
 
 ## Spawn vs SpawnAgent
 

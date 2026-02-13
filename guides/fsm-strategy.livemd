@@ -16,6 +16,8 @@ The FSM (Finite State Machine) Strategy enables you to build agents with explici
 - Any process with defined states and transitions
 
 The FSM Strategy stores its state in `agent.state.__strategy__` and automatically validates transitions.
+It keeps `cmd/2` pure by emitting `%Directive.RunInstruction{}` for runtime execution, then handling
+execution results through internal strategy actions.
 
 ## Configuration
 

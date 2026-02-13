@@ -55,7 +55,9 @@ defmodule Jido.Agent.Strategy.FSM do
       agent = MyAgent.new()
       {agent, directives} = MyAgent.cmd(agent, SomeAction)
 
-  The strategy automatically transitions through states as instructions execute.
+  The strategy emits `%Directive.RunInstruction{}` directives for runtime execution,
+  then handles execution results through internal `cmd/2` actions. This keeps
+  strategy `cmd/2` pure while preserving FSM transition semantics.
   """
 
   use Jido.Agent.Strategy
@@ -75,6 +77,7 @@ defmodule Jido.Agent.Strategy.FSM do
     "completed" => ["idle"],
     "failed" => ["idle"]
   }
+  @instruction_result_action :fsm_instruction_result
 
   defmodule Machine do
     @moduledoc """
@@ -141,7 +144,10 @@ defmodule Jido.Agent.Strategy.FSM do
         machine: machine,
         module: __MODULE__,
         initial_state: initial_state,
-        auto_transition: Keyword.get(opts, :auto_transition, true)
+        auto_transition: Keyword.get(opts, :auto_transition, true),
+        pending_instructions: [],
+        current_instruction: nil,
+        deferred_directives: []
       })
 
     agent =
@@ -153,6 +159,15 @@ defmodule Jido.Agent.Strategy.FSM do
       end
 
     {agent, []}
+  end
+
+  @impl true
+  def cmd(
+        %Agent{} = agent,
+        [%Instruction{action: @instruction_result_action, params: result_payload}],
+        ctx
+      ) do
+    handle_instruction_result(agent, result_payload, ctx)
   end
 
   @impl true
@@ -174,13 +189,18 @@ defmodule Jido.Agent.Strategy.FSM do
     case Machine.transition(machine, "processing") do
       {:ok, machine} ->
         agent = maybe_append_checkpoint(agent, :transition, "processing")
-        {agent, machine, directives} = process_instructions(agent, machine, instructions)
 
-        machine = maybe_auto_transition(machine, auto_transition, initial_state)
-        agent = maybe_append_checkpoint(agent, :transition, machine.status)
+        strategy_state = %{
+          state
+          | machine: machine,
+            initial_state: initial_state,
+            auto_transition: auto_transition,
+            pending_instructions: instructions,
+            current_instruction: nil,
+            deferred_directives: []
+        }
 
-        agent = StratState.put(agent, %{state | machine: machine})
-        {agent, directives}
+        dispatch_next_instruction(agent, strategy_state)
 
       {:error, reason} ->
         error = Error.execution_error("FSM transition failed", %{reason: reason})
@@ -213,17 +233,82 @@ defmodule Jido.Agent.Strategy.FSM do
     ThreadAgent.append(agent, entry)
   end
 
-  defp process_instructions(agent, machine, instructions) do
-    {final_agent, final_machine, reversed_directives} =
-      Enum.reduce(instructions, {agent, machine, []}, fn instruction,
-                                                         {acc_agent, acc_machine, acc_directives} ->
-        {new_agent, new_machine, new_directives} =
-          run_instruction_with_tracking(acc_agent, acc_machine, instruction)
+  defp dispatch_next_instruction(agent, state) do
+    case Map.get(state, :pending_instructions, []) do
+      [next_instruction | rest] ->
+        agent = maybe_append_instruction_start(agent, next_instruction)
 
-        {new_agent, new_machine, Enum.reverse(new_directives) ++ acc_directives}
-      end)
+        directives = [
+          Directive.run_instruction(next_instruction,
+            result_action: @instruction_result_action,
+            meta: %{strategy: __MODULE__}
+          )
+        ]
 
-    {final_agent, final_machine, Enum.reverse(reversed_directives)}
+        state = %{state | pending_instructions: rest, current_instruction: next_instruction}
+        agent = StratState.put(agent, state)
+        {agent, directives}
+
+      [] ->
+        finalize_batch(agent, state)
+    end
+  end
+
+  defp finalize_batch(agent, state) do
+    machine =
+      maybe_auto_transition(
+        Map.fetch!(state, :machine),
+        Map.get(state, :auto_transition, true),
+        Map.get(state, :initial_state, @default_initial_state)
+      )
+
+    agent = maybe_append_checkpoint(agent, :transition, machine.status)
+    directives = Map.get(state, :deferred_directives, [])
+
+    state = %{
+      state
+      | machine: machine,
+        pending_instructions: [],
+        current_instruction: nil,
+        deferred_directives: []
+    }
+
+    agent = StratState.put(agent, state)
+    {agent, directives}
+  end
+
+  defp handle_instruction_result(agent, result_payload, ctx) when is_map(result_payload) do
+    state = StratState.get(agent, %{})
+    opts = ctx[:strategy_opts] || []
+
+    initial_state =
+      Map.get(state, :initial_state, Keyword.get(opts, :initial_state, @default_initial_state))
+
+    transitions = Keyword.get(opts, :transitions, @default_transitions)
+    auto_transition = Map.get(state, :auto_transition, Keyword.get(opts, :auto_transition, true))
+    machine = Map.get(state, :machine) || Machine.new(initial_state, transitions)
+
+    {agent, machine, new_directives, status} =
+      apply_instruction_result(agent, machine, result_payload)
+
+    agent = maybe_append_instruction_end(agent, Map.get(state, :current_instruction), status)
+
+    deferred_directives = Map.get(state, :deferred_directives, []) ++ new_directives
+
+    strategy_state = %{
+      state
+      | machine: machine,
+        initial_state: initial_state,
+        auto_transition: auto_transition,
+        deferred_directives: deferred_directives
+    }
+
+    dispatch_next_instruction(agent, strategy_state)
+  end
+
+  defp handle_instruction_result(agent, _result_payload, _ctx) do
+    error = Error.execution_error("Instruction result payload must be a map", %{})
+    {agent, [%Directive.Error{error: error, context: :instruction_result}]}
   end
 
   defp maybe_auto_transition(machine, false, _initial_state), do: machine
@@ -235,37 +320,30 @@ defmodule Jido.Agent.Strategy.FSM do
     end
   end
 
-  defp run_instruction_with_tracking(agent, machine, %Instruction{} = instruction) do
-    if ThreadAgent.has_thread?(agent) do
-      agent = append_instruction_start(agent, instruction)
-      {agent, machine, directives, status} = run_instruction(agent, machine, instruction)
-      agent = append_instruction_end(agent, instruction, status)
-      {agent, machine, directives}
-    else
-      {agent, machine, directives, _status} = run_instruction(agent, machine, instruction)
-      {agent, machine, directives}
-    end
+  defp apply_instruction_result(agent, machine, %{status: :ok, result: result, effects: effects})
+       when is_map(result) do
+    machine = %{machine | processed_count: machine.processed_count + 1, last_result: result}
+    agent = StateOps.apply_result(agent, result)
+    {agent, directives} = StateOps.apply_state_ops(agent, List.wrap(effects))
+    {agent, machine, directives, :ok}
   end
 
-  defp run_instruction(agent, machine, %Instruction{} = instruction) do
-    instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+  defp apply_instruction_result(agent, machine, %{status: :ok, result: result})
+       when is_map(result) do
+    machine = %{machine | processed_count: machine.processed_count + 1, last_result: result}
+    {StateOps.apply_result(agent, result), machine, [], :ok}
+  end
 
-    case Jido.Exec.run(instruction) do
-      {:ok, result} when is_map(result) ->
-        machine = %{machine | processed_count: machine.processed_count + 1, last_result: result}
-        {StateOps.apply_result(agent, result), machine, [], :ok}
+  defp apply_instruction_result(agent, machine, %{status: :error, reason: reason}) do
+    machine = %{machine | error: reason}
+    error = Error.execution_error("Instruction failed", %{reason: reason})
+    {agent, machine, [%Directive.Error{error: error, context: :instruction}], :error}
+  end
 
-      {:ok, result, effects} when is_map(result) ->
-        machine = %{machine | processed_count: machine.processed_count + 1, last_result: result}
-        agent = StateOps.apply_result(agent, result)
-        {agent, directives} = StateOps.apply_state_ops(agent, List.wrap(effects))
-        {agent, machine, directives, :ok}
-
-      {:error, reason} ->
-        machine = %{machine | error: reason}
-        error = Error.execution_error("Instruction failed", %{reason: reason})
-        {agent, machine, [%Directive.Error{error: error, context: :instruction}], :error}
-    end
+  defp apply_instruction_result(agent, machine, payload) do
+    machine = %{machine | error: payload}
+    error = Error.execution_error("Invalid instruction execution payload", %{payload: payload})
+    {agent, machine, [%Directive.Error{error: error, context: :instruction}], :error}
   end
 
   defp append_instruction_start(agent, %Instruction{} = instruction) do
@@ -284,6 +362,24 @@ defmodule Jido.Agent.Strategy.FSM do
     }
 
     ThreadAgent.append(agent, entry)
+  end
+
+  defp maybe_append_instruction_start(agent, %Instruction{} = instruction) do
+    if ThreadAgent.has_thread?(agent) do
+      append_instruction_start(agent, instruction)
+    else
+      agent
+    end
+  end
+
+  defp maybe_append_instruction_end(agent, nil, _status), do: agent
+
+  defp maybe_append_instruction_end(agent, %Instruction{} = instruction, status) do
+    if ThreadAgent.has_thread?(agent) do
+      append_instruction_end(agent, instruction, status)
+    else
+      agent
+    end
   end
 
   defp instruction_payload(%Instruction{} = instruction) do
