@@ -174,8 +174,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
   require Logger
 
   alias Jido.AgentServer.State
+  alias Jido.Tracing.Context, as: TraceContext
 
-  def exec(%{tag: tag, reason: reason}, _input_signal, state) do
+  def exec(%{tag: tag, reason: reason}, input_signal, state) do
     case State.get_child(state, tag) do
       nil ->
         Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
@@ -186,12 +187,20 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
         )
 
-        task_sup =
-          if state.jido, do: Jido.task_supervisor_name(state.jido), else: Jido.TaskSupervisor
+        stop_signal =
+          Jido.Signal.new!(
+            "jido.agent.stop",
+            %{reason: reason},
+            source: "/agent/#{state.id}"
+          )
 
-        Task.Supervisor.start_child(task_sup, fn ->
-          GenServer.stop(pid, reason, 5_000)
-        end)
+        traced_signal =
+          case TraceContext.propagate_to(stop_signal, input_signal.id) do
+            {:ok, signal} -> signal
+            {:error, _} -> stop_signal
+          end
+
+        _ = Jido.AgentServer.cast(pid, traced_signal)
 
         {:ok, state}
     end

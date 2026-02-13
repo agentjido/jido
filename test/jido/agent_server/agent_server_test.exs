@@ -332,6 +332,16 @@ defmodule JidoTest.AgentServerTest do
 
       GenServer.stop(pid)
     end
+
+    test "jido.agent.stop gracefully stops even without explicit routes", %{jido: jido} do
+      {:ok, pid} = AgentServer.start(agent: TestAgent, jido: jido)
+      ref = Process.monitor(pid)
+
+      signal = Signal.new!("jido.agent.stop", %{reason: :shutdown}, source: "/test")
+      assert :ok = AgentServer.cast(pid, signal)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, :shutdown}, 1_000
+    end
   end
 
   describe "drain loop" do

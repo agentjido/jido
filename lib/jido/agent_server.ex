@@ -1095,12 +1095,19 @@ defmodule Jido.AgentServer do
         {:ok, actions}
 
       {:error, %{details: %{reason: :no_handlers_found}}} ->
-        {:error, :no_matching_route}
+        default_system_action(signal)
 
       {:error, reason} ->
         {:error, reason}
     end
   end
+
+  defp default_system_action(%Signal{type: "jido.agent.stop", data: data}) do
+    params = if is_map(data), do: data, else: %{}
+    {:ok, [{Jido.Actions.Lifecycle.StopSelf, params}]}
+  end
+
+  defp default_system_action(_signal), do: {:error, :no_matching_route}
 
   defp target_to_action({:strategy_cmd, cmd}, %Signal{data: data}) do
     {cmd, data}
