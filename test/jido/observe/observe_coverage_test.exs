@@ -5,7 +5,7 @@ defmodule JidoTest.ObserveCoverageTest do
   Targets uncovered paths:
   - Tracer error logging paths (span_start, span_stop, span_exception failures)
   - debug_enabled?/0 with various config values
-  - emit_debug_event/3 with debug on/off
+  - emit_event/3 and emit_debug_event/3 behavior
   - redact/2 with various config scenarios
   """
   use ExUnit.Case, async: false
@@ -13,6 +13,8 @@ defmodule JidoTest.ObserveCoverageTest do
   import ExUnit.CaptureLog
 
   alias Jido.Observe
+  alias Jido.Signal
+  alias Jido.Tracing.Context, as: TraceContext
   alias JidoTest.Support.TestTracer
 
   setup do
@@ -134,6 +136,7 @@ defmodule JidoTest.ObserveCoverageTest do
 
   describe "emit_debug_event/3" do
     setup do
+      TraceContext.clear()
       test_pid = self()
       handler_id = "debug-event-handler-#{System.unique_integer()}"
 
@@ -147,10 +150,25 @@ defmodule JidoTest.ObserveCoverageTest do
       )
 
       on_exit(fn ->
+        TraceContext.clear()
         :telemetry.detach(handler_id)
       end)
 
       :ok
+    end
+
+    test "enriches debug metadata with trace correlation when present" do
+      Application.put_env(:jido, :observability, debug_events: :all)
+
+      signal = Signal.new!("test.debug.trace", %{}, source: "/test")
+      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+
+      Observe.emit_debug_event([:jido, :test, :debug], %{count: 5}, %{key: "trace"})
+
+      assert_receive {:debug_event, [:jido, :test, :debug], %{count: 5}, metadata}
+      assert metadata.key == "trace"
+      assert metadata.jido_trace_id == trace.trace_id
+      assert metadata.jido_span_id == trace.span_id
     end
 
     test "emits event when debug_events is :all" do
@@ -199,6 +217,67 @@ defmodule JidoTest.ObserveCoverageTest do
       Observe.emit_debug_event([:jido, :test, :debug])
 
       assert_receive {:debug_event, [:jido, :test, :debug], %{}, %{}}
+    end
+  end
+
+  describe "emit_event/3" do
+    setup do
+      TraceContext.clear()
+      test_pid = self()
+      handler_id = "event-handler-#{System.unique_integer()}"
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :test, :event],
+        fn event, measurements, metadata, _ ->
+          send(test_pid, {:event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn ->
+        TraceContext.clear()
+        :telemetry.detach(handler_id)
+      end)
+
+      :ok
+    end
+
+    test "emits event regardless of debug_events config" do
+      Application.put_env(:jido, :observability, debug_events: :off)
+
+      Observe.emit_event([:jido, :test, :event], %{count: 1}, %{key: "value"})
+
+      assert_receive {:event, [:jido, :test, :event], %{count: 1}, %{key: "value"}}
+    end
+
+    test "returns :ok and supports default measurements and metadata" do
+      assert Observe.emit_event([:jido, :test, :event]) == :ok
+      assert_receive {:event, [:jido, :test, :event], %{}, %{}}
+    end
+
+    test "enriches metadata with current trace context" do
+      signal = Signal.new!("test.event.trace", %{}, source: "/test")
+      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+
+      Observe.emit_event([:jido, :test, :event], %{count: 2}, %{key: "trace"})
+
+      assert_receive {:event, [:jido, :test, :event], %{count: 2}, metadata}
+      assert metadata.key == "trace"
+      assert metadata.jido_trace_id == trace.trace_id
+      assert metadata.jido_span_id == trace.span_id
+    end
+
+    test "caller metadata takes precedence over correlation metadata" do
+      signal = Signal.new!("test.event.override", %{}, source: "/test")
+      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+      custom_trace_id = "custom-trace-id"
+
+      Observe.emit_event([:jido, :test, :event], %{}, %{jido_trace_id: custom_trace_id})
+
+      assert_receive {:event, [:jido, :test, :event], %{}, metadata}
+      assert metadata.jido_trace_id == custom_trace_id
+      assert metadata.jido_span_id == trace.span_id
     end
   end
 

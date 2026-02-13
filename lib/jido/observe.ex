@@ -10,7 +10,7 @@ defmodule Jido.Observe do
   - Automatic telemetry event emission (start/stop/exception)
   - Duration measurement for all spans (nanoseconds)
   - Automatic correlation ID enrichment from `Jido.Tracing.Context`
-  - Extension point for future OpenTelemetry integration via `Jido.Observe.Tracer`
+  - Pluggable tracer callbacks via `Jido.Observe.Tracer`
   - Threshold-based logging via `Jido.Observe.Log`
 
   ## Correlation Tracing Integration
@@ -294,6 +294,38 @@ defmodule Jido.Observe do
   end
 
   @doc """
+  Emits a telemetry event unconditionally.
+
+  Unlike `emit_debug_event/3`, this helper does not check debug configuration.
+  It is intended for domain-level events that should always be emitted.
+
+  Trace correlation metadata from `Jido.Tracing.Context` is merged in automatically
+  when present.
+
+  ## Parameters
+
+  - `event_prefix` - Telemetry event name
+  - `measurements` - Map of measurements (durations, counts, etc.)
+  - `metadata` - Map of metadata (agent_id, iteration, etc.)
+
+  ## Example
+
+      Jido.Observe.emit_event(
+        [:jido, :agent, :workflow, :step],
+        %{step_duration_ns: 1_234_567},
+        %{agent_id: agent.id, step: "plan"}
+      )
+  """
+  @spec emit_event(event_prefix(), measurements(), metadata()) :: :ok
+  def emit_event(event_prefix, measurements \\ %{}, metadata \\ %{})
+
+  def emit_event(event_prefix, measurements, metadata)
+      when is_list(event_prefix) and is_map(measurements) and is_map(metadata) do
+    :telemetry.execute(event_prefix, measurements, enrich_with_correlation(metadata))
+    :ok
+  end
+
+  @doc """
   Emits a debug event only if debug events are enabled in config.
 
   This helper checks the `:debug_events` config before emitting, ensuring
@@ -328,7 +360,7 @@ defmodule Jido.Observe do
     instance = Map.get(metadata, :jido_instance)
 
     if ObserveConfig.debug_events_enabled?(instance) do
-      :telemetry.execute(event_prefix, measurements, metadata)
+      emit_event(event_prefix, measurements, metadata)
     end
 
     :ok
