@@ -754,13 +754,13 @@ defmodule Jido.AgentServer do
     {:reply, :ok, new_state}
   end
 
-  def handle_call({:recent_events, _opts}, _from, %State{debug: false} = state) do
-    {:reply, {:error, :debug_not_enabled}, state}
-  end
-
   def handle_call({:recent_events, opts}, _from, %State{} = state) do
-    events = State.get_debug_events(state, opts)
-    {:reply, {:ok, events}, state}
+    if state.debug || Jido.Debug.enabled?(state.jido) do
+      events = State.get_debug_events(state, opts)
+      {:reply, {:ok, events}, state}
+    else
+      {:reply, {:error, :debug_not_enabled}, state}
+    end
   end
 
   def handle_call({:await_completion, opts}, from, %State{} = state) do
@@ -987,7 +987,8 @@ defmodule Jido.AgentServer do
     %{
       agent_id: state.id,
       agent_module: state.agent_module,
-      signal_type: signal.type
+      signal_type: signal.type,
+      jido_instance: state.jido
     }
     |> Map.merge(trace_metadata)
   end
@@ -1788,7 +1789,8 @@ defmodule Jido.AgentServer do
         agent_id: state.id,
         agent_module: state.agent_module,
         directive_type: directive_type,
-        signal_type: signal.type
+        signal_type: signal.type,
+        jido_instance: state.jido
       }
       |> Map.merge(trace_metadata)
 

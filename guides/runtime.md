@@ -150,15 +150,49 @@ Use the `:hint` and `:server_status` to understand why the agent hasn't complete
 
 ## Debug Mode
 
-AgentServer can record recent events in an in-memory buffer to help diagnose agent behavior without configuring telemetry.
+AgentServer can record recent events in an in-memory buffer to help diagnose agent behavior without configuring telemetry. Debug mode can be enabled at two levels: for an entire Jido instance (all agents) or for individual agents.
 
-### Enable Debug Mode
+### Instance-Level Debug
+
+Enable debug recording for all agents in a Jido instance.
+
+At boot time via config:
+
+```elixir
+config :my_app, MyApp.Jido, debug: true
+config :my_app, MyApp.Jido, debug: :verbose
+```
+
+Or toggle at runtime:
+
+```elixir
+MyApp.Jido.debug(:on)
+MyApp.Jido.debug(:verbose)
+MyApp.Jido.debug(:off)
+```
+
+Query the current debug level:
+
+```elixir
+MyApp.Jido.debug()
+```
+
+Get full debug status including active agent counts:
+
+```elixir
+MyApp.Jido.debug_status()
+```
+
+When instance-level debug is enabled, recording is turned on for ALL agents managed by that instance.
+
+### Per-Agent Debug
+
+For surgical debugging of a single agent, enable debug mode on a specific process.
 
 At start:
 
 ```elixir
 {:ok, pid} = MyApp.Jido.start_agent(MyAgent, debug: true)
-# or
 {:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent, debug: true)
 ```
 
@@ -171,8 +205,18 @@ Or toggle at runtime:
 ### Retrieve Events
 
 ```elixir
-{:ok, events} = Jido.AgentServer.recent_events(pid, limit: 20)
+{:ok, events} = MyApp.Jido.recent(pid, 20)
+```
 
+Or use the AgentServer API directly:
+
+```elixir
+{:ok, events} = Jido.AgentServer.recent_events(pid, limit: 20)
+```
+
+Inspect the results:
+
+```elixir
 Enum.each(events, fn e ->
   IO.inspect({e.type, e.data}, label: "event")
 end)
@@ -183,10 +227,11 @@ Events are returned newest-first. Each event has:
 - `:type` - event type (`:signal_received`, `:directive_started`)
 - `:data` - event-specific details
 
-The buffer holds up to 50 events. This is a development aid, not an audit log.
+The buffer holds up to 500 events by default (configurable via `debug_max_events`). This is a development aid, not an audit log.
 
 ## Related
 
+- [Debugging](debugging.md) — Systematic debugging workflow
 - [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle
 - [Worker Pools](worker-pools.md) — Pre-warmed agent pools for throughput
 - [Await & Coordination](await.md) — Waiting on agent completion

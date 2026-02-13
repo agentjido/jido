@@ -83,6 +83,10 @@ defmodule Jido do
       @otp_app unquote(otp_app)
       @jido_storage Jido.Storage.normalize_storage(unquote(Macro.escape(storage)))
 
+      @doc false
+      @spec __otp_app__() :: atom()
+      def __otp_app__, do: @otp_app
+
       @doc "Returns the storage configuration for this Jido instance."
       @spec __jido_storage__() :: {module(), keyword()}
       def __jido_storage__, do: @jido_storage
@@ -104,6 +108,7 @@ defmodule Jido do
         opts =
           config(init_arg)
           |> Keyword.put_new(:name, __MODULE__)
+          |> Keyword.put_new(:otp_app, @otp_app)
 
         Jido.child_spec(opts)
       end
@@ -113,6 +118,7 @@ defmodule Jido do
         opts =
           config(init_arg)
           |> Keyword.put_new(:name, __MODULE__)
+          |> Keyword.put_new(:otp_app, @otp_app)
 
         Jido.start_link(opts)
       end
@@ -185,6 +191,34 @@ defmodule Jido do
       def thaw(agent_module, key) do
         Jido.Persist.thaw(__jido_storage__(), agent_module, key)
       end
+
+      @doc """
+      Controls debug mode for this Jido instance.
+
+      - `debug()` — returns current debug level
+      - `debug(:on)` — enable developer-friendly verbosity
+      - `debug(:verbose)` — enable maximum detail
+      - `debug(:off)` — disable debug overrides
+      - `debug(pid)` — toggle per-agent debug mode
+      - `debug(:on, redact: false)` — also disable redaction
+      """
+      @spec debug() :: Jido.Debug.level()
+      def debug, do: Jido.Debug.level(__MODULE__)
+
+      @spec debug(Jido.Debug.level() | pid()) :: :ok | Jido.Debug.level()
+      def debug(pid) when is_pid(pid), do: Jido.AgentServer.set_debug(pid, true)
+      def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
+
+      @spec debug(Jido.Debug.level(), keyword()) :: :ok
+      def debug(level, opts) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level, opts)
+
+      @doc "Returns recent debug events from an agent's ring buffer."
+      @spec recent(pid(), non_neg_integer()) :: {:ok, [map()]} | {:error, term()}
+      def recent(pid, limit \\ 50), do: Jido.AgentServer.recent_events(pid, limit: limit)
+
+      @doc "Returns the current debug status for this instance."
+      @spec debug_status() :: map()
+      def debug_status, do: Jido.Debug.status(__MODULE__)
     end
   end
 
@@ -200,6 +234,28 @@ defmodule Jido do
   """
   @spec default_instance() :: atom()
   def default_instance, do: @default_instance
+
+  # ---------------------------------------------------------------------------
+  # Debug API (default instance delegates)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Controls debug mode for the default Jido instance (`Jido.Default`).
+
+  - `debug()` — returns current debug level
+  - `debug(:on)` — enable developer-friendly verbosity
+  - `debug(:verbose)` — enable maximum detail
+  - `debug(:off)` — disable debug overrides
+  """
+  @spec debug() :: Jido.Debug.level()
+  def debug, do: Jido.Debug.level(@default_instance)
+
+  @spec debug(Jido.Debug.level()) :: :ok
+  def debug(level) when is_atom(level), do: Jido.Debug.enable(@default_instance, level)
+
+  @spec debug(Jido.Debug.level(), keyword()) :: :ok
+  def debug(level, opts) when is_atom(level),
+    do: Jido.Debug.enable(@default_instance, level, opts)
 
   @doc """
   Start the default Jido instance for scripts and Livebook.
@@ -281,6 +337,10 @@ defmodule Jido do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
+
+    if otp_app = opts[:otp_app] do
+      Jido.Debug.maybe_enable_from_config(otp_app, name)
+    end
 
     base_children = [
       {Task.Supervisor,
