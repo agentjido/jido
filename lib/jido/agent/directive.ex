@@ -27,6 +27,7 @@ defmodule Jido.Agent.Directive do
     * `%SpawnAgent{}` - Spawn a child Jido agent with full hierarchy tracking
     * `%StopChild{}` - Request a tracked child agent to stop gracefully
     * `%Schedule{}` - Schedule a delayed message
+    * `%RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
     * `%Stop{}` - Stop the agent process (self)
 
   ## Usage
@@ -41,6 +42,9 @@ defmodule Jido.Agent.Directive do
       # Schedule for later
       %Directive.Schedule{delay_ms: 5000, message: :timeout}
 
+      # Execute instruction at runtime
+      %Directive.RunInstruction{instruction: instruction, result_action: :fsm_instruction_result}
+
   ## Extensibility
 
   External packages can define their own directive structs:
@@ -52,7 +56,18 @@ defmodule Jido.Agent.Directive do
   The runtime dispatches on struct type, so no changes to core are needed.
   """
 
-  alias __MODULE__.{Emit, Error, Spawn, SpawnAgent, StopChild, Schedule, Stop, Cron, CronCancel}
+  alias __MODULE__.{
+    Emit,
+    Error,
+    Spawn,
+    SpawnAgent,
+    StopChild,
+    Schedule,
+    RunInstruction,
+    Stop,
+    Cron,
+    CronCancel
+  }
 
   @typedoc """
   Any external directive struct (core or extension).
@@ -70,6 +85,7 @@ defmodule Jido.Agent.Directive do
           | SpawnAgent.t()
           | StopChild.t()
           | Schedule.t()
+          | RunInstruction.t()
           | Stop.t()
           | Cron.t()
           | CronCancel.t()
@@ -359,6 +375,53 @@ defmodule Jido.Agent.Directive do
   end
 
   # ============================================================================
+  # RunInstruction - Runtime instruction execution
+  # ============================================================================
+
+  defmodule RunInstruction do
+    @moduledoc """
+    Execute a `%Jido.Instruction{}` at runtime and route the result back to `cmd/2`.
+
+    This directive lets strategies keep `cmd/2` pure by emitting instruction execution
+    requests instead of calling `Jido.Exec.run/1` directly. The runtime executes the
+    instruction, builds a result payload, then calls:
+
+        agent_module.cmd(agent, {result_action, payload})
+
+    ## Fields
+
+    - `instruction` - The `%Jido.Instruction{}` to execute
+    - `result_action` - Internal action atom/module for result handling in `cmd/2`
+    - `meta` - Optional metadata echoed in the result payload
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                instruction: Zoi.any(description: "%Jido.Instruction{} to execute"),
+                result_action:
+                  Zoi.any(
+                    description: "Action used when routing execution result back into cmd/2"
+                  ),
+                meta:
+                  Zoi.map(Zoi.any(), Zoi.any(),
+                    description: "Optional metadata for result payload"
+                  )
+                  |> Zoi.default(%{})
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc "Returns the Zoi schema for RunInstruction."
+    @spec schema() :: Zoi.schema()
+    def schema, do: @schema
+  end
+
+  # ============================================================================
   # Stop - Stop the agent process
   # ============================================================================
 
@@ -476,6 +539,28 @@ defmodule Jido.Agent.Directive do
   @spec schedule(non_neg_integer(), term()) :: Schedule.t()
   def schedule(delay_ms, message) do
     %Schedule{delay_ms: delay_ms, message: message}
+  end
+
+  @doc """
+  Creates a RunInstruction directive.
+
+  ## Options
+
+  - `:result_action` - Internal action atom/module to receive execution results (default: `:instruction_result`)
+  - `:meta` - Optional metadata echoed in result payload (map)
+
+  ## Examples
+
+      Directive.run_instruction(instruction)
+      Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
+  """
+  @spec run_instruction(Jido.Instruction.t(), keyword()) :: RunInstruction.t()
+  def run_instruction(%Jido.Instruction{} = instruction, opts \\ []) do
+    %RunInstruction{
+      instruction: instruction,
+      result_action: Keyword.get(opts, :result_action, :instruction_result),
+      meta: Keyword.get(opts, :meta, %{})
+    }
   end
 
   @doc """

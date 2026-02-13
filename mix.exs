@@ -225,6 +225,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.SpawnAgent,
           Jido.Agent.Directive.StopChild,
           Jido.Agent.Directive.Schedule,
+          Jido.Agent.Directive.RunInstruction,
           Jido.Agent.Directive.Stop,
           Jido.Agent.Directive.Cron,
           Jido.Agent.Directive.CronCancel

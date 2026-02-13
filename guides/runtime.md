@@ -48,6 +48,7 @@ Signal → AgentServer.call/cast
        → Agent.cmd/2
        → {agent, directives}
        → Directives queued → drain loop via DirectiveExec
+       → (for RunInstruction) execute instruction → call Agent.cmd/2 with result_action
 ```
 
 The AgentServer routes incoming signals to actions based on your strategy's `signal_routes/0`, executes the action via `cmd/2`, and processes any returned directives.

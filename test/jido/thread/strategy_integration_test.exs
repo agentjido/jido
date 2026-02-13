@@ -5,6 +5,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
   alias Jido.Agent.Strategy.FSM, as: StrategyFSM
   alias Jido.Thread
   alias Jido.Thread.Agent, as: ThreadAgent
+  alias JidoTest.Support.FSMRuntimeHelper
 
   defmodule SimpleAction do
     @moduledoc false
@@ -71,6 +72,10 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       schema: [value: [type: :integer, default: 0]]
 
     def signal_routes(_ctx), do: []
+  end
+
+  defp run_cmd(agent_module, agent, action) do
+    FSMRuntimeHelper.run_cmd(agent_module, agent, action)
   end
 
   describe "Direct strategy without thread?" do
@@ -179,7 +184,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
   describe "FSM strategy without thread?" do
     test "behavior unchanged, no thread created" do
       agent = FSMTestAgent.new()
-      {updated, directives} = FSMTestAgent.cmd(agent, SimpleAction)
+      {updated, directives} = run_cmd(FSMTestAgent, agent, SimpleAction)
 
       assert updated.state.executed == true
       assert directives == []
@@ -190,7 +195,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       agent = FSMTestAgent.new()
 
       {updated, _} =
-        FSMTestAgent.cmd(agent, [
+        run_cmd(FSMTestAgent, agent, [
           SimpleAction,
           {ValueAction, %{value: 42}}
         ])
@@ -204,7 +209,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
   describe "FSM strategy with thread?: true" do
     test "creates thread and appends checkpoint entries for transitions" do
       agent = FSMThreadAgent.new()
-      {updated, directives} = FSMThreadAgent.cmd(agent, SimpleAction)
+      {updated, directives} = run_cmd(FSMThreadAgent, agent, SimpleAction)
 
       assert updated.state.executed == true
       assert directives == []
@@ -232,7 +237,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
 
     test "tracks instruction_start/end entries alongside checkpoints" do
       agent = FSMThreadAgent.new()
-      {updated, _} = FSMThreadAgent.cmd(agent, SimpleAction)
+      {updated, _} = run_cmd(FSMThreadAgent, agent, SimpleAction)
 
       thread = ThreadAgent.get(updated)
       entries = Thread.to_list(thread)
@@ -245,7 +250,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
 
     test "records :error status on failing action" do
       agent = FSMThreadAgent.new()
-      {updated, directives} = FSMThreadAgent.cmd(agent, FailingAction)
+      {updated, directives} = run_cmd(FSMThreadAgent, agent, FailingAction)
 
       assert [%Jido.Agent.Directive.Error{}] = directives
 
@@ -260,7 +265,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       agent = FSMThreadAgent.new()
 
       {updated, _} =
-        FSMThreadAgent.cmd(agent, [SimpleAction, {ValueAction, %{value: 100}}])
+        run_cmd(FSMThreadAgent, agent, [SimpleAction, {ValueAction, %{value: 100}}])
 
       thread = ThreadAgent.get(updated)
       entries = Thread.to_list(thread)
@@ -280,7 +285,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
       agent = ThreadAgent.ensure(agent)
       agent = ThreadAgent.append(agent, %{kind: :note, payload: %{text: "existing"}})
 
-      {updated, _} = FSMTestAgent.cmd(agent, SimpleAction)
+      {updated, _} = run_cmd(FSMTestAgent, agent, SimpleAction)
 
       thread = ThreadAgent.get(updated)
       entries = Thread.to_list(thread)

@@ -44,6 +44,9 @@ use Jido.Agent,
   }
 ```
 
+FSM keeps `cmd/2` pure by emitting `%Directive.RunInstruction{}` for runtime
+execution and handling results via internal strategy actions.
+
 ## Snapshot Interface
 
 Get a stable view of strategy state:

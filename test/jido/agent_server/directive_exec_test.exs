@@ -56,11 +56,72 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     defstruct [:value]
   end
 
+  defmodule RunInstructionSuccessAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "run_instruction_success",
+      schema: []
+
+    def run(_params, _context), do: {:ok, %{ran: true}}
+  end
+
+  defmodule RunInstructionFailureAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "run_instruction_failure",
+      schema: []
+
+    def run(_params, _context), do: {:error, :boom}
+  end
+
+  defmodule CaptureResultAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "capture_result_action",
+      schema: [
+        status: [type: :atom, required: true],
+        result: [type: :map, default: %{}],
+        reason: [type: :any, default: nil],
+        effects: [type: :any, default: []],
+        instruction: [type: :any, default: nil],
+        meta: [type: :map, default: %{}]
+      ]
+
+    def run(params, _context) do
+      {:ok,
+       %{
+         captured_status: params.status,
+         captured_result: params.result,
+         captured_reason: params.reason,
+         captured_meta: params.meta
+       }}
+    end
+  end
+
+  defmodule CaptureResultEmitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "capture_result_emit_action",
+      schema: [
+        status: [type: :atom, required: true],
+        result: [type: :map, default: %{}],
+        reason: [type: :any, default: nil],
+        effects: [type: :any, default: []],
+        instruction: [type: :any, default: nil],
+        meta: [type: :map, default: %{}]
+      ]
+
+    def run(_params, _context) do
+      directive = Directive.emit(%{type: "capture.result.event"})
+      {:ok, %{captured_emit: true}, [directive]}
+    end
+  end
+
   setup %{jido: jido} do
     agent = TestAgent.new()
 
     {:ok, opts} = Options.new(%{agent: agent, id: "test-agent-123", jido: jido})
-    {:ok, state} = State.from_options(opts, agent.__struct__, agent)
+    {:ok, state} = State.from_options(opts, TestAgent, agent)
 
     input_signal = Signal.new!(%{type: "test.signal", source: "/test", data: %{}})
 
@@ -279,6 +340,48 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       directive = %Directive.Spawn{child_spec: child_spec, tag: :worker}
 
       assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+    end
+  end
+
+  describe "RunInstruction directive" do
+    test "executes instruction and routes result via result_action", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      instruction = Jido.Instruction.new!(%{action: RunInstructionSuccessAction})
+
+      directive =
+        Directive.run_instruction(instruction,
+          result_action: CaptureResultAction,
+          meta: %{source: :test}
+        )
+
+      assert {:ok, state} = DirectiveExec.exec(directive, input_signal, state)
+
+      assert state.agent.state.captured_status == :ok
+      assert state.agent.state.captured_result == %{ran: true}
+      assert state.agent.state.captured_reason == nil
+      assert state.agent.state.captured_meta == %{source: :test}
+      assert State.queue_length(state) == 0
+    end
+
+    test "normalizes failures and enqueues directives from result_action", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      instruction = Jido.Instruction.new!(%{action: RunInstructionFailureAction})
+
+      directive =
+        Directive.run_instruction(instruction,
+          result_action: CaptureResultEmitAction
+        )
+
+      assert {:ok, state} = DirectiveExec.exec(directive, input_signal, state)
+      assert state.agent.state.captured_emit == true
+      assert State.queue_length(state) == 1
+
+      assert {{:value, {^input_signal, %Directive.Emit{signal: %{type: "capture.result.event"}}}},
+              _state} = State.dequeue(state)
     end
   end
 

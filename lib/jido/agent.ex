@@ -42,6 +42,7 @@ defmodule Jido.Agent do
   - `%Directive.Error{}` - Signal an error (wraps `Jido.Error.t()`)
   - `%Directive.Spawn{}` - Spawn a child process
   - `%Directive.Schedule{}` - Schedule a delayed message
+  - `%Directive.RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
   - `%Directive.Stop{}` - Stop the agent process
 
   The Emit directive integrates with `Jido.Signal` for dispatch:
