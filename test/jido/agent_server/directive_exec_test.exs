@@ -14,6 +14,43 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       ]
   end
 
+  defmodule StopOnSignalAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "stop_on_signal",
+      schema: [
+        reason: [type: :any, default: :normal]
+      ]
+
+    alias Jido.Agent.Directive
+
+    def run(%{reason: reason}, %{state: %{observer_pid: observer_pid}})
+        when is_pid(observer_pid) do
+      send(observer_pid, {:child_stop_signal_received, reason})
+      {:ok, %{stop_reason: reason}, [%Directive.Stop{reason: reason}]}
+    end
+
+    def run(%{reason: reason}, _context) do
+      {:ok, %{stop_reason: reason}, [%Directive.Stop{reason: reason}]}
+    end
+  end
+
+  defmodule StopAwareAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "directive_exec_stop_aware_agent",
+      schema: [
+        observer_pid: [type: :any, default: nil],
+        stop_reason: [type: :any, default: nil]
+      ]
+
+    def signal_routes(_ctx) do
+      [
+        {"jido.agent.stop", StopOnSignalAction}
+      ]
+    end
+  end
+
   defmodule CustomDirective do
     @moduledoc false
     defstruct [:value]
@@ -356,6 +393,28 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
   end
 
   describe "StopChild directive" do
+    test "sends jido.agent.stop to child", %{state: state, input_signal: input_signal} do
+      spawn_directive = %Directive.SpawnAgent{
+        agent: StopAwareAgent,
+        tag: :stop_signal_child,
+        opts: %{initial_state: %{observer_pid: self()}},
+        meta: %{}
+      }
+
+      {:ok, state_with_child} = DirectiveExec.exec(spawn_directive, input_signal, state)
+      assert Map.has_key?(state_with_child.children, :stop_signal_child)
+      child_pid = state_with_child.children[:stop_signal_child].pid
+      child_ref = Process.monitor(child_pid)
+
+      stop_directive = %Directive.StopChild{tag: :stop_signal_child, reason: :shutdown}
+
+      assert {:ok, ^state_with_child} =
+               DirectiveExec.exec(stop_directive, input_signal, state_with_child)
+
+      assert_receive {:child_stop_signal_received, :shutdown}, 1_000
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :shutdown}, 1_000
+    end
+
     test "stops existing child", %{state: state, input_signal: input_signal} do
       spawn_directive = %Directive.SpawnAgent{
         agent: TestAgent,
