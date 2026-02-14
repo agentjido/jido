@@ -32,6 +32,15 @@ defmodule Jido.AgentServer.State do
               queue:
                 Zoi.any(description: "Directive queue (:queue.queue())")
                 |> Zoi.default(:queue.new()),
+              signal_call_inflight:
+                Zoi.any(description: "In-flight synchronous signal call context")
+                |> Zoi.optional(),
+              signal_call_queue:
+                Zoi.any(description: "Queued synchronous signal call requests")
+                |> Zoi.default(:queue.new()),
+              deferred_async_signals:
+                Zoi.any(description: "Async signals buffered while sync call is in-flight")
+                |> Zoi.default(:queue.new()),
 
               # Hierarchy
               parent: Zoi.any(description: "Parent reference") |> Zoi.optional(),
@@ -119,6 +128,9 @@ defmodule Jido.AgentServer.State do
         status: :initializing,
         processing: false,
         queue: :queue.new(),
+        signal_call_inflight: nil,
+        signal_call_queue: :queue.new(),
+        deferred_async_signals: :queue.new(),
         parent: opts.parent,
         children: %{},
         on_parent_death: opts.on_parent_death,
