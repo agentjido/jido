@@ -228,9 +228,9 @@ defmodule JidoTest.AgentTest do
     test "passes max_retries option to disable retries" do
       agent = TestAgents.Basic.new()
 
-      start_time = System.monotonic_time(:millisecond)
+      start_no_retry = System.monotonic_time(:millisecond)
 
-      {_updated, directives} =
+      {_updated_no_retry, directives_no_retry} =
         TestAgents.Basic.cmd(
           agent,
           {TestActions.SlowAction, %{delay_ms: 200}},
@@ -238,10 +238,22 @@ defmodule JidoTest.AgentTest do
           max_retries: 0
         )
 
-      elapsed = System.monotonic_time(:millisecond) - start_time
+      elapsed_no_retry = System.monotonic_time(:millisecond) - start_no_retry
 
-      assert [%Jido.Agent.Directive.Error{}] = directives
-      assert elapsed < 100
+      start_default = System.monotonic_time(:millisecond)
+
+      {_updated_default, directives_default} =
+        TestAgents.Basic.cmd(
+          agent,
+          {TestActions.SlowAction, %{delay_ms: 200}},
+          timeout: 10
+        )
+
+      elapsed_default = System.monotonic_time(:millisecond) - start_default
+
+      assert [%Jido.Agent.Directive.Error{}] = directives_no_retry
+      assert [%Jido.Agent.Directive.Error{}] = directives_default
+      assert elapsed_no_retry < elapsed_default
     end
 
     test "cmd/2 delegates to cmd/3 with empty opts" do
