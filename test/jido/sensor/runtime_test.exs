@@ -527,6 +527,66 @@ defmodule JidoTest.Sensor.RuntimeTest do
     end
   end
 
+  describe "signal delivery via async dispatch" do
+    test "dispatches to non-pid agent_ref using context dispatch_fun/2" do
+      test_pid = self()
+
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: SimpleSensor,
+          config: %{prefix: "dispatch_fun"},
+          context: %{
+            agent_ref: {:custom, :target},
+            dispatch_fun: fn signal, _agent_ref ->
+              send(test_pid, {:dispatched_signal, signal})
+              :ok
+            end
+          }
+        )
+
+      :ok = Runtime.event(pid, {:data, 42})
+
+      assert_receive {:dispatched_signal, signal}, 100
+      assert signal.type == "dispatch_fun.data.received"
+      assert signal.data.value == 42
+
+      GenServer.stop(pid)
+    end
+
+    test "keeps runtime responsive when dispatch is slow" do
+      test_pid = self()
+
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: SimpleSensor,
+          config: %{prefix: "slow_dispatch"},
+          context: %{
+            agent_ref: {:custom, :target},
+            dispatch_fun: fn signal, _agent_ref ->
+              Process.sleep(150)
+              send(test_pid, {:dispatched_value, signal.data.value})
+              :ok
+            end
+          }
+        )
+
+      started_at = System.monotonic_time(:millisecond)
+
+      :ok = Runtime.event(pid, {:data, 1})
+      :ok = Runtime.event(pid, {:data, 2})
+
+      assert_receive {:dispatched_value, value1}, 500
+      assert_receive {:dispatched_value, value2}, 500
+
+      elapsed_ms = System.monotonic_time(:millisecond) - started_at
+
+      assert MapSet.new([value1, value2]) == MapSet.new([1, 2])
+      assert elapsed_ms < 280
+
+      GenServer.stop(pid)
+    end
+  end
+
   describe "child_spec/1" do
     test "returns valid child spec with default id" do
       spec = Runtime.child_spec(sensor: SimpleSensor)
