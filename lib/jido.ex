@@ -2,6 +2,7 @@ defmodule Jido do
   use Supervisor
 
   alias Jido.Agent.WorkerPool
+  alias Jido.Config.Defaults
 
   @moduledoc """
   自動 (Jido) - A foundational framework for building autonomous, distributed agent systems in Elixir.
@@ -330,7 +331,7 @@ defmodule Jido do
       start: {__MODULE__, :start_link, [opts]},
       type: :supervisor,
       restart: :permanent,
-      shutdown: 10_000
+      shutdown: Defaults.jido_shutdown_timeout_ms()
     }
   end
 
@@ -525,7 +526,7 @@ defmodule Jido do
 
   See `Jido.Await.completion/3` for details.
   """
-  defdelegate await(server, timeout_ms \\ 10_000, opts \\ []),
+  defdelegate await(server, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
     to: Jido.Await,
     as: :completion
 
@@ -534,16 +535,21 @@ defmodule Jido do
 
   See `Jido.Await.child/4` for details.
   """
-  defdelegate await_child(server, child_tag, timeout_ms \\ 30_000, opts \\ []),
-    to: Jido.Await,
-    as: :child
+  defdelegate await_child(
+                server,
+                child_tag,
+                timeout_ms \\ Defaults.await_child_timeout_ms(),
+                opts \\ []
+              ),
+              to: Jido.Await,
+              as: :child
 
   @doc """
   Wait for all agents to reach terminal status.
 
   See `Jido.Await.all/3` for details.
   """
-  defdelegate await_all(servers, timeout_ms \\ 10_000, opts \\ []),
+  defdelegate await_all(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
     to: Jido.Await,
     as: :all
 
@@ -552,7 +558,7 @@ defmodule Jido do
 
   See `Jido.Await.any/3` for details.
   """
-  defdelegate await_any(servers, timeout_ms \\ 10_000, opts \\ []),
+  defdelegate await_any(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
     to: Jido.Await,
     as: :any
 

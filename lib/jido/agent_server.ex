@@ -168,6 +168,7 @@ defmodule Jido.AgentServer do
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
+  alias Jido.Config.Defaults
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
   alias Jido.Signal.Router, as: JidoRouter
@@ -248,7 +249,7 @@ defmodule Jido.AgentServer do
     %{
       id: id,
       start: {__MODULE__, :start_link, [opts]},
-      shutdown: 5_000,
+      shutdown: Defaults.agent_server_shutdown_timeout_ms(),
       restart: :permanent,
       type: :worker
     }
@@ -273,7 +274,7 @@ defmodule Jido.AgentServer do
       {:ok, agent} = Jido.AgentServer.call("agent-id", signal, 10_000)
   """
   @spec call(server(), Signal.t(), timeout()) :: {:ok, struct()} | {:error, term()}
-  def call(server, %Signal{} = signal, timeout \\ 5_000) do
+  def call(server, %Signal{} = signal, timeout \\ Defaults.agent_server_call_timeout_ms()) do
     with {:ok, pid} <- resolve_server(server) do
       GenServer.call(pid, {:signal, signal}, timeout)
     end
@@ -348,7 +349,7 @@ defmodule Jido.AgentServer do
   """
   @spec await_completion(server(), keyword()) :: {:ok, map()} | {:error, term()}
   def await_completion(server, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, 10_000)
+    timeout = Keyword.get(opts, :timeout, Defaults.agent_server_await_timeout_ms())
 
     with {:ok, pid} <- resolve_server(server) do
       try do

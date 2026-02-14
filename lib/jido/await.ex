@@ -34,6 +34,7 @@ defmodule Jido.Await do
   """
 
   alias Jido.AgentServer
+  alias Jido.Config.Defaults
 
   @type server :: AgentServer.server()
   @type status :: :completed | :failed | atom()
@@ -75,7 +76,7 @@ defmodule Jido.Await do
   """
   @spec completion(server(), non_neg_integer(), Keyword.t()) ::
           {:ok, completion()} | {:error, term()}
-  def completion(server, timeout_ms \\ 10_000, opts \\ []) do
+  def completion(server, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []) do
     opts = Keyword.put(opts, :timeout, timeout_ms)
 
     try do
@@ -113,7 +114,7 @@ defmodule Jido.Await do
   """
   @spec child(server(), term(), non_neg_integer(), Keyword.t()) ::
           {:ok, completion()} | {:error, term()}
-  def child(parent_server, child_tag, timeout_ms \\ 10_000, opts \\ []) do
+  def child(parent_server, child_tag, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []) do
     deadline = now_ms() + timeout_ms
 
     with {:ok, child_pid} <- poll_for_child(parent_server, child_tag, deadline, 50) do
@@ -180,7 +181,7 @@ defmodule Jido.Await do
   """
   @spec all([server()], non_neg_integer(), Keyword.t()) ::
           {:ok, %{server() => completion()}} | {:error, :timeout} | {:error, {server(), term()}}
-  def all(servers, timeout_ms \\ 10_000, opts \\ [])
+  def all(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ [])
   def all([], _timeout_ms, _opts), do: {:ok, %{}}
 
   def all(servers, timeout_ms, opts) do
@@ -250,7 +251,7 @@ defmodule Jido.Await do
   """
   @spec any([server()], non_neg_integer(), Keyword.t()) ::
           {:ok, {server(), completion()}} | {:error, :timeout} | {:error, {server(), term()}}
-  def any(servers, timeout_ms \\ 10_000, opts \\ [])
+  def any(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ [])
   def any([], _timeout_ms, _opts), do: {:error, :timeout}
 
   def any(servers, timeout_ms, opts) do

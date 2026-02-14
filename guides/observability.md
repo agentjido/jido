@@ -42,6 +42,7 @@ config :my_app, MyApp.InternalJido,
 ```
 
 Settings resolve in this order: Debug override → instance config → global config → default.
+Invalid values are ignored and fall back to Jido defaults.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
 

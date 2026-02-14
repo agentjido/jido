@@ -74,6 +74,7 @@ defmodule Jido.Agent.InstanceManager do
   require Logger
 
   alias Jido.Agent.Persistence
+  alias Jido.Config.Defaults
 
   @type manager_name :: atom()
   @type key :: term()
@@ -223,7 +224,7 @@ defmodule Jido.Agent.InstanceManager do
         # Use GenServer.stop for graceful shutdown (triggers terminate/2 with :shutdown)
         # This ensures hibernate happens before the process exits
         try do
-          GenServer.stop(pid, :shutdown, 5_000)
+          GenServer.stop(pid, :shutdown, Defaults.instance_manager_stop_timeout_ms())
           :ok
         catch
           :exit, _ -> :ok
