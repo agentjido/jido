@@ -132,12 +132,20 @@ defmodule Jido.Storage.ETS do
 
     expected_rev = Keyword.get(opts, :expected_rev)
     now = System.system_time(:millisecond)
+    lock_key = {:jido_storage_append_thread, threads_table, thread_id}
+    lock_id = {lock_key, self()}
 
+    :global.trans(lock_id, fn ->
+      do_append_thread(thread_id, entries, expected_rev, now, opts, threads_table, meta_table)
+    end)
+  rescue
+    ArgumentError -> {:error, :table_not_found}
+  end
+
+  defp do_append_thread(thread_id, entries, expected_rev, now, opts, threads_table, meta_table) do
     current_rev = get_current_rev(threads_table, thread_id)
 
-    if expected_rev && current_rev != expected_rev do
-      {:error, :conflict}
-    else
+    with :ok <- validate_expected_rev(expected_rev, current_rev) do
       base_seq = current_rev
       is_new = current_rev == 0
 
@@ -172,9 +180,11 @@ defmodule Jido.Storage.ETS do
 
       {:ok, reconstruct_thread(thread_id, load_all_entries(threads_table, thread_id), meta)}
     end
-  rescue
-    ArgumentError -> {:error, :table_not_found}
   end
+
+  defp validate_expected_rev(nil, _current_rev), do: :ok
+  defp validate_expected_rev(expected_rev, expected_rev), do: :ok
+  defp validate_expected_rev(_expected_rev, _current_rev), do: {:error, :conflict}
 
   @impl true
   @doc """
