@@ -9,6 +9,8 @@ defmodule JidoTest.ObserveTest do
   alias Jido.Observe
   alias Jido.Observe.Log
   alias Jido.Observe.NoopTracer
+  alias Jido.Signal
+  alias Jido.Tracing.Context, as: TraceContext
 
   setup do
     previous_level = Logger.level()
@@ -327,6 +329,67 @@ defmodule JidoTest.ObserveTest do
 
       duration_ms = div(duration, 1_000_000)
       assert duration_ms >= sleep_time_ms
+    end
+  end
+
+  describe "emit_event/3" do
+    setup do
+      TraceContext.clear()
+      test_pid = self()
+      handler_id = "emit-event-handler-#{System.unique_integer()}"
+
+      :telemetry.attach(
+        handler_id,
+        [:jido, :test, :domain, :event],
+        fn event, measurements, metadata, _ ->
+          send(test_pid, {:telemetry_event, event, measurements, metadata})
+        end,
+        nil
+      )
+
+      on_exit(fn ->
+        TraceContext.clear()
+        :telemetry.detach(handler_id)
+      end)
+
+      :ok
+    end
+
+    test "emits event even when debug events are off" do
+      Application.put_env(:jido, :observability, debug_events: :off)
+
+      assert :ok =
+               Observe.emit_event(
+                 [:jido, :test, :domain, :event],
+                 %{duration_ms: 12},
+                 %{request_id: "req-1"}
+               )
+
+      assert_receive {:telemetry_event, [:jido, :test, :domain, :event], %{duration_ms: 12},
+                      %{request_id: "req-1"}}
+    end
+
+    test "enriches metadata with active trace context" do
+      signal = Signal.new!("trace.source", %{}, source: "/test")
+      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+
+      Observe.emit_event([:jido, :test, :domain, :event], %{count: 1}, %{phase: :tool})
+
+      assert_receive {:telemetry_event, [:jido, :test, :domain, :event], %{count: 1}, metadata}
+      assert metadata.phase == :tool
+      assert metadata.jido_trace_id == trace.trace_id
+      assert metadata.jido_span_id == trace.span_id
+    end
+
+    test "caller metadata overrides correlation metadata keys" do
+      signal = Signal.new!("trace.override", %{}, source: "/test")
+      {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+
+      Observe.emit_event([:jido, :test, :domain, :event], %{}, %{jido_trace_id: "custom-trace"})
+
+      assert_receive {:telemetry_event, [:jido, :test, :domain, :event], %{}, metadata}
+      assert metadata.jido_trace_id == "custom-trace"
+      assert metadata.jido_span_id == trace.span_id
     end
   end
 
