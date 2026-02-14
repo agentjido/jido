@@ -314,6 +314,68 @@ defmodule JidoTest.Storage.ETSTest do
 
       assert thread.stats.entry_count == 3
     end
+
+    test "append_thread/3 assigns unique contiguous sequence numbers under concurrency" do
+      opts = [table: unique_table(:concurrent_append_seq)]
+      thread_id = "thread_#{System.unique_integer([:positive])}"
+      total_appends = 40
+
+      # Ensure tables are created/owned by the test process.
+      assert {:ok, _} = ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: 0}}], opts)
+
+      results =
+        1..total_appends
+        |> Task.async_stream(
+          fn i ->
+            ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: i}}], opts)
+          end,
+          max_concurrency: 20,
+          ordered: false,
+          timeout: 5_000
+        )
+        |> Enum.to_list()
+
+      assert Enum.all?(results, fn
+               {:ok, {:ok, _thread}} -> true
+               _ -> false
+             end)
+
+      assert {:ok, thread} = ETS.load_thread(thread_id, opts)
+      assert thread.rev == total_appends + 1
+
+      seqs = Enum.map(thread.entries, & &1.seq)
+      assert seqs == Enum.to_list(0..total_appends)
+      assert Enum.uniq(seqs) == seqs
+    end
+
+    test "append_thread/3 with expected_rev allows only one concurrent writer" do
+      opts = [table: unique_table(:concurrent_expected_rev)]
+      thread_id = "thread_#{System.unique_integer([:positive])}"
+
+      assert {:ok, first} = ETS.append_thread(thread_id, [%{kind: :note}], opts)
+      assert first.rev == 1
+
+      results =
+        1..2
+        |> Task.async_stream(
+          fn _ ->
+            ETS.append_thread(thread_id, [%{kind: :note}], Keyword.put(opts, :expected_rev, 1))
+          end,
+          max_concurrency: 2,
+          ordered: false,
+          timeout: 5_000
+        )
+        |> Enum.map(fn {:ok, result} -> result end)
+
+      ok_count = Enum.count(results, &match?({:ok, _}, &1))
+      conflict_count = Enum.count(results, &(&1 == {:error, :conflict}))
+
+      assert ok_count == 1
+      assert conflict_count == 1
+
+      assert {:ok, loaded} = ETS.load_thread(thread_id, opts)
+      assert loaded.rev == 2
+    end
   end
 
   describe "table isolation" do
