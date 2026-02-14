@@ -142,7 +142,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
         )
 
       signal = Signal.new!("unknown_action", %{}, source: "/test")
-      {:error, :no_matching_route} = Jido.AgentServer.call(pid, signal)
+      assert {:error, %Jido.Error.RoutingError{}} = Jido.AgentServer.call(pid, signal)
 
       # The agent should still be functional despite the error
       signal2 = Signal.new!("increment", %{amount: 1}, source: "/test")

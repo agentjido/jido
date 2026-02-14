@@ -133,12 +133,12 @@ defmodule JidoTest.PersistTest do
   end
 
   describe "thaw/3" do
-    test "returns :not_found for missing agent" do
+    test "returns {:error, :not_found} for missing agent" do
       table = unique_table()
       ETS.put_checkpoint({Agent, "nonexistent"}, %{}, table: table)
       ETS.delete_checkpoint({Agent, "nonexistent"}, table: table)
 
-      assert :not_found = Persist.thaw(storage(table), Agent, "nonexistent")
+      assert {:error, :not_found} = Persist.thaw(storage(table), Agent, "nonexistent")
     end
 
     test "thaws agent without thread" do

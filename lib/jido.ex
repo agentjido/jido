@@ -187,7 +187,7 @@ defmodule Jido do
       end
 
       @doc "Thaw an agent from storage."
-      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
       def thaw(agent_module, key) do
         Jido.Persist.thaw(__jido_storage__(), agent_module, key)
       end
@@ -483,7 +483,7 @@ defmodule Jido do
   end
 
   @doc "Thaw an agent using the given Jido instance."
-  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | :not_found | {:error, term()}
+  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
   def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
     Jido.Persist.thaw(jido_instance, agent_module, key)
   end
