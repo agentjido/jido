@@ -382,7 +382,7 @@ defmodule JidoTest.AgentServerCoverageTest do
       {:ok, pid} = AgentServer.start_link(agent: JidoTest.TestAgents.Minimal, jido: jido)
 
       signal = Signal.new!("nonexistent_action", %{}, source: "/test")
-      {:error, :no_matching_route} = AgentServer.call(pid, signal)
+      assert {:error, %Jido.Error.RoutingError{}} = AgentServer.call(pid, signal)
 
       GenServer.stop(pid)
     end

@@ -33,14 +33,14 @@ defmodule JidoTest.UtilTest do
       invalid_names = ["123action", "invalid-name", "invalid name", 123]
 
       for name <- invalid_names do
-        assert {:error, _} = Util.validate_name(name),
+        assert {:error, %Jido.Error.ValidationError{}} = Util.validate_name(name),
                "expected #{inspect(name)} to be rejected"
       end
     end
 
     test "rejects invalid names with validate: true option" do
       for name <- ["invalid-name", 123] do
-        assert {:error, _} = Util.validate_name(name, validate: true),
+        assert {:error, %Jido.Error.ValidationError{}} = Util.validate_name(name, validate: true),
                "expected #{inspect(name)} to be rejected with validate: true"
       end
     end
@@ -60,7 +60,7 @@ defmodule JidoTest.UtilTest do
       ]
 
       for invalid <- invalid_inputs do
-        assert {:error, _} = Util.validate_actions(invalid),
+        assert {:error, %Jido.Error.ValidationError{}} = Util.validate_actions(invalid),
                "expected #{inspect(invalid)} to be rejected"
       end
     end
@@ -73,7 +73,7 @@ defmodule JidoTest.UtilTest do
 
     test "rejects invalid module inputs" do
       for input <- [:non_existent_module, "not_an_atom"] do
-        assert {:error, _} = Util.validate_module(input),
+        assert {:error, %Jido.Error.ValidationError{}} = Util.validate_module(input),
                "expected #{inspect(input)} to be rejected"
       end
     end
@@ -86,7 +86,7 @@ defmodule JidoTest.UtilTest do
 
     test "rejects invalid module inputs" do
       for input <- [:definitely_not_a_module, "not_an_atom"] do
-        assert {:error, _} = Util.validate_module_compiled(input),
+        assert {:error, %Jido.Error.ValidationError{}} = Util.validate_module_compiled(input),
                "expected #{inspect(input)} to be rejected"
       end
     end

@@ -31,7 +31,7 @@ defmodule Jido.Persist do
   ## thaw/3 Flow
 
   1. Call `adapter.get_checkpoint/2`
-  2. If `:not_found`, return `:not_found`
+  2. If missing, return `{:error, :not_found}`
   3. Call `agent_module.restore/2` if implemented, else use default
   4. If checkpoint has thread pointer, load and attach thread
   5. Verify loaded thread.rev matches checkpoint pointer rev
@@ -56,7 +56,7 @@ defmodule Jido.Persist do
       # Thaw an agent
       case Jido.Persist.thaw(storage, MyAgent, "agent-123") do
         {:ok, agent} -> agent
-        :not_found -> start_fresh()
+        {:error, :not_found} -> start_fresh()
         {:error, :missing_thread} -> handle_missing_thread()
         {:error, :thread_mismatch} -> handle_mismatch()
       end
@@ -126,13 +126,13 @@ defmodule Jido.Persist do
   ## Returns
 
   - `{:ok, agent}` - Successfully thawed
-  - `:not_found` - No checkpoint exists for this key
+  - `{:error, :not_found}` - No checkpoint exists for this key
   - `{:error, :missing_thread}` - Checkpoint references thread that doesn't exist
   - `{:error, :thread_mismatch}` - Loaded thread.rev != checkpoint thread.rev
   - `{:error, reason}` - Other errors
   """
   @spec thaw(storage_config() | module() | struct(), agent_module(), key()) ::
-          {:ok, agent()} | :not_found | {:error, term()}
+          {:ok, agent()} | {:error, term()}
   def thaw(storage_or_instance, agent_module, key)
 
   def thaw({adapter, opts}, agent_module, key) when is_atom(adapter) do
@@ -173,20 +173,19 @@ defmodule Jido.Persist do
     end
   end
 
-  @spec do_thaw(module(), keyword(), agent_module(), key()) ::
-          {:ok, agent()} | :not_found | {:error, term()}
+  @spec do_thaw(module(), keyword(), agent_module(), key()) :: {:ok, agent()} | {:error, term()}
   defp do_thaw(adapter, opts, agent_module, key) do
     checkpoint_key = make_checkpoint_key(agent_module, key)
 
     Logger.debug("Persist.thaw starting for #{inspect(agent_module)} key=#{inspect(key)}")
 
-    case adapter.get_checkpoint(checkpoint_key, opts) do
+    case Jido.Storage.fetch_checkpoint(adapter, checkpoint_key, opts) do
       {:ok, checkpoint} ->
         restore_from_checkpoint(adapter, opts, agent_module, checkpoint)
 
-      :not_found ->
+      {:error, :not_found} ->
         Logger.debug("Persist.thaw: checkpoint not found for #{inspect(checkpoint_key)}")
-        :not_found
+        {:error, :not_found}
 
       {:error, reason} = error ->
         Logger.error(
@@ -318,7 +317,7 @@ defmodule Jido.Persist do
   defp rehydrate_thread(adapter, opts, agent, %{thread: %{id: thread_id, rev: expected_rev}}) do
     Logger.debug("Persist: rehydrating thread #{thread_id} with expected rev=#{expected_rev}")
 
-    case adapter.load_thread(thread_id, opts) do
+    case Jido.Storage.fetch_thread(adapter, thread_id, opts) do
       {:ok, %Thread{rev: ^expected_rev} = thread} ->
         agent_with_thread = attach_thread(agent, thread)
         {:ok, agent_with_thread}
@@ -330,7 +329,7 @@ defmodule Jido.Persist do
 
         {:error, :thread_mismatch}
 
-      :not_found ->
+      {:error, :not_found} ->
         Logger.error("Persist: thread #{thread_id} not found but referenced in checkpoint")
         {:error, :missing_thread}
 

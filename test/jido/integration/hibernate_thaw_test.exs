@@ -274,13 +274,13 @@ defmodule JidoTest.Integration.HibernateThawTest do
       assert entry2.payload.text == "agent2"
     end
 
-    test "thawing nonexistent agent returns :not_found" do
+    test "thawing nonexistent agent returns {:error, :not_found}" do
       jido = create_jido_instance(unique_table())
 
       agent = WorkflowAgent.new(id: "exists")
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      assert :not_found = Jido.Persist.thaw(jido, Jido.Agent, "does-not-exist")
+      assert {:error, :not_found} = Jido.Persist.thaw(jido, Jido.Agent, "does-not-exist")
     end
   end
 

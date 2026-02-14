@@ -10,7 +10,8 @@ defmodule JidoTest.UtilCoverageTest do
     end
 
     test "rejects invalid action module with opts" do
-      assert {:error, _} = Util.validate_actions(NonExistentModule, validate: true)
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Util.validate_actions(NonExistentModule, validate: true)
     end
 
     test "validates valid action list with opts" do
@@ -18,7 +19,8 @@ defmodule JidoTest.UtilCoverageTest do
     end
 
     test "rejects invalid action list with opts" do
-      assert {:error, _} = Util.validate_actions([NonExistentModule], validate: true)
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Util.validate_actions([NonExistentModule], validate: true)
     end
   end
 

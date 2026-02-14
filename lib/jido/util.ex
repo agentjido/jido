@@ -62,16 +62,19 @@ defmodule Jido.Util do
       {:error, "The name must contain only letters, numbers, and underscores."}
 
   """
-  @spec validate_name(any()) :: {:ok, String.t()} | {:error, String.t()}
-  @spec validate_name(any(), keyword()) :: :ok | {:error, String.t()}
+  @spec validate_name(any()) :: {:ok, String.t()} | {:error, Jido.Error.ValidationError.t()}
+  @spec validate_name(any(), keyword()) :: :ok | {:error, Jido.Error.ValidationError.t()}
   def validate_name(name, opts \\ [])
 
   def validate_name(name, []) when is_binary(name) do
     if Regex.match?(@name_regex, name) do
       OK.success(name)
     else
-      "The name must start with a letter and contain only letters, numbers, and underscores."
-      |> OK.failure()
+      {:error,
+       Jido.Error.validation_error(
+         "The name must start with a letter and contain only letters, numbers, and underscores.",
+         field: :name
+       )}
     end
   end
 
@@ -80,17 +83,19 @@ defmodule Jido.Util do
       :ok
     else
       {:error,
-       "The name must start with a letter and contain only letters, numbers, and underscores."}
+       Jido.Error.validation_error(
+         "The name must start with a letter and contain only letters, numbers, and underscores.",
+         field: :name
+       )}
     end
   end
 
   def validate_name(_, []) do
-    "Invalid name format."
-    |> OK.failure()
+    {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
   end
 
   def validate_name(_, _opts) do
-    {:error, "Invalid name format."}
+    {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
   end
 
   @doc """
@@ -128,14 +133,18 @@ defmodule Jido.Util do
       {:ok, [ValidAction]}
   """
   @spec validate_actions(list(module()) | module(), keyword()) ::
-          :ok | {:ok, list(module()) | module()} | {:error, String.t()}
+          :ok | {:ok, list(module()) | module()} | {:error, Jido.Error.ValidationError.t()}
   def validate_actions(actions, opts \\ [])
 
   def validate_actions(actions, []) when is_list(actions) do
     if Enum.all?(actions, &implements_action?/1) do
       {:ok, actions}
     else
-      {:error, "All actions must implement the Jido.Action behavior"}
+      {:error,
+       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
+         kind: :action,
+         subject: actions
+       )}
     end
   end
 
@@ -143,7 +152,11 @@ defmodule Jido.Util do
     if Enum.all?(actions, &implements_action?/1) do
       :ok
     else
-      {:error, "All actions must implement the Jido.Action behavior"}
+      {:error,
+       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
+         kind: :action,
+         subject: actions
+       )}
     end
   end
 
@@ -151,7 +164,11 @@ defmodule Jido.Util do
     if implements_action?(action) do
       {:ok, action}
     else
-      {:error, "All actions must implement the Jido.Action behavior"}
+      {:error,
+       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
+         kind: :action,
+         subject: action
+       )}
     end
   end
 
@@ -159,7 +176,11 @@ defmodule Jido.Util do
     if implements_action?(action) do
       :ok
     else
-      {:error, "All actions must implement the Jido.Action behavior"}
+      {:error,
+       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
+         kind: :action,
+         subject: action
+       )}
     end
   end
 
@@ -188,17 +209,22 @@ defmodule Jido.Util do
       iex> Jido.Util.validate_module(:invalid_module)
       {:error, "Module :invalid_module does not exist or cannot be loaded"}
   """
-  @spec validate_module(any()) :: {:ok, module()} | {:error, String.t()}
+  @spec validate_module(any()) :: {:ok, module()} | {:error, Jido.Error.ValidationError.t()}
   def validate_module(module) when is_atom(module) do
     if Code.ensure_loaded?(module) do
       {:ok, module}
     else
-      {:error, "Module #{inspect(module)} does not exist or cannot be loaded"}
+      {:error,
+       Jido.Error.validation_error("Module does not exist or cannot be loaded",
+         kind: :config,
+         subject: module,
+         details: %{module: inspect(module)}
+       )}
     end
   end
 
   def validate_module(_) do
-    {:error, "Module must be an atom"}
+    {:error, Jido.Error.validation_error("Module must be an atom", kind: :config, field: :module)}
   end
 
   @doc """
@@ -225,19 +251,25 @@ defmodule Jido.Util do
       iex> Jido.Util.validate_module_compiled(:invalid_module)
       {:error, "Module :invalid_module does not exist or could not be compiled"}
   """
-  @spec validate_module_compiled(any()) :: {:ok, module()} | {:error, String.t()}
+  @spec validate_module_compiled(any()) ::
+          {:ok, module()} | {:error, Jido.Error.ValidationError.t()}
   def validate_module_compiled(module) when is_atom(module) do
     case Code.ensure_compiled(module) do
       {:module, _} ->
         {:ok, module}
 
       {:error, _reason} ->
-        {:error, "Module #{inspect(module)} does not exist or could not be compiled"}
+        {:error,
+         Jido.Error.validation_error("Module does not exist or could not be compiled",
+           kind: :config,
+           subject: module,
+           details: %{module: inspect(module)}
+         )}
     end
   end
 
   def validate_module_compiled(_) do
-    {:error, "Module must be an atom"}
+    {:error, Jido.Error.validation_error("Module must be an atom", kind: :config, field: :module)}
   end
 
   @doc false

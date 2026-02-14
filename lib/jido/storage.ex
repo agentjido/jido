@@ -115,4 +115,32 @@ defmodule Jido.Storage do
   @spec normalize_storage(module() | {module(), keyword()}) :: {module(), keyword()}
   def normalize_storage({mod, opts}) when is_atom(mod) and is_list(opts), do: {mod, opts}
   def normalize_storage(mod) when is_atom(mod), do: {mod, []}
+
+  @doc """
+  Fetch a checkpoint and normalize not-found semantics.
+
+  Converts adapter-level `:not_found` into `{:error, :not_found}`.
+  """
+  @spec fetch_checkpoint(module(), term(), keyword()) :: {:ok, term()} | {:error, term()}
+  def fetch_checkpoint(adapter, key, opts) when is_atom(adapter) and is_list(opts) do
+    case adapter.get_checkpoint(key, opts) do
+      {:ok, data} -> {:ok, data}
+      :not_found -> {:error, :not_found}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  @doc """
+  Fetch a thread and normalize not-found semantics.
+
+  Converts adapter-level `:not_found` into `{:error, :not_found}`.
+  """
+  @spec fetch_thread(module(), String.t(), keyword()) :: {:ok, Thread.t()} | {:error, term()}
+  def fetch_thread(adapter, thread_id, opts) when is_atom(adapter) and is_list(opts) do
+    case adapter.load_thread(thread_id, opts) do
+      {:ok, thread} -> {:ok, thread}
+      :not_found -> {:error, :not_found}
+      {:error, _reason} = error -> error
+    end
+  end
 end

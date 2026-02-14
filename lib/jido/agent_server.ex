@@ -1282,7 +1282,7 @@ defmodule Jido.AgentServer do
       })
 
     error_directive = %Directive.Error{error: error, context: :routing}
-    enqueue_error_directive(reason, signal, [error_directive], state)
+    enqueue_error_directive(error, signal, [error_directive], state)
   end
 
   defp enqueue_error_directive(error, signal, directives, state) do
