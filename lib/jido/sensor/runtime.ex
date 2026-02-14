@@ -117,7 +117,7 @@ defmodule Jido.Sensor.Runtime do
     opts = normalize_opts(opts)
 
     with {:ok, sensor} <- get_required(opts, :sensor),
-         true <- Code.ensure_loaded?(sensor),
+         :ok <- ensure_sensor_loaded(sensor),
          {:ok, config} <- parse_config(sensor, opts[:config] || %{}),
          context = opts[:context] || %{},
          id = opts[:id] || Jido.Util.generate_id(),
@@ -176,6 +176,16 @@ defmodule Jido.Sensor.Runtime do
 
   defp normalize_opts(opts) when is_map(opts), do: Map.to_list(opts)
   defp normalize_opts(opts) when is_list(opts), do: opts
+
+  defp ensure_sensor_loaded(sensor) do
+    case Code.ensure_loaded(sensor) do
+      {:module, _} ->
+        :ok
+
+      {:error, reason} ->
+        {:error, {:sensor_not_loaded, sensor, reason}}
+    end
+  end
 
   defp get_required(opts, key) do
     case Keyword.get(opts, key) do
@@ -296,14 +306,56 @@ defmodule Jido.Sensor.Runtime do
         send(agent_ref, {:signal, signal})
 
       agent_ref != nil ->
-        if Code.ensure_loaded?(Dispatch) do
-          Dispatch.dispatch(signal, agent_ref)
-        else
-          Logger.warning("Jido.Signal.Dispatch not available, cannot deliver signal")
-        end
+        dispatch_signal_async(signal, agent_ref, state)
 
       true ->
         Logger.debug("Sensor.Runtime #{state.id} has no agent_ref, signal not delivered")
+    end
+  end
+
+  defp dispatch_signal_async(signal, agent_ref, state) do
+    runner = fn ->
+      try do
+        dispatch_fun(state).(signal, agent_ref)
+      rescue
+        e ->
+          Logger.warning(
+            "Sensor.Runtime #{state.id} async dispatch failed: #{Exception.message(e)}"
+          )
+      end
+    end
+
+    task_sup = dispatch_task_supervisor(state)
+
+    task_sup_pid =
+      case task_sup do
+        nil -> nil
+        sup when is_atom(sup) -> Process.whereis(sup)
+      end
+
+    if is_pid(task_sup_pid) do
+      Task.Supervisor.start_child(task_sup, runner)
+    else
+      Task.start(runner)
+    end
+
+    :ok
+  end
+
+  defp dispatch_fun(state) do
+    case get_in(state, [:context, :dispatch_fun]) do
+      fun when is_function(fun, 2) ->
+        fun
+
+      _ ->
+        &Dispatch.dispatch/2
+    end
+  end
+
+  defp dispatch_task_supervisor(state) do
+    case get_in(state, [:context, :jido_instance]) do
+      jido when is_atom(jido) -> Jido.task_supervisor_name(jido)
+      _ -> nil
     end
   end
 end
