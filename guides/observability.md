@@ -64,9 +64,9 @@ Jido emits telemetry events for all core operations. Use these for metrics colle
 | `[:jido, :agent_server, :signal, :start]` | Signal processing started | `system_time` | `agent_id`, `signal_type`, `jido_instance` |
 | `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `jido_instance` |
 | `[:jido, :agent_server, :signal, :exception]` | Signal processing failed | `duration` | `agent_id`, `signal_type`, `error`, `jido_instance` |
-| `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type`, `jido_instance` |
-| `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `result`, `jido_instance` |
-| `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `error`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type`, `directive`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `directive`, `result`, `jido_instance` |
+| `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `directive`, `error`, `jido_instance` |
 | `[:jido, :agent_server, :queue, :overflow]` | Directive queue overflow | `queue_size` | `agent_id`, `signal_type`, `jido_instance` |
 
 ### Strategy Events

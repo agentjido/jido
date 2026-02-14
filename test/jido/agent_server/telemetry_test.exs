@@ -134,12 +134,14 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert is_integer(measurements.system_time)
       assert metadata.agent_id == "telemetry-directive-test"
       assert metadata.directive_type == "Emit"
+      assert match?(%Directive.Emit{}, metadata.directive)
 
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], measurements,
                       metadata}
 
       assert is_integer(measurements.duration)
       assert metadata.result == :async
+      assert match?(%Directive.Emit{}, metadata.directive)
 
       GenServer.stop(pid)
     end
@@ -160,10 +162,12 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], _, metadata}
 
       assert metadata.directive_type == "Schedule"
+      assert match?(%Directive.Schedule{}, metadata.directive)
 
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], _, metadata}
 
       assert metadata.result == :ok
+      assert match?(%Directive.Schedule{}, metadata.directive)
 
       GenServer.stop(pid)
     end

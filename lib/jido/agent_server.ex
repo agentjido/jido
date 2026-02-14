@@ -1796,6 +1796,7 @@ defmodule Jido.AgentServer do
         agent_id: state.id,
         agent_module: state.agent_module,
         directive_type: directive_type,
+        directive: directive,
         signal_type: signal.type,
         jido_instance: state.jido
       }
