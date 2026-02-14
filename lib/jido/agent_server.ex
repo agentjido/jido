@@ -1090,7 +1090,7 @@ defmodule Jido.AgentServer do
               })
 
             error_directive = %Directive.Error{error: error, context: :routing}
-            {:error, reason, [error_directive]}
+            {:error, error, [error_directive]}
         end
     end
   end
