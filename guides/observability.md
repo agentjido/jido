@@ -325,77 +325,25 @@ Call `MyApp.JidoTelemetryHandler.attach()` in your application startup.
 
 ## OpenTelemetry Integration
 
-Implement the `Jido.Observe.Tracer` behaviour to integrate with OpenTelemetry:
+Jido includes a first-party OpenTelemetry tracer: `Jido.Observe.OpenTelemetryTracer`.
+
+### Quick Start (First-Party Tracer)
 
 ```elixir
 # mix.exs
 defp deps do
   [
-    {:opentelemetry, "~> 1.4"},
-    {:opentelemetry_api, "~> 1.3"},
+    {:opentelemetry, "~> 1.5"},
+    {:opentelemetry_api, "~> 1.4"},
     {:opentelemetry_exporter, "~> 1.7"}
   ]
 end
 ```
 
 ```elixir
-defmodule MyApp.OtelTracer do
-  @behaviour Jido.Observe.Tracer
-
-  require OpenTelemetry.Tracer, as: Tracer
-
-  @impl true
-  def span_start(event_prefix, metadata) do
-    span_name = Enum.join(event_prefix, ".")
-
-    attributes =
-      metadata
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-      |> Enum.map(fn {k, v} -> {k, to_string(v)} end)
-
-    Tracer.start_span(span_name, %{attributes: attributes})
-  end
-
-  @impl true
-  def span_stop(span_ctx, measurements) do
-    if span_ctx do
-      duration_ms =
-        case measurements[:duration] do
-          nil -> 0
-          d -> System.convert_time_unit(d, :native, :millisecond)
-        end
-
-      Tracer.set_attribute(:duration_ms, duration_ms)
-
-      if directive_count = measurements[:directive_count] do
-        Tracer.set_attribute(:directive_count, directive_count)
-      end
-
-      Tracer.end_span(span_ctx)
-    end
-
-    :ok
-  end
-
-  @impl true
-  def span_exception(span_ctx, kind, reason, stacktrace) do
-    if span_ctx do
-      Tracer.set_status(:error, inspect(reason))
-      Tracer.record_exception(reason, stacktrace, %{kind: kind})
-      Tracer.end_span(span_ctx)
-    end
-
-    :ok
-  end
-end
-```
-
-Configure Jido to use your tracer:
-
-```elixir
 # config/prod.exs
 config :jido, :observability,
-  tracer: MyApp.OtelTracer,
+  tracer: Jido.Observe.OpenTelemetryTracer,
   log_level: :info,
   redact_sensitive: true
 
@@ -407,6 +355,36 @@ config :opentelemetry,
 config :opentelemetry_exporter,
   otlp_protocol: :grpc,
   otlp_endpoint: System.get_env("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+```
+
+`Jido.Observe.OpenTelemetryTracer` is runtime-safe: if OpenTelemetry modules are not
+loaded in the current environment, callbacks degrade to no-ops.
+
+### Custom Tracer Extensions
+
+For custom backend behavior, you can still implement `Jido.Observe.Tracer` directly:
+
+```elixir
+defmodule MyApp.CustomTracer do
+  @behaviour Jido.Observe.Tracer
+
+  @impl true
+  def span_start(event_prefix, metadata) do
+    # Start external span and return tracer context.
+  end
+
+  @impl true
+  def span_stop(tracer_ctx, measurements) do
+    # Complete external span.
+    :ok
+  end
+
+  @impl true
+  def span_exception(tracer_ctx, kind, reason, stacktrace) do
+    # Record exception in external tracer.
+    :ok
+  end
+end
 ```
 
 ## Correlation IDs and Distributed Tracing
@@ -463,42 +441,96 @@ def handle_event([:jido, :agent_server, :signal, :stop], _measurements, metadata
 end
 ```
 
-## Using Jido.Observe for Custom Spans
+## Custom Namespace Events and Spans
 
-Wrap custom operations with `Jido.Observe.with_span/3`:
+### Non-Gated Domain Events (`emit_event/3`)
+
+Use `Jido.Observe.emit_event/3` for production domain lifecycle events that must
+always emit telemetry regardless of `:debug_events` config.
+
+`Jido.Observe.EventContract` provides lightweight key validation helpers so
+downstream namespaces keep stable metadata/measurement contracts.
 
 ```elixir
-defmodule MyApp.CustomAction do
-  use Jido.Action,
-    name: "custom_action",
-    schema: [query: [type: :string, required: true]]
+alias Jido.Observe
+alias Jido.Observe.EventContract
 
-  def run(%{query: query}, context) do
-    Jido.Observe.with_span([:my_app, :external, :search], %{query: query}, fn ->
-      result = ExternalService.search(query)
-      {:ok, %{results: result}}
-    end)
-  end
+with {:ok, validated} <-
+       EventContract.validate_event(
+         [:jido, :ai, :request, :completed],
+         %{duration_ms: 42},
+         %{request_id: "req-1", terminal_state: :completed, model: "gpt-4.1"},
+         required_metadata: [:request_id, :terminal_state],
+         required_measurements: [:duration_ms]
+       ) do
+  Observe.emit_event(validated.event, validated.measurements, validated.metadata)
 end
 ```
 
-For async operations, use `start_span/2` and `finish_span/2`:
+### Async Request Lifecycle Pattern
+
+For long-lived request workflows, use a request-root span plus async child spans.
+Propagate correlation metadata across async boundaries, then emit terminal
+domain events (`completed`, `failed`, `cancelled`, `rejected`).
 
 ```elixir
-span_ctx = Jido.Observe.start_span([:my_app, :async, :fetch], %{url: url})
+alias Jido.Observe
+alias Jido.Observe.EventContract
+alias Jido.Tracing.Context, as: TraceContext
 
-Task.async(fn ->
-  try do
-    result = HTTPClient.get(url)
-    Jido.Observe.finish_span(span_ctx, %{response_size: byte_size(result)})
-    result
-  rescue
-    e ->
-      Jido.Observe.finish_span_error(span_ctx, :error, e, __STACKTRACE__)
-      reraise e, __STACKTRACE__
-  end
-end)
+# Root request span
+request_span = Observe.start_span([:jido, :ai, :request], %{request_id: request_id})
+trace_metadata = TraceContext.to_telemetry_metadata()
+
+# Async tool span
+task =
+  Task.async(fn ->
+    child_metadata = Map.merge(trace_metadata, %{request_id: request_id, tool: "search"})
+    tool_span = Observe.start_span([:jido, :ai, :request, :tool], child_metadata)
+    result = ExternalSearch.run(query)
+    Observe.finish_span(tool_span, %{result_count: length(result.items)})
+  end)
+
+Task.await(task)
+
+# Terminal lifecycle event
+{:ok, validated} =
+  EventContract.validate_event(
+    [:jido, :ai, :request, :completed],
+    %{duration_ms: 125},
+    %{request_id: request_id, terminal_state: :completed},
+    required_metadata: [:request_id, :terminal_state],
+    required_measurements: [:duration_ms]
+  )
+
+Observe.emit_event(
+  validated.event,
+  validated.measurements,
+  Map.merge(validated.metadata, trace_metadata)
+)
+
+Observe.finish_span(request_span, %{directive_count: 1})
 ```
+
+### Recommended Event Taxonomy
+
+| Event | Purpose | Required Metadata | Required Measurements |
+|-------|---------|-------------------|-----------------------|
+| `[:jido, :ai, :request, :start]` | Request lifecycle start | `request_id` | — |
+| `[:jido, :ai, :request, :tool, :start]` | Async tool lifecycle start | `request_id`, `tool` | — |
+| `[:jido, :ai, :request, :tool, :stop]` | Async tool lifecycle stop | `request_id`, `tool` | `duration` or `duration_ms` |
+| `[:jido, :ai, :request, :completed]` | Request completed | `request_id`, `terminal_state` | `duration_ms` |
+| `[:jido, :ai, :request, :failed]` | Request failed | `request_id`, `terminal_state` | `duration_ms` |
+| `[:jido, :ai, :request, :cancelled]` | Request cancelled | `request_id`, `terminal_state` | `duration_ms` |
+| `[:jido, :ai, :request, :rejected]` | Request rejected | `request_id`, `terminal_state` | `duration_ms` |
+
+### Recommended Contract Keys and Metric Tags
+
+| Category | Keys | Notes |
+|----------|------|-------|
+| Metadata | `request_id`, `terminal_state`, `tool`, `model` | Use IDs and categorical values, avoid payloads. |
+| Measurements | `duration_ms`, `token_count`, `result_count`, `cost_usd` | Numeric measurements only. |
+| Metric Tags | `jido_instance`, `terminal_state`, `tool`, `model` | Keep tag cardinality bounded. |
 
 ## Dashboard Metrics Recommendations
 
@@ -625,11 +657,13 @@ Debug events are no-ops when `:debug_events` is `:off` (production default).
 ## Key Modules
 
 - `Jido.Observe` — Unified observability façade with span helpers
+- `Jido.Observe.EventContract` — Lightweight required-key validation for custom event contracts
 - `Jido.Observe.Config` — Per-instance config resolution (debug override → instance → global → default)
 - `Jido.Debug` — Per-instance runtime debug mode
 - `Jido.Telemetry` — Built-in telemetry handler and metrics definitions
 - `Jido.Tracing.Context` — Correlation ID propagation
 - `Jido.Observe.Tracer` — Behaviour for OpenTelemetry integration
+- `Jido.Observe.OpenTelemetryTracer` — First-party OpenTelemetry tracer implementation
 - `Jido.Observe.NoopTracer` — Default no-op tracer
 - `Jido.Observe.Log` — Threshold-based logging
 

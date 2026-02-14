@@ -384,6 +384,8 @@ defmodule Jido.MixProject do
       {:telemetry_metrics, "~> 1.1"},
       {:sched_ex, "~> 1.1"},
       {:uniq, "~> 0.6.1"},
+      {:opentelemetry_api, "~> 1.4", optional: true},
+      {:opentelemetry, "~> 1.5", optional: true},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
