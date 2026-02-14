@@ -167,6 +167,101 @@ defmodule JidoTest.AgentServerTest do
       assert agent.state.counter == 1
       GenServer.stop(pid)
     end
+
+    test "does not block state queries while a slow signal call is in-flight", %{jido: jido} do
+      defmodule NonBlockingSlowAction do
+        @moduledoc false
+        use Jido.Action, name: "non_blocking_slow", schema: []
+
+        def run(_params, _context) do
+          Process.sleep(150)
+          {:ok, %{slow_done: true}}
+        end
+      end
+
+      defmodule NonBlockingAgent do
+        @moduledoc false
+        use Jido.Agent,
+          name: "non_blocking_agent",
+          schema: [
+            counter: [type: :integer, default: 0],
+            slow_done: [type: :boolean, default: false]
+          ]
+
+        def signal_routes(_ctx) do
+          [
+            {"slow", NonBlockingSlowAction},
+            {"increment", TestActions.IncrementAction}
+          ]
+        end
+      end
+
+      {:ok, pid} = AgentServer.start_link(agent: NonBlockingAgent, jido: jido)
+
+      slow_signal = Signal.new!("slow", %{}, source: "/test")
+      task = Task.async(fn -> AgentServer.call(pid, slow_signal, 2_000) end)
+
+      Process.sleep(20)
+      started = System.monotonic_time(:millisecond)
+      assert {:ok, _state} = AgentServer.state(pid)
+      elapsed = System.monotonic_time(:millisecond) - started
+      assert elapsed < 100
+
+      assert {:ok, agent} = Task.await(task, 2_000)
+      assert agent.state.slow_done == true
+
+      GenServer.stop(pid)
+    end
+
+    test "buffers async signals while a sync call is running", %{jido: jido} do
+      defmodule BufferedSlowAction do
+        @moduledoc false
+        use Jido.Action, name: "buffered_slow", schema: []
+
+        def run(_params, _context) do
+          Process.sleep(120)
+          {:ok, %{slow_done: true}}
+        end
+      end
+
+      defmodule BufferedSignalAgent do
+        @moduledoc false
+        use Jido.Agent,
+          name: "buffered_signal_agent",
+          schema: [
+            counter: [type: :integer, default: 0],
+            slow_done: [type: :boolean, default: false]
+          ]
+
+        def signal_routes(_ctx) do
+          [
+            {"slow", BufferedSlowAction},
+            {"increment", TestActions.IncrementAction}
+          ]
+        end
+      end
+
+      {:ok, pid} = AgentServer.start_link(agent: BufferedSignalAgent, jido: jido)
+
+      slow_signal = Signal.new!("slow", %{}, source: "/test")
+      task = Task.async(fn -> AgentServer.call(pid, slow_signal, 2_000) end)
+
+      Process.sleep(15)
+      increment_signal = Signal.new!("increment", %{}, source: "/test")
+      assert :ok = AgentServer.cast(pid, increment_signal)
+
+      assert {:ok, _agent} = Task.await(task, 2_000)
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.slow_done == true and state.agent.state.counter == 1
+        end)
+
+      assert state.agent.state.counter == 1
+      assert state.agent.state.slow_done == true
+
+      GenServer.stop(pid)
+    end
   end
 
   describe "cast/2 (async)" do

@@ -726,20 +726,16 @@ defmodule Jido.AgentServer do
   end
 
   @impl true
-  def handle_call({:signal, %Signal{} = signal}, _from, state) do
+  def handle_call({:signal, %Signal{} = signal}, from, state) do
     {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
 
     try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, resolved_action} ->
-          transformed_agent =
-            run_plugin_transform_hooks(new_state.agent, resolved_action, traced_signal, new_state)
+      state =
+        state
+        |> enqueue_signal_call(from, traced_signal)
+        |> maybe_start_next_signal_call()
 
-          {:reply, {:ok, transformed_agent}, new_state}
-
-        {:error, reason, new_state} ->
-          {:reply, {:error, reason}, new_state}
-      end
+      {:noreply, state}
     after
       TraceContext.clear()
     end
@@ -819,9 +815,13 @@ defmodule Jido.AgentServer do
     {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
 
     try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
+      if signal_call_inflight?(state) do
+        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
+      else
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, new_state} -> {:noreply, new_state}
+        end
       end
     after
       TraceContext.clear()
@@ -868,9 +868,13 @@ defmodule Jido.AgentServer do
     {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
 
     try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
+      if signal_call_inflight?(state) do
+        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
+      else
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, new_state} -> {:noreply, new_state}
+        end
       end
     after
       TraceContext.clear()
@@ -918,12 +922,48 @@ defmodule Jido.AgentServer do
     {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
 
     try do
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
+      if signal_call_inflight?(state) do
+        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
+      else
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, new_state} -> {:noreply, new_state}
+        end
       end
     after
       TraceContext.clear()
+    end
+  end
+
+  def handle_info({:signal_call_result, ref, result}, %State{} = state) do
+    case state.signal_call_inflight do
+      %{ref: ^ref} = inflight ->
+        state = %{state | signal_call_inflight: nil}
+        state = apply_signal_call_result(result, inflight, state)
+        state = maybe_start_next_signal_call(state)
+        state = maybe_process_deferred_async_signal(state)
+        {:noreply, state}
+
+      _ ->
+        {:noreply, state}
+    end
+  end
+
+  def handle_info(:process_deferred_signal, %State{} = state) do
+    case :queue.out(state.deferred_async_signals) do
+      {{:value, signal}, q} ->
+        state = %{state | deferred_async_signals: q}
+
+        case process_signal(signal, state) do
+          {:ok, new_state, _resolved_action} ->
+            {:noreply, maybe_process_deferred_async_signal(new_state)}
+
+          {:error, _reason, new_state} ->
+            {:noreply, maybe_process_deferred_async_signal(new_state)}
+        end
+
+      {:empty, _} ->
+        {:noreply, state}
     end
   end
 
@@ -949,6 +989,212 @@ defmodule Jido.AgentServer do
   # ---------------------------------------------------------------------------
   # Internal: Signal Processing
   # ---------------------------------------------------------------------------
+
+  defp enqueue_signal_call(%State{} = state, from, %Signal{} = signal) do
+    q = :queue.in({from, signal}, state.signal_call_queue)
+    %{state | signal_call_queue: q}
+  end
+
+  defp enqueue_deferred_async_signal(%State{} = state, %Signal{} = signal) do
+    q = :queue.in(signal, state.deferred_async_signals)
+    %{state | deferred_async_signals: q}
+  end
+
+  defp signal_call_inflight?(%State{signal_call_inflight: inflight}), do: not is_nil(inflight)
+
+  defp maybe_start_next_signal_call(%State{signal_call_inflight: nil} = state) do
+    case :queue.out(state.signal_call_queue) do
+      {{:value, {from, signal}}, q} ->
+        start_time = System.monotonic_time()
+        metadata = build_signal_metadata(state, signal)
+        ref = make_ref()
+
+        state =
+          state
+          |> Map.put(:signal_call_queue, q)
+          |> Map.put(:signal_call_inflight, %{
+            ref: ref,
+            from: from,
+            signal: signal,
+            start_time: start_time,
+            metadata: metadata
+          })
+          |> State.record_debug_event(:signal_received, %{type: signal.type, id: signal.id})
+          |> State.set_status(:processing)
+
+        emit_telemetry(
+          [:jido, :agent_server, :signal, :start],
+          %{system_time: System.system_time()},
+          metadata
+        )
+
+        start_signal_call_task(ref, signal, state)
+        state
+
+      {:empty, _} ->
+        maybe_set_idle_status(state)
+    end
+  end
+
+  defp maybe_start_next_signal_call(%State{} = state), do: state
+
+  defp start_signal_call_task(ref, signal, state_snapshot) do
+    parent = self()
+
+    runner = fn ->
+      result =
+        try do
+          compute_signal_call_result(signal, state_snapshot)
+        catch
+          kind, reason ->
+            {:exception, kind, reason, __STACKTRACE__}
+        end
+
+      send(parent, {:signal_call_result, ref, result})
+    end
+
+    task_sup =
+      if state_snapshot.jido, do: Jido.task_supervisor_name(state_snapshot.jido), else: nil
+
+    case task_sup && Process.whereis(task_sup) do
+      pid when is_pid(pid) ->
+        Task.Supervisor.start_child(task_sup, runner)
+
+      _ ->
+        spawn(runner)
+        {:ok, nil}
+    end
+  end
+
+  defp compute_signal_call_result(%Signal{} = signal, %State{signal_router: router} = state) do
+    case run_plugin_signal_hooks(signal, state) do
+      {:error, error} ->
+        error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
+        {:error, error, [error_directive]}
+
+      {:override, action_spec, modified_signal} ->
+        effective_signal = modified_signal || signal
+        compute_signal_call_dispatch(effective_signal, action_spec, state)
+
+      {:continue, modified_signal} ->
+        case route_to_actions(router, modified_signal) do
+          {:ok, actions} ->
+            compute_signal_call_dispatch(modified_signal, actions, state)
+
+          {:error, reason} ->
+            error =
+              Jido.Error.routing_error("No route for signal", %{
+                signal_type: modified_signal.type,
+                reason: reason
+              })
+
+            error_directive = %Directive.Error{error: error, context: :routing}
+            {:error, reason, [error_directive]}
+        end
+    end
+  end
+
+  defp compute_signal_call_dispatch(_signal, action_spec, state) do
+    action_arg =
+      case action_spec do
+        [single] -> single
+        list when is_list(list) -> list
+        other -> other
+      end
+
+    {agent, directives} = state.agent_module.cmd(state.agent, action_arg)
+    {:ok, agent, List.wrap(directives), action_arg}
+  end
+
+  defp apply_signal_call_result(result, inflight, %State{} = state) do
+    %{from: from, signal: signal, start_time: start_time, metadata: metadata} = inflight
+    duration = System.monotonic_time() - start_time
+
+    case result do
+      {:ok, agent, directives, resolved_action} ->
+        state = State.update_agent(state, agent)
+        state = maybe_notify_completion_waiters(state)
+
+        emit_telemetry(
+          [:jido, :agent_server, :signal, :stop],
+          %{duration: duration},
+          Map.merge(metadata, %{directive_count: length(directives)})
+        )
+
+        case State.enqueue_all(state, signal, directives) do
+          {:ok, enq_state} ->
+            enq_state = start_drain_if_idle(enq_state)
+
+            transformed_agent =
+              run_plugin_transform_hooks(enq_state.agent, resolved_action, signal, enq_state)
+
+            GenServer.reply(from, {:ok, transformed_agent})
+            enq_state
+
+          {:error, :queue_overflow} ->
+            emit_telemetry(
+              [:jido, :agent_server, :queue, :overflow],
+              %{queue_size: state.max_queue_size},
+              metadata
+            )
+
+            Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+            GenServer.reply(from, {:error, :queue_overflow})
+            maybe_set_idle_status(state)
+        end
+
+      {:error, reason, directives} ->
+        emit_telemetry(
+          [:jido, :agent_server, :signal, :stop],
+          %{duration: duration},
+          Map.merge(metadata, %{error: reason})
+        )
+
+        state =
+          case State.enqueue_all(state, signal, directives) do
+            {:ok, enq_state} -> start_drain_if_idle(enq_state)
+            {:error, :queue_overflow} -> state
+          end
+
+        GenServer.reply(from, {:error, reason})
+        maybe_set_idle_status(state)
+
+      {:exception, kind, reason, stacktrace} ->
+        emit_telemetry(
+          [:jido, :agent_server, :signal, :exception],
+          %{duration: duration},
+          Map.merge(metadata, %{kind: kind, error: reason})
+        )
+
+        Logger.error(
+          "Signal call task failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}\n" <>
+            Exception.format_stacktrace(stacktrace)
+        )
+
+        GenServer.reply(from, {:error, reason})
+        maybe_set_idle_status(state)
+    end
+  end
+
+  defp maybe_process_deferred_async_signal(%State{signal_call_inflight: nil} = state) do
+    if :queue.is_empty(state.deferred_async_signals) do
+      maybe_set_idle_status(state)
+    else
+      send(self(), :process_deferred_signal)
+      state
+    end
+  end
+
+  defp maybe_process_deferred_async_signal(%State{} = state), do: state
+
+  defp maybe_set_idle_status(%State{} = state) do
+    if is_nil(state.signal_call_inflight) and :queue.is_empty(state.signal_call_queue) and
+         :queue.is_empty(state.deferred_async_signals) and state.processing == false do
+      State.set_status(state, :idle)
+    else
+      state
+    end
+  end
 
   defp process_signal(%Signal{} = signal, %State{signal_router: router} = state) do
     start_time = System.monotonic_time()
