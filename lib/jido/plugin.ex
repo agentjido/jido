@@ -84,12 +84,12 @@ defmodule Jido.Plugin do
                                 description:
                                   "The name of the Plugin. Must contain only letters, numbers, and underscores."
                               )
-                              |> Zoi.refine({Jido.Util, :validate_name, []}),
+                              |> Zoi.refine({__MODULE__, :validate_plugin_name, []}),
                             state_key:
                               Zoi.atom(description: "The key for plugin state in agent state."),
                             actions:
                               Zoi.list(Zoi.atom(), description: "List of action modules.")
-                              |> Zoi.refine({Jido.Util, :validate_actions, []}),
+                              |> Zoi.refine({__MODULE__, :validate_plugin_actions, []}),
                             description:
                               Zoi.string(description: "A description of what the Plugin does.")
                               |> Zoi.optional(),
@@ -151,6 +151,30 @@ defmodule Jido.Plugin do
   @doc false
   @spec config_schema() :: Zoi.schema()
   def config_schema, do: @plugin_config_schema
+
+  @doc false
+  @spec validate_plugin_name(String.t(), keyword()) :: :ok | {:error, String.t()}
+  def validate_plugin_name(name, _opts \\ []) do
+    case Jido.Util.validate_name(name, []) do
+      {:error, %{message: message}} when is_binary(message) ->
+        {:error, message}
+
+      _ ->
+        :ok
+    end
+  end
+
+  @doc false
+  @spec validate_plugin_actions([module()], keyword()) :: :ok | {:error, String.t()}
+  def validate_plugin_actions(actions, _opts \\ []) do
+    case Jido.Util.validate_actions(actions, []) do
+      {:error, %{message: message}} when is_binary(message) ->
+        {:error, message}
+
+      _ ->
+        :ok
+    end
+  end
 
   # Callbacks
 
