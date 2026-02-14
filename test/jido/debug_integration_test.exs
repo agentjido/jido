@@ -1,6 +1,7 @@
 defmodule JidoTest.DebugIntegrationTest do
   use JidoTest.Case, async: false
 
+  alias Jido.Config.Defaults
   alias Jido.Debug
 
   defmodule TestAgent do
@@ -58,7 +59,7 @@ defmodule JidoTest.DebugIntegrationTest do
       pid = start_server(%{jido: jido}, TestAgent, debug: true)
 
       {:ok, state} = Jido.AgentServer.state(pid)
-      assert state.debug_max_events == 500
+      assert state.debug_max_events == Defaults.debug_max_events()
     end
   end
 
