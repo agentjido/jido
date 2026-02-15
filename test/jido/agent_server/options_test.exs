@@ -21,6 +21,7 @@ defmodule JidoTest.AgentServer.OptionsTest do
       assert is_binary(opts.id)
       assert opts.initial_state == %{}
       assert opts.registry == :"Elixir.test_jido.Registry"
+      assert opts.register_global == true
       assert opts.error_policy == :log_only
       assert opts.max_queue_size == 10_000
       assert opts.on_parent_death == :stop
@@ -43,6 +44,19 @@ defmodule JidoTest.AgentServer.OptionsTest do
 
       # Registry is derived from jido instance name
       assert opts.registry == :"Elixir.test_jido.Registry"
+    end
+
+    test "explicit registry is preserved when provided" do
+      {:ok, opts} =
+        Options.new(@base_opts ++ [agent: ValidAgent, registry: JidoTest.CustomRegistry])
+
+      assert opts.registry == JidoTest.CustomRegistry
+    end
+
+    test "allows disabling global registration" do
+      {:ok, opts} = Options.new(@base_opts ++ [agent: ValidAgent, register_global: false])
+
+      assert opts.register_global == false
     end
 
     test "creates options with default_dispatch" do

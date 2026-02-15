@@ -830,6 +830,9 @@ Jido.Agent.InstanceManager.child_spec(
 5. **Idle**: When all attachments detach, idle timer starts
 6. **Hibernate**: On timeout, agent is persisted via `hibernate`, then process stops
 
+Manager-backed checkpoints are keyed by `{manager_name, pool_key}` to prevent
+cross-manager collisions when multiple managers share one storage backend.
+
 ```elixir
 # Get or start an agent (thaws if hibernated)
 {:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123")

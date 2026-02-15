@@ -35,6 +35,9 @@ defmodule Jido.AgentServer.Options do
                 |> Zoi.optional(),
               initial_state: Zoi.map(description: "Initial agent state") |> Zoi.default(%{}),
               registry: Zoi.atom(description: "Registry module") |> Zoi.default(Jido.Registry),
+              register_global:
+                Zoi.boolean(description: "Register agent id in :registry during init")
+                |> Zoi.default(true),
               default_dispatch:
                 Zoi.any(description: "Default dispatch config for Emit directives")
                 |> Zoi.optional(),
@@ -140,7 +143,7 @@ defmodule Jido.AgentServer.Options do
       end
 
     jido_instance = Map.get(attrs, :jido, Jido)
-    registry = Jido.registry_name(jido_instance)
+    registry = Map.get(attrs, :registry, Jido.registry_name(jido_instance))
     attrs = Map.put(attrs, :jido, jido_instance)
 
     attrs

@@ -163,10 +163,11 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
+    persistence_key = {lifecycle.pool, pool_key}
     agent = state.agent
     agent_module = state.agent_module
 
-    case Persist.hibernate(storage, agent_module, pool_key, agent) do
+    case Persist.hibernate(storage, agent_module, persistence_key, agent) do
       :ok ->
         Logger.debug("Lifecycle hibernated agent for #{lifecycle.pool}/#{inspect(pool_key)}")
 

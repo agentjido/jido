@@ -43,6 +43,7 @@ defmodule Jido.Agent.InstanceManager do
     - Omitted: derive from Jido instance (`:jido`, or `agent_opts[:jido]`, or `Jido`)
     - `nil`: disable hibernate/thaw for this manager
   - `:jido` - Jido instance atom used for default storage resolution (optional)
+  - `:registry_partitions` - Partition count for manager registry (default: schedulers online)
   - `:agent_opts` - Additional options passed to AgentServer
 
   ## Lifecycle
@@ -53,6 +54,9 @@ defmodule Jido.Agent.InstanceManager do
   4. Callers use `attach/1` to track interest
   5. When all attachments gone, idle timer starts
   6. On idle timeout: hibernate to storage (if configured) then stop
+
+  Persistence keys are manager-scoped (`{manager_name, pool_key}`), so multiple
+  managers can safely share the same storage backend without checkpoint collisions.
 
   ## Phoenix Integration
 
@@ -93,6 +97,7 @@ defmodule Jido.Agent.InstanceManager do
   - `:idle_timeout` - Idle timeout in ms (default: `:infinity`)
   - `:storage` - `nil`, storage module, or `{StorageModule, opts}` (optional)
   - `:jido` - Jido instance atom used for default storage resolution (optional)
+  - `:registry_partitions` - Partition count for manager registry (optional)
   - `:agent_opts` - Options passed to AgentServer (optional)
 
   ## Examples
@@ -125,6 +130,7 @@ defmodule Jido.Agent.InstanceManager do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
+    registry_partitions = resolve_registry_partitions(opts)
 
     ensure_legacy_persistence_not_set!(opts)
 
@@ -143,7 +149,7 @@ defmodule Jido.Agent.InstanceManager do
     :persistent_term.put({__MODULE__, name}, config)
 
     children = [
-      {Registry, keys: :unique, name: registry_name(name)},
+      {Registry, keys: :unique, partitions: registry_partitions, name: registry_name(name)},
       {DynamicSupervisor, strategy: :one_for_one, name: dynamic_supervisor_name(name)},
       {Jido.Agent.InstanceManager.Cleanup, name}
     ]
@@ -281,7 +287,12 @@ defmodule Jido.Agent.InstanceManager do
 
   defp build_child_spec(config, key, agent_or_nil, opts) do
     initial_state = Keyword.get(opts, :initial_state, %{})
-    agent_opts = Keyword.put_new(config.agent_opts, :jido, config.jido)
+
+    agent_opts =
+      config.agent_opts
+      |> Keyword.put_new(:jido, config.jido)
+      |> Keyword.put(:registry, registry_name(config.name))
+      |> Keyword.put(:register_global, false)
 
     base_opts =
       [
@@ -312,8 +323,10 @@ defmodule Jido.Agent.InstanceManager do
 
   defp maybe_thaw(%{storage: nil}, _key), do: nil
 
-  defp maybe_thaw(%{storage: storage, agent: agent_module}, key) do
-    case Persist.thaw(storage, agent_module, key) do
+  defp maybe_thaw(%{name: manager_name, storage: storage, agent: agent_module}, key) do
+    persistence_key = manager_persistence_key(manager_name, key)
+
+    case Persist.thaw(storage, agent_module, persistence_key) do
       {:ok, agent} ->
         Logger.debug("InstanceManager thawed agent for key #{inspect(key)}")
         agent
@@ -368,8 +381,30 @@ defmodule Jido.Agent.InstanceManager do
     :persistent_term.get({__MODULE__, manager})
   end
 
+  defp resolve_registry_partitions(opts) do
+    case Keyword.get(opts, :registry_partitions, System.schedulers_online()) do
+      partitions when is_integer(partitions) and partitions > 0 ->
+        partitions
+
+      other ->
+        raise ArgumentError,
+              "Invalid :registry_partitions for Jido.Agent.InstanceManager; expected positive integer, got: #{inspect(other)}"
+    end
+  end
+
   defp key_to_id(key) when is_binary(key), do: key
-  defp key_to_id(key), do: inspect(key)
+
+  defp key_to_id(key) do
+    digest =
+      key
+      |> :erlang.term_to_binary()
+      |> then(&:crypto.hash(:sha256, &1))
+      |> Base.url_encode64(padding: false)
+
+    "key_" <> digest
+  end
+
+  defp manager_persistence_key(manager_name, key), do: {manager_name, key}
 
   # ---------------------------------------------------------------------------
   # Internal: Naming

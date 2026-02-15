@@ -109,6 +109,15 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       assert state.agent.state.counter == 42
     end
+
+    test "manager-managed agents are not globally registered in Jido registry", %{
+      manager: manager
+    } do
+      {:ok, pid} = InstanceManager.get(manager, "registry-scope-key")
+
+      assert InstanceManager.lookup(manager, "registry-scope-key") == {:ok, pid}
+      assert Jido.whereis(JidoTest.InstanceManagerTestJido, "registry-scope-key") == nil
+    end
   end
 
   describe "stop/2" do
@@ -335,7 +344,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1000
 
       # Verify state was persisted to ETS
-      store_key = {TestAgent, "stop-persist-key"}
+      store_key = {TestAgent, {manager, "stop-persist-key"}}
 
       case ETS.get_checkpoint(store_key, table: table) do
         {:ok, persisted} ->
@@ -469,7 +478,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       :ok = InstanceManager.stop(manager_name, "override-key")
 
-      store_key = {TestAgent, "override-key"}
+      store_key = {TestAgent, {manager_name, "override-key"}}
 
       assert {:ok, _} = ETS.get_checkpoint(store_key, table: override_table)
       assert :not_found = ETS.get_checkpoint(store_key, table: StorageAwareJido.storage_table())
@@ -516,8 +525,97 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       {:ok, state2} = AgentServer.state(pid2)
       assert state2.agent.state.counter == 55
+      assert String.starts_with?(state2.agent.id, "key_")
 
       :ok = AgentServer.detach(pid2)
+    end
+
+    @tag timeout: 5000
+    test "manager name namespaces persistence keys to prevent cross-manager collisions" do
+      table_name = :"#{@manager_prefix}_shared_table_#{:erlang.unique_integer([:positive])}"
+      manager_a = :"#{@manager_prefix}_ns_a_#{:erlang.unique_integer([:positive])}"
+      manager_b = :"#{@manager_prefix}_ns_b_#{:erlang.unique_integer([:positive])}"
+      shared_key = "shared-user-key"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_a,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          ),
+          id: :namespaced_manager_a
+        )
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_b,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          ),
+          id: :namespaced_manager_b
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_a})
+        :persistent_term.erase({InstanceManager, manager_b})
+        cleanup_storage_tables(table_name)
+      end)
+
+      {:ok, pid_a1} = InstanceManager.get(manager_a, shared_key, initial_state: %{counter: 11})
+      {:ok, pid_b1} = InstanceManager.get(manager_b, shared_key, initial_state: %{counter: 22})
+
+      ref_a = Process.monitor(pid_a1)
+      ref_b = Process.monitor(pid_b1)
+
+      assert_receive {:DOWN, ^ref_a, :process, ^pid_a1, {:shutdown, :idle_timeout}}, 1000
+      assert_receive {:DOWN, ^ref_b, :process, ^pid_b1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, _checkpoint_a} =
+        ETS.get_checkpoint({TestAgent, {manager_a, shared_key}}, table: table_name)
+
+      {:ok, _checkpoint_b} =
+        ETS.get_checkpoint({TestAgent, {manager_b, shared_key}}, table: table_name)
+
+      {:ok, pid_a2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager_a, shared_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, pid_b2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager_b, shared_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, state_a2} = AgentServer.state(pid_a2)
+      {:ok, state_b2} = AgentServer.state(pid_b2)
+
+      assert state_a2.agent.state.counter == 11
+      assert state_b2.agent.state.counter == 22
+
+      :ok = AgentServer.detach(pid_a2)
+      :ok = AgentServer.detach(pid_b2)
     end
   end
 
