@@ -419,6 +419,21 @@ defmodule Jido.Agent do
       @doc "Returns the merged schema (base + plugin schemas)."
       @spec schema() :: Zoi.schema() | keyword()
       def schema, do: @merged_schema
+
+      @doc false
+      @spec __agent_metadata__() :: map()
+      def __agent_metadata__ do
+        %{
+          module: __MODULE__,
+          name: name(),
+          description: description(),
+          category: category(),
+          tags: tags(),
+          vsn: vsn(),
+          actions: actions(),
+          schema: schema()
+        }
+      end
     end
   end
 
