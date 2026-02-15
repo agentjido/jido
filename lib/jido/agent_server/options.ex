@@ -69,8 +69,8 @@ defmodule Jido.AgentServer.Options do
                   description: "Idle timeout in ms before hibernate/stop (:infinity to disable)"
                 )
                 |> Zoi.default(:infinity),
-              persistence:
-                Zoi.any(description: "Persistence config [store: {Module, opts}]")
+              storage:
+                Zoi.any(description: "Storage config (nil | Module | {Module, opts})")
                 |> Zoi.optional(),
 
               # Debug mode

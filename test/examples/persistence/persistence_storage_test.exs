@@ -16,7 +16,6 @@ defmodule JidoExampleTest.PersistenceStorageTest do
   @moduletag :example
   @moduletag timeout: 15_000
 
-  alias Jido.Agent
   alias Jido.Persist
   alias Jido.Storage.ETS
   alias Jido.Thread
@@ -56,7 +55,7 @@ defmodule JidoExampleTest.PersistenceStorageTest do
       agent = %{agent | state: %{agent.state | counter: 42, status: :active, notes: ["hello"]}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "rt-1")
+      {:ok, restored} = Persist.thaw(storage(table), PersistableAgent, "rt-1")
 
       assert restored.id == "rt-1"
       assert restored.state.counter == 42
@@ -67,7 +66,8 @@ defmodule JidoExampleTest.PersistenceStorageTest do
     test "thaw returns {:error, :not_found} for non-existent agent" do
       table = unique_table()
 
-      assert {:error, :not_found} = Persist.thaw(storage(table), Agent, "does-not-exist")
+      assert {:error, :not_found} =
+               Persist.thaw(storage(table), PersistableAgent, "does-not-exist")
     end
 
     test "state mutations before hibernate are preserved after thaw" do
@@ -79,7 +79,7 @@ defmodule JidoExampleTest.PersistenceStorageTest do
       agent = %{agent | state: %{agent.state | status: :processing, notes: ["step1", "step2"]}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "mutate-1")
+      {:ok, restored} = Persist.thaw(storage(table), PersistableAgent, "mutate-1")
 
       assert restored.state.counter == 10
       assert restored.state.status == :processing
@@ -101,7 +101,7 @@ defmodule JidoExampleTest.PersistenceStorageTest do
 
       :ok = Persist.hibernate(storage(table), agent)
 
-      {:ok, checkpoint} = ETS.get_checkpoint({Agent, "thread-1"}, table: table)
+      {:ok, checkpoint} = ETS.get_checkpoint({PersistableAgent, "thread-1"}, table: table)
       refute Map.has_key?(checkpoint.state, :__thread__)
       assert checkpoint.thread == %{id: "thread-flush-1", rev: 2}
 
@@ -122,7 +122,7 @@ defmodule JidoExampleTest.PersistenceStorageTest do
       agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "thread-2")
+      {:ok, restored} = Persist.thaw(storage(table), PersistableAgent, "thread-2")
 
       assert restored.state.counter == 7
 
@@ -145,8 +145,8 @@ defmodule JidoExampleTest.PersistenceStorageTest do
       :ok = Persist.hibernate(storage(table), agent_a)
       :ok = Persist.hibernate(storage(table), agent_b)
 
-      {:ok, restored_a} = Persist.thaw(storage(table), Agent, "multi-a")
-      {:ok, restored_b} = Persist.thaw(storage(table), Agent, "multi-b")
+      {:ok, restored_a} = Persist.thaw(storage(table), PersistableAgent, "multi-a")
+      {:ok, restored_b} = Persist.thaw(storage(table), PersistableAgent, "multi-b")
 
       assert restored_a.state.counter == 100
       assert restored_a.state.status == :done

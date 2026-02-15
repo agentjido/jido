@@ -147,6 +147,9 @@ defmodule Jido.Agent do
               id:
                 Zoi.string(description: "Unique agent identifier")
                 |> Zoi.optional(),
+              agent_module:
+                Zoi.atom(description: "Concrete agent module that created this struct")
+                |> Zoi.optional(),
               name:
                 Zoi.string(description: "Agent name")
                 |> Zoi.optional(),
@@ -673,6 +676,7 @@ defmodule Jido.Agent do
 
         agent = %Agent{
           id: id,
+          agent_module: __MODULE__,
           name: name(),
           description: description(),
           category: category(),

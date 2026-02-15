@@ -32,19 +32,20 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = WorkflowAgent.new(id: "basic-roundtrip-1")
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "basic-roundtrip-1")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "basic-roundtrip-1")
 
       assert thawed.id == "basic-roundtrip-1"
     end
 
-    test "agent struct type is preserved" do
+    test "agent module metadata is preserved" do
       jido = create_jido_instance(unique_table())
       agent = WorkflowAgent.new(id: "basic-roundtrip-2")
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "basic-roundtrip-2")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "basic-roundtrip-2")
 
       assert thawed.__struct__ == Jido.Agent
+      assert thawed.agent_module == WorkflowAgent
     end
 
     test "default state values are preserved" do
@@ -52,7 +53,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = WorkflowAgent.new(id: "basic-roundtrip-3")
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "basic-roundtrip-3")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "basic-roundtrip-3")
 
       assert thawed.state.step == 0
       assert thawed.state.status == :pending
@@ -71,7 +72,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
         |> ThreadAgent.append(%{kind: :message, payload: %{content: "hello"}})
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "thread-test-1")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "thread-test-1")
 
       assert thawed.state[:__thread__] != nil
       assert thawed.state[:__thread__].id == "thread-for-agent-1"
@@ -90,7 +91,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = ThreadAgent.put(agent, thread)
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "thread-test-2")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "thread-test-2")
 
       rehydrated = thawed.state[:__thread__]
       assert rehydrated.rev == 3
@@ -112,7 +113,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = ThreadAgent.put(agent, thread)
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "thread-test-3")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "thread-test-3")
 
       rehydrated = thawed.state[:__thread__]
       entry_list = Thread.to_list(rehydrated)
@@ -138,7 +139,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = ThreadAgent.put(agent, thread)
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "thread-test-4")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "thread-test-4")
 
       rehydrated = thawed.state[:__thread__]
       [entry] = Thread.to_list(rehydrated)
@@ -155,7 +156,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = %{agent | state: %{agent.state | step: 5}}
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "state-mut-1")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "state-mut-1")
 
       assert thawed.state.step == 5
     end
@@ -166,7 +167,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = %{agent | state: %{agent.state | status: :completed}}
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "state-mut-2")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "state-mut-2")
 
       assert thawed.state.status == :completed
     end
@@ -177,7 +178,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = %{agent | state: %{agent.state | data: %{user_id: "u123", items: ["a", "b", "c"]}}}
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "state-mut-3")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "state-mut-3")
 
       assert thawed.state.data == %{user_id: "u123", items: ["a", "b", "c"]}
     end
@@ -197,7 +198,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       }
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "state-mut-4")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "state-mut-4")
 
       assert thawed.state.step == 10
       assert thawed.state.status == :in_progress
@@ -222,9 +223,9 @@ defmodule JidoTest.Integration.HibernateThawTest do
       :ok = Jido.Persist.hibernate(jido, agent2)
       :ok = Jido.Persist.hibernate(jido, agent3)
 
-      {:ok, thawed1} = Jido.Persist.thaw(jido, Jido.Agent, "multi-agent-1")
-      {:ok, thawed2} = Jido.Persist.thaw(jido, Jido.Agent, "multi-agent-2")
-      {:ok, thawed3} = Jido.Persist.thaw(jido, Jido.Agent, "multi-agent-3")
+      {:ok, thawed1} = Jido.Persist.thaw(jido, WorkflowAgent, "multi-agent-1")
+      {:ok, thawed2} = Jido.Persist.thaw(jido, WorkflowAgent, "multi-agent-2")
+      {:ok, thawed3} = Jido.Persist.thaw(jido, WorkflowAgent, "multi-agent-3")
 
       assert thawed1.id == "multi-agent-1"
       assert thawed1.state.step == 1
@@ -261,8 +262,8 @@ defmodule JidoTest.Integration.HibernateThawTest do
       :ok = Jido.Persist.hibernate(jido, agent1)
       :ok = Jido.Persist.hibernate(jido, agent2)
 
-      {:ok, thawed1} = Jido.Persist.thaw(jido, Jido.Agent, "multi-thread-1")
-      {:ok, thawed2} = Jido.Persist.thaw(jido, Jido.Agent, "multi-thread-2")
+      {:ok, thawed1} = Jido.Persist.thaw(jido, WorkflowAgent, "multi-thread-1")
+      {:ok, thawed2} = Jido.Persist.thaw(jido, WorkflowAgent, "multi-thread-2")
 
       assert thawed1.state[:__thread__].id == "thread-multi-1"
       assert thawed2.state[:__thread__].id == "thread-multi-2"
@@ -280,7 +281,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = WorkflowAgent.new(id: "exists")
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      assert {:error, :not_found} = Jido.Persist.thaw(jido, Jido.Agent, "does-not-exist")
+      assert {:error, :not_found} = Jido.Persist.thaw(jido, WorkflowAgent, "does-not-exist")
     end
   end
 
@@ -295,7 +296,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent_v2 = %{agent | state: %{agent.state | step: 2, status: :version2}}
       :ok = Jido.Persist.hibernate(jido, agent_v2)
 
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "overwrite-1")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "overwrite-1")
 
       assert thawed.state.step == 2
       assert thawed.state.status == :version2
@@ -307,14 +308,14 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = %{agent | state: %{agent.state | step: 1}}
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed1} = Jido.Persist.thaw(jido, Jido.Agent, "overwrite-2")
+      {:ok, thawed1} = Jido.Persist.thaw(jido, WorkflowAgent, "overwrite-2")
 
       assert thawed1.state.step == 1
 
       updated = %{thawed1 | state: %{thawed1.state | step: 99, status: :final}}
       :ok = Jido.Persist.hibernate(jido, updated)
 
-      {:ok, thawed2} = Jido.Persist.thaw(jido, Jido.Agent, "overwrite-2")
+      {:ok, thawed2} = Jido.Persist.thaw(jido, WorkflowAgent, "overwrite-2")
 
       assert thawed2.state.step == 99
       assert thawed2.state.status == :final
@@ -330,7 +331,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
 
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      {:ok, thawed1} = Jido.Persist.thaw(jido, Jido.Agent, "overwrite-3")
+      {:ok, thawed1} = Jido.Persist.thaw(jido, WorkflowAgent, "overwrite-3")
       assert Thread.entry_count(thawed1.state[:__thread__]) == 1
 
       updated_thread =
@@ -341,7 +342,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       updated = ThreadAgent.put(thawed1, updated_thread)
       :ok = Jido.Persist.hibernate(jido, updated)
 
-      {:ok, thawed2} = Jido.Persist.thaw(jido, Jido.Agent, "overwrite-3")
+      {:ok, thawed2} = Jido.Persist.thaw(jido, WorkflowAgent, "overwrite-3")
 
       assert thawed2.state[:__thread__].id == "overwrite-thread-v2"
       assert Thread.entry_count(thawed2.state[:__thread__]) == 2
@@ -363,7 +364,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
 
       :ok = Jido.Persist.hibernate(jido, agent)
 
-      {:ok, checkpoint} = ETS.get_checkpoint({Jido.Agent, "invariant-1"}, table: table)
+      {:ok, checkpoint} = ETS.get_checkpoint({WorkflowAgent, "invariant-1"}, table: table)
 
       refute is_struct(checkpoint.thread, Thread)
       assert checkpoint.thread == %{id: "invariant-thread", rev: 1}
@@ -376,7 +377,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = WorkflowAgent.new(id: original_id)
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, original_id)
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, original_id)
 
       assert thawed.id == original_id
     end
@@ -394,7 +395,7 @@ defmodule JidoTest.Integration.HibernateThawTest do
       agent = ThreadAgent.put(agent, thread)
 
       :ok = Jido.Persist.hibernate(jido, agent)
-      {:ok, thawed} = Jido.Persist.thaw(jido, Jido.Agent, "kind-test")
+      {:ok, thawed} = Jido.Persist.thaw(jido, WorkflowAgent, "kind-test")
 
       entries = Thread.to_list(thawed.state[:__thread__])
       assert Enum.at(entries, 0).kind == :user_input

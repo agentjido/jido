@@ -2,7 +2,7 @@ defmodule Jido.AgentServer.State.Lifecycle do
   @moduledoc """
   Lifecycle state for pool-managed agents.
 
-  Tracks attachment, idle timeout, and persistence configuration
+  Tracks attachment, idle timeout, and storage configuration
   for agents managed by Jido.Agent.InstanceManager.
   """
 
@@ -20,7 +20,7 @@ defmodule Jido.AgentServer.State.Lifecycle do
               idle_timeout:
                 Zoi.any(description: "Idle timeout in ms (:infinity to disable)")
                 |> Zoi.default(:infinity),
-              persistence: Zoi.any(description: "Persistence config") |> Zoi.optional(),
+              storage: Zoi.any(description: "Storage config") |> Zoi.optional(),
               attachments:
                 Zoi.any(description: "MapSet of attached owner pids")
                 |> Zoi.default(MapSet.new()),
@@ -49,7 +49,7 @@ defmodule Jido.AgentServer.State.Lifecycle do
       pool: Keyword.get(opts, :pool),
       pool_key: Keyword.get(opts, :pool_key),
       idle_timeout: Keyword.get(opts, :idle_timeout, :infinity),
-      persistence: Keyword.get(opts, :persistence),
+      storage: Keyword.get(opts, :storage),
       attachments: MapSet.new(),
       attachment_monitors: %{},
       idle_timer: nil

@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.Lifecycle do
   Internal behavior for AgentServer lifecycle hooks.
 
   Allows instance managers and other orchestrators to inject
-  attachment tracking, idle timeouts, and persistence
+  attachment tracking, idle timeouts, and storage-backed persistence
   without polluting the core runtime.
   """
 

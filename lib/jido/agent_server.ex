@@ -714,7 +714,7 @@ defmodule Jido.AgentServer do
       idle_timeout: state.lifecycle.idle_timeout,
       pool: state.lifecycle.pool,
       pool_key: state.lifecycle.pool_key,
-      persistence: state.lifecycle.persistence
+      storage: state.lifecycle.storage
     ]
 
     state = state.lifecycle.mod.init(lifecycle_opts, state)
@@ -974,7 +974,7 @@ defmodule Jido.AgentServer do
 
   @impl true
   def terminate(reason, state) do
-    # Delegate to lifecycle module for persistence/hibernation
+    # Delegate to lifecycle module for storage-backed hibernation
     state.lifecycle.mod.terminate(reason, state)
 
     # Clean up all cron jobs owned by this agent

@@ -1,6 +1,6 @@
 defmodule Jido.Agent.InstanceManager do
   @moduledoc """
-  Keyed singleton registry with lifecycle management and optional persistence.
+  Keyed singleton registry with lifecycle management and optional storage-backed hibernation.
 
   InstanceManager provides a pattern for managing one agent per logical context
   (user session, game room, connection, conversation). This is NOT a pool—each
@@ -8,7 +8,7 @@ defmodule Jido.Agent.InstanceManager do
 
   - **Keyed singletons** — one agent per key, lookup or start on demand
   - **Automatic lifecycle** — idle timeout with attachment tracking
-  - **Optional persistence** — hibernate/thaw with pluggable storage backends
+  - **Optional storage** — hibernate/thaw with pluggable storage backends
   - **Multiple registries** — different agent types, different configurations
 
   ## Architecture
@@ -16,7 +16,7 @@ defmodule Jido.Agent.InstanceManager do
   Each instance manager consists of:
   - A `Registry` for unique key → pid lookup
   - A `DynamicSupervisor` for agent lifecycle
-  - Optional `Store` for hibernate/thaw persistence
+  - Optional storage config for hibernate/thaw persistence
 
   ## Usage
 
@@ -26,9 +26,7 @@ defmodule Jido.Agent.InstanceManager do
           name: :sessions,
           agent: MyApp.SessionAgent,
           idle_timeout: :timer.minutes(15),
-          persistence: [
-            store: {Jido.Agent.Store.ETS, table: :session_cache}
-          ]
+          storage: {Jido.Storage.ETS, table: :session_cache}
         )
       ]
 
@@ -41,19 +39,20 @@ defmodule Jido.Agent.InstanceManager do
   - `:name` - Instance manager name (required, atom)
   - `:agent` - Agent module (required)
   - `:idle_timeout` - Time in ms before idle agent hibernates/stops (default: `:infinity`)
-  - `:persistence` - Persistence configuration (optional)
-    - `:store` - `{StoreModule, opts}` tuple
-    - `:key_fun` - Custom key function `(agent_module, agent_id) -> key`
+  - `:storage` - `nil`, storage module, or `{StorageModule, opts}` (optional)
+    - Omitted: derive from Jido instance (`:jido`, or `agent_opts[:jido]`, or `Jido`)
+    - `nil`: disable hibernate/thaw for this manager
+  - `:jido` - Jido instance atom used for default storage resolution (optional)
   - `:agent_opts` - Additional options passed to AgentServer
 
   ## Lifecycle
 
   1. `get/3` looks up by key in Registry
-  2. If not found and persistence enabled, tries to thaw from store
+  2. If not found and storage enabled, tries to thaw from storage
   3. If still not found, starts fresh agent
   4. Callers use `attach/1` to track interest
   5. When all attachments gone, idle timer starts
-  6. On idle timeout: hibernate to store (if configured) then stop
+  6. On idle timeout: hibernate to storage (if configured) then stop
 
   ## Phoenix Integration
 
@@ -73,8 +72,9 @@ defmodule Jido.Agent.InstanceManager do
 
   require Logger
 
-  alias Jido.Agent.Persistence
   alias Jido.Config.Defaults
+  alias Jido.Persist
+  alias Jido.Storage
 
   @type manager_name :: atom()
   @type key :: term()
@@ -91,7 +91,8 @@ defmodule Jido.Agent.InstanceManager do
   - `:name` - Instance manager name (required)
   - `:agent` - Agent module (required)
   - `:idle_timeout` - Idle timeout in ms (default: `:infinity`)
-  - `:persistence` - `[store: {Module, opts}]` (optional)
+  - `:storage` - `nil`, storage module, or `{StorageModule, opts}` (optional)
+  - `:jido` - Jido instance atom used for default storage resolution (optional)
   - `:agent_opts` - Options passed to AgentServer (optional)
 
   ## Examples
@@ -125,12 +126,17 @@ defmodule Jido.Agent.InstanceManager do
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
 
+    ensure_legacy_persistence_not_set!(opts)
+
+    jido = resolve_manager_jido(opts)
+
     # Store config in persistent_term for fast access
     config = %{
       name: name,
       agent: Keyword.fetch!(opts, :agent),
+      jido: jido,
       idle_timeout: Keyword.get(opts, :idle_timeout, :infinity),
-      persistence: Keyword.get(opts, :persistence),
+      storage: resolve_manager_storage(opts, jido),
       agent_opts: Keyword.get(opts, :agent_opts, [])
     }
 
@@ -160,7 +166,7 @@ defmodule Jido.Agent.InstanceManager do
   Gets or starts an agent by key.
 
   If an agent for the given key is already running, returns its pid.
-  If persistence is configured and a hibernated state exists, thaws it.
+  If storage is configured and a hibernated state exists, thaws it.
   Otherwise starts a fresh agent.
 
   ## Options
@@ -209,7 +215,7 @@ defmodule Jido.Agent.InstanceManager do
   @doc """
   Stops an agent by key.
 
-  If persistence is configured, the agent will hibernate before stopping.
+  If storage is configured, the agent will hibernate before stopping.
   Uses a graceful shutdown to ensure the agent's terminate callback runs.
 
   ## Examples
@@ -255,7 +261,7 @@ defmodule Jido.Agent.InstanceManager do
   defp start_agent(manager, key, opts) do
     config = get_config(manager)
 
-    # Try to thaw from persistence first
+    # Try to thaw from storage first
     agent_or_nil = maybe_thaw(config, key)
 
     child_spec = build_child_spec(config, key, agent_or_nil, opts)
@@ -275,11 +281,12 @@ defmodule Jido.Agent.InstanceManager do
 
   defp build_child_spec(config, key, agent_or_nil, opts) do
     initial_state = Keyword.get(opts, :initial_state, %{})
+    agent_opts = Keyword.put_new(config.agent_opts, :jido, config.jido)
 
     base_opts =
       [
         agent: agent_or_nil || config.agent,
-        # When thawing from persistence we pass a struct, so keep the module explicit.
+        # When thawing from storage we pass a struct, so keep the module explicit.
         agent_module: config.agent,
         id: key_to_id(key),
         name: {:via, Registry, {registry_name(config.name), key}},
@@ -288,8 +295,8 @@ defmodule Jido.Agent.InstanceManager do
         pool: config.name,
         pool_key: key,
         idle_timeout: config.idle_timeout,
-        persistence: config.persistence
-      ] ++ config.agent_opts
+        storage: config.storage
+      ] ++ agent_opts
 
     # Only add initial_state for fresh agents (not thawed)
     base_opts =
@@ -303,15 +310,15 @@ defmodule Jido.Agent.InstanceManager do
     Supervisor.child_spec({Jido.AgentServer, base_opts}, restart: :transient)
   end
 
-  defp maybe_thaw(%{persistence: nil}, _key), do: nil
+  defp maybe_thaw(%{storage: nil}, _key), do: nil
 
-  defp maybe_thaw(%{persistence: persistence, agent: agent_module}, key) do
-    case Persistence.thaw(persistence, agent_module, key) do
+  defp maybe_thaw(%{storage: storage, agent: agent_module}, key) do
+    case Persist.thaw(storage, agent_module, key) do
       {:ok, agent} ->
         Logger.debug("InstanceManager thawed agent for key #{inspect(key)}")
         agent
 
-      :not_found ->
+      {:error, :not_found} ->
         nil
 
       {:error, reason} ->
@@ -326,6 +333,36 @@ defmodule Jido.Agent.InstanceManager do
   # ---------------------------------------------------------------------------
   # Internal: Helpers
   # ---------------------------------------------------------------------------
+
+  defp ensure_legacy_persistence_not_set!(opts) do
+    if Keyword.has_key?(opts, :persistence) do
+      raise ArgumentError,
+            "Jido.Agent.InstanceManager no longer supports :persistence; use :storage (nil | StorageModule | {StorageModule, opts})"
+    end
+  end
+
+  defp resolve_manager_jido(opts) do
+    Keyword.get(opts, :jido) || Keyword.get(Keyword.get(opts, :agent_opts, []), :jido, Jido)
+  end
+
+  defp resolve_manager_storage(opts, jido) do
+    if Keyword.has_key?(opts, :storage) do
+      case Keyword.get(opts, :storage) do
+        nil -> nil
+        storage -> Storage.normalize_storage(storage)
+      end
+    else
+      resolve_default_storage(jido)
+    end
+  end
+
+  defp resolve_default_storage(jido) when is_atom(jido) do
+    if function_exported?(jido, :__jido_storage__, 0) do
+      jido.__jido_storage__()
+    else
+      {Jido.Storage.ETS, [table: :"#{jido}_storage"]}
+    end
+  end
 
   defp get_config(manager) do
     :persistent_term.get({__MODULE__, manager})
