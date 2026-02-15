@@ -13,6 +13,16 @@ defmodule JidoTest.DiscoveryTest do
     def run(_params, _context), do: {:ok, %{}}
   end
 
+  defmodule TestAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "discovery_test_agent",
+      description: "Test agent for discovery",
+      category: "test",
+      tags: ["discovery", "test"],
+      schema: []
+  end
+
   setup do
     Discovery.refresh()
     :ok
@@ -109,6 +119,44 @@ defmodule JidoTest.DiscoveryTest do
     test "returns a list of agents" do
       agents = Discovery.list_agents()
       assert is_list(agents)
+    end
+
+    test "includes discoverable agent metadata" do
+      app = :jido_discovery_test_app
+
+      spec =
+        {:application, app,
+         description: ~c"Jido discovery test app", vsn: ~c"0.1.0", modules: [TestAgent]}
+
+      load_result =
+        case :application.load(spec) do
+          :ok -> :ok
+          {:error, {:already_loaded, ^app}} -> :ok
+        end
+
+      assert load_result == :ok
+
+      on_exit(fn ->
+        unload_result =
+          case :application.unload(app) do
+            :ok -> :ok
+            {:error, {:not_loaded, ^app}} -> :ok
+          end
+
+        assert unload_result == :ok
+      end)
+
+      :ok = Discovery.refresh()
+      agents = Discovery.list_agents()
+      agent = Enum.find(agents, &(&1[:name] == "discovery_test_agent"))
+
+      assert agent != nil
+      assert agent[:description] == "Test agent for discovery"
+      assert agent[:category] == "test"
+      assert is_list(agent[:tags]) and "discovery" in agent[:tags]
+      assert agent[:module] == TestAgent
+      assert Map.has_key?(agent, :schema)
+      assert Map.has_key?(agent, :slug)
     end
 
     test "filters by limit" do
