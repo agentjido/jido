@@ -649,10 +649,8 @@ defmodule Jido.AgentServer do
 
     with {:ok, options} <- Options.new(opts),
          {:ok, agent_module, agent} <- resolve_agent(options),
-         {:ok, state} <- State.from_options(options, agent_module, agent) do
-      # Register in Registry
-      Registry.register(state.registry, state.id, %{})
-
+         {:ok, state} <- State.from_options(options, agent_module, agent),
+         :ok <- maybe_register_global(options, state) do
       # Monitor parent if present
       state = maybe_monitor_parent(state)
 
@@ -660,6 +658,21 @@ defmodule Jido.AgentServer do
     else
       {:error, reason} ->
         {:stop, reason}
+    end
+  end
+
+  defp maybe_register_global(%Options{register_global: false}, _state), do: :ok
+
+  defp maybe_register_global(%Options{register_global: true}, state) do
+    case Registry.register(state.registry, state.id, %{}) do
+      {:ok, _} ->
+        :ok
+
+      {:error, {:already_registered, pid}} when pid == self() ->
+        :ok
+
+      {:error, _reason} = error ->
+        error
     end
   end
 
@@ -714,7 +727,7 @@ defmodule Jido.AgentServer do
       idle_timeout: state.lifecycle.idle_timeout,
       pool: state.lifecycle.pool,
       pool_key: state.lifecycle.pool_key,
-      persistence: state.lifecycle.persistence
+      storage: state.lifecycle.storage
     ]
 
     state = state.lifecycle.mod.init(lifecycle_opts, state)
@@ -974,7 +987,7 @@ defmodule Jido.AgentServer do
 
   @impl true
   def terminate(reason, state) do
-    # Delegate to lifecycle module for persistence/hibernation
+    # Delegate to lifecycle module for storage-backed hibernation
     state.lifecycle.mod.terminate(reason, state)
 
     # Clean up all cron jobs owned by this agent

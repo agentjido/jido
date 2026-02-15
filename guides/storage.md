@@ -798,6 +798,29 @@ children = [
 ]
 ```
 
+`InstanceManager` storage resolution:
+
+- `storage: {Adapter, opts}` or `storage: Adapter` - explicit backend override
+- `storage` omitted - uses the configured Jido instance storage (`jido.__jido_storage__/0` when available)
+- `storage: nil` - disables hibernate/thaw for that manager
+
+```elixir
+# Uses MyApp.Jido.__jido_storage__/0 by default
+Jido.Agent.InstanceManager.child_spec(
+  name: :sessions,
+  agent: MyApp.SessionAgent,
+  jido: MyApp.Jido,
+  idle_timeout: :timer.minutes(15)
+)
+
+# Disable persistence for this manager
+Jido.Agent.InstanceManager.child_spec(
+  name: :ephemeral_sessions,
+  agent: MyApp.SessionAgent,
+  storage: nil
+)
+```
+
 ### Lifecycle Flow
 
 1. **Get/Start**: `InstanceManager.get/3` looks up by key in Registry
@@ -806,6 +829,9 @@ children = [
 4. **Attach**: Callers track interest via `AgentServer.attach/1`
 5. **Idle**: When all attachments detach, idle timer starts
 6. **Hibernate**: On timeout, agent is persisted via `hibernate`, then process stops
+
+Manager-backed checkpoints are keyed by `{manager_name, pool_key}` to prevent
+cross-manager collisions when multiple managers share one storage backend.
 
 ```elixir
 # Get or start an agent (thaws if hibernated)
@@ -883,25 +909,6 @@ Jido.Agent.InstanceManager.child_spec(
   # No storage: - agent dies on idle, no restore
 )
 ```
-
-## Migration from Legacy API
-
-If migrating from the older `Jido.Agent.Persistence` / `Jido.Agent.Store` API:
-
-| Old API | New API |
-|---------|---------|
-| `Jido.Agent.Persistence.hibernate/4` | `MyApp.Jido.hibernate/1` or `Jido.Persist.hibernate/2` |
-| `Jido.Agent.Persistence.thaw/3` | `MyApp.Jido.thaw/2` or `Jido.Persist.thaw/3` |
-| `Jido.Agent.Store` behaviour (3 callbacks) | `Jido.Storage` behaviour (6 callbacks) |
-| `dump/2` callback | `checkpoint/2` callback |
-| `load/2` callback | `restore/2` callback |
-
-Key differences:
-
-1. **Unified storage** — One adapter handles both checkpoints and threads
-2. **Thread-aware** — Automatically flushes journal before checkpoint
-3. **Thread pointer** — Checkpoint stores pointer, not full thread
-4. **Configured on Jido instance** — Not per-call configuration
 
 ## Summary
 

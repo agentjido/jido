@@ -5,7 +5,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   Handles:
   - Attachment tracking (attach/detach/monitor owner processes)
   - Idle timer management (start/cancel/reset)
-  - Hibernate on shutdown (calls Jido.Agent.Persistence)
+  - Hibernate on shutdown (calls `Jido.Persist`)
 
   ## State
 
@@ -16,7 +16,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   - `idle_timeout` - timeout value in milliseconds
   - `pool` - pool name (for logging)
   - `pool_key` - pool key
-  - `persistence` - persistence config
+  - `storage` - storage config for persistence
 
   ## Events
 
@@ -31,7 +31,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
   require Logger
 
-  alias Jido.Agent.Persistence
+  alias Jido.Persist
 
   @impl true
   def init(_opts, state) do
@@ -147,7 +147,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   def terminate(reason, state) do
     lifecycle = state.lifecycle
 
-    if clean_shutdown?(reason) && lifecycle.persistence do
+    if clean_shutdown?(reason) && lifecycle.storage do
       hibernate_agent(state)
     end
 
@@ -161,12 +161,13 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
   defp hibernate_agent(state) do
     lifecycle = state.lifecycle
-    persistence = lifecycle.persistence
+    storage = lifecycle.storage
     pool_key = lifecycle.pool_key
+    persistence_key = {lifecycle.pool, pool_key}
     agent = state.agent
     agent_module = state.agent_module
 
-    case Persistence.hibernate(persistence, agent_module, pool_key, agent) do
+    case Persist.hibernate(storage, agent_module, persistence_key, agent) do
       :ok ->
         Logger.debug("Lifecycle hibernated agent for #{lifecycle.pool}/#{inspect(pool_key)}")
 

@@ -13,17 +13,19 @@ defmodule Jido.Persist do
   The primary API accepts a storage configuration tuple:
 
       Jido.Persist.hibernate({adapter, opts}, agent)
+      Jido.Persist.hibernate({adapter, opts}, agent_module, key, agent)
       Jido.Persist.thaw({adapter, opts}, agent_module, key)
 
   Or a Jido instance with embedded storage config:
 
       Jido.Persist.hibernate(jido_instance, agent)
+      Jido.Persist.hibernate(jido_instance, agent_module, key, agent)
       Jido.Persist.thaw(jido_instance, agent_module, key)
 
-  ## hibernate/2 Flow
+  ## hibernate Flow
 
   1. Extract thread from `agent.state[:__thread__]`
-  2. If thread exists with entries, flush journal via `adapter.append_thread/3`
+  2. Flush only missing thread entries via `adapter.append_thread/3`
   3. Call `agent_module.checkpoint/2` if implemented, else use default
   4. **Enforce invariant**: Remove `:__thread__` from state, store only thread pointer
   5. Call `adapter.put_checkpoint/3`
@@ -44,22 +46,6 @@ defmodule Jido.Persist do
   - `restore(checkpoint_data, ctx)` - Returns `{:ok, agent}` for custom deserialization
 
   If not implemented, default serialization is used.
-
-  ## Examples
-
-      # Using storage config tuple
-      storage = {Jido.Storage.ETS, table: :my_storage}
-
-      # Hibernate an agent
-      :ok = Jido.Persist.hibernate(storage, agent)
-
-      # Thaw an agent
-      case Jido.Persist.thaw(storage, MyAgent, "agent-123") do
-        {:ok, agent} -> agent
-        {:error, :not_found} -> start_fresh()
-        {:error, :missing_thread} -> handle_missing_thread()
-        {:error, :thread_mismatch} -> handle_mismatch()
-      end
   """
 
   require Logger
@@ -85,88 +71,63 @@ defmodule Jido.Persist do
   @doc """
   Persists an agent to storage, flushing any pending thread entries first.
 
-  Accepts either a `{adapter, opts}` tuple or a struct with `:storage` field.
-
-  ## Examples
-
-      storage = {Jido.Storage.ETS, table: :agents}
-      :ok = Jido.Persist.hibernate(storage, my_agent)
-
-  ## Returns
-
-  - `:ok` - Successfully hibernated
-  - `{:error, reason}` - Failed to hibernate
+  Accepts a `{storage_adapter, opts}` tuple, a storage adapter module,
+  a map/struct with `:storage`, or a Jido instance module.
   """
   @spec hibernate(storage_config() | module() | struct(), agent()) :: :ok | {:error, term()}
-  def hibernate(storage_or_instance, agent)
-
-  def hibernate({adapter, opts}, agent) when is_atom(adapter) do
-    do_hibernate(adapter, opts, agent)
+  def hibernate(storage_or_instance, agent) do
+    with {:ok, {agent_module, key}} <- resolve_agent_identity(agent),
+         {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
+      do_hibernate(adapter, opts, agent_module, key, agent)
+    end
   end
 
-  def hibernate(%{storage: {adapter, opts}}, agent) do
-    do_hibernate(adapter, opts, agent)
-  end
+  @doc """
+  Persists an agent using an explicit `{agent_module, key}` identity.
 
-  def hibernate(jido_instance, agent) when is_atom(jido_instance) do
-    {adapter, opts} = jido_instance.__jido_storage__()
-    do_hibernate(adapter, opts, agent)
+  This is primarily used by keyed lifecycle managers that persist with pool keys.
+  """
+  @spec hibernate(storage_config() | module() | struct(), agent_module(), key(), agent()) ::
+          :ok | {:error, term()}
+  def hibernate(storage_or_instance, agent_module, key, agent) do
+    with {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
+      do_hibernate(adapter, opts, agent_module, key, agent)
+    end
   end
 
   @doc """
   Restores an agent from storage, rehydrating thread if present.
 
-  Accepts either a `{adapter, opts}` tuple or a struct with `:storage` field.
-
-  ## Examples
-
-      storage = {Jido.Storage.ETS, table: :agents}
-      {:ok, agent} = Jido.Persist.thaw(storage, MyAgent, "agent-123")
-
-  ## Returns
-
-  - `{:ok, agent}` - Successfully thawed
-  - `{:error, :not_found}` - No checkpoint exists for this key
-  - `{:error, :missing_thread}` - Checkpoint references thread that doesn't exist
-  - `{:error, :thread_mismatch}` - Loaded thread.rev != checkpoint thread.rev
-  - `{:error, reason}` - Other errors
+  Accepts a `{storage_adapter, opts}` tuple, a storage adapter module,
+  a map/struct with `:storage`, or a Jido instance module.
   """
   @spec thaw(storage_config() | module() | struct(), agent_module(), key()) ::
           {:ok, agent()} | {:error, term()}
-  def thaw(storage_or_instance, agent_module, key)
-
-  def thaw({adapter, opts}, agent_module, key) when is_atom(adapter) do
-    do_thaw(adapter, opts, agent_module, key)
-  end
-
-  def thaw(%{storage: {adapter, opts}}, agent_module, key) do
-    do_thaw(adapter, opts, agent_module, key)
-  end
-
-  def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
-    {adapter, opts} = jido_instance.__jido_storage__()
-    do_thaw(adapter, opts, agent_module, key)
+  def thaw(storage_or_instance, agent_module, key) do
+    with {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
+      do_thaw(adapter, opts, agent_module, key)
+    end
   end
 
   # --- Private Implementation ---
 
-  @spec do_hibernate(module(), keyword(), agent()) :: :ok | {:error, term()}
-  defp do_hibernate(adapter, opts, agent) do
-    agent_module = agent.__struct__
+  @spec do_hibernate(module(), keyword(), agent_module(), key(), agent()) ::
+          :ok | {:error, term()}
+  defp do_hibernate(adapter, opts, agent_module, key, agent) do
     thread = get_thread(agent)
 
-    Logger.debug("Persist.hibernate starting for #{inspect(agent_module)} id=#{agent.id}")
+    Logger.debug("Persist.hibernate starting for #{inspect(agent_module)} key=#{inspect(key)}")
 
     with :ok <- flush_journal(adapter, opts, thread),
          {:ok, checkpoint} <- create_checkpoint(agent_module, agent, thread),
-         checkpoint_key <- make_checkpoint_key(agent_module, agent.id),
+         checkpoint_key <- make_checkpoint_key(agent_module, key),
          :ok <- adapter.put_checkpoint(checkpoint_key, checkpoint, opts) do
-      Logger.debug("Persist.hibernate completed for #{inspect(agent_module)} id=#{agent.id}")
+      Logger.debug("Persist.hibernate completed for #{inspect(agent_module)} key=#{inspect(key)}")
       :ok
     else
       {:error, reason} = error ->
         Logger.error(
-          "Persist.hibernate failed for #{inspect(agent_module)} id=#{agent.id}: #{inspect(reason)}"
+          "Persist.hibernate failed for #{inspect(agent_module)} key=#{inspect(key)}: #{inspect(reason)}"
         )
 
         error
@@ -201,19 +162,124 @@ defmodule Jido.Persist do
   defp flush_journal(_adapter, _opts, %Thread{entries: []}), do: :ok
 
   defp flush_journal(adapter, opts, %Thread{} = thread) do
-    Logger.debug("Persist: flushing #{length(thread.entries)} entries for thread #{thread.id}")
+    with :ok <- validate_local_thread(thread),
+         {:ok, stored_rev} <- get_stored_thread_rev(adapter, opts, thread.id),
+         :ok <- append_missing_entries(adapter, opts, thread, stored_rev) do
+      :ok
+    end
+  end
 
-    case adapter.append_thread(thread.id, thread.entries, [{:expected_rev, 0} | opts]) do
-      {:ok, _updated_thread} ->
+  @spec validate_local_thread(Thread.t()) :: :ok | {:error, term()}
+  defp validate_local_thread(%Thread{} = thread) do
+    entry_count = length(thread.entries)
+
+    if thread.rev == entry_count do
+      :ok
+    else
+      Logger.error(
+        "Persist: invalid local thread revision for #{thread.id}: rev=#{thread.rev}, entries=#{entry_count}"
+      )
+
+      {:error, :invalid_thread_revision}
+    end
+  end
+
+  @spec get_stored_thread_rev(module(), keyword(), String.t()) ::
+          {:ok, non_neg_integer()} | {:error, term()}
+  defp get_stored_thread_rev(adapter, opts, thread_id) do
+    case Jido.Storage.fetch_thread(adapter, thread_id, opts) do
+      {:ok, %Thread{rev: stored_rev}} ->
+        {:ok, stored_rev}
+
+      {:error, :not_found} ->
+        {:ok, 0}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  @spec append_missing_entries(module(), keyword(), Thread.t(), non_neg_integer()) ::
+          :ok | {:error, term()}
+  defp append_missing_entries(adapter, opts, %Thread{} = thread, stored_rev) do
+    local_rev = thread.rev
+    entry_count = length(thread.entries)
+
+    cond do
+      stored_rev > local_rev ->
+        Logger.error(
+          "Persist: thread rev regression for #{thread.id}: local_rev=#{local_rev}, stored_rev=#{stored_rev}"
+        )
+
+        {:error, :thread_rev_regression}
+
+      stored_rev > entry_count ->
+        Logger.error(
+          "Persist: thread history truncated for #{thread.id}: entry_count=#{entry_count}, stored_rev=#{stored_rev}"
+        )
+
+        {:error, :thread_history_truncated}
+
+      stored_rev == local_rev ->
+        Logger.debug("Persist: thread #{thread.id} already persisted at rev=#{stored_rev}")
         :ok
 
-      {:error, :conflict} ->
-        Logger.debug("Persist: conflict on append, thread may already be persisted")
+      true ->
+        missing_entries = Enum.drop(thread.entries, stored_rev)
+
+        append_opts =
+          [{:expected_rev, stored_rev}]
+          |> maybe_put_thread_metadata(stored_rev, thread.metadata)
+          |> Kernel.++(opts)
+
+        Logger.debug(
+          "Persist: flushing #{length(missing_entries)} new entries for thread #{thread.id} from rev=#{stored_rev}"
+        )
+
+        case adapter.append_thread(thread.id, missing_entries, append_opts) do
+          {:ok, _updated_thread} ->
+            :ok
+
+          {:error, :conflict} ->
+            handle_thread_append_conflict(adapter, opts, thread.id, local_rev)
+
+          {:error, reason} = error ->
+            Logger.error(
+              "Persist: failed to flush journal for thread #{thread.id}: #{inspect(reason)}"
+            )
+
+            error
+        end
+    end
+  end
+
+  @spec maybe_put_thread_metadata(keyword(), non_neg_integer(), map()) :: keyword()
+  defp maybe_put_thread_metadata(opts, 0, metadata) when is_map(metadata),
+    do: [{:metadata, metadata} | opts]
+
+  defp maybe_put_thread_metadata(opts, _stored_rev, _metadata), do: opts
+
+  @spec handle_thread_append_conflict(module(), keyword(), String.t(), non_neg_integer()) ::
+          :ok | {:error, term()}
+  defp handle_thread_append_conflict(adapter, opts, thread_id, local_rev) do
+    case Jido.Storage.fetch_thread(adapter, thread_id, opts) do
+      {:ok, %Thread{rev: stored_rev}} when stored_rev >= local_rev ->
+        Logger.debug(
+          "Persist: append conflict resolved for #{thread_id}; stored_rev=#{stored_rev} >= local_rev=#{local_rev}"
+        )
+
         :ok
+
+      {:ok, %Thread{rev: stored_rev}} ->
+        Logger.error(
+          "Persist: append conflict for #{thread_id}; stored_rev=#{stored_rev}, local_rev=#{local_rev}"
+        )
+
+        {:error, :conflict}
 
       {:error, reason} = error ->
         Logger.error(
-          "Persist: failed to flush journal for thread #{thread.id}: #{inspect(reason)}"
+          "Persist: append conflict but failed to reload thread #{thread_id}: #{inspect(reason)}"
         )
 
         error
@@ -229,7 +295,7 @@ defmodule Jido.Persist do
       if function_exported?(agent_module, :checkpoint, 2) do
         agent_module.checkpoint(agent, ctx)
       else
-        {:ok, default_checkpoint(agent, thread)}
+        {:ok, default_checkpoint(agent_module, agent, thread)}
       end
 
     case result do
@@ -256,8 +322,8 @@ defmodule Jido.Persist do
     |> Map.put(:thread, thread_pointer)
   end
 
-  @spec default_checkpoint(agent(), Thread.t() | nil) :: checkpoint()
-  defp default_checkpoint(agent, thread) do
+  @spec default_checkpoint(agent_module(), agent(), Thread.t() | nil) :: checkpoint()
+  defp default_checkpoint(agent_module, agent, thread) do
     thread_pointer =
       case thread do
         nil -> nil
@@ -266,7 +332,7 @@ defmodule Jido.Persist do
 
     %{
       version: 1,
-      agent_module: agent.__struct__,
+      agent_module: agent_module,
       id: agent.id,
       state: Map.delete(agent.state, :__thread__),
       thread: thread_pointer
@@ -338,6 +404,45 @@ defmodule Jido.Persist do
         error
     end
   end
+
+  @spec resolve_storage(storage_config() | module() | struct()) ::
+          {:ok, storage_config()} | {:error, term()}
+  defp resolve_storage({adapter, opts}) when is_atom(adapter) and is_list(opts),
+    do: {:ok, {adapter, opts}}
+
+  defp resolve_storage(%{storage: storage}), do: resolve_storage(storage)
+
+  defp resolve_storage(storage) when is_atom(storage) do
+    cond do
+      function_exported?(storage, :__jido_storage__, 0) ->
+        {:ok, storage.__jido_storage__()}
+
+      function_exported?(storage, :get_checkpoint, 2) and
+        function_exported?(storage, :put_checkpoint, 3) and
+        function_exported?(storage, :load_thread, 2) and
+          function_exported?(storage, :append_thread, 3) ->
+        {:ok, {storage, []}}
+
+      true ->
+        {:error, :invalid_storage}
+    end
+  end
+
+  defp resolve_storage(_), do: {:error, :invalid_storage}
+
+  @spec resolve_agent_identity(agent()) :: {:ok, {agent_module(), key()}} | {:error, term()}
+  defp resolve_agent_identity(%{id: id} = agent) when not is_nil(id) do
+    agent_module =
+      case Map.get(agent, :agent_module) do
+        mod when is_atom(mod) -> mod
+        _ -> agent.__struct__
+      end
+
+    {:ok, {agent_module, id}}
+  end
+
+  defp resolve_agent_identity(%{id: nil}), do: {:error, :missing_agent_id}
+  defp resolve_agent_identity(_), do: {:error, :invalid_agent}
 
   @spec get_thread(agent()) :: Thread.t() | nil
   defp get_thread(%{state: %{__thread__: thread}}) when is_struct(thread, Thread), do: thread

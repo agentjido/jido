@@ -7,12 +7,21 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   @moduletag :integration
 
   alias Jido.Agent.InstanceManager
-  alias Jido.Agent.Store.ETS
   alias Jido.AgentServer
+  alias Jido.Storage.ETS
 
   # Use module attribute for manager naming to avoid atom leaks
   # Each test gets a unique integer suffix but we clean up persistent_term
   @manager_prefix "instance_manager_test"
+
+  defmodule StorageAwareJido do
+    use Jido, otp_app: :jido_test_instance_manager
+
+    def storage_table do
+      {_adapter, opts} = __jido_storage__()
+      Keyword.get(opts, :table, :jido_storage)
+    end
+  end
 
   # Simple test agent
   defmodule TestAgent do
@@ -25,28 +34,14 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       actions: []
   end
 
-  # Agent with custom dump/load
-  defmodule CustomSerializeAgent do
-    use Jido.Agent,
-      name: "custom_serialize_agent",
-      description: "Agent with custom serialization",
-      schema: [
-        data: [type: :map, default: %{}],
-        runtime_pid: [type: :any, default: nil]
-      ],
-      actions: []
-
-    def dump(agent, _ctx) do
-      # Strip runtime-only fields
-      {:ok, Map.drop(agent.state, [:runtime_pid])}
-    end
-
-    def load(dump, _ctx) do
-      # Restore with defaults
-      state = Map.put(dump, :runtime_pid, nil)
-      agent = CustomSerializeAgent.new(state: state)
-      {:ok, agent}
-    end
+  defp cleanup_storage_tables(table) do
+    Enum.each([:"#{table}_checkpoints", :"#{table}_threads", :"#{table}_thread_meta"], fn t ->
+      try do
+        :ets.delete(t)
+      rescue
+        _ -> :ok
+      end
+    end)
   end
 
   setup do
@@ -73,7 +68,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           InstanceManager.child_spec(
             name: manager_name,
             agent: TestAgent,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           )
         )
 
@@ -113,6 +109,15 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       assert state.agent.state.counter == 42
     end
+
+    test "manager-managed agents are not globally registered in Jido registry", %{
+      manager: manager
+    } do
+      {:ok, pid} = InstanceManager.get(manager, "registry-scope-key")
+
+      assert InstanceManager.lookup(manager, "registry-scope-key") == {:ok, pid}
+      assert Jido.whereis(JidoTest.InstanceManagerTestJido, "registry-scope-key") == nil
+    end
   end
 
   describe "stop/2" do
@@ -124,7 +129,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           InstanceManager.child_spec(
             name: manager_name,
             agent: TestAgent,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           )
         )
 
@@ -164,7 +170,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
             name: manager_name,
             agent: TestAgent,
             idle_timeout: 200,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           )
         )
 
@@ -235,7 +242,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           InstanceManager.child_spec(
             name: manager_name,
             agent: TestAgent,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           )
         )
 
@@ -258,7 +266,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     end
   end
 
-  describe "persistence with ETS store" do
+  describe "storage with ETS adapter" do
     setup do
       manager_name = :"#{@manager_prefix}_persist_#{:erlang.unique_integer([:positive])}"
       table_name = :"#{@manager_prefix}_cache_#{:erlang.unique_integer([:positive])}"
@@ -269,21 +277,14 @@ defmodule JidoTest.Agent.InstanceManagerTest do
             name: manager_name,
             agent: TestAgent,
             idle_timeout: 200,
-            persistence: [
-              store: {Jido.Agent.Store.ETS, table: table_name}
-            ],
+            storage: {ETS, table: table_name},
             agent_opts: [jido: JidoTest.InstanceManagerTestJido]
           )
         )
 
       on_exit(fn ->
         :persistent_term.erase({InstanceManager, manager_name})
-
-        try do
-          :ets.delete(table_name)
-        rescue
-          _ -> :ok
-        end
+        cleanup_storage_tables(table_name)
       end)
 
       {:ok, manager: manager_name, table: table_name}
@@ -343,9 +344,9 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 1000
 
       # Verify state was persisted to ETS
-      store_key = {TestAgent, "stop-persist-key"}
+      store_key = {TestAgent, {manager, "stop-persist-key"}}
 
-      case ETS.get(store_key, table: table) do
+      case ETS.get_checkpoint(store_key, table: table) do
         {:ok, persisted} ->
           # Persisted data should contain the counter
           assert persisted.state.counter == 42
@@ -353,6 +354,268 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         :not_found ->
           flunk("Agent state was not persisted on stop")
       end
+    end
+  end
+
+  describe "default storage from jido instance" do
+    setup do
+      manager_name = :"#{@manager_prefix}_jido_default_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} = start_supervised(StorageAwareJido)
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            idle_timeout: 200,
+            agent_opts: [jido: StorageAwareJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_name})
+        cleanup_storage_tables(StorageAwareJido.storage_table())
+      end)
+
+      {:ok, manager: manager_name}
+    end
+
+    @tag timeout: 5000
+    test "omitted storage uses jido instance storage", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "jido-default", initial_state: %{counter: 123})
+      ref = Process.monitor(pid1)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "jido-default")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, state2} = AgentServer.state(pid2)
+      assert state2.agent.state.counter == 123
+
+      :ok = AgentServer.detach(pid2)
+    end
+  end
+
+  describe "storage controls" do
+    test "legacy :persistence option raises actionable error" do
+      manager_name =
+        :"#{@manager_prefix}_legacy_persistence_#{:erlang.unique_integer([:positive])}"
+
+      assert_raise RuntimeError, ~r/no longer supports :persistence; use :storage/, fn ->
+        start_supervised!(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            persistence: {ETS, table: :legacy_persistence_should_fail},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+      end
+    end
+
+    test "storage: nil disables restore" do
+      manager_name = :"#{@manager_prefix}_no_storage_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: nil,
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+
+      on_exit(fn -> :persistent_term.erase({InstanceManager, manager_name}) end)
+
+      {:ok, pid1} = InstanceManager.get(manager_name, "no-storage", initial_state: %{counter: 77})
+      ref = Process.monitor(pid1)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, pid2} = InstanceManager.get(manager_name, "no-storage")
+      {:ok, state2} = AgentServer.state(pid2)
+      assert state2.agent.state.counter == 0
+    end
+
+    test "explicit storage overrides jido default storage" do
+      manager_name = :"#{@manager_prefix}_override_#{:erlang.unique_integer([:positive])}"
+      override_table = :"#{@manager_prefix}_override_table_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} = start_supervised(StorageAwareJido)
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: override_table},
+            agent_opts: [jido: StorageAwareJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_name})
+        cleanup_storage_tables(override_table)
+        cleanup_storage_tables(StorageAwareJido.storage_table())
+      end)
+
+      {:ok, _pid} =
+        InstanceManager.get(manager_name, "override-key", initial_state: %{counter: 41})
+
+      :ok = InstanceManager.stop(manager_name, "override-key")
+
+      store_key = {TestAgent, {manager_name, "override-key"}}
+
+      assert {:ok, _} = ETS.get_checkpoint(store_key, table: override_table)
+      assert :not_found = ETS.get_checkpoint(store_key, table: StorageAwareJido.storage_table())
+    end
+
+    @tag timeout: 5000
+    test "non-binary pool key round-trips persisted state" do
+      manager_name = :"#{@manager_prefix}_tuple_key_#{:erlang.unique_integer([:positive])}"
+      table_name = :"#{@manager_prefix}_tuple_table_#{:erlang.unique_integer([:positive])}"
+      pool_key = {:user, 42}
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_name})
+        cleanup_storage_tables(table_name)
+      end)
+
+      {:ok, pid1} = InstanceManager.get(manager_name, pool_key, initial_state: %{counter: 55})
+      ref = Process.monitor(pid1)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager_name, pool_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, state2} = AgentServer.state(pid2)
+      assert state2.agent.state.counter == 55
+      assert String.starts_with?(state2.agent.id, "key_")
+
+      :ok = AgentServer.detach(pid2)
+    end
+
+    @tag timeout: 5000
+    test "manager name namespaces persistence keys to prevent cross-manager collisions" do
+      table_name = :"#{@manager_prefix}_shared_table_#{:erlang.unique_integer([:positive])}"
+      manager_a = :"#{@manager_prefix}_ns_a_#{:erlang.unique_integer([:positive])}"
+      manager_b = :"#{@manager_prefix}_ns_b_#{:erlang.unique_integer([:positive])}"
+      shared_key = "shared-user-key"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_a,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          ),
+          id: :namespaced_manager_a
+        )
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_b,
+            agent: TestAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          ),
+          id: :namespaced_manager_b
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_a})
+        :persistent_term.erase({InstanceManager, manager_b})
+        cleanup_storage_tables(table_name)
+      end)
+
+      {:ok, pid_a1} = InstanceManager.get(manager_a, shared_key, initial_state: %{counter: 11})
+      {:ok, pid_b1} = InstanceManager.get(manager_b, shared_key, initial_state: %{counter: 22})
+
+      ref_a = Process.monitor(pid_a1)
+      ref_b = Process.monitor(pid_b1)
+
+      assert_receive {:DOWN, ^ref_a, :process, ^pid_a1, {:shutdown, :idle_timeout}}, 1000
+      assert_receive {:DOWN, ^ref_b, :process, ^pid_b1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, _checkpoint_a} =
+        ETS.get_checkpoint({TestAgent, {manager_a, shared_key}}, table: table_name)
+
+      {:ok, _checkpoint_b} =
+        ETS.get_checkpoint({TestAgent, {manager_b, shared_key}}, table: table_name)
+
+      {:ok, pid_a2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager_a, shared_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, pid_b2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager_b, shared_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, state_a2} = AgentServer.state(pid_a2)
+      {:ok, state_b2} = AgentServer.state(pid_b2)
+
+      assert state_a2.agent.state.counter == 11
+      assert state_b2.agent.state.counter == 22
+
+      :ok = AgentServer.detach(pid_a2)
+      :ok = AgentServer.detach(pid_b2)
     end
   end
 
@@ -366,7 +629,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           InstanceManager.child_spec(
             name: manager_a,
             agent: TestAgent,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           ),
           id: :manager_a
         )
@@ -376,7 +640,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           InstanceManager.child_spec(
             name: manager_b,
             agent: TestAgent,
-            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
           ),
           id: :manager_b
         )

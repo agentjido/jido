@@ -17,7 +17,6 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
   @moduletag :example
   @moduletag timeout: 15_000
 
-  alias Jido.Agent
   alias Jido.Persist
   alias Jido.Storage.ETS
   alias Jido.Thread
@@ -63,7 +62,7 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
       agent = %{agent | state: %{agent.state | counter: 10, status: :active}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "identity-1")
+      {:ok, restored} = Persist.thaw(storage(table), FullAgent, "identity-1")
 
       assert IdentityAgent.has_identity?(restored)
       assert restored.state.__identity__.profile[:age] == 5
@@ -87,7 +86,7 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
       agent = %{agent | state: %{agent.state | counter: 5}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "memory-1")
+      {:ok, restored} = Persist.thaw(storage(table), FullAgent, "memory-1")
 
       assert MemoryAgent.has_memory?(restored)
       assert MemoryAgent.get_in_space(restored, :world, :temperature) == 22
@@ -117,7 +116,7 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
       agent = %{agent | state: %{agent.state | counter: 42, status: :processing}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "all-plugins-1")
+      {:ok, restored} = Persist.thaw(storage(table), FullAgent, "all-plugins-1")
 
       # Identity preserved
       assert IdentityAgent.has_identity?(restored)
@@ -150,7 +149,7 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
       agent = %{agent | state: %{agent.state | counter: 7}}
 
       :ok = Persist.hibernate(storage(table), agent)
-      {:ok, restored} = Persist.thaw(storage(table), Agent, "no-plugins-1")
+      {:ok, restored} = Persist.thaw(storage(table), FullAgent, "no-plugins-1")
 
       assert restored.state.counter == 7
       refute IdentityAgent.has_identity?(restored)
