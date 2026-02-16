@@ -2,6 +2,47 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
+## 2.0.0-rc.5 - 2026-02-16
+
+### Added
+- Observability V2: per-instance debug & telemetry configuration (#129)
+- Always-on `emit_event` helper for lifecycle observability (#141)
+- Event contracts and lifecycle observability docs (#140)
+- Directive struct included in agent_server telemetry metadata (#134, #142)
+- `RunInstruction` directive and pure FSM cmd (#139)
+- Prevent synchronous signal-call blocking in AgentServer (#150)
+- Declarative schedules DSL for cron (#137)
+
+### Changed
+- **BREAKING**: Unify persistence on `Jido.Persist` and `Jido.Storage` (#156)
+- Centralize defaults and validate observability config
+- Harden InstanceManager registry and key semantics (#156)
+- Share instruction tracking helpers in strategy layer (#166)
+- Use shared templates in Igniter generator tasks (#165)
+- Unify entry normalization across storage adapters (#164)
+- Extract shared signal collector test helper (#167)
+
+### Fixed
+- Normalize timeout diagnostics in `await_all`/`await_any` (#168)
+- Cancel timed-out completion waiters in AgentServer (#162)
+- Preserve file read errors during append (#163)
+- Return normalized errors for corrupt entry logs (#161)
+- Avoid atom creation from persisted journal kinds (#160)
+- Restore agent metadata export for discovery (#159)
+- Return routing error struct for unknown signals (#155)
+- Normalize refinement errors for Zoi validation in plugins
+- Make ETS `append_thread` atomic and revision-safe (#150)
+- Send `jido.agent.stop` when stopping child (#138)
+- Normalize id in both constructor paths to guarantee UUID7 (#132)
+- Fix silent cron tick failure (#137)
+- Normalize util and storage-facing error contracts (#153)
+- Offload runtime dispatch from sensor process (#152)
+
+### Dependencies
+- Bump `jido_action` and `jido_signal` to 2.0.0-rc.5
+
+---
+
 ## 2.0.0-rc.4 - 2026-02-06
 
 ### Added

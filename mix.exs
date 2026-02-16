@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.0.0-rc.4"
+  @version "2.0.0-rc.5"
 
   def vsn do
     @version
@@ -369,8 +369,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.0.0-rc.4"},
-      {:jido_signal, "~> 2.0.0-rc.4"},
+      {:jido_action, "~> 2.0.0-rc.5"},
+      {:jido_signal, "~> 2.0.0-rc.5"},
 
       # Jido Deps
       {:deep_merge, "~> 1.0"},
