@@ -21,6 +21,7 @@ if Code.ensure_loaded?(Igniter) do
 
     alias Igniter.Project.Module, as: IgniterModule
     alias Jido.Igniter.Helpers
+    alias Jido.Igniter.Templates
 
     @impl Igniter.Mix.Task
     def info(_argv, _composing_task) do
@@ -47,57 +48,12 @@ if Code.ensure_loaded?(Igniter) do
       name = Helpers.module_to_name(module_name)
       interval = options[:interval]
 
-      contents = """
-      defmodule #{inspect(module)} do
-        use Jido.Sensor,
-          name: "#{name}",
-          description: "TODO: Add description",
-          schema: Zoi.object(%{
-            interval: Zoi.integer() |> Zoi.default(#{interval})
-          })
-
-        @impl true
-        def init(config, _context) do
-          interval = config[:interval] || #{interval}
-          {:ok, %{interval: interval}, [{:schedule, interval}]}
-        end
-
-        @impl true
-        def handle_event(:poll, state) do
-          # TODO: Implement polling logic
-          {:ok, state, []}
-        end
-      end
-      """
+      contents = Templates.sensor_template(inspect(module), name, interval)
 
       test_module_name = "JidoTest.#{module_name |> String.replace(~r/^.*?\./, "")}"
       test_module = IgniterModule.parse(test_module_name)
 
-      sensor_alias = module |> Module.split() |> List.last()
-
-      test_contents = """
-      defmodule #{inspect(test_module)} do
-        use ExUnit.Case, async: true
-
-        alias #{inspect(module)}
-
-        describe "init/2" do
-          test "initializes with default interval" do
-            assert {:ok, state, directives} = #{sensor_alias}.init(%{}, %{})
-            assert is_map(state)
-            assert is_list(directives)
-          end
-        end
-
-        describe "handle_event/2" do
-          test "handles poll event" do
-            {:ok, state, _} = #{sensor_alias}.init(%{}, %{})
-            assert {:ok, _state, signals} = #{sensor_alias}.handle_event(:poll, state)
-            assert is_list(signals)
-          end
-        end
-      end
-      """
+      test_contents = Templates.sensor_test_template(inspect(module), inspect(test_module))
 
       igniter
       |> IgniterModule.create_module(module, contents)

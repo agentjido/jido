@@ -21,6 +21,7 @@ if Code.ensure_loaded?(Igniter) do
 
     alias Igniter.Project.Module, as: IgniterModule
     alias Jido.Igniter.Helpers
+    alias Jido.Igniter.Templates
 
     @impl Igniter.Mix.Task
     def info(_argv, _composing_task) do
@@ -49,50 +50,12 @@ if Code.ensure_loaded?(Igniter) do
 
       signal_patterns = Helpers.parse_list(options[:signals])
 
-      patterns_str = Enum.map_join(signal_patterns, ", ", &~s("#{&1}"))
-
-      contents = """
-      defmodule #{inspect(module)} do
-        use Jido.Plugin,
-          name: "#{name}",
-          state_key: :#{state_key},
-          actions: [],
-          schema: Zoi.object(%{}),
-          signal_patterns: [#{patterns_str}]
-
-        @impl Jido.Plugin
-        def signal_routes(_config) do
-          []
-        end
-      end
-      """
+      contents = Templates.plugin_template(inspect(module), name, state_key, signal_patterns)
 
       test_module_name = "JidoTest.#{module_name |> String.replace(~r/^.*?\./, "")}"
       test_module = IgniterModule.parse(test_module_name)
 
-      plugin_alias = module |> Module.split() |> List.last()
-
-      test_contents = """
-      defmodule #{inspect(test_module)} do
-        use ExUnit.Case, async: true
-
-        alias #{inspect(module)}
-
-        describe "plugin_spec/1" do
-          test "returns plugin specification" do
-            spec = #{plugin_alias}.plugin_spec(%{})
-            assert spec.module == #{plugin_alias}
-            assert spec.name == #{plugin_alias}.name()
-          end
-        end
-
-        describe "mount/2" do
-          test "returns default state" do
-            assert {:ok, %{}} = #{plugin_alias}.mount(nil, %{})
-          end
-        end
-      end
-      """
+      test_contents = Templates.plugin_test_template(inspect(module), inspect(test_module))
 
       igniter
       |> IgniterModule.create_module(module, contents)
