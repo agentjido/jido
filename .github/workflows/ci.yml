@@ -14,6 +14,7 @@ jobs:
   lint:
     name: Lint
     uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@main
+    secrets: inherit
 
   test:
     name: Test
