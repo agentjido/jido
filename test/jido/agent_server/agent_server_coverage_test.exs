@@ -375,6 +375,25 @@ defmodule JidoTest.AgentServerCoverageTest do
 
       GenServer.stop(pid)
     end
+
+    test "timeout cleanup prevents completion_waiters growth", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: CompletionAgent, jido: jido)
+
+      for _ <- 1..3 do
+        assert {:error, {:timeout, _diagnostic}} =
+                 AgentServer.await_completion(pid, timeout: 10)
+      end
+
+      eventually(
+        fn ->
+          {:ok, state} = AgentServer.state(pid)
+          map_size(state.completion_waiters) == 0
+        end,
+        timeout: 500
+      )
+
+      GenServer.stop(pid)
+    end
   end
 
   describe "invalid signal handling" do

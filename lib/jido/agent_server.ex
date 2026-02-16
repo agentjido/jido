@@ -350,12 +350,16 @@ defmodule Jido.AgentServer do
   @spec await_completion(server(), keyword()) :: {:ok, map()} | {:error, term()}
   def await_completion(server, opts \\ []) do
     timeout = Keyword.get(opts, :timeout, Defaults.agent_server_await_timeout_ms())
+    waiter_id = make_ref()
+    opts = Keyword.put(opts, :waiter_id, waiter_id)
 
     with {:ok, pid} <- resolve_server(server) do
       try do
         GenServer.call(pid, {:await_completion, opts}, timeout)
       catch
         :exit, {:timeout, _} ->
+          GenServer.cast(pid, {:cancel_await_completion, waiter_id})
+
           case status(server) do
             {:ok, s} -> {:error, {:timeout, build_timeout_diagnostic(s, timeout)}}
             _ -> {:error, :timeout}
@@ -777,6 +781,7 @@ defmodule Jido.AgentServer do
     status_path = Keyword.get(opts, :status_path, [:status])
     result_path = Keyword.get(opts, :result_path, [:last_answer])
     error_path = Keyword.get(opts, :error_path, [:error])
+    waiter_id = Keyword.get(opts, :waiter_id)
 
     case completion_from_agent_state(state.agent.state, status_path, result_path, error_path) do
       {:ok, result} ->
@@ -789,6 +794,7 @@ defmodule Jido.AgentServer do
         waiter = %{
           from: from,
           monitor_ref: monitor_ref,
+          waiter_id: waiter_id,
           status_path: status_path,
           result_path: result_path,
           error_path: error_path
@@ -823,6 +829,20 @@ defmodule Jido.AgentServer do
       {:cont, new_state} -> {:noreply, new_state}
       {:stop, reason, new_state} -> {:stop, reason, new_state}
     end
+  end
+
+  def handle_cast({:cancel_await_completion, waiter_id}, %State{} = state) do
+    remaining_waiters =
+      Enum.reduce(state.completion_waiters, %{}, fn {monitor_ref, waiter}, acc ->
+        if waiter.waiter_id == waiter_id do
+          Process.demonitor(waiter.monitor_ref, [:flush])
+          acc
+        else
+          Map.put(acc, monitor_ref, waiter)
+        end
+      end)
+
+    {:noreply, %{state | completion_waiters: remaining_waiters}}
   end
 
   def handle_cast({:signal, %Signal{} = signal}, state) do
