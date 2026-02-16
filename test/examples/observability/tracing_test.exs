@@ -26,46 +26,7 @@ defmodule JidoExampleTest.TracingTest do
   alias Jido.AgentServer
   alias Jido.Signal
   alias Jido.Tracing.Trace
-
-  # ===========================================================================
-  # SIGNAL COLLECTOR: Captures emitted signals with trace data
-  # ===========================================================================
-
-  defmodule TracedSignalCollector do
-    @moduledoc false
-    use GenServer
-
-    def start_link(opts \\ []) do
-      GenServer.start_link(__MODULE__, [], opts)
-    end
-
-    def get_signals(pid) do
-      GenServer.call(pid, :get_signals)
-    end
-
-    def clear(pid) do
-      GenServer.call(pid, :clear)
-    end
-
-    @impl true
-    def init(_opts) do
-      {:ok, []}
-    end
-
-    @impl true
-    def handle_info({:signal, signal}, signals) do
-      {:noreply, [signal | signals]}
-    end
-
-    @impl true
-    def handle_call(:get_signals, _from, signals) do
-      {:reply, Enum.reverse(signals), signals}
-    end
-
-    def handle_call(:clear, _from, _signals) do
-      {:reply, :ok, []}
-    end
-  end
+  alias JidoTest.SignalCollector
 
   # ===========================================================================
   # ACTIONS: Emit signals to demonstrate trace propagation
@@ -163,7 +124,7 @@ defmodule JidoExampleTest.TracingTest do
 
   describe "automatic trace attachment" do
     test "AgentServer attaches trace data to incoming signals", %{jido: jido} do
-      {:ok, collector} = TracedSignalCollector.start_link()
+      {:ok, collector} = SignalCollector.start_link()
       on_exit(fn -> if Process.alive?(collector), do: GenServer.stop(collector) end)
 
       {:ok, pid} =
@@ -179,11 +140,11 @@ defmodule JidoExampleTest.TracingTest do
       {:ok, _agent} = AgentServer.call(pid, signal)
 
       eventually(fn ->
-        signals = TracedSignalCollector.get_signals(collector)
+        signals = SignalCollector.get_signals(collector)
         signals != []
       end)
 
-      [emitted] = TracedSignalCollector.get_signals(collector)
+      [emitted] = SignalCollector.get_signals(collector)
       trace = Trace.get(emitted)
 
       assert trace != nil
@@ -194,7 +155,7 @@ defmodule JidoExampleTest.TracingTest do
 
   describe "trace propagation across signal chains" do
     test "emitted signals share trace_id with input signal", %{jido: jido} do
-      {:ok, collector} = TracedSignalCollector.start_link()
+      {:ok, collector} = SignalCollector.start_link()
       on_exit(fn -> if Process.alive?(collector), do: GenServer.stop(collector) end)
 
       {:ok, pid} =
@@ -213,11 +174,11 @@ defmodule JidoExampleTest.TracingTest do
       {:ok, _} = AgentServer.call(pid, signal3)
 
       eventually(fn ->
-        signals = TracedSignalCollector.get_signals(collector)
+        signals = SignalCollector.get_signals(collector)
         match?([_, _, _ | _], signals)
       end)
 
-      signals = TracedSignalCollector.get_signals(collector)
+      signals = SignalCollector.get_signals(collector)
       traces = Enum.map(signals, &Trace.get/1)
 
       assert length(traces) == 3
@@ -234,7 +195,7 @@ defmodule JidoExampleTest.TracingTest do
     end
 
     test "single request flow maintains same trace_id across emissions", %{jido: jido} do
-      {:ok, collector} = TracedSignalCollector.start_link()
+      {:ok, collector} = SignalCollector.start_link()
       on_exit(fn -> if Process.alive?(collector), do: GenServer.stop(collector) end)
 
       {:ok, pid} =
@@ -250,11 +211,11 @@ defmodule JidoExampleTest.TracingTest do
       {:ok, _} = AgentServer.call(pid, traced_signal)
 
       eventually(fn ->
-        signals = TracedSignalCollector.get_signals(collector)
+        signals = SignalCollector.get_signals(collector)
         signals != []
       end)
 
-      [emitted] = TracedSignalCollector.get_signals(collector)
+      [emitted] = SignalCollector.get_signals(collector)
       emitted_trace = Trace.get(emitted)
 
       assert emitted_trace.trace_id == root_trace.trace_id
@@ -267,7 +228,7 @@ defmodule JidoExampleTest.TracingTest do
 
   describe "trace data inspection" do
     test "trace data can be extracted for logging/debugging", %{jido: jido} do
-      {:ok, collector} = TracedSignalCollector.start_link()
+      {:ok, collector} = SignalCollector.start_link()
       on_exit(fn -> if Process.alive?(collector), do: GenServer.stop(collector) end)
 
       {:ok, pid} =
@@ -280,11 +241,11 @@ defmodule JidoExampleTest.TracingTest do
       {:ok, _} = AgentServer.call(pid, signal)
 
       eventually(fn ->
-        signals = TracedSignalCollector.get_signals(collector)
+        signals = SignalCollector.get_signals(collector)
         signals != []
       end)
 
-      [emitted] = TracedSignalCollector.get_signals(collector)
+      [emitted] = SignalCollector.get_signals(collector)
 
       trace = Trace.get(emitted)
       assert trace.trace_id =~ ~r/^[0-9a-f-]{36}$/

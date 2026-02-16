@@ -59,6 +59,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
   alias Jido.AgentServer
   alias Jido.Signal
   alias Jido.Tracing.Trace
+  alias JidoTest.SignalCollector
 
   # ===========================================================================
   # LAYER 3: WORKER ACTIONS
@@ -406,32 +407,6 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
   end
 
   # ===========================================================================
-  # SIGNAL COLLECTOR: For trace verification
-  # ===========================================================================
-
-  defmodule HierarchySignalCollector do
-    @moduledoc false
-    use GenServer
-
-    def start_link(opts \\ []) do
-      GenServer.start_link(__MODULE__, [], opts)
-    end
-
-    def get_signals(pid), do: GenServer.call(pid, :get_signals)
-    def clear(pid), do: GenServer.call(pid, :clear)
-
-    @impl true
-    def init(_), do: {:ok, []}
-
-    @impl true
-    def handle_info({:signal, signal}, signals), do: {:noreply, [signal | signals]}
-
-    @impl true
-    def handle_call(:get_signals, _from, signals), do: {:reply, Enum.reverse(signals), signals}
-    def handle_call(:clear, _from, _signals), do: {:reply, :ok, []}
-  end
-
-  # ===========================================================================
   # TESTS
   # ===========================================================================
 
@@ -580,7 +555,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
 
   describe "trace propagation through hierarchy" do
     test "trace_id preserved from orchestrator to worker", %{jido: jido} do
-      {:ok, collector} = HierarchySignalCollector.start_link()
+      {:ok, collector} = SignalCollector.start_link()
       on_exit(fn -> if Process.alive?(collector), do: GenServer.stop(collector) end)
 
       {:ok, orchestrator_pid} =
