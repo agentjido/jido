@@ -308,8 +308,7 @@ defmodule Jido.Storage.File do
       {:ok, rev, entries, created_at, metadata}
     else
       {:error, :enoent} -> :not_found
-      {:error, :invalid_entries_log} -> {:error, :invalid_entries_log}
-      {:error, _reason} -> :not_found
+      {:error, reason} -> {:error, reason}
     end
   end
 
