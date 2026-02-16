@@ -150,6 +150,27 @@ defmodule Jido.Thread.Store.Adapters.JournalBackedTest do
       loaded_kinds = loaded |> Thread.to_list() |> Enum.map(& &1.kind)
       assert loaded_kinds == kinds
     end
+
+    test "does not create atoms from unknown string kinds" do
+      {:ok, store} = Store.new(JournalBacked)
+      unknown_kind = "dynamic_kind_#{System.unique_integer([:positive])}"
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unknown_kind)
+      end
+
+      {:ok, store, _thread} =
+        Store.append(store, "string-kind-test", %{kind: unknown_kind, payload: %{ok: true}})
+
+      {:ok, _store, loaded} = Store.load(store, "string-kind-test")
+
+      [entry] = Thread.to_list(loaded)
+      assert entry.kind == :unknown
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unknown_kind)
+      end
+    end
   end
 
   describe "multiple threads" do

@@ -189,7 +189,7 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   defp to_atom(string) when is_binary(string) do
     String.to_existing_atom(string)
   rescue
-    ArgumentError -> String.to_atom(string)
+    ArgumentError -> :unknown
   end
 
   defp to_atom(_), do: :unknown
