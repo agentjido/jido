@@ -65,6 +65,7 @@ defmodule Jido.Agent.Strategy.FSM do
   alias Jido.Agent
   alias Jido.Agent.Directive
   alias Jido.Agent.StateOps
+  alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.Error
   alias Jido.Instruction
@@ -236,7 +237,7 @@ defmodule Jido.Agent.Strategy.FSM do
   defp dispatch_next_instruction(agent, state) do
     case Map.get(state, :pending_instructions, []) do
       [next_instruction | rest] ->
-        agent = maybe_append_instruction_start(agent, next_instruction)
+        agent = InstructionTracking.maybe_append_instruction_start(agent, next_instruction)
 
         directives = [
           Directive.run_instruction(next_instruction,
@@ -291,7 +292,12 @@ defmodule Jido.Agent.Strategy.FSM do
     {agent, machine, new_directives, status} =
       apply_instruction_result(agent, machine, result_payload)
 
-    agent = maybe_append_instruction_end(agent, Map.get(state, :current_instruction), status)
+    agent =
+      InstructionTracking.maybe_append_instruction_end(
+        agent,
+        Map.get(state, :current_instruction),
+        status
+      )
 
     deferred_directives = Map.get(state, :deferred_directives, []) ++ new_directives
 
@@ -344,59 +350,6 @@ defmodule Jido.Agent.Strategy.FSM do
     machine = %{machine | error: payload}
     error = Error.execution_error("Invalid instruction execution payload", %{payload: payload})
     {agent, machine, [%Directive.Error{error: error, context: :instruction}], :error}
-  end
-
-  defp append_instruction_start(agent, %Instruction{} = instruction) do
-    entry = %{
-      kind: :instruction_start,
-      payload: instruction_payload(instruction)
-    }
-
-    ThreadAgent.append(agent, entry)
-  end
-
-  defp append_instruction_end(agent, %Instruction{} = instruction, status) do
-    entry = %{
-      kind: :instruction_end,
-      payload: Map.put(instruction_payload(instruction), :status, status)
-    }
-
-    ThreadAgent.append(agent, entry)
-  end
-
-  defp maybe_append_instruction_start(agent, %Instruction{} = instruction) do
-    if ThreadAgent.has_thread?(agent) do
-      append_instruction_start(agent, instruction)
-    else
-      agent
-    end
-  end
-
-  defp maybe_append_instruction_end(agent, nil, _status), do: agent
-
-  defp maybe_append_instruction_end(agent, %Instruction{} = instruction, status) do
-    if ThreadAgent.has_thread?(agent) do
-      append_instruction_end(agent, instruction, status)
-    else
-      agent
-    end
-  end
-
-  defp instruction_payload(%Instruction{} = instruction) do
-    payload = %{action: instruction.action}
-
-    payload =
-      if is_map(instruction.params) and map_size(instruction.params) > 0 do
-        Map.put(payload, :param_keys, Map.keys(instruction.params))
-      else
-        payload
-      end
-
-    if instruction.id do
-      Map.put(payload, :instruction_id, instruction.id)
-    else
-      payload
-    end
   end
 
   @impl true
