@@ -6,13 +6,22 @@ defmodule Jido.Igniter.Templates do
   Returns the template for an Agent module.
   """
   @spec agent_template(module :: String.t(), name :: String.t()) :: String.t()
-  def agent_template(module, name) do
+  def agent_template(module, name), do: agent_template(module, name, plugins: [])
+
+  @doc """
+  Returns the template for an Agent module with optional plugin attachments.
+  """
+  @spec agent_template(module :: String.t(), name :: String.t(), opts :: keyword()) :: String.t()
+  def agent_template(module, name, opts) do
+    plugins = Keyword.get(opts, :plugins, [])
+    plugins_opt = format_plugins_option(plugins)
+
     """
     defmodule #{module} do
       use Jido.Agent,
         name: "#{name}",
         description: "TODO: Add description",
-        schema: []
+        schema: []#{plugins_opt}
     end
     """
   end
@@ -22,6 +31,8 @@ defmodule Jido.Igniter.Templates do
   """
   @spec agent_test_template(module :: String.t(), test_module :: String.t()) :: String.t()
   def agent_test_template(module, test_module) do
+    alias_name = module_alias(module)
+
     """
     defmodule #{test_module} do
       use ExUnit.Case, async: true
@@ -30,12 +41,12 @@ defmodule Jido.Igniter.Templates do
 
       describe "new/1" do
         test "creates agent with default state" do
-          agent = #{module |> String.split(".") |> List.last()}.new()
-          assert agent.name == #{module |> String.split(".") |> List.last()}.name()
+          agent = #{alias_name}.new()
+          assert agent.name == #{alias_name}.name()
         end
 
         test "creates agent with custom id" do
-          agent = #{module |> String.split(".") |> List.last()}.new(id: "custom-id")
+          agent = #{alias_name}.new(id: "custom-id")
           assert agent.id == "custom-id"
         end
       end
@@ -77,7 +88,7 @@ defmodule Jido.Igniter.Templates do
   """
   @spec plugin_test_template(module :: String.t(), test_module :: String.t()) :: String.t()
   def plugin_test_template(module, test_module) do
-    alias_name = module |> String.split(".") |> List.last()
+    alias_name = module_alias(module)
 
     """
     defmodule #{test_module} do
@@ -119,7 +130,8 @@ defmodule Jido.Igniter.Templates do
 
       @impl true
       def init(config, _context) do
-        {:ok, %{interval: config[:interval] || #{interval}}, [{:schedule, config[:interval] || #{interval}}]}
+        interval = config[:interval] || #{interval}
+        {:ok, %{interval: interval}, [{:schedule, interval}]}
       end
 
       @impl true
@@ -136,7 +148,7 @@ defmodule Jido.Igniter.Templates do
   """
   @spec sensor_test_template(module :: String.t(), test_module :: String.t()) :: String.t()
   def sensor_test_template(module, test_module) do
-    alias_name = module |> String.split(".") |> List.last()
+    alias_name = module_alias(module)
 
     """
     defmodule #{test_module} do
@@ -161,5 +173,18 @@ defmodule Jido.Igniter.Templates do
       end
     end
     """
+  end
+
+  defp format_plugins_option([]), do: ""
+
+  defp format_plugins_option(plugins) do
+    plugins_str = Enum.map_join(plugins, ", ", &inspect/1)
+    ",\n    plugins: [#{plugins_str}]"
+  end
+
+  defp module_alias(module) do
+    module
+    |> String.split(".")
+    |> List.last()
   end
 end

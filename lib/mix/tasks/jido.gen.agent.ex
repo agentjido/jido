@@ -21,6 +21,7 @@ if Code.ensure_loaded?(Igniter) do
 
     alias Igniter.Project.Module, as: IgniterModule
     alias Jido.Igniter.Helpers
+    alias Jido.Igniter.Templates
 
     @impl Igniter.Mix.Task
     def info(_argv, _composing_task) do
@@ -51,47 +52,12 @@ if Code.ensure_loaded?(Igniter) do
         |> Helpers.parse_list()
         |> Enum.map(&String.to_atom/1)
 
-      plugins_opt =
-        if Enum.empty?(plugins) do
-          ""
-        else
-          plugins_str = Enum.map_join(plugins, ", ", &inspect/1)
-          ",\n    plugins: [#{plugins_str}]"
-        end
-
-      contents = """
-      defmodule #{inspect(module)} do
-        use Jido.Agent,
-          name: "#{name}",
-          description: "TODO: Add description",
-          schema: []#{plugins_opt}
-      end
-      """
+      contents = Templates.agent_template(inspect(module), name, plugins: plugins)
 
       test_module_name = "JidoTest.#{module_name |> String.replace(~r/^.*?\./, "")}"
       test_module = IgniterModule.parse(test_module_name)
 
-      agent_alias = module |> Module.split() |> List.last()
-
-      test_contents = """
-      defmodule #{inspect(test_module)} do
-        use ExUnit.Case, async: true
-
-        alias #{inspect(module)}
-
-        describe "new/1" do
-          test "creates agent with default state" do
-            agent = #{agent_alias}.new()
-            assert agent.name == #{agent_alias}.name()
-          end
-
-          test "creates agent with custom id" do
-            agent = #{agent_alias}.new(id: "custom-id")
-            assert agent.id == "custom-id"
-          end
-        end
-      end
-      """
+      test_contents = Templates.agent_test_template(inspect(module), inspect(test_module))
 
       igniter
       |> IgniterModule.create_module(module, contents)
