@@ -30,6 +30,7 @@ defmodule Jido.Storage.ETS do
 
   alias Jido.Thread
   alias Jido.Thread.Entry
+  alias Jido.Thread.EntryNormalizer
 
   @default_table :jido_storage
 
@@ -150,12 +151,7 @@ defmodule Jido.Storage.ETS do
       is_new = current_rev == 0
 
       prepared_entries =
-        entries
-        |> Enum.with_index()
-        |> Enum.map(fn {entry, idx} ->
-          seq = base_seq + idx
-          prepare_entry(entry, seq, now)
-        end)
+        EntryNormalizer.normalize_many(entries, base_seq, now)
 
       ets_entries =
         Enum.map(prepared_entries, fn entry ->
@@ -275,35 +271,6 @@ defmodule Jido.Storage.ETS do
     end
   end
 
-  defp prepare_entry(%Entry{} = entry, seq, now) do
-    %Entry{
-      id: entry.id || generate_entry_id(),
-      seq: seq,
-      at: entry.at || now,
-      kind: entry.kind,
-      payload: entry.payload,
-      refs: entry.refs
-    }
-  end
-
-  defp prepare_entry(attrs, seq, now) when is_map(attrs) do
-    %Entry{
-      id: fetch_entry_attr(attrs, :id, &generate_entry_id/0),
-      seq: seq,
-      at: fetch_entry_attr(attrs, :at, fn -> now end),
-      kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
-      payload: fetch_entry_attr(attrs, :payload, fn -> %{} end),
-      refs: fetch_entry_attr(attrs, :refs, fn -> %{} end)
-    }
-  end
-
-  defp fetch_entry_attr(attrs, key, default_fun) when is_function(default_fun, 0) do
-    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
-      nil -> default_fun.()
-      value -> value
-    end
-  end
-
   defp reconstruct_thread(thread_id, entries, meta) do
     entry_count = length(entries)
 
@@ -316,9 +283,5 @@ defmodule Jido.Storage.ETS do
       metadata: meta[:metadata] || %{},
       stats: %{entry_count: entry_count}
     }
-  end
-
-  defp generate_entry_id do
-    "entry_" <> Jido.Util.generate_id()
   end
 end

@@ -22,6 +22,7 @@ defmodule Jido.Thread do
   """
 
   alias Jido.Thread.Entry
+  alias Jido.Thread.EntryNormalizer
 
   @schema Zoi.struct(
             __MODULE__,
@@ -69,11 +70,7 @@ defmodule Jido.Thread do
     base_seq = length(thread.entries)
 
     prepared_entries =
-      entries
-      |> Enum.with_index()
-      |> Enum.map(fn {entry, idx} ->
-        prepare_entry(entry, base_seq + idx, now)
-      end)
+      EntryNormalizer.normalize_many(entries, base_seq, now)
 
     %{
       thread
@@ -117,38 +114,7 @@ defmodule Jido.Thread do
     Enum.filter(entries, fn e -> e.seq >= from_seq and e.seq <= to_seq end)
   end
 
-  defp prepare_entry(%Entry{} = entry, seq, now) do
-    %{
-      entry
-      | id: entry.id || generate_entry_id(),
-        seq: seq,
-        at: entry.at || now
-    }
-  end
-
-  defp prepare_entry(attrs, seq, now) when is_map(attrs) do
-    %Entry{
-      id: fetch_entry_attr(attrs, :id, &generate_entry_id/0),
-      seq: seq,
-      at: fetch_entry_attr(attrs, :at, fn -> now end),
-      kind: fetch_entry_attr(attrs, :kind, fn -> :note end),
-      payload: fetch_entry_attr(attrs, :payload, fn -> %{} end),
-      refs: fetch_entry_attr(attrs, :refs, fn -> %{} end)
-    }
-  end
-
-  defp fetch_entry_attr(attrs, key, default_fun) when is_function(default_fun, 0) do
-    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
-      nil -> default_fun.()
-      value -> value
-    end
-  end
-
   defp generate_id do
     "thread_" <> Jido.Util.generate_id()
-  end
-
-  defp generate_entry_id do
-    "entry_" <> Jido.Util.generate_id()
   end
 end

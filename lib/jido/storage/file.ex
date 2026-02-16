@@ -36,6 +36,7 @@ defmodule Jido.Storage.File do
 
   alias Jido.Thread
   alias Jido.Thread.Entry
+  alias Jido.Thread.EntryNormalizer
 
   @type key :: term()
   @type opts :: keyword()
@@ -246,19 +247,7 @@ defmodule Jido.Storage.File do
     now = System.system_time(:millisecond)
     base_seq = length(current_entries)
 
-    prepared_entries =
-      entries
-      |> Enum.with_index()
-      |> Enum.map(fn {entry, idx} ->
-        %Entry{
-          id: entry.id || generate_entry_id(),
-          seq: base_seq + idx,
-          at: entry.at || now,
-          kind: entry.kind,
-          payload: entry.payload || %{},
-          refs: entry.refs || %{}
-        }
-      end)
+    prepared_entries = EntryNormalizer.normalize_many(entries, base_seq, now)
 
     {:ok, prepared_entries, now}
   end
@@ -390,9 +379,5 @@ defmodule Jido.Storage.File do
     :global.trans(lock_id, fn ->
       fun.()
     end)
-  end
-
-  defp generate_entry_id do
-    "entry_" <> Base.url_encode64(:crypto.strong_rand_bytes(12), padding: false)
   end
 end

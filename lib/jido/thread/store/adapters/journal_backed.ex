@@ -28,6 +28,7 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   alias Jido.Signal.Journal
   alias Jido.Thread
   alias Jido.Thread.Entry
+  alias Jido.Thread.EntryNormalizer
 
   @signal_type "jido.thread.entry"
 
@@ -102,11 +103,7 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   end
 
   defp prepare_entries(entries, base_seq, now) do
-    entries
-    |> Enum.with_index()
-    |> Enum.map(fn {entry, idx} ->
-      build_entry(entry, base_seq + idx, now)
-    end)
+    EntryNormalizer.normalize_many(entries, base_seq, now, id_generator: &generate_id/0)
   end
 
   defp record_entries(journal, thread_id, entries) do
@@ -119,37 +116,6 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
       end
     end)
   end
-
-  defp build_entry(entry, seq, now) do
-    %Entry{
-      id: get_entry_id(entry) || generate_id(),
-      seq: seq,
-      at: get_entry_at(entry) || now,
-      kind: get_entry_kind(entry) || :note,
-      payload: get_entry_payload(entry) || %{},
-      refs: get_entry_refs(entry) || %{}
-    }
-  end
-
-  defp get_entry_id(%Entry{id: id}), do: id
-  defp get_entry_id(%{id: id}), do: id
-  defp get_entry_id(_), do: nil
-
-  defp get_entry_at(%Entry{at: at}), do: at
-  defp get_entry_at(%{at: at}), do: at
-  defp get_entry_at(_), do: nil
-
-  defp get_entry_kind(%Entry{kind: kind}), do: kind
-  defp get_entry_kind(%{kind: kind}), do: kind
-  defp get_entry_kind(_), do: nil
-
-  defp get_entry_payload(%Entry{payload: payload}), do: payload
-  defp get_entry_payload(%{payload: payload}), do: payload
-  defp get_entry_payload(_), do: nil
-
-  defp get_entry_refs(%Entry{refs: refs}), do: refs
-  defp get_entry_refs(%{refs: refs}), do: refs
-  defp get_entry_refs(_), do: nil
 
   defp encode_entry(thread_id, %Entry{} = entry) do
     Signal.new!(%{
