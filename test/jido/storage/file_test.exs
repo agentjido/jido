@@ -310,6 +310,45 @@ defmodule JidoTest.Storage.FileTest do
       assert length(loaded.entries) == 3
       assert Enum.at(loaded.entries, 2).payload.data == String.duplicate("z", 100_000)
     end
+
+    test "load_thread/2 returns {:error, :invalid_entries_log} for truncated entries", %{
+      opts: opts
+    } do
+      thread_id = "corrupt_load_#{:erlang.unique_integer([:positive])}"
+      path = Keyword.fetch!(opts, :path)
+
+      entry = %Entry{id: "e1", seq: 0, at: 0, kind: :message, payload: %{ok: true}, refs: %{}}
+      {:ok, _thread} = FileStorage.append_thread(thread_id, [entry], opts)
+
+      entries_file = Path.join([path, "threads", thread_id, "entries.log"])
+      :ok = File.write(entries_file, <<0, 0, 1, 0, 1, 2, 3>>)
+
+      assert {:error, :invalid_entries_log} = FileStorage.load_thread(thread_id, opts)
+    end
+
+    test "append_thread/3 returns {:error, :invalid_entries_log} when existing entries are corrupt",
+         %{opts: opts} do
+      thread_id = "corrupt_append_#{:erlang.unique_integer([:positive])}"
+      path = Keyword.fetch!(opts, :path)
+
+      entry = %Entry{id: "e1", seq: 0, at: 0, kind: :message, payload: %{ok: true}, refs: %{}}
+      {:ok, _thread} = FileStorage.append_thread(thread_id, [entry], opts)
+
+      entries_file = Path.join([path, "threads", thread_id, "entries.log"])
+      :ok = File.write(entries_file, <<0, 0, 0, 20, 1, 2>>)
+
+      next_entry = %Entry{
+        id: "e2",
+        seq: 0,
+        at: 0,
+        kind: :message,
+        payload: %{ok: false},
+        refs: %{}
+      }
+
+      assert {:error, :invalid_entries_log} =
+               FileStorage.append_thread(thread_id, [next_entry], opts)
+    end
   end
 
   describe "edge cases" do

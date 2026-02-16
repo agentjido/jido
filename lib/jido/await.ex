@@ -220,6 +220,10 @@ defmodule Jido.Await do
         kill_waiters(Map.delete(waiters, ref))
         {:error, :timeout}
 
+      {:await_result, ref, _server, {:error, {:timeout, _details}}} ->
+        kill_waiters(Map.delete(waiters, ref))
+        {:error, :timeout}
+
       {:await_result, ref, server, {:error, reason}} ->
         kill_waiters(Map.delete(waiters, ref))
         {:error, {server, reason}}
@@ -284,6 +288,10 @@ defmodule Jido.Await do
         {:ok, {server, result}}
 
       {:await_result, ref, _server, {:error, :timeout}} ->
+        kill_waiters(Map.delete(waiters, ref))
+        {:error, :timeout}
+
+      {:await_result, ref, _server, {:error, {:timeout, _details}}} ->
         kill_waiters(Map.delete(waiters, ref))
         {:error, :timeout}
 
