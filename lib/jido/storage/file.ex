@@ -201,27 +201,30 @@ defmodule Jido.Storage.File do
     meta_file = Path.join(thread_dir, "meta.term")
     entries_file = Path.join(thread_dir, "entries.log")
 
-    {current_rev, current_entries, created_at, metadata} =
-      load_thread_or_new(meta_file, entries_file)
+    case load_thread_or_new(meta_file, entries_file) do
+      {:error, reason} ->
+        {:error, reason}
 
-    with :ok <- validate_expected_rev(expected_rev, current_rev),
-         :ok <- ensure_thread_dir(thread_dir),
-         {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
-         :ok <- append_to_file(entries_file, encode_entries(prepared_entries)),
-         {:ok, thread} <-
-           persist_thread_meta(
-             meta_file,
-             thread_id,
-             current_rev,
-             current_entries,
-             prepared_entries,
-             created_at,
-             metadata,
-             now
-           ) do
-      {:ok, thread}
-    else
-      {:error, reason} -> {:error, reason}
+      {current_rev, current_entries, created_at, metadata} ->
+        with :ok <- validate_expected_rev(expected_rev, current_rev),
+             :ok <- ensure_thread_dir(thread_dir),
+             {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
+             :ok <- append_to_file(entries_file, encode_entries(prepared_entries)),
+             {:ok, thread} <-
+               persist_thread_meta(
+                 meta_file,
+                 thread_id,
+                 current_rev,
+                 current_entries,
+                 prepared_entries,
+                 created_at,
+                 metadata,
+                 now
+               ) do
+          {:ok, thread}
+        else
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 
@@ -233,6 +236,9 @@ defmodule Jido.Storage.File do
       :not_found ->
         now = System.system_time(:millisecond)
         {0, [], now, %{}}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -306,7 +312,7 @@ defmodule Jido.Storage.File do
       {:ok, rev, entries, created_at, metadata}
     else
       {:error, :enoent} -> :not_found
-      {:error, _reason} -> :not_found
+      {:error, reason} -> {:error, reason}
     end
   end
 

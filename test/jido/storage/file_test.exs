@@ -310,6 +310,36 @@ defmodule JidoTest.Storage.FileTest do
       assert length(loaded.entries) == 3
       assert Enum.at(loaded.entries, 2).payload.data == String.duplicate("z", 100_000)
     end
+
+    test "append_thread/3 surfaces non-ENOENT read failures from existing thread files", %{
+      opts: opts
+    } do
+      thread_id = "read_error_#{:erlang.unique_integer([:positive])}"
+      path = Keyword.fetch!(opts, :path)
+
+      entry = %Entry{id: "e1", seq: 0, at: 0, kind: :message, payload: %{ok: true}, refs: %{}}
+      {:ok, _thread} = FileStorage.append_thread(thread_id, [entry], opts)
+
+      entries_file = Path.join([path, "threads", thread_id, "entries.log"])
+      :ok = File.rm(entries_file)
+      :ok = File.mkdir(entries_file)
+
+      next_entry = %Entry{
+        id: "e2",
+        seq: 0,
+        at: 0,
+        kind: :message,
+        payload: %{ok: false},
+        refs: %{}
+      }
+
+      assert {:error, :eisdir} =
+               FileStorage.append_thread(
+                 thread_id,
+                 [next_entry],
+                 Keyword.put(opts, :expected_rev, 1)
+               )
+    end
   end
 
   describe "edge cases" do
