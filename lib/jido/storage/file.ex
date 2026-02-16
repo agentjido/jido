@@ -131,9 +131,9 @@ defmodule Jido.Storage.File do
     entries_file = Path.join(thread_dir, "entries.log")
 
     with {:ok, meta_binary} <- File.read(meta_file),
-         {:ok, entries_binary} <- File.read(entries_file) do
+         {:ok, entries_binary} <- File.read(entries_file),
+         {:ok, entries} <- decode_entries(entries_binary) do
       {rev, created_at, updated_at, metadata} = :erlang.binary_to_term(meta_binary, [:safe])
-      entries = decode_entries(entries_binary)
 
       thread = %Thread{
         id: thread_id,
@@ -201,41 +201,37 @@ defmodule Jido.Storage.File do
     meta_file = Path.join(thread_dir, "meta.term")
     entries_file = Path.join(thread_dir, "entries.log")
 
-    case load_thread_or_new(meta_file, entries_file) do
-      {:error, reason} ->
-        {:error, reason}
-
-      {current_rev, current_entries, created_at, metadata} ->
-        with :ok <- validate_expected_rev(expected_rev, current_rev),
-             :ok <- ensure_thread_dir(thread_dir),
-             {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
-             :ok <- append_to_file(entries_file, encode_entries(prepared_entries)),
-             {:ok, thread} <-
-               persist_thread_meta(
-                 meta_file,
-                 thread_id,
-                 current_rev,
-                 current_entries,
-                 prepared_entries,
-                 created_at,
-                 metadata,
-                 now
-               ) do
-          {:ok, thread}
-        else
-          {:error, reason} -> {:error, reason}
-        end
+    with {:ok, current_rev, current_entries, created_at, metadata} <-
+           load_thread_or_new(meta_file, entries_file),
+         :ok <- validate_expected_rev(expected_rev, current_rev),
+         :ok <- ensure_thread_dir(thread_dir),
+         {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
+         :ok <- append_to_file(entries_file, encode_entries(prepared_entries)),
+         {:ok, thread} <-
+           persist_thread_meta(
+             meta_file,
+             thread_id,
+             current_rev,
+             current_entries,
+             prepared_entries,
+             created_at,
+             metadata,
+             now
+           ) do
+      {:ok, thread}
+    else
+      {:error, reason} -> {:error, reason}
     end
   end
 
   defp load_thread_or_new(meta_file, entries_file) do
     case load_existing_thread(meta_file, entries_file) do
       {:ok, rev, existing_entries, created, meta} ->
-        {rev, existing_entries, created, meta}
+        {:ok, rev, existing_entries, created, meta}
 
       :not_found ->
         now = System.system_time(:millisecond)
-        {0, [], now, %{}}
+        {:ok, 0, [], now, %{}}
 
       {:error, reason} ->
         {:error, reason}
@@ -306,9 +302,9 @@ defmodule Jido.Storage.File do
 
   defp load_existing_thread(meta_file, entries_file) do
     with {:ok, meta_binary} <- File.read(meta_file),
-         {:ok, entries_binary} <- File.read(entries_file) do
+         {:ok, entries_binary} <- File.read(entries_file),
+         {:ok, entries} <- decode_entries(entries_binary) do
       {rev, created_at, _updated_at, metadata} = :erlang.binary_to_term(meta_binary, [:safe])
-      entries = decode_entries(entries_binary)
       {:ok, rev, entries, created_at, metadata}
     else
       {:error, :enoent} -> :not_found
@@ -335,12 +331,31 @@ defmodule Jido.Storage.File do
     end)
   end
 
-  defp decode_entries(<<>>), do: []
+  defp decode_entries(binary), do: decode_entries(binary, [])
 
-  defp decode_entries(<<size::unsigned-32, rest::binary>>) do
+  defp decode_entries(<<>>, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp decode_entries(<<size::unsigned-32, rest::binary>>, acc) do
+    with {:ok, term_binary, remaining} <- decode_frame(rest, size),
+         {:ok, entry} <- decode_entry(term_binary) do
+      decode_entries(remaining, [entry | acc])
+    end
+  end
+
+  defp decode_entries(_malformed, _acc), do: {:error, :invalid_entries_log}
+
+  defp decode_frame(rest, size) when byte_size(rest) >= size do
     <<term_binary::binary-size(size), remaining::binary>> = rest
-    entry = :erlang.binary_to_term(term_binary, [:safe])
-    [entry | decode_entries(remaining)]
+    {:ok, term_binary, remaining}
+  end
+
+  defp decode_frame(_rest, _size), do: {:error, :invalid_entries_log}
+
+  defp decode_entry(term_binary) do
+    {:ok, :erlang.binary_to_term(term_binary, [:safe])}
+  rescue
+    ArgumentError ->
+      {:error, :invalid_entries_log}
   end
 
   defp checkpoint_path(base_path, key) do
