@@ -18,6 +18,7 @@ defmodule JidoExampleTest.EmitDirectiveTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.Signal
+  alias JidoTest.SignalCollector
 
   # ===========================================================================
   # ACTIONS: Emit domain events
@@ -96,46 +97,6 @@ defmodule JidoExampleTest.EmitDirectiveTest do
         end
 
       {:ok, %{emitted_count: count}, emissions}
-    end
-  end
-
-  # ===========================================================================
-  # COLLECTOR: Test helper to capture emitted signals
-  # ===========================================================================
-
-  defmodule SignalCollector do
-    @moduledoc false
-    use GenServer
-
-    def start_link(opts \\ []) do
-      GenServer.start_link(__MODULE__, [], opts)
-    end
-
-    def get_signals(pid) do
-      GenServer.call(pid, :get_signals)
-    end
-
-    def clear(pid) do
-      GenServer.call(pid, :clear)
-    end
-
-    @impl true
-    def init(_opts) do
-      {:ok, []}
-    end
-
-    @impl true
-    def handle_info({:signal, signal}, signals) do
-      {:noreply, [signal | signals]}
-    end
-
-    @impl true
-    def handle_call(:get_signals, _from, signals) do
-      {:reply, Enum.reverse(signals), signals}
-    end
-
-    def handle_call(:clear, _from, _signals) do
-      {:reply, :ok, []}
     end
   end
 
