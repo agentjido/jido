@@ -86,4 +86,21 @@ if Code.ensure_loaded?(Igniter) do
       igniter
     end
   end
+else
+  defmodule Mix.Tasks.Jido.Install do
+    @moduledoc "Installs Jido. Should be run with `mix igniter.install jido`"
+    @shortdoc @moduledoc
+
+    use Mix.Task
+
+    def run(_argv) do
+      Mix.shell().error("""
+      The task 'jido.install' requires igniter. Please install igniter and try again.
+
+      For more information, see: https://hexdocs.pm/igniter/readme.html#installation
+      """)
+
+      exit({:shutdown, 1})
+    end
+  end
 end
