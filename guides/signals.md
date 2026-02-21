@@ -93,21 +93,18 @@ When a signal arrives at an agent, the `SignalRouter` determines which action to
 
 ### Agent Signal Routes
 
-Define a static route table at compile time, then expose it via `signal_routes/1`:
+Declare static routes at compile time with the `signal_routes:` option:
 
 ```elixir
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]]
-
-  @signal_routes [
-    {"increment", MyApp.Actions.Increment},
-    {"decrement", MyApp.Actions.Decrement},
-    {"reset", MyApp.Actions.Reset}
-  ]
-
-  def signal_routes(_ctx), do: @signal_routes
+    schema: [counter: [type: :integer, default: 0]],
+    signal_routes: [
+      {"increment", MyApp.Actions.Increment},
+      {"decrement", MyApp.Actions.Decrement},
+      {"reset", MyApp.Actions.Reset}
+    ]
 end
 ```
 
@@ -239,10 +236,8 @@ end
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]]
-
-  @signal_routes [{"increment", MyApp.Actions.Increment}]
-  def signal_routes(_ctx), do: @signal_routes
+    schema: [counter: [type: :integer, default: 0]],
+    signal_routes: [{"increment", MyApp.Actions.Increment}]
 end
 
 # Use it

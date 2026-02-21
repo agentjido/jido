@@ -245,10 +245,8 @@ defmodule FanOut.WorkerAgent do
     schema: [
       status: [type: :atom, default: :idle],
       last_answer: [type: :any, default: nil]
-    ]
-
-  @signal_routes [{"compute", FanOut.ComputeAction}]
-  def signal_routes(_ctx), do: @signal_routes
+    ],
+    signal_routes: [{"compute", FanOut.ComputeAction}]
 end
 
 defmodule FanOut.Coordinator do

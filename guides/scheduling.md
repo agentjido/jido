@@ -19,14 +19,11 @@ defmodule MyAgent do
     schedules: [
       {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat},
       {"@daily", "cleanup.run", job_id: :cleanup, timezone: "America/New_York"}
+    ],
+    signal_routes: [
+      {"heartbeat.tick", HeartbeatAction},
+      {"cleanup.run", CleanupAction}
     ]
-
-  @signal_routes [
-    {"heartbeat.tick", HeartbeatAction},
-    {"cleanup.run", CleanupAction}
-  ]
-
-  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 
@@ -289,14 +286,11 @@ defmodule DailyReportAgent do
     schedules: [
       {"0 6 * * *", "report.generate",
         job_id: :daily_report, timezone: "America/New_York"}
+    ],
+    signal_routes: [
+      {"report.generate", GenerateReportAction},
+      {"report.cancel", CancelReportAction}
     ]
-
-  @signal_routes [
-    {"report.generate", GenerateReportAction},
-    {"report.cancel", CancelReportAction}
-  ]
-
-  def signal_routes(_ctx), do: @signal_routes
 
   defmodule GenerateReportAction do
     use Jido.Action, name: "generate_report", schema: []

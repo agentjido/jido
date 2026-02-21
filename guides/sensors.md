@@ -296,10 +296,8 @@ defmodule TickCounterAgent do
     schema: [
       tick_count: [type: :integer, default: 0],
       last_sensor_count: [type: :integer, default: 0]
-    ]
-
-  @signal_routes [{"sensor.tick", HandleTickAction}]
-  def signal_routes(_ctx), do: @signal_routes
+    ],
+    signal_routes: [{"sensor.tick", HandleTickAction}]
 end
 
 # The sensor

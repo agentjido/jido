@@ -234,6 +234,12 @@ defmodule Jido.Agent do
                                description: "Plugin modules or {module, config} tuples"
                              )
                              |> Zoi.default([]),
+                           signal_routes:
+                             Zoi.list(Zoi.any(),
+                               description:
+                                 "Compile-time signal route table. Each route maps signal type/pattern to an action target."
+                             )
+                             |> Zoi.default([]),
                            default_plugins:
                              Zoi.any(
                                description:
@@ -305,21 +311,20 @@ defmodule Jido.Agent do
 
   ## Context
 
-  The context map contains:
+  The context map currently contains:
   - `agent_module` - The agent module
-  - `strategy` - The strategy module
-  - `strategy_opts` - Strategy options
 
   ## Examples
 
-      @signal_routes [
-        {"user.created", HandleUserCreatedAction},
-        {"counter.increment", IncrementAction},
-        {"payment.*", fn s -> s.data.amount > 100 end, LargePaymentAction, 10}
-      ]
-
-      def signal_routes(_ctx), do: @signal_routes
+      use Jido.Agent,
+        name: "my_agent",
+        signal_routes: [
+          {"user.created", HandleUserCreatedAction},
+          {"counter.increment", IncrementAction},
+          {"payment.*", fn s -> s.data.amount > 100 end, LargePaymentAction, 10}
+        ]
   """
+  @callback signal_routes() :: [Jido.Signal.Router.route_spec()]
   @callback signal_routes(ctx :: map()) :: [Jido.Signal.Router.route_spec()]
 
   @doc """
@@ -367,6 +372,7 @@ defmodule Jido.Agent do
   @optional_callbacks [
     on_before_cmd: 2,
     on_after_cmd: 3,
+    signal_routes: 0,
     signal_routes: 1,
     checkpoint: 2,
     restore: 2
@@ -928,8 +934,12 @@ defmodule Jido.Agent do
   defp __quoted_callback_routes__ do
     quote location: :keep do
       @impl true
+      @spec signal_routes() :: list()
+      def signal_routes, do: @validated_opts[:signal_routes] || []
+
+      @impl true
       @spec signal_routes(map()) :: list()
-      def signal_routes(_ctx), do: []
+      def signal_routes(_ctx), do: signal_routes()
     end
   end
 
@@ -1020,6 +1030,7 @@ defmodule Jido.Agent do
                      on_after_cmd: 3,
                      checkpoint: 2,
                      restore: 2,
+                     signal_routes: 0,
                      signal_routes: 1,
                      name: 0,
                      description: 0,

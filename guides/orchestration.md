@@ -95,10 +95,8 @@ defmodule FetcherAgent do
     schema: [
       status: [type: :atom, default: :idle],
       last_fetch: [type: :string, default: nil]
-    ]
-
-  @signal_routes [{"fetch.request", FetchUrlAction}]
-  def signal_routes(_ctx), do: @signal_routes
+    ],
+    signal_routes: [{"fetch.request", FetchUrlAction}]
 end
 ```
 
@@ -207,15 +205,12 @@ defmodule CoordinatorAgent do
       pending: [type: :map, default: %{}],
       completed: [type: {:list, :map}, default: []],
       status: [type: :atom, default: :idle]
+    ],
+    signal_routes: [
+      {"fetch_urls", SpawnFetchersAction},
+      {"jido.agent.child.started", HandleChildStartedAction},
+      {"fetch.result", HandleFetchResultAction}
     ]
-
-  @signal_routes [
-    {"fetch_urls", SpawnFetchersAction},
-    {"jido.agent.child.started", HandleChildStartedAction},
-    {"fetch.result", HandleFetchResultAction}
-  ]
-
-  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 
@@ -421,10 +416,8 @@ defmodule ParallelFetcher do
   defmodule Worker do
     use Jido.Agent,
       name: "fetcher_worker",
-      schema: [status: [type: :atom, default: :idle]]
-
-    @signal_routes [{"fetch", FetchAction}]
-    def signal_routes(_ctx), do: @signal_routes
+      schema: [status: [type: :atom, default: :idle]],
+      signal_routes: [{"fetch", FetchAction}]
   end
 
   # ============================================================================
@@ -494,15 +487,12 @@ defmodule ParallelFetcher do
         pending: [type: :map, default: %{}],
         results: [type: {:list, :map}, default: []],
         status: [type: :atom, default: :idle]
+      ],
+      signal_routes: [
+        {"start", StartAction},
+        {"jido.agent.child.started", ChildStartedAction},
+        {"fetch.result", ResultAction}
       ]
-
-    @signal_routes [
-      {"start", StartAction},
-      {"jido.agent.child.started", ChildStartedAction},
-      {"fetch.result", ResultAction}
-    ]
-
-    def signal_routes(_ctx), do: @signal_routes
   end
 
   # ============================================================================
