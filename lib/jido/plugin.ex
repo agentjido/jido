@@ -28,20 +28,16 @@ defmodule Jido.Plugin do
             messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
             model: Zoi.string() |> Zoi.default("gpt-4")
           }),
-          signal_patterns: ["chat.*"]
+          signal_patterns: ["chat.*"],
+          signal_routes: [
+            {"chat.send", MyApp.Actions.SendMessage},
+            {"chat.history", MyApp.Actions.ListHistory}
+          ]
 
         @impl Jido.Plugin
         def mount(agent, config) do
           # Custom initialization beyond schema defaults
           {:ok, %{initialized_at: DateTime.utc_now()}}
-        end
-
-        @impl Jido.Plugin
-        def signal_routes(_ctx) do
-          [
-            {"chat.send", MyApp.Actions.SendMessage},
-            {"chat.history", MyApp.Actions.ListHistory}
-          ]
         end
       end
 
@@ -72,6 +68,9 @@ defmodule Jido.Plugin do
   - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
   - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
+
+  For static routes, prefer the compile-time `signal_routes:` option in `use Jido.Plugin`.
+  Use the `signal_routes/1` callback only for dynamic routes based on runtime config.
   """
 
   alias Jido.Plugin.Manifest
@@ -214,6 +213,8 @@ defmodule Jido.Plugin do
   Returns the signal routes for this plugin.
 
   The signal routes determine how signals are routed to handlers.
+  Prefer compile-time `signal_routes:` in `use Jido.Plugin` for static routes,
+  and implement this callback only for dynamic route generation.
   """
   @callback signal_routes(config :: map()) :: term()
 

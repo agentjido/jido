@@ -17,12 +17,12 @@ defmodule Jido.Actions.Status do
 
   ## Usage
 
-      def signal_routes do
-        [
+      use Jido.Agent,
+        name: "status_agent",
+        signal_routes: [
           {"work.done", Jido.Actions.Status.MarkCompleted},
           {"work.error", Jido.Actions.Status.MarkFailed}
         ]
-      end
   """
 
   defmodule SetStatus do

@@ -88,26 +88,23 @@ signal = Jido.Signal.new!("background.task", %{task_id: "abc"}, source: "/schedu
 When a signal arrives at an agent, the `SignalRouter` determines which action to execute. Routes are checked in priority order:
 
 1. **Strategy routes** (priority 50+) — via `strategy.signal_routes/1`
-2. **Agent routes** (priority 0) — via `agent_module.signal_routes/0`
+2. **Agent routes** (priority 0) — via `agent_module.signal_routes/1`
 3. **Plugin routes** (priority -10) — via plugin `signal_patterns` and `signal_routes/1`
 
 ### Agent Signal Routes
 
-Define `signal_routes/0` in your agent to map signal types to actions:
+Declare static routes at compile time with the `signal_routes:` option:
 
 ```elixir
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]]
-
-  def signal_routes do
-    [
+    schema: [counter: [type: :integer, default: 0]],
+    signal_routes: [
       {"increment", MyApp.Actions.Increment},
       {"decrement", MyApp.Actions.Decrement},
       {"reset", MyApp.Actions.Reset}
     ]
-  end
 end
 ```
 
@@ -139,7 +136,11 @@ defmodule MyApp.ChatPlugin do
     name: "chat",
     state_key: :chat,
     actions: [MyApp.Actions.SendMessage, MyApp.Actions.ClearHistory],
-    signal_patterns: ["chat.*"]
+    signal_patterns: ["chat.*"],
+    signal_routes: [
+      {"chat.send", MyApp.Actions.SendMessage},
+      {"chat.clear", MyApp.Actions.ClearHistory}
+    ]
 end
 ```
 
@@ -147,7 +148,8 @@ Pattern matching:
 - `"chat.*"` — matches `chat.message`, `chat.clear`, etc.
 - `"chat.**"` — matches `chat.message`, `chat.room.join`, etc.
 
-Plugins can also implement a `signal_routes/1` callback for dynamic routing.
+For explicit route mappings, declare plugin `signal_routes:` in `use Jido.Plugin`.
+Keep plugin `signal_routes/1` callback for dynamic/conditional routing.
 
 ## Emitting Signals (Directive.Emit)
 
@@ -203,7 +205,7 @@ Directive.emit_to_parent(agent, signal)
 ┌─────────────────────────────────────────────────────────────────┐
 │                         AgentServer                              │
 │  Signal → AgentServer.call/cast                                  │
-│  → route_signal_to_action (via signal_routes or plugin patterns) │
+│  → route_signal_to_action (via strategy/agent/plugin routes)      │
 │  → Agent.cmd/2                                                   │
 │  → process directives                                            │
 └───────────────────────────────┬─────────────────────────────────┘
@@ -234,13 +236,8 @@ end
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]]
-
-  def signal_routes do
-    [
-      {"increment", MyApp.Actions.Increment}
-    ]
-  end
+    schema: [counter: [type: :integer, default: 0]],
+    signal_routes: [{"increment", MyApp.Actions.Increment}]
 end
 
 # Use it

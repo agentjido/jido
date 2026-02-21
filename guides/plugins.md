@@ -26,7 +26,11 @@ defmodule MyApp.ChatPlugin do
       messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
       model: Zoi.string() |> Zoi.default("gpt-4")
     }),
-    signal_patterns: ["chat.*"]
+    signal_patterns: ["chat.*"],
+    signal_routes: [
+      {"chat.send", MyApp.Actions.SendMessage},
+      {"chat.history", MyApp.Actions.ListHistory}
+    ]
 end
 ```
 
@@ -46,6 +50,7 @@ end
 | `schema` | Zoi schema for plugin state defaults |
 | `config_schema` | Zoi schema for per-agent configuration |
 | `signal_patterns` | List of signal patterns for routing |
+| `signal_routes` | Static signal route tuples (`{"type", Action}`) |
 | `category`, `vsn`, `tags` | Metadata for organization |
 
 ## Using Plugins
@@ -99,19 +104,24 @@ end
 
 Returns `{:ok, map}` to merge into plugin state, or `{:error, reason}` to abort agent creation.
 
-### signal_routes/1
+### signal_routes (compile-time)
 
-Defines signal-to-action routing rules.
+Define signal-to-action routing rules declaratively in `use Jido.Plugin`:
 
 ```elixir
-@impl Jido.Plugin
-def signal_routes(_config) do
-  [
-    {"chat.send", MyApp.Actions.SendMessage},
-    {"chat.history", MyApp.Actions.ListHistory}
-  ]
+defmodule MyApp.ChatPlugin do
+  use Jido.Plugin,
+    name: "chat",
+    state_key: :chat,
+    actions: [MyApp.Actions.SendMessage, MyApp.Actions.ListHistory],
+    signal_routes: [
+      {"chat.send", MyApp.Actions.SendMessage},
+      {"chat.history", MyApp.Actions.ListHistory}
+    ]
 end
 ```
+
+Use the `signal_routes/1` callback only when routes must be computed from runtime config.
 
 ### handle_signal/2
 

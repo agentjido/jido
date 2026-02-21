@@ -139,6 +139,25 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
     end
   end
 
+  defmodule AgentWithConfiguredRoutes do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_configured_routes",
+      schema: [],
+      signal_routes: [{"agent.configured", JidoTest.AgentServer.SignalRouterTest.TestAction}]
+  end
+
+  defmodule AgentWithLegacyRoutes do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_legacy_routes",
+      schema: []
+
+    def signal_routes do
+      [{"agent.legacy", JidoTest.AgentServer.SignalRouterTest.TestAction}]
+    end
+  end
+
   defmodule AgentWithoutRoutes do
     @moduledoc "Agent that does NOT export signal_routes/1"
     use Jido.Agent,
@@ -267,6 +286,22 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
 
       assert %JidoRouter.Router{} = router
       assert router.route_count > 0
+    end
+
+    test "builds router from use Jido.Agent signal_routes option" do
+      state = build_test_state(AgentWithConfiguredRoutes)
+      router = SignalRouter.build(state)
+
+      assert %JidoRouter.Router{} = router
+      assert router.route_count == 1
+    end
+
+    test "builds router when agent defines legacy signal_routes/0 callback" do
+      state = build_test_state(AgentWithLegacyRoutes)
+      router = SignalRouter.build(state)
+
+      assert %JidoRouter.Router{} = router
+      assert router.route_count == 1
     end
 
     test "returns empty router when agent doesn't export signal_routes/1" do

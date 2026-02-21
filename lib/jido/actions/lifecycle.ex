@@ -9,13 +9,13 @@ defmodule Jido.Actions.Lifecycle do
 
   ## Usage
 
-      def signal_routes do
-        [
+      use Jido.Agent,
+        name: "coordinator_agent",
+        signal_routes: [
           {"work.done", Jido.Actions.Lifecycle.NotifyParent},
           {"spawn.worker", Jido.Actions.Lifecycle.SpawnChild},
           {"shutdown", Jido.Actions.Lifecycle.StopSelf}
         ]
-      end
   """
 
   alias Jido.Agent.Directive

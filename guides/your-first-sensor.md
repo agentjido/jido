@@ -147,13 +147,8 @@ defmodule CounterAgent do
     schema: [
       tick_count: [type: :integer, default: 0],
       last_tick: [type: :integer, default: 0]
-    ]
-
-  def signal_routes do
-    [
-      {"sensor.tick", HandleTickAction}
-    ]
-  end
+    ],
+    signal_routes: [{"sensor.tick", HandleTickAction}]
 end
 ```
 

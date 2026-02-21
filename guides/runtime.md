@@ -44,14 +44,14 @@ Or start directly via `AgentServer`:
 
 ```
 Signal → AgentServer.call/cast
-       → route_signal_to_action (via strategy.signal_routes or default)
+       → route_signal_to_action (via strategy/agent/plugin routes)
        → Agent.cmd/2
        → {agent, directives}
        → Directives queued → drain loop via DirectiveExec
        → (for RunInstruction) execute instruction → call Agent.cmd/2 with result_action
 ```
 
-The AgentServer routes incoming signals to actions based on your strategy's `signal_routes/0`, executes the action via `cmd/2`, and processes any returned directives.
+The AgentServer routes incoming signals using strategy, agent, and plugin route tables (`signal_routes/1` callbacks), executes the action via `cmd/2`, and processes any returned directives.
 
 ## Parent-Child Hierarchy
 

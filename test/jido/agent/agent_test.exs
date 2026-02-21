@@ -5,6 +5,37 @@ defmodule JidoTest.AgentTest do
   alias JidoTest.TestActions
   alias JidoTest.TestAgents
 
+  defmodule ConfiguredRoutesAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "configured_routes_agent",
+      schema: [],
+      signal_routes: [{"configured.route", JidoTest.TestActions.NoSchema}]
+  end
+
+  defmodule ExtendingRoutesAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "extending_routes_agent",
+      schema: [],
+      signal_routes: [{"base.route", JidoTest.TestActions.NoSchema}]
+
+    def signal_routes(ctx) do
+      super(ctx) ++ [{"extended.route", JidoTest.TestActions.BasicAction}]
+    end
+  end
+
+  defmodule LegacyRoutesAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "legacy_routes_agent",
+      schema: []
+
+    def signal_routes do
+      [{"legacy.route", JidoTest.TestActions.NoSchema}]
+    end
+  end
+
   describe "module definition" do
     test "defines metadata accessors" do
       assert TestAgents.Basic.name() == "basic_agent"
@@ -19,6 +50,32 @@ defmodule JidoTest.AgentTest do
       assert TestAgents.Minimal.description() == nil
       schema = TestAgents.Minimal.schema()
       assert is_struct(schema) or schema == []
+    end
+  end
+
+  describe "signal routes configuration" do
+    test "use Jido.Agent signal_routes option is exposed through signal_routes/1" do
+      routes = ConfiguredRoutesAgent.signal_routes(%{agent_module: ConfiguredRoutesAgent})
+
+      assert routes == [{"configured.route", JidoTest.TestActions.NoSchema}]
+    end
+
+    test "signal_routes/1 override can extend configured routes via super/1" do
+      routes = ExtendingRoutesAgent.signal_routes(%{agent_module: ExtendingRoutesAgent})
+
+      assert {"base.route", JidoTest.TestActions.NoSchema} in routes
+      assert {"extended.route", JidoTest.TestActions.BasicAction} in routes
+      assert length(routes) == 2
+    end
+
+    test "legacy signal_routes/0 override remains functional through signal_routes/1" do
+      assert LegacyRoutesAgent.signal_routes() == [
+               {"legacy.route", JidoTest.TestActions.NoSchema}
+             ]
+
+      assert LegacyRoutesAgent.signal_routes(%{agent_module: LegacyRoutesAgent}) == [
+               {"legacy.route", JidoTest.TestActions.NoSchema}
+             ]
     end
   end
 

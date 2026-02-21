@@ -286,15 +286,12 @@ defmodule MyApp.CounterAgent do
     description: "A counter with PubSub broadcasting",
     schema: [
       count: [type: :integer, default: 0]
-    ]
-
-  def signal_routes do
-    [
+    ],
+    signal_routes: [
       {"counter.increment", MyApp.Actions.Increment},
       {"counter.decrement", MyApp.Actions.Decrement},
       {"counter.reset", MyApp.Actions.Reset}
     ]
-  end
 end
 ```
 

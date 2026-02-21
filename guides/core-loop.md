@@ -104,7 +104,7 @@ Signal → AgentServer → Agent.cmd/2 → {agent, directives} → DirectiveExec
 ```
 
 1. **Signal arrives** at AgentServer (via `call/3` or `cast/2`)
-2. **AgentServer routes** signal to action using strategy's signal routes
+2. **AgentServer routes** signal to action using strategy, agent, and plugin routes
 3. **Agent.cmd/2** executes the action, returns updated agent + directives
 4. **DirectiveExec** processes directives (emit signals, spawn processes, schedule messages)
 

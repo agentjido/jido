@@ -95,11 +95,8 @@ defmodule FetcherAgent do
     schema: [
       status: [type: :atom, default: :idle],
       last_fetch: [type: :string, default: nil]
-    ]
-
-  def signal_routes do
-    [{"fetch.request", FetchUrlAction}]
-  end
+    ],
+    signal_routes: [{"fetch.request", FetchUrlAction}]
 end
 ```
 
@@ -208,15 +205,12 @@ defmodule CoordinatorAgent do
       pending: [type: :map, default: %{}],
       completed: [type: {:list, :map}, default: []],
       status: [type: :atom, default: :idle]
-    ]
-
-  def signal_routes do
-    [
+    ],
+    signal_routes: [
       {"fetch_urls", SpawnFetchersAction},
       {"jido.agent.child.started", HandleChildStartedAction},
       {"fetch.result", HandleFetchResultAction}
     ]
-  end
 end
 ```
 
@@ -306,7 +300,7 @@ defmodule HandleChildExitAction do
 end
 
 # Add to coordinator routes
-def signal_routes do
+def signal_routes(_ctx) do
   [
     # ... other routes
     {"jido.agent.child.exit", HandleChildExitAction}
@@ -422,9 +416,8 @@ defmodule ParallelFetcher do
   defmodule Worker do
     use Jido.Agent,
       name: "fetcher_worker",
-      schema: [status: [type: :atom, default: :idle]]
-
-    def signal_routes, do: [{"fetch", FetchAction}]
+      schema: [status: [type: :atom, default: :idle]],
+      signal_routes: [{"fetch", FetchAction}]
   end
 
   # ============================================================================
@@ -494,15 +487,12 @@ defmodule ParallelFetcher do
         pending: [type: :map, default: %{}],
         results: [type: {:list, :map}, default: []],
         status: [type: :atom, default: :idle]
-      ]
-
-    def signal_routes do
-      [
+      ],
+      signal_routes: [
         {"start", StartAction},
         {"jido.agent.child.started", ChildStartedAction},
         {"fetch.result", ResultAction}
       ]
-    end
   end
 
   # ============================================================================

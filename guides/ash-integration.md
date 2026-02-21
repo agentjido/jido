@@ -84,15 +84,12 @@ defmodule MyApp.OrderAgent do
     name: "order_processor",
     schema: [
       current_order_id: [type: {:or, [:string, nil]}, default: nil]
-    ]
-
-  def signal_routes do
-    [
+    ],
+    signal_routes: [
       {"order.place", MyApp.Order.Jido.Place},
       {"order.confirm", MyApp.Order.Jido.Confirm},
       {"order.ship", MyApp.Order.Jido.Ship}
     ]
-  end
 end
 ```
 
@@ -235,14 +232,11 @@ defmodule MyApp.FulfillmentAgent do
       order_id: [type: :string, required: true],
       customer_email: [type: :string, required: true],
       step: [type: :atom, default: :pending]
-    ]
-
-  def signal_routes do
-    [
+    ],
+    signal_routes: [
       {"fulfillment.start", MyApp.Actions.BeginFulfillment},
       {"fulfillment.complete", MyApp.Actions.CompleteFulfillment}
     ]
-  end
 end
 ```
 

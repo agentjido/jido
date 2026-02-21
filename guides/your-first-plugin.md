@@ -16,12 +16,8 @@ defmodule MyApp.CounterPlugin do
       value: Zoi.integer() |> Zoi.default(0),
       last_updated: Zoi.any() |> Zoi.optional()
     }),
-    signal_patterns: ["counter.*"]
-
-  @impl Jido.Plugin
-  def signal_routes(_config) do
-    [{"counter.increment", MyApp.IncrementAction}]
-  end
+    signal_patterns: ["counter.*"],
+    signal_routes: [{"counter.increment", MyApp.IncrementAction}]
 end
 ```
 
@@ -89,12 +85,8 @@ defmodule MyApp.CounterPlugin do
       value: Zoi.integer() |> Zoi.default(0),
       last_updated: Zoi.any() |> Zoi.optional()
     }),
-    signal_patterns: ["counter.*"]
-
-  @impl Jido.Plugin
-  def signal_routes(_config) do
-    [{"counter.increment", MyApp.IncrementAction}]
-  end
+    signal_patterns: ["counter.*"],
+    signal_routes: [{"counter.increment", MyApp.IncrementAction}]
 end
 ```
 
@@ -112,6 +104,7 @@ end
 |--------|-------------|
 | `schema` | Zoi schema for plugin state with defaults |
 | `signal_patterns` | Patterns this plugin handles (e.g., `"counter.*"`) |
+| `signal_routes` | Static signal route tuples (`{"type", Action}`) |
 
 ### Step 3: Attach to an Agent
 
@@ -163,17 +156,20 @@ Plugins can't accidentally overwrite each other's state.
 
 ## Signal Routing
 
-The `signal_routes/1` callback maps signal types to actions:
+Declare signal routes at compile time with the `signal_routes:` option:
 
 ```elixir
-@impl Jido.Plugin
-def signal_routes(_config) do
-  [
+use Jido.Plugin,
+  name: "counter",
+  state_key: :counter,
+  actions: [MyApp.IncrementAction, MyApp.ResetAction],
+  signal_routes: [
     {"counter.increment", MyApp.IncrementAction},
     {"counter.reset", MyApp.ResetAction}
   ]
-end
 ```
+
+Use `signal_routes/1` only for dynamic routes that depend on config.
 
 When a signal arrives:
 

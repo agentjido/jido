@@ -354,11 +354,8 @@ defmodule MyApp.FetcherAgent do
     schema: [
       http_client: [type: :any, required: true],
       last_fetch: [type: :map, default: nil]
-    ]
-
-  def signal_routes do
-    [{"fetch", MyApp.FetchAction}]
-  end
+    ],
+    signal_routes: [{"fetch", MyApp.FetchAction}]
 end
 
 # Configuration
