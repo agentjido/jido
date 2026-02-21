@@ -105,8 +105,9 @@ mix igniter.install jido
 
 This automatically:
 - Adds Jido to your dependencies
+- Creates a `MyApp.Jido` instance module (`use Jido, otp_app: :my_app`)
 - Creates configuration in `config/config.exs`
-- Adds `Jido.Bus.InMemory` to your supervision tree
+- Adds `MyApp.Jido` to your supervision tree
 
 Generate an example agent to get started:
 

@@ -93,7 +93,7 @@ This enables:
 | **Agent** | Immutable struct with state and schema. Defines `cmd/2` for pure transformations. |
 | **Action** | Function that transforms agent state (may perform side effects). Defined in [jido_action](https://hexdocs.pm/jido_action). |
 | **Directive** | Effect description for runtime execution (Emit, Spawn, Schedule, etc.). Never modifies state. |
-| **Skill** | Composable capability module bundling actions, state, and routing rules. |
+| **Plugin** | Composable capability module bundling actions, state, and routing rules. |
 | **Strategy** | Execution pattern (Direct, FSM, custom) that controls how actions are processed. |
 | **Signal** | CloudEvents-compliant message. Defined in [jido_signal](https://hexdocs.pm/jido_signal). |
 

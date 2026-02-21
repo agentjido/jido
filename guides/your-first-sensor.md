@@ -189,4 +189,4 @@ Jido.Sensor.Runtime.event(sensor_pid, {:custom_data, payload})
 
 - [Signals Guide](signals.md) — Learn about Signal structure and routing
 - [Runtime Guide](runtime.md) — Understand how agents process incoming signals
-- [examples/sensor_demo.exs](../examples/sensor_demo.exs) — Full working example with quotes and webhooks
+- [sensor_demo_test.exs](https://github.com/agentjido/jido/blob/main/test/examples/observability/sensor_demo_test.exs) — Full working example with quotes and webhooks

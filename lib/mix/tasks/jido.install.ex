@@ -10,12 +10,13 @@ if Code.ensure_loaded?(Igniter) do
     This task will:
 
     1. Add Jido configuration to `config/config.exs`
-    2. Optionally add `Jido.Bus.InMemory` to your application's supervision tree
-    3. Optionally generate an example agent
+    2. Create a `<YourApp>.Jido` instance module
+    3. Optionally add `<YourApp>.Jido` to your application's supervision tree
+    4. Optionally generate an example agent
 
     ## Options
 
-    - `--no-supervisor` - Skip adding Jido bus to the supervision tree
+    - `--no-supervisor` - Skip adding Jido instance to the supervision tree
     - `--example` - Generate an example agent module
 
     ## Examples
@@ -29,6 +30,7 @@ if Code.ensure_loaded?(Igniter) do
 
     alias Igniter.Project.Application
     alias Igniter.Project.Config
+    alias Igniter.Project.Module, as: IgniterModule
 
     @impl Igniter.Mix.Task
     def info(_argv, _composing_task) do
@@ -52,14 +54,22 @@ if Code.ensure_loaded?(Igniter) do
     def igniter(igniter) do
       options = igniter.args.options
       app_name = Application.app_name(igniter)
+      jido_module = Module.concat([Macro.camelize(to_string(app_name)), "Jido"])
+      jido_module_contents = "use Jido, otp_app: #{inspect(app_name)}"
 
       igniter =
         igniter
+        |> IgniterModule.find_and_update_or_create_module(
+          jido_module,
+          jido_module_contents,
+          fn zipper -> {:ok, zipper} end
+        )
         |> Config.configure_new(
           "config.exs",
-          :jido,
-          [:default_bus],
-          :jido_bus
+          app_name,
+          [jido_module],
+          max_tasks: 1000,
+          agent_pools: []
         )
 
       igniter =
@@ -68,7 +78,7 @@ if Code.ensure_loaded?(Igniter) do
         else
           Application.add_new_child(
             igniter,
-            {Jido.Bus.InMemory, name: :jido_bus},
+            jido_module,
             after: [Ecto.Repo, Phoenix.PubSub]
           )
         end
