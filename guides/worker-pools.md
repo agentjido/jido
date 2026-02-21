@@ -356,9 +356,8 @@ defmodule MyApp.FetcherAgent do
       last_fetch: [type: :map, default: nil]
     ]
 
-  def signal_routes do
-    [{"fetch", MyApp.FetchAction}]
-  end
+  @signal_routes [{"fetch", MyApp.FetchAction}]
+  def signal_routes(_ctx), do: @signal_routes
 end
 
 # Configuration

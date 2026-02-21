@@ -6,7 +6,7 @@ defmodule Jido.Actions.Scheduling do
 
   ## Usage
 
-      def signal_routes do
+      def signal_routes(_ctx) do
         [
           {"work.start", MyStartAction},  # Might schedule a timeout
           {"work.timeout", Jido.Actions.Status.MarkFailed}

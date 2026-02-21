@@ -312,13 +312,13 @@ defmodule Jido.Agent do
 
   ## Examples
 
-      def signal_routes(_ctx) do
-        [
-          {"user.created", HandleUserCreatedAction},
-          {"counter.increment", IncrementAction},
-          {"payment.*", fn s -> s.data.amount > 100 end, LargePaymentAction, 10}
-        ]
-      end
+      @signal_routes [
+        {"user.created", HandleUserCreatedAction},
+        {"counter.increment", IncrementAction},
+        {"payment.*", fn s -> s.data.amount > 100 end, LargePaymentAction, 10}
+      ]
+
+      def signal_routes(_ctx), do: @signal_routes
   """
   @callback signal_routes(ctx :: map()) :: [Jido.Signal.Router.route_spec()]
 

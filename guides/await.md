@@ -163,7 +163,7 @@ Request graceful cancellation of an agent:
 Cancellation is advisory. The agent receives a `jido.agent.cancel` signal and decides how to respond. Typical pattern:
 
 ```elixir
-def signal_routes do
+def signal_routes(_ctx) do
   [{"jido.agent.cancel", HandleCancelAction}]
 end
 
@@ -247,9 +247,8 @@ defmodule FanOut.WorkerAgent do
       last_answer: [type: :any, default: nil]
     ]
 
-  def signal_routes do
-    [{"compute", FanOut.ComputeAction}]
-  end
+  @signal_routes [{"compute", FanOut.ComputeAction}]
+  def signal_routes(_ctx), do: @signal_routes
 end
 
 defmodule FanOut.Coordinator do

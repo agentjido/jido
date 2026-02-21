@@ -97,9 +97,8 @@ defmodule FetcherAgent do
       last_fetch: [type: :string, default: nil]
     ]
 
-  def signal_routes do
-    [{"fetch.request", FetchUrlAction}]
-  end
+  @signal_routes [{"fetch.request", FetchUrlAction}]
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 
@@ -210,13 +209,13 @@ defmodule CoordinatorAgent do
       status: [type: :atom, default: :idle]
     ]
 
-  def signal_routes do
-    [
-      {"fetch_urls", SpawnFetchersAction},
-      {"jido.agent.child.started", HandleChildStartedAction},
-      {"fetch.result", HandleFetchResultAction}
-    ]
-  end
+  @signal_routes [
+    {"fetch_urls", SpawnFetchersAction},
+    {"jido.agent.child.started", HandleChildStartedAction},
+    {"fetch.result", HandleFetchResultAction}
+  ]
+
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 
@@ -306,7 +305,7 @@ defmodule HandleChildExitAction do
 end
 
 # Add to coordinator routes
-def signal_routes do
+def signal_routes(_ctx) do
   [
     # ... other routes
     {"jido.agent.child.exit", HandleChildExitAction}
@@ -424,7 +423,8 @@ defmodule ParallelFetcher do
       name: "fetcher_worker",
       schema: [status: [type: :atom, default: :idle]]
 
-    def signal_routes, do: [{"fetch", FetchAction}]
+    @signal_routes [{"fetch", FetchAction}]
+    def signal_routes(_ctx), do: @signal_routes
   end
 
   # ============================================================================
@@ -496,13 +496,13 @@ defmodule ParallelFetcher do
         status: [type: :atom, default: :idle]
       ]
 
-    def signal_routes do
-      [
-        {"start", StartAction},
-        {"jido.agent.child.started", ChildStartedAction},
-        {"fetch.result", ResultAction}
-      ]
-    end
+    @signal_routes [
+      {"start", StartAction},
+      {"jido.agent.child.started", ChildStartedAction},
+      {"fetch.result", ResultAction}
+    ]
+
+    def signal_routes(_ctx), do: @signal_routes
   end
 
   # ============================================================================

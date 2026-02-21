@@ -9,7 +9,7 @@ defmodule Jido.Actions.Control do
 
   ## Usage
 
-      def signal_routes do
+      def signal_routes(_ctx) do
         [
           {"jido.agent.cancel", Jido.Actions.Control.Cancel},
           {"proxy.forward", Jido.Actions.Control.Forward}
@@ -186,7 +186,7 @@ defmodule Jido.Actions.Control do
     ## Example
 
         # Handle a request and reply
-        def signal_routes do
+        def signal_routes(_ctx) do
           [{"query.request", MyQueryHandler}]
         end
 

@@ -149,11 +149,8 @@ defmodule CounterAgent do
       last_tick: [type: :integer, default: 0]
     ]
 
-  def signal_routes do
-    [
-      {"sensor.tick", HandleTickAction}
-    ]
-  end
+  @signal_routes [{"sensor.tick", HandleTickAction}]
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 

@@ -288,13 +288,13 @@ defmodule MyApp.CounterAgent do
       count: [type: :integer, default: 0]
     ]
 
-  def signal_routes do
-    [
-      {"counter.increment", MyApp.Actions.Increment},
-      {"counter.decrement", MyApp.Actions.Decrement},
-      {"counter.reset", MyApp.Actions.Reset}
-    ]
-  end
+  @signal_routes [
+    {"counter.increment", MyApp.Actions.Increment},
+    {"counter.decrement", MyApp.Actions.Decrement},
+    {"counter.reset", MyApp.Actions.Reset}
+  ]
+
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 

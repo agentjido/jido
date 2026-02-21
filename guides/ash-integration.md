@@ -86,13 +86,13 @@ defmodule MyApp.OrderAgent do
       current_order_id: [type: {:or, [:string, nil]}, default: nil]
     ]
 
-  def signal_routes do
-    [
-      {"order.place", MyApp.Order.Jido.Place},
-      {"order.confirm", MyApp.Order.Jido.Confirm},
-      {"order.ship", MyApp.Order.Jido.Ship}
-    ]
-  end
+  @signal_routes [
+    {"order.place", MyApp.Order.Jido.Place},
+    {"order.confirm", MyApp.Order.Jido.Confirm},
+    {"order.ship", MyApp.Order.Jido.Ship}
+  ]
+
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 
@@ -237,12 +237,12 @@ defmodule MyApp.FulfillmentAgent do
       step: [type: :atom, default: :pending]
     ]
 
-  def signal_routes do
-    [
-      {"fulfillment.start", MyApp.Actions.BeginFulfillment},
-      {"fulfillment.complete", MyApp.Actions.CompleteFulfillment}
-    ]
-  end
+  @signal_routes [
+    {"fulfillment.start", MyApp.Actions.BeginFulfillment},
+    {"fulfillment.complete", MyApp.Actions.CompleteFulfillment}
+  ]
+
+  def signal_routes(_ctx), do: @signal_routes
 end
 ```
 

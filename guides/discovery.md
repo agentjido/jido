@@ -174,8 +174,8 @@ defmodule MyApp.Debug do
   def list_all_routes do
     for agent <- Jido.Discovery.list_agents() do
       routes = 
-        if function_exported?(agent.module, :signal_routes, 0) do
-          agent.module.signal_routes()
+        if function_exported?(agent.module, :signal_routes, 1) do
+          agent.module.signal_routes(%{agent_module: agent.module})
         else
           []
         end

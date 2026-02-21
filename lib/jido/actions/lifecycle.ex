@@ -9,7 +9,7 @@ defmodule Jido.Actions.Lifecycle do
 
   ## Usage
 
-      def signal_routes do
+      def signal_routes(_ctx) do
         [
           {"work.done", Jido.Actions.Lifecycle.NotifyParent},
           {"spawn.worker", Jido.Actions.Lifecycle.SpawnChild},
