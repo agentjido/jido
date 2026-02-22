@@ -147,6 +147,9 @@ defmodule Jido.Agent.Directive do
       - `:http` / `:webhook` - HTTP endpoints
       - `:logger` / `:console` / `:noop` - Logging/testing
 
+    If `dispatch` is omitted and the agent has no `default_dispatch`, runtime
+    falls back to emitting to the current agent process (`self()`).
+
     ## Examples
 
         # Use agent's default dispatch (configured on AgentServer)
@@ -457,6 +460,10 @@ defmodule Jido.Agent.Directive do
 
   @doc """
   Creates an Emit directive.
+
+  If `dispatch` is omitted, runtime will use `AgentServer` `default_dispatch`.
+  When no default is configured, runtime falls back to emitting to the current
+  agent process (`self()`).
 
   ## Examples
 

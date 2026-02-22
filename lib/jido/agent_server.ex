@@ -46,7 +46,7 @@ defmodule Jido.AgentServer do
   - `:id` - Instance ID (auto-generated if not provided)
   - `:initial_state` - Initial state map for agent
   - `:registry` - Registry module (default: `Jido.Registry`)
-  - `:default_dispatch` - Default dispatch config for Emit directives
+  - `:default_dispatch` - Default dispatch config for Emit directives (fallback: current agent pid)
   - `:error_policy` - Error handling policy
   - `:max_queue_size` - Max directive queue size (default: 10_000)
   - `:parent` - Parent reference for hierarchy

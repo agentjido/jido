@@ -20,7 +20,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
   end
 
   defp dispatch_signal(traced_signal, nil, _state) do
-    Logger.debug("Emit directive with no dispatch config, signal: #{traced_signal.type}")
+    send(self(), {:signal, traced_signal})
   end
 
   defp dispatch_signal(traced_signal, cfg, state) do

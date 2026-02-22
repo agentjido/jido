@@ -129,7 +129,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
   end
 
   describe "Emit directive" do
-    test "returns async tuple with nil ref when no dispatch config", %{
+    test "falls back to dispatching to current process when no dispatch config", %{
       state: state,
       input_signal: input_signal
     } do
@@ -137,6 +137,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       directive = %Directive.Emit{signal: signal, dispatch: nil}
 
       assert {:async, nil, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      assert_receive {:signal, %Signal{type: "test.emitted"}}
     end
 
     test "returns async tuple when dispatch config provided", %{
