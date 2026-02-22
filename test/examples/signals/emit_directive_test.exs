@@ -124,6 +124,64 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     end
   end
 
+  defmodule InternalIncrementAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "internal_increment",
+      schema: [
+        amount: [type: :integer, default: 1]
+      ]
+
+    def run(%{amount: amount}, context) do
+      current = Map.get(context.state, :count, 0)
+      new_count = current + amount
+
+      internal_signal =
+        Signal.new!(
+          "print.count",
+          %{previous_count: current, count: new_count},
+          source: "/internal-counter"
+        )
+
+      {:ok, %{count: new_count}, [Directive.emit(internal_signal)]}
+    end
+  end
+
+  defmodule InternalPrintCountAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "internal_print_count",
+      schema: [
+        previous_count: [type: :integer, required: true],
+        count: [type: :integer, required: true]
+      ]
+
+    def run(%{previous_count: previous_count, count: count}, context) do
+      if is_pid(context.state.observer),
+        do: send(context.state.observer, {:print_count, previous_count, count})
+
+      {:ok, %{last_seen_count: count}}
+    end
+  end
+
+  defmodule InternalEmitAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "internal_emit_agent",
+      schema: [
+        count: [type: :integer, default: 0],
+        observer: [type: :any, default: nil],
+        last_seen_count: [type: :integer, default: 0]
+      ]
+
+    def signal_routes(_ctx) do
+      [
+        {"count.increment", InternalIncrementAction},
+        {"print.count", InternalPrintCountAction}
+      ]
+    end
+  end
+
   # ===========================================================================
   # TESTS
   # ===========================================================================
@@ -255,6 +313,21 @@ defmodule JidoExampleTest.EmitDirectiveTest do
 
       indexes = Enum.map(signals, & &1.data.index) |> Enum.sort()
       assert indexes == [1, 2, 3, 4, 5]
+    end
+  end
+
+  describe "emit loopback" do
+    test "emit without dispatch loops back to the current agent", %{jido: jido} do
+      {:ok, pid} =
+        Jido.start_agent(jido, InternalEmitAgent,
+          id: unique_id("internal-emit"),
+          initial_state: %{observer: self()}
+        )
+
+      signal = Signal.new!("count.increment", %{amount: 1}, source: "/test")
+      {:ok, _agent} = AgentServer.call(pid, signal)
+
+      assert_receive {:print_count, 0, 1}, 2_000
     end
   end
 end
