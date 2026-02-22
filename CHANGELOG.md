@@ -2,6 +2,20 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
+## 2.0.0 - 2026-02-22
+
+### Changed
+- Promote `2.0.0-rc.5` to stable `2.0.0`
+- Require Elixir `~> 1.18`
+- Bump ecosystem deps to stable ranges: `jido_action ~> 2.0`, `jido_signal ~> 2.0`
+
+### Fixed
+- Restore compile-time `signal_routes` behavior while preserving callback compatibility (#170)
+- Prevent loopback `emit` from redispatching to the current agent in AgentServer (#171)
+
+### Tooling
+- Align Igniter setup/docs with the instance-scoped API
+
 ## 2.0.0-rc.5 - 2026-02-16
 
 ### Added
@@ -104,7 +118,7 @@
 
 ---
 
-## 2.0.0 - 2025-12-31
+## 2.0.0 (Architecture Preview Notes) - 2025-12-31
 
 ### Added
 - **Instance-Scoped Supervisors**: Jido now uses user-owned, instance-scoped supervisors instead of auto-started global singletons
