@@ -163,6 +163,9 @@ defmodule MyApp.CounterAgent do
     description: "A simple counter agent",
     schema: [
       count: [type: :integer, default: 0]
+    ],
+    signal_routes: [
+      {"increment", MyApp.Actions.Increment}
     ]
 end
 ```
@@ -206,6 +209,7 @@ agent.state.count
 {:ok, pid} = MyApp.Jido.start_agent(MyApp.CounterAgent, id: "counter-1")
 
 # Send signals to the running agent (synchronous)
+# Signal types must be declared in signal_routes
 {:ok, agent} = Jido.AgentServer.call(pid, Jido.Signal.new!("increment", %{amount: 10}, source: "/user"))
 
 # Look up the agent by ID
