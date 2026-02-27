@@ -9,6 +9,7 @@ defmodule Jido.Config.Defaults do
   @type telemetry_log_level :: :trace | :debug | :info | :warning | :error
   @type telemetry_log_args :: :keys_only | :full | :none
   @type debug_events_mode :: :off | :minimal | :all
+  @type tracer_failure_mode :: :warn | :strict
 
   @jido_shutdown_timeout_ms 10_000
 
@@ -36,6 +37,7 @@ defmodule Jido.Config.Defaults do
   @observe_debug_events :off
   @redact_sensitive false
   @tracer Jido.Observe.NoopTracer
+  @tracer_failure_mode :warn
   @debug_max_events 500
 
   @doc "Default shutdown timeout for the top-level Jido supervisor."
@@ -109,6 +111,10 @@ defmodule Jido.Config.Defaults do
   @doc "Default tracer module."
   @spec tracer() :: module()
   def tracer, do: @tracer
+
+  @doc "Default tracer failure mode."
+  @spec tracer_failure_mode() :: tracer_failure_mode()
+  def tracer_failure_mode, do: @tracer_failure_mode
 
   @doc "Default max debug-event buffer size."
   @spec debug_max_events() :: non_neg_integer()

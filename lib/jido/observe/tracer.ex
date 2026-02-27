@@ -30,6 +30,7 @@ defmodule Jido.Observe.Tracer do
   @type metadata :: map()
   @type measurements :: map()
   @type tracer_ctx :: term()
+  @type result :: term()
 
   @doc """
   Called when a span starts.
@@ -48,4 +49,20 @@ defmodule Jido.Observe.Tracer do
   """
   @callback span_exception(tracer_ctx(), kind :: atom(), reason :: term(), stacktrace :: list()) ::
               :ok
+
+  @doc """
+  Optional synchronous span callback.
+
+  When implemented, `Jido.Observe.with_span/3` will call this callback for sync spans
+  instead of the `span_start/span_stop/span_exception` lifecycle trio.
+
+  Callback contract:
+  - Call the provided function in the caller process
+  - Call the provided function exactly once
+  - Preserve the function's return value
+  - Preserve the function's exception/throw/exit semantics
+  """
+  @callback with_span_scope(event_prefix(), metadata(), (-> result())) :: result()
+
+  @optional_callbacks with_span_scope: 3
 end

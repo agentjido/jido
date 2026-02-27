@@ -246,6 +246,7 @@ defmodule JidoTest.ObserveTest do
       assert span_ctx.metadata == %{meta: "data"}
       assert is_integer(span_ctx.start_time)
       assert is_integer(span_ctx.start_system_time)
+      assert span_ctx.tracer_module == Jido.Observe.NoopTracer
     end
   end
 
