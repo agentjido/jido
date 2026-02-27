@@ -2,22 +2,6 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
-## 2.0.1 - 2026-02-27
-
-### Added
-- Optional sync tracer callback `with_span_scope/3` for `Jido.Observe.with_span/3`
-- Configurable tracer failure mode via `:observability, tracer_failure_mode` (`:warn` | `:strict`)
-- Pinned tracer module on span context to prevent mid-span config drift
-
-### Changed
-- `with_span/3` now uses `with_span_scope/3` when a tracer implements it, with backward-compatible fallback to legacy callbacks
-- Tracer callback failures now include standardized diagnostics (tracer module, callback, event prefix, failure mode)
-- Async span lifecycle remains explicit and context-neutral by default
-
-### Fixed
-- Harden sync span contract handling against scoped callback foot guns (zero-call, double-call, swallowed exception, return tampering)
-- Catch and handle tracer callback failures consistently across `rescue`/`throw`/`exit`
-
 ## 2.0.0 - 2026-02-22
 
 ### Changed
