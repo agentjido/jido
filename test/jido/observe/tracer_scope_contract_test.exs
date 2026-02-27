@@ -152,6 +152,49 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
     end
   end
 
+  defmodule CrossProcessInvokeTracer do
+    @behaviour Jido.Observe.Tracer
+
+    @impl true
+    def span_start(_event_prefix, _metadata), do: :ok
+
+    @impl true
+    def span_stop(_ctx, _measurements), do: :ok
+
+    @impl true
+    def span_exception(_ctx, _kind, _reason, _stacktrace), do: :ok
+
+    @impl true
+    def with_span_scope(_event_prefix, _metadata, fun) do
+      caller = self()
+      ref = make_ref()
+
+      spawn(fn ->
+        result =
+          try do
+            {:ok, fun.()}
+          rescue
+            e -> {:error, e, __STACKTRACE__}
+          catch
+            kind, reason -> {kind, reason, __STACKTRACE__}
+          end
+
+        send(caller, {ref, result})
+      end)
+
+      receive do
+        {^ref, {:ok, result}} ->
+          result
+
+        {^ref, {:error, error, stacktrace}} ->
+          reraise error, stacktrace
+
+        {^ref, {kind, reason, stacktrace}} ->
+          :erlang.raise(kind, reason, stacktrace)
+      end
+    end
+  end
+
   defmodule PinnedTracerA do
     @behaviour Jido.Observe.Tracer
 
@@ -387,6 +430,27 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
     assert log =~ "scope_failure"
   end
 
+  test "warn mode prevents cross-process scoped invocation from double-running function" do
+    Application.put_env(:jido, :observability, tracer: CrossProcessInvokeTracer)
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    on_exit(fn ->
+      if Process.alive?(counter), do: Agent.stop(counter)
+    end)
+
+    log =
+      capture_log(fn ->
+        assert :ok =
+                 Observe.with_span([:jido, :scope, :cross_process, :warn], %{}, fn ->
+                   Agent.update(counter, &(&1 + 1))
+                   :ok
+                 end)
+      end)
+
+    assert Agent.get(counter, & &1) == 1
+    assert log =~ "with_span_scope/3 must execute wrapped function in caller process"
+  end
+
   test "strict mode raises when scoped callback throws before invocation" do
     Application.put_env(
       :jido,
@@ -400,6 +464,30 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
         :ok
       end)
     end
+  end
+
+  test "strict mode raises and does not run wrapped function when scoped callback runs cross-process" do
+    Application.put_env(
+      :jido,
+      :observability,
+      tracer: CrossProcessInvokeTracer,
+      tracer_failure_mode: :strict
+    )
+
+    {:ok, counter} = Agent.start_link(fn -> 0 end)
+
+    on_exit(fn ->
+      if Process.alive?(counter), do: Agent.stop(counter)
+    end)
+
+    assert_raise RuntimeError, ~r/tracer with_span_scope\/3 failed/, fn ->
+      Observe.with_span([:jido, :scope, :cross_process, :strict], %{}, fn ->
+        Agent.update(counter, &(&1 + 1))
+        :ok
+      end)
+    end
+
+    assert Agent.get(counter, & &1) == 0
   end
 
   test "finish_span uses tracer pinned at start even if config changes" do

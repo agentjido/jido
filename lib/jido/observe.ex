@@ -49,6 +49,7 @@ defmodule Jido.Observe do
   If the configured tracer implements optional `with_span_scope/3`, `with_span/3`
   uses that callback for sync span scoping. Adapter contract for `with_span_scope/3`:
 
+  - Call the provided function in the caller process
   - Call the provided function exactly once
   - Preserve the function return value
   - Preserve exception/throw/exit semantics
@@ -408,7 +409,7 @@ defmodule Jido.Observe do
 
   defp with_span_scoped(%SpanCtx{} = span_ctx, fun) do
     key = {__MODULE__, :scoped_guard, make_ref()}
-    wrapped_fun = scoped_wrapped_fun(fun, span_ctx, key)
+    wrapped_fun = scoped_wrapped_fun(fun, span_ctx, key, self())
 
     Process.put(key, %{count: 0, outcome: nil})
 
@@ -545,18 +546,24 @@ defmodule Jido.Observe do
     end
   end
 
-  defp scoped_wrapped_fun(fun, span_ctx, key) do
+  defp scoped_wrapped_fun(fun, span_ctx, key, owner_pid) do
     fn ->
-      state = scoped_state(key)
+      if self() != owner_pid do
+        raise RuntimeError,
+              "with_span_scope/3 must execute wrapped function in caller process " <>
+                "(owner=#{inspect(owner_pid)}, caller=#{inspect(self())})"
+      else
+        state = scoped_state(key)
 
-      case state.count do
-        0 ->
-          Process.put(key, %{count: 1, outcome: nil})
-          execute_scoped_fun(fun, span_ctx, key)
+        case state.count do
+          0 ->
+            Process.put(key, %{count: 1, outcome: nil})
+            execute_scoped_fun(fun, span_ctx, key)
 
-        count when is_integer(count) and count > 0 ->
-          Process.put(key, %{state | count: count + 1})
-          replay_scoped_outcome(state.outcome)
+          count when is_integer(count) and count > 0 ->
+            Process.put(key, %{state | count: count + 1})
+            replay_scoped_outcome(state.outcome)
+        end
       end
     end
   end

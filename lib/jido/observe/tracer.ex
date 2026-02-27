@@ -57,6 +57,7 @@ defmodule Jido.Observe.Tracer do
   instead of the `span_start/span_stop/span_exception` lifecycle trio.
 
   Callback contract:
+  - Call the provided function in the caller process
   - Call the provided function exactly once
   - Preserve the function's return value
   - Preserve the function's exception/throw/exit semantics
