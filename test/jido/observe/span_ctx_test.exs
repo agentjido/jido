@@ -31,6 +31,11 @@ defmodule JidoTest.Observe.SpanCtxTest do
       assert {:ok, %SpanCtx{tracer_ctx: {:opentelemetry, :ctx}}} = SpanCtx.new(attrs)
     end
 
+    test "creates a SpanCtx with optional tracer_module" do
+      attrs = Map.put(@valid_attrs, :tracer_module, Jido.Observe.NoopTracer)
+      assert {:ok, %SpanCtx{tracer_module: Jido.Observe.NoopTracer}} = SpanCtx.new(attrs)
+    end
+
     test "returns error for non-map input" do
       assert {:error, error} = SpanCtx.new("not a map")
       assert error.message == "SpanCtx requires a map"

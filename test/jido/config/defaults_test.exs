@@ -25,6 +25,7 @@ defmodule JidoTest.Config.DefaultsTest do
     assert Defaults.observe_debug_events() == :off
     refute Defaults.redact_sensitive()
     assert Defaults.tracer() == Jido.Observe.NoopTracer
+    assert Defaults.tracer_failure_mode() == :warn
     assert Defaults.debug_max_events() == 500
   end
 end

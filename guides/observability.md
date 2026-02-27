@@ -347,7 +347,8 @@ end
 config :jido, :observability,
   tracer: JidoOtel.Tracer,
   log_level: :info,
-  redact_sensitive: true
+  redact_sensitive: true,
+  tracer_failure_mode: :warn
 
 # OpenTelemetry exporter configuration
 config :opentelemetry,
@@ -383,7 +384,34 @@ defmodule MyApp.CustomTracer do
     # Record exception in external tracer.
     :ok
   end
+
+  @impl true
+  def with_span_scope(event_prefix, metadata, fun) do
+    # Optional sync span scoping callback.
+    # Must call `fun.()` exactly once and preserve result/error semantics.
+    _ = {event_prefix, metadata}
+    fun.()
+  end
 end
+```
+
+### Sync vs Async Tracer Semantics
+
+- `with_span/3` uses optional `with_span_scope/3` when implemented.
+- `start_span/2` + finish callbacks remain explicit lifecycle APIs for async work.
+- Existing tracers that implement only `span_start/2`, `span_stop/2`, and `span_exception/4` continue to work unchanged.
+
+### Tracer Failure Modes
+
+Use `:tracer_failure_mode` to control callback failures:
+
+- `:warn` (default): isolate tracer failures and continue app flow
+- `:strict`: raise immediately when tracer callbacks fail
+
+```elixir
+config :jido, :observability,
+  tracer: MyApp.CustomTracer,
+  tracer_failure_mode: :strict
 ```
 
 ## Correlation IDs and Distributed Tracing
@@ -471,6 +499,9 @@ end
 For long-lived request workflows, use a request-root span plus async child spans.
 Propagate correlation metadata across async boundaries, then emit terminal
 domain events (`completed`, `failed`, `cancelled`, `rejected`).
+
+Important: OpenTelemetry current-span context is process-local. Across `Task` boundaries,
+explicitly propagate only correlation metadata and start/finish spans in the owning process.
 
 ```elixir
 alias Jido.Observe

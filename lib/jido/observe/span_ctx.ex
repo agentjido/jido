@@ -13,6 +13,8 @@ defmodule Jido.Observe.SpanCtx do
               start_time: Zoi.integer(description: "Monotonic start time in nanoseconds"),
               start_system_time: Zoi.integer(description: "System start time in nanoseconds"),
               metadata: Zoi.map(description: "Event metadata"),
+              tracer_module:
+                Zoi.atom(description: "Pinned tracer module for this span") |> Zoi.optional(),
               tracer_ctx: Zoi.any(description: "Tracer-specific context") |> Zoi.optional()
             },
             coerce: true

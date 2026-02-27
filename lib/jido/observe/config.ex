@@ -28,6 +28,7 @@ defmodule Jido.Observe.Config do
   @telemetry_log_args_modes [:keys_only, :full, :none]
   @debug_events_modes [:off, :minimal, :all]
   @observe_log_levels Logger.levels()
+  @tracer_failure_modes [:warn, :strict]
 
   # --- Telemetry settings ---
 
@@ -218,6 +219,23 @@ defmodule Jido.Observe.Config do
     |> normalize_tracer()
   end
 
+  @doc "Returns tracer callback failure handling mode."
+  @spec tracer_failure_mode(instance()) :: :warn | :strict
+  def tracer_failure_mode(instance \\ nil)
+
+  def tracer_failure_mode(nil) do
+    global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
+    |> normalize_tracer_failure_mode()
+  end
+
+  def tracer_failure_mode(instance) do
+    with nil <- Jido.Debug.override(instance, :tracer_failure_mode),
+         nil <- instance_observability(instance, :tracer_failure_mode) do
+      global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
+    end
+    |> normalize_tracer_failure_mode()
+  end
+
   # --- Debug buffer settings ---
 
   @doc "Returns the maximum number of debug events to store."
@@ -299,6 +317,9 @@ defmodule Jido.Observe.Config do
 
   defp normalize_boolean(true), do: true
   defp normalize_boolean(_), do: false
+
+  defp normalize_tracer_failure_mode(mode) when mode in @tracer_failure_modes, do: mode
+  defp normalize_tracer_failure_mode(_), do: Defaults.tracer_failure_mode()
 
   defp normalize_tracer(module) when is_atom(module) do
     case Code.ensure_loaded(module) do

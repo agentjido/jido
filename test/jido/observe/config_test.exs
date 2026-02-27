@@ -200,6 +200,22 @@ defmodule JidoTest.Observe.ConfigTest do
     end
   end
 
+  describe "tracer_failure_mode/1" do
+    test "returns :warn by default" do
+      assert Config.tracer_failure_mode(nil) == :warn
+    end
+
+    test "reads from global observability config" do
+      Application.put_env(:jido, :observability, tracer_failure_mode: :strict)
+      assert Config.tracer_failure_mode(nil) == :strict
+    end
+
+    test "falls back to default when value is invalid" do
+      Application.put_env(:jido, :observability, tracer_failure_mode: :invalid)
+      assert Config.tracer_failure_mode(nil) == :warn
+    end
+  end
+
   describe "debug_max_events/1" do
     test "returns default by default" do
       assert Config.debug_max_events(nil) == Defaults.debug_max_events()
