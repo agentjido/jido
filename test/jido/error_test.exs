@@ -246,6 +246,43 @@ defmodule JidoTest.ErrorTest do
     end
   end
 
+  describe "Splode interop" do
+    test "to_error/1 keeps Jido validation errors typed and classified" do
+      error = Error.validation_error("Invalid", field: :email)
+      converted = Error.to_error(error)
+
+      assert %Error.ValidationError{} = converted
+      assert converted.class == :invalid
+      assert converted.message == "Invalid"
+    end
+
+    test "to_class/1 wraps typed errors in the corresponding class" do
+      error = Error.validation_error("Invalid", field: :email)
+      class_error = Error.to_class(error)
+
+      assert %Error.Invalid{} = class_error
+      assert class_error.class == :invalid
+      assert [%Error.ValidationError{}] = class_error.errors
+    end
+
+    test "to_error/1 preserves unknown error message for plain values" do
+      unknown = Error.to_error("plain failure")
+
+      assert %Error.Internal.UnknownError{} = unknown
+      assert unknown.class == :internal
+      assert unknown.message == "plain failure"
+    end
+
+    test "to_class/1 handles unknown values without raising" do
+      class_error = Error.to_class("plain failure")
+
+      assert %Error.Internal{} = class_error
+      assert class_error.class == :internal
+      assert [%Error.Internal.UnknownError{} = wrapped] = class_error.errors
+      assert wrapped.message == "plain failure"
+    end
+  end
+
   describe "extract_message/1" do
     test "extracts message from various structures" do
       assert Error.extract_message(%{message: %{message: "Nested"}}) == "Nested"
