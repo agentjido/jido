@@ -164,7 +164,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
     persistence_key = {lifecycle.pool, pool_key}
-    agent = state.agent
+    agent = attach_cron_specs(state.agent, state.cron_specs)
     agent_module = state.agent_module
 
     case Persist.hibernate(storage, agent_module, persistence_key, agent) do
@@ -176,6 +176,19 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
           "Lifecycle hibernate failed for #{lifecycle.pool}/#{inspect(pool_key)}: #{inspect(reason)}"
         )
     end
+  end
+
+  defp attach_cron_specs(agent, cron_specs) when is_map(cron_specs) do
+    key = Jido.Scheduler.cron_specs_state_key()
+
+    state_with_specs =
+      if map_size(cron_specs) == 0 do
+        Map.delete(agent.state, key)
+      else
+        Map.put(agent.state, key, cron_specs)
+      end
+
+    %{agent | state: state_with_specs}
   end
 
   defp maybe_start_idle_timer(state) do

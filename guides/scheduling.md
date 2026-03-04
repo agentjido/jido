@@ -185,22 +185,28 @@ Cancelling a non-existent job is a no-op — it doesn't raise an error.
 
 ## Semantics & Guarantees
 
-### Timer-Based, Not Persistent
+### Timer-Based Delivery, Optional Durable Registration
 
-Both `Schedule` and `Cron` use in-memory timers (`Process.send_after/3` and [SchedEx](https://github.com/SchedEx/SchedEx)).
+`Schedule` is always in-memory (`Process.send_after/3`).
+
+`Cron` is process-local at runtime, with optional durable registration when the
+agent is managed by `Jido.Agent.InstanceManager` **and** storage is enabled.
+In that mode, dynamic cron specs are persisted through `Jido.Persist` and
+re-registered on thaw.
 
 **What this means:**
 
 | Scenario | Behavior |
 |----------|----------|
-| Agent crashes before timer fires | Scheduled message lost |
-| Agent restarts | Cron jobs must be re-registered |
-| Node restart | All schedules lost |
+| Agent crashes before `Schedule` timer fires | Scheduled message lost |
+| Agent crashes before `Cron` tick fires | Tick may be missed |
+| InstanceManager + storage + idle hibernate/thaw | Dynamic cron registrations are restored |
+| `storage: nil` or non-persistent lifecycle | Dynamic cron registrations are runtime-only |
 | Timer fires during agent busy | Message queued in mailbox |
 
 ### Missed-Run Behavior
 
-**Cron jobs do not catch up on missed runs.** If your agent is down when a cron tick would fire, that tick is simply missed. When the agent restarts and re-registers the job, scheduling resumes from the next scheduled time.
+**Cron jobs do not catch up on missed runs.** If your agent is down when a cron tick would fire, that tick is simply missed. After restart/thaw, scheduling resumes from the next scheduled time.
 
 Example: An agent with a `@daily` job at midnight crashes at 11:50 PM and restarts at 12:30 AM. The midnight run is missed entirely — no catch-up occurs.
 

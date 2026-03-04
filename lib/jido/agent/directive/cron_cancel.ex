@@ -47,7 +47,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
       pid when is_pid(pid) ->
         Jido.Scheduler.cancel(pid)
         Logger.debug("AgentServer #{agent_id} cancelled cron job #{inspect(logical_id)}")
-        new_state = %{state | cron_jobs: Map.delete(state.cron_jobs, logical_id)}
+
+        new_state = %{
+          state
+          | cron_jobs: Map.delete(state.cron_jobs, logical_id),
+            cron_specs: Map.delete(state.cron_specs, logical_id)
+        }
+
         {:ok, new_state}
 
       _other ->
@@ -55,7 +61,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
           "AgentServer #{agent_id} cron job #{inspect(logical_id)} has legacy format, removing from state"
         )
 
-        new_state = %{state | cron_jobs: Map.delete(state.cron_jobs, logical_id)}
+        new_state = %{
+          state
+          | cron_jobs: Map.delete(state.cron_jobs, logical_id),
+            cron_specs: Map.delete(state.cron_specs, logical_id)
+        }
+
         {:ok, new_state}
     end
   end

@@ -51,6 +51,9 @@ defmodule Jido.AgentServer.State do
               # Cron jobs
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
+              cron_specs:
+                Zoi.map(description: "Map of job_id => durable cron registration spec")
+                |> Zoi.default(%{}),
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules")
                 |> Zoi.default(false),
@@ -111,6 +114,7 @@ defmodule Jido.AgentServer.State do
   @spec from_options(Options.t(), module(), struct()) :: {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent) do
     agent = inject_parent_into_agent(agent, opts.parent)
+    {agent, restored_cron_specs} = extract_cron_specs(agent)
 
     lifecycle_opts = [
       lifecycle_mod: opts.lifecycle_mod,
@@ -141,6 +145,7 @@ defmodule Jido.AgentServer.State do
         registry: opts.registry,
         spawn_fun: opts.spawn_fun,
         cron_jobs: %{},
+        cron_specs: restored_cron_specs,
         skip_schedules: opts.skip_schedules,
         error_count: 0,
         metrics: %{},
@@ -161,6 +166,23 @@ defmodule Jido.AgentServer.State do
     updated_state = Map.put(agent.state, :__parent__, parent)
     %{agent | state: updated_state}
   end
+
+  @spec extract_cron_specs(struct()) :: {struct(), map()}
+  defp extract_cron_specs(%{state: state} = agent) when is_map(state) do
+    key = Jido.Scheduler.cron_specs_state_key()
+    cron_specs = state |> Map.get(key) |> Jido.Scheduler.normalize_cron_specs()
+
+    cleaned_agent =
+      if Map.has_key?(state, key) do
+        %{agent | state: Map.delete(state, key)}
+      else
+        agent
+      end
+
+    {cleaned_agent, cron_specs}
+  end
+
+  defp extract_cron_specs(agent), do: {agent, %{}}
 
   @doc """
   Updates the agent in state.

@@ -69,7 +69,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
     logical_id = logical_id || make_ref()
     signal = build_signal(message, logical_id, agent_id)
 
-    cancel_existing_job(state.cron_jobs, logical_id)
+    state = cancel_existing_job(state, logical_id)
 
     opts = build_scheduler_opts(tz)
 
@@ -84,7 +84,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
       cron_expr,
       opts
     )
-    |> handle_scheduler_result(state, agent_id, logical_id, cron_expr)
+    |> handle_scheduler_result(state, agent_id, logical_id, cron_expr, message, tz)
   end
 
   defp build_signal(%Jido.Signal{} = signal, _logical_id, _agent_id), do: signal
@@ -96,30 +96,59 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
     )
   end
 
-  defp cancel_existing_job(cron_jobs, logical_id) do
-    case Map.get(cron_jobs, logical_id) do
+  defp cancel_existing_job(state, logical_id) do
+    case Map.get(state.cron_jobs, logical_id) do
       pid when is_pid(pid) -> Jido.Scheduler.cancel(pid)
       _ -> :ok
     end
+
+    %{
+      state
+      | cron_jobs: Map.delete(state.cron_jobs, logical_id),
+        cron_specs: Map.delete(state.cron_specs, logical_id)
+    }
   end
 
   defp build_scheduler_opts(nil), do: []
   defp build_scheduler_opts(tz), do: [timezone: tz]
 
-  defp handle_scheduler_result({:ok, pid}, state, agent_id, logical_id, cron_expr) do
+  defp handle_scheduler_result(
+         {:ok, pid},
+         state,
+         agent_id,
+         logical_id,
+         cron_expr,
+         message,
+         tz
+       ) do
     Logger.debug(
       "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
     )
 
-    new_state = put_in(state.cron_jobs[logical_id], pid)
+    cron_spec = Jido.Scheduler.build_cron_spec(cron_expr, message, tz)
+
+    new_state = %{
+      state
+      | cron_jobs: Map.put(state.cron_jobs, logical_id, pid),
+        cron_specs: Map.put(state.cron_specs, logical_id, cron_spec)
+    }
+
     {:ok, new_state}
   end
 
-  defp handle_scheduler_result({:error, reason}, _state, agent_id, logical_id, _cron_expr) do
+  defp handle_scheduler_result(
+         {:error, reason},
+         state,
+         agent_id,
+         logical_id,
+         _cron_expr,
+         _message,
+         _tz
+       ) do
     Logger.error(
       "AgentServer #{agent_id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
     )
 
-    {:error, reason}
+    {:ok, state}
   end
 end

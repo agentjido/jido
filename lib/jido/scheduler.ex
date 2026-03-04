@@ -1,49 +1,67 @@
 defmodule Jido.Scheduler do
   @moduledoc """
-  Per-instance cron scheduling using SchedEx.
+  Per-agent cron scheduling with internal timer processes.
 
-  This module provides a thin wrapper around SchedEx for scheduling recurring
-  cron jobs that are scoped to individual agents. Unlike a global scheduler,
-  each cron job is supervised as part of the agent's process tree.
+  `Jido.Scheduler` is intentionally lightweight and process-local:
+  each registered cron job is backed by a dedicated process linked to the
+  caller (typically the owning `Jido.AgentServer`).
 
-  ## Usage
-
-  Jobs are typically created via the `%Directive.Cron{}` directive, which
-  internally uses this module. You can also use it directly:
-
-      # Start a cron job that calls a function every minute
-      {:ok, pid} = Jido.Scheduler.run_every(MyModule, :tick, [arg1], "* * * * *")
-
-      # Cancel the job
-      Jido.Scheduler.cancel(pid)
-
-  ## Cron Expressions
-
-  Standard 5-field cron expressions are supported:
-
-  - `"* * * * *"` - Every minute
-  - `"*/5 * * * *"` - Every 5 minutes
-  - `"0 * * * *"` - Every hour
-  - `"0 0 * * *"` - Daily at midnight
-  - `"0 0 * * MON"` - Every Monday at midnight
-
-  Extended 7-field expressions (with seconds and year) are also supported.
-
-  ## Aliases
-
-  - `@yearly` / `@annually` - Once a year at midnight Jan 1
-  - `@monthly` - Once a month at midnight on the 1st
-  - `@weekly` - Once a week at midnight on Sunday
-  - `@daily` / `@midnight` - Once a day at midnight
-  - `@hourly` - Once an hour at the beginning of the hour
-
-  See `Jido.Agent.Directive.Cron` for directive-based usage.
+  The runtime stores live job processes in `AgentServer.State.cron_jobs` and
+  separately stores durable schedule definitions in `AgentServer.State.cron_specs`.
+  The durable specs are persisted through `Jido.Persist` for InstanceManager-
+  managed agents.
   """
+
+  alias Jido.Scheduler.Job
+
+  @cron_specs_state_key :__cron_specs__
+  @default_timezone "Etc/UTC"
+
+  @type cron_spec :: %{
+          required(:cron_expression) => String.t(),
+          required(:message) => term(),
+          required(:timezone) => String.t()
+        }
+
+  @doc """
+  Reserved internal agent-state key used to stage durable cron specs across
+  hibernate/thaw boundaries.
+  """
+  @spec cron_specs_state_key() :: atom()
+  def cron_specs_state_key, do: @cron_specs_state_key
+
+  @doc """
+  Build a normalized durable cron spec map.
+  """
+  @spec build_cron_spec(String.t(), term(), String.t() | nil) :: cron_spec()
+  def build_cron_spec(cron_expression, message, timezone \\ nil)
+      when is_binary(cron_expression) do
+    %{
+      cron_expression: cron_expression,
+      message: message,
+      timezone: normalize_timezone(timezone)
+    }
+  end
+
+  @doc """
+  Normalize a persisted cron-spec map, dropping malformed entries.
+  """
+  @spec normalize_cron_specs(term()) :: %{optional(term()) => cron_spec()}
+  def normalize_cron_specs(specs) when is_map(specs) do
+    Enum.reduce(specs, %{}, fn {job_id, spec}, acc ->
+      case normalize_cron_spec(spec) do
+        {:ok, normalized} -> Map.put(acc, job_id, normalized)
+        :error -> acc
+      end
+    end)
+  end
+
+  def normalize_cron_specs(_), do: %{}
 
   @doc """
   Starts a recurring cron job.
 
-  Returns `{:ok, pid}` where `pid` is the SchedEx process that can be
+  Returns `{:ok, pid}` where `pid` is the scheduler job process that can be
   used to cancel the job later.
 
   ## Options
@@ -58,15 +76,7 @@ defmodule Jido.Scheduler do
   @spec run_every(module(), atom(), list(), String.t(), keyword()) ::
           {:ok, pid()} | {:error, term()}
   def run_every(module, function, args, cron_expr, opts \\ []) do
-    timezone = Keyword.get(opts, :timezone, "Etc/UTC")
-
-    SchedEx.run_every(
-      module,
-      function,
-      args,
-      cron_expr,
-      timezone: timezone
-    )
+    run_every(fn -> apply(module, function, args) end, cron_expr, opts)
   end
 
   @doc """
@@ -77,14 +87,10 @@ defmodule Jido.Scheduler do
       {:ok, pid} = Jido.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
   """
   @spec run_every((-> any()), String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
-  def run_every(fun, cron_expr, opts \\ []) when is_function(fun, 0) do
-    timezone = Keyword.get(opts, :timezone, "Etc/UTC")
-
-    SchedEx.run_every(
-      fun,
-      cron_expr,
-      timezone: timezone
-    )
+  def run_every(fun, cron_expr, opts \\ [])
+      when is_function(fun, 0) and is_binary(cron_expr) and is_list(opts) do
+    timezone = normalize_timezone(Keyword.get(opts, :timezone))
+    Job.start_link(fun, cron_expr, timezone)
   end
 
   @doc """
@@ -97,7 +103,15 @@ defmodule Jido.Scheduler do
   """
   @spec cancel(pid()) :: :ok
   def cancel(pid) when is_pid(pid) do
-    SchedEx.cancel(pid)
+    if Process.alive?(pid) do
+      try do
+        GenServer.stop(pid, :normal, 5_000)
+      catch
+        :exit, _ -> :ok
+      end
+    end
+
+    :ok
   end
 
   @doc """
@@ -107,4 +121,34 @@ defmodule Jido.Scheduler do
   def alive?(pid) when is_pid(pid) do
     Process.alive?(pid)
   end
+
+  @spec normalize_cron_spec(term()) :: {:ok, cron_spec()} | :error
+  defp normalize_cron_spec(spec) when is_map(spec) do
+    cron_expression = map_get(spec, :cron_expression)
+    timezone = map_get(spec, :timezone)
+
+    cond do
+      not is_binary(cron_expression) ->
+        :error
+
+      true ->
+        {:ok,
+         %{
+           cron_expression: cron_expression,
+           message: map_get(spec, :message),
+           timezone: normalize_timezone(timezone)
+         }}
+    end
+  end
+
+  defp normalize_cron_spec(_), do: :error
+
+  defp map_get(map, key) do
+    Map.get(map, key) || Map.get(map, Atom.to_string(key))
+  end
+
+  defp normalize_timezone(nil), do: @default_timezone
+  defp normalize_timezone(""), do: @default_timezone
+  defp normalize_timezone(timezone) when is_binary(timezone), do: timezone
+  defp normalize_timezone(_), do: @default_timezone
 end
