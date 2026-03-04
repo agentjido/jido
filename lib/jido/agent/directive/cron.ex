@@ -138,7 +138,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
 
   defp handle_scheduler_result(
          {:error, reason},
-         _state,
+         state,
          agent_id,
          logical_id,
          _cron_expr,
@@ -149,6 +149,6 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
       "AgentServer #{agent_id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
     )
 
-    {:error, reason}
+    {:ok, state}
   end
 end

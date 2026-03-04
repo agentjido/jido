@@ -506,7 +506,9 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           fn state ->
             Map.has_key?(state.cron_jobs, :durable_tick) and
               Map.has_key?(state.cron_specs, :durable_tick)
-          end, timeout: 2_000)
+          end,
+          timeout: 2_000
+        )
 
       state1 =
         eventually_state(pid1, fn state -> state.agent.state.tick_count > 0 end, timeout: 3_000)
@@ -540,7 +542,9 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         pid2,
         fn state ->
           state.agent.state.tick_count > pre_hibernate_ticks
-        end, timeout: 3_000)
+        end,
+        timeout: 3_000
+      )
 
       :ok = AgentServer.detach(pid2)
     end
@@ -571,7 +575,9 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         fn state ->
           not Map.has_key?(state.cron_jobs, :to_cancel) and
             not Map.has_key?(state.cron_specs, :to_cancel)
-        end, timeout: 2_000)
+        end,
+        timeout: 2_000
+      )
 
       :ok = AgentServer.detach(pid1)
       ref = Process.monitor(pid1)

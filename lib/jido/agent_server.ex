@@ -1783,12 +1783,15 @@ defmodule Jido.AgentServer do
       {:ok, new_state} ->
         new_state
 
-      {:error, reason} ->
+      {:async, _ref, new_state} ->
+        new_state
+
+      {:stop, reason, new_state} ->
         Logger.error(
-          "AgentServer #{state.id} failed to restore cron job #{inspect(job_id)}: #{inspect(reason)}"
+          "AgentServer #{state.id} stopped while restoring cron job #{inspect(job_id)}: #{inspect(reason)}"
         )
 
-        state
+        new_state
     end
   end
 
