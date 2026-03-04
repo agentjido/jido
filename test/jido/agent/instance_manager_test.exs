@@ -9,6 +9,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   alias Jido.Agent.InstanceManager
   alias Jido.Agent.Directive
   alias Jido.AgentServer
+  alias Jido.Scheduler
   alias Jido.Signal
   alias Jido.Storage.ETS
 
@@ -78,6 +79,27 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       name: "durable_cron_agent",
       schema: [
         tick_count: [type: :integer, default: 0]
+      ]
+
+    @impl true
+    def signal_routes(_ctx) do
+      [
+        {"register_cron", RegisterCronAction},
+        {"cancel_cron", CancelCronAction},
+        {"cron.tick", CronTickAction}
+      ]
+    end
+  end
+
+  defmodule DeclarativeConflictAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "declarative_conflict_agent",
+      schema: [
+        tick_count: [type: :integer, default: 0]
+      ],
+      schedules: [
+        {"* * * * *", "cron.tick", job_id: :declarative_conflict}
       ]
 
     @impl true
@@ -485,7 +507,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         cleanup_storage_tables(table_name)
       end)
 
-      {:ok, manager: manager_name}
+      {:ok, manager: manager_name, table: table_name}
     end
 
     @tag timeout: 8_000
@@ -599,6 +621,228 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       {:ok, state2} = AgentServer.state(pid2)
       assert map_size(state2.cron_jobs) == 0
       assert map_size(state2.cron_specs) == 0
+
+      :ok = AgentServer.detach(pid2)
+    end
+
+    @tag timeout: 8_000
+    test "write-through register survives abrupt process loss", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "durable-cron-kill-register")
+      :ok = AgentServer.attach(pid1)
+
+      register_signal =
+        Signal.new!("register_cron", %{job_id: :after_kill_register, cron: "* * * * * * *"},
+          source: "/test"
+        )
+
+      :ok = AgentServer.cast(pid1, register_signal)
+
+      eventually_state(
+        pid1,
+        fn state ->
+          Map.has_key?(state.cron_jobs, :after_kill_register) and
+            Map.has_key?(state.cron_specs, :after_kill_register)
+        end,
+        timeout: 2_000
+      )
+
+      ref = Process.monitor(pid1)
+      Process.exit(pid1, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, :killed}, 2_000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "durable-cron-kill-register")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 3_000
+        )
+
+      state2 =
+        eventually_state(
+          pid2,
+          fn state ->
+            Map.has_key?(state.cron_jobs, :after_kill_register) and
+              Map.has_key?(state.cron_specs, :after_kill_register)
+          end,
+          timeout: 3_000
+        )
+
+      assert is_pid(state2.cron_jobs[:after_kill_register])
+      :ok = AgentServer.detach(pid2)
+    end
+
+    @tag timeout: 8_000
+    test "write-through cancel survives abrupt process loss", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "durable-cron-kill-cancel")
+      :ok = AgentServer.attach(pid1)
+
+      register_signal =
+        Signal.new!("register_cron", %{job_id: :after_kill_cancel, cron: "* * * * * * *"},
+          source: "/test"
+        )
+
+      cancel_signal =
+        Signal.new!("cancel_cron", %{job_id: :after_kill_cancel}, source: "/test")
+
+      :ok = AgentServer.cast(pid1, register_signal)
+
+      eventually_state(
+        pid1,
+        fn state ->
+          Map.has_key?(state.cron_jobs, :after_kill_cancel) and
+            Map.has_key?(state.cron_specs, :after_kill_cancel)
+        end,
+        timeout: 2_000
+      )
+
+      :ok = AgentServer.cast(pid1, cancel_signal)
+
+      eventually_state(
+        pid1,
+        fn state ->
+          not Map.has_key?(state.cron_jobs, :after_kill_cancel) and
+            not Map.has_key?(state.cron_specs, :after_kill_cancel)
+        end,
+        timeout: 2_000
+      )
+
+      ref = Process.monitor(pid1)
+      Process.exit(pid1, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, :killed}, 2_000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "durable-cron-kill-cancel")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 3_000
+        )
+
+      {:ok, state2} = AgentServer.state(pid2)
+      refute Map.has_key?(state2.cron_jobs, :after_kill_cancel)
+      refute Map.has_key?(state2.cron_specs, :after_kill_cancel)
+
+      :ok = AgentServer.detach(pid2)
+    end
+  end
+
+  describe "restored cron conflict policy with declarative schedules" do
+    setup do
+      manager_name =
+        :"#{@manager_prefix}_durable_cron_conflict_#{:erlang.unique_integer([:positive])}"
+
+      table_name =
+        :"#{@manager_prefix}_durable_cron_conflict_table_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: DeclarativeConflictAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_name})
+        cleanup_storage_tables(table_name)
+      end)
+
+      {:ok, manager: manager_name, table: table_name}
+    end
+
+    @tag timeout: 8_000
+    test "declarative schedule wins over restored dynamic conflict and persisted manifest is cleaned",
+         %{
+           manager: manager,
+           table: table
+         } do
+      conflict_job_id = {:agent_schedule, "declarative_conflict_agent", :declarative_conflict}
+      instance_key = "durable-cron-conflict-1"
+
+      {:ok, pid1} = InstanceManager.get(manager, instance_key)
+      :ok = AgentServer.attach(pid1)
+
+      eventually_state(pid1, fn state -> Map.has_key?(state.cron_jobs, conflict_job_id) end,
+        timeout: 2_000
+      )
+
+      register_signal =
+        Signal.new!("register_cron", %{job_id: conflict_job_id, cron: "@hourly"}, source: "/test")
+
+      :ok = AgentServer.cast(pid1, register_signal)
+
+      eventually_state(
+        pid1,
+        fn state ->
+          Map.has_key?(state.cron_jobs, conflict_job_id) and
+            Map.has_key?(state.cron_specs, conflict_job_id)
+        end,
+        timeout: 2_000
+      )
+
+      ref = Process.monitor(pid1)
+      Process.exit(pid1, :kill)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, :killed}, 2_000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, instance_key)
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 3_000
+        )
+
+      state2 =
+        eventually_state(
+          pid2,
+          fn state ->
+            Map.has_key?(state.cron_jobs, conflict_job_id) and
+              not Map.has_key?(state.cron_specs, conflict_job_id)
+          end,
+          timeout: 3_000
+        )
+
+      assert is_pid(state2.cron_jobs[conflict_job_id])
+
+      store_key = {DeclarativeConflictAgent, {manager, instance_key}}
+      scheduler_key = Scheduler.cron_specs_state_key()
+
+      eventually(
+        fn ->
+          case ETS.get_checkpoint(store_key, table: table) do
+            {:ok, checkpoint} ->
+              persisted_specs =
+                checkpoint
+                |> Map.get(:state, %{})
+                |> Map.get(scheduler_key, %{})
+
+              not Map.has_key?(persisted_specs, conflict_job_id)
+
+            :not_found ->
+              false
+          end
+        end,
+        timeout: 3_000
+      )
 
       :ok = AgentServer.detach(pid2)
     end

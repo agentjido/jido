@@ -3,7 +3,7 @@ defmodule Jido.Scheduler do
   Per-agent cron scheduling with internal timer processes.
 
   `Jido.Scheduler` is intentionally lightweight and process-local:
-  each registered cron job is backed by a dedicated process linked to the
+  each registered cron job is backed by a dedicated process owned by the
   caller (typically the owning `Jido.AgentServer`).
 
   The runtime stores live job processes in `AgentServer.State.cron_jobs` and
@@ -89,8 +89,14 @@ defmodule Jido.Scheduler do
   @spec run_every((-> any()), String.t(), keyword()) :: {:ok, pid()} | {:error, term()}
   def run_every(fun, cron_expr, opts \\ [])
       when is_function(fun, 0) and is_binary(cron_expr) and is_list(opts) do
-    timezone = normalize_timezone(Keyword.get(opts, :timezone))
-    Job.start_link(fun, cron_expr, timezone)
+    with {:ok, timezone} <- validate_timezone_opt(Keyword.get(opts, :timezone)) do
+      try do
+        Job.start(fun, cron_expr, timezone)
+      catch
+        :exit, reason ->
+          {:error, reason}
+      end
+    end
   end
 
   @doc """
@@ -151,4 +157,10 @@ defmodule Jido.Scheduler do
   defp normalize_timezone(""), do: @default_timezone
   defp normalize_timezone(timezone) when is_binary(timezone), do: timezone
   defp normalize_timezone(_), do: @default_timezone
+
+  @spec validate_timezone_opt(term()) :: {:ok, String.t()} | {:error, term()}
+  defp validate_timezone_opt(nil), do: {:ok, @default_timezone}
+  defp validate_timezone_opt(""), do: {:ok, @default_timezone}
+  defp validate_timezone_opt(timezone) when is_binary(timezone), do: {:ok, timezone}
+  defp validate_timezone_opt(_), do: {:error, :invalid_timezone}
 end

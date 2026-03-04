@@ -35,39 +35,31 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
 
   def exec(%{job_id: logical_id}, _input_signal, state) do
     agent_id = state.id
+    proposed_specs = Map.delete(state.cron_specs, logical_id)
 
-    case Map.get(state.cron_jobs, logical_id) do
-      nil ->
-        Logger.debug(
-          "AgentServer #{agent_id} cron job #{inspect(logical_id)} not found, nothing to cancel"
-        )
+    case Jido.AgentServer.persist_cron_specs(state, proposed_specs) do
+      :ok ->
+        {_pid, runtime_state} =
+          Jido.AgentServer.untrack_cron_job(state, logical_id, cancel?: true)
 
-        {:ok, state}
+        new_state = %{runtime_state | cron_specs: proposed_specs}
 
-      pid when is_pid(pid) ->
-        Jido.Scheduler.cancel(pid)
         Logger.debug("AgentServer #{agent_id} cancelled cron job #{inspect(logical_id)}")
 
-        new_state = %{
-          state
-          | cron_jobs: Map.delete(state.cron_jobs, logical_id),
-            cron_specs: Map.delete(state.cron_specs, logical_id)
-        }
-
+        Jido.AgentServer.emit_cron_telemetry_event(new_state, :cancel, %{job_id: logical_id})
         {:ok, new_state}
 
-      _other ->
-        Logger.debug(
-          "AgentServer #{agent_id} cron job #{inspect(logical_id)} has legacy format, removing from state"
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{agent_id} failed to persist cron cancellation for #{inspect(logical_id)}: #{inspect(reason)}"
         )
 
-        new_state = %{
-          state
-          | cron_jobs: Map.delete(state.cron_jobs, logical_id),
-            cron_specs: Map.delete(state.cron_specs, logical_id)
-        }
+        Jido.AgentServer.emit_cron_telemetry_event(state, :persist_failure, %{
+          job_id: logical_id,
+          reason: reason
+        })
 
-        {:ok, new_state}
+        {:ok, state}
     end
   end
 end

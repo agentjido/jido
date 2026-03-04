@@ -153,6 +153,17 @@ Directive.cron("0 9 * * *", morning_signal,
 
 Default timezone is `Etc/UTC`.
 
+Jido does **not** mutate the global calendar timezone database at runtime.
+Named timezones depend on your application config:
+
+```elixir
+# config/config.exs
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+```
+
+If timezone configuration is missing or invalid, cron registration returns
+`{:error, {:invalid_timezone, reason}}` and the agent process stays alive.
+
 ### Upsert Behavior
 
 Registering a cron job with an existing `job_id` cancels the old job and replaces it:
@@ -200,9 +211,25 @@ re-registered on thaw.
 |----------|----------|
 | Agent crashes before `Schedule` timer fires | Scheduled message lost |
 | Agent crashes before `Cron` tick fires | Tick may be missed |
-| InstanceManager + storage + idle hibernate/thaw | Dynamic cron registrations are restored |
+| InstanceManager + storage | Dynamic cron register/cancel is write-through durable |
+| InstanceManager + storage + thaw/restart | Dynamic cron registrations are restored |
 | `storage: nil` or non-persistent lifecycle | Dynamic cron registrations are runtime-only |
 | Timer fires during agent busy | Message queued in mailbox |
+
+Dynamic cron write-through ordering:
+
+- `Cron` (register/upsert): start runtime job, persist proposed manifest, then commit runtime state
+- `CronCancel`: persist manifest removal first, then stop runtime job and commit state
+
+If persistence fails, registration/cancellation is isolated and the agent keeps the prior state.
+
+### Failure Isolation and Recovery
+
+- Invalid dynamic cron input (bad cron/timezone) does not crash `AgentServer`.
+- Scheduler startup/runtime failures are non-fatal to the owning agent.
+- Cron runtime pids are monitored separately from child lifecycle monitors.
+- Abnormal dynamic cron job exits trigger capped exponential-backoff restart from durable `cron_specs`.
+- Normal/shutdown cron exits are treated as expected removal (no restart).
 
 ### Missed-Run Behavior
 

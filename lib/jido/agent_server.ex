@@ -167,7 +167,7 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.Agent.Directive
-  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
+  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, CronTick, Orphaned}
   alias Jido.Config.Defaults
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
@@ -176,6 +176,8 @@ defmodule Jido.AgentServer do
   alias Jido.Tracing.Trace
 
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
+  @cron_restart_base_ms 500
+  @cron_restart_max_ms 30_000
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -643,6 +645,138 @@ defmodule Jido.AgentServer do
     end
   end
 
+  @doc false
+  @spec register_dynamic_cron_runtime(State.t(), term(), term(), term(), term()) ::
+          {:ok, State.t()} | {:error, term(), State.t()}
+  def register_dynamic_cron_runtime(
+        %State{} = state,
+        logical_id,
+        cron_expr,
+        message,
+        timezone
+      ) do
+    with :ok <- validate_dynamic_cron_input(cron_expr, timezone) do
+      agent_id = state.id
+      agent_pid = self()
+      signal = build_dynamic_cron_signal(message, logical_id, agent_id)
+      opts = if is_binary(timezone), do: [timezone: timezone], else: []
+
+      case Jido.Scheduler.run_every(
+             fn ->
+               if Process.alive?(agent_pid) do
+                 _ = Jido.AgentServer.cast(agent_pid, signal)
+               end
+
+               :ok
+             end,
+             cron_expr,
+             opts
+           ) do
+        {:ok, pid} ->
+          {:ok, track_cron_job(state, logical_id, pid)}
+
+        {:error, reason} ->
+          Logger.error(
+            "AgentServer #{agent_id} failed to register runtime cron job #{inspect(logical_id)}: #{inspect(reason)}"
+          )
+
+          {:error, reason, state}
+      end
+    else
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  @doc false
+  @spec track_cron_job(State.t(), term(), pid()) :: State.t()
+  def track_cron_job(%State{} = state, logical_id, pid) when is_pid(pid) do
+    {_old_pid, state} = untrack_cron_job(state, logical_id, cancel?: true)
+    monitor_ref = Process.monitor(pid)
+
+    %{
+      state
+      | cron_jobs: Map.put(state.cron_jobs, logical_id, pid),
+        cron_monitors: Map.put(state.cron_monitors, logical_id, monitor_ref),
+        cron_monitor_refs: Map.put(state.cron_monitor_refs, monitor_ref, logical_id),
+        cron_restart_attempts: Map.delete(state.cron_restart_attempts, logical_id)
+    }
+  end
+
+  @doc false
+  @spec untrack_cron_job(State.t(), term(), keyword()) :: {pid() | nil, State.t()}
+  def untrack_cron_job(%State{} = state, logical_id, opts \\ []) do
+    cancel? = Keyword.get(opts, :cancel?, false)
+    pid = Map.get(state.cron_jobs, logical_id)
+    monitor_ref = Map.get(state.cron_monitors, logical_id)
+    timer_ref = Map.get(state.cron_restart_timers, logical_id)
+
+    if cancel? and is_pid(pid) and Process.alive?(pid) do
+      Jido.Scheduler.cancel(pid)
+    end
+
+    if is_reference(monitor_ref) do
+      Process.demonitor(monitor_ref, [:flush])
+    end
+
+    if is_reference(timer_ref) do
+      :erlang.cancel_timer(timer_ref)
+    end
+
+    new_state = %{
+      state
+      | cron_jobs: Map.delete(state.cron_jobs, logical_id),
+        cron_monitors: Map.delete(state.cron_monitors, logical_id),
+        cron_monitor_refs:
+          if(is_reference(monitor_ref),
+            do: Map.delete(state.cron_monitor_refs, monitor_ref),
+            else: state.cron_monitor_refs
+          ),
+        cron_restart_attempts: Map.delete(state.cron_restart_attempts, logical_id),
+        cron_restart_timers: Map.delete(state.cron_restart_timers, logical_id),
+        cron_restart_timer_refs:
+          if(is_reference(timer_ref),
+            do: Map.delete(state.cron_restart_timer_refs, timer_ref),
+            else: state.cron_restart_timer_refs
+          )
+    }
+
+    {pid, new_state}
+  end
+
+  @doc false
+  @spec persist_cron_specs(State.t(), map()) :: :ok | {:error, term()}
+  def persist_cron_specs(%State{} = state, cron_specs) when is_map(cron_specs) do
+    lifecycle_mod = state.lifecycle.mod
+    cron_specs = Jido.Scheduler.normalize_cron_specs(cron_specs)
+
+    if function_exported?(lifecycle_mod, :persist_cron_specs, 2) do
+      lifecycle_mod.persist_cron_specs(state, cron_specs)
+    else
+      :ok
+    end
+  end
+
+  @doc false
+  @spec emit_cron_telemetry_event(State.t(), atom(), map()) :: :ok
+  def emit_cron_telemetry_event(%State{} = state, event, metadata \\ %{})
+      when is_atom(event) and is_map(metadata) do
+    emit_telemetry(
+      [:jido, :agent_server, :cron, event],
+      %{system_time: System.system_time()},
+      Map.merge(
+        %{
+          agent_id: state.id,
+          agent_module: state.agent_module,
+          jido_instance: state.jido
+        },
+        metadata
+      )
+    )
+
+    :ok
+  end
+
   # ---------------------------------------------------------------------------
   # GenServer Callbacks
   # ---------------------------------------------------------------------------
@@ -719,15 +853,7 @@ defmodule Jido.AgentServer do
     # Start plugin subscription sensors
     state = start_plugin_subscriptions(state)
 
-    # Register plugin schedules (cron jobs)
-    state = register_plugin_schedules(state)
-    state = register_restored_cron_specs(state)
-
-    notify_parent_of_startup(state)
-
-    state = start_drain_if_idle(state)
-
-    # Initialize lifecycle module (starts idle timer if needed)
+    # Initialize lifecycle module (may restore state for keyed lifecycle)
     lifecycle_opts = [
       idle_timeout: state.lifecycle.idle_timeout,
       pool: state.lifecycle.pool,
@@ -736,6 +862,14 @@ defmodule Jido.AgentServer do
     ]
 
     state = state.lifecycle.mod.init(lifecycle_opts, state)
+
+    # Register plugin schedules (cron jobs)
+    state = register_plugin_schedules(state)
+    state = register_restored_cron_specs(state)
+
+    notify_parent_of_startup(state)
+
+    state = start_drain_if_idle(state)
 
     {:noreply, State.set_status(state, :idle)}
   end
@@ -927,15 +1061,50 @@ defmodule Jido.AgentServer do
         end
 
       _ ->
-        # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
-        {_popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
-        state = %{state | completion_waiters: new_waiters}
+        case Map.get(state.cron_monitor_refs, ref) do
+          nil ->
+            # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
+            {_popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
+            state = %{state | completion_waiters: new_waiters}
 
-        if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
-          handle_parent_down(state, pid, reason)
-        else
-          handle_child_down(state, pid, reason)
+            if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
+              handle_parent_down(state, pid, reason)
+            else
+              handle_child_down(state, pid, reason)
+            end
+
+          logical_id ->
+            {:noreply, handle_cron_job_down(state, logical_id, pid, reason)}
         end
+    end
+  end
+
+  def handle_info({:timeout, ref, {:cron_restart, logical_id}}, state) do
+    case Map.get(state.cron_restart_timer_refs, ref) do
+      ^logical_id ->
+        state = clear_cron_restart_timer(state, logical_id)
+
+        case Map.get(state.cron_specs, logical_id) do
+          %{cron_expression: cron_expr, message: message, timezone: timezone} ->
+            case register_dynamic_cron_runtime(state, logical_id, cron_expr, message, timezone) do
+              {:ok, new_state} ->
+                emit_cron_telemetry_event(new_state, :restart, %{
+                  job_id: logical_id,
+                  cron_expression: cron_expr
+                })
+
+                {:noreply, new_state}
+
+              {:error, reason, failed_state} ->
+                {:noreply, schedule_cron_restart(failed_state, logical_id, reason)}
+            end
+
+          _ ->
+            {:noreply, state}
+        end
+
+      _ ->
+        {:noreply, state}
     end
   end
 
@@ -1777,21 +1946,43 @@ defmodule Jido.AgentServer do
          job_id,
          %{cron_expression: cron_expr, message: message, timezone: timezone}
        ) do
-    directive = Directive.cron(cron_expr, message, job_id: job_id, timezone: timezone)
+    if Map.has_key?(state.cron_jobs, job_id) do
+      Logger.warning(
+        "AgentServer #{state.id} skipping restored cron job #{inspect(job_id)} because declarative/plugin schedule already exists"
+      )
 
-    case DirectiveExec.exec(directive, init_signal(), state) do
-      {:ok, new_state} ->
-        new_state
+      new_cron_specs = Map.delete(state.cron_specs, job_id)
+      cleaned_state = %{state | cron_specs: new_cron_specs}
 
-      {:async, _ref, new_state} ->
-        new_state
+      case persist_cron_specs(cleaned_state, new_cron_specs) do
+        :ok ->
+          cleaned_state
 
-      {:stop, reason, new_state} ->
-        Logger.error(
-          "AgentServer #{state.id} stopped while restoring cron job #{inspect(job_id)}: #{inspect(reason)}"
-        )
+        {:error, reason} ->
+          emit_cron_telemetry_event(cleaned_state, :persist_failure, %{
+            job_id: job_id,
+            reason: reason
+          })
 
-        new_state
+          cleaned_state
+      end
+    else
+      directive = Directive.cron(cron_expr, message, job_id: job_id, timezone: timezone)
+
+      case DirectiveExec.exec(directive, init_signal(), state) do
+        {:ok, new_state} ->
+          new_state
+
+        {:async, _ref, new_state} ->
+          new_state
+
+        {:stop, reason, new_state} ->
+          Logger.error(
+            "AgentServer #{state.id} stopped while restoring cron job #{inspect(job_id)}: #{inspect(reason)}"
+          )
+
+          new_state
+      end
     end
   end
 
@@ -1841,8 +2032,7 @@ defmodule Jido.AgentServer do
           "AgentServer #{agent_id} registered schedule #{inspect(job_id)}: #{cron_expr}"
         )
 
-        new_cron_jobs = Map.put(state.cron_jobs, job_id, pid)
-        %{state | cron_jobs: new_cron_jobs}
+        track_cron_job(state, job_id, pid)
 
       {:error, reason} ->
         Logger.error(
@@ -1852,6 +2042,88 @@ defmodule Jido.AgentServer do
         state
     end
   end
+
+  defp validate_dynamic_cron_input(cron_expr, _timezone)
+       when not is_binary(cron_expr),
+       do: {:error, :invalid_cron_expression}
+
+  defp validate_dynamic_cron_input(_cron_expr, timezone)
+       when not (is_nil(timezone) or is_binary(timezone)),
+       do: {:error, :invalid_timezone}
+
+  defp validate_dynamic_cron_input(_cron_expr, _timezone), do: :ok
+
+  defp build_dynamic_cron_signal(%Signal{} = signal, _logical_id, _agent_id), do: signal
+
+  defp build_dynamic_cron_signal(message, logical_id, agent_id) do
+    CronTick.new!(
+      %{job_id: logical_id, message: message},
+      source: "/agent/#{agent_id}"
+    )
+  end
+
+  defp handle_cron_job_down(state, logical_id, pid, reason) do
+    {tracked_pid, state} = untrack_cron_job(state, logical_id, cancel?: false)
+
+    if tracked_pid == pid do
+      if normal_cron_exit?(reason) do
+        state
+      else
+        schedule_cron_restart(state, logical_id, reason)
+      end
+    else
+      state
+    end
+  end
+
+  defp schedule_cron_restart(state, logical_id, reason) do
+    if Map.has_key?(state.cron_specs, logical_id) do
+      attempt = Map.get(state.cron_restart_attempts, logical_id, 0)
+
+      delay =
+        min((@cron_restart_base_ms * :math.pow(2, attempt)) |> trunc(), @cron_restart_max_ms)
+
+      timer_ref = :erlang.start_timer(delay, self(), {:cron_restart, logical_id})
+
+      Logger.warning(
+        "AgentServer #{state.id} scheduling cron restart for #{inspect(logical_id)} in #{delay}ms after #{inspect(reason)}"
+      )
+
+      emit_cron_telemetry_event(state, :restart, %{
+        job_id: logical_id,
+        reason: reason,
+        delay_ms: delay
+      })
+
+      %{
+        state
+        | cron_restart_attempts: Map.put(state.cron_restart_attempts, logical_id, attempt + 1),
+          cron_restart_timers: Map.put(state.cron_restart_timers, logical_id, timer_ref),
+          cron_restart_timer_refs: Map.put(state.cron_restart_timer_refs, timer_ref, logical_id)
+      }
+    else
+      state
+    end
+  end
+
+  defp clear_cron_restart_timer(state, logical_id) do
+    case Map.pop(state.cron_restart_timers, logical_id) do
+      {timer_ref, timers} when is_reference(timer_ref) ->
+        %{
+          state
+          | cron_restart_timers: timers,
+            cron_restart_timer_refs: Map.delete(state.cron_restart_timer_refs, timer_ref)
+        }
+
+      {_other, timers} ->
+        %{state | cron_restart_timers: timers}
+    end
+  end
+
+  defp normal_cron_exit?(:normal), do: true
+  defp normal_cron_exit?(:shutdown), do: true
+  defp normal_cron_exit?({:shutdown, _}), do: true
+  defp normal_cron_exit?(_), do: false
 
   # ---------------------------------------------------------------------------
   # Internal: Drain Loop

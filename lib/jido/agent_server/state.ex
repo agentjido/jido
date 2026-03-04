@@ -51,6 +51,21 @@ defmodule Jido.AgentServer.State do
               # Cron jobs
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
+              cron_monitors:
+                Zoi.map(description: "Map of job_id => monitor_ref for cron jobs")
+                |> Zoi.default(%{}),
+              cron_monitor_refs:
+                Zoi.map(description: "Map of monitor_ref => job_id for cron jobs")
+                |> Zoi.default(%{}),
+              cron_restart_attempts:
+                Zoi.map(description: "Map of job_id => restart attempt count for cron jobs")
+                |> Zoi.default(%{}),
+              cron_restart_timers:
+                Zoi.map(description: "Map of job_id => timer_ref for cron restarts")
+                |> Zoi.default(%{}),
+              cron_restart_timer_refs:
+                Zoi.map(description: "Map of timer_ref => job_id for cron restarts")
+                |> Zoi.default(%{}),
               cron_specs:
                 Zoi.map(description: "Map of job_id => durable cron registration spec")
                 |> Zoi.default(%{}),
@@ -145,6 +160,11 @@ defmodule Jido.AgentServer.State do
         registry: opts.registry,
         spawn_fun: opts.spawn_fun,
         cron_jobs: %{},
+        cron_monitors: %{},
+        cron_monitor_refs: %{},
+        cron_restart_attempts: %{},
+        cron_restart_timers: %{},
+        cron_restart_timer_refs: %{},
         cron_specs: restored_cron_specs,
         skip_schedules: opts.skip_schedules,
         error_count: 0,

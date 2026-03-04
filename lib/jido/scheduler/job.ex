@@ -18,6 +18,12 @@ defmodule Jido.Scheduler.Job do
           timer_ref: reference() | nil
         }
 
+  @spec start((-> term()), String.t(), String.t()) :: GenServer.on_start()
+  def start(fun, cron_expr, timezone)
+      when is_function(fun, 0) and is_binary(cron_expr) and is_binary(timezone) do
+    GenServer.start(__MODULE__, %{fun: fun, cron_expr: cron_expr, timezone: timezone})
+  end
+
   @spec start_link((-> term()), String.t(), String.t()) :: GenServer.on_start()
   def start_link(fun, cron_expr, timezone)
       when is_function(fun, 0) and is_binary(cron_expr) and is_binary(timezone) do
@@ -26,8 +32,6 @@ defmodule Jido.Scheduler.Job do
 
   @impl true
   def init(%{fun: fun, cron_expr: cron_expr, timezone: timezone}) do
-    ensure_time_zone_database()
-
     with {:ok, cron} <- parse_cron(cron_expr),
          {:ok, _now} <- now_in_timezone(timezone),
          {:ok, timer_ref} <- schedule_next_tick(cron, timezone) do
@@ -158,14 +162,5 @@ defmodule Jido.Scheduler.Job do
         Logger.error("Scheduler callback #{kind}: #{inspect(reason)}")
         :ok
     end
-  end
-
-  @spec ensure_time_zone_database() :: :ok
-  defp ensure_time_zone_database do
-    if Code.ensure_loaded?(Tzdata.TimeZoneDatabase) do
-      Calendar.put_time_zone_database(Tzdata.TimeZoneDatabase)
-    end
-
-    :ok
   end
 end

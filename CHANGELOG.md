@@ -2,6 +2,26 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
+## 2.1.0 - 2026-03-04
+
+### Added
+- Durable in-house scheduler hardening for InstanceManager-managed agents
+- Write-through scheduler-manifest persistence path in `Jido.Persist`
+- Cron telemetry events for register/cancel/restart/persist-failure
+
+### Changed
+- `Jido.Scheduler.run_every/3,5` now returns structured errors for invalid cron/timezone inputs and no longer exits callers
+- Scheduler jobs start unlinked from `AgentServer` to isolate scheduler failures
+- Dynamic cron durability is an instance-level concern integrated through lifecycle hooks with `Jido.Storage`/`Jido.Persist`
+- Startup conflict policy for restored dynamic cron vs declarative/plugin cron is now `declarative/plugin wins`
+
+### Fixed
+- `CronCancel` now removes durable specs even if runtime pid is already missing
+- Cron runtime failures no longer take down the owning agent; abnormal exits trigger capped backoff restart from durable specs
+- Checkpoint normalization now always strips runtime-only `:__thread__` and correctly applies scheduler-manifest invariants
+- Removed runtime global timezone DB mutation from scheduler job startup
+- Extended integration/regression coverage for invalid cron/timezone isolation, restart durability, conflict cleanup, and persist invariants
+
 ## 2.0.0 - 2026-02-22
 
 ### Changed

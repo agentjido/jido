@@ -86,6 +86,19 @@ This prevents:
 - Consistency drift when checkpoint and journal get out of sync
 - Memory bloat in serialized checkpoints
 
+### Scheduler Manifest Invariant
+
+Dynamic cron durability is stored as a scheduler manifest under
+`state[:__cron_specs__]` in checkpoints.
+
+- Runtime-only thread state (`:__thread__`) is always stripped from checkpoint `state`
+- Scheduler durability data is normalized and stored only under `:__cron_specs__`
+- Manifest updates use targeted checkpoint patching when a checkpoint exists
+- If no checkpoint exists yet, Jido falls back to a full `hibernate` write
+
+This keeps dynamic scheduler durability consistent with the same storage and
+checkpoint invariants used by the rest of Jido persistence.
+
 ### Terminology
 
 | Operation | Description |
@@ -216,6 +229,15 @@ end
 # Thaw an agent by module and ID
 {:ok, agent} = MyApp.Jido.thaw(MyAgent, "user-123")
 ```
+
+### Instance-Level Durable Cron Semantics
+
+When an agent runs under `Jido.Agent.InstanceManager` with storage enabled:
+
+- Dynamic `Cron`/`CronCancel` directives are write-through durable via `Jido.Persist`
+- Durability is keyed by `{manager_name, pool_key}` (instance-scoped)
+- Acknowledged register/cancel mutations survive thaw and crash-restart recovery
+- Missed runs are not replayed (no catch-up)
 
 #### `hibernate/1`
 

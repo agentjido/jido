@@ -22,7 +22,7 @@ defmodule JidoTest.SchedulerTest do
     test "accepts timezone option" do
       assert {:ok, pid} =
                Scheduler.run_every(TestModule, :test_func, [self()], "* * * * *",
-                 timezone: "America/New_York"
+                 timezone: "Etc/UTC"
                )
 
       assert is_pid(pid)
@@ -43,9 +43,32 @@ defmodule JidoTest.SchedulerTest do
 
     test "accepts timezone option" do
       fun = fn -> :ok end
-      assert {:ok, pid} = Scheduler.run_every(fun, "* * * * *", timezone: "Europe/London")
+      assert {:ok, pid} = Scheduler.run_every(fun, "* * * * *", timezone: "Etc/UTC")
       assert is_pid(pid)
       Scheduler.cancel(pid)
+    end
+
+    test "returns error for invalid cron expression without crashing caller" do
+      fun = fn -> :ok end
+
+      assert {:error, reason} = Scheduler.run_every(fun, "not-a-cron-expression")
+
+      assert match?({:invalid_cron_expression, _}, reason) or
+               match?({:invalid_cron, _}, reason)
+    end
+
+    test "returns error for invalid timezone identifier without crashing caller" do
+      fun = fn -> :ok end
+
+      assert {:error, {:invalid_timezone, _}} =
+               Scheduler.run_every(fun, "* * * * *", timezone: "Invalid/Nowhere")
+    end
+
+    test "returns error for invalid timezone option type" do
+      fun = fn -> :ok end
+
+      assert {:error, :invalid_timezone} =
+               Scheduler.run_every(fun, "* * * * *", timezone: :america_chicago)
     end
   end
 

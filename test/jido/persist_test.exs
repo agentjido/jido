@@ -2,9 +2,11 @@ defmodule JidoTest.PersistTest do
   use JidoTest.Case, async: true
 
   alias Jido.Persist
+  alias Jido.Scheduler
   alias Jido.Storage.ETS
   alias Jido.Thread
   alias JidoTest.PersistTest.CustomAgent
+  alias JidoTest.PersistTest.RuntimeStateCheckpointAgent
   alias JidoTest.PersistTest.TestAgent
 
   defmodule TestAgent do
@@ -50,6 +52,30 @@ defmodule JidoTest.PersistTest do
         |> Map.put(:restored_by, :custom)
 
       {:ok, %{agent | state: restored_state}}
+    end
+  end
+
+  defmodule RuntimeStateCheckpointAgent do
+    use Jido.Agent,
+      name: "runtime_state_checkpoint_agent",
+      schema: [value: [type: :string, default: ""]]
+
+    @impl true
+    def signal_routes(_ctx), do: []
+
+    @impl true
+    def checkpoint(agent, _ctx) do
+      {:ok,
+       %{
+         version: 1,
+         agent_module: __MODULE__,
+         id: agent.id,
+         state: %{
+           value: agent.state.value,
+           __thread__: %{runtime_only: true}
+         },
+         thread: nil
+       }}
     end
   end
 
@@ -372,6 +398,78 @@ defmodule JidoTest.PersistTest do
     end
   end
 
+  describe "persist_scheduler_manifest/5" do
+    test "patches an existing checkpoint, strips runtime thread key, and updates scheduler manifest" do
+      table = unique_table()
+      checkpoint_key = {TestAgent, {:pool, "existing"}}
+      scheduler_key = Scheduler.cron_specs_state_key()
+
+      existing_checkpoint = %{
+        version: 1,
+        agent_module: TestAgent,
+        id: "existing-id",
+        state:
+          %{
+            counter: 7,
+            status: :active,
+            __thread__: %{runtime_only: true}
+          }
+          |> Map.put(scheduler_key, %{legacy: :value}),
+        thread: nil
+      }
+
+      :ok = ETS.put_checkpoint(checkpoint_key, existing_checkpoint, table: table)
+
+      manifest = %{
+        durable_job: Scheduler.build_cron_spec("* * * * *", :tick, "Etc/UTC")
+      }
+
+      agent = TestAgent.new(id: "existing-id")
+
+      assert :ok =
+               Persist.persist_scheduler_manifest(
+                 storage(table),
+                 TestAgent,
+                 {:pool, "existing"},
+                 agent,
+                 manifest
+               )
+
+      {:ok, updated_checkpoint} = ETS.get_checkpoint(checkpoint_key, table: table)
+      refute Map.has_key?(updated_checkpoint.state, :__thread__)
+      assert updated_checkpoint.state.counter == 7
+      assert updated_checkpoint.state.status == :active
+      assert updated_checkpoint.state[scheduler_key] == manifest
+    end
+
+    test "falls back to full hibernate when checkpoint does not exist" do
+      table = unique_table()
+      checkpoint_key = {TestAgent, {:pool, "missing"}}
+      scheduler_key = Scheduler.cron_specs_state_key()
+
+      manifest = %{
+        first_job: Scheduler.build_cron_spec("@hourly", :tick, nil)
+      }
+
+      agent = TestAgent.new(id: "agent-missing")
+      agent = %{agent | state: %{agent.state | counter: 42, status: :processing}}
+
+      assert :ok =
+               Persist.persist_scheduler_manifest(
+                 storage(table),
+                 TestAgent,
+                 {:pool, "missing"},
+                 agent,
+                 manifest
+               )
+
+      {:ok, checkpoint} = ETS.get_checkpoint(checkpoint_key, table: table)
+      assert checkpoint.state.counter == 42
+      assert checkpoint.state.status == :processing
+      assert checkpoint.state[scheduler_key] == manifest
+    end
+  end
+
   describe "edge cases" do
     test "empty thread (no entries) does not create thread in storage" do
       table = unique_table()
@@ -419,6 +517,32 @@ defmodule JidoTest.PersistTest do
 
       assert checkpoint.thread == %{id: "custom-thread", rev: 1}
       refute Map.has_key?(checkpoint.state || %{}, :__thread__)
+    end
+
+    test "custom checkpoint state always strips __thread__ and preserves scheduler manifest invariants" do
+      table = unique_table()
+      scheduler_key = Scheduler.cron_specs_state_key()
+
+      manifest = %{
+        invariant_job: Scheduler.build_cron_spec("*/5 * * * *", :tick, nil)
+      }
+
+      agent = RuntimeStateCheckpointAgent.new(id: "runtime-invariant-1")
+
+      agent =
+        %{
+          agent
+          | state:
+              agent.state |> Map.put(:value, "with_runtime") |> Map.put(scheduler_key, manifest)
+        }
+
+      :ok = Persist.hibernate(storage(table), agent)
+
+      {:ok, checkpoint} =
+        ETS.get_checkpoint({RuntimeStateCheckpointAgent, "runtime-invariant-1"}, table: table)
+
+      refute Map.has_key?(checkpoint.state || %{}, :__thread__)
+      assert checkpoint.state[scheduler_key] == manifest
     end
   end
 end

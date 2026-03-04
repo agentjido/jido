@@ -163,7 +163,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
           data: %{
             job_id: :timezone_test,
             cron: "0 9 * * *",
-            timezone: "America/New_York"
+            timezone: "Etc/UTC"
           }
         })
 
@@ -171,6 +171,57 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       state = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :timezone_test) end)
       assert is_pid(state.cron_jobs[:timezone_test])
+
+      GenServer.stop(pid)
+    end
+
+    test "invalid cron directive is isolated and agent survives", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-4b", jido: jido)
+      ref = Process.monitor(pid)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{
+            job_id: :invalid_cron,
+            cron: "definitely-not-a-cron"
+          }
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      eventually(fn -> Process.alive?(pid) end)
+      {:ok, state} = AgentServer.state(pid)
+      refute Map.has_key?(state.cron_jobs, :invalid_cron)
+      refute Map.has_key?(state.cron_specs, :invalid_cron)
+      refute_received {:DOWN, ^ref, :process, ^pid, _}
+
+      GenServer.stop(pid)
+    end
+
+    test "invalid timezone directive is isolated and agent survives", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-4c", jido: jido)
+      ref = Process.monitor(pid)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{
+            job_id: :invalid_tz,
+            cron: "0 9 * * *",
+            timezone: "Invalid/Nowhere"
+          }
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      eventually(fn -> Process.alive?(pid) end)
+      {:ok, state} = AgentServer.state(pid)
+      refute Map.has_key?(state.cron_jobs, :invalid_tz)
+      refute Map.has_key?(state.cron_specs, :invalid_tz)
+      refute_received {:DOWN, ^ref, :process, ^pid, _}
 
       GenServer.stop(pid)
     end
@@ -191,6 +242,94 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       [job_id] = Map.keys(state.cron_jobs)
       assert is_reference(job_id)
+
+      GenServer.stop(pid)
+    end
+  end
+
+  describe "runtime failure isolation and recovery" do
+    test "abnormal cron job death does not kill agent and job restarts", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-9a", jido: jido)
+      server_ref = Process.monitor(pid)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :restartable, cron: "* * * * *"}
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :restartable) end)
+      original_job_pid = state1.cron_jobs[:restartable]
+      assert is_pid(original_job_pid)
+      assert Process.alive?(original_job_pid)
+
+      Process.exit(original_job_pid, :kill)
+
+      state2 =
+        eventually_state(
+          pid,
+          fn state ->
+            new_pid = Map.get(state.cron_jobs, :restartable)
+            is_pid(new_pid) and new_pid != original_job_pid and Process.alive?(new_pid)
+          end,
+          timeout: 6_000
+        )
+
+      restarted_job_pid = state2.cron_jobs[:restartable]
+      refute restarted_job_pid == original_job_pid
+      assert Process.alive?(pid)
+      refute_received {:DOWN, ^server_ref, :process, ^pid, _}
+
+      GenServer.stop(pid)
+    end
+
+    test "cancel removes durable spec even when runtime pid is already gone", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-9b", jido: jido)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :gone_runtime, cron: "* * * * *"}
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :gone_runtime) end)
+      job_pid = state1.cron_jobs[:gone_runtime]
+      assert is_pid(job_pid)
+
+      Process.exit(job_pid, :shutdown)
+
+      eventually_state(
+        pid,
+        fn state ->
+          not Map.has_key?(state.cron_jobs, :gone_runtime) and
+            Map.has_key?(state.cron_specs, :gone_runtime)
+        end,
+        timeout: 2_000
+      )
+
+      cancel_signal =
+        Signal.new!(%{
+          type: "cancel_cron",
+          source: "/test",
+          data: %{job_id: :gone_runtime}
+        })
+
+      :ok = AgentServer.cast(pid, cancel_signal)
+
+      eventually_state(
+        pid,
+        fn state ->
+          not Map.has_key?(state.cron_jobs, :gone_runtime) and
+            not Map.has_key?(state.cron_specs, :gone_runtime)
+        end,
+        timeout: 2_000
+      )
 
       GenServer.stop(pid)
     end

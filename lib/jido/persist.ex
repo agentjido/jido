@@ -110,6 +110,53 @@ defmodule Jido.Persist do
     end
   end
 
+  @doc """
+  Persists only the scheduler manifest for an existing checkpoint.
+
+  This is used by the keyed lifecycle to provide write-through durability for
+  dynamic cron mutations without rewriting a full checkpoint on every update.
+  If the checkpoint does not exist yet, falls back to full `hibernate/4`.
+  """
+  @spec persist_scheduler_manifest(
+          storage_config() | module() | struct(),
+          agent_module(),
+          key(),
+          agent(),
+          map()
+        ) ::
+          :ok | {:error, term()}
+  def persist_scheduler_manifest(
+        storage_or_instance,
+        agent_module,
+        key,
+        agent,
+        scheduler_manifest
+      )
+      when is_map(scheduler_manifest) do
+    with {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
+      checkpoint_key = make_checkpoint_key(agent_module, key)
+      scheduler_manifest = Scheduler.normalize_cron_specs(scheduler_manifest)
+
+      case Jido.Storage.fetch_checkpoint(adapter, checkpoint_key, opts) do
+        {:ok, checkpoint} ->
+          checkpoint
+          |> patch_checkpoint_scheduler_manifest(scheduler_manifest)
+          |> then(&adapter.put_checkpoint(checkpoint_key, &1, opts))
+
+        {:error, :not_found} ->
+          agent =
+            attach_scheduler_manifest(agent, %{
+              state: %{Scheduler.cron_specs_state_key() => scheduler_manifest}
+            })
+
+          do_hibernate(adapter, opts, agent_module, key, agent)
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
+
   # --- Private Implementation ---
 
   @spec do_hibernate(module(), keyword(), agent_module(), key(), agent()) ::
@@ -314,10 +361,11 @@ defmodule Jido.Persist do
     scheduler_key = Scheduler.cron_specs_state_key()
 
     state_without_runtime =
-      checkpoint[:state] ||
-        %{}
-        |> Map.delete(:__thread__)
-        |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
+      checkpoint
+      |> Map.get(:state, %{})
+      |> ensure_state_map()
+      |> Map.delete(:__thread__)
+      |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
 
     thread_pointer =
       case thread do
@@ -470,6 +518,20 @@ defmodule Jido.Persist do
 
   defp maybe_put_scheduler_manifest(state, key, _scheduler_manifest), do: Map.delete(state, key)
 
+  @spec patch_checkpoint_scheduler_manifest(checkpoint(), map()) :: checkpoint()
+  defp patch_checkpoint_scheduler_manifest(checkpoint, scheduler_manifest) do
+    scheduler_key = Scheduler.cron_specs_state_key()
+
+    updated_state =
+      checkpoint
+      |> Map.get(:state, %{})
+      |> ensure_state_map()
+      |> Map.delete(:__thread__)
+      |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
+
+    Map.put(checkpoint, :state, updated_state)
+  end
+
   @spec get_scheduler_manifest(agent()) :: map()
   defp get_scheduler_manifest(%{state: state}) when is_map(state) do
     key = Scheduler.cron_specs_state_key()
@@ -478,7 +540,7 @@ defmodule Jido.Persist do
 
   defp get_scheduler_manifest(_), do: %{}
 
-  @spec attach_scheduler_manifest(agent(), checkpoint()) :: agent()
+  @spec attach_scheduler_manifest(agent(), map()) :: agent()
   defp attach_scheduler_manifest(agent, checkpoint) do
     key = Scheduler.cron_specs_state_key()
 
@@ -502,4 +564,8 @@ defmodule Jido.Persist do
   defp make_checkpoint_key(agent_module, agent_id) do
     {agent_module, agent_id}
   end
+
+  @spec ensure_state_map(term()) :: map()
+  defp ensure_state_map(state) when is_map(state), do: state
+  defp ensure_state_map(_), do: %{}
 end
