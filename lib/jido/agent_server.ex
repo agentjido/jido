@@ -721,6 +721,7 @@ defmodule Jido.AgentServer do
 
     # Register plugin schedules (cron jobs)
     state = register_plugin_schedules(state)
+    state = register_restored_cron_specs(state)
 
     notify_parent_of_startup(state)
 
@@ -1759,6 +1760,44 @@ defmodule Jido.AgentServer do
     Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
       register_schedule(acc_state, schedule_spec)
     end)
+  end
+
+  defp register_restored_cron_specs(%State{cron_specs: cron_specs} = state)
+       when map_size(cron_specs) == 0,
+       do: state
+
+  defp register_restored_cron_specs(%State{} = state) do
+    Enum.reduce(state.cron_specs, state, fn {job_id, spec}, acc_state ->
+      register_restored_cron_spec(acc_state, job_id, spec)
+    end)
+  end
+
+  defp register_restored_cron_spec(
+         %State{} = state,
+         job_id,
+         %{cron_expression: cron_expr, message: message, timezone: timezone}
+       ) do
+    directive = Directive.cron(cron_expr, message, job_id: job_id, timezone: timezone)
+
+    case DirectiveExec.exec(directive, init_signal(), state) do
+      {:ok, new_state} ->
+        new_state
+
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{state.id} failed to restore cron job #{inspect(job_id)}: #{inspect(reason)}"
+        )
+
+        state
+    end
+  end
+
+  defp register_restored_cron_spec(%State{} = state, job_id, invalid_spec) do
+    Logger.error(
+      "AgentServer #{state.id} skipped invalid persisted cron spec #{inspect(job_id)}: #{inspect(invalid_spec)}"
+    )
+
+    state
   end
 
   defp register_schedule(%State{} = state, schedule_spec) do

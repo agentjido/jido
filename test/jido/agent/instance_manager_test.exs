@@ -7,7 +7,9 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   @moduletag :integration
 
   alias Jido.Agent.InstanceManager
+  alias Jido.Agent.Directive
   alias Jido.AgentServer
+  alias Jido.Signal
   alias Jido.Storage.ETS
 
   # Use module attribute for manager naming to avoid atom leaks
@@ -32,6 +34,60 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         counter: [type: :integer, default: 0]
       ],
       actions: []
+  end
+
+  defmodule CronTickAction do
+    @moduledoc false
+    use Jido.Action, name: "cron_tick", schema: []
+
+    @impl true
+    def run(_params, context) do
+      count = Map.get(context.state, :tick_count, 0)
+      {:ok, %{tick_count: count + 1}}
+    end
+  end
+
+  defmodule RegisterCronAction do
+    @moduledoc false
+    use Jido.Action, name: "register_cron", schema: []
+
+    @impl true
+    def run(params, _context) do
+      cron = Map.get(params, :cron, "* * * * * * *")
+      job_id = Map.get(params, :job_id, :durable_tick)
+      timezone = Map.get(params, :timezone)
+      message = Signal.new!("cron.tick", %{}, source: "/instance-manager-test")
+
+      {:ok, %{}, [Directive.cron(cron, message, job_id: job_id, timezone: timezone)]}
+    end
+  end
+
+  defmodule CancelCronAction do
+    @moduledoc false
+    use Jido.Action, name: "cancel_cron", schema: []
+
+    @impl true
+    def run(%{job_id: job_id}, _context) do
+      {:ok, %{}, [Directive.cron_cancel(job_id)]}
+    end
+  end
+
+  defmodule DurableCronAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "durable_cron_agent",
+      schema: [
+        tick_count: [type: :integer, default: 0]
+      ]
+
+    @impl true
+    def signal_routes(_ctx) do
+      [
+        {"register_cron", RegisterCronAction},
+        {"cancel_cron", CancelCronAction},
+        {"cron.tick", CronTickAction}
+      ]
+    end
   end
 
   defp cleanup_storage_tables(table) do
@@ -403,6 +459,140 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       {:ok, state2} = AgentServer.state(pid2)
       assert state2.agent.state.counter == 123
+
+      :ok = AgentServer.detach(pid2)
+    end
+  end
+
+  describe "durable cron persistence with InstanceManager storage" do
+    setup do
+      manager_name = :"#{@manager_prefix}_durable_cron_#{:erlang.unique_integer([:positive])}"
+      table_name = :"#{@manager_prefix}_durable_cron_table_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: DurableCronAgent,
+            idle_timeout: 200,
+            storage: {ETS, table: table_name},
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager_name})
+        cleanup_storage_tables(table_name)
+      end)
+
+      {:ok, manager: manager_name}
+    end
+
+    @tag timeout: 8_000
+    test "dynamic cron registrations survive hibernate/thaw", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "durable-cron-1")
+      :ok = AgentServer.attach(pid1)
+
+      register_signal =
+        Signal.new!("register_cron", %{job_id: :durable_tick, cron: "* * * * * * *"},
+          source: "/test"
+        )
+
+      :ok = AgentServer.cast(pid1, register_signal)
+
+      _state1 =
+        eventually_state(
+          pid1,
+          fn state ->
+            Map.has_key?(state.cron_jobs, :durable_tick) and
+              Map.has_key?(state.cron_specs, :durable_tick)
+          end, timeout: 2_000)
+
+      state1 =
+        eventually_state(pid1, fn state -> state.agent.state.tick_count > 0 end, timeout: 3_000)
+
+      pre_hibernate_ticks = state1.agent.state.tick_count
+
+      :ok = AgentServer.detach(pid1)
+      ref = Process.monitor(pid1)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 2_000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "durable-cron-1")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 3_000
+        )
+
+      refute pid1 == pid2
+
+      eventually_state(pid2, fn state -> Map.has_key?(state.cron_jobs, :durable_tick) end,
+        timeout: 2_000
+      )
+
+      eventually_state(
+        pid2,
+        fn state ->
+          state.agent.state.tick_count > pre_hibernate_ticks
+        end, timeout: 3_000)
+
+      :ok = AgentServer.detach(pid2)
+    end
+
+    @tag timeout: 8_000
+    test "cancelled dynamic cron does not re-register after thaw", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "durable-cron-2")
+      :ok = AgentServer.attach(pid1)
+
+      register_signal =
+        Signal.new!("register_cron", %{job_id: :to_cancel, cron: "* * * * * * *"},
+          source: "/test"
+        )
+
+      cancel_signal =
+        Signal.new!("cancel_cron", %{job_id: :to_cancel}, source: "/test")
+
+      :ok = AgentServer.cast(pid1, register_signal)
+
+      eventually_state(pid1, fn state -> Map.has_key?(state.cron_jobs, :to_cancel) end,
+        timeout: 2_000
+      )
+
+      :ok = AgentServer.cast(pid1, cancel_signal)
+
+      eventually_state(
+        pid1,
+        fn state ->
+          not Map.has_key?(state.cron_jobs, :to_cancel) and
+            not Map.has_key?(state.cron_specs, :to_cancel)
+        end, timeout: 2_000)
+
+      :ok = AgentServer.detach(pid1)
+      ref = Process.monitor(pid1)
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 2_000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "durable-cron-2")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 3_000
+        )
+
+      {:ok, state2} = AgentServer.state(pid2)
+      assert map_size(state2.cron_jobs) == 0
+      assert map_size(state2.cron_specs) == 0
 
       :ok = AgentServer.detach(pid2)
     end

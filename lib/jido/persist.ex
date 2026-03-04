@@ -50,6 +50,7 @@ defmodule Jido.Persist do
 
   require Logger
 
+  alias Jido.Scheduler
   alias Jido.Thread
 
   @type storage_config :: {module(), keyword()}
@@ -290,6 +291,7 @@ defmodule Jido.Persist do
           {:ok, checkpoint()} | {:error, term()}
   defp create_checkpoint(agent_module, agent, thread) do
     ctx = %{}
+    scheduler_manifest = get_scheduler_manifest(agent)
 
     result =
       if function_exported?(agent_module, :checkpoint, 2) do
@@ -300,16 +302,22 @@ defmodule Jido.Persist do
 
     case result do
       {:ok, checkpoint} ->
-        {:ok, enforce_checkpoint_invariants(checkpoint, thread)}
+        {:ok, enforce_checkpoint_invariants(checkpoint, thread, scheduler_manifest)}
 
       {:error, _} = error ->
         error
     end
   end
 
-  @spec enforce_checkpoint_invariants(map(), Thread.t() | nil) :: checkpoint()
-  defp enforce_checkpoint_invariants(checkpoint, thread) do
-    state_without_thread = Map.delete(checkpoint[:state] || %{}, :__thread__)
+  @spec enforce_checkpoint_invariants(map(), Thread.t() | nil, map()) :: checkpoint()
+  defp enforce_checkpoint_invariants(checkpoint, thread, scheduler_manifest) do
+    scheduler_key = Scheduler.cron_specs_state_key()
+
+    state_without_runtime =
+      checkpoint[:state] ||
+        %{}
+        |> Map.delete(:__thread__)
+        |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
 
     thread_pointer =
       case thread do
@@ -318,7 +326,7 @@ defmodule Jido.Persist do
       end
 
     checkpoint
-    |> Map.put(:state, state_without_thread)
+    |> Map.put(:state, state_without_runtime)
     |> Map.put(:thread, thread_pointer)
   end
 
@@ -346,6 +354,7 @@ defmodule Jido.Persist do
 
     with {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
          {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
+      agent = attach_scheduler_manifest(agent, checkpoint)
       Logger.debug("Persist.thaw completed for #{inspect(agent_module)} id=#{checkpoint.id}")
       {:ok, agent}
     end
@@ -451,6 +460,42 @@ defmodule Jido.Persist do
   @spec attach_thread(agent(), Thread.t()) :: agent()
   defp attach_thread(agent, thread) do
     %{agent | state: Map.put(agent.state, :__thread__, thread)}
+  end
+
+  @spec maybe_put_scheduler_manifest(map(), atom(), map()) :: map()
+  defp maybe_put_scheduler_manifest(state, key, scheduler_manifest)
+       when is_map(scheduler_manifest) and map_size(scheduler_manifest) > 0 do
+    Map.put(state, key, scheduler_manifest)
+  end
+
+  defp maybe_put_scheduler_manifest(state, key, _scheduler_manifest), do: Map.delete(state, key)
+
+  @spec get_scheduler_manifest(agent()) :: map()
+  defp get_scheduler_manifest(%{state: state}) when is_map(state) do
+    key = Scheduler.cron_specs_state_key()
+    state |> Map.get(key) |> Scheduler.normalize_cron_specs()
+  end
+
+  defp get_scheduler_manifest(_), do: %{}
+
+  @spec attach_scheduler_manifest(agent(), checkpoint()) :: agent()
+  defp attach_scheduler_manifest(agent, checkpoint) do
+    key = Scheduler.cron_specs_state_key()
+
+    scheduler_manifest =
+      checkpoint
+      |> Map.get(:state, %{})
+      |> Map.get(key)
+      |> Scheduler.normalize_cron_specs()
+
+    merged_state =
+      if map_size(scheduler_manifest) == 0 do
+        Map.delete(agent.state, key)
+      else
+        Map.put(agent.state, key, scheduler_manifest)
+      end
+
+    %{agent | state: merged_state}
   end
 
   @spec make_checkpoint_key(agent_module(), term()) :: checkpoint_key()

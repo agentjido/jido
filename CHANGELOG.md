@@ -2,6 +2,20 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
+## 2.1.0 - Unreleased
+
+### Added
+- Durable dynamic cron registrations for `Jido.Agent.InstanceManager` agents with storage enabled.
+- Persisted cron-spec replay during thaw/startup for keyed lifecycle agents.
+
+### Changed
+- Replaced `sched_ex`-backed cron execution with an in-house scheduler engine.
+- Added durable cron metadata tracking in `AgentServer.State` (`cron_specs`) while keeping runtime `cron_jobs` PID semantics.
+
+### Dependencies
+- Remove `sched_ex`/`timex` transitive chain from core deps.
+- Add direct `crontab` and `tzdata` dependencies for scheduler evaluation and timezone support.
+
 ## 2.0.0 - 2026-02-22
 
 ### Changed
