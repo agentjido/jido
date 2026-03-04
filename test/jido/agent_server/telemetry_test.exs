@@ -125,22 +125,20 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :stop], _, _}
 
-      # Wait for directive to be processed in drain loop
-      await_telemetry_event([:jido, :agent_server, :directive, :start])
-
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], measurements,
-                      metadata}
+                      %{agent_id: "telemetry-directive-test", directive_type: "Emit"} = metadata},
+                     500
 
       assert is_integer(measurements.system_time)
-      assert metadata.agent_id == "telemetry-directive-test"
-      assert metadata.directive_type == "Emit"
+      assert metadata.signal_type == "emit_directive"
       assert match?(%Directive.Emit{}, metadata.directive)
 
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], measurements,
-                      metadata}
+                      %{agent_id: "telemetry-directive-test", result: :async} = metadata},
+                     500
 
       assert is_integer(measurements.duration)
-      assert metadata.result == :async
+      assert metadata.signal_type == "emit_directive"
       assert match?(%Directive.Emit{}, metadata.directive)
 
       GenServer.stop(pid)
@@ -157,16 +155,16 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :stop], _, _}
 
-      await_telemetry_event([:jido, :agent_server, :directive, :start])
+      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], _,
+                      %{directive_type: "Schedule", signal_type: "schedule_directive"} = metadata},
+                     500
 
-      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], _, metadata}
-
-      assert metadata.directive_type == "Schedule"
       assert match?(%Directive.Schedule{}, metadata.directive)
 
-      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], _, metadata}
+      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], _,
+                      %{result: :ok, signal_type: "schedule_directive"} = metadata},
+                     500
 
-      assert metadata.result == :ok
       assert match?(%Directive.Schedule{}, metadata.directive)
 
       GenServer.stop(pid)
@@ -205,11 +203,9 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :stop], _, _}
 
-      await_telemetry_event([:jido, :agent_server, :directive, :start])
-
-      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], _, metadata}
-
-      assert metadata.signal_type == "emit_directive"
+      assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :start], _,
+                      %{signal_type: "emit_directive", directive_type: "Emit"}},
+                     500
 
       GenServer.stop(pid)
     end
@@ -245,37 +241,13 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :start], _, _}
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :stop], _, _}
 
-      await_telemetry_event([:jido, :agent_server, :directive, :stop])
-
       assert_receive {:telemetry_event, [:jido, :agent_server, :directive, :stop], measurements,
-                      _}
+                      %{signal_type: "emit_directive", result: :async}},
+                     500
 
       assert measurements.duration >= 0
 
       GenServer.stop(pid)
-    end
-  end
-
-  # Helper to wait for async telemetry events
-  defp await_telemetry_event(event, timeout \\ 500) do
-    deadline = System.monotonic_time(:millisecond) + timeout
-    do_await_telemetry_event(event, deadline)
-  end
-
-  defp do_await_telemetry_event(event, deadline) do
-    remaining = deadline - System.monotonic_time(:millisecond)
-
-    if remaining <= 0 do
-      flunk("Timed out waiting for telemetry event #{inspect(event)}")
-    end
-
-    receive do
-      {:telemetry_event, ^event, _, _} = msg ->
-        send(self(), msg)
-        :ok
-    after
-      10 ->
-        do_await_telemetry_event(event, deadline)
     end
   end
 end
