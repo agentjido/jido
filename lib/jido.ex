@@ -82,7 +82,7 @@ defmodule Jido do
 
     quote location: :keep do
       @otp_app unquote(otp_app)
-      @jido_storage Jido.Storage.normalize_storage(unquote(Macro.escape(storage)))
+      @jido_storage Jido.Storage.normalize_storage(unquote(storage))
 
       @doc false
       @spec __otp_app__() :: atom()
