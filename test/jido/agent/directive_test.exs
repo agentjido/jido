@@ -57,6 +57,7 @@ defmodule JidoTest.Agent.DirectiveTest do
       assert directive.tag == :worker_1
       assert directive.opts == %{}
       assert directive.meta == %{}
+      assert directive.restart == :transient
     end
 
     test "creates SpawnAgent directive with opts" do
@@ -65,12 +66,14 @@ defmodule JidoTest.Agent.DirectiveTest do
 
       assert directive.opts == %{initial_state: %{batch: 100}}
       assert directive.meta == %{}
+      assert directive.restart == :transient
     end
 
     test "creates SpawnAgent directive with meta" do
       directive = Directive.spawn_agent(MyAgent, :handler, meta: %{topic: "events"})
       assert directive.opts == %{}
       assert directive.meta == %{topic: "events"}
+      assert directive.restart == :transient
     end
 
     test "creates SpawnAgent directive with both opts and meta" do
@@ -82,6 +85,13 @@ defmodule JidoTest.Agent.DirectiveTest do
 
       assert directive.opts == %{id: "custom"}
       assert directive.meta == %{assigned: true}
+      assert directive.restart == :transient
+    end
+
+    test "creates SpawnAgent directive with explicit restart policy" do
+      directive = Directive.spawn_agent(MyAgent, :durable, restart: :permanent)
+
+      assert directive.restart == :permanent
     end
   end
 

@@ -61,12 +61,15 @@ Emit a `SpawnAgent` directive to create a child agent:
 
 ```elixir
 %Directive.SpawnAgent{agent: ChildAgent, tag: :worker_1}
+# Or keep the child running across restarts/stops:
+%Directive.SpawnAgent{agent: ChildAgent, tag: :durable_worker, restart: :permanent}
 ```
 
 The parent:
 - Monitors the child process
 - Tracks children in `state.children` map by tag
 - Receives `jido.agent.child.exit` signals when children exit
+- Rebinds tracked child info automatically if the child restarts
 
 ### Child Communication
 
@@ -81,6 +84,9 @@ Directive.emit_to_parent(agent, signal)
 ```elixir
 %Directive.StopChild{tag: :worker_1}
 ```
+
+`SpawnAgent` children default to `restart: :transient`, so `StopChild` cleanly removes
+them instead of immediately restarting them.
 
 ## Completion Detection
 

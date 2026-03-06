@@ -1241,6 +1241,8 @@ defmodule Jido.AgentServer do
         id: signal.id
       })
 
+    state = maybe_track_child_started(state, signal)
+
     emit_telemetry(
       [:jido, :agent_server, :signal, :start],
       %{system_time: System.system_time()},
@@ -1271,6 +1273,58 @@ defmodule Jido.AgentServer do
       jido_instance: state.jido
     }
     |> Map.merge(trace_metadata)
+  end
+
+  defp maybe_track_child_started(
+         %State{id: state_id} = state,
+         %Signal{type: "jido.agent.child.started", data: data}
+       )
+       when is_map(data) do
+    with %{
+           parent_id: ^state_id,
+           tag: tag,
+           pid: pid,
+           child_id: child_id,
+           child_module: child_module
+         } <-
+           data,
+         true <- is_pid(pid),
+         true <- is_binary(child_id),
+         true <- is_atom(child_module) do
+      meta = Map.get(data, :meta, %{})
+
+      case State.get_child(state, tag) do
+        %ChildInfo{pid: ^pid} ->
+          state
+
+        %ChildInfo{ref: ref} ->
+          Process.demonitor(ref, [:flush])
+          track_child_started(state, pid, child_module, child_id, tag, meta)
+
+        nil ->
+          track_child_started(state, pid, child_module, child_id, tag, meta)
+      end
+    else
+      _ -> state
+    end
+  end
+
+  defp maybe_track_child_started(state, _signal), do: state
+
+  defp track_child_started(state, pid, child_module, child_id, tag, meta) do
+    ref = Process.monitor(pid)
+
+    child_info =
+      ChildInfo.new!(%{
+        pid: pid,
+        ref: ref,
+        module: child_module,
+        id: child_id,
+        tag: tag,
+        meta: meta
+      })
+
+    State.add_child(state, tag, child_info)
   end
 
   defp do_process_signal(signal, router, state, start_time, metadata) do

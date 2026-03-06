@@ -85,7 +85,8 @@ defmodule JidoTest.Actions.LifecycleTest do
         agent_module: SomeWorker,
         tag: :worker_1,
         initial_state: %{batch_size: 100},
-        meta: %{assigned: true}
+        meta: %{assigned: true},
+        restart: :permanent
       }
 
       {:ok, result, [directive]} = Lifecycle.SpawnChild.run(params, %{})
@@ -96,6 +97,7 @@ defmodule JidoTest.Actions.LifecycleTest do
       assert directive.tag == :worker_1
       assert directive.opts == %{initial_state: %{batch_size: 100}}
       assert directive.meta == %{assigned: true}
+      assert directive.restart == :permanent
     end
 
     test "uses empty opts when no initial_state" do
@@ -103,12 +105,14 @@ defmodule JidoTest.Actions.LifecycleTest do
         agent_module: SomeWorker,
         tag: :worker_2,
         initial_state: %{},
-        meta: %{}
+        meta: %{},
+        restart: :transient
       }
 
       {:ok, _result, [directive]} = Lifecycle.SpawnChild.run(params, %{})
 
       assert directive.opts == %{}
+      assert directive.restart == :transient
     end
   end
 
