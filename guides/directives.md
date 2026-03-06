@@ -32,8 +32,8 @@ end
 | `Emit` | Dispatch a signal via configured adapters | — |
 | `Error` | Signal an error from cmd/2 | — |
 | `Spawn` | Spawn generic BEAM child process | None (fire-and-forget) |
-| `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals) |
-| `StopChild` | Gracefully stop a tracked child agent | Uses children map |
+| `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals, `restart: :transient` default) |
+| `StopChild` | Gracefully stop and remove a tracked child agent | Uses children map |
 | `Schedule` | Schedule a delayed message | — |
 | `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
 | `Stop` | Stop the agent process (self) | — |
@@ -55,6 +55,7 @@ Directive.emit_to_parent(agent, signal)
 Directive.spawn(child_spec)
 Directive.spawn_agent(MyWorkerAgent, :worker_1)
 Directive.spawn_agent(MyWorkerAgent, :processor, opts: %{initial_state: %{batch_size: 100}})
+Directive.spawn_agent(MyWorkerAgent, :durable, restart: :permanent)
 
 # Stop processes
 Directive.stop_child(:worker_1)
@@ -95,6 +96,11 @@ Directive.spawn({Task, :start_link, [fn -> send_webhook(url) end]})
 # Tracked child agent
 Directive.spawn_agent(WorkerAgent, :worker_1, opts: %{initial_state: state})
 ```
+
+`SpawnAgent` children default to `restart: :transient`, which means:
+- `Directive.stop_child/2` cleanly removes them
+- abnormal exits still restart the child
+- callers can override to `:permanent` or `:temporary` when needed
 
 ## Custom Directives
 
