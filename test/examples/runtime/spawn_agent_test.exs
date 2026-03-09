@@ -378,6 +378,39 @@ defmodule JidoExampleTest.SpawnAgentTest do
 
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
     end
+
+    test "custom stop reasons do not restart transient children", %{jido: jido} do
+      parent_id = unique_id("parent")
+      {:ok, parent_pid} = Jido.start_agent(jido, ParentAgent, id: parent_id)
+
+      spawn_signal = Signal.new!("spawn_worker", %{tag: :cleanup_worker}, source: "/test")
+      {:ok, _agent} = AgentServer.call(parent_pid, spawn_signal)
+
+      child_info = await_child(parent_pid, :cleanup_worker)
+      child_ref = Process.monitor(child_info.pid)
+
+      stop_signal =
+        Signal.new!("stop_worker", %{tag: :cleanup_worker, reason: :cleanup}, source: "/test")
+
+      {:ok, agent} = AgentServer.call(parent_pid, stop_signal)
+
+      assert agent.state.last_stopped == :cleanup_worker
+      assert_receive {:DOWN, ^child_ref, :process, _, {:shutdown, :cleanup}}, 1000
+
+      eventually_state(parent_pid, fn state ->
+        not Map.has_key?(state.children, :cleanup_worker)
+      end)
+
+      eventually(fn -> Jido.whereis(jido, child_info.id) == nil end)
+
+      {:ok, parent_state} = AgentServer.state(parent_pid)
+
+      assert Enum.count(parent_state.agent.state.child_started_events, fn event ->
+               event.tag == :cleanup_worker
+             end) == 1
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
   end
 
   describe "restarted children rebind and still notify parent" do

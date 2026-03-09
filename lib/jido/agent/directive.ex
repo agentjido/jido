@@ -357,6 +357,8 @@ defmodule Jido.Agent.Directive do
 
     `SpawnAgent` children default to `restart: :transient`, so a normal
     `StopChild` shutdown removes the child instead of immediately restarting it.
+    Custom reasons are wrapped as `{:shutdown, reason}` so transient children
+    are still removed cleanly.
     """
 
     @schema Zoi.struct(

@@ -283,7 +283,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         stop_signal =
           Jido.Signal.new!(
             "jido.agent.stop",
-            %{reason: reason},
+            %{reason: normalize_stop_reason(reason)},
             source: "/agent/#{state.id}"
           )
 
@@ -298,6 +298,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         {:ok, state}
     end
   end
+
+  # Transient children only skip restart for OTP "clean" shutdown reasons.
+  # Wrap custom reasons so StopChild removes the child instead of respawning it.
+  defp normalize_stop_reason(:normal), do: :normal
+  defp normalize_stop_reason(:shutdown), do: :shutdown
+  defp normalize_stop_reason({:shutdown, _} = reason), do: reason
+  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Stop do
