@@ -1125,8 +1125,8 @@ defmodule Jido.Agent do
 
         # Build plugin specs from instances (for backward compatibility)
         @plugin_specs Enum.map(@plugin_instances, fn instance ->
-                        instance.module.plugin_spec(instance.config)
-                        |> Map.put(:state_key, instance.state_key)
+                        spec = instance.module.plugin_spec(instance.config)
+                        %{spec | state_key: instance.state_key}
                       end)
 
         # Validate unique state_keys (now derived from instances)
