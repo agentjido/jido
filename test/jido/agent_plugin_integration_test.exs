@@ -861,6 +861,17 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       assert :slack_sales in state_keys
     end
 
+    test "plugin_specs/0 preserves Spec structs for aliased instances" do
+      specs = MultiSlackAgent.plugin_specs()
+
+      assert length(specs) == 2
+      assert Enum.all?(specs, &match?(%Spec{}, &1))
+
+      state_keys = Enum.map(specs, & &1.state_key)
+      assert :slack_support in state_keys
+      assert :slack_sales in state_keys
+    end
+
     test "instances have different route_prefixes" do
       instances = MultiSlackAgent.plugin_instances()
 

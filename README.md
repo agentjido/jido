@@ -261,8 +261,8 @@ State operations are internal state transitions handled by the strategy layer du
 | `Emit`       | Dispatch a signal via configured adapters        |
 | `Error`      | Signal an error from cmd/2                       |
 | `Spawn`      | Spawn a generic BEAM child process               |
-| `SpawnAgent` | Spawn a child Jido agent with hierarchy tracking |
-| `StopChild`  | Gracefully stop a tracked child agent            |
+| `SpawnAgent` | Spawn a tracked child Jido agent (`restart: :transient` by default) |
+| `StopChild`  | Gracefully stop and remove a tracked child agent                      |
 | `Schedule`   | Schedule a delayed message                       |
 | `Stop`       | Stop the agent process                           |
 

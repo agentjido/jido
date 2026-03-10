@@ -72,15 +72,26 @@ defmodule Jido.Error do
 
     defmodule UnknownError do
       @moduledoc false
-      defexception [:message, :details]
+      use Splode.Error, class: :internal, fields: [:message, :details, :error]
 
       @impl true
       def exception(opts) do
-        %__MODULE__{
-          message: Keyword.get(opts, :message, "Unknown error"),
-          details: Keyword.get(opts, :details, %{})
-        }
+        opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+        message =
+          opts
+          |> Keyword.get(:message)
+          |> Kernel.||(unknown_message(opts[:error]))
+
+        opts
+        |> Keyword.put(:message, message)
+        |> Keyword.put_new(:details, %{})
+        |> super()
       end
+
+      defp unknown_message(error) when is_binary(error), do: error
+      defp unknown_message(nil), do: "Unknown error"
+      defp unknown_message(error), do: inspect(error)
     end
   end
 
@@ -111,7 +122,9 @@ defmodule Jido.Error do
     - `subject` - The invalid value (field name, action module, etc.)
     - `details` - Additional context
     """
-    defexception [:message, :kind, :subject, :details]
+    use Splode.Error,
+      class: :invalid,
+      fields: [:message, :kind, :subject, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -122,12 +135,12 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Validation failed"),
-        kind: Keyword.get(opts, :kind),
-        subject: Keyword.get(opts, :subject),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Validation failed")
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 
@@ -143,7 +156,9 @@ defmodule Jido.Error do
     - `phase` - Where failure occurred: `:execution`, `:planning`
     - `details` - Additional context
     """
-    defexception [:message, :phase, :details]
+    use Splode.Error,
+      class: :execution,
+      fields: [:message, :phase, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -153,11 +168,13 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Execution failed"),
-        phase: Keyword.get(opts, :phase, :execution),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Execution failed")
+      |> Keyword.put_new(:phase, :execution)
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 
@@ -171,7 +188,9 @@ defmodule Jido.Error do
     - `target` - The intended routing target
     - `details` - Additional context
     """
-    defexception [:message, :target, :details]
+    use Splode.Error,
+      class: :routing,
+      fields: [:message, :target, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -181,11 +200,12 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Routing failed"),
-        target: Keyword.get(opts, :target),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Routing failed")
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 
@@ -199,7 +219,9 @@ defmodule Jido.Error do
     - `timeout` - The timeout value in milliseconds
     - `details` - Additional context
     """
-    defexception [:message, :timeout, :details]
+    use Splode.Error,
+      class: :timeout,
+      fields: [:message, :timeout, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -209,11 +231,12 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Operation timed out"),
-        timeout: Keyword.get(opts, :timeout),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Operation timed out")
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 
@@ -229,7 +252,9 @@ defmodule Jido.Error do
     - `result` - Result from successful compensation
     - `details` - Additional context
     """
-    defexception [:message, :original_error, :compensated, :result, :details]
+    use Splode.Error,
+      class: :execution,
+      fields: [:message, :original_error, :compensated, :result, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -241,13 +266,13 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Compensation error"),
-        original_error: Keyword.get(opts, :original_error),
-        compensated: Keyword.get(opts, :compensated, false),
-        result: Keyword.get(opts, :result),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Compensation error")
+      |> Keyword.put_new(:compensated, false)
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 
@@ -260,7 +285,7 @@ defmodule Jido.Error do
     - `message` - Human-readable error message
     - `details` - Additional context
     """
-    defexception [:message, :details]
+    use Splode.Error, class: :internal, fields: [:message, :details]
 
     @type t :: %__MODULE__{
             message: String.t(),
@@ -269,10 +294,12 @@ defmodule Jido.Error do
 
     @impl true
     def exception(opts) do
-      %__MODULE__{
-        message: Keyword.get(opts, :message, "Internal error"),
-        details: Keyword.get(opts, :details, %{})
-      }
+      opts = if is_map(opts), do: Map.to_list(opts), else: opts
+
+      opts
+      |> Keyword.put_new(:message, "Internal error")
+      |> Keyword.put_new(:details, %{})
+      |> super()
     end
   end
 

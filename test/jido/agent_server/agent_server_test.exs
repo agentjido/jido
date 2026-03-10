@@ -122,6 +122,28 @@ defmodule JidoTest.AgentServerTest do
       assert AgentServer.whereis(Jido.registry_name(jido), "dynamic-test") == pid
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), pid)
     end
+
+    test "retains permanent restart semantics for directly started agents", %{jido: jido} do
+      id = "dynamic-restart-test"
+      {:ok, pid} = AgentServer.start(agent: TestAgent, id: id, jido: jido)
+      ref = Process.monitor(pid)
+
+      GenServer.stop(pid, :normal)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 500
+
+      eventually(fn ->
+        case AgentServer.whereis(Jido.registry_name(jido), id) do
+          new_pid when is_pid(new_pid) -> new_pid != pid and Process.alive?(new_pid)
+          _ -> false
+        end
+      end)
+
+      restarted_pid = AgentServer.whereis(Jido.registry_name(jido), id)
+      assert is_pid(restarted_pid)
+      refute restarted_pid == pid
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), restarted_pid)
+    end
   end
 
   describe "call/3 (sync)" do

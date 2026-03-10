@@ -187,48 +187,71 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
   require Logger
 
+  alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.AgentServer.{ChildInfo, State}
 
-  def exec(%{agent: agent, tag: tag, opts: opts, meta: meta}, _input_signal, state) do
-    child_id = opts[:id] || "#{state.id}/#{tag}"
+  def exec(
+        %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
+        _input_signal,
+        state
+      ) do
+    case Directive.validate_restart_policy(restart) do
+      :ok ->
+        child_id = opts[:id] || "#{state.id}/#{tag}"
 
-    child_opts =
-      [
-        agent: agent,
-        id: child_id,
-        parent: %{
-          pid: self(),
-          id: state.id,
-          tag: tag,
-          meta: meta
-        }
-      ] ++ Map.to_list(Map.delete(opts, :id))
-
-    child_opts = if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
-
-    case AgentServer.start(child_opts) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-
-        child_info =
-          ChildInfo.new!(%{
-            pid: pid,
-            ref: ref,
-            module: resolve_agent_module(agent),
+        child_opts =
+          [
+            agent: agent,
             id: child_id,
-            tag: tag,
-            meta: meta
-          })
+            parent: %{
+              pid: self(),
+              id: state.id,
+              tag: tag,
+              meta: meta
+            }
+          ] ++ Map.to_list(Map.delete(opts, :id))
 
-        new_state = State.add_child(state, tag, child_info)
+        child_opts =
+          if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
 
-        Logger.debug("AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}")
+        child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
 
-        {:ok, new_state}
+        supervisor =
+          if state.jido, do: Jido.agent_supervisor_name(state.jido), else: Jido.AgentSupervisor
+
+        case DynamicSupervisor.start_child(supervisor, child_spec) do
+          {:ok, pid} ->
+            ref = Process.monitor(pid)
+
+            child_info =
+              ChildInfo.new!(%{
+                pid: pid,
+                ref: ref,
+                module: resolve_agent_module(agent),
+                id: child_id,
+                tag: tag,
+                meta: meta
+              })
+
+            new_state = State.add_child(state, tag, child_info)
+
+            Logger.debug(
+              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
+            )
+
+            {:ok, new_state}
+
+          {:error, reason} ->
+            Logger.error(
+              "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
+            )
+
+            {:ok, state}
+        end
 
       {:error, reason} ->
-        Logger.error("AgentServer #{state.id} failed to spawn child: #{inspect(reason)}")
+        Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
         {:ok, state}
     end
   end
@@ -260,7 +283,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         stop_signal =
           Jido.Signal.new!(
             "jido.agent.stop",
-            %{reason: reason},
+            %{reason: normalize_stop_reason(reason)},
             source: "/agent/#{state.id}"
           )
 
@@ -275,6 +298,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         {:ok, state}
     end
   end
+
+  # Transient children only skip restart for OTP "clean" shutdown reasons.
+  # Wrap custom reasons so StopChild removes the child instead of respawning it.
+  defp normalize_stop_reason(:normal), do: :normal
+  defp normalize_stop_reason(:shutdown), do: :shutdown
+  defp normalize_stop_reason({:shutdown, _} = reason), do: reason
+  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Stop do

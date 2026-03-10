@@ -519,6 +519,30 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :shutdown}, 1_000
     end
 
+    test "wraps custom stop reasons as clean shutdowns", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      spawn_directive = %Directive.SpawnAgent{
+        agent: StopAwareAgent,
+        tag: :custom_reason_child,
+        opts: %{initial_state: %{observer_pid: self()}},
+        meta: %{}
+      }
+
+      {:ok, state_with_child} = DirectiveExec.exec(spawn_directive, input_signal, state)
+      child_pid = state_with_child.children[:custom_reason_child].pid
+      child_ref = Process.monitor(child_pid)
+
+      stop_directive = %Directive.StopChild{tag: :custom_reason_child, reason: :cleanup}
+
+      assert {:ok, ^state_with_child} =
+               DirectiveExec.exec(stop_directive, input_signal, state_with_child)
+
+      assert_receive {:child_stop_signal_received, {:shutdown, :cleanup}}, 1_000
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, {:shutdown, :cleanup}}, 1_000
+    end
+
     test "stops existing child", %{state: state, input_signal: input_signal} do
       spawn_directive = %Directive.SpawnAgent{
         agent: TestAgent,
