@@ -7,52 +7,61 @@ defmodule JidoTest.Storage.RedisTest do
 
   @moduletag :unit
 
-  # ---------------------------------------------------------------------------
-  # Mock Redis backend using an Agent (per-test process for isolation)
-  # ---------------------------------------------------------------------------
-
-  defp start_mock_redis(_context \\ %{}) do
-    {:ok, pid} = Agent.start_link(fn -> %{} end)
+  defp start_mock_redis do
+    {:ok, pid} = Agent.start_link(fn -> %{data: %{}, commands: []} end)
     pid
   end
 
-  defp mock_command_fn(pid) do
+  defp mock_command_fn(pid, override \\ fn _command -> :next end) do
     fn command ->
-      case command do
-        ["GET", key] ->
-          {:ok, Agent.get(pid, fn state -> Map.get(state, key) end)}
-
-        ["SET", key, value] ->
-          Agent.update(pid, fn state -> Map.put(state, key, value) end)
-          {:ok, "OK"}
-
-        ["SET", key, value, "PX", _ttl] ->
-          Agent.update(pid, fn state -> Map.put(state, key, value) end)
-          {:ok, "OK"}
-
-        ["DEL" | keys] ->
-          count =
-            Agent.get_and_update(pid, fn state ->
-              deleted = Enum.count(keys, &Map.has_key?(state, &1))
-              new_state = Map.drop(state, keys)
-              {deleted, new_state}
-            end)
-
-          {:ok, count}
-
-        _ ->
-          {:error, :unknown_command}
+      case override.(command) do
+        :next -> handle_mock_command(pid, command)
+        result -> result
       end
     end
+  end
+
+  defp handle_mock_command(pid, command) do
+    Agent.get_and_update(pid, fn state ->
+      state = update_in(state.commands, &[command | &1])
+
+      case command do
+        ["GET", key] ->
+          {{:ok, Map.get(state.data, key)}, state}
+
+        ["SET", key, value] ->
+          {{:ok, "OK"}, put_in(state.data[key], value)}
+
+        ["SET", key, value, "PX", _ttl] ->
+          {{:ok, "OK"}, put_in(state.data[key], value)}
+
+        ["DEL" | keys] ->
+          deleted = Enum.count(keys, &Map.has_key?(state.data, &1))
+          {{:ok, deleted}, update_in(state.data, &Map.drop(&1, keys))}
+
+        _ ->
+          {{:error, :unknown_command}, state}
+      end
+    end)
   end
 
   defp redis_opts(pid, extra \\ []) do
     Keyword.merge([command_fn: mock_command_fn(pid)], extra)
   end
 
-  # ---------------------------------------------------------------------------
-  # Checkpoint Tests
-  # ---------------------------------------------------------------------------
+  defp command_log(pid) do
+    Agent.get(pid, fn state -> Enum.reverse(state.commands) end)
+  end
+
+  defp stored_data(pid) do
+    Agent.get(pid, fn state -> state.data end)
+  end
+
+  defp put_raw(pid, key, value) do
+    Agent.update(pid, fn state -> put_in(state.data[key], value) end)
+  end
+
+  defp thread_key(thread_id, prefix \\ "jido"), do: "#{prefix}:th:#{thread_id}"
 
   describe "get_checkpoint/2" do
     test "returns :not_found when key does not exist" do
@@ -68,13 +77,19 @@ defmodule JidoTest.Storage.RedisTest do
       assert {:ok, %{counter: 42}} = Redis.get_checkpoint(:my_key, opts)
     end
 
-    test "returns :not_found after checkpoint is deleted" do
+    test "returns {:error, :invalid_term} for corrupt checkpoint data" do
       pid = start_mock_redis()
-      opts = redis_opts(pid)
+      put_raw(pid, "jido:cp:bad", <<0, 1, 2>>)
 
-      :ok = Redis.put_checkpoint(:del_key, %{val: 1}, opts)
-      :ok = Redis.delete_checkpoint(:del_key, opts)
-      assert :not_found = Redis.get_checkpoint(:del_key, opts)
+      opts = [
+        command_fn:
+          mock_command_fn(pid, fn
+            ["GET", _key] -> {:ok, <<0, 1, 2>>}
+            _ -> :next
+          end)
+      ]
+
+      assert {:error, :invalid_term} = Redis.get_checkpoint(:bad, opts)
     end
   end
 
@@ -104,12 +119,16 @@ defmodule JidoTest.Storage.RedisTest do
       assert {:ok, %{v: 2}} = Redis.get_checkpoint(:key, opts)
     end
 
-    test "accepts TTL option" do
+    test "uses PX when ttl is configured" do
       pid = start_mock_redis()
       opts = redis_opts(pid, ttl: 60_000)
 
       :ok = Redis.put_checkpoint(:ttl_key, %{data: true}, opts)
-      assert {:ok, %{data: true}} = Redis.get_checkpoint(:ttl_key, opts)
+
+      assert Enum.any?(command_log(pid), fn
+               ["SET", _key, _value, "PX", "60000"] -> true
+               _ -> false
+             end)
     end
   end
 
@@ -129,10 +148,6 @@ defmodule JidoTest.Storage.RedisTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Thread Tests
-  # ---------------------------------------------------------------------------
-
   describe "load_thread/2" do
     test "returns :not_found when thread does not exist" do
       pid = start_mock_redis()
@@ -147,6 +162,20 @@ defmodule JidoTest.Storage.RedisTest do
         Redis.append_thread("th-1", [%{kind: :message, payload: %{content: "hi"}}], opts)
 
       assert {:ok, %Thread{id: "th-1", rev: 1}} = Redis.load_thread("th-1", opts)
+    end
+
+    test "returns {:error, :invalid_term} for corrupt thread data" do
+      pid = start_mock_redis()
+      put_raw(pid, thread_key("corrupt"), <<0, 1, 2>>)
+
+      assert {:error, :invalid_term} = Redis.load_thread("corrupt", redis_opts(pid))
+    end
+
+    test "returns {:error, :invalid_term} for invalid thread shape" do
+      pid = start_mock_redis()
+      put_raw(pid, thread_key("bad-shape"), :erlang.term_to_binary(%{entries: []}))
+
+      assert {:error, :invalid_term} = Redis.load_thread("bad-shape", redis_opts(pid))
     end
   end
 
@@ -164,6 +193,15 @@ defmodule JidoTest.Storage.RedisTest do
       assert thread.id == "new-th"
       assert thread.rev == 2
       assert length(thread.entries) == 2
+    end
+
+    test "stores thread state under a single key" do
+      pid = start_mock_redis()
+      opts = redis_opts(pid)
+
+      {:ok, _thread} = Redis.append_thread("single-key", [%{kind: :note}], opts)
+
+      assert Map.keys(stored_data(pid)) == [thread_key("single-key")]
     end
 
     test "appends to existing thread" do
@@ -252,6 +290,56 @@ defmodule JidoTest.Storage.RedisTest do
       {:ok, thread} = Redis.append_thread("meta-th", [%{kind: :note}], opts)
       assert thread.metadata == %{source: "test"}
     end
+
+    test "uses PX for thread writes when ttl is configured" do
+      pid = start_mock_redis()
+      opts = redis_opts(pid, ttl: 60_000)
+
+      {:ok, _thread} = Redis.append_thread("ttl-th", [%{kind: :note}], opts)
+
+      assert Enum.any?(command_log(pid), fn
+               ["SET", "jido:th:ttl-th", _value, "PX", "60000"] -> true
+               _ -> false
+             end)
+    end
+
+    test "redis read failures during append propagate and keep existing history" do
+      pid = start_mock_redis()
+
+      {:ok, _thread} =
+        Redis.append_thread("stable-th", [%{kind: :note, payload: %{n: 1}}], redis_opts(pid))
+
+      opts = [
+        command_fn:
+          mock_command_fn(pid, fn
+            ["GET", "jido:th:stable-th"] -> {:error, :connection_closed}
+            _ -> :next
+          end)
+      ]
+
+      assert {:error, :connection_closed} =
+               Redis.append_thread("stable-th", [%{kind: :note, payload: %{n: 2}}], opts)
+
+      assert {:ok, thread} = Redis.load_thread("stable-th", redis_opts(pid))
+      assert thread.rev == 1
+      assert Enum.map(thread.entries, & &1.payload.n) == [1]
+    end
+
+    test "returns {:error, :invalid_term} when stored thread data is corrupt" do
+      pid = start_mock_redis()
+      put_raw(pid, thread_key("bad-th"), <<0, 1, 2>>)
+
+      assert {:error, :invalid_term} =
+               Redis.append_thread("bad-th", [%{kind: :note}], redis_opts(pid))
+    end
+
+    test "returns {:error, :invalid_term} when stored thread data has an invalid shape" do
+      pid = start_mock_redis()
+      put_raw(pid, thread_key("bad-shape"), :erlang.term_to_binary(%{entries: [], metadata: %{}}))
+
+      assert {:error, :invalid_term} =
+               Redis.append_thread("bad-shape", [%{kind: :note}], redis_opts(pid))
+    end
   end
 
   describe "delete_thread/2" do
@@ -267,12 +355,9 @@ defmodule JidoTest.Storage.RedisTest do
       {:ok, _} = Redis.append_thread("del-th", [%{kind: :note}], opts)
       :ok = Redis.delete_thread("del-th", opts)
       assert :not_found = Redis.load_thread("del-th", opts)
+      assert stored_data(pid) == %{}
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Key Prefixing
-  # ---------------------------------------------------------------------------
 
   describe "key prefixing" do
     test "different prefixes create isolated namespaces" do
@@ -303,10 +388,6 @@ defmodule JidoTest.Storage.RedisTest do
     end
   end
 
-  # ---------------------------------------------------------------------------
-  # Round-Trip with Jido.Storage helpers
-  # ---------------------------------------------------------------------------
-
   describe "Jido.Storage helper integration" do
     test "fetch_checkpoint normalizes :not_found" do
       pid = start_mock_redis()
@@ -327,10 +408,6 @@ defmodule JidoTest.Storage.RedisTest do
       assert {Redis, [prefix: "x"]} = Storage.normalize_storage({Redis, prefix: "x"})
     end
   end
-
-  # ---------------------------------------------------------------------------
-  # Error Handling
-  # ---------------------------------------------------------------------------
 
   describe "error handling" do
     test "raises ArgumentError when command_fn is missing" do
@@ -358,6 +435,13 @@ defmodule JidoTest.Storage.RedisTest do
       opts = [command_fn: failing_fn]
 
       assert {:error, :connection_closed} = Redis.load_thread("th", opts)
+    end
+
+    test "propagates Redis errors on append_thread" do
+      failing_fn = fn _cmd -> {:error, :connection_closed} end
+      opts = [command_fn: failing_fn]
+
+      assert {:error, :connection_closed} = Redis.append_thread("th", [%{kind: :note}], opts)
     end
   end
 end

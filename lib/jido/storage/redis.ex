@@ -2,16 +2,21 @@ defmodule Jido.Storage.Redis do
   @moduledoc """
   Redis-based storage adapter for agent checkpoints and thread journals.
 
-  Durable storage suitable for production. Survives process restarts and
-  pod rolls — data persists as long as the Redis server retains it.
+  Durable storage suitable when you already operate Redis and want an
+  optional external backing store for Jido. The adapter does not depend
+  on a Redis client; callers provide a 1-arity `:command_fn`.
 
   ## Usage
+
+      defmodule MyApp.RedisStorage do
+        def command(cmd), do: Redix.command(:my_redis, cmd)
+      end
 
       defmodule MyApp.Jido do
         use Jido,
           otp_app: :my_app,
           storage: {Jido.Storage.Redis, [
-            command_fn: fn cmd -> Redix.command(:my_redis, cmd) end,
+            command_fn: &MyApp.RedisStorage.command/1,
             prefix: "jido"
           ]}
       end
@@ -19,18 +24,20 @@ defmodule Jido.Storage.Redis do
   ## Options
 
   - `:command_fn` (required) — A function that executes Redis commands.
-    Signature: `fn [String.t()] -> {:ok, term()} | {:error, term()}`
-    This avoids adding Redix as a dependency; callers provide their own
-    Redis client.
+    Signature: `fn [binary()] -> {:ok, term()} | {:error, term()}`
+    This keeps Redis client choice in the caller.
   - `:prefix` (optional, default `"jido"`) — Key prefix for namespacing.
   - `:ttl` (optional) — TTL in milliseconds for all keys. When set, keys
     expire automatically.
 
   ## Key Layout
 
-      {prefix}:cp:{hex_hash}           → Serialized checkpoint
-      {prefix}:th:{thread_id}:entries   → Serialized thread entries
-      {prefix}:th:{thread_id}:meta      → Serialized thread metadata
+      {prefix}:cp:{hex_hash}   → Serialized checkpoint
+      {prefix}:th:{thread_id}  → Serialized thread state
+
+  Thread journals are stored as a single serialized value containing
+  revision, timestamps, metadata, and entries. Using one key avoids
+  partial writes between thread entries and metadata.
 
   ## Concurrency
 
@@ -41,11 +48,19 @@ defmodule Jido.Storage.Redis do
   @behaviour Jido.Storage
 
   alias Jido.Thread
+  alias Jido.Thread.Entry
   alias Jido.Thread.EntryNormalizer
 
   @default_prefix "jido"
 
   @type opts :: keyword()
+  @type stored_thread :: %{
+          rev: non_neg_integer(),
+          created_at: integer(),
+          updated_at: integer(),
+          metadata: map(),
+          entries: [Entry.t()]
+        }
 
   # =============================================================================
   # Checkpoint Operations
@@ -103,21 +118,19 @@ defmodule Jido.Storage.Redis do
   @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | :not_found | {:error, term()}
   def load_thread(thread_id, opts) do
     command_fn = fetch_command_fn!(opts)
-    entries_key = thread_entries_key(thread_id, opts)
-    meta_key = thread_meta_key(thread_id, opts)
+    redis_key = thread_key(thread_id, opts)
 
-    with {:ok, entries_binary} <- command_fn.(["GET", entries_key]),
-         {:ok, meta_binary} <- command_fn.(["GET", meta_key]) do
-      if is_nil(entries_binary) or is_nil(meta_binary) do
+    case command_fn.(["GET", redis_key]) do
+      {:ok, nil} ->
         :not_found
-      else
-        with {:ok, entries} <- safe_binary_to_term(entries_binary),
-             {:ok, meta} <- safe_binary_to_term(meta_binary) do
-          {:ok, reconstruct_thread(thread_id, entries, meta)}
+
+      {:ok, binary} ->
+        with {:ok, stored_thread} <- decode_thread(binary) do
+          {:ok, reconstruct_thread(thread_id, stored_thread)}
         end
-      end
-    else
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -139,10 +152,9 @@ defmodule Jido.Storage.Redis do
   @spec delete_thread(String.t(), opts()) :: :ok | {:error, term()}
   def delete_thread(thread_id, opts) do
     command_fn = fetch_command_fn!(opts)
-    entries_key = thread_entries_key(thread_id, opts)
-    meta_key = thread_meta_key(thread_id, opts)
+    redis_key = thread_key(thread_id, opts)
 
-    case command_fn.(["DEL", entries_key, meta_key]) do
+    case command_fn.(["DEL", redis_key]) do
       {:ok, _} -> :ok
       {:error, reason} -> {:error, reason}
     end
@@ -154,74 +166,62 @@ defmodule Jido.Storage.Redis do
 
   defp do_append_thread(thread_id, entries, expected_rev, now, opts) do
     command_fn = fetch_command_fn!(opts)
-    entries_key = thread_entries_key(thread_id, opts)
-    meta_key = thread_meta_key(thread_id, opts)
+    redis_key = thread_key(thread_id, opts)
 
-    {current_rev, current_entries, created_at, metadata} =
-      load_thread_or_new(command_fn, entries_key, meta_key)
-
-    with :ok <- validate_expected_rev(expected_rev, current_rev) do
-      base_seq = current_rev
-      is_new = current_rev == 0
+    with {:ok, stored_thread} <- load_thread_or_new(command_fn, redis_key, now),
+         :ok <- validate_expected_rev(expected_rev, stored_thread.rev) do
+      base_seq = stored_thread.rev
+      is_new = stored_thread.rev == 0
 
       prepared_entries = EntryNormalizer.normalize_many(entries, base_seq, now)
-      all_entries = current_entries ++ prepared_entries
-      new_rev = current_rev + length(prepared_entries)
+      all_entries = stored_thread.entries ++ prepared_entries
+      new_rev = stored_thread.rev + length(prepared_entries)
 
       thread_metadata =
         if is_new do
-          Keyword.get(opts, :metadata, metadata)
+          Keyword.get(opts, :metadata, stored_thread.metadata)
         else
-          metadata
+          stored_thread.metadata
         end
 
-      created_at = if is_new, do: now, else: created_at
+      created_at = if is_new, do: now, else: stored_thread.created_at
 
-      meta = %{
+      updated_thread = %{
         rev: new_rev,
         created_at: created_at,
         updated_at: now,
-        metadata: thread_metadata
+        metadata: thread_metadata,
+        entries: all_entries
       }
 
-      entries_binary = :erlang.term_to_binary(all_entries)
-      meta_binary = :erlang.term_to_binary(meta)
+      binary = :erlang.term_to_binary(updated_thread)
+      command = set_command(redis_key, binary, Keyword.get(opts, :ttl))
 
-      ttl = Keyword.get(opts, :ttl)
-
-      set_entries_cmd =
-        case ttl do
-          nil -> ["SET", entries_key, entries_binary]
-          t -> ["SET", entries_key, entries_binary, "PX", to_string(t)]
-        end
-
-      set_meta_cmd =
-        case ttl do
-          nil -> ["SET", meta_key, meta_binary]
-          t -> ["SET", meta_key, meta_binary, "PX", to_string(t)]
-        end
-
-      with {:ok, _} <- command_fn.(set_entries_cmd),
-           {:ok, _} <- command_fn.(set_meta_cmd) do
-        {:ok, reconstruct_thread(thread_id, all_entries, meta)}
+      with {:ok, _} <- command_fn.(command) do
+        {:ok, reconstruct_thread(thread_id, updated_thread)}
       else
         {:error, reason} -> {:error, reason}
       end
     end
   end
 
-  defp load_thread_or_new(command_fn, entries_key, meta_key) do
-    with {:ok, entries_binary} <- command_fn.(["GET", entries_key]),
-         {:ok, meta_binary} <- command_fn.(["GET", meta_key]) do
-      if is_nil(entries_binary) or is_nil(meta_binary) do
-        {0, [], nil, %{}}
-      else
-        entries = :erlang.binary_to_term(entries_binary, [:safe])
-        meta = :erlang.binary_to_term(meta_binary, [:safe])
-        {meta.rev, entries, meta.created_at, meta.metadata}
-      end
-    else
-      {:error, _} -> {0, [], nil, %{}}
+  defp load_thread_or_new(command_fn, redis_key, now) do
+    case command_fn.(["GET", redis_key]) do
+      {:ok, nil} ->
+        {:ok,
+         %{
+           rev: 0,
+           created_at: now,
+           updated_at: now,
+           metadata: %{},
+           entries: []
+         }}
+
+      {:ok, binary} ->
+        decode_thread(binary)
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -229,16 +229,16 @@ defmodule Jido.Storage.Redis do
   defp validate_expected_rev(expected_rev, expected_rev), do: :ok
   defp validate_expected_rev(_expected_rev, _current_rev), do: {:error, :conflict}
 
-  defp reconstruct_thread(thread_id, entries, meta) do
-    entry_count = length(entries)
+  defp reconstruct_thread(thread_id, stored_thread) do
+    entry_count = length(stored_thread.entries)
 
     %Thread{
       id: thread_id,
-      rev: entry_count,
-      entries: entries,
-      created_at: meta[:created_at],
-      updated_at: meta[:updated_at],
-      metadata: meta[:metadata] || %{},
+      rev: stored_thread.rev,
+      entries: stored_thread.entries,
+      created_at: stored_thread.created_at,
+      updated_at: stored_thread.updated_at,
+      metadata: stored_thread.metadata,
       stats: %{entry_count: entry_count}
     }
   end
@@ -249,15 +249,84 @@ defmodule Jido.Storage.Redis do
     "#{prefix}:cp:#{hash}"
   end
 
-  defp thread_entries_key(thread_id, opts) do
+  defp thread_key(thread_id, opts) do
     prefix = Keyword.get(opts, :prefix, @default_prefix)
-    "#{prefix}:th:#{thread_id}:entries"
+    "#{prefix}:th:#{thread_id}"
   end
 
-  defp thread_meta_key(thread_id, opts) do
-    prefix = Keyword.get(opts, :prefix, @default_prefix)
-    "#{prefix}:th:#{thread_id}:meta"
+  defp set_command(redis_key, binary, nil), do: ["SET", redis_key, binary]
+  defp set_command(redis_key, binary, ttl), do: ["SET", redis_key, binary, "PX", to_string(ttl)]
+
+  defp decode_thread(binary) do
+    with {:ok, stored_thread} <- safe_binary_to_term(binary),
+         {:ok, validated_thread} <- validate_thread(stored_thread) do
+      {:ok, validated_thread}
+    end
   end
+
+  defp validate_thread(%{
+         rev: rev,
+         created_at: created_at,
+         updated_at: updated_at,
+         metadata: metadata,
+         entries: entries
+       })
+       when is_integer(rev) and rev >= 0 and is_integer(created_at) and is_integer(updated_at) and
+              is_map(metadata) and is_list(entries) do
+    cond do
+      rev != length(entries) ->
+        {:error, :invalid_term}
+
+      not valid_entries?(entries) ->
+        {:error, :invalid_term}
+
+      true ->
+        {:ok,
+         %{
+           rev: rev,
+           created_at: created_at,
+           updated_at: updated_at,
+           metadata: metadata,
+           entries: entries
+         }}
+    end
+  end
+
+  defp validate_thread(_), do: {:error, :invalid_term}
+
+  defp valid_entries?(entries) do
+    entries
+    |> Enum.with_index()
+    |> Enum.all?(fn {entry, expected_seq} ->
+      valid_entry?(entry) and entry.seq == expected_seq
+    end)
+  end
+
+  defp valid_entry?(%Entry{
+         id: id,
+         seq: seq,
+         at: at,
+         kind: kind,
+         payload: payload,
+         refs: refs
+       })
+       when is_binary(id) and is_integer(seq) and seq >= 0 and is_integer(at) and is_atom(kind) and
+              is_map(payload) and is_map(refs),
+       do: true
+
+  defp valid_entry?(%{
+         id: id,
+         seq: seq,
+         at: at,
+         kind: kind,
+         payload: payload,
+         refs: refs
+       })
+       when is_binary(id) and is_integer(seq) and seq >= 0 and is_integer(at) and is_atom(kind) and
+              is_map(payload) and is_map(refs),
+       do: true
+
+  defp valid_entry?(_), do: false
 
   defp fetch_command_fn!(opts) do
     case Keyword.fetch(opts, :command_fn) do
