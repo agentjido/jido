@@ -25,6 +25,11 @@ defmodule Jido.Agent.Directive.Cron do
       %Cron{cron: "*/5 * * * *", message: check_signal, job_id: :check, timezone: "America/New_York"}
   """
 
+  require Logger
+
+  alias Jido.AgentServer
+  alias Jido.AgentServer.Signal.CronTick
+
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -47,28 +52,20 @@ defmodule Jido.Agent.Directive.Cron do
   @doc "Returns the Zoi schema for Cron."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
-end
 
-defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
-  @moduledoc false
-
-  require Logger
-
-  alias Jido.AgentServer
-  alias Jido.AgentServer.Signal.CronTick
-
-  def exec(
-        %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
-        _input_signal,
-        state
-      ) do
+  @doc false
+  @spec register(map(), term(), term(), term(), term(), keyword()) :: {:ok, map()}
+  def register(state, cron_expr, message, logical_id, tz, opts \\ []) do
+    on_failure = Keyword.get(opts, :on_failure, :keep)
     agent_id = state.id
+    agent_pid = self()
     logical_id = logical_id || make_ref()
+    signal = build_signal(message, logical_id, agent_id)
 
-    with :ok <- validate_registration_input(cron_expr, tz),
-         {:ok, pid} <- start_runtime_job(state, cron_expr, message, logical_id, tz),
+    with {:ok, cron_spec} <- Jido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
+         {:ok, pid} <- start_runtime_job(agent_pid, signal, cron_expr, cron_spec.timezone),
          {:ok, persisted_state} <-
-           persist_then_commit_registration(state, pid, logical_id, cron_expr, message, tz) do
+           persist_then_commit_registration(state, pid, logical_id, cron_spec) do
       Logger.debug(
         "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
       )
@@ -85,7 +82,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
           "AgentServer #{agent_id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
         )
 
-        {:ok, state}
+        {:ok, handle_failed_registration(state, logical_id, on_failure)}
     end
   end
 
@@ -98,11 +95,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
     )
   end
 
-  defp start_runtime_job(state, cron_expr, message, logical_id, tz) do
-    agent_pid = self()
-    signal = build_signal(message, logical_id, state.id)
-    opts = if is_binary(tz), do: [timezone: tz], else: []
-
+  defp start_runtime_job(agent_pid, signal, cron_expr, timezone) do
     Jido.Scheduler.run_every(
       fn ->
         if Process.alive?(agent_pid) do
@@ -112,12 +105,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
         :ok
       end,
       cron_expr,
-      opts
+      timezone: timezone
     )
   end
 
-  defp persist_then_commit_registration(state, new_pid, logical_id, cron_expr, message, tz) do
-    cron_spec = Jido.Scheduler.build_cron_spec(cron_expr, message, tz)
+  defp persist_then_commit_registration(state, new_pid, logical_id, cron_spec) do
     proposed_specs = Map.put(state.cron_specs, logical_id, cron_spec)
 
     case AgentServer.persist_cron_specs(state, proposed_specs) do
@@ -132,7 +124,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
 
         AgentServer.emit_cron_telemetry_event(state, :persist_failure, %{
           job_id: logical_id,
-          cron_expression: cron_expr,
+          cron_expression: cron_spec.cron_expression,
           reason: reason
         })
 
@@ -140,13 +132,29 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
     end
   end
 
-  defp validate_registration_input(cron_expr, _tz) when not is_binary(cron_expr),
-    do: {:error, :invalid_cron_expression}
+  defp handle_failed_registration(state, logical_id, :drop) do
+    {_pid, runtime_state} = AgentServer.untrack_cron_job(state, logical_id, cancel?: true)
+    %{runtime_state | cron_specs: Map.delete(runtime_state.cron_specs, logical_id)}
+  end
 
-  defp validate_registration_input(_cron_expr, tz) when not (is_nil(tz) or is_binary(tz)),
-    do: {:error, :invalid_timezone}
+  defp handle_failed_registration(state, _logical_id, _on_failure), do: state
+end
 
-  defp validate_registration_input(_cron_expr, _tz) do
-    :ok
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Cron do
+  @moduledoc false
+
+  def exec(
+        %{cron: cron_expr, message: message, job_id: logical_id, timezone: tz},
+        _input_signal,
+        state
+      ) do
+    Jido.Agent.Directive.Cron.register(
+      state,
+      cron_expr,
+      message,
+      logical_id,
+      tz,
+      on_failure: :keep
+    )
   end
 end

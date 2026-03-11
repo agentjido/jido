@@ -866,6 +866,21 @@ cross-manager collisions when multiple managers share one storage backend.
 :ok = Jido.AgentServer.detach(pid)
 ```
 
+### Durable Dynamic Cron Registrations
+
+When an agent registers a recurring job at runtime with `Directive.cron/3`,
+`InstanceManager` persists that dynamic schedule as part of the checkpoint state.
+Jido stages those specs under a reserved internal key, `:__cron_specs__`, and
+re-registers them on thaw.
+
+This durability scope is intentionally narrow:
+
+- Dynamic `Directive.cron/3` registrations are persisted when storage is enabled
+- Declarative `schedules:` entries are recreated from code on start
+- Plugin schedules are recreated from code on start
+- Missed cron ticks are not replayed during hibernate or downtime
+- `storage: nil` keeps dynamic cron registrations runtime-only
+
 ### Example: Session Agent with Auto-Hibernate
 
 ```elixir

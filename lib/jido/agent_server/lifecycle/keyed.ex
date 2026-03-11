@@ -217,7 +217,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
     persistence_key = {lifecycle.pool, pool_key}
-    agent = attach_cron_specs(state.agent, state.cron_specs)
+    agent = Jido.Scheduler.attach_staged_cron_specs(state.agent, state.cron_specs)
     agent_module = state.agent_module
 
     case Persist.hibernate(storage, agent_module, persistence_key, agent) do
@@ -232,31 +232,23 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   end
 
   defp attach_cron_specs(agent, cron_specs) when is_map(cron_specs) do
-    key = Jido.Scheduler.cron_specs_state_key()
-
-    state_with_specs =
-      if map_size(cron_specs) == 0 do
-        Map.delete(agent.state, key)
-      else
-        Map.put(agent.state, key, cron_specs)
-      end
-
-    %{agent | state: state_with_specs}
+    Jido.Scheduler.attach_staged_cron_specs(agent, cron_specs)
   end
 
-  defp extract_cron_specs(%{state: state} = agent) when is_map(state) do
-    key = Jido.Scheduler.cron_specs_state_key()
-    cron_specs = state |> Map.get(key) |> Jido.Scheduler.normalize_cron_specs()
+  defp extract_cron_specs(%{id: agent_id} = agent) do
+    {cleaned_agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
+    {cron_specs, invalid_cron_specs} = Jido.Scheduler.classify_cron_specs(staged_cron_specs)
 
-    cleaned_agent =
-      if Map.has_key?(state, key) do
-        %{agent | state: Map.delete(state, key)}
-      else
-        agent
-      end
+    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
+      Logger.error(
+        "Lifecycle dropped malformed persisted cron spec #{inspect(job_id)} for #{inspect(agent_id)}: #{inspect(spec)} (#{inspect(reason)})"
+      )
+    end)
 
     {cleaned_agent, cron_specs}
   end
+
+  defp extract_cron_specs(agent), do: {agent, %{}}
 
   defp maybe_start_idle_timer(state) do
     lifecycle = state.lifecycle

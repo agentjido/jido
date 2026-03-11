@@ -4,6 +4,8 @@
 
 Jido provides three scheduling mechanisms: declarative schedules in the agent definition, one-time delays via `Schedule`, and dynamic recurring jobs via `Cron`. All are timer-based and tied to the agent's process lifecycle.
 
+Dynamic cron scheduling now lives in Jido core because durable runtime registrations need to survive hibernate/thaw without carrying the old `sched_ex -> timex -> gettext` dependency chain. The implementation stays intentionally small: `crontab` parses cron expressions and `tzdata` resolves named timezones.
+
 ## Declarative Schedules
 
 The simplest way to add recurring jobs is to declare them in your agent definition. Schedules target signal types, which get routed through `signal_routes/1` like any other signal:
@@ -120,6 +122,8 @@ defmodule SetupCronAction do
 end
 ```
 
+Use dynamic cron for lightweight trigger work. Each tick sends a message or signal back into the owning agent's normal routing path; it is not a general-purpose detached job runner.
+
 ### Cron Expressions
 
 Standard 5-field expressions are supported:
@@ -166,7 +170,7 @@ If timezone configuration is missing or invalid, cron registration returns
 
 ### Upsert Behavior
 
-Registering a cron job with an existing `job_id` cancels the old job and replaces it:
+Registering a cron job with an existing `job_id` validates and starts the replacement first, then swaps it in and cancels the old job:
 
 ```elixir
 Directive.cron("*/5 * * * *", tick_signal, job_id: :heartbeat)
@@ -204,6 +208,8 @@ Cancelling a non-existent job is a no-op — it doesn't raise an error.
 agent is managed by `Jido.Agent.InstanceManager` **and** storage is enabled.
 In that mode, dynamic cron specs are persisted through `Jido.Persist` and
 re-registered on thaw.
+
+Only dynamic `Directive.cron/3` registrations are persisted. Declarative `schedules:` entries and plugin schedules are recreated from code when the `AgentServer` starts.
 
 **What this means:**
 

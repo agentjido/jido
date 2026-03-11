@@ -10,6 +10,8 @@ defmodule Jido.AgentServer.State do
   the agent itself, directive queue, hierarchy tracking, and configuration.
   """
 
+  require Logger
+
   alias Jido.AgentServer.{ChildInfo, Options}
   alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
 
@@ -129,7 +131,16 @@ defmodule Jido.AgentServer.State do
   @spec from_options(Options.t(), module(), struct()) :: {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent) do
     agent = inject_parent_into_agent(agent, opts.parent)
-    {agent, restored_cron_specs} = extract_cron_specs(agent)
+    {agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
+
+    {restored_cron_specs, invalid_cron_specs} =
+      Jido.Scheduler.classify_cron_specs(staged_cron_specs)
+
+    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
+      Logger.error(
+        "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
+      )
+    end)
 
     lifecycle_opts = [
       lifecycle_mod: opts.lifecycle_mod,
@@ -186,23 +197,6 @@ defmodule Jido.AgentServer.State do
     updated_state = Map.put(agent.state, :__parent__, parent)
     %{agent | state: updated_state}
   end
-
-  @spec extract_cron_specs(struct()) :: {struct(), map()}
-  defp extract_cron_specs(%{state: state} = agent) when is_map(state) do
-    key = Jido.Scheduler.cron_specs_state_key()
-    cron_specs = state |> Map.get(key) |> Jido.Scheduler.normalize_cron_specs()
-
-    cleaned_agent =
-      if Map.has_key?(state, key) do
-        %{agent | state: Map.delete(state, key)}
-      else
-        agent
-      end
-
-    {cleaned_agent, cron_specs}
-  end
-
-  defp extract_cron_specs(agent), do: {agent, %{}}
 
   @doc """
   Updates the agent in state.

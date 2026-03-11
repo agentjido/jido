@@ -1,12 +1,16 @@
 defmodule JidoTest.AgentServer.CronIntegrationTest do
   use JidoTest.Case, async: false
 
+  import ExUnit.CaptureLog
+
   @moduletag :integration
   @moduletag capture_log: true
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer
+  alias Jido.Persist
   alias Jido.Signal
+  alias Jido.Storage.ETS
 
   defmodule CronCountAction do
     @moduledoc false
@@ -151,6 +155,195 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       refute first_job_pid == second_job_pid
 
       GenServer.stop(pid)
+    end
+
+    test "failed upsert preserves the existing runtime job and durable spec", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: CronTestAgent, id: "cron-test-upsert-invalid", jido: jido)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :stable, cron: "* * * * *"}
+        })
+
+      :ok = AgentServer.cast(pid, register_signal)
+
+      state1 =
+        eventually_state(pid, fn state ->
+          Map.has_key?(state.cron_jobs, :stable) and Map.has_key?(state.cron_specs, :stable)
+        end)
+
+      job_pid = state1.cron_jobs[:stable]
+      cron_spec = state1.cron_specs[:stable]
+
+      invalid_update_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :stable, cron: "not-a-cron"}
+        })
+
+      :ok = AgentServer.cast(pid, invalid_update_signal)
+
+      state2 =
+        eventually_state(pid, fn state ->
+          state.cron_jobs[:stable] == job_pid and state.cron_specs[:stable] == cron_spec
+        end)
+
+      assert Process.alive?(job_pid)
+      assert state2.cron_specs[:stable].cron_expression == "* * * * *"
+
+      GenServer.stop(pid)
+    end
+
+    test "invalid dynamic cron input logs and preserves the agent", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: CronTestAgent, id: "cron-test-invalid-type", jido: jido)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :invalid_type, cron: 123}
+        })
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _agent} = AgentServer.call(pid, register_signal)
+
+          state =
+            eventually(fn ->
+              case AgentServer.state(pid) do
+                {:ok, state} -> state
+                _ -> nil
+              end
+            end)
+
+          refute Map.has_key?(state.cron_jobs, :invalid_type)
+          refute Map.has_key?(state.cron_specs, :invalid_type)
+        end)
+
+      assert Process.alive?(pid)
+      assert log =~ "failed to register cron job :invalid_type"
+
+      GenServer.stop(pid)
+    end
+
+    test "rejects non-durable cron messages during registration", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: CronTestAgent, id: "cron-test-invalid-message", jido: jido)
+
+      register_signal =
+        Signal.new!(%{
+          type: "register_cron",
+          source: "/test",
+          data: %{job_id: :invalid_message, cron: "* * * * *", message: {:notify, self()}}
+        })
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _agent} = AgentServer.call(pid, register_signal)
+        end)
+
+      assert log =~ "invalid_message"
+
+      {:ok, state} = AgentServer.state(pid)
+      refute Map.has_key?(state.cron_jobs, :invalid_message)
+      refute Map.has_key?(state.cron_specs, :invalid_message)
+
+      GenServer.stop(pid)
+    end
+
+    test "malformed restored cron spec is logged and dropped", %{jido: jido} do
+      scheduler_key = Jido.Scheduler.cron_specs_state_key()
+
+      agent =
+        CronTestAgent.new(id: "cron-test-restored-invalid")
+        |> then(fn agent ->
+          cron_specs = %{skipped: %{cron_expression: 123, message: :tick, timezone: "Etc/UTC"}}
+
+          %{agent | state: Map.put(agent.state, scheduler_key, cron_specs)}
+        end)
+
+      log =
+        capture_log(fn ->
+          {:ok, pid} =
+            AgentServer.start_link(
+              agent: agent,
+              agent_module: CronTestAgent,
+              id: "cron-test-restored-invalid",
+              jido: jido
+            )
+
+          assert Process.alive?(pid)
+
+          state = eventually_state(pid, fn state -> map_size(state.cron_jobs) == 0 end)
+
+          assert map_size(state.cron_jobs) == 0
+          refute Map.has_key?(state.cron_specs, :skipped)
+
+          GenServer.stop(pid)
+        end)
+
+      assert log =~ "dropped malformed persisted cron spec :skipped"
+    end
+
+    test "replay failure drops the durable spec and does not re-persist it", %{jido: jido} do
+      scheduler_key = Jido.Scheduler.cron_specs_state_key()
+      table = :"cron_replay_drop_#{System.unique_integer([:positive])}"
+
+      restored_signal =
+        Signal.new!(%{
+          type: "cron.tick",
+          source: "/test"
+        })
+
+      agent =
+        CronTestAgent.new(id: "cron-test-restored-transient")
+        |> then(fn agent ->
+          cron_specs = %{
+            skipped:
+              Jido.Scheduler.build_cron_spec("* * * * *", restored_signal, "America/New_York")
+          }
+
+          %{agent | state: Map.put(agent.state, scheduler_key, cron_specs)}
+        end)
+
+      on_exit(fn ->
+        {:ok, _} = Application.ensure_all_started(:tzdata)
+      end)
+
+      log =
+        capture_log(fn ->
+          :ok = Application.stop(:tzdata)
+
+          {:ok, pid} =
+            AgentServer.start_link(
+              agent: agent,
+              agent_module: CronTestAgent,
+              id: "cron-test-restored-transient",
+              jido: jido
+            )
+
+          {:ok, state} = AgentServer.state(pid)
+          refute Map.has_key?(state.cron_jobs, :skipped)
+          refute Map.has_key?(state.cron_specs, :skipped)
+
+          persisted_agent = Jido.Scheduler.attach_staged_cron_specs(state.agent, state.cron_specs)
+          assert :ok = Persist.hibernate({ETS, table: table}, persisted_agent)
+
+          {:ok, checkpoint} =
+            ETS.get_checkpoint({CronTestAgent, "cron-test-restored-transient"}, table: table)
+
+          refute Map.has_key?(checkpoint.state || %{}, scheduler_key)
+
+          GenServer.stop(pid)
+          {:ok, _} = Application.ensure_all_started(:tzdata)
+        end)
+
+      assert log =~ "failed to register cron job :skipped"
     end
 
     test "cron job with timezone", %{jido: jido} do

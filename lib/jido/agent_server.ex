@@ -1967,22 +1967,10 @@ defmodule Jido.AgentServer do
           cleaned_state
       end
     else
-      directive = Directive.cron(cron_expr, message, job_id: job_id, timezone: timezone)
+      {:ok, new_state} =
+        Directive.Cron.register(state, cron_expr, message, job_id, timezone, on_failure: :drop)
 
-      case DirectiveExec.exec(directive, init_signal(), state) do
-        {:ok, new_state} ->
-          new_state
-
-        {:async, _ref, new_state} ->
-          new_state
-
-        {:stop, reason, new_state} ->
-          Logger.error(
-            "AgentServer #{state.id} stopped while restoring cron job #{inspect(job_id)}: #{inspect(reason)}"
-          )
-
-          new_state
-      end
+      new_state
     end
   end
 
