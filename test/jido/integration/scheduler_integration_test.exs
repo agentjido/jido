@@ -1,10 +1,10 @@
 defmodule JidoTest.Integration.SchedulerIntegrationTest do
   @moduledoc """
-  Opt-in scheduler integration tests for invasive runtime failure scenarios.
+  Scheduler integration tests for invasive runtime failure scenarios.
 
-  Run with:
+  Target only with:
 
-      mix test --include scheduler_integration test/jido/integration/scheduler_integration_test.exs
+      mix test --only scheduler_integration test/jido/integration/scheduler_integration_test.exs
   """
 
   use JidoTest.Case, async: false

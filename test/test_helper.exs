@@ -4,4 +4,4 @@
 # However, since that's a compile-time option, we accept the Discovery log.
 
 ExUnit.start()
-ExUnit.configure(exclude: [:skip, :flaky, :example, :scheduler_integration])
+ExUnit.configure(exclude: [:skip, :flaky, :example])

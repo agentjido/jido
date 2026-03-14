@@ -1,11 +1,11 @@
 defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
   @moduledoc """
-  Opt-in scheduler durability tests that exercise storage-backed hibernate/thaw
+  Scheduler durability tests that exercise storage-backed hibernate/thaw
   and corrupted replay paths.
 
-  Run with:
+  Target only with:
 
-      mix test --include scheduler_integration test/jido/integration/scheduler_durability_integration_test.exs
+      mix test --only scheduler_integration test/jido/integration/scheduler_durability_integration_test.exs
   """
 
   use JidoTest.Case, async: false

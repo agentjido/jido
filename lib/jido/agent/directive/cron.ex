@@ -28,7 +28,7 @@ defmodule Jido.Agent.Directive.Cron do
   require Logger
 
   alias Jido.AgentServer
-  alias Jido.AgentServer.Signal.CronTick
+  alias Jido.AgentServer.CronRuntimeSpec
 
   @schema Zoi.struct(
             __MODULE__,
@@ -58,14 +58,18 @@ defmodule Jido.Agent.Directive.Cron do
   def register(state, cron_expr, message, logical_id, tz, opts \\ []) do
     on_failure = Keyword.get(opts, :on_failure, :keep)
     agent_id = state.id
-    agent_pid = self()
     logical_id = logical_id || make_ref()
-    signal = build_signal(message, logical_id, agent_id)
 
     with {:ok, cron_spec} <- Jido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
-         {:ok, pid} <- start_runtime_job(agent_pid, signal, cron_expr, cron_spec.timezone),
+         runtime_spec =
+           CronRuntimeSpec.dynamic(
+             cron_spec.cron_expression,
+             cron_spec.message,
+             cron_spec.timezone
+           ),
+         {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec),
          {:ok, persisted_state} <-
-           persist_then_commit_registration(state, pid, logical_id, cron_spec) do
+           persist_then_commit_registration(state, pid, logical_id, cron_spec, runtime_spec) do
       Logger.debug(
         "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
       )
@@ -86,38 +90,8 @@ defmodule Jido.Agent.Directive.Cron do
     end
   end
 
-  defp build_signal(%Jido.Signal{} = signal, _logical_id, _agent_id), do: signal
-
-  defp build_signal(message, logical_id, agent_id) do
-    CronTick.new!(
-      %{job_id: logical_id, message: message},
-      source: "/agent/#{agent_id}"
-    )
-  end
-
-  defp start_runtime_job(agent_pid, signal, cron_expr, timezone) do
-    Jido.Scheduler.run_every(
-      fn ->
-        if Process.alive?(agent_pid) do
-          _ = Jido.AgentServer.cast(agent_pid, signal)
-        end
-
-        :ok
-      end,
-      cron_expr,
-      timezone: timezone
-    )
-  end
-
-  defp persist_then_commit_registration(state, new_pid, logical_id, cron_spec) do
+  defp persist_then_commit_registration(state, new_pid, logical_id, cron_spec, runtime_spec) do
     proposed_specs = Map.put(state.cron_specs, logical_id, cron_spec)
-
-    runtime_spec = %{
-      kind: :dynamic,
-      cron_expression: cron_spec.cron_expression,
-      message: cron_spec.message,
-      timezone: cron_spec.timezone
-    }
 
     case AgentServer.persist_cron_specs(state, proposed_specs) do
       :ok ->
