@@ -107,6 +107,20 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     def run(_params, _context), do: {:ok, %{}}
   end
 
+  defmodule RecordSensorSignalAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_sensor_signal",
+      schema: [
+        value: [type: :any, required: true],
+        count: [type: :integer, required: true]
+      ]
+
+    def run(params, _context) do
+      {:ok, %{last_sensor_value: params.value, last_sensor_count: params.count}}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Plugin Modules
   # ---------------------------------------------------------------------------
@@ -166,6 +180,26 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
   end
 
+  defmodule PluginWithRoutedSensor do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_routed_sensor",
+      state_key: :routed_sensor,
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
+
+    @impl Jido.Plugin
+    def subscriptions(_config, context) do
+      [
+        {JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
+         %{
+           emit_on_init: false,
+           signal_type: "plugin.sensor.delivered",
+           agent_ref: context.agent_ref
+         }}
+      ]
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Agent Modules
   # ---------------------------------------------------------------------------
@@ -175,6 +209,21 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     use Jido.Agent,
       name: "agent_with_sensor_plugin",
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor]
+  end
+
+  defmodule AgentWithRoutedSensorPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_routed_sensor_plugin",
+      schema: [
+        last_sensor_value: [type: :any, default: nil],
+        last_sensor_count: [type: :integer, default: 0]
+      ],
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithRoutedSensor],
+      signal_routes: [
+        {"plugin.sensor.delivered",
+         JidoTest.AgentServer.PluginSubscriptionsTest.RecordSensorSignalAction}
+      ]
   end
 
   defmodule PluginWithStaticSubscriptions do
@@ -308,7 +357,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
   describe "signal delivery to agent" do
     test "sensor signals are delivered to the agent", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithSensorPlugin, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithRoutedSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
@@ -320,7 +369,14 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       Runtime.event(child_info.pid, {:trigger, :test_value})
 
-      Process.sleep(50)
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.last_sensor_value == :test_value and
+            state.agent.state.last_sensor_count == 1
+        end)
+
+      assert state.agent.state.last_sensor_value == :test_value
+      assert state.agent.state.last_sensor_count == 1
 
       GenServer.stop(pid)
     end

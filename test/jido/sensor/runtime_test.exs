@@ -167,6 +167,26 @@ defmodule JidoTest.Sensor.RuntimeTest do
     end
   end
 
+  defmodule SignalReceiver do
+    @moduledoc false
+    use GenServer
+
+    def start_link(opts) do
+      GenServer.start_link(__MODULE__, Keyword.fetch!(opts, :test_pid),
+        name: Keyword.get(opts, :name)
+      )
+    end
+
+    @impl GenServer
+    def init(test_pid), do: {:ok, test_pid}
+
+    @impl GenServer
+    def handle_info({:signal, signal}, test_pid) do
+      send(test_pid, {:received_signal, signal})
+      {:noreply, test_pid}
+    end
+  end
+
   defmodule RequiredFieldSensor do
     @moduledoc false
     use Jido.Sensor,
@@ -528,6 +548,30 @@ defmodule JidoTest.Sensor.RuntimeTest do
   end
 
   describe "signal delivery via async dispatch" do
+    test "resolves registry via tuples before dispatching" do
+      registry = :"sensor_runtime_registry_#{System.unique_integer([:positive])}"
+      receiver_name = {:via, Registry, {registry, "sensor-receiver"}}
+
+      {:ok, _registry_pid} = Registry.start_link(keys: :unique, name: registry)
+      {:ok, receiver_pid} = SignalReceiver.start_link(test_pid: self(), name: receiver_name)
+
+      {:ok, pid} =
+        Runtime.start_link(
+          sensor: SimpleSensor,
+          config: %{prefix: "via"},
+          context: %{agent_ref: receiver_name}
+        )
+
+      :ok = Runtime.event(pid, {:data, 42})
+
+      assert_receive {:received_signal, signal}, 200
+      assert signal.type == "via.data.received"
+      assert signal.data.value == 42
+
+      GenServer.stop(pid)
+      GenServer.stop(receiver_pid)
+    end
+
     test "dispatches to non-pid agent_ref using context dispatch_fun/2" do
       test_pid = self()
 
