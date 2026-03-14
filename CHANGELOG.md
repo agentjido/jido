@@ -210,3 +210,64 @@ See the Migration section in README.md for upgrade instructions.
 ## 1.1.0-rc - 2025-02-08
 
 - Stateful Agents
+
+<!-- changelog -->
+
+## [v2.1.0](https://github.com/agentjido/jido/compare/v2.0.0...v2.1.0) (2026-03-14)
+
+
+
+
+### Features:
+
+* scheduler: durable in-house cron scheduler for Jido 2.1 (#181) by mikehostetler
+
+* scheduler: in-house cron engine with durable instance replay by mikehostetler
+
+* plugin: support static subscriptions and fix documentation (#198) by Iulian Costan
+
+* plugin: support static subscriptions and fix documentation by Iulian Costan
+
+* storage: add Redis storage adapter (#184) by austin macciola
+
+* storage: add Redis storage adapter by austin macciola
+
+### Bug Fixes:
+
+* ci: resolve lint guard and dialyzer issues by mikehostetler
+
+* finalize durable scheduler hardening and dialyzer cleanup by mikehostetler
+
+* scheduler: harden durable cron replay and callbacks by mikehostetler
+
+* scheduler: restore cron replay invariants by mikehostetler
+
+* misplaced end in example (#201) by Jan Pieper
+
+* sensor: resolve via refs for subscription signals (#200) by mikehostetler
+
+* storage: harden redis adapter and instance integration by austin macciola
+
+* Improve typespec precision (#196) by Philip Munksgaard
+
+* preserve plugin spec structs in agents (#188) by mikehostetler
+
+* normalize StopChild shutdown reasons by mikehostetler
+
+* align StopChild with SpawnAgent restart semantics by mikehostetler
+
+* util: use Code.ensure_compiled to resolve action validation ordeâ¦ (#183) by caike
+
+* util: use Code.ensure_compiled to resolve action validation ordering by caike
+
+* error: make Jido.Error splode conversions reliable by Pascal Charbonneau
+
+* observe: harden sync and async tracer span semantics (#178) by mikehostetler
+
+* observe: harden tracer sync and async span semantics by mikehostetler
+
+* observe: prevent cross-process scoped callback re-execution by mikehostetler
+
+### Refactoring:
+
+* scheduler: simplify runtime registration by mikehostetler
