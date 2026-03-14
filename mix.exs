@@ -370,7 +370,7 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.0"},
+      {:jido_action, "~> 2.1"},
       {:jido_signal, "~> 2.0"},
 
       # Jido Deps
