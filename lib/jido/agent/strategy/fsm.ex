@@ -1,9 +1,12 @@
 defmodule Jido.Agent.Strategy.FSM do
   @moduledoc """
-  A generic finite state machine execution strategy.
+  An execution-phase finite state machine strategy.
 
-  This strategy implements FSM-based workflows where instructions trigger
-  state transitions. The FSM state is stored in `agent.state.__strategy__`.
+  This strategy keeps `cmd/2` pure by validating execution-state transitions,
+  emitting `%Directive.RunInstruction{}` directives, and handling instruction
+  results when the runtime routes them back through `cmd/2`.
+
+  The FSM state is stored in `agent.state.__strategy__`.
 
   ## Configuration
 
@@ -27,8 +30,13 @@ defmodule Jido.Agent.Strategy.FSM do
 
   - `:initial_state` - Initial FSM state (default: `"idle"`)
   - `:transitions` - Map of valid transitions `%{from_state => [to_states]}`
-  - `:auto_transition` - Whether to auto-transition back to initial state after
-    processing (default: `true`)
+  - `:auto_transition` - Whether to auto-transition back to the initial state
+    after processing (default: `true`)
+
+  Custom transition maps must include the runtime `"processing"` state. The
+  strategy always enters `"processing"` before dispatching instructions. If
+  `:auto_transition` is enabled, `"processing"` must also be able to return to
+  the configured initial state.
 
   ## Default Transitions
 
@@ -43,7 +51,7 @@ defmodule Jido.Agent.Strategy.FSM do
 
   ## States
 
-  Default states (can be customized via transitions):
+  Default execution states:
 
   - `"idle"` - Initial state, waiting for work
   - `"processing"` - Currently processing instructions
@@ -55,9 +63,9 @@ defmodule Jido.Agent.Strategy.FSM do
       agent = MyAgent.new()
       {agent, directives} = MyAgent.cmd(agent, SomeAction)
 
-  The strategy emits `%Directive.RunInstruction{}` directives for runtime execution,
-  then handles execution results through internal `cmd/2` actions. This keeps
-  strategy `cmd/2` pure while preserving FSM transition semantics.
+  `cmd/2` only prepares the work. Use `Jido.AgentServer` (or another runtime
+  that executes `%Directive.RunInstruction{}`) to run the instruction batch and
+  feed the result back into the strategy.
   """
 
   use Jido.Agent.Strategy
