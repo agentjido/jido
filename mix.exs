@@ -383,7 +383,8 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:poolboy, "~> 1.5"},
       {:telemetry_metrics, "~> 1.1"},
-      {:sched_ex, "~> 1.1"},
+      {:crontab, "~> 1.2"},
+      {:tzdata, "~> 1.1"},
       {:uniq, "~> 0.6.1"},
 
       # Development & Test Dependencies

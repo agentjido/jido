@@ -10,6 +10,8 @@ defmodule Jido.AgentServer.State do
   the agent itself, directive queue, hierarchy tracking, and configuration.
   """
 
+  require Logger
+
   alias Jido.AgentServer.{ChildInfo, Options}
   alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
 
@@ -51,8 +53,32 @@ defmodule Jido.AgentServer.State do
               # Cron jobs
               cron_jobs:
                 Zoi.map(description: "Map of job_id => scheduler job name") |> Zoi.default(%{}),
+              cron_monitors:
+                Zoi.map(description: "Map of job_id => monitor_ref for cron jobs")
+                |> Zoi.default(%{}),
+              cron_monitor_refs:
+                Zoi.map(description: "Map of monitor_ref => job_id for cron jobs")
+                |> Zoi.default(%{}),
+              cron_restart_attempts:
+                Zoi.map(description: "Map of job_id => restart attempt count for cron jobs")
+                |> Zoi.default(%{}),
+              cron_restart_timers:
+                Zoi.map(description: "Map of job_id => timer_ref for cron restarts")
+                |> Zoi.default(%{}),
+              cron_restart_timer_refs:
+                Zoi.map(description: "Map of timer_ref => job_id for cron restarts")
+                |> Zoi.default(%{}),
+              cron_specs:
+                Zoi.map(description: "Map of job_id => durable cron registration spec")
+                |> Zoi.default(%{}),
+              cron_runtime_specs:
+                Zoi.map(description: "Map of job_id => runtime cron restart spec")
+                |> Zoi.default(%{}),
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules")
+                |> Zoi.default(false),
+              restored_from_storage:
+                Zoi.boolean(description: "Whether the startup agent was already thawed")
                 |> Zoi.default(false),
 
               # Configuration
@@ -111,6 +137,16 @@ defmodule Jido.AgentServer.State do
   @spec from_options(Options.t(), module(), struct()) :: {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent) do
     agent = inject_parent_into_agent(agent, opts.parent)
+    {agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
+
+    {restored_cron_specs, invalid_cron_specs} =
+      Jido.Scheduler.classify_cron_specs(staged_cron_specs)
+
+    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
+      Logger.error(
+        "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
+      )
+    end)
 
     lifecycle_opts = [
       lifecycle_mod: opts.lifecycle_mod,
@@ -141,7 +177,15 @@ defmodule Jido.AgentServer.State do
         registry: opts.registry,
         spawn_fun: opts.spawn_fun,
         cron_jobs: %{},
+        cron_monitors: %{},
+        cron_monitor_refs: %{},
+        cron_restart_attempts: %{},
+        cron_restart_timers: %{},
+        cron_restart_timer_refs: %{},
+        cron_specs: restored_cron_specs,
+        cron_runtime_specs: %{},
         skip_schedules: opts.skip_schedules,
+        restored_from_storage: opts.restored_from_storage,
         error_count: 0,
         metrics: %{},
         completion_waiters: %{},

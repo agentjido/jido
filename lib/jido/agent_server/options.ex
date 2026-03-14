@@ -75,6 +75,9 @@ defmodule Jido.AgentServer.Options do
               storage:
                 Zoi.any(description: "Storage config (nil | Module | {Module, opts})")
                 |> Zoi.optional(),
+              restored_from_storage:
+                Zoi.boolean(description: "Whether the startup agent was already thawed")
+                |> Zoi.default(false),
 
               # Debug mode
               debug:

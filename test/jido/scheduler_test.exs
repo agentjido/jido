@@ -1,9 +1,21 @@
 defmodule JidoTest.SchedulerTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
   import JidoTest.Eventually
 
   alias Jido.Scheduler
+  alias Jido.Scheduler.Job
+
+  setup do
+    original_database = Calendar.get_time_zone_database()
+
+    on_exit(fn ->
+      Calendar.put_time_zone_database(original_database)
+    end)
+
+    :ok
+  end
 
   defmodule TestModule do
     def test_func(arg) do
@@ -22,11 +34,33 @@ defmodule JidoTest.SchedulerTest do
     test "accepts timezone option" do
       assert {:ok, pid} =
                Scheduler.run_every(TestModule, :test_func, [self()], "* * * * *",
-                 timezone: "America/New_York"
+                 timezone: "Etc/UTC"
                )
 
       assert is_pid(pid)
       Scheduler.cancel(pid)
+    end
+
+    test "returns {:error, reason} for invalid cron input" do
+      assert {:error, {:invalid_cron, _reason}} =
+               Scheduler.run_every(TestModule, :test_func, [self()], "not-a-cron")
+    end
+
+    test "returns {:error, reason} for invalid cron type" do
+      assert {:error, {:invalid_cron, :invalid_type}} =
+               Scheduler.run_every(TestModule, :test_func, [self()], 123)
+    end
+
+    test "returns {:error, reason} for invalid timezone input" do
+      assert {:error, {:invalid_timezone, _reason}} =
+               Scheduler.run_every(TestModule, :test_func, [self()], "* * * * *",
+                 timezone: "Not/A_Zone"
+               )
+    end
+
+    test "returns {:error, reason} for invalid timezone type" do
+      assert {:error, {:invalid_timezone, :invalid_type}} =
+               Scheduler.run_every(TestModule, :test_func, [self()], "* * * * *", timezone: 123)
     end
   end
 
@@ -43,8 +77,54 @@ defmodule JidoTest.SchedulerTest do
 
     test "accepts timezone option" do
       fun = fn -> :ok end
-      assert {:ok, pid} = Scheduler.run_every(fun, "* * * * *", timezone: "Europe/London")
+      assert {:ok, pid} = Scheduler.run_every(fun, "* * * * *", timezone: "Etc/UTC")
       assert is_pid(pid)
+      Scheduler.cancel(pid)
+    end
+
+    test "returns {:error, reason} for invalid cron input without crashing caller" do
+      fun = fn -> :ok end
+
+      assert {:error, {:invalid_cron, _reason}} =
+               Scheduler.run_every(fun, "not-a-cron-expression")
+    end
+
+    test "returns error for invalid timezone identifier without crashing caller" do
+      fun = fn -> :ok end
+
+      assert {:error, {:invalid_timezone, _}} =
+               Scheduler.run_every(fun, "* * * * *", timezone: "Invalid/Nowhere")
+    end
+
+    test "returns error for invalid timezone option type" do
+      fun = fn -> :ok end
+
+      assert {:error, {:invalid_timezone, :invalid_type}} =
+               Scheduler.run_every(fun, "* * * * *", timezone: :america_chicago)
+    end
+
+    test "uses tzdata directly without mutating the global calendar database" do
+      Calendar.put_time_zone_database(Calendar.UTCOnlyTimeZoneDatabase)
+
+      assert {:ok, pid} =
+               Scheduler.run_every(fn -> :ok end, "* * * * *", timezone: "America/New_York")
+
+      assert Calendar.get_time_zone_database() == Calendar.UTCOnlyTimeZoneDatabase
+      Scheduler.cancel(pid)
+    end
+
+    test "executes callbacks in an isolated worker process" do
+      test_pid = self()
+
+      assert {:ok, pid} =
+               Scheduler.run_every(
+                 fn -> send(test_pid, {:worker_tick, self()}) end,
+                 "* * * * * * *"
+               )
+
+      assert_receive {:worker_tick, worker_pid}, 2_000
+      assert is_pid(worker_pid)
+      refute worker_pid == pid
       Scheduler.cancel(pid)
     end
   end
@@ -56,6 +136,62 @@ defmodule JidoTest.SchedulerTest do
 
       assert :ok = Scheduler.cancel(pid)
       eventually(fn -> not Process.alive?(pid) end)
+    end
+
+    test "cancels a blocked callback worker and stops future ticks" do
+      test_pid = self()
+
+      {:ok, pid} =
+        Scheduler.run_every(
+          fn ->
+            send(test_pid, {:worker_started, self()})
+
+            receive do
+            after
+              :infinity -> :ok
+            end
+          end,
+          "* * * * * * *"
+        )
+
+      assert_receive {:worker_started, worker_pid}, 2_000
+      assert is_pid(worker_pid)
+
+      assert :ok = Scheduler.cancel(pid)
+      eventually(fn -> not Process.alive?(pid) end)
+      eventually(fn -> not Process.alive?(worker_pid) end)
+      refute_receive {:worker_started, _another_worker}, 1_500
+    end
+
+    test "callback kill does not take down the owner" do
+      test_pid = self()
+
+      owner =
+        spawn(fn ->
+          {:ok, pid} =
+            Scheduler.run_every(
+              fn -> Process.exit(self(), :kill) end,
+              "* * * * * * *"
+            )
+
+          send(test_pid, {:owner_started, self(), pid})
+
+          receive do
+            :stop -> Scheduler.cancel(pid)
+          end
+        end)
+
+      ref = Process.monitor(owner)
+
+      assert_receive {:owner_started, ^owner, pid}, 1_000
+      assert Process.alive?(owner)
+      assert Process.alive?(pid)
+
+      refute_receive {:DOWN, ^ref, :process, ^owner, _reason}, 1_500
+      assert Process.alive?(owner)
+
+      send(owner, :stop)
+      assert_receive {:DOWN, ^ref, :process, ^owner, _reason}, 2_000
     end
   end
 
@@ -76,6 +212,86 @@ defmodule JidoTest.SchedulerTest do
       {:ok, pid} = Scheduler.run_every(fn -> :ok end, "* * * * *")
       Scheduler.cancel(pid)
       eventually(fn -> Scheduler.alive?(pid) == false end)
+    end
+  end
+
+  describe "DST handling" do
+    test "skips nonexistent spring-forward occurrences" do
+      timezone = "America/Chicago"
+      {:ok, schedule} = Job.prepare_schedule("30 2 * * *", timezone)
+      {:ok, now} = DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, Tzdata.TimeZoneDatabase)
+
+      {:ok, expected} =
+        DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, Tzdata.TimeZoneDatabase)
+
+      assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
+    end
+
+    test "chooses the later ambiguous fall-back occurrence" do
+      timezone = "America/Chicago"
+      {:ok, schedule} = Job.prepare_schedule("31 1 * * *", timezone)
+
+      {:ambiguous, _first_now, now} =
+        DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, Tzdata.TimeZoneDatabase)
+
+      {:ambiguous, _first_expected, expected} =
+        DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, Tzdata.TimeZoneDatabase)
+
+      assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
+      assert DateTime.diff(expected, now, :millisecond) == 30_000
+    end
+  end
+
+  describe "runtime schedule recovery" do
+    test "tzdata loss enters retry mode and resumes without killing the owner" do
+      test_pid = self()
+      tick_gate = {__MODULE__, make_ref()}
+      owner_tag = make_ref()
+      :persistent_term.put(tick_gate, false)
+
+      on_exit(fn ->
+        :persistent_term.erase(tick_gate)
+        {:ok, _} = Application.ensure_all_started(:tzdata)
+      end)
+
+      capture_log(fn ->
+        owner =
+          spawn(fn ->
+            {:ok, pid} =
+              Scheduler.run_every(
+                fn ->
+                  if :persistent_term.get(tick_gate, false) do
+                    send(test_pid, {:recovered_tick, owner_tag, self()})
+                  end
+                end,
+                "* * * * * * *",
+                timezone: "America/New_York"
+              )
+
+            send(test_pid, {:job_started, owner_tag, self(), pid})
+
+            receive do
+              :stop -> Scheduler.cancel(pid)
+            end
+          end)
+
+        assert_receive {:job_started, ^owner_tag, ^owner, job_pid}, 1_000
+        assert Process.alive?(owner)
+        assert Process.alive?(job_pid)
+
+        :ok = Application.stop(:tzdata)
+
+        eventually(fn -> Process.alive?(owner) and Process.alive?(job_pid) end, timeout: 2_000)
+
+        :persistent_term.put(tick_gate, true)
+        {:ok, _} = Application.ensure_all_started(:tzdata)
+
+        assert_receive {:recovered_tick, ^owner_tag, worker_pid}, 3_000
+        assert is_pid(worker_pid)
+        refute worker_pid == job_pid
+        assert Process.alive?(job_pid)
+        send(owner, :stop)
+      end)
     end
   end
 end

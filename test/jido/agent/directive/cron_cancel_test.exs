@@ -3,6 +3,7 @@ defmodule JidoTest.Agent.Directive.CronCancelTest do
 
   alias Jido.Agent.Directive
   alias Jido.Agent.Directive.CronCancel
+  alias Jido.AgentServer.DirectiveExec
 
   describe "CronCancel directive creation" do
     test "creates cron cancel directive with atom job_id" do
@@ -85,6 +86,24 @@ defmodule JidoTest.Agent.Directive.CronCancelTest do
     test "allows valid struct creation" do
       directive = struct!(CronCancel, %{job_id: :test})
       assert directive.job_id == :test
+    end
+  end
+
+  describe "directive execution" do
+    test "removes persisted cron specs even when no runtime job exists" do
+      directive = %CronCancel{job_id: :durable}
+
+      state = %{
+        id: "agent-1",
+        cron_jobs: %{},
+        cron_specs: %{
+          durable: Jido.Scheduler.build_cron_spec("* * * * *", :tick, "America/New_York")
+        }
+      }
+
+      assert {:ok, new_state} = DirectiveExec.exec(directive, nil, state)
+      assert new_state.cron_jobs == %{}
+      assert new_state.cron_specs == %{}
     end
   end
 end

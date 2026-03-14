@@ -35,6 +35,8 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
   @impl true
   def init(_opts, state) do
+    state = maybe_restore_agent_from_storage(state)
+
     # The lifecycle struct is already populated by State.from_options
     # Just start the idle timer if appropriate
     maybe_start_idle_timer(state)
@@ -144,6 +146,26 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   end
 
   @impl true
+  def persist_cron_specs(state, cron_specs) when is_map(cron_specs) do
+    lifecycle = state.lifecycle
+
+    if lifecycle.storage do
+      persistence_key = {lifecycle.pool, lifecycle.pool_key}
+      agent = attach_cron_specs(state.agent, cron_specs)
+
+      Persist.persist_scheduler_manifest(
+        lifecycle.storage,
+        state.agent_module,
+        persistence_key,
+        agent,
+        cron_specs
+      )
+    else
+      :ok
+    end
+  end
+
+  @impl true
   def terminate(reason, state) do
     lifecycle = state.lifecycle
 
@@ -159,12 +181,46 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   defp clean_shutdown?({:shutdown, _}), do: true
   defp clean_shutdown?(_), do: false
 
+  defp maybe_restore_agent_from_storage(state) do
+    lifecycle = state.lifecycle
+
+    cond do
+      state.restored_from_storage ->
+        state
+
+      is_nil(lifecycle.storage) ->
+        state
+
+      map_size(state.cron_specs) > 0 ->
+        state
+
+      true ->
+        persistence_key = {lifecycle.pool, lifecycle.pool_key}
+
+        case Persist.thaw(lifecycle.storage, state.agent_module, persistence_key) do
+          {:ok, restored_agent} ->
+            {restored_agent, restored_cron_specs} = extract_cron_specs(restored_agent)
+            %{state | agent: restored_agent, cron_specs: restored_cron_specs}
+
+          {:error, :not_found} ->
+            state
+
+          {:error, reason} ->
+            Logger.warning(
+              "Lifecycle restore failed for #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}: #{inspect(reason)}"
+            )
+
+            state
+        end
+    end
+  end
+
   defp hibernate_agent(state) do
     lifecycle = state.lifecycle
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
     persistence_key = {lifecycle.pool, pool_key}
-    agent = state.agent
+    agent = Jido.Scheduler.attach_staged_cron_specs(state.agent, state.cron_specs)
     agent_module = state.agent_module
 
     case Persist.hibernate(storage, agent_module, persistence_key, agent) do
@@ -177,6 +233,25 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
         )
     end
   end
+
+  defp attach_cron_specs(agent, cron_specs) when is_map(cron_specs) do
+    Jido.Scheduler.attach_staged_cron_specs(agent, cron_specs)
+  end
+
+  defp extract_cron_specs(%{id: agent_id} = agent) do
+    {cleaned_agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
+    {cron_specs, invalid_cron_specs} = Jido.Scheduler.classify_cron_specs(staged_cron_specs)
+
+    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
+      Logger.error(
+        "Lifecycle dropped malformed persisted cron spec #{inspect(job_id)} for #{inspect(agent_id)}: #{inspect(spec)} (#{inspect(reason)})"
+      )
+    end)
+
+    {cleaned_agent, cron_specs}
+  end
+
+  defp extract_cron_specs(agent), do: {agent, %{}}
 
   defp maybe_start_idle_timer(state) do
     lifecycle = state.lifecycle

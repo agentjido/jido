@@ -63,6 +63,11 @@ defmodule Jido.Telemetry do
   - `[:jido, :agent_server, :directive, :stop]` - Directive execution completed
   - `[:jido, :agent_server, :directive, :exception]` - Directive execution failed
   - `[:jido, :agent_server, :queue, :overflow]` - Directive queue overflow
+  - `[:jido, :agent_server, :cron, :register]` - Dynamic cron registered
+  - `[:jido, :agent_server, :cron, :cancel]` - Dynamic cron cancelled
+  - `[:jido, :agent_server, :cron, :restart_scheduled]` - Dynamic cron restart scheduled
+  - `[:jido, :agent_server, :cron, :restart_succeeded]` - Dynamic cron restart completed
+  - `[:jido, :agent_server, :cron, :persist_failure]` - Cron persistence failed
 
   ### Strategy Events
   - `[:jido, :agent, :strategy, :init, :start]` - Strategy initialization started
@@ -198,7 +203,12 @@ defmodule Jido.Telemetry do
       [:jido, :agent_server, :directive, :start],
       [:jido, :agent_server, :directive, :stop],
       [:jido, :agent_server, :directive, :exception],
-      [:jido, :agent_server, :queue, :overflow]
+      [:jido, :agent_server, :queue, :overflow],
+      [:jido, :agent_server, :cron, :register],
+      [:jido, :agent_server, :cron, :cancel],
+      [:jido, :agent_server, :cron, :restart_scheduled],
+      [:jido, :agent_server, :cron, :restart_succeeded],
+      [:jido, :agent_server, :cron, :persist_failure]
     ]
   end
 
@@ -494,6 +504,56 @@ defmodule Jido.Telemetry do
         "queue_size=#{measurements[:queue_size]}",
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id]
+    )
+  end
+
+  def handle_event([:jido, :agent_server, :cron, :register], _measurements, metadata, _config) do
+    Logger.debug(
+      "[cron.register] job_id=#{inspect(metadata[:job_id])} cron=#{inspect(metadata[:cron_expression])}",
+      agent_id: metadata[:agent_id]
+    )
+  end
+
+  def handle_event([:jido, :agent_server, :cron, :cancel], _measurements, metadata, _config) do
+    Logger.debug(
+      "[cron.cancel] job_id=#{inspect(metadata[:job_id])}",
+      agent_id: metadata[:agent_id]
+    )
+  end
+
+  def handle_event(
+        [:jido, :agent_server, :cron, :restart_scheduled],
+        _measurements,
+        metadata,
+        _config
+      ) do
+    Logger.debug(
+      "[cron.restart_scheduled] job_id=#{inspect(metadata[:job_id])} reason=#{Formatter.safe_inspect(metadata[:reason], 120)} delay_ms=#{inspect(metadata[:delay_ms])}",
+      agent_id: metadata[:agent_id]
+    )
+  end
+
+  def handle_event(
+        [:jido, :agent_server, :cron, :restart_succeeded],
+        _measurements,
+        metadata,
+        _config
+      ) do
+    Logger.debug(
+      "[cron.restart_succeeded] job_id=#{inspect(metadata[:job_id])} cron=#{inspect(metadata[:cron_expression])}",
+      agent_id: metadata[:agent_id]
+    )
+  end
+
+  def handle_event(
+        [:jido, :agent_server, :cron, :persist_failure],
+        _measurements,
+        metadata,
+        _config
+      ) do
+    Logger.warning(
+      "[cron.persist_failure] job_id=#{inspect(metadata[:job_id])} reason=#{Formatter.safe_inspect(metadata[:reason], 200)}",
+      agent_id: metadata[:agent_id]
     )
   end
 

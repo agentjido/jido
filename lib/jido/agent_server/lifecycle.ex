@@ -13,7 +13,9 @@ defmodule Jido.AgentServer.Lifecycle do
   @callback init(opts :: keyword(), server_state :: map()) :: map()
   @callback handle_event(event :: term(), server_state :: map()) ::
               {:cont, map()} | {:stop, reason :: term(), map()}
+  @callback persist_cron_specs(server_state :: map(), cron_specs :: map()) ::
+              :ok | {:error, term()}
   @callback terminate(reason :: term(), server_state :: map()) :: :ok
 
-  @optional_callbacks [init: 2, handle_event: 2, terminate: 2]
+  @optional_callbacks [init: 2, handle_event: 2, persist_cron_specs: 2, terminate: 2]
 end

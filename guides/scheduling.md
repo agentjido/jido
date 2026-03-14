@@ -4,6 +4,8 @@
 
 Jido provides three scheduling mechanisms: declarative schedules in the agent definition, one-time delays via `Schedule`, and dynamic recurring jobs via `Cron`. All are timer-based and tied to the agent's process lifecycle.
 
+Dynamic cron scheduling now lives in Jido core because durable runtime registrations need to survive hibernate/thaw without carrying the old `sched_ex -> timex -> gettext` dependency chain. The implementation stays intentionally small: `crontab` parses cron expressions and `tzdata` resolves named timezones.
+
 ## Declarative Schedules
 
 The simplest way to add recurring jobs is to declare them in your agent definition. Schedules target signal types, which get routed through `signal_routes/1` like any other signal:
@@ -120,6 +122,8 @@ defmodule SetupCronAction do
 end
 ```
 
+Use dynamic cron for lightweight trigger work. Each tick sends a message or signal back into the owning agent's normal routing path; it is not a general-purpose detached job runner.
+
 ### Cron Expressions
 
 Standard 5-field expressions are supported:
@@ -153,9 +157,20 @@ Directive.cron("0 9 * * *", morning_signal,
 
 Default timezone is `Etc/UTC`.
 
+Jido does **not** mutate the global calendar timezone database at runtime.
+Named timezones depend on your application config:
+
+```elixir
+# config/config.exs
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+```
+
+If timezone configuration is missing or invalid, cron registration returns
+`{:error, {:invalid_timezone, reason}}` and the agent process stays alive.
+
 ### Upsert Behavior
 
-Registering a cron job with an existing `job_id` cancels the old job and replaces it:
+Registering a cron job with an existing `job_id` validates and starts the replacement first, then swaps it in and cancels the old job:
 
 ```elixir
 Directive.cron("*/5 * * * *", tick_signal, job_id: :heartbeat)
@@ -185,22 +200,47 @@ Cancelling a non-existent job is a no-op — it doesn't raise an error.
 
 ## Semantics & Guarantees
 
-### Timer-Based, Not Persistent
+### Timer-Based Delivery, Optional Durable Registration
 
-Both `Schedule` and `Cron` use in-memory timers (`Process.send_after/3` and [SchedEx](https://github.com/SchedEx/SchedEx)).
+`Schedule` is always in-memory (`Process.send_after/3`).
+
+`Cron` is process-local at runtime, with optional durable registration when the
+agent is managed by `Jido.Agent.InstanceManager` **and** storage is enabled.
+In that mode, dynamic cron specs are persisted through `Jido.Persist` and
+re-registered on thaw.
+
+Only dynamic `Directive.cron/3` registrations are persisted. Declarative `schedules:` entries and plugin schedules are recreated from code when the `AgentServer` starts and remain runtime-only.
 
 **What this means:**
 
 | Scenario | Behavior |
 |----------|----------|
-| Agent crashes before timer fires | Scheduled message lost |
-| Agent restarts | Cron jobs must be re-registered |
-| Node restart | All schedules lost |
+| Agent crashes before `Schedule` timer fires | Scheduled message lost |
+| Agent crashes before `Cron` tick fires | Tick may be missed |
+| InstanceManager + storage | Dynamic cron register/cancel is write-through durable |
+| InstanceManager + storage + thaw/restart | Dynamic cron registrations are restored |
+| `storage: nil` or non-persistent lifecycle | Dynamic cron registrations are runtime-only |
 | Timer fires during agent busy | Message queued in mailbox |
+
+Dynamic cron write-through ordering:
+
+- `Cron` (register/upsert): start runtime job, persist proposed manifest, then commit runtime state
+- `CronCancel`: persist manifest removal first, then stop runtime job and commit state
+
+If persistence fails, registration/cancellation is isolated and the agent keeps the prior state.
+
+### Failure Isolation and Recovery
+
+- Invalid dynamic cron input (bad cron/timezone) does not crash `AgentServer`.
+- Scheduler startup/runtime failures are non-fatal to the owning agent.
+- Cron runtime pids are monitored separately from child lifecycle monitors.
+- Abnormal cron job exits trigger capped exponential-backoff restart from in-memory runtime specs while the owning `AgentServer` remains alive.
+- Only dynamic `Directive.cron/3` registrations are restored after thaw/restart from durable `cron_specs`.
+- Normal/shutdown cron exits are treated as expected removal (no restart).
 
 ### Missed-Run Behavior
 
-**Cron jobs do not catch up on missed runs.** If your agent is down when a cron tick would fire, that tick is simply missed. When the agent restarts and re-registers the job, scheduling resumes from the next scheduled time.
+**Cron jobs do not catch up on missed runs.** If your agent is down when a cron tick would fire, that tick is simply missed. After restart/thaw, scheduling resumes from the next scheduled time.
 
 Example: An agent with a `@daily` job at midnight crashes at 11:50 PM and restarts at 12:30 AM. The midnight run is missed entirely — no catch-up occurs.
 

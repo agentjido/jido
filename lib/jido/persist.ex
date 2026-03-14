@@ -50,6 +50,7 @@ defmodule Jido.Persist do
 
   require Logger
 
+  alias Jido.Scheduler
   alias Jido.Thread
 
   @type storage_config :: {module(), keyword()}
@@ -64,7 +65,7 @@ defmodule Jido.Persist do
           version: pos_integer(),
           agent_module: agent_module(),
           id: term(),
-          state: map(),
+          state: map() | nil,
           thread: thread_pointer() | nil
         }
 
@@ -106,6 +107,55 @@ defmodule Jido.Persist do
   def thaw(storage_or_instance, agent_module, key) do
     with {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
       do_thaw(adapter, opts, agent_module, key)
+    end
+  end
+
+  @doc """
+  Persists only the scheduler manifest for an existing checkpoint.
+
+  This is used by the keyed lifecycle to provide write-through durability for
+  dynamic cron mutations without rewriting a full checkpoint on every update.
+  If the checkpoint does not exist yet, falls back to full `hibernate/4`.
+  """
+  @spec persist_scheduler_manifest(
+          storage_config() | module() | struct(),
+          agent_module(),
+          key(),
+          agent(),
+          map()
+        ) ::
+          :ok | {:error, term()}
+  def persist_scheduler_manifest(
+        storage_or_instance,
+        agent_module,
+        key,
+        agent,
+        scheduler_manifest
+      )
+      when is_map(scheduler_manifest) do
+    with {:ok, {adapter, opts}} <- resolve_storage(storage_or_instance) do
+      checkpoint_key = make_checkpoint_key(agent_module, key)
+      scheduler_manifest = Scheduler.normalize_cron_specs(scheduler_manifest)
+
+      case Jido.Storage.fetch_checkpoint(adapter, checkpoint_key, opts) do
+        {:ok, checkpoint} ->
+          with {:ok, checkpoint} <- validate_checkpoint(checkpoint) do
+            checkpoint
+            |> patch_checkpoint_scheduler_manifest(scheduler_manifest)
+            |> then(&adapter.put_checkpoint(checkpoint_key, &1, opts))
+          end
+
+        {:error, :not_found} ->
+          agent =
+            attach_scheduler_manifest(agent, %{
+              state: %{Scheduler.cron_specs_state_key() => scheduler_manifest}
+            })
+
+          do_hibernate(adapter, opts, agent_module, key, agent)
+
+        {:error, _reason} = error ->
+          error
+      end
     end
   end
 
@@ -290,26 +340,24 @@ defmodule Jido.Persist do
           {:ok, checkpoint()} | {:error, term()}
   defp create_checkpoint(agent_module, agent, thread) do
     ctx = %{}
+    scheduler_manifest = get_scheduler_manifest(agent)
 
-    result =
-      if function_exported?(agent_module, :checkpoint, 2) do
-        agent_module.checkpoint(agent, ctx)
-      else
-        {:ok, default_checkpoint(agent_module, agent, thread)}
-      end
-
-    case result do
-      {:ok, checkpoint} ->
-        {:ok, enforce_checkpoint_invariants(checkpoint, thread)}
-
-      {:error, _} = error ->
-        error
+    with {:ok, checkpoint} <- checkpoint_payload(agent_module, agent, thread, ctx),
+         {:ok, checkpoint} <- validate_checkpoint(checkpoint) do
+      {:ok, enforce_checkpoint_invariants(checkpoint, thread, scheduler_manifest)}
     end
   end
 
-  @spec enforce_checkpoint_invariants(map(), Thread.t() | nil) :: checkpoint()
-  defp enforce_checkpoint_invariants(checkpoint, thread) do
-    state_without_thread = Map.delete(checkpoint[:state] || %{}, :__thread__)
+  @spec enforce_checkpoint_invariants(map(), Thread.t() | nil, map()) :: checkpoint()
+  defp enforce_checkpoint_invariants(checkpoint, thread, scheduler_manifest) do
+    scheduler_key = Scheduler.cron_specs_state_key()
+
+    state_without_runtime =
+      checkpoint
+      |> Map.get(:state, %{})
+      |> ensure_state_map()
+      |> Map.delete(:__thread__)
+      |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
 
     thread_pointer =
       case thread do
@@ -318,7 +366,7 @@ defmodule Jido.Persist do
       end
 
     checkpoint
-    |> Map.put(:state, state_without_thread)
+    |> Map.put(:state, state_without_runtime)
     |> Map.put(:thread, thread_pointer)
   end
 
@@ -344,8 +392,10 @@ defmodule Jido.Persist do
   defp restore_from_checkpoint(adapter, opts, agent_module, checkpoint) do
     ctx = %{}
 
-    with {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
+    with {:ok, checkpoint} <- validate_checkpoint(checkpoint),
+         {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
          {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
+      agent = attach_scheduler_manifest(agent, checkpoint)
       Logger.debug("Persist.thaw completed for #{inspect(agent_module)} id=#{checkpoint.id}")
       {:ok, agent}
     end
@@ -354,7 +404,7 @@ defmodule Jido.Persist do
   @spec restore_agent(agent_module(), checkpoint(), map()) :: {:ok, agent()} | {:error, term()}
   defp restore_agent(agent_module, checkpoint, ctx) do
     if function_exported?(agent_module, :restore, 2) do
-      agent_module.restore(checkpoint, ctx)
+      invoke_agent_callback(:restore, fn -> agent_module.restore(checkpoint, ctx) end)
     else
       default_restore(agent_module, checkpoint)
     end
@@ -453,8 +503,104 @@ defmodule Jido.Persist do
     %{agent | state: Map.put(agent.state, :__thread__, thread)}
   end
 
+  @spec maybe_put_scheduler_manifest(map(), atom(), map()) :: map()
+  defp maybe_put_scheduler_manifest(state, key, scheduler_manifest)
+       when is_map(scheduler_manifest) and map_size(scheduler_manifest) > 0 do
+    Map.put(state, key, scheduler_manifest)
+  end
+
+  defp maybe_put_scheduler_manifest(state, key, _scheduler_manifest), do: Map.delete(state, key)
+
+  @spec checkpoint_payload(agent_module(), agent(), Thread.t() | nil, map()) ::
+          {:ok, checkpoint()} | {:error, term()}
+  defp checkpoint_payload(agent_module, agent, thread, ctx) do
+    if function_exported?(agent_module, :checkpoint, 2) do
+      invoke_agent_callback(:checkpoint, fn -> agent_module.checkpoint(agent, ctx) end)
+    else
+      {:ok, default_checkpoint(agent_module, agent, thread)}
+    end
+  end
+
+  @spec validate_checkpoint(term()) :: {:ok, checkpoint()} | {:error, term()}
+  defp validate_checkpoint(checkpoint) when is_map(checkpoint) do
+    case Map.get(checkpoint, :state) do
+      nil -> {:ok, checkpoint}
+      state when is_map(state) -> {:ok, checkpoint}
+      state -> {:error, {:invalid_checkpoint, {:invalid_state, state}}}
+    end
+  end
+
+  defp validate_checkpoint(checkpoint),
+    do: {:error, {:invalid_checkpoint, {:invalid_shape, checkpoint}}}
+
+  @spec patch_checkpoint_scheduler_manifest(checkpoint(), map()) :: checkpoint()
+  defp patch_checkpoint_scheduler_manifest(checkpoint, scheduler_manifest) do
+    scheduler_key = Scheduler.cron_specs_state_key()
+
+    updated_state =
+      checkpoint
+      |> Map.get(:state, %{})
+      |> ensure_state_map()
+      |> Map.delete(:__thread__)
+      |> maybe_put_scheduler_manifest(scheduler_key, scheduler_manifest)
+
+    Map.put(checkpoint, :state, updated_state)
+  end
+
+  @spec get_scheduler_manifest(agent()) :: map()
+  defp get_scheduler_manifest(%{state: state}) when is_map(state) do
+    {_clean_state, scheduler_manifest} = Scheduler.split_staged_cron_specs(state)
+    scheduler_manifest
+  end
+
+  defp get_scheduler_manifest(_), do: %{}
+
+  @spec attach_scheduler_manifest(agent(), map()) :: agent()
+  defp attach_scheduler_manifest(agent, checkpoint) do
+    scheduler_manifest =
+      checkpoint
+      |> Map.get(:state, %{})
+      |> Scheduler.split_staged_cron_specs()
+      |> elem(1)
+
+    Scheduler.attach_staged_cron_specs(agent, scheduler_manifest)
+  end
+
+  @spec invoke_agent_callback(:checkpoint | :restore, (-> term())) ::
+          {:ok, term()} | {:error, term()}
+  defp invoke_agent_callback(callback, fun) do
+    try do
+      normalize_callback_result(callback, fun.())
+    rescue
+      error ->
+        {:error,
+         {callback_error_key(callback), {:raised, error.__struct__, Exception.message(error)}}}
+    catch
+      kind, reason ->
+        {:error, {callback_error_key(callback), {kind, reason}}}
+    end
+  end
+
+  @spec normalize_callback_result(:checkpoint | :restore, term()) ::
+          {:ok, term()} | {:error, term()}
+  defp normalize_callback_result(_callback, {:ok, _value} = result), do: result
+  defp normalize_callback_result(_callback, {:error, _reason} = result), do: result
+
+  defp normalize_callback_result(callback, other) do
+    {:error, {callback_error_key(callback), {:invalid_return, other}}}
+  end
+
+  @spec callback_error_key(:checkpoint | :restore) ::
+          :checkpoint_callback_failed | :restore_callback_failed
+  defp callback_error_key(:checkpoint), do: :checkpoint_callback_failed
+  defp callback_error_key(:restore), do: :restore_callback_failed
+
   @spec make_checkpoint_key(agent_module(), term()) :: checkpoint_key()
   defp make_checkpoint_key(agent_module, agent_id) do
     {agent_module, agent_id}
   end
+
+  @spec ensure_state_map(term()) :: map()
+  defp ensure_state_map(state) when is_map(state), do: state
+  defp ensure_state_map(_), do: %{}
 end

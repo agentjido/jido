@@ -74,6 +74,18 @@ Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
 Directive.error(Jido.Error.validation_error("Invalid input"))
 ```
 
+## Cron and CronCancel Semantics
+
+`Cron` and `CronCancel` are failure-isolated:
+
+- Invalid cron expression or timezone is rejected at runtime without crashing the agent
+- Scheduler registration failures return errors and leave agent state unchanged
+- `CronCancel` is safe when runtime pid is missing; durable spec removal still applies
+
+For keyed InstanceManager lifecycles with storage enabled, dynamic cron mutations are
+write-through durable via `Jido.Persist`/`Jido.Storage` before state commit.
+Non-persistent lifecycles keep cron state runtime-only.
+
 ## RunInstruction
 
 `RunInstruction` is used by strategies that keep `cmd/2` pure. Instead of calling

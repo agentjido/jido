@@ -12,5 +12,8 @@ defmodule Jido.AgentServer.Lifecycle.Noop do
   def handle_event(_event, state), do: {:cont, state}
 
   @impl true
+  def persist_cron_specs(_state, _cron_specs), do: :ok
+
+  @impl true
   def terminate(_reason, _state), do: :ok
 end
