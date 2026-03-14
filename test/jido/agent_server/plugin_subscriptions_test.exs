@@ -177,6 +177,25 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor]
   end
 
+  defmodule PluginWithStaticSubscriptions do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_static_subscriptions",
+      state_key: :static_subs,
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction],
+      subscriptions: [
+        {JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
+         %{emit_on_init: true, signal_type: "static.sensor.ready"}}
+      ]
+  end
+
+  defmodule AgentWithStaticSubscriptionPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_static_sub_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithStaticSubscriptions]
+  end
+
   defmodule AgentWithMultiSensorPlugin do
     @moduledoc false
     use Jido.Agent,
@@ -426,6 +445,38 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       eventually(fn ->
         not Process.alive?(pid)
       end)
+    end
+  end
+
+  describe "static plugin subscriptions" do
+    test "starts static subscription sensor during post_init", %{jido: jido} do
+      {:ok, pid} =
+        Jido.AgentServer.start_link(agent: AgentWithStaticSubscriptionPlugin, jido: jido)
+
+      {:ok, state} = Jido.AgentServer.state(pid)
+
+      sensor_children =
+        state.children
+        |> Enum.filter(fn {tag, _} ->
+          match?({:sensor, PluginWithStaticSubscriptions, TestSensor}, tag)
+        end)
+
+      assert length(sensor_children) == 1
+
+      # Verify manifest includes static subscriptions
+      manifest = PluginWithStaticSubscriptions.manifest()
+
+      assert manifest.subscriptions == [
+               {TestSensor, %{emit_on_init: true, signal_type: "static.sensor.ready"}}
+             ]
+
+      GenServer.stop(pid)
+    end
+
+    test "static subscriptions are available via subscriptions/0" do
+      assert PluginWithStaticSubscriptions.subscriptions() == [
+               {TestSensor, %{emit_on_init: true, signal_type: "static.sensor.ready"}}
+             ]
     end
   end
 end
