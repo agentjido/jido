@@ -209,7 +209,7 @@ agent is managed by `Jido.Agent.InstanceManager` **and** storage is enabled.
 In that mode, dynamic cron specs are persisted through `Jido.Persist` and
 re-registered on thaw.
 
-Only dynamic `Directive.cron/3` registrations are persisted. Declarative `schedules:` entries and plugin schedules are recreated from code when the `AgentServer` starts.
+Only dynamic `Directive.cron/3` registrations are persisted. Declarative `schedules:` entries and plugin schedules are recreated from code when the `AgentServer` starts and remain runtime-only.
 
 **What this means:**
 
@@ -234,7 +234,8 @@ If persistence fails, registration/cancellation is isolated and the agent keeps 
 - Invalid dynamic cron input (bad cron/timezone) does not crash `AgentServer`.
 - Scheduler startup/runtime failures are non-fatal to the owning agent.
 - Cron runtime pids are monitored separately from child lifecycle monitors.
-- Abnormal dynamic cron job exits trigger capped exponential-backoff restart from durable `cron_specs`.
+- Abnormal cron job exits trigger capped exponential-backoff restart from in-memory runtime specs while the owning `AgentServer` remains alive.
+- Only dynamic `Directive.cron/3` registrations are restored after thaw/restart from durable `cron_specs`.
 - Normal/shutdown cron exits are treated as expected removal (no restart).
 
 ### Missed-Run Behavior
