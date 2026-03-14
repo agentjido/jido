@@ -1,6 +1,7 @@
 import Config
 
 config :jido, default: Jido.DefaultInstance
+config :git_hooks, auto_install: false
 
 # Logger configuration for Jido telemetry metadata
 # These metadata keys are used by Jido.Telemetry for structured logging
