@@ -185,7 +185,8 @@ defmodule Jido.Util do
   end
 
   defp implements_action?(module) when is_atom(module) do
-    Code.ensure_loaded?(module) && function_exported?(module, :__action_metadata__, 0)
+    match?({:module, _}, Code.ensure_compiled(module)) and
+      function_exported?(module, :__action_metadata__, 0)
   end
 
   @doc """

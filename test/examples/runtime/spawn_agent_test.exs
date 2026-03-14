@@ -8,6 +8,7 @@ defmodule JidoExampleTest.SpawnAgentTest do
   - Child can access parent info via state.__parent__
   - Using emit_to_parent/3 for child-to-parent communication
   - StopChild directive to gracefully stop tracked children
+  - SpawnAgent children default to `restart: :transient`
   - Parent tracks children in state.children map
 
   ## Key Patterns
@@ -17,6 +18,7 @@ defmodule JidoExampleTest.SpawnAgentTest do
   3. Child state contains `__parent__` with ParentRef (pid, id, tag, meta)
   4. Use `Directive.emit_to_parent(agent, signal)` from child actions
   5. Use `Directive.stop_child(:tag)` to stop a tracked child
+  6. Override `restart:` only for children that should survive crashes or clean stops
 
   Run with: mix test --include example
   """
@@ -36,18 +38,25 @@ defmodule JidoExampleTest.SpawnAgentTest do
 
   defmodule SpawnWorkerAction do
     @moduledoc false
+    @restart_policies Directive.valid_restart_policies()
+
     use Jido.Action,
       name: "spawn_worker",
       schema: [
         tag: [type: :atom, required: true],
-        meta: [type: :map, default: %{}]
+        meta: [type: :map, default: %{}],
+        restart: [type: {:in, @restart_policies}, default: :transient]
       ]
 
     def run(%{tag: tag} = params, _context) do
       meta = Map.get(params, :meta, %{})
+      restart = Map.get(params, :restart, :transient)
 
       directive =
-        Directive.spawn_agent(JidoExampleTest.SpawnAgentTest.WorkerAgent, tag, meta: meta)
+        Directive.spawn_agent(JidoExampleTest.SpawnAgentTest.WorkerAgent, tag,
+          meta: meta,
+          restart: restart
+        )
 
       {:ok, %{last_spawned: tag}, [directive]}
     end
@@ -104,7 +113,7 @@ defmodule JidoExampleTest.SpawnAgentTest do
       ]
 
     def run(%{tag: tag, reason: reason}, _context) do
-      directive = Directive.stop_child(tag, reason: reason)
+      directive = Directive.stop_child(tag, reason)
       {:ok, %{last_stopped: tag}, [directive]}
     end
   end
@@ -359,6 +368,104 @@ defmodule JidoExampleTest.SpawnAgentTest do
         not Map.has_key?(state.children, :stopable_worker)
       end)
 
+      eventually(fn -> Jido.whereis(jido, child_info.id) == nil end)
+
+      {:ok, parent_state} = AgentServer.state(parent_pid)
+
+      assert Enum.count(parent_state.agent.state.child_started_events, fn event ->
+               event.tag == :stopable_worker
+             end) == 1
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+
+    test "custom stop reasons do not restart transient children", %{jido: jido} do
+      parent_id = unique_id("parent")
+      {:ok, parent_pid} = Jido.start_agent(jido, ParentAgent, id: parent_id)
+
+      spawn_signal = Signal.new!("spawn_worker", %{tag: :cleanup_worker}, source: "/test")
+      {:ok, _agent} = AgentServer.call(parent_pid, spawn_signal)
+
+      child_info = await_child(parent_pid, :cleanup_worker)
+      child_ref = Process.monitor(child_info.pid)
+
+      stop_signal =
+        Signal.new!("stop_worker", %{tag: :cleanup_worker, reason: :cleanup}, source: "/test")
+
+      {:ok, agent} = AgentServer.call(parent_pid, stop_signal)
+
+      assert agent.state.last_stopped == :cleanup_worker
+      assert_receive {:DOWN, ^child_ref, :process, _, {:shutdown, :cleanup}}, 1000
+
+      eventually_state(parent_pid, fn state ->
+        not Map.has_key?(state.children, :cleanup_worker)
+      end)
+
+      eventually(fn -> Jido.whereis(jido, child_info.id) == nil end)
+
+      {:ok, parent_state} = AgentServer.state(parent_pid)
+
+      assert Enum.count(parent_state.agent.state.child_started_events, fn event ->
+               event.tag == :cleanup_worker
+             end) == 1
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+  end
+
+  describe "restarted children rebind and still notify parent" do
+    test "parent tracks restarted child and still receives child.started", %{jido: jido} do
+      parent_id = unique_id("parent")
+      {:ok, parent_pid} = Jido.start_agent(jido, ParentAgent, id: parent_id)
+
+      signal =
+        Signal.new!(
+          "spawn_worker",
+          %{tag: :restarting_worker, restart: :permanent},
+          source: "/test"
+        )
+
+      {:ok, _agent} = AgentServer.call(parent_pid, signal)
+
+      child_info = await_child(parent_pid, :restarting_worker)
+      child_pid = child_info.pid
+      child_ref = Process.monitor(child_pid)
+
+      GenServer.stop(child_pid, :boom)
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :boom}, 1000
+
+      eventually(fn ->
+        case AgentServer.state(parent_pid) do
+          {:ok, state} ->
+            case Map.get(state.children, :restarting_worker) do
+              %{pid: pid} when is_pid(pid) -> pid != child_pid
+              _ -> false
+            end
+
+          _ ->
+            false
+        end
+      end)
+
+      restarted_child = await_child(parent_pid, :restarting_worker, 1000)
+      refute restarted_child.pid == child_pid
+      assert restarted_child.id == child_info.id
+      assert Jido.whereis(jido, child_info.id) == restarted_child.pid
+
+      eventually_state(parent_pid, fn state ->
+        Enum.any?(state.agent.state.child_started_events, &(&1.pid == restarted_child.pid))
+      end)
+
+      {:ok, parent_state} = AgentServer.state(parent_pid)
+
+      assert Enum.any?(parent_state.agent.state.child_started_events, &(&1.pid == child_pid))
+
+      assert Enum.any?(
+               parent_state.agent.state.child_started_events,
+               &(&1.pid == restarted_child.pid)
+             )
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), restarted_child.pid)
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
     end
   end

@@ -95,6 +95,23 @@ defmodule JidoTest.Agent.StrategyFSMTest do
         {Jido.Agent.Strategy.FSM,
          initial_state: "ready",
          transitions: %{
+           "ready" => ["processing"],
+           "processing" => ["ready", "done"],
+           "done" => ["ready"]
+         }},
+      schema: []
+
+    def signal_routes(_ctx), do: []
+  end
+
+  defmodule InvalidCustomFSMAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "invalid_custom_fsm_agent",
+      strategy:
+        {Jido.Agent.Strategy.FSM,
+         initial_state: "ready",
+         transitions: %{
            "ready" => ["working"],
            "working" => ["ready", "done"],
            "done" => ["ready"]
@@ -179,7 +196,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
         agent_module: CustomFSMAgent,
         strategy_opts: [
           initial_state: "ready",
-          transitions: %{"ready" => ["working"], "working" => ["ready", "done"]}
+          transitions: %{"ready" => ["processing"], "processing" => ["ready", "done"]}
         ]
       }
 
@@ -274,7 +291,19 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
     test "transitions through custom states" do
       agent = CustomFSMAgent.new()
-      {updated, _} = run_cmd(CustomFSMAgent, agent, SimpleAction)
+      {updated, directives} = run_cmd(CustomFSMAgent, agent, SimpleAction)
+
+      assert directives == []
+      state = StratState.get(updated)
+      assert state.machine.status == "ready"
+    end
+
+    test "returns an error directive when custom transitions skip processing" do
+      agent = InvalidCustomFSMAgent.new()
+      {updated, directives} = InvalidCustomFSMAgent.cmd(agent, SimpleAction)
+
+      assert [%Jido.Agent.Directive.Error{context: :fsm_transition, error: error}] = directives
+      assert error.message == "FSM transition failed"
 
       state = StratState.get(updated)
       assert state.machine.status == "ready"

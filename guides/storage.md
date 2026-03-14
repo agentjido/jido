@@ -177,6 +177,7 @@ storage: Jido.Storage.ETS
 |---------|------------|----------|
 | `Jido.Storage.ETS` | Ephemeral | Development, testing |
 | `Jido.Storage.File` | Disk | Simple production |
+| `Jido.Storage.Redis` | Durable | Optional external backing store |
 
 ### ETS Storage Options
 
@@ -209,6 +210,31 @@ priv/jido/storage/
         ├── meta.term          # {rev, created_at, updated_at, metadata}
         └── entries.log        # Length-prefixed binary frames
 ```
+
+### Redis Storage Options
+
+```elixir
+defmodule MyApp.RedisStorage do
+  def command(cmd), do: Redix.command(:my_redis, cmd)
+end
+
+storage: {Jido.Storage.Redis, command_fn: &MyApp.RedisStorage.command/1}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `:command_fn` | (required) | A `fn [binary()] -> {:ok, term()} \| {:error, term()}` that executes Redis commands. Bring your own client (Redix, etc.). |
+| `:prefix` | `"jido"` | Key prefix for namespacing. |
+| `:ttl` | `nil` | TTL in milliseconds. When set, all keys expire automatically. |
+
+Key layout:
+
+```
+{prefix}:cp:{hex_hash}   → Serialized checkpoint
+{prefix}:th:{thread_id}  → Serialized thread state
+```
+
+Redis is one durable storage option when you already operate Redis and want a shared external store. Jido core does not add a Redis dependency; callers provide `:command_fn`. Thread state is stored in a single value to avoid partial writes between entries and metadata.
 
 ## API Reference
 
@@ -955,7 +981,7 @@ Jido.Agent.InstanceManager.child_spec(
 | **Manual API?** | `MyApp.Jido.hibernate(agent)` / `thaw(MyAgent, key)` |
 | **Automatic API?** | `InstanceManager.get(:pool, key)` with `idle_timeout` |
 | **Default?** | `Jido.Storage.ETS` (ephemeral) |
-| **Production?** | Implement `Jido.Storage` behaviour with Ecto/Ash |
+| **Production?** | `Jido.Storage.Redis` is one built-in durable option; custom adapters (for example Ecto/Ash) remain valid |
 | **Key invariant?** | Never persist full thread in checkpoint; use pointer |
 
 ## Related

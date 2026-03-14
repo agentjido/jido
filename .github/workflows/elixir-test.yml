@@ -1,0 +1,150 @@
+name: Elixir Test
+
+on:
+  workflow_call:
+    inputs:
+      otp_versions:
+        description: JSON array of OTP versions
+        required: false
+        type: string
+        default: '["27", "28"]'
+      elixir_versions:
+        description: JSON array of Elixir versions
+        required: false
+        type: string
+        default: '["1.18", "1.19"]'
+      mix_env:
+        description: MIX_ENV for tests
+        required: false
+        type: string
+        default: test
+      test_command:
+        description: Command to run tests
+        required: false
+        type: string
+        default: mix test
+      postgres:
+        description: Enable PostgreSQL service
+        required: false
+        type: boolean
+        default: false
+      postgres_image:
+        description: PostgreSQL Docker image
+        required: false
+        type: string
+        default: postgres:16-alpine
+
+jobs:
+  test:
+    name: Elixir ${{ matrix.elixir }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        otp: ${{ fromJson(inputs.otp_versions) }}
+        elixir: ${{ fromJson(inputs.elixir_versions) }}
+
+    env:
+      MIX_ENV: ${{ inputs.mix_env }}
+      POSTGRES_HOST: localhost
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_db
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Start PostgreSQL
+        if: ${{ inputs.postgres }}
+        run: |
+          docker run -d \
+            --name postgres \
+            -e POSTGRES_USER=$POSTGRES_USER \
+            -e POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+            -e POSTGRES_DB=$POSTGRES_DB \
+            -p $POSTGRES_PORT:5432 \
+            --health-cmd="pg_isready -U postgres -d test_db" \
+            --health-interval=5s \
+            --health-timeout=3s \
+            --health-retries=20 \
+            ${{ inputs.postgres_image }}
+
+          echo "Waiting for PostgreSQL to be ready..."
+          for i in {1..30}; do
+            if docker exec postgres pg_isready -U $POSTGRES_USER -d $POSTGRES_DB > /dev/null 2>&1; then
+              echo "PostgreSQL is ready after ${i}s"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "PostgreSQL failed to start within 30 seconds"
+              docker logs postgres
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Setup Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ matrix.otp }}
+          elixir-version: ${{ matrix.elixir }}
+
+      - name: Restore Hex cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.hex
+          key: ${{ runner.os }}-hex-otp${{ matrix.otp }}-elixir${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-hex-otp${{ matrix.otp }}-elixir${{ matrix.elixir }}-
+
+      - name: Install Hex/Rebar
+        run: |
+          set -euo pipefail
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Restore dependencies cache
+        uses: actions/cache@v4
+        id: deps-cache
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ inputs.mix_env }}-otp${{ matrix.otp }}-elixir${{ matrix.elixir }}-${{ hashFiles('mix.lock') }}
+
+      - name: Remove cached rebar3 build artifacts in deps
+        run: |
+          if [ -d deps ]; then
+            find deps -maxdepth 6 -type d \( -name _build -o -name .rebar3 \) -prune -exec rm -rf {} + || true
+            find deps -maxdepth 6 -type f -name rebar3.crashdump -delete || true
+          fi
+
+      - name: Install dependencies
+        run: mix deps.get
+
+      - name: Compile dependencies
+        run: mix deps.compile
+
+      - name: Compile project
+        run: mix compile --warnings-as-errors
+
+      - name: Setup database
+        if: ${{ inputs.postgres }}
+        run: mix ecto.setup
+        env:
+          DATABASE_URL: postgres://${{ env.POSTGRES_USER }}:${{ env.POSTGRES_PASSWORD }}@${{ env.POSTGRES_HOST }}:${{ env.POSTGRES_PORT }}/${{ env.POSTGRES_DB }}
+
+      - name: Run tests
+        run: ${{ inputs.test_command }}
+
+      - name: Cleanup PostgreSQL
+        if: ${{ inputs.postgres && always() }}
+        run: docker stop postgres && docker rm postgres || true
+

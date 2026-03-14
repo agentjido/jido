@@ -122,6 +122,7 @@ defmodule Jido.Actions.Lifecycle do
     - `tag` - Tag for tracking this child (required)
     - `initial_state` - Initial state for the child agent (default: %{})
     - `meta` - Metadata to pass to child (default: %{})
+    - `restart` - Restart policy for the child (default: `:transient`)
 
     ## Example
 
@@ -131,9 +132,12 @@ defmodule Jido.Actions.Lifecycle do
         {Jido.Actions.Lifecycle.SpawnChild, %{
           agent_module: MyWorker,
           tag: :worker_1,
-          initial_state: %{batch_size: 100}
+          initial_state: %{batch_size: 100},
+          restart: :permanent
         }}
     """
+    @restart_policies Directive.valid_restart_policies()
+
     use Jido.Action,
       name: "spawn_child",
       description: "Spawn a child agent with hierarchy tracking",
@@ -141,12 +145,20 @@ defmodule Jido.Actions.Lifecycle do
         agent_module: [type: :atom, required: true, doc: "Agent module to spawn"],
         tag: [type: :atom, required: true, doc: "Tag for tracking this child"],
         initial_state: [type: :map, default: %{}, doc: "Initial state for child"],
-        meta: [type: :map, default: %{}, doc: "Metadata to pass to child"]
+        meta: [type: :map, default: %{}, doc: "Metadata to pass to child"],
+        restart: [
+          type: {:in, @restart_policies},
+          default: :transient,
+          doc: "Restart policy for the child"
+        ]
       ]
 
-    def run(%{agent_module: mod, tag: tag, initial_state: state, meta: meta}, _context) do
+    def run(
+          %{agent_module: mod, tag: tag, initial_state: state, meta: meta, restart: restart},
+          _context
+        ) do
       opts = if state == %{}, do: %{}, else: %{initial_state: state}
-      directive = Directive.spawn_agent(mod, tag, opts: opts, meta: meta)
+      directive = Directive.spawn_agent(mod, tag, opts: opts, meta: meta, restart: restart)
       {:ok, %{spawning: tag}, [directive]}
     end
   end

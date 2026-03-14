@@ -36,7 +36,8 @@ defmodule JidoTest.AgentServer.HierarchyTest do
     def run(%{module: mod, tag: tag} = params, _context) do
       opts = Map.get(params, :opts, %{})
       meta = Map.get(params, :meta, %{})
-      {:ok, %{}, [Directive.spawn_agent(mod, tag, opts: opts, meta: meta)]}
+      restart = Map.get(params, :restart, :transient)
+      {:ok, %{}, [Directive.spawn_agent(mod, tag, opts: opts, meta: meta, restart: restart)]}
     end
   end
 
@@ -558,6 +559,49 @@ defmodule JidoTest.AgentServer.HierarchyTest do
       assert event.tag == :dying_child
       assert event.reason == :shutdown
 
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+
+    test "rebinds restarted child info when child restarts", %{jido: jido} do
+      parent_id = unique_id("spawn-parent")
+      {:ok, parent_pid} = AgentServer.start(agent: ParentAgent, id: parent_id, jido: jido)
+
+      signal =
+        Signal.new!(
+          "spawn_agent",
+          %{module: ChildAgent, tag: :restarting_child, restart: :permanent},
+          source: "/test"
+        )
+
+      {:ok, _agent} = AgentServer.call(parent_pid, signal)
+
+      child_info = await_child(parent_pid, :restarting_child)
+      child_pid = child_info.pid
+      child_ref = Process.monitor(child_pid)
+
+      GenServer.stop(child_pid, :boom)
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :boom}, 500
+
+      eventually(fn ->
+        case AgentServer.state(parent_pid) do
+          {:ok, state} ->
+            case Map.get(state.children, :restarting_child) do
+              %{pid: pid} when is_pid(pid) -> pid != child_pid
+              _ -> false
+            end
+
+          _ ->
+            false
+        end
+      end)
+
+      restarted_child = await_child(parent_pid, :restarting_child, 1000)
+      refute restarted_child.pid == child_pid
+      assert restarted_child.id == child_info.id
+      assert restarted_child.tag == :restarting_child
+      assert Jido.whereis(jido, child_info.id) == restarted_child.pid
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), restarted_child.pid)
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
     end
 

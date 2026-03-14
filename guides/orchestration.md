@@ -346,7 +346,7 @@ defmodule CleanupWorkersAction do
 
   def run(%{tags: tags}, _context) do
     stop_directives = Enum.map(tags, fn tag ->
-      Directive.stop_child(tag, reason: :cleanup)
+      Directive.stop_child(tag, :cleanup)
     end)
 
     {:ok, %{status: :cleaned_up}, stop_directives}

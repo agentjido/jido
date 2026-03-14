@@ -90,6 +90,25 @@ defmodule Jido.Agent.Directive do
           | Cron.t()
           | CronCancel.t()
 
+  @typedoc "Restart policy for spawned AgentServer children."
+  @type restart_policy :: :permanent | :temporary | :transient
+
+  @restart_policies [:permanent, :temporary, :transient]
+
+  @doc false
+  @spec valid_restart_policies() :: [restart_policy()]
+  def valid_restart_policies, do: @restart_policies
+
+  @doc false
+  @spec validate_restart_policy(term(), keyword()) :: :ok | {:error, String.t()}
+  def validate_restart_policy(restart, _opts \\ [])
+
+  def validate_restart_policy(restart, _opts) when restart in @restart_policies, do: :ok
+
+  def validate_restart_policy(restart, _opts) do
+    {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
+  end
+
   # ============================================================================
   # Error - Signal an error from cmd/2
   # ============================================================================
@@ -249,6 +268,7 @@ defmodule Jido.Agent.Directive do
     - `tag` - Tag for tracking this child (used as key in children map)
     - `opts` - Additional options passed to child AgentServer
     - `meta` - Metadata to pass to child via parent reference
+    - `restart` - Restart policy for the child under supervision (default: `:transient`)
 
     ## Examples
 
@@ -268,6 +288,13 @@ defmodule Jido.Agent.Directive do
           tag: :handler,
           meta: %{assigned_topic: "events.user"}
         }
+
+        # Override restart behavior for long-lived workers
+        %SpawnAgent{
+          agent: MyWorkerAgent,
+          tag: :supervised,
+          restart: :permanent
+        }
     """
 
     @schema Zoi.struct(
@@ -276,7 +303,11 @@ defmodule Jido.Agent.Directive do
                 agent: Zoi.any(description: "Agent module (atom) or pre-built agent struct"),
                 tag: Zoi.any(description: "Tag for tracking this child"),
                 opts: Zoi.map(description: "Options for child AgentServer") |> Zoi.default(%{}),
-                meta: Zoi.map(description: "Metadata to pass to child") |> Zoi.default(%{})
+                meta: Zoi.map(description: "Metadata to pass to child") |> Zoi.default(%{}),
+                restart:
+                  Zoi.atom(description: "Restart policy for the child")
+                  |> Zoi.refine({Jido.Agent.Directive, :validate_restart_policy, []})
+                  |> Zoi.default(:transient)
               },
               coerce: true
             )
@@ -323,6 +354,11 @@ defmodule Jido.Agent.Directive do
     The runtime sends a `jido.agent.stop` signal to the child process,
     which triggers a graceful shutdown. The child's exit will be delivered
     back to the parent as a `jido.agent.child.exit` signal.
+
+    `SpawnAgent` children default to `restart: :transient`, so a normal
+    `StopChild` shutdown removes the child instead of immediately restarting it.
+    Custom reasons are wrapped as `{:shutdown, reason}` so transient children
+    are still removed cleanly.
     """
 
     @schema Zoi.struct(
@@ -508,18 +544,28 @@ defmodule Jido.Agent.Directive do
 
   - `:opts` - Additional options for the child AgentServer (map)
   - `:meta` - Metadata to pass to the child via parent reference (map)
+  - `:restart` - Child restart policy under supervision (default: `:transient`)
 
   ## Examples
 
       Directive.spawn_agent(MyWorkerAgent, :worker_1)
       Directive.spawn_agent(MyWorkerAgent, :processor, opts: %{initial_state: %{batch_size: 100}})
       Directive.spawn_agent(MyWorkerAgent, :handler, meta: %{assigned_topic: "events"})
+      Directive.spawn_agent(MyWorkerAgent, :durable, restart: :permanent)
   """
   @spec spawn_agent(term(), term(), keyword()) :: SpawnAgent.t()
   def spawn_agent(agent, tag, options \\ []) do
     opts = Keyword.get(options, :opts, %{})
     meta = Keyword.get(options, :meta, %{})
-    %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta}
+    restart = Keyword.get(options, :restart, :transient)
+
+    case validate_restart_policy(restart) do
+      :ok ->
+        %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart}
+
+      {:error, message} ->
+        raise Jido.Error.validation_error(message, field: :restart)
+    end
   end
 
   @doc """

@@ -311,6 +311,7 @@ defmodule Jido.MixProject do
           Jido.Storage,
           Jido.Storage.ETS,
           Jido.Storage.File,
+          Jido.Storage.Redis,
           Jido.Persist,
           Jido.Agent.InstanceManager,
           Jido.Agent.Persistence,
@@ -369,7 +370,7 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.0"},
+      {:jido_action, "~> 2.1"},
       {:jido_signal, "~> 2.0"},
 
       # Jido Deps
