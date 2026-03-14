@@ -9,6 +9,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   alias Jido.Agent.InstanceManager
   alias Jido.AgentServer
   alias Jido.Storage.ETS
+  alias Jido.Storage.Redis
 
   # Use module attribute for manager naming to avoid atom leaks
   # Each test gets a unique integer suffix but we clean up persistent_term
@@ -21,6 +22,56 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       {_adapter, opts} = __jido_storage__()
       Keyword.get(opts, :table, :jido_storage)
     end
+  end
+
+  defmodule RedisMock do
+    def child_spec(opts) do
+      %{
+        id: __MODULE__,
+        start: {__MODULE__, :start_link, [opts]}
+      }
+    end
+
+    def start_link(_opts \\ []) do
+      Agent.start_link(fn -> %{} end, name: __MODULE__)
+    end
+
+    def command(command) do
+      Agent.get_and_update(__MODULE__, fn state ->
+        case command do
+          ["GET", key] ->
+            {{:ok, Map.get(state, key)}, state}
+
+          ["SET", key, value] ->
+            {{:ok, "OK"}, Map.put(state, key, value)}
+
+          ["SET", key, value, "PX", _ttl] ->
+            {{:ok, "OK"}, Map.put(state, key, value)}
+
+          ["DEL" | keys] ->
+            deleted = Enum.count(keys, &Map.has_key?(state, &1))
+            {{:ok, deleted}, Map.drop(state, keys)}
+
+          _ ->
+            {{:error, :unknown_command}, state}
+        end
+      end)
+    end
+
+    def data do
+      Agent.get(__MODULE__, & &1)
+    end
+  end
+
+  defmodule RedisStorageAwareJido do
+    use Jido,
+      otp_app: :jido_test_instance_manager,
+      storage:
+        {Redis,
+         [
+           command_fn: fn cmd -> JidoTest.Agent.InstanceManagerTest.RedisMock.command(cmd) end,
+           prefix: "instance_manager_test"
+         ]}
   end
 
   # Simple test agent
@@ -403,6 +454,56 @@ defmodule JidoTest.Agent.InstanceManagerTest do
 
       {:ok, state2} = AgentServer.state(pid2)
       assert state2.agent.state.counter == 123
+
+      :ok = AgentServer.detach(pid2)
+    end
+  end
+
+  describe "default storage from redis-backed jido instance" do
+    setup do
+      manager_name = :"#{@manager_prefix}_redis_default_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} = start_supervised({RedisMock, []})
+      {:ok, _} = start_supervised(RedisStorageAwareJido)
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            idle_timeout: 200,
+            agent_opts: [jido: RedisStorageAwareJido]
+          )
+        )
+
+      on_exit(fn -> :persistent_term.erase({InstanceManager, manager_name}) end)
+
+      {:ok, manager: manager_name}
+    end
+
+    @tag timeout: 5000
+    test "omitted storage uses redis storage from the jido instance", %{manager: manager} do
+      {:ok, pid1} = InstanceManager.get(manager, "redis-default", initial_state: %{counter: 123})
+      ref = Process.monitor(pid1)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid1, {:shutdown, :idle_timeout}}, 1000
+
+      {:ok, pid2} =
+        eventually(
+          fn ->
+            {:ok, pid} = InstanceManager.get(manager, "redis-default")
+
+            case AgentServer.attach(pid) do
+              :ok -> {:ok, pid}
+              _ -> false
+            end
+          end,
+          timeout: 2000
+        )
+
+      {:ok, state2} = AgentServer.state(pid2)
+      assert state2.agent.state.counter == 123
+      assert map_size(RedisMock.data()) > 0
 
       :ok = AgentServer.detach(pid2)
     end

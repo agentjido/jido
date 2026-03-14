@@ -82,7 +82,6 @@ defmodule Jido do
 
     quote location: :keep do
       @otp_app unquote(otp_app)
-      @jido_storage Jido.Storage.normalize_storage(unquote(Macro.escape(storage)))
 
       @doc false
       @spec __otp_app__() :: unquote(otp_app)
@@ -90,7 +89,7 @@ defmodule Jido do
 
       @doc "Returns the storage configuration for this Jido instance."
       @spec __jido_storage__() :: {module(), keyword()}
-      def __jido_storage__, do: @jido_storage
+      def __jido_storage__, do: Jido.Storage.normalize_storage(unquote(storage))
 
       require Jido.Agent.DefaultPlugins
 

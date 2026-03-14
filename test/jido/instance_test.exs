@@ -3,14 +3,87 @@ defmodule JidoTest.InstanceTest do
 
   import JidoTest.Eventually
 
+  alias Jido.Storage.Redis
+  alias Jido.Thread
   alias JidoTest.TestAgents.Minimal
 
   defmodule TestInstance do
     use Jido, otp_app: :jido_test_instance
   end
 
+  defmodule RedisTestAgent do
+    use Jido.Agent,
+      name: "redis_test_agent",
+      schema: [
+        counter: [type: :integer, default: 0]
+      ]
+
+    @impl true
+    def signal_routes(_ctx), do: []
+  end
+
+  defmodule RedisMock do
+    def child_spec(opts) do
+      %{
+        id: __MODULE__,
+        start: {__MODULE__, :start_link, [opts]}
+      }
+    end
+
+    def start_link(_opts \\ []) do
+      Agent.start_link(fn -> %{} end, name: __MODULE__)
+    end
+
+    def command(command) do
+      Agent.get_and_update(__MODULE__, fn state ->
+        case command do
+          ["GET", key] ->
+            {{:ok, Map.get(state, key)}, state}
+
+          ["SET", key, value] ->
+            {{:ok, "OK"}, Map.put(state, key, value)}
+
+          ["SET", key, value, "PX", _ttl] ->
+            {{:ok, "OK"}, Map.put(state, key, value)}
+
+          ["DEL" | keys] ->
+            deleted = Enum.count(keys, &Map.has_key?(state, &1))
+            {{:ok, deleted}, Map.drop(state, keys)}
+
+          _ ->
+            {{:ok, {:echo, command}}, state}
+        end
+      end)
+    end
+  end
+
+  defp compile_inline_redis_instance(prefix) do
+    module =
+      Module.concat(__MODULE__, :"InlineRedisInstance#{System.unique_integer([:positive])}")
+
+    source = """
+    defmodule #{inspect(module)} do
+      use Jido,
+        otp_app: :jido_test_instance,
+        storage: {Jido.Storage.Redis, [
+          command_fn: fn cmd -> JidoTest.InstanceTest.RedisMock.command(cmd) end,
+          prefix: #{inspect(prefix)}
+        ]}
+    end
+    """
+
+    Code.compile_string(source)
+    module
+  end
+
+  defp unload_module(module) do
+    :code.purge(module)
+    :code.delete(module)
+  end
+
   setup do
     Application.put_env(:jido_test_instance, TestInstance, max_tasks: 500)
+    {:ok, _pid} = start_supervised({RedisMock, []})
 
     on_exit(fn ->
       Application.delete_env(:jido_test_instance, TestInstance)
@@ -55,6 +128,38 @@ defmodule JidoTest.InstanceTest do
 
       assert {Jido, :start_link, [opts]} = spec.start
       assert Keyword.get(opts, :max_tasks) == 2000
+    end
+
+    test "supports anonymous Redis command_fn in __jido_storage__/0" do
+      module = compile_inline_redis_instance("inline-storage")
+      on_exit(fn -> unload_module(module) end)
+
+      assert {Redis, opts} = module.__jido_storage__()
+      assert is_function(opts[:command_fn], 1)
+      assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
+      assert opts[:prefix] == "inline-storage"
+    end
+
+    test "hibernate and thaw work through a dynamically compiled Redis instance" do
+      module = compile_inline_redis_instance("inline-persist")
+      on_exit(fn -> unload_module(module) end)
+
+      agent =
+        RedisTestAgent.new(id: "redis-instance-agent")
+        |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
+        |> then(fn agent ->
+          thread =
+            Thread.new(id: "redis-thread")
+            |> Thread.append(%{kind: :note, payload: %{text: "saved"}})
+
+          %{agent | state: Map.put(agent.state, :__thread__, thread)}
+        end)
+
+      assert :ok = module.hibernate(agent)
+      assert {:ok, thawed} = module.thaw(RedisTestAgent, "redis-instance-agent")
+      assert thawed.state.counter == 42
+      assert thawed.state[:__thread__].id == "redis-thread"
+      assert Thread.entry_count(thawed.state[:__thread__]) == 1
     end
   end
 
