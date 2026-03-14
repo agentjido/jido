@@ -305,6 +305,9 @@ defmodule Jido.Sensor.Runtime do
       is_pid(agent_ref) ->
         send(agent_ref, {:signal, signal})
 
+      is_pid(server_pid = resolve_server_pid(agent_ref)) ->
+        send(server_pid, {:signal, signal})
+
       agent_ref != nil ->
         dispatch_signal_async(signal, agent_ref, state)
 
@@ -341,6 +344,22 @@ defmodule Jido.Sensor.Runtime do
 
     :ok
   end
+
+  defp resolve_server_pid(agent_ref) when is_atom(agent_ref), do: GenServer.whereis(agent_ref)
+
+  defp resolve_server_pid({name, node} = agent_ref) when is_atom(name) and is_atom(node) do
+    GenServer.whereis(agent_ref)
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp resolve_server_pid({:via, _, _} = agent_ref) do
+    GenServer.whereis(agent_ref)
+  rescue
+    ArgumentError -> nil
+  end
+
+  defp resolve_server_pid(_agent_ref), do: nil
 
   defp dispatch_fun(state) do
     case get_in(state, [:context, :dispatch_fun]) do
