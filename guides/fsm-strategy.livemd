@@ -8,20 +8,34 @@ Mix.install([
 
 ## Overview
 
-The FSM (Finite State Machine) Strategy enables you to build agents with explicit state machines that control workflow progression. This is ideal for:
+The FSM (Finite State Machine) Strategy gives an agent an explicit execution
+state machine around `cmd/2`.
 
-- Order processing workflows
-- Document approval flows
-- Multi-step wizards
-- Any process with defined states and transitions
+It keeps `cmd/2` pure by emitting `%Directive.RunInstruction{}` directives for
+runtime execution, then handling execution results when the runtime routes them
+back through `cmd/2`.
 
-The FSM Strategy stores its state in `agent.state.__strategy__` and automatically validates transitions.
-It keeps `cmd/2` pure by emitting `%Directive.RunInstruction{}` for runtime execution, then handling
-execution results through internal strategy actions.
+This strategy is useful when you want to:
+
+- track whether an agent is idle or actively processing work
+- gate execution so commands only run from valid execution states
+- inspect strategy state via `strategy_snapshot/1`
+
+The FSM state lives in `agent.state.__strategy__`.
+
+## Key Contract
+
+The built-in FSM strategy always enters `"processing"` while instructions are
+running. That means custom transition maps must include `"processing"` as the
+runtime execution state.
+
+If `:auto_transition` is enabled, `"processing"` must also be able to return to
+the configured initial state.
+
+Use your regular agent state for domain workflow data such as
+`agent.state.order_status`.
 
 ## Configuration
-
-Configure the FSM Strategy in your agent definition:
 
 ```elixir
 defmodule OrderAgent do
@@ -32,20 +46,23 @@ defmodule OrderAgent do
       customer: [type: :string],
       items: [type: {:list, :map}, default: []],
       total: [type: :float, default: 0.0],
-      cancelled_reason: [type: :string, default: nil],
+      order_status: [type: :atom, default: :pending],
+      shipped_via: [type: :string, default: nil],
       shipped_at: [type: :any, default: nil],
       delivered_at: [type: :any, default: nil]
     ],
+    signal_routes: [
+      {"order.confirm", ConfirmOrder},
+      {"order.ship", ShipOrder},
+      {"order.deliver", DeliverOrder}
+    ],
     strategy: {Jido.Agent.Strategy.FSM,
-      initial_state: "pending",
+      initial_state: "ready",
       transitions: %{
-        "pending" => ["confirmed", "cancelled"],
-        "confirmed" => ["shipped", "cancelled"],
-        "shipped" => ["delivered"],
-        "delivered" => [],
-        "cancelled" => []
+        "ready" => ["processing"],
+        "processing" => ["ready"]
       },
-      auto_transition: false
+      auto_transition: true
     }
 end
 ```
@@ -54,9 +71,9 @@ end
 
 | Option | Description | Default |
 |--------|-------------|---------|
-| `:initial_state` | The starting FSM state | `"idle"` |
-| `:transitions` | Map of valid transitions `%{from => [to_states]}` | Default workflow (see below) |
-| `:auto_transition` | Auto-return to initial state after processing | `true` |
+| `:initial_state` | The starting execution state | `"idle"` |
+| `:transitions` | Map of valid execution transitions `%{from => [to_states]}` | Default workflow (see below) |
+| `:auto_transition` | Auto-return to the initial state after processing | `true` |
 
 ### Default Transitions
 
@@ -71,30 +88,47 @@ If no transitions are provided, the strategy uses:
 }
 ```
 
-## Inspecting FSM State
+## Runtime Execution
 
-Use `strategy_snapshot/1` to inspect the current FSM state without accessing internals:
+`MyAgent.cmd/2` stays pure under this strategy. It prepares work and returns
+directives; it does not execute instructions inline.
+
+Use `Jido.AgentServer.call/3` to run a signal through the runtime:
+
+```elixir
+{:ok, pid} = Jido.AgentServer.start_link(agent: OrderAgent)
+{:ok, agent} = Jido.AgentServer.call(pid, signal)
+```
+
+The runtime handles `%Directive.RunInstruction{}` for you and feeds the result
+back into the strategy.
+
+If you need the settled agent after the runtime finishes draining directives,
+fetch it from `Jido.AgentServer.state/1` after the strategy returns to `:idle`.
+
+## Inspecting Strategy State
+
+Use `strategy_snapshot/1` to inspect the FSM execution state:
 
 ```elixir
 snap = OrderAgent.strategy_snapshot(agent)
 
-snap.status   # :idle, :running, :success, :failure
-snap.done?    # boolean - whether in terminal state
-snap.result   # last action result
-snap.details  # %{fsm_state: "shipped", processed_count: 5, ...}
+snap.status              # :idle or :running
+snap.done?               # false for the default runtime flow
+snap.result              # last instruction result
+snap.details[:fsm_state] # "ready" or "processing"
 ```
 
-The `details.fsm_state` contains the current FSM state string.
+Keep domain state in the agent itself:
 
-## Complete Example: Order Fulfillment
-
-Let's build a complete order fulfillment workflow with the following states:
-
+```elixir
+agent.state[:order_status] # :pending, :confirmed, :shipped, :delivered
 ```
-pending → confirmed → shipped → delivered
-    ↓         ↓
- cancelled  cancelled
-```
+
+## Complete Example: Order Fulfillment at Runtime
+
+This example uses the FSM strategy for execution-state tracking while the order
+lifecycle itself lives in `agent.state.order_status`.
 
 ### Step 1: Define the Actions
 
@@ -102,198 +136,178 @@ pending → confirmed → shipped → delivered
 defmodule ConfirmOrder do
   use Jido.Action,
     name: "confirm_order",
-    description: "Confirm a pending order",
     schema: []
 
   @impl true
   def run(_params, context) do
-    order_id = context.state[:order_id]
-    IO.puts("✓ Order #{order_id} confirmed")
-    {:ok, %{}}
+    case context.state[:order_status] do
+      :pending -> {:ok, %{order_status: :confirmed}}
+      other -> {:error, "cannot confirm order from #{inspect(other)}"}
+    end
   end
 end
 
 defmodule ShipOrder do
   use Jido.Action,
     name: "ship_order",
-    description: "Ship a confirmed order",
     schema: [
       carrier: [type: :string, default: "Standard Shipping"]
     ]
 
   @impl true
-  def run(params, context) do
-    order_id = context.state[:order_id]
-    IO.puts("📦 Order #{order_id} shipped via #{params.carrier}")
-    {:ok, %{shipped_at: DateTime.utc_now()}}
+  def run(%{carrier: carrier}, context) do
+    case context.state[:order_status] do
+      :confirmed ->
+        {:ok, %{order_status: :shipped, shipped_via: carrier, shipped_at: DateTime.utc_now()}}
+
+      other ->
+        {:error, "cannot ship order from #{inspect(other)}"}
+    end
   end
 end
 
 defmodule DeliverOrder do
   use Jido.Action,
     name: "deliver_order",
-    description: "Mark an order as delivered",
     schema: []
 
   @impl true
   def run(_params, context) do
-    order_id = context.state[:order_id]
-    IO.puts("✅ Order #{order_id} delivered!")
-    {:ok, %{delivered_at: DateTime.utc_now()}}
-  end
-end
-
-defmodule CancelOrder do
-  use Jido.Action,
-    name: "cancel_order",
-    description: "Cancel an order",
-    schema: [
-      reason: [type: :string, required: true]
-    ]
-
-  @impl true
-  def run(params, context) do
-    order_id = context.state[:order_id]
-    IO.puts("❌ Order #{order_id} cancelled: #{params.reason}")
-    {:ok, %{cancelled_reason: params.reason}}
+    case context.state[:order_status] do
+      :shipped -> {:ok, %{order_status: :delivered, delivered_at: DateTime.utc_now()}}
+      other -> {:error, "cannot deliver order from #{inspect(other)}"}
+    end
   end
 end
 ```
 
-### Step 2: Define the Order Agent
+### Step 2: Define the Agent
 
 ```elixir
 defmodule OrderAgent do
   use Jido.Agent,
     name: "order_agent",
-    description: "Handles order lifecycle with FSM",
+    description: "Handles order lifecycle while FSM tracks execution state",
     schema: [
       order_id: [type: :string],
       customer: [type: :string],
       items: [type: {:list, :map}, default: []],
       total: [type: :float, default: 0.0],
-      cancelled_reason: [type: :string, default: nil],
+      order_status: [type: :atom, default: :pending],
+      shipped_via: [type: :string, default: nil],
       shipped_at: [type: :any, default: nil],
       delivered_at: [type: :any, default: nil]
     ],
+    signal_routes: [
+      {"order.confirm", ConfirmOrder},
+      {"order.ship", ShipOrder},
+      {"order.deliver", DeliverOrder}
+    ],
     strategy: {Jido.Agent.Strategy.FSM,
-      initial_state: "pending",
+      initial_state: "ready",
       transitions: %{
-        "pending" => ["confirmed", "cancelled"],
-        "confirmed" => ["shipped", "cancelled"],
-        "shipped" => ["delivered"],
-        "delivered" => [],
-        "cancelled" => []
+        "ready" => ["processing"],
+        "processing" => ["ready"]
       },
-      auto_transition: false
+      auto_transition: true
     }
 end
 ```
 
-### Step 3: Happy Path - Complete Order Flow
+### Step 3: Start the Runtime
 
 ```elixir
-agent = OrderAgent.new(
-  id: "order-001",
-  state: %{
-    order_id: "ORD-12345",
-    customer: "Alice",
-    items: [%{sku: "WIDGET-A", qty: 2}],
-    total: 49.99
-  }
-)
+alias Jido.Signal
 
-IO.puts("Initial FSM state:")
-snap = OrderAgent.strategy_snapshot(agent)
-IO.inspect(snap.details[:fsm_state], label: "FSM State")
+def wait_for_idle!(pid, timeout_ms \\ 1_000) do
+  deadline = System.monotonic_time(:millisecond) + timeout_ms
+  do_wait_for_idle(pid, deadline)
+end
+
+defp do_wait_for_idle(pid, deadline) do
+  {:ok, status} = Jido.AgentServer.status(pid)
+
+  cond do
+    status.snapshot.status == :idle ->
+      {:ok, state} = Jido.AgentServer.state(pid)
+      state.agent
+
+    System.monotonic_time(:millisecond) >= deadline ->
+      raise "timed out waiting for FSM runtime to become idle"
+
+    true ->
+      Process.sleep(10)
+      do_wait_for_idle(pid, deadline)
+  end
+end
+
+{:ok, pid} =
+  Jido.AgentServer.start_link(
+    agent: OrderAgent,
+    id: "order-001",
+    initial_state: %{
+      order_id: "ORD-12345",
+      customer: "Alice",
+      items: [%{sku: "WIDGET-A", qty: 2}],
+      total: 49.99,
+      order_status: :pending
+    }
+  )
 ```
 
-Now let's process the order through its lifecycle:
+### Step 4: Process the Order
 
 ```elixir
-{agent, _directives} = OrderAgent.cmd(agent, ConfirmOrder)
+{:ok, _agent} =
+  Jido.AgentServer.call(pid, Signal.new!("order.confirm", %{}, source: "/guide"))
 
+agent = wait_for_idle!(pid)
 snap = OrderAgent.strategy_snapshot(agent)
-IO.inspect(snap.details[:fsm_state], label: "After confirm")
+IO.inspect(agent.state[:order_status], label: "Order status")
+IO.inspect(snap.details[:fsm_state], label: "FSM state")
 IO.inspect(snap.details[:processed_count], label: "Actions processed")
 ```
 
 ```elixir
-{agent, _directives} = OrderAgent.cmd(agent, {ShipOrder, %{carrier: "FedEx Express"}})
+{:ok, _agent} =
+  Jido.AgentServer.call(
+    pid,
+    Signal.new!("order.ship", %{carrier: "FedEx Express"}, source: "/guide")
+  )
 
+agent = wait_for_idle!(pid)
 snap = OrderAgent.strategy_snapshot(agent)
-IO.inspect(snap.details[:fsm_state], label: "After ship")
-IO.inspect(agent.state[:shipped_at], label: "Shipped at")
+IO.inspect(agent.state[:order_status], label: "Order status after ship")
+IO.inspect(agent.state[:shipped_via], label: "Carrier")
+IO.inspect(snap.details[:fsm_state], label: "FSM state")
 ```
 
 ```elixir
-{agent, _directives} = OrderAgent.cmd(agent, DeliverOrder)
+{:ok, _agent} =
+  Jido.AgentServer.call(pid, Signal.new!("order.deliver", %{}, source: "/guide"))
 
+agent = wait_for_idle!(pid)
 snap = OrderAgent.strategy_snapshot(agent)
-IO.inspect(snap.details[:fsm_state], label: "After deliver")
+IO.inspect(agent.state[:order_status], label: "Order status after deliver")
 IO.inspect(agent.state[:delivered_at], label: "Delivered at")
-IO.inspect(snap.status, label: "Status")
+IO.inspect(snap.details[:fsm_state], label: "FSM state")
 ```
 
-### Step 4: Cancellation Flow
+After each successful runtime call:
 
-Let's create a new order and cancel it:
+- `agent.state.order_status` advances through the business workflow
+- `snap.details[:fsm_state]` returns to `"ready"`
+- `snap.details[:processed_count]` increments
 
-```elixir
-cancelled_agent = OrderAgent.new(
-  id: "order-002",
-  state: %{
-    order_id: "ORD-12346",
-    customer: "Bob",
-    items: [%{sku: "GADGET-B", qty: 1}],
-    total: 99.99
-  }
-)
+## Common Pitfall: Missing `"processing"`
 
-{cancelled_agent, _} = OrderAgent.cmd(cancelled_agent, ConfirmOrder)
-
-snap = OrderAgent.strategy_snapshot(cancelled_agent)
-IO.inspect(snap.details[:fsm_state], label: "Before cancel")
-```
+The following configuration looks like a business-state FSM, but it is invalid
+for the built-in strategy because `"processing"` is missing:
 
 ```elixir
-{cancelled_agent, _} = OrderAgent.cmd(
-  cancelled_agent, 
-  {CancelOrder, %{reason: "Customer requested cancellation"}}
-)
-
-snap = OrderAgent.strategy_snapshot(cancelled_agent)
-IO.inspect(snap.details[:fsm_state], label: "After cancel")
-IO.inspect(cancelled_agent.state[:cancelled_reason], label: "Reason")
-```
-
-### Step 5: Invalid Transition Handling
-
-The FSM Strategy prevents invalid transitions. Let's try to ship a cancelled order:
-
-```elixir
-{agent_after_invalid, directives} = OrderAgent.cmd(cancelled_agent, ShipOrder)
-
-IO.inspect(directives, label: "Directives from invalid transition")
-
-snap = OrderAgent.strategy_snapshot(agent_after_invalid)
-IO.inspect(snap.details[:fsm_state], label: "FSM state unchanged")
-```
-
-The FSM Strategy returns an `Error` directive when an invalid transition is attempted, and the FSM state remains unchanged.
-
-## State-Dependent Action Routing
-
-You can use `handle_signal/2` to route signals based on FSM state:
-
-```elixir
-defmodule SmartOrderAgent do
+defmodule BrokenOrderAgent do
   use Jido.Agent,
-    name: "smart_order_agent",
-    schema: [
-      order_id: [type: :string],
-      customer: [type: :string]
-    ],
+    name: "broken_order_agent",
     strategy: {Jido.Agent.Strategy.FSM,
       initial_state: "pending",
       transitions: %{
@@ -305,78 +319,36 @@ defmodule SmartOrderAgent do
       },
       auto_transition: false
     }
-
-  alias Jido.Signal
-
-  @impl true
-  def handle_signal(agent, %Signal{type: "order.process"} = signal) do
-    snap = strategy_snapshot(agent)
-    fsm_state = snap.details[:fsm_state]
-    
-    action = case fsm_state do
-      "pending" -> ConfirmOrder
-      "confirmed" -> {ShipOrder, %{carrier: signal.data[:carrier] || "Standard"}}
-      "shipped" -> DeliverOrder
-      _ -> nil
-    end
-    
-    if action do
-      cmd(agent, action)
-    else
-      {agent, []}
-    end
-  end
-
-  def handle_signal(agent, %Signal{type: "order.cancel"} = signal) do
-    snap = strategy_snapshot(agent)
-    fsm_state = snap.details[:fsm_state]
-    
-    if fsm_state in ["pending", "confirmed"] do
-      reason = signal.data[:reason] || "No reason provided"
-      cmd(agent, {CancelOrder, %{reason: reason}})
-    else
-      {agent, []}
-    end
-  end
-
-  def handle_signal(agent, _signal), do: {agent, []}
 end
 ```
 
+Calling `cmd/2` on that agent returns an error directive immediately because the
+strategy cannot transition from `"pending"` to `"processing"`:
+
 ```elixir
-smart_agent = SmartOrderAgent.new(
-  id: "smart-001",
-  state: %{order_id: "ORD-99999", customer: "Charlie"}
-)
+agent = BrokenOrderAgent.new()
+{agent, directives} = BrokenOrderAgent.cmd(agent, ConfirmOrder)
 
-alias Jido.Signal
-
-process_signal = Signal.new!("order.process", %{}, source: "/api")
-
-{smart_agent, _} = SmartOrderAgent.handle_signal(smart_agent, process_signal)
-IO.inspect(SmartOrderAgent.strategy_snapshot(smart_agent).details[:fsm_state], label: "Step 1")
-
-{smart_agent, _} = SmartOrderAgent.handle_signal(smart_agent, process_signal)
-IO.inspect(SmartOrderAgent.strategy_snapshot(smart_agent).details[:fsm_state], label: "Step 2")
-
-{smart_agent, _} = SmartOrderAgent.handle_signal(smart_agent, process_signal)
-IO.inspect(SmartOrderAgent.strategy_snapshot(smart_agent).details[:fsm_state], label: "Step 3")
+IO.inspect(directives, label: "Directive(s)")
+IO.inspect(BrokenOrderAgent.strategy_snapshot(agent).details[:fsm_state], label: "FSM state")
 ```
+
+If you want business-state transitions like `"pending" -> "confirmed"`, model
+those in `agent.state` or build a custom strategy on top of this runtime
+pattern.
 
 ## Summary
 
 | Concept | Purpose |
 |---------|---------|
-| `strategy: {FSM, opts}` | Configure FSM-based execution |
-| `:initial_state` | Starting state for the FSM |
-| `:transitions` | Map of valid state transitions |
-| `:auto_transition` | Auto-return to initial state (default: true) |
-| `strategy_snapshot/1` | Inspect FSM state without internal access |
-| `snap.details[:fsm_state]` | Current FSM state string |
-| `snap.status` | Coarse status (:idle, :running, :success, :failure) |
+| `strategy: {FSM, opts}` | Configure execution-state tracking around `cmd/2` |
+| `"processing"` | Runtime state entered while instructions execute |
+| `AgentServer.call/3` | Executes `%Directive.RunInstruction{}` and returns the updated agent |
+| `strategy_snapshot/1` | Inspect execution state without reading internals |
+| `agent.state` | Store domain workflow data such as `order_status` |
 
 ## Next Steps
 
 - **[Agents Guide](agents.md)** - Core agent concepts
-- **[Directives Guide](directives.md)** - Handling side effects
-- **[Runtime Guide](runtime.md)** - Running agents in production
+- **[Signals Guide](signals.md)** - Route signals into actions
+- **[Runtime Guide](runtime.md)** - Run agents in production

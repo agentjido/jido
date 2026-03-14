@@ -85,7 +85,7 @@ defmodule Jido do
       @jido_storage Jido.Storage.normalize_storage(unquote(Macro.escape(storage)))
 
       @doc false
-      @spec __otp_app__() :: atom()
+      @spec __otp_app__() :: unquote(otp_app)
       def __otp_app__, do: @otp_app
 
       @doc "Returns the storage configuration for this Jido instance."
@@ -100,6 +100,9 @@ defmodule Jido do
                          unquote(Macro.escape(default_plugins))
                        )
 
+      # The typespec for __default_plugins__ triggers a `contract_supertype`
+      # warning from dialyzer.
+      @dialyzer {:nowarn_function, [__default_plugins__: 0]}
       @doc "Returns the default plugins for agents bound to this Jido instance."
       @spec __default_plugins__() :: [module() | {module(), map()}]
       def __default_plugins__, do: @default_plugins
@@ -206,7 +209,7 @@ defmodule Jido do
       @spec debug() :: Jido.Debug.level()
       def debug, do: Jido.Debug.level(__MODULE__)
 
-      @spec debug(Jido.Debug.level() | pid()) :: :ok | Jido.Debug.level()
+      @spec debug(Jido.Debug.level() | pid()) :: :ok | {:error, term()} | Jido.Debug.level()
       def debug(pid) when is_pid(pid), do: Jido.AgentServer.set_debug(pid, true)
       def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
 
