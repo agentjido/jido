@@ -185,6 +185,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
 
     cond do
+      state.restored_from_storage ->
+        state
+
       is_nil(lifecycle.storage) ->
         state
 

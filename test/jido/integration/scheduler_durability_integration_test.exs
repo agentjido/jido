@@ -400,7 +400,6 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
       assert log =~ "dropped malformed persisted cron spec"
     end
 
-    @tag skip: "Known bug: keyed lifecycle can thaw twice through InstanceManager.get/2"
     test "custom restore callback runs exactly once through InstanceManager.get/2", context do
       %{manager: manager, table: table} = start_manager(context, RestoreCountingAgent)
       instance_key = "restore-once-1"
@@ -431,12 +430,9 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
       :ok = AgentServer.detach(pid)
     end
 
-    @tag skip: "Known bug: write-through cron persistence rewrites corrupt checkpoint state"
     test "write-through cron register and cancel do not rewrite corrupt checkpoint state",
          context do
       %{manager: manager, table: table} = start_manager(context, CronAgent)
-      scheduler_key = Jido.Scheduler.cron_specs_state_key()
-
       register_key = "corrupt-write-through-register"
       register_checkpoint_key = checkpoint_key(CronAgent, manager, register_key)
 
@@ -462,8 +458,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
         fn ->
           case ETS.get_checkpoint(register_checkpoint_key, table: table) do
             {:ok, checkpoint} ->
-              checkpoint.state == [] and checkpoint.marker == :register_marker and
-                not Map.has_key?(Map.get(checkpoint, :state, %{}), scheduler_key)
+              checkpoint.state == [] and checkpoint.marker == :register_marker
 
             _ ->
               false
@@ -500,8 +495,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
         fn ->
           case ETS.get_checkpoint(cancel_checkpoint_key, table: table) do
             {:ok, checkpoint} ->
-              checkpoint.state == [] and checkpoint.marker == :cancel_marker and
-                not Map.has_key?(Map.get(checkpoint, :state, %{}), scheduler_key)
+              checkpoint.state == [] and checkpoint.marker == :cancel_marker
 
             _ ->
               false

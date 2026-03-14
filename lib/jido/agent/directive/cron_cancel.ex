@@ -49,6 +49,22 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
         emit_telemetry(new_state, :cancel, %{job_id: logical_id})
         {:ok, new_state}
 
+      {:error, {:invalid_checkpoint, _} = reason} ->
+        {_pid, runtime_state} = drop_runtime_job(state, logical_id)
+        new_state = %{runtime_state | cron_specs: proposed_specs}
+
+        Logger.error(
+          "AgentServer #{agent_id} failed to persist cron cancellation for #{inspect(logical_id)}: #{inspect(reason)}"
+        )
+
+        emit_telemetry(state, :persist_failure, %{
+          job_id: logical_id,
+          reason: reason
+        })
+
+        emit_telemetry(new_state, :cancel, %{job_id: logical_id})
+        {:ok, new_state}
+
       {:error, reason} ->
         Logger.error(
           "AgentServer #{agent_id} failed to persist cron cancellation for #{inspect(logical_id)}: #{inspect(reason)}"
@@ -69,7 +85,11 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
   defp persist_cron_specs(_state, _cron_specs), do: :ok
 
   defp drop_runtime_job(%State{} = state, logical_id),
-    do: Jido.AgentServer.untrack_cron_job(state, logical_id, cancel?: true)
+    do:
+      Jido.AgentServer.untrack_cron_job(state, logical_id,
+        cancel?: true,
+        drop_runtime_spec?: true
+      )
 
   defp drop_runtime_job(state, logical_id) do
     {Map.get(state.cron_jobs, logical_id),

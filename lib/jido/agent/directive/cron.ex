@@ -112,9 +112,32 @@ defmodule Jido.Agent.Directive.Cron do
   defp persist_then_commit_registration(state, new_pid, logical_id, cron_spec) do
     proposed_specs = Map.put(state.cron_specs, logical_id, cron_spec)
 
+    runtime_spec = %{
+      kind: :dynamic,
+      cron_expression: cron_spec.cron_expression,
+      message: cron_spec.message,
+      timezone: cron_spec.timezone
+    }
+
     case AgentServer.persist_cron_specs(state, proposed_specs) do
       :ok ->
-        tracked_state = AgentServer.track_cron_job(state, logical_id, new_pid)
+        tracked_state =
+          AgentServer.track_cron_job(state, logical_id, new_pid, runtime_spec: runtime_spec)
+
+        committed_state = %{tracked_state | cron_specs: proposed_specs}
+
+        {:ok, committed_state}
+
+      {:error, {:invalid_checkpoint, _} = reason} ->
+        AgentServer.emit_cron_telemetry_event(state, :persist_failure, %{
+          job_id: logical_id,
+          cron_expression: cron_spec.cron_expression,
+          reason: reason
+        })
+
+        tracked_state =
+          AgentServer.track_cron_job(state, logical_id, new_pid, runtime_spec: runtime_spec)
+
         committed_state = %{tracked_state | cron_specs: proposed_specs}
 
         {:ok, committed_state}
@@ -133,7 +156,9 @@ defmodule Jido.Agent.Directive.Cron do
   end
 
   defp handle_failed_registration(state, logical_id, :drop) do
-    {_pid, runtime_state} = AgentServer.untrack_cron_job(state, logical_id, cancel?: true)
+    {_pid, runtime_state} =
+      AgentServer.untrack_cron_job(state, logical_id, cancel?: true, drop_runtime_spec?: true)
+
     %{runtime_state | cron_specs: Map.delete(runtime_state.cron_specs, logical_id)}
   end
 

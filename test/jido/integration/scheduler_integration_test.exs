@@ -228,7 +228,6 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       assert state.cron_specs == %{}
     end
 
-    @tag skip: "Known bug: declarative/plugin schedules are not restarted after abnormal death"
     test "agent schedules restart after abnormal scheduler death", context do
       pid = start_scheduled_agent(context, id: unique_id("scheduler-declarative-restart"))
 
@@ -280,7 +279,6 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       assert state.cron_specs == %{}
     end
 
-    @tag skip: "Known bug: plugin schedules are not restarted after abnormal death"
     test "plugin schedules restart after abnormal scheduler death", context do
       pid = start_server(context, PluginScheduledAgent, id: unique_id("scheduler-plugin-restart"))
 

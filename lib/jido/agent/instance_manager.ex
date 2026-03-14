@@ -306,7 +306,8 @@ defmodule Jido.Agent.InstanceManager do
         pool: config.name,
         pool_key: key,
         idle_timeout: config.idle_timeout,
-        storage: config.storage
+        storage: config.storage,
+        restored_from_storage: not is_nil(agent_or_nil)
       ] ++ agent_opts
 
     # Only add initial_state for fresh agents (not thawed)

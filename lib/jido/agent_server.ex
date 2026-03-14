@@ -660,6 +660,7 @@ defmodule Jido.AgentServer do
       agent_pid = self()
       signal = build_dynamic_cron_signal(message, logical_id, agent_id)
       opts = if is_binary(timezone), do: [timezone: timezone], else: []
+      runtime_spec = dynamic_runtime_spec(cron_expr, message, timezone)
 
       case Jido.Scheduler.run_every(
              fn ->
@@ -673,7 +674,7 @@ defmodule Jido.AgentServer do
              opts
            ) do
         {:ok, pid} ->
-          {:ok, track_cron_job(state, logical_id, pid)}
+          {:ok, track_cron_job(state, logical_id, pid, runtime_spec: runtime_spec)}
 
         {:error, reason} ->
           Logger.error(
@@ -689,10 +690,18 @@ defmodule Jido.AgentServer do
   end
 
   @doc false
-  @spec track_cron_job(State.t(), term(), pid()) :: State.t()
-  def track_cron_job(%State{} = state, logical_id, pid) when is_pid(pid) do
+  @spec track_cron_job(State.t(), term(), pid(), keyword()) :: State.t()
+  def track_cron_job(%State{} = state, logical_id, pid, opts \\ []) when is_pid(pid) do
+    runtime_spec = Keyword.get(opts, :runtime_spec)
     {_old_pid, state} = untrack_cron_job(state, logical_id, cancel?: true)
     monitor_ref = Process.monitor(pid)
+
+    state =
+      if is_map(runtime_spec) do
+        %{state | cron_runtime_specs: Map.put(state.cron_runtime_specs, logical_id, runtime_spec)}
+      else
+        state
+      end
 
     %{
       state
@@ -707,6 +716,7 @@ defmodule Jido.AgentServer do
   @spec untrack_cron_job(State.t(), term(), keyword()) :: {pid() | nil, State.t()}
   def untrack_cron_job(%State{} = state, logical_id, opts \\ []) do
     cancel? = Keyword.get(opts, :cancel?, false)
+    drop_runtime_spec? = Keyword.get(opts, :drop_runtime_spec?, false)
     pid = Map.get(state.cron_jobs, logical_id)
     monitor_ref = Map.get(state.cron_monitors, logical_id)
     timer_ref = Map.get(state.cron_restart_timers, logical_id)
@@ -738,6 +748,11 @@ defmodule Jido.AgentServer do
           if(is_reference(timer_ref),
             do: Map.delete(state.cron_restart_timer_refs, timer_ref),
             else: state.cron_restart_timer_refs
+          ),
+        cron_runtime_specs:
+          if(drop_runtime_spec?,
+            do: Map.delete(state.cron_runtime_specs, logical_id),
+            else: state.cron_runtime_specs
           )
     }
 
@@ -1084,9 +1099,28 @@ defmodule Jido.AgentServer do
       ^logical_id ->
         state = clear_cron_restart_timer(state, logical_id)
 
-        case Map.get(state.cron_specs, logical_id) do
-          %{cron_expression: cron_expr, message: message, timezone: timezone} ->
+        case Map.get(state.cron_runtime_specs, logical_id) do
+          %{kind: :dynamic, cron_expression: cron_expr, message: message, timezone: timezone} ->
             case register_dynamic_cron_runtime(state, logical_id, cron_expr, message, timezone) do
+              {:ok, new_state} ->
+                emit_cron_telemetry_event(new_state, :restart, %{
+                  job_id: logical_id,
+                  cron_expression: cron_expr
+                })
+
+                {:noreply, new_state}
+
+              {:error, reason, failed_state} ->
+                {:noreply, schedule_cron_restart(failed_state, logical_id, reason)}
+            end
+
+          %{
+            kind: :schedule,
+            cron_expression: cron_expr,
+            signal_type: signal_type,
+            timezone: timezone
+          } ->
+            case register_schedule_runtime(state, logical_id, cron_expr, signal_type, timezone) do
               {:ok, new_state} ->
                 emit_cron_telemetry_event(new_state, :restart, %{
                   job_id: logical_id,
@@ -2020,7 +2054,8 @@ defmodule Jido.AgentServer do
           "AgentServer #{agent_id} registered schedule #{inspect(job_id)}: #{cron_expr}"
         )
 
-        track_cron_job(state, job_id, pid)
+        runtime_spec = schedule_runtime_spec(cron_expr, signal_type, timezone)
+        track_cron_job(state, job_id, pid, runtime_spec: runtime_spec)
 
       {:error, reason} ->
         Logger.error(
@@ -2050,6 +2085,54 @@ defmodule Jido.AgentServer do
     )
   end
 
+  defp dynamic_runtime_spec(cron_expr, message, timezone) do
+    %{
+      kind: :dynamic,
+      cron_expression: cron_expr,
+      message: message,
+      timezone: timezone
+    }
+  end
+
+  defp schedule_runtime_spec(cron_expr, signal_type, timezone) do
+    %{
+      kind: :schedule,
+      cron_expression: cron_expr,
+      signal_type: signal_type,
+      timezone: timezone
+    }
+  end
+
+  defp register_schedule_runtime(%State{} = state, logical_id, cron_expr, signal_type, timezone) do
+    agent_id = state.id
+    agent_pid = self()
+    signal = Signal.new!(signal_type, %{}, source: "/agent/#{agent_id}/schedule")
+    opts = if timezone, do: [timezone: timezone], else: []
+    runtime_spec = schedule_runtime_spec(cron_expr, signal_type, timezone)
+
+    case Jido.Scheduler.run_every(
+           fn ->
+             if Process.alive?(agent_pid) do
+               _ = Jido.AgentServer.cast(agent_pid, signal)
+             end
+
+             :ok
+           end,
+           cron_expr,
+           opts
+         ) do
+      {:ok, pid} ->
+        {:ok, track_cron_job(state, logical_id, pid, runtime_spec: runtime_spec)}
+
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{agent_id} failed to register schedule #{inspect(logical_id)}: #{inspect(reason)}"
+        )
+
+        {:error, reason, state}
+    end
+  end
+
   defp handle_cron_job_down(state, logical_id, pid, reason) do
     {tracked_pid, state} = untrack_cron_job(state, logical_id, cancel?: false)
 
@@ -2065,7 +2148,7 @@ defmodule Jido.AgentServer do
   end
 
   defp schedule_cron_restart(state, logical_id, reason) do
-    if Map.has_key?(state.cron_specs, logical_id) do
+    if Map.has_key?(state.cron_runtime_specs, logical_id) do
       attempt = Map.get(state.cron_restart_attempts, logical_id, 0)
 
       delay =

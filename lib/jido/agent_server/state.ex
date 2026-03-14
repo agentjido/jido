@@ -71,8 +71,14 @@ defmodule Jido.AgentServer.State do
               cron_specs:
                 Zoi.map(description: "Map of job_id => durable cron registration spec")
                 |> Zoi.default(%{}),
+              cron_runtime_specs:
+                Zoi.map(description: "Map of job_id => runtime cron restart spec")
+                |> Zoi.default(%{}),
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules")
+                |> Zoi.default(false),
+              restored_from_storage:
+                Zoi.boolean(description: "Whether the startup agent was already thawed")
                 |> Zoi.default(false),
 
               # Configuration
@@ -177,7 +183,9 @@ defmodule Jido.AgentServer.State do
         cron_restart_timers: %{},
         cron_restart_timer_refs: %{},
         cron_specs: restored_cron_specs,
+        cron_runtime_specs: %{},
         skip_schedules: opts.skip_schedules,
+        restored_from_storage: opts.restored_from_storage,
         error_count: 0,
         metrics: %{},
         completion_waiters: %{},

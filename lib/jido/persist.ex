@@ -139,9 +139,11 @@ defmodule Jido.Persist do
 
       case Jido.Storage.fetch_checkpoint(adapter, checkpoint_key, opts) do
         {:ok, checkpoint} ->
-          checkpoint
-          |> patch_checkpoint_scheduler_manifest(scheduler_manifest)
-          |> then(&adapter.put_checkpoint(checkpoint_key, &1, opts))
+          with {:ok, checkpoint} <- validate_checkpoint(checkpoint) do
+            checkpoint
+            |> patch_checkpoint_scheduler_manifest(scheduler_manifest)
+            |> then(&adapter.put_checkpoint(checkpoint_key, &1, opts))
+          end
 
         {:error, :not_found} ->
           agent =
