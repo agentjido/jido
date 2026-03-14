@@ -67,10 +67,11 @@ defmodule Jido.Plugin do
   - `capabilities` - List of atoms describing what the plugin provides (default: []).
   - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
   - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
+  - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
 
-  For static routes, prefer the compile-time `signal_routes:` option in `use Jido.Plugin`.
-  Use the `signal_routes/1` callback only for dynamic routes based on runtime config.
+  For static routes and subscriptions, prefer the compile-time `signal_routes:` and `subscriptions:` options in `use Jido.Plugin`.
+  Use the `signal_routes/1` and `subscriptions/2` callbacks only for dynamic generation based on runtime config.
   """
 
   alias Jido.Plugin.Manifest
@@ -130,6 +131,11 @@ defmodule Jido.Plugin do
                             signal_routes:
                               Zoi.list(Zoi.any(),
                                 description: "Signal route tuples like {\"post\", ActionModule}."
+                              )
+                              |> Zoi.default([]),
+                            subscriptions:
+                              Zoi.list(Zoi.any(),
+                                description: "Sensor subscription tuples like {SensorModule, config}."
                               )
                               |> Zoi.default([]),
                             schedules:
@@ -314,27 +320,33 @@ defmodule Jido.Plugin do
               nil | Supervisor.child_spec() | [Supervisor.child_spec()]
 
   @doc """
-  Returns bus subscriptions for this plugin.
+  Returns a list of sensors to be started for this plugin.
 
-  Called during `AgentServer.init/1` to determine which bus adapters
-  to subscribe to and with what options.
+  Called during `AgentServer.init/1` to start and monitor
+  plugin-specific sensors. These sensors are automatically linked to
+  the agent and can emit signals back to it.
 
   ## Parameters
 
   - `config` - Per-agent configuration for this plugin
-  - `context` - Map with `:agent_id`, `:agent_module`
+  - `context` - A map containing:
+    - `:agent_id` - The unique identifier of the agent
+    - `:agent_ref` - A reference (PID or via-tuple) to the AgentServer
+    - `:agent_module` - The module of the agent
+    - `:plugin_spec` - The specification of the current plugin
+    - `:jido_instance` - The Jido instance name
 
   ## Returns
 
-  List of `{adapter_module, opts}` tuples. Each adapter's `subscribe/2`
-  will be called with the AgentServer pid.
+  List of `{sensor_module, sensor_opts}` tuples. Each sensor will be
+  started under a `Jido.Sensor.Runtime`.
 
   ## Example
 
       def subscriptions(_config, context) do
         [
-          {Jido.Bus.Adapters.Local, topic: "events.*"},
-          {Jido.Bus.Adapters.PubSub, pubsub: MyApp.PubSub, topic: context.agent_id}
+          {MyApp.Sensors.MarketData, %{symbol: "AAPL", interval: 1000}},
+          {Jido.Sensors.Heartbeat, %{interval: 5000, agent_ref: context.agent_ref}}
         ]
       end
   """
@@ -511,6 +523,10 @@ defmodule Jido.Plugin do
       @spec signal_routes() :: [tuple()]
       def signal_routes, do: @validated_opts[:signal_routes] || []
 
+      @doc "Returns the sensor subscriptions for this plugin."
+      @spec subscriptions() :: [tuple()]
+      def subscriptions, do: @validated_opts[:subscriptions] || []
+
       @doc "Returns the schedules for this plugin."
       @spec schedules() :: [tuple()]
       def schedules, do: @validated_opts[:schedules] || []
@@ -571,6 +587,7 @@ defmodule Jido.Plugin do
           config_schema: config_schema(),
           actions: actions(),
           signal_routes: signal_routes(),
+          subscriptions: subscriptions(),
           schedules: schedules(),
           signal_patterns: signal_patterns(),
           singleton: singleton?()
@@ -627,7 +644,7 @@ defmodule Jido.Plugin do
       @doc false
       @spec subscriptions(map(), map()) :: [{module(), keyword() | map()}]
       @impl Jido.Plugin
-      def subscriptions(_config, _context), do: []
+      def subscriptions(_config, _context), do: subscriptions()
 
       @doc false
       @spec on_checkpoint(term(), map()) ::
