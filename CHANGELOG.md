@@ -2,12 +2,6 @@
 
 <!-- %% CHANGELOG_ENTRIES %% -->
 
-## Unreleased
-
-### Dependencies
-- Bump `jido_action` to `~> 2.1`
-- Drop stale transitive API/tool-pack lock entries after the `jido_action` 2.1 core split (`weather`, `tentacat`, `httpoison`, `tz`)
-
 ## 2.0.0 - 2026-02-22
 
 ### Changed
