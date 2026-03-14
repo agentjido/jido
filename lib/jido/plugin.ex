@@ -135,7 +135,8 @@ defmodule Jido.Plugin do
                               |> Zoi.default([]),
                             subscriptions:
                               Zoi.list(Zoi.any(),
-                                description: "Sensor subscription tuples like {SensorModule, config}."
+                                description:
+                                  "Sensor subscription tuples like {SensorModule, config}."
                               )
                               |> Zoi.default([]),
                             schedules:

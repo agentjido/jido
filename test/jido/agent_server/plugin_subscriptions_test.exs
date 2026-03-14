@@ -450,7 +450,8 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
   describe "static plugin subscriptions" do
     test "starts static subscription sensor during post_init", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithStaticSubscriptionPlugin, jido: jido)
+      {:ok, pid} =
+        Jido.AgentServer.start_link(agent: AgentWithStaticSubscriptionPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
