@@ -311,6 +311,7 @@ defmodule Jido.MixProject do
           Jido.Storage,
           Jido.Storage.ETS,
           Jido.Storage.File,
+          Jido.Storage.Redis,
           Jido.Persist,
           Jido.Agent.InstanceManager,
           Jido.Agent.Persistence,

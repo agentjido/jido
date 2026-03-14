@@ -11,6 +11,8 @@ defmodule Jido.Storage do
   | Adapter | Durability | Use Case |
   |---------|------------|----------|
   | `Jido.Storage.ETS` | Ephemeral | Development, testing |
+  | `Jido.Storage.File` | Disk | Simple durable storage |
+  | `Jido.Storage.Redis` | Durable | Optional external backing store |
 
   ## Implementing Custom Adapters
 
