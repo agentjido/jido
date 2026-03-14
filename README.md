@@ -24,7 +24,6 @@ defmodule MyAgent do
     schema: [
       count: [type: :integer, default: 0]
     ]
-  end
 end
 
 {agent, directives} = MyAgent.cmd(agent, action)
