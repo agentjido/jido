@@ -530,7 +530,9 @@ defmodule Jido.Agent do
       def plugin_routes, do: @validated_plugin_routes
 
       @doc "Returns the expanded plugin and agent schedules."
-      @spec plugin_schedules() :: [Jido.Plugin.Schedules.schedule_spec()]
+      @spec plugin_schedules() :: [
+              Jido.Plugin.Schedules.schedule_spec() | Jido.Agent.Schedules.schedule_spec()
+            ]
       def plugin_schedules, do: @expanded_plugin_schedules ++ @expanded_agent_schedules
     end
   end

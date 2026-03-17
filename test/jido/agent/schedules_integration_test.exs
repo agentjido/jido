@@ -47,6 +47,53 @@ defmodule JidoTest.Agent.SchedulesIntegrationTest do
   end
 
   describe "agent with schedules" do
+    test "plugin_schedules/0 typespec includes plugin and agent schedule specs" do
+      unique = System.unique_integer([:positive])
+      module = Module.concat(__MODULE__, "SpecAgent#{unique}")
+
+      old_options = Code.compiler_options()
+
+      [{^module, beam}] =
+        try do
+          Code.compiler_options(debug_info: true)
+
+          Code.compile_string("""
+          defmodule #{inspect(module)} do
+            use Jido.Agent,
+              name: "spec_agent_#{unique}",
+              schema: [],
+              schedules: [
+                {"* * * * *", "agent.tick", job_id: :tick}
+              ]
+          end
+          """)
+        after
+          Code.compiler_options(old_options)
+        end
+
+      beam_path = Path.join(System.tmp_dir!(), "spec_agent_#{unique}.beam")
+      File.write!(beam_path, beam)
+      on_exit(fn -> File.rm(beam_path) end)
+
+      {:ok, {_module, [abstract_code: {:raw_abstract_v1, abstract_code}]}} =
+        :beam_lib.chunks(String.to_charlist(beam_path), [:abstract_code])
+
+      {{:plugin_schedules, 0}, [spec]} =
+        Enum.find_value(abstract_code, fn
+          {:attribute, _line, :spec, {{:plugin_schedules, 0}, _} = spec} -> spec
+          _other -> nil
+        end)
+
+      rendered =
+        :plugin_schedules
+        |> Code.Typespec.spec_to_quoted(spec)
+        |> Macro.to_string()
+
+      assert String.contains?(rendered, "Jido.Plugin.Schedules.schedule_spec()")
+      assert String.contains?(rendered, "Jido.Agent.Schedules.schedule_spec()")
+      assert String.contains?(rendered, "|")
+    end
+
     test "plugin_schedules/0 includes agent schedules" do
       schedules = ScheduledAgent.plugin_schedules()
 
