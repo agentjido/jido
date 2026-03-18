@@ -334,6 +334,31 @@ defmodule JidoTest.AgentServerTest do
     end
   end
 
+  describe "query/2" do
+    test "runs function server-side and returns result", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: TestAgent, id: "query-test", jido: jido)
+
+      {:ok, id} = AgentServer.query(pid, fn state -> state.id end)
+      assert id == "query-test"
+
+      {:ok, counter} = AgentServer.query(pid, fn state -> state.agent.state.counter end)
+      assert counter == 0
+
+      GenServer.stop(pid)
+    end
+
+    test "raising function crashes the server", %{jido: jido} do
+      {:ok, pid} = AgentServer.start(agent: TestAgent, id: "query-crash-test", jido: jido)
+      ref = Process.monitor(pid)
+
+      catch_exit do
+        AgentServer.query(pid, fn _state -> raise "boom" end)
+      end
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}
+    end
+  end
+
   describe "whereis/1 and whereis/2" do
     test "whereis/1 returns pid for registered agent using default registry", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: TestAgent, id: "whereis-test-1", jido: jido)

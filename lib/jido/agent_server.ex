@@ -328,6 +328,24 @@ defmodule Jido.AgentServer do
   end
 
   @doc """
+  Run a function against the server state and return only its result.
+
+  The function executes inside the AgentServer process, so only the
+  return value crosses the process boundary — avoiding a full state copy.
+
+      {:ok, rev} = Jido.AgentServer.query(pid, fn state ->
+        state.agent |> Jido.Thread.Agent.get() |> Map.get(:rev)
+      end)
+  """
+  @spec query(server(), (State.t() -> result)) :: {:ok, result} | {:error, term()}
+        when result: term()
+  def query(server, fun) when is_function(fun, 1) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:query, fun})
+    end
+  end
+
+  @doc """
   Wait for an agent to reach a terminal status (`:completed` or `:failed`).
 
   This is an event-driven wait - the caller blocks until the agent's state
@@ -983,6 +1001,10 @@ defmodule Jido.AgentServer do
       {:cont, new_state} -> {:reply, :ok, new_state}
       {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
     end
+  end
+
+  def handle_call({:query, fun}, _from, state) when is_function(fun, 1) do
+    {:reply, {:ok, fun.(state)}, state}
   end
 
   def handle_call(_msg, _from, state) do
