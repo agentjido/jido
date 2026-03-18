@@ -24,6 +24,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
       send_signal_sync(producer, "root", %{test_data: "cross-process-spy-test"})
 
       wait_for_cross_process_completion([consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       assert_bus_signal_observed(spy, "child.event")
 
@@ -73,6 +74,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
 
       # Wait for consumer to process the signal
       wait_for_cross_process_completion([consumer], timeout: 2000)
+      wait_for_received_signals(consumer, 1, timeout: 2000)
       received_signals = get_received_signals(consumer)
       assert length(received_signals) >= 1
     end
@@ -87,6 +89,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
       send_signal_sync(producer, "root", %{sequence: 2, data: "second"})
 
       wait_for_cross_process_completion([consumer])
+      wait_for_received_signals(consumer, 2, timeout: 2000)
 
       child_signals = get_spy_signals(spy, "child.event")
       assert length(child_signals) >= 2
@@ -109,6 +112,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
       send_signal_sync(producer, "root", %{event_type: "system_action"})
 
       wait_for_cross_process_completion([consumer])
+      wait_for_received_signals(consumer, 2, timeout: 2000)
 
       all_signals = get_spy_signals(spy, "*")
       child_signals = get_spy_signals(spy, "child.*")
@@ -127,6 +131,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
 
       send_signal_sync(producer, "root", %{test_dispatch_result: true})
       wait_for_cross_process_completion([consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       all_events = get_spy_signals(spy)
 
@@ -156,6 +161,7 @@ defmodule Jido.Agent.BusSpyIntegrationTest do
 
       send_signal_sync(producer, "root", %{trace_data: original_trace_data})
       wait_for_cross_process_completion([consumer])
+      wait_for_received_signals(consumer, 1, timeout: 2000)
 
       # Filter to get just the before_dispatch event
       child_signals = get_spy_signals(spy, "child.event")
