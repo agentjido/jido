@@ -85,6 +85,18 @@ defmodule Jido.Thread do
   @spec entry_count(t()) :: non_neg_integer()
   def entry_count(%__MODULE__{stats: %{entry_count: count}}), do: count
 
+  @doc "Merge additional refs into an entry identified by seq"
+  @spec update_entry_refs(t(), non_neg_integer(), map()) :: t()
+  def update_entry_refs(%__MODULE__{} = thread, seq, new_refs) when is_map(new_refs) do
+    entries =
+      Enum.map(thread.entries, fn
+        %{seq: ^seq} = entry -> %{entry | refs: Map.merge(entry.refs, new_refs)}
+        entry -> entry
+      end)
+
+    %{thread | entries: entries}
+  end
+
   @doc "Get last entry"
   @spec last(t()) :: Entry.t() | nil
   def last(%__MODULE__{entries: []}), do: nil

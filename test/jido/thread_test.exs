@@ -236,6 +236,44 @@ defmodule JidoTest.ThreadTest do
     end
   end
 
+  describe "Thread.update_entry_refs/3" do
+    test "merges new refs into entry identified by seq" do
+      thread =
+        Thread.new()
+        |> Thread.append(%{kind: :message, payload: %{role: :user}, refs: %{slack_ts: "1234"}})
+        |> Thread.append(%{
+          kind: :message,
+          payload: %{role: :assistant},
+          refs: %{request_id: "r1"}
+        })
+
+      updated = Thread.update_entry_refs(thread, 1, %{slack_ts: "5678"})
+
+      assert Thread.get_entry(updated, 0).refs == %{slack_ts: "1234"}
+      assert Thread.get_entry(updated, 1).refs == %{request_id: "r1", slack_ts: "5678"}
+    end
+
+    test "does not affect other entries" do
+      thread =
+        Thread.new()
+        |> Thread.append(%{kind: :a, refs: %{x: 1}})
+        |> Thread.append(%{kind: :b, refs: %{y: 2}})
+
+      updated = Thread.update_entry_refs(thread, 0, %{z: 3})
+
+      assert Thread.get_entry(updated, 0).refs == %{x: 1, z: 3}
+      assert Thread.get_entry(updated, 1).refs == %{y: 2}
+    end
+
+    test "no-ops when seq does not exist" do
+      thread = Thread.new() |> Thread.append(%{kind: :a, refs: %{x: 1}})
+
+      updated = Thread.update_entry_refs(thread, 99, %{new: true})
+
+      assert Thread.get_entry(updated, 0).refs == %{x: 1}
+    end
+  end
+
   describe "Thread.to_list/1" do
     test "returns empty list for empty thread" do
       thread = Thread.new()

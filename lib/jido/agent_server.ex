@@ -327,6 +327,22 @@ defmodule Jido.AgentServer do
     end
   end
 
+  @doc "Update refs on a thread entry by seq number."
+  @spec update_thread_entry_refs(server(), non_neg_integer(), map()) :: :ok | {:error, term()}
+  def update_thread_entry_refs(server, seq, refs) when is_integer(seq) and is_map(refs) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:update_thread_entry_refs, seq, refs})
+    end
+  end
+
+  @doc "Append one or more entries to the agent's thread from an external process."
+  @spec append_thread_entry(server(), map() | [map()]) :: :ok | {:error, term()}
+  def append_thread_entry(server, entry_or_entries) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:append_thread_entry, entry_or_entries})
+    end
+  end
+
   @doc """
   Wait for an agent to reach a terminal status (`:completed` or `:failed`).
 
@@ -927,6 +943,20 @@ defmodule Jido.AgentServer do
 
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
+  end
+
+  def handle_call({:update_thread_entry_refs, seq, refs}, _from, %State{} = state) do
+    agent =
+      Jido.Thread.Agent.update(state.agent, fn thread ->
+        if thread, do: Jido.Thread.update_entry_refs(thread, seq, refs), else: thread
+      end)
+
+    {:reply, :ok, State.update_agent(state, agent)}
+  end
+
+  def handle_call({:append_thread_entry, entry_or_entries}, _from, %State{} = state) do
+    agent = Jido.Thread.Agent.append(state.agent, entry_or_entries)
+    {:reply, :ok, State.update_agent(state, agent)}
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
