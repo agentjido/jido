@@ -50,14 +50,19 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
   defp log_error(error, context, state) do
     message = extract_message(error)
+    details = extract_details(error)
     context_str = if context, do: " [#{context}]", else: ""
+    details_str = if details != %{}, do: " #{inspect(details)}", else: ""
 
-    Logger.error("Agent #{state.id}#{context_str}: #{message}")
+    Logger.error("Agent #{state.id}#{context_str}: #{message}#{details_str}")
   end
 
   defp extract_message(%{message: message}) when is_binary(message), do: message
   defp extract_message(%{message: %{message: message}}) when is_binary(message), do: message
   defp extract_message(error), do: inspect(error)
+
+  defp extract_details(%{details: details}) when is_map(details), do: details
+  defp extract_details(_), do: %{}
 
   defp emit_error_signal(error, context, state, dispatch_cfg) do
     signal = build_error_signal(error, context, state)
