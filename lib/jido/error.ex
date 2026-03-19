@@ -352,15 +352,17 @@ defmodule Jido.Error do
 
   - `:phase` - Where failure occurred: `:execution`, `:planning`
   - `:details` - Additional context map
+  - Any other keys are merged into `details`
   """
   @spec execution_error(String.t(), keyword() | map()) :: ExecutionError.t()
   def execution_error(message, opts \\ []) do
     opts = if is_map(opts), do: Map.to_list(opts), else: opts
+    details = merge_extra_details(opts, [:phase])
 
     ExecutionError.exception(
       message: message,
       phase: Keyword.get(opts, :phase, :execution),
-      details: Keyword.get(opts, :details, %{})
+      details: details
     )
   end
 
@@ -440,6 +442,21 @@ defmodule Jido.Error do
       message: message,
       details: Keyword.get(opts, :details, %{})
     )
+  end
+
+  defp merge_extra_details(opts, reserved_keys) do
+    explicit_details =
+      case Keyword.get(opts, :details, %{}) do
+        details when is_map(details) -> details
+        _ -> %{}
+      end
+
+    extra_details =
+      opts
+      |> Keyword.drop([:details | reserved_keys])
+      |> Enum.into(%{})
+
+    Map.merge(extra_details, explicit_details)
   end
 
   # ============================================================================

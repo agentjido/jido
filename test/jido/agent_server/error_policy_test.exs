@@ -186,6 +186,21 @@ defmodule JidoTest.AgentServer.ErrorPolicyTest do
       assert log =~ "timeout"
     end
 
+    test "includes details in max_errors warning log before the threshold" do
+      state = build_state({:max_errors, 3})
+      error = Jido.Error.execution_error("Boom", reason: :timeout)
+      directive = %Directive.Error{error: error, context: :test}
+
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, new_state} = ErrorPolicy.handle(directive, state)
+          assert new_state.error_count == 1
+        end)
+
+      assert log =~ "Boom"
+      assert log =~ "timeout"
+    end
+
     test "omits details from log when empty" do
       state = build_state(:log_only)
       error = Jido.Error.execution_error("Boom")

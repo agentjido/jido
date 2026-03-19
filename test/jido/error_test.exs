@@ -64,6 +64,18 @@ defmodule JidoTest.ErrorTest do
 
       assert error.details[:step] == :process
     end
+
+    test "stores unknown keyword opts in details" do
+      error =
+        Error.execution_error("Failed",
+          phase: :planning,
+          reason: :timeout,
+          details: %{step: :process}
+        )
+
+      assert error.phase == :planning
+      assert error.details == %{reason: :timeout, step: :process}
+    end
   end
 
   describe "routing_error/2" do
