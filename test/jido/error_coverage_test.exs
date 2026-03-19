@@ -35,6 +35,14 @@ defmodule JidoTest.ErrorCoverageTest do
       assert error.details == %{step: 1}
     end
 
+    test "execution_error treats bare map opts as details" do
+      error = Error.execution_error("Failed", %{phase: :planning, reason: :timeout})
+
+      assert %Error.ExecutionError{} = error
+      assert error.phase == :planning
+      assert error.details == %{reason: :timeout}
+    end
+
     test "routing_error accepts map opts" do
       error = Error.routing_error("No route", %{target: :agent_1, details: %{reason: :unknown}})
 

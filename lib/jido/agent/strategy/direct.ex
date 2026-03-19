@@ -82,7 +82,7 @@ defmodule Jido.Agent.Strategy.Direct do
         {agent, directives, :ok}
 
       {:error, reason} ->
-        error = Error.execution_error("Instruction failed", %{reason: reason})
+        error = Error.execution_error("Instruction failed", details: %{reason: reason})
         {agent, [%Directive.Error{error: error, context: :instruction}], :error}
     end
   end

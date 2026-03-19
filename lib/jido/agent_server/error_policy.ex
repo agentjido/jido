@@ -52,12 +52,22 @@ defmodule Jido.AgentServer.ErrorPolicy do
     message = extract_message(error)
     context_str = if context, do: " [#{context}]", else: ""
 
-    Logger.error("Agent #{state.id}#{context_str}: #{message}")
+    Logger.error("Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}")
   end
 
   defp extract_message(%{message: message}) when is_binary(message), do: message
   defp extract_message(%{message: %{message: message}}) when is_binary(message), do: message
   defp extract_message(error), do: inspect(error)
+
+  defp extract_details(%{details: details}) when is_map(details), do: details
+  defp extract_details(_), do: %{}
+
+  defp details_suffix(error) do
+    case extract_details(error) do
+      details when map_size(details) > 0 -> " #{inspect(details)}"
+      _ -> ""
+    end
+  end
 
   defp emit_error_signal(error, context, state, dispatch_cfg) do
     signal = build_error_signal(error, context, state)
@@ -95,7 +105,10 @@ defmodule Jido.AgentServer.ErrorPolicy do
       Logger.error("Agent #{state.id} exceeded max errors (#{count}/#{max}), stopping")
       {:stop, {:max_errors_exceeded, count}, state}
     else
-      Logger.warning("Agent #{state.id} error #{count}/#{max}: #{extract_message(error)}")
+      Logger.warning(
+        "Agent #{state.id} error #{count}/#{max}: #{extract_message(error)}#{details_suffix(error)}"
+      )
+
       {:ok, state}
     end
   end
