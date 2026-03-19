@@ -14,6 +14,11 @@ defmodule Jido.AgentServer do
   - Registry-based naming via `Jido.Registry`
   - Logical parent-child hierarchy via state tracking + monitors
 
+  Jido's parent-child hierarchy is **logical**, not OTP supervisory ancestry.
+  Parent and child agents are still OTP peers under a supervisor; the parent
+  relationship is represented explicitly with `Jido.AgentServer.ParentRef`,
+  runtime monitors, and lifecycle signals.
+
   ## Public API
 
   - `start/1` - Start under DynamicSupervisor
@@ -50,7 +55,10 @@ defmodule Jido.AgentServer do
   - `:error_policy` - Error handling policy
   - `:max_queue_size` - Max directive queue size (default: 10_000)
   - `:parent` - Parent reference for hierarchy
-  - `:on_parent_death` - Behavior when parent dies (`:stop`, `:continue`, `:emit_orphan`)
+  - `:on_parent_death` - Behavior when parent dies:
+    - `:stop` - stop the child
+    - `:continue` - keep running and become orphaned
+    - `:emit_orphan` - become orphaned and process `jido.agent.orphaned`
   - `:spawn_fun` - Custom function for spawning children
   - `:debug` - Enable debug mode with event buffer (default: `false`)
 
@@ -133,6 +141,24 @@ defmodule Jido.AgentServer do
 
   > **Note:** This is a development aid, not an audit log. Events are not
   > persisted and the buffer has fixed capacity.
+
+  ## Orphans and Adoption
+
+  If a child is configured with `on_parent_death: :continue` or `:emit_orphan`,
+  the runtime clears the current parent reference immediately when the logical
+  parent dies:
+
+  - `state.parent` becomes `nil`
+  - `agent.state.__parent__` becomes `nil`
+  - the former parent is preserved in `state.orphaned_from`
+  - the former parent is preserved in `agent.state.__orphaned_from__`
+
+  This prevents children from continuing to route signals to a dead parent via
+  `Jido.Agent.Directive.emit_to_parent/3`.
+
+  Reattachment is explicit. A replacement parent can adopt the live child with
+  `Jido.Agent.Directive.adopt_child/3`, which refreshes the child's live parent
+  reference and monitoring relationship.
 
   ## Timeout Diagnostics
 
@@ -567,6 +593,21 @@ defmodule Jido.AgentServer do
     end
   end
 
+  @doc false
+  @spec adopt_parent(server(), ParentRef.t()) ::
+          {:ok, %{id: String.t(), agent_module: module()}} | {:error, term()}
+  def adopt_parent(server, %ParentRef{} = parent_ref) do
+    with {:ok, pid} <- resolve_server(server) do
+      try do
+        GenServer.call(pid, {:adopt_parent, parent_ref})
+      catch
+        :exit, {:noproc, _} -> {:error, :not_found}
+        :exit, {:timeout, _} -> {:error, :timeout}
+        :exit, reason -> {:error, reason}
+      end
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Attachment API (for Jido.Agent.InstanceManager integration)
   # ---------------------------------------------------------------------------
@@ -982,6 +1023,28 @@ defmodule Jido.AgentServer do
     case state.lifecycle.mod.handle_event({:detach, owner_pid}, state) do
       {:cont, new_state} -> {:reply, :ok, new_state}
       {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
+    end
+  end
+
+  def handle_call({:adopt_parent, %ParentRef{} = parent_ref}, _from, %State{} = state) do
+    cond do
+      not is_nil(state.parent) ->
+        {:reply, {:error, :already_attached}, state}
+
+      not is_pid(parent_ref.pid) ->
+        {:reply, {:error, :invalid_parent}, state}
+
+      true ->
+        new_state =
+          state
+          |> State.attach_parent(parent_ref)
+          |> maybe_monitor_parent()
+          |> State.record_debug_event(:parent_adopted, %{
+            parent_id: parent_ref.id,
+            tag: parent_ref.tag
+          })
+
+        {:reply, {:ok, %{id: new_state.id, agent_module: new_state.agent_module}}, new_state}
     end
   end
 
@@ -2346,15 +2409,28 @@ defmodule Jido.AgentServer do
   end
 
   defp handle_parent_down(%State{on_parent_death: :continue} = state, _pid, reason) do
-    Logger.info("AgentServer #{state.id} continuing after parent death (#{inspect(reason)})")
-    {:noreply, state}
+    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
+
+    Logger.info(
+      "AgentServer #{state.id} continuing as orphan after parent #{former_parent.id} died (#{inspect(reason)})"
+    )
+
+    {:noreply, orphaned_state}
   end
 
   defp handle_parent_down(%State{on_parent_death: :emit_orphan} = state, _pid, reason) do
+    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
+
     signal =
       Orphaned.new!(
-        %{parent_id: state.parent.id, reason: reason},
-        source: "/agent/#{state.id}"
+        %{
+          parent_id: former_parent.id,
+          parent_pid: former_parent.pid,
+          tag: former_parent.tag,
+          meta: former_parent.meta || %{},
+          reason: reason
+        },
+        source: "/agent/#{orphaned_state.id}"
       )
 
     traced_signal =
@@ -2363,7 +2439,7 @@ defmodule Jido.AgentServer do
         {:error, _} -> signal
       end
 
-    case process_signal(traced_signal, state) do
+    case process_signal(traced_signal, orphaned_state) do
       {:ok, new_state, _resolved_action} -> {:noreply, new_state}
       {:error, _reason, ns} -> {:noreply, ns}
     end
@@ -2404,6 +2480,19 @@ defmodule Jido.AgentServer do
   defp wrap_parent_down_reason(:shutdown), do: {:shutdown, {:parent_down, :shutdown}}
   defp wrap_parent_down_reason({:shutdown, _} = r), do: {:shutdown, {:parent_down, r}}
   defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
+
+  defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
+    orphaned_state =
+      state
+      |> State.orphan_parent()
+      |> State.record_debug_event(:orphaned, %{
+        former_parent_id: former_parent.id,
+        tag: former_parent.tag,
+        reason: reason
+      })
+
+    {former_parent, orphaned_state}
+  end
 
   # ---------------------------------------------------------------------------
   # Internal: Telemetry

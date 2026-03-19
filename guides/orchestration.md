@@ -43,6 +43,26 @@ Multi-agent orchestration follows a simple flow:
    [aggregate]
 ```
 
+`emit_to_parent/3` only works while a child is attached to a live logical
+parent. If the coordinator dies and the child is configured to survive, the
+child becomes orphaned and must be explicitly adopted before parent-directed
+communication resumes.
+
+## When the Coordinator Dies
+
+Jido gives you three policies for child behavior when the logical parent dies:
+
+- `:stop` keeps the hierarchy simple and is the default.
+- `:continue` lets the child finish work as an orphan without extra signaling.
+- `:emit_orphan` lets the child react explicitly to the orphan transition.
+
+Use orphan survival only when the child owns work that should outlive the
+original coordinator. If you want a replacement coordinator to take over, make
+that handoff explicit with `Directive.adopt_child/3`.
+
+See [Orphans & Adoption](orphans.md) for the full lifecycle, adoption rules,
+and caveats around replacement coordinators.
+
 ## Tutorial: Building a Parallel URL Fetcher
 
 We'll build a coordinator that spawns worker agents to fetch multiple URLs in parallel, then aggregates the results.

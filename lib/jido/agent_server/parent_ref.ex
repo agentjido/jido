@@ -1,9 +1,17 @@
 defmodule Jido.AgentServer.ParentRef do
-  @moduledoc false
-  # Reference to a parent agent in the logical hierarchy.
-  #
-  # Used for hierarchical agent management where child agents track
-  # their parent relationship without nested OTP supervision.
+  @moduledoc """
+  Reference to a logical parent agent in Jido hierarchy tracking.
+
+  `ParentRef` models Jido's logical parent-child relationship, which is layered
+  on top of OTP supervision. Parent and child agents are still OTP peers under
+  a supervisor; the parent relationship is represented explicitly with this
+  struct, child-start signals, and process monitors.
+
+  While a child is attached, the runtime injects this value into
+  `agent.state.__parent__` so child actions can use `Directive.emit_to_parent/3`.
+  If the child becomes orphaned, the current parent ref is cleared and the former
+  parent is moved to `agent.state.__orphaned_from__`.
+  """
 
   @schema Zoi.struct(
             __MODULE__,

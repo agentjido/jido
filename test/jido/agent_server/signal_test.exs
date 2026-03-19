@@ -5,17 +5,33 @@ defmodule JidoTest.AgentServer.SignalTest do
 
   describe "Orphaned signal" do
     test "creates signal with correct type" do
-      {:ok, signal} = Orphaned.new(%{parent_id: "parent-123", reason: :normal})
+      {:ok, signal} =
+        Orphaned.new(%{
+          parent_id: "parent-123",
+          parent_pid: self(),
+          tag: :worker,
+          meta: %{role: "worker"},
+          reason: :normal
+        })
 
       assert signal.type == "jido.agent.orphaned"
       assert signal.data.parent_id == "parent-123"
+      assert signal.data.parent_pid == self()
+      assert signal.data.tag == :worker
+      assert signal.data.meta == %{role: "worker"}
       assert signal.data.reason == :normal
     end
 
     test "creates signal with custom source" do
       {:ok, signal} =
         Orphaned.new(
-          %{parent_id: "parent-123", reason: {:shutdown, :timeout}},
+          %{
+            parent_id: "parent-123",
+            parent_pid: self(),
+            tag: :worker,
+            meta: %{},
+            reason: {:shutdown, :timeout}
+          },
           source: "/agent/child-456"
         )
 
@@ -25,12 +41,13 @@ defmodule JidoTest.AgentServer.SignalTest do
 
     test "new! raises on missing required fields" do
       assert_raise RuntimeError, fn ->
-        Orphaned.new!(%{parent_id: "parent-123"})
+        Orphaned.new!(%{parent_id: "parent-123", parent_pid: self(), tag: :worker, meta: %{}})
       end
     end
 
     test "validates parent_id is required" do
-      {:error, _reason} = Orphaned.new(%{reason: :normal})
+      {:error, _reason} =
+        Orphaned.new(%{parent_pid: self(), tag: :worker, meta: %{}, reason: :normal})
     end
   end
 
@@ -115,7 +132,15 @@ defmodule JidoTest.AgentServer.SignalTest do
 
   describe "signal compatibility" do
     test "all signals are valid Jido.Signal structs" do
-      {:ok, orphaned} = Orphaned.new(%{parent_id: "p1", reason: :normal})
+      {:ok, orphaned} =
+        Orphaned.new(%{
+          parent_id: "p1",
+          parent_pid: self(),
+          tag: :worker,
+          meta: %{},
+          reason: :normal
+        })
+
       {:ok, child_exit} = ChildExit.new(%{tag: :t1, pid: self(), reason: :normal})
       {:ok, scheduled} = Scheduled.new(%{message: :msg})
 
@@ -125,7 +150,15 @@ defmodule JidoTest.AgentServer.SignalTest do
     end
 
     test "signals have proper specversion" do
-      {:ok, signal} = Orphaned.new(%{parent_id: "p1", reason: :normal})
+      {:ok, signal} =
+        Orphaned.new(%{
+          parent_id: "p1",
+          parent_pid: self(),
+          tag: :worker,
+          meta: %{},
+          reason: :normal
+        })
+
       assert signal.specversion == "1.0.2"
     end
 

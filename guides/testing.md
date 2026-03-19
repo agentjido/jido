@@ -460,6 +460,75 @@ defmodule HierarchyTest do
 end
 ```
 
+### Testing Orphaning and Adoption
+
+When you use `on_parent_death: :continue` or `:emit_orphan`, test the orphan
+transition explicitly instead of only asserting that the child survived.
+
+```elixir
+test "child becomes orphaned and can be adopted", %{jido: jido} do
+  {:ok, parent_pid} = Jido.start_agent(jido, ParentAgent, id: "parent-1")
+
+  {:ok, _} =
+    AgentServer.call(
+      parent_pid,
+      Signal.new!(
+        "spawn_agent",
+        %{
+          module: ChildAgent,
+          tag: :worker,
+          opts: %{id: "worker-1", on_parent_death: :emit_orphan}
+        },
+        source: "/test"
+      )
+    )
+
+  eventually(fn ->
+    {:ok, children} = Jido.get_children(parent_pid)
+    Map.has_key?(children, :worker)
+  end)
+
+  {:ok, children} = Jido.get_children(parent_pid)
+  child_pid = children.worker
+
+  DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+
+  eventually_state(child_pid, fn state ->
+    state.parent == nil and
+      Map.get(state.agent.state, :__parent__) == nil and
+      state.orphaned_from.id == "parent-1"
+  end)
+
+  {:ok, replacement_pid} = Jido.start_agent(jido, ParentAgent, id: "parent-2")
+
+  {:ok, _} =
+    AgentServer.call(
+      replacement_pid,
+      Signal.new!(
+        "adopt_child",
+        %{child: "worker-1", tag: :worker},
+        source: "/test"
+      )
+    )
+
+  eventually(fn ->
+    {:ok, children} = Jido.get_children(replacement_pid)
+    Map.get(children, :worker) == child_pid
+  end)
+end
+```
+
+Good orphan lifecycle tests should verify:
+
+- `state.parent` and `agent.state.__parent__` are cleared
+- `state.orphaned_from` and `agent.state.__orphaned_from__` are populated
+- `Directive.emit_to_parent/3` returns `nil` while orphaned
+- `jido.agent.orphaned` handlers see detached state, not stale parent routing
+- `Directive.adopt_child/3` restores `Jido.get_children/1` and child-to-parent messaging
+
+For a full acceptance test that reads like user documentation, see
+`test/examples/runtime/orphan_lifecycle_test.exs`.
+
 ## Testing Directive Execution
 
 ```elixir

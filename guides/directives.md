@@ -33,6 +33,7 @@ end
 | `Error` | Signal an error from cmd/2 | — |
 | `Spawn` | Spawn generic BEAM child process | None (fire-and-forget) |
 | `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals, `restart: :transient` default) |
+| `AdoptChild` | Attach an orphaned or unattached child to the current parent | Full (monitoring, parent ref refresh, children map update) |
 | `StopChild` | Gracefully stop and remove a tracked child agent | Uses children map |
 | `Schedule` | Schedule a delayed message | — |
 | `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
@@ -56,6 +57,8 @@ Directive.spawn(child_spec)
 Directive.spawn_agent(MyWorkerAgent, :worker_1)
 Directive.spawn_agent(MyWorkerAgent, :processor, opts: %{initial_state: %{batch_size: 100}})
 Directive.spawn_agent(MyWorkerAgent, :durable, restart: :permanent)
+Directive.adopt_child("worker-123", :recovered_worker)
+Directive.adopt_child(child_pid, :recovered_worker, meta: %{restored: true})
 
 # Stop processes
 Directive.stop_child(:worker_1)
@@ -114,6 +117,24 @@ Directive.spawn_agent(WorkerAgent, :worker_1, opts: %{initial_state: state})
 - abnormal exits still restart the child
 - callers can override to `:permanent` or `:temporary` when needed
 
+Children spawned this way can later become orphaned if `on_parent_death` is set
+to `:continue` or `:emit_orphan`. In that case, `Directive.adopt_child/3` is
+the explicit way to reattach the live child to a new logical parent.
+
+## Parent-Aware Communication
+
+`Directive.emit_to_parent/3` is intentionally strict:
+
+- it works only while `agent.state.__parent__` is present
+- it returns `nil` for standalone agents
+- it returns `nil` for orphaned agents after the runtime clears `__parent__`
+
+That prevents stale routing to a dead coordinator. If a child needs to remember
+where it came from after orphaning, read `agent.state.__orphaned_from__` or
+handle `jido.agent.orphaned` instead of relying on `emit_to_parent/3`.
+
+See [Orphans & Adoption](orphans.md) for the full orphan lifecycle.
+
 ## Custom Directives
 
 External packages can define their own directives:
@@ -162,4 +183,4 @@ When the agent runs this action via `cmd/2`:
 
 See `Jido.Agent.Directive` moduledoc for the complete API reference.
 
-**Related guides:** [State Operations](state-ops.md)
+**Related guides:** [State Operations](state-ops.md), [Orphans & Adoption](orphans.md)
