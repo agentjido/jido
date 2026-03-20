@@ -200,6 +200,41 @@ defmodule JidoTest.AgentServer.HierarchyTest do
 
       assert reason in [:shutdown, :noproc]
     end
+
+    test "child exits with {:shutdown, _} even when parent crashes abnormally", %{jido: jido} do
+      # Start parent linked to test process
+      {:ok, parent_pid} =
+        AgentServer.start_link(agent: ParentAgent, id: "parent-crash-1", jido: jido)
+
+      parent_ref = ParentRef.new!(%{pid: parent_pid, id: "parent-crash-1", tag: :worker})
+
+      # Start child linked to test process (not under DynamicSupervisor)
+      # so it won't be restarted
+      {:ok, child_pid} =
+        AgentServer.start_link(
+          agent: ChildAgent,
+          id: "child-crash-1",
+          parent: parent_ref,
+          on_parent_death: :stop,
+          jido: jido
+        )
+
+      # Verify child is alive and monitoring parent
+      assert Process.alive?(child_pid)
+      child_ref = Process.monitor(child_pid)
+
+      # Crash parent with an abnormal reason.
+      # Trap exits so we don't die along with the linked parent/child.
+      Process.flag(:trap_exit, true)
+      Process.exit(parent_pid, {:function_clause, :simulated_crash})
+
+      # Wait for child to die
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, exit_reason}, 5000
+
+      # The child should always exit with {:shutdown, _} so supervisors
+      # with :transient restart policy do not restart it.
+      assert {:shutdown, {:parent_down, _}} = exit_reason
+    end
   end
 
   describe "on_parent_death: :continue" do
@@ -396,15 +431,13 @@ defmodule JidoTest.AgentServer.HierarchyTest do
       Process.exit(parent_pid, :kill)
 
       # Child should stop when parent dies - reason may be :killed or :noproc
-      # depending on timing (whether parent is still dying or already dead)
-      # :killed is not a benign reason, so it stays unwrapped as {:parent_down, :killed}
-      # :noproc is benign, so it becomes {:shutdown, {:parent_down, :noproc}}
+      # depending on timing (whether parent is still dying or already dead).
+      # All parent-down reasons are wrapped as {:shutdown, {:parent_down, _}}
+      # so supervisors with :transient restart policy do not restart the child.
       assert_receive {:DOWN, ^child_ref, :process, ^child_pid, exit_reason}, 1000
 
-      assert exit_reason in [
-               {:parent_down, :killed},
-               {:shutdown, {:parent_down, :noproc}}
-             ]
+      assert {:shutdown, {:parent_down, inner}} = exit_reason
+      assert inner in [:killed, :noproc]
     end
   end
 
