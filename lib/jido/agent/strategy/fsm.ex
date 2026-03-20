@@ -350,7 +350,7 @@ defmodule Jido.Agent.Strategy.FSM do
 
   defp apply_instruction_result(agent, machine, %{status: :error, reason: reason}) do
     machine = %{machine | error: reason}
-    error = Error.execution_error("Instruction failed", %{reason: reason})
+    error = Error.execution_error("Instruction failed", details: %{reason: reason})
     {agent, machine, [%Directive.Error{error: error, context: :instruction}], :error}
   end
 

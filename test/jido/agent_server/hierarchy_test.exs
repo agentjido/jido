@@ -252,7 +252,6 @@ defmodule JidoTest.AgentServer.HierarchyTest do
       Process.exit(parent_pid, {:function_clause, :simulated_crash})
 
       assert_receive {:DOWN, ^child_ref, :process, ^child_pid, exit_reason}, 5000
-
       assert {:shutdown, {:parent_down, _}} = exit_reason
     end
   end
