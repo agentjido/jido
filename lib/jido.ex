@@ -5,7 +5,8 @@ defmodule Jido do
   alias Jido.Config.Defaults
 
   @moduledoc """
-  自動 (Jido) - A foundational framework for building autonomous, distributed agent systems in Elixir.
+  自動 (Jido) - An autonomous agent framework for Elixir, built for workflows and
+  multi-agent systems.
 
   ## Quick Start
 

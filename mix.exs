@@ -20,7 +20,7 @@ defmodule Jido.MixProject do
       # Docs
       name: "Jido",
       description:
-        "Pure functional agents and OTP runtime for building autonomous multi-agent workflows in Elixir.",
+        "An autonomous agent framework for Elixir, built for workflows and multi-agent systems.",
       source_url: "https://github.com/agentjido/jido",
       homepage_url: "https://github.com/agentjido/jido",
       package: package(),

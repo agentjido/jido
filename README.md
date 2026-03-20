@@ -6,7 +6,10 @@
 [![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
 [![Coverage Status](https://coveralls.io/repos/github/agentjido/jido/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido?branch=main)
 
-> **Pure functional agents and OTP runtime for building autonomous multi-agent workflows in Elixir.**
+> **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
+
+Define agents, connect them to actions, signals, and directives, and run them
+with supervision and fault tolerance built in.
 
 _The name "Jido" (自動) comes from the Japanese word meaning "automatic" or "automated", where 自 (ji) means "self" and 動 (dō) means "movement"._
 
@@ -14,7 +17,20 @@ _Learn more about Jido at [agentjido.xyz](https://agentjido.xyz)._
 
 ## Overview
 
-With Jido, your agents are immutable data structures with a single command function:
+Jido helps you build agent systems as ordinary Elixir and OTP software.
+
+- Agents hold state and implement `cmd/2`
+- Actions do work and transform that state
+- Signals route events into the system
+- Directives describe effects for the runtime to execute
+
+Use Jido when software needs to inspect context, choose among multiple steps,
+coordinate with other agents, and keep running reliably over time.
+
+AI is optional. The core package gives you the agent architecture and runtime;
+companion packages such as `jido_ai` add model integration when you need it.
+
+At the core, Jido agents are immutable data structures with a single command function:
 
 ```elixir
 defmodule MyAgent do

@@ -2,7 +2,11 @@
 
 **After:** You can explain Jido in one sentence: "Signal → Action → cmd/2 → {agent, directives} → runtime executes directives."
 
-This guide explains the mental model behind Jido — an Elm/Redux-inspired agent framework for Elixir.
+This guide explains the mental model behind Jido, an autonomous agent framework
+for Elixir built for workflows and multi-agent systems.
+
+Jido combines immutable agents, actions, signals, directives, and an OTP
+runtime so you can build agent systems as ordinary Elixir software.
 
 ## The Elm/Redux Pattern
 
