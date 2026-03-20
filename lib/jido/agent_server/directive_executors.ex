@@ -190,6 +190,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.AgentServer.{ChildInfo, State}
+  alias Jido.RuntimeStore
+
+  @relationship_hive :relationships
 
   def exec(
         %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
@@ -222,25 +225,37 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
         case DynamicSupervisor.start_child(supervisor, child_spec) do
           {:ok, pid} ->
-            ref = Process.monitor(pid)
+            case persist_relationship(state, child_id, tag, meta) do
+              :ok ->
+                ref = Process.monitor(pid)
 
-            child_info =
-              ChildInfo.new!(%{
-                pid: pid,
-                ref: ref,
-                module: resolve_agent_module(agent),
-                id: child_id,
-                tag: tag,
-                meta: meta
-              })
+                child_info =
+                  ChildInfo.new!(%{
+                    pid: pid,
+                    ref: ref,
+                    module: resolve_agent_module(agent),
+                    id: child_id,
+                    tag: tag,
+                    meta: meta
+                  })
 
-            new_state = State.add_child(state, tag, child_info)
+                new_state = State.add_child(state, tag, child_info)
 
-            Logger.debug(
-              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-            )
+                Logger.debug(
+                  "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
+                )
 
-            {:ok, new_state}
+                {:ok, new_state}
+
+              {:error, reason} ->
+                _ = DynamicSupervisor.terminate_child(supervisor, pid)
+
+                Logger.error(
+                  "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
+                )
+
+                {:ok, state}
+            end
 
           {:error, reason} ->
             Logger.error(
@@ -259,6 +274,91 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   defp resolve_agent_module(agent) when is_atom(agent), do: agent
   defp resolve_agent_module(%{__struct__: module}), do: module
   defp resolve_agent_module(_), do: nil
+
+  defp persist_relationship(state, child_id, tag, meta) do
+    RuntimeStore.put(state.jido, @relationship_hive, child_id, %{
+      parent_id: state.id,
+      tag: tag,
+      meta: normalize_meta(meta)
+    })
+  end
+
+  defp normalize_meta(meta) when is_map(meta), do: meta
+  defp normalize_meta(_meta), do: %{}
+end
+
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
+  @moduledoc false
+
+  require Logger
+
+  alias Jido.AgentServer
+  alias Jido.AgentServer.{ChildInfo, ParentRef, State}
+
+  def exec(%{child: child, tag: tag, meta: meta}, _input_signal, state) do
+    with :ok <- ensure_tag_available(state, tag),
+         {:ok, child_pid} <- resolve_child(child, state),
+         :ok <- ensure_not_self(child_pid),
+         {:ok, child_runtime} <- adopt_child(child_pid, tag, meta, state) do
+      child_info =
+        ChildInfo.new!(%{
+          pid: child_pid,
+          ref: Process.monitor(child_pid),
+          module: child_runtime.agent_module,
+          id: child_runtime.id,
+          tag: tag,
+          meta: meta
+        })
+
+      Logger.debug(
+        "AgentServer #{state.id} adopted child #{child_runtime.id} with tag #{inspect(tag)}"
+      )
+
+      {:ok, State.add_child(state, tag, child_info)}
+    else
+      {:error, reason} ->
+        Logger.warning(
+          "AgentServer #{state.id} failed to adopt child #{inspect(child)} with tag #{inspect(tag)}: #{inspect(reason)}"
+        )
+
+        {:ok, state}
+    end
+  end
+
+  defp ensure_tag_available(state, tag) do
+    case State.get_child(state, tag) do
+      nil -> :ok
+      _child -> {:error, {:tag_in_use, tag}}
+    end
+  end
+
+  defp resolve_child(pid, _state) when is_pid(pid) do
+    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :child_not_alive}
+  end
+
+  defp resolve_child(id, state) when is_binary(id) do
+    case Jido.whereis(state.jido, id) do
+      pid when is_pid(pid) -> {:ok, pid}
+      nil -> {:error, :child_not_found}
+    end
+  end
+
+  defp resolve_child(child, _state), do: {:error, {:invalid_child, child}}
+
+  defp ensure_not_self(pid) when pid == self(), do: {:error, :cannot_adopt_self}
+  defp ensure_not_self(_pid), do: :ok
+
+  defp adopt_child(child_pid, tag, meta, state) do
+    parent_ref =
+      ParentRef.new!(%{
+        pid: self(),
+        id: state.id,
+        tag: tag,
+        meta: meta
+      })
+
+    AgentServer.adopt_parent(child_pid, parent_ref)
+  end
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
@@ -267,7 +367,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
   require Logger
 
   alias Jido.AgentServer.State
+  alias Jido.RuntimeStore
   alias Jido.Tracing.Context, as: TraceContext
+
+  @relationship_hive :relationships
 
   def exec(%{tag: tag, reason: reason}, input_signal, state) do
     case State.get_child(state, tag) do
@@ -275,10 +378,20 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
         {:ok, state}
 
-      %{pid: pid} ->
+      %{pid: pid, id: child_id} ->
         Logger.debug(
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
         )
+
+        case RuntimeStore.delete(state.jido, @relationship_hive, child_id) do
+          :ok ->
+            :ok
+
+          {:error, delete_reason} ->
+            Logger.warning(
+              "AgentServer #{state.id} failed to clear relationship for child #{child_id}: #{inspect(delete_reason)}"
+            )
+        end
 
         stop_signal =
           Jido.Signal.new!(

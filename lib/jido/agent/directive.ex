@@ -25,6 +25,7 @@ defmodule Jido.Agent.Directive do
     * `%Error{}` - Signal an error (wraps `Jido.Error.t()`)
     * `%Spawn{}` - Spawn a generic BEAM child process (fire-and-forget, no tracking)
     * `%SpawnAgent{}` - Spawn a child Jido agent with full hierarchy tracking
+    * `%AdoptChild{}` - Attach an orphaned or unattached child to the current parent
     * `%StopChild{}` - Request a tracked child agent to stop gracefully
     * `%Schedule{}` - Schedule a delayed message
     * `%RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
@@ -61,6 +62,7 @@ defmodule Jido.Agent.Directive do
     Error,
     Spawn,
     SpawnAgent,
+    AdoptChild,
     StopChild,
     Schedule,
     RunInstruction,
@@ -83,6 +85,7 @@ defmodule Jido.Agent.Directive do
           | Error.t()
           | Spawn.t()
           | SpawnAgent.t()
+          | AdoptChild.t()
           | StopChild.t()
           | Schedule.t()
           | RunInstruction.t()
@@ -261,6 +264,14 @@ defmodule Jido.Agent.Directive do
     - Parent monitors the child process
     - Parent tracks child in its children map by tag
     - Child exit signals are delivered to parent as `jido.agent.child.exit`
+    - Child can use `emit_to_parent/3` while attached
+
+    The logical relationship is independent from OTP supervisory ancestry. If
+    the child later becomes orphaned, the current parent ref is cleared and the
+    child must be explicitly reattached with `AdoptChild` before
+    `emit_to_parent/3` works again. The active logical binding is mirrored into
+    `Jido.RuntimeStore`, so child restarts continue to use the current parent
+    relationship instead of stale startup metadata.
 
     ## Fields
 
@@ -317,6 +328,52 @@ defmodule Jido.Agent.Directive do
     defstruct Zoi.Struct.struct_fields(@schema)
 
     @doc "Returns the Zoi schema for SpawnAgent."
+    @spec schema() :: Zoi.schema()
+    def schema, do: @schema
+  end
+
+  # ============================================================================
+  # AdoptChild - Attach an orphaned or unattached child agent
+  # ============================================================================
+
+  defmodule AdoptChild do
+    @moduledoc """
+    Attach an orphaned or unattached child agent to the current parent.
+
+    This directive is the explicit reattachment path for Jido's logical
+    hierarchy. It updates the live child runtime so the child can resume
+    parent-directed communication with `emit_to_parent/3`.
+
+    Adoption is explicit. Jido does not automatically reconnect children
+    when a logical parent restarts.
+
+    Adoption updates the live runtime and the instance `Jido.RuntimeStore`
+    binding, so later child restarts rehydrate the adopted parent relationship.
+
+    ## Fields
+
+    - `child` - Child PID or child agent id to adopt
+    - `tag` - Tag for tracking this adopted child
+    - `meta` - Metadata to write into the child's new parent reference
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                child: Zoi.any(description: "Child PID or child id"),
+                tag: Zoi.any(description: "Tag for tracking this adopted child"),
+                meta:
+                  Zoi.map(description: "Metadata to pass to the adopted child")
+                  |> Zoi.default(%{})
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc "Returns the Zoi schema for AdoptChild."
     @spec schema() :: Zoi.schema()
     def schema, do: @schema
   end
@@ -569,6 +626,36 @@ defmodule Jido.Agent.Directive do
   end
 
   @doc """
+  Creates an AdoptChild directive for explicitly attaching a child to the current parent.
+
+  ## Options
+
+  - `:meta` - Metadata to write into the adopted child's new parent reference (map)
+
+  ## Examples
+
+      Directive.adopt_child(child_pid, :worker_1)
+      Directive.adopt_child("child-agent-id", :worker_1, meta: %{restored: true})
+  """
+  @spec adopt_child(pid() | String.t(), term(), keyword()) :: AdoptChild.t()
+  def adopt_child(child, tag, opts \\ [])
+
+  def adopt_child(child, tag, opts) when is_pid(child) or is_binary(child) do
+    %AdoptChild{
+      child: child,
+      tag: tag,
+      meta: Keyword.get(opts, :meta, %{})
+    }
+  end
+
+  def adopt_child(child, _tag, _opts) do
+    raise Jido.Error.validation_error(
+            "child must be a PID or child id string, got: #{inspect(child)}",
+            field: :child
+          )
+  end
+
+  @doc """
   Creates a StopChild directive to gracefully stop a tracked child agent.
 
   ## Examples
@@ -696,10 +783,14 @@ defmodule Jido.Agent.Directive do
   Creates an Emit directive targeting the agent's parent.
 
   The agent's state must have a `__parent__` field containing a `ParentRef` struct.
-  This field is automatically populated when an agent is spawned via the 
-  `SpawnAgent` directive.
+  This field is automatically populated when an agent is spawned via the
+  `SpawnAgent` directive or explicitly reattached via `AdoptChild`.
 
-  Returns `nil` if the agent has no parent. Use `List.wrap/1` to safely
+  Returns `nil` if the agent has no current parent. Orphaned agents clear
+  `__parent__` during the orphan transition, so `emit_to_parent/3` becomes
+  unavailable until the child is explicitly adopted again. Former parent
+  provenance remains available via `agent.state.__orphaned_from__`, but that
+  field is intentionally not used for routing. Use `List.wrap/1` to safely
   handle the result when building directive lists.
 
   ## Options

@@ -12,7 +12,7 @@ defmodule Jido.AgentServer.State do
 
   require Logger
 
-  alias Jido.AgentServer.{ChildInfo, Options}
+  alias Jido.AgentServer.{ChildInfo, Options, ParentRef}
   alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
 
   @type status :: :initializing | :idle | :processing | :stopping
@@ -46,6 +46,8 @@ defmodule Jido.AgentServer.State do
 
               # Hierarchy
               parent: Zoi.any(description: "Parent reference") |> Zoi.optional(),
+              orphaned_from:
+                Zoi.any(description: "Former parent reference after orphaning") |> Zoi.optional(),
               children: Zoi.map(description: "Map of tag => ChildInfo") |> Zoi.default(%{}),
               on_parent_death:
                 Zoi.atom(description: "Behavior on parent death") |> Zoi.default(:stop),
@@ -168,6 +170,7 @@ defmodule Jido.AgentServer.State do
         signal_call_queue: :queue.new(),
         deferred_async_signals: :queue.new(),
         parent: opts.parent,
+        orphaned_from: nil,
         children: %{},
         on_parent_death: opts.on_parent_death,
         jido: opts.jido,
@@ -202,8 +205,42 @@ defmodule Jido.AgentServer.State do
   defp inject_parent_into_agent(agent, nil), do: agent
 
   defp inject_parent_into_agent(agent, parent) do
-    updated_state = Map.put(agent.state, :__parent__, parent)
-    %{agent | state: updated_state}
+    %{agent | state: put_parent_refs(agent.state, parent, nil)}
+  end
+
+  @doc """
+  Attaches a parent reference to the runtime and agent state.
+  """
+  @spec attach_parent(t(), ParentRef.t()) :: t()
+  def attach_parent(%__MODULE__{} = state, %ParentRef{} = parent) do
+    %{
+      state
+      | parent: parent,
+        orphaned_from: nil,
+        agent: %{state.agent | state: put_parent_refs(state.agent.state, parent, nil)}
+    }
+  end
+
+  @doc """
+  Transitions the runtime into an orphaned state, preserving the former parent.
+  """
+  @spec orphan_parent(t()) :: t()
+  def orphan_parent(%__MODULE__{parent: %ParentRef{} = parent} = state) do
+    %{
+      state
+      | parent: nil,
+        orphaned_from: parent,
+        agent: %{state.agent | state: put_parent_refs(state.agent.state, nil, parent)}
+    }
+  end
+
+  def orphan_parent(%__MODULE__{} = state) do
+    %{
+      state
+      | parent: nil,
+        orphaned_from: nil,
+        agent: %{state.agent | state: put_parent_refs(state.agent.state, nil, nil)}
+    }
   end
 
   @doc """
@@ -315,6 +352,15 @@ defmodule Jido.AgentServer.State do
   def get_child(%__MODULE__{children: children}, tag) do
     Map.get(children, tag)
   end
+
+  defp put_parent_refs(agent_state, parent, orphaned_from) do
+    agent_state
+    |> maybe_put_state_key(:__parent__, parent)
+    |> maybe_put_state_key(:__orphaned_from__, orphaned_from)
+  end
+
+  defp maybe_put_state_key(state, key, nil), do: Map.delete(state, key)
+  defp maybe_put_state_key(state, key, value), do: Map.put(state, key, value)
 
   @doc """
   Increments the error count.

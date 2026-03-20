@@ -95,6 +95,28 @@ defmodule JidoTest.Agent.DirectiveTest do
     end
   end
 
+  describe "adopt_child/3" do
+    test "creates AdoptChild directive for pid" do
+      directive = Directive.adopt_child(self(), :worker_1)
+      assert %Directive.AdoptChild{child: child, tag: :worker_1, meta: %{}} = directive
+      assert child == self()
+    end
+
+    test "creates AdoptChild directive for child id with meta" do
+      directive = Directive.adopt_child("child-123", :worker_1, meta: %{restored: true})
+
+      assert directive.child == "child-123"
+      assert directive.tag == :worker_1
+      assert directive.meta == %{restored: true}
+    end
+
+    test "raises validation error for unsupported child reference" do
+      assert_raise Jido.Error.ValidationError, fn ->
+        Directive.adopt_child(:not_a_pid_or_id, :worker_1)
+      end
+    end
+  end
+
   describe "stop_child/2" do
     test "creates StopChild directive with default reason" do
       directive = Directive.stop_child(:worker_1)
@@ -161,6 +183,11 @@ defmodule JidoTest.Agent.DirectiveTest do
 
     test "returns nil when parent ref is missing pid" do
       agent = %{state: %{__parent__: %{}}}
+      assert Directive.emit_to_parent(agent, %{type: "test"}) == nil
+    end
+
+    test "returns nil when the agent is orphaned" do
+      agent = %{state: %{__orphaned_from__: %{id: "former-parent"}}}
       assert Directive.emit_to_parent(agent, %{type: "test"}) == nil
     end
 
@@ -237,6 +264,7 @@ defmodule JidoTest.Agent.DirectiveTest do
       Directive.Error,
       Directive.Spawn,
       Directive.SpawnAgent,
+      Directive.AdoptChild,
       Directive.StopChild,
       Directive.Schedule,
       Directive.Stop,

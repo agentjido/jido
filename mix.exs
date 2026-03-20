@@ -113,6 +113,7 @@ defmodule Jido.MixProject do
           "guides/ash-integration.md"
         ],
         Advanced: [
+          "guides/orphans.md",
           "guides/fsm-strategy.livemd",
           "guides/errors.md"
         ],
@@ -168,6 +169,7 @@ defmodule Jido.MixProject do
         {"guides/ash-integration.md", title: "Ash Integration"},
 
         # Advanced
+        {"guides/orphans.md", title: "Orphans & Adoption"},
         {"guides/fsm-strategy.livemd", title: "FSM Strategy Deep Dive"},
         {"guides/errors.md", title: "Error Handling"},
 
@@ -223,6 +225,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Directive.Error,
           Jido.Agent.Directive.Spawn,
           Jido.Agent.Directive.SpawnAgent,
+          Jido.Agent.Directive.AdoptChild,
           Jido.Agent.Directive.StopChild,
           Jido.Agent.Directive.Schedule,
           Jido.Agent.Directive.RunInstruction,
@@ -249,6 +252,7 @@ defmodule Jido.MixProject do
           Jido.AgentServer.Options,
           Jido.AgentServer.ErrorPolicy,
           Jido.AgentServer.SignalRouter,
+          Jido.AgentServer.ParentRef,
           Jido.AgentServer.ChildInfo,
           Jido.AgentServer.DirectiveExec,
           Jido.AgentServer.Lifecycle,

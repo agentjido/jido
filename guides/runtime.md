@@ -55,6 +55,16 @@ The AgentServer routes incoming signals using strategy, agent, and plugin route 
 
 ## Parent-Child Hierarchy
 
+### Logical Hierarchy vs OTP Supervision
+
+Jido's parent/child model is a **logical hierarchy**, not nested OTP supervision.
+
+- Parent and child agents are OTP peers under the same supervisor tree.
+- The relationship is tracked with `ParentRef`, child-start signals, and process monitors.
+- Parent death policies such as `on_parent_death: :stop` or `:emit_orphan` describe domain behavior, not OTP ancestry.
+
+This is why a child can survive a logical parent death and become orphaned without becoming an independently supervised OTP child of that parent.
+
 ### Spawning Children
 
 Emit a `SpawnAgent` directive to create a child agent:
@@ -78,6 +88,33 @@ Children can emit signals back to their parent:
 ```elixir
 Directive.emit_to_parent(agent, signal)
 ```
+
+`emit_to_parent/3` only works while the child is currently attached. If the
+child becomes orphaned, `__parent__` is cleared and `emit_to_parent/3` returns
+`nil` until a replacement parent explicitly adopts the child.
+
+### Parent Death, Orphans, and Adoption
+
+`on_parent_death` controls what happens when a logical parent disappears:
+
+| Option | Behavior |
+|--------|----------|
+| `:stop` | Child shuts down |
+| `:continue` | Child stays alive and becomes orphaned silently |
+| `:emit_orphan` | Child stays alive, becomes orphaned, then handles `jido.agent.orphaned` |
+
+When orphaning happens, Jido:
+
+- clears `state.parent`
+- clears `agent.state.__parent__`
+- preserves the former parent in `state.orphaned_from`
+- preserves the former parent in `agent.state.__orphaned_from__`
+
+If you need to reattach the child, use `Directive.adopt_child/3` from the new
+parent. Adoption restores `emit_to_parent/3` and `Jido.get_children/1`, and
+the current binding is mirrored into `Jido.RuntimeStore` so later child
+restarts come back under the adopted parent as well. See
+[Orphans & Adoption](orphans.md) for the full lifecycle and caveats.
 
 ### Stopping Children
 
@@ -242,3 +279,4 @@ The buffer holds up to 500 events by default (configurable via `debug_max_events
 - [Persistence & Storage](storage.md) — Hibernate/thaw and InstanceManager lifecycle
 - [Worker Pools](worker-pools.md) — Pre-warmed agent pools for throughput
 - [Await & Coordination](await.md) — Waiting on agent completion
+- [Orphans & Adoption](orphans.md) — Advanced orphan lifecycle and explicit adoption
