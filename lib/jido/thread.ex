@@ -101,10 +101,12 @@ defmodule Jido.Thread do
   def to_list(%__MODULE__{entries: entries}), do: entries
 
   @doc "Filter entries by kind"
-  @spec filter_by_kind(t(), atom() | [atom()]) :: [Entry.t()]
+  @spec filter_by_kind(t() | nil, atom() | [atom()]) :: [Entry.t()]
   def filter_by_kind(%__MODULE__{entries: entries}, kinds) when is_list(kinds) do
     Enum.filter(entries, &(&1.kind in kinds))
   end
+
+  def filter_by_kind(nil, _kinds), do: []
 
   def filter_by_kind(thread, kind), do: filter_by_kind(thread, [kind])
 

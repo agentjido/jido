@@ -255,6 +255,22 @@ defmodule JidoTest.ThreadTest do
   end
 
   describe "Thread.filter_by_kind/2" do
+    test "returns empty list for missing thread" do
+      task = Task.async(fn -> Thread.filter_by_kind(nil, :message) end)
+
+      result =
+        case Task.yield(task, 10) do
+          {:ok, value} ->
+            value
+
+          nil ->
+            Task.shutdown(task, :brutal_kill)
+            :timeout
+        end
+
+      assert result == []
+    end
+
     test "returns empty list when no matches" do
       thread =
         Thread.new()
