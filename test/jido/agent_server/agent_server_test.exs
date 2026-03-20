@@ -1129,4 +1129,24 @@ defmodule JidoTest.AgentServerTest do
       assert second.payload == %{role: :assistant, content: "second"}
     end
   end
+
+  describe "update_thread_entry_refs/3" do
+    test "updates refs on an existing thread entry", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
+
+      assert :ok =
+               AgentServer.append_thread_entry(pid, %{
+                 kind: :ai_message,
+                 payload: %{role: :user, content: "queued event"},
+                 refs: %{source: :queued_event}
+               })
+
+      assert :ok = AgentServer.update_thread_entry_refs(pid, 0, %{slack_ts: "1234"})
+
+      {:ok, state} = AgentServer.state(pid)
+      thread = Jido.Thread.Agent.get(state.agent)
+
+      assert Jido.Thread.get_entry(thread, 0).refs == %{source: :queued_event, slack_ts: "1234"}
+    end
+  end
 end

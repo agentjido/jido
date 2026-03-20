@@ -265,12 +265,44 @@ defmodule JidoTest.ThreadTest do
       assert Thread.get_entry(updated, 1).refs == %{y: 2}
     end
 
+    test "updates updated_at when refs change" do
+      thread = Thread.new() |> Thread.append(%{kind: :a, refs: %{x: 1}})
+      old_updated_at = thread.updated_at
+
+      Process.sleep(1)
+      updated = Thread.update_entry_refs(thread, 0, %{y: 2})
+
+      assert updated.updated_at > old_updated_at
+    end
+
     test "no-ops when seq does not exist" do
       thread = Thread.new() |> Thread.append(%{kind: :a, refs: %{x: 1}})
+      old_updated_at = thread.updated_at
 
+      Process.sleep(1)
       updated = Thread.update_entry_refs(thread, 99, %{new: true})
 
       assert Thread.get_entry(updated, 0).refs == %{x: 1}
+      assert updated.updated_at == old_updated_at
+    end
+  end
+
+  describe "Thread.apply_checkpoint_overlay/2" do
+    test "rejects invalid ref_updates payloads" do
+      thread = Thread.new() |> Thread.append(%{kind: :message, refs: %{source: :seed}})
+
+      assert {:error, :invalid_overlay_ref_updates} =
+               Thread.apply_checkpoint_overlay(thread, %{ref_updates: [:bad_payload]})
+    end
+
+    test "rejects invalid updated_at payloads" do
+      thread = Thread.new() |> Thread.append(%{kind: :message, refs: %{source: :seed}})
+
+      assert {:error, :invalid_overlay_updated_at} =
+               Thread.apply_checkpoint_overlay(thread, %{
+                 ref_updates: %{},
+                 updated_at: "not-an-int"
+               })
     end
   end
 

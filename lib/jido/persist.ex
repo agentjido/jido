@@ -53,6 +53,8 @@ defmodule Jido.Persist do
   alias Jido.Scheduler
   alias Jido.Thread
 
+  @thread_overlay_key :__thread_overlay__
+
   @type storage_config :: {module(), keyword()}
   @type agent :: struct()
   @type agent_module :: module()
@@ -62,11 +64,12 @@ defmodule Jido.Persist do
   @type thread_pointer :: %{id: String.t(), rev: non_neg_integer()}
 
   @type checkpoint :: %{
-          version: pos_integer(),
-          agent_module: agent_module(),
-          id: term(),
-          state: map() | nil,
-          thread: thread_pointer() | nil
+          required(:version) => pos_integer(),
+          required(:agent_module) => agent_module(),
+          required(:id) => term(),
+          required(:state) => map() | nil,
+          required(:thread) => thread_pointer() | nil,
+          optional(:__thread_overlay__) => map() | nil
         }
 
   @doc """
@@ -365,9 +368,16 @@ defmodule Jido.Persist do
         %Thread{id: id, rev: rev} -> %{id: id, rev: rev}
       end
 
+    thread_overlay =
+      case thread do
+        %Thread{} = thread -> Thread.checkpoint_overlay(thread)
+        nil -> nil
+      end
+
     checkpoint
     |> Map.put(:state, state_without_runtime)
     |> Map.put(:thread, thread_pointer)
+    |> maybe_put_thread_overlay(thread_overlay)
   end
 
   @spec default_checkpoint(agent_module(), agent(), Thread.t() | nil) :: checkpoint()
@@ -394,7 +404,8 @@ defmodule Jido.Persist do
 
     with {:ok, checkpoint} <- validate_checkpoint(checkpoint),
          {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
-         {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
+         {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint),
+         {:ok, agent} <- apply_thread_overlay(agent, checkpoint) do
       agent = attach_scheduler_manifest(agent, checkpoint)
       Logger.debug("Persist.thaw completed for #{inspect(agent_module)} id=#{checkpoint.id}")
       {:ok, agent}
@@ -452,6 +463,48 @@ defmodule Jido.Persist do
       {:error, reason} = error ->
         Logger.error("Persist: failed to load thread #{thread_id}: #{inspect(reason)}")
         error
+    end
+  end
+
+  @spec apply_thread_overlay(agent(), checkpoint()) :: {:ok, agent()} | {:error, term()}
+  defp apply_thread_overlay(agent, checkpoint) do
+    case get_thread_overlay(checkpoint) do
+      nil ->
+        {:ok, agent}
+
+      overlay when is_map(overlay) ->
+        case get_thread(agent) do
+          %Thread{} = thread ->
+            case Thread.apply_checkpoint_overlay(thread, overlay) do
+              {:ok, updated_thread} ->
+                {:ok, attach_thread(agent, updated_thread)}
+
+              {:error, {:missing_entry, seq}} ->
+                Logger.error(
+                  "Persist: thread overlay references missing entry seq=#{inspect(seq)} for #{thread.id}"
+                )
+
+                {:error, :thread_mismatch}
+
+              {:error, reason} = error ->
+                Logger.error(
+                  "Persist: failed to apply thread overlay for #{thread.id}: #{inspect(reason)}"
+                )
+
+                error
+            end
+
+          nil ->
+            Logger.error(
+              "Persist: checkpoint includes thread overlay but no thread was rehydrated"
+            )
+
+            {:error, :missing_thread}
+        end
+
+      invalid_overlay ->
+        Logger.error("Persist: invalid thread overlay #{inspect(invalid_overlay)}")
+        {:error, {:invalid_checkpoint, {:invalid_thread_overlay, invalid_overlay}}}
     end
   end
 
@@ -603,4 +656,22 @@ defmodule Jido.Persist do
   @spec ensure_state_map(term()) :: map()
   defp ensure_state_map(state) when is_map(state), do: state
   defp ensure_state_map(_), do: %{}
+
+  @spec maybe_put_thread_overlay(map(), map() | nil) :: map()
+  defp maybe_put_thread_overlay(checkpoint, nil) do
+    checkpoint
+    |> Map.delete(@thread_overlay_key)
+    |> Map.delete(:thread_overlay)
+  end
+
+  defp maybe_put_thread_overlay(checkpoint, overlay),
+    do: Map.put(checkpoint, @thread_overlay_key, overlay)
+
+  @spec get_thread_overlay(map()) :: map() | nil | term()
+  defp get_thread_overlay(checkpoint) do
+    Map.get(checkpoint, @thread_overlay_key) ||
+      Map.get(checkpoint, :thread_overlay) ||
+      Map.get(checkpoint, "__thread_overlay__") ||
+      Map.get(checkpoint, "thread_overlay")
+  end
 end

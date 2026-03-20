@@ -186,6 +186,29 @@ defmodule JidoTest.PersistTest do
       assert checkpoint.thread == %{id: "thread-2", rev: 2}
     end
 
+    test "carries thread ref updates through checkpoint overlays" do
+      table = unique_table()
+      agent = TestAgent.new(id: "agent-ref-overlay")
+
+      thread =
+        Thread.new(id: "thread-ref-overlay")
+        |> Thread.append(%{kind: :message, payload: %{content: "hello"}, refs: %{source: :seed}})
+        |> Thread.update_entry_refs(0, %{slack_ts: "1234"})
+
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+
+      assert :ok = Persist.hibernate(storage(table), agent)
+
+      {:ok, checkpoint} = ETS.get_checkpoint({TestAgent, "agent-ref-overlay"}, table: table)
+
+      assert checkpoint.thread == %{id: "thread-ref-overlay", rev: 1}
+
+      assert checkpoint.__thread_overlay__ == %{
+               ref_updates: %{0 => %{slack_ts: "1234"}},
+               updated_at: thread.updated_at
+             }
+    end
+
     test "uses custom checkpoint callback when implemented" do
       table = unique_table()
       agent = CustomAgent.new(id: "custom-1")
@@ -340,6 +363,34 @@ defmodule JidoTest.PersistTest do
       rehydrated_thread = thawed.state[:__thread__]
       assert rehydrated_thread.id == "thaw-thread-2"
       assert Thread.entry_count(rehydrated_thread) == 2
+    end
+
+    test "thaws agent with thread ref updates preserved across repeated hibernation" do
+      table = unique_table()
+      agent = TestAgent.new(id: "thaw-ref-updates")
+
+      thread =
+        Thread.new(id: "thaw-ref-thread")
+        |> Thread.append(%{kind: :message, payload: %{content: "hello"}, refs: %{source: :seed}})
+        |> Thread.update_entry_refs(0, %{slack_ts: "1234"})
+
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+
+      :ok = Persist.hibernate(storage(table), agent)
+
+      assert {:ok, thawed} = Persist.thaw(storage(table), TestAgent, "thaw-ref-updates")
+
+      rehydrated_thread = thawed.state[:__thread__]
+      assert Thread.get_entry(rehydrated_thread, 0).refs == %{source: :seed, slack_ts: "1234"}
+      assert rehydrated_thread.updated_at == thread.updated_at
+
+      :ok = Persist.hibernate(storage(table), thawed)
+      assert {:ok, thawed_again} = Persist.thaw(storage(table), TestAgent, "thaw-ref-updates")
+
+      assert Thread.get_entry(thawed_again.state[:__thread__], 0).refs == %{
+               source: :seed,
+               slack_ts: "1234"
+             }
     end
 
     test "uses custom restore callback when implemented" do

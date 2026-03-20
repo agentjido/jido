@@ -37,7 +37,10 @@ defmodule Jido.Thread do
               created_at: Zoi.integer(description: "Creation timestamp (ms)"),
               updated_at: Zoi.integer(description: "Last update timestamp (ms)"),
               metadata: Zoi.map(description: "Arbitrary metadata") |> Zoi.default(%{}),
-              stats: Zoi.map(description: "Cached aggregates") |> Zoi.default(%{entry_count: 0})
+              stats: Zoi.map(description: "Cached aggregates") |> Zoi.default(%{entry_count: 0}),
+              pending_ref_updates:
+                Zoi.map(description: "Internal ref updates awaiting checkpoint replay")
+                |> Zoi.default(%{})
             },
             coerce: true
           )
@@ -58,7 +61,8 @@ defmodule Jido.Thread do
       created_at: now,
       updated_at: now,
       metadata: opts[:metadata] || %{},
-      stats: %{entry_count: 0}
+      stats: %{entry_count: 0},
+      pending_ref_updates: %{}
     }
   end
 
@@ -88,14 +92,68 @@ defmodule Jido.Thread do
   @doc "Merge additional refs into an entry identified by seq"
   @spec update_entry_refs(t(), non_neg_integer(), map()) :: t()
   def update_entry_refs(%__MODULE__{} = thread, seq, new_refs) when is_map(new_refs) do
-    entries =
-      Enum.map(thread.entries, fn
-        %{seq: ^seq} = entry -> %{entry | refs: Map.merge(entry.refs, new_refs)}
-        entry -> entry
-      end)
+    case merge_entry_refs(thread.entries, seq, new_refs) do
+      {:ok, entries, true} ->
+        pending_ref_updates =
+          Map.update(thread.pending_ref_updates, seq, new_refs, &Map.merge(&1, new_refs))
 
-    %{thread | entries: entries}
+        %{
+          thread
+          | entries: entries,
+            updated_at: System.system_time(:millisecond),
+            pending_ref_updates: pending_ref_updates
+        }
+
+      {:ok, _entries, false} ->
+        thread
+
+      {:error, :not_found} ->
+        thread
+    end
   end
+
+  @doc false
+  @spec checkpoint_overlay(t()) :: map() | nil
+  def checkpoint_overlay(%__MODULE__{
+        pending_ref_updates: pending_ref_updates,
+        updated_at: updated_at
+      })
+      when map_size(pending_ref_updates) > 0 do
+    %{ref_updates: pending_ref_updates, updated_at: updated_at}
+  end
+
+  def checkpoint_overlay(%__MODULE__{}), do: nil
+
+  @doc false
+  @spec apply_checkpoint_overlay(t(), map()) :: {:ok, t()} | {:error, term()}
+  def apply_checkpoint_overlay(%__MODULE__{} = thread, overlay) when is_map(overlay) do
+    with {:ok, ref_updates} <- overlay_ref_updates(overlay),
+         {:ok, overlay_updated_at} <- overlay_updated_at(overlay, thread.updated_at) do
+      Enum.reduce_while(ref_updates, {:ok, thread}, fn {raw_seq, refs}, {:ok, acc} ->
+        with {:ok, seq} <- normalize_overlay_seq(raw_seq),
+             {:ok, entries, _changed?} <- merge_entry_refs(acc.entries, seq, refs) do
+          pending_ref_updates =
+            Map.update(acc.pending_ref_updates, seq, refs, &Map.merge(&1, refs))
+
+          updated_thread = %{acc | entries: entries, pending_ref_updates: pending_ref_updates}
+          {:cont, {:ok, updated_thread}}
+        else
+          {:error, :not_found} -> {:halt, {:error, {:missing_entry, raw_seq}}}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+      |> case do
+        {:ok, updated_thread} ->
+          {:ok,
+           %{updated_thread | updated_at: max(updated_thread.updated_at, overlay_updated_at)}}
+
+        {:error, _reason} = error ->
+          error
+      end
+    end
+  end
+
+  def apply_checkpoint_overlay(%__MODULE__{}, _overlay), do: {:error, :invalid_overlay}
 
   @doc "Get last entry"
   @spec last(t()) :: Entry.t() | nil
@@ -128,5 +186,54 @@ defmodule Jido.Thread do
 
   defp generate_id do
     "thread_" <> Jido.Util.generate_id()
+  end
+
+  defp merge_entry_refs(entries, seq, new_refs) when is_integer(seq) and is_map(new_refs) do
+    {entries, {found?, changed?}} =
+      Enum.map_reduce(entries, {false, false}, fn
+        %{seq: ^seq} = entry, {_found?, changed?} ->
+          merged_refs = Map.merge(entry.refs, new_refs)
+
+          updated_entry =
+            if merged_refs == entry.refs, do: entry, else: %{entry | refs: merged_refs}
+
+          {updated_entry, {true, changed? or updated_entry != entry}}
+
+        entry, acc ->
+          {entry, acc}
+      end)
+
+    if found? do
+      {:ok, entries, changed?}
+    else
+      {:error, :not_found}
+    end
+  end
+
+  defp merge_entry_refs(_entries, _seq, _new_refs), do: {:error, :invalid_overlay_refs}
+
+  defp normalize_overlay_seq(seq) when is_integer(seq) and seq >= 0, do: {:ok, seq}
+
+  defp normalize_overlay_seq(seq) when is_binary(seq) do
+    case Integer.parse(seq) do
+      {parsed, ""} when parsed >= 0 -> {:ok, parsed}
+      _ -> {:error, :invalid_overlay_seq}
+    end
+  end
+
+  defp normalize_overlay_seq(_seq), do: {:error, :invalid_overlay_seq}
+
+  defp overlay_ref_updates(overlay) do
+    case Map.get(overlay, :ref_updates) || Map.get(overlay, "ref_updates") || %{} do
+      ref_updates when is_map(ref_updates) -> {:ok, ref_updates}
+      _ -> {:error, :invalid_overlay_ref_updates}
+    end
+  end
+
+  defp overlay_updated_at(overlay, default) do
+    case Map.get(overlay, :updated_at) || Map.get(overlay, "updated_at") || default do
+      updated_at when is_integer(updated_at) -> {:ok, updated_at}
+      _ -> {:error, :invalid_overlay_updated_at}
+    end
   end
 end
