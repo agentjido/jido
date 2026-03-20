@@ -186,6 +186,13 @@ defmodule JidoTest.InstanceTest do
       assert Process.whereis(reg) != nil
     end
 
+    test "starts RuntimeStore as child" do
+      {:ok, _pid} = TestInstance.start_link()
+
+      runtime_store = TestInstance.runtime_store_name()
+      assert Process.whereis(runtime_store) != nil
+    end
+
     test "starts AgentSupervisor as child" do
       {:ok, _pid} = TestInstance.start_link()
 

@@ -183,6 +183,10 @@ defmodule Jido do
       @spec task_supervisor_name() :: atom()
       def task_supervisor_name, do: Jido.task_supervisor_name(__MODULE__)
 
+      @doc "Returns the RuntimeStore name for this Jido instance."
+      @spec runtime_store_name() :: atom()
+      def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
+
       @doc "Hibernate an agent to storage."
       @spec hibernate(Jido.Agent.t()) :: :ok | {:error, term()}
       def hibernate(agent) do
@@ -340,15 +344,19 @@ defmodule Jido do
   @impl true
   def init(opts) do
     name = Keyword.fetch!(opts, :name)
+    runtime_store = runtime_store_name(name)
 
     if otp_app = opts[:otp_app] do
       Jido.Debug.maybe_enable_from_config(otp_app, name)
     end
 
+    :ok = Jido.RuntimeStore.ensure_table(runtime_store)
+
     base_children = [
       {Task.Supervisor,
        name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
       {Registry, keys: :unique, name: registry_name(name)},
+      {Jido.RuntimeStore, name: runtime_store},
       {DynamicSupervisor,
        name: agent_supervisor_name(name),
        strategy: :one_for_one,
@@ -380,6 +388,10 @@ defmodule Jido do
   @doc "Returns the TaskSupervisor name for a Jido instance."
   @spec task_supervisor_name(atom()) :: atom()
   def task_supervisor_name(name), do: Module.concat(name, TaskSupervisor)
+
+  @doc "Returns the RuntimeStore name for a Jido instance."
+  @spec runtime_store_name(atom()) :: atom()
+  def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
 
   @doc "Returns the Scheduler name for a Jido instance."
   @spec scheduler_name(atom()) :: atom()
