@@ -255,6 +255,18 @@ defmodule JidoTest.ThreadTest do
   end
 
   describe "Thread.filter_by_kind/2" do
+    test "returns empty list for missing thread" do
+      assert Thread.filter_by_kind(nil, :message) == []
+    end
+
+    test "raises for invalid thread input" do
+      malformed_thread = :erlang.binary_to_term(:erlang.term_to_binary(%{}))
+
+      assert_raise FunctionClauseError, fn ->
+        Thread.filter_by_kind(malformed_thread, :message)
+      end
+    end
+
     test "returns empty list when no matches" do
       thread =
         Thread.new()
