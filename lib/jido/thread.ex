@@ -108,7 +108,9 @@ defmodule Jido.Thread do
 
   def filter_by_kind(nil, _kinds), do: []
 
-  def filter_by_kind(thread, kind), do: filter_by_kind(thread, [kind])
+  def filter_by_kind(%__MODULE__{} = thread, kind) when is_atom(kind) do
+    filter_by_kind(thread, [kind])
+  end
 
   @doc "Get entries in seq range (inclusive)"
   @spec slice(t(), non_neg_integer(), non_neg_integer()) :: [Entry.t()]
