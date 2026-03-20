@@ -58,7 +58,9 @@ Jido gives you three policies for child behavior when the logical parent dies:
 
 Use orphan survival only when the child owns work that should outlive the
 original coordinator. If you want a replacement coordinator to take over, make
-that handoff explicit with `Directive.adopt_child/3`.
+that handoff explicit with `Directive.adopt_child/3`. The adopted relationship
+is mirrored into `Jido.RuntimeStore`, so future child restarts keep the
+replacement coordinator instead of reverting to the startup parent.
 
 See [Orphans & Adoption](orphans.md) for the full lifecycle, adoption rules,
 and caveats around replacement coordinators.

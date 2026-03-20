@@ -119,7 +119,9 @@ Directive.spawn_agent(WorkerAgent, :worker_1, opts: %{initial_state: state})
 
 Children spawned this way can later become orphaned if `on_parent_death` is set
 to `:continue` or `:emit_orphan`. In that case, `Directive.adopt_child/3` is
-the explicit way to reattach the live child to a new logical parent.
+the explicit way to reattach the live child to a new logical parent. Jido keeps
+the active logical binding in `Jido.RuntimeStore`, so child restarts continue
+to use the current parent relationship after adoption.
 
 ## Parent-Aware Communication
 

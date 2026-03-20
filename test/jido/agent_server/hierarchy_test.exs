@@ -769,6 +769,89 @@ defmodule JidoTest.AgentServer.HierarchyTest do
       GenServer.stop(child_info.pid)
     end
 
+    test "rehydrates the adopted parent after the child restarts", %{jido: jido} do
+      original_parent_id = unique_id("original-parent")
+      replacement_parent_id = unique_id("replacement-parent")
+      child_id = unique_id("restartable-child")
+
+      {:ok, original_parent_pid} =
+        AgentServer.start(agent: ParentAgent, id: original_parent_id, jido: jido)
+
+      spawn_signal =
+        Signal.new!(
+          "spawn_agent",
+          %{
+            module: ChildAgent,
+            tag: :recoverable,
+            opts: %{id: child_id, on_parent_death: :continue}
+          },
+          source: "/test"
+        )
+
+      {:ok, _agent} = AgentServer.call(original_parent_pid, spawn_signal)
+      child_info = await_child(original_parent_pid, :recoverable)
+      original_child_pid = child_info.pid
+      original_child_ref = Process.monitor(original_child_pid)
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), original_parent_pid)
+
+      eventually_state(original_child_pid, fn state ->
+        state.parent == nil and state.orphaned_from.id == original_parent_id
+      end)
+
+      {:ok, replacement_parent_pid} =
+        AgentServer.start(agent: ParentAgent, id: replacement_parent_id, jido: jido)
+
+      adopt_signal =
+        Signal.new!(
+          "adopt_child",
+          %{child: child_id, tag: :recovered, meta: %{restored: true}},
+          source: "/test"
+        )
+
+      {:ok, _agent} = AgentServer.call(replacement_parent_pid, adopt_signal)
+
+      eventually(fn ->
+        case Jido.get_children(replacement_parent_pid) do
+          {:ok, children} -> Map.get(children, :recovered) == original_child_pid
+          _ -> false
+        end
+      end)
+
+      GenServer.stop(original_child_pid, :boom)
+      assert_receive {:DOWN, ^original_child_ref, :process, ^original_child_pid, :boom}, 1_000
+
+      eventually(fn ->
+        case Jido.get_children(replacement_parent_pid) do
+          {:ok, children} ->
+            case Map.get(children, :recovered) do
+              pid when is_pid(pid) -> pid != original_child_pid
+              _ -> false
+            end
+
+          _ ->
+            false
+        end
+      end)
+
+      restarted_child = await_child(replacement_parent_pid, :recovered, 1_000)
+      refute restarted_child.pid == original_child_pid
+      assert restarted_child.id == child_id
+      assert Jido.whereis(jido, child_id) == restarted_child.pid
+
+      {:ok, restarted_state} = AgentServer.state(restarted_child.pid)
+      assert restarted_state.parent.id == replacement_parent_id
+      assert restarted_state.parent.pid == replacement_parent_pid
+      assert restarted_state.parent.tag == :recovered
+      assert restarted_state.parent.meta == %{restored: true}
+      assert restarted_state.orphaned_from == nil
+      assert restarted_state.agent.state.__parent__.id == replacement_parent_id
+      assert Map.get(restarted_state.agent.state, :__orphaned_from__) == nil
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), restarted_child.pid)
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), replacement_parent_pid)
+    end
+
     test "does not adopt a child that is already attached", %{jido: jido} do
       parent_id = unique_id("attached-parent")
       adopter_id = unique_id("adopter")

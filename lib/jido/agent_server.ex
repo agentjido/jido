@@ -160,6 +160,10 @@ defmodule Jido.AgentServer do
   `Jido.Agent.Directive.adopt_child/3`, which refreshes the child's live parent
   reference and monitoring relationship.
 
+  Relationship bindings are mirrored into `Jido.RuntimeStore`, so when a child
+  later restarts it rehydrates its current logical parent from instance runtime
+  state instead of falling back to stale startup metadata.
+
   ## Timeout Diagnostics
 
   When `await_completion/2` times out, it returns a diagnostic map:
@@ -196,6 +200,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
   alias Jido.Config.Defaults
+  alias Jido.RuntimeStore
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
   alias Jido.Signal.Router, as: JidoRouter
@@ -205,6 +210,7 @@ defmodule Jido.AgentServer do
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
   @cron_restart_max_ms 30_000
+  @relationship_hive :relationships
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -858,6 +864,7 @@ defmodule Jido.AgentServer do
     opts = if is_map(raw_opts), do: Map.to_list(raw_opts), else: raw_opts
 
     with {:ok, options} <- Options.new(opts),
+         {:ok, options} <- hydrate_parent_from_runtime_store(options),
          {:ok, agent_module, agent} <- resolve_agent(options),
          {:ok, state} <- State.from_options(options, agent_module, agent),
          :ok <- maybe_register_global(options, state) do
@@ -938,6 +945,7 @@ defmodule Jido.AgentServer do
     # Register plugin schedules (cron jobs)
     state = register_plugin_schedules(state)
     state = register_restored_cron_specs(state)
+    state = maybe_persist_parent_binding(state)
 
     notify_parent_of_startup(state)
 
@@ -1035,16 +1043,22 @@ defmodule Jido.AgentServer do
         {:reply, {:error, :invalid_parent}, state}
 
       true ->
-        new_state =
-          state
-          |> State.attach_parent(parent_ref)
-          |> maybe_monitor_parent()
-          |> State.record_debug_event(:parent_adopted, %{
-            parent_id: parent_ref.id,
-            tag: parent_ref.tag
-          })
+        case persist_parent_binding(state.jido, state.id, parent_ref) do
+          :ok ->
+            new_state =
+              state
+              |> State.attach_parent(parent_ref)
+              |> maybe_monitor_parent()
+              |> State.record_debug_event(:parent_adopted, %{
+                parent_id: parent_ref.id,
+                tag: parent_ref.tag
+              })
 
-        {:reply, {:ok, %{id: new_state.id, agent_module: new_state.agent_module}}, new_state}
+            {:reply, {:ok, %{id: new_state.id, agent_module: new_state.agent_module}}, new_state}
+
+          {:error, reason} ->
+            {:reply, {:error, reason}, state}
+        end
     end
   end
 
@@ -2399,6 +2413,7 @@ defmodule Jido.AgentServer do
   defp notify_parent_of_startup(_state), do: :ok
 
   defp handle_parent_down(%State{on_parent_death: :stop} = state, _pid, reason) do
+    _ = clear_parent_binding(state.jido, state.id)
     stop_reason = wrap_parent_down_reason(reason)
 
     Logger.info(
@@ -2482,6 +2497,8 @@ defmodule Jido.AgentServer do
   defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
 
   defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
+    _ = clear_parent_binding(state.jido, state.id)
+
     orphaned_state =
       state
       |> State.orphan_parent()
@@ -2493,6 +2510,72 @@ defmodule Jido.AgentServer do
 
     {former_parent, orphaned_state}
   end
+
+  defp hydrate_parent_from_runtime_store(%Options{} = options) do
+    case RuntimeStore.fetch(options.jido, @relationship_hive, options.id) do
+      {:ok, %{parent_id: parent_id, tag: tag, meta: meta}} when is_binary(parent_id) ->
+        parent =
+          case Jido.whereis(options.jido, parent_id) do
+            pid when is_pid(pid) ->
+              ParentRef.new!(%{
+                pid: pid,
+                id: parent_id,
+                tag: tag,
+                meta: normalize_parent_meta(meta)
+              })
+
+            nil ->
+              _ = clear_parent_binding(options.jido, options.id)
+              nil
+          end
+
+        {:ok, %{options | parent: parent}}
+
+      {:ok, _other} ->
+        {:ok, options}
+
+      :error ->
+        {:ok, options}
+    end
+  end
+
+  defp maybe_persist_parent_binding(%State{parent: %ParentRef{} = parent} = state) do
+    case RuntimeStore.fetch(state.jido, @relationship_hive, state.id) do
+      {:ok, _binding} ->
+        state
+
+      :error ->
+        case persist_parent_binding(state.jido, state.id, parent) do
+          :ok ->
+            state
+
+          {:error, reason} ->
+            Logger.warning(
+              "AgentServer #{state.id} failed to persist parent binding: #{inspect(reason)}"
+            )
+
+            state
+        end
+    end
+  end
+
+  defp maybe_persist_parent_binding(state), do: state
+
+  defp persist_parent_binding(jido, child_id, %ParentRef{} = parent_ref)
+       when is_atom(jido) and is_binary(child_id) do
+    RuntimeStore.put(jido, @relationship_hive, child_id, %{
+      parent_id: parent_ref.id,
+      tag: parent_ref.tag,
+      meta: normalize_parent_meta(parent_ref.meta)
+    })
+  end
+
+  defp clear_parent_binding(jido, child_id) when is_atom(jido) and is_binary(child_id) do
+    RuntimeStore.delete(jido, @relationship_hive, child_id)
+  end
+
+  defp normalize_parent_meta(meta) when is_map(meta), do: meta
+  defp normalize_parent_meta(_meta), do: %{}
 
   # ---------------------------------------------------------------------------
   # Internal: Telemetry

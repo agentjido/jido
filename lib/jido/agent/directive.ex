@@ -269,7 +269,9 @@ defmodule Jido.Agent.Directive do
     The logical relationship is independent from OTP supervisory ancestry. If
     the child later becomes orphaned, the current parent ref is cleared and the
     child must be explicitly reattached with `AdoptChild` before
-    `emit_to_parent/3` works again.
+    `emit_to_parent/3` works again. The active logical binding is mirrored into
+    `Jido.RuntimeStore`, so child restarts continue to use the current parent
+    relationship instead of stale startup metadata.
 
     ## Fields
 
@@ -345,9 +347,8 @@ defmodule Jido.Agent.Directive do
     Adoption is explicit. Jido does not automatically reconnect children
     when a logical parent restarts.
 
-    This updates the live runtime relationship only. It does not rewrite the
-    child's original startup child spec, so a later child restart still uses
-    the startup configuration that originally created the child.
+    Adoption updates the live runtime and the instance `Jido.RuntimeStore`
+    binding, so later child restarts rehydrate the adopted parent relationship.
 
     ## Fields
 

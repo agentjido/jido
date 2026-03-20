@@ -14,6 +14,8 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
   - orphan state preserves former-parent provenance
   - `Directive.adopt_child/3` restores parent linkage and `Jido.get_children/1`
   - the adopted child can resume sending results to the new parent
+  - an adopted child restart rehydrates the adopted parent binding
+  - a `RuntimeStore` process restart inside the same Jido instance retains bindings
   - a second parent death re-triggers the orphan lifecycle
 
   ## Run
@@ -37,6 +39,7 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.AgentServer.ParentRef
+  alias Jido.RuntimeStore
   alias Jido.Signal
 
   # ===========================================================================
@@ -425,6 +428,233 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
       assert second_orphan_event.can_emit_to_parent == false
 
       GenServer.stop(child_pid)
+    end
+
+    test "adopted children keep the adopted parent after a restart", %{jido: jido} do
+      original_parent_id = unique_id("restart-original")
+      replacement_parent_id = unique_id("restart-replacement")
+      child_id = unique_id("restart-worker")
+
+      {:ok, original_parent_pid} =
+        Jido.start_agent(jido, CoordinatorAgent, id: original_parent_id)
+
+      spawn_signal =
+        Signal.new!(
+          "spawn_recoverable_worker",
+          %{tag: :primary_worker, child_id: child_id},
+          source: "/example"
+        )
+
+      {:ok, _agent} = AgentServer.call(original_parent_pid, spawn_signal)
+      child_pid = await_child_pid(original_parent_pid, :primary_worker)
+      child_ref = Process.monitor(child_pid)
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), original_parent_pid)
+
+      eventually_state(child_pid, fn state ->
+        state.parent == nil and
+          match?(%ParentRef{id: ^original_parent_id}, state.orphaned_from)
+      end)
+
+      {:ok, replacement_parent_pid} =
+        Jido.start_agent(jido, CoordinatorAgent, id: replacement_parent_id)
+
+      adopt_signal =
+        Signal.new!(
+          "adopt_worker",
+          %{child: child_id, tag: :recovered_worker, meta: %{role: "replacement"}},
+          source: "/example"
+        )
+
+      {:ok, _agent} = AgentServer.call(replacement_parent_pid, adopt_signal)
+
+      eventually(fn ->
+        case Jido.get_children(replacement_parent_pid) do
+          {:ok, children} -> Map.get(children, :recovered_worker) == child_pid
+          _ -> false
+        end
+      end)
+
+      GenServer.stop(child_pid, :boom)
+      assert_receive {:DOWN, ^child_ref, :process, ^child_pid, :boom}, 1_000
+
+      eventually(fn ->
+        case Jido.get_children(replacement_parent_pid) do
+          {:ok, children} ->
+            case Map.get(children, :recovered_worker) do
+              pid when is_pid(pid) -> pid != child_pid
+              _ -> false
+            end
+
+          _ ->
+            false
+        end
+      end)
+
+      restarted_child_pid = await_child_pid(replacement_parent_pid, :recovered_worker, 1_000)
+      refute restarted_child_pid == child_pid
+
+      {:ok, restarted_state} = AgentServer.state(restarted_child_pid)
+      assert restarted_state.parent.id == replacement_parent_id
+      assert restarted_state.parent.pid == replacement_parent_pid
+      assert restarted_state.parent.tag == :recovered_worker
+      assert restarted_state.parent.meta == %{role: "replacement"}
+      assert restarted_state.orphaned_from == nil
+      assert restarted_state.agent.state.__parent__.id == replacement_parent_id
+      assert Map.get(restarted_state.agent.state, :__orphaned_from__) == nil
+
+      adopted_report =
+        Signal.new!("worker.report", %{text: "after restart"}, source: "/example")
+
+      {:ok, _agent} = AgentServer.call(restarted_child_pid, adopted_report)
+
+      eventually_state(replacement_parent_pid, fn state ->
+        Enum.any?(state.agent.state.received_messages, fn message ->
+          message.text == "after restart" and
+            message.current_parent_id == replacement_parent_id
+        end)
+      end)
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), replacement_parent_pid)
+
+      eventually_state(restarted_child_pid, fn state ->
+        state.parent == nil and
+          match?(%ParentRef{id: ^replacement_parent_id}, state.orphaned_from) and
+          length(state.agent.state.orphan_events) == 1
+      end)
+
+      GenServer.stop(restarted_child_pid)
+    end
+
+    test "repeated orphan/adopt/restart cycles keep bindings stable", %{jido: jido} do
+      original_parent_id = unique_id("stress-original")
+      child_id = unique_id("stress-worker")
+      runtime_store = Jido.runtime_store_name(jido)
+
+      {:ok, original_parent_pid} =
+        Jido.start_agent(jido, CoordinatorAgent, id: original_parent_id)
+
+      spawn_signal =
+        Signal.new!(
+          "spawn_recoverable_worker",
+          %{tag: :primary_worker, child_id: child_id},
+          source: "/example"
+        )
+
+      {:ok, _agent} = AgentServer.call(original_parent_pid, spawn_signal)
+      child_pid = await_child_pid(original_parent_pid, :primary_worker)
+
+      assert {:ok, %{parent_id: ^original_parent_id, tag: :primary_worker}} =
+               RuntimeStore.fetch(jido, :relationships, child_id)
+
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), original_parent_pid)
+
+      eventually_state(child_pid, fn state ->
+        state.parent == nil and
+          match?(%ParentRef{id: ^original_parent_id}, state.orphaned_from)
+      end)
+
+      assert :error == RuntimeStore.fetch(jido, :relationships, child_id)
+
+      cycles = [
+        %{parent_id: unique_id("stress-replacement"), tag: :cycle_one, meta: %{cycle: 1}},
+        %{parent_id: unique_id("stress-replacement"), tag: :cycle_two, meta: %{cycle: 2}}
+      ]
+
+      final_child_pid =
+        Enum.reduce(cycles, child_pid, fn %{parent_id: parent_id, tag: tag, meta: meta}, pid ->
+          {:ok, parent_pid} = Jido.start_agent(jido, CoordinatorAgent, id: parent_id)
+
+          adopt_signal =
+            Signal.new!(
+              "adopt_worker",
+              %{child: child_id, tag: tag, meta: meta},
+              source: "/example"
+            )
+
+          {:ok, _agent} = AgentServer.call(parent_pid, adopt_signal)
+
+          eventually(fn ->
+            case Jido.get_children(parent_pid) do
+              {:ok, children} -> Map.get(children, tag) == pid
+              _ -> false
+            end
+          end)
+
+          assert {:ok, %{parent_id: ^parent_id, tag: ^tag, meta: ^meta}} =
+                   RuntimeStore.fetch(jido, :relationships, child_id)
+
+          if meta.cycle == 1 do
+            runtime_store_pid = Process.whereis(runtime_store)
+            runtime_store_ref = Process.monitor(runtime_store_pid)
+
+            Process.exit(runtime_store_pid, :kill)
+
+            assert_receive {:DOWN, ^runtime_store_ref, :process, ^runtime_store_pid, :killed},
+                           1_000
+
+            eventually(fn ->
+              case Process.whereis(runtime_store) do
+                restarted_pid when is_pid(restarted_pid) -> restarted_pid != runtime_store_pid
+                _ -> false
+              end
+            end)
+
+            assert {:ok, %{parent_id: ^parent_id, tag: ^tag, meta: ^meta}} =
+                     RuntimeStore.fetch(jido, :relationships, child_id)
+          end
+
+          report_signal =
+            Signal.new!("worker.report", %{text: "cycle #{meta.cycle}"}, source: "/example")
+
+          {:ok, _agent} = AgentServer.call(pid, report_signal)
+
+          eventually_state(parent_pid, fn state ->
+            Enum.any?(state.agent.state.received_messages, fn message ->
+              message.text == "cycle #{meta.cycle}" and message.current_parent_id == parent_id
+            end)
+          end)
+
+          child_ref = Process.monitor(pid)
+          GenServer.stop(pid, :boom)
+          assert_receive {:DOWN, ^child_ref, :process, ^pid, :boom}, 1_000
+
+          eventually(fn ->
+            case Jido.get_children(parent_pid) do
+              {:ok, children} ->
+                case Map.get(children, tag) do
+                  restarted_pid when is_pid(restarted_pid) -> restarted_pid != pid
+                  _ -> false
+                end
+
+              _ ->
+                false
+            end
+          end)
+
+          restarted_child_pid = await_child_pid(parent_pid, tag, 1_000)
+
+          assert {:ok, %{parent_id: ^parent_id, tag: ^tag, meta: ^meta}} =
+                   RuntimeStore.fetch(jido, :relationships, child_id)
+
+          {:ok, restarted_state} = AgentServer.state(restarted_child_pid)
+          assert restarted_state.parent.id == parent_id
+          assert restarted_state.parent.pid == parent_pid
+          assert restarted_state.parent.tag == tag
+          assert restarted_state.parent.meta == meta
+
+          DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+
+          eventually_state(restarted_child_pid, fn state ->
+            state.parent == nil and match?(%ParentRef{id: ^parent_id}, state.orphaned_from)
+          end)
+
+          assert :error == RuntimeStore.fetch(jido, :relationships, child_id)
+
+          restarted_child_pid
+        end)
+
+      GenServer.stop(final_child_pid)
     end
   end
 end

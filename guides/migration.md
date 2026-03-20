@@ -418,6 +418,7 @@ these semantics:
 - `on_parent_death: :continue` and `:emit_orphan` now clear stale current-parent refs
 - orphaned children keep former-parent provenance in `orphaned_from` / `__orphaned_from__`
 - `emit_to_parent/3` returns `nil` while orphaned until a new parent explicitly adopts the child
+- adopted child restarts now rehydrate the current parent binding from `Jido.RuntimeStore`
 
 That behavior is more correct for logical hierarchies, but code that relied on
 stale `state.parent` or `agent.state.__parent__` after parent death must be

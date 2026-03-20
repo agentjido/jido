@@ -111,8 +111,9 @@ When orphaning happens, Jido:
 - preserves the former parent in `agent.state.__orphaned_from__`
 
 If you need to reattach the child, use `Directive.adopt_child/3` from the new
-parent. Adoption restores `emit_to_parent/3` and `Jido.get_children/1`, but it
-does not automatically rewrite the child's original startup spec. See
+parent. Adoption restores `emit_to_parent/3` and `Jido.get_children/1`, and
+the current binding is mirrored into `Jido.RuntimeStore` so later child
+restarts come back under the adopted parent as well. See
 [Orphans & Adoption](orphans.md) for the full lifecycle and caveats.
 
 ### Stopping Children

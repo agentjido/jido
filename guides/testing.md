@@ -525,6 +525,7 @@ Good orphan lifecycle tests should verify:
 - `Directive.emit_to_parent/3` returns `nil` while orphaned
 - `jido.agent.orphaned` handlers see detached state, not stale parent routing
 - `Directive.adopt_child/3` restores `Jido.get_children/1` and child-to-parent messaging
+- an adopted child restart still binds to the adopted parent, not stale startup metadata
 
 For a full acceptance test that reads like user documentation, see
 `test/examples/runtime/orphan_lifecycle_test.exs`.

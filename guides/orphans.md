@@ -149,6 +149,7 @@ After adoption, the child is visible through `Jido.get_children/1` on the new pa
 4. The child survives, becomes orphaned, and receives `jido.agent.orphaned`.
 5. A replacement coordinator explicitly adopts the child by id.
 6. The child resumes parent-directed communication with the new coordinator.
+7. If that child later restarts, it rehydrates the adopted relationship from `Jido.RuntimeStore`.
 
 The canonical runnable example for this flow lives in `test/examples/runtime/orphan_lifecycle_test.exs`.
 
@@ -178,7 +179,7 @@ Use `:emit_orphan` when:
 - Adoption is explicit to avoid accidental dual ownership.
 - Child tags are parent-local ownership keys, not global identity.
 - `emit_to_parent/3` is only for currently attached children. Orphan-aware logic should read `__orphaned_from__` or the `jido.agent.orphaned` payload instead.
-- Adoption updates the **live runtime relationship**. It does not rewrite the original startup child spec. If an adopted child later crashes and restarts, it restarts with its original startup parent configuration, not the adopted parent.
+- The current logical relationship is mirrored into `Jido.RuntimeStore`, which is instance-local and ephemeral. Its ETS table survives `RuntimeStore` process restarts, but it still resets when the owning Jido instance stops.
 
 ## Testing and Evaluation
 
@@ -189,6 +190,7 @@ Treat orphaning as a real lifecycle, not an implementation detail. Good tests sh
 - the orphan signal sees detached state
 - `emit_to_parent/3` returns `nil` while orphaned
 - explicit adoption restores `Jido.get_children/1` and child-to-parent messaging
+- adopted child restarts still bind to the adopted parent
 - a second parent death re-triggers the orphan lifecycle
 
 For a CI-ready acceptance test covering that full path, see `test/examples/runtime/orphan_lifecycle_test.exs`.
