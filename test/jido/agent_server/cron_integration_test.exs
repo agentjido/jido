@@ -245,13 +245,20 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       log =
         capture_log(fn ->
           assert {:ok, _agent} = AgentServer.call(pid, register_signal)
+
+          state =
+            eventually(fn ->
+              case AgentServer.state(pid) do
+                {:ok, state} -> state
+                _ -> nil
+              end
+            end)
+
+          refute Map.has_key?(state.cron_jobs, :invalid_message)
+          refute Map.has_key?(state.cron_specs, :invalid_message)
         end)
 
       assert log =~ "invalid_message"
-
-      {:ok, state} = AgentServer.state(pid)
-      refute Map.has_key?(state.cron_jobs, :invalid_message)
-      refute Map.has_key?(state.cron_specs, :invalid_message)
 
       GenServer.stop(pid)
     end
