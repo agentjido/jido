@@ -251,6 +251,40 @@ defmodule MyAgent do
 end
 ```
 
+### Thread Plugin
+
+The Thread plugin stores `agent.state[:__thread__]` as an append-only journal of
+what happened. Thread entries should be treated as immutable facts.
+
+If external metadata arrives later, append a follow-up entry that points back
+to the original entry instead of updating it in place. The caller supplies a
+stable `entry_id` up front so later events can reference it:
+
+```elixir
+alias Jido.Thread.Agent, as: ThreadAgent
+
+entry_id = "entry_" <> Jido.Util.generate_id()
+
+agent =
+  ThreadAgent.append(agent, %{
+    id: entry_id,
+    kind: :message,
+    payload: %{role: "assistant", content: "hello"}
+  })
+
+agent =
+  ThreadAgent.append(agent, %{
+    kind: :message_committed,
+    payload: %{provider: :slack, remote_id: slack_ts},
+    refs: %{entry_id: entry_id}
+  })
+```
+
+This is the preferred way to model late provider acknowledgements, delivery
+receipts, and similar metadata while preserving thread history. For the
+rationale and a more general pattern, see
+[Persistence & Storage](storage.md#modeling-late-metadata-with-follow-up-events).
+
 ### Memory Plugin
 
 The Memory plugin gives every agent an on-demand cognitive memory container stored at `agent.state[:__memory__]`. Memory is organized into **spaces** — named containers holding either map (key-value) or list (ordered items) data. Two reserved spaces, `:world` and `:tasks`, are created by default. Domain-specific wrappers should be built in your own modules on top of the generic space primitives.

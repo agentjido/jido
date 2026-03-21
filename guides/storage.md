@@ -86,6 +86,54 @@ This prevents:
 - Consistency drift when checkpoint and journal get out of sync
 - Memory bloat in serialized checkpoints
 
+### Modeling Late Metadata with Follow-Up Events
+
+When metadata arrives after an entry has already been appended, record it as a
+new fact instead of mutating the original entry.
+
+This comes up often with external providers. For example, an assistant message
+may be appended to the thread before Slack returns the final message `ts`. In
+that case, supply a stable `entry_id` up front, then append a second entry that
+points back to the original message by `entry_id`:
+
+```elixir
+alias Jido.Thread.Agent, as: ThreadAgent
+
+entry_id = "entry_" <> Jido.Util.generate_id()
+
+agent =
+  ThreadAgent.append(agent, %{
+    id: entry_id,
+    kind: :message,
+    payload: %{role: "assistant", content: "Working on it"}
+  })
+
+agent =
+  ThreadAgent.append(agent, %{
+    kind: :message_committed,
+    payload: %{provider: :slack, remote_id: slack_ts},
+    refs: %{entry_id: entry_id}
+  })
+```
+
+You can also model this as a more generic annotation entry:
+
+```elixir
+agent =
+  ThreadAgent.append(agent, %{
+    kind: :annotation,
+    payload: %{type: :provider_ref, provider: :slack, remote_id: slack_ts},
+    refs: %{entry_id: entry_id}
+  })
+```
+
+This keeps the journal canonical and append-only:
+
+- The original message remains immutable
+- Journal-backed storage and thawed agents see the same history
+- Read models can fold follow-up events into a resolved "message plus provider metadata" view
+- The same pattern works for retries, edits, deletes, delivery failures, and acknowledgements
+
 ### Scheduler Manifest Invariant
 
 Dynamic cron durability is stored as a scheduler manifest under
