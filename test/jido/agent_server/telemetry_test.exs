@@ -1,8 +1,11 @@
 defmodule JidoTest.AgentServer.TelemetryTest do
   use JidoTest.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias Jido.Agent.Directive
   alias Jido.AgentServer
+  alias Jido.Debug
   alias Jido.Signal
   alias JidoTest.TestActions
 
@@ -108,6 +111,46 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :stop], _, metadata}
 
       assert metadata.directive_count == 1
+      assert metadata.directive_types == %{"Emit" => 1}
+
+      GenServer.stop(pid)
+    end
+  end
+
+  describe "action logging integration" do
+    test "suppresses jido_action start logs when args are not full", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-default", jido: jido)
+
+      signal = Signal.new!("increment", %{}, source: "/test")
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _agent} = AgentServer.call(pid, signal)
+        end)
+
+      refute log =~ "Executing JidoTest.TestActions.IncrementAction"
+      refute log =~ "with params:"
+
+      GenServer.stop(pid)
+    end
+
+    test "enables verbose jido_action logs when instance debug is verbose", %{jido: jido} do
+      Debug.enable(jido, :verbose)
+      on_exit(fn -> Debug.disable(jido) end)
+
+      {:ok, pid} =
+        AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-verbose", jido: jido)
+
+      signal = Signal.new!("increment", %{}, source: "/test")
+
+      log =
+        capture_log(fn ->
+          assert {:ok, _agent} = AgentServer.call(pid, signal)
+        end)
+
+      assert log =~ "Executing JidoTest.TestActions.IncrementAction"
+      assert log =~ "with params:"
 
       GenServer.stop(pid)
     end

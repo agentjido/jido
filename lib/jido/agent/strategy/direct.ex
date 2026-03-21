@@ -27,6 +27,7 @@ defmodule Jido.Agent.Strategy.Direct do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.StateOps
   alias Jido.Error
@@ -72,7 +73,10 @@ defmodule Jido.Agent.Strategy.Direct do
   defp run_instruction(agent, %Instruction{} = instruction) do
     instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
-    case Jido.Exec.run(instruction) do
+    exec_opts =
+      ObserveConfig.action_exec_opts(instruction.opts[:__jido_instance__], instruction.opts)
+
+    case Jido.Exec.run(%{instruction | opts: exec_opts}) do
       {:ok, result} when is_map(result) ->
         {StateOps.apply_result(agent, result), [], :ok}
 

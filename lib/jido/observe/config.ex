@@ -143,6 +143,31 @@ defmodule Jido.Observe.Config do
     signal_type in interesting_signal_types(instance)
   end
 
+  @doc """
+  Returns `Jido.Exec` options aligned with the instance observability config.
+
+  Jido action execution only supports coarse logger thresholds, so `:keys_only`
+  and `:none` argument modes are translated into a warning-or-higher threshold
+  to suppress verbose action/context dumps. Full argument logging is only
+  enabled when the instance opts into `log_args: :full` or `Jido.debug(:verbose)`.
+  """
+  @spec action_exec_opts(instance(), keyword()) :: keyword()
+  def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
+    opts
+    |> Keyword.delete(:__jido_instance__)
+    |> Keyword.put_new(:log_level, action_log_level(instance))
+  end
+
+  @doc """
+  Returns the effective `Jido.Exec` logger threshold for the given instance.
+  """
+  @spec action_log_level(instance()) :: Logger.level()
+  def action_log_level(instance \\ nil) do
+    instance
+    |> telemetry_log_level()
+    |> normalize_action_log_level(telemetry_log_args(instance))
+  end
+
   # --- Observe settings ---
 
   @doc "Returns the observability log level for the given instance."
@@ -292,6 +317,23 @@ defmodule Jido.Observe.Config do
 
   defp global_observability(key, default) do
     :jido |> Application.get_env(:observability, []) |> Keyword.get(key, default)
+  end
+
+  defp normalize_action_log_level(level, :full), do: logger_level_for_action(level)
+
+  defp normalize_action_log_level(level, mode) when mode in [:keys_only, :none] do
+    max_logger_level(logger_level_for_action(level), :warning)
+  end
+
+  defp logger_level_for_action(:trace), do: :debug
+  defp logger_level_for_action(level) when level in @observe_log_levels, do: level
+  defp logger_level_for_action(_), do: :warning
+
+  defp max_logger_level(left, right) do
+    case Logger.compare_levels(left, right) do
+      :lt -> right
+      _ -> left
+    end
   end
 
   defp normalize_telemetry_log_level(level) when level in @telemetry_log_levels, do: level
