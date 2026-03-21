@@ -285,6 +285,17 @@ receipts, and similar metadata while preserving thread history. For the
 rationale and a more general pattern, see
 [Persistence & Storage](storage.md#modeling-late-metadata-with-follow-up-events).
 
+When appending from an external process (outside the agent), use
+`Jido.AgentServer.append_thread_entry/2`:
+
+```elixir
+:ok = Jido.AgentServer.append_thread_entry(agent_pid, %{
+  kind: :message_committed,
+  payload: %{provider: :slack, remote_id: slack_ts},
+  refs: %{entry_id: entry_id}
+})
+```
+
 ### Memory Plugin
 
 The Memory plugin gives every agent an on-demand cognitive memory container stored at `agent.state[:__memory__]`. Memory is organized into **spaces** — named containers holding either map (key-value) or list (ordered items) data. Two reserved spaces, `:world` and `:tasks`, are created by default. Domain-specific wrappers should be built in your own modules on top of the generic space primitives.

@@ -1075,4 +1075,58 @@ defmodule JidoTest.AgentServerTest do
       assert priority < 0
     end
   end
+
+  describe "append_thread_entry/2" do
+    test "appends a single entry to agent thread", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
+
+      entry = %{
+        kind: :ai_message,
+        payload: %{role: :user, content: "queued event"},
+        refs: %{source: :queued_event}
+      }
+
+      assert :ok = AgentServer.append_thread_entry(pid, entry)
+
+      {:ok, state} = AgentServer.state(pid)
+      thread = Jido.Thread.Agent.get(state.agent)
+
+      assert thread != nil
+      assert length(thread.entries) == 1
+
+      [appended] = thread.entries
+      assert appended.kind == :ai_message
+      assert appended.payload == %{role: :user, content: "queued event"}
+      assert appended.refs == %{source: :queued_event}
+    end
+
+    test "appends multiple entries at once", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: TestAgent, jido: jido)
+
+      entries = [
+        %{
+          kind: :ai_message,
+          payload: %{role: :user, content: "first"},
+          refs: %{source: :queued_event}
+        },
+        %{
+          kind: :ai_message,
+          payload: %{role: :assistant, content: "second"},
+          refs: %{source: :queued_event}
+        }
+      ]
+
+      assert :ok = AgentServer.append_thread_entry(pid, entries)
+
+      {:ok, state} = AgentServer.state(pid)
+      thread = Jido.Thread.Agent.get(state.agent)
+
+      assert thread != nil
+      assert length(thread.entries) == 2
+
+      [first, second] = thread.entries
+      assert first.payload == %{role: :user, content: "first"}
+      assert second.payload == %{role: :assistant, content: "second"}
+    end
+  end
 end

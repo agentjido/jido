@@ -359,6 +359,14 @@ defmodule Jido.AgentServer do
     end
   end
 
+  @doc "Append one or more entries to the agent's thread from an external process."
+  @spec append_thread_entry(server(), map() | [map()]) :: :ok | {:error, term()}
+  def append_thread_entry(server, entry_or_entries) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:append_thread_entry, entry_or_entries})
+    end
+  end
+
   @doc """
   Wait for an agent to reach a terminal status (`:completed` or `:failed`).
 
@@ -976,6 +984,11 @@ defmodule Jido.AgentServer do
 
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
+  end
+
+  def handle_call({:append_thread_entry, entry_or_entries}, _from, %State{} = state) do
+    agent = Jido.Thread.Agent.append(state.agent, entry_or_entries)
+    {:reply, :ok, State.update_agent(state, agent)}
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
