@@ -2,12 +2,6 @@
 
 <!-- changelog -->
 
-## Unreleased
-
-### Bug Fixes:
-
-* observability: align Jido action logging with instance telemetry config and debug overrides
-
 ## [v2.1.0](https://github.com/agentjido/jido/compare/v2.0.0...v2.1.0) (2026-03-14)
 
 ### Features:
