@@ -115,8 +115,8 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "debug_enabled?/1" do
-    test "true by default (default log level is :debug)" do
-      assert Config.debug_enabled?(nil)
+    test "false by default (default log level is :info)" do
+      refute Config.debug_enabled?(nil)
     end
 
     test "false when log level is info" do
@@ -233,8 +233,8 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "level_enabled?/2" do
-    test "debug is enabled at debug level" do
-      assert Config.level_enabled?(nil, :debug)
+    test "debug is not enabled at info level" do
+      refute Config.level_enabled?(nil, :debug)
     end
 
     test "trace is not enabled at debug level" do
