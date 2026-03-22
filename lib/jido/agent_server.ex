@@ -907,7 +907,12 @@ defmodule Jido.AgentServer do
             do: agent_module.strategy_opts(),
             else: []
 
-        ctx = %{agent_module: agent_module, strategy_opts: strategy_opts}
+        ctx = %{
+          agent_module: agent_module,
+          strategy_opts: strategy_opts,
+          jido_instance: state.jido
+        }
+
         {agent, directives} = strategy.init(state.agent, ctx)
 
         state = State.update_agent(state, agent)
