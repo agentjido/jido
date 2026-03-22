@@ -150,7 +150,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
 
     if lifecycle.storage do
-      persistence_key = {lifecycle.pool, lifecycle.pool_key}
+      persistence_key = Jido.partition_key({lifecycle.pool, lifecycle.pool_key}, state.partition)
       agent = attach_cron_specs(state.agent, cron_specs)
 
       Persist.persist_scheduler_manifest(
@@ -195,7 +195,8 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
         state
 
       true ->
-        persistence_key = {lifecycle.pool, lifecycle.pool_key}
+        persistence_key =
+          Jido.partition_key({lifecycle.pool, lifecycle.pool_key}, state.partition)
 
         case Persist.thaw(lifecycle.storage, state.agent_module, persistence_key) do
           {:ok, restored_agent} ->
@@ -219,7 +220,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
-    persistence_key = {lifecycle.pool, pool_key}
+    persistence_key = Jido.partition_key({lifecycle.pool, pool_key}, state.partition)
     agent = Jido.Scheduler.attach_staged_cron_specs(state.agent, state.cron_specs)
     agent_module = state.agent_module
 

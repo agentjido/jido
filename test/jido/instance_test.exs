@@ -161,6 +161,33 @@ defmodule JidoTest.InstanceTest do
       assert thawed.state[:__thread__].id == "redis-thread"
       assert Thread.entry_count(thawed.state[:__thread__]) == 1
     end
+
+    test "partitioned and unpartitioned checkpoints coexist through an instance module" do
+      module = compile_inline_redis_instance("inline-partition-persist")
+      on_exit(fn -> unload_module(module) end)
+
+      unpartitioned =
+        RedisTestAgent.new(id: "shared-partition-key")
+        |> then(fn agent -> %{agent | state: %{agent.state | counter: 10}} end)
+
+      partitioned =
+        RedisTestAgent.new(id: "shared-partition-key")
+        |> then(fn agent -> %{agent | state: %{agent.state | counter: 20}} end)
+
+      assert :ok = module.hibernate(unpartitioned)
+      assert :ok = module.hibernate(partitioned, partition: :blue)
+
+      assert {:ok, thawed_unpartitioned} = module.thaw(RedisTestAgent, "shared-partition-key")
+
+      assert {:ok, thawed_partitioned} =
+               module.thaw(RedisTestAgent, "shared-partition-key", partition: :blue)
+
+      assert thawed_unpartitioned.state.counter == 10
+      assert Map.get(thawed_unpartitioned.state, :__partition__) == nil
+
+      assert thawed_partitioned.state.counter == 20
+      assert thawed_partitioned.state.__partition__ == :blue
+    end
   end
 
   describe "instance lifecycle" do
@@ -274,6 +301,35 @@ defmodule JidoTest.InstanceTest do
       assert Process.alive?(pid)
       assert :ok = TestInstance.stop_agent(pid)
       refute Process.alive?(pid)
+    end
+
+    test "partitions isolate same agent IDs within one instance" do
+      {:ok, _sup_pid} = TestInstance.start_link()
+
+      {:ok, unpartitioned_pid} = TestInstance.start_agent(Minimal, id: "shared-id")
+      {:ok, alpha_pid} = TestInstance.start_agent(Minimal, id: "shared-id", partition: :alpha)
+      {:ok, beta_pid} = TestInstance.start_agent(Minimal, id: "shared-id", partition: :beta)
+
+      assert unpartitioned_pid != alpha_pid
+      assert alpha_pid != beta_pid
+
+      assert TestInstance.whereis("shared-id") == unpartitioned_pid
+      assert TestInstance.whereis("shared-id", partition: :alpha) == alpha_pid
+      assert TestInstance.whereis("shared-id", partition: :beta) == beta_pid
+
+      assert TestInstance.list_agents() == [{"shared-id", unpartitioned_pid}]
+      assert TestInstance.list_agents(partition: :alpha) == [{"shared-id", alpha_pid}]
+      assert TestInstance.list_agents(partition: :beta) == [{"shared-id", beta_pid}]
+
+      assert TestInstance.agent_count() == 1
+      assert TestInstance.agent_count(partition: :alpha) == 1
+      assert TestInstance.agent_count(partition: :beta) == 1
+
+      assert :ok = TestInstance.stop_agent("shared-id", partition: :alpha)
+      eventually(fn -> TestInstance.whereis("shared-id", partition: :alpha) == nil end)
+
+      assert TestInstance.whereis("shared-id") == unpartitioned_pid
+      assert TestInstance.whereis("shared-id", partition: :beta) == beta_pid
     end
   end
 

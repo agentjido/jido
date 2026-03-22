@@ -22,6 +22,14 @@ defmodule JidoTest.TelemetryTest do
       assert :ok = Telemetry.setup()
       assert :ok = Telemetry.setup()
     end
+
+    test "default metrics do not tag on jido_partition" do
+      metrics = Telemetry.metrics()
+
+      assert Enum.all?(metrics, fn metric ->
+               :jido_partition not in Map.get(metric, :tags, [])
+             end)
+    end
   end
 
   describe "span_agent_cmd/3" do

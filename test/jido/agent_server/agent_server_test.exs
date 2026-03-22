@@ -356,6 +356,35 @@ defmodule JidoTest.AgentServerTest do
     test "whereis/2 returns nil for unknown agent in specific registry", %{jido: jido} do
       assert AgentServer.whereis(Jido.registry_name(jido), "nonexistent-2") == nil
     end
+
+    test "whereis/3 resolves only within the requested partition", %{jido: jido} do
+      {:ok, alpha_pid} =
+        AgentServer.start_link(
+          agent: TestAgent,
+          id: "whereis-shared",
+          jido: jido,
+          partition: :alpha
+        )
+
+      {:ok, beta_pid} =
+        AgentServer.start_link(
+          agent: TestAgent,
+          id: "whereis-shared",
+          jido: jido,
+          partition: :beta
+        )
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared", partition: :alpha) ==
+               alpha_pid
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared", partition: :beta) ==
+               beta_pid
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared") == nil
+
+      GenServer.stop(alpha_pid)
+      GenServer.stop(beta_pid)
+    end
   end
 
   describe "via_tuple/2" do
@@ -367,6 +396,11 @@ defmodule JidoTest.AgentServerTest do
     test "works with custom registry", %{jido: _jido} do
       via = AgentServer.via_tuple("via-test", MyRegistry)
       assert via == {:via, Registry, {MyRegistry, "via-test"}}
+    end
+
+    test "via_tuple/3 creates a partitioned registry key", %{jido: jido} do
+      via = AgentServer.via_tuple("via-test", Jido.registry_name(jido), partition: :alpha)
+      assert via == {:via, Registry, {Jido.registry_name(jido), {:partition, :alpha, "via-test"}}}
     end
   end
 

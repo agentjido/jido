@@ -30,6 +30,9 @@ defmodule Jido.AgentServer.Options do
               jido:
                 Zoi.atom(description: "Jido instance name for registry scoping (default: Jido)")
                 |> Zoi.optional(),
+              partition:
+                Zoi.any(description: "Logical partition within a Jido instance")
+                |> Zoi.optional(),
               id:
                 Zoi.string(description: "Instance ID (auto-generated if not provided)")
                 |> Zoi.optional(),

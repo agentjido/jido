@@ -83,7 +83,8 @@ defmodule Jido.Agent.Strategy do
   @type context :: %{
           required(:agent_module) => module(),
           required(:strategy_opts) => keyword(),
-          optional(:jido_instance) => atom() | nil
+          optional(:jido_instance) => atom() | nil,
+          optional(:partition) => term() | nil
         }
 
   @type status :: :idle | :running | :waiting | :success | :failure

@@ -97,6 +97,7 @@ defmodule Jido.MixProject do
         Operations: [
           "guides/debugging.md",
           "guides/observability.md",
+          "guides/multi-tenancy.md",
           "guides/testing.md",
           "guides/configuration.md",
           "guides/storage.md",
@@ -153,6 +154,7 @@ defmodule Jido.MixProject do
         # Operations
         {"guides/debugging.md", title: "Debugging"},
         {"guides/observability.md", title: "Observability"},
+        {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
         {"guides/testing.md", title: "Testing"},
         {"guides/configuration.md", title: "Configuration"},
         {"guides/storage.md", title: "Persistence & Storage"},

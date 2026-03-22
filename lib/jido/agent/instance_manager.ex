@@ -141,6 +141,7 @@ defmodule Jido.Agent.InstanceManager do
       name: name,
       agent: Keyword.fetch!(opts, :agent),
       jido: jido,
+      partition: resolve_manager_partition(opts),
       idle_timeout: Keyword.get(opts, :idle_timeout, :infinity),
       storage: resolve_manager_storage(opts, jido),
       agent_opts: Keyword.get(opts, :agent_opts, [])
@@ -186,7 +187,7 @@ defmodule Jido.Agent.InstanceManager do
   """
   @spec get(manager_name(), key(), keyword()) :: {:ok, pid()} | {:error, term()}
   def get(manager, key, opts \\ []) do
-    case lookup(manager, key) do
+    case lookup(manager, key, opts) do
       {:ok, pid} ->
         {:ok, pid}
 
@@ -203,9 +204,11 @@ defmodule Jido.Agent.InstanceManager do
       {:ok, pid} = Jido.Agent.InstanceManager.lookup(:sessions, "user-123")
       :error = Jido.Agent.InstanceManager.lookup(:sessions, "nonexistent")
   """
-  @spec lookup(manager_name(), key()) :: {:ok, pid()} | :error
-  def lookup(manager, key) do
-    case Registry.lookup(registry_name(manager), key) do
+  @spec lookup(manager_name(), key(), keyword()) :: {:ok, pid()} | :error
+  def lookup(manager, key, opts \\ []) do
+    partition = effective_partition(get_config(manager), opts)
+
+    case Registry.lookup(registry_name(manager), manager_registry_key(key, partition)) do
       [{pid, _}] ->
         if Process.alive?(pid) do
           {:ok, pid}
@@ -229,9 +232,9 @@ defmodule Jido.Agent.InstanceManager do
       :ok = Jido.Agent.InstanceManager.stop(:sessions, "user-123")
       {:error, :not_found} = Jido.Agent.InstanceManager.stop(:sessions, "nonexistent")
   """
-  @spec stop(manager_name(), key()) :: :ok | {:error, :not_found}
-  def stop(manager, key) do
-    case lookup(manager, key) do
+  @spec stop(manager_name(), key(), keyword()) :: :ok | {:error, :not_found}
+  def stop(manager, key, opts \\ []) do
+    case lookup(manager, key, opts) do
       {:ok, pid} ->
         # Use GenServer.stop for graceful shutdown (triggers terminate/2 with :shutdown)
         # This ensures hibernate happens before the process exits
@@ -254,10 +257,20 @@ defmodule Jido.Agent.InstanceManager do
 
       %{count: 5, keys: [...]} = Jido.Agent.InstanceManager.stats(:sessions)
   """
-  @spec stats(manager_name()) :: %{count: non_neg_integer(), keys: [key()]}
-  def stats(manager) do
+  @spec stats(manager_name(), keyword()) :: %{count: non_neg_integer(), keys: [key()]}
+  def stats(manager, opts \\ []) do
+    partition = effective_partition(get_config(manager), opts)
     entries = Registry.select(registry_name(manager), [{{:"$1", :_, :_}, [], [:"$1"]}])
-    %{count: length(entries), keys: entries}
+
+    keys =
+      Enum.flat_map(entries, fn entry ->
+        case Jido.unwrap_partition_key(entry) do
+          {^partition, key} -> [key]
+          _other -> []
+        end
+      end)
+
+    %{count: length(keys), keys: keys}
   end
 
   # ---------------------------------------------------------------------------
@@ -266,11 +279,12 @@ defmodule Jido.Agent.InstanceManager do
 
   defp start_agent(manager, key, opts) do
     config = get_config(manager)
+    partition = effective_partition(config, opts)
 
     # Try to thaw from storage first
-    agent_or_nil = maybe_thaw(config, key)
+    agent_or_nil = maybe_thaw(config, key, partition)
 
-    child_spec = build_child_spec(config, key, agent_or_nil, opts)
+    child_spec = build_child_spec(config, key, agent_or_nil, opts, partition)
 
     case DynamicSupervisor.start_child(dynamic_supervisor_name(manager), child_spec) do
       {:ok, pid} ->
@@ -285,12 +299,13 @@ defmodule Jido.Agent.InstanceManager do
     end
   end
 
-  defp build_child_spec(config, key, agent_or_nil, opts) do
+  defp build_child_spec(config, key, agent_or_nil, opts, partition) do
     initial_state = Keyword.get(opts, :initial_state, %{})
 
     agent_opts =
       config.agent_opts
       |> Keyword.put_new(:jido, config.jido)
+      |> Keyword.put(:partition, partition)
       |> Keyword.put(:registry, registry_name(config.name))
       |> Keyword.put(:register_global, false)
 
@@ -300,7 +315,8 @@ defmodule Jido.Agent.InstanceManager do
         # When thawing from storage we pass a struct, so keep the module explicit.
         agent_module: config.agent,
         id: key_to_id(key),
-        name: {:via, Registry, {registry_name(config.name), key}},
+        name:
+          {:via, Registry, {registry_name(config.name), manager_registry_key(key, partition)}},
         # Instance manager lifecycle options
         lifecycle_mod: Jido.AgentServer.Lifecycle.Keyed,
         pool: config.name,
@@ -322,10 +338,10 @@ defmodule Jido.Agent.InstanceManager do
     Supervisor.child_spec({Jido.AgentServer, base_opts}, restart: :transient)
   end
 
-  defp maybe_thaw(%{storage: nil}, _key), do: nil
+  defp maybe_thaw(%{storage: nil}, _key, _partition), do: nil
 
-  defp maybe_thaw(%{name: manager_name, storage: storage, agent: agent_module}, key) do
-    persistence_key = manager_persistence_key(manager_name, key)
+  defp maybe_thaw(%{name: manager_name, storage: storage, agent: agent_module}, key, partition) do
+    persistence_key = manager_persistence_key(manager_name, key, partition)
 
     case Persist.thaw(storage, agent_module, persistence_key) do
       {:ok, agent} ->
@@ -359,6 +375,10 @@ defmodule Jido.Agent.InstanceManager do
     Keyword.get(opts, :jido) || Keyword.get(Keyword.get(opts, :agent_opts, []), :jido, Jido)
   end
 
+  defp resolve_manager_partition(opts) do
+    Keyword.get(opts, :partition, Keyword.get(Keyword.get(opts, :agent_opts, []), :partition))
+  end
+
   defp resolve_manager_storage(opts, jido) do
     if Keyword.has_key?(opts, :storage) do
       case Keyword.get(opts, :storage) do
@@ -380,6 +400,10 @@ defmodule Jido.Agent.InstanceManager do
 
   defp get_config(manager) do
     :persistent_term.get({__MODULE__, manager})
+  end
+
+  defp effective_partition(config, opts) do
+    Keyword.get(opts, :partition, config.partition)
   end
 
   defp resolve_registry_partitions(opts) do
@@ -405,7 +429,11 @@ defmodule Jido.Agent.InstanceManager do
     "key_" <> digest
   end
 
-  defp manager_persistence_key(manager_name, key), do: {manager_name, key}
+  defp manager_registry_key(key, partition), do: Jido.partition_key(key, partition)
+
+  defp manager_persistence_key(manager_name, key, partition) do
+    Jido.partition_key({manager_name, key}, partition)
+  end
 
   # ---------------------------------------------------------------------------
   # Internal: Naming

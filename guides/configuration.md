@@ -324,6 +324,16 @@ config :my_app, MyApp.TenantB.Jido,
   max_tasks: 1000
 ```
 
+This is Jido's hard-isolation model. For shared-instance logical isolation, use
+`partition:` on agent APIs inside a single instance:
+
+```elixir
+{:ok, _pid} = MyApp.Jido.start_agent(MyApp.Agent, id: "agent-1", partition: :tenant_a)
+pid = MyApp.Jido.whereis("agent-1", partition: :tenant_a)
+```
+
+See [Multi-Tenancy](multi-tenancy.md) for the full model and tradeoffs.
+
 ## Testing Configuration
 
 For tests, use `JidoTest.Case` which provides an isolated Jido instance:

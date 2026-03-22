@@ -666,7 +666,8 @@ defmodule Jido.Telemetry do
       agent_id: agent.id,
       agent_module: agent.name,
       action: action,
-      jido_instance: nil
+      jido_instance: nil,
+      jido_partition: nil
     }
 
     :telemetry.execute(
@@ -721,7 +722,8 @@ defmodule Jido.Telemetry do
     metadata = %{
       agent_id: agent.id,
       strategy: strategy_module,
-      jido_instance: nil
+      jido_instance: nil,
+      jido_partition: nil
     }
 
     :telemetry.execute(

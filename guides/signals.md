@@ -68,8 +68,13 @@ signal = Jido.Signal.new!("increment", %{amount: 10}, source: "/user")
 # Custom timeout
 {:ok, agent} = Jido.AgentServer.call(pid, signal, 10_000)
 
-# Using agent ID instead of pid (requires registry)
-{:ok, agent} = Jido.AgentServer.call("agent-id", signal)
+# Resolve the pid from your Jido instance first
+pid = MyApp.Jido.whereis("agent-id")
+{:ok, agent} = Jido.AgentServer.call(pid, signal)
+
+# Partitioned lookup
+pid = MyApp.Jido.whereis("agent-id", partition: :tenant_a)
+{:ok, agent} = Jido.AgentServer.call(pid, signal)
 ```
 
 ### Asynchronous (cast)
@@ -80,7 +85,9 @@ Use `cast/2` for fire-and-forget signals:
 signal = Jido.Signal.new!("background.task", %{task_id: "abc"}, source: "/scheduler")
 
 :ok = Jido.AgentServer.cast(pid, signal)
-:ok = Jido.AgentServer.cast("agent-id", signal)
+
+pid = MyApp.Jido.whereis("agent-id")
+:ok = Jido.AgentServer.cast(pid, signal)
 ```
 
 ## Signal Routing

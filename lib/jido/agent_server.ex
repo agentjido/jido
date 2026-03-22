@@ -568,7 +568,15 @@ defmodule Jido.AgentServer do
   """
   @spec whereis(module(), String.t()) :: pid() | nil
   def whereis(registry, id) when is_atom(registry) and is_binary(id) do
-    case Registry.lookup(registry, id) do
+    whereis(registry, id, [])
+  end
+
+  @spec whereis(module(), String.t(), keyword()) :: pid() | nil
+  def whereis(registry, id, opts)
+      when is_atom(registry) and is_binary(id) and is_list(opts) do
+    key = Jido.partition_key(id, Keyword.get(opts, :partition))
+
+    case Registry.lookup(registry, key) do
       [{pid, _}] -> pid
       [] -> nil
     end
@@ -582,9 +590,15 @@ defmodule Jido.AgentServer do
       name = Jido.AgentServer.via_tuple("agent-id", MyApp.Jido.Registry)
       GenServer.call(name, :get_state)
   """
-  @spec via_tuple(String.t(), module()) :: {:via, Registry, {module(), String.t()}}
+  @spec via_tuple(String.t(), module()) :: {:via, Registry, {module(), term()}}
   def via_tuple(id, registry) when is_binary(id) and is_atom(registry) do
-    {:via, Registry, {registry, id}}
+    via_tuple(id, registry, [])
+  end
+
+  @spec via_tuple(String.t(), module(), keyword()) :: {:via, Registry, {module(), term()}}
+  def via_tuple(id, registry, opts)
+      when is_binary(id) and is_atom(registry) and is_list(opts) do
+    {:via, Registry, {registry, Jido.partition_key(id, Keyword.get(opts, :partition))}}
   end
 
   @doc """
@@ -602,7 +616,8 @@ defmodule Jido.AgentServer do
 
   @doc false
   @spec adopt_parent(server(), ParentRef.t()) ::
-          {:ok, %{id: String.t(), agent_module: module()}} | {:error, term()}
+          {:ok, %{id: String.t(), agent_module: module(), partition: term() | nil}}
+          | {:error, term()}
   def adopt_parent(server, %ParentRef{} = parent_ref) do
     with {:ok, pid} <- resolve_server(server) do
       try do
@@ -847,7 +862,8 @@ defmodule Jido.AgentServer do
         %{
           agent_id: state.id,
           agent_module: state.agent_module,
-          jido_instance: state.jido
+          jido_instance: state.jido,
+          jido_partition: state.partition
         },
         metadata
       )
@@ -882,7 +898,7 @@ defmodule Jido.AgentServer do
   defp maybe_register_global(%Options{register_global: false}, _state), do: :ok
 
   defp maybe_register_global(%Options{register_global: true}, state) do
-    case Registry.register(state.registry, state.id, %{}) do
+    case Registry.register(state.registry, Jido.partition_key(state.id, state.partition), %{}) do
       {:ok, _} ->
         :ok
 
@@ -910,7 +926,8 @@ defmodule Jido.AgentServer do
         ctx = %{
           agent_module: agent_module,
           strategy_opts: strategy_opts,
-          jido_instance: state.jido
+          jido_instance: state.jido,
+          partition: state.partition
         }
 
         {agent, directives} = strategy.init(state.agent, ctx)
@@ -1049,7 +1066,7 @@ defmodule Jido.AgentServer do
         {:reply, {:error, :invalid_parent}, state}
 
       true ->
-        case persist_parent_binding(state.jido, state.id, parent_ref) do
+        case persist_parent_binding(state.jido, state.id, state.partition, parent_ref) do
           :ok ->
             new_state =
               state
@@ -1060,7 +1077,13 @@ defmodule Jido.AgentServer do
                 tag: parent_ref.tag
               })
 
-            {:reply, {:ok, %{id: new_state.id, agent_module: new_state.agent_module}}, new_state}
+            {:reply,
+             {:ok,
+              %{
+                id: new_state.id,
+                agent_module: new_state.agent_module,
+                partition: new_state.partition
+              }}, new_state}
 
           {:error, reason} ->
             {:reply, {:error, reason}, state}
@@ -1421,7 +1444,10 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      state.agent_module.cmd(state.agent, action_arg, __jido_instance__: state.jido)
+      state.agent_module.cmd(state.agent, action_arg,
+        __jido_instance__: state.jido,
+        __partition__: state.partition
+      )
 
     {:ok, agent, List.wrap(directives), action_arg}
   end
@@ -1556,7 +1582,8 @@ defmodule Jido.AgentServer do
       agent_id: state.id,
       agent_module: state.agent_module,
       signal_type: signal.type,
-      jido_instance: state.jido
+      jido_instance: state.jido,
+      jido_partition: state.partition
     }
     |> Map.merge(trace_metadata)
   end
@@ -1585,6 +1612,7 @@ defmodule Jido.AgentServer do
          true <- is_binary(child_id),
          true <- is_atom(child_module) do
       meta = Map.get(data, :meta, %{})
+      child_partition = Map.get(data, :child_partition)
 
       case State.get_child(state, tag) do
         %ChildInfo{pid: ^pid} ->
@@ -1592,10 +1620,10 @@ defmodule Jido.AgentServer do
 
         %ChildInfo{ref: ref} ->
           Process.demonitor(ref, [:flush])
-          track_child_started(state, pid, child_module, child_id, tag, meta)
+          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
 
         nil ->
-          track_child_started(state, pid, child_module, child_id, tag, meta)
+          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
       end
     else
       _ -> state
@@ -1604,7 +1632,7 @@ defmodule Jido.AgentServer do
 
   defp maybe_track_child_started(state, _signal), do: state
 
-  defp track_child_started(state, pid, child_module, child_id, tag, meta) do
+  defp track_child_started(state, pid, child_module, child_id, child_partition, tag, meta) do
     ref = Process.monitor(pid)
 
     child_info =
@@ -1613,6 +1641,7 @@ defmodule Jido.AgentServer do
         ref: ref,
         module: child_module,
         id: child_id,
+        partition: child_partition,
         tag: tag,
         meta: meta
       })
@@ -1683,7 +1712,11 @@ defmodule Jido.AgentServer do
         other -> other
       end
 
-    {agent, directives} = agent_module.cmd(state.agent, action_arg, __jido_instance__: state.jido)
+    {agent, directives} =
+      agent_module.cmd(state.agent, action_arg,
+        __jido_instance__: state.jido,
+        __partition__: state.partition
+      )
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1849,7 +1882,9 @@ defmodule Jido.AgentServer do
       plugin: spec.module,
       plugin_spec: spec,
       plugin_instance: instance,
-      config: spec.config || %{}
+      config: spec.config || %{},
+      jido_instance: state.jido,
+      partition: state.partition
     }
 
     try do
@@ -1909,7 +1944,9 @@ defmodule Jido.AgentServer do
         plugin: spec.module,
         plugin_spec: spec,
         plugin_instance: instance,
-        config: spec.config || %{}
+        config: spec.config || %{},
+        jido_instance: state.jido,
+        partition: state.partition
       }
 
       try do
@@ -2025,11 +2062,12 @@ defmodule Jido.AgentServer do
 
     Enum.reduce(plugin_specs, state, fn spec, acc_state ->
       context = %{
-        agent_ref: via_tuple(acc_state.id, acc_state.registry),
+        agent_ref: via_tuple(acc_state.id, acc_state.registry, partition: acc_state.partition),
         agent_id: acc_state.id,
         agent_module: agent_module,
         plugin_spec: spec,
-        jido_instance: acc_state.jido
+        jido_instance: acc_state.jido,
+        partition: acc_state.partition
       }
 
       config = spec.config || %{}
@@ -2384,7 +2422,7 @@ defmodule Jido.AgentServer do
     # String IDs require explicit registry lookup via Jido.whereis/2
     {:error,
      {:invalid_server,
-      "String IDs require explicit registry lookup. Use Jido.whereis(MyApp.Jido, \"#{id}\") first or pass the pid directly."}}
+      "String IDs require explicit registry lookup. Use Jido.whereis(MyApp.Jido, \"#{id}\", partition: ...) first or pass the pid directly."}}
   end
 
   defp resolve_server(_), do: {:error, :invalid_server}
@@ -2407,6 +2445,7 @@ defmodule Jido.AgentServer do
         %{
           parent_id: parent.id,
           child_id: state.id,
+          child_partition: state.partition,
           child_module: state.agent_module,
           tag: parent.tag,
           pid: self(),
@@ -2428,7 +2467,7 @@ defmodule Jido.AgentServer do
   defp notify_parent_of_startup(_state), do: :ok
 
   defp handle_parent_down(%State{on_parent_death: :stop} = state, _pid, reason) do
-    _ = clear_parent_binding(state.jido, state.id)
+    _ = clear_parent_binding(state.jido, state.id, state.partition)
     stop_reason = wrap_parent_down_reason(reason)
 
     Logger.info(
@@ -2512,7 +2551,7 @@ defmodule Jido.AgentServer do
   defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
 
   defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
-    _ = clear_parent_binding(state.jido, state.id)
+    _ = clear_parent_binding(state.jido, state.id, state.partition)
 
     orphaned_state =
       state
@@ -2527,20 +2566,27 @@ defmodule Jido.AgentServer do
   end
 
   defp hydrate_parent_from_runtime_store(%Options{} = options) do
-    case RuntimeStore.fetch(options.jido, @relationship_hive, options.id) do
-      {:ok, %{parent_id: parent_id, tag: tag, meta: meta}} when is_binary(parent_id) ->
+    case RuntimeStore.fetch(
+           options.jido,
+           @relationship_hive,
+           Jido.partition_key(options.id, options.partition)
+         ) do
+      {:ok, %{parent_id: parent_id, tag: tag, meta: meta} = binding} when is_binary(parent_id) ->
+        parent_partition = Map.get(binding, :parent_partition)
+
         parent =
-          case Jido.whereis(options.jido, parent_id) do
+          case Jido.whereis(options.jido, parent_id, partition: parent_partition) do
             pid when is_pid(pid) ->
               ParentRef.new!(%{
                 pid: pid,
                 id: parent_id,
+                partition: parent_partition,
                 tag: tag,
                 meta: normalize_parent_meta(meta)
               })
 
             nil ->
-              _ = clear_parent_binding(options.jido, options.id)
+              _ = clear_parent_binding(options.jido, options.id, options.partition)
               nil
           end
 
@@ -2555,12 +2601,16 @@ defmodule Jido.AgentServer do
   end
 
   defp maybe_persist_parent_binding(%State{parent: %ParentRef{} = parent} = state) do
-    case RuntimeStore.fetch(state.jido, @relationship_hive, state.id) do
+    case RuntimeStore.fetch(
+           state.jido,
+           @relationship_hive,
+           Jido.partition_key(state.id, state.partition)
+         ) do
       {:ok, _binding} ->
         state
 
       :error ->
-        case persist_parent_binding(state.jido, state.id, parent) do
+        case persist_parent_binding(state.jido, state.id, state.partition, parent) do
           :ok ->
             state
 
@@ -2576,17 +2626,19 @@ defmodule Jido.AgentServer do
 
   defp maybe_persist_parent_binding(state), do: state
 
-  defp persist_parent_binding(jido, child_id, %ParentRef{} = parent_ref)
+  defp persist_parent_binding(jido, child_id, child_partition, %ParentRef{} = parent_ref)
        when is_atom(jido) and is_binary(child_id) do
-    RuntimeStore.put(jido, @relationship_hive, child_id, %{
+    RuntimeStore.put(jido, @relationship_hive, Jido.partition_key(child_id, child_partition), %{
       parent_id: parent_ref.id,
+      parent_partition: parent_ref.partition,
       tag: parent_ref.tag,
       meta: normalize_parent_meta(parent_ref.meta)
     })
   end
 
-  defp clear_parent_binding(jido, child_id) when is_atom(jido) and is_binary(child_id) do
-    RuntimeStore.delete(jido, @relationship_hive, child_id)
+  defp clear_parent_binding(jido, child_id, child_partition)
+       when is_atom(jido) and is_binary(child_id) do
+    RuntimeStore.delete(jido, @relationship_hive, Jido.partition_key(child_id, child_partition))
   end
 
   defp normalize_parent_meta(meta) when is_map(meta), do: meta
@@ -2618,7 +2670,8 @@ defmodule Jido.AgentServer do
         directive_type: directive_type,
         directive: directive,
         signal_type: signal.type,
-        jido_instance: state.jido
+        jido_instance: state.jido,
+        jido_partition: state.partition
       }
       |> Map.merge(trace_metadata)
 

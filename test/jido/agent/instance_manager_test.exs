@@ -247,6 +247,16 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       assert InstanceManager.lookup(manager, "registry-scope-key") == {:ok, pid}
       assert Jido.whereis(JidoTest.InstanceManagerTestJido, "registry-scope-key") == nil
     end
+
+    test "get/3 and lookup/3 isolate same manager key across partitions", %{manager: manager} do
+      {:ok, alpha_pid} = InstanceManager.get(manager, "shared-key", partition: :alpha)
+      {:ok, beta_pid} = InstanceManager.get(manager, "shared-key", partition: :beta)
+
+      assert alpha_pid != beta_pid
+      assert InstanceManager.lookup(manager, "shared-key", partition: :alpha) == {:ok, alpha_pid}
+      assert InstanceManager.lookup(manager, "shared-key", partition: :beta) == {:ok, beta_pid}
+      assert InstanceManager.lookup(manager, "shared-key") == :error
+    end
   end
 
   describe "stop/2" do
@@ -483,6 +493,64 @@ defmodule JidoTest.Agent.InstanceManagerTest do
         :not_found ->
           flunk("Agent state was not persisted on stop")
       end
+    end
+
+    @tag timeout: 5000
+    test "partitioned storage keeps same manager key isolated across partitions", %{
+      manager: manager,
+      table: table
+    } do
+      {:ok, alpha_pid} =
+        InstanceManager.get(manager, "shared-storage-key",
+          partition: :alpha,
+          initial_state: %{counter: 11}
+        )
+
+      {:ok, beta_pid} =
+        InstanceManager.get(manager, "shared-storage-key",
+          partition: :beta,
+          initial_state: %{counter: 22}
+        )
+
+      alpha_ref = Process.monitor(alpha_pid)
+      beta_ref = Process.monitor(beta_pid)
+
+      :ok = InstanceManager.stop(manager, "shared-storage-key", partition: :alpha)
+      :ok = InstanceManager.stop(manager, "shared-storage-key", partition: :beta)
+
+      assert_receive {:DOWN, ^alpha_ref, :process, ^alpha_pid, _reason}, 1000
+      assert_receive {:DOWN, ^beta_ref, :process, ^beta_pid, _reason}, 1000
+
+      assert {:ok, alpha_checkpoint} =
+               ETS.get_checkpoint(
+                 {TestAgent, {:partition, :alpha, {manager, "shared-storage-key"}}},
+                 table: table
+               )
+
+      assert {:ok, beta_checkpoint} =
+               ETS.get_checkpoint(
+                 {TestAgent, {:partition, :beta, {manager, "shared-storage-key"}}},
+                 table: table
+               )
+
+      assert alpha_checkpoint.state.counter == 11
+      assert beta_checkpoint.state.counter == 22
+
+      {:ok, restored_alpha} =
+        InstanceManager.get(manager, "shared-storage-key", partition: :alpha)
+
+      {:ok, restored_beta} = InstanceManager.get(manager, "shared-storage-key", partition: :beta)
+
+      {:ok, alpha_state} = AgentServer.state(restored_alpha)
+      {:ok, beta_state} = AgentServer.state(restored_beta)
+
+      assert alpha_state.partition == :alpha
+      assert alpha_state.agent.state.counter == 11
+      assert alpha_state.agent.state.__partition__ == :alpha
+
+      assert beta_state.partition == :beta
+      assert beta_state.agent.state.counter == 22
+      assert beta_state.agent.state.__partition__ == :beta
     end
   end
 
