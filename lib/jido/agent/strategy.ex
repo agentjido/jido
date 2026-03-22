@@ -81,8 +81,10 @@ defmodule Jido.Agent.Strategy do
   alias Jido.Agent.Strategy.State, as: StratState
 
   @type context :: %{
-          agent_module: module(),
-          strategy_opts: keyword()
+          required(:agent_module) => module(),
+          required(:strategy_opts) => keyword(),
+          optional(:jido_instance) => atom() | nil,
+          optional(:partition) => term() | nil
         }
 
   @type status :: :idle | :running | :waiting | :success | :failure

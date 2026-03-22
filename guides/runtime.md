@@ -25,6 +25,12 @@ Or start directly via `AgentServer`:
 {:ok, pid} = Jido.AgentServer.start(agent: MyAgent, jido: MyApp.Jido)
 ```
 
+To run multiple logical tenants in one Jido instance, pass `partition:`:
+
+```elixir
+{:ok, pid} = MyApp.Jido.start_agent(MyAgent, id: "worker-1", partition: :alpha)
+```
+
 ## call/3 vs cast/2
 
 **Synchronous** - blocks until signal is processed, returns updated agent:
@@ -64,6 +70,14 @@ Jido's parent/child model is a **logical hierarchy**, not nested OTP supervision
 - Parent death policies such as `on_parent_death: :stop` or `:emit_orphan` describe domain behavior, not OTP ancestry.
 
 This is why a child can survive a logical parent death and become orphaned without becoming an independently supervised OTP child of that parent.
+
+When partitions are in use:
+
+- Spawned children inherit the parent partition by default
+- Adoption by child ID resolves only within the caller's partition
+- Cross-partition adoption requires an explicit pid or via tuple
+
+See [Multi-Tenancy](multi-tenancy.md) for the partition-specific rules.
 
 ### Spawning Children
 

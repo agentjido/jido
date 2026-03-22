@@ -91,7 +91,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 - GenServer-based AgentServer for production deployment
 - Parent-child agent hierarchies with lifecycle management
 - Signal routing with configurable strategies
-- Instance-scoped supervision for multi-tenant deployments
+- Instance isolation and shared-instance partitions for multi-tenant deployments
 
 ### Composable Plugins
 - Reusable capability modules that extend agents
@@ -169,6 +169,13 @@ Supervisor.start_link(children, strategy: :one_for_one)
 
 ## Quick Start
 
+For multi-tenant deployments, Jido supports two models:
+
+- **Isolated instances** for hard isolation
+- **Shared-instance partitions** for logical grouping inside one instance
+
+See [guides/multi-tenancy.md](guides/multi-tenancy.md) for the guarantees and tradeoffs.
+
 ### 1. Define an Agent
 
 ```elixir
@@ -229,6 +236,9 @@ agent.state.count
 
 # Look up the agent by ID
 pid = MyApp.Jido.whereis("counter-1")
+
+# Partitioned lookup
+pid = MyApp.Jido.whereis("counter-1", partition: :tenant_a)
 
 # List all running agents
 agents = MyApp.Jido.list_agents()

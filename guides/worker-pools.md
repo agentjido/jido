@@ -26,6 +26,10 @@ Use spawn-per-request when:
 - Initialization is cheap
 - Request volume is unpredictable and bursty
 
+Worker pools are instance-scoped and are not partition-aware. If you are using
+shared-instance partitions, do not treat a pooled worker as partition-isolated
+mutable state.
+
 ## Configuration
 
 Configure pools in your Jido instance:

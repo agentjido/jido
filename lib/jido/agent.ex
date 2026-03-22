@@ -714,7 +714,7 @@ defmodule Jido.Agent do
 
         # Run strategy initialization (directives are dropped here;
         # AgentServer handles init directives separately)
-        ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+        ctx = __strategy_ctx__()
         {initialized_agent, _directives} = strategy().init(agent, ctx)
         initialized_agent
       end
@@ -816,9 +816,17 @@ defmodule Jido.Agent do
       def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
         {:ok, agent, action} = on_before_cmd(agent, action)
 
-        case Instruction.normalize(action, %{state: agent.state}, opts) do
+        jido_instance = Keyword.get(opts, :__jido_instance__)
+        partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
+
+        instruction_opts =
+          opts
+          |> Keyword.delete(:__jido_instance__)
+          |> Keyword.delete(:__partition__)
+
+        case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
           {:ok, instructions} ->
-            ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+            ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()
 
             normalized_instructions =
@@ -853,7 +861,7 @@ defmodule Jido.Agent do
       """
       @spec strategy_snapshot(Agent.t()) :: Jido.Agent.Strategy.Snapshot.t()
       def strategy_snapshot(%Agent{} = agent) do
-        ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+        ctx = __strategy_ctx__(nil, Map.get(agent.state, :__partition__))
         strategy().snapshot(agent, ctx)
       end
 
@@ -1057,6 +1065,15 @@ defmodule Jido.Agent do
 
   defp __quoted_callback_helpers__ do
     quote location: :keep do
+      defp __strategy_ctx__(jido_instance \\ nil, partition \\ nil) do
+        %{
+          agent_module: __MODULE__,
+          strategy_opts: strategy_opts(),
+          jido_instance: jido_instance,
+          partition: partition
+        }
+      end
+
       # Private helper for after hook dispatch
       defp __do_after_cmd__(agent, msg, directives) do
         {:ok, agent, directives} = on_after_cmd(agent, msg, directives)

@@ -78,6 +78,11 @@ config :my_app, MyApp.Jido,
   ]
 ```
 
+For Jido-managed action execution, `telemetry.log_args` also governs the
+underlying `jido_action` logs and action spans. Use `:full` when you want full
+action params/context in debug sessions; use `:keys_only` or `:none` to keep
+action execution quiet.
+
 Instances without per-instance config inherit from global `config :jido, :telemetry` and `config :jido, :observability`. See [Observability](observability.md) for details.
 
 Settings resolve in this order:
@@ -318,6 +323,16 @@ config :my_app, MyApp.TenantA.Jido,
 config :my_app, MyApp.TenantB.Jido,
   max_tasks: 1000
 ```
+
+This is Jido's hard-isolation model. For shared-instance logical isolation, use
+`partition:` on agent APIs inside a single instance:
+
+```elixir
+{:ok, _pid} = MyApp.Jido.start_agent(MyApp.Agent, id: "agent-1", partition: :tenant_a)
+pid = MyApp.Jido.whereis("agent-1", partition: :tenant_a)
+```
+
+See [Multi-Tenancy](multi-tenancy.md) for the full model and tradeoffs.
 
 ## Testing Configuration
 

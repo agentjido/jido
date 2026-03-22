@@ -564,8 +564,20 @@ defmodule Jido.Telemetry do
   defp log_signal_stop(metadata, duration, directive_count) do
     Logger.debug(
       fn ->
+        directive_types =
+          metadata[:directive_types]
+          |> Formatter.format_directive_types()
+
+        directive_summary =
+          if directive_types == "" do
+            ""
+          else
+            "#{directive_types} "
+          end
+
         "[signal] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
           "directives=#{directive_count} " <>
+          directive_summary <>
           "duration=#{Formatter.format_duration(duration)}"
       end,
       agent_id: metadata[:agent_id],
@@ -654,7 +666,8 @@ defmodule Jido.Telemetry do
       agent_id: agent.id,
       agent_module: agent.name,
       action: action,
-      jido_instance: nil
+      jido_instance: nil,
+      jido_partition: nil
     }
 
     :telemetry.execute(
@@ -709,7 +722,8 @@ defmodule Jido.Telemetry do
     metadata = %{
       agent_id: agent.id,
       strategy: strategy_module,
-      jido_instance: nil
+      jido_instance: nil,
+      jido_partition: nil
     }
 
     :telemetry.execute(

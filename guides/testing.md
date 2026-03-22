@@ -19,6 +19,20 @@ defmodule MyAgentTest do
 end
 ```
 
+To test shared-instance partitions, start multiple agents with the same ID and
+different `partition:` values:
+
+```elixir
+{:ok, alpha} = Jido.start_agent(jido, MyAgent, id: "same-id", partition: :alpha)
+{:ok, beta} = Jido.start_agent(jido, MyAgent, id: "same-id", partition: :beta)
+
+assert Jido.whereis(jido, "same-id", partition: :alpha) == alpha
+assert Jido.whereis(jido, "same-id", partition: :beta) == beta
+assert Jido.whereis(jido, "same-id") == nil
+```
+
+See [Multi-Tenancy](multi-tenancy.md) for the runtime rules these tests should enforce.
+
 ### Context Keys
 
 The test context includes:

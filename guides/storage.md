@@ -15,6 +15,10 @@ end
 # Manual: Thaw an agent (loads checkpoint, rehydrates thread)
 {:ok, agent} = MyApp.Jido.thaw(MyAgent, "user-123")
 
+# Partitioned checkpoint identity inside one Jido instance
+:ok = MyApp.Jido.hibernate(agent, partition: :tenant_a)
+{:ok, agent} = MyApp.Jido.thaw(MyAgent, "user-123", partition: :tenant_a)
+
 # Automatic: InstanceManager hibernates on idle, thaws on demand
 {:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, "user-123")
 ```
@@ -30,6 +34,9 @@ This guide covers Jido's unified persistence system: checkpoints, thread journal
 | **None** | Stateless agents, cheap rebuilds, short-lived tasks | Skip storage config |
 
 Both manual and automatic approaches use the same underlying `Jido.Storage` behaviour.
+
+If you use shared-instance partitions, partitioned checkpoints and unpartitioned
+checkpoints can coexist for the same agent ID. See [Multi-Tenancy](multi-tenancy.md).
 
 ## Overview
 

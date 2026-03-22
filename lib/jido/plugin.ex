@@ -336,6 +336,7 @@ defmodule Jido.Plugin do
     - `:agent_module` - The module of the agent
     - `:plugin_spec` - The specification of the current plugin
     - `:jido_instance` - The Jido instance name
+    - `:partition` - The logical partition of the agent, if any
 
   ## Returns
 

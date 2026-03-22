@@ -89,5 +89,37 @@ defmodule JidoTest.DebugIntegrationTest do
 
       :telemetry.detach(handler_id)
     end
+
+    test "telemetry and debug events include jido_partition", %{jido: jido} do
+      test_pid = self()
+      handler_id = "test-partition-meta-#{System.unique_integer([:positive])}"
+
+      :telemetry.attach_many(
+        handler_id,
+        [
+          [:jido, :agent_server, :signal, :start],
+          [:jido, :agent_server, :signal, :stop]
+        ],
+        fn _event, _measurements, metadata, _config ->
+          send(test_pid, {:partition_meta, metadata})
+        end,
+        nil
+      )
+
+      pid = start_server(%{jido: jido}, TestAgent, debug: true, partition: :blue)
+      signal = signal("jido.test.partition", %{})
+      Jido.AgentServer.cast(pid, signal)
+
+      assert_receive {:partition_meta, metadata}, 1000
+      assert metadata[:jido_instance] == jido
+      assert metadata[:jido_partition] == :blue
+
+      eventually(fn ->
+        {:ok, events} = Jido.AgentServer.recent_events(pid)
+        Enum.any?(events, &(&1.jido_partition == :blue))
+      end)
+
+      :telemetry.detach(handler_id)
+    end
   end
 end
