@@ -2,7 +2,10 @@ defmodule JidoTest.Observe.ConfigTest do
   use ExUnit.Case, async: false
 
   alias Jido.Config.Defaults
+  alias Jido.Debug
   alias Jido.Observe.Config
+
+  @test_instance :"jido_observe_config_#{System.unique_integer([:positive])}"
 
   defmodule ValidTracer do
     @moduledoc false
@@ -19,9 +22,12 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   setup do
+    Debug.reset(@test_instance)
+
     on_exit(fn ->
       Application.delete_env(:jido, :telemetry)
       Application.delete_env(:jido, :observability)
+      Debug.reset(@test_instance)
     end)
 
     :ok
@@ -122,6 +128,97 @@ defmodule JidoTest.Observe.ConfigTest do
     test "false when log level is info" do
       Application.put_env(:jido, :telemetry, log_level: :info)
       refute Config.debug_enabled?(nil)
+    end
+  end
+
+  describe "action_log_level/1" do
+    test "suppresses verbose action logs when args are keys_only" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
+
+      assert Config.action_log_level(nil) == :warning
+    end
+
+    test "enables full action logs only when args are full" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :full)
+
+      assert Config.action_log_level(nil) == :debug
+    end
+
+    test "maps trace telemetry to debug for action logger" do
+      Application.put_env(:jido, :telemetry, log_level: :trace, log_args: :full)
+
+      assert Config.action_log_level(nil) == :debug
+    end
+
+    test "honors debug override for keys_only mode" do
+      Application.put_env(:jido, :telemetry, log_level: :trace, log_args: :full)
+      Debug.enable(@test_instance, :on)
+
+      assert Config.action_log_level(@test_instance) == :warning
+    end
+
+    test "honors verbose debug override for full args" do
+      Application.put_env(:jido, :telemetry, log_level: :warning, log_args: :none)
+      Debug.enable(@test_instance, :verbose)
+
+      assert Config.action_log_level(@test_instance) == :debug
+    end
+  end
+
+  describe "action_telemetry_mode/1" do
+    test "suppresses action telemetry when args are keys_only" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
+
+      assert Config.action_telemetry_mode(nil) == :silent
+    end
+
+    test "suppresses action telemetry when args are none" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :none)
+
+      assert Config.action_telemetry_mode(nil) == :silent
+    end
+
+    test "enables action telemetry only when args are full" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :full)
+
+      assert Config.action_telemetry_mode(nil) == :full
+    end
+
+    test "honors verbose debug override for full action telemetry" do
+      Application.put_env(:jido, :telemetry, log_level: :warning, log_args: :none)
+      Debug.enable(@test_instance, :verbose)
+
+      assert Config.action_telemetry_mode(@test_instance) == :full
+    end
+  end
+
+  describe "action_exec_opts/2" do
+    test "adds derived exec options without overwriting explicit opts" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
+
+      opts = Config.action_exec_opts(nil, timeout: 10)
+
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
+      assert Keyword.get(opts, :timeout) == 10
+
+      explicit_opts =
+        Config.action_exec_opts(nil, log_level: :error, telemetry: :full, timeout: 10)
+
+      assert Keyword.get(explicit_opts, :log_level) == :error
+      assert Keyword.get(explicit_opts, :telemetry) == :full
+      assert Keyword.get(explicit_opts, :timeout) == 10
+    end
+
+    test "strips internal Jido instance plumbing before calling Jido.Exec" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
+
+      opts = Config.action_exec_opts(nil, __jido_instance__: Jido, timeout: 10)
+
+      refute Keyword.has_key?(opts, :__jido_instance__)
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
+      assert Keyword.get(opts, :timeout) == 10
     end
   end
 

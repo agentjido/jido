@@ -52,6 +52,26 @@ defmodule JidoTest.Agent.StrategyTest do
     def cmd(agent, _instructions, _ctx), do: {agent, []}
   end
 
+  defmodule ContextCaptureStrategy do
+    @moduledoc false
+    use Jido.Agent.Strategy
+
+    @impl true
+    def cmd(agent, instructions, ctx) do
+      send(self(), {:strategy_ctx, ctx, Enum.map(instructions, & &1.opts)})
+      {agent, []}
+    end
+  end
+
+  defmodule ContextCaptureAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "context_capture_agent",
+      strategy: JidoTest.Agent.StrategyTest.ContextCaptureStrategy
+
+    def signal_routes(_ctx), do: []
+  end
+
   describe "Snapshot" do
     test "terminal?/1 returns true for success and failure" do
       assert Snapshot.terminal?(%Snapshot{status: :success, done?: true})
@@ -263,6 +283,22 @@ defmodule JidoTest.Agent.StrategyTest do
       assert {"test.action", {:strategy_cmd, :test_action}} in routes
       assert {"test.tick", {:strategy_tick}} in routes
       assert {"test.custom", {:custom, :my_handler}} in routes
+    end
+
+    test "passes jido instance via strategy context without leaking internal opts" do
+      agent = ContextCaptureAgent.new(id: "context-capture")
+
+      {updated_agent, directives} =
+        ContextCaptureAgent.cmd(agent, :noop, timeout: 5, __jido_instance__: Jido)
+
+      assert updated_agent == agent
+      assert directives == []
+
+      assert_receive {:strategy_ctx,
+                      %{agent_module: ContextCaptureAgent, jido_instance: Jido} = ctx,
+                      [[timeout: 5]]}
+
+      assert ctx.strategy_opts == []
     end
   end
 
