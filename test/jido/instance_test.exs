@@ -188,6 +188,15 @@ defmodule JidoTest.InstanceTest do
       assert thawed_partitioned.state.counter == 20
       assert thawed_partitioned.state.__partition__ == :blue
     end
+
+    test "hibernate rejects conflicting partition metadata" do
+      agent =
+        RedisTestAgent.new(id: "partition-conflict")
+        |> then(fn agent -> %{agent | state: Map.put(agent.state, :__partition__, :alpha)} end)
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               TestInstance.hibernate(agent, partition: :beta)
+    end
   end
 
   describe "instance lifecycle" do

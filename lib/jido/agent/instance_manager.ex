@@ -80,6 +80,23 @@ defmodule Jido.Agent.InstanceManager do
   alias Jido.Persist
   alias Jido.Storage
 
+  @reserved_agent_opts [
+    :agent,
+    :agent_module,
+    :id,
+    :name,
+    :partition,
+    :parent,
+    :registry,
+    :register_global,
+    :lifecycle_mod,
+    :pool,
+    :pool_key,
+    :idle_timeout,
+    :storage,
+    :restored_from_storage
+  ]
+
   @type manager_name :: atom()
   @type key :: term()
 
@@ -304,6 +321,7 @@ defmodule Jido.Agent.InstanceManager do
 
     agent_opts =
       config.agent_opts
+      |> Keyword.drop(@reserved_agent_opts)
       |> Keyword.put_new(:jido, config.jido)
       |> Keyword.put(:partition, partition)
       |> Keyword.put(:registry, registry_name(config.name))

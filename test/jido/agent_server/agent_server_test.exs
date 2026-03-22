@@ -105,6 +105,37 @@ defmodule JidoTest.AgentServerTest do
       GenServer.stop(pid)
     end
 
+    test "inherits partition from a pre-built agent when opts omit it", %{jido: jido} do
+      agent = TestAgent.new(id: "prebuilt-partitioned")
+      agent = %{agent | state: Map.put(agent.state, :__partition__, :alpha)}
+
+      {:ok, pid} = AgentServer.start_link(agent: agent, agent_module: TestAgent, jido: jido)
+      {:ok, state} = AgentServer.state(pid)
+
+      assert state.partition == :alpha
+      assert state.agent.state.__partition__ == :alpha
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "prebuilt-partitioned",
+               partition: :alpha
+             ) ==
+               pid
+
+      GenServer.stop(pid)
+    end
+
+    test "rejects conflicting partition for a pre-built agent", %{jido: jido} do
+      agent = TestAgent.new(id: "prebuilt-conflict")
+      agent = %{agent | state: Map.put(agent.state, :__partition__, :alpha)}
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               AgentServer.start(
+                 agent: agent,
+                 agent_module: TestAgent,
+                 partition: :beta,
+                 jido: jido
+               )
+    end
+
     test "starts with initial_state", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(agent: TestAgent, initial_state: %{counter: 42}, jido: jido)

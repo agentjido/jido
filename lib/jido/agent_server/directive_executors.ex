@@ -204,6 +204,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   alias Jido.RuntimeStore
 
   @relationship_hive :relationships
+  @reserved_child_opts [:agent, :id, :jido, :parent, :partition]
 
   def exec(
         %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
@@ -215,22 +216,23 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
         child_id = opts[:id] || "#{state.id}/#{tag}"
         child_partition = Map.get(opts, :partition, state.partition)
 
-        child_opts =
-          [
-            agent: agent,
-            id: child_id,
-            partition: child_partition,
-            parent: %{
-              pid: self(),
-              id: state.id,
-              partition: state.partition,
-              tag: tag,
-              meta: meta
-            }
-          ] ++ Map.to_list(Map.delete(opts, :id))
+        parent_ref = %{
+          pid: self(),
+          id: state.id,
+          partition: state.partition,
+          tag: tag,
+          meta: meta
+        }
 
         child_opts =
-          if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
+          opts
+          |> Map.drop(@reserved_child_opts)
+          |> Map.put(:agent, agent)
+          |> Map.put(:id, child_id)
+          |> Map.put(:partition, child_partition)
+          |> Map.put(:parent, parent_ref)
+          |> maybe_put_jido(state.jido)
+          |> Map.to_list()
 
         child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
 
@@ -306,6 +308,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
   defp normalize_meta(meta) when is_map(meta), do: meta
   defp normalize_meta(_meta), do: %{}
+
+  defp maybe_put_jido(opts, nil), do: opts
+  defp maybe_put_jido(opts, jido), do: Map.put(opts, :jido, jido)
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do

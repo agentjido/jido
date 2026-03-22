@@ -544,10 +544,9 @@ defmodule Jido do
 
   @spec hibernate(atom(), Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
   def hibernate(jido_instance, agent, opts) when is_atom(jido_instance) and is_list(opts) do
-    agent =
-      maybe_put_partition(agent, Keyword.get(opts, :partition))
-
-    Jido.Persist.hibernate(jido_instance, agent)
+    with {:ok, agent} <- maybe_put_partition(agent, Keyword.get(opts, :partition)) do
+      Jido.Persist.hibernate(jido_instance, agent)
+    end
   end
 
   @doc "Thaw an agent using the given Jido instance."
@@ -564,31 +563,46 @@ defmodule Jido do
     jido_instance
     |> Jido.Persist.thaw(agent_module, partition_key(key, partition))
     |> case do
-      {:ok, agent} -> {:ok, maybe_put_partition(agent, partition)}
+      {:ok, agent} -> maybe_put_partition(agent, partition)
       {:error, _reason} = error -> error
     end
   end
 
   defp filter_agent_registry_entries(entries, partition) do
-    Enum.flat_map(entries, fn
-      {{:partition, ^partition, id}, pid} when is_binary(id) ->
-        [{id, pid}]
+    Enum.flat_map(entries, fn {registry_key, pid} ->
+      case unwrap_partition_key(registry_key) do
+        {^partition, id} when is_binary(id) ->
+          [{id, pid}]
 
-      {id, pid} when is_nil(partition) and is_binary(id) ->
-        [{id, pid}]
+        {nil, id} when is_nil(partition) and is_binary(id) ->
+          [{id, pid}]
 
-      _other ->
-        []
+        _other ->
+          []
+      end
     end)
   end
 
-  defp maybe_put_partition(%{state: state} = agent, nil) when is_map(state), do: agent
+  defp maybe_put_partition(%{state: state} = agent, nil) when is_map(state), do: {:ok, agent}
 
   defp maybe_put_partition(%{state: state} = agent, partition) when is_map(state) do
-    %{agent | state: Map.put(state, :__partition__, partition)}
+    case Map.get(state, :__partition__) do
+      nil ->
+        {:ok, %{agent | state: Map.put(state, :__partition__, partition)}}
+
+      ^partition ->
+        {:ok, agent}
+
+      agent_partition ->
+        {:error,
+         Jido.Error.validation_error("partition does not match agent runtime state", %{
+           partition: partition,
+           agent_partition: agent_partition
+         })}
+    end
   end
 
-  defp maybe_put_partition(agent, _partition), do: agent
+  defp maybe_put_partition(agent, _partition), do: {:ok, agent}
 
   # ---------------------------------------------------------------------------
   # Discovery
