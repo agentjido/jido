@@ -165,25 +165,60 @@ defmodule JidoTest.Observe.ConfigTest do
     end
   end
 
-  describe "action_exec_opts/2" do
-    test "adds derived log level without overwriting explicit opts" do
+  describe "action_telemetry_mode/1" do
+    test "suppresses action telemetry when args are keys_only" do
       Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
 
-      assert Config.action_exec_opts(nil, timeout: 10) == [log_level: :warning, timeout: 10]
+      assert Config.action_telemetry_mode(nil) == :silent
+    end
 
-      assert Config.action_exec_opts(nil, log_level: :error, timeout: 10) == [
-               log_level: :error,
-               timeout: 10
-             ]
+    test "suppresses action telemetry when args are none" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :none)
+
+      assert Config.action_telemetry_mode(nil) == :silent
+    end
+
+    test "enables action telemetry only when args are full" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :full)
+
+      assert Config.action_telemetry_mode(nil) == :full
+    end
+
+    test "honors verbose debug override for full action telemetry" do
+      Application.put_env(:jido, :telemetry, log_level: :warning, log_args: :none)
+      Debug.enable(@test_instance, :verbose)
+
+      assert Config.action_telemetry_mode(@test_instance) == :full
+    end
+  end
+
+  describe "action_exec_opts/2" do
+    test "adds derived exec options without overwriting explicit opts" do
+      Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
+
+      opts = Config.action_exec_opts(nil, timeout: 10)
+
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
+      assert Keyword.get(opts, :timeout) == 10
+
+      explicit_opts =
+        Config.action_exec_opts(nil, log_level: :error, telemetry: :full, timeout: 10)
+
+      assert Keyword.get(explicit_opts, :log_level) == :error
+      assert Keyword.get(explicit_opts, :telemetry) == :full
+      assert Keyword.get(explicit_opts, :timeout) == 10
     end
 
     test "strips internal Jido instance plumbing before calling Jido.Exec" do
       Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
 
-      assert Config.action_exec_opts(nil, __jido_instance__: Jido, timeout: 10) == [
-               log_level: :warning,
-               timeout: 10
-             ]
+      opts = Config.action_exec_opts(nil, __jido_instance__: Jido, timeout: 10)
+
+      refute Keyword.has_key?(opts, :__jido_instance__)
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
+      assert Keyword.get(opts, :timeout) == 10
     end
   end
 

@@ -148,14 +148,18 @@ defmodule Jido.Observe.Config do
 
   Jido action execution only supports coarse logger thresholds, so `:keys_only`
   and `:none` argument modes are translated into a warning-or-higher threshold
-  to suppress verbose action/context dumps. Full argument logging is only
-  enabled when the instance opts into `log_args: :full` or `Jido.debug(:verbose)`.
+  to suppress verbose action/context dumps. `jido_action` telemetry only
+  supports `:full` or `:silent`, so non-full argument modes are translated into
+  `:silent` to avoid leaking full action params/context through dependency
+  telemetry spans. Full argument logging is only enabled when the instance opts
+  into `log_args: :full` or `Jido.debug(:verbose)`.
   """
   @spec action_exec_opts(instance(), keyword()) :: keyword()
   def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
     opts
     |> Keyword.delete(:__jido_instance__)
     |> Keyword.put_new(:log_level, action_log_level(instance))
+    |> Keyword.put_new(:telemetry, action_telemetry_mode(instance))
   end
 
   @doc """
@@ -166,6 +170,16 @@ defmodule Jido.Observe.Config do
     instance
     |> telemetry_log_level()
     |> normalize_action_log_level(telemetry_log_args(instance))
+  end
+
+  @doc """
+  Returns the effective `Jido.Exec` telemetry mode for the given instance.
+  """
+  @spec action_telemetry_mode(instance()) :: :full | :silent
+  def action_telemetry_mode(instance \\ nil) do
+    instance
+    |> telemetry_log_args()
+    |> normalize_action_telemetry_mode()
   end
 
   # --- Observe settings ---
@@ -324,6 +338,9 @@ defmodule Jido.Observe.Config do
   defp normalize_action_log_level(level, mode) when mode in [:keys_only, :none] do
     max_logger_level(logger_level_for_action(level), :warning)
   end
+
+  defp normalize_action_telemetry_mode(:full), do: :full
+  defp normalize_action_telemetry_mode(mode) when mode in [:keys_only, :none], do: :silent
 
   defp logger_level_for_action(:trace), do: :debug
   defp logger_level_for_action(level) when level in @observe_log_levels, do: level

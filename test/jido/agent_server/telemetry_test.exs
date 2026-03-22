@@ -67,8 +67,23 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       nil
     )
 
+    action_handler_id = "test-action-telemetry-handler-#{:erlang.unique_integer()}"
+
+    :telemetry.attach_many(
+      action_handler_id,
+      [
+        [:jido, :action, :start],
+        [:jido, :action, :stop]
+      ],
+      fn event, measurements, metadata, _config ->
+        send(test_pid, {:action_telemetry_event, event, measurements, metadata})
+      end,
+      nil
+    )
+
     on_exit(fn ->
       :telemetry.detach(handler_id)
+      :telemetry.detach(action_handler_id)
     end)
 
     {:ok, jido: context.jido}
@@ -131,6 +146,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
       refute log =~ "Executing JidoTest.TestActions.IncrementAction"
       refute log =~ "with params:"
+      refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
 
       GenServer.stop(pid)
     end
@@ -151,6 +167,11 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
       assert log =~ "Executing JidoTest.TestActions.IncrementAction"
       assert log =~ "with params:"
+
+      assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
+                      %{action: JidoTest.TestActions.IncrementAction}}
+
+      assert_receive {:action_telemetry_event, [:jido, :action, :stop], _, _}
 
       GenServer.stop(pid)
     end
