@@ -150,7 +150,13 @@ defmodule Jido.AgentServer.Options do
         id when is_atom(id) -> Atom.to_string(id)
       end
 
-    partition = Map.get(attrs, :partition, agent_partition)
+    partition =
+      case Map.fetch(attrs, :partition) do
+        {:ok, nil} -> agent_partition
+        {:ok, partition} -> partition
+        :error -> agent_partition
+      end
+
     jido_instance = Map.get(attrs, :jido, Jido)
     registry = Map.get(attrs, :registry, Jido.registry_name(jido_instance))
     attrs = Map.put(attrs, :jido, jido_instance)
