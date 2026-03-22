@@ -16,7 +16,7 @@ defmodule JidoTest.Config.DefaultsTest do
   end
 
   test "returns centralized observability defaults" do
-    assert Defaults.telemetry_log_level() == :debug
+    assert Defaults.telemetry_log_level() == :info
     assert Defaults.telemetry_log_args() == :keys_only
     assert Defaults.slow_signal_threshold_ms() == 10
     assert Defaults.slow_directive_threshold_ms() == 5
