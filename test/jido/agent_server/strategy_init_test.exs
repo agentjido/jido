@@ -14,7 +14,8 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
       new_state =
         Map.put(agent.state, :__strategy__, %{
           initialized: true,
-          opts: ctx[:strategy_opts] || []
+          opts: ctx[:strategy_opts] || [],
+          jido_instance: ctx[:jido_instance]
         })
 
       {%{agent | state: new_state}, []}
@@ -110,6 +111,15 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
       {:ok, state} = AgentServer.state(pid)
 
       assert state.agent.state.__strategy__.opts == [max_iterations: 5]
+
+      GenServer.stop(pid)
+    end
+
+    test "jido instance is passed to init/2", %{jido: jido} do
+      {:ok, pid} = AgentServer.start_link(agent: TrackingAgent, jido: jido)
+      {:ok, state} = AgentServer.state(pid)
+
+      assert state.agent.state.__strategy__.jido_instance == jido
 
       GenServer.stop(pid)
     end

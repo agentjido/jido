@@ -46,6 +46,15 @@ Invalid values are ignored and fall back to Jido defaults.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
 
+For Jido-managed `Jido.Exec` calls, `telemetry.log_args` also controls how much
+observability data is allowed through the underlying `jido_action` layer:
+
+- `log_args: :full` keeps verbose action logs and emits `[:jido, :action, ...]` spans
+- `log_args: :keys_only` and `:none` suppress the noisy full action start log
+- `log_args: :keys_only` and `:none` also silence dependency action spans, because
+  `jido_action` only supports `:full` or `:silent` telemetry payload behavior
+- `MyApp.Jido.debug(:verbose)` re-enables full action logs and action spans for that instance
+
 ## Telemetry Event Reference
 
 Jido emits telemetry events for all core operations. Use these for metrics collection and alerting.
@@ -63,12 +72,16 @@ Jido emits telemetry events for all core operations. Use these for metrics colle
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
 | `[:jido, :agent_server, :signal, :start]` | Signal processing started | `system_time` | `agent_id`, `signal_type`, `jido_instance` |
-| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `jido_instance` |
+| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `directive_types`, `jido_instance` |
 | `[:jido, :agent_server, :signal, :exception]` | Signal processing failed | `duration` | `agent_id`, `signal_type`, `error`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type`, `directive`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `directive`, `result`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `directive`, `error`, `jido_instance` |
 | `[:jido, :agent_server, :queue, :overflow]` | Directive queue overflow | `queue_size` | `agent_id`, `signal_type`, `jido_instance` |
+
+When debug or trace logging is enabled, the structured `[signal]` log line
+includes the directive-type summary from `directive_types`, for example
+`directives=2 Emit=1 Schedule=1`.
 
 ### Strategy Events
 

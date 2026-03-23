@@ -714,7 +714,7 @@ defmodule Jido.Agent do
 
         # Run strategy initialization (directives are dropped here;
         # AgentServer handles init directives separately)
-        ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+        ctx = __strategy_ctx__()
         {initialized_agent, _directives} = strategy().init(agent, ctx)
         initialized_agent
       end
@@ -816,9 +816,12 @@ defmodule Jido.Agent do
       def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
         {:ok, agent, action} = on_before_cmd(agent, action)
 
-        case Instruction.normalize(action, %{state: agent.state}, opts) do
+        jido_instance = Keyword.get(opts, :__jido_instance__)
+        instruction_opts = Keyword.delete(opts, :__jido_instance__)
+
+        case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
           {:ok, instructions} ->
-            ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+            ctx = __strategy_ctx__(jido_instance)
             strat = strategy()
 
             normalized_instructions =
@@ -853,7 +856,7 @@ defmodule Jido.Agent do
       """
       @spec strategy_snapshot(Agent.t()) :: Jido.Agent.Strategy.Snapshot.t()
       def strategy_snapshot(%Agent{} = agent) do
-        ctx = %{agent_module: __MODULE__, strategy_opts: strategy_opts()}
+        ctx = __strategy_ctx__()
         strategy().snapshot(agent, ctx)
       end
 
@@ -1057,6 +1060,14 @@ defmodule Jido.Agent do
 
   defp __quoted_callback_helpers__ do
     quote location: :keep do
+      defp __strategy_ctx__(jido_instance \\ nil) do
+        %{
+          agent_module: __MODULE__,
+          strategy_opts: strategy_opts(),
+          jido_instance: jido_instance
+        }
+      end
+
       # Private helper for after hook dispatch
       defp __do_after_cmd__(agent, msg, directives) do
         {:ok, agent, directives} = on_after_cmd(agent, msg, directives)

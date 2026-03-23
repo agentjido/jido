@@ -1,6 +1,8 @@
 defmodule JidoTest.TelemetryTest do
   use ExUnit.Case, async: false
 
+  import ExUnit.CaptureLog
+
   alias Jido.Agent
   alias Jido.Telemetry
 
@@ -343,6 +345,28 @@ defmodule JidoTest.TelemetryTest do
                  %{agent_id: "test", signal_type: "test.signal", error: :err},
                  nil
                )
+    end
+
+    test "includes directive type summary in signal logs" do
+      log =
+        capture_log(fn ->
+          assert :ok =
+                   Telemetry.handle_event(
+                     [:jido, :agent_server, :signal, :stop],
+                     %{duration: 1_000},
+                     %{
+                       agent_id: "test",
+                       signal_type: "test.signal",
+                       directive_count: 2,
+                       directive_types: %{"Emit" => 1, "Schedule" => 1}
+                     },
+                     nil
+                   )
+        end)
+
+      assert log =~ "[signal] type=test.signal directives=2"
+      assert log =~ "Emit=1"
+      assert log =~ "Schedule=1"
     end
 
     test "handles agent_server directive events" do

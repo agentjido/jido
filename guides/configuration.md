@@ -78,6 +78,11 @@ config :my_app, MyApp.Jido,
   ]
 ```
 
+For Jido-managed action execution, `telemetry.log_args` also governs the
+underlying `jido_action` logs and action spans. Use `:full` when you want full
+action params/context in debug sessions; use `:keys_only` or `:none` to keep
+action execution quiet.
+
 Instances without per-instance config inherit from global `config :jido, :telemetry` and `config :jido, :observability`. See [Observability](observability.md) for details.
 
 Settings resolve in this order:

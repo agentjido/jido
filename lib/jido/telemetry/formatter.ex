@@ -170,6 +170,10 @@ defmodule Jido.Telemetry.Formatter do
 
   def summarize_directives(_), do: %{}
 
+  defp extract_directive_type(%{__struct__: mod}) when is_atom(mod) do
+    mod |> Module.split() |> List.last()
+  end
+
   defp extract_directive_type(%{type: type}), do: type
   defp extract_directive_type({type, _}) when is_atom(type), do: type
   defp extract_directive_type(type) when is_atom(type), do: type
@@ -194,7 +198,12 @@ defmodule Jido.Telemetry.Formatter do
     summary
     |> Enum.sort_by(fn {k, _v} -> to_string(k) end)
     |> Enum.map_join(" ", fn {type, count} ->
-      formatted_type = type |> to_string() |> String.capitalize()
+      formatted_type =
+        case type do
+          type when is_binary(type) -> type
+          type -> type |> to_string() |> String.capitalize()
+        end
+
       "#{formatted_type}=#{count}"
     end)
   end

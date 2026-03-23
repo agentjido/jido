@@ -204,6 +204,7 @@ defmodule Jido.AgentServer do
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
   alias Jido.Signal.Router, as: JidoRouter
+  alias Jido.Telemetry.Formatter
   alias Jido.Tracing.Context, as: TraceContext
   alias Jido.Tracing.Trace
 
@@ -906,7 +907,12 @@ defmodule Jido.AgentServer do
             do: agent_module.strategy_opts(),
             else: []
 
-        ctx = %{agent_module: agent_module, strategy_opts: strategy_opts}
+        ctx = %{
+          agent_module: agent_module,
+          strategy_opts: strategy_opts,
+          jido_instance: state.jido
+        }
+
         {agent, directives} = strategy.init(state.agent, ctx)
 
         state = State.update_agent(state, agent)
@@ -1414,7 +1420,9 @@ defmodule Jido.AgentServer do
         other -> other
       end
 
-    {agent, directives} = state.agent_module.cmd(state.agent, action_arg)
+    {agent, directives} =
+      state.agent_module.cmd(state.agent, action_arg, __jido_instance__: state.jido)
+
     {:ok, agent, List.wrap(directives), action_arg}
   end
 
@@ -1430,7 +1438,7 @@ defmodule Jido.AgentServer do
         emit_telemetry(
           [:jido, :agent_server, :signal, :stop],
           %{duration: duration},
-          Map.merge(metadata, %{directive_count: length(directives)})
+          Map.merge(metadata, signal_stop_metadata(directives))
         )
 
         case State.enqueue_all(state, signal, directives) do
@@ -1553,6 +1561,13 @@ defmodule Jido.AgentServer do
     |> Map.merge(trace_metadata)
   end
 
+  defp signal_stop_metadata(directives) when is_list(directives) do
+    %{
+      directive_count: length(directives),
+      directive_types: Formatter.summarize_directives(directives)
+    }
+  end
+
   defp maybe_track_child_started(
          %State{id: state_id} = state,
          %Signal{type: "jido.agent.child.started", data: data}
@@ -1668,7 +1683,7 @@ defmodule Jido.AgentServer do
         other -> other
       end
 
-    {agent, directives} = agent_module.cmd(state.agent, action_arg)
+    {agent, directives} = agent_module.cmd(state.agent, action_arg, __jido_instance__: state.jido)
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1677,7 +1692,7 @@ defmodule Jido.AgentServer do
     emit_telemetry(
       [:jido, :agent_server, :signal, :stop],
       %{duration: System.monotonic_time() - start_time},
-      Map.merge(metadata, %{directive_count: length(directives)})
+      Map.merge(metadata, signal_stop_metadata(directives))
     )
 
     case State.enqueue_all(state, signal, directives) do
