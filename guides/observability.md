@@ -43,6 +43,8 @@ config :my_app, MyApp.InternalJido,
 
 Settings resolve in this order: Debug override → instance config → global config → default.
 Invalid values are ignored and fall back to Jido defaults.
+The default telemetry log level is `:info`, so compact debug signal/directive
+logs are opt-in through config or `MyApp.Jido.debug(:on)`.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
 

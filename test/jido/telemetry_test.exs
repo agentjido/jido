@@ -213,6 +213,16 @@ defmodule JidoTest.TelemetryTest do
   end
 
   describe "handle_event/4" do
+    setup do
+      Application.delete_env(:jido, :telemetry)
+
+      on_exit(fn ->
+        Application.delete_env(:jido, :telemetry)
+      end)
+
+      :ok
+    end
+
     test "handles agent cmd start event" do
       assert :ok =
                Telemetry.handle_event(
@@ -347,7 +357,29 @@ defmodule JidoTest.TelemetryTest do
                )
     end
 
-    test "includes directive type summary in signal logs" do
+    test "does not emit signal summary logs at the default info level" do
+      log =
+        capture_log(fn ->
+          assert :ok =
+                   Telemetry.handle_event(
+                     [:jido, :agent_server, :signal, :stop],
+                     %{duration: 1_000},
+                     %{
+                       agent_id: "test",
+                       signal_type: "test.signal",
+                       directive_count: 2,
+                       directive_types: %{"Emit" => 1, "Schedule" => 1}
+                     },
+                     nil
+                   )
+        end)
+
+      assert log == ""
+    end
+
+    test "includes directive type summary in signal logs when debug logging is enabled" do
+      Application.put_env(:jido, :telemetry, log_level: :debug)
+
       log =
         capture_log(fn ->
           assert :ok =
