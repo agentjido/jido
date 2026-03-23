@@ -25,6 +25,9 @@ config :logger, :default_formatter,
 ```
 
 Without `level: :debug`, Logger discards debug messages before Jido sees them.
+Jido's default telemetry threshold is `:info`, so compact `[signal]` and
+`[directive]` debug logs appear only after you enable debug logging via config
+or `MyApp.Jido.debug(:on)`.
 
 ## Instance-Scoped Debug
 
