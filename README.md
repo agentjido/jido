@@ -293,6 +293,7 @@ State operations are internal state transitions handled by the strategy layer du
 - [Signals & Routing](guides/signals.md) - Signal-based communication
 - [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
 - [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
+- [Pods](guides/pods.md) - Manager-led durable topologies for named teams
 - [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
 - [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
 - [Plugins](guides/plugins.md) - Composable capability bundles

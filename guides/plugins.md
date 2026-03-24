@@ -200,6 +200,11 @@ Jido ships with **default plugins** that are automatically included in every age
 
 Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Identity.Agent.ensure/2` and `Jido.Memory.Agent.ensure/2`.
 
+`Jido.Pod` also uses this mechanism for pod-wrapped agents: it injects a
+singleton plugin under the reserved `:__pod__` key. That plugin is not a
+framework-wide default for all agents, but pod agents can still replace it via
+the normal `default_plugins: %{__pod__: ...}` override path.
+
 ### Identity Plugin
 
 The Identity plugin gives every agent a first-class identity primitive stored at `agent.state[:__identity__]`. Identity tracks profile facts (age, origin, generation) and a monotonic revision counter.
@@ -340,6 +345,9 @@ use Jido.Agent,
 ```
 
 > **Note:** `default_plugins:` only controls built-in defaults. To add new plugins, use the `plugins:` option.
+
+For pod-wrapped agents, the reserved `:__pod__` plugin can be replaced but
+should not be disabled. See [Pods](pods.md) for the pod-specific contract.
 
 ## See Also
 

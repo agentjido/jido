@@ -106,7 +106,42 @@ children = [
 `reconcile/2` eagerly acquires nodes marked `activation: :eager`.
 `ensure_node/3` lazily acquires and adopts a named node on demand.
 
-## Persistence
+## Hierarchical Topologies Today
+
+You can describe hierarchy-like intent in the topology data:
+
+```elixir
+topology =
+  Jido.Pod.Topology.new!(
+    name: "editorial_pipeline",
+    nodes: %{
+      lead: %{agent: MyApp.LeadAgent, manager: :editorial_leads, activation: :eager},
+      review: %{agent: MyApp.ReviewAgent, manager: :editorial_reviews},
+      publish: %{agent: MyApp.PublishAgent, manager: :editorial_publish}
+    },
+    links: [
+      {:owns, :lead, :review},
+      {:owns, :lead, :publish},
+      {:depends_on, :publish, :review}
+    ]
+  )
+```
+
+That is a **topology description**, not nested durable runtime parentage.
+
+Current runtime behavior is intentionally flat:
+
+- the pod agent is the single durable manager
+- all nodes are reconciled as manager-owned members
+- `links` are metadata only
+- `kind: :pod` is accepted by the topology shape for future evolution, but it
+  does not create recursive pod runtime semantics today
+
+So the honest answer is: **no, durable hierarchical pod runtime is not here
+yet**. You can model hierarchy in the topology data, but the runtime semantics
+remain manager-led and flat in this first slice.
+
+## Persistence, Storage, And Thaw
 
 Pod durability uses the same `Persist` and `Storage` adapters as any other
 agent because the topology snapshot lives in normal agent state.
@@ -115,11 +150,52 @@ This means storage adapters such as `jido_ecto` do not need a new storage
 contract to support pods. If an adapter needs additive schema changes for
 larger checkpoint payloads, those changes stay in the adapter package.
 
+What is persisted:
+
+- `agent.state[:__pod__].topology`
+- `agent.state[:__pod__].topology_version`
+- any pod-plugin metadata you keep under `:__pod__`
+
+What is **not** persisted as durable truth:
+
+- live child PIDs
+- monitors
+- `AgentServer` `state.children`
+- a live process tree
+
+That means pod thaw is a two-step story:
+
+1. the pod agent thaws with its topology snapshot already restored
+2. runtime relationships are re-established explicitly with `reconcile/2` and
+   `ensure_node/3`
+
+Example:
+
+```elixir
+{:ok, pod_pid} = Jido.Agent.InstanceManager.get(:order_review_pods, "order-123")
+{:ok, _started} = Jido.Pod.reconcile(pod_pid)
+
+# Later: the pod manager hibernates and is restored
+{:ok, restored_pid} = Jido.Agent.InstanceManager.get(:order_review_pods, "order-123")
+{:ok, topology} = Jido.Pod.fetch_topology(restored_pid)
+{:ok, snapshots} = Jido.Pod.nodes(restored_pid)
+```
+
+After thaw:
+
+- eager nodes can be re-adopted with `reconcile/2`
+- surviving lazy nodes show up as `:running` until explicitly adopted
+- `ensure_node/3` handles either case: start fresh or re-adopt existing
+
+So there is no extra storage adapter architecture for pods. The extra durability
+need is **runtime reconciliation after thaw**, not a new persistence contract.
+
 ## Scope
 
 This first slice keeps the model deliberately small:
 
 - predefined topology only
+- flat manager-led runtime semantics
 - single-node runtime assumptions
 - no pod-local signal bus
 - no separate pod instance manager
@@ -127,3 +203,12 @@ This first slice keeps the model deliberately small:
 
 The extension seam for later work is the `:__pod__` plugin state and the
 canonical `%Jido.Pod.Topology{}` shape.
+
+## See Also
+
+- [Runtime](runtime.md) for live hierarchy and adoption behavior
+- [Persistence & Storage](storage.md) for checkpoint and thaw invariants
+- [Multi-Agent Orchestration](orchestration.md) for ephemeral `SpawnAgent`
+  coordination patterns
+- [Plugins](plugins.md#default-plugins) for reserved plugin state keys and
+  override semantics

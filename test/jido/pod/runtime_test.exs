@@ -138,4 +138,43 @@ defmodule JidoTest.Pod.RuntimeTest do
     planner_key = {ReviewPod, pod_key, :planner}
     assert {:ok, ^planner_pid} = InstanceManager.lookup(@planner_manager, planner_key)
   end
+
+  test "thaw restores pod topology immediately and stages lazy node re-adoption explicitly", %{
+    pod_key: pod_key
+  } do
+    assert {:ok, pod_pid} = InstanceManager.get(@pod_manager, pod_key)
+    assert {:ok, _started} = Pod.reconcile(pod_pid)
+    assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
+    assert {:ok, reviewer_pid} = Pod.ensure_node(pod_pid, :reviewer)
+
+    pod_ref = Process.monitor(pod_pid)
+    assert :ok = InstanceManager.stop(@pod_manager, pod_key)
+    assert_receive {:DOWN, ^pod_ref, :process, ^pod_pid, _reason}, 1_000
+
+    assert Process.alive?(planner_pid)
+    assert Process.alive?(reviewer_pid)
+
+    assert {:ok, restored_pid} = InstanceManager.get(@pod_manager, pod_key)
+    assert {:ok, %Pod.Topology{name: "runtime_review_pod"}} = Pod.fetch_topology(restored_pid)
+
+    assert {:ok, snapshots} = Pod.nodes(restored_pid)
+    assert snapshots.planner.status == :running
+    assert snapshots.planner.running_pid == planner_pid
+    assert snapshots.planner.adopted_pid == nil
+    assert snapshots.reviewer.status == :running
+    assert snapshots.reviewer.running_pid == reviewer_pid
+    assert snapshots.reviewer.adopted_pid == nil
+
+    assert {:ok, _started} = Pod.reconcile(restored_pid)
+    assert {:ok, snapshots} = Pod.nodes(restored_pid)
+    assert snapshots.planner.status == :adopted
+    assert snapshots.planner.adopted_pid == planner_pid
+    assert snapshots.reviewer.status == :running
+    assert snapshots.reviewer.adopted_pid == nil
+
+    assert {:ok, ^reviewer_pid} = Pod.ensure_node(restored_pid, :reviewer)
+    assert {:ok, snapshots} = Pod.nodes(restored_pid)
+    assert snapshots.reviewer.status == :adopted
+    assert snapshots.reviewer.adopted_pid == reviewer_pid
+  end
 end

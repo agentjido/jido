@@ -82,6 +82,12 @@ hibernate/thaw. If you need durable agent lifecycle, use
 `Jido.Agent.InstanceManager` and treat reacquisition/reattachment as an explicit
 workflow concern.
 
+If the durable unit is a named team rather than a single agent, use
+`Jido.Pod`. A pod runs through ordinary `InstanceManager` lifecycle, persists
+its topology snapshot in `agent.state[:__pod__]`, and re-establishes live node
+attachments explicitly with `Jido.Pod.reconcile/2` and `Jido.Pod.ensure_node/3`
+after thaw. See [Pods](pods.md).
+
 The parent:
 - Monitors the child process
 - Tracks children in `state.children` map by tag
