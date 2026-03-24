@@ -112,6 +112,12 @@ Directive.spawn({Task, :start_link, [fn -> send_webhook(url) end]})
 Directive.spawn_agent(WorkerAgent, :worker_1, opts: %{initial_state: state})
 ```
 
+`SpawnAgent` forwards standard child startup options such as `:id`,
+`:initial_state`, and `:on_parent_death`. It does not install
+`InstanceManager` lifecycle features, so lifecycle/persistence options like
+`:storage`, `:idle_timeout`, `:lifecycle_mod`, `:pool`, `:pool_key`, and
+`:restored_from_storage` are rejected.
+
 `SpawnAgent` children default to `restart: :transient`, which means:
 - `Directive.stop_child/2` cleanly removes them
 - abnormal exits still restart the child

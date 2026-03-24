@@ -97,6 +97,14 @@ defmodule Jido.Agent.Directive do
   @type restart_policy :: :permanent | :temporary | :transient
 
   @restart_policies [:permanent, :temporary, :transient]
+  @unsupported_spawn_agent_opts [
+    :lifecycle_mod,
+    :pool,
+    :pool_key,
+    :idle_timeout,
+    :storage,
+    :restored_from_storage
+  ]
 
   @doc false
   @spec valid_restart_policies() :: [restart_policy()]
@@ -111,6 +119,28 @@ defmodule Jido.Agent.Directive do
   def validate_restart_policy(restart, _opts) do
     {:error, "restart must be one of #{inspect(@restart_policies)}, got: #{inspect(restart)}"}
   end
+
+  @doc false
+  @spec validate_spawn_agent_opts(term(), keyword()) :: :ok | {:error, String.t()}
+  def validate_spawn_agent_opts(opts, _extra \\ [])
+
+  def validate_spawn_agent_opts(opts, _extra) when is_map(opts) do
+    unsupported_opts =
+      @unsupported_spawn_agent_opts
+      |> Enum.filter(&Map.has_key?(opts, &1))
+      |> Enum.sort()
+
+    case unsupported_opts do
+      [] ->
+        :ok
+
+      opts ->
+        {:error,
+         "SpawnAgent does not support lifecycle/persistence opts #{inspect(opts)}; use Jido.Agent.InstanceManager for storage-backed lifecycle"}
+    end
+  end
+
+  def validate_spawn_agent_opts(_opts, _extra), do: :ok
 
   # ============================================================================
   # Error - Signal an error from cmd/2
@@ -277,7 +307,11 @@ defmodule Jido.Agent.Directive do
 
     - `agent` - Agent module (atom) or pre-built agent struct to spawn
     - `tag` - Tag for tracking this child (used as key in children map)
-    - `opts` - Additional options passed to child AgentServer
+    - `opts` - Additional options passed to child AgentServer. Supports standard
+      child startup options like `:id`, `:initial_state`, and `:on_parent_death`,
+      but not InstanceManager lifecycle/persistence options like `:storage`,
+      `:idle_timeout`, `:lifecycle_mod`, `:pool`, `:pool_key`, or
+      `:restored_from_storage`
     - `meta` - Metadata to pass to child via parent reference
     - `restart` - Restart policy for the child under supervision (default: `:transient`)
 
@@ -600,6 +634,9 @@ defmodule Jido.Agent.Directive do
   ## Options
 
   - `:opts` - Additional options for the child AgentServer (map)
+    - Supports child startup options like `:id`, `:initial_state`, and `:on_parent_death`
+    - Does not support InstanceManager lifecycle/persistence options like `:storage`,
+      `:idle_timeout`, `:lifecycle_mod`, `:pool`, `:pool_key`, or `:restored_from_storage`
   - `:meta` - Metadata to pass to the child via parent reference (map)
   - `:restart` - Child restart policy under supervision (default: `:transient`)
 
@@ -618,7 +655,13 @@ defmodule Jido.Agent.Directive do
 
     case validate_restart_policy(restart) do
       :ok ->
-        %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart}
+        case validate_spawn_agent_opts(opts) do
+          :ok ->
+            %SpawnAgent{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart}
+
+          {:error, message} ->
+            raise Jido.Error.validation_error(message, field: :opts)
+        end
 
       {:error, message} ->
         raise Jido.Error.validation_error(message, field: :restart)
