@@ -93,6 +93,22 @@ defmodule JidoTest.Agent.DirectiveTest do
 
       assert directive.restart == :permanent
     end
+
+    test "raises validation error for unsupported lifecycle opts" do
+      assert_raise Jido.Error.ValidationError,
+                   ~r/SpawnAgent does not support lifecycle\/persistence opts/,
+                   fn ->
+                     Directive.spawn_agent(MyAgent, :worker,
+                       opts: %{storage: Jido.Storage.ETS, idle_timeout: 5_000}
+                     )
+                   end
+    end
+
+    test "raises validation error when opts is not a map" do
+      assert_raise Jido.Error.ValidationError, ~r/SpawnAgent opts must be a map/, fn ->
+        Directive.spawn_agent(MyAgent, :worker, opts: [:not_a_map])
+      end
+    end
   end
 
   describe "adopt_child/3" do

@@ -900,6 +900,13 @@ children = [
 - `storage` omitted - uses the configured Jido instance storage (`jido.__jido_storage__/0` when available)
 - `storage: nil` - disables hibernate/thaw for that manager
 
+This automatic lifecycle is scoped to agents started through
+`Jido.Agent.InstanceManager`. It does not apply to arbitrary `SpawnAgent`
+children, and hibernating a parent agent does not recursively persist its live
+child tree. If a durable parent needs durable collaborators, model those
+collaborators as keyed managed agents and reacquire or adopt them explicitly
+after thaw.
+
 ```elixir
 # Uses MyApp.Jido.__jido_storage__/0 by default
 Jido.Agent.InstanceManager.child_spec(

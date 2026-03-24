@@ -75,6 +75,13 @@ Emit a `SpawnAgent` directive to create a child agent:
 %Directive.SpawnAgent{agent: ChildAgent, tag: :durable_worker, restart: :permanent}
 ```
 
+`SpawnAgent` is for live tracked child agents. It supports standard child
+startup options such as `:id`, `:initial_state`, and `:on_parent_death`, but it
+does not install `InstanceManager` lifecycle features like storage-backed
+hibernate/thaw. If you need durable agent lifecycle, use
+`Jido.Agent.InstanceManager` and treat reacquisition/reattachment as an explicit
+workflow concern.
+
 The parent:
 - Monitors the child process
 - Tracks children in `state.children` map by tag
