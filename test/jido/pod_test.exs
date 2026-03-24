@@ -108,11 +108,14 @@ defmodule JidoTest.PodTest do
 
     topology =
       topology
-      |> Topology.put_link({:depends_on, :reviewer, :planner})
+      |> then(fn topology ->
+        assert {:ok, topology} = Topology.put_link(topology, {:depends_on, :reviewer, :planner})
+        topology
+      end)
       |> Topology.delete_node(:planner)
 
     refute Map.has_key?(topology.nodes, :planner)
-    assert [{:depends_on, :reviewer, :planner}] == topology.links
+    assert [] == topology.links
   end
 
   test "mutated pod topology persists through existing storage adapters" do

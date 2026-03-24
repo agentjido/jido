@@ -197,6 +197,7 @@ defmodule Jido.MixProject do
           Jido.Await,
           Jido.Pod,
           Jido.Pod.Topology,
+          Jido.Pod.Topology.Link,
           Jido.Pod.Topology.Node
         ],
         Strategies: [

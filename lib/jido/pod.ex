@@ -12,6 +12,7 @@ defmodule Jido.Pod do
   alias Jido.AgentServer
   alias Jido.AgentServer.ChildInfo
   alias Jido.AgentServer.State
+  alias Jido.Observe
   alias Jido.Plugin.Instance, as: PluginInstance
   alias Jido.Pod.Plugin
   alias Jido.Pod.Topology
@@ -219,6 +220,27 @@ defmodule Jido.Pod do
   end
 
   @doc """
+  Gets a pod instance through the given `InstanceManager` and immediately
+  reconciles eager nodes.
+
+  This is the default happy path for pod lifecycle access. Call
+  `Jido.Agent.InstanceManager.get/3` directly if you need lower-level control
+  over reconciliation timing.
+  """
+  @spec get(atom(), term(), keyword()) :: {:ok, pid()} | {:error, term()}
+  def get(manager, key, opts \\ []) when is_atom(manager) and is_list(opts) do
+    with {:ok, pod_pid} <- InstanceManager.get(manager, key, opts) do
+      case reconcile(pod_pid) do
+        {:ok, _started} ->
+          {:ok, pod_pid}
+
+        {:error, reason} ->
+          {:error, %{stage: :reconcile, pod: pod_pid, reason: reason}}
+      end
+    end
+  end
+
+  @doc """
   Returns the reserved pod plugin instance for a pod-wrapped agent module.
   """
   @spec pod_plugin_instance(module()) :: {:ok, PluginInstance.t()} | {:error, term()}
@@ -348,8 +370,11 @@ defmodule Jido.Pod do
   """
   @spec lookup_node(AgentServer.server(), atom()) :: {:ok, pid()} | :error | {:error, term()}
   def lookup_node(server, name) when is_atom(name) do
-    with {:ok, snapshots} <- nodes(server) do
-      case Map.get(snapshots, name) do
+    with {:ok, state} <- AgentServer.state(server),
+         {:ok, topology} <- fetch_topology(state),
+         {:ok, node} <- fetch_node(topology, name),
+         :ok <- ensure_runtime_supported(node, name) do
+      case Map.get(build_node_snapshots(state, topology), name) do
         nil -> {:error, :unknown_node}
         %{pid: pid} when is_pid(pid) -> {:ok, pid}
         _snapshot -> :error
@@ -364,18 +389,26 @@ defmodule Jido.Pod do
   def ensure_node(server, name, opts \\ []) when is_atom(name) and is_list(opts) do
     with {:ok, state} <- AgentServer.state(server),
          {:ok, topology} <- fetch_topology(state),
-         {:ok, node} <- fetch_node(topology, name) do
-      case Map.get(state.children, name) do
-        %ChildInfo{pid: pid} when is_pid(pid) ->
-          if Process.alive?(pid) do
-            {:ok, pid}
-          else
-            ensure_node_from_manager(server, state, node, name, opts)
-          end
+         {:ok, node} <- fetch_node(topology, name),
+         :ok <- ensure_runtime_supported(node, name) do
+      {source, adopted_pid} = determine_node_source(state, node, name)
 
-        _child_info ->
-          ensure_node_from_manager(server, state, node, name, opts)
-      end
+      observe_pod_operation(
+        [:jido, :pod, :node, :ensure],
+        node_event_metadata(state, node, name, source),
+        fn ->
+          case source do
+            :adopted ->
+              {:ok, adopted_pid}
+
+            :running ->
+              ensure_node_from_manager(server, state, node, name, opts)
+
+            :started ->
+              ensure_node_from_manager(server, state, node, name, opts)
+          end
+        end
+      )
     end
   end
 
@@ -384,20 +417,34 @@ defmodule Jido.Pod do
   """
   @spec reconcile(AgentServer.server(), keyword()) :: {:ok, %{atom() => pid()}} | {:error, term()}
   def reconcile(server, opts \\ []) when is_list(opts) do
-    with {:ok, topology} <- fetch_topology(server) do
-      eager_nodes =
-        topology.nodes
-        |> Enum.filter(fn {_name, node} -> node.activation == :eager end)
+    with {:ok, state} <- AgentServer.state(server),
+         {:ok, topology} <- fetch_topology(state) do
+      observe_pod_operation(
+        [:jido, :pod, :reconcile],
+        pod_event_metadata(state),
+        fn ->
+          eager_node_names =
+            topology.nodes
+            |> Enum.filter(fn {_name, node} -> node.activation == :eager end)
+            |> Enum.map(&elem(&1, 0))
 
-      Enum.reduce_while(eager_nodes, {:ok, %{}}, fn {name, _node}, {:ok, acc} ->
-        case ensure_node(server, name, opts) do
-          {:ok, pid} ->
-            {:cont, {:ok, Map.put(acc, name, pid)}}
+          with {:ok, ordered_nodes} <- Topology.dependency_order(topology, eager_node_names) do
+            Enum.reduce_while(ordered_nodes, {:ok, %{}}, fn name, {:ok, acc} ->
+              case ensure_node(server, name, opts) do
+                {:ok, pid} ->
+                  {:cont, {:ok, Map.put(acc, name, pid)}}
 
-          {:error, reason} ->
-            {:halt, {:error, %{node: name, reason: reason}}}
+                {:error, reason} ->
+                  {:halt, {:error, %{node: name, reason: reason}}}
+              end
+            end)
+          end
+        end,
+        fn
+          {:ok, started} -> %{node_count: map_size(started)}
+          _other -> %{}
         end
-      end)
+      )
     end
   end
 
@@ -433,6 +480,16 @@ defmodule Jido.Pod do
     end
   end
 
+  defp ensure_runtime_supported(%Node{kind: :agent}, _name), do: :ok
+
+  defp ensure_runtime_supported(%Node{} = node, name) do
+    {:error,
+     Jido.Error.validation_error(
+       "Pod runtime only supports kind: :agent nodes today.",
+       details: %{name: name, kind: node.kind}
+     )}
+  end
+
   defp build_node_snapshots(%State{} = state, %Topology{} = topology) do
     Map.new(topology.nodes, fn {name, node} ->
       key = node_key(state, name)
@@ -460,6 +517,19 @@ defmodule Jido.Pod do
 
       _ ->
         nil
+    end
+  end
+
+  defp determine_node_source(%State{} = state, %Node{} = node, name) do
+    case adopted_child_pid(state, name) do
+      pid when is_pid(pid) ->
+        {:adopted, pid}
+
+      nil ->
+        case running_child_pid(node.manager, node_key(state, name)) do
+          pid when is_pid(pid) -> {:running, nil}
+          nil -> {:started, nil}
+        end
     end
   end
 
@@ -500,6 +570,54 @@ defmodule Jido.Pod do
   defp snapshot_status(adopted_pid, _running_pid) when is_pid(adopted_pid), do: :adopted
   defp snapshot_status(nil, running_pid) when is_pid(running_pid), do: :running
   defp snapshot_status(_adopted_pid, _running_pid), do: :stopped
+
+  defp pod_event_metadata(%State{} = state, extra \\ %{}) when is_map(extra) do
+    Map.merge(
+      %{
+        pod_id: state.id,
+        pod_module: state.agent_module,
+        agent_id: state.id,
+        agent_module: state.agent_module,
+        jido_instance: state.jido
+      },
+      extra
+    )
+  end
+
+  defp node_event_metadata(%State{} = state, %Node{} = node, name, source) do
+    pod_event_metadata(state, %{
+      node_name: name,
+      node_manager: node.manager,
+      node_kind: node.kind,
+      source: source
+    })
+  end
+
+  defp observe_pod_operation(event_prefix, metadata, fun, measurement_fun \\ fn _ -> %{} end)
+       when is_list(event_prefix) and is_map(metadata) and is_function(fun, 0) and
+              is_function(measurement_fun, 1) do
+    span_ctx = Observe.start_span(event_prefix, metadata)
+
+    try do
+      case fun.() do
+        {:error, reason} = error ->
+          Observe.finish_span_error(span_ctx, :error, reason, [])
+          error
+
+        result ->
+          Observe.finish_span(span_ctx, measurement_fun.(result))
+          result
+      end
+    rescue
+      error ->
+        Observe.finish_span_error(span_ctx, :error, error, __STACKTRACE__)
+        reraise error, __STACKTRACE__
+    catch
+      kind, reason ->
+        Observe.finish_span_error(span_ctx, kind, reason, __STACKTRACE__)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
 
   defp node_key(%State{} = state, name) do
     {state.agent_module, pod_key(state), name}

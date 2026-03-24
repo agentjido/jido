@@ -27,7 +27,7 @@ This guide covers Jido's unified persistence system: checkpoints, thread journal
 |----------|-------------|-----|
 | **Manual** | Explicit control over when to persist | `MyApp.Jido.hibernate/1`, `thaw/2` |
 | **Automatic** | Idle-based lifecycle for per-user/entity agents | `InstanceManager.get/3` with `idle_timeout` |
-| **Pod-managed topology** | Durable named teams with explicit reattachment after thaw | `Jido.Pod` + `InstanceManager.get/3` + `Jido.Pod.reconcile/2` |
+| **Pod-managed topology** | Durable named teams with explicit reattachment after thaw | `Jido.Pod.get/3` or `InstanceManager.get/3` + `Jido.Pod.reconcile/2` |
 | **None** | Stateless agents, cheap rebuilds, short-lived tasks | Skip storage config |
 
 Both manual and automatic approaches use the same underlying `Jido.Storage` behaviour.
@@ -55,6 +55,11 @@ So thaw works like this:
 
 If a node stayed alive independently while the pod manager was hibernated, it
 will appear as running but not yet adopted until reconciliation occurs.
+
+`Jido.Pod.get/3` bundles the common path by calling
+`Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.
+Use the explicit two-step path when you need to inspect the restored topology
+before reattachment.
 
 See [Pods](pods.md) for the manager-led runtime model and examples.
 

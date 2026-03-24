@@ -41,6 +41,20 @@ defmodule JidoTest.Pod.RuntimeTest do
       }
   end
 
+  defmodule HierarchicalReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "hierarchical_runtime_review_pod",
+      topology: %{
+        nested: %{
+          module: ReviewPod,
+          manager: :pod_runtime_nested_pods,
+          kind: :pod,
+          activation: :eager
+        }
+      }
+  end
+
   setup %{jido: jido} do
     storage_table = :"pod_runtime_storage_#{System.unique_integer([:positive])}"
 
@@ -86,14 +100,11 @@ defmodule JidoTest.Pod.RuntimeTest do
     {:ok, pod_key: "order-123"}
   end
 
-  test "reconcile eagerly starts eager nodes and ensure_node lazily activates others", %{
+  test "get eagerly reconciles eager nodes and ensure_node lazily activates others", %{
     pod_key: pod_key
   } do
-    assert {:ok, pod_pid} = InstanceManager.get(@pod_manager, pod_key)
+    assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key)
     assert {:ok, %Pod.Topology{name: "runtime_review_pod"}} = Pod.fetch_topology(pod_pid)
-
-    assert {:ok, started} = Pod.reconcile(pod_pid)
-    assert Map.has_key?(started, :planner)
 
     planner_key = {ReviewPod, pod_key, :planner}
     reviewer_key = {ReviewPod, pod_key, :reviewer}
@@ -117,8 +128,7 @@ defmodule JidoTest.Pod.RuntimeTest do
   end
 
   test "restored pod managers can re-adopt surviving eager nodes", %{pod_key: pod_key} do
-    assert {:ok, pod_pid} = InstanceManager.get(@pod_manager, pod_key)
-    assert {:ok, _started} = Pod.reconcile(pod_pid)
+    assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key)
     assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
 
     pod_ref = Process.monitor(pod_pid)
@@ -130,9 +140,8 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert planner_state.parent == nil
     assert planner_state.orphaned_from.id == pod_key
 
-    assert {:ok, restored_pid} = InstanceManager.get(@pod_manager, pod_key)
+    assert {:ok, restored_pid} = Pod.get(@pod_manager, pod_key)
     assert restored_pid != pod_pid
-    assert {:ok, _started} = Pod.reconcile(restored_pid)
     assert {:ok, ^planner_pid} = Pod.lookup_node(restored_pid, :planner)
 
     planner_key = {ReviewPod, pod_key, :planner}
@@ -142,8 +151,7 @@ defmodule JidoTest.Pod.RuntimeTest do
   test "thaw restores pod topology immediately and stages lazy node re-adoption explicitly", %{
     pod_key: pod_key
   } do
-    assert {:ok, pod_pid} = InstanceManager.get(@pod_manager, pod_key)
-    assert {:ok, _started} = Pod.reconcile(pod_pid)
+    assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key)
     assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
     assert {:ok, reviewer_pid} = Pod.ensure_node(pod_pid, :reviewer)
 
@@ -176,5 +184,29 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert {:ok, snapshots} = Pod.nodes(restored_pid)
     assert snapshots.reviewer.status == :adopted
     assert snapshots.reviewer.adopted_pid == reviewer_pid
+  end
+
+  test "nested pod nodes are explicit topology metadata, not supported runtime children", %{
+    jido: jido
+  } do
+    storage_table = :"pod_runtime_nested_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_nested_pod_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: HierarchicalReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    assert {:error, %{stage: :reconcile, pod: pid, reason: %{node: :nested, reason: reason}}} =
+             Pod.get(manager, "group-123")
+
+    assert Process.alive?(pid)
+    assert inspect(reason) =~ "only supports kind: :agent"
   end
 end

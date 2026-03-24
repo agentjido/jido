@@ -64,7 +64,7 @@ advertise the `:pod` capability.
 
 - `name` is the stable topology name.
 - `nodes` is a map of logical node name to `%Jido.Pod.Topology.Node{}`.
-- `links` is optional topology metadata.
+- `links` is a list of `%Jido.Pod.Topology.Link{}`.
 - `version` is a simple topology version integer.
 
 The topology API is pure:
@@ -81,7 +81,22 @@ The topology API is pure:
     :reviewer,
     %{agent: MyApp.ReviewerAgent, manager: :reviewer_members}
   )
+
+{:ok, topology} =
+  Jido.Pod.Topology.put_link(
+    topology,
+    {:depends_on, :reviewer, :planner}
+  )
 ```
+
+Tuple shorthand links are normalized into canonical `%Jido.Pod.Topology.Link{}`
+structs for storage and inspection.
+
+In v1, links support a small fixed vocabulary:
+
+- `:depends_on` orders eager reconciliation when both nodes are eager
+  `kind: :agent` members
+- `:owns` is descriptive topology metadata only
 
 ## Running A Pod
 
@@ -98,13 +113,19 @@ children = [
 ```
 
 ```elixir
-{:ok, pod_pid} = Jido.Agent.InstanceManager.get(:order_review_pods, "order-123")
-{:ok, _started} = Jido.Pod.reconcile(pod_pid)
+{:ok, pod_pid} = Jido.Pod.get(:order_review_pods, "order-123")
 {:ok, reviewer_pid} = Jido.Pod.ensure_node(pod_pid, :reviewer)
 ```
 
+`Jido.Pod.get/3` is the default happy path: it gets the pod manager through the
+ordinary `InstanceManager` and immediately reconciles eager nodes.
+
 `reconcile/2` eagerly acquires nodes marked `activation: :eager`.
 `ensure_node/3` lazily acquires and adopts a named node on demand.
+
+If you need lower-level control, you can still call
+`Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
+yourself.
 
 ## Hierarchical Topologies Today
 
@@ -132,10 +153,11 @@ That is a **topology description**, not nested durable runtime parentage.
 Current runtime behavior is intentionally flat:
 
 - the pod agent is the single durable manager
-- all nodes are reconciled as manager-owned members
-- `links` are metadata only
-- `kind: :pod` is accepted by the topology shape for future evolution, but it
-  does not create recursive pod runtime semantics today
+- all runtime-managed nodes are reconciled as manager-owned members
+- `:depends_on` affects eager `kind: :agent` reconciliation order only
+- `:owns` is metadata only
+- `kind: :pod` is accepted by the topology shape for future evolution, but
+  runtime helpers reject it with a clear unsupported-kind error today
 
 So the honest answer is: **no, durable hierarchical pod runtime is not here
 yet**. You can model hierarchy in the topology data, but the runtime semantics
@@ -172,13 +194,15 @@ That means pod thaw is a two-step story:
 Example:
 
 ```elixir
-{:ok, pod_pid} = Jido.Agent.InstanceManager.get(:order_review_pods, "order-123")
-{:ok, _started} = Jido.Pod.reconcile(pod_pid)
+{:ok, pod_pid} = Jido.Pod.get(:order_review_pods, "order-123")
 
 # Later: the pod manager hibernates and is restored
 {:ok, restored_pid} = Jido.Agent.InstanceManager.get(:order_review_pods, "order-123")
 {:ok, topology} = Jido.Pod.fetch_topology(restored_pid)
 {:ok, snapshots} = Jido.Pod.nodes(restored_pid)
+
+# Low-level: explicitly re-adopt eager nodes after thaw
+{:ok, _started} = Jido.Pod.reconcile(restored_pid)
 ```
 
 After thaw:
