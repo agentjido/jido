@@ -4,7 +4,10 @@
 
 > This is an advanced orchestration pattern.
 >
-> Most Jido hierarchies should keep the default `on_parent_death: :stop`. Reach for orphaning only when the child owns durable or long-running work that should outlive the original coordinator.
+> Most Jido hierarchies should keep the default `on_parent_death: :stop`. Reach
+> for orphaning only when the child owns long-running or business-critical work
+> that should outlive the original coordinator. Orphan survival is about live
+> runtime continuity, not automatic storage-backed durability.
 
 ## Architecture: Logical Hierarchy, Not OTP Parenthood
 

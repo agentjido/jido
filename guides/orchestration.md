@@ -48,6 +48,12 @@ parent. If the coordinator dies and the child is configured to survive, the
 child becomes orphaned and must be explicitly adopted before parent-directed
 communication resumes.
 
+This guide describes live runtime orchestration. `SpawnAgent` children are
+tracked helpers, not storage-managed hierarchy members. If some collaborators
+must survive idle hibernation or be restored independently, model them as keyed
+managed agents under `Jido.Agent.InstanceManager` rather than expecting
+`SpawnAgent` to make the hierarchy durable.
+
 ## When the Coordinator Dies
 
 Jido gives you three policies for child behavior when the logical parent dies:
