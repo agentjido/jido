@@ -9,6 +9,8 @@ defmodule JidoTest.Pod.RuntimeTest do
 
   @planner_manager :pod_runtime_planner_members
   @reviewer_manager :pod_runtime_reviewer_members
+  @nested_pod_manager :pod_runtime_nested_pods
+  @recursive_pod_manager :pod_runtime_recursive_pods
   @pod_manager :pod_runtime_review_pods
 
   defmodule PodWorker do
@@ -61,6 +63,34 @@ defmodule JidoTest.Pod.RuntimeTest do
       }
   end
 
+  defmodule RecursiveReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "recursive_review_pod",
+      topology: %{
+        nested: %{
+          module: __MODULE__,
+          manager: :pod_runtime_recursive_pods,
+          kind: :pod,
+          activation: :eager
+        }
+      }
+  end
+
+  defmodule AlternateReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "alternate_review_pod",
+      topology: %{
+        editor: %{
+          agent: PodWorker,
+          manager: :pod_runtime_planner_members,
+          activation: :eager,
+          initial_state: %{role: "editor"}
+        }
+      }
+  end
+
   defmodule PartialFailurePod do
     @moduledoc false
     use Jido.Pod,
@@ -75,14 +105,28 @@ defmodule JidoTest.Pod.RuntimeTest do
               activation: :eager
             },
             nested: %{
-              module: JidoTest.Pod.RuntimeTest.ReviewPod,
-              manager: :pod_runtime_nested_pods,
+              module: JidoTest.Pod.RuntimeTest.RecursiveReviewPod,
+              manager: :pod_runtime_recursive_pods,
               kind: :pod,
               activation: :eager
             }
           },
           links: [{:depends_on, :nested, :planner}]
         )
+  end
+
+  defmodule ManagerMismatchPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "manager_mismatch_pod",
+      topology: %{
+        nested: %{
+          module: AlternateReviewPod,
+          manager: :pod_runtime_nested_pods,
+          kind: :pod,
+          activation: :eager
+        }
+      }
   end
 
   setup %{jido: jido} do
@@ -121,9 +165,33 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
       )
 
+    {:ok, _nested_pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: @nested_pod_manager,
+          agent: ReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido, on_parent_death: :continue]
+        )
+      )
+
+    {:ok, _recursive_pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: @recursive_pod_manager,
+          agent: RecursiveReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido, on_parent_death: :continue]
+        )
+      )
+
     on_exit(fn ->
       :persistent_term.erase({InstanceManager, @planner_manager})
       :persistent_term.erase({InstanceManager, @reviewer_manager})
+      :persistent_term.erase({InstanceManager, @nested_pod_manager})
+      :persistent_term.erase({InstanceManager, @recursive_pod_manager})
       :persistent_term.erase({InstanceManager, @pod_manager})
     end)
 
@@ -219,9 +287,10 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert snapshots.reviewer.adopted_pid == reviewer_pid
   end
 
-  test "nested pod nodes are explicit topology metadata, not supported runtime children", %{
-    jido: jido
-  } do
+  test "nested pod nodes run through their own pod runtime and attach into the parent hierarchy",
+       %{
+         jido: jido
+       } do
     storage_table = :"pod_runtime_nested_storage_#{System.unique_integer([:positive])}"
     manager = :"pod_runtime_nested_pod_manager_#{System.unique_integer([:positive])}"
 
@@ -236,12 +305,93 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
       )
 
+    assert {:ok, pid} = Pod.get(manager, "group-123")
+    assert Process.alive?(pid)
+
+    nested_key = {HierarchicalReviewPod, "group-123", :nested}
+    nested_planner_key = {ReviewPod, nested_key, :planner}
+
+    assert {:ok, nested_pid} = Pod.lookup_node(pid, :nested)
+    assert {:ok, ^nested_pid} = InstanceManager.lookup(@nested_pod_manager, nested_key)
+    assert {:ok, nested_planner_pid} = Pod.lookup_node(nested_pid, :planner)
+
+    assert {:ok, ^nested_planner_pid} =
+             InstanceManager.lookup(@planner_manager, nested_planner_key)
+
+    {:ok, parent_state} = AgentServer.state(pid)
+    assert parent_state.children.nested.pid == nested_pid
+
+    {:ok, nested_state} = AgentServer.state(nested_pid)
+    assert nested_state.children.planner.pid == nested_planner_pid
+  end
+
+  test "restored parent pods re-adopt surviving nested pod nodes", %{jido: jido} do
+    storage_table = :"pod_runtime_nested_restore_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_nested_restore_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: HierarchicalReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    assert {:ok, pod_pid} = Pod.get(manager, "group-restore")
+    assert {:ok, nested_pid} = Pod.lookup_node(pod_pid, :nested)
+    assert {:ok, nested_planner_pid} = Pod.lookup_node(nested_pid, :planner)
+
+    pod_ref = Process.monitor(pod_pid)
+    assert :ok = InstanceManager.stop(manager, "group-restore")
+    assert_receive {:DOWN, ^pod_ref, :process, ^pod_pid, _reason}, 1_000
+
+    assert Process.alive?(nested_pid)
+    assert Process.alive?(nested_planner_pid)
+
+    assert {:ok, nested_state} = AgentServer.state(nested_pid)
+    assert nested_state.parent == nil
+    assert nested_state.orphaned_from.id == "group-restore"
+
+    assert {:ok, nested_planner_state} = AgentServer.state(nested_planner_pid)
+    assert nested_planner_state.parent.pid == nested_pid
+
+    assert {:ok, restored_pid} = Pod.get(manager, "group-restore")
+    assert {:ok, ^nested_pid} = Pod.lookup_node(restored_pid, :nested)
+
+    {:ok, restored_state} = AgentServer.state(restored_pid)
+    assert restored_state.children.nested.pid == nested_pid
+
+    {:ok, nested_state} = AgentServer.state(nested_pid)
+    assert nested_state.children.planner.pid == nested_planner_pid
+  end
+
+  test "nested pod nodes fail fast when the manager is configured for a different pod module",
+       %{jido: jido} do
+    storage_table = :"pod_runtime_manager_mismatch_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_manager_mismatch_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: ManagerMismatchPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
     assert {:error, %{stage: :reconcile, pod: pid, reason: report}} =
              Pod.get(manager, "group-123")
 
     assert Process.alive?(pid)
     assert report.failed == [:nested]
-    assert inspect(report.failures.nested) =~ "only supports kind: :agent"
+
+    assert inspect(report.failures.nested) =~
+             "requires the nested pod manager to manage the declared pod module"
   end
 
   test "reconcile reports partial success when one eager node cannot run", %{jido: jido} do
@@ -267,6 +417,7 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert report.failed == [:nested]
     assert report.pending == []
     assert Map.has_key?(report.nodes, :planner)
-    assert inspect(report.failures.nested) =~ "only supports kind: :agent"
+    assert report.failures.nested.stage == :nested_reconcile
+    assert inspect(report.failures.nested.reason) =~ "Recursive pod runtime is not supported"
   end
 end

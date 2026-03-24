@@ -119,6 +119,9 @@ includes the directive-type summary from `directive_types`, for example
 `owner` is the logical `:owns` parent when the node is not a pod root. Root
 nodes emit `owner: nil`.
 
+For `kind: :pod` nodes, a node-level exception on the outer pod can wrap a
+nested reconcile report from the inner pod manager.
+
 ### Correlation Metadata
 
 When trace context is active, all events include:

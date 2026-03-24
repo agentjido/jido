@@ -128,7 +128,10 @@ Ownership matters at runtime:
 - owned nodes are adopted under their logical owner node
 - `:depends_on` and `:owns` are combined into reconcile waves so prerequisites
   are running before descendants are adopted
-- `kind: :pod` remains topology-only for now; runtime helpers still reject it
+- `kind: :pod` nodes are acquired through their own `InstanceManager`, adopted
+  into the ownership tree, and then reconciled recursively
+- recursive pod ancestry is still rejected explicitly to avoid infinite runtime
+  expansion
 
 If you need lower-level control, you can still call
 `Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
@@ -136,8 +139,8 @@ yourself.
 
 ## Hierarchical Runtime Ownership
 
-Pods now support hierarchical runtime ownership for supported `kind: :agent`
-nodes:
+Pods support hierarchical runtime ownership for both `kind: :agent` and
+`kind: :pod` nodes:
 
 ```elixir
 topology =
@@ -164,14 +167,36 @@ In that example:
 - `publish` will not reconcile until `review` is running because of
   `{:depends_on, :publish, :review}`
 
-This is still **not** recursive pod runtime. `kind: :pod` is accepted by the
-topology shape for future evolution, but runtime helpers reject it with a clear
-unsupported-kind error today.
+Nested pods work the same way, except the node process is itself another pod
+manager:
+
+```elixir
+topology =
+  Jido.Pod.Topology.new!(
+    name: "program",
+    nodes: %{
+      coordinator: %{agent: MyApp.CoordinatorAgent, manager: :coordinators, activation: :eager},
+      editorial: %{module: MyApp.EditorialPod, manager: :editorial_pods, kind: :pod, activation: :eager}
+    },
+    links: [
+      {:owns, :coordinator, :editorial}
+    ]
+  )
+```
+
+In that case:
+
+- `editorial` is started through `:editorial_pods`
+- the `editorial` pod manager is adopted under `coordinator`
+- the nested pod then reconciles its own eager topology
+- thaw repairs the broken ownership edge at the outer pod boundary, then the
+  nested pod repairs its own eager edges when reconciled
 
 So the honest answer is:
 
-- **yes** for hierarchical runtime ownership among `kind: :agent` nodes
-- **no** for nested durable pod-of-pod runtime semantics
+- **yes** for nested durable pod-of-pod runtime semantics on a single node
+- **no** for recursive pod ancestry; a pod cannot expand back into itself in the
+  current runtime
 
 ## Persistence, Storage, And Thaw
 
@@ -219,10 +244,13 @@ After thaw:
 
 - surviving root nodes show up as `:running` until explicitly re-adopted
 - owned descendants can remain `:adopted` if their logical owner survived
+- surviving nested pod managers can remain `:running` or `:adopted` depending on
+  whether their immediate owner survived
 - `reconcile/2` repairs the root boundary and any missing ownership edges for
   eager nodes
 - `ensure_node/3` handles either case: start fresh, re-adopt a root, or
   reattach an owned descendant under its owner
+- nested pod nodes reconcile their own eager topology after they are reattached
 
 So there is no extra storage adapter architecture for pods. The extra durability
 need is **runtime reconciliation after thaw**, not a new persistence contract.
@@ -232,12 +260,12 @@ need is **runtime reconciliation after thaw**, not a new persistence contract.
 This first slice keeps the model deliberately small:
 
 - predefined topology only
-- hierarchical ownership for supported `kind: :agent` nodes
+- hierarchical ownership for `kind: :agent` and `kind: :pod` nodes
 - pod manager as the durable root
 - single-node runtime assumptions
 - no pod-local signal bus
 - no separate pod instance manager
-- no nested `kind: :pod` runtime
+- no recursive pod ancestry
 - no automatic topology mutation protocol
 
 The extension seam for later work is the `:__pod__` plugin state and the

@@ -8,6 +8,7 @@ defmodule JidoTest.Pod.TelemetryTest do
 
   @planner_manager :pod_telemetry_planner_members
   @reviewer_manager :pod_telemetry_reviewer_members
+  @recursive_pod_manager :pod_telemetry_recursive_pods
   @pod_manager :pod_telemetry_review_pods
 
   defmodule PodWorker do
@@ -44,6 +45,20 @@ defmodule JidoTest.Pod.TelemetryTest do
         )
   end
 
+  defmodule RecursiveReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "recursive_telemetry_review_pod",
+      topology: %{
+        nested: %{
+          module: __MODULE__,
+          manager: :pod_telemetry_recursive_pods,
+          kind: :pod,
+          activation: :eager
+        }
+      }
+  end
+
   defmodule BrokenReviewPod do
     @moduledoc false
     use Jido.Pod,
@@ -59,8 +74,8 @@ defmodule JidoTest.Pod.TelemetryTest do
               initial_state: %{role: "planner"}
             },
             nested: %{
-              module: ReviewPod,
-              manager: :pod_telemetry_nested_pods,
+              module: RecursiveReviewPod,
+              manager: :pod_telemetry_recursive_pods,
               kind: :pod,
               activation: :eager
             }
@@ -124,10 +139,22 @@ defmodule JidoTest.Pod.TelemetryTest do
         )
       )
 
+    {:ok, _recursive_pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: @recursive_pod_manager,
+          agent: RecursiveReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido, on_parent_death: :continue]
+        )
+      )
+
     on_exit(fn ->
       :telemetry.detach(handler_id)
       :persistent_term.erase({InstanceManager, @planner_manager})
       :persistent_term.erase({InstanceManager, @reviewer_manager})
+      :persistent_term.erase({InstanceManager, @recursive_pod_manager})
       :persistent_term.erase({InstanceManager, @pod_manager})
     end)
 
@@ -242,9 +269,15 @@ defmodule JidoTest.Pod.TelemetryTest do
                     %{node_name: :planner, source: :started}}
 
     assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :exception], %{duration: _},
-                    %{node_name: :nested, error: error}}
+                    %{pod_module: RecursiveReviewPod, node_name: :nested, error: inner_error}}
 
-    assert inspect(error) =~ "only supports kind: :agent"
+    assert inspect(inner_error) =~ "Recursive pod runtime is not supported"
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :exception], %{duration: _},
+                    %{pod_module: BrokenReviewPod, node_name: :nested, error: error}}
+
+    assert error.stage == :nested_reconcile
+    assert inspect(error.reason) =~ "Recursive pod runtime is not supported"
 
     assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :exception], %{duration: _},
                     %{pod_id: ^pod_key, pod_module: BrokenReviewPod, error: ^report}}

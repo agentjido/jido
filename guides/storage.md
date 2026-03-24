@@ -58,6 +58,8 @@ can show up in two different states:
 
 - surviving root nodes are typically `:running` until the pod manager re-adopts them
 - surviving owned descendants can remain `:adopted` if their logical owner never died
+- surviving nested pod managers follow the same rule, then reconcile their own
+  eager topology once they are reattached
 
 `Jido.Pod.get/3` bundles the common path by calling
 `Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.

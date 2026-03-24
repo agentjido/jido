@@ -16,6 +16,7 @@ defmodule Jido.Pod do
   alias Jido.Pod.Plugin
   alias Jido.Pod.Topology
   alias Jido.Pod.Topology.Node
+  alias Jido.RuntimeStore
 
   @pod_state_key Plugin.state_key_atom()
   @pod_capability Plugin.capability()
@@ -486,12 +487,68 @@ defmodule Jido.Pod do
 
   defp ensure_runtime_supported(%Node{kind: :agent}, _name), do: :ok
 
+  defp ensure_runtime_supported(%Node{kind: :pod, module: module, manager: manager}, _name)
+       when is_atom(module) do
+    with :ok <- ensure_pod_module(module),
+         :ok <- ensure_pod_manager_module(manager, module) do
+      :ok
+    end
+  end
+
   defp ensure_runtime_supported(%Node{} = node, name) do
     {:error,
      Jido.Error.validation_error(
-       "Pod runtime only supports kind: :agent nodes today.",
+       "Pod runtime only supports kind: :agent and kind: :pod nodes today.",
        details: %{name: name, kind: node.kind}
      )}
+  end
+
+  defp ensure_pod_module(module) when is_atom(module) do
+    case Code.ensure_loaded(module) do
+      {:module, _loaded} ->
+        cond do
+          function_exported?(module, :pod?, 0) and module.pod?() ->
+            case pod_plugin_instance(module) do
+              {:ok, _instance} -> :ok
+              {:error, reason} -> {:error, reason}
+            end
+
+          true ->
+            {:error,
+             Jido.Error.validation_error(
+               "Pod runtime requires kind: :pod nodes to reference a pod module.",
+               details: %{module: module}
+             )}
+        end
+
+      {:error, reason} ->
+        {:error,
+         Jido.Error.validation_error(
+           "Pod runtime could not load the module for a kind: :pod node.",
+           details: %{module: module, reason: reason}
+         )}
+    end
+  end
+
+  defp ensure_pod_manager_module(manager, module) when is_atom(manager) and is_atom(module) do
+    case InstanceManager.agent_module(manager) do
+      {:ok, ^module} ->
+        :ok
+
+      {:ok, actual_module} ->
+        {:error,
+         Jido.Error.validation_error(
+           "Pod runtime requires the nested pod manager to manage the declared pod module.",
+           details: %{manager: manager, module: module, actual_module: actual_module}
+         )}
+
+      {:error, :not_found} ->
+        {:error,
+         Jido.Error.validation_error(
+           "Pod runtime could not resolve the nested pod manager.",
+           details: %{manager: manager, module: module}
+         )}
+    end
   end
 
   defp build_node_snapshots(%State{} = state, %Topology{} = topology) do
@@ -605,6 +662,14 @@ defmodule Jido.Pod do
   end
 
   defp do_ensure_planned_node(server_pid, state, topology, name, node, snapshot, report, opts) do
+    if node.kind == :pod do
+      ensure_planned_pod_node(server_pid, state, topology, name, node, snapshot, report, opts)
+    else
+      ensure_planned_agent_node(server_pid, state, topology, name, node, snapshot, report, opts)
+    end
+  end
+
+  defp ensure_planned_agent_node(server_pid, state, topology, name, node, snapshot, report, opts) do
     case snapshot.status do
       :adopted ->
         {:ok, ensure_result(name, snapshot.running_pid, :adopted, snapshot.owner)}
@@ -621,6 +686,33 @@ defmodule Jido.Pod do
              {:ok, ^pid} <- adopt_runtime_child(parent_pid, pid, name, node.meta, state, topology) do
           {:ok, ensure_result(name, pid, snapshot_source(snapshot), snapshot.owner)}
         end
+    end
+  end
+
+  defp ensure_planned_pod_node(server_pid, state, topology, name, node, snapshot, report, opts) do
+    with :ok <- ensure_pod_recursion_safe(node, state, opts) do
+      case snapshot.status do
+        :adopted ->
+          with {:ok, _nested_report} <-
+                 reconcile_nested_pod(snapshot.running_pid, node, state, opts) do
+            {:ok, ensure_result(name, snapshot.running_pid, :adopted, snapshot.owner)}
+          end
+
+        :misplaced ->
+          {:error, misplaced_node_reason(name, snapshot)}
+
+        _status ->
+          initial_state = Keyword.get(opts, :initial_state, node.initial_state)
+          key = node_key(state, name)
+
+          with {:ok, parent_pid} <- resolve_parent_pid(server_pid, state, topology, name, report),
+               {:ok, pid} <- get_managed_node(node.manager, key, initial_state: initial_state),
+               {:ok, ^pid} <-
+                 adopt_runtime_child(parent_pid, pid, name, node.meta, state, topology),
+               {:ok, _nested_report} <- reconcile_nested_pod(pid, node, state, opts) do
+            {:ok, ensure_result(name, pid, snapshot_source(snapshot), snapshot.owner)}
+          end
+      end
     end
   end
 
@@ -687,20 +779,7 @@ defmodule Jido.Pod do
         end
       )
 
-    pending =
-      if failures == %{} do
-        List.flatten(Enum.drop(waves, wave_index + 1))
-      else
-        current_wave_pending =
-          wave_results
-          |> Enum.reject(fn
-            {:ok, _name, _result} -> true
-            {:error, _name, _reason} -> true
-          end)
-          |> Enum.map(&elem(&1, 1))
-
-        current_wave_pending ++ List.flatten(Enum.drop(waves, wave_index + 1))
-      end
+    pending = List.flatten(Enum.drop(waves, wave_index + 1))
 
     %{
       report
@@ -723,7 +802,7 @@ defmodule Jido.Pod do
     running_pid = running_child_pid(node.manager, key)
     owner = owner_name(topology, name)
     expected_parent = expected_parent_ref(state, name, owner)
-    actual_parent = actual_parent_ref(running_pid)
+    actual_parent = actual_parent_ref(state, name)
     adopted? = parent_matches?(actual_parent, expected_parent)
 
     status =
@@ -748,16 +827,18 @@ defmodule Jido.Pod do
     }
   end
 
-  defp actual_parent_ref(pid) when is_pid(pid) do
-    with {:ok, child_state} <- AgentServer.state(pid),
-         %{id: id, pid: parent_pid, tag: tag} <- child_state.parent do
-      %{id: id, pid: parent_pid, tag: tag}
-    else
-      _other -> nil
+  defp actual_parent_ref(%State{} = state, name) when is_atom(name) do
+    case RuntimeStore.fetch(state.jido, :relationships, node_id(state, name)) do
+      {:ok, %{parent_id: parent_id, tag: tag}} when is_binary(parent_id) ->
+        %{id: parent_id, pid: Jido.whereis(state.jido, parent_id), tag: tag}
+
+      {:ok, _other} ->
+        nil
+
+      :error ->
+        nil
     end
   end
-
-  defp actual_parent_ref(_pid), do: nil
 
   defp owner_name(%Topology{} = topology, name) do
     case Topology.owner_of(topology, name) do
@@ -892,6 +973,37 @@ defmodule Jido.Pod do
     end
   end
 
+  defp reconcile_nested_pod(pid, %Node{module: module}, %State{} = state, opts)
+       when is_pid(pid) and is_atom(module) do
+    nested_opts =
+      opts
+      |> Keyword.take([:max_concurrency, :timeout])
+      |> Keyword.put(:__pod_ancestry__, pod_ancestry(opts, state) ++ [module])
+
+    case reconcile(pid, nested_opts) do
+      {:ok, report} ->
+        {:ok, report}
+
+      {:error, report} ->
+        {:error, %{stage: :nested_reconcile, pod: pid, reason: report}}
+    end
+  end
+
+  defp ensure_pod_recursion_safe(%Node{module: module} = node, %State{} = state, opts)
+       when is_atom(module) do
+    ancestry = pod_ancestry(opts, state)
+
+    if module in ancestry do
+      {:error,
+       Jido.Error.validation_error(
+         "Recursive pod runtime is not supported for the current pod ancestry.",
+         details: %{module: module, ancestry: ancestry, manager: node.manager}
+       )}
+    else
+      :ok
+    end
+  end
+
   defp resolve_runtime_server(server, %State{id: id, registry: registry}) do
     if is_pid(server) and Process.alive?(server) do
       {:ok, server}
@@ -901,6 +1013,14 @@ defmodule Jido.Pod do
         nil -> {:error, :not_found}
       end
     end
+  end
+
+  defp pod_ancestry(opts, %State{agent_module: agent_module}) when is_list(opts) do
+    opts
+    |> Keyword.get(:__pod_ancestry__, [])
+    |> List.wrap()
+    |> Kernel.++([agent_module])
+    |> Enum.uniq()
   end
 
   defp node_prerequisites(%Topology{} = topology, name) do

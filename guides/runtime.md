@@ -87,7 +87,9 @@ If the durable unit is a named team rather than a single agent, use
 its topology snapshot in `agent.state[:__pod__]`, and re-establishes live node
 attachments explicitly with `Jido.Pod.reconcile/2` and `Jido.Pod.ensure_node/3`
 after thaw. Root pod nodes are adopted into the pod manager, while owned nodes
-are adopted under their logical runtime owner. `Jido.Pod.get/3` is the default
+are adopted under their logical runtime owner. Nested `kind: :pod` nodes are
+acquired through their own `InstanceManager` and then reconciled recursively.
+`Jido.Pod.get/3` is the default
 happy path because it performs the initial eager reconciliation after
 `InstanceManager.get/3`. See [Pods](pods.md).
 
