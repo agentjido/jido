@@ -121,10 +121,8 @@ defmodule Jido.Agent.Directive do
   end
 
   @doc false
-  @spec validate_spawn_agent_opts(term(), keyword()) :: :ok | {:error, String.t()}
-  def validate_spawn_agent_opts(opts, _extra \\ [])
-
-  def validate_spawn_agent_opts(opts, _extra) when is_map(opts) do
+  @spec validate_spawn_agent_opts(term()) :: :ok | {:error, String.t()}
+  def validate_spawn_agent_opts(opts) when is_map(opts) do
     unsupported_opts =
       @unsupported_spawn_agent_opts
       |> Enum.filter(&Map.has_key?(opts, &1))
@@ -140,7 +138,9 @@ defmodule Jido.Agent.Directive do
     end
   end
 
-  def validate_spawn_agent_opts(_opts, _extra), do: :ok
+  def validate_spawn_agent_opts(opts) do
+    {:error, "SpawnAgent opts must be a map, got: #{inspect(opts)}"}
+  end
 
   # ============================================================================
   # Error - Signal an error from cmd/2

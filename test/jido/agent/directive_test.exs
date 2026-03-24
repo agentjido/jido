@@ -103,6 +103,12 @@ defmodule JidoTest.Agent.DirectiveTest do
                      )
                    end
     end
+
+    test "raises validation error when opts is not a map" do
+      assert_raise Jido.Error.ValidationError, ~r/SpawnAgent opts must be a map/, fn ->
+        Directive.spawn_agent(MyAgent, :worker, opts: [:not_a_map])
+      end
+    end
   end
 
   describe "adopt_child/3" do

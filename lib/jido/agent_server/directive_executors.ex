@@ -209,81 +209,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
         _input_signal,
         state
       ) do
-    case Directive.validate_restart_policy(restart) do
-      :ok ->
-        case Directive.validate_spawn_agent_opts(opts) do
-          :ok ->
-            child_id = opts[:id] || "#{state.id}/#{tag}"
-
-            child_opts =
-              [
-                agent: agent,
-                id: child_id,
-                parent: %{
-                  pid: self(),
-                  id: state.id,
-                  tag: tag,
-                  meta: meta
-                }
-              ] ++ Map.to_list(Map.delete(opts, :id))
-
-            child_opts =
-              if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
-
-            child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
-
-            supervisor =
-              if state.jido,
-                do: Jido.agent_supervisor_name(state.jido),
-                else: Jido.AgentSupervisor
-
-            case DynamicSupervisor.start_child(supervisor, child_spec) do
-              {:ok, pid} ->
-                case persist_relationship(state, child_id, tag, meta) do
-                  :ok ->
-                    ref = Process.monitor(pid)
-
-                    child_info =
-                      ChildInfo.new!(%{
-                        pid: pid,
-                        ref: ref,
-                        module: resolve_agent_module(agent),
-                        id: child_id,
-                        tag: tag,
-                        meta: meta
-                      })
-
-                    new_state = State.add_child(state, tag, child_info)
-
-                    Logger.debug(
-                      "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-                    )
-
-                    {:ok, new_state}
-
-                  {:error, reason} ->
-                    _ = DynamicSupervisor.terminate_child(supervisor, pid)
-
-                    Logger.error(
-                      "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
-                    )
-
-                    {:ok, state}
-                end
-
-              {:error, reason} ->
-                Logger.error(
-                  "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
-                )
-
-                {:ok, state}
-            end
-
-          {:error, reason} ->
-            Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
-            {:ok, state}
-        end
-
+    with :ok <- Directive.validate_restart_policy(restart),
+         :ok <- Directive.validate_spawn_agent_opts(opts) do
+      spawn_child(state, agent, tag, opts, meta, restart)
+    else
       {:error, reason} ->
         Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
         {:ok, state}
@@ -293,6 +222,72 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   defp resolve_agent_module(agent) when is_atom(agent), do: agent
   defp resolve_agent_module(%{__struct__: module}), do: module
   defp resolve_agent_module(_), do: nil
+
+  defp spawn_child(state, agent, tag, opts, meta, restart) do
+    child_id = opts[:id] || "#{state.id}/#{tag}"
+
+    child_opts =
+      [
+        agent: agent,
+        id: child_id,
+        parent: %{
+          pid: self(),
+          id: state.id,
+          tag: tag,
+          meta: meta
+        }
+      ] ++ Map.to_list(Map.delete(opts, :id))
+
+    child_opts =
+      if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
+
+    child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
+
+    supervisor =
+      if state.jido, do: Jido.agent_supervisor_name(state.jido), else: Jido.AgentSupervisor
+
+    case DynamicSupervisor.start_child(supervisor, child_spec) do
+      {:ok, pid} ->
+        case persist_relationship(state, child_id, tag, meta) do
+          :ok ->
+            ref = Process.monitor(pid)
+
+            child_info =
+              ChildInfo.new!(%{
+                pid: pid,
+                ref: ref,
+                module: resolve_agent_module(agent),
+                id: child_id,
+                tag: tag,
+                meta: meta
+              })
+
+            new_state = State.add_child(state, tag, child_info)
+
+            Logger.debug(
+              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
+            )
+
+            {:ok, new_state}
+
+          {:error, reason} ->
+            _ = DynamicSupervisor.terminate_child(supervisor, pid)
+
+            Logger.error(
+              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
+            )
+
+            {:ok, state}
+        end
+
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
+        )
+
+        {:ok, state}
+    end
+  end
 
   defp persist_relationship(state, child_id, tag, meta) do
     RuntimeStore.put(state.jido, @relationship_hive, child_id, %{

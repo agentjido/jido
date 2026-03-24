@@ -509,6 +509,21 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
       refute Map.has_key?(state.children, :managed_child)
     end
+
+    test "rejects malformed opts even for raw SpawnAgent structs", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      directive = %Directive.SpawnAgent{
+        agent: TestAgent,
+        tag: :bad_opts_child,
+        opts: [:not_a_map],
+        meta: %{}
+      }
+
+      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      refute Map.has_key?(state.children, :bad_opts_child)
+    end
   end
 
   describe "StopChild directive" do
