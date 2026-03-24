@@ -7,7 +7,6 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   """
 
   alias Jido.Agent
-  alias Jido.Agent.StateOps
   alias Jido.Instruction
   alias Jido.Thread.Agent, as: ThreadAgent
 
@@ -16,10 +15,12 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   """
   @spec append_instruction_start(Agent.t(), Instruction.t()) :: Agent.t()
   def append_instruction_start(agent, %Instruction{} = instruction) do
-    append_entry(agent, %{
+    entry = %{
       kind: :instruction_start,
       payload: instruction_payload(instruction)
-    })
+    }
+
+    ThreadAgent.append(agent, entry)
   end
 
   @doc """
@@ -27,10 +28,12 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   """
   @spec append_instruction_end(Agent.t(), Instruction.t(), atom()) :: Agent.t()
   def append_instruction_end(agent, %Instruction{} = instruction, status) do
-    append_entry(agent, %{
+    entry = %{
       kind: :instruction_end,
       payload: Map.put(instruction_payload(instruction), :status, status)
-    })
+    }
+
+    ThreadAgent.append(agent, entry)
   end
 
   @doc """
@@ -76,10 +79,5 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
     else
       payload
     end
-  end
-
-  defp append_entry(agent, entry) do
-    {agent, []} = StateOps.apply_state_ops(agent, [ThreadAgent.append_op(entry)])
-    agent
   end
 end

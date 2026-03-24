@@ -1002,7 +1002,7 @@ defmodule Jido.AgentServer do
 
   def handle_call({:append_thread_entry, entry_or_entries}, _from, %State{} = state) do
     {agent, []} =
-      StateOps.apply_state_ops(state.agent, [Jido.Thread.Agent.append_op(entry_or_entries)])
+      StateOps.apply_state_ops(state.agent, [Jido.Agent.StateOp.append_thread(entry_or_entries)])
 
     {:reply, :ok, State.update_agent(state, agent)}
   end
