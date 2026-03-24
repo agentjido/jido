@@ -25,7 +25,10 @@ defmodule Jido.Thread.Plugin do
   use Jido.Plugin,
     name: "thread",
     state_key: :__thread__,
-    actions: [],
+    actions: [Jido.Thread.Actions.Record],
+    signal_routes: [
+      {"entries.record", Jido.Thread.Actions.Record}
+    ],
     singleton: true,
     description: "Thread state management for agent conversation history.",
     capabilities: [:thread]

@@ -5,6 +5,7 @@ defmodule JidoExampleTest.ThreadPluginTest do
   This test shows:
   - Every agent gets `Jido.Thread.Plugin` automatically (default singleton plugin)
   - Using `Jido.Thread.Agent` helpers: `ensure/2`, `append/3`, `get/1`, `has_thread?/1`
+  - Recording generic thread entries through the default `thread.entries.record` signal
   - Actions that build conversation history using Thread
   - Disabling the thread plugin with `default_plugins: %{__thread__: false}`
   - The strategy layer auto-tracks instruction_start/instruction_end when thread exists
@@ -97,6 +98,14 @@ defmodule JidoExampleTest.ThreadPluginTest do
       schema: [
         value: [type: :integer, default: 0]
       ]
+  end
+
+  defmodule PassiveThreadAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "passive_thread_agent",
+      description: "Agent that relies on the default thread plugin route",
+      schema: []
   end
 
   # ===========================================================================
@@ -206,6 +215,25 @@ defmodule JidoExampleTest.ThreadPluginTest do
   end
 
   describe "thread via AgentServer" do
+    test "default thread signal records generic entries", %{jido: jido} do
+      {:ok, pid} = Jido.start_agent(jido, PassiveThreadAgent, id: unique_id("thread"))
+
+      {:ok, agent} =
+        AgentServer.call(
+          pid,
+          signal("thread.entries.record", %{
+            entries: [
+              %{kind: :message, payload: %{role: "user", content: "queued event"}}
+            ]
+          })
+        )
+
+      assert ThreadAgent.has_thread?(agent)
+      thread = ThreadAgent.get(agent)
+      assert Thread.entry_count(thread) == 1
+      assert Thread.last(thread).payload == %{role: "user", content: "queued event"}
+    end
+
     test "thread persists across signals in a running server", %{jido: jido} do
       {:ok, pid} = Jido.start_agent(jido, ChatAgent, id: unique_id("chat"))
 

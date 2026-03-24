@@ -256,6 +256,31 @@ end
 The Thread plugin stores `agent.state[:__thread__]` as an append-only journal of
 what happened. Thread entries should be treated as immutable facts.
 
+For running agents, the default thread plugin also exposes a generic
+`thread.entries.record` signal route for appending new entries through the
+normal signal/action pipeline:
+
+```elixir
+entry_id = "entry_" <> Jido.Util.generate_id()
+
+signal =
+  Jido.Signal.new!("thread.entries.record", %{
+    entries: [
+      %{
+        kind: :message_committed,
+        payload: %{provider: :slack, remote_id: slack_ts},
+        refs: %{entry_id: entry_id}
+      }
+    ]
+  }, source: "/providers/slack")
+
+{:ok, agent} = Jido.AgentServer.call(pid, signal)
+```
+
+This route is provided by the default `Jido.Thread.Plugin`. If you disable or
+replace that plugin, expose whatever thread routes best fit your own thread
+semantics.
+
 If external metadata arrives later, append a follow-up entry that points back
 to the original entry instead of updating it in place. The caller supplies a
 stable `entry_id` up front so later events can reference it:

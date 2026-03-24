@@ -21,8 +21,8 @@ defmodule JidoTest.Thread.PluginTest do
       assert :thread in ThreadPlugin.capabilities()
     end
 
-    test "has no actions" do
-      assert ThreadPlugin.actions() == []
+    test "exposes thread record action" do
+      assert ThreadPlugin.actions() == [Jido.Thread.Actions.Record]
     end
 
     test "schema is nil (no auto-initialization)" do
@@ -45,6 +45,11 @@ defmodule JidoTest.Thread.PluginTest do
     test "state_key is :__thread__ in manifest" do
       manifest = ThreadPlugin.manifest()
       assert manifest.state_key == :__thread__
+    end
+
+    test "includes thread record signal route in manifest" do
+      manifest = ThreadPlugin.manifest()
+      assert {"entries.record", Jido.Thread.Actions.Record} in manifest.signal_routes
     end
   end
 
@@ -103,6 +108,14 @@ defmodule JidoTest.Thread.PluginTest do
     test "agent can disable thread plugin" do
       modules = AgentWithoutThread.plugins()
       refute Jido.Thread.Plugin in modules
+    end
+
+    test "agent exposes default thread record signal type" do
+      assert "thread.entries.record" in AgentWithThread.signal_types()
+    end
+
+    test "disabled agent does not expose default thread signal type" do
+      refute "thread.entries.record" in AgentWithoutThread.signal_types()
     end
 
     test "thread can be attached after creation via Thread.Agent" do
