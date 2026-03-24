@@ -50,11 +50,14 @@ The durability boundary is important:
 So thaw works like this:
 
 1. the pod agent thaws and immediately has its topology back
-2. eager nodes are re-adopted by calling `Jido.Pod.reconcile/2`
-3. lazy or surviving nodes are reattached on demand via `Jido.Pod.ensure_node/3`
+2. eager roots and missing ownership edges are repaired by calling `Jido.Pod.reconcile/2`
+3. lazy roots or surviving nodes are reattached on demand via `Jido.Pod.ensure_node/3`
 
 If a node stayed alive independently while the pod manager was hibernated, it
-will appear as running but not yet adopted until reconciliation occurs.
+can show up in two different states:
+
+- surviving root nodes are typically `:running` until the pod manager re-adopts them
+- surviving owned descendants can remain `:adopted` if their logical owner never died
 
 `Jido.Pod.get/3` bundles the common path by calling
 `Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.

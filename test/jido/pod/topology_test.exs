@@ -104,6 +104,87 @@ defmodule JidoTest.Pod.TopologyTest do
     assert inspect(reason) =~ "cyclic"
   end
 
+  test "ownership helpers expose roots, owners, and owned children" do
+    topology =
+      Topology.new!(
+        name: "ownership",
+        nodes: %{
+          lead: %{agent: WorkerAgent, manager: :lead_members},
+          squad: %{agent: WorkerAgent, manager: :squad_members},
+          worker: %{agent: WorkerAgent, manager: :worker_members}
+        },
+        links: [
+          {:owns, :lead, :squad},
+          {:owns, :squad, :worker},
+          {:depends_on, :worker, :squad}
+        ]
+      )
+
+    assert [:lead] == Topology.roots(topology)
+    assert {:ok, :lead} = Topology.owner_of(topology, :squad)
+    assert {:ok, :squad} = Topology.owner_of(topology, :worker)
+    assert :root == Topology.owner_of(topology, :lead)
+    assert [:squad] == Topology.owned_children(topology, :lead)
+    assert [:worker] == Topology.owned_children(topology, :squad)
+    assert [:squad] == Topology.dependencies_of(topology, :worker)
+  end
+
+  test "rejects multiple owners for a single node" do
+    assert {:error, reason} =
+             Topology.new(
+               name: "multi_owner",
+               nodes: %{
+                 lead_a: %{agent: WorkerAgent, manager: :lead_members},
+                 lead_b: %{agent: WorkerAgent, manager: :lead_members},
+                 worker: %{agent: WorkerAgent, manager: :worker_members}
+               },
+               links: [
+                 {:owns, :lead_a, :worker},
+                 {:owns, :lead_b, :worker}
+               ]
+             )
+
+    assert inspect(reason) =~ "at most one :owns parent"
+  end
+
+  test "rejects ownership cycles" do
+    assert {:error, reason} =
+             Topology.new(
+               name: "cyclic_ownership",
+               nodes: %{
+                 lead: %{agent: WorkerAgent, manager: :lead_members},
+                 squad: %{agent: WorkerAgent, manager: :squad_members}
+               },
+               links: [
+                 {:owns, :lead, :squad},
+                 {:owns, :squad, :lead}
+               ]
+             )
+
+    assert inspect(reason) =~ "cyclic :owns"
+  end
+
+  test "reconcile_waves expands ownership and dependencies into ordered waves" do
+    topology =
+      Topology.new!(
+        name: "wave_order",
+        nodes: %{
+          lead: %{agent: WorkerAgent, manager: :lead_members},
+          squad: %{agent: WorkerAgent, manager: :squad_members},
+          worker: %{agent: WorkerAgent, manager: :worker_members},
+          auditor: %{agent: WorkerAgent, manager: :auditor_members}
+        },
+        links: [
+          {:owns, :lead, :squad},
+          {:owns, :squad, :worker},
+          {:depends_on, :worker, :auditor}
+        ]
+      )
+
+    assert {:ok, waves} = Topology.reconcile_waves(topology, [:worker])
+    assert waves == [[:auditor, :lead], [:squad], [:worker]]
+  end
+
   test "put_link validates endpoints and deduplicates" do
     topology =
       Topology.from_nodes!("link_validation", %{

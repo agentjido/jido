@@ -57,7 +57,8 @@ defmodule Jido.Pod.Topology do
     with {:ok, name} <- normalize_name(Map.get(attrs, :name)),
          {:ok, nodes} <- normalize_nodes(Map.get(attrs, :nodes, %{})),
          {:ok, defaults} <- normalize_defaults(Map.get(attrs, :defaults, %{})),
-         {:ok, links} <- normalize_links(Map.get(attrs, :links, []), nodes) do
+         {:ok, links} <- normalize_links(Map.get(attrs, :links, []), nodes),
+         :ok <- validate_link_structure(links, nodes) do
       attrs =
         attrs
         |> Map.put(:name, name)
@@ -169,10 +170,18 @@ defmodule Jido.Pod.Topology do
   def put_link(%__MODULE__{} = topology, link) do
     with {:ok, normalized_link} <- Link.new(link),
          :ok <- validate_link_endpoints(normalized_link, topology.nodes) do
-      if normalized_link in topology.links do
-        {:ok, topology}
+      links =
+        if normalized_link in topology.links do
+          topology.links
+        else
+          topology.links ++ [normalized_link]
+        end
+
+      with :ok <- validate_link_structure(links, topology.nodes) do
+        {:ok, %{topology | links: links}}
       else
-        {:ok, %{topology | links: topology.links ++ [normalized_link]}}
+        {:error, _reason} = error ->
+          error
       end
     end
   end
@@ -207,28 +216,102 @@ defmodule Jido.Pod.Topology do
           type == :depends_on and from in ordered_names and to in ordered_names
         end)
 
-      adjacency =
-        Enum.reduce(dependency_links, %{}, fn %Link{from: from, to: to}, acc ->
-          Map.update(acc, to, [from], &[from | &1])
-        end)
-
-      indegree =
-        Enum.reduce(ordered_names, %{}, fn name, acc -> Map.put(acc, name, 0) end)
-        |> then(fn base ->
-          Enum.reduce(dependency_links, base, fn %Link{from: from}, acc ->
-            Map.update!(acc, from, &(&1 + 1))
-          end)
-        end)
-
-      case topological_order(ordered_names, adjacency, indegree, []) do
-        {:ok, ordered} ->
-          {:ok, ordered}
+      case topological_layers(
+             ordered_names,
+             Enum.map(dependency_links, fn %Link{from: from, to: to} -> {to, from} end)
+           ) do
+        {:ok, layers} ->
+          {:ok, List.flatten(layers)}
 
         {:error, _reason} ->
           {:error,
            Jido.Error.validation_error(
              "Topology contains cyclic :depends_on links.",
              details: %{nodes: ordered_names, links: dependency_links}
+           )}
+      end
+    end
+  end
+
+  @doc """
+  Returns the logical owner of a node when the topology contains an `:owns` link.
+  """
+  @spec owner_of(t(), atom()) :: {:ok, atom()} | :root | :error
+  def owner_of(%__MODULE__{} = topology, name) when is_atom(name) do
+    cond do
+      not Map.has_key?(topology.nodes, name) ->
+        :error
+
+      true ->
+        case Enum.find(topology.links, &match?(%Link{type: :owns, to: ^name}, &1)) do
+          %Link{from: owner} -> {:ok, owner}
+          nil -> :root
+        end
+    end
+  end
+
+  @doc """
+  Returns the owned children for the given node.
+  """
+  @spec owned_children(t(), atom()) :: [atom()]
+  def owned_children(%__MODULE__{} = topology, owner) when is_atom(owner) do
+    topology.links
+    |> Enum.filter(&match?(%Link{type: :owns, from: ^owner}, &1))
+    |> Enum.map(& &1.to)
+    |> Enum.sort()
+  end
+
+  @doc """
+  Returns the direct `:depends_on` prerequisites for the given node.
+  """
+  @spec dependencies_of(t(), atom()) :: [atom()]
+  def dependencies_of(%__MODULE__{} = topology, name) when is_atom(name) do
+    topology.links
+    |> Enum.filter(&match?(%Link{type: :depends_on, from: ^name}, &1))
+    |> Enum.map(& &1.to)
+    |> Enum.sort()
+  end
+
+  @doc """
+  Returns the root nodes that have no logical `:owns` parent.
+  """
+  @spec roots(t()) :: [atom()]
+  def roots(%__MODULE__{} = topology) do
+    topology.nodes
+    |> Map.keys()
+    |> Enum.filter(&(owner_of(topology, &1) == :root))
+    |> Enum.sort()
+  end
+
+  @doc """
+  Builds runtime reconcile waves for the requested nodes.
+
+  Each wave contains nodes whose ownership and dependency prerequisites are
+  satisfied by earlier waves. The requested nodes are automatically expanded to
+  include transitive owners and dependencies.
+  """
+  @spec reconcile_waves(t(), [atom()]) :: {:ok, [[atom()]]} | {:error, term()}
+  def reconcile_waves(%__MODULE__{} = topology, node_names) when is_list(node_names) do
+    requested_names = Enum.uniq(node_names)
+
+    with :ok <- validate_dependency_targets(requested_names, topology.nodes),
+         {:ok, closure} <- runtime_closure(topology, requested_names) do
+      edges =
+        Enum.flat_map(closure, fn name ->
+          runtime_prerequisites(topology, name)
+          |> Enum.filter(&(&1 in closure))
+          |> Enum.map(&{&1, name})
+        end)
+
+      case topological_layers(closure, edges) do
+        {:ok, waves} ->
+          {:ok, waves}
+
+        {:error, _reason} ->
+          {:error,
+           Jido.Error.validation_error(
+             "Topology contains cyclic ownership or dependency links.",
+             details: %{nodes: closure}
            )}
       end
     end
@@ -317,6 +400,13 @@ defmodule Jido.Pod.Topology do
      Jido.Error.validation_error("Topology links must be a list.", details: %{links: other})}
   end
 
+  defp validate_link_structure(links, nodes) when is_list(links) and is_map(nodes) do
+    with :ok <- validate_single_owner(links),
+         :ok <- validate_ownership_cycles(links, nodes) do
+      :ok
+    end
+  end
+
   defp validate_link_endpoints(%Link{from: from, to: to}, nodes) when is_map(nodes) do
     cond do
       not Map.has_key?(nodes, from) ->
@@ -354,20 +444,127 @@ defmodule Jido.Pod.Topology do
     end)
   end
 
-  defp topological_order([], _adjacency, _indegree, acc), do: {:ok, Enum.reverse(acc)}
+  defp validate_single_owner(links) when is_list(links) do
+    links
+    |> Enum.filter(&match?(%Link{type: :owns}, &1))
+    |> Enum.group_by(& &1.to, & &1.from)
+    |> Enum.reduce_while(:ok, fn {name, owners}, :ok ->
+      case owners |> Enum.uniq() |> Enum.sort() do
+        [_single_owner] ->
+          {:cont, :ok}
 
-  defp topological_order(remaining, adjacency, indegree, acc) do
-    case Enum.find(remaining, &(Map.get(indegree, &1, 0) == 0)) do
-      nil ->
+        multiple_owners ->
+          {:halt,
+           {:error,
+            Jido.Error.validation_error(
+              "Topology nodes can have at most one :owns parent.",
+              details: %{node: name, owners: multiple_owners}
+            )}}
+      end
+    end)
+  end
+
+  defp validate_ownership_cycles(links, nodes) when is_list(links) and is_map(nodes) do
+    ownership_edges =
+      Enum.flat_map(links, fn
+        %Link{type: :owns, from: owner, to: child} -> [{owner, child}]
+        _other -> []
+      end)
+
+    case topological_layers(Map.keys(nodes), ownership_edges) do
+      {:ok, _layers} ->
+        :ok
+
+      {:error, _reason} ->
+        {:error,
+         Jido.Error.validation_error(
+           "Topology contains cyclic :owns links.",
+           details: %{links: Enum.filter(links, &(&1.type == :owns))}
+         )}
+    end
+  end
+
+  defp runtime_closure(%__MODULE__{} = topology, requested_names) when is_list(requested_names) do
+    Enum.reduce_while(requested_names, {:ok, []}, fn name, {:ok, acc} ->
+      case expand_runtime_node(topology, name, acc) do
+        {:ok, expanded} -> {:cont, {:ok, expanded}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp expand_runtime_node(%__MODULE__{} = topology, name, acc)
+       when is_atom(name) and is_list(acc) do
+    if name in acc do
+      {:ok, acc}
+    else
+      prereqs = runtime_prerequisites(topology, name)
+
+      Enum.reduce_while(prereqs, {:ok, acc}, fn prereq, {:ok, acc_so_far} ->
+        case expand_runtime_node(topology, prereq, acc_so_far) do
+          {:ok, expanded} -> {:cont, {:ok, expanded}}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+      |> case do
+        {:ok, expanded} -> {:ok, expanded ++ [name]}
+        {:error, _reason} = error -> error
+      end
+    end
+  end
+
+  defp runtime_prerequisites(%__MODULE__{} = topology, name) when is_atom(name) do
+    owner =
+      case owner_of(topology, name) do
+        {:ok, owner_name} -> [owner_name]
+        :root -> []
+        :error -> []
+      end
+
+    owner ++ dependencies_of(topology, name)
+  end
+
+  defp topological_layers(node_names, edges) when is_list(node_names) and is_list(edges) do
+    ordered_nodes = node_names |> Enum.uniq() |> Enum.sort()
+
+    adjacency =
+      Enum.reduce(edges, %{}, fn {prereq, dependent}, acc ->
+        Map.update(acc, prereq, [dependent], &[dependent | &1])
+      end)
+
+    indegree =
+      Enum.reduce(ordered_nodes, %{}, fn name, acc -> Map.put(acc, name, 0) end)
+      |> then(fn base ->
+        Enum.reduce(edges, base, fn {_prereq, dependent}, acc ->
+          Map.update!(acc, dependent, &(&1 + 1))
+        end)
+      end)
+
+    do_topological_layers(ordered_nodes, adjacency, indegree, [])
+  end
+
+  defp do_topological_layers([], _adjacency, _indegree, acc), do: {:ok, Enum.reverse(acc)}
+
+  defp do_topological_layers(remaining, adjacency, indegree, acc) do
+    ready =
+      remaining
+      |> Enum.filter(&(Map.get(indegree, &1, 0) == 0))
+      |> Enum.sort()
+
+    case ready do
+      [] ->
         {:error, :cyclic_dependencies}
 
-      next ->
+      _ready ->
         next_indegree =
-          Enum.reduce(Map.get(adjacency, next, []), indegree, fn dependent, acc_indegree ->
-            Map.update!(acc_indegree, dependent, &(&1 - 1))
+          Enum.reduce(ready, indegree, fn node, indegree_acc ->
+            Enum.reduce(Map.get(adjacency, node, []), indegree_acc, fn dependent, inner_acc ->
+              Map.update!(inner_acc, dependent, &(&1 - 1))
+            end)
           end)
 
-        topological_order(List.delete(remaining, next), adjacency, next_indegree, [next | acc])
+        next_remaining = remaining -- ready
+        do_topological_layers(next_remaining, adjacency, next_indegree, [ready | acc])
     end
   end
 end

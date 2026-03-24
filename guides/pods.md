@@ -94,9 +94,8 @@ structs for storage and inspection.
 
 In v1, links support a small fixed vocabulary:
 
-- `:depends_on` orders eager reconciliation when both nodes are eager
-  `kind: :agent` members
-- `:owns` is descriptive topology metadata only
+- `:depends_on` defines runtime prerequisites and eager reconciliation order
+- `:owns` defines the logical runtime owner for supported `kind: :agent` nodes
 
 ## Running A Pod
 
@@ -123,13 +122,22 @@ ordinary `InstanceManager` and immediately reconciles eager nodes.
 `reconcile/2` eagerly acquires nodes marked `activation: :eager`.
 `ensure_node/3` lazily acquires and adopts a named node on demand.
 
+Ownership matters at runtime:
+
+- root nodes with no `:owns` parent are adopted directly into the pod manager
+- owned nodes are adopted under their logical owner node
+- `:depends_on` and `:owns` are combined into reconcile waves so prerequisites
+  are running before descendants are adopted
+- `kind: :pod` remains topology-only for now; runtime helpers still reject it
+
 If you need lower-level control, you can still call
 `Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
 yourself.
 
-## Hierarchical Topologies Today
+## Hierarchical Runtime Ownership
 
-You can describe hierarchy-like intent in the topology data:
+Pods now support hierarchical runtime ownership for supported `kind: :agent`
+nodes:
 
 ```elixir
 topology =
@@ -148,20 +156,22 @@ topology =
   )
 ```
 
-That is a **topology description**, not nested durable runtime parentage.
+In that example:
 
-Current runtime behavior is intentionally flat:
+- `lead` is a root node owned by the pod manager
+- `review` is owned by `lead`
+- `publish` is also owned by `lead`
+- `publish` will not reconcile until `review` is running because of
+  `{:depends_on, :publish, :review}`
 
-- the pod agent is the single durable manager
-- all runtime-managed nodes are reconciled as manager-owned members
-- `:depends_on` affects eager `kind: :agent` reconciliation order only
-- `:owns` is metadata only
-- `kind: :pod` is accepted by the topology shape for future evolution, but
-  runtime helpers reject it with a clear unsupported-kind error today
+This is still **not** recursive pod runtime. `kind: :pod` is accepted by the
+topology shape for future evolution, but runtime helpers reject it with a clear
+unsupported-kind error today.
 
-So the honest answer is: **no, durable hierarchical pod runtime is not here
-yet**. You can model hierarchy in the topology data, but the runtime semantics
-remain manager-led and flat in this first slice.
+So the honest answer is:
+
+- **yes** for hierarchical runtime ownership among `kind: :agent` nodes
+- **no** for nested durable pod-of-pod runtime semantics
 
 ## Persistence, Storage, And Thaw
 
@@ -188,7 +198,7 @@ What is **not** persisted as durable truth:
 That means pod thaw is a two-step story:
 
 1. the pod agent thaws with its topology snapshot already restored
-2. runtime relationships are re-established explicitly with `reconcile/2` and
+2. root relationships are re-established explicitly with `reconcile/2` and
    `ensure_node/3`
 
 Example:
@@ -201,15 +211,18 @@ Example:
 {:ok, topology} = Jido.Pod.fetch_topology(restored_pid)
 {:ok, snapshots} = Jido.Pod.nodes(restored_pid)
 
-# Low-level: explicitly re-adopt eager nodes after thaw
-{:ok, _started} = Jido.Pod.reconcile(restored_pid)
+# Low-level: explicitly reconcile eager roots after thaw
+{:ok, report} = Jido.Pod.reconcile(restored_pid)
 ```
 
 After thaw:
 
-- eager nodes can be re-adopted with `reconcile/2`
-- surviving lazy nodes show up as `:running` until explicitly adopted
-- `ensure_node/3` handles either case: start fresh or re-adopt existing
+- surviving root nodes show up as `:running` until explicitly re-adopted
+- owned descendants can remain `:adopted` if their logical owner survived
+- `reconcile/2` repairs the root boundary and any missing ownership edges for
+  eager nodes
+- `ensure_node/3` handles either case: start fresh, re-adopt a root, or
+  reattach an owned descendant under its owner
 
 So there is no extra storage adapter architecture for pods. The extra durability
 need is **runtime reconciliation after thaw**, not a new persistence contract.
@@ -219,10 +232,12 @@ need is **runtime reconciliation after thaw**, not a new persistence contract.
 This first slice keeps the model deliberately small:
 
 - predefined topology only
-- flat manager-led runtime semantics
+- hierarchical ownership for supported `kind: :agent` nodes
+- pod manager as the durable root
 - single-node runtime assumptions
 - no pod-local signal bus
 - no separate pod instance manager
+- no nested `kind: :pod` runtime
 - no automatic topology mutation protocol
 
 The extension seam for later work is the `:__pod__` plugin state and the

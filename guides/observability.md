@@ -104,17 +104,20 @@ includes the directive-type summary from `directive_types`, for example
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
 | `[:jido, :pod, :reconcile, :start]` | Pod eager reconciliation started | `system_time` | `pod_id`, `pod_module`, `jido_instance` |
-| `[:jido, :pod, :reconcile, :stop]` | Pod eager reconciliation completed | `duration`, `node_count` | `pod_id`, `pod_module`, `jido_instance` |
+| `[:jido, :pod, :reconcile, :stop]` | Pod eager reconciliation completed | `duration`, `node_count`, `requested_count`, `failure_count`, `pending_count`, `wave_count` | `pod_id`, `pod_module`, `jido_instance` |
 | `[:jido, :pod, :reconcile, :exception]` | Pod eager reconciliation failed | `duration` | `pod_id`, `pod_module`, `error`, `jido_instance` |
-| `[:jido, :pod, :node, :ensure, :start]` | Pod node acquisition/adoption started | `system_time` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `jido_instance` |
-| `[:jido, :pod, :node, :ensure, :stop]` | Pod node acquisition/adoption completed | `duration` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `jido_instance` |
-| `[:jido, :pod, :node, :ensure, :exception]` | Pod node acquisition/adoption failed | `duration` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `error`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :start]` | Pod node acquisition/adoption started | `system_time` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :stop]` | Pod node acquisition/adoption completed | `duration`, `source`, `parent` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :exception]` | Pod node acquisition/adoption failed | `duration` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `error`, `jido_instance` |
 
 `source` explains what `ensure_node/3` did:
 
 - `:started` — the node was started through its `InstanceManager`
 - `:running` — the node was already alive and was re-adopted
-- `:adopted` — the node was already attached to the pod manager
+- `:adopted` — the node was already attached to its expected runtime parent
+
+`owner` is the logical `:owns` parent when the node is not a pod root. Root
+nodes emit `owner: nil`.
 
 ### Correlation Metadata
 

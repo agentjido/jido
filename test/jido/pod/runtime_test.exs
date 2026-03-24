@@ -4,6 +4,7 @@ defmodule JidoTest.Pod.RuntimeTest do
   alias Jido.Agent.InstanceManager
   alias Jido.AgentServer
   alias Jido.Pod
+  alias Jido.Pod.Topology
   alias Jido.Storage.ETS
 
   @planner_manager :pod_runtime_planner_members
@@ -23,22 +24,27 @@ defmodule JidoTest.Pod.RuntimeTest do
     @moduledoc false
     use Jido.Pod,
       name: "runtime_review_pod",
-      topology: %{
-        planner: %{
-          agent: PodWorker,
-          manager: :pod_runtime_planner_members,
-          activation: :eager,
-          meta: %{role: "planner"},
-          initial_state: %{role: "planner"}
-        },
-        reviewer: %{
-          agent: PodWorker,
-          manager: :pod_runtime_reviewer_members,
-          activation: :lazy,
-          meta: %{role: "reviewer"},
-          initial_state: %{role: "reviewer"}
-        }
-      }
+      topology:
+        Topology.new!(
+          name: "runtime_review_pod",
+          nodes: %{
+            planner: %{
+              agent: PodWorker,
+              manager: :pod_runtime_planner_members,
+              activation: :eager,
+              meta: %{role: "planner"},
+              initial_state: %{role: "planner"}
+            },
+            reviewer: %{
+              agent: PodWorker,
+              manager: :pod_runtime_reviewer_members,
+              activation: :lazy,
+              meta: %{role: "reviewer"},
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, :planner, :reviewer}]
+        )
   end
 
   defmodule HierarchicalReviewPod do
@@ -53,6 +59,30 @@ defmodule JidoTest.Pod.RuntimeTest do
           activation: :eager
         }
       }
+  end
+
+  defmodule PartialFailurePod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "partial_failure_pod",
+      topology:
+        Jido.Pod.Topology.new!(
+          name: "partial_failure_pod",
+          nodes: %{
+            planner: %{
+              agent: JidoTest.Pod.RuntimeTest.PodWorker,
+              manager: :pod_runtime_planner_members,
+              activation: :eager
+            },
+            nested: %{
+              module: JidoTest.Pod.RuntimeTest.ReviewPod,
+              manager: :pod_runtime_nested_pods,
+              kind: :pod,
+              activation: :eager
+            }
+          },
+          links: [{:depends_on, :nested, :planner}]
+        )
   end
 
   setup %{jido: jido} do
@@ -100,9 +130,10 @@ defmodule JidoTest.Pod.RuntimeTest do
     {:ok, pod_key: "order-123"}
   end
 
-  test "get eagerly reconciles eager nodes and ensure_node lazily activates others", %{
-    pod_key: pod_key
-  } do
+  test "get eagerly reconciles roots and ensure_node adopts owned lazy nodes under their owner",
+       %{
+         pod_key: pod_key
+       } do
     assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key)
     assert {:ok, %Pod.Topology{name: "runtime_review_pod"}} = Pod.fetch_topology(pod_pid)
 
@@ -124,7 +155,10 @@ defmodule JidoTest.Pod.RuntimeTest do
 
     {:ok, manager_state} = AgentServer.state(pod_pid)
     assert manager_state.children.planner.pid == planner_pid
-    assert manager_state.children.reviewer.pid == reviewer_pid
+    refute Map.has_key?(manager_state.children, :reviewer)
+
+    {:ok, planner_state} = AgentServer.state(planner_pid)
+    assert planner_state.children.reviewer.pid == reviewer_pid
   end
 
   test "restored pod managers can re-adopt surviving eager nodes", %{pod_key: pod_key} do
@@ -148,9 +182,10 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert {:ok, ^planner_pid} = InstanceManager.lookup(@planner_manager, planner_key)
   end
 
-  test "thaw restores pod topology immediately and stages lazy node re-adoption explicitly", %{
-    pod_key: pod_key
-  } do
+  test "thaw restores pod topology immediately and only root ownership needs pod-level re-adoption",
+       %{
+         pod_key: pod_key
+       } do
     assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key)
     assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
     assert {:ok, reviewer_pid} = Pod.ensure_node(pod_pid, :reviewer)
@@ -169,19 +204,17 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert snapshots.planner.status == :running
     assert snapshots.planner.running_pid == planner_pid
     assert snapshots.planner.adopted_pid == nil
-    assert snapshots.reviewer.status == :running
+    assert snapshots.reviewer.status == :adopted
     assert snapshots.reviewer.running_pid == reviewer_pid
-    assert snapshots.reviewer.adopted_pid == nil
+    assert snapshots.reviewer.adopted_pid == reviewer_pid
 
-    assert {:ok, _started} = Pod.reconcile(restored_pid)
+    assert {:ok, report} = Pod.reconcile(restored_pid)
+    assert report.completed == [:planner]
+    assert report.failed == []
+
     assert {:ok, snapshots} = Pod.nodes(restored_pid)
     assert snapshots.planner.status == :adopted
     assert snapshots.planner.adopted_pid == planner_pid
-    assert snapshots.reviewer.status == :running
-    assert snapshots.reviewer.adopted_pid == nil
-
-    assert {:ok, ^reviewer_pid} = Pod.ensure_node(restored_pid, :reviewer)
-    assert {:ok, snapshots} = Pod.nodes(restored_pid)
     assert snapshots.reviewer.status == :adopted
     assert snapshots.reviewer.adopted_pid == reviewer_pid
   end
@@ -203,10 +236,37 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
       )
 
-    assert {:error, %{stage: :reconcile, pod: pid, reason: %{node: :nested, reason: reason}}} =
+    assert {:error, %{stage: :reconcile, pod: pid, reason: report}} =
              Pod.get(manager, "group-123")
 
     assert Process.alive?(pid)
-    assert inspect(reason) =~ "only supports kind: :agent"
+    assert report.failed == [:nested]
+    assert inspect(report.failures.nested) =~ "only supports kind: :agent"
+  end
+
+  test "reconcile reports partial success when one eager node cannot run", %{jido: jido} do
+    storage_table = :"pod_runtime_partial_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_partial_pod_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: PartialFailurePod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    assert {:error, %{stage: :reconcile, pod: pod_pid, reason: report}} =
+             Pod.get(manager, "partial-123")
+
+    assert Process.alive?(pod_pid)
+    assert report.completed == [:planner]
+    assert report.failed == [:nested]
+    assert report.pending == []
+    assert Map.has_key?(report.nodes, :planner)
+    assert inspect(report.failures.nested) =~ "only supports kind: :agent"
   end
 end

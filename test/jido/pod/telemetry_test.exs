@@ -3,6 +3,7 @@ defmodule JidoTest.Pod.TelemetryTest do
 
   alias Jido.Agent.InstanceManager
   alias Jido.Pod
+  alias Jido.Pod.Topology
   alias Jido.Storage.ETS
 
   @planner_manager :pod_telemetry_planner_members
@@ -22,20 +23,50 @@ defmodule JidoTest.Pod.TelemetryTest do
     @moduledoc false
     use Jido.Pod,
       name: "telemetry_review_pod",
-      topology: %{
-        planner: %{
-          agent: PodWorker,
-          manager: :pod_telemetry_planner_members,
-          activation: :eager,
-          initial_state: %{role: "planner"}
-        },
-        reviewer: %{
-          agent: PodWorker,
-          manager: :pod_telemetry_reviewer_members,
-          activation: :lazy,
-          initial_state: %{role: "reviewer"}
-        }
-      }
+      topology:
+        Topology.new!(
+          name: "telemetry_review_pod",
+          nodes: %{
+            planner: %{
+              agent: PodWorker,
+              manager: :pod_telemetry_planner_members,
+              activation: :eager,
+              initial_state: %{role: "planner"}
+            },
+            reviewer: %{
+              agent: PodWorker,
+              manager: :pod_telemetry_reviewer_members,
+              activation: :lazy,
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, :planner, :reviewer}]
+        )
+  end
+
+  defmodule BrokenReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "broken_telemetry_review_pod",
+      topology:
+        Topology.new!(
+          name: "broken_telemetry_review_pod",
+          nodes: %{
+            planner: %{
+              agent: PodWorker,
+              manager: :pod_telemetry_planner_members,
+              activation: :eager,
+              initial_state: %{role: "planner"}
+            },
+            nested: %{
+              module: ReviewPod,
+              manager: :pod_telemetry_nested_pods,
+              kind: :pod,
+              activation: :eager
+            }
+          },
+          links: [{:depends_on, :nested, :planner}]
+        )
   end
 
   setup %{jido: jido} do
@@ -115,6 +146,7 @@ defmodule JidoTest.Pod.TelemetryTest do
                       node_name: :planner,
                       node_kind: :agent,
                       node_manager: @planner_manager,
+                      owner: nil,
                       source: :started,
                       pod_id: ^pod_key
                     }}
@@ -125,7 +157,7 @@ defmodule JidoTest.Pod.TelemetryTest do
     assert duration >= 0
 
     assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :stop],
-                    %{duration: duration, node_count: 1},
+                    %{duration: duration, node_count: 1, wave_count: 1},
                     %{pod_id: ^pod_key, pod_module: ReviewPod}}
 
     assert duration >= 0
@@ -137,6 +169,7 @@ defmodule JidoTest.Pod.TelemetryTest do
                       node_name: :reviewer,
                       node_kind: :agent,
                       node_manager: @reviewer_manager,
+                      owner: :planner,
                       source: :started
                     }}
 
@@ -158,19 +191,66 @@ defmodule JidoTest.Pod.TelemetryTest do
     assert Process.alive?(planner_pid)
 
     assert {:ok, restored_pid} = InstanceManager.get(@pod_manager, pod_key)
-    assert {:ok, _started} = Pod.reconcile(restored_pid)
+    assert {:ok, report} = Pod.reconcile(restored_pid)
+    assert report.completed == [:planner]
 
     assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :start], %{system_time: _},
                     %{pod_id: ^pod_key, pod_module: ReviewPod}}
 
     assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
-                    %{node_name: :planner, source: :running, node_manager: @planner_manager}}
+                    %{
+                      node_name: :planner,
+                      source: :running,
+                      node_manager: @planner_manager,
+                      owner: nil
+                    }}
 
     assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
                     %{node_name: :planner, source: :running}}
 
     assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :stop],
-                    %{duration: _, node_count: 1}, %{pod_id: ^pod_key, pod_module: ReviewPod}}
+                    %{duration: _, node_count: 1, wave_count: 1},
+                    %{pod_id: ^pod_key, pod_module: ReviewPod}}
+  end
+
+  test "failed reconcile emits exception telemetry with partial report", %{jido: jido} do
+    storage_table = :"pod_telemetry_broken_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_telemetry_broken_pods_#{System.unique_integer([:positive])}"
+    pod_key = "broken-telemetry-123"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: BrokenReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    assert {:error, %{stage: :reconcile, pod: pid, reason: report}} = Pod.get(manager, pod_key)
+    assert Process.alive?(pid)
+
+    assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :start], %{system_time: _},
+                    %{pod_id: ^pod_key, pod_module: BrokenReviewPod}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
+                    %{node_name: :planner, source: :started}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
+                    %{node_name: :planner, source: :started}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :exception], %{duration: _},
+                    %{node_name: :nested, error: error}}
+
+    assert inspect(error) =~ "only supports kind: :agent"
+
+    assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :exception], %{duration: _},
+                    %{pod_id: ^pod_key, pod_module: BrokenReviewPod, error: ^report}}
+
+    assert report.completed == [:planner]
+    assert report.failed == [:nested]
   end
 
   defp drain_telemetry_events do

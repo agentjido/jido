@@ -12,11 +12,12 @@ defmodule JidoExampleTest.PodRuntimeTest do
 
   - `use Jido.Pod` wraps an ordinary agent module
   - `Jido.Pod.get/3` is the happy path over `InstanceManager.get/3`
-  - eager nodes start in `:depends_on` order during reconcile
+  - eager nodes start in ownership/dependency order during reconcile
   - lazy nodes are materialized on demand with `ensure_node/3`
-  - pod topology persists, but live attachments do not
-  - surviving nodes can be re-adopted after the pod manager thaws
-  - lazy survivors remain `:running` until explicitly re-adopted
+  - pod topology persists, but live root attachments do not
+  - owned descendants can stay attached under surviving runtime owners
+  - surviving root nodes can be re-adopted after the pod manager thaws
+  - lazy root survivors remain `:running` until explicitly re-adopted
 
   ## Run
 
@@ -24,9 +25,9 @@ defmodule JidoExampleTest.PodRuntimeTest do
 
   ## Important Boundary
 
-  Pods are still a flat, manager-led runtime. Hierarchy can be described in
-  topology data, but this example only exercises supported `kind: :agent`
-  nodes.
+  Pods are manager-led at the durability boundary, but runtime ownership for
+  supported `kind: :agent` nodes is hierarchical. This example exercises a
+  real ownership chain plus a lazy root node.
   """
   use JidoTest.Case, async: false
 
@@ -84,6 +85,8 @@ defmodule JidoExampleTest.PodRuntimeTest do
             }
           },
           links: [
+            {:owns, :planner, :reviewer},
+            {:owns, :reviewer, :publisher},
             {:depends_on, :reviewer, :planner},
             {:depends_on, :publisher, :reviewer}
           ]
@@ -148,7 +151,12 @@ defmodule JidoExampleTest.PodRuntimeTest do
       assert {:ok, %Pod.Topology{name: "review_pipeline"} = topology} =
                Pod.fetch_topology(pod_pid)
 
-      assert topology.nodes |> Map.keys() |> Enum.sort() == [:auditor, :planner, :publisher, :reviewer]
+      assert topology.nodes |> Map.keys() |> Enum.sort() == [
+               :auditor,
+               :planner,
+               :publisher,
+               :reviewer
+             ]
 
       assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
       assert {:ok, reviewer_pid} = Pod.lookup_node(pod_pid, :reviewer)
@@ -161,11 +169,23 @@ defmodule JidoExampleTest.PodRuntimeTest do
       assert snapshots.publisher.status == :adopted
       assert snapshots.auditor.status == :stopped
 
+      {:ok, manager_state} = AgentServer.state(pod_pid)
+      assert Map.keys(manager_state.children) == [:planner]
+
+      {:ok, planner_state} = AgentServer.state(planner_pid)
+      assert planner_state.children.reviewer.pid == reviewer_pid
+
+      {:ok, reviewer_state} = AgentServer.state(reviewer_pid)
+      assert reviewer_state.children.publisher.pid == publisher_pid
+
       assert {:ok, auditor_pid} = Pod.ensure_node(pod_pid, :auditor)
       assert {:ok, ^auditor_pid} = Pod.lookup_node(pod_pid, :auditor)
 
       assert {:ok, snapshots} = Pod.nodes(pod_pid)
       assert snapshots.auditor.status == :adopted
+
+      {:ok, manager_state} = AgentServer.state(pod_pid)
+      assert manager_state.children.auditor.pid == auditor_pid
 
       assert Process.alive?(planner_pid)
       assert Process.alive?(reviewer_pid)
@@ -198,6 +218,12 @@ defmodule JidoExampleTest.PodRuntimeTest do
       assert planner_state.parent == nil
       assert planner_state.orphaned_from.id == pod_key
 
+      assert {:ok, reviewer_state} = AgentServer.state(reviewer_pid)
+      assert reviewer_state.parent.pid == planner_pid
+
+      assert {:ok, publisher_state} = AgentServer.state(publisher_pid)
+      assert publisher_state.parent.pid == reviewer_pid
+
       assert {:ok, auditor_state} = AgentServer.state(auditor_pid)
       assert auditor_state.parent == nil
       assert auditor_state.orphaned_from.id == pod_key
@@ -215,16 +241,16 @@ defmodule JidoExampleTest.PodRuntimeTest do
                       %{node_name: :planner, source: :running}}
 
       assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
-                      %{node_name: :reviewer, source: :running}}
+                      %{node_name: :reviewer, source: :adopted}}
 
       assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
-                      %{node_name: :reviewer, source: :running}}
+                      %{node_name: :reviewer, source: :adopted}}
 
       assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
-                      %{node_name: :publisher, source: :running}}
+                      %{node_name: :publisher, source: :adopted}}
 
       assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
-                      %{node_name: :publisher, source: :running}}
+                      %{node_name: :publisher, source: :adopted}}
 
       assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :stop],
                       %{duration: _, node_count: 3},

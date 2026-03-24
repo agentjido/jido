@@ -1,15 +1,16 @@
 defmodule JidoExampleTest.PodScaleTest do
   @moduledoc """
-  Example test demonstrating a hierarchy-shaped pod at load.
+  Example test demonstrating a hierarchical pod at load.
 
   This example is intentionally large. It treats a 1000-node pod as a standard
   use case and pushes on the current runtime contract:
 
-  - the topology encodes hierarchy-like structure with `:owns` and `:depends_on`
-  - runtime semantics remain flat and manager-led
+  - the topology encodes a real ownership hierarchy with `:owns` and `:depends_on`
+  - the pod manager owns only root nodes at runtime
+  - descendants are adopted under their logical owners
   - all nodes are durable `kind: :agent` members
   - eager reconciliation must handle the full topology
-  - thaw must re-adopt surviving members at scale
+  - thaw must re-adopt surviving roots while preserving descendant ownership
 
   ## Topology Shape
 
@@ -25,9 +26,9 @@ defmodule JidoExampleTest.PodScaleTest do
 
   ## Important Boundary
 
-  This is a hierarchy-shaped topology, not a recursive pod runtime. The current
-  `Jido.Pod` implementation still has one durable pod manager that owns all live
-  members directly.
+  This is a hierarchical agent runtime, not a recursive nested-pod runtime. The
+  current `Jido.Pod` implementation still has one durable pod manager, but only
+  root members are adopted directly into it.
   """
   use JidoTest.Case, async: false
 
@@ -78,6 +79,10 @@ defmodule JidoExampleTest.PodScaleTest do
 
     def sample_nodes do
       [:lead_1, :lead_10, :squad_1_1, :squad_10_9, :worker_1_1_1, :worker_10_9_10]
+    end
+
+    def root_nodes do
+      Enum.map(1..@lead_count, &lead_name/1)
     end
 
     defp nodes do
@@ -248,11 +253,28 @@ defmodule JidoExampleTest.PodScaleTest do
       assert map_size(snapshots) == TopologyBuilder.total_nodes()
       assert adopted_count(snapshots) == TopologyBuilder.total_nodes()
 
+      {:ok, manager_state} = AgentServer.state(pod_pid)
+
+      assert manager_state.children
+             |> Map.keys()
+             |> Enum.sort_by(&Atom.to_string/1) ==
+               Enum.sort_by(TopologyBuilder.root_nodes(), &Atom.to_string/1)
+
       Enum.each(TopologyBuilder.sample_nodes(), fn name ->
         assert {:ok, pid} = Pod.lookup_node(pod_pid, name)
         assert Process.alive?(pid)
         assert snapshots[name].status == :adopted
       end)
+
+      {:ok, lead_pid} = Pod.lookup_node(pod_pid, :lead_1)
+      {:ok, squad_pid} = Pod.lookup_node(pod_pid, :squad_1_1)
+      {:ok, worker_pid} = Pod.lookup_node(pod_pid, :worker_1_1_1)
+
+      {:ok, lead_state} = AgentServer.state(lead_pid)
+      assert lead_state.children.squad_1_1.pid == squad_pid
+
+      {:ok, squad_state} = AgentServer.state(squad_pid)
+      assert squad_state.children.worker_1_1_1.pid == worker_pid
     end
 
     test "re-adopts 1000 surviving nodes after manager thaw", %{pod_key: pod_key} do
@@ -271,12 +293,22 @@ defmodule JidoExampleTest.PodScaleTest do
       assert :ok = InstanceManager.stop(@pod_manager, pod_key)
       assert_receive {:DOWN, ^pod_ref, :process, ^pod_pid, _reason}, 5_000
 
-      Enum.each(sample_pids, fn {_name, pid} ->
-        assert Process.alive?(pid)
-        assert {:ok, state} = AgentServer.state(pid)
-        assert state.parent == nil
-        assert state.orphaned_from.id == pod_key
-      end)
+      assert Process.alive?(sample_pids.lead_1)
+      assert Process.alive?(sample_pids.lead_10)
+      assert Process.alive?(sample_pids.squad_1_1)
+      assert Process.alive?(sample_pids.squad_10_9)
+      assert Process.alive?(sample_pids.worker_1_1_1)
+      assert Process.alive?(sample_pids.worker_10_9_10)
+
+      assert {:ok, lead_state} = AgentServer.state(sample_pids.lead_1)
+      assert lead_state.parent == nil
+      assert lead_state.orphaned_from.id == pod_key
+
+      assert {:ok, squad_state} = AgentServer.state(sample_pids.squad_1_1)
+      assert squad_state.parent.pid == sample_pids.lead_1
+
+      assert {:ok, worker_state} = AgentServer.state(sample_pids.worker_1_1_1)
+      assert worker_state.parent.pid == sample_pids.squad_1_1
 
       assert {:ok, restored_pid} = Pod.get(@pod_manager, pod_key)
       assert restored_pid != pod_pid
