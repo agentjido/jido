@@ -26,7 +26,6 @@ defmodule Jido.AgentServer do
   - `call/3` - Synchronous signal processing
   - `cast/2` - Asynchronous signal processing
   - `state/1` - Get full State struct
-  - `append_thread_entry/2` - Append entries to the default thread journal
   - `whereis/1` - Registry lookup by ID (default registry)
   - `whereis/2` - Registry lookup by ID (specific registry)
 
@@ -199,7 +198,6 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.Agent.Directive
-  alias Jido.Agent.StateOps
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
   alias Jido.Config.Defaults
   alias Jido.RuntimeStore
@@ -359,20 +357,6 @@ defmodule Jido.AgentServer do
   def state(server) do
     with {:ok, pid} <- resolve_server(server) do
       GenServer.call(pid, :get_state)
-    end
-  end
-
-  @doc """
-  Append one or more entries to the agent's default thread journal.
-
-  This is intended for late-bound bookkeeping that originates outside the
-  signal/action pipeline, such as provider acknowledgements or usage metadata.
-  """
-  @spec append_thread_entry(server(), map() | struct() | [map() | struct()]) ::
-          :ok | {:error, term()}
-  def append_thread_entry(server, entry_or_entries) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:append_thread_entry, entry_or_entries})
     end
   end
 
@@ -998,13 +982,6 @@ defmodule Jido.AgentServer do
 
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
-  end
-
-  def handle_call({:append_thread_entry, entry_or_entries}, _from, %State{} = state) do
-    {agent, []} =
-      StateOps.apply_state_ops(state.agent, [Jido.Agent.StateOp.append_thread(entry_or_entries)])
-
-    {:reply, :ok, State.update_agent(state, agent)}
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
