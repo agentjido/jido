@@ -186,6 +186,7 @@ defmodule JidoTest.TestAgents do
     @moduledoc false
     use Jido.Agent,
       name: "agent_with_plugin_routes",
+      default_plugins: false,
       plugins: [JidoTest.TestAgents.TestPluginWithRoutes]
 
     def signal_routes(_ctx), do: []
@@ -195,6 +196,7 @@ defmodule JidoTest.TestAgents do
     @moduledoc false
     use Jido.Agent,
       name: "agent_multi_instance",
+      default_plugins: false,
       plugins: [
         {JidoTest.TestAgents.TestPluginWithRoutes, as: :support},
         {JidoTest.TestAgents.TestPluginWithRoutes, as: :sales}
