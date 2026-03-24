@@ -615,6 +615,26 @@ defmodule Jido.AgentServer do
     end
   end
 
+  @doc """
+  Adopts a live child into this agent's logical child map.
+
+  This updates both the child's live parent reference and the manager's tracked
+  `state.children` map before returning.
+  """
+  @spec adopt_child(server(), pid() | String.t(), term(), map()) ::
+          {:ok, pid()} | {:error, term()}
+  def adopt_child(server, child, tag, meta \\ %{}) do
+    with {:ok, pid} <- resolve_server(server) do
+      try do
+        GenServer.call(pid, {:adopt_child, child, tag, meta})
+      catch
+        :exit, {:noproc, _} -> {:error, :not_found}
+        :exit, {:timeout, _} -> {:error, :timeout}
+        :exit, reason -> {:error, reason}
+      end
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Attachment API (for Jido.Agent.InstanceManager integration)
   # ---------------------------------------------------------------------------
@@ -1065,6 +1085,33 @@ defmodule Jido.AgentServer do
           {:error, reason} ->
             {:reply, {:error, reason}, state}
         end
+    end
+  end
+
+  def handle_call({:adopt_child, child, tag, meta}, _from, %State{} = state) do
+    with :ok <- ensure_adopt_tag_available(state, tag),
+         {:ok, child_pid} <- resolve_adopt_child(child, state),
+         :ok <- ensure_adopt_not_self(child_pid),
+         {:ok, child_runtime} <- perform_child_adoption(child_pid, tag, meta, state) do
+      child_info =
+        ChildInfo.new!(%{
+          pid: child_pid,
+          ref: Process.monitor(child_pid),
+          module: child_runtime.agent_module,
+          id: child_runtime.id,
+          tag: tag,
+          meta: meta
+        })
+
+      new_state =
+        state
+        |> State.add_child(tag, child_info)
+        |> State.record_debug_event(:child_adopted, %{child_id: child_runtime.id, tag: tag})
+
+      {:reply, {:ok, child_pid}, new_state}
+    else
+      {:error, reason} ->
+        {:reply, {:error, reason}, state}
     end
   end
 
@@ -2392,6 +2439,41 @@ defmodule Jido.AgentServer do
   # ---------------------------------------------------------------------------
   # Internal: Hierarchy
   # ---------------------------------------------------------------------------
+
+  defp ensure_adopt_tag_available(state, tag) do
+    case State.get_child(state, tag) do
+      nil -> :ok
+      _child -> {:error, {:tag_in_use, tag}}
+    end
+  end
+
+  defp resolve_adopt_child(pid, _state) when is_pid(pid) do
+    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :child_not_alive}
+  end
+
+  defp resolve_adopt_child(id, state) when is_binary(id) do
+    case Jido.whereis(state.jido, id) do
+      pid when is_pid(pid) -> {:ok, pid}
+      nil -> {:error, :child_not_found}
+    end
+  end
+
+  defp resolve_adopt_child(child, _state), do: {:error, {:invalid_child, child}}
+
+  defp ensure_adopt_not_self(pid) when pid == self(), do: {:error, :cannot_adopt_self}
+  defp ensure_adopt_not_self(_pid), do: :ok
+
+  defp perform_child_adoption(child_pid, tag, meta, state) do
+    parent_ref =
+      ParentRef.new!(%{
+        pid: self(),
+        id: state.id,
+        tag: tag,
+        meta: meta
+      })
+
+    adopt_parent(child_pid, parent_ref)
+  end
 
   defp maybe_monitor_parent(%State{parent: %ParentRef{pid: pid}} = state) when is_pid(pid) do
     Process.monitor(pid)

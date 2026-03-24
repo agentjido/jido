@@ -106,6 +106,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Multi-Agent Orchestration
 - Multi-agent workflows with configurable strategies
 - Plan-based orchestration for complex workflows
+- Pod-wrapped agents with canonical durable topologies
 - Extensible strategy protocol for custom execution patterns
 
 ## Installation
