@@ -5,6 +5,7 @@ defmodule JidoTest.Agent.StateOpsTest do
   alias Jido.Agent.Directive
   alias Jido.Agent.StateOp
   alias Jido.Agent.StateOps
+  alias Jido.Thread
 
   describe "apply_result/2" do
     test "merges result into agent state" do
@@ -150,6 +151,49 @@ defmodule JidoTest.Agent.StateOpsTest do
         StateOps.apply_state_ops(agent, [%StateOp.DeletePath{path: [:not, :here]}])
 
       assert updated.state.keep == 1
+    end
+  end
+
+  describe "apply_state_ops/2 with AppendThread" do
+    test "initializes a thread when missing and appends entries" do
+      {:ok, agent} = Agent.new(%{id: "test", state: %{}})
+
+      {updated, directives} =
+        StateOps.apply_state_ops(agent, [
+          %StateOp.AppendThread{entries: [%{kind: :message, payload: %{text: "hello"}}]}
+        ])
+
+      assert directives == []
+      assert %Thread{} = updated.state.__thread__
+      assert Thread.entry_count(updated.state.__thread__) == 1
+      assert Thread.last(updated.state.__thread__).payload == %{text: "hello"}
+    end
+
+    test "appends to an existing thread" do
+      {:ok, agent} =
+        Agent.new(%{
+          id: "test",
+          state: %{__thread__: Thread.new() |> Thread.append(%{kind: :note, payload: %{n: 1}})}
+        })
+
+      {updated, directives} =
+        StateOps.apply_state_ops(agent, [
+          %StateOp.AppendThread{entries: [%{kind: :note, payload: %{n: 2}}]}
+        ])
+
+      assert directives == []
+      assert Thread.entry_count(updated.state.__thread__) == 2
+      assert Thread.last(updated.state.__thread__).payload == %{n: 2}
+    end
+
+    test "treats empty batches as a no-op" do
+      {:ok, agent} = Agent.new(%{id: "test", state: %{}})
+
+      {updated, directives} =
+        StateOps.apply_state_ops(agent, [%StateOp.AppendThread{entries: []}])
+
+      assert directives == []
+      refute Map.has_key?(updated.state, :__thread__)
     end
   end
 

@@ -171,6 +171,26 @@ defmodule JidoTest.Thread.AgentTest do
     end
   end
 
+  describe "append_op/1" do
+    test "builds an AppendThread state op for a single entry" do
+      op = ThreadAgent.append_op(%{kind: :message, payload: %{text: "hi"}})
+
+      assert %Jido.Agent.StateOp.AppendThread{
+               entries: [%{kind: :message, payload: %{text: "hi"}}]
+             } = op
+    end
+
+    test "preserves batches of entries" do
+      entries = [
+        %{kind: :message, payload: %{text: "one"}},
+        %{kind: :message, payload: %{text: "two"}}
+      ]
+
+      op = ThreadAgent.append_op(entries)
+      assert op.entries == entries
+    end
+  end
+
   describe "has_thread?/1" do
     test "returns false when no thread" do
       agent = create_agent()

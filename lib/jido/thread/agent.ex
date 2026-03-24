@@ -20,6 +20,7 @@ defmodule Jido.Thread.Agent do
   """
 
   alias Jido.Agent
+  alias Jido.Agent.StateOp
   alias Jido.Thread
 
   @key :__thread__
@@ -63,6 +64,10 @@ defmodule Jido.Thread.Agent do
     thread = get(agent)
     put(agent, Thread.append(thread, entry_or_entries))
   end
+
+  @doc "Build a state operation that appends entries to the agent thread."
+  @spec append_op(map() | struct() | [map() | struct()]) :: StateOp.AppendThread.t()
+  def append_op(entry_or_entries), do: StateOp.append_thread(entry_or_entries)
 
   @doc "Check if agent has a thread"
   @spec has_thread?(Agent.t()) :: boolean()

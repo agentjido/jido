@@ -15,6 +15,7 @@ defmodule Jido.Agent.StateOp do
   - `DeleteKeys` - Remove top-level keys from state
   - `SetPath` - Set value at a nested path
   - `DeletePath` - Delete value at a nested path
+  - `AppendThread` - Append one or more entries to the default thread journal
 
   ## Usage
 
@@ -31,10 +32,16 @@ defmodule Jido.Agent.StateOp do
   directives to the runtime.
   """
 
-  alias __MODULE__.{SetState, ReplaceState, DeleteKeys, SetPath, DeletePath}
+  alias __MODULE__.{SetState, ReplaceState, DeleteKeys, SetPath, DeletePath, AppendThread}
 
   @typedoc "Any state operation struct."
-  @type t :: SetState.t() | ReplaceState.t() | DeleteKeys.t() | SetPath.t() | DeletePath.t()
+  @type t ::
+          SetState.t()
+          | ReplaceState.t()
+          | DeleteKeys.t()
+          | SetPath.t()
+          | DeletePath.t()
+          | AppendThread.t()
 
   # ============================================================================
   # SetState - Merge attributes into agent state
@@ -194,6 +201,33 @@ defmodule Jido.Agent.StateOp do
   end
 
   # ============================================================================
+  # AppendThread - Append entries to the default thread journal
+  # ============================================================================
+
+  defmodule AppendThread do
+    @moduledoc """
+    Append one or more entries to the default thread journal stored at
+    `agent.state[:__thread__]`.
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                entries: Zoi.list(Zoi.any(), description: "Entries to append to the thread")
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc "Returns the Zoi schema for AppendThread."
+    @spec schema() :: Zoi.schema()
+    def schema, do: @schema
+  end
+
+  # ============================================================================
   # Helper Constructors
   # ============================================================================
 
@@ -216,4 +250,13 @@ defmodule Jido.Agent.StateOp do
   @doc "Creates a DeletePath state operation."
   @spec delete_path([atom()]) :: DeletePath.t()
   def delete_path(path) when is_list(path), do: %DeletePath{path: path}
+
+  @doc "Creates an AppendThread state operation."
+  @spec append_thread(map() | struct() | [map() | struct()]) :: AppendThread.t()
+  def append_thread(entry_or_entries)
+      when is_map(entry_or_entries) or is_struct(entry_or_entries),
+      do: %AppendThread{entries: [entry_or_entries]}
+
+  def append_thread(entry_or_entries) when is_list(entry_or_entries),
+    do: %AppendThread{entries: entry_or_entries}
 end

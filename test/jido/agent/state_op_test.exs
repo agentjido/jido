@@ -85,6 +85,26 @@ defmodule JidoTest.Agent.StateOpTest do
     end
   end
 
+  describe "append_thread/1" do
+    test "wraps a single entry" do
+      effect = StateOp.append_thread(%{kind: :message, payload: %{text: "hi"}})
+
+      assert %StateOp.AppendThread{
+               entries: [%{kind: :message, payload: %{text: "hi"}}]
+             } = effect
+    end
+
+    test "preserves entry batches" do
+      entries = [
+        %{kind: :note, payload: %{text: "one"}},
+        %{kind: :note, payload: %{text: "two"}}
+      ]
+
+      effect = StateOp.append_thread(entries)
+      assert effect.entries == entries
+    end
+  end
+
   describe "state op structs" do
     test "SetState struct fields" do
       effect = %StateOp.SetState{attrs: %{a: 1}}
@@ -110,6 +130,11 @@ defmodule JidoTest.Agent.StateOpTest do
     test "DeletePath struct fields" do
       effect = %StateOp.DeletePath{path: [:q, :r]}
       assert effect.path == [:q, :r]
+    end
+
+    test "AppendThread struct fields" do
+      effect = %StateOp.AppendThread{entries: [%{kind: :message}]}
+      assert effect.entries == [%{kind: :message}]
     end
   end
 
@@ -137,6 +162,11 @@ defmodule JidoTest.Agent.StateOpTest do
     test "DeletePath.schema/0 returns Zoi schema" do
       assert %{__struct__: Zoi.Types.Struct, module: StateOp.DeletePath} =
                StateOp.DeletePath.schema()
+    end
+
+    test "AppendThread.schema/0 returns Zoi schema" do
+      assert %{__struct__: Zoi.Types.Struct, module: StateOp.AppendThread} =
+               StateOp.AppendThread.schema()
     end
   end
 end

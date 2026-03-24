@@ -12,6 +12,7 @@ defmodule Jido.Agent.StateOps do
   - `StateOp.DeleteKeys` - Remove top-level keys
   - `StateOp.SetPath` - Set value at nested path
   - `StateOp.DeletePath` - Delete value at nested path
+  - `StateOp.AppendThread` - Append entries to the default thread journal
 
   Any other struct is treated as an external directive and passed through.
   """
@@ -19,6 +20,7 @@ defmodule Jido.Agent.StateOps do
   alias Jido.Agent
   alias Jido.Agent.State
   alias Jido.Agent.StateOp
+  alias Jido.Thread.Agent, as: ThreadAgent
 
   @doc """
   Merges action result into agent state.
@@ -61,6 +63,12 @@ defmodule Jido.Agent.StateOps do
         %StateOp.DeletePath{path: path}, {a, directives} ->
           {_, new_state} = pop_in(a.state, path)
           {%{a | state: new_state}, directives}
+
+        %StateOp.AppendThread{entries: []}, {a, directives} ->
+          {a, directives}
+
+        %StateOp.AppendThread{entries: entries}, {a, directives} ->
+          {ThreadAgent.append(a, entries), directives}
 
         %_{} = directive, {a, directives} ->
           {a, [directive | directives]}
