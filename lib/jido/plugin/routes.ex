@@ -50,13 +50,13 @@ defmodule Jido.Plugin.Routes do
 
   ## Examples
 
-      iex> instance = Instance.new(SlackPlugin)  # route_prefix: "slack"
-      iex> expand_routes(instance)
-      [{"slack.post", SlackActions.Post, []}, {"slack.list", SlackActions.List, []}]
+      instance = Instance.new(SlackPlugin)  # route_prefix: "slack"
+      expand_routes(instance)
+      # => [{"slack.post", SlackActions.Post, []}, {"slack.list", SlackActions.List, []}]
 
-      iex> instance = Instance.new({SlackPlugin, as: :support})  # route_prefix: "support.slack"
-      iex> expand_routes(instance)
-      [{"support.slack.post", SlackActions.Post, []}, ...]
+      instance = Instance.new({SlackPlugin, as: :support})  # route_prefix: "support.slack"
+      expand_routes(instance)
+      # => [{"support.slack.post", SlackActions.Post, []}, {"support.slack.list", SlackActions.List, []}]
   """
   @spec expand_routes(Instance.t()) :: [{String.t(), module(), keyword()}]
   def expand_routes(%Instance{} = instance) do

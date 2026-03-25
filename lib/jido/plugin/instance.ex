@@ -68,14 +68,14 @@ defmodule Jido.Plugin.Instance do
 
   ## Examples
 
-      iex> Instance.new(MyPlugin)
-      %Instance{module: MyPlugin, as: nil, state_key: :my_plugin, ...}
+      Instance.new(MyPlugin)
+      # => %Instance{module: MyPlugin, as: nil, state_key: :my_plugin}
 
-      iex> Instance.new({MyPlugin, as: :support, token: "abc"})
-      %Instance{module: MyPlugin, as: :support, state_key: :my_plugin_support, ...}
+      Instance.new({MyPlugin, as: :support, token: "abc"})
+      # => %Instance{module: MyPlugin, as: :support, state_key: :my_plugin_support}
 
-      iex> Instance.new({MyPlugin, %{token: "abc"}})
-      %Instance{module: MyPlugin, as: nil, config: %{token: "abc"}, ...}
+      Instance.new({MyPlugin, %{token: "abc"}})
+      # => %Instance{module: MyPlugin, as: nil, config: %{token: "abc"}}
   """
   @spec new(module() | {module(), map() | keyword()}) :: t()
   def new(plugin_declaration) do

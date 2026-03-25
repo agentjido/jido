@@ -15,11 +15,11 @@ defmodule Jido.Sensor.Spec do
 
   ## Examples
 
-      iex> Sensor.Spec.new!(%{module: MySensor, name: "my_sensor"})
-      %Sensor.Spec{module: MySensor, name: "my_sensor", ...}
+      Sensor.Spec.new!(%{module: MySensor, name: "my_sensor"})
+      # => %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{}}
 
-      iex> Sensor.Spec.new(%{module: MySensor, name: "my_sensor", config: %{interval: 1000}})
-      {:ok, %Sensor.Spec{...}}
+      Sensor.Spec.new(%{module: MySensor, name: "my_sensor", config: %{interval: 1000}})
+      # => {:ok, %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{interval: 1000}}}
   """
 
   @schema Zoi.struct(
@@ -49,11 +49,11 @@ defmodule Jido.Sensor.Spec do
 
   ## Examples
 
-      iex> Sensor.Spec.new(%{module: MySensor, name: "my_sensor"})
-      {:ok, %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{}, ...}}
+      Sensor.Spec.new(%{module: MySensor, name: "my_sensor"})
+      # => {:ok, %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{}}}
 
-      iex> Sensor.Spec.new(%{name: "missing_module"})
-      {:error, ...}
+      Sensor.Spec.new(%{name: "missing_module"})
+      # => {:error, validation_errors}
   """
   @spec new(map()) :: {:ok, t()} | {:error, term()}
   def new(attrs) when is_map(attrs) do
@@ -67,8 +67,8 @@ defmodule Jido.Sensor.Spec do
 
   ## Examples
 
-      iex> Sensor.Spec.new!(%{module: MySensor, name: "my_sensor"})
-      %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{}, ...}
+      Sensor.Spec.new!(%{module: MySensor, name: "my_sensor"})
+      # => %Sensor.Spec{module: MySensor, name: "my_sensor", config: %{}}
   """
   @spec new!(map()) :: t()
   def new!(attrs) do
