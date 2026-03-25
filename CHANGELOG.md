@@ -2,20 +2,6 @@
 
 <!-- changelog -->
 
-## Unreleased
-
-### Added
-
-- pods: add canonical topology links, eager dependency ordering, `Jido.Pod.get/3`, and pod lifecycle telemetry
-
-### Changed
-
-- pods: make flat manager-led runtime limits explicit for `kind: :pod` topology nodes
-
-### Documentation
-
-- document pod thaw/reconcile invariants, typed links, and pod observability events
-
 ## [v2.1.0](https://github.com/agentjido/jido/compare/v2.0.0...v2.1.0) (2026-03-14)
 
 ### Features:
