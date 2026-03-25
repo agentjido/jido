@@ -39,11 +39,11 @@ defmodule Jido.Plugin.Config do
 
   ## Examples
 
-      iex> Config.resolve_config(MyApp.SlackPlugin, %{channel: "#support"})
-      {:ok, %{token: "env-token", channel: "#support"}}
+      Config.resolve_config(MyApp.SlackPlugin, %{channel: "#support"})
+      # => {:ok, %{token: "env-token", channel: "#support"}}
 
-      iex> Config.resolve_config(MyApp.SlackPlugin, %{invalid: "field"})
-      {:error, [%Zoi.Error{...}]}
+      Config.resolve_config(MyApp.SlackPlugin, %{invalid: "field"})
+      # => {:error, validation_errors}
   """
   @spec resolve_config(module(), map()) :: {:ok, map()} | {:error, list()}
   def resolve_config(plugin_module, overrides \\ %{}) do
@@ -58,11 +58,11 @@ defmodule Jido.Plugin.Config do
 
   ## Examples
 
-      iex> Config.resolve_config!(MyApp.SlackPlugin, %{channel: "#support"})
-      %{token: "env-token", channel: "#support"}
+      Config.resolve_config!(MyApp.SlackPlugin, %{channel: "#support"})
+      # => %{token: "env-token", channel: "#support"}
 
-      iex> Config.resolve_config!(MyApp.SlackPlugin, %{invalid: "field"})
-      ** (ArgumentError) Config validation failed for MyApp.SlackPlugin: ...
+      Config.resolve_config!(MyApp.SlackPlugin, %{invalid: "field"})
+      # Raises ArgumentError when the resolved config fails schema validation.
   """
   @spec resolve_config!(module(), map()) :: map()
   def resolve_config!(plugin_module, overrides \\ %{}) do

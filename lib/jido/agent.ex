@@ -463,10 +463,10 @@ defmodule Jido.Agent do
       For multi-instance plugins, the module appears once regardless of how many
       instances are mounted.
 
-      ## Examples
+      ## Example
 
-          iex> #{inspect(__MODULE__)}.plugins()
-          [SlackPlugin, OpenAIPlugin]
+          MyAgent.plugins()
+          # => [MyApp.SlackPlugin, MyApp.OpenAIPlugin]
       """
       @spec plugins() :: [module()]
       def plugins do
@@ -497,10 +497,10 @@ defmodule Jido.Agent do
       Capabilities are atoms describing what the agent can do based on its
       mounted plugins.
 
-      ## Examples
+      ## Example
 
-          iex> #{inspect(__MODULE__)}.capabilities()
-          [:messaging, :channel_management, :chat, :embeddings]
+          MyAgent.capabilities()
+          # => [:messaging, :channel_management, :chat, :embeddings]
       """
       @spec capabilities() :: [atom()]
       def capabilities do
@@ -514,10 +514,10 @@ defmodule Jido.Agent do
 
       These are the fully-prefixed signal types that the agent can handle.
 
-      ## Examples
+      ## Example
 
-          iex> #{inspect(__MODULE__)}.signal_types()
-          ["slack.post", "slack.channels.list", "openai.chat", ...]
+          MyAgent.signal_types()
+          # => ["slack.post", "slack.channels.list", "openai.chat"]
       """
       @spec signal_types() :: [String.t()]
       def signal_types do
