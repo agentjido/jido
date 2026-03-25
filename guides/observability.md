@@ -493,6 +493,15 @@ always emit telemetry regardless of `:debug_events` config.
 `Jido.Observe.EventContract` provides lightweight key validation helpers so
 downstream namespaces keep stable metadata/measurement contracts.
 
+Namespace ownership matters here:
+
+- `jido` owns the generic runtime and execution surfaces such as
+  `[:jido, :agent, ...]`, `[:jido, :agent_server, ...]`, and `[:jido, :action, ...]`.
+- Domain packages should own their own higher-level namespaces such as
+  `[:jido, :ai, ...]` in `jido_ai`.
+- Keep AI- or domain-specific event contracts out of core `jido`; use
+  `emit_event/3` plus package-local docs/tests in the owning package instead.
+
 ```elixir
 alias Jido.Observe
 alias Jido.Observe.EventContract
