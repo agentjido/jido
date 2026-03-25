@@ -12,6 +12,7 @@ defmodule JidoTest.Pod.RuntimeTest do
   @nested_pod_manager :pod_runtime_nested_pods
   @recursive_pod_manager :pod_runtime_recursive_pods
   @pod_manager :pod_runtime_review_pods
+  @lazy_pod_manager :pod_runtime_lazy_review_pods
 
   defmodule PodWorker do
     @moduledoc false
@@ -61,6 +62,33 @@ defmodule JidoTest.Pod.RuntimeTest do
           activation: :eager
         }
       }
+  end
+
+  defmodule LazyReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "lazy_runtime_review_pod",
+      topology:
+        Topology.new!(
+          name: "lazy_runtime_review_pod",
+          nodes: %{
+            planner: %{
+              agent: PodWorker,
+              manager: :pod_runtime_planner_members,
+              activation: :lazy,
+              meta: %{role: "planner"},
+              initial_state: %{role: "planner"}
+            },
+            reviewer: %{
+              agent: PodWorker,
+              manager: :pod_runtime_reviewer_members,
+              activation: :lazy,
+              meta: %{role: "reviewer"},
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, :planner, :reviewer}]
+        )
   end
 
   defmodule RecursiveReviewPod do
@@ -165,6 +193,17 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
       )
 
+    {:ok, _lazy_pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: @lazy_pod_manager,
+          agent: LazyReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
     {:ok, _nested_pod_manager} =
       start_supervised(
         InstanceManager.child_spec(
@@ -193,6 +232,7 @@ defmodule JidoTest.Pod.RuntimeTest do
       :persistent_term.erase({InstanceManager, @nested_pod_manager})
       :persistent_term.erase({InstanceManager, @recursive_pod_manager})
       :persistent_term.erase({InstanceManager, @pod_manager})
+      :persistent_term.erase({InstanceManager, @lazy_pod_manager})
     end)
 
     {:ok, pod_key: "order-123"}
@@ -227,6 +267,34 @@ defmodule JidoTest.Pod.RuntimeTest do
 
     {:ok, planner_state} = AgentServer.state(planner_pid)
     assert planner_state.children.reviewer.pid == reviewer_pid
+  end
+
+  test "ensure_node applies initial_state overrides only to the requested node", %{
+    pod_key: pod_key
+  } do
+    assert {:ok, pod_pid} = Pod.get(@lazy_pod_manager, pod_key)
+
+    planner_key = {LazyReviewPod, pod_key, :planner}
+    reviewer_key = {LazyReviewPod, pod_key, :reviewer}
+
+    assert :error = Pod.lookup_node(pod_pid, :planner)
+    assert :error = Pod.lookup_node(pod_pid, :reviewer)
+    assert :error = InstanceManager.lookup(@planner_manager, planner_key)
+    assert :error = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, reviewer_pid} =
+             Pod.ensure_node(pod_pid, :reviewer, initial_state: %{role: "override"})
+
+    assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
+    assert {:ok, ^reviewer_pid} = Pod.lookup_node(pod_pid, :reviewer)
+    assert {:ok, ^planner_pid} = InstanceManager.lookup(@planner_manager, planner_key)
+    assert {:ok, ^reviewer_pid} = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, planner_state} = AgentServer.state(planner_pid)
+    assert planner_state.agent.state.role == "planner"
+
+    assert {:ok, reviewer_state} = AgentServer.state(reviewer_pid)
+    assert reviewer_state.agent.state.role == "override"
   end
 
   test "restored pod managers can re-adopt surviving eager nodes", %{pod_key: pod_key} do

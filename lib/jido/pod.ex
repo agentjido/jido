@@ -601,7 +601,7 @@ defmodule Jido.Pod do
         Task.async_stream(
           wave,
           fn name ->
-            ensure_planned_node(server_pid, state, topology, name, report, opts)
+            ensure_planned_node(server_pid, state, topology, requested_names, name, report, opts)
           end,
           ordered: true,
           max_concurrency: max_concurrency,
@@ -625,7 +625,7 @@ defmodule Jido.Pod do
     end)
   end
 
-  defp ensure_planned_node(server_pid, state, topology, name, report, opts) do
+  defp ensure_planned_node(server_pid, state, topology, requested_names, name, report, opts) do
     with {:ok, node} <- fetch_node(topology, name) do
       snapshot = build_node_snapshot(state, topology, name, node)
       source = snapshot_source(snapshot)
@@ -639,6 +639,7 @@ defmodule Jido.Pod do
               server_pid,
               state,
               topology,
+              requested_names,
               name,
               node,
               snapshot,
@@ -661,15 +662,55 @@ defmodule Jido.Pod do
     end
   end
 
-  defp do_ensure_planned_node(server_pid, state, topology, name, node, snapshot, report, opts) do
+  defp do_ensure_planned_node(
+         server_pid,
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
     if node.kind == :pod do
-      ensure_planned_pod_node(server_pid, state, topology, name, node, snapshot, report, opts)
+      ensure_planned_pod_node(
+        server_pid,
+        state,
+        topology,
+        requested_names,
+        name,
+        node,
+        snapshot,
+        report,
+        opts
+      )
     else
-      ensure_planned_agent_node(server_pid, state, topology, name, node, snapshot, report, opts)
+      ensure_planned_agent_node(
+        server_pid,
+        state,
+        topology,
+        requested_names,
+        name,
+        node,
+        snapshot,
+        report,
+        opts
+      )
     end
   end
 
-  defp ensure_planned_agent_node(server_pid, state, topology, name, node, snapshot, report, opts) do
+  defp ensure_planned_agent_node(
+         server_pid,
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
     case snapshot.status do
       :adopted ->
         {:ok, ensure_result(name, snapshot.running_pid, :adopted, snapshot.owner)}
@@ -678,7 +719,7 @@ defmodule Jido.Pod do
         {:error, misplaced_node_reason(name, snapshot)}
 
       _status ->
-        initial_state = Keyword.get(opts, :initial_state, node.initial_state)
+        initial_state = node_initial_state(requested_names, name, node, opts)
         key = node_key(state, name)
 
         with {:ok, parent_pid} <- resolve_parent_pid(server_pid, state, topology, name, report),
@@ -689,7 +730,17 @@ defmodule Jido.Pod do
     end
   end
 
-  defp ensure_planned_pod_node(server_pid, state, topology, name, node, snapshot, report, opts) do
+  defp ensure_planned_pod_node(
+         server_pid,
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
     with :ok <- ensure_pod_recursion_safe(node, state, opts) do
       case snapshot.status do
         :adopted ->
@@ -702,7 +753,7 @@ defmodule Jido.Pod do
           {:error, misplaced_node_reason(name, snapshot)}
 
         _status ->
-          initial_state = Keyword.get(opts, :initial_state, node.initial_state)
+          initial_state = node_initial_state(requested_names, name, node, opts)
           key = node_key(state, name)
 
           with {:ok, parent_pid} <- resolve_parent_pid(server_pid, state, topology, name, report),
@@ -865,6 +916,14 @@ defmodule Jido.Pod do
   defp snapshot_source(%{status: :stopped}), do: :started
   defp snapshot_source(%{status: :running}), do: :running
   defp snapshot_source(%{status: :misplaced}), do: :running
+
+  defp node_initial_state(requested_names, name, node, opts) do
+    if name in requested_names do
+      Keyword.get(opts, :initial_state, node.initial_state)
+    else
+      node.initial_state
+    end
+  end
 
   defp ensure_result(_name, pid, source, owner) when is_pid(pid) do
     %{
