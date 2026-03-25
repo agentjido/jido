@@ -853,7 +853,7 @@ defmodule Jido.Pod do
     running_pid = running_child_pid(node.manager, key)
     owner = owner_name(topology, name)
     expected_parent = expected_parent_ref(state, name, owner)
-    actual_parent = actual_parent_ref(state, name)
+    actual_parent = actual_parent_ref(state, topology, name)
     adopted? = parent_matches?(actual_parent, expected_parent)
 
     status =
@@ -878,16 +878,34 @@ defmodule Jido.Pod do
     }
   end
 
-  defp actual_parent_ref(%State{} = state, name) when is_atom(name) do
+  defp actual_parent_ref(%State{} = state, %Topology{} = topology, name) when is_atom(name) do
     case RuntimeStore.fetch(state.jido, :relationships, node_id(state, name)) do
       {:ok, %{parent_id: parent_id, tag: tag}} when is_binary(parent_id) ->
-        %{id: parent_id, pid: Jido.whereis(state.jido, parent_id), tag: tag}
+        %{id: parent_id, pid: resolve_parent_runtime_pid(state, topology, parent_id), tag: tag}
 
       {:ok, _other} ->
         nil
 
       :error ->
         nil
+    end
+  end
+
+  defp resolve_parent_runtime_pid(%State{id: state_id, registry: registry}, _topology, parent_id)
+       when parent_id == state_id do
+    AgentServer.whereis(registry, state_id)
+  end
+
+  defp resolve_parent_runtime_pid(%State{} = state, %Topology{} = topology, parent_id)
+       when is_binary(parent_id) do
+    case Enum.find(topology.nodes, fn {candidate_name, _node} ->
+           node_id(state, candidate_name) == parent_id
+         end) do
+      {owner_name, %Node{manager: manager}} ->
+        running_child_pid(manager, node_key(state, owner_name))
+
+      nil ->
+        Jido.whereis(state.jido, parent_id)
     end
   end
 

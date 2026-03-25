@@ -261,6 +261,10 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert {:ok, ^reviewer_pid} = Pod.lookup_node(pod_pid, :reviewer)
     assert {:ok, ^reviewer_pid} = InstanceManager.lookup(@reviewer_manager, reviewer_key)
 
+    assert {:ok, snapshots} = Pod.nodes(pod_pid)
+    assert snapshots.planner.actual_parent.pid == pod_pid
+    assert snapshots.reviewer.actual_parent.pid == planner_pid
+
     {:ok, manager_state} = AgentServer.state(pod_pid)
     assert manager_state.children.planner.pid == planner_pid
     refute Map.has_key?(manager_state.children, :reviewer)
