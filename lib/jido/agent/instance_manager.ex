@@ -218,6 +218,18 @@ defmodule Jido.Agent.InstanceManager do
     end
   end
 
+  @doc false
+  @spec agent_module(manager_name()) :: {:ok, module()} | {:error, :not_found}
+  def agent_module(manager) when is_atom(manager) do
+    case :persistent_term.get({__MODULE__, manager}, :error) do
+      %{agent: agent} when is_atom(agent) ->
+        {:ok, agent}
+
+      _other ->
+        {:error, :not_found}
+    end
+  end
+
   @doc """
   Stops an agent by key.
 

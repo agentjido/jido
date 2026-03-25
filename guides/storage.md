@@ -27,9 +27,46 @@ This guide covers Jido's unified persistence system: checkpoints, thread journal
 |----------|-------------|-----|
 | **Manual** | Explicit control over when to persist | `MyApp.Jido.hibernate/1`, `thaw/2` |
 | **Automatic** | Idle-based lifecycle for per-user/entity agents | `InstanceManager.get/3` with `idle_timeout` |
+| **Pod-managed topology** | Durable named teams with explicit reattachment after thaw | `Jido.Pod.get/3` or `InstanceManager.get/3` + `Jido.Pod.reconcile/2` |
 | **None** | Stateless agents, cheap rebuilds, short-lived tasks | Skip storage config |
 
 Both manual and automatic approaches use the same underlying `Jido.Storage` behaviour.
+
+## Pods Use Ordinary Checkpoints
+
+Pods do not introduce a separate storage contract.
+
+- The pod agent persists its topology snapshot as ordinary plugin state under
+  `agent.state[:__pod__]`
+- Each durable node persists through its own `Jido.Agent.InstanceManager`
+- Storage adapters such as `jido_ecto` keep working through the same checkpoint
+  and thread APIs
+
+The durability boundary is important:
+
+- storage preserves the pod topology snapshot
+- storage does not preserve a live `state.children` tree, PIDs, or monitors
+
+So thaw works like this:
+
+1. the pod agent thaws and immediately has its topology back
+2. eager roots and missing ownership edges are repaired by calling `Jido.Pod.reconcile/2`
+3. lazy roots or surviving nodes are reattached on demand via `Jido.Pod.ensure_node/3`
+
+If a node stayed alive independently while the pod manager was hibernated, it
+can show up in two different states:
+
+- surviving root nodes are typically `:running` until the pod manager re-adopts them
+- surviving owned descendants can remain `:adopted` if their logical owner never died
+- surviving nested pod managers follow the same rule, then reconcile their own
+  eager topology once they are reattached
+
+`Jido.Pod.get/3` bundles the common path by calling
+`Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.
+Use the explicit two-step path when you need to inspect the restored topology
+before reattachment.
+
+See [Pods](pods.md) for the manager-led runtime model and examples.
 
 ## Overview
 

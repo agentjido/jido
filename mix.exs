@@ -92,7 +92,8 @@ defmodule Jido.MixProject do
         ],
         Coordination: [
           "guides/await.md",
-          "guides/orchestration.md"
+          "guides/orchestration.md",
+          "guides/pods.md"
         ],
         Operations: [
           "guides/debugging.md",
@@ -149,6 +150,7 @@ defmodule Jido.MixProject do
         # Coordination
         {"guides/await.md", title: "Await & Coordination"},
         {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
+        {"guides/pods.md", title: "Pods"},
 
         # Operations
         {"guides/debugging.md", title: "Debugging"},
@@ -192,7 +194,11 @@ defmodule Jido.MixProject do
           Jido,
           Jido.Agent,
           Jido.AgentServer,
-          Jido.Await
+          Jido.Await,
+          Jido.Pod,
+          Jido.Pod.Topology,
+          Jido.Pod.Topology.Link,
+          Jido.Pod.Topology.Node
         ],
         Strategies: [
           Jido.Agent.Strategy,
@@ -210,7 +216,8 @@ defmodule Jido.MixProject do
           Jido.Plugin.Requirements,
           Jido.Plugin.Routes,
           Jido.Plugin.Schedules,
-          Jido.Plugin.Spec
+          Jido.Plugin.Spec,
+          Jido.Pod.Plugin
         ],
         Identity: [
           Jido.Identity,

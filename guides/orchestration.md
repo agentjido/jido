@@ -54,6 +54,10 @@ must survive idle hibernation or be restored independently, model them as keyed
 managed agents under `Jido.Agent.InstanceManager` rather than expecting
 `SpawnAgent` to make the hierarchy durable.
 
+If you want a durable named team with a persisted topology, use `Jido.Pod`
+instead. Pods are manager-led and storage-aware, while this guide stays focused
+on ephemeral `SpawnAgent` coordination patterns.
+
 ## When the Coordinator Dies
 
 Jido gives you three policies for child behavior when the logical parent dies:
