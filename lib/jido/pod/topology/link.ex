@@ -14,8 +14,16 @@ defmodule Jido.Pod.Topology.Link do
               type:
                 Zoi.atom(description: "The relationship type.")
                 |> Zoi.refine({__MODULE__, :validate_type, []}),
-              from: Zoi.atom(description: "The source node name."),
-              to: Zoi.atom(description: "The target node name."),
+              from:
+                Zoi.union([
+                  Zoi.atom(description: "The source node name."),
+                  Zoi.string(description: "The source node name.")
+                ]),
+              to:
+                Zoi.union([
+                  Zoi.atom(description: "The target node name."),
+                  Zoi.string(description: "The target node name.")
+                ]),
               meta:
                 Zoi.map(description: "Optional metadata associated with the link.")
                 |> Zoi.default(%{})

@@ -20,9 +20,11 @@ defmodule Jido.Pod do
 
   @pod_state_key Plugin.state_key_atom()
   @pod_capability Plugin.capability()
+  defguardp is_node_name(name) when is_atom(name) or is_binary(name)
 
   @type node_status :: :adopted | :running | :misplaced | :stopped
   @type ensure_source :: :adopted | :running | :started
+  @type node_name :: Topology.node_name()
 
   @type node_snapshot :: %{
           node: Node.t(),
@@ -30,7 +32,7 @@ defmodule Jido.Pod do
           pid: pid() | nil,
           running_pid: pid() | nil,
           adopted_pid: pid() | nil,
-          owner: atom() | nil,
+          owner: node_name() | nil,
           expected_parent: map(),
           actual_parent: map() | nil,
           adopted?: boolean(),
@@ -40,18 +42,18 @@ defmodule Jido.Pod do
   @type ensure_result :: %{
           pid: pid(),
           source: ensure_source(),
-          owner: atom() | nil,
-          parent: :pod | atom()
+          owner: node_name() | nil,
+          parent: :pod | node_name()
         }
 
   @type reconcile_report :: %{
-          requested: [atom()],
-          waves: [[atom()]],
-          nodes: %{atom() => ensure_result()},
-          failures: %{atom() => term()},
-          completed: [atom()],
-          failed: [atom()],
-          pending: [atom()]
+          requested: [node_name()],
+          waves: [[node_name()]],
+          nodes: %{node_name() => ensure_result()},
+          failures: %{node_name() => term()},
+          completed: [node_name()],
+          failed: [node_name()],
+          pending: [node_name()]
         }
 
   @doc false
@@ -206,7 +208,7 @@ defmodule Jido.Pod do
 
   defmacro __using__(opts) do
     name = __MODULE__.expand_and_eval_literal_option(Keyword.fetch!(opts, :name), __CALLER__)
-    raw_topology = Keyword.fetch!(opts, :topology)
+    raw_topology = Keyword.get(opts, :topology, %{})
     topology = __MODULE__.resolve_topology!(name, raw_topology, __CALLER__)
 
     default_plugins =
@@ -348,22 +350,25 @@ defmodule Jido.Pod do
 
   @doc """
   Replaces the persisted topology snapshot in a pod agent.
+
+  Structural topology changes advance `topology.version`; no-op replacements
+  preserve the current version.
   """
   @spec put_topology(Agent.t(), Topology.t()) :: {:ok, Agent.t()} | {:error, term()}
   def put_topology(%Agent{} = agent, %Topology{} = topology) do
-    with {:ok, instance} <- pod_plugin_instance(agent.agent_module),
+    with {:ok, current_topology} <- fetch_topology(agent),
+         {:ok, instance} <- pod_plugin_instance(agent.agent_module),
          {:ok, pod_state} <- fetch_state(agent) do
-      updated_state =
-        pod_state
-        |> Map.put(:topology, topology)
-        |> Map.put(:topology_version, topology.version)
-
-      {:ok, %{agent | state: Map.put(agent.state, instance.state_key, updated_state)}}
+      normalized_topology = normalize_updated_topology(current_topology, topology)
+      {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
     end
   end
 
   @doc """
   Applies a pure topology transformation to a pod agent.
+
+  Structural topology changes advance `topology.version`; no-op updates preserve
+  the current version.
   """
   @spec update_topology(
           Agent.t(),
@@ -373,14 +378,18 @@ defmodule Jido.Pod do
   def update_topology(%Agent{} = agent, fun) when is_function(fun, 1) do
     with {:ok, topology} <- fetch_topology(agent),
          {:ok, new_topology} <- normalize_topology_update(fun.(topology)) do
-      put_topology(agent, new_topology)
+      with {:ok, instance} <- pod_plugin_instance(agent.agent_module),
+           {:ok, pod_state} <- fetch_state(agent) do
+        normalized_topology = normalize_updated_topology(topology, new_topology)
+        {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
+      end
     end
   end
 
   @doc """
   Returns runtime snapshots for every node in a running pod.
   """
-  @spec nodes(AgentServer.server()) :: {:ok, %{atom() => node_snapshot()}} | {:error, term()}
+  @spec nodes(AgentServer.server()) :: {:ok, %{node_name() => node_snapshot()}} | {:error, term()}
   def nodes(server) do
     with {:ok, state} <- AgentServer.state(server),
          {:ok, topology} <- fetch_topology(state) do
@@ -391,8 +400,8 @@ defmodule Jido.Pod do
   @doc """
   Looks up a node's live process if it is currently running.
   """
-  @spec lookup_node(AgentServer.server(), atom()) :: {:ok, pid()} | :error | {:error, term()}
-  def lookup_node(server, name) when is_atom(name) do
+  @spec lookup_node(AgentServer.server(), node_name()) :: {:ok, pid()} | :error | {:error, term()}
+  def lookup_node(server, name) when is_node_name(name) do
     with {:ok, state} <- AgentServer.state(server),
          {:ok, topology} <- fetch_topology(state),
          {:ok, node} <- fetch_node(topology, name),
@@ -408,8 +417,9 @@ defmodule Jido.Pod do
   @doc """
   Ensures a named node is running and adopted into the pod manager.
   """
-  @spec ensure_node(AgentServer.server(), atom(), keyword()) :: {:ok, pid()} | {:error, term()}
-  def ensure_node(server, name, opts \\ []) when is_atom(name) and is_list(opts) do
+  @spec ensure_node(AgentServer.server(), node_name(), keyword()) ::
+          {:ok, pid()} | {:error, term()}
+  def ensure_node(server, name, opts \\ []) when is_node_name(name) and is_list(opts) do
     with {:ok, state} <- AgentServer.state(server),
          {:ok, topology} <- fetch_topology(state),
          {:ok, node} <- fetch_node(topology, name),
@@ -475,7 +485,33 @@ defmodule Jido.Pod do
      )}
   end
 
-  defp fetch_node(%Topology{} = topology, name) when is_atom(name) do
+  defp persist_topology(%Agent{} = agent, state_key, pod_state, %Topology{} = topology)
+       when is_atom(state_key) and is_map(pod_state) do
+    updated_state =
+      pod_state
+      |> Map.put(:topology, topology)
+      |> Map.put(:topology_version, topology.version)
+
+    %{agent | state: Map.put(agent.state, state_key, updated_state)}
+  end
+
+  defp normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
+    if topology_changed?(current, updated) do
+      %{updated | version: max(updated.version, current.version + 1)}
+    else
+      %{updated | version: current.version}
+    end
+  end
+
+  defp topology_changed?(%Topology{} = left, %Topology{} = right) do
+    drop_topology_version(left) != drop_topology_version(right)
+  end
+
+  defp drop_topology_version(%Topology{} = topology) do
+    %{topology | version: 0}
+  end
+
+  defp fetch_node(%Topology{} = topology, name) when is_node_name(name) do
     case Topology.fetch_node(topology, name) do
       {:ok, %Node{} = node} ->
         {:ok, node}
@@ -878,7 +914,8 @@ defmodule Jido.Pod do
     }
   end
 
-  defp actual_parent_ref(%State{} = state, %Topology{} = topology, name) when is_atom(name) do
+  defp actual_parent_ref(%State{} = state, %Topology{} = topology, name)
+       when is_node_name(name) do
     case RuntimeStore.fetch(state.jido, :relationships, node_id(state, name)) do
       {:ok, %{parent_id: parent_id, tag: tag}} when is_binary(parent_id) ->
         %{id: parent_id, pid: resolve_parent_runtime_pid(state, topology, parent_id), tag: tag}
@@ -920,7 +957,8 @@ defmodule Jido.Pod do
     %{scope: :pod, name: nil, id: state.id, tag: name}
   end
 
-  defp expected_parent_ref(%State{} = state, name, owner_name) when is_atom(owner_name) do
+  defp expected_parent_ref(%State{} = state, name, owner_name)
+       when is_node_name(owner_name) do
     %{scope: :node, name: owner_name, id: node_id(state, owner_name), tag: name}
   end
 

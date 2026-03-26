@@ -33,6 +33,15 @@ end
 
 This wraps `use Jido.Agent` and injects a singleton pod plugin under `:__pod__`.
 
+`topology:` may also be omitted to start with an empty named topology:
+
+```elixir
+defmodule MyApp.EmptyReviewPod do
+  use Jido.Pod,
+    name: "empty_review"
+end
+```
+
 ## Pod Plugin
 
 The default pod plugin is `Jido.Pod.Plugin`.
@@ -66,6 +75,12 @@ advertise the `:pod` capability.
 - `nodes` is a map of logical node name to `%Jido.Pod.Topology.Node{}`.
 - `links` is a list of `%Jido.Pod.Topology.Link{}`.
 - `version` is a simple topology version integer.
+  `Jido.Pod.put_topology/2` and `Jido.Pod.update_topology/2` advance it when
+  the structural topology changes and preserve it for no-op rewrites.
+
+Node names may be atoms or strings. Static predefined pods can keep atom names,
+while runtime-defined or persisted dynamic nodes can use strings. Mixed
+topologies are supported.
 
 The topology API is pure:
 

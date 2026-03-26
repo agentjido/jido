@@ -10,6 +10,7 @@ defmodule Jido.Pod.Topology do
   alias Jido.Pod.Topology.{Link, Node}
 
   @topology_name_regex ~r/^[a-zA-Z][a-zA-Z0-9_]*$/
+  defguardp is_node_name(name) when is_atom(name) or is_binary(name)
 
   @schema Zoi.struct(
             __MODULE__,
@@ -35,6 +36,7 @@ defmodule Jido.Pod.Topology do
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
+  @type node_name :: Node.name()
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
@@ -131,12 +133,12 @@ defmodule Jido.Pod.Topology do
   @doc """
   Inserts or replaces a node definition in the topology.
   """
-  @spec put_node(t(), atom(), Node.t() | keyword() | map()) :: {:ok, t()} | {:error, term()}
-  def put_node(%__MODULE__{} = topology, name, %Node{} = node) when is_atom(name) do
+  @spec put_node(t(), node_name(), Node.t() | keyword() | map()) :: {:ok, t()} | {:error, term()}
+  def put_node(%__MODULE__{} = topology, name, %Node{} = node) when is_node_name(name) do
     {:ok, %{topology | nodes: Map.put(topology.nodes, name, %{node | name: name})}}
   end
 
-  def put_node(%__MODULE__{} = topology, name, attrs) when is_atom(name) do
+  def put_node(%__MODULE__{} = topology, name, attrs) when is_node_name(name) do
     case Node.new(name, attrs) do
       {:ok, node} -> {:ok, %{topology | nodes: Map.put(topology.nodes, name, node)}}
       {:error, _reason} = error -> error
@@ -146,8 +148,8 @@ defmodule Jido.Pod.Topology do
   @doc """
   Removes a node from the topology.
   """
-  @spec delete_node(t(), atom()) :: t()
-  def delete_node(%__MODULE__{} = topology, name) when is_atom(name) do
+  @spec delete_node(t(), node_name()) :: t()
+  def delete_node(%__MODULE__{} = topology, name) when is_node_name(name) do
     %{
       topology
       | nodes: Map.delete(topology.nodes, name),
@@ -158,8 +160,8 @@ defmodule Jido.Pod.Topology do
   @doc """
   Fetches a node by name.
   """
-  @spec fetch_node(t(), atom()) :: {:ok, Node.t()} | :error
-  def fetch_node(%__MODULE__{} = topology, name) when is_atom(name) do
+  @spec fetch_node(t(), node_name()) :: {:ok, Node.t()} | :error
+  def fetch_node(%__MODULE__{} = topology, name) when is_node_name(name) do
     Map.fetch(topology.nodes, name)
   end
 
@@ -206,7 +208,7 @@ defmodule Jido.Pod.Topology do
   Only dependencies between the provided node names participate in ordering.
   Other links are ignored.
   """
-  @spec dependency_order(t(), [atom()]) :: {:ok, [atom()]} | {:error, term()}
+  @spec dependency_order(t(), [node_name()]) :: {:ok, [node_name()]} | {:error, term()}
   def dependency_order(%__MODULE__{} = topology, node_names) when is_list(node_names) do
     ordered_names = Enum.uniq(node_names)
 
@@ -236,8 +238,8 @@ defmodule Jido.Pod.Topology do
   @doc """
   Returns the logical owner of a node when the topology contains an `:owns` link.
   """
-  @spec owner_of(t(), atom()) :: {:ok, atom()} | :root | :error
-  def owner_of(%__MODULE__{} = topology, name) when is_atom(name) do
+  @spec owner_of(t(), node_name()) :: {:ok, node_name()} | :root | :error
+  def owner_of(%__MODULE__{} = topology, name) when is_node_name(name) do
     cond do
       not Map.has_key?(topology.nodes, name) ->
         :error
@@ -253,8 +255,8 @@ defmodule Jido.Pod.Topology do
   @doc """
   Returns the owned children for the given node.
   """
-  @spec owned_children(t(), atom()) :: [atom()]
-  def owned_children(%__MODULE__{} = topology, owner) when is_atom(owner) do
+  @spec owned_children(t(), node_name()) :: [node_name()]
+  def owned_children(%__MODULE__{} = topology, owner) when is_node_name(owner) do
     topology.links
     |> Enum.filter(&match?(%Link{type: :owns, from: ^owner}, &1))
     |> Enum.map(& &1.to)
@@ -264,8 +266,8 @@ defmodule Jido.Pod.Topology do
   @doc """
   Returns the direct `:depends_on` prerequisites for the given node.
   """
-  @spec dependencies_of(t(), atom()) :: [atom()]
-  def dependencies_of(%__MODULE__{} = topology, name) when is_atom(name) do
+  @spec dependencies_of(t(), node_name()) :: [node_name()]
+  def dependencies_of(%__MODULE__{} = topology, name) when is_node_name(name) do
     topology.links
     |> Enum.filter(&match?(%Link{type: :depends_on, from: ^name}, &1))
     |> Enum.map(& &1.to)
@@ -275,7 +277,7 @@ defmodule Jido.Pod.Topology do
   @doc """
   Returns the root nodes that have no logical `:owns` parent.
   """
-  @spec roots(t()) :: [atom()]
+  @spec roots(t()) :: [node_name()]
   def roots(%__MODULE__{} = topology) do
     topology.nodes
     |> Map.keys()
@@ -290,7 +292,7 @@ defmodule Jido.Pod.Topology do
   satisfied by earlier waves. The requested nodes are automatically expanded to
   include transitive owners and dependencies.
   """
-  @spec reconcile_waves(t(), [atom()]) :: {:ok, [[atom()]]} | {:error, term()}
+  @spec reconcile_waves(t(), [node_name()]) :: {:ok, [[node_name()]]} | {:error, term()}
   def reconcile_waves(%__MODULE__{} = topology, node_names) when is_list(node_names) do
     requested_names = Enum.uniq(node_names)
 
@@ -348,7 +350,7 @@ defmodule Jido.Pod.Topology do
 
   defp normalize_nodes(nodes) when is_map(nodes) do
     Enum.reduce_while(nodes, {:ok, %{}}, fn {name, attrs}, {:ok, acc} ->
-      if is_atom(name) do
+      if is_node_name(name) do
         case Node.new(name, attrs) do
           {:ok, node} -> {:cont, {:ok, Map.put(acc, name, node)}}
           {:error, _reason} = error -> {:halt, error}
@@ -357,7 +359,7 @@ defmodule Jido.Pod.Topology do
         {:halt,
          {:error,
           Jido.Error.validation_error(
-            "Topology node names must be atoms.",
+            "Topology node names must be atoms or strings.",
             details: %{name: name}
           )}}
       end
@@ -494,7 +496,7 @@ defmodule Jido.Pod.Topology do
   end
 
   defp expand_runtime_node(%__MODULE__{} = topology, name, acc)
-       when is_atom(name) and is_list(acc) do
+       when is_node_name(name) and is_list(acc) do
     if name in acc do
       {:ok, acc}
     else
@@ -513,7 +515,7 @@ defmodule Jido.Pod.Topology do
     end
   end
 
-  defp runtime_prerequisites(%__MODULE__{} = topology, name) when is_atom(name) do
+  defp runtime_prerequisites(%__MODULE__{} = topology, name) when is_node_name(name) do
     owner =
       case owner_of(topology, name) do
         {:ok, owner_name} -> [owner_name]

@@ -10,10 +10,16 @@ defmodule Jido.Pod.Topology.Node do
   @valid_activations [:eager, :lazy]
   @valid_kinds [:agent, :pod]
 
+  @type name :: atom() | String.t()
+
   @schema Zoi.struct(
             __MODULE__,
             %{
-              name: Zoi.atom(description: "The logical node name."),
+              name:
+                Zoi.union([
+                  Zoi.atom(description: "The logical node name."),
+                  Zoi.string(description: "The logical node name.")
+                ]),
               kind:
                 Zoi.atom(description: "The node kind.")
                 |> Zoi.default(:agent)
@@ -47,12 +53,12 @@ defmodule Jido.Pod.Topology.Node do
   @doc """
   Builds a validated topology node.
   """
-  @spec new(atom(), keyword() | map()) :: {:ok, t()} | {:error, term()}
-  def new(name, attrs) when is_atom(name) and is_list(attrs) do
+  @spec new(name(), keyword() | map()) :: {:ok, t()} | {:error, term()}
+  def new(name, attrs) when (is_atom(name) or is_binary(name)) and is_list(attrs) do
     new(name, Map.new(attrs))
   end
 
-  def new(name, attrs) when is_atom(name) and is_map(attrs) do
+  def new(name, attrs) when (is_atom(name) or is_binary(name)) and is_map(attrs) do
     attrs =
       attrs
       |> Map.new()
@@ -76,7 +82,7 @@ defmodule Jido.Pod.Topology.Node do
   @doc """
   Builds a validated topology node, raising on error.
   """
-  @spec new!(atom(), keyword() | map()) :: t()
+  @spec new!(name(), keyword() | map()) :: t()
   def new!(name, attrs) do
     case new(name, attrs) do
       {:ok, node} ->
