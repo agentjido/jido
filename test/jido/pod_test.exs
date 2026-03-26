@@ -44,6 +44,12 @@ defmodule JidoTest.PodTest do
       }
   end
 
+  defmodule EmptyPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "empty_pod"
+  end
+
   defmodule CustomPluginPod do
     @moduledoc false
     use Jido.Pod,
@@ -63,6 +69,14 @@ defmodule JidoTest.PodTest do
     assert Enum.any?(ExamplePod.plugin_instances(), fn instance ->
              instance.module == Plugin and instance.state_key == :__pod__
            end)
+  end
+
+  test "use Jido.Pod defaults omitted topology to an empty topology" do
+    assert EmptyPod.pod?()
+    assert %Topology{name: "empty_pod", nodes: %{}, links: []} = EmptyPod.topology()
+
+    agent = EmptyPod.new()
+    assert {:ok, %Topology{name: "empty_pod", nodes: %{}}} = Pod.fetch_topology(agent)
   end
 
   test "default_plugins can replace the reserved __pod__ plugin" do
@@ -118,6 +132,26 @@ defmodule JidoTest.PodTest do
     assert [] == topology.links
   end
 
+  test "topology data structures accept string node names" do
+    topology =
+      Topology.from_nodes!("string_named_topology", %{
+        "planner" => %{agent: WorkerAgent, manager: :planner_nodes}
+      })
+
+    assert {:ok, topology} =
+             Topology.put_node(
+               topology,
+               "reviewer",
+               %{agent: WorkerAgent, manager: :reviewer_nodes, activation: :eager}
+             )
+
+    assert {:ok, %Node{activation: :eager}} = Topology.fetch_node(topology, "reviewer")
+    assert {:ok, topology} = Topology.put_link(topology, {:depends_on, "reviewer", "planner"})
+
+    assert {:ok, ["planner", "reviewer"]} =
+             Topology.dependency_order(topology, ["reviewer", "planner"])
+  end
+
   test "mutated pod topology persists through existing storage adapters" do
     table = :"pod_test_storage_#{System.unique_integer([:positive])}"
     storage = {ETS, table: table}
@@ -136,5 +170,25 @@ defmodule JidoTest.PodTest do
     assert {:ok, thawed} = Jido.Persist.thaw(storage, ExamplePod, "persisted-pod")
     assert {:ok, topology} = Pod.fetch_topology(thawed)
     assert Map.has_key?(topology.nodes, :auditor)
+  end
+
+  test "mutated pod topology persists string-named nodes through existing storage adapters" do
+    table = :"pod_test_storage_#{System.unique_integer([:positive])}"
+    storage = {ETS, table: table}
+    agent = EmptyPod.new(id: "persisted-dynamic-pod")
+
+    {:ok, agent} =
+      Pod.update_topology(agent, fn topology ->
+        Topology.put_node(
+          topology,
+          "auditor",
+          %{agent: WorkerAgent, manager: :auditor_nodes}
+        )
+      end)
+
+    assert :ok = Jido.Persist.hibernate(storage, agent)
+    assert {:ok, thawed} = Jido.Persist.thaw(storage, EmptyPod, "persisted-dynamic-pod")
+    assert {:ok, topology} = Pod.fetch_topology(thawed)
+    assert Map.has_key?(topology.nodes, "auditor")
   end
 end

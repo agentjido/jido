@@ -91,6 +91,33 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
   end
 
+  defmodule StringNamedReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "string_named_runtime_review_pod",
+      topology:
+        Topology.new!(
+          name: "string_named_runtime_review_pod",
+          nodes: %{
+            "planner" => %{
+              agent: PodWorker,
+              manager: :pod_runtime_planner_members,
+              activation: :eager,
+              meta: %{role: "planner"},
+              initial_state: %{role: "planner"}
+            },
+            "reviewer" => %{
+              agent: PodWorker,
+              manager: :pod_runtime_reviewer_members,
+              activation: :lazy,
+              meta: %{role: "reviewer"},
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, "planner", "reviewer"}]
+        )
+  end
+
   defmodule RecursiveReviewPod do
     @moduledoc false
     use Jido.Pod,
@@ -464,6 +491,44 @@ defmodule JidoTest.Pod.RuntimeTest do
 
     assert inspect(report.failures.nested) =~
              "requires the nested pod manager to manage the declared pod module"
+  end
+
+  test "pods support string node names for runtime lookup, ensure, and snapshots", %{jido: jido} do
+    storage_table = :"pod_runtime_string_names_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_string_names_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: StringNamedReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    pod_key = "string-nodes-123"
+    planner_key = {StringNamedReviewPod, pod_key, "planner"}
+    reviewer_key = {StringNamedReviewPod, pod_key, "reviewer"}
+
+    assert {:ok, pod_pid} = Pod.get(manager, pod_key)
+    assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, "planner")
+    assert {:ok, ^planner_pid} = InstanceManager.lookup(@planner_manager, planner_key)
+    assert :error = Pod.lookup_node(pod_pid, "reviewer")
+    assert :error = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, snapshots} = Pod.nodes(pod_pid)
+    assert snapshots["planner"].status == :adopted
+    assert snapshots["reviewer"].status == :stopped
+
+    assert {:ok, reviewer_pid} = Pod.ensure_node(pod_pid, "reviewer")
+    assert {:ok, ^reviewer_pid} = Pod.lookup_node(pod_pid, "reviewer")
+    assert {:ok, ^reviewer_pid} = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, snapshots} = Pod.nodes(pod_pid)
+    assert snapshots["planner"].actual_parent.pid == pod_pid
+    assert snapshots["reviewer"].actual_parent.pid == planner_pid
   end
 
   test "reconcile reports partial success when one eager node cannot run", %{jido: jido} do
