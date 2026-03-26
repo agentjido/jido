@@ -235,4 +235,34 @@ defmodule JidoTest.PodTest do
 
     assert {:ok, %{topology_version: 3}} = Pod.fetch_state(changed_again_agent)
   end
+
+  test "put_topology shares the same topology version semantics as update_topology" do
+    agent = EmptyPod.new()
+
+    changed_topology =
+      Topology.from_nodes!("empty_pod", %{
+        "auditor" => %{agent: WorkerAgent, manager: :auditor_nodes}
+      })
+
+    assert {:ok, changed_agent} = Pod.put_topology(agent, changed_topology)
+    assert {:ok, %{topology_version: 2}} = Pod.fetch_state(changed_agent)
+    assert {:ok, %Topology{version: 2} = topology} = Pod.fetch_topology(changed_agent)
+    assert Map.has_key?(topology.nodes, "auditor")
+
+    assert {:ok, unchanged_agent} = Pod.put_topology(changed_agent, changed_topology)
+    assert {:ok, %{topology_version: 2}} = Pod.fetch_state(unchanged_agent)
+    assert {:ok, %Topology{version: 2}} = Pod.fetch_topology(unchanged_agent)
+
+    expanded_topology =
+      Topology.put_node(changed_topology, "reviewer", %{
+        agent: WorkerAgent,
+        manager: :reviewer_nodes
+      })
+      |> elem(1)
+
+    assert {:ok, expanded_agent} = Pod.put_topology(unchanged_agent, expanded_topology)
+    assert {:ok, %{topology_version: 3}} = Pod.fetch_state(expanded_agent)
+    assert {:ok, %Topology{version: 3} = topology} = Pod.fetch_topology(expanded_agent)
+    assert Map.has_key?(topology.nodes, "reviewer")
+  end
 end

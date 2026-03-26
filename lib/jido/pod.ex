@@ -353,14 +353,11 @@ defmodule Jido.Pod do
   """
   @spec put_topology(Agent.t(), Topology.t()) :: {:ok, Agent.t()} | {:error, term()}
   def put_topology(%Agent{} = agent, %Topology{} = topology) do
-    with {:ok, instance} <- pod_plugin_instance(agent.agent_module),
+    with {:ok, current_topology} <- fetch_topology(agent),
+         {:ok, instance} <- pod_plugin_instance(agent.agent_module),
          {:ok, pod_state} <- fetch_state(agent) do
-      updated_state =
-        pod_state
-        |> Map.put(:topology, topology)
-        |> Map.put(:topology_version, topology.version)
-
-      {:ok, %{agent | state: Map.put(agent.state, instance.state_key, updated_state)}}
+      normalized_topology = normalize_updated_topology(current_topology, topology)
+      {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
     end
   end
 
@@ -375,7 +372,11 @@ defmodule Jido.Pod do
   def update_topology(%Agent{} = agent, fun) when is_function(fun, 1) do
     with {:ok, topology} <- fetch_topology(agent),
          {:ok, new_topology} <- normalize_topology_update(fun.(topology)) do
-      put_topology(agent, normalize_updated_topology(topology, new_topology))
+      with {:ok, instance} <- pod_plugin_instance(agent.agent_module),
+           {:ok, pod_state} <- fetch_state(agent) do
+        normalized_topology = normalize_updated_topology(topology, new_topology)
+        {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
+      end
     end
   end
 
@@ -476,6 +477,16 @@ defmodule Jido.Pod do
        "Topology update function must return a Jido.Pod.Topology or {:ok, topology}.",
        details: %{result: other}
      )}
+  end
+
+  defp persist_topology(%Agent{} = agent, state_key, pod_state, %Topology{} = topology)
+       when is_atom(state_key) and is_map(pod_state) do
+    updated_state =
+      pod_state
+      |> Map.put(:topology, topology)
+      |> Map.put(:topology_version, topology.version)
+
+    %{agent | state: Map.put(agent.state, state_key, updated_state)}
   end
 
   defp normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
