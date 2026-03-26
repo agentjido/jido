@@ -45,6 +45,31 @@ defmodule JidoTest.Pod.TelemetryTest do
         )
   end
 
+  defmodule MixedNamedReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "mixed_named_telemetry_review_pod",
+      topology:
+        Topology.new!(
+          name: "mixed_named_telemetry_review_pod",
+          nodes: %{
+            :planner => %{
+              agent: PodWorker,
+              manager: :pod_telemetry_planner_members,
+              activation: :eager,
+              initial_state: %{role: "planner"}
+            },
+            "reviewer" => %{
+              agent: PodWorker,
+              manager: :pod_telemetry_reviewer_members,
+              activation: :lazy,
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, :planner, "reviewer"}]
+        )
+  end
+
   defmodule RecursiveReviewPod do
     @moduledoc false
     use Jido.Pod,
@@ -284,6 +309,43 @@ defmodule JidoTest.Pod.TelemetryTest do
 
     assert report.completed == [:planner]
     assert report.failed == [:nested]
+  end
+
+  test "node ensure telemetry supports mixed atom and string node names", %{jido: jido} do
+    storage_table = :"pod_telemetry_mixed_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_telemetry_mixed_pods_#{System.unique_integer([:positive])}"
+    pod_key = "mixed-telemetry-123"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: MixedNamedReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    assert {:ok, pod_pid} = Pod.get(manager, pod_key)
+    assert is_pid(pod_pid)
+
+    drain_telemetry_events()
+
+    assert {:ok, _reviewer_pid} = Pod.ensure_node(pod_pid, "reviewer")
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
+                    %{
+                      node_name: "reviewer",
+                      node_kind: :agent,
+                      node_manager: @reviewer_manager,
+                      owner: :planner,
+                      source: :started,
+                      pod_id: ^pod_key
+                    }}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
+                    %{node_name: "reviewer", owner: :planner, source: :started}}
   end
 
   defp drain_telemetry_events do

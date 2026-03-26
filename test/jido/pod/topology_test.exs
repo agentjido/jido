@@ -226,4 +226,31 @@ defmodule JidoTest.Pod.TopologyTest do
     assert {:ok, [["planner"], ["reviewer"], ["publisher"]]} =
              Topology.reconcile_waves(topology, ["publisher"])
   end
+
+  test "topology helpers support mixed atom and string node names" do
+    topology =
+      Topology.new!(
+        name: "mixed_nodes",
+        nodes: %{
+          :planner => %{agent: WorkerAgent, manager: :planner_members},
+          "reviewer" => %{agent: WorkerAgent, manager: :reviewer_members},
+          "publisher" => %{agent: WorkerAgent, manager: :publisher_members}
+        },
+        links: [
+          {:owns, :planner, "reviewer"},
+          {:depends_on, "publisher", "reviewer"}
+        ]
+      )
+
+    assert {:ok, [:planner, "reviewer", "publisher"]} =
+             Topology.dependency_order(topology, ["publisher", :planner, "reviewer"])
+
+    assert [:planner, "publisher"] == Topology.roots(topology)
+    assert {:ok, :planner} = Topology.owner_of(topology, "reviewer")
+    assert ["reviewer"] == Topology.owned_children(topology, :planner)
+    assert ["reviewer"] == Topology.dependencies_of(topology, "publisher")
+
+    assert {:ok, [[:planner], ["reviewer"], ["publisher"]]} =
+             Topology.reconcile_waves(topology, ["publisher"])
+  end
 end

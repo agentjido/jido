@@ -118,6 +118,33 @@ defmodule JidoTest.Pod.RuntimeTest do
         )
   end
 
+  defmodule MixedNamedReviewPod do
+    @moduledoc false
+    use Jido.Pod,
+      name: "mixed_named_runtime_review_pod",
+      topology:
+        Topology.new!(
+          name: "mixed_named_runtime_review_pod",
+          nodes: %{
+            :planner => %{
+              agent: PodWorker,
+              manager: :pod_runtime_planner_members,
+              activation: :eager,
+              meta: %{role: "planner"},
+              initial_state: %{role: "planner"}
+            },
+            "reviewer" => %{
+              agent: PodWorker,
+              manager: :pod_runtime_reviewer_members,
+              activation: :lazy,
+              meta: %{role: "reviewer"},
+              initial_state: %{role: "reviewer"}
+            }
+          },
+          links: [{:owns, :planner, "reviewer"}]
+        )
+  end
+
   defmodule RecursiveReviewPod do
     @moduledoc false
     use Jido.Pod,
@@ -528,6 +555,42 @@ defmodule JidoTest.Pod.RuntimeTest do
 
     assert {:ok, snapshots} = Pod.nodes(pod_pid)
     assert snapshots["planner"].actual_parent.pid == pod_pid
+    assert snapshots["reviewer"].actual_parent.pid == planner_pid
+  end
+
+  test "pods support mixed atom and string node names in the same runtime topology", %{jido: jido} do
+    storage_table = :"pod_runtime_mixed_names_storage_#{System.unique_integer([:positive])}"
+    manager = :"pod_runtime_mixed_names_manager_#{System.unique_integer([:positive])}"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: MixedNamedReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    pod_key = "mixed-nodes-123"
+    planner_key = {MixedNamedReviewPod, pod_key, :planner}
+    reviewer_key = {MixedNamedReviewPod, pod_key, "reviewer"}
+
+    assert {:ok, pod_pid} = Pod.get(manager, pod_key)
+    assert {:ok, planner_pid} = Pod.lookup_node(pod_pid, :planner)
+    assert {:ok, ^planner_pid} = InstanceManager.lookup(@planner_manager, planner_key)
+    assert :error = Pod.lookup_node(pod_pid, "reviewer")
+    assert :error = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, reviewer_pid} = Pod.ensure_node(pod_pid, "reviewer")
+    assert {:ok, ^reviewer_pid} = Pod.lookup_node(pod_pid, "reviewer")
+    assert {:ok, ^reviewer_pid} = InstanceManager.lookup(@reviewer_manager, reviewer_key)
+
+    assert {:ok, snapshots} = Pod.nodes(pod_pid)
+    assert snapshots[:planner].status == :adopted
+    assert snapshots["reviewer"].status == :adopted
+    assert snapshots["reviewer"].owner == :planner
     assert snapshots["reviewer"].actual_parent.pid == planner_pid
   end
 
