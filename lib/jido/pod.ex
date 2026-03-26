@@ -350,6 +350,9 @@ defmodule Jido.Pod do
 
   @doc """
   Replaces the persisted topology snapshot in a pod agent.
+
+  Structural topology changes advance `topology.version`; no-op replacements
+  preserve the current version.
   """
   @spec put_topology(Agent.t(), Topology.t()) :: {:ok, Agent.t()} | {:error, term()}
   def put_topology(%Agent{} = agent, %Topology{} = topology) do
@@ -363,6 +366,9 @@ defmodule Jido.Pod do
 
   @doc """
   Applies a pure topology transformation to a pod agent.
+
+  Structural topology changes advance `topology.version`; no-op updates preserve
+  the current version.
   """
   @spec update_topology(
           Agent.t(),
