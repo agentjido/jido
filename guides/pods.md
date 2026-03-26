@@ -75,6 +75,7 @@ advertise the `:pod` capability.
 - `nodes` is a map of logical node name to `%Jido.Pod.Topology.Node{}`.
 - `links` is a list of `%Jido.Pod.Topology.Link{}`.
 - `version` is a simple topology version integer.
+  `Jido.Pod.update_topology/2` advances it when the structural topology changes.
 
 Node names may be atoms or strings. Static predefined pods can keep atom names,
 while runtime-defined or persisted dynamic nodes can use strings. Mixed

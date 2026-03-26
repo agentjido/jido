@@ -375,7 +375,7 @@ defmodule Jido.Pod do
   def update_topology(%Agent{} = agent, fun) when is_function(fun, 1) do
     with {:ok, topology} <- fetch_topology(agent),
          {:ok, new_topology} <- normalize_topology_update(fun.(topology)) do
-      put_topology(agent, new_topology)
+      put_topology(agent, normalize_updated_topology(topology, new_topology))
     end
   end
 
@@ -476,6 +476,22 @@ defmodule Jido.Pod do
        "Topology update function must return a Jido.Pod.Topology or {:ok, topology}.",
        details: %{result: other}
      )}
+  end
+
+  defp normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
+    if topology_changed?(current, updated) do
+      %{updated | version: max(updated.version, current.version + 1)}
+    else
+      %{updated | version: current.version}
+    end
+  end
+
+  defp topology_changed?(%Topology{} = left, %Topology{} = right) do
+    drop_topology_version(left) != drop_topology_version(right)
+  end
+
+  defp drop_topology_version(%Topology{} = topology) do
+    %{topology | version: 0}
   end
 
   defp fetch_node(%Topology{} = topology, name) when is_node_name(name) do

@@ -191,4 +191,48 @@ defmodule JidoTest.PodTest do
     assert {:ok, topology} = Pod.fetch_topology(thawed)
     assert Map.has_key?(topology.nodes, "auditor")
   end
+
+  test "update_topology advances topology version only when the topology changes" do
+    agent = EmptyPod.new()
+
+    assert {:ok, %{topology_version: 1}} = Pod.fetch_state(agent)
+    assert {:ok, %Topology{version: 1}} = Pod.fetch_topology(agent)
+
+    assert {:ok, unchanged_agent} = Pod.update_topology(agent, & &1)
+    assert {:ok, %{topology_version: 1}} = Pod.fetch_state(unchanged_agent)
+    assert {:ok, %Topology{version: 1}} = Pod.fetch_topology(unchanged_agent)
+
+    assert {:ok, changed_agent} =
+             Pod.update_topology(unchanged_agent, fn topology ->
+               Topology.put_node(
+                 topology,
+                 "auditor",
+                 %{agent: WorkerAgent, manager: :auditor_nodes}
+               )
+             end)
+
+    assert {:ok, %{topology_version: 2}} = Pod.fetch_state(changed_agent)
+    assert {:ok, %Topology{version: 2} = topology} = Pod.fetch_topology(changed_agent)
+    assert Map.has_key?(topology.nodes, "auditor")
+
+    assert {:ok, changed_again_agent} =
+             Pod.update_topology(changed_agent, fn topology ->
+               Topology.put_node(
+                 topology,
+                 "reviewer",
+                 %{agent: WorkerAgent, manager: :reviewer_nodes}
+               )
+             end)
+
+    assert {:ok, %{topology_version: 3}} = Pod.fetch_state(changed_again_agent)
+    assert {:ok, %Topology{version: 3} = topology} = Pod.fetch_topology(changed_again_agent)
+    assert Map.has_key?(topology.nodes, "reviewer")
+
+    assert {:error, _reason} =
+             Pod.update_topology(changed_again_agent, fn topology ->
+               Topology.put_link(topology, {:depends_on, "auditor", "auditor"})
+             end)
+
+    assert {:ok, %{topology_version: 3}} = Pod.fetch_state(changed_again_agent)
+  end
 end
