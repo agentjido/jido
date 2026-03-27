@@ -16,6 +16,9 @@ defmodule Jido.AgentServer.ChildInfo do
               ref: Zoi.any(description: "Monitor reference for the child process"),
               module: Zoi.atom(description: "Child agent module"),
               id: Zoi.string(description: "Child instance ID"),
+              partition:
+                Zoi.any(description: "Logical partition of the child agent")
+                |> Zoi.optional(),
               tag: Zoi.any(description: "Tag used when spawning") |> Zoi.optional(),
               meta: Zoi.map(description: "Metadata passed during spawn") |> Zoi.default(%{})
             },

@@ -79,7 +79,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
       state.agent_module.cmd(
         state.agent,
         {result_action, execution_payload},
-        __jido_instance__: state.jido
+        __jido_instance__: state.jido,
+        __partition__: state.partition
       )
 
     state = State.update_agent(state, agent)
@@ -203,6 +204,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   alias Jido.RuntimeStore
 
   @relationship_hive :relationships
+  @reserved_child_opts [:agent, :id, :jido, :parent, :partition]
 
   def exec(
         %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
@@ -225,21 +227,25 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
   defp spawn_child(state, agent, tag, opts, meta, restart) do
     child_id = opts[:id] || "#{state.id}/#{tag}"
+    child_partition = Map.get(opts, :partition, state.partition)
+
+    parent_ref = %{
+      pid: self(),
+      id: state.id,
+      partition: state.partition,
+      tag: tag,
+      meta: meta
+    }
 
     child_opts =
-      [
-        agent: agent,
-        id: child_id,
-        parent: %{
-          pid: self(),
-          id: state.id,
-          tag: tag,
-          meta: meta
-        }
-      ] ++ Map.to_list(Map.delete(opts, :id))
-
-    child_opts =
-      if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
+      opts
+      |> Map.drop(@reserved_child_opts)
+      |> Map.put(:agent, agent)
+      |> Map.put(:id, child_id)
+      |> Map.put(:partition, child_partition)
+      |> Map.put(:parent, parent_ref)
+      |> maybe_put_jido(state.jido)
+      |> Map.to_list()
 
     child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
 
@@ -248,7 +254,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
     case DynamicSupervisor.start_child(supervisor, child_spec) do
       {:ok, pid} ->
-        case persist_relationship(state, child_id, tag, meta) do
+        case persist_relationship(state, child_id, child_partition, tag, meta) do
           :ok ->
             ref = Process.monitor(pid)
 
@@ -258,6 +264,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
                 ref: ref,
                 module: resolve_agent_module(agent),
                 id: child_id,
+                partition: child_partition,
                 tag: tag,
                 meta: meta
               })
@@ -289,16 +296,25 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
     end
   end
 
-  defp persist_relationship(state, child_id, tag, meta) do
-    RuntimeStore.put(state.jido, @relationship_hive, child_id, %{
-      parent_id: state.id,
-      tag: tag,
-      meta: normalize_meta(meta)
-    })
+  defp persist_relationship(state, child_id, child_partition, tag, meta) do
+    RuntimeStore.put(
+      state.jido,
+      @relationship_hive,
+      Jido.partition_key(child_id, child_partition),
+      %{
+        parent_id: state.id,
+        parent_partition: state.partition,
+        tag: tag,
+        meta: normalize_meta(meta)
+      }
+    )
   end
 
   defp normalize_meta(meta) when is_map(meta), do: meta
   defp normalize_meta(_meta), do: %{}
+
+  defp maybe_put_jido(opts, nil), do: opts
+  defp maybe_put_jido(opts, jido), do: Map.put(opts, :jido, jido)
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
@@ -320,6 +336,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
           ref: Process.monitor(child_pid),
           module: child_runtime.agent_module,
           id: child_runtime.id,
+          partition: child_runtime.partition,
           tag: tag,
           meta: meta
         })
@@ -351,7 +368,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
   end
 
   defp resolve_child(id, state) when is_binary(id) do
-    case Jido.whereis(state.jido, id) do
+    case Jido.whereis(state.jido, id, partition: state.partition) do
       pid when is_pid(pid) -> {:ok, pid}
       nil -> {:error, :child_not_found}
     end
@@ -367,6 +384,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
       ParentRef.new!(%{
         pid: self(),
         id: state.id,
+        partition: state.partition,
         tag: tag,
         meta: meta
       })
@@ -392,12 +410,16 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
         Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
         {:ok, state}
 
-      %{pid: pid, id: child_id} ->
+      %{pid: pid, id: child_id, partition: child_partition} ->
         Logger.debug(
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
         )
 
-        case RuntimeStore.delete(state.jido, @relationship_hive, child_id) do
+        case RuntimeStore.delete(
+               state.jido,
+               @relationship_hive,
+               Jido.partition_key(child_id, child_partition)
+             ) do
           :ok ->
             :ok
 

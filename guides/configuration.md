@@ -324,6 +324,18 @@ config :my_app, MyApp.TenantB.Jido,
   max_tasks: 1000
 ```
 
+If you want logical multi-tenancy inside one shared Jido instance, use
+`partition` as the tenant boundary and keep a root pod per tenant or workspace:
+
+```elixir
+{:ok, workspace_pid} =
+  Jido.Pod.get(MyApp.Jido.WorkspacePods, "workspace-123", partition: :tenant_alpha)
+```
+
+That keeps registry identity, persistence, runtime lineage, and pod telemetry
+isolated per tenant without requiring a separate BEAM supervision tree per
+tenant.
+
 ## Testing Configuration
 
 For tests, use `JidoTest.Case` which provides an isolated Jido instance:

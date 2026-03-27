@@ -817,11 +817,16 @@ defmodule Jido.Agent do
         {:ok, agent, action} = on_before_cmd(agent, action)
 
         jido_instance = Keyword.get(opts, :__jido_instance__)
-        instruction_opts = Keyword.delete(opts, :__jido_instance__)
+        partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
+
+        instruction_opts =
+          opts
+          |> Keyword.delete(:__jido_instance__)
+          |> Keyword.delete(:__partition__)
 
         case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
           {:ok, instructions} ->
-            ctx = __strategy_ctx__(jido_instance)
+            ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()
 
             normalized_instructions =
@@ -856,7 +861,7 @@ defmodule Jido.Agent do
       """
       @spec strategy_snapshot(Agent.t()) :: Jido.Agent.Strategy.Snapshot.t()
       def strategy_snapshot(%Agent{} = agent) do
-        ctx = __strategy_ctx__()
+        ctx = __strategy_ctx__(nil, Map.get(agent.state, :__partition__))
         strategy().snapshot(agent, ctx)
       end
 
@@ -1060,11 +1065,12 @@ defmodule Jido.Agent do
 
   defp __quoted_callback_helpers__ do
     quote location: :keep do
-      defp __strategy_ctx__(jido_instance \\ nil) do
+      defp __strategy_ctx__(jido_instance \\ nil, partition \\ nil) do
         %{
           agent_module: __MODULE__,
           strategy_opts: strategy_opts(),
-          jido_instance: jido_instance
+          jido_instance: jido_instance,
+          partition: partition
         }
       end
 

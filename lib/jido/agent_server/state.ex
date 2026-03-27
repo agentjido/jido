@@ -85,6 +85,9 @@ defmodule Jido.AgentServer.State do
 
               # Configuration
               jido: Zoi.atom(description: "Jido instance name (required)"),
+              partition:
+                Zoi.any(description: "Logical partition within the Jido instance")
+                |> Zoi.optional(),
               default_dispatch: Zoi.any(description: "Default dispatch config") |> Zoi.optional(),
               error_policy:
                 Zoi.any(description: "Error handling policy") |> Zoi.default(:log_only),
@@ -138,7 +141,7 @@ defmodule Jido.AgentServer.State do
   """
   @spec from_options(Options.t(), module(), struct()) :: {:ok, t()} | {:error, term()}
   def from_options(%Options{} = opts, agent_module, agent) do
-    agent = inject_parent_into_agent(agent, opts.parent)
+    agent = inject_runtime_refs(agent, opts.partition, opts.parent, nil)
     {agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
 
     {restored_cron_specs, invalid_cron_specs} =
@@ -174,6 +177,7 @@ defmodule Jido.AgentServer.State do
         children: %{},
         on_parent_death: opts.on_parent_death,
         jido: opts.jido,
+        partition: opts.partition,
         default_dispatch: opts.default_dispatch,
         error_policy: opts.error_policy,
         max_queue_size: opts.max_queue_size,
@@ -202,10 +206,8 @@ defmodule Jido.AgentServer.State do
     end
   end
 
-  defp inject_parent_into_agent(agent, nil), do: agent
-
-  defp inject_parent_into_agent(agent, parent) do
-    %{agent | state: put_parent_refs(agent.state, parent, nil)}
+  defp inject_runtime_refs(agent, partition, parent, orphaned_from) do
+    %{agent | state: put_runtime_refs(agent.state, partition, parent, orphaned_from)}
   end
 
   @doc """
@@ -217,7 +219,7 @@ defmodule Jido.AgentServer.State do
       state
       | parent: parent,
         orphaned_from: nil,
-        agent: %{state.agent | state: put_parent_refs(state.agent.state, parent, nil)}
+        agent: inject_runtime_refs(state.agent, state.partition, parent, nil)
     }
   end
 
@@ -230,7 +232,7 @@ defmodule Jido.AgentServer.State do
       state
       | parent: nil,
         orphaned_from: parent,
-        agent: %{state.agent | state: put_parent_refs(state.agent.state, nil, parent)}
+        agent: inject_runtime_refs(state.agent, state.partition, nil, parent)
     }
   end
 
@@ -239,7 +241,7 @@ defmodule Jido.AgentServer.State do
       state
       | parent: nil,
         orphaned_from: nil,
-        agent: %{state.agent | state: put_parent_refs(state.agent.state, nil, nil)}
+        agent: inject_runtime_refs(state.agent, state.partition, nil, nil)
     }
   end
 
@@ -248,7 +250,10 @@ defmodule Jido.AgentServer.State do
   """
   @spec update_agent(t(), struct()) :: t()
   def update_agent(%__MODULE__{} = state, agent) do
-    %{state | agent: agent}
+    %{
+      state
+      | agent: inject_runtime_refs(agent, state.partition, state.parent, state.orphaned_from)
+    }
   end
 
   @doc """
@@ -353,8 +358,9 @@ defmodule Jido.AgentServer.State do
     Map.get(children, tag)
   end
 
-  defp put_parent_refs(agent_state, parent, orphaned_from) do
+  defp put_runtime_refs(agent_state, partition, parent, orphaned_from) do
     agent_state
+    |> maybe_put_state_key(:__partition__, partition)
     |> maybe_put_state_key(:__parent__, parent)
     |> maybe_put_state_key(:__orphaned_from__, orphaned_from)
   end
@@ -382,7 +388,9 @@ defmodule Jido.AgentServer.State do
       event = %{
         at: System.monotonic_time(:millisecond),
         type: type,
-        data: data
+        data: data,
+        jido_instance: state.jido,
+        jido_partition: state.partition
       }
 
       new_events = Enum.take([event | state.debug_events], state.debug_max_events)

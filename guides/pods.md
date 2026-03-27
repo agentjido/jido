@@ -152,6 +152,41 @@ If you need lower-level control, you can still call
 `Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
 yourself.
 
+## Partitioned Pods
+
+Pods now work cleanly with Jido's logical `partition` boundary.
+
+That gives you two tenancy models:
+
+- separate Jido instances for hard isolation
+- one shared Jido instance with `partition` as the tenant/workspace namespace
+
+In the shared-instance model, the pod is the durable unit and the partition is
+the namespace around it:
+
+```elixir
+{:ok, alpha_pod} = Jido.Pod.get(:order_review_pods, "order-123", partition: :alpha)
+{:ok, beta_pod} = Jido.Pod.get(:order_review_pods, "order-123", partition: :beta)
+```
+
+Those are two different pod runtimes, even though they share the same pod key.
+
+Partition behavior is intentionally simple:
+
+- the pod manager runtime has one partition
+- pod-managed children inherit that partition by default
+- nested pod nodes inherit that same partition
+- persistence, registry lookup, parent bindings, and pod telemetry all stay in
+  that partition
+
+So the normal mental model is:
+
+- `partition` isolates tenants or workspaces
+- `Jido.Pod` gives each tenant/workspace a durable structured runtime
+
+Cross-partition interaction is still explicit and exceptional. A pod tree is
+single-partition by default.
+
 ## Hierarchical Runtime Ownership
 
 Pods support hierarchical runtime ownership for both `kind: :agent` and

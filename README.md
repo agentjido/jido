@@ -91,7 +91,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 - GenServer-based AgentServer for production deployment
 - Parent-child agent hierarchies with lifecycle management
 - Signal routing with configurable strategies
-- Instance-scoped supervision for multi-tenant deployments
+- Instance-scoped supervision plus logical partitions for multi-tenant deployments
 
 ### Composable Plugins
 - Reusable capability modules that extend agents
@@ -106,7 +106,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Multi-Agent Orchestration
 - Multi-agent workflows with configurable strategies
 - Plan-based orchestration for complex workflows
-- Pod-wrapped agents with canonical durable topologies, hierarchical runtime ownership, and nested pod nodes
+- Pod-wrapped agents with canonical durable topologies, hierarchical runtime ownership, nested pod nodes, and partition-safe tenancy boundaries
 - Extensible strategy protocol for custom execution patterns
 
 ## Installation
