@@ -736,4 +736,43 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert beta_nested_state.partition == :beta
     assert beta_nested_state.parent.partition == :beta
   end
+
+  test "thaw restores only the requested pod partition when the same key exists twice", %{
+    pod_key: pod_key
+  } do
+    assert {:ok, alpha_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    assert {:ok, beta_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :beta)
+    assert {:ok, alpha_planner_pid} = Pod.lookup_node(alpha_pod_pid, :planner)
+    assert {:ok, beta_planner_pid} = Pod.lookup_node(beta_pod_pid, :planner)
+
+    alpha_ref = Process.monitor(alpha_pod_pid)
+    assert :ok = InstanceManager.stop(@pod_manager, pod_key, partition: :alpha)
+    assert_receive {:DOWN, ^alpha_ref, :process, ^alpha_pod_pid, _reason}, 1_000
+
+    assert Process.alive?(alpha_planner_pid)
+    assert Process.alive?(beta_pod_pid)
+    assert Process.alive?(beta_planner_pid)
+
+    {:ok, alpha_planner_state} = AgentServer.state(alpha_planner_pid)
+    {:ok, beta_pod_state} = AgentServer.state(beta_pod_pid)
+    {:ok, beta_planner_state} = AgentServer.state(beta_planner_pid)
+
+    assert alpha_planner_state.partition == :alpha
+    assert alpha_planner_state.parent == nil
+    assert alpha_planner_state.orphaned_from.partition == :alpha
+
+    assert beta_pod_state.partition == :beta
+    assert beta_planner_state.partition == :beta
+    assert beta_planner_state.parent.pid == beta_pod_pid
+
+    assert {:ok, restored_alpha_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    refute restored_alpha_pod_pid == alpha_pod_pid
+
+    assert {:ok, ^restored_alpha_pod_pid} =
+             InstanceManager.lookup(@pod_manager, pod_key, partition: :alpha)
+
+    assert {:ok, ^beta_pod_pid} = InstanceManager.lookup(@pod_manager, pod_key, partition: :beta)
+    assert {:ok, ^alpha_planner_pid} = Pod.lookup_node(restored_alpha_pod_pid, :planner)
+    assert {:ok, ^beta_planner_pid} = Pod.lookup_node(beta_pod_pid, :planner)
+  end
 end
