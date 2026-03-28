@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Add focused subject specs for lib/jido.ex, lib/jido/agent.ex, lib/jido/agent_server.ex, and the matching runtime and agents guides so core contracts move beyond the package-level starter spec.",
+  "id": "jido-z8u.3",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 1,
+  "status": "open",
+  "title": "Author core agent and runtime subject specs",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
