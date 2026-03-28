@@ -58,8 +58,77 @@ Most users only need this flow:
 - call `Jido.Pod.ensure_node/3` for lazy members
 - call `Jido.Pod.mutate/3` only when the durable team needs to grow or shrink
 
-For a compact end-to-end example, see
+If you only read one example, start with [Canonical Example](#canonical-example)
+below. The fully runnable example lives in
 `test/examples/runtime/mutable_pod_runtime_test.exs`.
+
+## Canonical Example
+
+This is the shortest end-to-end Pod story in core Jido:
+
+```elixir
+defmodule MyApp.ReviewWorkerAgent do
+  use Jido.Agent,
+    name: "review_worker",
+    schema: [
+      role: [type: :string, default: "worker"]
+    ]
+end
+
+defmodule MyApp.ReviewPod do
+  use Jido.Pod,
+    name: "review_pod"
+end
+
+children = [
+  Jido.Agent.InstanceManager.child_spec(
+    name: :review_workers,
+    agent: MyApp.ReviewWorkerAgent,
+    storage: {Jido.Storage.ETS, table: :review_runtime}
+  ),
+  Jido.Agent.InstanceManager.child_spec(
+    name: :review_pods,
+    agent: MyApp.ReviewPod,
+    storage: {Jido.Storage.ETS, table: :review_runtime}
+  )
+]
+
+{:ok, pod_pid} = Jido.Pod.get(:review_pods, "review-123")
+
+{:ok, report} =
+  Jido.Pod.mutate(
+    pod_pid,
+    [
+      Jido.Pod.Mutation.add_node("planner", %{
+        agent: MyApp.ReviewWorkerAgent,
+        manager: :review_workers,
+        activation: :eager,
+        initial_state: %{role: "planner"}
+      }),
+      Jido.Pod.Mutation.add_node(
+        "reviewer",
+        %{
+          agent: MyApp.ReviewWorkerAgent,
+          manager: :review_workers,
+          activation: :lazy,
+          initial_state: %{role: "reviewer"}
+        },
+        owner: "planner",
+        depends_on: ["planner"]
+      )
+    ]
+  )
+
+{:ok, reviewer_pid} = Jido.Pod.ensure_node(pod_pid, "reviewer")
+```
+
+What this demonstrates:
+
+- the pod itself is one durable keyed runtime
+- topology is stored as ordinary pod state under `:__pod__`
+- eager members start during `get/3` or mutation reconciliation
+- lazy members stay defined but stopped until `ensure_node/3`
+- later reacquisition restores the same durable topology before reconcile
 
 ## Pod Plugin
 
