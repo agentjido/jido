@@ -71,7 +71,15 @@ defmodule Jido.Agent.Strategy.Direct do
   end
 
   defp run_instruction(agent, %Instruction{} = instruction, ctx) do
-    instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+    instruction =
+      %{
+        instruction
+        | context:
+            instruction.context
+            |> Map.put(:state, agent.state)
+            |> Map.put(:agent, agent)
+            |> Map.put(:agent_server_pid, self())
+      }
 
     exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], instruction.opts)
 

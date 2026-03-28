@@ -12,6 +12,9 @@ defmodule Jido.Pod do
   alias Jido.AgentServer.State
   alias Jido.Plugin.Instance, as: PluginInstance
   alias Jido.Pod.Definition
+  alias Jido.Pod.Mutable
+  alias Jido.Pod.Mutation
+  alias Jido.Pod.Mutation.Report
   alias Jido.Pod.Runtime
   alias Jido.Pod.Topology
   alias Jido.Pod.Topology.Node
@@ -50,6 +53,8 @@ defmodule Jido.Pod do
           failed: [node_name()],
           pending: [node_name()]
         }
+
+  @type mutation_report :: Report.t()
 
   defmacro __using__(opts) do
     name = Definition.expand_and_eval_literal_option(Keyword.fetch!(opts, :name), __CALLER__)
@@ -152,6 +157,25 @@ defmodule Jido.Pod do
   defdelegate update_topology(agent, fun), to: TopologyState
 
   @doc """
+  Applies live topology mutations to a running pod and waits for runtime work to finish.
+
+  `server` follows the same resolution rules as `Jido.AgentServer.state/1` and
+  `Jido.AgentServer.call/3`. Pass the running pod pid, a locally registered
+  server name, or another resolvable runtime server reference. Raw string ids
+  still require explicit registry lookup before use.
+  """
+  @spec mutate(AgentServer.server(), [Mutation.t() | term()], keyword()) ::
+          {:ok, mutation_report()} | {:error, mutation_report() | term()}
+  defdelegate mutate(server, ops, opts \\ []), to: Mutable
+
+  @doc """
+  Builds state ops and runtime effects for an in-turn pod mutation.
+  """
+  @spec mutation_effects(Agent.t(), [Mutation.t() | term()], keyword()) ::
+          {:ok, [struct()]} | {:error, term()}
+  defdelegate mutation_effects(agent, ops, opts \\ []), to: Mutable
+
+  @doc """
   Returns runtime snapshots for every node in a running pod.
   """
   @spec nodes(AgentServer.server()) :: {:ok, %{node_name() => node_snapshot()}} | {:error, term()}
@@ -176,4 +200,8 @@ defmodule Jido.Pod do
   @spec reconcile(AgentServer.server(), keyword()) ::
           {:ok, reconcile_report()} | {:error, reconcile_report()}
   defdelegate reconcile(server, opts \\ []), to: Runtime
+
+  @doc false
+  @spec mark_mutation_lock(Agent.t(), map(), String.t() | nil) :: :ok
+  defdelegate mark_mutation_lock(agent, context, mutation_id), to: Mutable
 end

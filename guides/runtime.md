@@ -92,9 +92,14 @@ attachments explicitly with `Jido.Pod.reconcile/2` and `Jido.Pod.ensure_node/3`
 after thaw. Root pod nodes are adopted into the pod manager, while owned nodes
 are adopted under their logical runtime owner. Nested `kind: :pod` nodes are
 acquired through their own `InstanceManager` and then reconciled recursively.
-`Jido.Pod.get/3` is the default
-happy path because it performs the initial eager reconciliation after
-`InstanceManager.get/3`. See [Pods](pods.md).
+`Jido.Pod.get/3` is the default happy path because it performs the initial eager
+reconciliation after `InstanceManager.get/3`.
+
+Running pods may also change their durable topology at runtime with
+`Jido.Pod.mutate/3`. That path persists the new topology snapshot first, then
+applies runtime stop/start work and returns a mutation report. In-turn pod code
+uses the same runtime path through `Jido.Pod.mutation_effects/3`. See
+[Pods](pods.md) and `test/examples/runtime/mutable_pod_runtime_test.exs`.
 
 The parent:
 - Monitors the child process

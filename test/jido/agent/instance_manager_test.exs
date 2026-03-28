@@ -283,7 +283,8 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     end
 
     test "returns :not_found for an unknown manager" do
-      assert InstanceManager.agent_module(:missing_manager_for_agent_module) == {:error, :not_found}
+      assert InstanceManager.agent_module(:missing_manager_for_agent_module) ==
+               {:error, :not_found}
     end
   end
 

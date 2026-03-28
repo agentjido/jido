@@ -7,6 +7,7 @@ defmodule Jido.Pod.Plugin do
   `Persist` and `Storage` adapters continue to work unchanged.
   """
 
+  alias Jido.Pod.Actions.Mutate, as: MutateAction
   alias Jido.Pod.Topology
 
   @state_key :__pod__
@@ -15,12 +16,21 @@ defmodule Jido.Pod.Plugin do
   use Jido.Plugin,
     name: "pod",
     state_key: @state_key,
-    actions: [],
+    actions: [MutateAction],
+    signal_routes: [{"mutate", MutateAction}],
     schema:
       Zoi.object(%{
         topology: Zoi.any(description: "Resolved pod topology.") |> Zoi.optional(),
         topology_version:
           Zoi.integer(description: "Resolved topology version.") |> Zoi.default(1),
+        mutation:
+          Zoi.object(%{
+            id: Zoi.string(description: "In-flight mutation id.") |> Zoi.optional(),
+            status: Zoi.atom(description: "Mutation status.") |> Zoi.default(:idle),
+            report: Zoi.any(description: "Latest mutation report.") |> Zoi.optional(),
+            error: Zoi.any(description: "Latest mutation error/report.") |> Zoi.optional()
+          })
+          |> Zoi.default(%{id: nil, status: :idle, report: nil, error: nil}),
         metadata:
           Zoi.map(description: "Pod-level runtime metadata owned by the plugin.")
           |> Zoi.default(%{})
@@ -45,6 +55,7 @@ defmodule Jido.Pod.Plugin do
      %{
        topology: topology,
        topology_version: topology.version,
+       mutation: %{id: nil, status: :idle, report: nil, error: nil},
        metadata: %{}
      }
      |> deep_merge(overrides)}

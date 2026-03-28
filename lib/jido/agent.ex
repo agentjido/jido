@@ -139,6 +139,70 @@ defmodule Jido.Agent do
   alias Jido.Plugin.Instance, as: PluginInstance
   alias Jido.Plugin.Requirements, as: PluginRequirements
 
+  @doc false
+  def expand_aliases_in_ast(ast, caller_env) do
+    Macro.prewalk(ast, fn
+      {:__aliases__, _, _} = alias_node -> Macro.expand(alias_node, caller_env)
+      other -> other
+    end)
+  end
+
+  @doc false
+  def expand_and_eval_literal_option(value, caller_env) do
+    case value do
+      nil ->
+        nil
+
+      value when is_atom(value) or is_binary(value) or is_number(value) ->
+        value
+
+      %_{} = struct ->
+        struct
+
+      {:__aliases__, _, _} = alias_node ->
+        Macro.expand(alias_node, caller_env)
+
+      value when is_list(value) ->
+        Enum.map(value, fn
+          {key, nested_value} ->
+            {
+              expand_and_eval_literal_option(key, caller_env),
+              expand_and_eval_literal_option(nested_value, caller_env)
+            }
+
+          nested_value ->
+            expand_and_eval_literal_option(nested_value, caller_env)
+        end)
+
+      value when is_map(value) ->
+        Map.new(value, fn {key, nested_value} ->
+          {
+            expand_and_eval_literal_option(key, caller_env),
+            expand_and_eval_literal_option(nested_value, caller_env)
+          }
+        end)
+
+      value when is_tuple(value) ->
+        if ast_node?(value) do
+          value
+          |> expand_aliases_in_ast(caller_env)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+        else
+          value
+          |> Tuple.to_list()
+          |> Enum.map(&expand_and_eval_literal_option(&1, caller_env))
+          |> List.to_tuple()
+        end
+
+      other ->
+        other
+    end
+  end
+
+  defp ast_node?({_, meta, _}) when is_list(meta), do: true
+  defp ast_node?(_other), do: false
+
   require OK
 
   @schema Zoi.struct(
@@ -945,7 +1009,7 @@ defmodule Jido.Agent do
     quote location: :keep do
       @impl true
       @spec signal_routes() :: list()
-      def signal_routes, do: @validated_opts[:signal_routes] || []
+      def signal_routes, do: @expanded_signal_routes
 
       @impl true
       @spec signal_routes(map()) :: list()
@@ -1111,6 +1175,11 @@ defmodule Jido.Agent do
                                file: __ENV__.file,
                                line: __ENV__.line
                          end)
+
+        @expanded_signal_routes Jido.Agent.expand_and_eval_literal_option(
+                                  @validated_opts[:signal_routes] || [],
+                                  __ENV__
+                                )
 
         @default_plugin_list Jido.Agent.__resolve_default_plugins__(@validated_opts)
         @all_plugin_decls @default_plugin_list ++ (@validated_opts[:plugins] || [])

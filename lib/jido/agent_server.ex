@@ -194,6 +194,7 @@ defmodule Jido.AgentServer do
     ParentRef,
     SignalRouter,
     State,
+    StopChildRuntime,
     Status
   }
 
@@ -642,6 +643,24 @@ defmodule Jido.AgentServer do
     with {:ok, pid} <- resolve_server(server) do
       try do
         GenServer.call(pid, {:adopt_child, child, tag, meta})
+      catch
+        :exit, {:noproc, _} -> {:error, :not_found}
+        :exit, {:timeout, _} -> {:error, :timeout}
+        :exit, reason -> {:error, reason}
+      end
+    end
+  end
+
+  @doc """
+  Requests graceful termination of a tracked child agent.
+
+  This is the runtime counterpart to `Directive.stop_child/2`.
+  """
+  @spec stop_child(server(), term(), term()) :: :ok | {:error, term()}
+  def stop_child(server, tag, reason \\ :normal) do
+    with {:ok, pid} <- resolve_server(server) do
+      try do
+        GenServer.call(pid, {:stop_child, tag, reason})
       catch
         :exit, {:noproc, _} -> {:error, :not_found}
         :exit, {:timeout, _} -> {:error, :timeout}
@@ -1137,6 +1156,18 @@ defmodule Jido.AgentServer do
       {:error, reason} ->
         {:reply, {:error, reason}, state}
     end
+  end
+
+  def handle_call({:stop_child, tag, reason}, _from, %State{} = state) do
+    signal =
+      Signal.new!(
+        "jido.agent.stop_child",
+        %{tag: tag, reason: reason},
+        source: "/agent/#{state.id}"
+      )
+
+    {:ok, new_state} = StopChildRuntime.exec(tag, reason, signal, state)
+    {:reply, :ok, new_state}
   end
 
   def handle_call(_msg, _from, state) do
@@ -2354,6 +2385,8 @@ defmodule Jido.AgentServer do
   defp start_drain_if_idle(%State{} = state), do: state
 
   defp continue_draining(state) do
+    state = maybe_notify_completion_waiters(state)
+
     if State.queue_empty?(state) do
       {:noreply, %{state | processing: false} |> State.set_status(:idle)}
     else
@@ -2652,7 +2685,6 @@ defmodule Jido.AgentServer do
   defp hydrate_parent_from_runtime_store(%Options{} = options) do
     case Jido.parent_binding(options.jido, options.id, partition: options.partition) do
       {:ok, %{parent_id: parent_id, parent_partition: parent_partition, tag: tag, meta: meta}} ->
-
         parent =
           case Jido.whereis(options.jido, parent_id, partition: parent_partition) do
             pid when is_pid(pid) ->
