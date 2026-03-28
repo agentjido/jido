@@ -33,7 +33,6 @@ surface:
   statement: Jido shall keep runtime side effects explicit through directives and AgentServer runtime modules instead of hiding effects inside agent state transitions.
   priority: must
   stability: stable
-
 ```
 
 ## Verification
@@ -51,5 +50,4 @@ surface:
   covers:
     - package.jido.pure_cmd
     - package.jido.runtime_separation
-
 ```
