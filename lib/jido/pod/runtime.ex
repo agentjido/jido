@@ -128,7 +128,8 @@ defmodule Jido.Pod.Runtime do
     {:ok, State.update_agent(state, %{state.agent | state: agent_state})}
   end
 
-  @spec teardown_runtime(AgentServer.server(), keyword()) :: {:ok, map()} | {:error, map() | term()}
+  @spec teardown_runtime(AgentServer.server(), keyword()) ::
+          {:ok, map()} | {:error, map() | term()}
   def teardown_runtime(server, opts \\ []) when is_list(opts) do
     with {:ok, state} <- AgentServer.state(server),
          {:ok, topology} <- TopologyState.fetch_topology(state),

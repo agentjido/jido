@@ -68,7 +68,8 @@ defmodule Jido.Pod.Mutable do
   end
 
   @spec mark_mutation_lock(Agent.t(), map(), String.t() | nil) :: :ok
-  def mark_mutation_lock(%Agent{id: id, state: state}, context, mutation_id) when is_map(context) do
+  def mark_mutation_lock(%Agent{id: id, state: state}, context, mutation_id)
+      when is_map(context) do
     ensure_mutation_lock_table!()
 
     agent_server_pid = Map.get(context, :agent_server_pid)
@@ -155,7 +156,11 @@ defmodule Jido.Pod.Mutable do
     end
   end
 
-  defp canonical_external_mutation_lock_keys(server, %State{id: id, jido: jido, partition: partition}) do
+  defp canonical_external_mutation_lock_keys(server, %State{
+         id: id,
+         jido: jido,
+         partition: partition
+       }) do
     pid_key =
       case server do
         pid when is_pid(pid) ->
