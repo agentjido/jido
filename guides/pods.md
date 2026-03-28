@@ -45,6 +45,22 @@ defmodule MyApp.EmptyReviewPod do
 end
 ```
 
+If you are just getting started, you can skip the next two reference sections
+and jump to [Running A Pod](#running-a-pod).
+
+## Happy Path
+
+Most users only need this flow:
+
+- define a pod with `use Jido.Pod`
+- run the pod manager through a normal `Jido.Agent.InstanceManager`
+- call `Jido.Pod.get/3` to load the durable team and reconcile eager members
+- call `Jido.Pod.ensure_node/3` for lazy members
+- call `Jido.Pod.mutate/3` only when the durable team needs to grow or shrink
+
+For a compact end-to-end example, see
+`test/examples/runtime/mutable_pod_runtime_test.exs`.
+
 ## Pod Plugin
 
 The default pod plugin is `Jido.Pod.Plugin`.
@@ -154,6 +170,16 @@ Ownership matters at runtime:
 If you need lower-level control, you can still call
 `Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
 yourself.
+
+## Core API
+
+Most applications only need these entry points:
+
+- `Jido.Pod.get/3` loads the durable pod and reconciles eager members
+- `Jido.Pod.ensure_node/3` starts or re-adopts one named member
+- `Jido.Pod.reconcile/2` repairs eager roots and ownership edges explicitly
+- `Jido.Pod.fetch_topology/1` reads the current durable topology snapshot
+- `Jido.Pod.mutate/3` changes the durable topology of a running pod
 
 ## Partitioned Pods
 

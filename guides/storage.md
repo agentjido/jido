@@ -76,7 +76,8 @@ is what later hibernate/thaw cycles restore. Storage still does not preserve a
 live process tree; it preserves the pod's latest durable topology plus each
 node's own durable agent state.
 
-See [Pods](pods.md) for the manager-led runtime model and examples.
+See [Pods](pods.md) and `test/examples/runtime/mutable_pod_runtime_test.exs`
+for the manager-led runtime model and examples.
 
 ## Overview
 
