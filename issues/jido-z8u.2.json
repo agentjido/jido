@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Turn the scaffolded package spec into current truth for Jido, cover the changed bootstrap files, and link the first package requirements to existing docs.",
+  "id": "jido-z8u.2",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 1,
+  "status": "open",
+  "title": "Replace package.todo with a brownfield package contract",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
