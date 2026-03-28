@@ -1,5 +1,7 @@
 # Phoenix Integration
 
+<!-- covers: jido.integrations_and_migration.framework_guides -->
+
 **After:** You can run Jido agents inside a Phoenix application with LiveView updates.
 
 This guide shows how to integrate Jido agents with Phoenix controllers, LiveView, and PubSub for real-time UI updates.

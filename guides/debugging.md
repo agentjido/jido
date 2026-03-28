@@ -1,5 +1,7 @@
 # Debugging
 
+<!-- covers: jido.debugging_and_errors.runtime_debugging -->
+
 **After:** You can systematically debug agent behavior using instance-scoped debug mode, ring buffers, and telemetry.
 
 ## Quick Reference

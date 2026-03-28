@@ -1,5 +1,7 @@
 # Ash Framework Integration
 
+<!-- covers: jido.integrations_and_migration.framework_guides -->
+
 **After:** You can trigger Jido agents from Ash actions and resources.
 
 The [`ash_jido`](https://github.com/agentjido/ash_jido) package bridges Ash Framework resources with Jido agents. It generates `Jido.Action` modules from Ash actions at compile time.

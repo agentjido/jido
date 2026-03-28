@@ -1,5 +1,7 @@
 # Configuration & Deployment
 
+<!-- covers: jido.configuration_and_discovery.configuration_defaults -->
+
 **After:** You can configure Jido for different environments.
 
 This guide covers Jido configuration options and production deployment patterns.

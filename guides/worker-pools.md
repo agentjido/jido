@@ -1,5 +1,7 @@
 # Worker Pools
 
+<!-- covers: jido.worker_pools_and_tooling.worker_pools -->
+
 **After:** You can run concurrent work safely without melting the BEAM.
 
 ```elixir

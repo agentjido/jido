@@ -7,6 +7,7 @@
 [![Coverage Status](https://coveralls.io/repos/github/agentjido/jido/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido?branch=main)
 
 > **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
+<!-- package.jido.framework -->
 
 Define agents, connect them to actions, signals, and directives, and run them
 with supervision and fault tolerance built in.
@@ -46,6 +47,7 @@ end
 ```
 
 State changes are pure data transformations; side effects are described as directives and executed by an OTP runtime. You get deterministic agent logic, testability without processes, and a clear path to running those agents in production.
+<!-- package.jido.pure_cmd package.jido.runtime_separation -->
 
 ## The Jido Ecosystem
 

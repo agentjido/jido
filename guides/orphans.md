@@ -1,5 +1,7 @@
 # Orphans & Adoption
 
+<!-- covers: jido.runtime_lifecycle.hierarchy_and_orphans -->
+
 **After:** You can let a child survive logical parent death, inspect the orphan transition explicitly, and reattach that child to a new coordinator when the workflow truly requires it.
 
 > This is an advanced orchestration pattern.

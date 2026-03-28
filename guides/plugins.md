@@ -1,5 +1,7 @@
 # Plugins
 
+<!-- covers: jido.plugins_and_sensors.plugin_mounting jido.plugins_and_sensors.plugin_lifecycle -->
+
 **After:** You can compose multiple plugins with isolated state and understand lifecycle hooks.
 
 > 🎓 **New to plugins?** Start with [Your First Plugin](your-first-plugin.md) for a hands-on tutorial before diving into this comprehensive reference.

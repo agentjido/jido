@@ -1,5 +1,7 @@
 # Sensors
 
+<!-- covers: jido.plugins_and_sensors.sensor_ingress -->
+
 **After:** You can feed signals into Jido from the outside world.
 
 > 🎓 **New to sensors?** Start with [Your First Sensor](your-first-sensor.md) for a hands-on tutorial before diving into this comprehensive reference.

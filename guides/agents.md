@@ -1,5 +1,7 @@
 # Agents
 
+<!-- covers: jido.agents_and_actions.schema_defined_agents jido.agents_and_actions.pure_cmd_contract -->
+
 **After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
 
 Agents are immutable data structures that hold state and respond to actions. The core operation is `cmd/2` (or `cmd/3` with options), which processes actions and returns an updated agent plus directives for external effects.

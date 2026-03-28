@@ -1,5 +1,7 @@
 # Error Handling
 
+<!-- covers: jido.debugging_and_errors.structured_errors -->
+
 **After:** You can handle errors consistently across actions, directives, and signal processing.
 
 Jido provides structured error handling across the agent lifecycle, from action execution to directive processing. All errors use a unified system built on [Splode](https://hexdocs.pm/splode) for consistent error classification and aggregation.

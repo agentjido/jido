@@ -1,5 +1,7 @@
 # Multi-Tenancy
 
+<!-- covers: jido.multi_tenancy.partition_namespace jido.multi_tenancy.pod_first_tenancy jido.multi_tenancy.partition_propagation -->
+
 Jido now supports two distinct multi-tenancy models:
 
 - separate Jido instances for hard isolation

@@ -1,5 +1,7 @@
 # State Operations
 
+<!-- covers: jido.signals_and_directives.state_ops_internal_mutation -->
+
 **After:** You can perform non-trivial state changes safely and consistently.
 
 State operations are internal state transitions handled by the strategy layer during `cmd/2`. Unlike directives, they never reach the runtime.

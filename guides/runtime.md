@@ -1,5 +1,7 @@
 # Runtime
 
+<!-- covers: jido.runtime_lifecycle.agent_server_runtime -->
+
 **After:** You can run agents in a supervision tree and manage parent/child hierarchies.
 
 Agents run inside an `AgentServer` GenServer process. This guide covers starting agents, sending signals, and managing parent-child hierarchies.
