@@ -7,7 +7,7 @@ This guide is the short decision tree.
 
 ## The Simple Mental Model
 
-- use `Jido.start_agent/2` or `Jido.AgentServer.start_link/1` for one live agent
+- use `MyApp.Jido.start_agent/2` (or `Jido.start_agent/3`) or `Jido.AgentServer.start_link/1` for one live agent
 - use `Directive.SpawnAgent` for a live tracked child of the current parent
 - use `Jido.Agent.InstanceManager` for one named durable agent
 - use `Jido.Pod` for one named durable team of agents
@@ -24,7 +24,7 @@ The important boundary is this:
 
 | Need | Use | Why |
 | --- | --- | --- |
-| A single live process right now | `Jido.start_agent/2` or `Jido.AgentServer.start_link/1` | Smallest runtime surface |
+| A single live process right now | `MyApp.Jido.start_agent/2` (or `Jido.start_agent/3`) or `Jido.AgentServer.start_link/1` | Smallest runtime surface |
 | A child that should be tracked by the current parent during this live workflow | `Directive.SpawnAgent` | Logical hierarchy, child exit signals, parent-child routing |
 | A single named agent that may hibernate and thaw later | `Jido.Agent.InstanceManager` | Durable keyed lifecycle for one agent |
 | A named group of agents with a durable topology | `Jido.Pod` | Durable team/workspace/unit with explicit reconcile semantics |
@@ -134,7 +134,7 @@ hibernate/thaw or named reacquisition, use `InstanceManager` or `Pod`.
 
 If you are unsure, start here:
 
-1. One live agent: `Jido.start_agent/2`
+1. One live agent: `MyApp.Jido.start_agent/2` (or `Jido.start_agent/3`)
 2. Live tracked child: `Directive.SpawnAgent`
 3. One durable named agent: `InstanceManager`
 4. One durable named team: `Pod`
