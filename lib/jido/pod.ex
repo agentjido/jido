@@ -51,18 +51,6 @@ defmodule Jido.Pod do
           pending: [node_name()]
         }
 
-  @doc false
-  defdelegate expand_aliases_in_ast(ast, caller_env), to: Definition
-
-  @doc false
-  defdelegate expand_and_eval_literal_option(value, caller_env), to: Definition
-
-  @doc false
-  defdelegate resolve_topology!(name, raw_topology, caller_env), to: Definition
-
-  @doc false
-  defdelegate split_pod_plugins!(default_plugins, caller_env), to: Definition
-
   defmacro __using__(opts) do
     name = Definition.expand_and_eval_literal_option(Keyword.fetch!(opts, :name), __CALLER__)
     raw_topology = Keyword.get(opts, :topology, %{})
