@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Link uncovered guides and tests into subject verifications, add ADRs only if durable migration policy appears, and finish with a passing mix spec.check --base HEAD.",
+  "id": "jido-z8u.7",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 2,
+  "status": "open",
+  "title": "Raise verification strength and close the remaining frontier gaps",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
