@@ -1,5 +1,7 @@
 # Pods
 
+<!-- covers: jido.pods.durable_topology jido.pods.reconcile_and_lazy_activation jido.pods.nested_pods jido.pods.live_mutation -->
+
 `Jido.Pod` is the simplest durable topology layer in core Jido: a pod is just an
 agent with a canonical topology snapshot and a reserved singleton plugin mounted
 under `:__pod__`.

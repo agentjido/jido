@@ -1,5 +1,7 @@
 # Await & Coordination
 
+<!-- covers: jido.runtime_lifecycle.await_coordination -->
+
 **After:** You can coordinate async agents without `Process.sleep` in tests.
 
 ```elixir

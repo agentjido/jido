@@ -1,5 +1,7 @@
 # Signals & Routing
 
+<!-- covers: jido.signals_and_directives.signal_routing -->
+
 Signals carry CloudEvents-style messages through the Jido system, providing a standardized communication envelope between agents.
 
 ## What is a Signal?

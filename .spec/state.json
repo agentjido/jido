@@ -1,0 +1,2508 @@
+{
+  "decisions": {
+    "items": [
+      {
+        "affects": [
+          "repo.governance"
+        ],
+        "date": "2026-03-28",
+        "file": ".spec/decisions/jido.spec_subject_map.md",
+        "id": "jido.spec_subject_map",
+        "status": "accepted",
+        "title": "Jido Spec Subject Map"
+      }
+    ]
+  },
+  "findings": [],
+  "index": {
+    "exceptions": [],
+    "requirements": [
+      {
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "id": "jido.agents_and_actions.action_execution_surface",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide action surfaces for validated state transformation and built-in control, lifecycle, status, and scheduling behaviors.",
+        "subject_id": "jido.agents_and_actions"
+      },
+      {
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "id": "jido.agents_and_actions.pure_cmd_contract",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall treat `cmd/2` and `cmd/3` as pure decision functions that return an updated agent together with explicit effects.",
+        "subject_id": "jido.agents_and_actions"
+      },
+      {
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "id": "jido.agents_and_actions.schema_defined_agents",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall let agent modules declare schema-backed state, defaults, and hooks through `use Jido.Agent`.",
+        "subject_id": "jido.agents_and_actions"
+      },
+      {
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "id": "jido.configuration_and_discovery.configuration_defaults",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall document and expose configuration defaults suitable for local development and deployment environments.",
+        "subject_id": "jido.configuration_and_discovery"
+      },
+      {
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "id": "jido.configuration_and_discovery.discovery_introspection",
+        "priority": "should",
+        "stability": "stable",
+        "statement": "Jido shall provide discovery and introspection APIs for actions, sensors, and related runtime metadata.",
+        "subject_id": "jido.configuration_and_discovery"
+      },
+      {
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "id": "jido.debugging_and_errors.runtime_debugging",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide runtime debugging facilities for inspecting recent execution and runtime state.",
+        "subject_id": "jido.debugging_and_errors"
+      },
+      {
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "id": "jido.debugging_and_errors.structured_errors",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall expose structured public error contracts across actions, directives, and signal processing.",
+        "subject_id": "jido.debugging_and_errors"
+      },
+      {
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "id": "jido.integrations_and_migration.framework_guides",
+        "priority": "should",
+        "stability": "stable",
+        "statement": "Jido shall document integration paths for Phoenix and Ash-based applications.",
+        "subject_id": "jido.integrations_and_migration"
+      },
+      {
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "id": "jido.integrations_and_migration.migration_guidance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall document how maintainers migrate from the 1.x runtime model to the current instance-scoped runtime model.",
+        "subject_id": "jido.integrations_and_migration"
+      },
+      {
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "id": "jido.multi_tenancy.partition_namespace",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support partition as a logical namespace boundary for runtimes in a shared instance.",
+        "subject_id": "jido.multi_tenancy"
+      },
+      {
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "id": "jido.multi_tenancy.partition_propagation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall propagate partition context through pod membership, hierarchy, persistence, and runtime lookup paths by default.",
+        "subject_id": "jido.multi_tenancy"
+      },
+      {
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "id": "jido.multi_tenancy.pod_first_tenancy",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall treat Pods as the durable tenant or workspace unit in the shared-instance tenancy model.",
+        "subject_id": "jido.multi_tenancy"
+      },
+      {
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "id": "jido.observability_and_tracing.telemetry_contract",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall emit structured observability and telemetry events for agent and pod execution.",
+        "subject_id": "jido.observability_and_tracing"
+      },
+      {
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "id": "jido.observability_and_tracing.tracing_context",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall preserve trace and span context across runtime execution and signal flow.",
+        "subject_id": "jido.observability_and_tracing"
+      },
+      {
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "id": "jido.plugins_and_sensors.plugin_lifecycle",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support plugin lifecycle hooks for initialization, restore, checkpoint, and runtime middleware behavior.",
+        "subject_id": "jido.plugins_and_sensors"
+      },
+      {
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "id": "jido.plugins_and_sensors.plugin_mounting",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall let plugins mount isolated state, actions, routes, and configuration onto agents.",
+        "subject_id": "jido.plugins_and_sensors"
+      },
+      {
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "id": "jido.plugins_and_sensors.sensor_ingress",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall let sensors translate external events into routed Jido signals.",
+        "subject_id": "jido.plugins_and_sensors"
+      },
+      {
+        "file": ".spec/specs/pods.spec.md",
+        "id": "jido.pods.durable_topology",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall model a Pod as a durable topology snapshot for a named group of agents.",
+        "subject_id": "jido.pods"
+      },
+      {
+        "file": ".spec/specs/pods.spec.md",
+        "id": "jido.pods.live_mutation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support live add and remove mutation of pod topology while keeping the topology itself durable.",
+        "subject_id": "jido.pods"
+      },
+      {
+        "file": ".spec/specs/pods.spec.md",
+        "id": "jido.pods.nested_pods",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support nested pod topologies as part of the durable group model.",
+        "subject_id": "jido.pods"
+      },
+      {
+        "file": ".spec/specs/pods.spec.md",
+        "id": "jido.pods.reconcile_and_lazy_activation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall reconcile eager pod members automatically and let lazy members start on demand through ensure operations.",
+        "subject_id": "jido.pods"
+      },
+      {
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "id": "jido.runtime_lifecycle.agent_server_runtime",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall host live agents inside AgentServer processes that execute directives, expose runtime status, and isolate agent state from transport concerns.",
+        "subject_id": "jido.runtime_lifecycle"
+      },
+      {
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "id": "jido.runtime_lifecycle.await_coordination",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide event-driven await APIs for async coordination instead of relying on sleep-based polling.",
+        "subject_id": "jido.runtime_lifecycle"
+      },
+      {
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "id": "jido.runtime_lifecycle.hierarchy_and_orphans",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support tracked child hierarchies, adoption, explicit orphan policies, and child stop control within the runtime.",
+        "subject_id": "jido.runtime_lifecycle"
+      },
+      {
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "id": "jido.runtime_lifecycle.instance_management",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide durable keyed instance-management patterns for starting, locating, hibernating, and thawing named runtimes.",
+        "subject_id": "jido.runtime_lifecycle"
+      },
+      {
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "id": "jido.runtime_persistence.hibernate_thaw",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support hibernate and thaw flows for durable keyed runtimes.",
+        "subject_id": "jido.runtime_persistence"
+      },
+      {
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "id": "jido.runtime_persistence.storage_backends",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support pluggable storage backends for persisted runtime checkpoints and related state.",
+        "subject_id": "jido.runtime_persistence"
+      },
+      {
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "id": "jido.signals_and_directives.directive_effect_boundary",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall represent external effects as directives executed by the runtime rather than hidden mutations inside pure agent code.",
+        "subject_id": "jido.signals_and_directives"
+      },
+      {
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "id": "jido.signals_and_directives.scheduling_support",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall support scheduling, cron delivery, and cancellation through explicit directive and runtime flows.",
+        "subject_id": "jido.signals_and_directives"
+      },
+      {
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "id": "jido.signals_and_directives.signal_routing",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall route CloudEvents-style signals to agent behavior through typed routing rules instead of ad hoc process messages.",
+        "subject_id": "jido.signals_and_directives"
+      },
+      {
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "id": "jido.signals_and_directives.state_ops_internal_mutation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall keep non-trivial state mutation inside strategy-applied state operations instead of treating them as external directives.",
+        "subject_id": "jido.signals_and_directives"
+      },
+      {
+        "file": ".spec/specs/strategies.spec.md",
+        "id": "jido.strategies.custom_extension",
+        "priority": "should",
+        "stability": "stable",
+        "statement": "Jido shall provide a custom strategy interface for specialized execution patterns.",
+        "subject_id": "jido.strategies"
+      },
+      {
+        "file": ".spec/specs/strategies.spec.md",
+        "id": "jido.strategies.direct_default",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide a direct strategy for single-turn action execution without changing the purity of agent logic.",
+        "subject_id": "jido.strategies"
+      },
+      {
+        "file": ".spec/specs/strategies.spec.md",
+        "id": "jido.strategies.fsm_support",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide an FSM strategy for multi-state execution flows driven by explicit machine state.",
+        "subject_id": "jido.strategies"
+      },
+      {
+        "file": ".spec/specs/strategies.spec.md",
+        "id": "jido.strategies.strategy_boundary",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall let strategies own the translation between pure agent results, internal state operations, and runtime directives.",
+        "subject_id": "jido.strategies"
+      },
+      {
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "id": "jido.testing_and_examples.async_test_support",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide test support for isolated instances and event-driven async assertions without sleep-based polling.",
+        "subject_id": "jido.testing_and_examples"
+      },
+      {
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "id": "jido.testing_and_examples.runnable_examples",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall keep runnable example and docs-example suites that exercise core public patterns.",
+        "subject_id": "jido.testing_and_examples"
+      },
+      {
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "id": "jido.testing_and_examples.testing_guidance",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall document testing patterns for pure logic and runtime integration.",
+        "subject_id": "jido.testing_and_examples"
+      },
+      {
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "id": "jido.thread_memory_identity.identity_capability",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide a persistent identity capability for durable agent identity and profile state.",
+        "subject_id": "jido.thread_memory_identity"
+      },
+      {
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "id": "jido.thread_memory_identity.memory_capability",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide a persistent memory capability for durable agent memory state.",
+        "subject_id": "jido.thread_memory_identity"
+      },
+      {
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "id": "jido.thread_memory_identity.thread_journal",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide a persistent thread capability for structured conversational or event journals.",
+        "subject_id": "jido.thread_memory_identity"
+      },
+      {
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "id": "jido.worker_pools_and_tooling.tooling",
+        "priority": "should",
+        "stability": "stable",
+        "statement": "Jido shall provide install and generator tooling that helps applications adopt the framework.",
+        "subject_id": "jido.worker_pools_and_tooling"
+      },
+      {
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "id": "jido.worker_pools_and_tooling.worker_pools",
+        "priority": "should",
+        "stability": "stable",
+        "statement": "Jido shall provide worker-pool patterns for reusable pooled agent execution.",
+        "subject_id": "jido.worker_pools_and_tooling"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "package.jido.framework",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall provide an Elixir framework for autonomous agents, workflows, and multi-agent systems.",
+        "subject_id": "package.jido"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "package.jido.local_quality_gate",
+        "priority": "should",
+        "stability": "evolving",
+        "statement": "Jido shall keep its repository-local quality tooling executable, including narrowly scoped analyzer suppressions for known external dependency issues when needed.",
+        "subject_id": "package.jido"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "package.jido.pure_cmd",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall treat agent modules as pure decision units whose core contract is cmd/2 returning an updated agent together with directives.",
+        "subject_id": "package.jido"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "package.jido.runtime_separation",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "Jido shall keep runtime side effects explicit through directives and AgentServer runtime modules instead of hiding effects inside agent state transitions.",
+        "subject_id": "package.jido"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.agent_prime_context",
+        "priority": "should",
+        "stability": "evolving",
+        "statement": "The repository shall include a .spec/AGENTS.md that tells agents to start a session with mix spec.prime before editing current truth.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.agents_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/AGENTS.md that gives local operating guidance for agents working inside the .spec workspace.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.decisions_readme_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/decisions/README.md that explains when durable ADRs belong in the workspace.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.readme_present",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "The repository shall include a .spec/README.md that explains purpose, layout, and workflow.",
+        "subject_id": "spec.system"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.workspace.state_generated",
+        "priority": "must",
+        "stability": "stable",
+        "statement": "When indexing and validation run, the workspace shall generate .spec/state.json containing indexed subjects, indexed decisions, and verification state.",
+        "subject_id": "spec.system"
+      }
+    ],
+    "scenarios": [],
+    "subjects": [
+      {
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "id": "jido.agents_and_actions",
+        "meta": {
+          "decisions": null,
+          "id": "jido.agents_and_actions",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido agents are schema-backed pure decision units with explicit action surfaces.",
+          "surface": [
+            "guides/getting-started.livemd",
+            "guides/core-loop.md",
+            "guides/agents.md",
+            "guides/actions.md",
+            "lib/jido.ex",
+            "lib/jido/agent.ex",
+            "lib/jido/agent/schema.ex",
+            "lib/jido/agent/state.ex",
+            "lib/jido/actions",
+            "test/examples/basics",
+            "test/jido/actions",
+            "test/jido/agent/agent_test.exs",
+            "test/jido/agent/schema_test.exs",
+            "test/jido/agent/schema_coverage_test.exs",
+            "test/jido/agent/state_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Agents And Actions"
+      },
+      {
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "id": "jido.configuration_and_discovery",
+        "meta": {
+          "decisions": null,
+          "id": "jido.configuration_and_discovery",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido exposes configuration defaults and discovery APIs for actions, sensors, and runtime metadata.",
+          "surface": [
+            "guides/configuration.md",
+            "guides/discovery.md",
+            "lib/jido/config/defaults.ex",
+            "lib/jido/discovery.ex",
+            "test/jido/config",
+            "test/jido/discovery_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Configuration And Discovery"
+      },
+      {
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "id": "jido.debugging_and_errors",
+        "meta": {
+          "decisions": null,
+          "id": "jido.debugging_and_errors",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido provides runtime debugging tools and structured public error contracts.",
+          "surface": [
+            "guides/debugging.md",
+            "guides/errors.md",
+            "lib/jido/debug.ex",
+            "lib/jido/error.ex",
+            "test/jido/debug_integration_test.exs",
+            "test/jido/debug_test.exs",
+            "test/jido/error_coverage_test.exs",
+            "test/jido/error_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Debugging And Errors"
+      },
+      {
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "id": "jido.integrations_and_migration",
+        "meta": {
+          "decisions": null,
+          "id": "jido.integrations_and_migration",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido documents framework integrations and the migration path from the 1.x runtime model.",
+          "surface": [
+            "guides/phoenix-integration.md",
+            "guides/ash-integration.md",
+            "guides/migration.md",
+            "test/jido/docs_examples_test.exs",
+            "test/jido/integration"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Integrations And Migration"
+      },
+      {
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "id": "jido.multi_tenancy",
+        "meta": {
+          "decisions": null,
+          "id": "jido.multi_tenancy",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido supports shared-instance logical multi-tenancy through partitions and pod-first tenancy boundaries.",
+          "surface": [
+            "guides/multi-tenancy.md",
+            "lib/jido.ex",
+            "lib/jido/agent_server/child_info.ex",
+            "lib/jido/agent_server/parent_ref.ex",
+            "lib/jido/pod/runtime.ex",
+            "test/examples/runtime/partitioned_pod_runtime_test.exs",
+            "test/jido/agent_server/hierarchy_test.exs",
+            "test/jido/jido_test.exs",
+            "test/jido/pod/runtime_test.exs",
+            "test/jido/telemetry_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Multi-Tenancy"
+      },
+      {
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "id": "jido.observability_and_tracing",
+        "meta": {
+          "decisions": null,
+          "id": "jido.observability_and_tracing",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido exposes production observability through structured telemetry, observation, and tracing.",
+          "surface": [
+            "guides/observability-intro.md",
+            "guides/observability.md",
+            "lib/jido/observe.ex",
+            "lib/jido/observe",
+            "lib/jido/telemetry.ex",
+            "lib/jido/telemetry",
+            "lib/jido/tracing",
+            "test/examples/observability",
+            "test/jido/observe",
+            "test/jido/telemetry_test.exs",
+            "test/jido/tracing"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Observability And Tracing"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
+        "id": "package.jido",
+        "meta": {
+          "decisions": null,
+          "id": "package.jido",
+          "kind": "package",
+          "status": "active",
+          "summary": "Jido is an Elixir framework for autonomous agent systems with pure agent logic and explicit runtime effects.",
+          "surface": [
+            ".dialyzer_ignore.exs",
+            "mix.exs",
+            "README.md",
+            "usage-rules.md",
+            "lib/jido.ex",
+            "lib/jido/agent.ex",
+            "lib/jido/agent_server.ex"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Package"
+      },
+      {
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "id": "jido.plugins_and_sensors",
+        "meta": {
+          "decisions": null,
+          "id": "jido.plugins_and_sensors",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido composes capabilities through plugins and ingests external events through sensors.",
+          "surface": [
+            "guides/plugins.md",
+            "guides/sensors.md",
+            "guides/your-first-plugin.md",
+            "guides/your-first-sensor.md",
+            "lib/jido/agent/default_plugins.ex",
+            "lib/jido/plugin.ex",
+            "lib/jido/plugin",
+            "lib/jido/sensor.ex",
+            "lib/jido/sensor",
+            "lib/jido/sensors",
+            "test/examples/plugins",
+            "test/examples/observability/sensor_demo_test.exs",
+            "test/jido/agent_plugin_integration_test.exs",
+            "test/jido/plugin",
+            "test/jido/sensor"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Plugins And Sensors"
+      },
+      {
+        "file": ".spec/specs/pods.spec.md",
+        "id": "jido.pods",
+        "meta": {
+          "decisions": null,
+          "id": "jido.pods",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido Pods provide durable topology, activation, nesting, and live mutation for grouped agents.",
+          "surface": [
+            "guides/pods.md",
+            "lib/jido/pod.ex",
+            "lib/jido/pod",
+            "test/examples/runtime/mutable_pod_runtime_test.exs",
+            "test/examples/runtime/nested_pod_runtime_test.exs",
+            "test/examples/runtime/nested_pod_scale_test.exs",
+            "test/examples/runtime/pod_runtime_test.exs",
+            "test/examples/runtime/pod_scale_test.exs",
+            "test/jido/pod",
+            "test/jido/pod/mutation"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Pods"
+      },
+      {
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "id": "jido.runtime_lifecycle",
+        "meta": {
+          "decisions": null,
+          "id": "jido.runtime_lifecycle",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido runtime lifecycle is hosted by AgentServer and coordinated through hierarchy, await, and instance-management APIs.",
+          "surface": [
+            "guides/runtime.md",
+            "guides/await.md",
+            "guides/orchestration.md",
+            "guides/orphans.md",
+            "guides/runtime-patterns.md",
+            "lib/jido/agent_server.ex",
+            "lib/jido/agent_server",
+            "lib/jido/application.ex",
+            "lib/jido/await.ex",
+            "lib/jido/agent/instance_manager.ex",
+            "lib/jido/agent/instance_manager",
+            "lib/jido/runtime_store.ex",
+            "test/examples/runtime/hierarchical_agents_test.exs",
+            "test/examples/runtime/orphan_lifecycle_test.exs",
+            "test/examples/runtime/parent_child_test.exs",
+            "test/examples/runtime/spawn_agent_test.exs",
+            "test/jido/agent/instance_manager_test.exs",
+            "test/jido/agent_server",
+            "test/jido/await_coverage_test.exs",
+            "test/jido/await_test.exs",
+            "test/jido/instance_test.exs",
+            "test/jido/runtime_store_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Runtime Lifecycle"
+      },
+      {
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "id": "jido.runtime_persistence",
+        "meta": {
+          "decisions": null,
+          "id": "jido.runtime_persistence",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido persists durable keyed runtimes through hibernate/thaw flows and pluggable storage backends.",
+          "surface": [
+            "guides/storage.md",
+            "lib/jido/persist.ex",
+            "lib/jido/storage.ex",
+            "lib/jido/storage",
+            "test/examples/persistence/checkpoint_restore_test.exs",
+            "test/examples/persistence/persistence_storage_test.exs",
+            "test/jido/integration/hibernate_thaw_test.exs",
+            "test/jido/persist_test.exs",
+            "test/jido/storage"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Runtime Persistence"
+      },
+      {
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "id": "jido.signals_and_directives",
+        "meta": {
+          "decisions": null,
+          "id": "jido.signals_and_directives",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido routes signals, models side effects as directives, and keeps state operations internal to strategy execution.",
+          "surface": [
+            "guides/signals.md",
+            "guides/directives.md",
+            "guides/state-ops.md",
+            "guides/scheduling.md",
+            "lib/jido/agent/directive.ex",
+            "lib/jido/agent/directive",
+            "lib/jido/agent/state_op.ex",
+            "lib/jido/agent/state_ops.ex",
+            "lib/jido/agent/schedules.ex",
+            "lib/jido/agent_server/signal_router.ex",
+            "lib/jido/agent_server/directive_exec.ex",
+            "lib/jido/agent_server/directive_executors.ex",
+            "lib/jido/scheduler.ex",
+            "lib/jido/scheduler",
+            "test/examples/signals",
+            "test/examples/runtime/schedule_directive_test.exs",
+            "test/jido/agent/directive",
+            "test/jido/agent/directive_test.exs",
+            "test/jido/agent/schedules_integration_test.exs",
+            "test/jido/agent/schedules_test.exs",
+            "test/jido/agent/state_op_test.exs",
+            "test/jido/agent/state_ops_test.exs",
+            "test/jido/agent_server/directive_exec_test.exs",
+            "test/jido/agent_server/signal_router_test.exs",
+            "test/jido/agent_server/cron_integration_test.exs",
+            "test/jido/agent_server/cron_tick_delivery_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Signals And Directives"
+      },
+      {
+        "file": ".spec/specs/spec_system.spec.md",
+        "id": "spec.system",
+        "meta": {
+          "decisions": null,
+          "id": "spec.system",
+          "kind": "policy",
+          "status": "active",
+          "summary": "Canonical workspace contract for authored specs and generated Spec Led state.",
+          "surface": [
+            ".spec/README.md",
+            ".spec/AGENTS.md",
+            ".spec/decisions/README.md",
+            ".spec/specs/*.spec.md",
+            ".spec/decisions/*.md"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Spec System"
+      },
+      {
+        "file": ".spec/specs/strategies.spec.md",
+        "id": "jido.strategies",
+        "meta": {
+          "decisions": null,
+          "id": "jido.strategies",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Strategies control how pure agent logic becomes state transitions and directives at runtime.",
+          "surface": [
+            "guides/strategies.md",
+            "guides/custom-strategies.md",
+            "guides/fsm-strategy.livemd",
+            "lib/jido/agent/strategy.ex",
+            "lib/jido/agent/strategy",
+            "test/examples/fsm",
+            "test/jido/agent/strategy",
+            "test/jido/agent/strategy_fsm_test.exs",
+            "test/jido/agent/strategy_state_test.exs",
+            "test/jido/agent/strategy_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Strategies"
+      },
+      {
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "id": "jido.testing_and_examples",
+        "meta": {
+          "decisions": null,
+          "id": "jido.testing_and_examples",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido provides isolation-friendly test support and runnable examples for core public flows.",
+          "surface": [
+            "guides/testing.md",
+            "test"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Testing And Examples"
+      },
+      {
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "id": "jido.thread_memory_identity",
+        "meta": {
+          "decisions": null,
+          "id": "jido.thread_memory_identity",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido provides persistent thread, memory, and identity capabilities as structured plugins.",
+          "surface": [
+            "guides/storage.md",
+            "lib/jido/thread.ex",
+            "lib/jido/thread",
+            "lib/jido/memory.ex",
+            "lib/jido/memory",
+            "lib/jido/identity.ex",
+            "lib/jido/identity",
+            "test/examples/persistence/default_plugins_persistence_test.exs",
+            "test/examples/plugins/identity_plugin_test.exs",
+            "test/examples/plugins/memory_plugin_test.exs",
+            "test/examples/plugins/thread_plugin_test.exs",
+            "test/jido/identity",
+            "test/jido/memory",
+            "test/jido/thread"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Thread Memory And Identity"
+      },
+      {
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "id": "jido.worker_pools_and_tooling",
+        "meta": {
+          "decisions": null,
+          "id": "jido.worker_pools_and_tooling",
+          "kind": "subsystem",
+          "status": "active",
+          "summary": "Jido provides worker-pool execution patterns and install or generator tooling for adoption.",
+          "surface": [
+            "guides/worker-pools.md",
+            "lib/jido/agent/worker_pool.ex",
+            "lib/jido/igniter",
+            "lib/jido/util.ex",
+            "lib/mix/tasks",
+            "test/jido/agent_pool_test.exs",
+            "test/jido/igniter",
+            "test/jido/scheduler_test.exs",
+            "test/jido/supervisor_test.exs"
+          ],
+          "verification_minimum_strength": null
+        },
+        "title": "Worker Pools And Tooling"
+      }
+    ],
+    "verifications": [
+      {
+        "covers": [
+          "jido.agents_and_actions.schema_defined_agents",
+          "jido.agents_and_actions.pure_cmd_contract"
+        ],
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.agents_and_actions",
+        "target": "guides/agents.md"
+      },
+      {
+        "covers": [
+          "jido.agents_and_actions.action_execution_surface"
+        ],
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.agents_and_actions",
+        "target": "guides/actions.md"
+      },
+      {
+        "covers": [
+          "jido.agents_and_actions.schema_defined_agents",
+          "jido.agents_and_actions.pure_cmd_contract",
+          "jido.agents_and_actions.action_execution_surface"
+        ],
+        "execute": true,
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "command",
+        "subject_id": "jido.agents_and_actions",
+        "target": "mix test test/jido/agent/agent_test.exs test/jido/agent/schema_test.exs test/jido/agent/schema_coverage_test.exs test/jido/agent/state_test.exs test/jido/actions/lifecycle_test.exs test/jido/actions/control_test.exs test/jido/actions/status_test.exs test/jido/actions/scheduling_test.exs test/examples/basics/counter_agent_test.exs test/examples/basics/error_handling_test.exs"
+      },
+      {
+        "covers": [
+          "jido.configuration_and_discovery.configuration_defaults"
+        ],
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "guides/configuration.md"
+      },
+      {
+        "covers": [
+          "jido.configuration_and_discovery.discovery_introspection"
+        ],
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "guides/discovery.md"
+      },
+      {
+        "covers": [
+          "jido.configuration_and_discovery.configuration_defaults",
+          "jido.configuration_and_discovery.discovery_introspection"
+        ],
+        "execute": true,
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "command",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "mix test test/jido/config test/jido/discovery_test.exs"
+      },
+      {
+        "covers": [
+          "jido.debugging_and_errors.runtime_debugging"
+        ],
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "guides/debugging.md"
+      },
+      {
+        "covers": [
+          "jido.debugging_and_errors.structured_errors"
+        ],
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "guides/errors.md"
+      },
+      {
+        "covers": [
+          "jido.debugging_and_errors.runtime_debugging",
+          "jido.debugging_and_errors.structured_errors"
+        ],
+        "execute": true,
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "command",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "mix test test/jido/debug_test.exs test/jido/debug_integration_test.exs test/jido/error_test.exs test/jido/error_coverage_test.exs"
+      },
+      {
+        "covers": [
+          "jido.integrations_and_migration.framework_guides"
+        ],
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/phoenix-integration.md"
+      },
+      {
+        "covers": [
+          "jido.integrations_and_migration.framework_guides"
+        ],
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/ash-integration.md"
+      },
+      {
+        "covers": [
+          "jido.integrations_and_migration.migration_guidance"
+        ],
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/migration.md"
+      },
+      {
+        "covers": [
+          "jido.integrations_and_migration.framework_guides",
+          "jido.integrations_and_migration.migration_guidance"
+        ],
+        "execute": true,
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "command",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "mix test test/jido/docs_examples_test.exs test/jido/integration"
+      },
+      {
+        "covers": [
+          "jido.multi_tenancy.partition_namespace",
+          "jido.multi_tenancy.pod_first_tenancy",
+          "jido.multi_tenancy.partition_propagation"
+        ],
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.multi_tenancy",
+        "target": "guides/multi-tenancy.md"
+      },
+      {
+        "covers": [
+          "jido.multi_tenancy.partition_namespace",
+          "jido.multi_tenancy.pod_first_tenancy",
+          "jido.multi_tenancy.partition_propagation"
+        ],
+        "execute": true,
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "command",
+        "subject_id": "jido.multi_tenancy",
+        "target": "mix test test/examples/runtime/partitioned_pod_runtime_test.exs test/jido/pod/runtime_test.exs test/jido/agent_server/hierarchy_test.exs test/jido/jido_test.exs test/jido/telemetry_test.exs"
+      },
+      {
+        "covers": [
+          "jido.observability_and_tracing.telemetry_contract",
+          "jido.observability_and_tracing.tracing_context"
+        ],
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "guides/observability.md"
+      },
+      {
+        "covers": [
+          "jido.observability_and_tracing.telemetry_contract",
+          "jido.observability_and_tracing.tracing_context"
+        ],
+        "execute": true,
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "command",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "mix test test/jido/observe test/jido/telemetry_test.exs test/jido/tracing test/examples/observability/observability_test.exs test/examples/observability/tracing_test.exs test/examples/observability/domain_event_observability_test.exs"
+      },
+      {
+        "covers": [
+          "jido.plugins_and_sensors.plugin_mounting",
+          "jido.plugins_and_sensors.plugin_lifecycle"
+        ],
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "guides/plugins.md"
+      },
+      {
+        "covers": [
+          "jido.plugins_and_sensors.sensor_ingress"
+        ],
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "guides/sensors.md"
+      },
+      {
+        "covers": [
+          "jido.plugins_and_sensors.plugin_mounting",
+          "jido.plugins_and_sensors.plugin_lifecycle",
+          "jido.plugins_and_sensors.sensor_ingress"
+        ],
+        "execute": true,
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "command",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "mix test test/jido/plugin test/jido/sensor/runtime_test.exs test/jido/sensor/sensor_translation_test.exs test/jido/agent_plugin_integration_test.exs test/examples/plugins test/examples/observability/sensor_demo_test.exs"
+      },
+      {
+        "covers": [
+          "jido.pods.durable_topology",
+          "jido.pods.reconcile_and_lazy_activation",
+          "jido.pods.nested_pods",
+          "jido.pods.live_mutation"
+        ],
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.pods",
+        "target": "guides/pods.md"
+      },
+      {
+        "covers": [
+          "jido.pods.durable_topology",
+          "jido.pods.reconcile_and_lazy_activation",
+          "jido.pods.nested_pods",
+          "jido.pods.live_mutation"
+        ],
+        "execute": true,
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "command",
+        "subject_id": "jido.pods",
+        "target": "mix test test/jido/pod test/jido/pod/mutation test/examples/runtime/pod_runtime_test.exs test/examples/runtime/nested_pod_runtime_test.exs test/examples/runtime/pod_scale_test.exs test/examples/runtime/nested_pod_scale_test.exs test/examples/runtime/mutable_pod_runtime_test.exs"
+      },
+      {
+        "covers": [
+          "jido.runtime_lifecycle.agent_server_runtime"
+        ],
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/runtime.md"
+      },
+      {
+        "covers": [
+          "jido.runtime_lifecycle.hierarchy_and_orphans"
+        ],
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/orphans.md"
+      },
+      {
+        "covers": [
+          "jido.runtime_lifecycle.await_coordination"
+        ],
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/await.md"
+      },
+      {
+        "covers": [
+          "jido.runtime_lifecycle.instance_management"
+        ],
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/runtime-patterns.md"
+      },
+      {
+        "covers": [
+          "jido.runtime_lifecycle.agent_server_runtime",
+          "jido.runtime_lifecycle.hierarchy_and_orphans",
+          "jido.runtime_lifecycle.await_coordination",
+          "jido.runtime_lifecycle.instance_management"
+        ],
+        "execute": true,
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "command",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "mix test test/jido/agent_server test/jido/await_test.exs test/jido/await_coverage_test.exs test/jido/agent/instance_manager_test.exs test/jido/instance_test.exs test/jido/runtime_store_test.exs test/examples/runtime/parent_child_test.exs test/examples/runtime/hierarchical_agents_test.exs test/examples/runtime/orphan_lifecycle_test.exs test/examples/runtime/spawn_agent_test.exs"
+      },
+      {
+        "covers": [
+          "jido.runtime_persistence.hibernate_thaw",
+          "jido.runtime_persistence.storage_backends"
+        ],
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.runtime_persistence",
+        "target": "guides/storage.md"
+      },
+      {
+        "covers": [
+          "jido.runtime_persistence.hibernate_thaw",
+          "jido.runtime_persistence.storage_backends"
+        ],
+        "execute": true,
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "command",
+        "subject_id": "jido.runtime_persistence",
+        "target": "mix test test/jido/persist_test.exs test/jido/storage test/examples/persistence/checkpoint_restore_test.exs test/examples/persistence/persistence_storage_test.exs test/jido/integration/hibernate_thaw_test.exs"
+      },
+      {
+        "covers": [
+          "jido.signals_and_directives.signal_routing"
+        ],
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/signals.md"
+      },
+      {
+        "covers": [
+          "jido.signals_and_directives.directive_effect_boundary",
+          "jido.signals_and_directives.scheduling_support"
+        ],
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/directives.md"
+      },
+      {
+        "covers": [
+          "jido.signals_and_directives.state_ops_internal_mutation"
+        ],
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/state-ops.md"
+      },
+      {
+        "covers": [
+          "jido.signals_and_directives.signal_routing",
+          "jido.signals_and_directives.directive_effect_boundary",
+          "jido.signals_and_directives.state_ops_internal_mutation",
+          "jido.signals_and_directives.scheduling_support"
+        ],
+        "execute": true,
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "command",
+        "subject_id": "jido.signals_and_directives",
+        "target": "mix test test/jido/agent/directive_test.exs test/jido/agent/directive/cron_test.exs test/jido/agent/directive/cron_cancel_test.exs test/jido/agent/schedules_test.exs test/jido/agent/schedules_integration_test.exs test/jido/agent/state_op_test.exs test/jido/agent/state_ops_test.exs test/jido/agent_server/signal_router_test.exs test/jido/agent_server/directive_exec_test.exs test/jido/agent_server/cron_integration_test.exs test/jido/agent_server/cron_tick_delivery_test.exs test/examples/signals/signal_routing_test.exs test/examples/signals/context_aware_routing_test.exs test/examples/signals/emit_directive_test.exs test/examples/runtime/schedule_directive_test.exs"
+      },
+      {
+        "covers": [
+          "jido.strategies.strategy_boundary",
+          "jido.strategies.direct_default"
+        ],
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.strategies",
+        "target": "guides/strategies.md"
+      },
+      {
+        "covers": [
+          "jido.strategies.custom_extension"
+        ],
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.strategies",
+        "target": "guides/custom-strategies.md"
+      },
+      {
+        "covers": [
+          "jido.strategies.fsm_support"
+        ],
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.strategies",
+        "target": "guides/fsm-strategy.livemd"
+      },
+      {
+        "covers": [
+          "jido.strategies.strategy_boundary",
+          "jido.strategies.direct_default",
+          "jido.strategies.fsm_support",
+          "jido.strategies.custom_extension"
+        ],
+        "execute": true,
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "command",
+        "subject_id": "jido.strategies",
+        "target": "mix test test/jido/agent/strategy_test.exs test/jido/agent/strategy/state_test.exs test/jido/agent/strategy_state_test.exs test/jido/agent/strategy_fsm_test.exs test/examples/fsm/fsm_agent_test.exs test/examples/fsm/fsm_strategy_guide_test.exs"
+      },
+      {
+        "covers": [
+          "jido.testing_and_examples.testing_guidance",
+          "jido.testing_and_examples.async_test_support",
+          "jido.testing_and_examples.runnable_examples"
+        ],
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.testing_and_examples",
+        "target": "guides/testing.md"
+      },
+      {
+        "covers": [
+          "jido.testing_and_examples.testing_guidance",
+          "jido.testing_and_examples.async_test_support",
+          "jido.testing_and_examples.runnable_examples"
+        ],
+        "execute": true,
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "command",
+        "subject_id": "jido.testing_and_examples",
+        "target": "mix test test/jido/docs_examples_test.exs test/examples"
+      },
+      {
+        "covers": [
+          "jido.thread_memory_identity.thread_journal",
+          "jido.thread_memory_identity.memory_capability",
+          "jido.thread_memory_identity.identity_capability"
+        ],
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "guides/storage.md"
+      },
+      {
+        "covers": [
+          "jido.thread_memory_identity.thread_journal",
+          "jido.thread_memory_identity.memory_capability",
+          "jido.thread_memory_identity.identity_capability"
+        ],
+        "execute": true,
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "command",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "mix test test/jido/thread test/jido/memory test/jido/identity test/examples/plugins/thread_plugin_test.exs test/examples/plugins/memory_plugin_test.exs test/examples/plugins/identity_plugin_test.exs test/examples/persistence/default_plugins_persistence_test.exs"
+      },
+      {
+        "covers": [
+          "jido.worker_pools_and_tooling.worker_pools"
+        ],
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "kind": "guide_file",
+        "subject_id": "jido.worker_pools_and_tooling",
+        "target": "guides/worker-pools.md"
+      },
+      {
+        "covers": [
+          "jido.worker_pools_and_tooling.worker_pools",
+          "jido.worker_pools_and_tooling.tooling"
+        ],
+        "execute": true,
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "kind": "command",
+        "subject_id": "jido.worker_pools_and_tooling",
+        "target": "mix test test/jido/agent_pool_test.exs test/jido/igniter test/jido/scheduler_test.exs test/jido/supervisor_test.exs"
+      },
+      {
+        "covers": [
+          "package.jido.framework",
+          "package.jido.pure_cmd",
+          "package.jido.runtime_separation"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "readme_file",
+        "subject_id": "package.jido",
+        "target": "README.md"
+      },
+      {
+        "covers": [
+          "package.jido.pure_cmd",
+          "package.jido.runtime_separation"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "contract",
+        "subject_id": "package.jido",
+        "target": "usage-rules.md"
+      },
+      {
+        "covers": [
+          "package.jido.local_quality_gate"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "source_file",
+        "subject_id": "package.jido",
+        "target": ".dialyzer_ignore.exs"
+      },
+      {
+        "covers": [
+          "spec.workspace.readme_present"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/README.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.agents_present",
+          "spec.workspace.agent_prime_context"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.decisions_readme_present"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "subject_id": "spec.system",
+        "target": ".spec/decisions/README.md"
+      },
+      {
+        "covers": [
+          "spec.workspace.state_generated"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "subject_id": "spec.system",
+        "target": "mix spec.index"
+      },
+      {
+        "covers": [
+          "spec.workspace.state_generated"
+        ],
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "subject_id": "spec.system",
+        "target": "mix spec.validate"
+      }
+    ]
+  },
+  "specification_version": "1.0",
+  "summary": {
+    "decision_parse_errors": 0,
+    "decisions": 1,
+    "exceptions": 0,
+    "findings": 0,
+    "requirements": 52,
+    "scenarios": 0,
+    "subjects": 17,
+    "verifications": 51
+  },
+  "verification": {
+    "claims": [
+      {
+        "cover_id": "jido.agents_and_actions.pure_cmd_contract",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.agents_and_actions",
+        "target": "guides/agents.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.agents_and_actions.schema_defined_agents",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.agents_and_actions",
+        "target": "guides/agents.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.agents_and_actions.action_execution_surface",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.agents_and_actions",
+        "target": "guides/actions.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.agents_and_actions.action_execution_surface",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.agents_and_actions",
+        "target": "mix test test/jido/agent/agent_test.exs test/jido/agent/schema_test.exs test/jido/agent/schema_coverage_test.exs test/jido/agent/state_test.exs test/jido/actions/lifecycle_test.exs test/jido/actions/control_test.exs test/jido/actions/status_test.exs test/jido/actions/scheduling_test.exs test/examples/basics/counter_agent_test.exs test/examples/basics/error_handling_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.agents_and_actions.pure_cmd_contract",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.agents_and_actions",
+        "target": "mix test test/jido/agent/agent_test.exs test/jido/agent/schema_test.exs test/jido/agent/schema_coverage_test.exs test/jido/agent/state_test.exs test/jido/actions/lifecycle_test.exs test/jido/actions/control_test.exs test/jido/actions/status_test.exs test/jido/actions/scheduling_test.exs test/examples/basics/counter_agent_test.exs test/examples/basics/error_handling_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.agents_and_actions.schema_defined_agents",
+        "file": ".spec/specs/agents_and_actions.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.agents_and_actions",
+        "target": "mix test test/jido/agent/agent_test.exs test/jido/agent/schema_test.exs test/jido/agent/schema_coverage_test.exs test/jido/agent/state_test.exs test/jido/actions/lifecycle_test.exs test/jido/actions/control_test.exs test/jido/actions/status_test.exs test/jido/actions/scheduling_test.exs test/examples/basics/counter_agent_test.exs test/examples/basics/error_handling_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.configuration_and_discovery.configuration_defaults",
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "guides/configuration.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.configuration_and_discovery.discovery_introspection",
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "guides/discovery.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.configuration_and_discovery.configuration_defaults",
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "mix test test/jido/config test/jido/discovery_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.configuration_and_discovery.discovery_introspection",
+        "file": ".spec/specs/configuration_and_discovery.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.configuration_and_discovery",
+        "target": "mix test test/jido/config test/jido/discovery_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.debugging_and_errors.runtime_debugging",
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "guides/debugging.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.debugging_and_errors.structured_errors",
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "guides/errors.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.debugging_and_errors.runtime_debugging",
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "mix test test/jido/debug_test.exs test/jido/debug_integration_test.exs test/jido/error_test.exs test/jido/error_coverage_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.debugging_and_errors.structured_errors",
+        "file": ".spec/specs/debugging_and_errors.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.debugging_and_errors",
+        "target": "mix test test/jido/debug_test.exs test/jido/debug_integration_test.exs test/jido/error_test.exs test/jido/error_coverage_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.integrations_and_migration.framework_guides",
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/phoenix-integration.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.integrations_and_migration.framework_guides",
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/ash-integration.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.integrations_and_migration.migration_guidance",
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "guides/migration.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.integrations_and_migration.framework_guides",
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "mix test test/jido/docs_examples_test.exs test/jido/integration",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.integrations_and_migration.migration_guidance",
+        "file": ".spec/specs/integrations_and_migration.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.integrations_and_migration",
+        "target": "mix test test/jido/docs_examples_test.exs test/jido/integration",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.multi_tenancy.partition_namespace",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.multi_tenancy",
+        "target": "guides/multi-tenancy.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.multi_tenancy.partition_propagation",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.multi_tenancy",
+        "target": "guides/multi-tenancy.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.multi_tenancy.pod_first_tenancy",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.multi_tenancy",
+        "target": "guides/multi-tenancy.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.multi_tenancy.partition_namespace",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.multi_tenancy",
+        "target": "mix test test/examples/runtime/partitioned_pod_runtime_test.exs test/jido/pod/runtime_test.exs test/jido/agent_server/hierarchy_test.exs test/jido/jido_test.exs test/jido/telemetry_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.multi_tenancy.partition_propagation",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.multi_tenancy",
+        "target": "mix test test/examples/runtime/partitioned_pod_runtime_test.exs test/jido/pod/runtime_test.exs test/jido/agent_server/hierarchy_test.exs test/jido/jido_test.exs test/jido/telemetry_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.multi_tenancy.pod_first_tenancy",
+        "file": ".spec/specs/multi_tenancy.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.multi_tenancy",
+        "target": "mix test test/examples/runtime/partitioned_pod_runtime_test.exs test/jido/pod/runtime_test.exs test/jido/agent_server/hierarchy_test.exs test/jido/jido_test.exs test/jido/telemetry_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.observability_and_tracing.telemetry_contract",
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "guides/observability.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.observability_and_tracing.tracing_context",
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "guides/observability.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.observability_and_tracing.telemetry_contract",
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "mix test test/jido/observe test/jido/telemetry_test.exs test/jido/tracing test/examples/observability/observability_test.exs test/examples/observability/tracing_test.exs test/examples/observability/domain_event_observability_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.observability_and_tracing.tracing_context",
+        "file": ".spec/specs/observability_and_tracing.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.observability_and_tracing",
+        "target": "mix test test/jido/observe test/jido/telemetry_test.exs test/jido/tracing test/examples/observability/observability_test.exs test/examples/observability/tracing_test.exs test/examples/observability/domain_event_observability_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.plugin_lifecycle",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "guides/plugins.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.plugin_mounting",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "guides/plugins.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.sensor_ingress",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "guides/sensors.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.plugin_lifecycle",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "mix test test/jido/plugin test/jido/sensor/runtime_test.exs test/jido/sensor/sensor_translation_test.exs test/jido/agent_plugin_integration_test.exs test/examples/plugins test/examples/observability/sensor_demo_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.plugin_mounting",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "mix test test/jido/plugin test/jido/sensor/runtime_test.exs test/jido/sensor/sensor_translation_test.exs test/jido/agent_plugin_integration_test.exs test/examples/plugins test/examples/observability/sensor_demo_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.plugins_and_sensors.sensor_ingress",
+        "file": ".spec/specs/plugins_and_sensors.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.plugins_and_sensors",
+        "target": "mix test test/jido/plugin test/jido/sensor/runtime_test.exs test/jido/sensor/sensor_translation_test.exs test/jido/agent_plugin_integration_test.exs test/examples/plugins test/examples/observability/sensor_demo_test.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.pods.durable_topology",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.pods",
+        "target": "guides/pods.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.pods.live_mutation",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.pods",
+        "target": "guides/pods.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.pods.nested_pods",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.pods",
+        "target": "guides/pods.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.pods.reconcile_and_lazy_activation",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.pods",
+        "target": "guides/pods.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.pods.durable_topology",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.pods",
+        "target": "mix test test/jido/pod test/jido/pod/mutation test/examples/runtime/pod_runtime_test.exs test/examples/runtime/nested_pod_runtime_test.exs test/examples/runtime/pod_scale_test.exs test/examples/runtime/nested_pod_scale_test.exs test/examples/runtime/mutable_pod_runtime_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.pods.live_mutation",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.pods",
+        "target": "mix test test/jido/pod test/jido/pod/mutation test/examples/runtime/pod_runtime_test.exs test/examples/runtime/nested_pod_runtime_test.exs test/examples/runtime/pod_scale_test.exs test/examples/runtime/nested_pod_scale_test.exs test/examples/runtime/mutable_pod_runtime_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.pods.nested_pods",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.pods",
+        "target": "mix test test/jido/pod test/jido/pod/mutation test/examples/runtime/pod_runtime_test.exs test/examples/runtime/nested_pod_runtime_test.exs test/examples/runtime/pod_scale_test.exs test/examples/runtime/nested_pod_scale_test.exs test/examples/runtime/mutable_pod_runtime_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.pods.reconcile_and_lazy_activation",
+        "file": ".spec/specs/pods.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.pods",
+        "target": "mix test test/jido/pod test/jido/pod/mutation test/examples/runtime/pod_runtime_test.exs test/examples/runtime/nested_pod_runtime_test.exs test/examples/runtime/pod_scale_test.exs test/examples/runtime/nested_pod_scale_test.exs test/examples/runtime/mutable_pod_runtime_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.agent_server_runtime",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/runtime.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.hierarchy_and_orphans",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/orphans.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.await_coordination",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/await.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.instance_management",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "guides/runtime-patterns.md",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.agent_server_runtime",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "mix test test/jido/agent_server test/jido/await_test.exs test/jido/await_coverage_test.exs test/jido/agent/instance_manager_test.exs test/jido/instance_test.exs test/jido/runtime_store_test.exs test/examples/runtime/parent_child_test.exs test/examples/runtime/hierarchical_agents_test.exs test/examples/runtime/orphan_lifecycle_test.exs test/examples/runtime/spawn_agent_test.exs",
+        "verification_index": 4
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.await_coordination",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "mix test test/jido/agent_server test/jido/await_test.exs test/jido/await_coverage_test.exs test/jido/agent/instance_manager_test.exs test/jido/instance_test.exs test/jido/runtime_store_test.exs test/examples/runtime/parent_child_test.exs test/examples/runtime/hierarchical_agents_test.exs test/examples/runtime/orphan_lifecycle_test.exs test/examples/runtime/spawn_agent_test.exs",
+        "verification_index": 4
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.hierarchy_and_orphans",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "mix test test/jido/agent_server test/jido/await_test.exs test/jido/await_coverage_test.exs test/jido/agent/instance_manager_test.exs test/jido/instance_test.exs test/jido/runtime_store_test.exs test/examples/runtime/parent_child_test.exs test/examples/runtime/hierarchical_agents_test.exs test/examples/runtime/orphan_lifecycle_test.exs test/examples/runtime/spawn_agent_test.exs",
+        "verification_index": 4
+      },
+      {
+        "cover_id": "jido.runtime_lifecycle.instance_management",
+        "file": ".spec/specs/runtime_lifecycle.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_lifecycle",
+        "target": "mix test test/jido/agent_server test/jido/await_test.exs test/jido/await_coverage_test.exs test/jido/agent/instance_manager_test.exs test/jido/instance_test.exs test/jido/runtime_store_test.exs test/examples/runtime/parent_child_test.exs test/examples/runtime/hierarchical_agents_test.exs test/examples/runtime/orphan_lifecycle_test.exs test/examples/runtime/spawn_agent_test.exs",
+        "verification_index": 4
+      },
+      {
+        "cover_id": "jido.runtime_persistence.hibernate_thaw",
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_persistence",
+        "target": "guides/storage.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.runtime_persistence.storage_backends",
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.runtime_persistence",
+        "target": "guides/storage.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.runtime_persistence.hibernate_thaw",
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_persistence",
+        "target": "mix test test/jido/persist_test.exs test/jido/storage test/examples/persistence/checkpoint_restore_test.exs test/examples/persistence/persistence_storage_test.exs test/jido/integration/hibernate_thaw_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.runtime_persistence.storage_backends",
+        "file": ".spec/specs/runtime_persistence.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.runtime_persistence",
+        "target": "mix test test/jido/persist_test.exs test/jido/storage test/examples/persistence/checkpoint_restore_test.exs test/examples/persistence/persistence_storage_test.exs test/jido/integration/hibernate_thaw_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.signals_and_directives.signal_routing",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/signals.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.signals_and_directives.directive_effect_boundary",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/directives.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.signals_and_directives.scheduling_support",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/directives.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.signals_and_directives.state_ops_internal_mutation",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.signals_and_directives",
+        "target": "guides/state-ops.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.signals_and_directives.directive_effect_boundary",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.signals_and_directives",
+        "target": "mix test test/jido/agent/directive_test.exs test/jido/agent/directive/cron_test.exs test/jido/agent/directive/cron_cancel_test.exs test/jido/agent/schedules_test.exs test/jido/agent/schedules_integration_test.exs test/jido/agent/state_op_test.exs test/jido/agent/state_ops_test.exs test/jido/agent_server/signal_router_test.exs test/jido/agent_server/directive_exec_test.exs test/jido/agent_server/cron_integration_test.exs test/jido/agent_server/cron_tick_delivery_test.exs test/examples/signals/signal_routing_test.exs test/examples/signals/context_aware_routing_test.exs test/examples/signals/emit_directive_test.exs test/examples/runtime/schedule_directive_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.signals_and_directives.scheduling_support",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.signals_and_directives",
+        "target": "mix test test/jido/agent/directive_test.exs test/jido/agent/directive/cron_test.exs test/jido/agent/directive/cron_cancel_test.exs test/jido/agent/schedules_test.exs test/jido/agent/schedules_integration_test.exs test/jido/agent/state_op_test.exs test/jido/agent/state_ops_test.exs test/jido/agent_server/signal_router_test.exs test/jido/agent_server/directive_exec_test.exs test/jido/agent_server/cron_integration_test.exs test/jido/agent_server/cron_tick_delivery_test.exs test/examples/signals/signal_routing_test.exs test/examples/signals/context_aware_routing_test.exs test/examples/signals/emit_directive_test.exs test/examples/runtime/schedule_directive_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.signals_and_directives.signal_routing",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.signals_and_directives",
+        "target": "mix test test/jido/agent/directive_test.exs test/jido/agent/directive/cron_test.exs test/jido/agent/directive/cron_cancel_test.exs test/jido/agent/schedules_test.exs test/jido/agent/schedules_integration_test.exs test/jido/agent/state_op_test.exs test/jido/agent/state_ops_test.exs test/jido/agent_server/signal_router_test.exs test/jido/agent_server/directive_exec_test.exs test/jido/agent_server/cron_integration_test.exs test/jido/agent_server/cron_tick_delivery_test.exs test/examples/signals/signal_routing_test.exs test/examples/signals/context_aware_routing_test.exs test/examples/signals/emit_directive_test.exs test/examples/runtime/schedule_directive_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.signals_and_directives.state_ops_internal_mutation",
+        "file": ".spec/specs/signals_and_directives.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.signals_and_directives",
+        "target": "mix test test/jido/agent/directive_test.exs test/jido/agent/directive/cron_test.exs test/jido/agent/directive/cron_cancel_test.exs test/jido/agent/schedules_test.exs test/jido/agent/schedules_integration_test.exs test/jido/agent/state_op_test.exs test/jido/agent/state_ops_test.exs test/jido/agent_server/signal_router_test.exs test/jido/agent_server/directive_exec_test.exs test/jido/agent_server/cron_integration_test.exs test/jido/agent_server/cron_tick_delivery_test.exs test/examples/signals/signal_routing_test.exs test/examples/signals/context_aware_routing_test.exs test/examples/signals/emit_directive_test.exs test/examples/runtime/schedule_directive_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.strategies.direct_default",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.strategies",
+        "target": "guides/strategies.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.strategies.strategy_boundary",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.strategies",
+        "target": "guides/strategies.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.strategies.custom_extension",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.strategies",
+        "target": "guides/custom-strategies.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.strategies.fsm_support",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.strategies",
+        "target": "guides/fsm-strategy.livemd",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "jido.strategies.custom_extension",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.strategies",
+        "target": "mix test test/jido/agent/strategy_test.exs test/jido/agent/strategy/state_test.exs test/jido/agent/strategy_state_test.exs test/jido/agent/strategy_fsm_test.exs test/examples/fsm/fsm_agent_test.exs test/examples/fsm/fsm_strategy_guide_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.strategies.direct_default",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.strategies",
+        "target": "mix test test/jido/agent/strategy_test.exs test/jido/agent/strategy/state_test.exs test/jido/agent/strategy_state_test.exs test/jido/agent/strategy_fsm_test.exs test/examples/fsm/fsm_agent_test.exs test/examples/fsm/fsm_strategy_guide_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.strategies.fsm_support",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.strategies",
+        "target": "mix test test/jido/agent/strategy_test.exs test/jido/agent/strategy/state_test.exs test/jido/agent/strategy_state_test.exs test/jido/agent/strategy_fsm_test.exs test/examples/fsm/fsm_agent_test.exs test/examples/fsm/fsm_strategy_guide_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.strategies.strategy_boundary",
+        "file": ".spec/specs/strategies.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.strategies",
+        "target": "mix test test/jido/agent/strategy_test.exs test/jido/agent/strategy/state_test.exs test/jido/agent/strategy_state_test.exs test/jido/agent/strategy_fsm_test.exs test/examples/fsm/fsm_agent_test.exs test/examples/fsm/fsm_strategy_guide_test.exs",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "jido.testing_and_examples.async_test_support",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.testing_and_examples",
+        "target": "guides/testing.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.testing_and_examples.runnable_examples",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.testing_and_examples",
+        "target": "guides/testing.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.testing_and_examples.testing_guidance",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.testing_and_examples",
+        "target": "guides/testing.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.testing_and_examples.async_test_support",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.testing_and_examples",
+        "target": "mix test test/jido/docs_examples_test.exs test/examples",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.testing_and_examples.runnable_examples",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.testing_and_examples",
+        "target": "mix test test/jido/docs_examples_test.exs test/examples",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.testing_and_examples.testing_guidance",
+        "file": ".spec/specs/testing_and_examples.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.testing_and_examples",
+        "target": "mix test test/jido/docs_examples_test.exs test/examples",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.identity_capability",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "guides/storage.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.memory_capability",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "guides/storage.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.thread_journal",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "guides/storage.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.identity_capability",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "mix test test/jido/thread test/jido/memory test/jido/identity test/examples/plugins/thread_plugin_test.exs test/examples/plugins/memory_plugin_test.exs test/examples/plugins/identity_plugin_test.exs test/examples/persistence/default_plugins_persistence_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.memory_capability",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "mix test test/jido/thread test/jido/memory test/jido/identity test/examples/plugins/thread_plugin_test.exs test/examples/plugins/memory_plugin_test.exs test/examples/plugins/identity_plugin_test.exs test/examples/persistence/default_plugins_persistence_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.thread_memory_identity.thread_journal",
+        "file": ".spec/specs/thread_memory_identity.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.thread_memory_identity",
+        "target": "mix test test/jido/thread test/jido/memory test/jido/identity test/examples/plugins/thread_plugin_test.exs test/examples/plugins/memory_plugin_test.exs test/examples/plugins/identity_plugin_test.exs test/examples/persistence/default_plugins_persistence_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.worker_pools_and_tooling.worker_pools",
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "kind": "guide_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "jido.worker_pools_and_tooling",
+        "target": "guides/worker-pools.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "jido.worker_pools_and_tooling.tooling",
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.worker_pools_and_tooling",
+        "target": "mix test test/jido/agent_pool_test.exs test/jido/igniter test/jido/scheduler_test.exs test/jido/supervisor_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "jido.worker_pools_and_tooling.worker_pools",
+        "file": ".spec/specs/worker_pools_and_tooling.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "executed",
+        "subject_id": "jido.worker_pools_and_tooling",
+        "target": "mix test test/jido/agent_pool_test.exs test/jido/igniter test/jido/scheduler_test.exs test/jido/supervisor_test.exs",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "package.jido.framework",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "readme_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": "README.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "package.jido.pure_cmd",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "readme_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": "README.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "package.jido.runtime_separation",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "readme_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": "README.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "package.jido.pure_cmd",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "contract",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": "usage-rules.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "package.jido.runtime_separation",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "contract",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": "usage-rules.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "package.jido.local_quality_gate",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": ".dialyzer_ignore.exs",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "spec.workspace.readme_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/README.md",
+        "verification_index": 0
+      },
+      {
+        "cover_id": "spec.workspace.agent_prime_context",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "spec.workspace.agents_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/AGENTS.md",
+        "verification_index": 1
+      },
+      {
+        "cover_id": "spec.workspace.decisions_readme_present",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "spec.system",
+        "target": ".spec/decisions/README.md",
+        "verification_index": 2
+      },
+      {
+        "cover_id": "spec.workspace.state_generated",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "claimed",
+        "subject_id": "spec.system",
+        "target": "mix spec.index",
+        "verification_index": 3
+      },
+      {
+        "cover_id": "spec.workspace.state_generated",
+        "file": ".spec/specs/spec_system.spec.md",
+        "kind": "command",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "claimed",
+        "subject_id": "spec.system",
+        "target": "mix spec.validate",
+        "verification_index": 4
+      }
+    ],
+    "cli_minimum_strength": null,
+    "default_minimum_strength": "claimed",
+    "strength_summary": {
+      "claimed": 2,
+      "executed": 43,
+      "linked": 53
+    },
+    "threshold_failures": 0
+  },
+  "workspace": {
+    "decision_count": 1,
+    "spec_count": 17
+  }
+}

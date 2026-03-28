@@ -1,5 +1,7 @@
 # Observability
 
+<!-- covers: jido.observability_and_tracing.telemetry_contract jido.observability_and_tracing.tracing_context -->
+
 **After:** You can monitor Jido agents in production with metrics, traces, and structured logging.
 
 This guide covers production-grade observability for Jido agents. For development debugging, see [Seeing What Happened](observability-intro.md).

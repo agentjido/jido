@@ -35,7 +35,10 @@ defmodule Jido.MixProject do
       ],
 
       # Dialyzer
-      dialyzer: [plt_add_apps: [:mix]]
+      dialyzer: [
+        plt_add_apps: [:mix],
+        ignore_warnings: ".dialyzer_ignore.exs"
+      ]
     ]
   end
 
@@ -405,6 +408,11 @@ defmodule Jido.MixProject do
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
+      {:spec_led_ex,
+       git: "https://github.com/specleddev/specled_ex.git",
+       branch: "main",
+       only: [:dev, :test],
+       runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},

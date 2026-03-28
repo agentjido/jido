@@ -1,5 +1,7 @@
 # Directives
 
+<!-- covers: jido.signals_and_directives.directive_effect_boundary jido.signals_and_directives.scheduling_support -->
+
 **After:** You can emit directives from actions to perform effects without polluting pure logic.
 
 Directives are **pure descriptions of external effects**. Agents emit them from `cmd/2` callbacks; the runtime (`AgentServer`) executes them.

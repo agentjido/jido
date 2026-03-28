@@ -1,5 +1,7 @@
 # Choosing A Runtime Pattern
 
+<!-- covers: jido.runtime_lifecycle.instance_management -->
+
 Jido now has a few different runtime building blocks, and they are close enough
 that it is easy to reach for the wrong one.
 

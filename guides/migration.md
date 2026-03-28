@@ -1,5 +1,7 @@
 # Migration Guide: Jido 1.x to 2.0
 
+<!-- covers: jido.integrations_and_migration.migration_guidance -->
+
 **After:** You can upgrade from Jido 1.x with minimal surprises.
 
 This guide helps you migrate existing Jido applications to version 2.0. The migration can be done incrementally—start with the minimum changes to get running, then adopt new patterns as needed.

@@ -2,6 +2,7 @@
 
 ## Intent
 Build reliable multi-agent systems by keeping decision logic pure and runtime effects explicit.
+<!-- package.jido.pure_cmd package.jido.runtime_separation -->
 
 ## Core Contracts
 - Treat `cmd/2` as the core agent contract: `{updated_agent, directives}`.

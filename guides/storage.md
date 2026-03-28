@@ -1,5 +1,7 @@
 # Persistence & Storage
 
+<!-- covers: jido.runtime_persistence.hibernate_thaw jido.runtime_persistence.storage_backends jido.thread_memory_identity.thread_journal jido.thread_memory_identity.memory_capability jido.thread_memory_identity.identity_capability -->
+
 **After:** Your agents can survive restarts, hibernate on idle, and preserve conversation history.
 
 ```elixir
