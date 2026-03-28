@@ -375,8 +375,8 @@ defmodule Jido.MixProject do
       links: %{
         "Documentation" => "https://hexdocs.pm/jido",
         "GitHub" => "https://github.com/agentjido/jido",
-        "Website" => "https://agentjido.xyz",
-        "Discord" => "https://agentjido.xyz/discord",
+        "Website" => "https://jido.run",
+        "Discord" => "https://jido.run/discord",
         "Changelog" => "https://github.com/agentjido/jido/blob/main/CHANGELOG.md"
       }
     ]
