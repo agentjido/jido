@@ -27,8 +27,13 @@ config :logger, :default_formatter,
 # Git hooks and git_ops configuration for conventional commits
 # Only enabled in dev environment (git_ops is a dev-only dependency)
 if config_env() == :dev do
+  # Worktrees use a `.git` file instead of a directory. Setting `project_path`
+  # keeps git_hooks on the current checkout and avoids brittle path discovery.
+  project_path = Path.expand("..", __DIR__)
+
   config :git_hooks,
     auto_install: true,
+    project_path: project_path,
     verbose: true,
     hooks: [
       commit_msg: [

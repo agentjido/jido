@@ -4,6 +4,9 @@
 agent with a canonical topology snapshot and a reserved singleton plugin mounted
 under `:__pod__`.
 
+If you are still choosing between `SpawnAgent`, `InstanceManager`, and `Pod`,
+start with [Choosing a Runtime Pattern](runtime-patterns.md).
+
 ## What A Pod Is
 
 - A pod module is an ordinary `Jido.Agent` module.
