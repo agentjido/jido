@@ -76,6 +76,7 @@ defmodule Jido.MixProject do
         "Start Here": [
           "guides/getting-started.livemd",
           "guides/core-loop.md",
+          "guides/runtime-patterns.md",
           "guides/your-first-plugin.md",
           "guides/your-first-sensor.md",
           "guides/observability-intro.md"
@@ -134,6 +135,7 @@ defmodule Jido.MixProject do
         # Start Here
         {"guides/getting-started.livemd", title: "Quick Start"},
         {"guides/core-loop.md", title: "Core Loop"},
+        {"guides/runtime-patterns.md", title: "Choosing a Runtime Pattern"},
         {"guides/your-first-plugin.md", title: "Your First Plugin"},
         {"guides/your-first-sensor.md", title: "Your First Sensor"},
         {"guides/observability-intro.md", title: "Seeing What Happened"},

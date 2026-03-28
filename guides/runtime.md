@@ -5,6 +5,9 @@
 Agents run inside an `AgentServer` GenServer process. This guide covers starting agents, sending signals, and managing parent-child hierarchies.
 
 > For complete API details, see `Jido.AgentServer` and `Jido.Await` moduledocs.
+>
+> If you are deciding between `SpawnAgent`, `InstanceManager`, `Pod`, and
+> `partition`, start with [Choosing a Runtime Pattern](runtime-patterns.md).
 
 ## Starting Agents
 

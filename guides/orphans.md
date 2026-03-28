@@ -8,6 +8,9 @@
 > for orphaning only when the child owns long-running or business-critical work
 > that should outlive the original coordinator. Orphan survival is about live
 > runtime continuity, not automatic storage-backed durability.
+>
+> If you are deciding between orphan/adoption, durable keyed agents, and Pods,
+> start with [Choosing a Runtime Pattern](runtime-patterns.md).
 
 ## Architecture: Logical Hierarchy, Not OTP Parenthood
 

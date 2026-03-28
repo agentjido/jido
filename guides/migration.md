@@ -193,10 +193,10 @@ end
 | Directive | Purpose | Example |
 |-----------|---------|---------|
 | `Emit` | Dispatch a signal via adapters | `Directive.emit(signal, {:pubsub, topic: "events"})` |
-| `Spawn` | Spawn a generic BEAM process | `Directive.spawn(Task, :async, [fn -> work() end])` |
-| `SpawnAgent` | Spawn a child agent with hierarchy | `Directive.spawn_agent(ChildAgent, id: "child-1")` |
+| `Spawn` | Spawn a generic BEAM process | `Directive.spawn({Task, fn -> work() end})` |
+| `SpawnAgent` | Spawn a child agent with hierarchy | `Directive.spawn_agent(ChildAgent, :child_1, opts: %{id: "child-1"})` |
 | `StopChild` | Stop a tracked child agent | `Directive.stop_child("child-1")` |
-| `Schedule` | Schedule a delayed message | `Directive.schedule(signal, delay: 5_000)` |
+| `Schedule` | Schedule a delayed message | `Directive.schedule(5_000, signal)` |
 | `Stop` | Stop the agent process | `Directive.stop(:normal)` |
 | `Error` | Signal an error | `Directive.error(:validation_failed)` |
 

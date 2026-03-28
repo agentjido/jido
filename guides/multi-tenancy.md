@@ -7,6 +7,10 @@ Jido now supports two distinct multi-tenancy models:
 
 The second model is the one this guide focuses on.
 
+If you are still deciding whether you need `partition` at all, or how it relates
+to `InstanceManager` and `Pod`, start with
+[Choosing a Runtime Pattern](runtime-patterns.md).
+
 In shared-instance deployments, the recommended unit is:
 
 - `partition` for tenant or workspace isolation
