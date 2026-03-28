@@ -99,7 +99,7 @@ Running pods may also change their durable topology at runtime with
 `Jido.Pod.mutate/3`. That path persists the new topology snapshot first, then
 applies runtime stop/start work and returns a mutation report. In-turn pod code
 uses the same runtime path through `Jido.Pod.mutation_effects/3`. See
-[Pods](pods.md) and `test/examples/runtime/mutable_pod_runtime_test.exs`.
+[Pods](pods.md), especially [Canonical Example](pods.md#canonical-example).
 
 The parent:
 - Monitors the child process

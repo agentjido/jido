@@ -94,6 +94,8 @@ Pods are the right abstraction when you care about:
 - nested pod nodes
 
 Pods are not just “a nicer `SpawnAgent`.” They are the durable topology layer.
+If you want the shortest end-to-end example, start with
+[Pods: Canonical Example](pods.md#canonical-example).
 
 ## Where `partition` Fits
 

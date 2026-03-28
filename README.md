@@ -13,7 +13,7 @@ with supervision and fault tolerance built in.
 
 _The name "Jido" (自動) comes from the Japanese word meaning "automatic" or "automated", where 自 (ji) means "self" and 動 (dō) means "movement"._
 
-_Learn more about Jido at [agentjido.xyz](https://agentjido.xyz)._
+_Learn more about Jido at [jido.run](https://jido.run)._
 
 ## Overview
 
@@ -59,7 +59,7 @@ Jido is the core package of the Jido ecosystem. The ecosystem is built around th
 | [jido](https://github.com/agentjido/jido)               | Core agent framework with state management, directives, and runtime                           |
 | [jido_ai](https://github.com/agentjido/jido_ai)         | AI/LLM integration for agents                                                                 |
 
-For demos and examples of what you can build with the Jido Ecosystem, see [https://agentjido.xyz](https://agentjido.xyz).
+For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run).
 
 ## Why Jido?
 
@@ -345,5 +345,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for detai
 
 - **Documentation**: [https://hexdocs.pm/jido](https://hexdocs.pm/jido)
 - **GitHub**: [https://github.com/agentjido/jido](https://github.com/agentjido/jido)
-- **AgentJido**: [https://agentjido.xyz](https://agentjido.xyz)
+- **AgentJido**: [https://jido.run](https://jido.run)
 - **Jido Workbench**: [https://github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
