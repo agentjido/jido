@@ -593,9 +593,9 @@ defmodule Jido.Pod do
     end)
   end
 
-  defp running_child_pid(manager, key) do
+  defp running_child_pid(manager, key, opts) do
     try do
-      case InstanceManager.lookup(manager, key) do
+      case InstanceManager.lookup(manager, key, opts) do
         {:ok, pid} -> pid
         :error -> nil
       end
@@ -757,9 +757,10 @@ defmodule Jido.Pod do
       _status ->
         initial_state = node_initial_state(requested_names, name, node, opts)
         key = node_key(state, name)
+        get_opts = [partition: state.partition, initial_state: initial_state]
 
         with {:ok, parent_pid} <- resolve_parent_pid(server_pid, state, topology, name, report),
-             {:ok, pid} <- get_managed_node(node.manager, key, initial_state: initial_state),
+             {:ok, pid} <- get_managed_node(node.manager, key, get_opts),
              {:ok, ^pid} <- adopt_runtime_child(parent_pid, pid, name, node.meta, state, topology) do
           {:ok, ensure_result(name, pid, snapshot_source(snapshot), snapshot.owner)}
         end
@@ -791,9 +792,10 @@ defmodule Jido.Pod do
         _status ->
           initial_state = node_initial_state(requested_names, name, node, opts)
           key = node_key(state, name)
+          get_opts = [partition: state.partition, initial_state: initial_state]
 
           with {:ok, parent_pid} <- resolve_parent_pid(server_pid, state, topology, name, report),
-               {:ok, pid} <- get_managed_node(node.manager, key, initial_state: initial_state),
+               {:ok, pid} <- get_managed_node(node.manager, key, get_opts),
                {:ok, ^pid} <-
                  adopt_runtime_child(parent_pid, pid, name, node.meta, state, topology),
                {:ok, _nested_report} <- reconcile_nested_pod(pid, node, state, opts) do
@@ -886,7 +888,7 @@ defmodule Jido.Pod do
       end
 
     key = node_key(state, name)
-    running_pid = running_child_pid(node.manager, key)
+    running_pid = running_child_pid(node.manager, key, partition: state.partition)
     owner = owner_name(topology, name)
     expected_parent = expected_parent_ref(state, name, owner)
     actual_parent = actual_parent_ref(state, topology, name)
@@ -916,9 +918,20 @@ defmodule Jido.Pod do
 
   defp actual_parent_ref(%State{} = state, %Topology{} = topology, name)
        when is_node_name(name) do
-    case RuntimeStore.fetch(state.jido, :relationships, node_id(state, name)) do
-      {:ok, %{parent_id: parent_id, tag: tag}} when is_binary(parent_id) ->
-        %{id: parent_id, pid: resolve_parent_runtime_pid(state, topology, parent_id), tag: tag}
+    case RuntimeStore.fetch(
+           state.jido,
+           :relationships,
+           Jido.partition_key(node_id(state, name), state.partition)
+         ) do
+      {:ok, %{parent_id: parent_id, tag: tag} = binding} when is_binary(parent_id) ->
+        parent_partition = Map.get(binding, :parent_partition, state.partition)
+
+        %{
+          id: parent_id,
+          partition: parent_partition,
+          pid: resolve_parent_runtime_pid(state, topology, parent_id, parent_partition),
+          tag: tag
+        }
 
       {:ok, _other} ->
         nil
@@ -928,21 +941,31 @@ defmodule Jido.Pod do
     end
   end
 
-  defp resolve_parent_runtime_pid(%State{id: state_id, registry: registry}, _topology, parent_id)
+  defp resolve_parent_runtime_pid(
+         %State{id: state_id, registry: registry, partition: partition},
+         _topology,
+         parent_id,
+         parent_partition
+       )
        when parent_id == state_id do
-    AgentServer.whereis(registry, state_id)
+    AgentServer.whereis(registry, state_id, partition: parent_partition || partition)
   end
 
-  defp resolve_parent_runtime_pid(%State{} = state, %Topology{} = topology, parent_id)
+  defp resolve_parent_runtime_pid(
+         %State{} = state,
+         %Topology{} = topology,
+         parent_id,
+         parent_partition
+       )
        when is_binary(parent_id) do
     case Enum.find(topology.nodes, fn {candidate_name, _node} ->
            node_id(state, candidate_name) == parent_id
          end) do
       {owner_name, %Node{manager: manager}} ->
-        running_child_pid(manager, node_key(state, owner_name))
+        running_child_pid(manager, node_key(state, owner_name), partition: parent_partition)
 
       nil ->
-        Jido.whereis(state.jido, parent_id)
+        Jido.whereis(state.jido, parent_id, partition: parent_partition)
     end
   end
 
@@ -954,16 +977,26 @@ defmodule Jido.Pod do
   end
 
   defp expected_parent_ref(%State{} = state, name, nil) do
-    %{scope: :pod, name: nil, id: state.id, tag: name}
+    %{scope: :pod, name: nil, id: state.id, partition: state.partition, tag: name}
   end
 
   defp expected_parent_ref(%State{} = state, name, owner_name)
        when is_node_name(owner_name) do
-    %{scope: :node, name: owner_name, id: node_id(state, owner_name), tag: name}
+    %{
+      scope: :node,
+      name: owner_name,
+      id: node_id(state, owner_name),
+      partition: state.partition,
+      tag: name
+    }
   end
 
-  defp parent_matches?(%{id: actual_id, tag: actual_tag}, %{id: expected_id, tag: expected_tag}) do
-    actual_id == expected_id and actual_tag == expected_tag
+  defp parent_matches?(
+         %{id: actual_id, partition: actual_partition, tag: actual_tag},
+         %{id: expected_id, partition: expected_partition, tag: expected_tag}
+       ) do
+    actual_id == expected_id and actual_partition == expected_partition and
+      actual_tag == expected_tag
   end
 
   defp parent_matches?(_actual_parent, _expected_parent), do: false
@@ -1026,7 +1059,8 @@ defmodule Jido.Pod do
         pod_module: state.agent_module,
         agent_id: state.id,
         agent_module: state.agent_module,
-        jido_instance: state.jido
+        jido_instance: state.jido,
+        jido_partition: state.partition
       },
       extra
     )
@@ -1119,11 +1153,11 @@ defmodule Jido.Pod do
     end
   end
 
-  defp resolve_runtime_server(server, %State{id: id, registry: registry}) do
+  defp resolve_runtime_server(server, %State{id: id, registry: registry, partition: partition}) do
     if is_pid(server) and Process.alive?(server) do
       {:ok, server}
     else
-      case AgentServer.whereis(registry, id) do
+      case AgentServer.whereis(registry, id, partition: partition) do
         pid when is_pid(pid) -> {:ok, pid}
         nil -> {:error, :not_found}
       end

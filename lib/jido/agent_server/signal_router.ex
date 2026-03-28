@@ -62,13 +62,18 @@ defmodule Jido.AgentServer.SignalRouter do
   end
 
   # Collects routes from strategy.signal_routes/1
-  defp add_strategy_routes(routes, %State{agent_module: agent_module, jido: jido_instance}) do
+  defp add_strategy_routes(routes, %State{
+         agent_module: agent_module,
+         jido: jido_instance,
+         partition: partition
+       }) do
     strat = agent_module.strategy()
 
     ctx = %{
       agent_module: agent_module,
       strategy_opts: agent_module.strategy_opts(),
-      jido_instance: jido_instance
+      jido_instance: jido_instance,
+      partition: partition
     }
 
     if function_exported?(strat, :signal_routes, 1) do
@@ -81,9 +86,13 @@ defmodule Jido.AgentServer.SignalRouter do
   end
 
   # Collects routes from agent_module.signal_routes/1
-  defp add_agent_routes(routes, %State{agent_module: agent_module, jido: jido_instance}) do
+  defp add_agent_routes(routes, %State{
+         agent_module: agent_module,
+         jido: jido_instance,
+         partition: partition
+       }) do
     if function_exported?(agent_module, :signal_routes, 1) do
-      ctx = %{agent_module: agent_module, jido_instance: jido_instance}
+      ctx = %{agent_module: agent_module, jido_instance: jido_instance, partition: partition}
       agent_routes = agent_module.signal_routes(ctx)
       normalized = normalize_routes(agent_routes, @agent_default_priority)
       routes ++ normalized

@@ -9,6 +9,7 @@ defmodule Jido.AgentServer.Signal.ChildStarted do
 
   - `:parent_id` - ID of the parent agent
   - `:child_id` - ID of the child agent
+  - `:child_partition` - Partition of the child agent
   - `:child_module` - Module of the child agent
   - `:tag` - Tag used when spawning the child
   - `:pid` - PID of the child process
@@ -21,6 +22,7 @@ defmodule Jido.AgentServer.Signal.ChildStarted do
     schema: [
       parent_id: [type: :string, required: true, doc: "ID of the parent agent"],
       child_id: [type: :string, required: true, doc: "ID of the child agent"],
+      child_partition: [type: :any, doc: "Partition of the child agent"],
       child_module: [type: :any, required: true, doc: "Module of the child agent"],
       tag: [type: :any, required: true, doc: "Tag used when spawning"],
       pid: [type: :any, required: true, doc: "PID of the child process"],

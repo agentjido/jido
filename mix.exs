@@ -93,7 +93,8 @@ defmodule Jido.MixProject do
         Coordination: [
           "guides/await.md",
           "guides/orchestration.md",
-          "guides/pods.md"
+          "guides/pods.md",
+          "guides/multi-tenancy.md"
         ],
         Operations: [
           "guides/debugging.md",
@@ -151,6 +152,7 @@ defmodule Jido.MixProject do
         {"guides/await.md", title: "Await & Coordination"},
         {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
         {"guides/pods.md", title: "Pods"},
+        {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
 
         # Operations
         {"guides/debugging.md", title: "Debugging"},

@@ -969,4 +969,124 @@ defmodule JidoTest.AgentServer.HierarchyTest do
       DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), adopter_pid)
     end
   end
+
+  describe "partitioned hierarchy" do
+    test "spawned children inherit the parent partition by default", %{jido: jido} do
+      parent_id = unique_id("partition-parent")
+
+      {:ok, parent_pid} =
+        AgentServer.start(agent: ParentAgent, id: parent_id, jido: jido, partition: :alpha)
+
+      spawn_signal =
+        Signal.new!("spawn_agent", %{module: ChildAgent, tag: :worker}, source: "/test")
+
+      {:ok, _agent} = AgentServer.call(parent_pid, spawn_signal)
+
+      parent_state =
+        eventually_state(parent_pid, fn state ->
+          Map.has_key?(state.children, :worker)
+        end)
+
+      child_info = parent_state.children.worker
+
+      assert child_info.partition == :alpha
+      assert Jido.whereis(jido, child_info.id, partition: :alpha) == child_info.pid
+      assert Jido.whereis(jido, child_info.id) == nil
+
+      {:ok, child_state} = AgentServer.state(child_info.pid)
+      assert child_state.partition == :alpha
+      assert child_state.agent.state.__partition__ == :alpha
+      assert child_state.parent.partition == :alpha
+
+      assert {:ok, binding} =
+               Jido.RuntimeStore.fetch(jido, :relationships, {:partition, :alpha, child_info.id})
+
+      assert binding.parent_id == parent_id
+      assert binding.parent_partition == :alpha
+
+      GenServer.stop(child_info.pid)
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+
+    test "adoption by child id resolves only within the parent's partition", %{jido: jido} do
+      parent_id = unique_id("partition-adopter")
+      child_id = unique_id("shared-child")
+
+      {:ok, parent_pid} =
+        AgentServer.start(agent: ParentAgent, id: parent_id, jido: jido, partition: :alpha)
+
+      {:ok, alpha_child_pid} =
+        AgentServer.start(agent: ChildAgent, id: child_id, jido: jido, partition: :alpha)
+
+      {:ok, beta_child_pid} =
+        AgentServer.start(agent: ChildAgent, id: child_id, jido: jido, partition: :beta)
+
+      adopt_signal =
+        Signal.new!("adopt_child", %{child: child_id, tag: :worker}, source: "/test")
+
+      {:ok, _agent} = AgentServer.call(parent_pid, adopt_signal)
+
+      eventually_state(alpha_child_pid, fn state ->
+        match?(%ParentRef{id: ^parent_id, partition: :alpha}, state.parent)
+      end)
+
+      {:ok, beta_child_state} = AgentServer.state(beta_child_pid)
+      assert beta_child_state.parent == nil
+
+      assert {:ok, binding} =
+               Jido.RuntimeStore.fetch(jido, :relationships, {:partition, :alpha, child_id})
+
+      assert binding.parent_id == parent_id
+      assert binding.parent_partition == :alpha
+
+      assert Jido.RuntimeStore.fetch(jido, :relationships, {:partition, :beta, child_id}) ==
+               :error
+
+      GenServer.stop(alpha_child_pid)
+      GenServer.stop(beta_child_pid)
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+
+    test "cross-partition adoption requires an explicit pid and preserves child partition", %{
+      jido: jido
+    } do
+      parent_id = unique_id("cross-partition-parent")
+      child_id = unique_id("cross-partition-child")
+
+      {:ok, parent_pid} =
+        AgentServer.start(agent: ParentAgent, id: parent_id, jido: jido, partition: :alpha)
+
+      {:ok, child_pid} =
+        AgentServer.start(agent: ChildAgent, id: child_id, jido: jido, partition: :beta)
+
+      adopt_signal =
+        Signal.new!("adopt_child", %{child: child_pid, tag: :cross}, source: "/test")
+
+      {:ok, _agent} = AgentServer.call(parent_pid, adopt_signal)
+
+      eventually_state(child_pid, fn state ->
+        state.partition == :beta and
+          match?(%ParentRef{id: ^parent_id, partition: :alpha}, state.parent)
+      end)
+
+      parent_state =
+        eventually_state(parent_pid, fn state ->
+          match?(%ChildInfo{partition: :beta}, Map.get(state.children, :cross))
+        end)
+
+      assert parent_state.children.cross.pid == child_pid
+      assert parent_state.children.cross.partition == :beta
+      assert Jido.whereis(jido, child_id, partition: :beta) == child_pid
+      assert Jido.whereis(jido, child_id, partition: :alpha) == nil
+
+      assert {:ok, binding} =
+               Jido.RuntimeStore.fetch(jido, :relationships, {:partition, :beta, child_id})
+
+      assert binding.parent_id == parent_id
+      assert binding.parent_partition == :alpha
+
+      GenServer.stop(child_pid)
+      DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), parent_pid)
+    end
+  end
 end

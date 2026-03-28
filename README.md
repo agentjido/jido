@@ -91,7 +91,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 - GenServer-based AgentServer for production deployment
 - Parent-child agent hierarchies with lifecycle management
 - Signal routing with configurable strategies
-- Instance-scoped supervision for multi-tenant deployments
+- Instance-scoped supervision plus logical partitions for multi-tenant deployments
 
 ### Composable Plugins
 - Reusable capability modules that extend agents
@@ -106,7 +106,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Multi-Agent Orchestration
 - Multi-agent workflows with configurable strategies
 - Plan-based orchestration for complex workflows
-- Pod-wrapped agents with canonical durable topologies, hierarchical runtime ownership, and nested pod nodes
+- Pod-wrapped agents with canonical durable topologies, hierarchical runtime ownership, nested pod nodes, and partition-safe tenancy boundaries
 - Extensible strategy protocol for custom execution patterns
 
 ## Installation
@@ -294,6 +294,7 @@ State operations are internal state transitions handled by the strategy layer du
 - [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
 - [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
 - [Pods](guides/pods.md) - Durable topologies for named teams with manager-led roots, hierarchical ownership, and nested pods
+- [Multi-Tenancy](guides/multi-tenancy.md) - Shared-instance tenancy with partitions and Pod-first durable workspaces
 - [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
 - [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
 - [Plugins](guides/plugins.md) - Composable capability bundles
