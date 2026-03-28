@@ -3,6 +3,7 @@ defmodule Jido do
 
   alias Jido.Agent.WorkerPool
   alias Jido.Config.Defaults
+  alias Jido.RuntimeStore
 
   @moduledoc """
   自動 (Jido) - An autonomous agent framework for Elixir, built for workflows and
@@ -491,6 +492,39 @@ defmodule Jido do
   end
 
   @doc """
+  Fetches the persisted logical parent binding for a child agent.
+
+  This is the stable runtime relationship lookup API for orchestration layers
+  that need to inspect the live parent/child graph without depending on raw
+  `RuntimeStore` hive layout.
+
+  Returns `{:ok, binding}` when present, or `:error` when no binding exists.
+
+  ## Examples
+
+      {:ok, binding} = Jido.parent_binding(MyApp.Jido, "child-123")
+      assert binding.parent_id == "parent-456"
+  """
+  @spec parent_binding(atom(), String.t()) :: {:ok, map()} | :error
+  def parent_binding(jido_instance, child_id)
+      when is_atom(jido_instance) and is_binary(child_id) do
+    parent_binding(jido_instance, child_id, [])
+  end
+
+  @spec parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
+  def parent_binding(jido_instance, child_id, opts)
+      when is_atom(jido_instance) and is_binary(child_id) and is_list(opts) do
+    case RuntimeStore.fetch(
+           jido_instance,
+           :relationships,
+           partition_key(child_id, Keyword.get(opts, :partition))
+         ) do
+      {:ok, binding} -> normalize_parent_binding(binding)
+      :error -> :error
+    end
+  end
+
+  @doc """
   Lists all agents running in a Jido instance.
 
   Returns a list of `{id, pid}` tuples.
@@ -603,6 +637,19 @@ defmodule Jido do
   end
 
   defp maybe_put_partition(agent, _partition), do: {:ok, agent}
+
+  defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
+       when is_binary(parent_id) do
+    {:ok,
+     binding
+     |> Map.put_new(:parent_partition, nil)
+     |> Map.update(:meta, %{}, fn
+       meta when is_map(meta) -> meta
+       _other -> %{}
+     end)}
+  end
+
+  defp normalize_parent_binding(_binding), do: :error
 
   # ---------------------------------------------------------------------------
   # Discovery
