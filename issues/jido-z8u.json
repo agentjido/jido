@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:11:42Z",
+  "description": "Track the brownfield migration from scaffolded package specs to subject-level current truth across core runtime, actions, plugins, guides, and tests.",
+  "id": "jido-z8u",
+  "labels": [],
+  "priority": 1,
+  "status": "open",
+  "title": "Migrate Jido brownfield current truth to Spec Led",
+  "type": "epic",
+  "updated_at": "2026-03-28T18:11:42Z"
+}
