@@ -8,6 +8,7 @@ kind: package
 status: active
 summary: Jido is an Elixir framework for autonomous agent systems with pure agent logic and explicit runtime effects.
 surface:
+  - .dialyzer_ignore.exs
   - mix.exs
   - README.md
   - usage-rules.md
@@ -33,6 +34,11 @@ surface:
   statement: Jido shall keep runtime side effects explicit through directives and AgentServer runtime modules instead of hiding effects inside agent state transitions.
   priority: must
   stability: stable
+
+- id: package.jido.local_quality_gate
+  statement: Jido shall keep its repository-local quality tooling executable, including narrowly scoped analyzer suppressions for known external dependency issues when needed.
+  priority: should
+  stability: evolving
 ```
 
 ## Verification
@@ -50,4 +56,9 @@ surface:
   covers:
     - package.jido.pure_cmd
     - package.jido.runtime_separation
+
+- kind: source_file
+  target: .dialyzer_ignore.exs
+  covers:
+    - package.jido.local_quality_gate
 ```

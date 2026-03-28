@@ -371,6 +371,14 @@
       },
       {
         "file": ".spec/specs/package.spec.md",
+        "id": "package.jido.local_quality_gate",
+        "priority": "should",
+        "stability": "evolving",
+        "statement": "Jido shall keep its repository-local quality tooling executable, including narrowly scoped analyzer suppressions for known external dependency issues when needed.",
+        "subject_id": "package.jido"
+      },
+      {
+        "file": ".spec/specs/package.spec.md",
         "id": "package.jido.pure_cmd",
         "priority": "must",
         "stability": "stable",
@@ -583,6 +591,7 @@
           "status": "active",
           "summary": "Jido is an Elixir framework for autonomous agent systems with pure agent logic and explicit runtime effects.",
           "surface": [
+            ".dialyzer_ignore.exs",
             "mix.exs",
             "README.md",
             "usage-rules.md",
@@ -1336,6 +1345,15 @@
       },
       {
         "covers": [
+          "package.jido.local_quality_gate"
+        ],
+        "file": ".spec/specs/package.spec.md",
+        "kind": "source_file",
+        "subject_id": "package.jido",
+        "target": ".dialyzer_ignore.exs"
+      },
+      {
+        "covers": [
           "spec.workspace.readme_present"
         ],
         "file": ".spec/specs/spec_system.spec.md",
@@ -1388,10 +1406,10 @@
     "decisions": 1,
     "exceptions": 0,
     "findings": 0,
-    "requirements": 51,
+    "requirements": 52,
     "scenarios": 0,
     "subjects": 17,
-    "verifications": 50
+    "verifications": 51
   },
   "verification": {
     "claims": [
@@ -2397,6 +2415,17 @@
         "verification_index": 1
       },
       {
+        "cover_id": "package.jido.local_quality_gate",
+        "file": ".spec/specs/package.spec.md",
+        "kind": "source_file",
+        "meets_minimum": true,
+        "required_strength": "claimed",
+        "strength": "linked",
+        "subject_id": "package.jido",
+        "target": ".dialyzer_ignore.exs",
+        "verification_index": 2
+      },
+      {
         "cover_id": "spec.workspace.readme_present",
         "file": ".spec/specs/spec_system.spec.md",
         "kind": "source_file",
@@ -2468,7 +2497,7 @@
     "strength_summary": {
       "claimed": 2,
       "executed": 43,
-      "linked": 52
+      "linked": 53
     },
     "threshold_failures": 0
   },
