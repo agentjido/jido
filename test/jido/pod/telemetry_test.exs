@@ -348,6 +348,44 @@ defmodule JidoTest.Pod.TelemetryTest do
                     %{node_name: "reviewer", owner: :planner, source: :started}}
   end
 
+  test "pod telemetry includes jido_partition for partitioned pod runtimes", %{pod_key: pod_key} do
+    assert {:ok, pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    assert is_pid(pod_pid)
+
+    assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :start], %{system_time: _},
+                    %{pod_id: ^pod_key, pod_module: ReviewPod, jido_partition: :alpha}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
+                    %{node_name: :planner, source: :started, jido_partition: :alpha}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
+                    %{node_name: :planner, source: :started, jido_partition: :alpha}}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :stop],
+                    %{duration: _, node_count: 1, wave_count: 1},
+                    %{pod_id: ^pod_key, pod_module: ReviewPod, jido_partition: :alpha}}
+
+    drain_telemetry_events()
+
+    assert {:ok, _reviewer_pid} = Pod.ensure_node(pod_pid, :reviewer)
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :start], %{system_time: _},
+                    %{
+                      node_name: :reviewer,
+                      owner: :planner,
+                      source: :started,
+                      jido_partition: :alpha
+                    }}
+
+    assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :stop], %{duration: _},
+                    %{
+                      node_name: :reviewer,
+                      owner: :planner,
+                      source: :started,
+                      jido_partition: :alpha
+                    }}
+  end
+
   defp drain_telemetry_events do
     receive do
       {:telemetry_event, _event, _measurements, _metadata} ->

@@ -3,10 +3,10 @@ defmodule Jido.Pod.Mutation.Planner do
   Pure planner for live pod mutations.
   """
 
-  alias Jido.Pod
   alias Jido.Pod.Mutation
   alias Jido.Pod.Mutation.{AddNode, Plan, RemoveNode, Report}
   alias Jido.Pod.Topology
+  alias Jido.Pod.TopologyState
 
   defguardp is_node_name(name) when is_atom(name) or is_binary(name)
   @typep node_name_list :: [Mutation.node_name()]
@@ -23,7 +23,7 @@ defmodule Jido.Pod.Mutation.Planner do
       mutation_id = Uniq.UUID.uuid7()
 
       normalized_final_topology =
-        Pod.normalize_mutated_topology(topology, validated_final_topology)
+        TopologyState.normalize_updated_topology(topology, validated_final_topology)
 
       report = seed_report(mutation_id, normalized_ops, normalized_final_topology, added, removed)
 

@@ -149,27 +149,27 @@ defmodule Jido do
       end
 
       @doc "Stops an agent (by pid or id) under this Jido instance."
-      @spec stop_agent(pid() | String.t()) :: :ok | {:error, :not_found}
-      def stop_agent(pid_or_id) do
-        Jido.stop_agent(__MODULE__, pid_or_id)
+      @spec stop_agent(pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
+      def stop_agent(pid_or_id, opts \\ []) when is_list(opts) do
+        Jido.stop_agent(__MODULE__, pid_or_id, opts)
       end
 
       @doc "Looks up an agent by ID under this Jido instance."
-      @spec whereis(String.t()) :: pid() | nil
-      def whereis(id) when is_binary(id) do
-        Jido.whereis(__MODULE__, id)
+      @spec whereis(String.t(), keyword()) :: pid() | nil
+      def whereis(id, opts \\ []) when is_binary(id) and is_list(opts) do
+        Jido.whereis(__MODULE__, id, opts)
       end
 
       @doc "Lists all agents under this Jido instance."
-      @spec list_agents() :: [{String.t(), pid()}]
-      def list_agents do
-        Jido.list_agents(__MODULE__)
+      @spec list_agents(keyword()) :: [{String.t(), pid()}]
+      def list_agents(opts \\ []) when is_list(opts) do
+        Jido.list_agents(__MODULE__, opts)
       end
 
       @doc "Returns the count of running agents under this Jido instance."
-      @spec agent_count() :: non_neg_integer()
-      def agent_count do
-        Jido.agent_count(__MODULE__)
+      @spec agent_count(keyword()) :: non_neg_integer()
+      def agent_count(opts \\ []) when is_list(opts) do
+        Jido.agent_count(__MODULE__, opts)
       end
 
       @doc "Returns the Registry name for this Jido instance."
@@ -189,15 +189,15 @@ defmodule Jido do
       def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
 
       @doc "Hibernate an agent to storage."
-      @spec hibernate(Jido.Agent.t()) :: :ok | {:error, term()}
-      def hibernate(agent) do
-        Jido.Persist.hibernate(__jido_storage__(), agent)
+      @spec hibernate(Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
+      def hibernate(agent, opts \\ []) when is_list(opts) do
+        Jido.hibernate(__MODULE__, agent, opts)
       end
 
       @doc "Thaw an agent from storage."
-      @spec thaw(module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-      def thaw(agent_module, key) do
-        Jido.Persist.thaw(__jido_storage__(), agent_module, key)
+      @spec thaw(module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
+      def thaw(agent_module, key, opts \\ []) when is_list(opts) do
+        Jido.thaw(__MODULE__, agent_module, key, opts)
       end
 
       @doc """
@@ -231,6 +231,7 @@ defmodule Jido do
   end
 
   @type agent_id :: String.t() | atom()
+  @type partition :: term()
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
@@ -402,6 +403,16 @@ defmodule Jido do
   @spec agent_pool_name(atom(), atom()) :: atom()
   def agent_pool_name(name, pool_name), do: Module.concat([name, AgentPool, pool_name])
 
+  @doc false
+  @spec partition_key(term(), partition() | nil) :: term()
+  def partition_key(value, nil), do: value
+  def partition_key(value, partition), do: {:partition, partition, value}
+
+  @doc false
+  @spec unwrap_partition_key(term()) :: {partition() | nil, term()}
+  def unwrap_partition_key({:partition, partition, value}), do: {partition, value}
+  def unwrap_partition_key(value), do: {nil, value}
+
   # ---------------------------------------------------------------------------
   # Agent Lifecycle
   # ---------------------------------------------------------------------------
@@ -440,6 +451,20 @@ defmodule Jido do
     end
   end
 
+  @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
+  def stop_agent(jido_instance, pid, _opts)
+      when is_atom(jido_instance) and is_pid(pid) do
+    stop_agent(jido_instance, pid)
+  end
+
+  def stop_agent(jido_instance, id, opts)
+      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
+    case whereis(jido_instance, id, opts) do
+      nil -> {:error, :not_found}
+      pid -> stop_agent(jido_instance, pid)
+    end
+  end
+
   @doc """
   Looks up an agent by ID in a Jido instance's registry.
 
@@ -451,7 +476,15 @@ defmodule Jido do
   """
   @spec whereis(atom(), String.t()) :: pid() | nil
   def whereis(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
-    case Registry.lookup(registry_name(jido_instance), id) do
+    whereis(jido_instance, id, [])
+  end
+
+  @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
+  def whereis(jido_instance, id, opts)
+      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
+    registry_key = partition_key(id, Keyword.get(opts, :partition))
+
+    case Registry.lookup(registry_name(jido_instance), registry_key) do
       [{pid, _}] -> pid
       [] -> nil
     end
@@ -469,8 +502,14 @@ defmodule Jido do
   """
   @spec list_agents(atom()) :: [{String.t(), pid()}]
   def list_agents(jido_instance) when is_atom(jido_instance) do
+    list_agents(jido_instance, [])
+  end
+
+  @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
+  def list_agents(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
     registry_name(jido_instance)
     |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> filter_agent_registry_entries(Keyword.get(opts, :partition))
   end
 
   @doc """
@@ -483,9 +522,14 @@ defmodule Jido do
   """
   @spec agent_count(atom()) :: non_neg_integer()
   def agent_count(jido_instance) when is_atom(jido_instance) do
-    agent_supervisor_name(jido_instance)
-    |> DynamicSupervisor.count_children()
-    |> Map.get(:active, 0)
+    agent_count(jido_instance, [])
+  end
+
+  @spec agent_count(atom(), keyword()) :: non_neg_integer()
+  def agent_count(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
+    jido_instance
+    |> list_agents(opts)
+    |> length()
   end
 
   # ---------------------------------------------------------------------------
@@ -495,14 +539,70 @@ defmodule Jido do
   @doc "Hibernate an agent using the given Jido instance."
   @spec hibernate(atom(), Jido.Agent.t()) :: :ok | {:error, term()}
   def hibernate(jido_instance, agent) when is_atom(jido_instance) do
-    Jido.Persist.hibernate(jido_instance, agent)
+    hibernate(jido_instance, agent, [])
+  end
+
+  @spec hibernate(atom(), Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
+  def hibernate(jido_instance, agent, opts) when is_atom(jido_instance) and is_list(opts) do
+    with {:ok, agent} <- maybe_put_partition(agent, Keyword.get(opts, :partition)) do
+      Jido.Persist.hibernate(jido_instance, agent)
+    end
   end
 
   @doc "Thaw an agent using the given Jido instance."
   @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
   def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
-    Jido.Persist.thaw(jido_instance, agent_module, key)
+    thaw(jido_instance, agent_module, key, [])
   end
+
+  @spec thaw(atom(), module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
+  def thaw(jido_instance, agent_module, key, opts)
+      when is_atom(jido_instance) and is_list(opts) do
+    partition = Keyword.get(opts, :partition)
+
+    jido_instance
+    |> Jido.Persist.thaw(agent_module, partition_key(key, partition))
+    |> case do
+      {:ok, agent} -> maybe_put_partition(agent, partition)
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp filter_agent_registry_entries(entries, partition) do
+    Enum.flat_map(entries, fn {registry_key, pid} ->
+      case unwrap_partition_key(registry_key) do
+        {^partition, id} when is_binary(id) ->
+          [{id, pid}]
+
+        {nil, id} when is_nil(partition) and is_binary(id) ->
+          [{id, pid}]
+
+        _other ->
+          []
+      end
+    end)
+  end
+
+  defp maybe_put_partition(%{state: state} = agent, nil) when is_map(state), do: {:ok, agent}
+
+  defp maybe_put_partition(%{state: state} = agent, partition) when is_map(state) do
+    case Map.get(state, :__partition__) do
+      nil ->
+        {:ok, %{agent | state: Map.put(state, :__partition__, partition)}}
+
+      ^partition ->
+        {:ok, agent}
+
+      agent_partition ->
+        {:error,
+         Jido.Error.validation_error("partition does not match agent runtime state", %{
+           partition: partition,
+           agent_partition: agent_partition
+         })}
+    end
+  end
+
+  defp maybe_put_partition(agent, _partition), do: {:ok, agent}
 
   # ---------------------------------------------------------------------------
   # Discovery

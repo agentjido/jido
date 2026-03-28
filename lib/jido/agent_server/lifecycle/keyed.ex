@@ -150,7 +150,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
 
     if lifecycle.storage do
-      persistence_key = {lifecycle.pool, lifecycle.pool_key}
+      persistence_key = persistence_key(state)
       agent = attach_cron_specs(state.agent, cron_specs)
 
       Persist.persist_scheduler_manifest(
@@ -195,7 +195,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
         state
 
       true ->
-        persistence_key = {lifecycle.pool, lifecycle.pool_key}
+        persistence_key = persistence_key(state)
 
         case Persist.thaw(lifecycle.storage, state.agent_module, persistence_key) do
           {:ok, restored_agent} ->
@@ -219,7 +219,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     lifecycle = state.lifecycle
     storage = lifecycle.storage
     pool_key = lifecycle.pool_key
-    persistence_key = {lifecycle.pool, pool_key}
+    persistence_key = persistence_key(state)
     agent = Jido.Scheduler.attach_staged_cron_specs(state.agent, state.cron_specs)
     agent_module = state.agent_module
 
@@ -232,6 +232,10 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
           "Lifecycle hibernate failed for #{lifecycle.pool}/#{inspect(pool_key)}: #{inspect(reason)}"
         )
     end
+  end
+
+  defp persistence_key(state) do
+    Jido.partition_key({state.lifecycle.pool, state.lifecycle.pool_key}, state.partition)
   end
 
   defp attach_cron_specs(agent, cron_specs) when is_map(cron_specs) do

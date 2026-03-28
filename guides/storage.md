@@ -21,6 +21,9 @@ end
 
 This guide covers Jido's unified persistence system: checkpoints, thread journals, manual and automatic lifecycle management.
 
+If you are still deciding whether your durable unit should be one agent or one
+team, start with [Choosing a Runtime Pattern](runtime-patterns.md).
+
 ## Choosing Your Persistence Model
 
 | Approach | When to Use | API |

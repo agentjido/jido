@@ -76,6 +76,7 @@ defmodule Jido.MixProject do
         "Start Here": [
           "guides/getting-started.livemd",
           "guides/core-loop.md",
+          "guides/runtime-patterns.md",
           "guides/your-first-plugin.md",
           "guides/your-first-sensor.md",
           "guides/observability-intro.md"
@@ -93,7 +94,8 @@ defmodule Jido.MixProject do
         Coordination: [
           "guides/await.md",
           "guides/orchestration.md",
-          "guides/pods.md"
+          "guides/pods.md",
+          "guides/multi-tenancy.md"
         ],
         Operations: [
           "guides/debugging.md",
@@ -133,6 +135,7 @@ defmodule Jido.MixProject do
         # Start Here
         {"guides/getting-started.livemd", title: "Quick Start"},
         {"guides/core-loop.md", title: "Core Loop"},
+        {"guides/runtime-patterns.md", title: "Choosing a Runtime Pattern"},
         {"guides/your-first-plugin.md", title: "Your First Plugin"},
         {"guides/your-first-sensor.md", title: "Your First Sensor"},
         {"guides/observability-intro.md", title: "Seeing What Happened"},
@@ -151,6 +154,7 @@ defmodule Jido.MixProject do
         {"guides/await.md", title: "Await & Coordination"},
         {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
         {"guides/pods.md", title: "Pods"},
+        {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
 
         # Operations
         {"guides/debugging.md", title: "Debugging"},

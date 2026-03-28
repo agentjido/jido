@@ -105,6 +105,60 @@ defmodule JidoTest.AgentServerTest do
       GenServer.stop(pid)
     end
 
+    test "inherits partition from a pre-built agent when opts omit it", %{jido: jido} do
+      agent = TestAgent.new(id: "prebuilt-partitioned")
+      agent = %{agent | state: Map.put(agent.state, :__partition__, :alpha)}
+
+      {:ok, pid} = AgentServer.start_link(agent: agent, agent_module: TestAgent, jido: jido)
+      {:ok, state} = AgentServer.state(pid)
+
+      assert state.partition == :alpha
+      assert state.agent.state.__partition__ == :alpha
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "prebuilt-partitioned",
+               partition: :alpha
+             ) == pid
+
+      GenServer.stop(pid)
+    end
+
+    test "preserves pre-built agent partition when opts pass partition: nil", %{jido: jido} do
+      agent = TestAgent.new(id: "prebuilt-partitioned-nil")
+      agent = %{agent | state: Map.put(agent.state, :__partition__, :alpha)}
+
+      {:ok, pid} =
+        AgentServer.start_link(
+          agent: agent,
+          agent_module: TestAgent,
+          partition: nil,
+          jido: jido
+        )
+
+      {:ok, state} = AgentServer.state(pid)
+
+      assert state.partition == :alpha
+      assert state.agent.state.__partition__ == :alpha
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "prebuilt-partitioned-nil",
+               partition: :alpha
+             ) == pid
+
+      GenServer.stop(pid)
+    end
+
+    test "rejects conflicting partition for a pre-built agent", %{jido: jido} do
+      agent = TestAgent.new(id: "prebuilt-conflict")
+      agent = %{agent | state: Map.put(agent.state, :__partition__, :alpha)}
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               AgentServer.start(
+                 agent: agent,
+                 agent_module: TestAgent,
+                 partition: :beta,
+                 jido: jido
+               )
+    end
+
     test "starts with initial_state", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(agent: TestAgent, initial_state: %{counter: 42}, jido: jido)
@@ -356,6 +410,35 @@ defmodule JidoTest.AgentServerTest do
     test "whereis/2 returns nil for unknown agent in specific registry", %{jido: jido} do
       assert AgentServer.whereis(Jido.registry_name(jido), "nonexistent-2") == nil
     end
+
+    test "whereis/3 resolves only within the requested partition", %{jido: jido} do
+      {:ok, alpha_pid} =
+        AgentServer.start_link(
+          agent: TestAgent,
+          id: "whereis-shared",
+          jido: jido,
+          partition: :alpha
+        )
+
+      {:ok, beta_pid} =
+        AgentServer.start_link(
+          agent: TestAgent,
+          id: "whereis-shared",
+          jido: jido,
+          partition: :beta
+        )
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared", partition: :alpha) ==
+               alpha_pid
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared", partition: :beta) ==
+               beta_pid
+
+      assert AgentServer.whereis(Jido.registry_name(jido), "whereis-shared") == nil
+
+      GenServer.stop(alpha_pid)
+      GenServer.stop(beta_pid)
+    end
   end
 
   describe "via_tuple/2" do
@@ -367,6 +450,11 @@ defmodule JidoTest.AgentServerTest do
     test "works with custom registry", %{jido: _jido} do
       via = AgentServer.via_tuple("via-test", MyRegistry)
       assert via == {:via, Registry, {MyRegistry, "via-test"}}
+    end
+
+    test "via_tuple/3 creates a partitioned registry key", %{jido: jido} do
+      via = AgentServer.via_tuple("via-test", Jido.registry_name(jido), partition: :alpha)
+      assert via == {:via, Registry, {Jido.registry_name(jido), {:partition, :alpha, "via-test"}}}
     end
   end
 

@@ -158,6 +158,7 @@ defmodule Jido.Observe.Config do
   def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
     opts
     |> Keyword.delete(:__jido_instance__)
+    |> Keyword.delete(:__partition__)
     |> Keyword.put_new(:log_level, action_log_level(instance))
     |> Keyword.put_new(:telemetry, action_telemetry_mode(instance))
   end

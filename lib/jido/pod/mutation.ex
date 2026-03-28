@@ -111,7 +111,9 @@ defmodule Jido.Pod.Mutation do
   end
 
   defmodule Plan do
-    @moduledoc false
+    @moduledoc """
+    Internal runtime plan produced for a live pod mutation.
+    """
 
     @enforce_keys [
       :mutation_id,

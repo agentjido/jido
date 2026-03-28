@@ -620,4 +620,159 @@ defmodule JidoTest.Pod.RuntimeTest do
     assert report.failures.nested.stage == :nested_reconcile
     assert inspect(report.failures.nested.reason) =~ "Recursive pod runtime is not supported"
   end
+
+  test "same pod key can exist across partitions and keeps runtime lookups isolated", %{
+    pod_key: pod_key
+  } do
+    planner_key = {ReviewPod, pod_key, :planner}
+    reviewer_key = {ReviewPod, pod_key, :reviewer}
+
+    assert {:ok, alpha_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    assert {:ok, beta_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :beta)
+
+    refute alpha_pod_pid == beta_pod_pid
+
+    assert {:ok, ^alpha_pod_pid} =
+             InstanceManager.lookup(@pod_manager, pod_key, partition: :alpha)
+
+    assert {:ok, ^beta_pod_pid} = InstanceManager.lookup(@pod_manager, pod_key, partition: :beta)
+    assert InstanceManager.lookup(@pod_manager, pod_key) == :error
+
+    assert {:ok, alpha_planner_pid} = Pod.lookup_node(alpha_pod_pid, :planner)
+    assert {:ok, beta_planner_pid} = Pod.lookup_node(beta_pod_pid, :planner)
+
+    refute alpha_planner_pid == beta_planner_pid
+
+    assert {:ok, ^alpha_planner_pid} =
+             InstanceManager.lookup(@planner_manager, planner_key, partition: :alpha)
+
+    assert {:ok, ^beta_planner_pid} =
+             InstanceManager.lookup(@planner_manager, planner_key, partition: :beta)
+
+    assert :error = Pod.lookup_node(alpha_pod_pid, :reviewer)
+    assert :error = Pod.lookup_node(beta_pod_pid, :reviewer)
+    assert InstanceManager.lookup(@reviewer_manager, reviewer_key, partition: :alpha) == :error
+    assert InstanceManager.lookup(@reviewer_manager, reviewer_key, partition: :beta) == :error
+
+    assert {:ok, alpha_reviewer_pid} = Pod.ensure_node(alpha_pod_pid, :reviewer)
+    assert {:ok, ^alpha_reviewer_pid} = Pod.lookup_node(alpha_pod_pid, :reviewer)
+    assert :error = Pod.lookup_node(beta_pod_pid, :reviewer)
+
+    assert {:ok, ^alpha_reviewer_pid} =
+             InstanceManager.lookup(@reviewer_manager, reviewer_key, partition: :alpha)
+
+    assert InstanceManager.lookup(@reviewer_manager, reviewer_key, partition: :beta) == :error
+
+    {:ok, alpha_pod_state} = AgentServer.state(alpha_pod_pid)
+    {:ok, beta_pod_state} = AgentServer.state(beta_pod_pid)
+    assert alpha_pod_state.partition == :alpha
+    assert beta_pod_state.partition == :beta
+
+    {:ok, alpha_planner_state} = AgentServer.state(alpha_planner_pid)
+    {:ok, beta_planner_state} = AgentServer.state(beta_planner_pid)
+    assert alpha_planner_state.partition == :alpha
+    assert alpha_planner_state.parent.partition == :alpha
+    assert beta_planner_state.partition == :beta
+    assert beta_planner_state.parent.partition == :beta
+
+    assert {:ok, alpha_snapshots} = Pod.nodes(alpha_pod_pid)
+    assert {:ok, beta_snapshots} = Pod.nodes(beta_pod_pid)
+    assert alpha_snapshots.planner.actual_parent.partition == :alpha
+    assert alpha_snapshots.reviewer.actual_parent.partition == :alpha
+    assert beta_snapshots.planner.actual_parent.partition == :beta
+    assert beta_snapshots.reviewer.status == :stopped
+  end
+
+  test "nested pod nodes inherit partition and allow the same pod key across partitions", %{
+    jido: jido
+  } do
+    storage_table =
+      :"pod_runtime_partitioned_nested_storage_#{System.unique_integer([:positive])}"
+
+    manager = :"pod_runtime_partitioned_nested_manager_#{System.unique_integer([:positive])}"
+    pod_key = "partitioned-group-123"
+
+    {:ok, _pod_manager} =
+      start_supervised(
+        InstanceManager.child_spec(
+          name: manager,
+          agent: HierarchicalReviewPod,
+          jido: jido,
+          storage: {ETS, table: storage_table},
+          agent_opts: [jido: jido]
+        )
+      )
+
+    nested_key = {HierarchicalReviewPod, pod_key, :nested}
+    nested_planner_key = {ReviewPod, nested_key, :planner}
+
+    assert {:ok, alpha_pod_pid} = Pod.get(manager, pod_key, partition: :alpha)
+    assert {:ok, beta_pod_pid} = Pod.get(manager, pod_key, partition: :beta)
+
+    assert {:ok, alpha_nested_pid} = Pod.lookup_node(alpha_pod_pid, :nested)
+    assert {:ok, beta_nested_pid} = Pod.lookup_node(beta_pod_pid, :nested)
+    refute alpha_nested_pid == beta_nested_pid
+
+    assert {:ok, ^alpha_nested_pid} =
+             InstanceManager.lookup(@nested_pod_manager, nested_key, partition: :alpha)
+
+    assert {:ok, ^beta_nested_pid} =
+             InstanceManager.lookup(@nested_pod_manager, nested_key, partition: :beta)
+
+    assert {:ok, alpha_nested_planner_pid} = Pod.lookup_node(alpha_nested_pid, :planner)
+    assert {:ok, beta_nested_planner_pid} = Pod.lookup_node(beta_nested_pid, :planner)
+    refute alpha_nested_planner_pid == beta_nested_planner_pid
+
+    assert {:ok, ^alpha_nested_planner_pid} =
+             InstanceManager.lookup(@planner_manager, nested_planner_key, partition: :alpha)
+
+    assert {:ok, ^beta_nested_planner_pid} =
+             InstanceManager.lookup(@planner_manager, nested_planner_key, partition: :beta)
+
+    {:ok, alpha_nested_state} = AgentServer.state(alpha_nested_pid)
+    {:ok, beta_nested_state} = AgentServer.state(beta_nested_pid)
+    assert alpha_nested_state.partition == :alpha
+    assert alpha_nested_state.parent.partition == :alpha
+    assert beta_nested_state.partition == :beta
+    assert beta_nested_state.parent.partition == :beta
+  end
+
+  test "thaw restores only the requested pod partition when the same key exists twice", %{
+    pod_key: pod_key
+  } do
+    assert {:ok, alpha_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    assert {:ok, beta_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :beta)
+    assert {:ok, alpha_planner_pid} = Pod.lookup_node(alpha_pod_pid, :planner)
+    assert {:ok, beta_planner_pid} = Pod.lookup_node(beta_pod_pid, :planner)
+
+    alpha_ref = Process.monitor(alpha_pod_pid)
+    assert :ok = InstanceManager.stop(@pod_manager, pod_key, partition: :alpha)
+    assert_receive {:DOWN, ^alpha_ref, :process, ^alpha_pod_pid, _reason}, 1_000
+
+    assert Process.alive?(alpha_planner_pid)
+    assert Process.alive?(beta_pod_pid)
+    assert Process.alive?(beta_planner_pid)
+
+    {:ok, alpha_planner_state} = AgentServer.state(alpha_planner_pid)
+    {:ok, beta_pod_state} = AgentServer.state(beta_pod_pid)
+    {:ok, beta_planner_state} = AgentServer.state(beta_planner_pid)
+
+    assert alpha_planner_state.partition == :alpha
+    assert alpha_planner_state.parent == nil
+    assert alpha_planner_state.orphaned_from.partition == :alpha
+
+    assert beta_pod_state.partition == :beta
+    assert beta_planner_state.partition == :beta
+    assert beta_planner_state.parent.pid == beta_pod_pid
+
+    assert {:ok, restored_alpha_pod_pid} = Pod.get(@pod_manager, pod_key, partition: :alpha)
+    refute restored_alpha_pod_pid == alpha_pod_pid
+
+    assert {:ok, ^restored_alpha_pod_pid} =
+             InstanceManager.lookup(@pod_manager, pod_key, partition: :alpha)
+
+    assert {:ok, ^beta_pod_pid} = InstanceManager.lookup(@pod_manager, pod_key, partition: :beta)
+    assert {:ok, ^alpha_planner_pid} = Pod.lookup_node(restored_alpha_pod_pid, :planner)
+    assert {:ok, ^beta_planner_pid} = Pod.lookup_node(beta_pod_pid, :planner)
+  end
 end

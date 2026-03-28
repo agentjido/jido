@@ -18,6 +18,9 @@ defmodule Jido.AgentServer.ParentRef do
             %{
               pid: Zoi.any(description: "Parent process PID"),
               id: Zoi.string(description: "Parent instance ID"),
+              partition:
+                Zoi.any(description: "Logical partition of the parent agent")
+                |> Zoi.optional(),
               tag: Zoi.any(description: "Tag assigned by parent when spawning this child"),
               meta: Zoi.map(description: "Arbitrary metadata from parent") |> Zoi.default(%{})
             },

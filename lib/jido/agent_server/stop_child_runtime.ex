@@ -17,12 +17,16 @@ defmodule Jido.AgentServer.StopChildRuntime do
         Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
         {:ok, state}
 
-      %{pid: pid, id: child_id} ->
+      %{pid: pid, id: child_id, partition: child_partition} ->
         Logger.debug(
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
         )
 
-        case RuntimeStore.delete(state.jido, @relationship_hive, child_id) do
+        case RuntimeStore.delete(
+               state.jido,
+               @relationship_hive,
+               Jido.partition_key(child_id, child_partition)
+             ) do
           :ok ->
             :ok
 
