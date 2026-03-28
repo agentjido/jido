@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Cover lib/jido/actions/**/*.ex and directive modules with subject-level current truth, then link guides/actions.md, guides/directives.md, scheduling docs, and relevant tests.",
+  "id": "jido-z8u.4",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 2,
+  "status": "open",
+  "title": "Author actions and directives subject specs",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
