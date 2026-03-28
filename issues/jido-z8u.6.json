@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Cover pods, orchestration, await, multi-tenancy, thread, memory, and storage surfaces, and link the corresponding guides and integration tests.",
+  "id": "jido-z8u.6",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 2,
+  "status": "open",
+  "title": "Author orchestration, pod, memory, and storage subject specs",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
