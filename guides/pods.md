@@ -152,6 +152,63 @@ If you need lower-level control, you can still call
 `Jido.Agent.InstanceManager.get/3` directly and then invoke `Jido.Pod.reconcile/2`
 yourself.
 
+## Live Mutation
+
+Pods now support live add/remove topology mutation on a running pod manager.
+
+`Jido.Pod.mutate/3` is the external synchronous API:
+
+```elixir
+{:ok, report} =
+  Jido.Pod.mutate(
+    pod_pid,
+    [
+      Jido.Pod.Mutation.add_node(
+        "reviewer",
+        %{agent: MyApp.ReviewerAgent, manager: :reviewer_members, activation: :eager},
+        owner: "planner",
+        depends_on: ["planner"]
+      )
+    ]
+  )
+```
+
+Pass a running pod pid or another `Jido.AgentServer` server reference that the
+runtime can resolve directly. Raw string ids still need explicit registry lookup
+before they can be used as the `server` argument.
+
+This slice supports:
+
+- batched `add_node` and `remove_node` operations
+- `kind: :agent` and `kind: :pod` nodes
+- ownership and dependency links embedded on add ops
+- mixed atom/string node names in the same topology
+
+This slice does **not** support:
+
+- standalone link mutation
+- reparenting a surviving node
+- multi-node pod runtime semantics
+
+Mutation semantics are persistence-first:
+
+1. the new topology snapshot is written into `agent.state[:__pod__]`
+2. runtime stop/start work runs against that new topology
+3. the returned `%Jido.Pod.Mutation.Report{}` records `added`, `removed`,
+   `started`, `stopped`, and `failures`
+
+If runtime work partially fails, the topology stays updated and the mutation
+returns `{:error, report}`. Recovery is explicit through later
+`Jido.Pod.reconcile/2`, `Jido.Pod.ensure_node/3`, or another mutation.
+
+For in-turn pod code, `Jido.Pod.mutation_effects/3` returns the state ops and
+runtime directive for the same mutation path instead of executing the mutation
+immediately.
+
+Removals are subtree-aware: removing a node removes its owned descendants,
+deletes links touching the removed nodes, and tears down live runtime state in
+reverse ownership/dependency order.
+
 ## Hierarchical Runtime Ownership
 
 Pods support hierarchical runtime ownership for both `kind: :agent` and
@@ -275,13 +332,15 @@ need is **runtime reconciliation after thaw**, not a new persistence contract.
 This first slice keeps the model deliberately small:
 
 - predefined topology only
+- live add/remove mutation for running pods
 - hierarchical ownership for `kind: :agent` and `kind: :pod` nodes
 - pod manager as the durable root
 - single-node runtime assumptions
 - no pod-local signal bus
 - no separate pod instance manager
 - no recursive pod ancestry
-- no automatic topology mutation protocol
+- no standalone link mutation
+- no reparenting of surviving nodes
 
 The extension seam for later work is the `:__pod__` plugin state and the
 canonical `%Jido.Pod.Topology{}` shape.

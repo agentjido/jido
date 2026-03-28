@@ -46,6 +46,8 @@ The durability boundary is important:
 
 - storage preserves the pod topology snapshot
 - storage does not preserve a live `state.children` tree, PIDs, or monitors
+- live pod mutations update the persisted topology snapshot first, then repair
+  runtime shape with explicit stop/start work
 
 So thaw works like this:
 
@@ -65,6 +67,11 @@ can show up in two different states:
 `Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.
 Use the explicit two-step path when you need to inspect the restored topology
 before reattachment.
+
+If a running pod changes shape with `Jido.Pod.mutate/3`, that updated topology
+is what later hibernate/thaw cycles restore. Storage still does not preserve a
+live process tree; it preserves the pod's latest durable topology plus each
+node's own durable agent state.
 
 See [Pods](pods.md) for the manager-led runtime model and examples.
 

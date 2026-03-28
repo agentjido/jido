@@ -9,17 +9,25 @@ defmodule Jido.Pod do
   alias Jido.Agent
   alias Jido.Agent.DefaultPlugins
   alias Jido.Agent.InstanceManager
+  alias Jido.Agent.StateOp
   alias Jido.AgentServer
+  alias Jido.AgentServer.{ChildInfo, ParentRef}
+  alias Jido.AgentServer.StopChildRuntime
   alias Jido.AgentServer.State
   alias Jido.Observe
   alias Jido.Plugin.Instance, as: PluginInstance
+  alias Jido.Pod.Directive.ApplyMutation
+  alias Jido.Pod.Mutation
+  alias Jido.Pod.Mutation.{Plan, Planner, Report}
   alias Jido.Pod.Plugin
   alias Jido.Pod.Topology
   alias Jido.Pod.Topology.Node
   alias Jido.RuntimeStore
+  alias Jido.Signal
 
   @pod_state_key Plugin.state_key_atom()
   @pod_capability Plugin.capability()
+  @mutation_lock_table :jido_pod_mutation_locks
   defguardp is_node_name(name) when is_atom(name) or is_binary(name)
 
   @type node_status :: :adopted | :running | :misplaced | :stopped
@@ -56,6 +64,8 @@ defmodule Jido.Pod do
           pending: [node_name()]
         }
 
+  @type mutation_report :: Report.t()
+
   @doc false
   def expand_aliases_in_ast(ast, caller_env) do
     Macro.prewalk(ast, fn
@@ -70,25 +80,55 @@ defmodule Jido.Pod do
       nil ->
         nil
 
-      value when is_atom(value) or is_binary(value) or is_number(value) or is_map(value) ->
+      value when is_atom(value) or is_binary(value) or is_number(value) ->
         value
+
+      %_{} = struct ->
+        struct
+
+      {:__aliases__, _, _} = alias_node ->
+        Macro.expand(alias_node, caller_env)
 
       value when is_list(value) ->
-        value
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
+        Enum.map(value, fn
+          {key, nested_value} ->
+            {
+              expand_and_eval_literal_option(key, caller_env),
+              expand_and_eval_literal_option(nested_value, caller_env)
+            }
+
+          nested_value ->
+            expand_and_eval_literal_option(nested_value, caller_env)
+        end)
+
+      value when is_map(value) ->
+        Map.new(value, fn {key, nested_value} ->
+          {
+            expand_and_eval_literal_option(key, caller_env),
+            expand_and_eval_literal_option(nested_value, caller_env)
+          }
+        end)
 
       value when is_tuple(value) ->
-        value
-        |> expand_aliases_in_ast(caller_env)
-        |> Code.eval_quoted([], caller_env)
-        |> elem(0)
+        if ast_node?(value) do
+          value
+          |> expand_aliases_in_ast(caller_env)
+          |> Code.eval_quoted([], caller_env)
+          |> elem(0)
+        else
+          value
+          |> Tuple.to_list()
+          |> Enum.map(&expand_and_eval_literal_option(&1, caller_env))
+          |> List.to_tuple()
+        end
 
       other ->
         other
     end
   end
+
+  defp ast_node?({_, meta, _}) when is_list(meta), do: true
+  defp ast_node?(_other), do: false
 
   @doc false
   def resolve_topology!(name, raw_topology, caller_env) do
@@ -228,6 +268,7 @@ defmodule Jido.Pod do
           Keyword.put(resolved_opts, :default_plugins, remaining_default_plugins)
         end
       end)
+      |> __MODULE__.expand_and_eval_literal_option(__CALLER__)
 
     quote location: :keep do
       use Jido.Agent, unquote(Macro.escape(agent_opts))
@@ -359,7 +400,7 @@ defmodule Jido.Pod do
     with {:ok, current_topology} <- fetch_topology(agent),
          {:ok, instance} <- pod_plugin_instance(agent.agent_module),
          {:ok, pod_state} <- fetch_state(agent) do
-      normalized_topology = normalize_updated_topology(current_topology, topology)
+      normalized_topology = normalize_mutated_topology(current_topology, topology)
       {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
     end
   end
@@ -380,10 +421,89 @@ defmodule Jido.Pod do
          {:ok, new_topology} <- normalize_topology_update(fun.(topology)) do
       with {:ok, instance} <- pod_plugin_instance(agent.agent_module),
            {:ok, pod_state} <- fetch_state(agent) do
-        normalized_topology = normalize_updated_topology(topology, new_topology)
+        normalized_topology = normalize_mutated_topology(topology, new_topology)
         {:ok, persist_topology(agent, instance.state_key, pod_state, normalized_topology)}
       end
     end
+  end
+
+  @doc """
+  Applies live topology mutations to a running pod and waits for runtime work to finish.
+
+  `server` follows the same resolution rules as `Jido.AgentServer.state/1` and
+  `Jido.AgentServer.call/3`. Pass the running pod pid, a locally registered
+  server name, or another resolvable runtime server reference. Raw string ids
+  still require explicit registry lookup before use.
+  """
+  @spec mutate(AgentServer.server(), [Mutation.t() | term()], keyword()) ::
+          {:ok, mutation_report()} | {:error, mutation_report() | term()}
+  def mutate(server, ops, opts \\ []) when is_list(opts) do
+    signal =
+      Signal.new!(
+        "pod.mutate",
+        %{ops: ops, opts: Map.new(opts)},
+        source: "/jido/pod/mutate"
+      )
+
+    await_timeout =
+      Keyword.get(opts, :await_timeout, Keyword.get(opts, :timeout, :timer.seconds(30)))
+
+    with {:ok, lock} <- acquire_external_mutation_lock(server) do
+      with {:ok, state} <- AgentServer.state(server),
+           {:ok, synced_lock} <- sync_external_mutation_lock(lock, server, state) do
+        with {:ok, pod_state} <- fetch_state(state),
+             :ok <- ensure_mutation_idle(pod_state),
+             {:ok, _agent} <- AgentServer.call(server, signal) do
+          await_mutation(server, await_timeout, synced_lock)
+        else
+          {:error, _reason} = error ->
+            release_external_mutation_lock(synced_lock)
+            error
+        end
+      else
+        {:error, _reason} = error ->
+          release_external_mutation_lock(lock)
+          error
+      end
+    end
+  end
+
+  @doc """
+  Builds state ops and runtime effects for an in-turn pod mutation.
+  """
+  @spec mutation_effects(Agent.t(), [Mutation.t() | term()], keyword()) ::
+          {:ok, [struct()]} | {:error, term()}
+  def mutation_effects(%Agent{} = agent, ops, opts \\ []) when is_list(opts) do
+    with {:ok, pod_state} <- fetch_state(agent),
+         :ok <- ensure_mutation_idle(pod_state),
+         {:ok, topology} <- fetch_topology(agent),
+         {:ok, plan} <- Planner.plan(topology, ops) do
+      mutation_state = %{id: plan.mutation_id, status: :running, report: plan.report, error: nil}
+
+      {:ok,
+       [
+         StateOp.set_path([@pod_state_key, :topology], plan.final_topology),
+         StateOp.set_path([@pod_state_key, :topology_version], plan.final_topology.version),
+         StateOp.set_path([@pod_state_key, :mutation], mutation_state),
+         ApplyMutation.new!(plan, opts)
+       ]}
+    end
+  end
+
+  @doc false
+  @spec mark_mutation_lock(Agent.t(), map(), String.t() | nil) :: :ok
+  def mark_mutation_lock(%Agent{id: id}, context, mutation_id) when is_map(context) do
+    ensure_mutation_lock_table!()
+
+    agent_server_pid = Map.get(context, :agent_server_pid)
+
+    :ets.insert(@mutation_lock_table, {id, mutation_id || true})
+
+    if is_pid(agent_server_pid) do
+      :ets.insert(@mutation_lock_table, {{:pid, agent_server_pid}, mutation_id || true})
+    end
+
+    :ok
   end
 
   @doc """
@@ -463,6 +583,99 @@ defmodule Jido.Pod do
     end
   end
 
+  @doc false
+  @spec execute_mutation_plan(State.t(), Plan.t(), keyword()) :: {:ok, State.t()}
+  def execute_mutation_plan(%State{} = state, %Plan{} = plan, opts \\ []) when is_list(opts) do
+    {state, stop_result} =
+      execute_stop_waves(
+        self(),
+        state,
+        plan.current_topology,
+        plan.removed_nodes,
+        plan.stop_waves,
+        plan.mutation_id,
+        opts,
+        true
+      )
+
+    {state, start_result} =
+      case plan.start_requested do
+        [] ->
+          {state,
+           {:ok,
+            %{
+              requested: [],
+              waves: [],
+              nodes: %{},
+              failures: %{},
+              completed: [],
+              failed: [],
+              pending: []
+            }}}
+
+        _names ->
+          case execute_runtime_plan_locally(
+                 state,
+                 plan.final_topology,
+                 plan.start_requested,
+                 plan.start_waves,
+                 opts
+               ) do
+            {:ok, next_state, report} -> {next_state, {:ok, report}}
+            {:error, next_state, report} -> {next_state, {:error, report}}
+          end
+      end
+
+    report = complete_mutation_report(plan.report, stop_result, start_result)
+    mutation_status = if report.status == :completed, do: :completed, else: :failed
+
+    mutation_state = %{
+      id: plan.mutation_id,
+      status: mutation_status,
+      report: report,
+      error: if(mutation_status == :failed, do: report, else: nil)
+    }
+
+    clear_mutation_lock(state)
+    agent = put_in(state.agent.state, [@pod_state_key, :mutation], mutation_state)
+    {:ok, State.update_agent(state, %{state.agent | state: agent})}
+  end
+
+  @doc false
+  @spec teardown_runtime(AgentServer.server(), keyword()) ::
+          {:ok, map()} | {:error, map() | term()}
+  def teardown_runtime(server, opts \\ []) when is_list(opts) do
+    with {:ok, state} <- AgentServer.state(server),
+         {:ok, topology} <- fetch_topology(state),
+         {:ok, server_pid} <- resolve_runtime_server(server, state),
+         {:ok, stop_waves} <- Planner.stop_waves(topology, Map.keys(topology.nodes)) do
+      {_state, stop_result} =
+        execute_stop_waves(
+          server_pid,
+          state,
+          topology,
+          topology.nodes,
+          stop_waves,
+          "pod-teardown",
+          opts,
+          false
+        )
+
+      report = %{
+        requested: Map.keys(topology.nodes),
+        waves: stop_waves,
+        stopped: Enum.sort(stop_result.stopped),
+        failures: stop_result.failures
+      }
+
+      if map_size(report.failures) == 0 do
+        {:ok, report}
+      else
+        {:error, report}
+      end
+    end
+  end
+
   defp extract_topology(%{topology: %Topology{} = topology}), do: {:ok, topology}
 
   defp extract_topology(plugin_state) do
@@ -495,11 +708,142 @@ defmodule Jido.Pod do
     %{agent | state: Map.put(agent.state, state_key, updated_state)}
   end
 
-  defp normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
+  @doc false
+  @spec normalize_mutated_topology(Topology.t(), Topology.t()) :: Topology.t()
+  def normalize_mutated_topology(%Topology{} = current, %Topology{} = updated) do
     if topology_changed?(current, updated) do
       %{updated | version: max(updated.version, current.version + 1)}
     else
       %{updated | version: current.version}
+    end
+  end
+
+  defp ensure_mutation_idle(%{mutation: %{status: status}})
+       when status in [:running, :queued] do
+    {:error, :mutation_in_progress}
+  end
+
+  defp ensure_mutation_idle(_pod_state), do: :ok
+
+  defp await_mutation(server, await_timeout, lock) do
+    case AgentServer.await_completion(
+           server,
+           timeout: await_timeout,
+           status_path: [@pod_state_key, :mutation, :status],
+           result_path: [@pod_state_key, :mutation, :report],
+           error_path: [@pod_state_key, :mutation, :error]
+         ) do
+      {:ok, %{status: :completed, result: result}} ->
+        {:ok, result}
+
+      {:ok, %{status: :failed, result: result}} ->
+        {:error, result}
+
+      {:error, :not_found} = error ->
+        release_external_mutation_lock(lock)
+        error
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp acquire_external_mutation_lock(server) do
+    ensure_mutation_lock_table!()
+
+    keys = external_mutation_lock_keys(server)
+
+    if insert_lock_keys(keys) do
+      {:ok, %{keys: keys}}
+    else
+      {:error, :mutation_in_progress}
+    end
+  end
+
+  defp external_mutation_lock_keys(server) do
+    case server do
+      pid when is_pid(pid) -> [{:pid, pid}]
+      id when is_binary(id) -> [id]
+      _other -> []
+    end
+  end
+
+  defp sync_external_mutation_lock(%{keys: keys} = lock, server, %State{} = state) do
+    missing_keys =
+      canonical_external_mutation_lock_keys(server, state)
+      |> Enum.reject(&(&1 in keys))
+
+    case acquire_missing_lock_keys(missing_keys, []) do
+      {:ok, acquired_keys} ->
+        {:ok, %{lock | keys: Enum.uniq(keys ++ acquired_keys)}}
+
+      {:error, acquired_keys} ->
+        release_external_mutation_lock(%{keys: keys ++ acquired_keys})
+        {:error, :mutation_in_progress}
+    end
+  end
+
+  defp canonical_external_mutation_lock_keys(server, %State{id: id, jido: jido}) do
+    pid_key =
+      case server do
+        pid when is_pid(pid) ->
+          {:pid, pid}
+
+        id_value when is_binary(id_value) and is_atom(jido) ->
+          case Jido.whereis(jido, id) do
+            pid when is_pid(pid) -> {:pid, pid}
+            _other -> nil
+          end
+
+        _other ->
+          nil
+      end
+
+    [id, pid_key]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  defp acquire_missing_lock_keys([], acquired), do: {:ok, Enum.reverse(acquired)}
+
+  defp acquire_missing_lock_keys([key | rest], acquired) do
+    if :ets.insert_new(@mutation_lock_table, {key, true}) do
+      acquire_missing_lock_keys(rest, [key | acquired])
+    else
+      {:error, Enum.reverse(acquired)}
+    end
+  end
+
+  defp insert_lock_keys([]), do: true
+
+  defp insert_lock_keys(keys) do
+    Enum.all?(keys, &:ets.insert_new(@mutation_lock_table, {&1, true}))
+  end
+
+  defp release_external_mutation_lock(%{keys: keys}) do
+    ensure_mutation_lock_table!()
+    Enum.each(keys, &:ets.delete(@mutation_lock_table, &1))
+    :ok
+  end
+
+  defp clear_mutation_lock(%State{id: id}) do
+    ensure_mutation_lock_table!()
+    :ets.delete(@mutation_lock_table, id)
+    :ets.delete(@mutation_lock_table, {:pid, self()})
+    :ok
+  end
+
+  defp ensure_mutation_lock_table! do
+    case :ets.whereis(@mutation_lock_table) do
+      :undefined ->
+        try do
+          :ets.new(@mutation_lock_table, [:named_table, :public, :set, read_concurrency: true])
+        rescue
+          ArgumentError -> @mutation_lock_table
+        end
+
+      _tid ->
+        @mutation_lock_table
     end
   end
 
@@ -661,6 +1005,55 @@ defmodule Jido.Pod do
     end)
   end
 
+  defp execute_runtime_plan_locally(state, topology, requested_names, waves, opts) do
+    initial_report = %{
+      requested: Enum.uniq(requested_names),
+      waves: waves,
+      nodes: %{},
+      failures: %{},
+      completed: [],
+      failed: [],
+      pending: List.flatten(waves)
+    }
+
+    Enum.reduce_while(Enum.with_index(waves), {:ok, state, initial_report}, fn {wave, wave_index},
+                                                                               {:ok, state_acc,
+                                                                                report} ->
+      {state_after_wave, wave_results} =
+        Enum.reduce(wave, {state_acc, []}, fn name, {state_wave, results} ->
+          case ensure_planned_node_locally(
+                 state_wave,
+                 topology,
+                 requested_names,
+                 name,
+                 report,
+                 opts
+               ) do
+            {:ok, {new_state, result}} ->
+              {new_state, [{:ok, name, result} | results]}
+
+            {:error, new_state, reason} ->
+              {new_state, [{:error, name, reason} | results]}
+
+            {:error, reason} ->
+              {state_wave, [{:error, name, reason} | results]}
+          end
+        end)
+
+      updated_report = merge_wave_results(report, Enum.reverse(wave_results), waves, wave_index)
+
+      if updated_report.failures == %{} do
+        {:cont, {:ok, state_after_wave, updated_report}}
+      else
+        {:halt, {:error, state_after_wave, updated_report}}
+      end
+    end)
+    |> case do
+      {:ok, next_state, report} -> {:ok, next_state, report}
+      {:error, next_state, report} -> {:error, next_state, report}
+    end
+  end
+
   defp ensure_planned_node(server_pid, state, topology, requested_names, name, report, opts) do
     with {:ok, node} <- fetch_node(topology, name) do
       snapshot = build_node_snapshot(state, topology, name, node)
@@ -686,6 +1079,42 @@ defmodule Jido.Pod do
         end,
         fn
           {:ok, result} ->
+            %{
+              source: result.source,
+              parent: result.parent
+            }
+
+          _other ->
+            %{}
+        end
+      )
+    end
+  end
+
+  defp ensure_planned_node_locally(state, topology, requested_names, name, report, opts) do
+    with {:ok, node} <- fetch_node(topology, name) do
+      snapshot = build_node_snapshot(state, topology, name, node)
+      source = snapshot_source(snapshot)
+
+      observe_pod_operation(
+        [:jido, :pod, :node, :ensure],
+        node_event_metadata(state, node, name, source, snapshot.owner),
+        fn ->
+          with :ok <- ensure_runtime_supported(node, name) do
+            do_ensure_planned_node_locally(
+              state,
+              topology,
+              requested_names,
+              name,
+              node,
+              snapshot,
+              report,
+              opts
+            )
+          end
+        end,
+        fn
+          {:ok, {_state, result}} ->
             %{
               source: result.source,
               parent: result.parent
@@ -724,6 +1153,41 @@ defmodule Jido.Pod do
     else
       ensure_planned_agent_node(
         server_pid,
+        state,
+        topology,
+        requested_names,
+        name,
+        node,
+        snapshot,
+        report,
+        opts
+      )
+    end
+  end
+
+  defp do_ensure_planned_node_locally(
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
+    if node.kind == :pod do
+      ensure_planned_pod_node_locally(
+        state,
+        topology,
+        requested_names,
+        name,
+        node,
+        snapshot,
+        report,
+        opts
+      )
+    else
+      ensure_planned_agent_node_locally(
         state,
         topology,
         requested_names,
@@ -803,6 +1267,81 @@ defmodule Jido.Pod do
     end
   end
 
+  defp ensure_planned_agent_node_locally(
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
+    case snapshot.status do
+      :adopted ->
+        {:ok, {state, ensure_result(name, snapshot.running_pid, :adopted, snapshot.owner)}}
+
+      :misplaced ->
+        {:error, state, misplaced_node_reason(name, snapshot)}
+
+      _status ->
+        initial_state = node_initial_state(requested_names, name, node, opts)
+        key = node_key(state, name)
+
+        with {:ok, parent_pid} <- resolve_parent_pid(self(), state, topology, name, report),
+             {:ok, pid} <- get_managed_node(node.manager, key, initial_state: initial_state),
+             {:ok, next_state, ^pid} <-
+               adopt_runtime_child_locally(parent_pid, pid, name, node.meta, state, topology) do
+          {:ok, {next_state, ensure_result(name, pid, snapshot_source(snapshot), snapshot.owner)}}
+        else
+          {:error, reason} -> {:error, state, reason}
+        end
+    end
+  end
+
+  defp ensure_planned_pod_node_locally(
+         state,
+         topology,
+         requested_names,
+         name,
+         node,
+         snapshot,
+         report,
+         opts
+       ) do
+    with :ok <- ensure_pod_recursion_safe(node, state, opts) do
+      case snapshot.status do
+        :adopted ->
+          with {:ok, _nested_report} <-
+                 reconcile_nested_pod(snapshot.running_pid, node, state, opts) do
+            {:ok, {state, ensure_result(name, snapshot.running_pid, :adopted, snapshot.owner)}}
+          else
+            {:error, reason} -> {:error, state, reason}
+          end
+
+        :misplaced ->
+          {:error, state, misplaced_node_reason(name, snapshot)}
+
+        _status ->
+          initial_state = node_initial_state(requested_names, name, node, opts)
+          key = node_key(state, name)
+
+          with {:ok, parent_pid} <- resolve_parent_pid(self(), state, topology, name, report),
+               {:ok, pid} <- get_managed_node(node.manager, key, initial_state: initial_state),
+               {:ok, next_state, ^pid} <-
+                 adopt_runtime_child_locally(parent_pid, pid, name, node.meta, state, topology),
+               {:ok, _nested_report} <- reconcile_nested_pod(pid, node, next_state, opts) do
+            {:ok,
+             {next_state, ensure_result(name, pid, snapshot_source(snapshot), snapshot.owner)}}
+          else
+            {:error, reason} -> {:error, state, reason}
+          end
+      end
+    else
+      {:error, reason} -> {:error, state, reason}
+    end
+  end
+
   defp resolve_parent_pid(server_pid, _state, topology, name, report) do
     case Topology.owner_of(topology, name) do
       :root ->
@@ -838,6 +1377,62 @@ defmodule Jido.Pod do
 
           _snapshot ->
             error
+        end
+    end
+  end
+
+  defp adopt_runtime_child_locally(parent_pid, child_pid, name, meta, state, topology) do
+    if parent_pid == self() do
+      local_adopt_child(child_pid, name, meta, state, topology)
+    else
+      case AgentServer.adopt_child(parent_pid, child_pid, name, meta) do
+        {:ok, ^child_pid} ->
+          {:ok, state, child_pid}
+
+        {:error, _reason} = error ->
+          case build_node_snapshot(state, topology, name) do
+            %{status: :adopted, running_pid: ^child_pid} ->
+              {:ok, state, child_pid}
+
+            _snapshot ->
+              error
+          end
+      end
+    end
+  end
+
+  defp local_adopt_child(child_pid, name, meta, state, topology) do
+    case State.get_child(state, name) do
+      nil ->
+        parent_ref =
+          ParentRef.new!(%{
+            pid: self(),
+            id: state.id,
+            tag: name,
+            meta: meta
+          })
+
+        with {:ok, child_runtime} <- AgentServer.adopt_parent(child_pid, parent_ref) do
+          child_info =
+            ChildInfo.new!(%{
+              pid: child_pid,
+              ref: Process.monitor(child_pid),
+              module: child_runtime.agent_module,
+              id: child_runtime.id,
+              tag: name,
+              meta: meta
+            })
+
+          {:ok, State.add_child(state, name, child_info), child_pid}
+        end
+
+      _child ->
+        case build_node_snapshot(state, topology, name) do
+          %{status: :adopted, running_pid: ^child_pid} ->
+            {:ok, state, child_pid}
+
+          _snapshot ->
+            {:error, {:tag_in_use, name}}
         end
     end
   end
@@ -1150,6 +1745,225 @@ defmodule Jido.Pod do
 
   defp append_unique(items, item) do
     if item in items, do: items, else: items ++ [item]
+  end
+
+  defp execute_stop_waves(
+         root_server_pid,
+         %State{} = state,
+         %Topology{} = topology,
+         removed_nodes,
+         stop_waves,
+         mutation_id,
+         opts,
+         local_root?
+       )
+       when is_pid(root_server_pid) and is_map(removed_nodes) and is_list(stop_waves) and
+              is_list(opts) do
+    Enum.reduce(stop_waves, {state, %{stopped: [], failures: %{}}}, fn wave,
+                                                                       {state_acc, report_acc} ->
+      Enum.reduce(wave, {state_acc, report_acc}, fn name, {state_wave, report_wave} ->
+        node = Map.fetch!(removed_nodes, name)
+
+        case stop_planned_node(
+               root_server_pid,
+               state_wave,
+               topology,
+               name,
+               node,
+               mutation_id,
+               opts,
+               local_root?
+             ) do
+          {:ok, new_state} ->
+            {new_state, %{report_wave | stopped: append_unique(report_wave.stopped, name)}}
+
+          {:error, new_state, reason} ->
+            {new_state, %{report_wave | failures: Map.put(report_wave.failures, name, reason)}}
+        end
+      end)
+    end)
+  end
+
+  defp stop_planned_node(
+         root_server_pid,
+         %State{} = state,
+         %Topology{} = topology,
+         name,
+         %Node{} = node,
+         mutation_id,
+         opts,
+         local_root?
+       ) do
+    snapshot = build_node_snapshot(state, topology, name, node)
+
+    case snapshot.running_pid do
+      pid when is_pid(pid) ->
+        with :ok <- maybe_teardown_nested_runtime(node, pid, opts),
+             {:ok, next_state} <-
+               dispatch_stop_to_parent(
+                 root_server_pid,
+                 state,
+                 topology,
+                 name,
+                 snapshot,
+                 mutation_id,
+                 local_root?
+               ),
+             :ok <-
+               await_process_exit(
+                 pid,
+                 Keyword.get(opts, :stop_timeout, Keyword.get(opts, :timeout, :timer.seconds(30)))
+               ) do
+          {:ok, next_state}
+        else
+          {:error, reason} -> {:error, state, reason}
+        end
+
+      _other ->
+        {:ok, state}
+    end
+  end
+
+  defp maybe_teardown_nested_runtime(%Node{kind: :pod}, pid, opts) when is_pid(pid) do
+    nested_opts =
+      opts |> Keyword.take([:timeout, :stop_timeout]) |> Keyword.delete(:initial_state)
+
+    case teardown_runtime(pid, nested_opts) do
+      {:ok, _report} -> :ok
+      {:error, report} -> {:error, {:nested_pod_teardown_failed, report}}
+    end
+  end
+
+  defp maybe_teardown_nested_runtime(%Node{}, _pid, _opts), do: :ok
+
+  defp dispatch_stop_to_parent(
+         root_server_pid,
+         %State{} = state,
+         %Topology{} = topology,
+         name,
+         snapshot,
+         mutation_id,
+         local_root?
+       ) do
+    parent_pid = resolve_stop_parent_pid(root_server_pid, state, topology, name, snapshot)
+    reason = {:pod_mutation, mutation_id}
+
+    cond do
+      is_pid(parent_pid) and parent_pid == root_server_pid and local_root? ->
+        signal =
+          Signal.new!(
+            "jido.pod.mutation.stop",
+            %{mutation_id: mutation_id, node: name},
+            source: "/pod/#{state.id}"
+          )
+
+        StopChildRuntime.exec(name, reason, signal, state)
+
+      is_pid(parent_pid) ->
+        case AgentServer.stop_child(parent_pid, name, reason) do
+          :ok -> {:ok, state}
+          {:error, stop_reason} -> {:error, stop_reason}
+        end
+
+      is_pid(snapshot.running_pid) ->
+        direct_stop_child(state, name, snapshot.running_pid, reason)
+
+      true ->
+        {:error,
+         Jido.Error.validation_error(
+           "Could not resolve a running parent for pod node teardown.",
+           details: %{node: name, actual_parent: snapshot.actual_parent}
+         )}
+    end
+  end
+
+  defp resolve_stop_parent_pid(
+         root_server_pid,
+         %State{} = state,
+         %Topology{} = topology,
+         name,
+         snapshot
+       ) do
+    cond do
+      is_map(snapshot.actual_parent) and is_pid(snapshot.actual_parent.pid) ->
+        snapshot.actual_parent.pid
+
+      true ->
+        case Topology.owner_of(topology, name) do
+          :root ->
+            root_server_pid
+
+          {:ok, owner_name} ->
+            running_child_pid(topology.nodes[owner_name].manager, node_key(state, owner_name))
+
+          :error ->
+            nil
+        end
+    end
+  end
+
+  defp direct_stop_child(%State{} = state, name, pid, reason) when is_pid(pid) do
+    _ = RuntimeStore.delete(state.jido, :relationships, node_id(state, name))
+
+    stop_signal =
+      Signal.new!(
+        "jido.agent.stop",
+        %{reason: {:shutdown, reason}},
+        source: "/pod/#{state.id}"
+      )
+
+    case AgentServer.cast(pid, stop_signal) do
+      :ok -> {:ok, state}
+      {:error, cast_reason} -> {:error, cast_reason}
+    end
+  end
+
+  defp await_process_exit(pid, timeout) when is_pid(pid) do
+    if Process.alive?(pid) do
+      ref = Process.monitor(pid)
+
+      receive do
+        {:DOWN, ^ref, :process, ^pid, _reason} ->
+          :ok
+      after
+        timeout ->
+          Process.demonitor(ref, [:flush])
+          {:error, :stop_timeout}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp complete_mutation_report(%Report{} = report, stop_result, start_result) do
+    stop_failures = Map.get(stop_result, :failures, %{})
+    stopped = Map.get(stop_result, :stopped, [])
+
+    {started, start_failures} =
+      case start_result do
+        {:ok, reconcile_report} ->
+          {started_names_from_reconcile(reconcile_report), %{}}
+
+        {:error, reconcile_report} ->
+          {started_names_from_reconcile(reconcile_report), reconcile_report.failures}
+      end
+
+    failures = Map.merge(stop_failures, start_failures)
+    status = if map_size(failures) == 0, do: :completed, else: :failed
+
+    %Report{
+      report
+      | status: status,
+        started: Enum.sort(started),
+        stopped: Enum.sort(stopped),
+        failures: failures
+    }
+  end
+
+  defp started_names_from_reconcile(report) do
+    report.nodes
+    |> Enum.filter(fn {_name, result} -> result.source == :started end)
+    |> Enum.map(&elem(&1, 0))
   end
 
   defp node_key(%State{} = state, name) do
