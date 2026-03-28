@@ -1,5 +1,7 @@
 # FSM Strategy Deep Dive
 
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https://github.com/agentjido/jido/blob/main/guides/fsm-strategy.livemd)
+
 ```elixir
 Mix.install([
   {:jido, path: "."}
