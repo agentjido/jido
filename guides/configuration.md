@@ -336,6 +336,9 @@ That keeps registry identity, persistence, runtime lineage, and pod telemetry
 isolated per tenant without requiring a separate BEAM supervision tree per
 tenant.
 
+For the full Pod-first architecture and runtime rules, see
+[Multi-Tenancy](multi-tenancy.md).
+
 ## Testing Configuration
 
 For tests, use `JidoTest.Case` which provides an isolated Jido instance:

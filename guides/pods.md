@@ -156,6 +156,8 @@ yourself.
 
 Pods now work cleanly with Jido's logical `partition` boundary.
 
+For the full shared-instance tenancy model, see [Multi-Tenancy](multi-tenancy.md).
+
 That gives you two tenancy models:
 
 - separate Jido instances for hard isolation
