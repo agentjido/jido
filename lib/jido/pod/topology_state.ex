@@ -109,6 +109,16 @@ defmodule Jido.Pod.TopologyState do
     end
   end
 
+  @doc false
+  @spec normalize_updated_topology(Topology.t(), Topology.t()) :: Topology.t()
+  def normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
+    if topology_changed?(current, updated) do
+      %{updated | version: max(updated.version, current.version + 1)}
+    else
+      %{updated | version: current.version}
+    end
+  end
+
   defp extract_topology(%{topology: %Topology{} = topology}), do: {:ok, topology}
 
   defp extract_topology(plugin_state) do
@@ -139,14 +149,6 @@ defmodule Jido.Pod.TopologyState do
       |> Map.put(:topology_version, topology.version)
 
     %{agent | state: Map.put(agent.state, state_key, updated_state)}
-  end
-
-  defp normalize_updated_topology(%Topology{} = current, %Topology{} = updated) do
-    if topology_changed?(current, updated) do
-      %{updated | version: max(updated.version, current.version + 1)}
-    else
-      %{updated | version: current.version}
-    end
   end
 
   defp topology_changed?(%Topology{} = left, %Topology{} = right) do
