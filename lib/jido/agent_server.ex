@@ -2683,14 +2683,8 @@ defmodule Jido.AgentServer do
   end
 
   defp hydrate_parent_from_runtime_store(%Options{} = options) do
-    case RuntimeStore.fetch(
-           options.jido,
-           @relationship_hive,
-           Jido.partition_key(options.id, options.partition)
-         ) do
-      {:ok, %{parent_id: parent_id, tag: tag, meta: meta} = binding} when is_binary(parent_id) ->
-        parent_partition = Map.get(binding, :parent_partition)
-
+    case Jido.parent_binding(options.jido, options.id, partition: options.partition) do
+      {:ok, %{parent_id: parent_id, parent_partition: parent_partition, tag: tag, meta: meta}} ->
         parent =
           case Jido.whereis(options.jido, parent_id, partition: parent_partition) do
             pid when is_pid(pid) ->
@@ -2709,20 +2703,13 @@ defmodule Jido.AgentServer do
 
         {:ok, %{options | parent: parent}}
 
-      {:ok, _other} ->
-        {:ok, options}
-
       :error ->
         {:ok, options}
     end
   end
 
   defp maybe_persist_parent_binding(%State{parent: %ParentRef{} = parent} = state) do
-    case RuntimeStore.fetch(
-           state.jido,
-           @relationship_hive,
-           Jido.partition_key(state.id, state.partition)
-         ) do
+    case Jido.parent_binding(state.jido, state.id, partition: state.partition) do
       {:ok, _binding} ->
         state
 

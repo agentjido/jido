@@ -823,13 +823,9 @@ defmodule Jido.Pod.Runtime do
 
   defp actual_parent_ref(%State{} = state, %Topology{} = topology, name)
        when is_node_name(name) do
-    case RuntimeStore.fetch(
-           state.jido,
-           :relationships,
-           Jido.partition_key(node_id(state, name), state.partition)
-         ) do
-      {:ok, %{parent_id: parent_id, tag: tag} = binding} when is_binary(parent_id) ->
-        parent_partition = Map.get(binding, :parent_partition, state.partition)
+    case Jido.parent_binding(state.jido, node_id(state, name), partition: state.partition) do
+      {:ok, %{parent_id: parent_id, parent_partition: parent_partition, tag: tag}} ->
+        parent_partition = parent_partition || state.partition
 
         %{
           id: parent_id,
@@ -837,9 +833,6 @@ defmodule Jido.Pod.Runtime do
           pid: resolve_parent_runtime_pid(state, topology, parent_id, parent_partition),
           tag: tag
         }
-
-      {:ok, _other} ->
-        nil
 
       :error ->
         nil

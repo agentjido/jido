@@ -238,7 +238,12 @@ defmodule Jido.Agent.InstanceManager do
     end
   end
 
-  @doc false
+  @doc """
+  Returns the agent module managed by the given `InstanceManager`.
+
+  This is useful for orchestration layers that need to validate manager/module
+  compatibility without reaching into supervisor config directly.
+  """
   @spec agent_module(manager_name()) :: {:ok, module()} | {:error, :not_found}
   def agent_module(manager) when is_atom(manager) do
     case :persistent_term.get({__MODULE__, manager}, :error) do

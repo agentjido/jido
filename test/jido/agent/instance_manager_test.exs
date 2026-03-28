@@ -259,6 +259,35 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     end
   end
 
+  describe "agent_module/1" do
+    setup do
+      manager_name = :"#{@manager_prefix}_agent_module_#{:erlang.unique_integer([:positive])}"
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager_name,
+            agent: TestAgent,
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido],
+            storage: nil
+          )
+        )
+
+      on_exit(fn -> :persistent_term.erase({InstanceManager, manager_name}) end)
+
+      {:ok, manager: manager_name}
+    end
+
+    test "returns the configured agent module", %{manager: manager} do
+      assert InstanceManager.agent_module(manager) == {:ok, TestAgent}
+    end
+
+    test "returns :not_found for an unknown manager" do
+      assert InstanceManager.agent_module(:missing_manager_for_agent_module) ==
+               {:error, :not_found}
+    end
+  end
+
   describe "stop/2" do
     setup do
       manager_name = :"#{@manager_prefix}_stop_#{:erlang.unique_integer([:positive])}"

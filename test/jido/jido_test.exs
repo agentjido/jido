@@ -1,6 +1,7 @@
 defmodule JidoTest.JidoTest do
   use JidoTest.Case, async: true
 
+  alias Jido.AgentServer
   alias JidoTest.TestAgents.Minimal
 
   describe "scheduler_name/1" do
@@ -45,6 +46,49 @@ defmodule JidoTest.JidoTest do
   describe "stop_agent/2 with non-existent id" do
     test "returns error when agent not found", %{jido: jido} do
       assert {:error, :not_found} = Jido.stop_agent(jido, "non-existent-agent-id")
+    end
+  end
+
+  describe "parent_binding/3" do
+    test "returns :error when no parent binding exists", %{jido: jido} do
+      assert :error = Jido.parent_binding(jido, "missing-child")
+    end
+
+    test "returns the persisted binding for an adopted child", %{jido: jido} do
+      {:ok, parent_pid} =
+        AgentServer.start(agent: Minimal, id: "parent-binding-parent", jido: jido)
+
+      {:ok, child_pid} = AgentServer.start(agent: Minimal, id: "parent-binding-child", jido: jido)
+
+      assert {:ok, ^child_pid} = AgentServer.adopt_child(parent_pid, child_pid, :worker)
+
+      assert {:ok, binding} = Jido.parent_binding(jido, "parent-binding-child")
+      assert binding.parent_id == "parent-binding-parent"
+      assert binding.parent_partition == nil
+      assert binding.tag == :worker
+      assert binding.meta == %{}
+    end
+
+    test "respects partitioned bindings", %{jido: jido} do
+      {:ok, parent_pid} =
+        AgentServer.start(agent: Minimal, id: "partitioned-parent", jido: jido, partition: :alpha)
+
+      {:ok, alpha_child_pid} =
+        AgentServer.start(agent: Minimal, id: "shared-child", jido: jido, partition: :alpha)
+
+      {:ok, _beta_child_pid} =
+        AgentServer.start(agent: Minimal, id: "shared-child", jido: jido, partition: :beta)
+
+      assert {:ok, ^alpha_child_pid} =
+               AgentServer.adopt_child(parent_pid, alpha_child_pid, :worker)
+
+      assert {:ok, binding} = Jido.parent_binding(jido, "shared-child", partition: :alpha)
+      assert binding.parent_id == "partitioned-parent"
+      assert binding.parent_partition == :alpha
+      assert binding.tag == :worker
+
+      assert :error = Jido.parent_binding(jido, "shared-child", partition: :beta)
+      assert :error = Jido.parent_binding(jido, "shared-child")
     end
   end
 
