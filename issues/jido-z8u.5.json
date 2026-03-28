@@ -1,0 +1,15 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-03-28T18:12:02Z",
+  "description": "Cover plugin, sensor, and strategy modules plus their guides so reusable capability composition has explicit authored specs and proof targets.",
+  "id": "jido-z8u.5",
+  "labels": [],
+  "parent": "jido-z8u",
+  "priority": 2,
+  "status": "open",
+  "title": "Author plugin, sensor, and strategy subject specs",
+  "type": "task",
+  "updated_at": "2026-03-28T18:12:02Z"
+}
