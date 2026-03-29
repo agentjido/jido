@@ -67,10 +67,13 @@ defmodule Jido.Pod do
     {pod_plugins, remaining_default_plugins} =
       Definition.split_pod_plugins!(default_plugins, __CALLER__)
 
+    user_plugins =
+      Definition.expand_and_eval_literal_option(Keyword.get(opts, :plugins, []), __CALLER__)
+
     agent_opts =
       opts
       |> Keyword.delete(:topology)
-      |> Keyword.put(:plugins, pod_plugins ++ Keyword.get(opts, :plugins, []))
+      |> Keyword.put(:plugins, pod_plugins ++ (user_plugins || []))
       |> then(fn resolved_opts ->
         if is_nil(remaining_default_plugins) do
           Keyword.delete(resolved_opts, :default_plugins)
