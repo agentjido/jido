@@ -2,6 +2,71 @@
 
 <!-- changelog -->
 
+## [v2.2.0](https://github.com/agentjido/jido/compare/v2.1.0...v2.2.0) (2026-03-29)
+
+
+
+
+### Features:
+
+* add partitioned multi-tenancy support (#218) by mikehostetler
+
+* rebuild multi-tenancy around partitioned pods by mikehostetler
+
+* reduce default log verbosity (#219) by dl-alexandre
+
+* add first-class orphan lifecycle and adoption (#213) by mikehostetler
+
+* add first-class orphan lifecycle and adoption (#212) by mikehostetler
+
+* add first-class orphan lifecycle and adoption by mikehostetler
+
+### Bug Fixes:
+
+* remove invalid doctest-style doc examples (#227) by mikehostetler
+
+* reject instance manager lifecycle opts in SpawnAgent (#222) by mikehostetler
+
+* reject instance manager lifecycle opts in SpawnAgent by mikehostetler
+
+* reduce default log verbosity (noisy logs) by dl-alexandre
+
+* align action logging with instance config (#217) by mikehostetler
+
+* observability: align action logging with instance config by mikehostetler
+
+* observability: align action telemetry with log args by mikehostetler
+
+* agent_server: always wrap parent-down reason as {:shutdown, _} by mikehostetler
+
+* thread: handle missing thread in filter_by_kind (#211) by Julian Scheid
+
+* thread: handle missing thread in filter_by_kind by Julian Scheid
+
+* thread: tighten filter_by_kind guards by Julian Scheid
+
+* agent_server: always wrap parent-down reason as {:shutdown, _} (#207) by Julian Scheid
+
+* pass details as keyword to execution_error (#206) by Julian Scheid
+
+* pass details as keyword to execution_error by Julian Scheid
+
+* preserve execution error details compatibly by Julian Scheid
+
+* agent: correct plugin_schedules typespec (#204) by CptnKirk
+
+* restore git_ops changelog marker placement by mikehostetler
+
+### Refactoring:
+
+* formalize pod extraction seams (#233) by mikehostetler
+
+* harden SpawnAgent directive validation by mikehostetler
+
+* agent: pass jido instance via strategy context by mikehostetler
+
+* harden runtime store ownership and stress adoption by mikehostetler
+
 ## [v2.1.0](https://github.com/agentjido/jido/compare/v2.0.0...v2.1.0) (2026-03-14)
 
 ### Features:
