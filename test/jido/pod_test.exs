@@ -34,6 +34,16 @@ defmodule JidoTest.PodTest do
     end
   end
 
+  defmodule UserPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "pod_test_user_plugin",
+      state_key: :pod_test_user_plugin,
+      actions: [],
+      schema: Zoi.object(%{}),
+      capabilities: []
+  end
+
   defmodule ExamplePod do
     @moduledoc false
     use Jido.Pod,
@@ -88,6 +98,27 @@ defmodule JidoTest.PodTest do
 
     assert {:ok, %{metadata: %{custom: true}}} = Pod.fetch_state(agent)
     assert {:ok, %Topology{name: "custom_plugin_pod"}} = Pod.fetch_topology(agent)
+  end
+
+  test "plugins option resolves aliased plugin modules before pod opts are escaped" do
+    suffix = System.unique_integer([:positive])
+    pod_mod = Module.concat(__MODULE__, :"AliasedPluginPod#{suffix}")
+    pod_name = "aliased_plugin_pod_#{suffix}"
+
+    Code.compile_string("""
+    defmodule #{inspect(pod_mod)} do
+      @moduledoc false
+      alias #{inspect(UserPlugin)}, as: UserPlugin
+
+      use Jido.Pod,
+        name: #{inspect(pod_name)},
+        plugins: [UserPlugin]
+    end
+    """)
+
+    assert Enum.any?(pod_mod.plugin_instances(), fn instance ->
+             instance.module == UserPlugin and instance.state_key == :pod_test_user_plugin
+           end)
   end
 
   test "disabling the reserved __pod__ plugin raises at compile time" do
