@@ -27,6 +27,7 @@ defmodule Jido.Agent.Strategy.Direct do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.StateOps
   alias Jido.Error
@@ -39,7 +40,7 @@ defmodule Jido.Agent.Strategy.Direct do
 
     {final_agent, reversed_directives} =
       Enum.reduce(instructions, {agent, []}, fn instruction, {acc_agent, acc_directives} ->
-        {new_agent, new_directives} = run_instruction_with_tracking(acc_agent, instruction)
+        {new_agent, new_directives} = run_instruction_with_tracking(acc_agent, instruction, ctx)
         {new_agent, Enum.reverse(new_directives) ++ acc_directives}
       end)
 
@@ -57,22 +58,32 @@ defmodule Jido.Agent.Strategy.Direct do
     end
   end
 
-  defp run_instruction_with_tracking(agent, %Instruction{} = instruction) do
+  defp run_instruction_with_tracking(agent, %Instruction{} = instruction, ctx) do
     if ThreadAgent.has_thread?(agent) do
       agent = InstructionTracking.append_instruction_start(agent, instruction)
-      {agent, directives, status} = run_instruction(agent, instruction)
+      {agent, directives, status} = run_instruction(agent, instruction, ctx)
       agent = InstructionTracking.append_instruction_end(agent, instruction, status)
       {agent, directives}
     else
-      {agent, directives, _status} = run_instruction(agent, instruction)
+      {agent, directives, _status} = run_instruction(agent, instruction, ctx)
       {agent, directives}
     end
   end
 
-  defp run_instruction(agent, %Instruction{} = instruction) do
-    instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+  defp run_instruction(agent, %Instruction{} = instruction, ctx) do
+    instruction =
+      %{
+        instruction
+        | context:
+            instruction.context
+            |> Map.put(:state, agent.state)
+            |> Map.put(:agent, agent)
+            |> Map.put(:agent_server_pid, self())
+      }
 
-    case Jido.Exec.run(instruction) do
+    exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], instruction.opts)
+
+    case Jido.Exec.run(%{instruction | opts: exec_opts}) do
       {:ok, result} when is_map(result) ->
         {StateOps.apply_result(agent, result), [], :ok}
 

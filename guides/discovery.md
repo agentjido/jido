@@ -1,5 +1,7 @@
 # Discovery & Introspection
 
+<!-- covers: jido.configuration_and_discovery.discovery_introspection -->
+
 **After:** You can list agents/actions and build tooling around Jido.
 
 ```elixir

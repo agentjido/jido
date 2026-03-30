@@ -1,5 +1,7 @@
 # Configuration & Deployment
 
+<!-- covers: jido.configuration_and_discovery.configuration_defaults -->
+
 **After:** You can configure Jido for different environments.
 
 This guide covers Jido configuration options and production deployment patterns.
@@ -77,6 +79,11 @@ config :my_app, MyApp.Jido,
     tracer: Jido.Observe.NoopTracer
   ]
 ```
+
+For Jido-managed action execution, `telemetry.log_args` also governs the
+underlying `jido_action` logs and action spans. Use `:full` when you want full
+action params/context in debug sessions; use `:keys_only` or `:none` to keep
+action execution quiet.
 
 Instances without per-instance config inherit from global `config :jido, :telemetry` and `config :jido, :observability`. See [Observability](observability.md) for details.
 
@@ -318,6 +325,21 @@ config :my_app, MyApp.TenantA.Jido,
 config :my_app, MyApp.TenantB.Jido,
   max_tasks: 1000
 ```
+
+If you want logical multi-tenancy inside one shared Jido instance, use
+`partition` as the tenant boundary and keep a root pod per tenant or workspace:
+
+```elixir
+{:ok, workspace_pid} =
+  Jido.Pod.get(MyApp.Jido.WorkspacePods, "workspace-123", partition: :tenant_alpha)
+```
+
+That keeps registry identity, persistence, runtime lineage, and pod telemetry
+isolated per tenant without requiring a separate BEAM supervision tree per
+tenant.
+
+For the full Pod-first architecture and runtime rules, see
+[Multi-Tenancy](multi-tenancy.md).
 
 ## Testing Configuration
 

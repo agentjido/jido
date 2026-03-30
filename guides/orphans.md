@@ -1,10 +1,18 @@
 # Orphans & Adoption
 
+<!-- covers: jido.runtime_lifecycle.hierarchy_and_orphans -->
+
 **After:** You can let a child survive logical parent death, inspect the orphan transition explicitly, and reattach that child to a new coordinator when the workflow truly requires it.
 
 > This is an advanced orchestration pattern.
 >
-> Most Jido hierarchies should keep the default `on_parent_death: :stop`. Reach for orphaning only when the child owns durable or long-running work that should outlive the original coordinator.
+> Most Jido hierarchies should keep the default `on_parent_death: :stop`. Reach
+> for orphaning only when the child owns long-running or business-critical work
+> that should outlive the original coordinator. Orphan survival is about live
+> runtime continuity, not automatic storage-backed durability.
+>
+> If you are deciding between orphan/adoption, durable keyed agents, and Pods,
+> start with [Choosing a Runtime Pattern](runtime-patterns.md).
 
 ## Architecture: Logical Hierarchy, Not OTP Parenthood
 

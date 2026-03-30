@@ -1,5 +1,7 @@
 # Strategies
 
+<!-- covers: jido.strategies.strategy_boundary jido.strategies.direct_default -->
+
 **After:** You can choose Direct vs FSM and understand what strategies control.
 
 Strategies control **how agents execute actions** in `cmd/2`. They enable different execution patterns without changing agent logic.

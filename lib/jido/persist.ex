@@ -488,7 +488,13 @@ defmodule Jido.Persist do
         _ -> agent.__struct__
       end
 
-    {:ok, {agent_module, id}}
+    partition =
+      case Map.get(agent, :state) do
+        state when is_map(state) -> Map.get(state, :__partition__)
+        _ -> nil
+      end
+
+    {:ok, {agent_module, Jido.partition_key(id, partition)}}
   end
 
   defp resolve_agent_identity(%{id: nil}), do: {:error, :missing_agent_id}

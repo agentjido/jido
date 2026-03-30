@@ -7,13 +7,14 @@
 [![Coverage Status](https://coveralls.io/repos/github/agentjido/jido/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido?branch=main)
 
 > **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
+<!-- package.jido.framework -->
 
 Define agents, connect them to actions, signals, and directives, and run them
 with supervision and fault tolerance built in.
 
 _The name "Jido" (自動) comes from the Japanese word meaning "automatic" or "automated", where 自 (ji) means "self" and 動 (dō) means "movement"._
 
-_Learn more about Jido at [agentjido.xyz](https://agentjido.xyz)._
+_Learn more about Jido at [jido.run](https://jido.run)._
 
 ## Overview
 
@@ -46,6 +47,7 @@ end
 ```
 
 State changes are pure data transformations; side effects are described as directives and executed by an OTP runtime. You get deterministic agent logic, testability without processes, and a clear path to running those agents in production.
+<!-- package.jido.pure_cmd package.jido.runtime_separation -->
 
 ## The Jido Ecosystem
 
@@ -59,7 +61,7 @@ Jido is the core package of the Jido ecosystem. The ecosystem is built around th
 | [jido](https://github.com/agentjido/jido)               | Core agent framework with state management, directives, and runtime                           |
 | [jido_ai](https://github.com/agentjido/jido_ai)         | AI/LLM integration for agents                                                                 |
 
-For demos and examples of what you can build with the Jido Ecosystem, see [https://agentjido.xyz](https://agentjido.xyz).
+For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run).
 
 ## Why Jido?
 
@@ -91,7 +93,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 - GenServer-based AgentServer for production deployment
 - Parent-child agent hierarchies with lifecycle management
 - Signal routing with configurable strategies
-- Instance-scoped supervision for multi-tenant deployments
+- Instance-scoped supervision plus logical partitions for multi-tenant deployments
 
 ### Composable Plugins
 - Reusable capability modules that extend agents
@@ -106,7 +108,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Multi-Agent Orchestration
 - Multi-agent workflows with configurable strategies
 - Plan-based orchestration for complex workflows
-- Extensible strategy protocol for custom execution patterns
+- Durable groups of agents with named topology, hierarchical runtime ownership, nested pod nodes, and partition-safe tenancy boundaries
 
 ## Installation
 
@@ -292,6 +294,9 @@ State operations are internal state transitions handled by the strategy layer du
 - [Signals & Routing](guides/signals.md) - Signal-based communication
 - [Agent Directives](guides/directives.md) - Effect descriptions for the runtime
 - [Runtime and AgentServer](guides/runtime.md) - Process-based agent execution
+- [Choosing a Runtime Pattern](guides/runtime-patterns.md) - When to use `SpawnAgent`, `InstanceManager`, `Pod`, and `partition`
+- [Pods](guides/pods.md) - Durable groups of agents with named topology, lazy activation, nested pods, and live add/remove mutation
+- [Multi-Tenancy](guides/multi-tenancy.md) - Shared-instance tenancy with partitions and Pod-first durable workspaces
 - [Persistence & Storage](guides/storage.md) - Hibernate, thaw, and InstanceManager lifecycle
 - [Scheduling](guides/scheduling.md) - Declarative and dynamic cron scheduling
 - [Plugins](guides/plugins.md) - Composable capability bundles
@@ -342,5 +347,5 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for detai
 
 - **Documentation**: [https://hexdocs.pm/jido](https://hexdocs.pm/jido)
 - **GitHub**: [https://github.com/agentjido/jido](https://github.com/agentjido/jido)
-- **AgentJido**: [https://agentjido.xyz](https://agentjido.xyz)
+- **AgentJido**: [https://jido.run](https://jido.run)
 - **Jido Workbench**: [https://github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)

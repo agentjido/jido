@@ -1,5 +1,7 @@
 # Migration Guide: Jido 1.x to 2.0
 
+<!-- covers: jido.integrations_and_migration.migration_guidance -->
+
 **After:** You can upgrade from Jido 1.x with minimal surprises.
 
 This guide helps you migrate existing Jido applications to version 2.0. The migration can be done incrementally—start with the minimum changes to get running, then adopt new patterns as needed.
@@ -193,10 +195,10 @@ end
 | Directive | Purpose | Example |
 |-----------|---------|---------|
 | `Emit` | Dispatch a signal via adapters | `Directive.emit(signal, {:pubsub, topic: "events"})` |
-| `Spawn` | Spawn a generic BEAM process | `Directive.spawn(Task, :async, [fn -> work() end])` |
-| `SpawnAgent` | Spawn a child agent with hierarchy | `Directive.spawn_agent(ChildAgent, id: "child-1")` |
+| `Spawn` | Spawn a generic BEAM process | `Directive.spawn({Task, fn -> work() end})` |
+| `SpawnAgent` | Spawn a child agent with hierarchy | `Directive.spawn_agent(ChildAgent, :child_1, opts: %{id: "child-1"})` |
 | `StopChild` | Stop a tracked child agent | `Directive.stop_child("child-1")` |
-| `Schedule` | Schedule a delayed message | `Directive.schedule(signal, delay: 5_000)` |
+| `Schedule` | Schedule a delayed message | `Directive.schedule(5_000, signal)` |
 | `Stop` | Stop the agent process | `Directive.stop(:normal)` |
 | `Error` | Signal an error | `Directive.error(:validation_failed)` |
 

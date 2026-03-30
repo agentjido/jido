@@ -1,5 +1,7 @@
 # Quick Start
 
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https://github.com/agentjido/jido/blob/main/guides/getting-started.livemd)
+
 ```elixir
 Mix.install([
   {:jido, "~> 2.0"}

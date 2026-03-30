@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.1.0"
+  @version "2.2.0"
 
   def vsn do
     @version
@@ -35,7 +35,9 @@ defmodule Jido.MixProject do
       ],
 
       # Dialyzer
-      dialyzer: [plt_add_apps: [:mix]]
+      dialyzer: [
+        plt_add_apps: [:mix]
+      ]
     ]
   end
 
@@ -76,6 +78,7 @@ defmodule Jido.MixProject do
         "Start Here": [
           "guides/getting-started.livemd",
           "guides/core-loop.md",
+          "guides/runtime-patterns.md",
           "guides/your-first-plugin.md",
           "guides/your-first-sensor.md",
           "guides/observability-intro.md"
@@ -92,7 +95,9 @@ defmodule Jido.MixProject do
         ],
         Coordination: [
           "guides/await.md",
-          "guides/orchestration.md"
+          "guides/orchestration.md",
+          "guides/pods.md",
+          "guides/multi-tenancy.md"
         ],
         Operations: [
           "guides/debugging.md",
@@ -132,6 +137,7 @@ defmodule Jido.MixProject do
         # Start Here
         {"guides/getting-started.livemd", title: "Quick Start"},
         {"guides/core-loop.md", title: "Core Loop"},
+        {"guides/runtime-patterns.md", title: "Choosing a Runtime Pattern"},
         {"guides/your-first-plugin.md", title: "Your First Plugin"},
         {"guides/your-first-sensor.md", title: "Your First Sensor"},
         {"guides/observability-intro.md", title: "Seeing What Happened"},
@@ -149,6 +155,8 @@ defmodule Jido.MixProject do
         # Coordination
         {"guides/await.md", title: "Await & Coordination"},
         {"guides/orchestration.md", title: "Multi-Agent Orchestration"},
+        {"guides/pods.md", title: "Pods"},
+        {"guides/multi-tenancy.md", title: "Multi-Tenancy"},
 
         # Operations
         {"guides/debugging.md", title: "Debugging"},
@@ -192,7 +200,11 @@ defmodule Jido.MixProject do
           Jido,
           Jido.Agent,
           Jido.AgentServer,
-          Jido.Await
+          Jido.Await,
+          Jido.Pod,
+          Jido.Pod.Topology,
+          Jido.Pod.Topology.Link,
+          Jido.Pod.Topology.Node
         ],
         Strategies: [
           Jido.Agent.Strategy,
@@ -210,7 +222,8 @@ defmodule Jido.MixProject do
           Jido.Plugin.Requirements,
           Jido.Plugin.Routes,
           Jido.Plugin.Schedules,
-          Jido.Plugin.Spec
+          Jido.Plugin.Spec,
+          Jido.Pod.Plugin
         ],
         Identity: [
           Jido.Identity,
@@ -364,8 +377,8 @@ defmodule Jido.MixProject do
       links: %{
         "Documentation" => "https://hexdocs.pm/jido",
         "GitHub" => "https://github.com/agentjido/jido",
-        "Website" => "https://agentjido.xyz",
-        "Discord" => "https://agentjido.xyz/discord",
+        "Website" => "https://jido.run",
+        "Discord" => "https://jido.run/discord",
         "Changelog" => "https://github.com/agentjido/jido/blob/main/CHANGELOG.md"
       }
     ]
@@ -374,8 +387,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.1"},
-      {:jido_signal, "~> 2.0"},
+      {:jido_action, "~> 2.2"},
+      {:jido_signal, "~> 2.1"},
 
       # Jido Deps
       {:deep_merge, "~> 1.0"},
@@ -394,6 +407,11 @@ defmodule Jido.MixProject do
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
+      {:spec_led_ex,
+       git: "https://github.com/specleddev/specled_ex.git",
+       branch: "main",
+       only: [:dev, :test],
+       runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},

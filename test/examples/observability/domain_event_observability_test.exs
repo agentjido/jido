@@ -131,6 +131,47 @@ defmodule JidoExampleTest.DomainEventObservabilityTest do
     end
   end
 
+  test "keeps generic action spans separate from package-owned AI domain events" do
+    events = [
+      [:jido, :action, :demo, :start],
+      [:jido, :action, :demo, :stop],
+      [:jido, :ai, :request, :completed]
+    ]
+
+    handler_id = attach_handler(self(), events)
+    on_exit(fn -> :telemetry.detach(handler_id) end)
+
+    span = Observe.start_span([:jido, :action, :demo], %{action: "demo_tool"})
+    Observe.finish_span(span, %{duration_ms: 7})
+
+    {:ok, validated} =
+      EventContract.validate_event(
+        [:jido, :ai, :request, :completed],
+        %{duration_ms: 11},
+        %{request_id: "req-owned-by-package", terminal_state: :completed},
+        required_metadata: [:request_id, :terminal_state],
+        required_measurements: [:duration_ms]
+      )
+
+    assert :ok = Observe.emit_event(validated.event, validated.measurements, validated.metadata)
+
+    received = collect_events(3)
+
+    assert Enum.any?(received, fn {event, _measurements, metadata} ->
+             event == [:jido, :action, :demo, :start] and metadata.action == "demo_tool"
+           end)
+
+    assert Enum.any?(received, fn {event, measurements, metadata} ->
+             event == [:jido, :action, :demo, :stop] and is_integer(measurements.duration) and
+               metadata.action == "demo_tool"
+           end)
+
+    assert Enum.any?(received, fn {event, measurements, metadata} ->
+             event == [:jido, :ai, :request, :completed] and measurements.duration_ms == 11 and
+               metadata.request_id == "req-owned-by-package"
+           end)
+  end
+
   defp attach_handler(test_pid, events) do
     handler_id = "domain-observability-handler-#{System.unique_integer([:positive])}"
 

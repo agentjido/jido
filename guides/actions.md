@@ -1,5 +1,7 @@
 # Actions
 
+<!-- covers: jido.agents_and_actions.action_execution_surface -->
+
 **After:** You can implement an Action module that transforms state and returns directives.
 
 ## The Complete Picture

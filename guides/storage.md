@@ -1,5 +1,7 @@
 # Persistence & Storage
 
+<!-- covers: jido.runtime_persistence.hibernate_thaw jido.runtime_persistence.storage_backends jido.thread_memory_identity.thread_journal jido.thread_memory_identity.memory_capability jido.thread_memory_identity.identity_capability -->
+
 **After:** Your agents can survive restarts, hibernate on idle, and preserve conversation history.
 
 ```elixir
@@ -21,15 +23,63 @@ end
 
 This guide covers Jido's unified persistence system: checkpoints, thread journals, manual and automatic lifecycle management.
 
+If you are still deciding whether your durable unit should be one agent or one
+team, start with [Choosing a Runtime Pattern](runtime-patterns.md).
+
 ## Choosing Your Persistence Model
 
 | Approach | When to Use | API |
 |----------|-------------|-----|
 | **Manual** | Explicit control over when to persist | `MyApp.Jido.hibernate/1`, `thaw/2` |
 | **Automatic** | Idle-based lifecycle for per-user/entity agents | `InstanceManager.get/3` with `idle_timeout` |
+| **Pod-managed topology** | Durable named teams with explicit reattachment after thaw | `Jido.Pod.get/3` or `InstanceManager.get/3` + `Jido.Pod.reconcile/2` |
 | **None** | Stateless agents, cheap rebuilds, short-lived tasks | Skip storage config |
 
 Both manual and automatic approaches use the same underlying `Jido.Storage` behaviour.
+
+## Pods Use Ordinary Checkpoints
+
+Pods do not introduce a separate storage contract.
+
+- The pod agent persists its topology snapshot as ordinary plugin state under
+  `agent.state[:__pod__]`
+- Each durable node persists through its own `Jido.Agent.InstanceManager`
+- Storage adapters such as `jido_ecto` keep working through the same checkpoint
+  and thread APIs
+
+The durability boundary is important:
+
+- storage preserves the pod topology snapshot
+- storage does not preserve a live `state.children` tree, PIDs, or monitors
+- live pod mutations update the persisted topology snapshot first, then repair
+  runtime shape with explicit stop/start work
+
+So thaw works like this:
+
+1. the pod agent thaws and immediately has its topology back
+2. eager roots and missing ownership edges are repaired by calling `Jido.Pod.reconcile/2`
+3. lazy roots or surviving nodes are reattached on demand via `Jido.Pod.ensure_node/3`
+
+If a node stayed alive independently while the pod manager was hibernated, it
+can show up in two different states:
+
+- surviving root nodes are typically `:running` until the pod manager re-adopts them
+- surviving owned descendants can remain `:adopted` if their logical owner never died
+- surviving nested pod managers follow the same rule, then reconcile their own
+  eager topology once they are reattached
+
+`Jido.Pod.get/3` bundles the common path by calling
+`Jido.Agent.InstanceManager.get/3` and then reconciling eager nodes for you.
+Use the explicit two-step path when you need to inspect the restored topology
+before reattachment.
+
+If a running pod changes shape with `Jido.Pod.mutate/3`, that updated topology
+is what later hibernate/thaw cycles restore. Storage still does not preserve a
+live process tree; it preserves the pod's latest durable topology plus each
+node's own durable agent state.
+
+See [Pods](pods.md) and `test/examples/runtime/mutable_pod_runtime_test.exs`
+for the manager-led runtime model and examples.
 
 ## Overview
 
@@ -899,6 +949,13 @@ children = [
 - `storage: {Adapter, opts}` or `storage: Adapter` - explicit backend override
 - `storage` omitted - uses the configured Jido instance storage (`jido.__jido_storage__/0` when available)
 - `storage: nil` - disables hibernate/thaw for that manager
+
+This automatic lifecycle is scoped to agents started through
+`Jido.Agent.InstanceManager`. It does not apply to arbitrary `SpawnAgent`
+children, and hibernating a parent agent does not recursively persist its live
+child tree. If a durable parent needs durable collaborators, model those
+collaborators as keyed managed agents and reacquire or adopt them explicitly
+after thaw.
 
 ```elixir
 # Uses MyApp.Jido.__jido_storage__/0 by default

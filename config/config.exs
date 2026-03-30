@@ -30,8 +30,14 @@ config :logger, :default_formatter,
 # Git hooks and git_ops configuration for conventional commits
 # Only enabled in dev environment (git_ops is a dev-only dependency)
 if config_env() == :dev do
+  # Worktrees use a `.git` file instead of a directory. We keep the explicit
+  # project path for git_hooks and only auto-install hooks from a normal checkout.
+  project_path = Path.expand("..", __DIR__)
+  auto_install_git_hooks? = File.dir?(Path.join(project_path, ".git"))
+
   config :git_hooks,
-    auto_install: true,
+    auto_install: auto_install_git_hooks?,
+    project_path: project_path,
     verbose: true,
     hooks: [
       commit_msg: [

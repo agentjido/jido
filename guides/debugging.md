@@ -1,5 +1,7 @@
 # Debugging
 
+<!-- covers: jido.debugging_and_errors.runtime_debugging -->
+
 **After:** You can systematically debug agent behavior using instance-scoped debug mode, ring buffers, and telemetry.
 
 ## Quick Reference
@@ -25,6 +27,9 @@ config :logger, :default_formatter,
 ```
 
 Without `level: :debug`, Logger discards debug messages before Jido sees them.
+Jido's default telemetry threshold is `:info`, so compact `[signal]` and
+`[directive]` debug logs appear only after you enable debug logging via config
+or `MyApp.Jido.debug(:on)`.
 
 ## Instance-Scoped Debug
 
@@ -45,6 +50,13 @@ MyApp.Jido.debug_status()   # full status map with active overrides
 | `:off` | config value | config value | config value | per-agent opt-in |
 | `:on` | `:debug` | `:keys_only` | `:minimal` | all agents in instance |
 | `:verbose` | `:trace` | `:full` | `:all` | all agents in instance |
+
+For Jido-managed action execution, `log_args` also controls the underlying
+`jido_action` noise level:
+
+- `:full` enables verbose action start logs and `[:jido, :action, ...]` spans
+- `:keys_only` and `:none` suppress the old full param/context action logs
+- `Jido.debug(:verbose)` re-enables both full action logs and action spans
 
 Redaction is never automatically disabled. Explicit opt-in only:
 
@@ -118,6 +130,10 @@ All events carry `:jido_instance` metadata. Key events:
 | `[:jido, :agent, :cmd, :start\|:stop\|:exception]` | `cmd/2` lifecycle |
 | `[:jido, :agent_server, :signal, :start\|:stop]` | Signal processing |
 | `[:jido, :agent_server, :directive, :start\|:stop]` | Directive execution |
+
+At debug/trace levels, `[signal]` log lines include both directive count and a
+directive-type summary such as `Emit=1 Schedule=1`, which is usually a better
+replacement for the older `jido_action` execution dump.
 
 Attach a handler:
 

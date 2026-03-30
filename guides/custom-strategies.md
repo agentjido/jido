@@ -1,5 +1,7 @@
 # Custom Strategies
 
+<!-- covers: jido.strategies.custom_extension -->
+
 **After:** You can implement a strategy for specialized execution patterns.
 
 ```elixir

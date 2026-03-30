@@ -1,5 +1,7 @@
 # Agents
 
+<!-- covers: jido.agents_and_actions.schema_defined_agents jido.agents_and_actions.pure_cmd_contract -->
+
 **After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
 
 Agents are immutable data structures that hold state and respond to actions. The core operation is `cmd/2` (or `cmd/3` with options), which processes actions and returns an updated agent plus directives for external effects.
@@ -186,6 +188,10 @@ agent = MyAgent.new(id: "custom-id")
 agent = MyAgent.new(state: %{counter: 10})
 ```
 
+If the module is primarily a durable coordinator for named collaborators, use
+`Jido.Pod` instead of `Jido.Agent`. `Jido.Pod` wraps the same agent model and
+adds a canonical topology plus a reserved singleton pod plugin.
+
 ## Further Reading
 
 - [Actions](actions.md) — Defining actions that transform agent state
@@ -193,4 +199,5 @@ agent = MyAgent.new(state: %{counter: 10})
 - [Directives](directives.md) — External effects emitted by agents
 - [Strategies](strategies.md) — Execution strategies for `cmd/2`
 - [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (Identity, Thread) and how to override them
+- [Pods](pods.md) — Manager-led durable topologies built on top of agents
 - `Jido.Agent` — Full module documentation

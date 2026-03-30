@@ -556,6 +556,45 @@ defmodule JidoTest.PersistTest do
       {:ok, thawed2} = Persist.thaw(storage(table), TestAgent, "multi-1")
       assert thawed2.state.counter == 2
     end
+
+    test "partitioned and unpartitioned checkpoint identities coexist" do
+      table = unique_table()
+
+      unpartitioned =
+        TestAgent.new(id: "partitioned-roundtrip")
+        |> then(fn agent -> %{agent | state: %{agent.state | counter: 10}} end)
+
+      partitioned =
+        TestAgent.new(id: "partitioned-roundtrip")
+        |> then(fn agent ->
+          %{agent | state: agent.state |> Map.put(:counter, 20) |> Map.put(:__partition__, :blue)}
+        end)
+
+      assert :ok = Persist.hibernate(storage(table), unpartitioned)
+      assert :ok = Persist.hibernate(storage(table), partitioned)
+
+      assert {:ok, checkpoint} =
+               ETS.get_checkpoint({TestAgent, "partitioned-roundtrip"}, table: table)
+
+      assert checkpoint.state.counter == 10
+
+      assert {:ok, partitioned_checkpoint} =
+               ETS.get_checkpoint({TestAgent, {:partition, :blue, "partitioned-roundtrip"}},
+                 table: table
+               )
+
+      assert partitioned_checkpoint.state.counter == 20
+
+      assert {:ok, thawed_partitioned} =
+               Persist.thaw(
+                 storage(table),
+                 TestAgent,
+                 {:partition, :blue, "partitioned-roundtrip"}
+               )
+
+      assert thawed_partitioned.state.counter == 20
+      assert thawed_partitioned.state.__partition__ == :blue
+    end
   end
 
   describe "integration with Jido instance" do

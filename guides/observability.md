@@ -1,5 +1,7 @@
 # Observability
 
+<!-- covers: jido.observability_and_tracing.telemetry_contract jido.observability_and_tracing.tracing_context -->
+
 **After:** You can monitor Jido agents in production with metrics, traces, and structured logging.
 
 This guide covers production-grade observability for Jido agents. For development debugging, see [Seeing What Happened](observability-intro.md).
@@ -43,8 +45,19 @@ config :my_app, MyApp.InternalJido,
 
 Settings resolve in this order: Debug override → instance config → global config → default.
 Invalid values are ignored and fall back to Jido defaults.
+The default telemetry log level is `:info`, so compact debug signal/directive
+logs are opt-in through config or `MyApp.Jido.debug(:on)`.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
+
+For Jido-managed `Jido.Exec` calls, `telemetry.log_args` also controls how much
+observability data is allowed through the underlying `jido_action` layer:
+
+- `log_args: :full` keeps verbose action logs and emits `[:jido, :action, ...]` spans
+- `log_args: :keys_only` and `:none` suppress the noisy full action start log
+- `log_args: :keys_only` and `:none` also silence dependency action spans, because
+  `jido_action` only supports `:full` or `:silent` telemetry payload behavior
+- `MyApp.Jido.debug(:verbose)` re-enables full action logs and action spans for that instance
 
 ## Telemetry Event Reference
 
@@ -63,12 +76,16 @@ Jido emits telemetry events for all core operations. Use these for metrics colle
 | Event | Description | Measurements | Metadata |
 |-------|-------------|--------------|----------|
 | `[:jido, :agent_server, :signal, :start]` | Signal processing started | `system_time` | `agent_id`, `signal_type`, `jido_instance` |
-| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `jido_instance` |
+| `[:jido, :agent_server, :signal, :stop]` | Signal processing completed | `duration` | `agent_id`, `signal_type`, `directive_count`, `directive_types`, `jido_instance` |
 | `[:jido, :agent_server, :signal, :exception]` | Signal processing failed | `duration` | `agent_id`, `signal_type`, `error`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :start]` | Directive execution started | `system_time` | `agent_id`, `directive_type`, `directive`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :stop]` | Directive execution completed | `duration` | `agent_id`, `directive_type`, `directive`, `result`, `jido_instance` |
 | `[:jido, :agent_server, :directive, :exception]` | Directive execution failed | `duration` | `agent_id`, `directive_type`, `directive`, `error`, `jido_instance` |
 | `[:jido, :agent_server, :queue, :overflow]` | Directive queue overflow | `queue_size` | `agent_id`, `signal_type`, `jido_instance` |
+
+When debug or trace logging is enabled, the structured `[signal]` log line
+includes the directive-type summary from `directive_types`, for example
+`directives=2 Emit=1 Schedule=1`.
 
 ### Strategy Events
 
@@ -83,6 +100,32 @@ Jido emits telemetry events for all core operations. Use these for metrics colle
 | `[:jido, :agent, :strategy, :tick, :start]` | Strategy tick started | `system_time` | `agent_id`, `strategy`, `jido_instance` |
 | `[:jido, :agent, :strategy, :tick, :stop]` | Strategy tick completed | `duration` | `agent_id`, `strategy`, `jido_instance` |
 | `[:jido, :agent, :strategy, :tick, :exception]` | Strategy tick failed | `duration` | `agent_id`, `strategy`, `error`, `jido_instance` |
+
+### Pod Events
+
+| Event | Description | Measurements | Metadata |
+|-------|-------------|--------------|----------|
+| `[:jido, :pod, :reconcile, :start]` | Pod eager reconciliation started | `system_time` | `pod_id`, `pod_module`, `jido_instance` |
+| `[:jido, :pod, :reconcile, :stop]` | Pod eager reconciliation completed | `duration`, `node_count`, `requested_count`, `failure_count`, `pending_count`, `wave_count` | `pod_id`, `pod_module`, `jido_instance` |
+| `[:jido, :pod, :reconcile, :exception]` | Pod eager reconciliation failed | `duration` | `pod_id`, `pod_module`, `error`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :start]` | Pod node acquisition/adoption started | `system_time` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :stop]` | Pod node acquisition/adoption completed | `duration`, `source`, `parent` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `jido_instance` |
+| `[:jido, :pod, :node, :ensure, :exception]` | Pod node acquisition/adoption failed | `duration` | `pod_id`, `pod_module`, `node_name`, `node_manager`, `node_kind`, `source`, `owner`, `error`, `jido_instance` |
+
+`source` explains what `ensure_node/3` did:
+
+- `:started` — the node was started through its `InstanceManager`
+- `:running` — the node was already alive and was re-adopted
+- `:adopted` — the node was already attached to its expected runtime parent
+
+`owner` is the logical `:owns` parent when the node is not a pod root. Root
+nodes emit `owner: nil`.
+
+`node_name` and `owner` can be either atoms or strings, depending on how the
+pod topology names its nodes.
+
+For `kind: :pod` nodes, a node-level exception on the outer pod can wrap a
+nested reconcile report from the inner pod manager.
 
 ### Correlation Metadata
 
@@ -477,6 +520,15 @@ always emit telemetry regardless of `:debug_events` config.
 
 `Jido.Observe.EventContract` provides lightweight key validation helpers so
 downstream namespaces keep stable metadata/measurement contracts.
+
+Namespace ownership matters here:
+
+- `jido` owns the generic runtime and execution surfaces such as
+  `[:jido, :agent, ...]`, `[:jido, :agent_server, ...]`, and `[:jido, :action, ...]`.
+- Domain packages should own their own higher-level namespaces such as
+  `[:jido, :ai, ...]` in `jido_ai`.
+- Keep AI- or domain-specific event contracts out of core `jido`; use
+  `emit_event/3` plus package-local docs/tests in the owning package instead.
 
 ```elixir
 alias Jido.Observe

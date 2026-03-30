@@ -53,6 +53,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
   require Logger
 
   alias Jido.AgentServer.State
+  alias Jido.Observe.Config, as: ObserveConfig
 
   def exec(
         %{instruction: instruction, result_action: result_action, meta: meta},
@@ -66,12 +67,22 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
 
     execution_payload =
       enriched_instruction
-      |> Jido.Exec.run()
+      |> then(fn instruction ->
+        exec_opts = ObserveConfig.action_exec_opts(state.jido, instruction.opts)
+        Jido.Exec.run(%{instruction | opts: exec_opts})
+      end)
       |> normalize_result_payload()
       |> Map.put(:instruction, instruction)
       |> Map.put(:meta, meta || %{})
 
-    {agent, directives} = state.agent_module.cmd(state.agent, {result_action, execution_payload})
+    {agent, directives} =
+      state.agent_module.cmd(
+        state.agent,
+        {result_action, execution_payload},
+        __jido_instance__: state.jido,
+        __partition__: state.partition
+      )
+
     state = State.update_agent(state, agent)
 
     case State.enqueue_all(state, input_signal, List.wrap(directives)) do
@@ -193,78 +204,17 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   alias Jido.RuntimeStore
 
   @relationship_hive :relationships
+  @reserved_child_opts [:agent, :id, :jido, :parent, :partition]
 
   def exec(
         %{agent: agent, tag: tag, opts: opts, meta: meta, restart: restart},
         _input_signal,
         state
       ) do
-    case Directive.validate_restart_policy(restart) do
-      :ok ->
-        child_id = opts[:id] || "#{state.id}/#{tag}"
-
-        child_opts =
-          [
-            agent: agent,
-            id: child_id,
-            parent: %{
-              pid: self(),
-              id: state.id,
-              tag: tag,
-              meta: meta
-            }
-          ] ++ Map.to_list(Map.delete(opts, :id))
-
-        child_opts =
-          if state.jido, do: Keyword.put(child_opts, :jido, state.jido), else: child_opts
-
-        child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
-
-        supervisor =
-          if state.jido, do: Jido.agent_supervisor_name(state.jido), else: Jido.AgentSupervisor
-
-        case DynamicSupervisor.start_child(supervisor, child_spec) do
-          {:ok, pid} ->
-            case persist_relationship(state, child_id, tag, meta) do
-              :ok ->
-                ref = Process.monitor(pid)
-
-                child_info =
-                  ChildInfo.new!(%{
-                    pid: pid,
-                    ref: ref,
-                    module: resolve_agent_module(agent),
-                    id: child_id,
-                    tag: tag,
-                    meta: meta
-                  })
-
-                new_state = State.add_child(state, tag, child_info)
-
-                Logger.debug(
-                  "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-                )
-
-                {:ok, new_state}
-
-              {:error, reason} ->
-                _ = DynamicSupervisor.terminate_child(supervisor, pid)
-
-                Logger.error(
-                  "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
-                )
-
-                {:ok, state}
-            end
-
-          {:error, reason} ->
-            Logger.error(
-              "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
-            )
-
-            {:ok, state}
-        end
-
+    with :ok <- Directive.validate_restart_policy(restart),
+         :ok <- Directive.validate_spawn_agent_opts(opts) do
+      spawn_child(state, agent, tag, opts, meta, restart)
+    else
       {:error, reason} ->
         Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
         {:ok, state}
@@ -275,16 +225,96 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   defp resolve_agent_module(%{__struct__: module}), do: module
   defp resolve_agent_module(_), do: nil
 
-  defp persist_relationship(state, child_id, tag, meta) do
-    RuntimeStore.put(state.jido, @relationship_hive, child_id, %{
-      parent_id: state.id,
+  defp spawn_child(state, agent, tag, opts, meta, restart) do
+    child_id = opts[:id] || "#{state.id}/#{tag}"
+    child_partition = Map.get(opts, :partition, state.partition)
+
+    parent_ref = %{
+      pid: self(),
+      id: state.id,
+      partition: state.partition,
       tag: tag,
-      meta: normalize_meta(meta)
-    })
+      meta: meta
+    }
+
+    child_opts =
+      opts
+      |> Map.drop(@reserved_child_opts)
+      |> Map.put(:agent, agent)
+      |> Map.put(:id, child_id)
+      |> Map.put(:partition, child_partition)
+      |> Map.put(:parent, parent_ref)
+      |> maybe_put_jido(state.jido)
+      |> Map.to_list()
+
+    child_spec = Supervisor.child_spec({AgentServer, child_opts}, restart: restart)
+
+    supervisor =
+      if state.jido, do: Jido.agent_supervisor_name(state.jido), else: Jido.AgentSupervisor
+
+    case DynamicSupervisor.start_child(supervisor, child_spec) do
+      {:ok, pid} ->
+        case persist_relationship(state, child_id, child_partition, tag, meta) do
+          :ok ->
+            ref = Process.monitor(pid)
+
+            child_info =
+              ChildInfo.new!(%{
+                pid: pid,
+                ref: ref,
+                module: resolve_agent_module(agent),
+                id: child_id,
+                partition: child_partition,
+                tag: tag,
+                meta: meta
+              })
+
+            new_state = State.add_child(state, tag, child_info)
+
+            Logger.debug(
+              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
+            )
+
+            {:ok, new_state}
+
+          {:error, reason} ->
+            _ = DynamicSupervisor.terminate_child(supervisor, pid)
+
+            Logger.error(
+              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
+            )
+
+            {:ok, state}
+        end
+
+      {:error, reason} ->
+        Logger.error(
+          "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
+        )
+
+        {:ok, state}
+    end
+  end
+
+  defp persist_relationship(state, child_id, child_partition, tag, meta) do
+    RuntimeStore.put(
+      state.jido,
+      @relationship_hive,
+      Jido.partition_key(child_id, child_partition),
+      %{
+        parent_id: state.id,
+        parent_partition: state.partition,
+        tag: tag,
+        meta: normalize_meta(meta)
+      }
+    )
   end
 
   defp normalize_meta(meta) when is_map(meta), do: meta
   defp normalize_meta(_meta), do: %{}
+
+  defp maybe_put_jido(opts, nil), do: opts
+  defp maybe_put_jido(opts, jido), do: Map.put(opts, :jido, jido)
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
@@ -306,6 +336,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
           ref: Process.monitor(child_pid),
           module: child_runtime.agent_module,
           id: child_runtime.id,
+          partition: child_runtime.partition,
           tag: tag,
           meta: meta
         })
@@ -337,7 +368,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
   end
 
   defp resolve_child(id, state) when is_binary(id) do
-    case Jido.whereis(state.jido, id) do
+    case Jido.whereis(state.jido, id, partition: state.partition) do
       pid when is_pid(pid) -> {:ok, pid}
       nil -> {:error, :child_not_found}
     end
@@ -353,6 +384,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
       ParentRef.new!(%{
         pid: self(),
         id: state.id,
+        partition: state.partition,
         tag: tag,
         meta: meta
       })
@@ -364,60 +396,11 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
   @moduledoc false
 
-  require Logger
-
-  alias Jido.AgentServer.State
-  alias Jido.RuntimeStore
-  alias Jido.Tracing.Context, as: TraceContext
-
-  @relationship_hive :relationships
+  alias Jido.AgentServer.StopChildRuntime
 
   def exec(%{tag: tag, reason: reason}, input_signal, state) do
-    case State.get_child(state, tag) do
-      nil ->
-        Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
-        {:ok, state}
-
-      %{pid: pid, id: child_id} ->
-        Logger.debug(
-          "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
-        )
-
-        case RuntimeStore.delete(state.jido, @relationship_hive, child_id) do
-          :ok ->
-            :ok
-
-          {:error, delete_reason} ->
-            Logger.warning(
-              "AgentServer #{state.id} failed to clear relationship for child #{child_id}: #{inspect(delete_reason)}"
-            )
-        end
-
-        stop_signal =
-          Jido.Signal.new!(
-            "jido.agent.stop",
-            %{reason: normalize_stop_reason(reason)},
-            source: "/agent/#{state.id}"
-          )
-
-        traced_signal =
-          case TraceContext.propagate_to(stop_signal, input_signal.id) do
-            {:ok, signal} -> signal
-            {:error, _} -> stop_signal
-          end
-
-        _ = Jido.AgentServer.cast(pid, traced_signal)
-
-        {:ok, state}
-    end
+    StopChildRuntime.exec(tag, reason, input_signal, state)
   end
-
-  # Transient children only skip restart for OTP "clean" shutdown reasons.
-  # Wrap custom reasons so StopChild removes the child instead of respawning it.
-  defp normalize_stop_reason(:normal), do: :normal
-  defp normalize_stop_reason(:shutdown), do: :shutdown
-  defp normalize_stop_reason({:shutdown, _} = reason), do: reason
-  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end
 
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Stop do

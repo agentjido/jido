@@ -1,10 +1,15 @@
 # Runtime
 
+<!-- covers: jido.runtime_lifecycle.agent_server_runtime -->
+
 **After:** You can run agents in a supervision tree and manage parent/child hierarchies.
 
 Agents run inside an `AgentServer` GenServer process. This guide covers starting agents, sending signals, and managing parent-child hierarchies.
 
 > For complete API details, see `Jido.AgentServer` and `Jido.Await` moduledocs.
+>
+> If you are deciding between `SpawnAgent`, `InstanceManager`, `Pod`, and
+> `partition`, start with [Choosing a Runtime Pattern](runtime-patterns.md).
 
 ## Starting Agents
 
@@ -74,6 +79,29 @@ Emit a `SpawnAgent` directive to create a child agent:
 # Or keep the child running across restarts/stops:
 %Directive.SpawnAgent{agent: ChildAgent, tag: :durable_worker, restart: :permanent}
 ```
+
+`SpawnAgent` is for live tracked child agents. It supports standard child
+startup options such as `:id`, `:initial_state`, and `:on_parent_death`, but it
+does not install `InstanceManager` lifecycle features like storage-backed
+hibernate/thaw. If you need durable agent lifecycle, use
+`Jido.Agent.InstanceManager` and treat reacquisition/reattachment as an explicit
+workflow concern.
+
+If the durable unit is a named team rather than a single agent, use
+`Jido.Pod`. A pod runs through ordinary `InstanceManager` lifecycle, persists
+its topology snapshot in `agent.state[:__pod__]`, and re-establishes live node
+attachments explicitly with `Jido.Pod.reconcile/2` and `Jido.Pod.ensure_node/3`
+after thaw. Root pod nodes are adopted into the pod manager, while owned nodes
+are adopted under their logical runtime owner. Nested `kind: :pod` nodes are
+acquired through their own `InstanceManager` and then reconciled recursively.
+`Jido.Pod.get/3` is the default happy path because it performs the initial eager
+reconciliation after `InstanceManager.get/3`.
+
+Running pods may also change their durable topology at runtime with
+`Jido.Pod.mutate/3`. That path persists the new topology snapshot first, then
+applies runtime stop/start work and returns a mutation report. In-turn pod code
+uses the same runtime path through `Jido.Pod.mutation_effects/3`. See
+[Pods](pods.md), especially [Canonical Example](pods.md#canonical-example).
 
 The parent:
 - Monitors the child process
