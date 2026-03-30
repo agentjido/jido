@@ -60,7 +60,7 @@ if config_env() == :dev do
     ]
 end
 
-# Import environment specific config (test.exs only)
-if config_env() == :test do
-  import_config "test.exs"
+# Import environment-specific overrides only for the environments that define them.
+if config_env() in [:prod, :test] do
+  import_config "#{config_env()}.exs"
 end
