@@ -11,6 +11,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
   alias Jido.Persist
   alias Jido.Signal
   alias Jido.Storage.ETS
+  alias JidoTest.Support.FailingTimeZoneDatabase
 
   defmodule CronCountAction do
     @moduledoc false
@@ -319,12 +320,13 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         end)
 
       on_exit(fn ->
-        {:ok, _} = Application.ensure_all_started(:tzdata)
+        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
       end)
 
       log =
         capture_log(fn ->
-          :ok = Application.stop(:tzdata)
+          # Simulate time zone database failure
+          Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
 
           {:ok, pid} =
             AgentServer.start_link(
@@ -347,7 +349,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
           refute Map.has_key?(checkpoint.state || %{}, scheduler_key)
 
           GenServer.stop(pid)
-          {:ok, _} = Application.ensure_all_started(:tzdata)
+          Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
         end)
 
       assert log =~ "failed to register cron job :skipped"

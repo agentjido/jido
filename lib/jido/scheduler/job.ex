@@ -12,7 +12,11 @@ defmodule Jido.Scheduler.Job do
   @retry_schedule :retry_schedule
   @retry_delay_ms 1_000
   @max_schedule_attempts 8
-  @time_zone_database Tzdata.TimeZoneDatabase
+
+  @spec time_zone_database() :: Calendar.time_zone_database()
+  defp time_zone_database do
+    Application.get_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
+  end
 
   @type schedule :: %{
           required(:cron_expr) => String.t(),
@@ -183,7 +187,7 @@ defmodule Jido.Scheduler.Job do
 
   @spec now_in_timezone(String.t()) :: {:ok, DateTime.t()} | {:error, term()}
   defp now_in_timezone(timezone) do
-    case DateTime.now(timezone, @time_zone_database) do
+    case DateTime.now(timezone, time_zone_database()) do
       {:ok, now} -> {:ok, now}
       {:error, reason} -> {:error, {:invalid_timezone, reason}}
     end
@@ -276,7 +280,7 @@ defmodule Jido.Scheduler.Job do
 
   defp do_next_scheduled_at(cron, timezone, from, attempts_left) do
     with {:ok, next_naive} <- next_run_date(cron, from) do
-      case DateTime.from_naive(next_naive, timezone, @time_zone_database) do
+      case DateTime.from_naive(next_naive, timezone, time_zone_database()) do
         {:ok, next_at} ->
           ensure_future_schedule(cron, timezone, next_at, from, attempts_left)
 
@@ -314,7 +318,7 @@ defmodule Jido.Scheduler.Job do
   @spec advance_search_start(DateTime.t(), String.t()) :: {:ok, DateTime.t()} | {:error, term()}
   defp advance_search_start(from, timezone) do
     with {:ok, utc_dt} <- DateTime.from_unix(DateTime.to_unix(from, :second) + 1, :second),
-         {:ok, next_from} <- DateTime.shift_zone(utc_dt, timezone, @time_zone_database) do
+         {:ok, next_from} <- DateTime.shift_zone(utc_dt, timezone, time_zone_database()) do
       {:ok, next_from}
     else
       {:error, reason} -> {:error, {:invalid_timezone, reason}}

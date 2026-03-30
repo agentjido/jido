@@ -6,6 +6,7 @@ defmodule JidoTest.SchedulerTest do
 
   alias Jido.Scheduler
   alias Jido.Scheduler.Job
+  alias JidoTest.Support.FailingTimeZoneDatabase
 
   setup do
     original_database = Calendar.get_time_zone_database()
@@ -21,6 +22,10 @@ defmodule JidoTest.SchedulerTest do
     def test_func(arg) do
       send(arg, :test_func_called)
     end
+  end
+
+  defp time_zone_database do
+    Application.get_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
   end
 
   describe "run_every/5 with module/function/args" do
@@ -103,7 +108,7 @@ defmodule JidoTest.SchedulerTest do
                Scheduler.run_every(fun, "* * * * *", timezone: :america_chicago)
     end
 
-    test "uses tzdata directly without mutating the global calendar database" do
+    test "uses configured time zone database without mutating the global calendar database" do
       Calendar.put_time_zone_database(Calendar.UTCOnlyTimeZoneDatabase)
 
       assert {:ok, pid} =
@@ -219,10 +224,12 @@ defmodule JidoTest.SchedulerTest do
     test "skips nonexistent spring-forward occurrences" do
       timezone = "America/Chicago"
       {:ok, schedule} = Job.prepare_schedule("30 2 * * *", timezone)
-      {:ok, now} = DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, Tzdata.TimeZoneDatabase)
+
+      {:ok, now} =
+        DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, time_zone_database())
 
       {:ok, expected} =
-        DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, Tzdata.TimeZoneDatabase)
+        DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
     end
@@ -232,10 +239,10 @@ defmodule JidoTest.SchedulerTest do
       {:ok, schedule} = Job.prepare_schedule("31 1 * * *", timezone)
 
       {:ambiguous, _first_now, now} =
-        DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, Tzdata.TimeZoneDatabase)
+        DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, time_zone_database())
 
       {:ambiguous, _first_expected, expected} =
-        DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, Tzdata.TimeZoneDatabase)
+        DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
       assert DateTime.diff(expected, now, :millisecond) == 30_000
@@ -243,15 +250,18 @@ defmodule JidoTest.SchedulerTest do
   end
 
   describe "runtime schedule recovery" do
-    test "tzdata loss enters retry mode and resumes without killing the owner" do
+    test "time zone database failure enters retry mode and resumes without killing the owner" do
       test_pid = self()
       tick_gate = {__MODULE__, make_ref()}
       owner_tag = make_ref()
       :persistent_term.put(tick_gate, false)
 
+      # Ensure we start with a working database
+      Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
+
       on_exit(fn ->
         :persistent_term.erase(tick_gate)
-        {:ok, _} = Application.ensure_all_started(:tzdata)
+        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
       end)
 
       capture_log(fn ->
@@ -279,12 +289,14 @@ defmodule JidoTest.SchedulerTest do
         assert Process.alive?(owner)
         assert Process.alive?(job_pid)
 
-        :ok = Application.stop(:tzdata)
+        # Simulate database failure
+        Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
 
         eventually(fn -> Process.alive?(owner) and Process.alive?(job_pid) end, timeout: 2_000)
 
+        # Restore working database
         :persistent_term.put(tick_gate, true)
-        {:ok, _} = Application.ensure_all_started(:tzdata)
+        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
 
         assert_receive {:recovered_tick, ^owner_tag, worker_pid}, 3_000
         assert is_pid(worker_pid)

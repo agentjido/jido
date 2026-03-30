@@ -2,6 +2,9 @@ import Config
 
 config :jido, default: Jido.DefaultInstance
 
+# Default scheduler time zone database
+config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+
 # Logger configuration for Jido telemetry metadata
 # These metadata keys are used by Jido.Telemetry for structured logging
 config :logger, :default_formatter,
