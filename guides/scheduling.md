@@ -4,7 +4,7 @@
 
 Jido provides three scheduling mechanisms: declarative schedules in the agent definition, one-time delays via `Schedule`, and dynamic recurring jobs via `Cron`. All are timer-based and tied to the agent's process lifecycle.
 
-Dynamic cron scheduling now lives in Jido core because durable runtime registrations need to survive hibernate/thaw without carrying the old `sched_ex -> timex -> gettext` dependency chain. The implementation stays intentionally small: `crontab` parses cron expressions and `tzdata` resolves named timezones.
+Dynamic cron scheduling now lives in Jido core so durable runtime registrations survive hibernate/thaw while keeping the implementation intentionally small. `crontab` parses cron expressions and the configured time zone database resolves named timezones.
 
 ## Declarative Schedules
 
@@ -158,12 +158,14 @@ Directive.cron("0 9 * * *", morning_signal,
 Default timezone is `Etc/UTC`.
 
 Jido does **not** mutate the global calendar timezone database at runtime.
-Named timezones depend on your application config:
+Named timezones use Jido's configured time zone database, which defaults to `TimeZoneInfo.TimeZoneDatabase`:
 
 ```elixir
 # config/config.exs
-config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
 ```
+
+You can override that setting if your application needs a different `Calendar.TimeZoneDatabase` implementation.
 
 If timezone configuration is missing or invalid, cron registration returns
 `{:error, {:invalid_timezone, reason}}` and the agent process stays alive.

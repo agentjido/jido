@@ -6,6 +6,7 @@ defmodule JidoTest.SchedulerTest do
 
   alias Jido.Scheduler
   alias Jido.Scheduler.Job
+  alias JidoTest.Support.FailingTimeZoneDatabase
 
   setup do
     original_database = Calendar.get_time_zone_database()
@@ -21,6 +22,10 @@ defmodule JidoTest.SchedulerTest do
     def test_func(arg) do
       send(arg, :test_func_called)
     end
+  end
+
+  defp time_zone_database do
+    Application.get_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
   end
 
   describe "run_every/5 with module/function/args" do
@@ -221,10 +226,10 @@ defmodule JidoTest.SchedulerTest do
       {:ok, schedule} = Job.prepare_schedule("30 2 * * *", timezone)
 
       {:ok, now} =
-        DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, Job.time_zone_database())
+        DateTime.from_naive(~N[2026-03-08 00:30:00], timezone, time_zone_database())
 
       {:ok, expected} =
-        DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, Job.time_zone_database())
+        DateTime.from_naive(~N[2026-03-09 02:30:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
     end
@@ -234,10 +239,10 @@ defmodule JidoTest.SchedulerTest do
       {:ok, schedule} = Job.prepare_schedule("31 1 * * *", timezone)
 
       {:ambiguous, _first_now, now} =
-        DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, Job.time_zone_database())
+        DateTime.from_naive(~N[2026-11-01 01:30:30], timezone, time_zone_database())
 
       {:ambiguous, _first_expected, expected} =
-        DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, Job.time_zone_database())
+        DateTime.from_naive(~N[2026-11-01 01:31:00], timezone, time_zone_database())
 
       assert {:ok, ^expected} = Job.next_scheduled_at(schedule.cron, timezone, now)
       assert DateTime.diff(expected, now, :millisecond) == 30_000
@@ -245,21 +250,6 @@ defmodule JidoTest.SchedulerTest do
   end
 
   describe "runtime schedule recovery" do
-    defmodule FailingTimeZoneDatabase do
-      @moduledoc false
-      @behaviour Calendar.TimeZoneDatabase
-
-      @impl true
-      def time_zone_period_from_utc_iso_days(_iso_days, _time_zone) do
-        {:error, :time_zone_not_found}
-      end
-
-      @impl true
-      def time_zone_periods_from_wall_datetime(_datetime, _time_zone) do
-        {:error, :time_zone_not_found}
-      end
-    end
-
     test "time zone database failure enters retry mode and resumes without killing the owner" do
       test_pid = self()
       tick_gate = {__MODULE__, make_ref()}

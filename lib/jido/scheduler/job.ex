@@ -13,9 +13,8 @@ defmodule Jido.Scheduler.Job do
   @retry_delay_ms 1_000
   @max_schedule_attempts 8
 
-  @doc false
   @spec time_zone_database() :: Calendar.time_zone_database()
-  def time_zone_database do
+  defp time_zone_database do
     Application.get_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
   end
 
