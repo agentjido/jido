@@ -20,6 +20,21 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
   @moduletag capture_log: true
   @moduletag timeout: 20_000
 
+  defmodule FailingTimeZoneDatabase do
+    @moduledoc false
+    @behaviour Calendar.TimeZoneDatabase
+
+    @impl true
+    def time_zone_period_from_utc_iso_days(_iso_days, _time_zone) do
+      {:error, :time_zone_not_found}
+    end
+
+    @impl true
+    def time_zone_periods_from_wall_datetime(_datetime, _time_zone) do
+      {:error, :time_zone_not_found}
+    end
+  end
+
   defmodule PluginTickAction do
     @moduledoc false
     use Jido.Action, name: "plugin_tick", schema: []
@@ -58,9 +73,10 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
   end
 
   describe "runtime scheduler failures" do
-    test "cron job enters retry mode during tzdata outage and resumes after recovery", context do
+    test "cron job enters retry mode during time zone database failure and resumes after recovery",
+         context do
       on_exit(fn ->
-        {:ok, _} = Application.ensure_all_started(:tzdata)
+        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
       end)
 
       pid = start_cron_agent(context, id: unique_id("scheduler-retry"))
@@ -76,7 +92,8 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
 
       server_ref = Process.monitor(pid)
 
-      :ok = Application.stop(:tzdata)
+      # Simulate time zone database failure
+      Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
 
       eventually(fn -> Process.alive?(pid) end, timeout: 2_000)
 
@@ -90,7 +107,8 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
 
       baseline = state_during_outage.agent.state.tick_count
 
-      {:ok, _} = Application.ensure_all_started(:tzdata)
+      # Restore working database
+      Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
 
       eventually(fn -> Process.alive?(job_pid) and not :sys.get_state(job_pid).retrying? end,
         timeout: 5_000

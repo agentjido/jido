@@ -388,7 +388,7 @@ defmodule Jido.MixProject do
       {:poolboy, "~> 1.5"},
       {:telemetry_metrics, "~> 1.1"},
       {:crontab, "~> 1.2"},
-      {:tzdata, "~> 1.1"},
+      {:time_zone_info, "~> 0.7"},
       {:uniq, "~> 0.6.1"},
 
       # Development & Test Dependencies

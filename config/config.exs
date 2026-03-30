@@ -2,6 +2,9 @@ import Config
 
 config :jido, default: Jido.DefaultInstance
 
+# Use time_zone_info as the default time zone database (replaces tzdata)
+config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+
 # Logger configuration for Jido telemetry metadata
 # These metadata keys are used by Jido.Telemetry for structured logging
 config :logger, :default_formatter,
