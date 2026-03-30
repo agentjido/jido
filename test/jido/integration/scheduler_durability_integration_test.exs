@@ -23,6 +23,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
     CronAgent,
     ScheduledCronAgent
   }
+
   alias JidoTest.Support.FailingTimeZoneDatabase
 
   @moduletag :integration
