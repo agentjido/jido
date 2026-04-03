@@ -25,7 +25,7 @@ defmodule Jido.Config.Defaults do
 
   @instance_manager_stop_timeout_ms 5_000
 
-  @telemetry_log_level :warning
+  @telemetry_log_level :info
   @telemetry_log_args :keys_only
   @slow_signal_threshold_ms 10
   @slow_directive_threshold_ms 5
@@ -33,7 +33,7 @@ defmodule Jido.Config.Defaults do
     "jido.strategy.init",
     "jido.strategy.complete"
   ]
-  @observe_log_level :warning
+  @observe_log_level :info
   @observe_debug_events :off
   @redact_sensitive false
   @tracer Jido.Observe.NoopTracer

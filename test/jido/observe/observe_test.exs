@@ -444,14 +444,14 @@ defmodule JidoTest.ObserveTest do
       assert Log.threshold() == :debug
     end
 
-    test "defaults to :warning when not configured" do
+    test "defaults to :info when not configured" do
       Application.delete_env(:jido, :observability)
-      assert Log.threshold() == :warning
+      assert Log.threshold() == :info
     end
 
-    test "defaults to :warning when log_level key is missing" do
+    test "defaults to :info when log_level key is missing" do
       Application.put_env(:jido, :observability, tracer: SomeTracer)
-      assert Log.threshold() == :warning
+      assert Log.threshold() == :info
     end
   end
 

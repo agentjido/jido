@@ -39,8 +39,8 @@ defmodule JidoTest.Observe.ConfigTest do
     end
 
     test "reads from global config" do
-      Application.put_env(:jido, :telemetry, log_level: :warning)
-      assert Config.telemetry_log_level(nil) == :warning
+      Application.put_env(:jido, :telemetry, log_level: :info)
+      assert Config.telemetry_log_level(nil) == :info
     end
 
     test "falls back to default when global value is invalid" do
@@ -121,12 +121,12 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "debug_enabled?/1" do
-    test "false by default (default log level is :warning)" do
+    test "false by default (default log level is :info)" do
       refute Config.debug_enabled?(nil)
     end
 
-    test "false when log level is warning" do
-      Application.put_env(:jido, :telemetry, log_level: :warning)
+    test "false when log level is info" do
+      Application.put_env(:jido, :telemetry, log_level: :info)
       refute Config.debug_enabled?(nil)
     end
   end
@@ -343,21 +343,21 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "level_enabled?/2" do
-    test "debug is not enabled at warning level" do
+    test "debug is not enabled at info level" do
       refute Config.level_enabled?(nil, :debug)
     end
 
-    test "trace is not enabled at warning level" do
+    test "trace is not enabled at info level" do
       refute Config.level_enabled?(nil, :trace)
     end
 
-    test "warning is enabled at the default warning level" do
-      assert Config.level_enabled?(nil, :warning)
+    test "info is enabled at the default info level" do
+      assert Config.level_enabled?(nil, :info)
     end
 
-    test "info is enabled when configured log level is info" do
-      Application.put_env(:jido, :telemetry, log_level: :info)
-      assert Config.level_enabled?(nil, :info)
+    test "warning is enabled when configured log level is warning" do
+      Application.put_env(:jido, :telemetry, log_level: :warning)
+      assert Config.level_enabled?(nil, :warning)
     end
   end
 

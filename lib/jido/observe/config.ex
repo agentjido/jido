@@ -153,6 +153,15 @@ defmodule Jido.Observe.Config do
   `:silent` to avoid leaking full action params/context through dependency
   telemetry spans. Full argument logging is only enabled when the instance opts
   into `log_args: :full` or `Jido.debug(:verbose)`.
+
+  Quieter runtime behavior remains opt-in through `:jido` telemetry and
+  observability config; the library defaults stay aligned with the historical
+  `:info` baseline for compatibility.
+
+  This function defines the supported boundary between `jido` and
+  downstream action execution. Human-readable dependency log strings are not a
+  stable contract; callers and tests should assert derived exec opts and
+  telemetry behavior instead.
   """
   @spec action_exec_opts(instance(), keyword()) :: keyword()
   def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
