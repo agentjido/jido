@@ -220,6 +220,19 @@ defmodule JidoTest.Observe.ConfigTest do
       assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
     end
+
+    test "honors verbose instance override when deriving exec opts" do
+      Application.put_env(:jido, :telemetry, log_level: :warning, log_args: :none)
+      Debug.enable(@test_instance, :verbose)
+
+      opts =
+        Config.action_exec_opts(@test_instance, __jido_instance__: @test_instance, timeout: 10)
+
+      refute Keyword.has_key?(opts, :__jido_instance__)
+      assert Keyword.get(opts, :log_level) == :debug
+      assert Keyword.get(opts, :telemetry) == :full
+      assert Keyword.get(opts, :timeout) == 10
+    end
   end
 
   describe "observe_log_level/1" do

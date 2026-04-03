@@ -18,10 +18,10 @@ defmodule Jido.Util do
   but they can also be useful for developers building applications with Jido.
   """
 
+  alias Jido.Log
   alias Jido.Signal.ID, as: SignalID
 
   require OK
-  require Logger
 
   @name_regex ~r/^[a-zA-Z][a-zA-Z0-9_]*$/
 
@@ -371,7 +371,7 @@ defmodule Jido.Util do
     end
   end
 
-  @valid_levels Logger.levels()
+  @valid_levels Log.levels()
 
   @doc """
   Conditionally logs a message based on comparing threshold and message log levels.
@@ -385,7 +385,7 @@ defmodule Jido.Util do
   - `threshold_level`: The minimum log level threshold (e.g. :debug, :info, etc)
   - `message_level`: The log level for this specific message
   - `message`: The message to potentially log
-  - `opts`: Additional options passed to Logger.log/3
+  - `opts`: Additional options passed to the logger backend
 
   ## Returns
 
@@ -411,8 +411,8 @@ defmodule Jido.Util do
       threshold_level not in @valid_levels or message_level not in @valid_levels ->
         :ok
 
-      Logger.compare_levels(threshold_level, message_level) in [:lt, :eq] ->
-        Logger.log(message_level, message, opts)
+      Log.compare_levels(threshold_level, message_level) in [:lt, :eq] ->
+        Log.log(message_level, message, opts)
 
       true ->
         :ok

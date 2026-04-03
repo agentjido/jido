@@ -61,9 +61,6 @@ defmodule Jido.Discovery do
   Reads are extremely fast (direct memory access) and never block.
   All processes can read concurrently without contention.
   """
-
-  require Logger
-
   @catalog_key :jido_discovery_catalog
 
   @type component_type :: :actions | :sensors | :agents | :plugins | :demos
