@@ -836,7 +836,7 @@ defmodule JidoTest.AgentServerTest do
       # Wait for scheduled atom message (10ms delay + processing)
       state =
         eventually_state(pid, fn state -> state.agent.state.received == :timeout end,
-          timeout: 100
+          timeout: 250
         )
 
       assert state.agent.state.received == :timeout

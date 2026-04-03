@@ -31,7 +31,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
   @moduledoc false
 
-  require Logger
+  alias Jido.Log
   alias Jido.AgentServer.State
 
   def exec(%{job_id: logical_id}, _input_signal, state) do
@@ -44,7 +44,9 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
 
         new_state = %{runtime_state | cron_specs: proposed_specs}
 
-        Logger.debug("AgentServer #{agent_id} cancelled cron job #{inspect(logical_id)}")
+        Log.debug(fn ->
+          "AgentServer #{agent_id} cancelled cron job #{Log.safe_inspect(logical_id)}"
+        end)
 
         emit_telemetry(new_state, :cancel, %{job_id: logical_id})
         {:ok, new_state}
@@ -53,9 +55,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
         {_pid, runtime_state} = drop_runtime_job(state, logical_id)
         new_state = %{runtime_state | cron_specs: proposed_specs}
 
-        Logger.error(
-          "AgentServer #{agent_id} failed to persist cron cancellation for #{inspect(logical_id)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "AgentServer #{agent_id} failed to persist cron cancellation for #{Log.safe_inspect(logical_id)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         emit_telemetry(state, :persist_failure, %{
           job_id: logical_id,
@@ -66,9 +69,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
         {:ok, new_state}
 
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{agent_id} failed to persist cron cancellation for #{inspect(logical_id)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "AgentServer #{agent_id} failed to persist cron cancellation for #{Log.safe_inspect(logical_id)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         emit_telemetry(state, :persist_failure, %{
           job_id: logical_id,

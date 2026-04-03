@@ -93,10 +93,9 @@ defmodule Jido.Observe do
   `prompt_size_bytes`) rather than the raw content.
   """
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.Observe.Config, as: ObserveConfig
-  alias Jido.Observe.Log
+  alias Jido.Observe.Log, as: ObserveLog
   alias Jido.Observe.SpanCtx
   alias Jido.Tracing.Context, as: TracingContext
 
@@ -253,7 +252,7 @@ defmodule Jido.Observe do
   """
   @spec log(Logger.level(), Logger.message(), keyword()) :: :ok
   def log(level, message, metadata \\ []) do
-    Log.log(level, message, metadata)
+    ObserveLog.log(level, message, metadata)
   end
 
   @doc """
@@ -695,21 +694,21 @@ defmodule Jido.Observe do
   end
 
   defp log_tracer_warning(%SpanCtx{} = span_ctx, callback_name, failure) do
-    Logger.warning(
+    Log.warning(fn ->
       "Jido.Observe tracer #{callback_name} failed " <>
-        "(tracer=#{inspect(span_ctx.tracer_module || tracer(span_ctx.metadata))}, " <>
-        "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
+        "(tracer=#{Log.safe_inspect(span_ctx.tracer_module || tracer(span_ctx.metadata))}, " <>
+        "event_prefix=#{Log.safe_inspect(span_ctx.event_prefix)}, " <>
         "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{format_tracer_failure(failure)}"
-    )
+    end)
   end
 
   defp log_scoped_contract_warning(%SpanCtx{} = span_ctx, message) do
-    Logger.warning(
+    Log.warning(fn ->
       "Jido.Observe tracer with_span_scope/3 contract violation " <>
-        "(tracer=#{inspect(span_ctx.tracer_module)}, " <>
-        "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
+        "(tracer=#{Log.safe_inspect(span_ctx.tracer_module)}, " <>
+        "event_prefix=#{Log.safe_inspect(span_ctx.event_prefix)}, " <>
         "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{message}"
-    )
+    end)
   end
 
   defp raise_tracer_failure(%SpanCtx{} = span_ctx, callback_name, failure) do

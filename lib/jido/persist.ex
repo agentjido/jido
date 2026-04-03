@@ -48,8 +48,7 @@ defmodule Jido.Persist do
   If not implemented, default serialization is used.
   """
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.Scheduler
   alias Jido.Thread
 
@@ -166,19 +165,25 @@ defmodule Jido.Persist do
   defp do_hibernate(adapter, opts, agent_module, key, agent) do
     thread = get_thread(agent)
 
-    Logger.debug("Persist.hibernate starting for #{inspect(agent_module)} key=#{inspect(key)}")
+    Log.debug(fn ->
+      "Persist.hibernate starting for #{Log.safe_inspect(agent_module)} key=#{Log.safe_inspect(key)}"
+    end)
 
     with :ok <- flush_journal(adapter, opts, thread),
          {:ok, checkpoint} <- create_checkpoint(agent_module, agent, thread),
          checkpoint_key <- make_checkpoint_key(agent_module, key),
          :ok <- adapter.put_checkpoint(checkpoint_key, checkpoint, opts) do
-      Logger.debug("Persist.hibernate completed for #{inspect(agent_module)} key=#{inspect(key)}")
+      Log.debug(fn ->
+        "Persist.hibernate completed for #{Log.safe_inspect(agent_module)} key=#{Log.safe_inspect(key)}"
+      end)
+
       :ok
     else
       {:error, reason} = error ->
-        Logger.error(
-          "Persist.hibernate failed for #{inspect(agent_module)} key=#{inspect(key)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "Persist.hibernate failed for #{Log.safe_inspect(agent_module)} " <>
+            "key=#{Log.safe_inspect(key)}: #{Log.safe_inspect(reason)}"
+        end)
 
         error
     end
@@ -188,20 +193,26 @@ defmodule Jido.Persist do
   defp do_thaw(adapter, opts, agent_module, key) do
     checkpoint_key = make_checkpoint_key(agent_module, key)
 
-    Logger.debug("Persist.thaw starting for #{inspect(agent_module)} key=#{inspect(key)}")
+    Log.debug(fn ->
+      "Persist.thaw starting for #{Log.safe_inspect(agent_module)} key=#{Log.safe_inspect(key)}"
+    end)
 
     case Jido.Storage.fetch_checkpoint(adapter, checkpoint_key, opts) do
       {:ok, checkpoint} ->
         restore_from_checkpoint(adapter, opts, agent_module, checkpoint)
 
       {:error, :not_found} ->
-        Logger.debug("Persist.thaw: checkpoint not found for #{inspect(checkpoint_key)}")
+        Log.debug(fn ->
+          "Persist.thaw: checkpoint not found for #{Log.safe_inspect(checkpoint_key)}"
+        end)
+
         {:error, :not_found}
 
       {:error, reason} = error ->
-        Logger.error(
-          "Persist.thaw failed to get checkpoint for #{inspect(checkpoint_key)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "Persist.thaw failed to get checkpoint for #{Log.safe_inspect(checkpoint_key)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         error
     end
@@ -226,9 +237,9 @@ defmodule Jido.Persist do
     if thread.rev == entry_count do
       :ok
     else
-      Logger.error(
+      Log.error(fn ->
         "Persist: invalid local thread revision for #{thread.id}: rev=#{thread.rev}, entries=#{entry_count}"
-      )
+      end)
 
       {:error, :invalid_thread_revision}
     end
@@ -257,21 +268,21 @@ defmodule Jido.Persist do
 
     cond do
       stored_rev > local_rev ->
-        Logger.error(
+        Log.error(fn ->
           "Persist: thread rev regression for #{thread.id}: local_rev=#{local_rev}, stored_rev=#{stored_rev}"
-        )
+        end)
 
         {:error, :thread_rev_regression}
 
       stored_rev > entry_count ->
-        Logger.error(
+        Log.error(fn ->
           "Persist: thread history truncated for #{thread.id}: entry_count=#{entry_count}, stored_rev=#{stored_rev}"
-        )
+        end)
 
         {:error, :thread_history_truncated}
 
       stored_rev == local_rev ->
-        Logger.debug("Persist: thread #{thread.id} already persisted at rev=#{stored_rev}")
+        Log.debug(fn -> "Persist: thread #{thread.id} already persisted at rev=#{stored_rev}" end)
         :ok
 
       true ->
@@ -282,9 +293,9 @@ defmodule Jido.Persist do
           |> maybe_put_thread_metadata(stored_rev, thread.metadata)
           |> Kernel.++(opts)
 
-        Logger.debug(
+        Log.debug(fn ->
           "Persist: flushing #{length(missing_entries)} new entries for thread #{thread.id} from rev=#{stored_rev}"
-        )
+        end)
 
         case adapter.append_thread(thread.id, missing_entries, append_opts) do
           {:ok, _updated_thread} ->
@@ -294,9 +305,9 @@ defmodule Jido.Persist do
             handle_thread_append_conflict(adapter, opts, thread.id, local_rev)
 
           {:error, reason} = error ->
-            Logger.error(
-              "Persist: failed to flush journal for thread #{thread.id}: #{inspect(reason)}"
-            )
+            Log.error(fn ->
+              "Persist: failed to flush journal for thread #{thread.id}: #{Log.safe_inspect(reason)}"
+            end)
 
             error
         end
@@ -314,23 +325,24 @@ defmodule Jido.Persist do
   defp handle_thread_append_conflict(adapter, opts, thread_id, local_rev) do
     case Jido.Storage.fetch_thread(adapter, thread_id, opts) do
       {:ok, %Thread{rev: stored_rev}} when stored_rev >= local_rev ->
-        Logger.debug(
+        Log.debug(fn ->
           "Persist: append conflict resolved for #{thread_id}; stored_rev=#{stored_rev} >= local_rev=#{local_rev}"
-        )
+        end)
 
         :ok
 
       {:ok, %Thread{rev: stored_rev}} ->
-        Logger.error(
+        Log.error(fn ->
           "Persist: append conflict for #{thread_id}; stored_rev=#{stored_rev}, local_rev=#{local_rev}"
-        )
+        end)
 
         {:error, :conflict}
 
       {:error, reason} = error ->
-        Logger.error(
-          "Persist: append conflict but failed to reload thread #{thread_id}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "Persist: append conflict but failed to reload thread #{thread_id}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         error
     end
@@ -396,7 +408,11 @@ defmodule Jido.Persist do
          {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
          {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
       agent = attach_scheduler_manifest(agent, checkpoint)
-      Logger.debug("Persist.thaw completed for #{inspect(agent_module)} id=#{checkpoint.id}")
+
+      Log.debug(fn ->
+        "Persist.thaw completed for #{Log.safe_inspect(agent_module)} id=#{checkpoint.id}"
+      end)
+
       {:ok, agent}
     end
   end
@@ -431,7 +447,9 @@ defmodule Jido.Persist do
   defp rehydrate_thread(_adapter, _opts, agent, %{thread: nil}), do: {:ok, agent}
 
   defp rehydrate_thread(adapter, opts, agent, %{thread: %{id: thread_id, rev: expected_rev}}) do
-    Logger.debug("Persist: rehydrating thread #{thread_id} with expected rev=#{expected_rev}")
+    Log.debug(fn ->
+      "Persist: rehydrating thread #{thread_id} with expected rev=#{expected_rev}"
+    end)
 
     case Jido.Storage.fetch_thread(adapter, thread_id, opts) do
       {:ok, %Thread{rev: ^expected_rev} = thread} ->
@@ -439,18 +457,24 @@ defmodule Jido.Persist do
         {:ok, agent_with_thread}
 
       {:ok, %Thread{rev: actual_rev}} ->
-        Logger.error(
+        Log.error(fn ->
           "Persist: thread rev mismatch for #{thread_id}: expected=#{expected_rev}, actual=#{actual_rev}"
-        )
+        end)
 
         {:error, :thread_mismatch}
 
       {:error, :not_found} ->
-        Logger.error("Persist: thread #{thread_id} not found but referenced in checkpoint")
+        Log.error(fn ->
+          "Persist: thread #{thread_id} not found but referenced in checkpoint"
+        end)
+
         {:error, :missing_thread}
 
       {:error, reason} = error ->
-        Logger.error("Persist: failed to load thread #{thread_id}: #{inspect(reason)}")
+        Log.error(fn ->
+          "Persist: failed to load thread #{thread_id}: #{Log.safe_inspect(reason)}"
+        end)
+
         error
     end
   end

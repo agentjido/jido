@@ -184,8 +184,6 @@ defmodule Jido.AgentServer do
 
   use GenServer
 
-  require Logger
-
   alias Jido.AgentServer.{
     ChildInfo,
     CronRuntimeSpec,
@@ -201,6 +199,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
   alias Jido.Config.Defaults
+  alias Jido.Log
   alias Jido.RuntimeStore
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
@@ -796,9 +795,10 @@ defmodule Jido.AgentServer do
         {:ok, track_cron_job(state, logical_id, pid, runtime_spec: runtime_spec)}
 
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to register #{runtime_cron_log_label(runtime_spec)} #{inspect(logical_id)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "AgentServer #{state.id} failed to register #{runtime_cron_log_label(runtime_spec)} " <>
+            "#{Log.safe_inspect(logical_id)}: #{Log.safe_inspect(reason)}"
+        end)
 
         {:error, reason, state}
     end
@@ -978,7 +978,7 @@ defmodule Jido.AgentServer do
             enq_state
 
           {:error, :queue_overflow} ->
-            Logger.warning("AgentServer #{state.id} queue overflow during strategy init")
+            Log.warning(fn -> "AgentServer #{state.id} queue overflow during strategy init" end)
             state
         end
       else
@@ -1563,7 +1563,7 @@ defmodule Jido.AgentServer do
               metadata
             )
 
-            Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+            Log.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
             GenServer.reply(from, {:error, :queue_overflow})
             maybe_set_idle_status(state)
         end
@@ -1591,10 +1591,10 @@ defmodule Jido.AgentServer do
           Map.merge(metadata, %{kind: kind, error: reason})
         )
 
-        Logger.error(
-          "Signal call task failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}\n" <>
-            Exception.format_stacktrace(stacktrace)
-        )
+        Log.error(fn ->
+          "Signal call task failed for #{state.id}: #{Log.safe_inspect(kind)} " <>
+            "#{Log.safe_inspect(reason)}\n#{Exception.format_stacktrace(stacktrace)}"
+        end)
 
         GenServer.reply(from, {:error, reason})
         maybe_set_idle_status(state)
@@ -1818,7 +1818,7 @@ defmodule Jido.AgentServer do
           metadata
         )
 
-        Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+        Log.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
         {:error, :queue_overflow, state}
     end
   end
@@ -1991,9 +1991,9 @@ defmodule Jido.AgentServer do
       end
     rescue
       e ->
-        Logger.error(
-          "Plugin #{inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
-        )
+        Log.error(fn ->
+          "Plugin #{Log.safe_inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
+        end)
 
         error =
           Jido.Error.execution_error(
@@ -2032,9 +2032,9 @@ defmodule Jido.AgentServer do
         spec.module.transform_result(action_term, agent_acc, context)
       rescue
         e ->
-          Logger.error(
-            "Plugin #{inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
-          )
+          Log.error(fn ->
+            "Plugin #{Log.safe_inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
+          end)
 
           agent_acc
       end
@@ -2084,9 +2084,10 @@ defmodule Jido.AgentServer do
         end)
 
       other ->
-        Logger.warning(
-          "Invalid child_spec from plugin #{inspect(plugin_module)}: #{inspect(other)}"
-        )
+        Log.warning(fn ->
+          "Invalid child_spec from plugin #{Log.safe_inspect(plugin_module)}: " <>
+            Log.safe_inspect(other)
+        end)
 
         state
     end
@@ -2112,16 +2113,20 @@ defmodule Jido.AgentServer do
         %{state | children: new_children}
 
       {:error, reason} ->
-        Logger.error("Failed to start plugin child #{inspect(plugin_module)}: #{inspect(reason)}")
+        Log.error(fn ->
+          "Failed to start plugin child #{Log.safe_inspect(plugin_module)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         state
     end
   end
 
   defp start_plugin_child(%State{} = state, plugin_module, spec) do
-    Logger.warning(
-      "Plugin child_spec missing :start key for #{inspect(plugin_module)}: #{inspect(spec)}"
-    )
+    Log.warning(fn ->
+      "Plugin child_spec missing :start key for #{Log.safe_inspect(plugin_module)}: " <>
+        Log.safe_inspect(spec)
+    end)
 
     state
   end
@@ -2194,9 +2199,10 @@ defmodule Jido.AgentServer do
         %{state | children: new_children}
 
       {:error, reason} ->
-        Logger.warning(
-          "Failed to start subscription sensor #{inspect(sensor_module)} for plugin #{inspect(plugin_module)}: #{inspect(reason)}"
-        )
+        Log.warning(fn ->
+          "Failed to start subscription sensor #{Log.safe_inspect(sensor_module)} for plugin " <>
+            "#{Log.safe_inspect(plugin_module)}: #{Log.safe_inspect(reason)}"
+        end)
 
         state
     end
@@ -2208,7 +2214,7 @@ defmodule Jido.AgentServer do
 
   @doc false
   defp register_plugin_schedules(%State{skip_schedules: true} = state) do
-    Logger.debug("AgentServer #{state.id} skipping plugin schedules")
+    Log.debug(fn -> "AgentServer #{state.id} skipping plugin schedules" end)
     state
   end
 
@@ -2241,9 +2247,10 @@ defmodule Jido.AgentServer do
          %{cron_expression: cron_expr, message: message, timezone: timezone}
        ) do
     if Map.has_key?(state.cron_jobs, job_id) do
-      Logger.warning(
-        "AgentServer #{state.id} skipping restored cron job #{inspect(job_id)} because declarative/plugin schedule already exists"
-      )
+      Log.warning(fn ->
+        "AgentServer #{state.id} skipping restored cron job #{Log.safe_inspect(job_id)} " <>
+          "because declarative/plugin schedule already exists"
+      end)
 
       new_cron_specs = Map.delete(state.cron_specs, job_id)
       cleaned_state = %{state | cron_specs: new_cron_specs}
@@ -2269,9 +2276,10 @@ defmodule Jido.AgentServer do
   end
 
   defp register_restored_cron_spec(%State{} = state, job_id, invalid_spec) do
-    Logger.error(
-      "AgentServer #{state.id} skipped invalid persisted cron spec #{inspect(job_id)}: #{inspect(invalid_spec)}"
-    )
+    Log.error(fn ->
+      "AgentServer #{state.id} skipped invalid persisted cron spec #{Log.safe_inspect(job_id)}: " <>
+        Log.safe_inspect(invalid_spec)
+    end)
 
     state
   end
@@ -2289,9 +2297,9 @@ defmodule Jido.AgentServer do
 
     case register_runtime_cron_job(state, job_id, runtime_spec) do
       {:ok, new_state} ->
-        Logger.debug(
-          "AgentServer #{state.id} registered schedule #{inspect(job_id)}: #{cron_expr}"
-        )
+        Log.debug(fn ->
+          "AgentServer #{state.id} registered schedule #{Log.safe_inspect(job_id)}: #{cron_expr}"
+        end)
 
         new_state
 
@@ -2333,9 +2341,10 @@ defmodule Jido.AgentServer do
 
       timer_ref = :erlang.start_timer(delay, self(), {:cron_restart, logical_id})
 
-      Logger.warning(
-        "AgentServer #{state.id} scheduling cron restart for #{inspect(logical_id)} in #{delay}ms after #{inspect(reason)}"
-      )
+      Log.warning(fn ->
+        "AgentServer #{state.id} scheduling cron restart for #{Log.safe_inspect(logical_id)} " <>
+          "in #{delay}ms after #{Log.safe_inspect(reason)}"
+      end)
 
       emit_cron_telemetry_event(state, :restart_scheduled, %{
         job_id: logical_id,
@@ -2587,9 +2596,10 @@ defmodule Jido.AgentServer do
     _ = clear_parent_binding(state.jido, state.id, state.partition)
     stop_reason = wrap_parent_down_reason(reason)
 
-    Logger.info(
-      "AgentServer #{state.id} stopping: parent died (#{inspect(reason)}), wrapped stop_reason: #{inspect(stop_reason)}"
-    )
+    Log.info(fn ->
+      "AgentServer #{state.id} stopping: parent died (#{Log.safe_inspect(reason)}), " <>
+        "wrapped stop_reason: #{Log.safe_inspect(stop_reason)}"
+    end)
 
     {:stop, stop_reason, State.set_status(state, :stopping)}
   end
@@ -2597,9 +2607,10 @@ defmodule Jido.AgentServer do
   defp handle_parent_down(%State{on_parent_death: :continue} = state, _pid, reason) do
     {former_parent, orphaned_state} = transition_to_orphan(state, reason)
 
-    Logger.info(
-      "AgentServer #{state.id} continuing as orphan after parent #{former_parent.id} died (#{inspect(reason)})"
-    )
+    Log.info(fn ->
+      "AgentServer #{state.id} continuing as orphan after parent #{former_parent.id} died " <>
+        "(#{Log.safe_inspect(reason)})"
+    end)
 
     {:noreply, orphaned_state}
   end
@@ -2635,7 +2646,9 @@ defmodule Jido.AgentServer do
     {tag, state} = State.remove_child_by_pid(state, pid)
 
     if tag do
-      Logger.debug("AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}")
+      Log.debug(fn ->
+        "AgentServer #{state.id} child #{Log.safe_inspect(tag)} exited: #{Log.safe_inspect(reason)}"
+      end)
 
       signal =
         ChildExit.new!(
@@ -2719,9 +2732,9 @@ defmodule Jido.AgentServer do
             state
 
           {:error, reason} ->
-            Logger.warning(
-              "AgentServer #{state.id} failed to persist parent binding: #{inspect(reason)}"
-            )
+            Log.warning(fn ->
+              "AgentServer #{state.id} failed to persist parent binding: #{Log.safe_inspect(reason)}"
+            end)
 
             state
         end
@@ -2821,16 +2834,18 @@ defmodule Jido.AgentServer do
        when reason in [:normal, :completed, :ok, :done, :success] do
     directive_type = directive.__struct__ |> Module.split() |> List.last()
 
-    Logger.warning("""
-    AgentServer #{state.id} received {:stop, #{inspect(reason)}, ...} from directive #{directive_type}.
+    Log.warning(fn ->
+      """
+      AgentServer #{state.id} received {:stop, #{Log.safe_inspect(reason)}, ...} from directive #{directive_type}.
 
-    This is a HARD STOP: pending directives and async work will be lost, and on_after_cmd/3 will NOT run.
+      This is a HARD STOP: pending directives and async work will be lost, and on_after_cmd/3 will NOT run.
 
-    For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
-    External code should poll AgentServer.state/1 and check status, not rely on process death.
+      For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
+      External code should poll AgentServer.state/1 and check status, not rely on process death.
 
-    {:stop, ...} should only be used for abnormal/framework-level termination.
-    """)
+      {:stop, ...} should only be used for abnormal/framework-level termination.
+      """
+    end)
   end
 
   defp warn_if_normal_stop(_reason, _directive, _state), do: :ok

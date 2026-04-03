@@ -3,10 +3,9 @@ defmodule Jido.Scheduler.Job do
 
   use GenServer
 
-  require Logger
-
   alias Crontab.CronExpression.Parser
   alias Crontab.Scheduler, as: CronScheduler
+  alias Jido.Log
 
   @tick :tick
   @retry_schedule :retry_schedule
@@ -200,11 +199,11 @@ defmodule Jido.Scheduler.Job do
       :ok
     rescue
       error ->
-        Logger.error("Scheduler callback raised: #{Exception.message(error)}")
+        Log.error(fn -> "Scheduler callback raised: #{Exception.message(error)}" end)
         :ok
     catch
       kind, reason ->
-        Logger.error("Scheduler callback #{kind}: #{inspect(reason)}")
+        Log.error(fn -> "Scheduler callback #{kind}: #{Log.safe_inspect(reason)}" end)
         :ok
     end
   end
@@ -234,9 +233,10 @@ defmodule Jido.Scheduler.Job do
   @spec enter_retry(state(), term()) :: state()
   defp enter_retry(state, reason) do
     if not state.retrying? do
-      Logger.warning(
-        "Scheduler job entering retry mode for #{inspect(state.cron_expr)} after schedule failure: #{inspect(reason)}"
-      )
+      Log.warning(fn ->
+        "Scheduler job entering retry mode for #{Log.safe_inspect(state.cron_expr, max_length: 80)} " <>
+          "after schedule failure: #{Log.safe_inspect(reason)}"
+      end)
     end
 
     timer_ref = Process.send_after(self(), @retry_schedule, @retry_delay_ms)
@@ -246,7 +246,9 @@ defmodule Jido.Scheduler.Job do
   @spec clear_retry(state(), reference()) :: state()
   defp clear_retry(state, timer_ref) do
     if state.retrying? do
-      Logger.info("Scheduler job recovered schedule resolution for #{inspect(state.cron_expr)}")
+      Log.debug(fn ->
+        "Scheduler job recovered schedule resolution for #{Log.safe_inspect(state.cron_expr, max_length: 80)}"
+      end)
     end
 
     %{state | timer_ref: timer_ref, retrying?: false}

@@ -74,9 +74,8 @@ defmodule Jido.Agent.InstanceManager do
 
   use Supervisor
 
-  require Logger
-
   alias Jido.Config.Defaults
+  alias Jido.Log
   alias Jido.Persist
   alias Jido.Storage
 
@@ -380,16 +379,17 @@ defmodule Jido.Agent.InstanceManager do
 
     case Persist.thaw(storage, agent_module, persistence_key) do
       {:ok, agent} ->
-        Logger.debug("InstanceManager thawed agent for key #{inspect(key)}")
+        Log.debug(fn -> "InstanceManager thawed agent for key #{Log.safe_inspect(key)}" end)
         agent
 
       {:error, :not_found} ->
         nil
 
       {:error, reason} ->
-        Logger.warning(
-          "InstanceManager failed to thaw agent for key #{inspect(key)}: #{inspect(reason)}"
-        )
+        Log.warning(fn ->
+          "InstanceManager failed to thaw agent for key #{Log.safe_inspect(key)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         nil
     end

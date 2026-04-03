@@ -39,6 +39,17 @@ defmodule JidoTest.TelemetryTest do
     end
   end
 
+  defp with_logger_level(level, fun) when is_atom(level) and is_function(fun, 0) do
+    previous_level = Logger.level()
+
+    try do
+      Logger.configure(level: level)
+      fun.()
+    after
+      Logger.configure(level: previous_level)
+    end
+  end
+
   describe "setup/0" do
     test "attaches telemetry handlers idempotently" do
       assert :ok = Telemetry.setup()
@@ -369,7 +380,7 @@ defmodule JidoTest.TelemetryTest do
                )
     end
 
-    test "does not emit signal summary logs at the default info level" do
+    test "does not emit signal summary logs at the default warning level" do
       log =
         with_telemetry_env(:delete, fn ->
           capture_log(fn ->
@@ -394,19 +405,21 @@ defmodule JidoTest.TelemetryTest do
     test "includes directive type summary in signal logs when debug logging is enabled" do
       log =
         with_telemetry_env([log_level: :debug], fn ->
-          capture_log(fn ->
-            assert :ok =
-                     Telemetry.handle_event(
-                       [:jido, :agent_server, :signal, :stop],
-                       %{duration: 1_000},
-                       %{
-                         agent_id: "test",
-                         signal_type: "test.signal",
-                         directive_count: 2,
-                         directive_types: %{"Emit" => 1, "Schedule" => 1}
-                       },
-                       nil
-                     )
+          with_logger_level(:debug, fn ->
+            capture_log(fn ->
+              assert :ok =
+                       Telemetry.handle_event(
+                         [:jido, :agent_server, :signal, :stop],
+                         %{duration: 1_000},
+                         %{
+                           agent_id: "test",
+                           signal_type: "test.signal",
+                           directive_count: 2,
+                           directive_types: %{"Emit" => 1, "Schedule" => 1}
+                         },
+                         nil
+                       )
+            end)
           end)
         end)
 

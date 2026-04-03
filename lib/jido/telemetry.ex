@@ -81,8 +81,7 @@ defmodule Jido.Telemetry do
   - `[:jido, :agent, :strategy, :tick, :exception]` - Strategy tick failed
   """
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Telemetry.Formatter
 
@@ -235,7 +234,7 @@ defmodule Jido.Telemetry do
     directive_count = metadata[:directive_count] || 0
 
     if interesting_agent_cmd?(instance, duration_ms, directive_count, metadata) do
-      Logger.debug(
+      Log.debug(
         fn ->
           "[agent.cmd] #{format_module(metadata[:agent_module])} " <>
             "action=#{Formatter.format_action(metadata[:action])} " <>
@@ -254,11 +253,13 @@ defmodule Jido.Telemetry do
   def handle_event([:jido, :agent, :cmd, :exception], measurements, metadata, _config) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[agent.cmd.error] #{format_module(metadata[:agent_module])} " <>
-        "action=#{Formatter.format_action(metadata[:action])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[agent.cmd.error] #{format_module(metadata[:agent_module])} " <>
+          "action=#{Formatter.format_action(metadata[:action])} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       span_id: metadata[:jido_span_id],
@@ -279,7 +280,7 @@ defmodule Jido.Telemetry do
     duration = Map.get(measurements, :duration, 0)
 
     if ObserveConfig.trace_enabled?(instance) do
-      Logger.debug(
+      Log.debug(
         fn ->
           "[strategy.init] #{format_module(metadata[:strategy])} " <>
             "duration=#{Formatter.format_duration(duration)}"
@@ -300,10 +301,12 @@ defmodule Jido.Telemetry do
       ) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[strategy.init.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[strategy.init.error] #{format_module(metadata[:strategy])} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
@@ -321,7 +324,7 @@ defmodule Jido.Telemetry do
     directive_count = metadata[:directive_count] || 0
 
     if interesting_strategy_cmd?(instance, duration_ms, directive_count) do
-      Logger.debug(
+      Log.debug(
         fn ->
           "[strategy.cmd] #{format_module(metadata[:strategy])} " <>
             "directives=#{directive_count} " <>
@@ -343,10 +346,12 @@ defmodule Jido.Telemetry do
       ) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[strategy.cmd.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[strategy.cmd.error] #{format_module(metadata[:strategy])} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
@@ -364,7 +369,7 @@ defmodule Jido.Telemetry do
 
     # Only log slow ticks - ticks are high frequency
     if duration_ms > ObserveConfig.slow_signal_threshold_ms(instance) do
-      Logger.debug(
+      Log.debug(
         fn ->
           "[strategy.tick] #{format_module(metadata[:strategy])} " <>
             "duration=#{Formatter.format_duration(duration)} (slow)"
@@ -385,10 +390,12 @@ defmodule Jido.Telemetry do
       ) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[strategy.tick.error] #{format_module(metadata[:strategy])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[strategy.tick.error] #{format_module(metadata[:strategy])} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       stacktrace: metadata[:stacktrace]
@@ -436,10 +443,12 @@ defmodule Jido.Telemetry do
       ) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[signal.error] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[signal.error] type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       span_id: metadata[:jido_span_id],
@@ -487,10 +496,12 @@ defmodule Jido.Telemetry do
       ) do
     duration = Map.get(measurements, :duration, 0)
 
-    Logger.warning(
-      "[directive.error] type=#{metadata[:directive_type]} " <>
-        "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
-        "duration=#{Formatter.format_duration(duration)}",
+    Log.warning(
+      fn ->
+        "[directive.error] type=#{metadata[:directive_type]} " <>
+          "error=#{Formatter.safe_inspect(metadata[:error], 200)} " <>
+          "duration=#{Formatter.format_duration(duration)}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id],
       span_id: metadata[:jido_span_id],
@@ -499,26 +510,27 @@ defmodule Jido.Telemetry do
   end
 
   def handle_event([:jido, :agent_server, :queue, :overflow], measurements, metadata, _config) do
-    Logger.warning(
-      "[queue.overflow] signal_type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
-        "queue_size=#{measurements[:queue_size]}",
+    Log.warning(
+      fn ->
+        "[queue.overflow] signal_type=#{Formatter.format_signal_type(metadata[:signal_type])} " <>
+          "queue_size=#{measurements[:queue_size]}"
+      end,
       agent_id: metadata[:agent_id],
       trace_id: metadata[:jido_trace_id]
     )
   end
 
   def handle_event([:jido, :agent_server, :cron, :register], _measurements, metadata, _config) do
-    Logger.debug(
-      "[cron.register] job_id=#{inspect(metadata[:job_id])} cron=#{inspect(metadata[:cron_expression])}",
-      agent_id: metadata[:agent_id]
-    )
+    maybe_log_cron_debug(metadata, fn ->
+      "[cron.register] job_id=#{Log.safe_inspect(metadata[:job_id], max_length: 80)} " <>
+        "cron=#{Log.safe_inspect(metadata[:cron_expression], max_length: 80)}"
+    end)
   end
 
   def handle_event([:jido, :agent_server, :cron, :cancel], _measurements, metadata, _config) do
-    Logger.debug(
-      "[cron.cancel] job_id=#{inspect(metadata[:job_id])}",
-      agent_id: metadata[:agent_id]
-    )
+    maybe_log_cron_debug(metadata, fn ->
+      "[cron.cancel] job_id=#{Log.safe_inspect(metadata[:job_id], max_length: 80)}"
+    end)
   end
 
   def handle_event(
@@ -527,10 +539,11 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    Logger.debug(
-      "[cron.restart_scheduled] job_id=#{inspect(metadata[:job_id])} reason=#{Formatter.safe_inspect(metadata[:reason], 120)} delay_ms=#{inspect(metadata[:delay_ms])}",
-      agent_id: metadata[:agent_id]
-    )
+    maybe_log_cron_debug(metadata, fn ->
+      "[cron.restart_scheduled] job_id=#{Log.safe_inspect(metadata[:job_id], max_length: 80)} " <>
+        "reason=#{Formatter.safe_inspect(metadata[:reason], 120)} " <>
+        "delay_ms=#{Log.safe_inspect(metadata[:delay_ms], max_length: 40)}"
+    end)
   end
 
   def handle_event(
@@ -539,10 +552,10 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    Logger.debug(
-      "[cron.restart_succeeded] job_id=#{inspect(metadata[:job_id])} cron=#{inspect(metadata[:cron_expression])}",
-      agent_id: metadata[:agent_id]
-    )
+    maybe_log_cron_debug(metadata, fn ->
+      "[cron.restart_succeeded] job_id=#{Log.safe_inspect(metadata[:job_id], max_length: 80)} " <>
+        "cron=#{Log.safe_inspect(metadata[:cron_expression], max_length: 80)}"
+    end)
   end
 
   def handle_event(
@@ -551,8 +564,11 @@ defmodule Jido.Telemetry do
         metadata,
         _config
       ) do
-    Logger.warning(
-      "[cron.persist_failure] job_id=#{inspect(metadata[:job_id])} reason=#{Formatter.safe_inspect(metadata[:reason], 200)}",
+    Log.warning(
+      fn ->
+        "[cron.persist_failure] job_id=#{Log.safe_inspect(metadata[:job_id], max_length: 80)} " <>
+          "reason=#{Formatter.safe_inspect(metadata[:reason], 200)}"
+      end,
       agent_id: metadata[:agent_id]
     )
   end
@@ -562,7 +578,7 @@ defmodule Jido.Telemetry do
   # ---------------------------------------------------------------------------
 
   defp log_signal_stop(metadata, duration, directive_count) do
-    Logger.debug(
+    Log.debug(
       fn ->
         directive_types =
           metadata[:directive_types]
@@ -587,7 +603,7 @@ defmodule Jido.Telemetry do
   end
 
   defp log_directive_stop(metadata, duration) do
-    Logger.debug(
+    Log.debug(
       fn ->
         "[directive] type=#{metadata[:directive_type]} " <>
           "result=#{metadata[:result]} " <>
@@ -634,6 +650,14 @@ defmodule Jido.Telemetry do
     has_directives = directive_count > 0
 
     is_slow or has_directives
+  end
+
+  defp maybe_log_cron_debug(metadata, message_fun) when is_function(message_fun, 0) do
+    if ObserveConfig.debug_enabled?(metadata[:jido_instance]) do
+      Log.debug(message_fun, agent_id: metadata[:agent_id])
+    end
+
+    :ok
   end
 
   defp format_module(nil), do: "unknown"

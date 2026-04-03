@@ -1,8 +1,7 @@
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
   @moduledoc false
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
@@ -32,7 +31,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
         Jido.Signal.Dispatch.dispatch(traced_signal, cfg)
       end)
     else
-      Logger.warning("Jido.Signal.Dispatch not available, skipping emit")
+      Log.warning(fn -> "Jido.Signal.Dispatch not available, skipping emit" end)
     end
   end
 end
@@ -50,8 +49,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction do
   @moduledoc false
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.AgentServer.State
   alias Jido.Observe.Config, as: ObserveConfig
 
@@ -90,7 +88,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         {:ok, state}
 
       {:error, :queue_overflow} ->
-        Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+        Log.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
         {:ok, state}
     end
   end
@@ -131,7 +129,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Spawn do
   @moduledoc false
 
-  require Logger
+  alias Jido.Log
 
   def exec(%{child_spec: child_spec, tag: tag}, _input_signal, state) do
     result =
@@ -146,15 +144,21 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Spawn do
 
     case result do
       {:ok, pid} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        Log.debug(fn ->
+          "Spawned child process #{Log.safe_inspect(pid)} with tag #{Log.safe_inspect(tag)}"
+        end)
+
         {:ok, state}
 
       {:ok, pid, _info} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        Log.debug(fn ->
+          "Spawned child process #{Log.safe_inspect(pid)} with tag #{Log.safe_inspect(tag)}"
+        end)
+
         {:ok, state}
 
       {:error, reason} ->
-        Logger.error("Failed to spawn child: #{inspect(reason)}")
+        Log.error(fn -> "Failed to spawn child: #{Log.safe_inspect(reason)}" end)
         {:ok, state}
 
       :ignored ->
@@ -196,9 +200,8 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
   @moduledoc false
 
-  require Logger
-
   alias Jido.Agent.Directive
+  alias Jido.Log
   alias Jido.AgentServer
   alias Jido.AgentServer.{ChildInfo, State}
   alias Jido.RuntimeStore
@@ -216,7 +219,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
       spawn_child(state, agent, tag, opts, meta, restart)
     else
       {:error, reason} ->
-        Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
+        Log.error(fn ->
+          "AgentServer #{state.id} failed to spawn child: #{Log.safe_inspect(reason)}"
+        end)
+
         {:ok, state}
     end
   end
@@ -271,26 +277,28 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
             new_state = State.add_child(state, tag, child_info)
 
-            Logger.debug(
-              "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-            )
+            Log.debug(fn ->
+              "AgentServer #{state.id} spawned child #{child_id} with tag #{Log.safe_inspect(tag)}"
+            end)
 
             {:ok, new_state}
 
           {:error, reason} ->
             _ = DynamicSupervisor.terminate_child(supervisor, pid)
 
-            Logger.error(
-              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
-            )
+            Log.error(fn ->
+              "AgentServer #{state.id} failed to persist relationship for child #{child_id}: " <>
+                Log.safe_inspect(reason)
+            end)
 
             {:ok, state}
         end
 
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "AgentServer #{state.id} failed to spawn child with restart #{Log.safe_inspect(restart)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         {:ok, state}
     end
@@ -320,8 +328,7 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
   @moduledoc false
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.AgentServer
   alias Jido.AgentServer.{ChildInfo, ParentRef, State}
 
@@ -341,16 +348,17 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
           meta: meta
         })
 
-      Logger.debug(
-        "AgentServer #{state.id} adopted child #{child_runtime.id} with tag #{inspect(tag)}"
-      )
+      Log.debug(fn ->
+        "AgentServer #{state.id} adopted child #{child_runtime.id} with tag #{Log.safe_inspect(tag)}"
+      end)
 
       {:ok, State.add_child(state, tag, child_info)}
     else
       {:error, reason} ->
-        Logger.warning(
-          "AgentServer #{state.id} failed to adopt child #{inspect(child)} with tag #{inspect(tag)}: #{inspect(reason)}"
-        )
+        Log.warning(fn ->
+          "AgentServer #{state.id} failed to adopt child #{Log.safe_inspect(child)} " <>
+            "with tag #{Log.safe_inspect(tag)}: #{Log.safe_inspect(reason)}"
+        end)
 
         {:ok, state}
     end
@@ -414,10 +422,13 @@ end
 defimpl Jido.AgentServer.DirectiveExec, for: Any do
   @moduledoc false
 
-  require Logger
+  alias Jido.Log
 
   def exec(directive, _input_signal, state) do
-    Logger.debug("Ignoring unknown directive: #{inspect(directive.__struct__)}")
+    Log.debug(fn ->
+      "Ignoring unknown directive: #{Log.safe_inspect(directive.__struct__)}"
+    end)
+
     {:ok, state}
   end
 end

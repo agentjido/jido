@@ -10,8 +10,7 @@ defmodule Jido.AgentServer.State do
   the agent itself, directive queue, hierarchy tracking, and configuration.
   """
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.AgentServer.{ChildInfo, Options, ParentRef}
   alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
 
@@ -148,9 +147,10 @@ defmodule Jido.AgentServer.State do
       Jido.Scheduler.classify_cron_specs(staged_cron_specs)
 
     Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
-      Logger.error(
-        "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      )
+      Log.error(fn ->
+        "AgentServer #{opts.id} dropped malformed persisted cron spec #{Log.safe_inspect(job_id)}: " <>
+          "#{Log.safe_inspect(spec)} (#{Log.safe_inspect(reason)})"
+      end)
     end)
 
     lifecycle_opts = [

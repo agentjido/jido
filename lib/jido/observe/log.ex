@@ -6,13 +6,13 @@ defmodule Jido.Observe.Log do
   The log threshold can be configured per-environment to control verbosity:
 
   - `:debug` in development for verbose output
-  - `:info` or `:warning` in production for minimal noise
+  - `:warning` in production and test for minimal noise
 
   ## Configuration
 
       # config/config.exs
       config :jido, :observability,
-        log_level: :info
+        log_level: :warning
       
       # config/dev.exs
       config :jido, :observability,
@@ -37,7 +37,7 @@ defmodule Jido.Observe.Log do
   Returns the current observability log threshold.
 
   Reads from application config `:jido, :observability, :log_level`.
-  Defaults to `:info` if not configured.
+  Defaults to `:warning` if not configured.
   """
   @spec threshold() :: level()
   def threshold do
@@ -58,11 +58,11 @@ defmodule Jido.Observe.Log do
 
   ## Examples
 
-      # With threshold at :info, this won't log
+      # With threshold at :warning, this won't log
       Log.log(:debug, "Verbose info", step: 1)
       
-      # With threshold at :info, this will log
-      Log.log(:info, "Important info", agent_id: "abc")
+      # With threshold at :warning, this will log
+      Log.log(:warning, "Important warning", agent_id: "abc")
   """
   @spec log(level(), Logger.message(), keyword()) :: :ok
   def log(level, message, metadata \\ []) do

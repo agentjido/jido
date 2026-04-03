@@ -9,9 +9,8 @@ defmodule Jido.AgentServer.ErrorPolicy do
   # - `{:max_errors, n}` - Stop after n errors
   # - `fun/2` - Custom function
 
-  require Logger
-
   alias Jido.Agent.Directive.Error, as: ErrorDirective
+  alias Jido.Log
   alias Jido.AgentServer.State
   alias Jido.Signal.Dispatch, as: SignalDispatch
 
@@ -29,7 +28,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
       :stop_on_error ->
         log_error(error, context, state)
-        Logger.error("Agent #{state.id} stopping due to error policy")
+        Log.error(fn -> "Agent #{state.id} stopping due to error policy" end)
         {:stop, {:agent_error, error}, state}
 
       {:emit_signal, dispatch_cfg} ->
@@ -50,21 +49,21 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
   defp log_error(error, context, state) do
     message = extract_message(error)
-    context_str = if context, do: " [#{context}]", else: ""
+    context_str = if context, do: " [#{Log.safe_inspect(context)}]", else: ""
 
-    Logger.error("Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}")
+    Log.error(fn -> "Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}" end)
   end
 
   defp extract_message(%{message: message}) when is_binary(message), do: message
   defp extract_message(%{message: %{message: message}}) when is_binary(message), do: message
-  defp extract_message(error), do: inspect(error)
+  defp extract_message(error), do: Log.safe_inspect(error)
 
   defp extract_details(%{details: details}) when is_map(details), do: details
   defp extract_details(_), do: %{}
 
   defp details_suffix(error) do
     case extract_details(error) do
-      details when map_size(details) > 0 -> " #{inspect(details)}"
+      details when map_size(details) > 0 -> " #{Log.safe_inspect(details)}"
       _ -> ""
     end
   end
@@ -80,7 +79,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
         SignalDispatch.dispatch(signal, dispatch_cfg)
       end)
     else
-      Logger.warning("Jido.Signal.Dispatch not available, skipping error signal emit")
+      Log.warning(fn -> "Jido.Signal.Dispatch not available, skipping error signal emit" end)
     end
   end
 
@@ -102,12 +101,12 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
     if count >= max do
       log_error(error, context, state)
-      Logger.error("Agent #{state.id} exceeded max errors (#{count}/#{max}), stopping")
+      Log.error(fn -> "Agent #{state.id} exceeded max errors (#{count}/#{max}), stopping" end)
       {:stop, {:max_errors_exceeded, count}, state}
     else
-      Logger.warning(
+      Log.warning(fn ->
         "Agent #{state.id} error #{count}/#{max}: #{extract_message(error)}#{details_suffix(error)}"
-      )
+      end)
 
       {:ok, state}
     end
@@ -125,16 +124,22 @@ defmodule Jido.AgentServer.ErrorPolicy do
           {:stop, reason, new_state}
 
         other ->
-          Logger.error("Custom error policy returned invalid result: #{inspect(other)}")
+          Log.error(fn ->
+            "Custom error policy returned invalid result: #{Log.safe_inspect(other)}"
+          end)
+
           {:ok, state}
       end
     rescue
       e ->
-        Logger.error("Custom error policy crashed: #{Exception.message(e)}")
+        Log.error(fn -> "Custom error policy crashed: #{Exception.message(e)}" end)
         {:ok, state}
     catch
       kind, reason ->
-        Logger.error("Custom error policy failed: #{kind} - #{inspect(reason)}")
+        Log.error(fn ->
+          "Custom error policy failed: #{kind} - #{Log.safe_inspect(reason)}"
+        end)
+
         {:ok, state}
     end
   end

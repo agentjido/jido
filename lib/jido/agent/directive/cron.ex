@@ -25,10 +25,9 @@ defmodule Jido.Agent.Directive.Cron do
       %Cron{cron: "*/5 * * * *", message: check_signal, job_id: :check, timezone: "America/New_York"}
   """
 
-  require Logger
-
   alias Jido.AgentServer
   alias Jido.AgentServer.CronRuntimeSpec
+  alias Jido.Log
 
   @schema Zoi.struct(
             __MODULE__,
@@ -70,9 +69,9 @@ defmodule Jido.Agent.Directive.Cron do
          {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec),
          {:ok, persisted_state} <-
            persist_then_commit_registration(state, pid, logical_id, cron_spec, runtime_spec) do
-      Logger.debug(
-        "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
-      )
+      Log.debug(fn ->
+        "AgentServer #{agent_id} registered cron job #{Log.safe_inspect(logical_id)}: #{cron_expr}"
+      end)
 
       AgentServer.emit_cron_telemetry_event(persisted_state, :register, %{
         job_id: logical_id,
@@ -82,9 +81,10 @@ defmodule Jido.Agent.Directive.Cron do
       {:ok, persisted_state}
     else
       {:error, reason} ->
-        Logger.error(
-          "AgentServer #{agent_id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
-        )
+        Log.error(fn ->
+          "AgentServer #{agent_id} failed to register cron job #{Log.safe_inspect(logical_id)}: " <>
+            Log.safe_inspect(reason)
+        end)
 
         {:ok, handle_failed_registration(state, logical_id, on_failure)}
     end

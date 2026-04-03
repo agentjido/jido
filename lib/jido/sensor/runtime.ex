@@ -46,8 +46,7 @@ defmodule Jido.Sensor.Runtime do
 
   use GenServer
 
-  require Logger
-
+  alias Jido.Log
   alias Jido.Signal.Dispatch
 
   @type server :: pid() | atom() | {:via, module(), term()}
@@ -157,7 +156,10 @@ defmodule Jido.Sensor.Runtime do
 
   @impl GenServer
   def handle_info(msg, state) do
-    Logger.debug("Sensor.Runtime #{state.id} received unexpected message: #{inspect(msg)}")
+    Log.debug(fn ->
+      "Sensor.Runtime #{state.id} received unexpected message: #{Log.safe_inspect(msg)}"
+    end)
+
     {:noreply, state}
   end
 
@@ -241,14 +243,17 @@ defmodule Jido.Sensor.Runtime do
           {:noreply, new_state}
 
         {:error, reason} ->
-          Logger.warning("Sensor.Runtime #{state.id} handle_event error: #{inspect(reason)}")
+          Log.warning(fn ->
+            "Sensor.Runtime #{state.id} handle_event error: #{Log.safe_inspect(reason)}"
+          end)
 
           {:noreply, state}
 
         other ->
-          Logger.warning(
-            "Sensor.Runtime #{state.id} handle_event returned invalid result: #{inspect(other)}"
-          )
+          Log.warning(fn ->
+            "Sensor.Runtime #{state.id} handle_event returned invalid result: " <>
+              Log.safe_inspect(other)
+          end)
 
           {:noreply, state}
       end
@@ -281,7 +286,9 @@ defmodule Jido.Sensor.Runtime do
   end
 
   defp apply_directive(directive, state) do
-    Logger.warning("Sensor.Runtime #{state.id} ignoring unknown directive: #{inspect(directive)}")
+    Log.warning(fn ->
+      "Sensor.Runtime #{state.id} ignoring unknown directive: #{Log.safe_inspect(directive)}"
+    end)
 
     state
   end
@@ -312,7 +319,7 @@ defmodule Jido.Sensor.Runtime do
         dispatch_signal_async(signal, agent_ref, state)
 
       true ->
-        Logger.debug("Sensor.Runtime #{state.id} has no agent_ref, signal not delivered")
+        Log.debug(fn -> "Sensor.Runtime #{state.id} has no agent_ref, signal not delivered" end)
     end
   end
 
@@ -322,9 +329,9 @@ defmodule Jido.Sensor.Runtime do
         dispatch_fun(state).(signal, agent_ref)
       rescue
         e ->
-          Logger.warning(
+          Log.warning(fn ->
             "Sensor.Runtime #{state.id} async dispatch failed: #{Exception.message(e)}"
-          )
+          end)
       end
     end
 

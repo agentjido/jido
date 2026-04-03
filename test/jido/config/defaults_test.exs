@@ -16,12 +16,12 @@ defmodule JidoTest.Config.DefaultsTest do
   end
 
   test "returns centralized observability defaults" do
-    assert Defaults.telemetry_log_level() == :info
+    assert Defaults.telemetry_log_level() == :warning
     assert Defaults.telemetry_log_args() == :keys_only
     assert Defaults.slow_signal_threshold_ms() == 10
     assert Defaults.slow_directive_threshold_ms() == 5
     assert Defaults.interesting_signal_types() == ["jido.strategy.init", "jido.strategy.complete"]
-    assert Defaults.observe_log_level() == :info
+    assert Defaults.observe_log_level() == :warning
     assert Defaults.observe_debug_events() == :off
     refute Defaults.redact_sensitive()
     assert Defaults.tracer() == Jido.Observe.NoopTracer
