@@ -32,7 +32,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
         Jido.Signal.Dispatch.dispatch(traced_signal, cfg)
       end)
     else
-      Logger.warning("Jido.Signal.Dispatch not available, skipping emit")
+      Logger.warning(fn -> "Jido.Signal.Dispatch not available, skipping emit" end)
     end
   end
 end
@@ -90,7 +90,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         {:ok, state}
 
       {:error, :queue_overflow} ->
-        Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+        Logger.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
         {:ok, state}
     end
   end
@@ -146,15 +146,21 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Spawn do
 
     case result do
       {:ok, pid} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        Logger.debug(fn ->
+          "Spawned child process #{inspect(pid)} with tag #{inspect(tag)}"
+        end)
+
         {:ok, state}
 
       {:ok, pid, _info} ->
-        Logger.debug("Spawned child process #{inspect(pid)} with tag #{inspect(tag)}")
+        Logger.debug(fn ->
+          "Spawned child process #{inspect(pid)} with tag #{inspect(tag)}"
+        end)
+
         {:ok, state}
 
       {:error, reason} ->
-        Logger.error("Failed to spawn child: #{inspect(reason)}")
+        Logger.error(fn -> "Failed to spawn child: #{inspect(reason)}" end)
         {:ok, state}
 
       :ignored ->
@@ -216,7 +222,10 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
       spawn_child(state, agent, tag, opts, meta, restart)
     else
       {:error, reason} ->
-        Logger.error("AgentServer #{state.id} failed to spawn child: #{reason}")
+        Logger.error(fn ->
+          "AgentServer #{state.id} failed to spawn child: #{inspect(reason)}"
+        end)
+
         {:ok, state}
     end
   end
@@ -271,26 +280,26 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.SpawnAgent do
 
             new_state = State.add_child(state, tag, child_info)
 
-            Logger.debug(
+            Logger.debug(fn ->
               "AgentServer #{state.id} spawned child #{child_id} with tag #{inspect(tag)}"
-            )
+            end)
 
             {:ok, new_state}
 
           {:error, reason} ->
             _ = DynamicSupervisor.terminate_child(supervisor, pid)
 
-            Logger.error(
+            Logger.error(fn ->
               "AgentServer #{state.id} failed to persist relationship for child #{child_id}: #{inspect(reason)}"
-            )
+            end)
 
             {:ok, state}
         end
 
       {:error, reason} ->
-        Logger.error(
+        Logger.error(fn ->
           "AgentServer #{state.id} failed to spawn child with restart #{inspect(restart)}: #{inspect(reason)}"
-        )
+        end)
 
         {:ok, state}
     end
@@ -341,16 +350,17 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.AdoptChild do
           meta: meta
         })
 
-      Logger.debug(
+      Logger.debug(fn ->
         "AgentServer #{state.id} adopted child #{child_runtime.id} with tag #{inspect(tag)}"
-      )
+      end)
 
       {:ok, State.add_child(state, tag, child_info)}
     else
       {:error, reason} ->
-        Logger.warning(
-          "AgentServer #{state.id} failed to adopt child #{inspect(child)} with tag #{inspect(tag)}: #{inspect(reason)}"
-        )
+        Logger.warning(fn ->
+          "AgentServer #{state.id} failed to adopt child #{inspect(child)} " <>
+            "with tag #{inspect(tag)}: #{inspect(reason)}"
+        end)
 
         {:ok, state}
     end
@@ -417,7 +427,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Any do
   require Logger
 
   def exec(directive, _input_signal, state) do
-    Logger.debug("Ignoring unknown directive: #{inspect(directive.__struct__)}")
+    Logger.debug(fn -> "Ignoring unknown directive: #{inspect(directive.__struct__)}" end)
     {:ok, state}
   end
 end

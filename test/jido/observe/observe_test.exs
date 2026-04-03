@@ -413,7 +413,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :debug)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           Observe.log(:info, "test message", key: "value")
         end)
 
@@ -474,7 +474,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :info)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           Log.log(:info, "info message")
         end)
 
@@ -485,7 +485,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :info)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :warning], fn ->
           Log.log(:warning, "warning message")
         end)
 
@@ -496,7 +496,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :warning)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :debug], fn ->
           Log.log(:debug, "debug message")
           Log.log(:info, "info message")
         end)
@@ -509,7 +509,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :debug)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :info], fn ->
           Log.log(:info, "with metadata", agent_id: "agent-123")
         end)
 
@@ -520,7 +520,7 @@ defmodule JidoTest.ObserveTest do
       Application.put_env(:jido, :observability, log_level: :debug)
 
       log =
-        capture_log(fn ->
+        capture_log([level: :debug], fn ->
           Log.log(:debug, "debug level message")
         end)
 
