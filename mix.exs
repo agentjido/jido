@@ -339,7 +339,6 @@ defmodule Jido.MixProject do
         Observability: [
           Jido.Observe,
           Jido.Observe.Config,
-          Jido.Observe.Log,
           Jido.Observe.Tracer,
           Jido.Observe.NoopTracer,
           Jido.Observe.SpanCtx,

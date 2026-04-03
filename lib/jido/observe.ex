@@ -2,8 +2,8 @@ defmodule Jido.Observe do
   @moduledoc """
   Unified observability facade for Jido agents.
 
-  Wraps `:telemetry` events and `Logger` with a simple API for observing
-  agent execution, action invocations, and workflow iterations.
+  Wraps `:telemetry` and tracer callbacks with a simple API for observing agent
+  execution, action invocations, and workflow iterations.
 
   ## Features
 
@@ -11,7 +11,6 @@ defmodule Jido.Observe do
   - Duration measurement for all spans (nanoseconds)
   - Automatic correlation ID enrichment from `Jido.Tracing.Context`
   - Pluggable tracer callbacks via `Jido.Observe.Tracer`
-  - Threshold-based logging via `Jido.Observe.Log`
 
   ## Correlation Tracing Integration
 
@@ -96,7 +95,6 @@ defmodule Jido.Observe do
   require Logger
 
   alias Jido.Observe.Config, as: ObserveConfig
-  alias Jido.Observe.Log
   alias Jido.Observe.SpanCtx
   alias Jido.Tracing.Context, as: TracingContext
 
@@ -240,20 +238,6 @@ defmodule Jido.Observe do
     )
 
     :ok
-  end
-
-  @doc """
-  Conditionally logs a message based on the observability threshold.
-
-  Delegates to `Jido.Observe.Log.log/3`.
-
-  ## Example
-
-      Jido.Observe.log(:debug, "Processing step", agent_id: agent.id)
-  """
-  @spec log(Logger.level(), Logger.message(), keyword()) :: :ok
-  def log(level, message, metadata \\ []) do
-    Log.log(level, message, metadata)
   end
 
   @doc """
