@@ -62,8 +62,6 @@ defmodule Jido.Discovery do
   All processes can read concurrently without contention.
   """
 
-  require Logger
-
   @catalog_key :jido_discovery_catalog
 
   @type component_type :: :actions | :sensors | :agents | :plugins | :demos
