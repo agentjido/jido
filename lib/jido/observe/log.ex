@@ -29,8 +29,6 @@ defmodule Jido.Observe.Log do
       Log.log(:info, "Agent completed", agent_id: agent.id)
   """
 
-  require Logger
-
   @type level :: Logger.level()
 
   @doc """
