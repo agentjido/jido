@@ -14,6 +14,9 @@ jobs:
   lint:
     name: Lint
     uses: ./.github/workflows/elixir-lint.yml
+    with:
+      otp_version: "28"
+      elixir_version: "1.20.0-rc.4"
     secrets: inherit
 
   test:
@@ -22,4 +25,12 @@ jobs:
     with:
       otp_versions: '["27", "28"]'
       elixir_versions: '["1.18", "1.19"]'
+      test_command: mix test
+
+  test_elixir_120:
+    name: Test Elixir 1.20
+    uses: ./.github/workflows/elixir-test.yml
+    with:
+      otp_versions: '["28"]'
+      elixir_versions: '["1.20.0-rc.4"]'
       test_command: mix test

@@ -334,7 +334,7 @@ defmodule Jido.Storage.File do
   defp decode_entries(_malformed, _acc), do: {:error, :invalid_entries_log}
 
   defp decode_frame(rest, size) when byte_size(rest) >= size do
-    <<term_binary::binary-size(size), remaining::binary>> = rest
+    <<term_binary::binary-size(^size), remaining::binary>> = rest
     {:ok, term_binary, remaining}
   end
 

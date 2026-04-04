@@ -461,9 +461,13 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert child_info.module == agent_struct.__struct__
       assert is_pid(child_info.pid)
 
-      # Stop the child - catch potential exit as process may be in init
-      catch_exit do
-        GenServer.stop(child_info.pid, :normal, 100)
+      # Stop the child without relying on catch_exit's generated AST handling.
+      if Process.alive?(child_info.pid) do
+        try do
+          GenServer.stop(child_info.pid, :normal, 100)
+        catch
+          :exit, _ -> :ok
+        end
       end
     end
 
