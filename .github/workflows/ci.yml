@@ -13,12 +13,12 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    uses: ./.github/workflows/elixir-lint.yml
+    uses: agentjido/github-actions/.github/workflows/elixir-lint.yml@v3
     secrets: inherit
 
   test:
     name: Test
-    uses: ./.github/workflows/elixir-test.yml
+    uses: agentjido/github-actions/.github/workflows/elixir-test.yml@v3
     with:
       otp_versions: '["27", "28"]'
       elixir_versions: '["1.18", "1.19"]'
