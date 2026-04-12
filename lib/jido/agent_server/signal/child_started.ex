@@ -19,6 +19,10 @@ defmodule Jido.AgentServer.Signal.ChildStarted do
   use Jido.Signal,
     type: "jido.agent.child.started",
     default_source: "/agent",
+    extension_policy: [
+      {Jido.Signal.Ext.Trace, :optional},
+      {Jido.Signal.Ext.Dispatch, :optional}
+    ],
     schema: [
       parent_id: [type: :string, required: true, doc: "ID of the parent agent"],
       child_id: [type: :string, required: true, doc: "ID of the child agent"],

@@ -49,7 +49,7 @@ defmodule JidoTest.AgentTest do
       assert TestAgents.Minimal.name() == "minimal_agent"
       assert TestAgents.Minimal.description() == nil
       schema = TestAgents.Minimal.schema()
-      assert is_struct(schema) or schema == []
+      assert is_struct(schema)
     end
   end
 

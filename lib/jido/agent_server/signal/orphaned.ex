@@ -18,6 +18,10 @@ defmodule Jido.AgentServer.Signal.Orphaned do
 
   use Jido.Signal,
     type: "jido.agent.orphaned",
+    extension_policy: [
+      {Jido.Signal.Ext.Trace, :optional},
+      {Jido.Signal.Ext.Dispatch, :optional}
+    ],
     schema: [
       parent_id: [type: :string, required: true, doc: "ID of the parent agent that died"],
       parent_pid: [type: :any, required: true, doc: "PID of the parent process that died"],

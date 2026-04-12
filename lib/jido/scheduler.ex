@@ -173,10 +173,7 @@ defmodule Jido.Scheduler do
   end
 
   def run_every(fun, cron_expr, opts) when is_function(fun, 0) and is_list(opts) do
-    case validate_cron_expression_type(cron_expr) do
-      :ok -> {:error, {:invalid_scheduler_options, :invalid_type}}
-      {:error, reason} -> {:error, reason}
-    end
+    validate_cron_expression_type(cron_expr)
   end
 
   def run_every(fun, _cron_expr, _opts) when is_function(fun, 0),
