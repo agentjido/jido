@@ -1,11 +1,10 @@
 defmodule JidoTest.AgentServer.TelemetryTest do
   use JidoTest.Case, async: false
 
-  import ExUnit.CaptureLog
-
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.Debug
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Signal
   alias JidoTest.TestActions
 
@@ -132,41 +131,36 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     end
   end
 
-  describe "action logging integration" do
-    test "suppresses jido_action start logs when args are not full", %{jido: jido} do
+  describe "action execution observability integration" do
+    test "suppresses jido_action telemetry when args are not full", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-default", jido: jido)
 
+      exec_opts = ObserveConfig.action_exec_opts(jido, [])
+      assert Keyword.get(exec_opts, :log_level) == :warning
+      assert Keyword.get(exec_opts, :telemetry) == :silent
+
       signal = Signal.new!("increment", %{}, source: "/test")
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _agent} = AgentServer.call(pid, signal)
-        end)
-
-      refute log =~ "Executing JidoTest.TestActions.IncrementAction"
-      refute log =~ "with params:"
+      assert {:ok, _agent} = AgentServer.call(pid, signal)
       refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
+      refute_receive {:action_telemetry_event, [:jido, :action, :stop], _, _}, 50
 
       GenServer.stop(pid)
     end
 
-    test "enables verbose jido_action logs when instance debug is verbose", %{jido: jido} do
+    test "enables full jido_action telemetry when instance debug is verbose", %{jido: jido} do
       Debug.enable(jido, :verbose)
       on_exit(fn -> Debug.disable(jido) end)
 
       {:ok, pid} =
         AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-verbose", jido: jido)
 
+      exec_opts = ObserveConfig.action_exec_opts(jido, [])
+      assert Keyword.get(exec_opts, :log_level) == :debug
+      assert Keyword.get(exec_opts, :telemetry) == :full
+
       signal = Signal.new!("increment", %{}, source: "/test")
-
-      log =
-        capture_log(fn ->
-          assert {:ok, _agent} = AgentServer.call(pid, signal)
-        end)
-
-      assert log =~ "Executing JidoTest.TestActions.IncrementAction"
-      assert log =~ "with params:"
+      assert {:ok, _agent} = AgentServer.call(pid, signal)
 
       assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
                       %{action: JidoTest.TestActions.IncrementAction}}

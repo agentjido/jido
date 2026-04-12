@@ -746,7 +746,6 @@ Debug events are no-ops when `:debug_events` is `:off` (production default).
 - `Jido.Tracing.Context` — Correlation ID propagation
 - `Jido.Observe.Tracer` — Behaviour for OpenTelemetry integration
 - `Jido.Observe.NoopTracer` — Default no-op tracer
-- `Jido.Observe.Log` — Threshold-based logging
 
 ## Further Reading
 
