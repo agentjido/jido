@@ -53,7 +53,7 @@
   "sourceror": {:hex, :sourceror, "1.12.0", "da354c5f35aad3cc1132f5d5b0d8437d865e2661c263260480bab51b5eedb437", [:mix], [], "hexpm", "755703683bd014ebcd5de9acc24b68fb874a660a568d1d63f8f98cd8a6ef9cd0"},
   "spec_led_ex": {:git, "https://github.com/specleddev/specled_ex.git", "301fad7cd490ea7328d47ec2f46c3d3f0c20a225", [branch: "main"]},
   "spitfire": {:hex, :spitfire, "0.3.10", "19aea9914132456515e8f7d592f63ab9f3130876b0252e834d2390bdd8becb24", [:mix], [], "hexpm", "6a6a5f77eb4165249c76199cd2d01fb595bac9207aed3de551918ac1c2bc9267"},
-  "splode": {:hex, :splode, "0.3.0", "ff8effecc509a51245df2f864ec78d849248647c37a75886033e3b1a53ca9470", [:mix], [], "hexpm", "73cfd0892d7316d6f2c93e6e8784bd6e137b2aa38443de52fd0a25171d106d81"},
+  "splode": {:hex, :splode, "0.3.1", "9843c54f84f71b7833fec3f0be06c3cfb5be6b35960ee195ea4fad84b1c25030", [:mix], [], "hexpm", "8f2309b6ec2ecbb01435656429ed1d9ed04ba28797a3280c3b0d1217018ecfbd"},
   "stream_data": {:hex, :stream_data, "1.3.0", "bde37905530aff386dea1ddd86ecbf00e6642dc074ceffc10b7d4e41dfd6aac9", [:mix], [], "hexpm", "3cc552e286e817dca43c98044c706eec9318083a1480c52ae2688b08e2936e3c"},
   "telemetry": {:hex, :telemetry, "1.4.1", "ab6de178e2b29b58e8256b92b382ea3f590a47152ca3651ea857a6cae05ac423", [:rebar3], [], "hexpm", "2172e05a27531d3d31dd9782841065c50dd5c3c7699d95266b2edd54c2dafa1c"},
   "telemetry_metrics": {:hex, :telemetry_metrics, "1.1.0", "5bd5f3b5637e0abea0426b947e3ce5dd304f8b3bc6617039e2b5a008adc02f8f", [:mix], [{:telemetry, "~> 0.4 or ~> 1.0", [hex: :telemetry, repo: "hexpm", optional: false]}], "hexpm", "e7b79e8ddfde70adb6db8a6623d1778ec66401f366e9a8f5dd0955c56bc8ce67"},
