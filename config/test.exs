@@ -12,7 +12,7 @@ config :git_hooks, auto_install: false
 # To enable verbose logging during debugging, set LOG_LEVEL env var:
 #   LOG_LEVEL=debug mix test test/my_test.exs
 #
-log_level = System.get_env("LOG_LEVEL", "debug") |> String.to_existing_atom()
+log_level = System.get_env("LOG_LEVEL", "warning") |> String.to_existing_atom()
 
 config :logger,
   level: log_level,
