@@ -16,6 +16,21 @@ defmodule Jido.Memory.Plugin do
         name: "minimal",
         default_plugins: %{__memory__: false}
 
+  ## Replacement
+
+  Packages that provide a richer memory implementation should replace this
+  default plugin through the `:__memory__` default-plugin slot:
+
+      use Jido.Agent,
+        name: "persistent_memory_agent",
+        default_plugins: %{
+          __memory__: {MyApp.PersistentMemoryPlugin, %{store: MyApp.Store}}
+        }
+
+  Do this instead of mounting a second memory plugin in `plugins:`. The
+  replacement plugin should also declare `state_key: :__memory__` so runtime
+  integrations can discover memory state at the canonical key.
+
   ## State Key
 
   Memory is stored at `agent.state[:__memory__]` as a `Jido.Memory` struct.
