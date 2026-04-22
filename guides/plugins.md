@@ -296,6 +296,11 @@ rationale and a more general pattern, see
 
 The Memory plugin gives every agent an on-demand cognitive memory container stored at `agent.state[:__memory__]`. Memory is organized into **spaces** — named containers holding either map (key-value) or list (ordered items) data. Two reserved spaces, `:world` and `:tasks`, are created by default. Domain-specific wrappers should be built in your own modules on top of the generic space primitives.
 
+The built-in plugin is deliberately minimal. Packages that provide their own
+memory implementation should use the same `:__memory__` state key and replace
+the default through `default_plugins:`, not by mounting a second memory plugin
+in `plugins:`.
+
 ```elixir
 alias Jido.Memory.Agent, as: MemoryAgent
 
@@ -334,6 +339,11 @@ use Jido.Agent,
 use Jido.Agent,
   name: "configured",
   default_plugins: %{__identity__: {MyApp.CustomIdentityPlugin, %{profile: %{age: 10}}}}
+
+# Replace memory while preserving the canonical :__memory__ state key
+use Jido.Agent,
+  name: "persistent_memory",
+  default_plugins: %{__memory__: {MyApp.PersistentMemoryPlugin, %{store: MyApp.Store}}}
 
 # Disable memory (keep others)
 use Jido.Agent,

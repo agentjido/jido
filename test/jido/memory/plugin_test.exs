@@ -4,6 +4,24 @@ defmodule JidoTest.Memory.PluginTest do
   alias Jido.Memory
   alias Jido.Memory.Plugin, as: MemoryPlugin
 
+  defmodule ExternalMemoryPlugin do
+    @moduledoc false
+    @state_schema Zoi.object(%{backend: Zoi.atom() |> Zoi.default(:external)})
+    @config_schema Zoi.object(%{backend: Zoi.atom() |> Zoi.default(:external)})
+
+    use Jido.Plugin,
+      name: "external_memory",
+      state_key: :__memory__,
+      actions: [],
+      schema: @state_schema,
+      config_schema: @config_schema,
+      singleton: true,
+      capabilities: [:memory]
+
+    @impl true
+    def mount(_agent, config), do: {:ok, %{backend: Map.get(config, :backend, :external)}}
+  end
+
   describe "plugin metadata" do
     test "name is memory" do
       assert MemoryPlugin.name() == "memory"
@@ -70,6 +88,12 @@ defmodule JidoTest.Memory.PluginTest do
         default_plugins: %{__memory__: false}
     end
 
+    defmodule AgentWithExternalMemory do
+      use Jido.Agent,
+        name: "memory_plugin_test_external_memory",
+        default_plugins: %{__memory__: {ExternalMemoryPlugin, %{backend: :persistent}}}
+    end
+
     test "agent includes memory plugin by default" do
       modules = AgentWithMemory.plugins()
       assert Jido.Memory.Plugin in modules
@@ -83,6 +107,15 @@ defmodule JidoTest.Memory.PluginTest do
     test "agent can disable memory plugin" do
       modules = AgentWithoutMemory.plugins()
       refute Jido.Memory.Plugin in modules
+    end
+
+    test "agent can replace memory through the canonical default plugin slot" do
+      modules = AgentWithExternalMemory.plugins()
+      agent = AgentWithExternalMemory.new()
+
+      assert ExternalMemoryPlugin in modules
+      refute Jido.Memory.Plugin in modules
+      assert agent.state[:__memory__].backend == :persistent
     end
 
     test "memory can be attached after creation via Memory.Agent" do
