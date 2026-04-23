@@ -70,9 +70,9 @@ defmodule Jido.Agent.Directive.Cron do
          {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec),
          {:ok, persisted_state} <-
            persist_then_commit_registration(state, pid, logical_id, cron_spec, runtime_spec) do
-      Logger.debug(
+      Logger.debug(fn ->
         "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
-      )
+      end)
 
       AgentServer.emit_cron_telemetry_event(persisted_state, :register, %{
         job_id: logical_id,
@@ -82,9 +82,9 @@ defmodule Jido.Agent.Directive.Cron do
       {:ok, persisted_state}
     else
       {:error, reason} ->
-        Logger.error(
+        Logger.error(fn ->
           "AgentServer #{agent_id} failed to register cron job #{inspect(logical_id)}: #{inspect(reason)}"
-        )
+        end)
 
         {:ok, handle_failed_registration(state, logical_id, on_failure)}
     end

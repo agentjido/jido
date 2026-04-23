@@ -36,6 +36,27 @@ defmodule JidoTest.AgentTest do
     end
   end
 
+  defmodule RetryTrackingSlowAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "retry_tracking_slow",
+      schema: [
+        delay_ms: [type: :integer, default: 100],
+        label: [type: :atom, required: true]
+      ]
+
+    def run(%{delay_ms: delay, label: label}, %{test_pid: test_pid}) when is_pid(test_pid) do
+      send(test_pid, {:retry_tracking_attempt, label})
+      Process.sleep(delay)
+      {:ok, %{processed: true, delay: delay}}
+    end
+
+    def run(%{delay_ms: delay}, _context) do
+      Process.sleep(delay)
+      {:ok, %{processed: true, delay: delay}}
+    end
+  end
+
   describe "module definition" do
     test "defines metadata accessors" do
       assert TestAgents.Basic.name() == "basic_agent"
@@ -284,33 +305,31 @@ defmodule JidoTest.AgentTest do
 
     test "passes max_retries option to disable retries" do
       agent = TestAgents.Basic.new()
-
-      start_no_retry = System.monotonic_time(:millisecond)
+      test_pid = self()
 
       {_updated_no_retry, directives_no_retry} =
         TestAgents.Basic.cmd(
           agent,
-          {TestActions.SlowAction, %{delay_ms: 200}},
+          {RetryTrackingSlowAction, %{delay_ms: 200, label: :no_retry}, %{test_pid: test_pid}},
           timeout: 10,
           max_retries: 0
         )
 
-      elapsed_no_retry = System.monotonic_time(:millisecond) - start_no_retry
-
-      start_default = System.monotonic_time(:millisecond)
+      assert_receive {:retry_tracking_attempt, :no_retry}, 1_000
+      refute_receive {:retry_tracking_attempt, :no_retry}, 100
 
       {_updated_default, directives_default} =
         TestAgents.Basic.cmd(
           agent,
-          {TestActions.SlowAction, %{delay_ms: 200}},
+          {RetryTrackingSlowAction, %{delay_ms: 200, label: :default}, %{test_pid: test_pid}},
           timeout: 10
         )
 
-      elapsed_default = System.monotonic_time(:millisecond) - start_default
-
       assert [%Jido.Agent.Directive.Error{}] = directives_no_retry
       assert [%Jido.Agent.Directive.Error{}] = directives_default
-      assert elapsed_no_retry < elapsed_default
+      assert_receive {:retry_tracking_attempt, :default}, 1_000
+      assert_receive {:retry_tracking_attempt, :default}, 1_000
+      refute_receive {:retry_tracking_attempt, :default}, 100
     end
 
     test "cmd/2 delegates to cmd/3 with empty opts" do

@@ -799,7 +799,7 @@ defmodule JidoTest.AgentServerTest do
         use Jido.Action, name: "schedule_atom", schema: []
 
         def run(_params, _context) do
-          {:ok, %{}, [%Directive.Schedule{delay_ms: 10, message: :timeout}]}
+          {:ok, %{}, [%Directive.Schedule{delay_ms: 0, message: :timeout}]}
         end
       end
 
@@ -833,10 +833,10 @@ defmodule JidoTest.AgentServerTest do
       signal = Signal.new!("schedule_atom", %{}, source: "/test")
       {:ok, _agent} = AgentServer.call(pid, signal)
 
-      # Wait for scheduled atom message (10ms delay + processing)
+      # Wait for the wrapped scheduled signal to be processed.
       state =
         eventually_state(pid, fn state -> state.agent.state.received == :timeout end,
-          timeout: 100
+          timeout: 500
         )
 
       assert state.agent.state.received == :timeout
