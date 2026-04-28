@@ -882,11 +882,13 @@ defmodule Jido.Agent do
 
         jido_instance = Keyword.get(opts, :__jido_instance__)
         partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
+        action_exec_defaults = Keyword.get(opts, :__jido_action_exec_defaults__, [])
 
         instruction_opts =
           opts
           |> Keyword.delete(:__jido_instance__)
           |> Keyword.delete(:__partition__)
+          |> Keyword.delete(:__jido_action_exec_defaults__)
 
         case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
           {:ok, instructions} ->
@@ -895,7 +897,9 @@ defmodule Jido.Agent do
 
             normalized_instructions =
               Enum.map(instructions, fn instr ->
-                AgentStrategy.normalize_instruction(strat, instr, ctx)
+                strat
+                |> AgentStrategy.normalize_instruction(instr, ctx)
+                |> __apply_action_exec_defaults__(action_exec_defaults)
               end)
 
             {agent, directives} = strat.cmd(agent, normalized_instructions, ctx)
@@ -906,6 +910,21 @@ defmodule Jido.Agent do
             {agent, [%Jido.Agent.Directive.Error{error: error, context: :normalize}]}
         end
       end
+
+      defp __apply_action_exec_defaults__(%Instruction{opts: opts} = instruction, defaults)
+           when is_list(defaults) and is_list(opts) do
+        merged_opts =
+          defaults
+          |> Enum.reverse()
+          |> Enum.reduce(opts, fn
+            {key, value}, acc when is_atom(key) -> Keyword.put_new(acc, key, value)
+            _invalid, acc -> acc
+          end)
+
+        %{instruction | opts: merged_opts}
+      end
+
+      defp __apply_action_exec_defaults__(instruction, _defaults), do: instruction
     end
   end
 
