@@ -201,6 +201,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
   alias Jido.Config.Defaults
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.RuntimeStore
   alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
@@ -1523,10 +1524,7 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      state.agent_module.cmd(state.agent, action_arg,
-        __jido_instance__: state.jido,
-        __partition__: state.partition
-      )
+      state.agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state))
 
     {:ok, agent, List.wrap(directives), action_arg}
   end
@@ -1792,10 +1790,7 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      agent_module.cmd(state.agent, action_arg,
-        __jido_instance__: state.jido,
-        __partition__: state.partition
-      )
+      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state))
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1866,6 +1861,14 @@ defmodule Jido.AgentServer do
 
   defp target_to_action({mod, params}, _signal) when is_atom(mod) and is_map(params) do
     {mod, params}
+  end
+
+  defp agent_cmd_opts(%State{} = state) do
+    [
+      __jido_instance__: state.jido,
+      __partition__: state.partition,
+      __jido_action_exec_defaults__: ObserveConfig.action_exec_opts(state.jido, [])
+    ]
   end
 
   # ---------------------------------------------------------------------------
