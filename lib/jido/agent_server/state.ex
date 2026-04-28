@@ -79,6 +79,9 @@ defmodule Jido.AgentServer.State do
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules")
                 |> Zoi.default(false),
+              cluster_role:
+                Zoi.atom(description: "Cluster runtime role (:primary | :standby)")
+                |> Zoi.default(:primary),
               restored_from_storage:
                 Zoi.boolean(description: "Whether the startup agent was already thawed")
                 |> Zoi.default(false),
@@ -191,7 +194,8 @@ defmodule Jido.AgentServer.State do
         cron_restart_timer_refs: %{},
         cron_specs: restored_cron_specs,
         cron_runtime_specs: %{},
-        skip_schedules: opts.skip_schedules,
+        skip_schedules: opts.skip_schedules || opts.cluster_role == :standby,
+        cluster_role: opts.cluster_role,
         restored_from_storage: opts.restored_from_storage,
         error_count: 0,
         metrics: %{},
@@ -254,6 +258,14 @@ defmodule Jido.AgentServer.State do
       state
       | agent: inject_runtime_refs(agent, state.partition, state.parent, state.orphaned_from)
     }
+  end
+
+  @doc """
+  Sets the cluster runtime role.
+  """
+  @spec set_cluster_role(t(), :primary | :standby) :: t()
+  def set_cluster_role(%__MODULE__{} = state, role) when role in [:primary, :standby] do
+    %{state | cluster_role: role, skip_schedules: role == :standby}
   end
 
   @doc """

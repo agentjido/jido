@@ -59,6 +59,9 @@ defmodule Jido.AgentServer.Options do
               skip_schedules:
                 Zoi.boolean(description: "Skip registering plugin schedules (useful for tests)")
                 |> Zoi.default(false),
+              cluster_role:
+                Zoi.atom(description: "Cluster runtime role (:primary | :standby)")
+                |> Zoi.default(:primary),
 
               # InstanceManager integration (set by Jido.Agent.InstanceManager)
               lifecycle_mod:
@@ -121,6 +124,7 @@ defmodule Jido.AgentServer.Options do
     with {:ok, _} <- validate_agent(attrs[:agent]),
          {:ok, _} <- validate_partition(attrs[:partition], agent_partition),
          {:ok, _} <- validate_error_policy(attrs[:error_policy]),
+         {:ok, _} <- validate_cluster_role(attrs[:cluster_role]),
          {:ok, parent} <- validate_parent(attrs[:parent]) do
       attrs = Map.put(attrs, :parent, parent)
       Zoi.parse(@schema, attrs)
@@ -227,6 +231,16 @@ defmodule Jido.AgentServer.Options do
        partition: partition,
        agent_partition: agent_partition
      })}
+  end
+
+  @doc false
+  @spec validate_cluster_role(term()) :: {:ok, :primary | :standby} | {:error, term()}
+  def validate_cluster_role(nil), do: {:ok, :primary}
+  def validate_cluster_role(:primary), do: {:ok, :primary}
+  def validate_cluster_role(:standby), do: {:ok, :standby}
+
+  def validate_cluster_role(other) do
+    {:error, Jido.Error.validation_error("invalid cluster_role: #{inspect(other)}")}
   end
 
   defp validate_parent(nil), do: {:ok, nil}

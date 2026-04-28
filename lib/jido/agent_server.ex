@@ -363,6 +363,46 @@ defmodule Jido.AgentServer do
   end
 
   @doc """
+  Exports a cluster-safe runtime snapshot for handoff or replica bootstrap.
+  """
+  @spec cluster_snapshot(server()) :: {:ok, map()} | {:error, term()}
+  def cluster_snapshot(server) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, :cluster_snapshot)
+    end
+  end
+
+  @doc """
+  Imports a previously exported runtime snapshot.
+  """
+  @spec import_cluster_snapshot(server(), map()) :: :ok | {:error, term()}
+  def import_cluster_snapshot(server, snapshot) when is_map(snapshot) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:import_cluster_snapshot, snapshot})
+    end
+  end
+
+  @doc """
+  Promotes the runtime into active primary mode.
+  """
+  @spec promote(server()) :: :ok | {:error, term()}
+  def promote(server) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:set_cluster_role, :primary})
+    end
+  end
+
+  @doc """
+  Demotes the runtime into passive standby mode.
+  """
+  @spec demote(server()) :: :ok | {:error, term()}
+  def demote(server) do
+    with {:ok, pid} <- resolve_server(server) do
+      GenServer.call(pid, {:set_cluster_role, :standby})
+    end
+  end
+
+  @doc """
   Wait for an agent to reach a terminal status (`:completed` or `:failed`).
 
   This is an event-driven wait - the caller blocks until the agent's state
@@ -974,13 +1014,17 @@ defmodule Jido.AgentServer do
 
         state = State.update_agent(state, agent)
 
-        case State.enqueue_all(state, init_signal(), List.wrap(directives)) do
-          {:ok, enq_state} ->
-            enq_state
+        if standby?(state) do
+          state
+        else
+          case State.enqueue_all(state, init_signal(), List.wrap(directives)) do
+            {:ok, enq_state} ->
+              enq_state
 
-          {:error, :queue_overflow} ->
-            Logger.warning("AgentServer #{state.id} queue overflow during strategy init")
-            state
+            {:error, :queue_overflow} ->
+              Logger.warning("AgentServer #{state.id} queue overflow during strategy init")
+              state
+          end
         end
       else
         state
@@ -1039,6 +1083,20 @@ defmodule Jido.AgentServer do
 
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
+  end
+
+  def handle_call(:cluster_snapshot, _from, %State{} = state) do
+    {:reply, {:ok, export_cluster_snapshot(state)}, state}
+  end
+
+  def handle_call({:import_cluster_snapshot, snapshot}, _from, %State{} = state)
+      when is_map(snapshot) do
+    {:reply, :ok, apply_cluster_snapshot(state, snapshot)}
+  end
+
+  def handle_call({:set_cluster_role, role}, _from, %State{} = state)
+      when role in [:primary, :standby] do
+    {:reply, :ok, set_cluster_role(state, role)}
   end
 
   def handle_call({:set_debug, enabled}, _from, %State{} = state) do
@@ -1544,26 +1602,34 @@ defmodule Jido.AgentServer do
           Map.merge(metadata, signal_stop_metadata(directives))
         )
 
-        case State.enqueue_all(state, signal, directives) do
-          {:ok, enq_state} ->
-            enq_state = start_drain_if_idle(enq_state)
+        if standby?(state) do
+          transformed_agent =
+            run_plugin_transform_hooks(state.agent, resolved_action, signal, state)
 
-            transformed_agent =
-              run_plugin_transform_hooks(enq_state.agent, resolved_action, signal, enq_state)
+          GenServer.reply(from, {:ok, transformed_agent})
+          maybe_set_idle_status(state)
+        else
+          case State.enqueue_all(state, signal, directives) do
+            {:ok, enq_state} ->
+              enq_state = start_drain_if_idle(enq_state)
 
-            GenServer.reply(from, {:ok, transformed_agent})
-            enq_state
+              transformed_agent =
+                run_plugin_transform_hooks(enq_state.agent, resolved_action, signal, enq_state)
 
-          {:error, :queue_overflow} ->
-            emit_telemetry(
-              [:jido, :agent_server, :queue, :overflow],
-              %{queue_size: state.max_queue_size},
-              metadata
-            )
+              GenServer.reply(from, {:ok, transformed_agent})
+              enq_state
 
-            Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
-            GenServer.reply(from, {:error, :queue_overflow})
-            maybe_set_idle_status(state)
+            {:error, :queue_overflow} ->
+              emit_telemetry(
+                [:jido, :agent_server, :queue, :overflow],
+                %{queue_size: state.max_queue_size},
+                metadata
+              )
+
+              Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+              GenServer.reply(from, {:error, :queue_overflow})
+              maybe_set_idle_status(state)
+          end
         end
 
       {:error, reason, directives} ->
@@ -1617,6 +1683,84 @@ defmodule Jido.AgentServer do
     else
       state
     end
+  end
+
+  defp standby?(%State{cluster_role: :standby}), do: true
+  defp standby?(%State{}), do: false
+
+  defp export_cluster_snapshot(%State{} = state) do
+    %{
+      agent: state.agent,
+      cron_specs: state.cron_specs
+    }
+  end
+
+  defp apply_cluster_snapshot(%State{} = state, snapshot) do
+    state
+    |> deactivate_cluster_runtime()
+    |> Map.put(:agent, Map.fetch!(snapshot, :agent))
+    |> Map.put(:cron_specs, Map.get(snapshot, :cron_specs, %{}))
+    |> Map.put(:queue, :queue.new())
+    |> Map.put(:signal_call_inflight, nil)
+    |> Map.put(:signal_call_queue, :queue.new())
+    |> Map.put(:deferred_async_signals, :queue.new())
+    |> Map.put(:processing, false)
+    |> Map.put(:status, :idle)
+    |> Map.put(:completion_waiters, %{})
+  end
+
+  defp set_cluster_role(%State{} = state, role) when role in [:primary, :standby] do
+    state =
+      case role do
+        :primary ->
+          state
+          |> State.set_cluster_role(:primary)
+          |> activate_cluster_runtime()
+
+        :standby ->
+          state
+          |> deactivate_cluster_runtime()
+          |> State.set_cluster_role(:standby)
+      end
+
+    maybe_set_idle_status(state)
+  end
+
+  defp activate_cluster_runtime(%State{} = state) do
+    state
+    |> start_plugin_children()
+    |> start_plugin_subscriptions()
+    |> register_plugin_schedules()
+    |> register_restored_cron_specs()
+  end
+
+  defp deactivate_cluster_runtime(%State{} = state) do
+    state
+    |> cancel_cluster_cron_jobs()
+    |> stop_cluster_children()
+  end
+
+  defp cancel_cluster_cron_jobs(%State{} = state) do
+    Enum.reduce(Map.keys(state.cron_jobs), state, fn logical_id, acc ->
+      {_pid, new_state} =
+        untrack_cron_job(acc, logical_id, cancel?: true, drop_runtime_spec?: false)
+
+      new_state
+    end)
+  end
+
+  defp stop_cluster_children(%State{} = state) do
+    Enum.each(state.children, fn {_tag, child} ->
+      if is_pid(child.pid) and Process.alive?(child.pid) do
+        Process.exit(child.pid, :shutdown)
+      end
+
+      if is_reference(child.ref) do
+        Process.demonitor(child.ref, [:flush])
+      end
+    end)
+
+    %{state | children: %{}}
   end
 
   defp process_signal(%Signal{} = signal, %State{signal_router: router} = state) do
@@ -1802,19 +1946,23 @@ defmodule Jido.AgentServer do
       Map.merge(metadata, signal_stop_metadata(directives))
     )
 
-    case State.enqueue_all(state, signal, directives) do
-      {:ok, enq_state} ->
-        {:ok, start_drain_if_idle(enq_state), action_arg}
+    if standby?(state) do
+      {:ok, maybe_set_idle_status(state), action_arg}
+    else
+      case State.enqueue_all(state, signal, directives) do
+        {:ok, enq_state} ->
+          {:ok, start_drain_if_idle(enq_state), action_arg}
 
-      {:error, :queue_overflow} ->
-        emit_telemetry(
-          [:jido, :agent_server, :queue, :overflow],
-          %{queue_size: state.max_queue_size},
-          metadata
-        )
+        {:error, :queue_overflow} ->
+          emit_telemetry(
+            [:jido, :agent_server, :queue, :overflow],
+            %{queue_size: state.max_queue_size},
+            metadata
+          )
 
-        Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
-        {:error, :queue_overflow, state}
+          Logger.warning("AgentServer #{state.id} queue overflow, dropping directives")
+          {:error, :queue_overflow, state}
+      end
     end
   end
 
@@ -2059,6 +2207,8 @@ defmodule Jido.AgentServer do
   # ---------------------------------------------------------------------------
 
   @doc false
+  defp start_plugin_children(%State{cluster_role: :standby} = state), do: state
+
   defp start_plugin_children(%State{} = state) do
     agent_module = state.agent_module
 
@@ -2134,6 +2284,8 @@ defmodule Jido.AgentServer do
   # ---------------------------------------------------------------------------
 
   @doc false
+  defp start_plugin_subscriptions(%State{cluster_role: :standby} = state), do: state
+
   defp start_plugin_subscriptions(%State{} = state) do
     agent_module = state.agent_module
 
@@ -2231,6 +2383,8 @@ defmodule Jido.AgentServer do
   defp register_restored_cron_specs(%State{cron_specs: cron_specs} = state)
        when map_size(cron_specs) == 0,
        do: state
+
+  defp register_restored_cron_specs(%State{cluster_role: :standby} = state), do: state
 
   defp register_restored_cron_specs(%State{} = state) do
     Enum.reduce(state.cron_specs, state, fn {job_id, spec}, acc_state ->
