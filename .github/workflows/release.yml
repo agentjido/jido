@@ -1,8 +1,25 @@
 name: Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
     inputs:
+      operation:
+        description: "Release operation: auto, prepare, or publish"
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - prepare
+          - publish
+      tag_name:
+        description: "Optional v-prefixed tag for publish simulation"
+        required: false
+        type: string
+        default: ""
       dry_run:
         description: "Dry run (no git push, no tag, no GitHub release, no Hex publish)"
         required: false
@@ -18,16 +35,25 @@ on:
         required: false
         type: boolean
         default: false
+      version_override:
+        description: "Optional bare SemVer override (for example 1.2.3, not v1.2.3)"
+        required: false
+        type: string
+        default: ""
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
   release:
     name: Release
-    uses: agentjido/github-actions/.github/workflows/elixir-release.yml@v3
+    uses: agentjido/github-actions/.github/workflows/jido-release.yml@v4
     with:
-      dry_run: ${{ inputs.dry_run }}
-      hex_dry_run: ${{ inputs.hex_dry_run }}
-      skip_tests: ${{ inputs.skip_tests }}
+      operation: ${{ inputs.operation || 'auto' }}
+      tag_name: ${{ inputs.tag_name || '' }}
+      dry_run: ${{ inputs.dry_run || false }}
+      hex_dry_run: ${{ inputs.hex_dry_run || false }}
+      skip_tests: ${{ inputs.skip_tests || false }}
+      version_override: ${{ inputs.version_override || '' }}
     secrets: inherit
