@@ -1062,8 +1062,9 @@ defmodule Jido.Agent do
     quote location: :keep do
       @impl true
       def restore(data, ctx) do
-        agent = new(id: data[:id] || data["id"])
-        base_state = data[:state] || data["state"] || %{}
+        data = normalize_keys(data)
+        agent = new(id: data[:id])
+        base_state = data[:state] || %{}
         agent = %{agent | state: Map.merge(agent.state, base_state)}
         externalized_keys = data[:externalized_keys] || %{}
 
@@ -1094,6 +1095,15 @@ defmodule Jido.Agent do
             {:cont, {:ok, acc}}
           end
         end)
+      end
+
+      defp normalize_keys(map) when is_map(map) do
+        Map.new(map, fn
+          {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+          pair -> pair
+        end)
+      rescue
+        ArgumentError -> map
       end
     end
   end
@@ -1294,8 +1304,8 @@ defmodule Jido.Agent do
         @validated_plugin_routes elem(@plugin_routes_result, 1)
 
         # Validate plugin requirements at compile time
-        @plugin_config_map Enum.reduce(@plugin_instances, %{}, fn instance, acc ->
-                             Map.put(acc, instance.state_key, instance.config)
+        @plugin_config_map Map.new(@plugin_instances, fn instance ->
+                             {instance.state_key, instance.config}
                            end)
         @requirements_result Jido.Plugin.Requirements.validate_all_requirements(
                                @plugin_instances,

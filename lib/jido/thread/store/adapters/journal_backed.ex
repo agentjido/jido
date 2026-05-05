@@ -136,13 +136,15 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
   end
 
   defp decode_entry(%Signal{data: data}) when is_map(data) do
+    data = normalize_keys(data)
+
     %Entry{
-      id: data["entry_id"] || data[:entry_id],
-      seq: data["seq"] || data[:seq],
-      at: data["at"] || data[:at],
-      kind: to_atom(data["kind"] || data[:kind]),
-      payload: data["payload"] || data[:payload] || %{},
-      refs: data["refs"] || data[:refs] || %{}
+      id: data[:entry_id],
+      seq: data[:seq],
+      at: data[:at],
+      kind: to_atom(data[:kind]),
+      payload: data[:payload] || %{},
+      refs: data[:refs] || %{}
     }
   rescue
     _ -> nil
@@ -181,5 +183,14 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
     :crypto.strong_rand_bytes(length)
     |> Base.url_encode64()
     |> binary_part(0, length)
+  end
+
+  defp normalize_keys(map) when is_map(map) do
+    Map.new(map, fn
+      {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+      pair -> pair
+    end)
+  rescue
+    ArgumentError -> map
   end
 end
