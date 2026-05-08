@@ -187,10 +187,14 @@ defmodule Jido.Thread.Store.Adapters.JournalBacked do
 
   defp normalize_keys(map) when is_map(map) do
     Map.new(map, fn
-      {k, v} when is_binary(k) -> {String.to_existing_atom(k), v}
+      {k, v} when is_binary(k) -> {existing_atom_or_original(k), v}
       pair -> pair
     end)
+  end
+
+  defp existing_atom_or_original(key) do
+    String.to_existing_atom(key)
   rescue
-    ArgumentError -> map
+    ArgumentError -> key
   end
 end
