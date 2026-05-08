@@ -106,6 +106,13 @@ defmodule JidoTest.Plugin.RestoreHooksTest do
       schema: [counter: [type: :integer, default: 0]]
   end
 
+  defmodule AgentWithSchemaOnly do
+    use Jido.Agent,
+      name: "restore_schema_only_agent",
+      default_plugins: false,
+      schema: [counter: [type: :integer, default: 0]]
+  end
+
   describe "restore calls plugin on_restore/2" do
     test "externalized plugin state is restored via on_restore" do
       agent = AgentWithExternalizePlugin.new()
@@ -236,6 +243,27 @@ defmodule JidoTest.Plugin.RestoreHooksTest do
       {:ok, restored} = AgentWithExternalizePlugin.restore(legacy_checkpoint, %{})
 
       assert restored.state[:ext] == %{id: "legacy", rev: 1}
+    end
+
+    test "restore accepts string-keyed checkpoints with unknown keys" do
+      unknown_key = "unknown_#{System.unique_integer([:positive])}"
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unknown_key)
+      end
+
+      checkpoint = %{
+        "version" => 1,
+        "agent_module" => AgentWithSchemaOnly,
+        "id" => "string-keyed-agent",
+        "state" => %{counter: 7},
+        unknown_key => true
+      }
+
+      {:ok, restored} = AgentWithSchemaOnly.restore(checkpoint, %{})
+
+      assert restored.id == "string-keyed-agent"
+      assert restored.state[:counter] == 7
     end
 
     test "restore passes config to on_restore context" do

@@ -94,10 +94,7 @@ defmodule Jido.RuntimeStore do
   """
   @spec fetch(atom(), hive(), key()) :: {:ok, value()} | :error
   def fetch(instance, hive, key) when is_atom(instance) do
-    case call(instance, {:fetch, hive, key}, :error) do
-      {:ok, value} -> {:ok, value}
-      :error -> :error
-    end
+    call(instance, {:fetch, hive, key}, :error)
   end
 
   @doc """

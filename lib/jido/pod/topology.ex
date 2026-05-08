@@ -535,7 +535,7 @@ defmodule Jido.Pod.Topology do
       end)
 
     indegree =
-      Enum.reduce(ordered_nodes, %{}, fn name, acc -> Map.put(acc, name, 0) end)
+      Map.new(ordered_nodes, fn name -> {name, 0} end)
       |> then(fn base ->
         Enum.reduce(edges, base, fn {_prereq, dependent}, acc ->
           Map.update!(acc, dependent, &(&1 + 1))

@@ -220,8 +220,6 @@ defmodule Jido.Storage.File do
              now
            ) do
       {:ok, thread}
-    else
-      {:error, reason} -> {:error, reason}
     end
   end
 

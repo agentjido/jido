@@ -1,6 +1,8 @@
 defmodule Jido.Thread.Store.Adapters.JournalBackedTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Signal
+  alias Jido.Signal.Journal
   alias Jido.Thread
   alias Jido.Thread.Entry
   alias Jido.Thread.Store
@@ -43,6 +45,46 @@ defmodule Jido.Thread.Store.Adapters.JournalBackedTest do
       assert Enum.at(entries, 0).payload.content == "First"
       assert Enum.at(entries, 1).payload.content == "Second"
       assert Enum.at(entries, 2).payload.name == "search"
+    end
+
+    test "loads string-keyed signal data with unknown keys" do
+      {:ok, state} = JournalBacked.init([])
+      unknown_key = "unknown_#{System.unique_integer([:positive])}"
+
+      assert_raise ArgumentError, fn ->
+        String.to_existing_atom(unknown_key)
+      end
+
+      signal =
+        Signal.new!(%{
+          id: "sig_string_keyed_entry",
+          type: "jido.thread.entry",
+          source: "jido.thread",
+          subject: "string-keyed-thread",
+          time: DateTime.utc_now() |> DateTime.to_iso8601(),
+          data: %{
+            "entry_id" => "entry-string-1",
+            "seq" => 0,
+            "at" => 123,
+            "kind" => "message",
+            "payload" => %{content: "Hello"},
+            "refs" => %{signal_id: "sig_string_keyed_entry"},
+            unknown_key => true
+          }
+        })
+
+      {:ok, journal} = Journal.record(state.journal, signal)
+
+      assert {:ok, _state, loaded} =
+               JournalBacked.load(%{state | journal: journal}, "string-keyed-thread")
+
+      [entry] = Thread.to_list(loaded)
+      assert entry.id == "entry-string-1"
+      assert entry.seq == 0
+      assert entry.at == 123
+      assert entry.kind == :message
+      assert entry.payload == %{content: "Hello"}
+      assert entry.refs == %{signal_id: "sig_string_keyed_entry"}
     end
 
     test "preserves entry metadata" do

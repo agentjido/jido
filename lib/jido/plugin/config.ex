@@ -105,10 +105,7 @@ defmodule Jido.Plugin.Config do
     config_schema = get_config_schema(plugin_module)
 
     if config_schema do
-      case Zoi.parse(config_schema, config) do
-        {:ok, validated} -> {:ok, validated}
-        {:error, errors} -> {:error, errors}
-      end
+      Zoi.parse(config_schema, config)
     else
       {:ok, config}
     end

@@ -199,8 +199,6 @@ defmodule Jido.Storage.Redis do
 
       with {:ok, _} <- command_fn.(command) do
         {:ok, reconstruct_thread(thread_id, updated_thread)}
-      else
-        {:error, reason} -> {:error, reason}
       end
     end
   end
