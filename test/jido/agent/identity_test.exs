@@ -1,7 +1,7 @@
-defmodule JidoTest.IdentityTest do
+defmodule JidoTest.Agent.IdentityTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Identity
+  alias Jido.Agent.Identity
 
   describe "new/1" do
     test "creates identity with default values" do

@@ -50,6 +50,7 @@ defmodule Jido.Persist do
 
   require Logger
 
+  alias Jido.Agent.Identity
   alias Jido.Scheduler
   alias Jido.Thread
 
@@ -393,6 +394,7 @@ defmodule Jido.Persist do
     ctx = %{}
 
     with {:ok, checkpoint} <- validate_checkpoint(checkpoint),
+         checkpoint <- Identity.migrate_checkpoint(checkpoint),
          {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
          {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
       agent = attach_scheduler_manifest(agent, checkpoint)

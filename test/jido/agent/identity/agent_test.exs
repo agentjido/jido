@@ -2,11 +2,24 @@ defmodule JidoTest.Identity.AgentTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Identity
-  alias Jido.Identity.Agent, as: IdentityAgent
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Agent, as: IdentityAgent
 
   defp create_agent do
     %Agent{id: "test-agent-1", state: %{}}
+  end
+
+  defp legacy_identity(fields \\ %{}) do
+    Map.merge(
+      %{
+        __struct__: Jido.Identity,
+        rev: 2,
+        profile: %{age: 5, origin: :legacy},
+        created_at: 1_000,
+        updated_at: 2_000
+      },
+      fields
+    )
   end
 
   describe "key/0" do
@@ -31,6 +44,13 @@ defmodule JidoTest.Identity.AgentTest do
       identity = Identity.new()
       agent = %{create_agent() | state: %{__identity__: identity}}
       assert IdentityAgent.get(agent) == identity
+    end
+
+    test "migrates legacy Jido.Identity agent identity state on read" do
+      agent = %{create_agent() | state: %{__identity__: legacy_identity()}}
+
+      assert %Identity{} = identity = IdentityAgent.get(agent)
+      assert identity.profile[:origin] == :legacy
     end
   end
 
@@ -111,6 +131,22 @@ defmodule JidoTest.Identity.AgentTest do
 
       result = IdentityAgent.get(updated)
       assert result.profile == %{age: 42}
+    end
+
+    test "writes migrated legacy Jido.Identity agent identity back into state" do
+      agent = %{create_agent() | state: %{__identity__: legacy_identity()}}
+
+      updated = IdentityAgent.ensure(agent)
+
+      assert %Identity{} = updated.state.__identity__
+      assert updated.state.__identity__.profile[:origin] == :legacy
+    end
+
+    test "does not overwrite custom identity state under :__identity__" do
+      custom_identity = %{__struct__: Jido.Identity, principal_id: "agent_123"}
+      agent = %{create_agent() | state: %{__identity__: custom_identity}}
+
+      assert IdentityAgent.ensure(agent) == agent
     end
   end
 

@@ -20,7 +20,7 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
   alias Jido.Persist
   alias Jido.Storage.ETS
   alias Jido.Thread
-  alias Jido.Identity.Agent, as: IdentityAgent
+  alias Jido.Agent.Identity.Agent, as: IdentityAgent
   alias Jido.Memory.Agent, as: MemoryAgent
   alias Jido.Thread.Agent, as: ThreadAgent
 

@@ -225,12 +225,12 @@ defmodule Jido.MixProject do
           Jido.Plugin.Spec,
           Jido.Pod.Plugin
         ],
-        Identity: [
-          Jido.Identity,
-          Jido.Identity.Plugin,
-          Jido.Identity.Agent,
-          Jido.Identity.Profile,
-          Jido.Identity.Actions.Evolve
+        "Agent Identity": [
+          Jido.Agent.Identity,
+          Jido.Agent.Identity.Plugin,
+          Jido.Agent.Identity.Agent,
+          Jido.Agent.Identity.Profile,
+          Jido.Agent.Identity.Actions.Evolve
         ],
         Directives: [
           Jido.Agent.Directive,

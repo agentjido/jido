@@ -1,11 +1,11 @@
 defmodule JidoTest.Identity.PluginTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Identity
-  alias Jido.Identity.Plugin, as: IdentityPlugin
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Plugin, as: IdentityPlugin
 
   describe "plugin metadata" do
-    test "name is identity" do
+    test "name remains identity" do
       assert IdentityPlugin.name() == "identity"
     end
 
@@ -61,7 +61,7 @@ defmodule JidoTest.Identity.PluginTest do
 
     test "agent includes identity plugin by default" do
       modules = AgentWithIdentity.plugins()
-      assert Jido.Identity.Plugin in modules
+      assert Jido.Agent.Identity.Plugin in modules
     end
 
     test "agent state does not contain :__identity__ key initially" do
@@ -71,7 +71,7 @@ defmodule JidoTest.Identity.PluginTest do
 
     test "agent can disable identity plugin" do
       modules = AgentWithoutIdentity.plugins()
-      refute Jido.Identity.Plugin in modules
+      refute Jido.Agent.Identity.Plugin in modules
     end
 
     test "identity can be attached after creation via Identity.Agent" do
@@ -82,7 +82,7 @@ defmodule JidoTest.Identity.PluginTest do
 
     test "cannot alias identity plugin" do
       assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
-        Jido.Plugin.Instance.new({Jido.Identity.Plugin, as: :my_identity})
+        Jido.Plugin.Instance.new({Jido.Agent.Identity.Plugin, as: :my_identity})
       end
     end
   end
