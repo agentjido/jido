@@ -15,7 +15,9 @@ defmodule Jido.Plugin do
   2. **Agent.new/1**: `mount/2` is called to initialize plugin state (pure)
   3. **AgentServer.init/1**: `child_spec/1` processes are started and monitored
   4. **Signal processing**: `handle_signal/2` runs before routing, can override or abort
-  5. **After cmd/2 (call path)**: `transform_result/3` wraps call results
+  5. **Before action execution**: `prepare_action/2` can verify/rewrite the effective signal and contribute trusted action context
+  6. **Before signal emit dispatch**: `prepare_emit/2` can rewrite outbound emitted signals
+  7. **After cmd/2 (call path)**: `transform_result/3` wraps call results
 
   ## Example Plugin
 
@@ -260,6 +262,41 @@ defmodule Jido.Plugin do
   """
   @callback handle_signal(signal :: term(), context :: map()) ::
               {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
+
+  @doc """
+  Pre-action hook called after `handle_signal/2` rewrites and before routing or
+  action execution.
+
+  Plugins can verify or rewrite the final effective signal and contribute
+  trusted action context. Returned context is merged into the context given to
+  routed actions. Plugins may not provide reserved keys such as `:state` or
+  `:signal`; duplicate context keys fail closed.
+
+  ## Parameters
+
+  - `signal` - The effective `Jido.Signal` struct after `handle_signal/2`
+    middleware has run.
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
+    `:plugin_instance`, `:config`
+
+  ## Returns
+
+  - `{:ok, signal, context_delta}` - Continue with possibly rewritten signal
+    and trusted action context.
+  - `{:error, reason}` - Abort signal processing with error.
+  """
+  @callback prepare_action(signal :: term(), context :: map()) ::
+              {:ok, term(), map()} | {:error, term()}
+
+  @doc """
+  Pre-emit hook called before an emitted signal is dispatched.
+
+  This hook is intended for outbound signal signing, trace enrichment, and other
+  signal-level transformations that must happen after an action returns an emit
+  directive but before runtime dispatch.
+  """
+  @callback prepare_emit(signal :: term(), context :: map()) ::
+              {:ok, term()} | {:error, term()}
 
   @doc """
   Caller view transform for the agent returned from `AgentServer.call/3`.
@@ -633,6 +670,16 @@ defmodule Jido.Plugin do
       def handle_signal(_signal, _context), do: {:ok, nil}
 
       @doc false
+      @spec prepare_action(term(), map()) :: {:ok, term(), map()} | {:error, term()}
+      @impl Jido.Plugin
+      def prepare_action(signal, _context), do: {:ok, signal, %{}}
+
+      @doc false
+      @spec prepare_emit(term(), map()) :: {:ok, term()} | {:error, term()}
+      @impl Jido.Plugin
+      def prepare_emit(signal, _context), do: {:ok, signal}
+
+      @doc false
       @spec transform_result(module() | String.t(), term(), map()) :: term()
       @impl Jido.Plugin
       def transform_result(_action, result, _context), do: result
@@ -668,6 +715,8 @@ defmodule Jido.Plugin do
         {:signal_routes, 0},
         {:signal_routes, 1},
         {:handle_signal, 2},
+        {:prepare_action, 2},
+        {:prepare_emit, 2},
         {:transform_result, 3},
         {:child_spec, 1},
         {:subscriptions, 2},

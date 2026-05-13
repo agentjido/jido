@@ -3,6 +3,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
 
   require Logger
 
+  alias Jido.Agent.Directive
+  alias Jido.AgentServer.ErrorPolicy
   alias Jido.Tracing.Context, as: TraceContext
 
   def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
@@ -14,9 +16,15 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
         {:error, _} -> signal
       end
 
-    dispatch_signal(traced_signal, cfg, state)
+    case Jido.AgentServer.prepare_emit_signal(traced_signal, input_signal, state) do
+      {:ok, prepared_signal} ->
+        dispatch_signal(prepared_signal, cfg, state)
+        {:async, nil, state}
 
-    {:async, nil, state}
+      {:error, error} ->
+        error_directive = %Directive.Error{error: error, context: :plugin_prepare_emit}
+        ErrorPolicy.handle(error_directive, state)
+    end
   end
 
   defp dispatch_signal(traced_signal, nil, _state) do

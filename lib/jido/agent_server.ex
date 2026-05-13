@@ -214,6 +214,7 @@ defmodule Jido.AgentServer do
   @cron_restart_base_ms 500
   @cron_restart_max_ms 30_000
   @relationship_hive :relationships
+  @reserved_action_context_keys [:state, :signal]
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -1495,27 +1496,42 @@ defmodule Jido.AgentServer do
 
       {:override, action_spec, modified_signal} ->
         effective_signal = modified_signal || signal
-        compute_signal_call_dispatch(effective_signal, action_spec, state)
+
+        case run_plugin_prepare_action_hooks(effective_signal, state) do
+          {:ok, prepared_signal, action_context} ->
+            compute_signal_call_dispatch(prepared_signal, action_spec, state, action_context)
+
+          {:error, error} ->
+            error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
+            {:error, error, [error_directive]}
+        end
 
       {:continue, modified_signal} ->
-        case route_to_actions(router, modified_signal) do
-          {:ok, actions} ->
-            compute_signal_call_dispatch(modified_signal, actions, state)
+        case run_plugin_prepare_action_hooks(modified_signal, state) do
+          {:ok, prepared_signal, action_context} ->
+            case route_to_actions(router, prepared_signal) do
+              {:ok, actions} ->
+                compute_signal_call_dispatch(prepared_signal, actions, state, action_context)
 
-          {:error, reason} ->
-            error =
-              Jido.Error.routing_error("No route for signal", %{
-                signal_type: modified_signal.type,
-                reason: reason
-              })
+              {:error, reason} ->
+                error =
+                  Jido.Error.routing_error("No route for signal", %{
+                    signal_type: prepared_signal.type,
+                    reason: reason
+                  })
 
-            error_directive = %Directive.Error{error: error, context: :routing}
+                error_directive = %Directive.Error{error: error, context: :routing}
+                {:error, error, [error_directive]}
+            end
+
+          {:error, error} ->
+            error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
             {:error, error, [error_directive]}
         end
     end
   end
 
-  defp compute_signal_call_dispatch(signal, action_spec, state) do
+  defp compute_signal_call_dispatch(signal, action_spec, state, action_context) do
     action_arg =
       case action_spec do
         [single] -> single
@@ -1524,7 +1540,11 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      state.agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal))
+      state.agent_module.cmd(
+        state.agent,
+        action_arg,
+        agent_cmd_opts(state, signal, action_context)
+      )
 
     {:ok, agent, List.wrap(directives), action_arg}
   end
@@ -1733,10 +1753,23 @@ defmodule Jido.AgentServer do
 
       {:override, action_spec, modified_signal} ->
         effective_signal = modified_signal || signal
-        dispatch_action(effective_signal, action_spec, state, start_time, metadata)
+        handle_prepared_action(effective_signal, action_spec, state, start_time, metadata)
 
       {:continue, modified_signal} ->
-        handle_signal_routing(modified_signal, router, state, start_time, metadata)
+        case run_plugin_prepare_action_hooks(modified_signal, state) do
+          {:ok, prepared_signal, action_context} ->
+            handle_signal_routing(
+              prepared_signal,
+              router,
+              state,
+              start_time,
+              metadata,
+              action_context
+            )
+
+          {:error, error} ->
+            handle_prepare_action_error(error, modified_signal, state)
+        end
     end
   end
 
@@ -1745,10 +1778,25 @@ defmodule Jido.AgentServer do
     enqueue_error_directive(error, signal, [error_directive], state)
   end
 
-  defp handle_signal_routing(signal, router, state, start_time, metadata) do
+  defp handle_prepared_action(signal, action_spec, state, start_time, metadata) do
+    case run_plugin_prepare_action_hooks(signal, state) do
+      {:ok, prepared_signal, action_context} ->
+        dispatch_action(prepared_signal, action_spec, state, start_time, metadata, action_context)
+
+      {:error, error} ->
+        handle_prepare_action_error(error, signal, state)
+    end
+  end
+
+  defp handle_prepare_action_error(error, signal, state) do
+    error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
+    enqueue_error_directive(error, signal, [error_directive], state)
+  end
+
+  defp handle_signal_routing(signal, router, state, start_time, metadata, action_context) do
     case route_to_actions(router, signal) do
       {:ok, actions} ->
-        dispatch_action(signal, actions, state, start_time, metadata)
+        dispatch_action(signal, actions, state, start_time, metadata, action_context)
 
       {:error, reason} ->
         handle_routing_error(reason, signal, state, start_time, metadata)
@@ -1779,7 +1827,7 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp dispatch_action(signal, action_spec, state, start_time, metadata) do
+  defp dispatch_action(signal, action_spec, state, start_time, metadata, action_context) do
     agent_module = state.agent_module
 
     action_arg =
@@ -1790,7 +1838,7 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal))
+      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal, action_context))
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1863,18 +1911,26 @@ defmodule Jido.AgentServer do
     {mod, params}
   end
 
-  defp agent_cmd_opts(%State{} = state, %Signal{} = signal) do
+  defp agent_cmd_opts(%State{} = state, %Signal{} = signal, action_context) do
     [
       __jido_instance__: state.jido,
       __partition__: state.partition,
       __jido_action_exec_defaults__: ObserveConfig.action_exec_opts(state.jido, []),
-      __jido_signal__: signal
+      __jido_signal__: signal,
+      __jido_action_context__: action_context
     ]
   end
 
   # ---------------------------------------------------------------------------
   # Internal: Plugin Signal Hooks
   # ---------------------------------------------------------------------------
+
+  @doc false
+  @spec prepare_emit_signal(Signal.t(), Signal.t(), State.t()) ::
+          {:ok, Signal.t()} | {:error, term()}
+  def prepare_emit_signal(%Signal{} = signal, %Signal{} = input_signal, %State{} = state) do
+    run_plugin_prepare_emit_hooks(signal, input_signal, state)
+  end
 
   defp run_plugin_signal_hooks(%Signal{} = signal, %State{} = state) do
     agent_module = state.agent_module
@@ -1905,6 +1961,87 @@ defmodule Jido.AgentServer do
       end
     end)
     |> normalize_hook_result()
+  end
+
+  defp run_plugin_prepare_action_hooks(%Signal{} = signal, %State{} = state) do
+    agent_module = state.agent_module
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
+
+    Enum.reduce_while(specs_and_instances, {:ok, signal, %{}}, fn {spec, instance},
+                                                                  {:ok, current_signal,
+                                                                   action_context} ->
+      if signal_matches_plugin?(current_signal, spec) do
+        case invoke_plugin_prepare_action(instance, spec, current_signal, state, agent_module) do
+          {:ok, prepared_signal, context_delta} ->
+            case merge_plugin_action_context(action_context, context_delta, spec.module) do
+              {:ok, merged_context} ->
+                {:cont, {:ok, prepared_signal, merged_context}}
+
+              {:error, error} ->
+                {:halt, {:error, error}}
+            end
+
+          {:error, error} ->
+            {:halt, {:error, error}}
+        end
+      else
+        {:cont, {:ok, current_signal, action_context}}
+      end
+    end)
+  end
+
+  defp run_plugin_prepare_emit_hooks(
+         %Signal{} = signal,
+         %Signal{} = input_signal,
+         %State{} = state
+       ) do
+    agent_module = state.agent_module
+    specs_and_instances = get_plugin_specs_and_instances(agent_module)
+
+    Enum.reduce_while(specs_and_instances, {:ok, signal}, fn {spec, instance},
+                                                             {:ok, current_signal} ->
+      if signal_matches_plugin?(current_signal, spec) do
+        case invoke_plugin_prepare_emit(
+               instance,
+               spec,
+               current_signal,
+               input_signal,
+               state,
+               agent_module
+             ) do
+          {:ok, prepared_signal} -> {:cont, {:ok, prepared_signal}}
+          {:error, error} -> {:halt, {:error, error}}
+        end
+      else
+        {:cont, {:ok, current_signal}}
+      end
+    end)
+  end
+
+  defp merge_plugin_action_context(action_context, context_delta, plugin)
+       when is_map(context_delta) do
+    keys = Map.keys(context_delta)
+    reserved_keys = Enum.filter(keys, &(&1 in @reserved_action_context_keys))
+    duplicate_keys = Enum.filter(keys, &Map.has_key?(action_context, &1))
+
+    cond do
+      reserved_keys != [] ->
+        {:error,
+         Jido.Error.execution_error("Plugin prepare_action returned reserved context keys", %{
+           plugin: plugin,
+           keys: reserved_keys
+         })}
+
+      duplicate_keys != [] ->
+        {:error,
+         Jido.Error.execution_error("Plugin prepare_action returned duplicate context keys", %{
+           plugin: plugin,
+           keys: duplicate_keys
+         })}
+
+      true ->
+        {:ok, Map.merge(action_context, context_delta)}
+    end
   end
 
   defp normalize_hook_result({:continue, signal}), do: {:continue, signal}
@@ -2006,6 +2143,117 @@ defmodule Jido.AgentServer do
           )
 
         {:halt, {:error, error}}
+    end
+  end
+
+  defp invoke_plugin_prepare_action(instance, spec, signal, state, agent_module) do
+    context = %{
+      agent: state.agent,
+      agent_module: agent_module,
+      plugin: spec.module,
+      plugin_spec: spec,
+      plugin_instance: instance,
+      config: spec.config || %{},
+      jido_instance: state.jido,
+      partition: state.partition
+    }
+
+    try do
+      if function_exported?(spec.module, :prepare_action, 2) do
+        case spec.module.prepare_action(signal, context) do
+          {:ok, %Signal{} = prepared_signal, context_delta} when is_map(context_delta) ->
+            {:ok, prepared_signal, context_delta}
+
+          {:error, reason} ->
+            error =
+              Jido.Error.execution_error(
+                "Plugin prepare_action failed",
+                %{plugin: spec.module, reason: reason}
+              )
+
+            {:error, error}
+
+          other ->
+            error =
+              Jido.Error.execution_error(
+                "Plugin prepare_action returned invalid result",
+                %{plugin: spec.module, result: other}
+              )
+
+            {:error, error}
+        end
+      else
+        {:ok, signal, %{}}
+      end
+    rescue
+      e ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} prepare_action crashed: #{Exception.message(e)}"
+        )
+
+        error =
+          Jido.Error.execution_error(
+            "Plugin prepare_action crashed",
+            %{plugin: spec.module, exception: Exception.message(e)}
+          )
+
+        {:error, error}
+    end
+  end
+
+  defp invoke_plugin_prepare_emit(instance, spec, signal, input_signal, state, agent_module) do
+    context = %{
+      agent: state.agent,
+      agent_module: agent_module,
+      plugin: spec.module,
+      plugin_spec: spec,
+      plugin_instance: instance,
+      config: spec.config || %{},
+      input_signal: input_signal,
+      jido_instance: state.jido,
+      partition: state.partition
+    }
+
+    try do
+      if function_exported?(spec.module, :prepare_emit, 2) do
+        case spec.module.prepare_emit(signal, context) do
+          {:ok, %Signal{} = prepared_signal} ->
+            {:ok, prepared_signal}
+
+          {:error, reason} ->
+            error =
+              Jido.Error.execution_error(
+                "Plugin prepare_emit failed",
+                %{plugin: spec.module, reason: reason}
+              )
+
+            {:error, error}
+
+          other ->
+            error =
+              Jido.Error.execution_error(
+                "Plugin prepare_emit returned invalid result",
+                %{plugin: spec.module, result: other}
+              )
+
+            {:error, error}
+        end
+      else
+        {:ok, signal}
+      end
+    rescue
+      e ->
+        Logger.error(
+          "Plugin #{inspect(spec.module)} prepare_emit crashed: #{Exception.message(e)}"
+        )
+
+        error =
+          Jido.Error.execution_error(
+            "Plugin prepare_emit crashed",
+            %{plugin: spec.module, exception: Exception.message(e)}
+          )
+
+        {:error, error}
     end
   end
 
