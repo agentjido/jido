@@ -196,11 +196,11 @@ Jido ships with **default plugins** that are automatically included in every age
 
 | Plugin | State Key | Purpose |
 |--------|-----------|---------|
-| `Jido.Identity.Plugin` | `:__identity__` | Agent self-model: profile, lifecycle facts |
+| `Jido.Agent.Identity.Plugin` | `:__identity__` | Agent identity: profile, lifecycle facts |
 | `Jido.Thread.Plugin` | `:__thread__` | Conversation thread management |
 | `Jido.Memory.Plugin` | `:__memory__` | On-demand memory container for agent cognitive state |
 
-Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Identity.Agent.ensure/2` and `Jido.Memory.Agent.ensure/2`.
+Default plugins are **singletons** — only one instance per state key. They are mounted during `new/1` like any other plugin, but they don't initialize state by default. State is created on demand using helpers like `Jido.Agent.Identity.Agent.ensure/2` and `Jido.Memory.Agent.ensure/2`.
 
 `Jido.Pod` also uses this mechanism for pod-wrapped agents: it injects a
 singleton plugin under the reserved `:__pod__` key. That plugin is not a
@@ -209,15 +209,49 @@ the normal `default_plugins: %{__pod__: ...}` override path.
 
 ### Identity Plugin
 
-The Identity plugin gives every agent a first-class identity primitive stored at `agent.state[:__identity__]`. Identity tracks profile facts (age, origin, generation) and a monotonic revision counter.
+The identity plugin gives every agent a first-class profile/lifecycle state
+primitive stored at `agent.state[:__identity__]`. The state key remains the
+canonical identity storage key; the struct and helper modules now live under
+`Jido.Agent.Identity` so `Jido.Identity` can be used by top-level identity
+extensions, including the separate `jido_identity` package.
+
+The default plugin keeps the existing `identity` metadata name and `:identity`
+capability because plugin ownership remains anchored on `:__identity__`.
+
+#### Naming and Migration
+
+The rename separates two concepts that previously shared the same namespace:
+
+| Concept | API owner |
+|---------|-----------|
+| Agent identity state: profile, age, origin, generation, revision | `Jido.Agent.Identity` |
+| Top-level identity extensions: keys, principals, signatures, attestations | `Jido.Identity` in a separate identity package |
+
+For built-in identity helpers, update these names:
+
+| Before | After |
+|--------|-------|
+| `Jido.Identity` | `Jido.Agent.Identity` |
+| `Jido.Identity.Agent` | `Jido.Agent.Identity.Agent` |
+| `Jido.Identity.Profile` | `Jido.Agent.Identity.Profile` |
+| `Jido.Identity.Actions.Evolve` | `Jido.Agent.Identity.Actions.Evolve` |
+| `Jido.Identity.Agent.has_identity?/1` | `Jido.Agent.Identity.Agent.has_identity?/1` |
+
+These surfaces intentionally do not change:
+
+- Agent state still stores the identity at `agent.state[:__identity__]`.
+- Default plugin overrides still use `default_plugins: %{__identity__: ...}`.
+- The default plugin metadata name remains `identity`.
+- The default plugin capability remains `:identity`.
+- The evolve action metadata name remains `identity_evolve`.
 
 ```elixir
-alias Jido.Identity.Agent, as: IdentityAgent
-alias Jido.Identity.Profile
+alias Jido.Agent.Identity.Agent, as: IdentityAgent
+alias Jido.Agent.Identity.Profile
 
 agent = MyAgent.new()
 
-# Identity is not initialized until you ask for it
+# Identity state is not initialized until you ask for it
 refute IdentityAgent.has_identity?(agent)
 
 # Initialize on demand
@@ -227,8 +261,8 @@ agent = IdentityAgent.ensure(agent, profile: %{age: 0, origin: :spawned})
 Profile.age(agent)    #=> 0
 Profile.get(agent, :origin)  #=> :spawned
 
-# Evolve identity over simulated time
-{agent, []} = MyAgent.cmd(agent, {Jido.Identity.Actions.Evolve, %{years: 3}})
+# Evolve identity profile facts over simulated time
+{agent, []} = MyAgent.cmd(agent, {Jido.Agent.Identity.Actions.Evolve, %{years: 3}})
 Profile.age(agent)    #=> 3
 ```
 
@@ -245,7 +279,7 @@ defmodule MyApp.CustomIdentityPlugin do
   @impl Jido.Plugin
   def mount(_agent, config) do
     profile = Map.get(config, :profile, %{age: 0})
-    {:ok, Jido.Identity.new(profile: profile)}
+    {:ok, Jido.Agent.Identity.new(profile: profile)}
   end
 end
 
@@ -257,6 +291,21 @@ defmodule MyAgent do
     }
 end
 ```
+
+Persisted checkpoints from earlier Jido releases may still contain a
+`%Jido.Identity{}` struct at `:__identity__`. `Jido.Persist.thaw/3` migrates
+that value to `%Jido.Agent.Identity{}` automatically during restore. For
+custom storage or manual checkpoint handling, use
+`Jido.Agent.Identity.migrate_legacy/1`,
+`Jido.Agent.Identity.migrate_state/1`, or
+`Jido.Agent.Identity.migrate_checkpoint/1`.
+
+The migration only converts the exact old core agent identity struct shape
+(`rev`, `profile`, `created_at`, and `updated_at`). Other values under
+`:__identity__`, including custom plugin state or top-level `Jido.Identity`
+extension structs, are left unchanged. Jido does not provide deprecated
+`Jido.Identity` shim modules because keeping those modules would continue to
+claim the top-level namespace this rename frees.
 
 ### Thread Plugin
 
@@ -325,7 +374,7 @@ agent = MemoryAgent.append_to_space(agent, :tasks, %{id: "t1", text: "Check sens
 Default plugins can be controlled per-agent using the `default_plugins:` option with a map keyed by state key:
 
 ```elixir
-# Disable identity (keep thread)
+# Disable identity state (keep thread)
 use Jido.Agent,
   name: "minimal",
   default_plugins: %{__identity__: false}

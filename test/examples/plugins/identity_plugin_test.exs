@@ -3,10 +3,10 @@ defmodule JidoExampleTest.IdentityPluginTest do
   Example test demonstrating Identity as a default plugin.
 
   This test shows:
-  - Every agent gets `Jido.Identity.Plugin` automatically (default singleton plugin)
-  - Using `Jido.Identity.Agent` and related helpers: `ensure/2`, profile management
-  - Snapshot for sharing identity with other agents
-  - Evolving identity over simulated time via `Jido.Identity.evolve/2` and the Evolve action
+  - Every agent gets `Jido.Agent.Identity.Plugin` automatically (default singleton plugin)
+  - Using `Jido.Agent.Identity.Agent` and related helpers: `ensure/2`, profile management
+  - Snapshot for sharing identity profile facts with other agents
+  - Evolving identity profile facts over simulated time via `Jido.Agent.Identity.evolve/2` and the Evolve action
   - Replacing the default Identity.Plugin with a custom implementation
   - Disabling the identity plugin with `default_plugins: %{__identity__: false}`
 
@@ -17,9 +17,9 @@ defmodule JidoExampleTest.IdentityPluginTest do
   @moduletag :example
   @moduletag timeout: 15_000
 
-  alias Jido.Identity
-  alias Jido.Identity.Agent, as: IdentityAgent
-  alias Jido.Identity.Profile
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Agent, as: IdentityAgent
+  alias Jido.Agent.Identity.Profile
 
   # ===========================================================================
   # CUSTOM IDENTITY PLUGIN
@@ -49,12 +49,12 @@ defmodule JidoExampleTest.IdentityPluginTest do
     @moduledoc false
     use Jido.Agent,
       name: "web_crawler",
-      description: "Agent with identity for capability-based routing",
+      description: "Agent with identity profile state for capability-based routing",
       schema: []
 
     def signal_routes(_ctx) do
       [
-        {"evolve", Jido.Identity.Actions.Evolve}
+        {"evolve", Jido.Agent.Identity.Actions.Evolve}
       ]
     end
   end
@@ -108,7 +108,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
     end
   end
 
-  describe "snapshot for sharing identity" do
+  describe "snapshot for sharing identity profile facts" do
     test "snapshot includes profile data" do
       agent =
         WebCrawlerAgent.new()
@@ -121,7 +121,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
       assert snapshot.profile[:origin] == :spawned
     end
 
-    test "snapshot returns nil when no identity" do
+    test "snapshot returns nil when no identity exists" do
       agent = WebCrawlerAgent.new()
       assert IdentityAgent.snapshot(agent) == nil
     end
@@ -145,17 +145,17 @@ defmodule JidoExampleTest.IdentityPluginTest do
         WebCrawlerAgent.new()
         |> IdentityAgent.ensure(profile: %{age: 0})
 
-      {agent, []} = WebCrawlerAgent.cmd(agent, {Jido.Identity.Actions.Evolve, %{years: 3}})
+      {agent, []} = WebCrawlerAgent.cmd(agent, {Jido.Agent.Identity.Actions.Evolve, %{years: 3}})
 
       assert Profile.age(agent) == 3
     end
 
-    test "evolution preserves identity data" do
+    test "evolution preserves identity profile data" do
       agent =
         WebCrawlerAgent.new()
         |> IdentityAgent.ensure(profile: %{age: 0, origin: :test})
 
-      {agent, []} = WebCrawlerAgent.cmd(agent, {Jido.Identity.Actions.Evolve, %{years: 5}})
+      {agent, []} = WebCrawlerAgent.cmd(agent, {Jido.Agent.Identity.Actions.Evolve, %{years: 5}})
 
       assert Profile.age(agent) == 5
       assert Profile.get(agent, :origin) == :test
@@ -176,7 +176,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
       modules = Enum.map(specs, & &1.module)
 
       assert CustomIdentityPlugin in modules
-      refute Jido.Identity.Plugin in modules
+      refute Jido.Agent.Identity.Plugin in modules
     end
   end
 
@@ -189,7 +189,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
 
       specs = NoIdentityAgent.plugin_specs()
       modules = Enum.map(specs, & &1.module)
-      refute Jido.Identity.Plugin in modules
+      refute Jido.Agent.Identity.Plugin in modules
     end
   end
 end

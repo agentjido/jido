@@ -2,9 +2,9 @@ defmodule JidoTest.Identity.ProfileTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Identity
-  alias Jido.Identity.Agent, as: IdentityAgent
-  alias Jido.Identity.Profile
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Agent, as: IdentityAgent
+  alias Jido.Agent.Identity.Profile
 
   defp create_agent do
     %Agent{id: "test-agent-1", state: %{}}

@@ -1,8 +1,27 @@
 defmodule JidoTest.Identity.Actions.EvolveTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Identity
-  alias Jido.Identity.Actions.Evolve
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Actions.Evolve
+
+  defp legacy_identity(fields \\ %{}) do
+    Map.merge(
+      %{
+        __struct__: Jido.Identity,
+        rev: 2,
+        profile: %{age: 5, origin: :legacy},
+        created_at: 1_000,
+        updated_at: 2_000
+      },
+      fields
+    )
+  end
+
+  describe "metadata" do
+    test "name remains identity_evolve" do
+      assert Evolve.name() == "identity_evolve"
+    end
+  end
 
   describe "run/2" do
     test "initializes identity when missing" do
@@ -16,6 +35,16 @@ defmodule JidoTest.Identity.Actions.EvolveTest do
 
       assert {:ok, %{__identity__: evolved}} = Evolve.run(%{days: 0, years: 5}, ctx)
       assert evolved.profile[:age] == 5
+    end
+
+    test "migrates legacy Jido.Identity agent identity state before evolving" do
+      ctx = %{state: %{__identity__: legacy_identity()}}
+
+      assert {:ok, %{__identity__: evolved}} = Evolve.run(%{days: 0, years: 1}, ctx)
+      assert %Identity{} = evolved
+      assert evolved.rev == 3
+      assert evolved.profile[:age] == 6
+      assert evolved.profile[:origin] == :legacy
     end
 
     test "evolves identity by days" do

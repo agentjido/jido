@@ -1,13 +1,13 @@
-defmodule Jido.Identity.Profile do
+defmodule Jido.Agent.Identity.Profile do
   @moduledoc """
   Helpers for reading and writing identity profile fields.
   """
 
   alias Jido.Agent
-  alias Jido.Identity
-  alias Jido.Identity.Agent, as: IdentityAgent
+  alias Jido.Agent.Identity
+  alias Jido.Agent.Identity.Agent, as: IdentityAgent
 
-  @doc "Returns the age from identity profile, or nil if no identity"
+  @doc "Returns the age from the identity profile, or nil when no identity exists."
   @spec age(Agent.t()) :: non_neg_integer() | nil
   def age(%Agent{} = agent) do
     case IdentityAgent.get(agent) do
@@ -16,7 +16,7 @@ defmodule Jido.Identity.Profile do
     end
   end
 
-  @doc "Get a key from the identity profile with a default"
+  @doc "Get a key from the identity profile with a default."
   @spec get(Agent.t(), atom(), term()) :: term()
   def get(%Agent{} = agent, key, default \\ nil) do
     case IdentityAgent.get(agent) do
@@ -25,7 +25,7 @@ defmodule Jido.Identity.Profile do
     end
   end
 
-  @doc "Set a key in the identity profile"
+  @doc "Set a key in the identity profile."
   @spec put(Agent.t(), atom(), term()) :: Agent.t()
   def put(%Agent{} = agent, key, value) do
     IdentityAgent.update(agent, fn identity ->

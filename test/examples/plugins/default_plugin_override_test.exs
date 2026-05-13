@@ -102,7 +102,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
       modules = Enum.map(specs, & &1.module)
 
       assert Jido.Thread.Plugin in modules
-      assert Jido.Identity.Plugin in modules
+      assert Jido.Agent.Identity.Plugin in modules
     end
   end
 

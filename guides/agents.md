@@ -198,6 +198,6 @@ adds a canonical topology plus a reserved singleton pod plugin.
 - [State Operations](state-ops.md) — Internal state transitions during `cmd/2`
 - [Directives](directives.md) — External effects emitted by agents
 - [Strategies](strategies.md) — Execution strategies for `cmd/2`
-- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (Identity, Thread) and how to override them
+- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (identity, thread) and how to override them
 - [Pods](pods.md) — Manager-led durable topologies built on top of agents
 - `Jido.Agent` — Full module documentation
