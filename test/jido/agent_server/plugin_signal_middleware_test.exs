@@ -32,6 +32,29 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
   end
 
+  defmodule RecordSignalContextAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_signal_context",
+      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(0)})
+
+    alias Jido.Agent.StateOp
+
+    def run(params, context) do
+      signal = Map.fetch!(context, :signal)
+      principal_id = get_in(signal.extensions, ["jido.identity", "principal_id"])
+
+      {:ok, %{},
+       %StateOp.SetState{
+         attrs: %{
+           context_signal_type: signal.type,
+           context_principal_id: principal_id,
+           context_params_unchanged?: Map.keys(params) == [:amount]
+         }
+       }}
+    end
+  end
+
   # =========================================================================
   # Gap 2: Signal Transformation
   # =========================================================================
@@ -162,6 +185,44 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
   end
 
+  defmodule SignalContextPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "signal_context",
+      state_key: :signal_context,
+      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.RecordSignalContextAction]
+
+    @impl Jido.Plugin
+    def handle_signal(signal, _context) do
+      extension =
+        signal.extensions
+        |> Map.get("jido.identity", %{})
+        |> Map.put("principal_id", "agent_from_plugin")
+
+      {:ok,
+       {:continue, %{signal | extensions: Map.put(signal.extensions, "jido.identity", extension)}}}
+    end
+  end
+
+  defmodule SignalContextAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "signal_context_agent",
+      schema: [
+        context_signal_type: [type: :string, default: nil],
+        context_principal_id: [type: :string, default: nil],
+        context_params_unchanged?: [type: :boolean, default: false]
+      ],
+      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.SignalContextPlugin]
+
+    def signal_routes(_ctx) do
+      [
+        {"counter.context",
+         JidoTest.AgentServer.PluginSignalMiddlewareTest.RecordSignalContextAction}
+      ]
+    end
+  end
+
   describe "Gap 2: handle_signal/2 signal transformation" do
     test "plugin can modify signal data with {:continue, new_signal}", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: SignalRewriteAgent, jido: jido)
@@ -198,6 +259,19 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
       assert agent.state[:counter] == 12
+    end
+
+    test "routed actions receive plugin-rewritten signal in context without changed params", %{
+      jido: jido
+    } do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: SignalContextAgent, jido: jido)
+
+      signal = Signal.new!("counter.context", %{amount: 4}, source: "/test")
+      {:ok, agent} = Jido.AgentServer.call(pid, signal)
+
+      assert agent.state[:context_signal_type] == "counter.context"
+      assert agent.state[:context_principal_id] == "agent_from_plugin"
+      assert agent.state[:context_params_unchanged?] == true
     end
   end
 

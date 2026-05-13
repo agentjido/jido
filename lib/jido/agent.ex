@@ -883,14 +883,23 @@ defmodule Jido.Agent do
         jido_instance = Keyword.get(opts, :__jido_instance__)
         partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
         action_exec_defaults = Keyword.get(opts, :__jido_action_exec_defaults__, [])
+        signal = Keyword.get(opts, :__jido_signal__)
 
         instruction_opts =
           opts
           |> Keyword.delete(:__jido_instance__)
           |> Keyword.delete(:__partition__)
           |> Keyword.delete(:__jido_action_exec_defaults__)
+          |> Keyword.delete(:__jido_signal__)
 
-        case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
+        instruction_context =
+          if signal do
+            %{state: agent.state, signal: signal}
+          else
+            %{state: agent.state}
+          end
+
+        case Instruction.normalize(action, instruction_context, instruction_opts) do
           {:ok, instructions} ->
             ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()

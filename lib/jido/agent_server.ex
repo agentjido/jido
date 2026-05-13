@@ -1515,7 +1515,7 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp compute_signal_call_dispatch(_signal, action_spec, state) do
+  defp compute_signal_call_dispatch(signal, action_spec, state) do
     action_arg =
       case action_spec do
         [single] -> single
@@ -1524,7 +1524,7 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      state.agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state))
+      state.agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal))
 
     {:ok, agent, List.wrap(directives), action_arg}
   end
@@ -1790,7 +1790,7 @@ defmodule Jido.AgentServer do
       end
 
     {agent, directives} =
-      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state))
+      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal))
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1863,11 +1863,12 @@ defmodule Jido.AgentServer do
     {mod, params}
   end
 
-  defp agent_cmd_opts(%State{} = state) do
+  defp agent_cmd_opts(%State{} = state, %Signal{} = signal) do
     [
       __jido_instance__: state.jido,
       __partition__: state.partition,
-      __jido_action_exec_defaults__: ObserveConfig.action_exec_opts(state.jido, [])
+      __jido_action_exec_defaults__: ObserveConfig.action_exec_opts(state.jido, []),
+      __jido_signal__: signal
     ]
   end
 
@@ -2048,7 +2049,11 @@ defmodule Jido.AgentServer do
     case resolved_action do
       mod when is_atom(mod) and not is_nil(mod) -> mod
       {mod, _params} when is_atom(mod) -> mod
+      {mod, _params, _context} when is_atom(mod) -> mod
+      {mod, _params, _context, _opts} when is_atom(mod) -> mod
       [{mod, _params} | _] when is_atom(mod) -> mod
+      [{mod, _params, _context} | _] when is_atom(mod) -> mod
+      [{mod, _params, _context, _opts} | _] when is_atom(mod) -> mod
       [mod | _] when is_atom(mod) -> mod
       _ -> original_signal.type
     end
