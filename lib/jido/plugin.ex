@@ -271,8 +271,8 @@ defmodule Jido.Plugin do
   signal and contribute trusted context. Returned context is merged into the
   context given to routed actions and later plugin phases. Plugins may not
   provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
-  `:input_signal`, `:directive`, or `:dispatch`; duplicate context keys fail
-  closed.
+  `:agent_server_pid`, `:input_signal`, `:directive`, or `:dispatch`;
+  duplicate context keys fail closed.
 
   ## Parameters
 

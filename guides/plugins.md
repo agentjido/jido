@@ -185,6 +185,7 @@ end
 The returned context delta is merged into accumulated `:trusted_context`.
 Reserved runtime keys are rejected: `:state`, `:signal`, `:agent`,
 `:agent_server_pid`, `:input_signal`, `:directive`, and `:dispatch`.
+Duplicate top-level trusted context keys are also rejected.
 
 ### prepare_action/3
 

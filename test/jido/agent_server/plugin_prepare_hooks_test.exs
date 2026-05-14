@@ -265,6 +265,70 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     def prepare_action(_signal, _action_arg, _context), do: {:ok, :not_a_map}
   end
 
+  defmodule ReservedActionContextPlugin do
+    @moduledoc false
+
+    use Jido.Plugin,
+      name: "reserved_action_context",
+      state_key: :reserved_action_context,
+      actions: [],
+      signal_patterns: []
+
+    @impl true
+    def prepare_signal(signal, _context) do
+      {:ok, signal, %{identity: %{principal_id: "agent_trusted"}}}
+    end
+
+    @impl true
+    def prepare_action(_signal, _action_arg, _context), do: {:ok, %{state: :forbidden}}
+  end
+
+  defmodule DuplicateActionContextPlugin do
+    @moduledoc false
+
+    use Jido.Plugin,
+      name: "duplicate_action_context",
+      state_key: :duplicate_action_context,
+      actions: [],
+      signal_patterns: []
+
+    @impl true
+    def prepare_signal(signal, _context) do
+      {:ok, signal, %{identity: %{principal_id: "agent_trusted"}}}
+    end
+
+    @impl true
+    def prepare_action(_signal, _action_arg, _context) do
+      {:ok, %{identity: %{principal_id: "action_phase"}}}
+    end
+  end
+
+  defmodule CrashSignalPlugin do
+    @moduledoc false
+
+    use Jido.Plugin,
+      name: "crash_signal",
+      state_key: :crash_signal,
+      actions: [],
+      signal_patterns: []
+
+    @impl true
+    def prepare_signal(_signal, _context), do: raise("signal boom")
+  end
+
+  defmodule CrashActionPlugin do
+    @moduledoc false
+
+    use Jido.Plugin,
+      name: "crash_action",
+      state_key: :crash_action,
+      actions: [],
+      signal_patterns: []
+
+    @impl true
+    def prepare_action(_signal, _action_arg, _context), do: raise("action boom")
+  end
+
   defmodule PrepareEmitPlugin do
     @moduledoc false
 
@@ -318,6 +382,20 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     @impl true
     def prepare_emit(%Signal{type: "outbound.raw"}, _context), do: {:ok, :not_a_signal}
+    def prepare_emit(signal, _context), do: {:ok, signal}
+  end
+
+  defmodule CrashEmitPlugin do
+    @moduledoc false
+
+    use Jido.Plugin,
+      name: "crash_emit",
+      state_key: :crash_emit,
+      actions: [],
+      signal_patterns: []
+
+    @impl true
+    def prepare_emit(%Signal{type: "outbound.raw"}, _context), do: raise("emit boom")
     def prepare_emit(signal, _context), do: {:ok, signal}
   end
 
@@ -413,6 +491,46 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
   end
 
+  defmodule ReservedActionContextAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "reserved_action_context_agent",
+      plugins: [ReservedActionContextPlugin]
+
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+  end
+
+  defmodule DuplicateActionContextAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "duplicate_action_context_agent",
+      plugins: [DuplicateActionContextPlugin]
+
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+  end
+
+  defmodule CrashSignalAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "crash_signal_agent",
+      plugins: [CrashSignalPlugin]
+
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+  end
+
+  defmodule CrashActionAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "crash_action_agent",
+      plugins: [CrashActionPlugin]
+
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+  end
+
   defmodule EmitAgent do
     @moduledoc false
 
@@ -452,6 +570,16 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     use Jido.Agent,
       name: "invalid_prepare_emit_agent",
       plugins: [IdentityPlugin, AuthorizationPlugin, InvalidPrepareEmitPlugin]
+
+    def signal_routes(_ctx), do: [{"emit.start.prepared", EmitRawSignalAction}]
+  end
+
+  defmodule CrashEmitAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "crash_emit_agent",
+      plugins: [IdentityPlugin, AuthorizationPlugin, CrashEmitPlugin]
 
     def signal_routes(_ctx), do: [{"emit.start.prepared", EmitRawSignalAction}]
   end
@@ -529,6 +657,24 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       assert Exception.message(error) =~ "Plugin prepare_action returned invalid result"
     end
 
+    test "prepare_signal crashes fail closed without stopping the server", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: CrashSignalAgent, jido: jido)
+
+      signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
+      assert {:error, error} = Jido.AgentServer.call(pid, signal)
+      assert Exception.message(error) =~ "Plugin prepare_signal crashed"
+      assert {:ok, _state} = Jido.AgentServer.state(pid)
+    end
+
+    test "prepare_action crashes fail closed without stopping the server", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: CrashActionAgent, jido: jido)
+
+      signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
+      assert {:error, error} = Jido.AgentServer.call(pid, signal)
+      assert Exception.message(error) =~ "Plugin prepare_action crashed"
+      assert {:ok, _state} = Jido.AgentServer.state(pid)
+    end
+
     test "prepare_signal and prepare_action run on async signal path", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: TrustedAgent, jido: jido)
 
@@ -559,6 +705,22 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       assert {:error, error} = Jido.AgentServer.call(pid, signal)
       assert Exception.message(error) =~ "duplicate trusted context keys"
     end
+
+    test "prepare_action reserved trusted context keys fail closed", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: ReservedActionContextAgent, jido: jido)
+
+      signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
+      assert {:error, error} = Jido.AgentServer.call(pid, signal)
+      assert Exception.message(error) =~ "reserved trusted context keys"
+    end
+
+    test "prepare_action duplicate trusted context keys fail closed", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: DuplicateActionContextAgent, jido: jido)
+
+      signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
+      assert {:error, error} = Jido.AgentServer.call(pid, signal)
+      assert Exception.message(error) =~ "duplicate trusted context keys"
+    end
   end
 
   describe "prepare_emit/2" do
@@ -580,6 +742,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       assert state.agent.state.emitted_trusted_principal_id == "agent_trusted"
       assert state.agent.state.emitted_saw_directive_dispatch? == true
       assert state.agent.state.emitted_saw_context_dispatch? == true
+      assert state.current_trusted_context == %{}
     end
 
     test "cast path passes prepared input signal and trusted context to prepare_emit", %{
@@ -597,6 +760,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
       assert state.agent.state.emitted_input_signal_type == "emit.start.prepared"
       assert state.agent.state.emitted_trusted_principal_id == "agent_trusted"
+      assert state.current_trusted_context == %{}
     end
 
     test "prepare_emit errors fail closed through the configured error policy", %{jido: jido} do
@@ -643,6 +807,32 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
       assert_receive {:prepare_emit_error, :plugin_prepare_emit, error}, 500
       assert Exception.message(error) =~ "Plugin prepare_emit returned invalid result"
+      assert {:ok, state} = Jido.AgentServer.state(pid)
+      assert state.current_trusted_context == %{}
+    end
+
+    test "prepare_emit crashes fail closed through the configured error policy", %{jido: jido} do
+      parent = self()
+
+      error_policy = fn directive, state ->
+        send(parent, {:prepare_emit_error, directive.context, directive.error})
+        {:ok, state}
+      end
+
+      {:ok, pid} =
+        Jido.AgentServer.start_link(
+          agent: CrashEmitAgent,
+          jido: jido,
+          error_policy: error_policy
+        )
+
+      signal = Signal.new!("emit.start", %{}, source: "/test")
+      assert {:ok, _agent} = Jido.AgentServer.call(pid, signal)
+
+      assert_receive {:prepare_emit_error, :plugin_prepare_emit, error}, 500
+      assert Exception.message(error) =~ "Plugin prepare_emit crashed"
+      assert {:ok, state} = Jido.AgentServer.state(pid)
+      assert state.current_trusted_context == %{}
     end
   end
 end
