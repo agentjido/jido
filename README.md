@@ -328,13 +328,13 @@ Compared to LangChain/CrewAI:
 
 **Q: What is the Agent/Action/Signal/Directive architecture?**
 
-A: 
-- **Agents**: Hold state and implement `cmd/2` - the core command function
-- **Actions**: Do work and transform agent state (pure data transformations)
-- **Signals**: Route events into the system using CloudEvents envelope
-- **Directives**: Describe effects for the runtime to execute (Emit, Spawn, SpawnAgent, StopChild, Schedule, Stop)
+A:
+- **Agents**: Immutable structs plus modules that hold state and implement `cmd/2`
+- **Actions**: Receive validated params and context, then return state updates and optional directives
+- **Signals**: CloudEvents-compliant messages routed into the system
+- **Directives**: Bare structs that describe effects for the runtime to execute
 
-State changes are pure; side effects are described as directives and executed by OTP runtime.
+`cmd/2` returns the updated agent plus directives. Directives never mutate agent state; the OTP runtime interprets them for external effects. Actions may still perform work such as API calls, file I/O, or database queries when that belongs in the action boundary.
 
 **Q: Is AI required for Jido?**
 
@@ -346,7 +346,7 @@ Use Jido when software needs to inspect context, choose steps, coordinate agents
 
 **Q: What are the Jido ecosystem packages?**
 
-A: 
+A:
 | Package | Description |
 |---------|-------------|
 | **req_llm** | HTTP client for LLM APIs |
@@ -362,7 +362,9 @@ A:
 A: Jido is available on Hex.pm:
 ```elixir
 def deps do
-  [{:jido, "~> latest_version"}]
+  [
+    {:jido, "~> 2.0"}
+  ]
 end
 ```
 
@@ -370,7 +372,7 @@ See [jido.run](https://jido.run) for demos and examples.
 
 **Q: How do I create an agent?**
 
-A: 
+A:
 ```elixir
 defmodule MyAgent do
   use Jido.Agent,
@@ -399,13 +401,17 @@ A: Use `AgentServer` (GenServer-based) for production deployment:
 
 A: Built-in directives:
 - **Emit**: Emit signals to the system
+- **Error**: Signal an error from `cmd/2`
 - **Spawn**: Spawn child processes
 - **SpawnAgent**: Spawn child agents
+- **AdoptChild**: Attach an orphaned or unattached child to the current parent
 - **StopChild**: Stop child processes/agents
 - **Schedule**: Schedule future actions
+- **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
 - **Stop**: Stop the agent
+- **Cron / CronCancel**: Register and cancel cron-based schedules
 
-Protocol-based extensibility for custom directives.
+External packages can also define custom directive structs. See [Agent Directives](guides/directives.md) for details.
 
 **Q: How do plugins work?**
 
@@ -418,7 +424,7 @@ See [Plugins Guide](guides/plugins.md) for details.
 
 **Q: What execution strategies are available?**
 
-A: 
+A:
 - **Direct Strategy**: Immediate execution
 - **FSM Strategy**: State machine workflows
 
@@ -428,14 +434,14 @@ See [Strategies Guide](guides/strategies.md) and [FSM Strategy Deep Dive](guides
 
 **Q: I'm getting GenServer timeout errors. What should I check?**
 
-A: 
+A:
 1. Check action execution time
 2. Consider using worker pools for throughput (`guides/worker-pools.md`)
 3. Review supervision tree configuration
 
 **Q: My agents aren't receiving signals. What's wrong?**
 
-A: 
+A:
 1. Check signal routing configuration
 2. Verify signal envelope format (CloudEvents)
 3. Review signal dispatch strategy
