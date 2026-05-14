@@ -1,13 +1,14 @@
-defmodule JidoExampleTest.PluginMiddlewareTest do
+defmodule JidoExampleTest.PluginPhaseHooksTest do
   @moduledoc """
-  Example test demonstrating plugin signal middleware (handle_signal/2 and transform_result/3).
+  Example test demonstrating plugin signal phase hooks (`handle_signal/2` and
+  `transform_result/3`).
 
   This test shows:
   - handle_signal/2 returning {:ok, :continue}, {:ok, {:continue, signal}},
     {:ok, {:override, action}}, and {:error, reason}
   - signal_patterns filtering — plugins with non-empty patterns only receive matching signals
   - transform_result/3 enriching the agent returned from AgentServer.call/3
-  - Middleware composition across multiple plugins
+  - Hook composition across multiple plugins
 
   Run with: mix test --include example
   """
@@ -61,7 +62,7 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
       name: "logging",
       state_key: :logging,
       actions: [
-        JidoExampleTest.PluginMiddlewareTest.ProcessAction
+        JidoExampleTest.PluginPhaseHooksTest.ProcessAction
       ],
       signal_patterns: []
 
@@ -78,7 +79,7 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
       name: "audit",
       state_key: :audit,
       actions: [
-        JidoExampleTest.PluginMiddlewareTest.ProcessAction
+        JidoExampleTest.PluginPhaseHooksTest.ProcessAction
       ],
       signal_patterns: ["audit.*"]
 
@@ -95,14 +96,14 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
       name: "admin_override",
       state_key: :admin_override,
       actions: [
-        JidoExampleTest.PluginMiddlewareTest.AdminAction
+        JidoExampleTest.PluginPhaseHooksTest.AdminAction
       ],
       signal_patterns: ["admin.*"]
 
     @impl Jido.Plugin
     def handle_signal(signal, _context) do
       if signal.type == "admin.override" do
-        {:ok, {:override, JidoExampleTest.PluginMiddlewareTest.AdminAction}}
+        {:ok, {:override, JidoExampleTest.PluginPhaseHooksTest.AdminAction}}
       else
         {:ok, :continue}
       end
@@ -115,7 +116,7 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
       name: "reject",
       state_key: :reject,
       actions: [
-        JidoExampleTest.PluginMiddlewareTest.ProcessAction
+        JidoExampleTest.PluginPhaseHooksTest.ProcessAction
       ],
       signal_patterns: ["blocked.*"]
 
@@ -131,7 +132,7 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
       name: "result_enricher",
       state_key: :enricher,
       actions: [
-        JidoExampleTest.PluginMiddlewareTest.ProcessAction
+        JidoExampleTest.PluginPhaseHooksTest.ProcessAction
       ],
       signal_patterns: []
 
@@ -150,20 +151,20 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
   # AGENTS
   # ===========================================================================
 
-  defmodule GlobalMiddlewareAgent do
+  defmodule GlobalPhaseAgent do
     @moduledoc false
     use Jido.Agent,
-      name: "global_mw_agent",
+      name: "global_phase_agent",
       schema: [
         log: [type: {:list, :string}, default: []],
         last_action: [type: :string, default: nil]
       ],
-      plugins: [JidoExampleTest.PluginMiddlewareTest.LoggingPlugin]
+      plugins: [JidoExampleTest.PluginPhaseHooksTest.LoggingPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"task.run", JidoExampleTest.PluginMiddlewareTest.ProcessAction},
-        {"other.run", JidoExampleTest.PluginMiddlewareTest.ProcessAction}
+        {"task.run", JidoExampleTest.PluginPhaseHooksTest.ProcessAction},
+        {"other.run", JidoExampleTest.PluginPhaseHooksTest.ProcessAction}
       ]
     end
   end
@@ -177,15 +178,15 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
         last_action: [type: :string, default: nil]
       ],
       plugins: [
-        JidoExampleTest.PluginMiddlewareTest.AuditPlugin,
-        JidoExampleTest.PluginMiddlewareTest.RejectPlugin
+        JidoExampleTest.PluginPhaseHooksTest.AuditPlugin,
+        JidoExampleTest.PluginPhaseHooksTest.RejectPlugin
       ]
 
     def signal_routes(_ctx) do
       [
-        {"audit.log", JidoExampleTest.PluginMiddlewareTest.ProcessAction},
-        {"task.run", JidoExampleTest.PluginMiddlewareTest.ProcessAction},
-        {"blocked.action", JidoExampleTest.PluginMiddlewareTest.ProcessAction}
+        {"audit.log", JidoExampleTest.PluginPhaseHooksTest.ProcessAction},
+        {"task.run", JidoExampleTest.PluginPhaseHooksTest.ProcessAction},
+        {"blocked.action", JidoExampleTest.PluginPhaseHooksTest.ProcessAction}
       ]
     end
   end
@@ -198,12 +199,12 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
         log: [type: {:list, :string}, default: []],
         last_action: [type: :string, default: nil]
       ],
-      plugins: [JidoExampleTest.PluginMiddlewareTest.AdminOverridePlugin]
+      plugins: [JidoExampleTest.PluginPhaseHooksTest.AdminOverridePlugin]
 
     def signal_routes(_ctx) do
       [
-        {"admin.override", JidoExampleTest.PluginMiddlewareTest.ProcessAction},
-        {"admin.normal", JidoExampleTest.PluginMiddlewareTest.ProcessAction}
+        {"admin.override", JidoExampleTest.PluginPhaseHooksTest.ProcessAction},
+        {"admin.normal", JidoExampleTest.PluginPhaseHooksTest.ProcessAction}
       ]
     end
   end
@@ -216,10 +217,10 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
         log: [type: {:list, :string}, default: []],
         last_action: [type: :string, default: nil]
       ],
-      plugins: [JidoExampleTest.PluginMiddlewareTest.ResultEnricherPlugin]
+      plugins: [JidoExampleTest.PluginPhaseHooksTest.ResultEnricherPlugin]
 
     def signal_routes(_ctx) do
-      [{"task.run", JidoExampleTest.PluginMiddlewareTest.ProcessAction}]
+      [{"task.run", JidoExampleTest.PluginPhaseHooksTest.ProcessAction}]
     end
   end
 
@@ -227,9 +228,9 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
   # TESTS
   # ===========================================================================
 
-  describe "global middleware" do
+  describe "global signal hooks" do
     test "plugin with empty signal_patterns intercepts all signals", %{jido: jido} do
-      {:ok, pid} = Jido.start_agent(jido, GlobalMiddlewareAgent, id: unique_id("global"))
+      {:ok, pid} = Jido.start_agent(jido, GlobalPhaseAgent, id: unique_id("global"))
 
       {:ok, agent} =
         AgentServer.call(pid, Signal.new!("task.run", %{value: "a"}, source: "/test"))

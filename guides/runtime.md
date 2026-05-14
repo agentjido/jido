@@ -49,14 +49,27 @@ Or start directly via `AgentServer`:
 
 ```
 Signal → AgentServer.call/cast
+       → plugin handle_signal/2
+       → plugin prepare_signal/2
        → route_signal_to_action (via strategy/agent/plugin routes)
-       → Agent.cmd/2
+       → plugin prepare_action/3
+       → Agent.cmd/3
        → {agent, directives}
-       → Directives queued → drain loop via DirectiveExec
-       → (for RunInstruction) execute instruction → call Agent.cmd/2 with result_action
+       → Directives queued with prepared signal and runtime context
+       → drain loop via DirectiveExec
+       → plugin prepare_emit/2 for emitted signals
+       → dispatch
+       → (for RunInstruction) execute instruction → call Agent.cmd/3 with result_action
+       → transform_result/3 on synchronous call return only
 ```
 
-The AgentServer routes incoming signals using strategy, agent, and plugin route tables (`signal_routes/1` callbacks), executes the action via `cmd/2`, and processes any returned directives.
+The AgentServer owns these phases. Plugins provide phase callbacks for signal
+preparation, action authorization, and outbound signal preparation; this is the
+extension model instead of a generic AgentServer middleware chain.
+`handle_signal/2` is retained for backwards-compatible coarse signal handling
+and route override. Security-sensitive inbound work should use
+`prepare_signal/2` and `prepare_action/3` so runtime context stays separate from
+signal data and action params.
 
 ## Parent-Child Hierarchy
 

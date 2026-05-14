@@ -1,4 +1,4 @@
-defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
+defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
   use JidoTest.Case, async: true
 
   alias Jido.Signal
@@ -32,8 +32,31 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
   end
 
+  defmodule RecordSignalContextAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_signal_context",
+      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(0)})
+
+    alias Jido.Agent.StateOp
+
+    def run(params, context) do
+      signal = Map.fetch!(context, :signal)
+      principal_id = get_in(signal.extensions, ["jido.identity", "principal_id"])
+
+      {:ok, %{},
+       %StateOp.SetState{
+         attrs: %{
+           context_signal_type: signal.type,
+           context_principal_id: principal_id,
+           context_params_unchanged?: Map.keys(params) == [:amount]
+         }
+       }}
+    end
+  end
+
   # =========================================================================
-  # Gap 2: Signal Transformation
+  # Signal Transformation
   # =========================================================================
 
   defmodule SignalRewritePlugin do
@@ -42,7 +65,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       name: "signal_rewrite",
       state_key: :signal_rewrite,
       actions: [
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction
+        JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction
       ]
 
     @impl Jido.Plugin
@@ -62,12 +85,12 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Agent,
       name: "signal_rewrite_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.SignalRewritePlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.SignalRewritePlugin]
 
     def signal_routes(_ctx) do
       [
-        {"counter.double", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"counter.double", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
@@ -78,8 +101,8 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       name: "override_with_signal",
       state_key: :override_ws,
       actions: [
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction,
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.MarkAction
+        JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction,
+        JidoTest.AgentServer.PluginSignalPhaseTest.MarkAction
       ]
 
     @impl Jido.Plugin
@@ -89,8 +112,8 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
 
         {:ok,
          {:override,
-          {JidoTest.AgentServer.PluginSignalMiddlewareTest.MarkAction,
-           %{marker: "special_override"}}, new_signal}}
+          {JidoTest.AgentServer.PluginSignalPhaseTest.MarkAction, %{marker: "special_override"}},
+          new_signal}}
       else
         {:ok, :continue}
       end
@@ -105,12 +128,12 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
         counter: [type: :integer, default: 0],
         marker: [type: :string, default: nil]
       ],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.OverrideWithSignalPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.OverrideWithSignalPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"counter.special", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"counter.special", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
@@ -120,7 +143,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "add_prefix",
       state_key: :add_prefix,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction]
 
     @impl Jido.Plugin
     def handle_signal(signal, _context) do
@@ -134,7 +157,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "multiply_amount",
       state_key: :multiply_amount,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction]
 
     @impl Jido.Plugin
     def handle_signal(signal, _context) do
@@ -153,16 +176,53 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       name: "chained_signal_rewrite_agent",
       schema: [counter: [type: :integer, default: 0]],
       plugins: [
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.AddPrefixPlugin,
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.MultiplyAmountPlugin
+        JidoTest.AgentServer.PluginSignalPhaseTest.AddPrefixPlugin,
+        JidoTest.AgentServer.PluginSignalPhaseTest.MultiplyAmountPlugin
       ]
 
     def signal_routes(_ctx) do
-      [{"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}]
+      [{"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}]
     end
   end
 
-  describe "Gap 2: handle_signal/2 signal transformation" do
+  defmodule SignalContextPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "signal_context",
+      state_key: :signal_context,
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.RecordSignalContextAction]
+
+    @impl Jido.Plugin
+    def handle_signal(signal, _context) do
+      extension =
+        signal.extensions
+        |> Map.get("jido.identity", %{})
+        |> Map.put("principal_id", "agent_from_plugin")
+
+      {:ok,
+       {:continue, %{signal | extensions: Map.put(signal.extensions, "jido.identity", extension)}}}
+    end
+  end
+
+  defmodule SignalContextAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "signal_context_agent",
+      schema: [
+        context_signal_type: [type: :string, default: nil],
+        context_principal_id: [type: :string, default: nil],
+        context_params_unchanged?: [type: :boolean, default: false]
+      ],
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.SignalContextPlugin]
+
+    def signal_routes(_ctx) do
+      [
+        {"counter.context", JidoTest.AgentServer.PluginSignalPhaseTest.RecordSignalContextAction}
+      ]
+    end
+  end
+
+  describe "handle_signal/2 signal transformation" do
     test "plugin can modify signal data with {:continue, new_signal}", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: SignalRewriteAgent, jido: jido)
 
@@ -199,10 +259,23 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
 
       assert agent.state[:counter] == 12
     end
+
+    test "routed actions receive plugin-rewritten signal in context without changed params", %{
+      jido: jido
+    } do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: SignalContextAgent, jido: jido)
+
+      signal = Signal.new!("counter.context", %{amount: 4}, source: "/test")
+      {:ok, agent} = Jido.AgentServer.call(pid, signal)
+
+      assert agent.state[:context_signal_type] == "counter.context"
+      assert agent.state[:context_principal_id] == "agent_from_plugin"
+      assert agent.state[:context_params_unchanged?] == true
+    end
   end
 
   # =========================================================================
-  # Gap 4: Signal Pattern Filtering
+  # Signal Pattern Filtering
   # =========================================================================
 
   defmodule RejectAllPlugin do
@@ -210,7 +283,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "reject_all",
       state_key: :reject_all,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction],
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction],
       signal_patterns: ["counter.*"]
 
     @impl Jido.Plugin
@@ -227,22 +300,22 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
         counter: [type: :integer, default: 0],
         other: [type: :integer, default: 0]
       ],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.RejectAllPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.RejectAllPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"other.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"other.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
 
-  defmodule GlobalMiddlewarePlugin do
+  defmodule GlobalPhasePlugin do
     @moduledoc false
     use Jido.Plugin,
-      name: "global_middleware",
-      state_key: :global_mw,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction],
+      name: "global_phase",
+      state_key: :global_phase,
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction],
       signal_patterns: []
 
     @impl Jido.Plugin
@@ -252,17 +325,17 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
   end
 
-  defmodule GlobalMiddlewareAgent do
+  defmodule GlobalPhaseAgent do
     @moduledoc false
     use Jido.Agent,
-      name: "global_middleware_agent",
+      name: "global_phase_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.GlobalMiddlewarePlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.GlobalPhasePlugin]
 
     def signal_routes(_ctx) do
       [
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"other.action", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"other.action", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
@@ -272,7 +345,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "wildcard_pattern",
       state_key: :wildcard,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction],
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction],
       signal_patterns: ["api.*.create"]
 
     @impl Jido.Plugin
@@ -286,18 +359,18 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Agent,
       name: "wildcard_pattern_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.WildcardPatternPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.WildcardPatternPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"api.user.create", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"api.user.delete", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"other.action", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"api.user.create", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"api.user.delete", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"other.action", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
 
-  describe "Gap 4: signal pattern filtering" do
+  describe "signal pattern filtering" do
     test "plugin with patterns only receives matching signals", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: FilteredRejectAgent, jido: jido)
 
@@ -314,7 +387,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     end
 
     test "plugin with empty patterns receives all signals", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: GlobalMiddlewareAgent, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: GlobalPhaseAgent, jido: jido)
 
       signal = Signal.new!("counter.increment", %{amount: 1}, source: "/test")
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
@@ -350,7 +423,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
   end
 
   # =========================================================================
-  # Gap 5: Resolved Action in transform_result
+  # Resolved Action in transform_result
   # =========================================================================
 
   defmodule ActionAwareTransformPlugin do
@@ -359,8 +432,8 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
       name: "action_aware_transform",
       state_key: :action_aware,
       actions: [
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction,
-        JidoTest.AgentServer.PluginSignalMiddlewareTest.MarkAction
+        JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction,
+        JidoTest.AgentServer.PluginSignalPhaseTest.MarkAction
       ]
 
     @impl Jido.Plugin
@@ -385,17 +458,17 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
         counter: [type: :integer, default: 0],
         marker: [type: :string, default: nil]
       ],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.ActionAwareTransformPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.ActionAwareTransformPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"marker.set", JidoTest.AgentServer.PluginSignalMiddlewareTest.MarkAction}
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"marker.set", JidoTest.AgentServer.PluginSignalPhaseTest.MarkAction}
       ]
     end
   end
 
-  describe "Gap 5: resolved action in transform_result" do
+  describe "resolved action in transform_result" do
     test "transform_result receives resolved action module", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ActionAwareTransformAgent, jido: jido)
 
@@ -430,7 +503,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
   end
 
   # =========================================================================
-  # Gap 6: Exception Safety
+  # Exception Safety
   # =========================================================================
 
   defmodule CrashingHandleSignalPlugin do
@@ -438,7 +511,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "crashing_handle_signal",
       state_key: :crashing_hs,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction]
 
     @impl Jido.Plugin
     def handle_signal(signal, _context) do
@@ -455,12 +528,12 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Agent,
       name: "crashing_hs_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.CrashingHandleSignalPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.CrashingHandleSignalPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"crash.me", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"crash.me", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
@@ -470,7 +543,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "crashing_transform",
       state_key: :crashing_tr,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction]
 
     @impl Jido.Plugin
     def transform_result(_action, _agent, _context) do
@@ -483,14 +556,14 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Agent,
       name: "crashing_transform_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.CrashingTransformPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.CrashingTransformPlugin]
 
     def signal_routes(_ctx) do
-      [{"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}]
+      [{"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}]
     end
   end
 
-  describe "Gap 6: exception safety" do
+  describe "exception safety" do
     @tag capture_log: true
     test "handle_signal crash returns error without crashing server", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: CrashingHandleSignalAgent, jido: jido)
@@ -528,7 +601,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
   end
 
   # =========================================================================
-  # Gap 7: Plugin Instance in Context
+  # Plugin Instance in Context
   # =========================================================================
 
   defmodule InstanceContextPlugin do
@@ -536,7 +609,7 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Plugin,
       name: "instance_context",
       state_key: :instance_ctx,
-      actions: [JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction]
+      actions: [JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction]
 
     @impl Jido.Plugin
     def handle_signal(signal, context) do
@@ -575,17 +648,17 @@ defmodule JidoTest.AgentServer.PluginSignalMiddlewareTest do
     use Jido.Agent,
       name: "instance_context_agent",
       schema: [counter: [type: :integer, default: 0]],
-      plugins: [JidoTest.AgentServer.PluginSignalMiddlewareTest.InstanceContextPlugin]
+      plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.InstanceContextPlugin]
 
     def signal_routes(_ctx) do
       [
-        {"check.context", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction},
-        {"counter.increment", JidoTest.AgentServer.PluginSignalMiddlewareTest.IncrementAction}
+        {"check.context", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction},
+        {"counter.increment", JidoTest.AgentServer.PluginSignalPhaseTest.IncrementAction}
       ]
     end
   end
 
-  describe "Gap 7: plugin instance in context" do
+  describe "plugin instance in context" do
     test "handle_signal context includes plugin_instance", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: InstanceContextAgent, jido: jido)
 

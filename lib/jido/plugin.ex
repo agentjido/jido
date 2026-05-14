@@ -15,7 +15,10 @@ defmodule Jido.Plugin do
   2. **Agent.new/1**: `mount/2` is called to initialize plugin state (pure)
   3. **AgentServer.init/1**: `child_spec/1` processes are started and monitored
   4. **Signal processing**: `handle_signal/2` runs before routing, can override or abort
-  5. **After cmd/2 (call path)**: `transform_result/3` wraps call results
+  5. **Prepare signal**: `prepare_signal/2` can verify/rewrite the effective signal and contribute runtime context
+  6. **Prepare action**: `prepare_action/3` can authorize the resolved action using runtime context
+  7. **Before signal emit dispatch**: `prepare_emit/2` can rewrite outbound emitted signals or dispatch
+  8. **After cmd/3 (call path)**: `transform_result/3` wraps call results
 
   ## Example Plugin
 
@@ -232,7 +235,11 @@ defmodule Jido.Plugin do
   Hooks execute in plugin declaration order. The first `{:override, ...}`
   short-circuits; the first `{:error, ...}` aborts. Plugins with non-empty
   `signal_patterns` only receive signals matching those patterns; plugins
-  with empty patterns act as global middleware.
+  with empty patterns receive all inbound signals for this phase.
+
+  This callback remains broad for backwards compatibility and route override.
+  Prefer `prepare_signal/2` for identity, encryption, canonicalization, and
+  runtime context extraction.
 
   ## Parameters
 
@@ -262,12 +269,83 @@ defmodule Jido.Plugin do
               {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
 
   @doc """
+  Pre-routing hook called after `handle_signal/2` rewrites and before routing.
+
+  Plugins can verify, decrypt, canonicalize, or rewrite the final effective
+  signal and contribute runtime context. Returned context is merged into the
+  context given to routed actions and later plugin phases. This is the preferred
+  inbound hook for identity and encrypted communication extensions because it
+  cannot override routing and has an explicit runtime context contract. Plugins
+  may not provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
+  `:agent_server_pid`, `:input_signal`, `:directive`, or `:dispatch`;
+  duplicate context keys fail closed.
+
+  ## Parameters
+
+  - `signal` - The effective `Jido.Signal` struct after `handle_signal/2`
+    hooks have run.
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
+    `:plugin_instance`, `:config`, `:runtime_context`
+
+  ## Returns
+
+  - `{:ok, signal, runtime_context_delta}` - Continue with possibly rewritten signal
+    and runtime context.
+  - `{:error, reason}` - Abort signal processing with error.
+  """
+  @callback prepare_signal(signal :: term(), context :: map()) ::
+              {:ok, term(), map()} | {:error, term()}
+
+  @doc """
+  Post-routing hook called after routing and before action execution.
+
+  Plugins can authorize the resolved action using the prepared signal and
+  accumulated runtime context. This hook cannot rewrite the signal or action;
+  it can only contribute additional runtime context or fail closed.
+
+  ## Parameters
+
+  - `signal` - The prepared `Jido.Signal` struct after `prepare_signal/2`
+  - `action_arg` - The resolved action argument that will be passed to the
+    agent command phase
+  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
+    `:plugin_instance`, `:config`, `:runtime_context`
+
+  ## Returns
+
+  - `{:ok, runtime_context_delta}` - Continue with additional runtime context.
+  - `{:error, reason}` - Abort signal processing with error.
+  """
+  @callback prepare_action(signal :: term(), action_arg :: term(), context :: map()) ::
+              {:ok, map()} | {:error, term()}
+
+  @doc """
+  Pre-emit hook called before an emitted signal is dispatched.
+
+  This hook is intended for outbound signal signing, trace enrichment, and other
+  signal-level transformations that must happen after an action returns an emit
+  directive but before runtime dispatch. The context includes `:input_signal`,
+  `:runtime_context`, `:directive`, `:dispatch`, plugin metadata, agent
+  metadata, `:jido_instance`, and `:partition`.
+
+  ## Returns
+
+  - `{:ok, signal}` - Continue with the prepared signal and existing dispatch.
+  - `{:ok, signal, dispatch}` - Continue with the prepared signal and rewritten
+    dispatch.
+  - `{:error, reason}` - Abort the emit through the configured error policy.
+  """
+  @callback prepare_emit(signal :: term(), context :: map()) ::
+              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
+
+  @doc """
   Caller view transform for the agent returned from `AgentServer.call/3`.
 
   Called after signal processing on the **synchronous call path only**.
-  Does not affect `cast/2`, `handle_info`, or internal server state — only
-  the agent struct returned to the caller. Transforms chain through all
-  plugins in declaration order.
+  Does not affect `cast/2`, `handle_info`, routing, authorization, dispatch, or
+  internal server state — only the agent struct returned to the caller.
+  Transforms chain through all plugins in declaration order, so this callback is
+  display/return shaping and is not a security hook.
 
   ## Parameters
 
@@ -275,7 +353,7 @@ defmodule Jido.Plugin do
     type string when no single module can be determined
   - `result` - The agent struct to transform
   - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`
+    `:plugin_instance`, `:config`, `:runtime_context`
 
   ## Returns
 
@@ -633,6 +711,22 @@ defmodule Jido.Plugin do
       def handle_signal(_signal, _context), do: {:ok, nil}
 
       @doc false
+      @spec prepare_signal(term(), map()) :: {:ok, term(), map()} | {:error, term()}
+      @impl Jido.Plugin
+      def prepare_signal(signal, _context), do: {:ok, signal, %{}}
+
+      @doc false
+      @spec prepare_action(term(), term(), map()) :: {:ok, map()} | {:error, term()}
+      @impl Jido.Plugin
+      def prepare_action(_signal, _action_arg, _context), do: {:ok, %{}}
+
+      @doc false
+      @spec prepare_emit(term(), map()) ::
+              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
+      @impl Jido.Plugin
+      def prepare_emit(signal, _context), do: {:ok, signal}
+
+      @doc false
       @spec transform_result(module() | String.t(), term(), map()) :: term()
       @impl Jido.Plugin
       def transform_result(_action, result, _context), do: result
@@ -668,6 +762,9 @@ defmodule Jido.Plugin do
         {:signal_routes, 0},
         {:signal_routes, 1},
         {:handle_signal, 2},
+        {:prepare_signal, 2},
+        {:prepare_action, 3},
+        {:prepare_emit, 2},
         {:transform_result, 3},
         {:child_spec, 1},
         {:subscriptions, 2},

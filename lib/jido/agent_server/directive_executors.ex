@@ -3,10 +3,13 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
 
   require Logger
 
+  alias Jido.Agent.Directive
+  alias Jido.AgentServer.ErrorPolicy
   alias Jido.Tracing.Context, as: TraceContext
 
-  def exec(%{signal: signal, dispatch: dispatch}, input_signal, state) do
+  def exec(%Directive.Emit{signal: signal, dispatch: dispatch} = directive, input_signal, state) do
     cfg = dispatch || state.default_dispatch
+    runtime_context = Map.get(state, :current_runtime_context, %{})
 
     traced_signal =
       case TraceContext.propagate_to(signal, input_signal.id) do
@@ -14,9 +17,22 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
         {:error, _} -> signal
       end
 
-    dispatch_signal(traced_signal, cfg, state)
+    case Jido.AgentServer.prepare_emit_signal(
+           traced_signal,
+           input_signal,
+           state,
+           directive,
+           cfg,
+           runtime_context
+         ) do
+      {:ok, prepared_signal, prepared_dispatch} ->
+        dispatch_signal(prepared_signal, prepared_dispatch, state)
+        {:async, nil, state}
 
-    {:async, nil, state}
+      {:error, error} ->
+        error_directive = %Directive.Error{error: error, context: :plugin_prepare_emit}
+        ErrorPolicy.handle(error_directive, state)
+    end
   end
 
   defp dispatch_signal(traced_signal, nil, _state) do
@@ -60,6 +76,8 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         input_signal,
         state
       ) do
+    runtime_context = Map.get(state, :current_runtime_context, %{})
+
     enriched_instruction = %{
       instruction
       | context: Map.put(instruction.context || %{}, :state, state.agent.state)
@@ -80,12 +98,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         state.agent,
         {result_action, execution_payload},
         __jido_instance__: state.jido,
-        __partition__: state.partition
+        __partition__: state.partition,
+        __jido_signal__: input_signal,
+        __jido_action_context__: runtime_context
       )
 
     state = State.update_agent(state, agent)
 
-    case State.enqueue_all(state, input_signal, List.wrap(directives)) do
+    case State.enqueue_all(state, input_signal, runtime_context, List.wrap(directives)) do
       {:ok, state} ->
         {:ok, state}
 

@@ -883,14 +883,31 @@ defmodule Jido.Agent do
         jido_instance = Keyword.get(opts, :__jido_instance__)
         partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
         action_exec_defaults = Keyword.get(opts, :__jido_action_exec_defaults__, [])
+        signal = Keyword.get(opts, :__jido_signal__)
+
+        action_context =
+          opts
+          |> Keyword.get(:__jido_action_context__, %{})
+          |> __normalize_internal_action_context__()
 
         instruction_opts =
           opts
           |> Keyword.delete(:__jido_instance__)
           |> Keyword.delete(:__partition__)
           |> Keyword.delete(:__jido_action_exec_defaults__)
+          |> Keyword.delete(:__jido_signal__)
+          |> Keyword.delete(:__jido_action_context__)
 
-        case Instruction.normalize(action, %{state: agent.state}, instruction_opts) do
+        base_context =
+          if signal do
+            %{state: agent.state, signal: signal}
+          else
+            %{state: agent.state}
+          end
+
+        instruction_context = Map.merge(action_context, base_context)
+
+        case Instruction.normalize(action, instruction_context, instruction_opts) do
           {:ok, instructions} ->
             ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()
@@ -925,6 +942,20 @@ defmodule Jido.Agent do
       end
 
       defp __apply_action_exec_defaults__(instruction, _defaults), do: instruction
+
+      defp __normalize_internal_action_context__(context) when is_map(context) do
+        Map.drop(context, [
+          :state,
+          :signal,
+          :agent,
+          :agent_server_pid,
+          :input_signal,
+          :directive,
+          :dispatch
+        ])
+      end
+
+      defp __normalize_internal_action_context__(_context), do: %{}
     end
   end
 

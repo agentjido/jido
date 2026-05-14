@@ -93,6 +93,36 @@ This prevents plugins from interfering with each other's state.
 
 All callbacks are optional with sensible defaults.
 
+### Signal phases
+
+AgentServer owns a fixed signal lifecycle. Plugins are the extension mechanism
+for phase-specific behavior; AgentServer does not expose a generic middleware
+chain.
+
+```text
+incoming signal
+-> handle_signal/2
+-> prepare_signal/2
+-> route
+-> prepare_action/3
+-> Agent.cmd/3
+-> directives queued
+-> prepare_emit/2
+-> dispatch
+-> transform_result/3 on synchronous call return only
+```
+
+Plugins run in declaration order. `handle_signal/2`, `prepare_signal/2`, and
+`prepare_action/3` are gated by `signal_patterns`. `prepare_emit/2` runs for
+all plugins so outbound signing/encryption plugins can decide by pattern
+matching the emitted signal.
+
+`handle_signal/2` remains in the lifecycle for backwards compatibility and for
+coarse signal control. New identity, encryption, and authorization extensions
+should prefer the narrower preparation hooks: use `prepare_signal/2` to verify,
+decrypt, canonicalize, and attach runtime context, then use `prepare_action/3`
+to authorize the resolved action.
+
 ### mount/2
 
 Called during `new/1` to initialize plugin state. Pure function—no side effects.
@@ -127,7 +157,10 @@ Use the `signal_routes/1` callback only when routes must be computed from runtim
 
 ### handle_signal/2
 
-Pre-routing hook called before signal routing. Can override or abort processing.
+Pre-routing compatibility hook called before signal routing. Use this for coarse
+rejection, legacy signal rewrites, or route override. Do not use it as the
+primary identity or encryption hook; it does not return runtime context and its
+route override power makes it intentionally broader than security preparation.
 
 ```elixir
 @impl Jido.Plugin
@@ -145,9 +178,69 @@ end
 
 The `context` map contains `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, and `:config`.
 
+### prepare_signal/2
+
+Runs after `handle_signal/2` and before routing. Use it to verify, decrypt, or
+canonicalize the effective signal and to attach runtime context for later phases.
+This is the preferred inbound hook for identity and encrypted communication
+extensions because it has a narrow contract: return the prepared signal plus a
+runtime context delta, or fail closed.
+
+```elixir
+@impl Jido.Plugin
+def prepare_signal(signal, context) do
+  identity = verify_signature!(signal)
+  {:ok, signal, %{identity: identity}}
+end
+```
+
+The returned runtime context delta is merged into accumulated `:runtime_context`.
+Reserved runtime keys are rejected: `:state`, `:signal`, `:agent`,
+`:agent_server_pid`, `:input_signal`, `:directive`, and `:dispatch`.
+Duplicate top-level runtime context keys are also rejected.
+
+### prepare_action/3
+
+Runs after routing and before agent command execution. Use it to authorize the
+resolved action against the prepared signal and accumulated runtime context.
+
+```elixir
+@impl Jido.Plugin
+def prepare_action(_signal, {MyApp.AdminAction, _params}, context) do
+  if "admin" in context.runtime_context.identity.scopes do
+    {:ok, %{authorized?: true}}
+  else
+    {:error, :unauthorized}
+  end
+end
+```
+
+This hook cannot rewrite the signal or action. It returns additional runtime
+context or fails closed.
+
+### prepare_emit/2
+
+Runs before an emitted signal is dispatched. Use it to sign, encrypt, enrich, or
+reroute outbound signals. Its context includes `:input_signal`,
+`:runtime_context`, `:directive`, `:dispatch`, plugin metadata, agent metadata,
+`:jido_instance`, and `:partition`.
+
+```elixir
+@impl Jido.Plugin
+def prepare_emit(signal, context) do
+  encrypted = encrypt_for_dispatch(signal, context.dispatch)
+  {:ok, encrypted}
+end
+```
+
+Return `{:ok, signal}` to keep the current dispatch or `{:ok, signal, dispatch}`
+to rewrite dispatch.
+
 ### transform_result/3
 
 Transforms the agent returned from `AgentServer.call/3` (synchronous path only).
+This is a caller-view hook, not a security hook; failures are logged and the
+agent is returned unchanged.
 
 ```elixir
 @impl Jido.Plugin
