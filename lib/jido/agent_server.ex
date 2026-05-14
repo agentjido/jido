@@ -39,7 +39,7 @@ defmodule Jido.AgentServer do
          → plugin prepare_action/3
          → Agent.cmd/3
          → {agent, directives}
-         → directives queued with prepared signal and trusted context
+         → directives queued with prepared signal and runtime context
          → drain loop executes via DirectiveExec protocol
          → plugin prepare_emit/2 for emitted signals
          → dispatch
@@ -220,7 +220,7 @@ defmodule Jido.AgentServer do
   @cron_restart_base_ms 500
   @cron_restart_max_ms 30_000
   @relationship_hive :relationships
-  @reserved_trusted_context_keys [
+  @reserved_runtime_context_keys [
     :state,
     :signal,
     :agent,
@@ -1242,12 +1242,12 @@ defmodule Jido.AgentServer do
         {:noreply, s}
 
       {{:value, item}, s1} ->
-        {signal, trusted_context, directive} = normalize_directive_queue_item(item)
+        {signal, runtime_context, directive} = normalize_directive_queue_item(item)
         TraceContext.set_from_signal(signal)
 
         result =
           try do
-            exec_directive_with_telemetry(directive, signal, trusted_context, s1)
+            exec_directive_with_telemetry(directive, signal, runtime_context, s1)
           after
             TraceContext.clear()
           end
@@ -1408,9 +1408,9 @@ defmodule Jido.AgentServer do
     {:noreply, state}
   end
 
-  defp normalize_directive_queue_item({signal, trusted_context, directive})
-       when is_map(trusted_context) do
-    {signal, trusted_context, directive}
+  defp normalize_directive_queue_item({signal, runtime_context, directive})
+       when is_map(runtime_context) do
+    {signal, runtime_context, directive}
   end
 
   defp normalize_directive_queue_item({signal, directive}) do
@@ -1525,14 +1525,14 @@ defmodule Jido.AgentServer do
 
       {:continue, modified_signal} ->
         case run_plugin_prepare_signal_hooks(modified_signal, state) do
-          {:ok, prepared_signal, trusted_context} ->
+          {:ok, prepared_signal, runtime_context} ->
             case route_to_actions(router, prepared_signal) do
               {:ok, actions} ->
                 compute_signal_call_with_action(
                   prepared_signal,
                   actions,
                   state,
-                  trusted_context
+                  runtime_context
                 )
 
               {:error, reason} ->
@@ -1543,7 +1543,7 @@ defmodule Jido.AgentServer do
                   })
 
                 error_directive = %Directive.Error{error: error, context: :routing}
-                {:error, error, [error_directive], prepared_signal, trusted_context}
+                {:error, error, [error_directive], prepared_signal, runtime_context}
             end
 
           {:error, error} ->
@@ -1553,18 +1553,18 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp compute_signal_call_with_action(signal, action_spec, state, trusted_context \\ nil) do
-    case maybe_prepare_signal(signal, state, trusted_context) do
-      {:ok, prepared_signal, trusted_context} ->
+  defp compute_signal_call_with_action(signal, action_spec, state, runtime_context \\ nil) do
+    case maybe_prepare_signal(signal, state, runtime_context) do
+      {:ok, prepared_signal, runtime_context} ->
         action_arg = action_arg_from_spec(action_spec)
 
-        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, trusted_context) do
-          {:ok, trusted_context} ->
-            compute_signal_call_dispatch(prepared_signal, action_arg, state, trusted_context)
+        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, runtime_context) do
+          {:ok, runtime_context} ->
+            compute_signal_call_dispatch(prepared_signal, action_arg, state, runtime_context)
 
           {:error, error} ->
             error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
-            {:error, error, [error_directive], prepared_signal, trusted_context}
+            {:error, error, [error_directive], prepared_signal, runtime_context}
         end
 
       {:error, error} ->
@@ -1577,19 +1577,19 @@ defmodule Jido.AgentServer do
     run_plugin_prepare_signal_hooks(signal, state)
   end
 
-  defp maybe_prepare_signal(signal, _state, trusted_context) when is_map(trusted_context) do
-    {:ok, signal, trusted_context}
+  defp maybe_prepare_signal(signal, _state, runtime_context) when is_map(runtime_context) do
+    {:ok, signal, runtime_context}
   end
 
-  defp compute_signal_call_dispatch(signal, action_arg, state, trusted_context) do
+  defp compute_signal_call_dispatch(signal, action_arg, state, runtime_context) do
     {agent, directives} =
       state.agent_module.cmd(
         state.agent,
         action_arg,
-        agent_cmd_opts(state, signal, trusted_context)
+        agent_cmd_opts(state, signal, runtime_context)
       )
 
-    {:ok, agent, List.wrap(directives), action_arg, signal, trusted_context}
+    {:ok, agent, List.wrap(directives), action_arg, signal, runtime_context}
   end
 
   defp apply_signal_call_result(result, inflight, %State{} = state) do
@@ -1597,7 +1597,7 @@ defmodule Jido.AgentServer do
     duration = System.monotonic_time() - start_time
 
     case result do
-      {:ok, agent, directives, resolved_action, effective_signal, trusted_context} ->
+      {:ok, agent, directives, resolved_action, effective_signal, runtime_context} ->
         state = State.update_agent(state, agent)
         state = maybe_notify_completion_waiters(state)
 
@@ -1607,7 +1607,7 @@ defmodule Jido.AgentServer do
           Map.merge(metadata, signal_stop_metadata(directives))
         )
 
-        case State.enqueue_all(state, effective_signal, trusted_context, directives) do
+        case State.enqueue_all(state, effective_signal, runtime_context, directives) do
           {:ok, enq_state} ->
             enq_state = start_drain_if_idle(enq_state)
 
@@ -1617,7 +1617,7 @@ defmodule Jido.AgentServer do
                 resolved_action,
                 effective_signal,
                 enq_state,
-                trusted_context
+                runtime_context
               )
 
             GenServer.reply(from, {:ok, transformed_agent})
@@ -1635,7 +1635,7 @@ defmodule Jido.AgentServer do
             maybe_set_idle_status(state)
         end
 
-      {:error, reason, directives, effective_signal, trusted_context} ->
+      {:error, reason, directives, effective_signal, runtime_context} ->
         emit_telemetry(
           [:jido, :agent_server, :signal, :stop],
           %{duration: duration},
@@ -1643,7 +1643,7 @@ defmodule Jido.AgentServer do
         )
 
         state =
-          case State.enqueue_all(state, effective_signal, trusted_context, directives) do
+          case State.enqueue_all(state, effective_signal, runtime_context, directives) do
             {:ok, enq_state} -> start_drain_if_idle(enq_state)
             {:error, :queue_overflow} -> state
           end
@@ -1813,14 +1813,14 @@ defmodule Jido.AgentServer do
 
       {:continue, modified_signal} ->
         case run_plugin_prepare_signal_hooks(modified_signal, state) do
-          {:ok, prepared_signal, trusted_context} ->
+          {:ok, prepared_signal, runtime_context} ->
             handle_signal_routing(
               prepared_signal,
               router,
               state,
               start_time,
               metadata,
-              trusted_context
+              runtime_context
             )
 
           {:error, error} ->
@@ -1836,22 +1836,22 @@ defmodule Jido.AgentServer do
 
   defp handle_prepared_signal_and_action(signal, action_spec, state, start_time, metadata) do
     case run_plugin_prepare_signal_hooks(signal, state) do
-      {:ok, prepared_signal, trusted_context} ->
+      {:ok, prepared_signal, runtime_context} ->
         action_arg = action_arg_from_spec(action_spec)
 
-        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, trusted_context) do
-          {:ok, trusted_context} ->
+        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, runtime_context) do
+          {:ok, runtime_context} ->
             dispatch_action(
               prepared_signal,
               action_arg,
               state,
               start_time,
               metadata,
-              trusted_context
+              runtime_context
             )
 
           {:error, error} ->
-            handle_prepare_action_error(error, prepared_signal, state, trusted_context)
+            handle_prepare_action_error(error, prepared_signal, state, runtime_context)
         end
 
       {:error, error} ->
@@ -1864,22 +1864,22 @@ defmodule Jido.AgentServer do
     enqueue_error_directive(error, signal, [error_directive], state)
   end
 
-  defp handle_prepare_action_error(error, signal, state, trusted_context) do
+  defp handle_prepare_action_error(error, signal, state, runtime_context) do
     error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
-    enqueue_error_directive(error, signal, [error_directive], state, trusted_context)
+    enqueue_error_directive(error, signal, [error_directive], state, runtime_context)
   end
 
-  defp handle_signal_routing(signal, router, state, start_time, metadata, trusted_context) do
+  defp handle_signal_routing(signal, router, state, start_time, metadata, runtime_context) do
     case route_to_actions(router, signal) do
       {:ok, actions} ->
         action_arg = action_arg_from_spec(actions)
 
-        case run_plugin_prepare_action_hooks(signal, action_arg, state, trusted_context) do
-          {:ok, trusted_context} ->
-            dispatch_action(signal, action_arg, state, start_time, metadata, trusted_context)
+        case run_plugin_prepare_action_hooks(signal, action_arg, state, runtime_context) do
+          {:ok, runtime_context} ->
+            dispatch_action(signal, action_arg, state, start_time, metadata, runtime_context)
 
           {:error, error} ->
-            handle_prepare_action_error(error, signal, state, trusted_context)
+            handle_prepare_action_error(error, signal, state, runtime_context)
         end
 
       {:error, reason} ->
@@ -1911,18 +1911,18 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp enqueue_error_directive(error, signal, directives, state, trusted_context) do
-    case State.enqueue_all(state, signal, trusted_context, directives) do
+  defp enqueue_error_directive(error, signal, directives, state, runtime_context) do
+    case State.enqueue_all(state, signal, runtime_context, directives) do
       {:ok, enq_state} -> {:error, error, start_drain_if_idle(enq_state)}
       {:error, :queue_overflow} -> {:error, error, state}
     end
   end
 
-  defp dispatch_action(signal, action_arg, state, start_time, metadata, trusted_context) do
+  defp dispatch_action(signal, action_arg, state, start_time, metadata, runtime_context) do
     agent_module = state.agent_module
 
     {agent, directives} =
-      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal, trusted_context))
+      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal, runtime_context))
 
     directives = List.wrap(directives)
     state = State.update_agent(state, agent)
@@ -1934,7 +1934,7 @@ defmodule Jido.AgentServer do
       Map.merge(metadata, signal_stop_metadata(directives))
     )
 
-    case State.enqueue_all(state, signal, trusted_context, directives) do
+    case State.enqueue_all(state, signal, runtime_context, directives) do
       {:ok, enq_state} ->
         {:ok, start_drain_if_idle(enq_state), action_arg}
 
@@ -2022,16 +2022,16 @@ defmodule Jido.AgentServer do
         %State{} = state,
         directive,
         dispatch,
-        trusted_context
+        runtime_context
       )
-      when is_map(trusted_context) do
+      when is_map(runtime_context) do
     run_plugin_prepare_emit_hooks(
       signal,
       input_signal,
       state,
       directive,
       dispatch,
-      trusted_context
+      runtime_context
     )
   end
 
@@ -2072,7 +2072,7 @@ defmodule Jido.AgentServer do
 
     Enum.reduce_while(specs_and_instances, {:ok, signal, %{}}, fn {spec, instance},
                                                                   {:ok, current_signal,
-                                                                   trusted_context} ->
+                                                                   runtime_context} ->
       if signal_matches_plugin?(current_signal, spec) do
         case invoke_plugin_prepare_signal(
                instance,
@@ -2080,12 +2080,12 @@ defmodule Jido.AgentServer do
                current_signal,
                state,
                agent_module,
-               trusted_context
+               runtime_context
              ) do
-          {:ok, prepared_signal, context_delta} ->
-            case merge_plugin_trusted_context(
-                   trusted_context,
-                   context_delta,
+          {:ok, prepared_signal, runtime_context_delta} ->
+            case merge_plugin_runtime_context(
+                   runtime_context,
+                   runtime_context_delta,
                    spec.module,
                    :prepare_signal
                  ) do
@@ -2100,7 +2100,7 @@ defmodule Jido.AgentServer do
             {:halt, {:error, error}}
         end
       else
-        {:cont, {:ok, current_signal, trusted_context}}
+        {:cont, {:ok, current_signal, runtime_context}}
       end
     end)
   end
@@ -2109,13 +2109,13 @@ defmodule Jido.AgentServer do
          %Signal{} = signal,
          action_arg,
          %State{} = state,
-         trusted_context
+         runtime_context
        )
-       when is_map(trusted_context) do
+       when is_map(runtime_context) do
     agent_module = state.agent_module
     specs_and_instances = get_plugin_specs_and_instances(agent_module)
 
-    Enum.reduce_while(specs_and_instances, {:ok, trusted_context}, fn {spec, instance},
+    Enum.reduce_while(specs_and_instances, {:ok, runtime_context}, fn {spec, instance},
                                                                       {:ok, current_context} ->
       if signal_matches_plugin?(signal, spec) do
         case invoke_plugin_prepare_action(
@@ -2127,10 +2127,10 @@ defmodule Jido.AgentServer do
                agent_module,
                current_context
              ) do
-          {:ok, context_delta} ->
-            case merge_plugin_trusted_context(
+          {:ok, runtime_context_delta} ->
+            case merge_plugin_runtime_context(
                    current_context,
-                   context_delta,
+                   runtime_context_delta,
                    spec.module,
                    :prepare_action
                  ) do
@@ -2153,9 +2153,9 @@ defmodule Jido.AgentServer do
          %State{} = state,
          directive,
          dispatch,
-         trusted_context
+         runtime_context
        )
-       when is_map(trusted_context) do
+       when is_map(runtime_context) do
     agent_module = state.agent_module
     specs_and_instances = get_plugin_specs_and_instances(agent_module)
 
@@ -2171,7 +2171,7 @@ defmodule Jido.AgentServer do
              agent_module,
              directive,
              current_dispatch,
-             trusted_context
+             runtime_context
            ) do
         {:ok, prepared_signal, prepared_dispatch} ->
           {:cont, {:ok, prepared_signal, prepared_dispatch}}
@@ -2182,29 +2182,29 @@ defmodule Jido.AgentServer do
     end)
   end
 
-  defp merge_plugin_trusted_context(trusted_context, context_delta, plugin, phase)
-       when is_map(context_delta) do
-    keys = Map.keys(context_delta)
-    reserved_keys = Enum.filter(keys, &(&1 in @reserved_trusted_context_keys))
-    duplicate_keys = Enum.filter(keys, &Map.has_key?(trusted_context, &1))
+  defp merge_plugin_runtime_context(runtime_context, runtime_context_delta, plugin, phase)
+       when is_map(runtime_context_delta) do
+    keys = Map.keys(runtime_context_delta)
+    reserved_keys = Enum.filter(keys, &(&1 in @reserved_runtime_context_keys))
+    duplicate_keys = Enum.filter(keys, &Map.has_key?(runtime_context, &1))
 
     cond do
       reserved_keys != [] ->
         {:error,
-         Jido.Error.execution_error("Plugin #{phase} returned reserved trusted context keys", %{
+         Jido.Error.execution_error("Plugin #{phase} returned reserved runtime context keys", %{
            plugin: plugin,
            keys: reserved_keys
          })}
 
       duplicate_keys != [] ->
         {:error,
-         Jido.Error.execution_error("Plugin #{phase} returned duplicate trusted context keys", %{
+         Jido.Error.execution_error("Plugin #{phase} returned duplicate runtime context keys", %{
            plugin: plugin,
            keys: duplicate_keys
          })}
 
       true ->
-        {:ok, Map.merge(trusted_context, context_delta)}
+        {:ok, Map.merge(runtime_context, runtime_context_delta)}
     end
   end
 
@@ -2321,16 +2321,17 @@ defmodule Jido.AgentServer do
          signal,
          state,
          agent_module,
-         trusted_context
+         runtime_context
        ) do
     context =
-      plugin_context(instance, spec, state, agent_module, %{trusted_context: trusted_context})
+      plugin_context(instance, spec, state, agent_module, %{runtime_context: runtime_context})
 
     try do
       if function_exported?(spec.module, :prepare_signal, 2) do
         case spec.module.prepare_signal(signal, context) do
-          {:ok, %Signal{} = prepared_signal, context_delta} when is_map(context_delta) ->
-            {:ok, prepared_signal, context_delta}
+          {:ok, %Signal{} = prepared_signal, runtime_context_delta}
+          when is_map(runtime_context_delta) ->
+            {:ok, prepared_signal, runtime_context_delta}
 
           {:error, reason} ->
             error =
@@ -2376,16 +2377,16 @@ defmodule Jido.AgentServer do
          action_arg,
          state,
          agent_module,
-         trusted_context
+         runtime_context
        ) do
     context =
-      plugin_context(instance, spec, state, agent_module, %{trusted_context: trusted_context})
+      plugin_context(instance, spec, state, agent_module, %{runtime_context: runtime_context})
 
     try do
       if function_exported?(spec.module, :prepare_action, 3) do
         case spec.module.prepare_action(signal, action_arg, context) do
-          {:ok, context_delta} when is_map(context_delta) ->
-            {:ok, context_delta}
+          {:ok, runtime_context_delta} when is_map(runtime_context_delta) ->
+            {:ok, runtime_context_delta}
 
           {:error, reason} ->
             error =
@@ -2433,11 +2434,11 @@ defmodule Jido.AgentServer do
          agent_module,
          directive,
          dispatch,
-         trusted_context
+         runtime_context
        ) do
     context =
       plugin_context(instance, spec, state, agent_module, %{
-        trusted_context: trusted_context,
+        runtime_context: runtime_context,
         input_signal: input_signal,
         directive: directive,
         dispatch: dispatch
@@ -2498,7 +2499,7 @@ defmodule Jido.AgentServer do
          resolved_action,
          original_signal,
          %State{} = state,
-         trusted_context
+         runtime_context
        ) do
     agent_module = state.agent_module
 
@@ -2509,7 +2510,7 @@ defmodule Jido.AgentServer do
     Enum.reduce(specs_and_instances, agent, fn {spec, instance}, agent_acc ->
       context =
         plugin_context(instance, spec, %{state | agent: agent_acc}, agent_module, %{
-          trusted_context: trusted_context
+          runtime_context: runtime_context
         })
 
       try do
@@ -3240,9 +3241,9 @@ defmodule Jido.AgentServer do
   # Internal: Telemetry
   # ---------------------------------------------------------------------------
 
-  defp exec_directive_with_telemetry(directive, signal, trusted_context, state) do
+  defp exec_directive_with_telemetry(directive, signal, runtime_context, state) do
     start_time = System.monotonic_time()
-    state = %{state | current_trusted_context: trusted_context}
+    state = %{state | current_runtime_context: runtime_context}
 
     directive_type =
       directive.__struct__ |> Module.split() |> List.last()
@@ -3278,7 +3279,7 @@ defmodule Jido.AgentServer do
       result =
         directive
         |> DirectiveExec.exec(signal, state)
-        |> clear_current_trusted_context()
+        |> clear_current_runtime_context()
 
       emit_telemetry(
         [:jido, :agent_server, :directive, :stop],
@@ -3299,19 +3300,19 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp clear_current_trusted_context({:ok, %State{} = state}) do
-    {:ok, %{state | current_trusted_context: %{}}}
+  defp clear_current_runtime_context({:ok, %State{} = state}) do
+    {:ok, %{state | current_runtime_context: %{}}}
   end
 
-  defp clear_current_trusted_context({:async, ref, %State{} = state}) do
-    {:async, ref, %{state | current_trusted_context: %{}}}
+  defp clear_current_runtime_context({:async, ref, %State{} = state}) do
+    {:async, ref, %{state | current_runtime_context: %{}}}
   end
 
-  defp clear_current_trusted_context({:stop, reason, %State{} = state}) do
-    {:stop, reason, %{state | current_trusted_context: %{}}}
+  defp clear_current_runtime_context({:stop, reason, %State{} = state}) do
+    {:stop, reason, %{state | current_runtime_context: %{}}}
   end
 
-  defp clear_current_trusted_context(result), do: result
+  defp clear_current_runtime_context(result), do: result
 
   defp result_type({:ok, _}), do: :ok
   defp result_type({:async, _, _}), do: :async

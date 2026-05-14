@@ -120,7 +120,7 @@ matching the emitted signal.
 `handle_signal/2` remains in the lifecycle for backwards compatibility and for
 coarse signal control. New identity, encryption, and authorization extensions
 should prefer the narrower preparation hooks: use `prepare_signal/2` to verify,
-decrypt, canonicalize, and attach trusted context, then use `prepare_action/3`
+decrypt, canonicalize, and attach runtime context, then use `prepare_action/3`
 to authorize the resolved action.
 
 ### mount/2
@@ -159,7 +159,7 @@ Use the `signal_routes/1` callback only when routes must be computed from runtim
 
 Pre-routing compatibility hook called before signal routing. Use this for coarse
 rejection, legacy signal rewrites, or route override. Do not use it as the
-primary identity or encryption hook; it does not return trusted context and its
+primary identity or encryption hook; it does not return runtime context and its
 route override power makes it intentionally broader than security preparation.
 
 ```elixir
@@ -181,10 +181,10 @@ The `context` map contains `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
 ### prepare_signal/2
 
 Runs after `handle_signal/2` and before routing. Use it to verify, decrypt, or
-canonicalize the effective signal and to attach trusted context for later phases.
+canonicalize the effective signal and to attach runtime context for later phases.
 This is the preferred inbound hook for identity and encrypted communication
 extensions because it has a narrow contract: return the prepared signal plus a
-trusted context delta, or fail closed.
+runtime context delta, or fail closed.
 
 ```elixir
 @impl Jido.Plugin
@@ -194,20 +194,20 @@ def prepare_signal(signal, context) do
 end
 ```
 
-The returned context delta is merged into accumulated `:trusted_context`.
+The returned runtime context delta is merged into accumulated `:runtime_context`.
 Reserved runtime keys are rejected: `:state`, `:signal`, `:agent`,
 `:agent_server_pid`, `:input_signal`, `:directive`, and `:dispatch`.
-Duplicate top-level trusted context keys are also rejected.
+Duplicate top-level runtime context keys are also rejected.
 
 ### prepare_action/3
 
 Runs after routing and before `Agent.cmd/3`. Use it to authorize the resolved
-action against the prepared signal and accumulated trusted context.
+action against the prepared signal and accumulated runtime context.
 
 ```elixir
 @impl Jido.Plugin
 def prepare_action(_signal, {MyApp.AdminAction, _params}, context) do
-  if "admin" in context.trusted_context.identity.scopes do
+  if "admin" in context.runtime_context.identity.scopes do
     {:ok, %{authorized?: true}}
   else
     {:error, :unauthorized}
@@ -215,14 +215,14 @@ def prepare_action(_signal, {MyApp.AdminAction, _params}, context) do
 end
 ```
 
-This hook cannot rewrite the signal or action. It returns additional trusted
+This hook cannot rewrite the signal or action. It returns additional runtime
 context or fails closed.
 
 ### prepare_emit/2
 
 Runs before an emitted signal is dispatched. Use it to sign, encrypt, enrich, or
 reroute outbound signals. Its context includes `:input_signal`,
-`:trusted_context`, `:directive`, `:dispatch`, plugin metadata, agent metadata,
+`:runtime_context`, `:directive`, `:dispatch`, plugin metadata, agent metadata,
 `:jido_instance`, and `:partition`.
 
 ```elixir

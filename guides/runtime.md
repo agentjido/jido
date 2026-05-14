@@ -55,7 +55,7 @@ Signal → AgentServer.call/cast
        → plugin prepare_action/3
        → Agent.cmd/3
        → {agent, directives}
-       → Directives queued with prepared signal and trusted context
+       → Directives queued with prepared signal and runtime context
        → drain loop via DirectiveExec
        → plugin prepare_emit/2 for emitted signals
        → dispatch
@@ -68,7 +68,7 @@ preparation, action authorization, and outbound signal preparation; this is the
 extension model instead of a generic AgentServer middleware chain.
 `handle_signal/2` is retained for backwards-compatible coarse signal handling
 and route override. Security-sensitive inbound work should use
-`prepare_signal/2` and `prepare_action/3` so trusted context stays separate from
+`prepare_signal/2` and `prepare_action/3` so runtime context stays separate from
 signal data and action params.
 
 ## Parent-Child Hierarchy

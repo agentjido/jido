@@ -5,11 +5,11 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
   alias Jido.Agent.StateOp
   alias Jido.Signal
 
-  defmodule RecordTrustedContextAction do
+  defmodule RecordRuntimeContextAction do
     @moduledoc false
 
     use Jido.Action,
-      name: "record_trusted_context",
+      name: "record_runtime_context",
       schema: Zoi.object(%{payload: Zoi.string()})
 
     @impl true
@@ -17,8 +17,8 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       {:ok, %{},
        %StateOp.SetState{
          attrs: %{
-           trusted_principal_id: context.identity.principal_id,
-           trusted_scope: context.authorization.scope,
+           runtime_principal_id: context.identity.principal_id,
+           runtime_scope: context.authorization.scope,
            prepared_signal_type: context.signal.type,
            payload: params.payload,
            params_contain_principal?: Map.has_key?(params, :principal_id)
@@ -50,7 +50,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
         Zoi.object(%{
           payload: Zoi.string(),
           input_signal_type: Zoi.string(),
-          trusted_principal_id: Zoi.string(),
+          runtime_principal_id: Zoi.string(),
           saw_directive_dispatch?: Zoi.boolean(),
           saw_context_dispatch?: Zoi.boolean()
         })
@@ -63,7 +63,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
            emitted_signal_type: context.signal.type,
            emitted_payload: params.payload,
            emitted_input_signal_type: params.input_signal_type,
-           emitted_trusted_principal_id: params.trusted_principal_id,
+           emitted_runtime_principal_id: params.runtime_principal_id,
            emitted_saw_directive_dispatch?: params.saw_directive_dispatch?,
            emitted_saw_context_dispatch?: params.saw_context_dispatch?
          }
@@ -96,7 +96,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     @impl true
     def prepare_signal(%Signal{type: type} = signal, _context)
         when type in ["incoming.verified", "emit.start.prepared", "outbound.prepared"] do
-      {:ok, signal, %{identity: %{principal_id: "agent_trusted"}}}
+      {:ok, signal, %{identity: %{principal_id: "agent_runtime"}}}
     end
 
     def prepare_signal(signal, _context), do: {:ok, signal, %{}}
@@ -112,33 +112,33 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       signal_patterns: []
 
     @impl true
-    def prepare_signal(signal, %{trusted_context: %{identity: %{principal_id: principal_id}}}) do
+    def prepare_signal(signal, %{runtime_context: %{identity: %{principal_id: principal_id}}}) do
       {:ok, signal, %{authorization: %{scope: "scope:#{principal_id}"}}}
     end
 
     def prepare_signal(signal, _context), do: {:ok, signal, %{}}
 
     @impl true
-    def prepare_action(_signal, {RecordTrustedContextAction, _params}, %{
-          trusted_context: %{identity: %{principal_id: "agent_trusted"}}
+    def prepare_action(_signal, {RecordRuntimeContextAction, _params}, %{
+          runtime_context: %{identity: %{principal_id: "agent_runtime"}}
         }) do
       {:ok, %{action_authorized?: true}}
     end
 
-    def prepare_action(_signal, {RecordTrustedContextAction, _params, _action_context}, %{
-          trusted_context: %{identity: %{principal_id: "agent_trusted"}}
+    def prepare_action(_signal, {RecordRuntimeContextAction, _params, _action_context}, %{
+          runtime_context: %{identity: %{principal_id: "agent_runtime"}}
         }) do
       {:ok, %{action_authorized?: true}}
     end
 
     def prepare_action(_signal, {EmitRawSignalAction, _params}, %{
-          trusted_context: %{identity: %{principal_id: "agent_trusted"}}
+          runtime_context: %{identity: %{principal_id: "agent_runtime"}}
         }) do
       {:ok, %{emit_authorized?: true}}
     end
 
     def prepare_action(_signal, {RecordPreparedEmitAction, _params}, %{
-          trusted_context: %{identity: %{principal_id: "agent_trusted"}}
+          runtime_context: %{identity: %{principal_id: "agent_runtime"}}
         }) do
       {:ok, %{record_emit_authorized?: true}}
     end
@@ -210,7 +210,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     @impl true
     def handle_signal(%Signal{type: "incoming.context_override"} = signal, _context) do
       action = {
-        RecordTrustedContextAction,
+        RecordRuntimeContextAction,
         %{payload: "from_action"},
         %{
           identity: %{principal_id: "action_supplied"},
@@ -276,7 +276,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     @impl true
     def prepare_signal(signal, _context) do
-      {:ok, signal, %{identity: %{principal_id: "agent_trusted"}}}
+      {:ok, signal, %{identity: %{principal_id: "agent_runtime"}}}
     end
 
     @impl true
@@ -294,7 +294,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     @impl true
     def prepare_signal(signal, _context) do
-      {:ok, signal, %{identity: %{principal_id: "agent_trusted"}}}
+      {:ok, signal, %{identity: %{principal_id: "agent_runtime"}}}
     end
 
     @impl true
@@ -347,7 +347,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
            data: %{
              payload: "prepared",
              input_signal_type: context.input_signal.type,
-             trusted_principal_id: context.trusted_context.identity.principal_id,
+             runtime_principal_id: context.runtime_context.identity.principal_id,
              saw_directive_dispatch?: context.directive.dispatch == {:logger, level: :info},
              saw_context_dispatch?: context.dispatch == {:logger, level: :info}
            }
@@ -399,21 +399,21 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     def prepare_emit(signal, _context), do: {:ok, signal}
   end
 
-  defmodule TrustedAgent do
+  defmodule RuntimeAgent do
     @moduledoc false
 
     use Jido.Agent,
-      name: "trusted_agent",
+      name: "runtime_agent",
       schema: [
-        trusted_principal_id: [type: :string, default: nil],
-        trusted_scope: [type: :string, default: nil],
+        runtime_principal_id: [type: :string, default: nil],
+        runtime_scope: [type: :string, default: nil],
         prepared_signal_type: [type: :string, default: nil],
         payload: [type: :string, default: nil],
         params_contain_principal?: [type: :boolean, default: nil]
       ],
       plugins: [IdentityPlugin, AuthorizationPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule ContextOverrideAgent do
@@ -422,8 +422,8 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     use Jido.Agent,
       name: "context_override_agent",
       schema: [
-        trusted_principal_id: [type: :string, default: nil],
-        trusted_scope: [type: :string, default: nil],
+        runtime_principal_id: [type: :string, default: nil],
+        runtime_scope: [type: :string, default: nil],
         prepared_signal_type: [type: :string, default: nil],
         payload: [type: :string, default: nil],
         params_contain_principal?: [type: :boolean, default: nil]
@@ -438,7 +438,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "reserved_context_agent",
       plugins: [ReservedContextPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule DuplicateContextAgent do
@@ -448,7 +448,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "duplicate_context_agent",
       plugins: [DuplicateContextPluginA, DuplicateContextPluginB]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule RejectActionAgent do
@@ -458,7 +458,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "reject_action_agent",
       plugins: [RejectActionPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule RejectSignalAgent do
@@ -468,7 +468,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "reject_signal_agent",
       plugins: [RejectSignalPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule InvalidPrepareSignalAgent do
@@ -478,7 +478,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "invalid_prepare_signal_agent",
       plugins: [InvalidPrepareSignalPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule InvalidPrepareActionAgent do
@@ -488,7 +488,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "invalid_prepare_action_agent",
       plugins: [InvalidPrepareActionPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule ReservedActionContextAgent do
@@ -498,7 +498,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "reserved_action_context_agent",
       plugins: [ReservedActionContextPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule DuplicateActionContextAgent do
@@ -508,7 +508,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "duplicate_action_context_agent",
       plugins: [DuplicateActionContextPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule CrashSignalAgent do
@@ -518,7 +518,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "crash_signal_agent",
       plugins: [CrashSignalPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule CrashActionAgent do
@@ -528,7 +528,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       name: "crash_action_agent",
       plugins: [CrashActionPlugin]
 
-    def signal_routes(_ctx), do: [{"incoming.verified", RecordTrustedContextAction}]
+    def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
   end
 
   defmodule EmitAgent do
@@ -540,7 +540,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
         emitted_signal_type: [type: :string, default: nil],
         emitted_payload: [type: :string, default: nil],
         emitted_input_signal_type: [type: :string, default: nil],
-        emitted_trusted_principal_id: [type: :string, default: nil],
+        emitted_runtime_principal_id: [type: :string, default: nil],
         emitted_saw_directive_dispatch?: [type: :boolean, default: nil],
         emitted_saw_context_dispatch?: [type: :boolean, default: nil]
       ],
@@ -585,27 +585,27 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
   end
 
   describe "prepare_signal/2 and prepare_action/3" do
-    test "prepare_signal receives rewritten signal and contributes trusted context", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: TrustedAgent, jido: jido)
+    test "prepare_signal receives rewritten signal and contributes runtime context", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: RuntimeAgent, jido: jido)
 
       signal = Signal.new!("incoming.original", %{payload: "original"}, source: "/test")
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
-      assert agent.state.trusted_principal_id == "agent_trusted"
-      assert agent.state.trusted_scope == "scope:agent_trusted"
+      assert agent.state.runtime_principal_id == "agent_runtime"
+      assert agent.state.runtime_scope == "scope:agent_runtime"
       assert agent.state.prepared_signal_type == "incoming.verified"
       assert agent.state.payload == "verified"
       assert agent.state.params_contain_principal? == false
     end
 
-    test "trusted context wins over action-supplied context", %{jido: jido} do
+    test "runtime context wins over action-supplied context", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ContextOverrideAgent, jido: jido)
 
       signal = Signal.new!("incoming.context_override", %{}, source: "/test")
       {:ok, agent} = Jido.AgentServer.call(pid, signal)
 
-      assert agent.state.trusted_principal_id == "agent_trusted"
-      assert agent.state.trusted_scope == "scope:agent_trusted"
+      assert agent.state.runtime_principal_id == "agent_runtime"
+      assert agent.state.runtime_scope == "scope:agent_runtime"
       assert agent.state.prepared_signal_type == "incoming.verified"
       assert agent.state.payload == "from_action"
       assert agent.state.params_contain_principal? == false
@@ -676,55 +676,55 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
     end
 
     test "prepare_signal and prepare_action run on async signal path", %{jido: jido} do
-      {:ok, pid} = Jido.AgentServer.start_link(agent: TrustedAgent, jido: jido)
+      {:ok, pid} = Jido.AgentServer.start_link(agent: RuntimeAgent, jido: jido)
 
       signal = Signal.new!("incoming.original", %{payload: "original"}, source: "/test")
       :ok = Jido.AgentServer.cast(pid, signal)
 
       state =
         eventually_state(pid, fn state ->
-          state.agent.state.trusted_principal_id == "agent_trusted"
+          state.agent.state.runtime_principal_id == "agent_runtime"
         end)
 
-      assert state.agent.state.trusted_scope == "scope:agent_trusted"
+      assert state.agent.state.runtime_scope == "scope:agent_runtime"
       assert state.agent.state.prepared_signal_type == "incoming.verified"
     end
 
-    test "reserved trusted context keys fail closed", %{jido: jido} do
+    test "reserved runtime context keys fail closed", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ReservedContextAgent, jido: jido)
 
       signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
       assert {:error, error} = Jido.AgentServer.call(pid, signal)
-      assert Exception.message(error) =~ "reserved trusted context keys"
+      assert Exception.message(error) =~ "reserved runtime context keys"
     end
 
-    test "duplicate trusted context keys fail closed", %{jido: jido} do
+    test "duplicate runtime context keys fail closed", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: DuplicateContextAgent, jido: jido)
 
       signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
       assert {:error, error} = Jido.AgentServer.call(pid, signal)
-      assert Exception.message(error) =~ "duplicate trusted context keys"
+      assert Exception.message(error) =~ "duplicate runtime context keys"
     end
 
-    test "prepare_action reserved trusted context keys fail closed", %{jido: jido} do
+    test "prepare_action reserved runtime context keys fail closed", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: ReservedActionContextAgent, jido: jido)
 
       signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
       assert {:error, error} = Jido.AgentServer.call(pid, signal)
-      assert Exception.message(error) =~ "reserved trusted context keys"
+      assert Exception.message(error) =~ "reserved runtime context keys"
     end
 
-    test "prepare_action duplicate trusted context keys fail closed", %{jido: jido} do
+    test "prepare_action duplicate runtime context keys fail closed", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: DuplicateActionContextAgent, jido: jido)
 
       signal = Signal.new!("incoming.verified", %{payload: "x"}, source: "/test")
       assert {:error, error} = Jido.AgentServer.call(pid, signal)
-      assert Exception.message(error) =~ "duplicate trusted context keys"
+      assert Exception.message(error) =~ "duplicate runtime context keys"
     end
   end
 
   describe "prepare_emit/2" do
-    test "call path passes prepared input signal and trusted context to prepare_emit", %{
+    test "call path passes prepared input signal and runtime context to prepare_emit", %{
       jido: jido
     } do
       {:ok, pid} = Jido.AgentServer.start_link(agent: EmitAgent, jido: jido)
@@ -739,13 +739,13 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
       assert state.agent.state.emitted_payload == "prepared"
       assert state.agent.state.emitted_input_signal_type == "emit.start.prepared"
-      assert state.agent.state.emitted_trusted_principal_id == "agent_trusted"
+      assert state.agent.state.emitted_runtime_principal_id == "agent_runtime"
       assert state.agent.state.emitted_saw_directive_dispatch? == true
       assert state.agent.state.emitted_saw_context_dispatch? == true
-      assert state.current_trusted_context == %{}
+      assert state.current_runtime_context == %{}
     end
 
-    test "cast path passes prepared input signal and trusted context to prepare_emit", %{
+    test "cast path passes prepared input signal and runtime context to prepare_emit", %{
       jido: jido
     } do
       {:ok, pid} = Jido.AgentServer.start_link(agent: EmitAgent, jido: jido)
@@ -759,8 +759,8 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
         end)
 
       assert state.agent.state.emitted_input_signal_type == "emit.start.prepared"
-      assert state.agent.state.emitted_trusted_principal_id == "agent_trusted"
-      assert state.current_trusted_context == %{}
+      assert state.agent.state.emitted_runtime_principal_id == "agent_runtime"
+      assert state.current_runtime_context == %{}
     end
 
     test "prepare_emit errors fail closed through the configured error policy", %{jido: jido} do
@@ -808,7 +808,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       assert_receive {:prepare_emit_error, :plugin_prepare_emit, error}, 500
       assert Exception.message(error) =~ "Plugin prepare_emit returned invalid result"
       assert {:ok, state} = Jido.AgentServer.state(pid)
-      assert state.current_trusted_context == %{}
+      assert state.current_runtime_context == %{}
     end
 
     test "prepare_emit crashes fail closed through the configured error policy", %{jido: jido} do
@@ -832,7 +832,7 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
       assert_receive {:prepare_emit_error, :plugin_prepare_emit, error}, 500
       assert Exception.message(error) =~ "Plugin prepare_emit crashed"
       assert {:ok, state} = Jido.AgentServer.state(pid)
-      assert state.current_trusted_context == %{}
+      assert state.current_runtime_context == %{}
     end
   end
 end

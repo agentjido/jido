@@ -121,8 +121,8 @@ defmodule Jido.AgentServer.State do
               debug_max_events:
                 Zoi.integer(description: "Max debug events in ring buffer")
                 |> Zoi.default(500),
-              current_trusted_context:
-                Zoi.map(description: "Trusted context for the directive currently being drained")
+              current_runtime_context:
+                Zoi.map(description: "Runtime context for the directive currently being drained")
                 |> Zoi.default(%{})
             },
             coerce: true
@@ -203,7 +203,7 @@ defmodule Jido.AgentServer.State do
         debug: opts.debug,
         debug_events: [],
         debug_max_events: Jido.Observe.Config.debug_max_events(opts.jido),
-        current_trusted_context: %{}
+        current_runtime_context: %{}
       }
 
       Zoi.parse(@schema, attrs)
@@ -282,20 +282,20 @@ defmodule Jido.AgentServer.State do
   end
 
   @doc """
-  Enqueues a directive with its triggering signal and trusted context.
+  Enqueues a directive with its triggering signal and runtime context.
   """
   @spec enqueue(t(), Jido.Signal.t(), map(), struct()) :: {:ok, t()} | {:error, :queue_overflow}
   def enqueue(
         %__MODULE__{queue: queue, max_queue_size: max} = state,
         signal,
-        trusted_context,
+        runtime_context,
         directive
       )
-      when is_map(trusted_context) do
+      when is_map(runtime_context) do
     if :queue.len(queue) >= max do
       {:error, :queue_overflow}
     else
-      {:ok, %{state | queue: :queue.in({signal, trusted_context, directive}, queue)}}
+      {:ok, %{state | queue: :queue.in({signal, runtime_context, directive}, queue)}}
     end
   end
 
@@ -313,16 +313,16 @@ defmodule Jido.AgentServer.State do
   end
 
   @doc """
-  Enqueues multiple directives with trusted context from a single signal.
+  Enqueues multiple directives with runtime context from a single signal.
   """
   @spec enqueue_all(t(), Jido.Signal.t(), map(), [struct()]) ::
           {:ok, t()} | {:error, :queue_overflow}
-  def enqueue_all(state, _signal, _trusted_context, []), do: {:ok, state}
+  def enqueue_all(state, _signal, _runtime_context, []), do: {:ok, state}
 
-  def enqueue_all(%__MODULE__{} = state, signal, trusted_context, [directive | rest])
-      when is_map(trusted_context) do
-    case enqueue(state, signal, trusted_context, directive) do
-      {:ok, new_state} -> enqueue_all(new_state, signal, trusted_context, rest)
+  def enqueue_all(%__MODULE__{} = state, signal, runtime_context, [directive | rest])
+      when is_map(runtime_context) do
+    case enqueue(state, signal, runtime_context, directive) do
+      {:ok, new_state} -> enqueue_all(new_state, signal, runtime_context, rest)
       error -> error
     end
   end
@@ -343,8 +343,8 @@ defmodule Jido.AgentServer.State do
     end
   end
 
-  defp normalize_queue_item({signal, trusted_context, directive})
-       when map_size(trusted_context) == 0 do
+  defp normalize_queue_item({signal, runtime_context, directive})
+       when map_size(runtime_context) == 0 do
     {signal, directive}
   end
 

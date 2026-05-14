@@ -9,7 +9,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
 
   def exec(%Directive.Emit{signal: signal, dispatch: dispatch} = directive, input_signal, state) do
     cfg = dispatch || state.default_dispatch
-    trusted_context = Map.get(state, :current_trusted_context, %{})
+    runtime_context = Map.get(state, :current_runtime_context, %{})
 
     traced_signal =
       case TraceContext.propagate_to(signal, input_signal.id) do
@@ -23,7 +23,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Emit do
            state,
            directive,
            cfg,
-           trusted_context
+           runtime_context
          ) do
       {:ok, prepared_signal, prepared_dispatch} ->
         dispatch_signal(prepared_signal, prepared_dispatch, state)
@@ -76,7 +76,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         input_signal,
         state
       ) do
-    trusted_context = Map.get(state, :current_trusted_context, %{})
+    runtime_context = Map.get(state, :current_runtime_context, %{})
 
     enriched_instruction = %{
       instruction
@@ -100,12 +100,12 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
         __jido_instance__: state.jido,
         __partition__: state.partition,
         __jido_signal__: input_signal,
-        __jido_action_context__: trusted_context
+        __jido_action_context__: runtime_context
       )
 
     state = State.update_agent(state, agent)
 
-    case State.enqueue_all(state, input_signal, trusted_context, List.wrap(directives)) do
+    case State.enqueue_all(state, input_signal, runtime_context, List.wrap(directives)) do
       {:ok, state} ->
         {:ok, state}
 
