@@ -201,8 +201,8 @@ Duplicate top-level runtime context keys are also rejected.
 
 ### prepare_action/3
 
-Runs after routing and before `Agent.cmd/3`. Use it to authorize the resolved
-action against the prepared signal and accumulated runtime context.
+Runs after routing and before agent command execution. Use it to authorize the
+resolved action against the prepared signal and accumulated runtime context.
 
 ```elixir
 @impl Jido.Plugin

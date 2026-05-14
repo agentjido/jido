@@ -306,8 +306,8 @@ defmodule Jido.Plugin do
   ## Parameters
 
   - `signal` - The prepared `Jido.Signal` struct after `prepare_signal/2`
-  - `action_arg` - The resolved action argument that will be passed to
-    `Agent.cmd/3`
+  - `action_arg` - The resolved action argument that will be passed to the
+    agent command phase
   - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
     `:plugin_instance`, `:config`, `:runtime_context`
 

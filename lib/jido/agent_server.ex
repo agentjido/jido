@@ -3312,8 +3312,6 @@ defmodule Jido.AgentServer do
     {:stop, reason, %{state | current_runtime_context: %{}}}
   end
 
-  defp clear_current_runtime_context(result), do: result
-
   defp result_type({:ok, _}), do: :ok
   defp result_type({:async, _, _}), do: :async
   defp result_type({:stop, _, _}), do: :stop
