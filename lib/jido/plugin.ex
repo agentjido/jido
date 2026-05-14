@@ -237,6 +237,10 @@ defmodule Jido.Plugin do
   `signal_patterns` only receive signals matching those patterns; plugins
   with empty patterns receive all inbound signals for this phase.
 
+  This callback remains broad for backwards compatibility and route override.
+  Prefer `prepare_signal/2` for identity, encryption, canonicalization, and
+  trusted context extraction.
+
   ## Parameters
 
   - `signal` - The incoming `Jido.Signal` struct (may be modified by earlier plugins)
@@ -269,8 +273,10 @@ defmodule Jido.Plugin do
 
   Plugins can verify, decrypt, canonicalize, or rewrite the final effective
   signal and contribute trusted context. Returned context is merged into the
-  context given to routed actions and later plugin phases. Plugins may not
-  provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
+  context given to routed actions and later plugin phases. This is the preferred
+  inbound hook for identity and encrypted communication extensions because it
+  cannot override routing and has an explicit trusted context contract. Plugins
+  may not provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
   `:agent_server_pid`, `:input_signal`, `:directive`, or `:dispatch`;
   duplicate context keys fail closed.
 

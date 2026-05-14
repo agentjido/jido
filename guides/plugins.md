@@ -117,6 +117,12 @@ Plugins run in declaration order. `handle_signal/2`, `prepare_signal/2`, and
 all plugins so outbound signing/encryption plugins can decide by pattern
 matching the emitted signal.
 
+`handle_signal/2` remains in the lifecycle for backwards compatibility and for
+coarse signal control. New identity, encryption, and authorization extensions
+should prefer the narrower preparation hooks: use `prepare_signal/2` to verify,
+decrypt, canonicalize, and attach trusted context, then use `prepare_action/3`
+to authorize the resolved action.
+
 ### mount/2
 
 Called during `new/1` to initialize plugin state. Pure function—no side effects.
@@ -151,7 +157,10 @@ Use the `signal_routes/1` callback only when routes must be computed from runtim
 
 ### handle_signal/2
 
-Pre-routing hook called before signal routing. Can override or abort processing.
+Pre-routing compatibility hook called before signal routing. Use this for coarse
+rejection, legacy signal rewrites, or route override. Do not use it as the
+primary identity or encryption hook; it does not return trusted context and its
+route override power makes it intentionally broader than security preparation.
 
 ```elixir
 @impl Jido.Plugin
@@ -173,6 +182,9 @@ The `context` map contains `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
 
 Runs after `handle_signal/2` and before routing. Use it to verify, decrypt, or
 canonicalize the effective signal and to attach trusted context for later phases.
+This is the preferred inbound hook for identity and encrypted communication
+extensions because it has a narrow contract: return the prepared signal plus a
+trusted context delta, or fail closed.
 
 ```elixir
 @impl Jido.Plugin

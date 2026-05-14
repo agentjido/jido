@@ -66,6 +66,10 @@ Signal → AgentServer.call/cast
 The AgentServer owns these phases. Plugins provide phase callbacks for signal
 preparation, action authorization, and outbound signal preparation; this is the
 extension model instead of a generic AgentServer middleware chain.
+`handle_signal/2` is retained for backwards-compatible coarse signal handling
+and route override. Security-sensitive inbound work should use
+`prepare_signal/2` and `prepare_action/3` so trusted context stays separate from
+signal data and action params.
 
 ## Parent-Child Hierarchy
 
