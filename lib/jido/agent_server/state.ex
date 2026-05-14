@@ -120,7 +120,10 @@ defmodule Jido.AgentServer.State do
                 |> Zoi.default([]),
               debug_max_events:
                 Zoi.integer(description: "Max debug events in ring buffer")
-                |> Zoi.default(500)
+                |> Zoi.default(500),
+              current_trusted_context:
+                Zoi.map(description: "Trusted context for the directive currently being drained")
+                |> Zoi.default(%{})
             },
             coerce: true
           )
@@ -199,7 +202,8 @@ defmodule Jido.AgentServer.State do
         lifecycle: lifecycle,
         debug: opts.debug,
         debug_events: [],
-        debug_max_events: Jido.Observe.Config.debug_max_events(opts.jido)
+        debug_max_events: Jido.Observe.Config.debug_max_events(opts.jido),
+        current_trusted_context: %{}
       }
 
       Zoi.parse(@schema, attrs)
@@ -278,6 +282,24 @@ defmodule Jido.AgentServer.State do
   end
 
   @doc """
+  Enqueues a directive with its triggering signal and trusted context.
+  """
+  @spec enqueue(t(), Jido.Signal.t(), map(), struct()) :: {:ok, t()} | {:error, :queue_overflow}
+  def enqueue(
+        %__MODULE__{queue: queue, max_queue_size: max} = state,
+        signal,
+        trusted_context,
+        directive
+      )
+      when is_map(trusted_context) do
+    if :queue.len(queue) >= max do
+      {:error, :queue_overflow}
+    else
+      {:ok, %{state | queue: :queue.in({signal, trusted_context, directive}, queue)}}
+    end
+  end
+
+  @doc """
   Enqueues multiple directives from a single signal.
   """
   @spec enqueue_all(t(), Jido.Signal.t(), [struct()]) :: {:ok, t()} | {:error, :queue_overflow}
@@ -291,18 +313,42 @@ defmodule Jido.AgentServer.State do
   end
 
   @doc """
+  Enqueues multiple directives with trusted context from a single signal.
+  """
+  @spec enqueue_all(t(), Jido.Signal.t(), map(), [struct()]) ::
+          {:ok, t()} | {:error, :queue_overflow}
+  def enqueue_all(state, _signal, _trusted_context, []), do: {:ok, state}
+
+  def enqueue_all(%__MODULE__{} = state, signal, trusted_context, [directive | rest])
+      when is_map(trusted_context) do
+    case enqueue(state, signal, trusted_context, directive) do
+      {:ok, new_state} -> enqueue_all(new_state, signal, trusted_context, rest)
+      error -> error
+    end
+  end
+
+  @doc """
   Dequeues the next directive for processing.
   """
-  @spec dequeue(t()) :: {{:value, {Jido.Signal.t(), struct()}}, t()} | {:empty, t()}
+  @spec dequeue(t()) ::
+          {{:value, {Jido.Signal.t(), struct()} | {Jido.Signal.t(), map(), struct()}}, t()}
+          | {:empty, t()}
   def dequeue(%__MODULE__{queue: queue} = state) do
     case :queue.out(queue) do
       {{:value, item}, new_queue} ->
-        {{:value, item}, %{state | queue: new_queue}}
+        {{:value, normalize_queue_item(item)}, %{state | queue: new_queue}}
 
       {:empty, _} ->
         {:empty, state}
     end
   end
+
+  defp normalize_queue_item({signal, trusted_context, directive})
+       when map_size(trusted_context) == 0 do
+    {signal, directive}
+  end
+
+  defp normalize_queue_item(item), do: item
 
   @doc """
   Returns the current queue length.

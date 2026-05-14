@@ -1,13 +1,14 @@
 defmodule JidoExampleTest.PluginMiddlewareTest do
   @moduledoc """
-  Example test demonstrating plugin signal middleware (handle_signal/2 and transform_result/3).
+  Example test demonstrating plugin signal phase hooks (`handle_signal/2` and
+  `transform_result/3`).
 
   This test shows:
   - handle_signal/2 returning {:ok, :continue}, {:ok, {:continue, signal}},
     {:ok, {:override, action}}, and {:error, reason}
   - signal_patterns filtering — plugins with non-empty patterns only receive matching signals
   - transform_result/3 enriching the agent returned from AgentServer.call/3
-  - Middleware composition across multiple plugins
+  - Hook composition across multiple plugins
 
   Run with: mix test --include example
   """
@@ -227,7 +228,7 @@ defmodule JidoExampleTest.PluginMiddlewareTest do
   # TESTS
   # ===========================================================================
 
-  describe "global middleware" do
+  describe "global signal hooks" do
     test "plugin with empty signal_patterns intercepts all signals", %{jido: jido} do
       {:ok, pid} = Jido.start_agent(jido, GlobalMiddlewareAgent, id: unique_id("global"))
 

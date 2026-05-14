@@ -97,6 +97,9 @@ The `context` field indicates where the error originated:
 - `:fsm_transition` — Error during FSM state transition
 - `:routing` — Error during signal routing
 - `:plugin_handle_signal` — Error in plugin signal handler
+- `:plugin_prepare_signal` — Error while verifying, decrypting, or preparing a signal
+- `:plugin_prepare_action` — Error while authorizing a resolved action
+- `:plugin_prepare_emit` — Error while preparing an emitted signal for dispatch
 
 ## Action Errors
 

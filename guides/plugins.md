@@ -93,6 +93,30 @@ This prevents plugins from interfering with each other's state.
 
 All callbacks are optional with sensible defaults.
 
+### Signal phases
+
+AgentServer owns a fixed signal lifecycle. Plugins are the extension mechanism
+for phase-specific behavior; AgentServer does not expose a generic middleware
+chain.
+
+```text
+incoming signal
+-> handle_signal/2
+-> prepare_signal/2
+-> route
+-> prepare_action/3
+-> Agent.cmd/3
+-> directives queued
+-> prepare_emit/2
+-> dispatch
+-> transform_result/3 on synchronous call return only
+```
+
+Plugins run in declaration order. `handle_signal/2`, `prepare_signal/2`, and
+`prepare_action/3` are gated by `signal_patterns`. `prepare_emit/2` runs for
+all plugins so outbound signing/encryption plugins can decide by pattern
+matching the emitted signal.
+
 ### mount/2
 
 Called during `new/1` to initialize plugin state. Pure function—no side effects.
@@ -145,9 +169,65 @@ end
 
 The `context` map contains `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`, and `:config`.
 
+### prepare_signal/2
+
+Runs after `handle_signal/2` and before routing. Use it to verify, decrypt, or
+canonicalize the effective signal and to attach trusted context for later phases.
+
+```elixir
+@impl Jido.Plugin
+def prepare_signal(signal, context) do
+  identity = verify_signature!(signal)
+  {:ok, signal, %{identity: identity}}
+end
+```
+
+The returned context delta is merged into accumulated `:trusted_context`.
+Reserved runtime keys are rejected: `:state`, `:signal`, `:agent`,
+`:agent_server_pid`, `:input_signal`, `:directive`, and `:dispatch`.
+
+### prepare_action/3
+
+Runs after routing and before `Agent.cmd/3`. Use it to authorize the resolved
+action against the prepared signal and accumulated trusted context.
+
+```elixir
+@impl Jido.Plugin
+def prepare_action(_signal, {MyApp.AdminAction, _params}, context) do
+  if "admin" in context.trusted_context.identity.scopes do
+    {:ok, %{authorized?: true}}
+  else
+    {:error, :unauthorized}
+  end
+end
+```
+
+This hook cannot rewrite the signal or action. It returns additional trusted
+context or fails closed.
+
+### prepare_emit/2
+
+Runs before an emitted signal is dispatched. Use it to sign, encrypt, enrich, or
+reroute outbound signals. Its context includes `:input_signal`,
+`:trusted_context`, `:directive`, `:dispatch`, plugin metadata, agent metadata,
+`:jido_instance`, and `:partition`.
+
+```elixir
+@impl Jido.Plugin
+def prepare_emit(signal, context) do
+  encrypted = encrypt_for_dispatch(signal, context.dispatch)
+  {:ok, encrypted}
+end
+```
+
+Return `{:ok, signal}` to keep the current dispatch or `{:ok, signal, dispatch}`
+to rewrite dispatch.
+
 ### transform_result/3
 
 Transforms the agent returned from `AgentServer.call/3` (synchronous path only).
+This is a caller-view hook, not a security hook; failures are logged and the
+agent is returned unchanged.
 
 ```elixir
 @impl Jido.Plugin

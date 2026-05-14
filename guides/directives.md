@@ -155,7 +155,9 @@ defmodule MyApp.Directive.CallLLM do
 end
 ```
 
-The runtime dispatches on struct type — no core changes needed. Implement a custom `AgentServer` or middleware to handle your directive types.
+The runtime dispatches on struct type — no core changes needed. Implement
+`Jido.AgentServer.DirectiveExec` for your directive type to handle custom
+effects.
 
 ## Complete Example: Action → Directive Flow
 

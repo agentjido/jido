@@ -944,7 +944,15 @@ defmodule Jido.Agent do
       defp __apply_action_exec_defaults__(instruction, _defaults), do: instruction
 
       defp __normalize_internal_action_context__(context) when is_map(context) do
-        Map.drop(context, [:state, :signal])
+        Map.drop(context, [
+          :state,
+          :signal,
+          :agent,
+          :agent_server_pid,
+          :input_signal,
+          :directive,
+          :dispatch
+        ])
       end
 
       defp __normalize_internal_action_context__(_context), do: %{}
