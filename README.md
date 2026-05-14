@@ -309,6 +309,150 @@ State operations are internal state transitions handled by the strategy layer du
 
 **API Reference:** [hexdocs.pm/jido](https://hexdocs.pm/jido)
 
+## FAQ
+
+### General Questions
+
+**Q: What is Jido and how does it differ from other agent frameworks?**
+
+A: Jido is an **autonomous agent framework for Elixir, built for workflows and multi-agent systems**. Key differentiators:
+- **OTP-native architecture**: Built on GenServer with supervision and fault tolerance built in
+- **Immutable agents**: Pure functional agent design inspired by Elm/Redux
+- **AI optional**: Core package provides agent architecture without requiring AI/LLM
+- **Directive-based effects**: Actions transform state; directives describe external effects
+
+Compared to LangChain/CrewAI:
+- **LangChain**: Chain-based orchestration, Python-first
+- **CrewAI**: Role-playing autonomous agents, team-based collaboration
+- **Jido**: OTP-native with supervision trees, Elixir/BEAM ecosystem
+
+**Q: What is the Agent/Action/Signal/Directive architecture?**
+
+A:
+- **Agents**: Immutable structs plus modules that hold state and implement `cmd/2`
+- **Actions**: Receive validated params and context, then return state updates and optional directives
+- **Signals**: CloudEvents-compliant messages routed into the system
+- **Directives**: Bare structs that describe effects for the runtime to execute
+
+`cmd/2` returns the updated agent plus directives. Directives never mutate agent state; the OTP runtime interprets them for external effects. Actions may still perform work such as API calls, file I/O, or database queries when that belongs in the action boundary.
+
+**Q: Is AI required for Jido?**
+
+A: **No!** The core package (`jido`) provides agent architecture and runtime without AI. AI/LLM integration is optional via companion packages:
+- `jido_ai`: AI/LLM integration for agents
+- `req_llm`: HTTP client for LLM APIs
+
+Use Jido when software needs to inspect context, choose steps, coordinate agents, and run reliably - AI is optional.
+
+**Q: What are the Jido ecosystem packages?**
+
+A:
+| Package | Description |
+|---------|-------------|
+| **req_llm** | HTTP client for LLM APIs |
+| **jido_action** | Composable, validated actions with AI tool integration |
+| **jido_signal** | CloudEvents-based message envelope and routing utilities |
+| **jido** | Core agent framework with state management, directives, runtime |
+| **jido_ai** | AI/LLM integration for agents |
+
+### Getting Started
+
+**Q: How do I install Jido?**
+
+A: Jido is available on Hex.pm:
+```elixir
+def deps do
+  [
+    {:jido, "~> 2.0"}
+  ]
+end
+```
+
+See [jido.run](https://jido.run) for demos and examples.
+
+**Q: How do I create an agent?**
+
+A:
+```elixir
+defmodule MyAgent do
+  use Jido.Agent,
+    name: "my_agent",
+    description: "My custom agent",
+    schema: [
+      count: [type: :integer, default: 0]
+    ]
+end
+
+{agent, directives} = MyAgent.cmd(agent, action)
+```
+
+See [hexdocs.pm/jido](https://hexdocs.pm/jido) for API reference.
+
+**Q: How do I run agents in production?**
+
+A: Use `AgentServer` (GenServer-based) for production deployment:
+- Parent-child agent hierarchies with lifecycle management
+- Signal routing with configurable strategies
+- Instance-scoped supervision plus logical partitions for multi-tenant deployments
+
+### Features
+
+**Q: What directives are available?**
+
+A: Built-in directives:
+- **Emit**: Emit signals to the system
+- **Error**: Signal an error from `cmd/2`
+- **Spawn**: Spawn child processes
+- **SpawnAgent**: Spawn child agents
+- **AdoptChild**: Attach an orphaned or unattached child to the current parent
+- **StopChild**: Stop child processes/agents
+- **Schedule**: Schedule future actions
+- **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
+- **Stop**: Stop the agent
+- **Cron / CronCancel**: Register and cancel cron-based schedules
+
+External packages can also define custom directive structs. See [Agent Directives](guides/directives.md) for details.
+
+**Q: How do plugins work?**
+
+A: Composable plugins extend agents with:
+- Reusable capability modules
+- State isolation per plugin with automatic schema merging
+- Easy capability sharing across agents
+
+See [Plugins Guide](guides/plugins.md) for details.
+
+**Q: What execution strategies are available?**
+
+A:
+- **Direct Strategy**: Immediate execution
+- **FSM Strategy**: State machine workflows
+
+See [Strategies Guide](guides/strategies.md) and [FSM Strategy Deep Dive](guides/fsm-strategy.livemd).
+
+### Troubleshooting
+
+**Q: I'm getting GenServer timeout errors. What should I check?**
+
+A:
+1. Check action execution time
+2. Consider using worker pools for throughput (`guides/worker-pools.md`)
+3. Review supervision tree configuration
+
+**Q: My agents aren't receiving signals. What's wrong?**
+
+A:
+1. Check signal routing configuration
+2. Verify signal envelope format (CloudEvents)
+3. Review signal dispatch strategy
+
+### Help Resources
+
+- **Documentation**: [hexdocs.pm/jido](https://hexdocs.pm/jido)
+- **Website**: [jido.run](https://jido.run)
+- **GitHub**: [github.com/agentjido/jido](https://github.com/agentjido/jido)
+- **Jido Workbench**: [github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
+
 ## Development
 
 ### Prerequisites
