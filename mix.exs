@@ -190,7 +190,7 @@ defmodule Jido.MixProject do
         {"LICENSE", title: "Apache 2.0 License"}
       ],
       extra_section: "Guides",
-      formatters: ["html"],
+      formatters: ["html", "markdown"],
       skip_undefined_reference_warnings_on: [
         "CHANGELOG.md",
         "LICENSE"
@@ -435,7 +435,7 @@ defmodule Jido.MixProject do
       test: "test --exclude flaky",
 
       # Helper to run docs
-      docs: "docs -f html --open",
+      docs: "docs --open",
 
       # Run to check the quality of your code
       q: ["quality"],
