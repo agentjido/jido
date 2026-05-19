@@ -48,7 +48,12 @@ defmodule JidoTest.AgentServer.ErrorPolicyTest do
       state = build_state(:log_only)
       directive = build_error_directive("Error message", :validation)
 
-      assert {:ok, ^state} = ErrorPolicy.handle(directive, state)
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          assert {:ok, ^state} = ErrorPolicy.handle(directive, state)
+        end)
+
+      assert log =~ "Agent error-policy-test-agent [validation]: Error message"
     end
   end
 

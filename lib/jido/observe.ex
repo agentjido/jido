@@ -2,8 +2,8 @@ defmodule Jido.Observe do
   @moduledoc """
   Unified observability facade for Jido agents.
 
-  Wraps `:telemetry` events and `Logger` with a simple API for observing
-  agent execution, action invocations, and workflow iterations.
+  Wraps `:telemetry` and tracer callbacks with a simple API for observing agent
+  execution, action invocations, and workflow iterations.
 
   ## Features
 
@@ -11,7 +11,7 @@ defmodule Jido.Observe do
   - Duration measurement for all spans (nanoseconds)
   - Automatic correlation ID enrichment from `Jido.Tracing.Context`
   - Pluggable tracer callbacks via `Jido.Observe.Tracer`
-  - Threshold-based logging via `Jido.Observe.Log`
+  - Threshold-based logging compatibility via `Jido.Observe.Log`
 
   ## Correlation Tracing Integration
 
@@ -246,10 +246,6 @@ defmodule Jido.Observe do
   Conditionally logs a message based on the observability threshold.
 
   Delegates to `Jido.Observe.Log.log/3`.
-
-  ## Example
-
-      Jido.Observe.log(:debug, "Processing step", agent_id: agent.id)
   """
   @spec log(Logger.level(), Logger.message(), keyword()) :: :ok
   def log(level, message, metadata \\ []) do
@@ -695,21 +691,21 @@ defmodule Jido.Observe do
   end
 
   defp log_tracer_warning(%SpanCtx{} = span_ctx, callback_name, failure) do
-    Logger.warning(
+    Logger.warning(fn ->
       "Jido.Observe tracer #{callback_name} failed " <>
         "(tracer=#{inspect(span_ctx.tracer_module || tracer(span_ctx.metadata))}, " <>
         "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
         "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{format_tracer_failure(failure)}"
-    )
+    end)
   end
 
   defp log_scoped_contract_warning(%SpanCtx{} = span_ctx, message) do
-    Logger.warning(
+    Logger.warning(fn ->
       "Jido.Observe tracer with_span_scope/3 contract violation " <>
         "(tracer=#{inspect(span_ctx.tracer_module)}, " <>
         "event_prefix=#{inspect(span_ctx.event_prefix)}, " <>
         "failure_mode=#{tracer_failure_mode(span_ctx.metadata)}): #{message}"
-    )
+    end)
   end
 
   defp raise_tracer_failure(%SpanCtx{} = span_ctx, callback_name, failure) do

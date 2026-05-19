@@ -6,6 +6,7 @@ defmodule JidoTest.ObserveTest do
 
   import ExUnit.CaptureLog
 
+  alias Jido.Debug
   alias Jido.Observe
   alias Jido.Observe.Log
   alias Jido.Observe.NoopTracer
@@ -525,6 +526,21 @@ defmodule JidoTest.ObserveTest do
         end)
 
       assert log =~ "debug level message"
+    end
+
+    test "honors per-instance debug override from metadata" do
+      test_instance = :"observe_log_#{System.unique_integer([:positive])}"
+      Application.put_env(:jido, :observability, log_level: :warning)
+      Debug.enable(test_instance, :on)
+
+      on_exit(fn -> Debug.reset(test_instance) end)
+
+      log =
+        capture_log(fn ->
+          Log.log(:debug, "debug override message", jido_instance: test_instance)
+        end)
+
+      assert log =~ "debug override message"
     end
   end
 

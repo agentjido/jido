@@ -157,7 +157,10 @@ defmodule Jido.Sensor.Runtime do
 
   @impl GenServer
   def handle_info(msg, state) do
-    Logger.debug("Sensor.Runtime #{state.id} received unexpected message: #{inspect(msg)}")
+    Logger.debug(fn ->
+      "Sensor.Runtime #{state.id} received unexpected message: #{inspect(msg)}"
+    end)
+
     {:noreply, state}
   end
 
@@ -241,14 +244,16 @@ defmodule Jido.Sensor.Runtime do
           {:noreply, new_state}
 
         {:error, reason} ->
-          Logger.warning("Sensor.Runtime #{state.id} handle_event error: #{inspect(reason)}")
+          Logger.warning(fn ->
+            "Sensor.Runtime #{state.id} handle_event error: #{inspect(reason)}"
+          end)
 
           {:noreply, state}
 
         other ->
-          Logger.warning(
+          Logger.warning(fn ->
             "Sensor.Runtime #{state.id} handle_event returned invalid result: #{inspect(other)}"
-          )
+          end)
 
           {:noreply, state}
       end
@@ -281,7 +286,9 @@ defmodule Jido.Sensor.Runtime do
   end
 
   defp apply_directive(directive, state) do
-    Logger.warning("Sensor.Runtime #{state.id} ignoring unknown directive: #{inspect(directive)}")
+    Logger.warning(fn ->
+      "Sensor.Runtime #{state.id} ignoring unknown directive: #{inspect(directive)}"
+    end)
 
     state
   end
@@ -312,7 +319,9 @@ defmodule Jido.Sensor.Runtime do
         dispatch_signal_async(signal, agent_ref, state)
 
       true ->
-        Logger.debug("Sensor.Runtime #{state.id} has no agent_ref, signal not delivered")
+        Logger.debug(fn ->
+          "Sensor.Runtime #{state.id} has no agent_ref, signal not delivered"
+        end)
     end
   end
 
@@ -322,9 +331,9 @@ defmodule Jido.Sensor.Runtime do
         dispatch_fun(state).(signal, agent_ref)
       rescue
         e ->
-          Logger.warning(
+          Logger.warning(fn ->
             "Sensor.Runtime #{state.id} async dispatch failed: #{Exception.message(e)}"
-          )
+          end)
       end
     end
 

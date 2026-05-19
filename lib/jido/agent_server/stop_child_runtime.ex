@@ -14,13 +14,16 @@ defmodule Jido.AgentServer.StopChildRuntime do
   def exec(tag, reason, %Signal{} = input_signal, %State{} = state) do
     case State.get_child(state, tag) do
       nil ->
-        Logger.debug("AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found")
+        Logger.debug(fn ->
+          "AgentServer #{state.id} cannot stop child #{inspect(tag)}: not found"
+        end)
+
         {:ok, state}
 
       %{pid: pid, id: child_id, partition: child_partition} ->
-        Logger.debug(
+        Logger.debug(fn ->
           "AgentServer #{state.id} stopping child #{inspect(tag)} with reason #{inspect(reason)}"
-        )
+        end)
 
         case RuntimeStore.delete(
                state.jido,
@@ -31,9 +34,9 @@ defmodule Jido.AgentServer.StopChildRuntime do
             :ok
 
           {:error, delete_reason} ->
-            Logger.warning(
+            Logger.warning(fn ->
               "AgentServer #{state.id} failed to clear relationship for child #{child_id}: #{inspect(delete_reason)}"
-            )
+            end)
         end
 
         stop_signal =

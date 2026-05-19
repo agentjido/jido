@@ -60,9 +60,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
       state = %{state | lifecycle: new_lifecycle}
       state = cancel_idle_timer(state)
 
-      Logger.debug(
+      Logger.debug(fn ->
         "Lifecycle attached pid #{inspect(pid)} to #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}"
-      )
+      end)
 
       {:cont, state}
     end
@@ -86,9 +86,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
       state = %{state | lifecycle: new_lifecycle}
 
-      Logger.debug(
+      Logger.debug(fn ->
         "Lifecycle detached pid #{inspect(pid)} from #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}"
-      )
+      end)
 
       if MapSet.size(new_lifecycle.attachments) == 0 do
         {:cont, maybe_start_idle_timer(state)}
@@ -118,9 +118,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
         state = %{state | lifecycle: new_lifecycle}
 
-        Logger.debug(
+        Logger.debug(fn ->
           "Lifecycle owner #{inspect(pid)} down for #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}"
-        )
+        end)
 
         if MapSet.size(new_lifecycle.attachments) == 0 do
           {:cont, maybe_start_idle_timer(state)}
@@ -136,7 +136,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   def handle_event(:idle_timeout, state) do
     lifecycle = state.lifecycle
 
-    Logger.debug("Lifecycle idle timeout for #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}")
+    Logger.debug(fn ->
+      "Lifecycle idle timeout for #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}"
+    end)
 
     {:stop, {:shutdown, :idle_timeout}, state}
   end
@@ -206,9 +208,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
             state
 
           {:error, reason} ->
-            Logger.warning(
+            Logger.warning(fn ->
               "Lifecycle restore failed for #{lifecycle.pool}/#{inspect(lifecycle.pool_key)}: #{inspect(reason)}"
-            )
+            end)
 
             state
         end
@@ -225,12 +227,14 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
     case Persist.hibernate(storage, agent_module, persistence_key, agent) do
       :ok ->
-        Logger.debug("Lifecycle hibernated agent for #{lifecycle.pool}/#{inspect(pool_key)}")
+        Logger.debug(fn ->
+          "Lifecycle hibernated agent for #{lifecycle.pool}/#{inspect(pool_key)}"
+        end)
 
       {:error, reason} ->
-        Logger.error(
+        Logger.error(fn ->
           "Lifecycle hibernate failed for #{lifecycle.pool}/#{inspect(pool_key)}: #{inspect(reason)}"
-        )
+        end)
     end
   end
 
@@ -247,9 +251,9 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     {cron_specs, invalid_cron_specs} = Jido.Scheduler.classify_cron_specs(staged_cron_specs)
 
     Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
-      Logger.error(
+      Logger.error(fn ->
         "Lifecycle dropped malformed persisted cron spec #{inspect(job_id)} for #{inspect(agent_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      )
+      end)
     end)
 
     {cleaned_agent, cron_specs}
