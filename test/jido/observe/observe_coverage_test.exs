@@ -394,7 +394,12 @@ defmodule JidoTest.ObserveCoverageTest do
              ) == :test_exit_value
 
       assert_receive {:exception_event, [:jido, :test, :catch, :exception], %{duration: _},
-                      %{kind: :exit, error: :test_exit_value}}
+                      %{kind: :exit, error: error} = metadata}
+
+      assert %{type: :internal, message: ":test_exit_value", details: %{}, retryable?: true} =
+               error
+
+      refute Map.has_key?(metadata, :stacktrace)
     end
   end
 end

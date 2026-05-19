@@ -207,6 +207,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Directive
   alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
   alias Jido.Config.Defaults
+  alias Jido.Observe
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.RuntimeStore
   alias Jido.Sensor.Runtime, as: SensorRuntime
@@ -1661,7 +1662,7 @@ defmodule Jido.AgentServer do
         emit_telemetry(
           [:jido, :agent_server, :signal, :exception],
           %{duration: duration},
-          Map.merge(metadata, %{kind: kind, error: reason})
+          Map.merge(metadata, Observe.exception_metadata(kind, reason))
         )
 
         Logger.error(fn ->
@@ -1720,7 +1721,7 @@ defmodule Jido.AgentServer do
         emit_telemetry(
           [:jido, :agent_server, :signal, :exception],
           %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason})
+          Map.merge(metadata, Observe.exception_metadata(kind, reason))
         )
 
         :erlang.raise(kind, reason, __STACKTRACE__)
@@ -3307,7 +3308,7 @@ defmodule Jido.AgentServer do
         emit_telemetry(
           [:jido, :agent_server, :directive, :exception],
           %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason})
+          Map.merge(metadata, Observe.exception_metadata(kind, reason))
         )
 
         :erlang.raise(kind, reason, __STACKTRACE__)
@@ -3331,7 +3332,7 @@ defmodule Jido.AgentServer do
   defp result_type({:stop, _, _}), do: :stop
 
   defp emit_telemetry(event, measurements, metadata) do
-    :telemetry.execute(event, measurements, metadata)
+    Observe.emit_event(event, measurements, metadata)
   end
 
   # Warn when {:stop, ...} is used with normal-looking reasons.

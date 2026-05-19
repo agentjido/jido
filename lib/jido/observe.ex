@@ -91,10 +91,15 @@ defmodule Jido.Observe do
   Metadata should be small, identifying data (IDs, step numbers, model names), not full
   prompts/responses. For large payloads, include derived measurements (`prompt_tokens`,
   `prompt_size_bytes`) rather than the raw content.
+
+  Exception telemetry uses bounded, public error metadata. Raw exceptions and
+  stacktraces are passed to tracer callbacks, but telemetry metadata exposes
+  low-cardinality fields such as `:error_type` and `:retryable?`.
   """
 
   require Logger
 
+  alias Jido.Error
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Observe.Log
   alias Jido.Observe.SpanCtx
@@ -282,6 +287,28 @@ defmodule Jido.Observe do
       when is_list(event_prefix) and is_map(measurements) and is_map(metadata) do
     :telemetry.execute(event_prefix, measurements, enrich_with_correlation(metadata))
     :ok
+  end
+
+  @doc """
+  Builds bounded exception metadata for telemetry events.
+
+  The returned metadata preserves the historical `:kind` and `:error` keys,
+  but `:error` is a public `Jido.Error.to_map/1` payload instead of a raw
+  exception term. Top-level fields stay low-cardinality for metrics and
+  alerting; richer bounded details remain under `:error`.
+
+  Stacktraces are intentionally excluded from telemetry metadata.
+  """
+  @spec exception_metadata(atom(), term()) :: metadata()
+  def exception_metadata(kind, reason) when is_atom(kind) do
+    error = Error.to_map(reason)
+
+    %{
+      kind: kind,
+      error: error,
+      error_type: error.type,
+      retryable?: error.retryable?
+    }
   end
 
   @doc """
@@ -610,11 +637,7 @@ defmodule Jido.Observe do
     start_time = System.monotonic_time(:nanosecond)
     start_system_time = System.system_time(:nanosecond)
 
-    :telemetry.execute(
-      event_prefix ++ [:start],
-      %{system_time: start_system_time},
-      metadata
-    )
+    emit_event(event_prefix ++ [:start], %{system_time: start_system_time}, metadata)
 
     %SpanCtx{
       event_prefix: event_prefix,
@@ -630,30 +653,18 @@ defmodule Jido.Observe do
     duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
     measurements = Map.merge(%{duration: duration}, extra_measurements)
 
-    :telemetry.execute(
-      span_ctx.event_prefix ++ [:stop],
-      measurements,
-      span_ctx.metadata
-    )
+    emit_event(span_ctx.event_prefix ++ [:stop], measurements, span_ctx.metadata)
 
     measurements
   end
 
-  defp emit_exception_event(%SpanCtx{} = span_ctx, kind, reason, stacktrace) do
+  defp emit_exception_event(%SpanCtx{} = span_ctx, kind, reason, _stacktrace) do
     duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
 
     error_metadata =
-      Map.merge(span_ctx.metadata, %{
-        kind: kind,
-        error: reason,
-        stacktrace: stacktrace
-      })
+      Map.merge(span_ctx.metadata, exception_metadata(kind, reason))
 
-    :telemetry.execute(
-      span_ctx.event_prefix ++ [:exception],
-      %{duration: duration},
-      error_metadata
-    )
+    emit_event(span_ctx.event_prefix ++ [:exception], %{duration: duration}, error_metadata)
   end
 
   defp invoke_tracer_callback(

@@ -103,6 +103,24 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       strategy: InspectOptsStrategy
   end
 
+  defmodule RaisingStrategy do
+    @moduledoc false
+    use Jido.Agent.Strategy
+
+    @impl true
+    def cmd(_agent, _instructions, _ctx), do: raise("signal exploded")
+  end
+
+  defmodule RaisingAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "raising_agent",
+      schema: [],
+      strategy: RaisingStrategy
+
+    def signal_routes(_ctx), do: [{"explode", JidoTest.TestActions.IncrementAction}]
+  end
+
   setup context do
     test_pid = self()
 
@@ -185,6 +203,36 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
       assert metadata.directive_count == 1
       assert metadata.directive_types == %{"Emit" => 1}
+
+      GenServer.stop(pid)
+    end
+
+    test "emits bounded public metadata for signal exceptions", %{jido: jido} do
+      {:ok, pid} =
+        AgentServer.start_link(agent: RaisingAgent, id: "telemetry-signal-error", jido: jido)
+
+      signal = Signal.new!("explode", %{}, source: "/test")
+
+      capture_log(fn ->
+        assert {:error, %RuntimeError{message: "signal exploded"}} = AgentServer.call(pid, signal)
+      end)
+
+      assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :start], _, _}
+
+      assert_receive {:telemetry_event, [:jido, :agent_server, :signal, :exception], measurements,
+                      metadata}
+
+      assert is_integer(measurements.duration)
+      assert metadata.agent_id == "telemetry-signal-error"
+      assert metadata.signal_type == "explode"
+      assert metadata.kind == :error
+
+      assert %{type: :internal, message: "signal exploded", details: %{}, retryable?: true} =
+               metadata.error
+
+      assert metadata.error_type == :internal
+      assert metadata.retryable? == true
+      refute Map.has_key?(metadata, :stacktrace)
 
       GenServer.stop(pid)
     end

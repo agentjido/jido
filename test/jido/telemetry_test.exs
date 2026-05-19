@@ -119,7 +119,13 @@ defmodule JidoTest.TelemetryTest do
       assert_receive {:telemetry_event, [:jido, :agent, :cmd, :exception], measurements, metadata}
       assert is_integer(measurements.duration)
       assert metadata.kind == :error
-      assert %RuntimeError{message: "test error"} = metadata.error
+
+      assert %{type: :internal, message: "test error", details: %{}, retryable?: true} =
+               metadata.error
+
+      assert metadata.error_type == :internal
+      assert metadata.retryable? == true
+      refute Map.has_key?(metadata, :stacktrace)
     end
   end
 
@@ -218,7 +224,13 @@ defmodule JidoTest.TelemetryTest do
 
       assert is_integer(measurements.duration)
       assert metadata.kind == :error
-      assert %RuntimeError{message: "strategy error"} = metadata.error
+
+      assert %{type: :internal, message: "strategy error", details: %{}, retryable?: true} =
+               metadata.error
+
+      assert metadata.error_type == :internal
+      assert metadata.retryable? == true
+      refute Map.has_key?(metadata, :stacktrace)
     end
 
     test "handles non-tuple result gracefully" do
