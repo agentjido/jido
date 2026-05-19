@@ -4,9 +4,15 @@
 
 **After:** You can implement an Action module that transforms state and returns directives.
 
+Jido keeps agent decision logic pure. Actions may be pure or effectful.
+Directives are for effects you want the runtime to own.
+
 ## The Complete Picture
 
-An action receives validated params and context, then returns state updates and optional directives. Actions may perform side effects (API calls, file I/O, database queries):
+An action receives validated params and context, then returns state updates and
+optional directives. Actions may perform side effects such as API calls, file
+I/O, or database queries when they need the result to continue reasoning or
+update state:
 
 ```elixir
 defmodule MyApp.Actions.CreateOrder do
@@ -72,6 +78,19 @@ end
 |-----|-------|
 | `:state` | Current agent state as a map |
 | `:agent` | The agent struct (when running via `emit_to_parent`) |
+
+## Effect Boundary
+
+Use this rule when deciding between action code and a directive:
+
+- If the step needs a result back now to continue reasoning or update state, keep
+  the work in the action.
+- If the workflow has already decided on an outbound effect and wants the
+  runtime or integration layer to own delivery, return a directive.
+
+For example, an action can call an API and use the response to update state. If
+the action only needs to announce that an order was created, return an
+`%Jido.Agent.Directive.Emit{}` and let the runtime dispatch the signal.
 
 ## Return Shapes
 

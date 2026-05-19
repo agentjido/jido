@@ -4,7 +4,12 @@
 
 **After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
 
-Agents are immutable data structures that hold state and respond to actions. The core operation is `cmd/2` (or `cmd/3` with options), which processes actions and returns an updated agent plus directives for external effects.
+Agents are immutable data structures that hold state and respond to actions. The
+core operation is `cmd/2` (or `cmd/3` with options), which processes actions and
+returns an updated agent plus any runtime-owned directives.
+
+Jido keeps agent decision logic pure. Actions may be pure or effectful.
+Directives are for effects you want the runtime to own.
 
 ## Defining an Agent
 
@@ -41,8 +46,13 @@ The fundamental operation:
 **Key invariants:**
 
 - The returned `agent` is always complete—no "apply directives" step needed
-- `directives` describe external effects only—they never modify agent state
-- `cmd/2` and `cmd/3` are pure functions—given same inputs, always same outputs
+- `directives` describe runtime-owned external effects only—they never modify
+  agent state
+- Agent decision logic stays explicit and testable
+
+Use an effectful action when the current step needs a result back now to continue
+reasoning or update state. Use a directive when the workflow has already decided
+on an outbound effect and wants the runtime or integration layer to own delivery.
 
 **Action formats:**
 

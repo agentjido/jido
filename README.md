@@ -25,6 +25,10 @@ Jido helps you build agent systems as ordinary Elixir and OTP software.
 - Signals route events into the system
 - Directives describe effects for the runtime to execute
 
+The purity boundary is the agent's decision logic: Jido keeps agent decisions and
+state transitions explicit, actions may be pure or effectful, and directives are
+for effects you want the runtime to own.
+
 Use Jido when software needs to inspect context, choose among multiple steps,
 coordinate with other agents, and keep running reliably over time.
 
@@ -46,7 +50,10 @@ end
 {agent, directives} = MyAgent.cmd(agent, action)
 ```
 
-State changes are pure data transformations; side effects are described as directives and executed by an OTP runtime. You get deterministic agent logic, testability without processes, and a clear path to running those agents in production.
+State changes are explicit data transformations. If an action needs a result
+back immediately to continue reasoning or update state, it may perform that work
+itself. If the workflow has already decided on an outbound effect and wants the
+runtime or integration layer to own delivery, return a directive.
 <!-- package.jido.pure_cmd package.jido.runtime_separation -->
 
 ## The Jido Ecosystem
@@ -80,12 +87,13 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ## Key Features
 
 ### Immutable Agent Architecture
-- Pure functional agent design inspired by Elm/Redux
+- Functional agent state model inspired by Elm/Redux
 - `cmd/2` as the core operation: actions in, updated agent + directives out
 - Schema-validated state with NimbleOptions or Zoi
 
 ### Directive-Based Effects
-- Actions transform state; directives describe external effects
+- Actions transform state and may perform required work
+- Directives describe runtime-owned external effects
 - Built-in directives: Emit, Spawn, SpawnAgent, StopChild, Schedule, Stop
 - Protocol-based extensibility for custom directives
 
@@ -248,14 +256,23 @@ The fundamental operation in Jido:
 
 Key invariants:
 - The returned `agent` is always complete - no "apply directives" step needed
-- `directives` describe external effects only - they never modify agent state
-- `cmd/2` is a pure function - same inputs always produce same outputs
+- `directives` describe runtime-owned external effects only - they never modify
+  agent state
+- Agent decision logic stays explicit and testable; deterministic actions produce
+  deterministic `cmd/2` results
+
+Use this rule of thumb for side effects:
+
+- If the step needs a result back now to continue reasoning or update state, an
+  effectful action is acceptable.
+- If the workflow has already decided on an outbound effect and wants the
+  runtime or integration layer to own delivery, return a directive.
 
 ### Actions vs Directives vs State Operations
 
 | Actions                                    | Directives                            | State Operations                |
 | ------------------------------------------ | ------------------------------------- | ------------------------------- |
-| Transform state, may perform side effects  | Describe external effects             | Describe internal state changes |
+| Transform state, may perform side effects  | Describe runtime-owned effects        | Describe internal state changes |
 | Executed by `cmd/2`, update `agent.state`  | Bare structs emitted by agents        | Applied by strategy layer       |
 | Can call APIs, read files, query databases | Runtime (AgentServer) interprets them | Never leave the strategy        |
 
@@ -317,9 +334,9 @@ State operations are internal state transitions handled by the strategy layer du
 
 A: Jido is an **autonomous agent framework for Elixir, built for workflows and multi-agent systems**. Key differentiators:
 - **OTP-native architecture**: Built on GenServer with supervision and fault tolerance built in
-- **Immutable agents**: Pure functional agent design inspired by Elm/Redux
+- **Immutable agents**: Functional state model inspired by Elm/Redux
 - **AI optional**: Core package provides agent architecture without requiring AI/LLM
-- **Directive-based effects**: Actions transform state; directives describe external effects
+- **Explicit effect boundaries**: actions may own immediate work; directives describe runtime-owned effects
 
 Compared to LangChain/CrewAI:
 - **LangChain**: Chain-based orchestration, Python-first
@@ -334,7 +351,10 @@ A:
 - **Signals**: CloudEvents-compliant messages routed into the system
 - **Directives**: Bare structs that describe effects for the runtime to execute
 
-`cmd/2` returns the updated agent plus directives. Directives never mutate agent state; the OTP runtime interprets them for external effects. Actions may still perform work such as API calls, file I/O, or database queries when that belongs in the action boundary.
+`cmd/2` returns the updated agent plus directives. Directives never mutate agent
+state; the OTP runtime interprets them for runtime-owned external effects.
+Actions may still perform work such as API calls, file I/O, or database queries
+when that result is needed immediately by the action or state transition.
 
 **Q: Is AI required for Jido?**
 

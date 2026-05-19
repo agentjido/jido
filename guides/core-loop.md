@@ -8,9 +8,12 @@ for Elixir built for workflows and multi-agent systems.
 Jido combines immutable agents, actions, signals, directives, and an OTP
 runtime so you can build agent systems as ordinary Elixir software.
 
+The core boundary is: Jido keeps agent decision logic pure. Actions may be pure
+or effectful. Directives are for effects you want the runtime to own.
+
 ## The Elm/Redux Pattern
 
-Jido agents follow a pure functional architecture:
+Jido agents follow a functional state architecture:
 
 ```elixir
 {agent, directives} = MyAgent.cmd(agent, action)
@@ -19,9 +22,10 @@ Jido agents follow a pure functional architecture:
 **Key principles:**
 
 1. **Agents are immutable structs** — `cmd/2` never mutates; it returns a new agent
-2. **State changes and effects are separated** — the returned agent has updated state; directives describe effects
+2. **State changes are explicit** — the returned agent has updated state
 3. **Directives are not executed by agents** — the runtime (AgentServer) interprets them
-4. **Same inputs → same outputs** — `cmd/2` is deterministic and testable
+4. **Actions own immediate work** — an action may perform I/O when it needs the result to update state
+5. **Runtime-owned effects are directives** — emit, spawn, schedule, and stop decisions leave `cmd/2` as data
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -39,8 +43,8 @@ Jido agents follow a pure functional architecture:
                                 │
                                 ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Agent.cmd/2 (pure function)                                    │
-│  ───────────────────────────                                    │
+│  Agent.cmd/2 (agent decision boundary)                          │
+│  ─────────────────────────────────────                          │
 │  Input:  agent struct + action                                  │
 │  Output: {updated_agent, directives}                            │
 └─────────────────────────────────────────────────────────────────┘
@@ -50,7 +54,7 @@ Jido agents follow a pure functional architecture:
 
 | Concept | What It Is | Responsibility |
 |---------|------------|----------------|
-| **Agent** | Immutable struct + module | Defines schema, handles `cmd/2`, pure logic |
+| **Agent** | Immutable struct + module | Defines schema, handles `cmd/2`, pure decision logic |
 | **AgentServer** | GenServer process | Holds agent state, executes directives, routes signals |
 
 ```elixir
@@ -94,12 +98,24 @@ This enables:
 
 | Term | Definition |
 |------|------------|
-| **Agent** | Immutable struct with state and schema. Defines `cmd/2` for pure transformations. |
+| **Agent** | Immutable struct with state and schema. Defines `cmd/2` for explicit state transitions. |
 | **Action** | Function that transforms agent state (may perform side effects). Defined in [jido_action](https://hexdocs.pm/jido_action). |
 | **Directive** | Effect description for runtime execution (Emit, Spawn, Schedule, etc.). Never modifies state. |
 | **Plugin** | Composable capability module bundling actions, state, and routing rules. |
 | **Strategy** | Execution pattern (Direct, FSM, custom) that controls how actions are processed. |
 | **Signal** | CloudEvents-compliant message. Defined in [jido_signal](https://hexdocs.pm/jido_signal). |
+
+## Action Or Directive?
+
+Use an effectful action when the current step needs a result back now to continue
+reasoning or update state. Use a directive when the workflow has already decided
+on an outbound effect and wants the runtime or integration layer to own delivery.
+
+Examples:
+
+- Reading a file so the action can parse it and update state can live in the action.
+- Dispatching a domain event, spawning a child, scheduling future work, or
+  stopping an agent should be returned as a directive.
 
 ## The Core Flow
 
@@ -127,7 +143,8 @@ assert match?([%Directive.Emit{}], directives)
 
 **Composability**: Directives are data — inspect, transform, filter, or mock them.
 
-**Separation of concerns**: Pure logic (Agent) vs. effectful runtime (AgentServer).
+**Separation of concerns**: Pure agent decisions, explicit action work, and
+runtime-owned directive execution.
 
 ## Further Reading
 

@@ -2,11 +2,17 @@
 
 <!-- covers: jido.signals_and_directives.directive_effect_boundary jido.signals_and_directives.scheduling_support -->
 
-**After:** You can emit directives from actions to perform effects without polluting pure logic.
+**After:** You can emit directives from actions when an effect should be owned by the runtime.
 
-Directives are **pure descriptions of external effects**. Agents emit them from `cmd/2` callbacks; the runtime (`AgentServer`) executes them.
+Directives are **pure descriptions of runtime-owned external effects**. Agents
+emit them from `cmd/2` callbacks; the runtime (`AgentServer`) executes them.
 
 **Key principle**: Directives never mutate state directly; state changes happen through `cmd/2` return values (including `result_action` callbacks used by `RunInstruction`).
+
+Directives are not the only place side effects can happen. Jido keeps agent
+decision logic pure; actions may be pure or effectful. Use a directive when the
+workflow has already decided on an outbound effect and wants the runtime or
+integration layer to own delivery.
 
 ## Directives vs State Operations
 
@@ -14,7 +20,7 @@ Jido separates two distinct concerns:
 
 | Concept | Module | Purpose | Handled By |
 |---------|--------|---------|------------|
-| **Directives** | `Jido.Agent.Directive` | External effects (emit signals, spawn processes) | Runtime (AgentServer) |
+| **Directives** | `Jido.Agent.Directive` | Runtime-owned effects (emit signals, spawn processes) | Runtime (AgentServer) |
 | **State Operations** | `Jido.Agent.StateOp` | Internal state transitions (set, replace, delete) | Strategy layer |
 
 State operations are applied during `cmd/2` and never leave the strategy layer. Directives are passed through to the runtime for execution. See the [State Operations guide](state-ops.md) for details on `SetState`, `SetPath`, and other state ops.
@@ -93,9 +99,10 @@ Non-persistent lifecycles keep cron state runtime-only.
 
 ## RunInstruction
 
-`RunInstruction` is used by strategies that keep `cmd/2` pure. Instead of calling
-`Jido.Exec.run/1` inline, the strategy emits `%Directive.RunInstruction{}` and the
-runtime executes it, then routes the result back through `cmd/2` using `result_action`.
+`RunInstruction` is used by strategies that want runtime-owned instruction
+execution. Instead of calling `Jido.Exec.run/1` inline, the strategy emits
+`%Directive.RunInstruction{}` and the runtime executes it, then routes the result
+back through `cmd/2` using `result_action`.
 
 ## Spawn vs SpawnAgent
 

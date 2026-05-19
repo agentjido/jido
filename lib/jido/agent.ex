@@ -1,7 +1,7 @@
 defmodule Jido.Agent do
   @moduledoc """
   An Agent is an immutable data structure that holds state and can be updated
-  via commands. This module provides a minimal, purely functional API:
+  via commands. This module provides a minimal, data-first API:
 
   - `new/1` - Create a new agent
   - `set/2` - Update state directly
@@ -18,8 +18,14 @@ defmodule Jido.Agent do
 
   Key invariants:
   - The returned `agent` is **always complete** — no "apply directives" step needed
-  - `directives` are **external effects only** — they never modify agent state
-  - `cmd/2` is a **pure function** — given same inputs, always same outputs
+  - `directives` are **runtime-owned external effects only** — they never modify agent state
+  - Agent decision logic stays explicit and testable
+
+  Jido keeps agent decision logic pure. Actions may be pure or effectful.
+  Directives are for effects you want the runtime to own. If a step needs a
+  result back now to continue reasoning or update state, an effectful action is
+  acceptable; if delivery should belong to the runtime or an integration layer,
+  return a directive.
 
   ## Action Formats
 
@@ -253,7 +259,7 @@ defmodule Jido.Agent do
   # Action input types
   @type action :: module() | {module(), map()} | Instruction.t() | [action()]
 
-  # Directive types (external effects only - never modify agent state)
+  # Directive types (runtime-owned external effects only - never modify agent state)
   # See Jido.Agent.Directive for structured payload modules
   @type directive :: Directive.t()
 
@@ -842,9 +848,10 @@ defmodule Jido.Agent do
   def __quoted_cmd_function__ do
     quote location: :keep do
       @doc """
-      Execute actions against the agent. Pure: `(agent, action) -> {agent, directives}`
+      Execute actions against the agent: `(agent, action) -> {agent, directives}`
 
-      This is the core operation. Actions modify state, directives are external effects.
+      This is the core operation. Actions modify state and may perform required
+      work; directives are runtime-owned external effects.
       Execution is delegated to the configured strategy (default: Direct).
 
       ## Action Formats
