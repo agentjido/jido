@@ -267,8 +267,12 @@ defmodule JidoTest.ErrorTest do
         Error.execution_error("Failed",
           details: %{
             token: "secret-token",
+            secretToken: "secret-token",
+            privateKey: "private-key",
+            accessToken: "access-token",
             authorization: "Bearer secret-token",
             stacktrace: [{__MODULE__, :test, 0, []}],
+            stackTrace: [{__MODULE__, :test, 0, []}],
             message: long_value,
             labels: Enum.map(1..30, &"label-#{&1}"),
             nested: %{password: "secret-password", value: :ok},
@@ -279,8 +283,12 @@ defmodule JidoTest.ErrorTest do
       result = Error.to_map(error)
 
       assert result.details.token == "[REDACTED]"
+      assert result.details.secretToken == "[REDACTED]"
+      assert result.details.privateKey == "[REDACTED]"
+      assert result.details.accessToken == "[REDACTED]"
       assert result.details.authorization == "[REDACTED]"
       assert result.details.stacktrace == "[OMITTED]"
+      assert result.details.stackTrace == "[OMITTED]"
       assert result.details.message =~ "(truncated)"
       assert length(result.details.labels) == 20
       refute "label-21" in result.details.labels
