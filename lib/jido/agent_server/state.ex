@@ -151,9 +151,9 @@ defmodule Jido.AgentServer.State do
       Jido.Scheduler.classify_cron_specs(staged_cron_specs)
 
     Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
-      Logger.error(
+      Logger.error(fn ->
         "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      )
+      end)
     end)
 
     lifecycle_opts = [

@@ -29,7 +29,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
       :stop_on_error ->
         log_error(error, context, state)
-        Logger.error("Agent #{state.id} stopping due to error policy")
+        Logger.error(fn -> "Agent #{state.id} stopping due to error policy" end)
         {:stop, {:agent_error, error}, state}
 
       {:emit_signal, dispatch_cfg} ->
@@ -50,9 +50,11 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
   defp log_error(error, context, state) do
     message = extract_message(error)
-    context_str = if context, do: " [#{context}]", else: ""
 
-    Logger.error("Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}")
+    Logger.error(fn ->
+      context_str = if context, do: " [#{inspect(context)}]", else: ""
+      "Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}"
+    end)
   end
 
   defp extract_message(%{message: message}) when is_binary(message), do: message
@@ -80,7 +82,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
         SignalDispatch.dispatch(signal, dispatch_cfg)
       end)
     else
-      Logger.warning("Jido.Signal.Dispatch not available, skipping error signal emit")
+      Logger.warning(fn -> "Jido.Signal.Dispatch not available, skipping error signal emit" end)
     end
   end
 
@@ -102,12 +104,12 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
     if count >= max do
       log_error(error, context, state)
-      Logger.error("Agent #{state.id} exceeded max errors (#{count}/#{max}), stopping")
+      Logger.error(fn -> "Agent #{state.id} exceeded max errors (#{count}/#{max}), stopping" end)
       {:stop, {:max_errors_exceeded, count}, state}
     else
-      Logger.warning(
+      Logger.warning(fn ->
         "Agent #{state.id} error #{count}/#{max}: #{extract_message(error)}#{details_suffix(error)}"
-      )
+      end)
 
       {:ok, state}
     end
@@ -125,16 +127,19 @@ defmodule Jido.AgentServer.ErrorPolicy do
           {:stop, reason, new_state}
 
         other ->
-          Logger.error("Custom error policy returned invalid result: #{inspect(other)}")
+          Logger.error(fn ->
+            "Custom error policy returned invalid result: #{inspect(other)}"
+          end)
+
           {:ok, state}
       end
     rescue
       e ->
-        Logger.error("Custom error policy crashed: #{Exception.message(e)}")
+        Logger.error(fn -> "Custom error policy crashed: #{Exception.message(e)}" end)
         {:ok, state}
     catch
       kind, reason ->
-        Logger.error("Custom error policy failed: #{kind} - #{inspect(reason)}")
+        Logger.error(fn -> "Custom error policy failed: #{kind} - #{inspect(reason)}" end)
         {:ok, state}
     end
   end

@@ -200,11 +200,11 @@ defmodule Jido.Scheduler.Job do
       :ok
     rescue
       error ->
-        Logger.error("Scheduler callback raised: #{Exception.message(error)}")
+        Logger.error(fn -> "Scheduler callback raised: #{Exception.message(error)}" end)
         :ok
     catch
       kind, reason ->
-        Logger.error("Scheduler callback #{kind}: #{inspect(reason)}")
+        Logger.error(fn -> "Scheduler callback #{kind}: #{inspect(reason)}" end)
         :ok
     end
   end
@@ -234,9 +234,10 @@ defmodule Jido.Scheduler.Job do
   @spec enter_retry(state(), term()) :: state()
   defp enter_retry(state, reason) do
     if not state.retrying? do
-      Logger.warning(
-        "Scheduler job entering retry mode for #{inspect(state.cron_expr)} after schedule failure: #{inspect(reason)}"
-      )
+      Logger.warning(fn ->
+        "Scheduler job entering retry mode for #{inspect(state.cron_expr)} " <>
+          "after schedule failure: #{inspect(reason)}"
+      end)
     end
 
     timer_ref = Process.send_after(self(), @retry_schedule, @retry_delay_ms)
@@ -246,7 +247,9 @@ defmodule Jido.Scheduler.Job do
   @spec clear_retry(state(), reference()) :: state()
   defp clear_retry(state, timer_ref) do
     if state.retrying? do
-      Logger.info("Scheduler job recovered schedule resolution for #{inspect(state.cron_expr)}")
+      Logger.debug(fn ->
+        "Scheduler job recovered schedule resolution for #{inspect(state.cron_expr)}"
+      end)
     end
 
     %{state | timer_ref: timer_ref, retrying?: false}

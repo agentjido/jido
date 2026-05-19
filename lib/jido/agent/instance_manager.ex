@@ -380,16 +380,16 @@ defmodule Jido.Agent.InstanceManager do
 
     case Persist.thaw(storage, agent_module, persistence_key) do
       {:ok, agent} ->
-        Logger.debug("InstanceManager thawed agent for key #{inspect(key)}")
+        Logger.debug(fn -> "InstanceManager thawed agent for key #{inspect(key)}" end)
         agent
 
       {:error, :not_found} ->
         nil
 
       {:error, reason} ->
-        Logger.warning(
+        Logger.warning(fn ->
           "InstanceManager failed to thaw agent for key #{inspect(key)}: #{inspect(reason)}"
-        )
+        end)
 
         nil
     end
