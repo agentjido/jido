@@ -294,18 +294,41 @@ defmodule JidoTest.Pod.TelemetryTest do
                     %{node_name: :planner, source: :started}}
 
     assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :exception], %{duration: _},
-                    %{pod_module: RecursiveReviewPod, node_name: :nested, error: inner_error}}
+                    %{
+                      pod_module: RecursiveReviewPod,
+                      node_name: :nested,
+                      error: inner_error
+                    } = metadata}
 
-    assert inspect(inner_error) =~ "Recursive pod runtime is not supported"
+    assert inner_error.type == :validation_error
+    assert inner_error.message =~ "Recursive pod runtime is not supported"
+    assert metadata.retryable? == false
+    refute Map.has_key?(metadata, :stacktrace)
 
     assert_receive {:telemetry_event, [:jido, :pod, :node, :ensure, :exception], %{duration: _},
-                    %{pod_module: BrokenReviewPod, node_name: :nested, error: error}}
+                    %{
+                      pod_module: BrokenReviewPod,
+                      node_name: :nested,
+                      error_type: :internal,
+                      error: error
+                    } = metadata}
 
-    assert error.stage == :nested_reconcile
-    assert inspect(error.reason) =~ "Recursive pod runtime is not supported"
+    assert error.message =~ "nested_reconcile"
+    assert error.message =~ "Recursive pod runtime is not supported"
+    assert metadata.retryable? == true
+    refute Map.has_key?(metadata, :stacktrace)
 
     assert_receive {:telemetry_event, [:jido, :pod, :reconcile, :exception], %{duration: _},
-                    %{pod_id: ^pod_key, pod_module: BrokenReviewPod, error: ^report}}
+                    %{
+                      pod_id: ^pod_key,
+                      pod_module: BrokenReviewPod,
+                      error_type: :internal,
+                      error: reconcile_error
+                    } = metadata}
+
+    assert reconcile_error.message =~ "nested"
+    assert metadata.retryable? == true
+    refute Map.has_key?(metadata, :stacktrace)
 
     assert report.completed == [:planner]
     assert report.failed == [:nested]

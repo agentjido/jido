@@ -83,6 +83,7 @@ defmodule Jido.Telemetry do
 
   require Logger
 
+  alias Jido.Observe
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Telemetry.Formatter
 
@@ -695,7 +696,7 @@ defmodule Jido.Telemetry do
       jido_partition: nil
     }
 
-    :telemetry.execute(
+    Observe.emit_event(
       [:jido, :agent, :cmd, :start],
       %{system_time: System.system_time()},
       metadata
@@ -704,7 +705,7 @@ defmodule Jido.Telemetry do
     try do
       {updated_agent, directives} = func.()
 
-      :telemetry.execute(
+      Observe.emit_event(
         [:jido, :agent, :cmd, :stop],
         %{
           duration: System.monotonic_time() - start_time,
@@ -718,10 +719,10 @@ defmodule Jido.Telemetry do
       kind, reason ->
         stack = __STACKTRACE__
 
-        :telemetry.execute(
+        Observe.emit_event(
           [:jido, :agent, :cmd, :exception],
           %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason, stacktrace: stack})
+          Map.merge(metadata, Observe.exception_metadata(kind, reason))
         )
 
         :erlang.raise(kind, reason, stack)
@@ -751,7 +752,7 @@ defmodule Jido.Telemetry do
       jido_partition: nil
     }
 
-    :telemetry.execute(
+    Observe.emit_event(
       [:jido, :agent, :strategy, operation, :start],
       %{system_time: System.system_time()},
       metadata
@@ -771,7 +772,7 @@ defmodule Jido.Telemetry do
             metadata
         end
 
-      :telemetry.execute(
+      Observe.emit_event(
         [:jido, :agent, :strategy, operation, :stop],
         measurements,
         final_metadata
@@ -782,10 +783,10 @@ defmodule Jido.Telemetry do
       kind, reason ->
         stack = __STACKTRACE__
 
-        :telemetry.execute(
+        Observe.emit_event(
           [:jido, :agent, :strategy, operation, :exception],
           %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, %{kind: kind, error: reason, stacktrace: stack})
+          Map.merge(metadata, Observe.exception_metadata(kind, reason))
         )
 
         :erlang.raise(kind, reason, stack)

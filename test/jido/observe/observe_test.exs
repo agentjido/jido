@@ -111,8 +111,13 @@ defmodule JidoTest.ObserveTest do
       assert duration >= 0
       assert metadata.error_test == true
       assert metadata.kind == :error
-      assert %RuntimeError{message: "test error"} = metadata.error
-      assert is_list(metadata.stacktrace)
+
+      assert %{type: :internal, message: "test error", details: %{}, retryable?: true} =
+               metadata.error
+
+      assert metadata.error_type == :internal
+      assert metadata.retryable? == true
+      refute Map.has_key?(metadata, :stacktrace)
     end
 
     test "emits :exception event on throw and re-throws" do
@@ -129,7 +134,11 @@ defmodule JidoTest.ObserveTest do
                       metadata}
 
       assert metadata.kind == :throw
-      assert metadata.error == :my_throw
+
+      assert %{type: :internal, message: ":my_throw", details: %{}, retryable?: true} =
+               metadata.error
+
+      refute Map.has_key?(metadata, :stacktrace)
     end
 
     test "emits :exception event on exit and re-exits" do
@@ -145,7 +154,11 @@ defmodule JidoTest.ObserveTest do
                       metadata}
 
       assert metadata.kind == :exit
-      assert metadata.error == :my_exit
+
+      assert %{type: :internal, message: ":my_exit", details: %{}, retryable?: true} =
+               metadata.error
+
+      refute Map.has_key?(metadata, :stacktrace)
     end
 
     test "passes metadata to all events" do
@@ -292,10 +305,15 @@ defmodule JidoTest.ObserveTest do
                       _}
     end
 
-    test "includes kind, error, stacktrace in metadata" do
+    test "includes bounded public error metadata without stacktrace" do
       span_ctx = Observe.start_span([:jido, :test, :error_span], %{original: "meta"})
 
-      error = %ArgumentError{message: "invalid argument"}
+      error =
+        Jido.Error.validation_error("invalid argument",
+          field: :password,
+          details: %{password: "secret", stacktrace: ["raw frame"]}
+        )
+
       stacktrace = [{__MODULE__, :some_fun, 2, [file: ~c"test.ex", line: 42]}]
 
       Observe.finish_span_error(span_ctx, :error, error, stacktrace)
@@ -305,8 +323,14 @@ defmodule JidoTest.ObserveTest do
 
       assert metadata.original == "meta"
       assert metadata.kind == :error
-      assert metadata.error == error
-      assert metadata.stacktrace == stacktrace
+      assert metadata.error_type == :validation_error
+      assert metadata.error.message == "invalid argument"
+      assert metadata.error.details.password == "[REDACTED]"
+      assert metadata.error.details.stacktrace == "[OMITTED]"
+      assert metadata.error.details.kind == :input
+      assert metadata.error.details.subject == :password
+      assert metadata.retryable? == false
+      refute Map.has_key?(metadata, :stacktrace)
     end
 
     test "supports different error kinds" do
