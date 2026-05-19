@@ -52,7 +52,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
     message = extract_message(error)
 
     Logger.error(fn ->
-      context_str = if context, do: " [#{inspect(context)}]", else: ""
+      context_str = if context, do: " [#{context}]", else: ""
       "Agent #{state.id}#{context_str}: #{message}#{details_suffix(error)}"
     end)
   end

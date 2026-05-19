@@ -247,7 +247,7 @@ defmodule Jido.Scheduler.Job do
   @spec clear_retry(state(), reference()) :: state()
   defp clear_retry(state, timer_ref) do
     if state.retrying? do
-      Logger.debug(fn ->
+      Logger.info(fn ->
         "Scheduler job recovered schedule resolution for #{inspect(state.cron_expr)}"
       end)
     end
