@@ -35,8 +35,14 @@ defmodule Jido do
       {agent, directives} = MyAgent.cmd(agent, MyAction)
 
   - **Agents** — Immutable structs updated via commands
-  - **Actions** — Functions that transform agent state (may perform side effects)
-  - **Directives** — Descriptions of external effects (signals, processes, etc.)
+  - **Actions** — Functions that transform agent state and may perform work
+  - **Directives** — Runtime-owned external effects (signals, processes, etc.)
+
+  Jido keeps agent decision logic pure. Actions may be pure or effectful.
+  Directives are for effects you want the runtime to own. If a step needs a
+  result back now to continue reasoning or update state, an effectful action is
+  acceptable; if delivery should belong to the runtime or an integration layer,
+  return a directive.
 
   ## For Tests
 

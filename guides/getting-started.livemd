@@ -72,7 +72,8 @@ end
 
 ## Step 3: Use cmd/2 for State Transformations
 
-The core pattern in Jido is `cmd/2` - a pure function that takes an agent and an action, returning the updated agent and any directives:
+The core pattern in Jido is `cmd/2`: pass an agent and an action, then receive
+the updated agent and any directives for runtime-owned effects:
 
 ```elixir
 {agent, directives} = MyAgent.cmd(agent, action)
@@ -111,9 +112,9 @@ IO.inspect(agent.state, label: "After increment by 1")
 ```
 
 Key points:
-- `cmd/2` is **pure** - same inputs always produce same outputs
 - The returned agent is fully updated
-- Directives describe side effects but don't modify state
+- Actions may be pure or effectful when they need a result back now
+- Directives describe runtime-owned effects and never modify state
 
 ## Step 4: Handle Signals with AgentServer
 

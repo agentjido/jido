@@ -470,16 +470,17 @@ V2 emits telemetry events for observability:
 
 ## Common Migration Patterns
 
-### Pattern 1: Gradual Directive Adoption
+### Pattern 1: Gradual Runtime-Owned Effect Adoption
 
-You don't need to convert all side effects at once. Start with the most critical paths:
+You don't need to move every side effect behind a directive. Start with effects
+the runtime should own, such as signal dispatch, scheduling, and spawned work:
 
 ```elixir
 def cmd(agent, signal) do
-  # New code uses directives
+  # New code returns runtime-owned effects as directives
   result = process(signal)
   
-  # Legacy code still works (but should be migrated)
+  # Immediate work can still happen at the action/command boundary
   LegacyNotifier.notify(result)
   
   {%{agent | state: result}, [
