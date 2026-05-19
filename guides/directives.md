@@ -43,6 +43,8 @@ end
 | `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals, `restart: :transient` default) |
 | `AdoptChild` | Attach an orphaned or unattached child to the current parent | Full (monitoring, parent ref refresh, children map update) |
 | `StopChild` | Gracefully stop and remove a tracked child agent | Uses children map |
+| `StartSensor` | Start or replace a tagged sensor runtime | Tracked under `{:sensor, tag}` |
+| `StopSensor` | Stop a tagged sensor runtime | Uses sensor tag |
 | `Schedule` | Schedule a delayed message | — |
 | `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
 | `Stop` | Stop the agent process (self) | — |
@@ -70,6 +72,10 @@ Directive.adopt_child(child_pid, :recovered_worker, meta: %{restored: true})
 
 # Stop processes
 Directive.stop_child(:worker_1)
+Directive.start_sensor(:market_data, MyApp.MarketDataSensor,
+  config: %{symbol: "AAPL", interval: 1000}
+)
+Directive.stop_sensor(:market_data)
 Directive.stop()
 Directive.stop(:shutdown)
 

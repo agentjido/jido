@@ -402,8 +402,8 @@ defmodule Jido.Plugin do
   Returns a list of sensors to be started for this plugin.
 
   Called during `AgentServer.init/1` to start and monitor
-  plugin-specific sensors. These sensors are automatically linked to
-  the agent and can emit signals back to it.
+  plugin-specific sensors. These sensors are managed and monitored by the
+  agent runtime and can emit signals back to it.
 
   ## Parameters
 
@@ -417,8 +417,9 @@ defmodule Jido.Plugin do
 
   ## Returns
 
-  List of `{sensor_module, sensor_opts}` tuples. Each sensor will be
-  started under a `Jido.Sensor.Runtime`.
+  List of `{sensor_module, sensor_opts}` tuples or `{tag, sensor_module, sensor_opts}`
+  tuples. Each sensor will be started under a `Jido.Sensor.Runtime`. Use the
+  tagged form when a plugin starts multiple instances of the same sensor module.
 
   ## Example
 
@@ -429,8 +430,11 @@ defmodule Jido.Plugin do
         ]
       end
   """
+  @type sensor_subscription ::
+          {module(), keyword() | map()} | {term(), module(), keyword() | map()}
+
   @callback subscriptions(config :: map(), context :: map()) ::
-              [{module(), keyword() | map()}]
+              [sensor_subscription()]
 
   @doc """
   Called during checkpoint to determine how this plugin's state should be persisted.
@@ -737,7 +741,7 @@ defmodule Jido.Plugin do
       def child_spec(_config), do: nil
 
       @doc false
-      @spec subscriptions(map(), map()) :: [{module(), keyword() | map()}]
+      @spec subscriptions(map(), map()) :: [Jido.Plugin.sensor_subscription()]
       @impl Jido.Plugin
       def subscriptions(_config, _context), do: subscriptions()
 

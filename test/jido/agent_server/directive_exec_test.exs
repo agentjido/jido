@@ -14,6 +14,42 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       ]
   end
 
+  defmodule LifecycleSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_lifecycle_sensor",
+      description: "Sensor used to test StartSensor and StopSensor directives",
+      schema:
+        Zoi.object(
+          %{
+            label: Zoi.string() |> Zoi.default("default")
+          },
+          coerce: true
+        )
+
+    @impl Jido.Sensor
+    def init(config, context) do
+      {:ok, %{config: config, context: context}}
+    end
+
+    @impl Jido.Sensor
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule FailingLifecycleSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_failing_lifecycle_sensor",
+      description: "Sensor that fails during init",
+      schema: Zoi.object(%{}, coerce: true)
+
+    @impl Jido.Sensor
+    def init(_config, _context), do: {:error, :init_failed}
+
+    @impl Jido.Sensor
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
   defmodule StopOnSignalAction do
     @moduledoc false
     use Jido.Action,
@@ -599,6 +635,114 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
     test "returns ok when child tag not found", %{state: state, input_signal: input_signal} do
       directive = %Directive.StopChild{tag: :nonexistent_child, reason: :normal}
+
+      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+    end
+  end
+
+  describe "StartSensor and StopSensor directives" do
+    test "starts a tagged sensor runtime", %{state: state, input_signal: input_signal} do
+      directive =
+        Directive.start_sensor(:market_data, LifecycleSensor,
+          config: %{label: "prices"},
+          meta: %{purpose: :quotes}
+        )
+
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+
+      key = {:sensor, :market_data}
+      assert Map.has_key?(new_state.children, key)
+
+      child_info = new_state.children[key]
+      assert child_info.module == LifecycleSensor
+      assert child_info.tag == key
+      assert child_info.meta.kind == :sensor
+      assert child_info.meta.sensor == LifecycleSensor
+      assert child_info.meta.sensor_tag == :market_data
+      assert child_info.meta.purpose == :quotes
+      assert Process.alive?(child_info.pid)
+
+      runtime_state = :sys.get_state(child_info.pid)
+      assert runtime_state.config.label == "prices"
+      assert runtime_state.context.agent_id == state.id
+      assert runtime_state.context.sensor_tag == :market_data
+      assert runtime_state.context.sensor_origin == :directive
+
+      GenServer.stop(child_info.pid)
+    end
+
+    test "leaves state unchanged when sensor init fails", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      directive = Directive.start_sensor(:bad_sensor, FailingLifecycleSensor)
+
+      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      refute Map.has_key?(state.children, {:sensor, :bad_sensor})
+    end
+
+    test "replaces an existing sensor by default", %{state: state, input_signal: input_signal} do
+      start_a =
+        Directive.start_sensor(:replaceable, LifecycleSensor, config: %{label: "a"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :replaceable}].pid
+
+      start_b =
+        Directive.start_sensor(:replaceable, LifecycleSensor, config: %{label: "b"})
+
+      assert {:ok, replaced_state} = DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+      new_pid = replaced_state.children[{:sensor, :replaceable}].pid
+      assert new_pid != old_pid
+      assert Process.alive?(new_pid)
+      refute_eventually(Process.alive?(old_pid))
+      assert :sys.get_state(new_pid).config.label == "b"
+
+      GenServer.stop(new_pid)
+    end
+
+    test "does not replace an existing sensor when replace? is false", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      start_a =
+        Directive.start_sensor(:sticky, LifecycleSensor, config: %{label: "a"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :sticky}].pid
+
+      start_b =
+        Directive.start_sensor(:sticky, LifecycleSensor,
+          config: %{label: "b"},
+          replace?: false
+        )
+
+      assert {:ok, unchanged_state} = DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+      assert unchanged_state.children[{:sensor, :sticky}].pid == old_pid
+      assert :sys.get_state(old_pid).config.label == "a"
+
+      GenServer.stop(old_pid)
+    end
+
+    test "stops an existing tagged sensor", %{state: state, input_signal: input_signal} do
+      start_directive = Directive.start_sensor(:temporary, LifecycleSensor)
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+
+      sensor_pid = state_with_sensor.children[{:sensor, :temporary}].pid
+
+      stop_directive = Directive.stop_sensor(:temporary, :cleanup)
+
+      assert {:ok, stopped_state} =
+               DirectiveExec.exec(stop_directive, input_signal, state_with_sensor)
+
+      refute Map.has_key?(stopped_state.children, {:sensor, :temporary})
+      refute_eventually(Process.alive?(sensor_pid))
+    end
+
+    test "returns ok when sensor tag is not found", %{state: state, input_signal: input_signal} do
+      directive = Directive.stop_sensor(:missing_sensor)
 
       assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
     end

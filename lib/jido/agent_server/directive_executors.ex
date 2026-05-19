@@ -433,6 +433,33 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopChild do
   end
 end
 
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StartSensor do
+  @moduledoc false
+
+  alias Jido.AgentServer.SensorLifecycle
+
+  def exec(
+        %{tag: tag, sensor: sensor, config: config, meta: meta, replace?: replace?},
+        _input_signal,
+        state
+      ) do
+    SensorLifecycle.start(state, tag, sensor, config, meta,
+      origin: :directive,
+      replace?: replace?
+    )
+  end
+end
+
+defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StopSensor do
+  @moduledoc false
+
+  alias Jido.AgentServer.SensorLifecycle
+
+  def exec(%{tag: tag, reason: reason}, _input_signal, state) do
+    SensorLifecycle.stop(state, tag, reason)
+  end
+end
+
 defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.Stop do
   @moduledoc false
 

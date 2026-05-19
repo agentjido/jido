@@ -51,12 +51,10 @@ defmodule Jido.Sensor do
 
   - `{:schedule, interval}` - Schedule next poll after interval ms
   - `{:schedule, interval, payload}` - Schedule with custom payload
-  - `{:connect, adapter}` - Connect to an external source
-  - `{:connect, adapter, opts}` - Connect with options
-  - `{:disconnect, adapter}` - Disconnect from a source
-  - `{:subscribe, topic}` - Subscribe to a topic/pattern
-  - `{:unsubscribe, topic}` - Unsubscribe from a topic
   - `{:emit, signal}` - Emit a signal immediately
+
+  Sensor modules that need external subscriptions or connections should establish
+  them in `init/2` and clean them up in `terminate/2`.
   """
 
   alias Jido.Sensor.Spec
@@ -64,11 +62,6 @@ defmodule Jido.Sensor do
   @type sensor_directive ::
           {:schedule, pos_integer()}
           | {:schedule, pos_integer(), term()}
-          | {:connect, atom()}
-          | {:connect, atom(), keyword()}
-          | {:disconnect, atom()}
-          | {:subscribe, term()}
-          | {:unsubscribe, term()}
           | {:emit, Jido.Signal.t()}
 
   @doc """

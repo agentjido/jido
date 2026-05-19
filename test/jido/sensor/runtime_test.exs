@@ -631,6 +631,28 @@ defmodule JidoTest.Sensor.RuntimeTest do
     end
   end
 
+  describe "start/1" do
+    test "starts the runtime unlinked to the caller" do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        {:ok, pid} =
+          Runtime.start(
+            sensor: SimpleSensor,
+            config: %{prefix: "unlinked"},
+            context: %{agent_ref: self()}
+          )
+
+        assert Process.alive?(pid)
+
+        GenServer.stop(pid)
+        refute_receive {:EXIT, ^pid, _reason}, 100
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+  end
+
   describe "child_spec/1" do
     test "returns valid child spec with default id" do
       spec = Runtime.child_spec(sensor: SimpleSensor)

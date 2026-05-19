@@ -15,6 +15,7 @@ defmodule Jido.Sensor.Runtime do
 
   ## Public API
 
+  - `start/1` - Start unlinked to caller
   - `start_link/1` - Start linked to caller
   - `child_spec/1` - Returns a proper child spec with stable id
   - `event/2` - Inject an external event into the sensor
@@ -51,6 +52,17 @@ defmodule Jido.Sensor.Runtime do
   alias Jido.Signal.Dispatch
 
   @type server :: pid() | atom() | {:via, module(), term()}
+
+  @doc """
+  Starts a Sensor.Runtime unlinked to the calling process.
+
+  Use this when another runtime will monitor and manage the sensor lifecycle
+  itself. Use `start_link/1` for direct supervision tree children.
+  """
+  @spec start(keyword() | map()) :: GenServer.on_start()
+  def start(opts) when is_list(opts) or is_map(opts) do
+    GenServer.start(__MODULE__, opts)
+  end
 
   @doc """
   Starts a Sensor.Runtime linked to the calling process.

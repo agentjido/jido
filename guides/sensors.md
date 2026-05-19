@@ -116,11 +116,10 @@ Callbacks return directives that the Runtime executes:
 | `{:schedule, ms}` | Schedule a `:tick` event after `ms` milliseconds |
 | `{:schedule, ms, payload}` | Schedule a custom event after `ms` milliseconds |
 | `{:emit, signal}` | Deliver signal to the agent immediately |
-| `{:connect, adapter}` | Connect to an external source |
-| `{:connect, adapter, opts}` | Connect with options |
-| `{:disconnect, adapter}` | Disconnect from a source |
-| `{:subscribe, topic}` | Subscribe to a topic/pattern |
-| `{:unsubscribe, topic}` | Unsubscribe from a topic |
+
+Sensors that need external connections or subscriptions should establish them in
+`init/2`, keep connection handles in their sensor state, and clean them up in
+`terminate/2`.
 
 ## Starting Sensors
 
