@@ -468,6 +468,24 @@ defmodule Jido.Error do
   @transport_max_string 512
   @transport_inspect_limit 50
   @transport_printable_limit 200
+  @non_retryable_error_type_strings ~w[
+    validation_error
+    invalid_action
+    invalid_sensor
+    config_error
+  ]
+  @known_error_type_strings %{
+    "validation_error" => :validation_error,
+    "invalid_action" => :invalid_action,
+    "invalid_sensor" => :invalid_sensor,
+    "config_error" => :config_error,
+    "planning_error" => :planning_error,
+    "execution_error" => :execution_error,
+    "routing_error" => :routing_error,
+    "timeout" => :timeout,
+    "compensation_error" => :compensation_error,
+    "internal" => :internal
+  }
   @redacted "[REDACTED]"
   @omitted "[OMITTED]"
   @depth_limit "[DEPTH_LIMIT]"
@@ -546,7 +564,13 @@ defmodule Jido.Error do
   def retryable?(%{type: type} = error) when is_atom(type),
     do: retryable_hint(Map.get(error, :details, error), default_retryable_for_type?(type))
 
+  def retryable?(%{type: type} = error) when is_binary(type),
+    do: retryable_hint(Map.get(error, :details, error), default_retryable_for_type?(type))
+
   def retryable?(%{"type" => type} = error) when is_atom(type),
+    do: retryable_hint(Map.get(error, "details", error), default_retryable_for_type?(type))
+
+  def retryable?(%{"type" => type} = error) when is_binary(type),
     do: retryable_hint(Map.get(error, "details", error), default_retryable_for_type?(type))
 
   def retryable?(%{details: details} = error),
@@ -712,7 +736,30 @@ defmodule Jido.Error do
   end
 
   defp sanitize_transport(value, depth) when is_map(value) do
-    value
+    sanitize_key_value_pairs(value, depth)
+  end
+
+  defp sanitize_transport(value, depth) when is_list(value) do
+    if key_value_list?(value) do
+      sanitize_key_value_pairs(value, depth)
+    else
+      value
+      |> Enum.take(@transport_max_items)
+      |> Enum.map(&sanitize_transport(&1, depth - 1))
+    end
+  end
+
+  defp sanitize_transport(value, _depth) when is_tuple(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_function(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_pid(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_reference(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth), do: safe_inspect(value)
+
+  defp sanitize_key(key) when is_atom(key) or is_binary(key), do: key
+  defp sanitize_key(key), do: safe_inspect(key)
+
+  defp sanitize_key_value_pairs(entries, depth) do
+    entries
     |> Enum.take(@transport_max_items)
     |> Map.new(fn {key, nested_value} ->
       sanitized_key = sanitize_key(key)
@@ -728,20 +775,13 @@ defmodule Jido.Error do
     end)
   end
 
-  defp sanitize_transport(value, depth) when is_list(value) do
-    value
-    |> Enum.take(@transport_max_items)
-    |> Enum.map(&sanitize_transport(&1, depth - 1))
+  defp key_value_list?(value) do
+    value != [] and
+      Enum.all?(value, fn
+        {key, _value} when is_atom(key) or is_binary(key) -> true
+        _other -> false
+      end)
   end
-
-  defp sanitize_transport(value, _depth) when is_tuple(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_function(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_pid(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_reference(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth), do: safe_inspect(value)
-
-  defp sanitize_key(key) when is_atom(key) or is_binary(key), do: key
-  defp sanitize_key(key), do: safe_inspect(key)
 
   defp sensitive_key?(key) do
     normalized_key = normalized_key(key)
@@ -846,6 +886,9 @@ defmodule Jido.Error do
        when type in [:validation_error, :invalid_action, :invalid_sensor, :config_error],
        do: false
 
+  defp default_retryable_for_type?(type) when is_binary(type),
+    do: normalize_type_string(type) not in @non_retryable_error_type_strings
+
   defp default_retryable_for_type?(_type), do: true
 
   # Maps error structs to unified type atoms
@@ -876,7 +919,19 @@ defmodule Jido.Error do
   defp unified_type(%Jido.Signal.Error.InternalError{}), do: :internal
 
   defp unified_type(%{type: type}) when is_atom(type), do: type
+  defp unified_type(%{type: type}) when is_binary(type), do: unified_type_from_string(type)
   defp unified_type(%{"type" => type}) when is_atom(type), do: type
+  defp unified_type(%{"type" => type}) when is_binary(type), do: unified_type_from_string(type)
 
   defp unified_type(_), do: :internal
+
+  defp unified_type_from_string(type) do
+    Map.get(@known_error_type_strings, normalize_type_string(type), :internal)
+  end
+
+  defp normalize_type_string(type) do
+    type
+    |> String.trim()
+    |> String.trim_leading(":")
+  end
 end

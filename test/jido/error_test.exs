@@ -276,6 +276,8 @@ defmodule JidoTest.ErrorTest do
             message: long_value,
             labels: Enum.map(1..30, &"label-#{&1}"),
             nested: %{password: "secret-password", value: :ok},
+            headers: [{"authorization", "Bearer header-secret"}, {"x-request-id", "req-123"}],
+            opts: [password: "keyword-secret", timeout: 500],
             bad: %BadInspect{token: "secret-token"}
           }
         )
@@ -293,8 +295,14 @@ defmodule JidoTest.ErrorTest do
       assert length(result.details.labels) == 20
       refute "label-21" in result.details.labels
       assert result.details.nested.password == "[REDACTED]"
+      assert result.details.headers["authorization"] == "[REDACTED]"
+      assert result.details.headers["x-request-id"] == "req-123"
+      assert result.details.opts.password == "[REDACTED]"
+      assert result.details.opts.timeout == 500
       refute inspect(result.details) =~ "secret-password"
       refute inspect(result.details) =~ "secret-token"
+      refute inspect(result.details) =~ "header-secret"
+      refute inspect(result.details) =~ "keyword-secret"
       assert result.details.bad.token == "[REDACTED]"
       assert Jason.encode!(result)
     end
@@ -320,6 +328,26 @@ defmodule JidoTest.ErrorTest do
       assert Error.to_map(non_retryable_error).retryable? == false
       assert Error.retryable?({:error, :timeout}) == true
       assert Error.retryable?({:error, %{type: :validation_error}}) == false
+    end
+
+    test "recognizes known string types from public payloads" do
+      payload = %{
+        "type" => "validation_error",
+        "message" => "Invalid",
+        "details" => %{"password" => "secret-password"}
+      }
+
+      result = Error.to_map(payload)
+
+      assert result.type == :validation_error
+      assert result.message == "Invalid"
+      assert result.details["password"] == "[REDACTED]"
+      assert result.retryable? == false
+
+      assert Error.retryable?(%{
+               "type" => "execution_error",
+               "details" => %{"retryable" => false}
+             }) == false
     end
 
     test "handles unknown struct" do
