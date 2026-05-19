@@ -23,7 +23,7 @@ jobs:
     with:
       otp_versions: '["27", "28"]'
       elixir_versions: '["1.18", "1.19"]'
-      experimental_compile_elixir_versions: '["v1.20.0-rc.4"]'
+      experimental_compile_elixir_versions: '["v1.20.0-rc.5"]'
       experimental_compile_otp_versions: '["28.4.1"]'
       experimental_compile_otp_name: '28'
       credo_command: mix credo --min-priority higher
