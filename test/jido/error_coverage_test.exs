@@ -151,7 +151,8 @@ defmodule JidoTest.ErrorCoverageTest do
       assert result.type == :internal
       assert result.message =~ "some"
       assert result.details == %{}
-      assert is_list(result.stacktrace)
+      assert result.retryable? == true
+      refute Map.has_key?(result, :stacktrace)
     end
 
     test "handles string error" do

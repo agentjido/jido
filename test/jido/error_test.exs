@@ -3,6 +3,10 @@ defmodule JidoTest.ErrorTest do
 
   alias Jido.Error
 
+  defmodule BadInspect do
+    defstruct [:token]
+  end
+
   describe "validation_error/2" do
     test "creates a validation error with message" do
       error = Error.validation_error("Invalid input")
@@ -234,13 +238,15 @@ defmodule JidoTest.ErrorTest do
       end
     end
 
-    test "converts validation error to map with message and stacktrace" do
+    test "converts validation error to public map without stacktrace" do
       error = Error.validation_error("Invalid", field: :email)
       result = Error.to_map(error)
 
       assert result.type == :validation_error
       assert result.message == "Invalid"
-      assert is_list(result.stacktrace)
+      assert result.details == %{kind: :input, subject: :email}
+      assert result.retryable? == false
+      refute Map.has_key?(result, :stacktrace)
     end
 
     test "converts compensation error to map" do
@@ -249,12 +255,70 @@ defmodule JidoTest.ErrorTest do
       result = Error.to_map(error)
 
       assert result.type == :compensation_error
+      assert result.details.compensated == true
+      assert result.details.original_error.type == :execution_error
+      assert result.details.original_error.message == "Original"
+    end
+
+    test "sanitizes nested details for public transport payloads" do
+      long_value = String.duplicate("x", 700)
+
+      error =
+        Error.execution_error("Failed",
+          details: %{
+            token: "secret-token",
+            authorization: "Bearer secret-token",
+            stacktrace: [{__MODULE__, :test, 0, []}],
+            message: long_value,
+            labels: Enum.map(1..30, &"label-#{&1}"),
+            nested: %{password: "secret-password", value: :ok},
+            bad: %BadInspect{token: "secret-token"}
+          }
+        )
+
+      result = Error.to_map(error)
+
+      assert result.details.token == "[REDACTED]"
+      assert result.details.authorization == "[REDACTED]"
+      assert result.details.stacktrace == "[OMITTED]"
+      assert result.details.message =~ "(truncated)"
+      assert length(result.details.labels) == 20
+      refute "label-21" in result.details.labels
+      assert result.details.nested.password == "[REDACTED]"
+      refute inspect(result.details) =~ "secret-password"
+      refute inspect(result.details) =~ "secret-token"
+      assert result.details.bad.token == "[REDACTED]"
+      assert Jason.encode!(result)
+    end
+
+    test "handles foreign exceptions without leaking stacktraces" do
+      result = Error.to_map(%RuntimeError{message: "foreign failure"})
+
+      assert result.type == :internal
+      assert result.message == "foreign failure"
+      assert result.details == %{}
+      assert result.retryable? == true
+      refute Map.has_key?(result, :stacktrace)
+    end
+
+    test "derives retryability from type and structured hints" do
+      assert Error.to_map(Error.timeout_error("Timed out")).retryable? == true
+      assert Error.to_map(Error.validation_error("Invalid")).retryable? == false
+
+      retryable_error = Error.validation_error("Retry anyway", details: %{retry: true})
+      non_retryable_error = Error.execution_error("Do not retry", details: %{retryable?: false})
+
+      assert Error.to_map(retryable_error).retryable? == true
+      assert Error.to_map(non_retryable_error).retryable? == false
+      assert Error.retryable?({:error, :timeout}) == true
+      assert Error.retryable?({:error, %{type: :validation_error}}) == false
     end
 
     test "handles unknown struct" do
       result = Error.to_map(%{unknown: "struct"})
 
       assert result.type == :internal
+      assert result.details == %{}
     end
   end
 

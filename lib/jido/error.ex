@@ -463,31 +463,90 @@ defmodule Jido.Error do
   # Utilities
   # ============================================================================
 
-  @doc """
-  Converts an error struct to a normalized map.
+  @transport_max_depth 4
+  @transport_max_items 20
+  @transport_max_string 512
+  @transport_inspect_limit 50
+  @transport_printable_limit 200
+  @redacted "[REDACTED]"
+  @omitted "[OMITTED]"
+  @depth_limit "[DEPTH_LIMIT]"
+  @sensitive_key_parts MapSet.new(~w[
+    api_key
+    apikey
+    authorization
+    credential
+    credentials
+    password
+    private_key
+    secret
+    token
+  ])
 
-  Returns a map with `:type`, `:message`, `:details`, and `:stacktrace` keys.
+  @doc """
+  Converts an error into a stable, public map.
+
+  The returned map is suitable for transport and reporting boundaries. It
+  includes bounded, sanitized details and never includes stacktraces by default.
   """
   @spec to_map(any()) :: map()
   def to_map(error) do
-    case error do
-      %{message: message} = err ->
-        %{
-          type: unified_type(err),
-          message: message,
-          details: Map.get(err, :details, %{}),
-          stacktrace: capture_stacktrace()
-        }
-
-      _ ->
-        %{
-          type: :internal,
-          message: inspect(error),
-          details: %{},
-          stacktrace: capture_stacktrace()
-        }
-    end
+    %{
+      type: unified_type(error),
+      message: public_message(error),
+      details: public_details(error),
+      retryable?: retryable?(error)
+    }
   end
+
+  @doc """
+  Returns whether an error is safe to retry by default.
+
+  Explicit `:retry`, `:retryable`, and `:retryable?` boolean hints in structured
+  details override the default classification.
+  """
+  @spec retryable?(term()) :: boolean()
+  def retryable?({:error, reason, _effects}), do: retryable?(reason)
+  def retryable?({:error, reason}), do: retryable?(reason)
+  def retryable?(%ValidationError{details: details}), do: retryable_hint(details, false)
+
+  def retryable?(%ExecutionError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%RoutingError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%TimeoutError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%CompensationError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%InternalError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%Internal.UnknownError{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%{retryable?: value}) when is_boolean(value), do: value
+  def retryable?(%{retryable: value}) when is_boolean(value), do: value
+  def retryable?(%{"retryable" => value}) when is_boolean(value), do: value
+  def retryable?(%{"retryable?" => value}) when is_boolean(value), do: value
+
+  def retryable?(%{type: type} = error) when is_atom(type),
+    do: retryable_hint(Map.get(error, :details, error), default_retryable_for_type?(type))
+
+  def retryable?(%{"type" => type} = error) when is_atom(type),
+    do: retryable_hint(Map.get(error, "details", error), default_retryable_for_type?(type))
+
+  def retryable?(%{details: details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(%{"details" => details} = error),
+    do: retryable_hint(details, default_retryable?(error))
+
+  def retryable?(reason) when is_atom(reason), do: default_retryable?(reason)
+  def retryable?(_reason), do: true
 
   @doc """
   Extracts the message string from a nested error structure.
@@ -557,6 +616,219 @@ defmodule Jido.Error do
     Enum.drop(stacktrace, 2)
   end
 
+  defp public_message(error) when is_exception(error),
+    do: truncate_string(Exception.message(error))
+
+  defp public_message(%{message: message}), do: transport_string(message)
+  defp public_message(%{"message" => message}), do: transport_string(message)
+  defp public_message(error), do: error |> sanitize_transport() |> safe_inspect()
+
+  defp public_details(%ValidationError{} = error) do
+    error.details
+    |> sanitize_details()
+    |> merge_public_fields(%{
+      kind: error.kind,
+      subject: error.subject
+    })
+  end
+
+  defp public_details(%ExecutionError{} = error) do
+    error.details
+    |> sanitize_details()
+    |> merge_public_fields(%{phase: error.phase})
+  end
+
+  defp public_details(%RoutingError{} = error) do
+    error.details
+    |> sanitize_details()
+    |> merge_public_fields(%{target: error.target})
+  end
+
+  defp public_details(%TimeoutError{} = error) do
+    error.details
+    |> sanitize_details()
+    |> merge_public_fields(%{timeout: error.timeout})
+  end
+
+  defp public_details(%CompensationError{} = error) do
+    error.details
+    |> sanitize_details()
+    |> merge_public_fields(%{
+      original_error: maybe_error_map(error.original_error),
+      compensated: error.compensated,
+      result: error.result
+    })
+  end
+
+  defp public_details(%{details: details}), do: sanitize_details(details)
+  defp public_details(%{"details" => details}), do: sanitize_details(details)
+  defp public_details(_error), do: %{}
+
+  defp maybe_error_map(nil), do: nil
+  defp maybe_error_map(error), do: to_map(error)
+
+  defp sanitize_details(details) when is_map(details), do: sanitize_transport(details)
+  defp sanitize_details(details) when details in [nil, []], do: %{}
+  defp sanitize_details(details), do: %{value: sanitize_transport(details)}
+
+  defp merge_public_fields(details, fields) do
+    fields
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Map.new(fn {key, value} -> {key, sanitize_transport(value)} end)
+    |> then(&Map.merge(details, &1))
+  end
+
+  defp sanitize_transport(value, depth \\ @transport_max_depth)
+  defp sanitize_transport(_value, 0), do: @depth_limit
+  defp sanitize_transport(value, _depth) when is_binary(value), do: truncate_string(value)
+
+  defp sanitize_transport(value, _depth)
+       when is_boolean(value) or is_number(value) or is_atom(value), do: value
+
+  defp sanitize_transport(%_{} = value, _depth) when is_exception(value) do
+    %{
+      type: value.__struct__ |> Module.split() |> Enum.join("."),
+      message: truncate_string(Exception.message(value))
+    }
+  end
+
+  defp sanitize_transport(%_{} = value, depth) do
+    value
+    |> Map.from_struct()
+    |> Map.put(:struct, value.__struct__)
+    |> sanitize_transport(depth)
+  rescue
+    _ -> safe_inspect(value)
+  end
+
+  defp sanitize_transport(value, depth) when is_map(value) do
+    value
+    |> Enum.take(@transport_max_items)
+    |> Map.new(fn {key, nested_value} ->
+      sanitized_key = sanitize_key(key)
+
+      nested_value =
+        cond do
+          sensitive_key?(sanitized_key) -> @redacted
+          stacktrace_key?(sanitized_key) -> @omitted
+          true -> sanitize_transport(nested_value, depth - 1)
+        end
+
+      {sanitized_key, nested_value}
+    end)
+  end
+
+  defp sanitize_transport(value, depth) when is_list(value) do
+    value
+    |> Enum.take(@transport_max_items)
+    |> Enum.map(&sanitize_transport(&1, depth - 1))
+  end
+
+  defp sanitize_transport(value, _depth) when is_tuple(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_function(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_pid(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth) when is_reference(value), do: safe_inspect(value)
+  defp sanitize_transport(value, _depth), do: safe_inspect(value)
+
+  defp sanitize_key(key) when is_atom(key) or is_binary(key), do: key
+  defp sanitize_key(key), do: safe_inspect(key)
+
+  defp sensitive_key?(key) do
+    normalized_key = normalized_key(key)
+
+    MapSet.member?(@sensitive_key_parts, normalized_key) ||
+      normalized_key |> key_parts() |> Enum.any?(&MapSet.member?(@sensitive_key_parts, &1))
+  end
+
+  defp stacktrace_key?(key) do
+    normalized_key(key) in ["stacktrace", "stack_trace"]
+  end
+
+  defp normalized_key(key) when is_atom(key), do: key |> Atom.to_string() |> String.downcase()
+  defp normalized_key(key) when is_binary(key), do: String.downcase(key)
+
+  defp key_parts(key), do: String.split(key, ~r/[^a-z0-9]+/, trim: true)
+
+  defp transport_string(value) when is_binary(value), do: truncate_string(value)
+  defp transport_string(%{message: message}), do: transport_string(message)
+  defp transport_string(value), do: value |> sanitize_transport() |> safe_inspect()
+
+  defp safe_inspect(value) do
+    value
+    |> inspect(limit: @transport_inspect_limit, printable_limit: @transport_printable_limit)
+    |> truncate_string()
+  rescue
+    _ -> inspect_fallback(value)
+  end
+
+  defp inspect_fallback(value) do
+    module =
+      case value do
+        %{__struct__: struct} when is_atom(struct) -> inspect(struct)
+        _ -> value |> :erlang.term_to_binary() |> byte_size() |> then(&"#{&1} bytes")
+      end
+
+    "#Inspect.Error<#{module}>"
+  end
+
+  defp truncate_string(value, max_chars \\ @transport_max_string) when is_binary(value) do
+    if String.length(value) > max_chars do
+      String.slice(value, 0, max_chars) <> "...(truncated)"
+    else
+      value
+    end
+  end
+
+  defp retryable_hint(term, default) do
+    case extract_retry_hint(term) do
+      value when is_boolean(value) -> value
+      _ -> default
+    end
+  end
+
+  defp extract_retry_hint(%{details: details}) do
+    case extract_retry_hint(details) do
+      nil -> nil
+      value -> value
+    end
+  end
+
+  defp extract_retry_hint(%{} = map) do
+    cond do
+      is_boolean(Map.get(map, :retry)) -> Map.get(map, :retry)
+      is_boolean(Map.get(map, "retry")) -> Map.get(map, "retry")
+      is_boolean(Map.get(map, :retryable)) -> Map.get(map, :retryable)
+      is_boolean(Map.get(map, "retryable")) -> Map.get(map, "retryable")
+      is_boolean(Map.get(map, :retryable?)) -> Map.get(map, :retryable?)
+      is_boolean(Map.get(map, "retryable?")) -> Map.get(map, "retryable?")
+      Map.has_key?(map, :reason) -> extract_retry_hint(Map.get(map, :reason))
+      Map.has_key?(map, "reason") -> extract_retry_hint(Map.get(map, "reason"))
+      true -> nil
+    end
+  end
+
+  defp extract_retry_hint(keyword) when is_list(keyword) do
+    if Keyword.keyword?(keyword) do
+      cond do
+        is_boolean(Keyword.get(keyword, :retry)) -> Keyword.get(keyword, :retry)
+        is_boolean(Keyword.get(keyword, :retryable)) -> Keyword.get(keyword, :retryable)
+        is_boolean(Keyword.get(keyword, :retryable?)) -> Keyword.get(keyword, :retryable?)
+        true -> nil
+      end
+    end
+  end
+
+  defp extract_retry_hint(_term), do: nil
+
+  defp default_retryable?(type) when is_atom(type), do: default_retryable_for_type?(type)
+  defp default_retryable?(error), do: error |> unified_type() |> default_retryable_for_type?()
+
+  defp default_retryable_for_type?(type)
+       when type in [:validation_error, :invalid_action, :invalid_sensor, :config_error],
+       do: false
+
+  defp default_retryable_for_type?(_type), do: true
+
   # Maps error structs to unified type atoms
   defp unified_type(%ValidationError{kind: :action}), do: :invalid_action
   defp unified_type(%ValidationError{kind: :sensor}), do: :invalid_sensor
@@ -583,6 +855,9 @@ defmodule Jido.Error do
   defp unified_type(%Jido.Signal.Error.TimeoutError{}), do: :timeout
   defp unified_type(%Jido.Signal.Error.DispatchError{}), do: :routing_error
   defp unified_type(%Jido.Signal.Error.InternalError{}), do: :internal
+
+  defp unified_type(%{type: type}) when is_atom(type), do: type
+  defp unified_type(%{"type" => type}) when is_atom(type), do: type
 
   defp unified_type(_), do: :internal
 end
