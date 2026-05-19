@@ -251,10 +251,15 @@ map = Jido.Error.to_map(error)
 %{
   type: :validation_error,
   message: "Bad input",
-  details: %{},
-  stacktrace: [...]
+  details: %{kind: :input, subject: :email},
+  retryable?: false
 }
 ```
+
+`to_map/1` is the public transport-safe error boundary. It does not include
+stacktraces by default, redacts sensitive detail keys, bounds nested values, and
+keeps retryability derived centrally from the structured error type plus any
+explicit `:retry`, `:retryable`, or `:retryable?` detail hint.
 
 ### Extracting Messages
 
