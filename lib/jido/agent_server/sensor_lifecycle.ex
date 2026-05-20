@@ -89,15 +89,17 @@ defmodule Jido.AgentServer.SensorLifecycle do
   defp start_new(state, tag, sensor, config, meta, opts) do
     id = sensor_id(state, tag)
     origin = Keyword.get(opts, :origin, :directive)
+    link? = Keyword.get(opts, :link?, false) == true
 
     runtime_opts = [
       sensor: sensor,
       config: config,
       context: sensor_context(state, tag, origin, Keyword.get(opts, :context, %{})),
-      id: id
+      id: id,
+      owner_pid: self()
     ]
 
-    case SensorRuntime.start(runtime_opts) do
+    case start_sensor_runtime(runtime_opts, link?) do
       {:ok, pid} ->
         ref = Process.monitor(pid)
         key = child_key(tag)
@@ -110,7 +112,7 @@ defmodule Jido.AgentServer.SensorLifecycle do
             id: id,
             partition: state.partition,
             tag: key,
-            meta: sensor_meta(tag, sensor, config, origin, meta)
+            meta: sensor_meta(tag, sensor, config, origin, meta, link?)
           })
 
         Logger.debug(fn ->
@@ -136,6 +138,9 @@ defmodule Jido.AgentServer.SensorLifecycle do
   end
 
   defp validate_sensor_module(sensor), do: {:error, {:invalid_sensor_module, sensor}}
+
+  defp start_sensor_runtime(runtime_opts, true), do: SensorRuntime.start_link(runtime_opts)
+  defp start_sensor_runtime(runtime_opts, _linked?), do: SensorRuntime.start(runtime_opts)
 
   defp stop_by_key(state, key, reason) do
     case State.get_child(state, key) do
@@ -169,13 +174,15 @@ defmodule Jido.AgentServer.SensorLifecycle do
     end
   end
 
-  defp stop_child_info(%ChildInfo{pid: pid, ref: ref}, reason) do
+  defp stop_child_info(%ChildInfo{pid: pid, ref: ref} = child_info, reason) do
     cond do
       not is_pid(pid) or not Process.alive?(pid) ->
         demonitor(ref)
         :ok
 
       true ->
+        unlinked? = maybe_unlink(child_info)
+
         case stop_sensor_pid(pid, normalize_stop_reason(reason)) do
           :ok ->
             demonitor(ref)
@@ -183,6 +190,7 @@ defmodule Jido.AgentServer.SensorLifecycle do
 
           {:error, _reason} = error ->
             if Process.alive?(pid) do
+              maybe_relink(child_info, unlinked?)
               error
             else
               demonitor(ref)
@@ -208,6 +216,21 @@ defmodule Jido.AgentServer.SensorLifecycle do
   defp demonitor(ref) when is_reference(ref), do: Process.demonitor(ref, [:flush])
   defp demonitor(_ref), do: false
 
+  defp maybe_unlink(%ChildInfo{pid: pid, meta: %{link?: true}}) when is_pid(pid) do
+    Process.unlink(pid)
+    true
+  end
+
+  defp maybe_unlink(_child_info), do: false
+
+  defp maybe_relink(%ChildInfo{pid: pid}, true) when is_pid(pid) do
+    Process.link(pid)
+  catch
+    :exit, :noproc -> :ok
+  end
+
+  defp maybe_relink(_child_info, _unlinked?), do: :ok
+
   defp normalize_stop_reason(:normal), do: :normal
   defp normalize_stop_reason(:shutdown), do: :shutdown
   defp normalize_stop_reason({:shutdown, _} = reason), do: reason
@@ -229,12 +252,13 @@ defmodule Jido.AgentServer.SensorLifecycle do
     |> Map.put(:sensor_origin, origin)
   end
 
-  defp sensor_meta(tag, sensor, config, origin, meta) do
+  defp sensor_meta(tag, sensor, config, origin, meta, link?) do
     Map.merge(normalize_map(meta), %{
       kind: :sensor,
       sensor: sensor,
       sensor_tag: tag,
       origin: origin,
+      link?: link?,
       config_hash: :erlang.phash2(config)
     })
   end

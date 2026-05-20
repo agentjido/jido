@@ -133,6 +133,25 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     end
   end
 
+  defmodule RecordSensorExitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_sensor_exit",
+      schema: [
+        tag: [type: :any, required: true],
+        pid: [type: :any, required: true],
+        reason: [type: :any, required: true],
+        sensor: [type: :any, required: true],
+        origin: [type: :any, required: true],
+        meta: [type: :map, default: %{}]
+      ]
+
+    def run(params, context) do
+      events = Map.get(context.state, :sensor_exit_events, [])
+      {:ok, %{sensor_exit_events: events ++ [params]}}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Plugin Modules
   # ---------------------------------------------------------------------------
@@ -261,12 +280,15 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     use Jido.Agent,
       name: "agent_with_child_exit_sensor_plugin",
       schema: [
-        child_exit_events: [type: {:list, :any}, default: []]
+        child_exit_events: [type: {:list, :any}, default: []],
+        sensor_exit_events: [type: {:list, :any}, default: []]
       ],
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor],
       signal_routes: [
         {"jido.agent.child.exit",
-         JidoTest.AgentServer.PluginSubscriptionsTest.RecordChildExitAction}
+         JidoTest.AgentServer.PluginSubscriptionsTest.RecordChildExitAction},
+        {"jido.agent.sensor.exit",
+         JidoTest.AgentServer.PluginSubscriptionsTest.RecordSensorExitAction}
       ]
   end
 
@@ -377,7 +399,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       GenServer.stop(pid)
     end
 
-    test "unexpected sensor exits do not emit child-agent exit signals", %{jido: jido} do
+    test "unexpected sensor exits emit sensor lifecycle signals only", %{jido: jido} do
       {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithChildExitSensorPlugin, jido: jido)
 
       {:ok, state} = Jido.AgentServer.state(pid)
@@ -390,14 +412,26 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       state =
         eventually_state(pid, fn state ->
-          sensor_count =
-            state.children
-            |> Enum.count(fn {tag, _} -> match?({:sensor, _}, tag) end)
-
-          sensor_count == 0
+          state.agent.state.sensor_exit_events != []
         end)
 
+      refute Map.has_key?(state.children, {:sensor, {:plugin, PluginWithSensor, TestSensor}})
       assert state.agent.state.child_exit_events == []
+
+      assert [
+               %{
+                 tag: {:plugin, PluginWithSensor, TestSensor},
+                 pid: sensor_pid,
+                 reason: :boom,
+                 sensor: TestSensor,
+                 origin: {:plugin, PluginWithSensor},
+                 meta: meta
+               }
+             ] = state.agent.state.sensor_exit_events
+
+      assert sensor_pid == child_info.pid
+      assert meta.kind == :sensor
+      assert meta.sensor_tag == {:plugin, PluginWithSensor, TestSensor}
 
       GenServer.stop(pid)
     end

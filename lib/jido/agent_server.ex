@@ -206,7 +206,7 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.Agent.Directive
-  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
+  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned, SensorExit}
   alias Jido.Config.Defaults
   alias Jido.Observe
   alias Jido.Observe.Config, as: ObserveConfig
@@ -3167,7 +3167,22 @@ defmodule Jido.AgentServer do
           "AgentServer #{state.id} sensor #{inspect(tag)} exited: #{inspect(reason)}"
         end)
 
-        {:noreply, state}
+        signal =
+          SensorExit.new!(
+            sensor_exit_data(tag, child_info, pid, reason),
+            source: "/agent/#{state.id}"
+          )
+
+        traced_signal =
+          case Trace.put(signal, Trace.new_root()) do
+            {:ok, s} -> s
+            {:error, _} -> signal
+          end
+
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, ns} -> {:noreply, ns}
+        end
 
       tag ->
         Logger.debug(fn ->
@@ -3194,6 +3209,23 @@ defmodule Jido.AgentServer do
       true ->
         {:noreply, state}
     end
+  end
+
+  defp sensor_exit_data({:sensor, sensor_tag}, child_info, pid, reason) do
+    sensor_exit_data(sensor_tag, child_info, pid, reason)
+  end
+
+  defp sensor_exit_data(tag, child_info, pid, reason) do
+    meta = child_info.meta || %{}
+
+    %{
+      tag: Map.get(meta, :sensor_tag, tag),
+      pid: pid,
+      reason: reason,
+      sensor: Map.get(meta, :sensor, child_info.module),
+      origin: Map.get(meta, :origin, :unknown),
+      meta: meta
+    }
   end
 
   # Wraps parent-down reasons so OTP treats them as clean shutdowns.

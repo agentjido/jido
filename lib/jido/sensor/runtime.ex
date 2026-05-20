@@ -26,6 +26,7 @@ defmodule Jido.Sensor.Runtime do
   - `:config` - Configuration map or keyword list for the sensor
   - `:context` - Context map including `:agent_ref`
   - `:id` - Instance ID (auto-generated if not provided)
+  - `:owner_pid` - Optional owner process to monitor; runtime stops if owner exits
 
   ## Signal Delivery
 
@@ -73,6 +74,7 @@ defmodule Jido.Sensor.Runtime do
   - `:config` - Configuration map or keyword list for the sensor (default: %{})
   - `:context` - Context map including `:agent_ref` (default: %{})
   - `:id` - Instance ID (auto-generated if not provided)
+  - `:owner_pid` - Optional owner process to monitor; runtime stops if owner exits
 
   ## Examples
 
@@ -133,12 +135,16 @@ defmodule Jido.Sensor.Runtime do
          {:ok, config} <- parse_config(sensor, opts[:config] || %{}),
          context = opts[:context] || %{},
          id = opts[:id] || Jido.Util.generate_id(),
+         owner_pid = opts[:owner_pid],
+         owner_ref = monitor_owner(owner_pid),
          {:ok, state, directives} <- call_sensor_init(sensor, config, context, id) do
       runtime_state = %{
         sensor: sensor,
         config: config,
         context: context,
         id: id,
+        owner_pid: owner_pid,
+        owner_ref: owner_ref,
         sensor_state: state,
         timers: %{}
       }
@@ -168,6 +174,16 @@ defmodule Jido.Sensor.Runtime do
   end
 
   @impl GenServer
+  def handle_info({:DOWN, ref, :process, owner_pid, reason}, state)
+      when ref == state.owner_ref and owner_pid == state.owner_pid do
+    Logger.debug(fn ->
+      "Sensor.Runtime #{state.id} owner #{inspect(owner_pid)} exited: #{inspect(reason)}"
+    end)
+
+    {:stop, {:owner_down, reason}, state}
+  end
+
+  @impl GenServer
   def handle_info(msg, state) do
     Logger.debug(fn ->
       "Sensor.Runtime #{state.id} received unexpected message: #{inspect(msg)}"
@@ -191,6 +207,9 @@ defmodule Jido.Sensor.Runtime do
 
   defp normalize_opts(opts) when is_map(opts), do: Map.to_list(opts)
   defp normalize_opts(opts) when is_list(opts), do: opts
+
+  defp monitor_owner(owner_pid) when is_pid(owner_pid), do: Process.monitor(owner_pid)
+  defp monitor_owner(_owner_pid), do: nil
 
   defp ensure_sensor_loaded(sensor) do
     case Code.ensure_loaded(sensor) do

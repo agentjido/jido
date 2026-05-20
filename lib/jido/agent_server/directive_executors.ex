@@ -439,13 +439,14 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.StartSensor do
   alias Jido.AgentServer.SensorLifecycle
 
   def exec(
-        %{tag: tag, sensor: sensor, config: config, meta: meta, replace?: replace?},
+        %{tag: tag, sensor: sensor, config: config, meta: meta, replace?: replace?, link?: link?},
         _input_signal,
         state
       ) do
     SensorLifecycle.start(state, tag, sensor, config, meta,
       origin: :directive,
-      replace?: replace?
+      replace?: replace?,
+      link?: link?
     )
   end
 end

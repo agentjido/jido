@@ -494,6 +494,8 @@ defmodule Jido.Agent.Directive do
     - `config` - Sensor configuration map (default: `%{}`)
     - `meta` - Metadata stored on the tracked sensor child info (default: `%{}`)
     - `replace?` - Stop and replace an existing sensor with this tag (default: `true`)
+    - `link?` - Link the sensor to the owning AgentServer so abnormal sensor
+      exits can take the owner down (default: `false`)
 
     ## Examples
 
@@ -514,7 +516,10 @@ defmodule Jido.Agent.Directive do
                 meta: Zoi.map(description: "Metadata for sensor tracking") |> Zoi.default(%{}),
                 replace?:
                   Zoi.boolean(description: "Replace an existing sensor with the same tag")
-                  |> Zoi.default(true)
+                  |> Zoi.default(true),
+                link?:
+                  Zoi.boolean(description: "Link sensor failure to owning AgentServer")
+                  |> Zoi.default(false)
               },
               coerce: true
             )
@@ -817,6 +822,8 @@ defmodule Jido.Agent.Directive do
   - `:config` - Sensor configuration map (default: `%{}`)
   - `:meta` - Metadata stored with the tracked sensor (default: `%{}`)
   - `:replace?` - Whether to replace an existing sensor for the tag (default: `true`)
+  - `:link?` - Link the sensor to the owning AgentServer so abnormal sensor
+    exits can take the owner down (default: `false`)
 
   ## Examples
 
@@ -832,7 +839,8 @@ defmodule Jido.Agent.Directive do
       sensor: sensor,
       config: Keyword.get(opts, :config, %{}),
       meta: Keyword.get(opts, :meta, %{}),
-      replace?: Keyword.get(opts, :replace?, true)
+      replace?: Keyword.get(opts, :replace?, true),
+      link?: Keyword.get(opts, :link?, false)
     }
   end
 

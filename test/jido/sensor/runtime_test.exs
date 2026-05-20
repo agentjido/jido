@@ -651,6 +651,23 @@ defmodule JidoTest.Sensor.RuntimeTest do
         Process.flag(:trap_exit, previous_trap_exit)
       end
     end
+
+    test "stops when monitored owner exits" do
+      owner = spawn(fn -> Process.sleep(:infinity) end)
+
+      {:ok, pid} =
+        Runtime.start(
+          sensor: MinimalSensor,
+          context: %{agent_ref: self()},
+          owner_pid: owner
+        )
+
+      ref = Process.monitor(pid)
+
+      Process.exit(owner, :kill)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, {:owner_down, :killed}}, 500
+    end
   end
 
   describe "child_spec/1" do

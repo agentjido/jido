@@ -64,6 +64,8 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     end
 
     @impl Jido.Sensor
+    def handle_event(:crash, _state), do: raise("linked sensor crash")
+
     def handle_event({:trigger, value}, state) do
       signal =
         Signal.new!(%{
@@ -90,6 +92,18 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
     def run(_params, _context) do
       directive = Directive.start_sensor(:round_trip, RoundTripSensor)
+      {:ok, %{sensor_start_requested: true}, [directive]}
+    end
+  end
+
+  defmodule StartLinkedRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "start_linked_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.start_sensor(:linked_round_trip, RoundTripSensor, link?: true)
       {:ok, %{sensor_start_requested: true}, [directive]}
     end
   end
@@ -126,6 +140,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       ],
       signal_routes: [
         {"directive.sensor.start", StartRoundTripSensorAction},
+        {"directive.linked_sensor.start", StartLinkedRoundTripSensorAction},
         {"directive.sensor.event", RecordRoundTripSensorAction}
       ]
   end
@@ -787,6 +802,77 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       GenServer.stop(pid)
     end
 
+    test "unlinked directive sensor stops when the owning agent exits abnormally", context do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        pid =
+          start_server(context, RoundTripSensorAgent,
+            id: unique_id("directive-sensor-owner-down")
+          )
+
+        start_signal =
+          Signal.new!(%{
+            source: "/test",
+            type: "directive.sensor.start",
+            data: %{}
+          })
+
+        assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+        state =
+          eventually_state(pid, fn state ->
+            Map.has_key?(state.children, {:sensor, :round_trip})
+          end)
+
+        sensor_pid = state.children[{:sensor, :round_trip}].pid
+        sensor_ref = Process.monitor(sensor_pid)
+
+        Process.exit(pid, :kill)
+
+        assert_receive {:EXIT, ^pid, :killed}, 500
+
+        assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:owner_down, :killed}},
+                       1_000
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "link? true makes sensor failure fail the owning agent", context do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        pid =
+          start_server(context, RoundTripSensorAgent, id: unique_id("directive-linked-sensor"))
+
+        start_signal =
+          Signal.new!(%{
+            source: "/test",
+            type: "directive.linked_sensor.start",
+            data: %{}
+          })
+
+        assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+        state =
+          eventually_state(pid, fn state ->
+            Map.has_key?(state.children, {:sensor, :linked_round_trip})
+          end)
+
+        sensor_pid = state.children[{:sensor, :linked_round_trip}].pid
+        agent_ref = Process.monitor(pid)
+
+        assert :ok = SensorRuntime.event(sensor_pid, :crash)
+
+        assert_receive {:DOWN, ^agent_ref, :process, ^pid,
+                        {%RuntimeError{message: "linked sensor crash"}, _stack}},
+                       1_000
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
     test "leaves state unchanged when sensor init fails", %{
       state: state,
       input_signal: input_signal
@@ -840,6 +926,44 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert :sys.get_state(old_pid).config.label == "a"
 
       GenServer.stop(old_pid)
+    end
+
+    test "replaces linked sensors without propagating controlled stop exits", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        start_a =
+          Directive.start_sensor(:linked_replaceable, LifecycleSensor,
+            config: %{label: "a"},
+            link?: true
+          )
+
+        {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+        old_pid = state_with_sensor.children[{:sensor, :linked_replaceable}].pid
+
+        start_b =
+          Directive.start_sensor(:linked_replaceable, LifecycleSensor,
+            config: %{label: "b"},
+            link?: true
+          )
+
+        assert {:ok, replaced_state} =
+                 DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+        new_pid = replaced_state.children[{:sensor, :linked_replaceable}].pid
+        assert new_pid != old_pid
+        assert Process.alive?(new_pid)
+        refute_receive {:EXIT, ^old_pid, {:shutdown, :replace}}, 100
+        refute_eventually(Process.alive?(old_pid))
+        assert :sys.get_state(new_pid).config.label == "b"
+
+        GenServer.stop(new_pid)
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
     end
 
     test "does not stop existing sensor when replacement module is invalid", %{

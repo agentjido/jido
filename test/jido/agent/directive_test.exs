@@ -111,6 +111,35 @@ defmodule JidoTest.Agent.DirectiveTest do
     end
   end
 
+  describe "start_sensor/3" do
+    test "creates StartSensor directive with defaults" do
+      directive = Directive.start_sensor(:market_data, MySensor)
+
+      assert %Directive.StartSensor{} = directive
+      assert directive.tag == :market_data
+      assert directive.sensor == MySensor
+      assert directive.config == %{}
+      assert directive.meta == %{}
+      assert directive.replace? == true
+      assert directive.link? == false
+    end
+
+    test "creates StartSensor directive with lifecycle options" do
+      directive =
+        Directive.start_sensor(:market_data, MySensor,
+          config: %{symbol: "AAPL"},
+          meta: %{purpose: :quotes},
+          replace?: false,
+          link?: true
+        )
+
+      assert directive.config == %{symbol: "AAPL"}
+      assert directive.meta == %{purpose: :quotes}
+      assert directive.replace? == false
+      assert directive.link? == true
+    end
+  end
+
   describe "adopt_child/3" do
     test "creates AdoptChild directive for pid" do
       directive = Directive.adopt_child(self(), :worker_1)
