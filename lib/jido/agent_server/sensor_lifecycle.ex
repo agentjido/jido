@@ -26,8 +26,10 @@ defmodule Jido.AgentServer.SensorLifecycle do
       %ChildInfo{} = child_info ->
         cond do
           sensor_child?(child_info) and replace? ->
-            {:ok, state} = stop_by_key(state, key, :replace)
-            start_new(state, tag, sensor, config, meta, opts)
+            case stop_by_key(state, key, :replace) do
+              {:stopped, state} -> start_new(state, tag, sensor, config, meta, opts)
+              {_result, state} -> {:ok, state}
+            end
 
           sensor_child?(child_info) ->
             {:ok, state}
@@ -47,13 +49,24 @@ defmodule Jido.AgentServer.SensorLifecycle do
 
   @spec stop(State.t(), term(), term()) :: {:ok, State.t()}
   def stop(%State{} = state, tag, reason \\ :normal) do
-    stop_by_key(state, child_key(tag), reason)
+    {_result, state} = stop_by_key(state, child_key(tag), reason)
+    {:ok, state}
   end
 
   @spec stop_all(State.t(), term()) :: :ok
   def stop_all(%State{} = state, reason) do
     Enum.each(state.children, fn {_key, child_info} ->
-      if sensor_child?(child_info), do: stop_child_info(child_info, reason)
+      if sensor_child?(child_info) do
+        case stop_child_info(child_info, reason) do
+          :ok ->
+            :ok
+
+          {:error, stop_reason} ->
+            Logger.warning(fn ->
+              "AgentServer #{state.id} failed to stop sensor #{inspect(child_info.tag)} during shutdown: #{inspect(stop_reason)}"
+            end)
+        end
+      end
     end)
 
     :ok
@@ -116,27 +129,51 @@ defmodule Jido.AgentServer.SensorLifecycle do
           "AgentServer #{state.id} cannot stop sensor #{inspect(key)}: not found"
         end)
 
-        {:ok, state}
+        {:missing, state}
 
       %ChildInfo{} = child_info ->
         if sensor_child?(child_info) do
-          stop_child_info(child_info, reason)
-          {:ok, State.remove_child(state, key)}
+          case stop_child_info(child_info, reason) do
+            :ok ->
+              {:stopped, State.remove_child(state, key)}
+
+            {:error, stop_reason} ->
+              Logger.warning(fn ->
+                "AgentServer #{state.id} failed to stop sensor #{inspect(key)}: #{inspect(stop_reason)}"
+              end)
+
+              {:kept, state}
+          end
         else
           Logger.warning(fn ->
             "AgentServer #{state.id} cannot stop sensor #{inspect(key)}: child key is not a sensor"
           end)
 
-          {:ok, state}
+          {:kept, state}
         end
     end
   end
 
   defp stop_child_info(%ChildInfo{pid: pid, ref: ref}, reason) do
-    if is_reference(ref), do: Process.demonitor(ref, [:flush])
+    cond do
+      not is_pid(pid) or not Process.alive?(pid) ->
+        demonitor(ref)
+        :ok
 
-    if is_pid(pid) and Process.alive?(pid) do
-      stop_sensor_pid(pid, normalize_stop_reason(reason))
+      true ->
+        case stop_sensor_pid(pid, normalize_stop_reason(reason)) do
+          :ok ->
+            demonitor(ref)
+            :ok
+
+          {:error, _reason} = error ->
+            if Process.alive?(pid) do
+              error
+            else
+              demonitor(ref)
+              :ok
+            end
+        end
     end
   end
 
@@ -150,9 +187,11 @@ defmodule Jido.AgentServer.SensorLifecycle do
       :ok
 
     :exit, reason ->
-      Logger.debug(fn -> "Failed to stop sensor #{inspect(pid)}: #{inspect(reason)}" end)
-      :ok
+      {:error, reason}
   end
+
+  defp demonitor(ref) when is_reference(ref), do: Process.demonitor(ref, [:flush])
+  defp demonitor(_ref), do: false
 
   defp normalize_stop_reason(:normal), do: :normal
   defp normalize_stop_reason(:shutdown), do: :shutdown

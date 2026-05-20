@@ -607,7 +607,7 @@ defmodule Jido.Plugin do
       def signal_routes, do: @validated_opts[:signal_routes] || []
 
       @doc "Returns the sensor subscriptions for this plugin."
-      @spec subscriptions() :: [tuple()]
+      @spec subscriptions() :: [Jido.Plugin.sensor_subscription()]
       def subscriptions, do: @validated_opts[:subscriptions] || []
 
       @doc "Returns the schedules for this plugin."
