@@ -108,6 +108,18 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     end
   end
 
+  defmodule StopRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "stop_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.stop_sensor(:round_trip, :controlled_stop)
+      {:ok, %{sensor_stop_requested: true}, [directive]}
+    end
+  end
+
   defmodule RecordRoundTripSensorAction do
     @moduledoc false
     use Jido.Action,
@@ -128,20 +140,39 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     end
   end
 
+  defmodule RecordRoundTripSensorExitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_round_trip_sensor_exit",
+      schema: [
+        tag: [type: :any, required: true],
+        reason: [type: :any, required: true]
+      ]
+
+    def run(params, context) do
+      events = Map.get(context.state, :sensor_exit_events, [])
+      {:ok, %{sensor_exit_events: events ++ [params]}}
+    end
+  end
+
   defmodule RoundTripSensorAgent do
     @moduledoc false
     use Jido.Agent,
       name: "directive_exec_round_trip_sensor_agent",
       schema: [
         sensor_start_requested: [type: :boolean, default: false],
+        sensor_stop_requested: [type: :boolean, default: false],
         last_sensor_value: [type: :any, default: nil],
         last_sensor_agent_id: [type: :any, default: nil],
-        last_sensor_tag: [type: :any, default: nil]
+        last_sensor_tag: [type: :any, default: nil],
+        sensor_exit_events: [type: {:list, :any}, default: []]
       ],
       signal_routes: [
         {"directive.sensor.start", StartRoundTripSensorAction},
+        {"directive.sensor.stop", StopRoundTripSensorAction},
         {"directive.linked_sensor.start", StartLinkedRoundTripSensorAction},
-        {"directive.sensor.event", RecordRoundTripSensorAction}
+        {"directive.sensor.event", RecordRoundTripSensorAction},
+        {"jido.agent.sensor.exit", RecordRoundTripSensorExitAction}
       ]
   end
 
@@ -798,6 +829,41 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
       assert state.agent.state.last_sensor_agent_id == state.id
       assert state.agent.state.last_sensor_tag == :round_trip
+
+      GenServer.stop(pid)
+    end
+
+    test "controlled stop does not emit sensor exit lifecycle signal", context do
+      pid =
+        start_server(context, RoundTripSensorAgent,
+          id: unique_id("directive-sensor-controlled-stop")
+        )
+
+      start_signal = Signal.new!(%{source: "/test", type: "directive.sensor.start", data: %{}})
+      stop_signal = Signal.new!(%{source: "/test", type: "directive.sensor.stop", data: %{}})
+
+      assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+      state =
+        eventually_state(pid, fn state ->
+          Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      sensor_pid = state.children[{:sensor, :round_trip}].pid
+      sensor_ref = Process.monitor(sensor_pid)
+
+      assert :ok = Jido.AgentServer.cast(pid, stop_signal)
+
+      assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:shutdown, :controlled_stop}},
+                     1_000
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.sensor_stop_requested == true and
+            not Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      assert state.agent.state.sensor_exit_events == []
 
       GenServer.stop(pid)
     end

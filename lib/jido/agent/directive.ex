@@ -487,6 +487,11 @@ defmodule Jido.Agent.Directive do
     Sensors are tracked separately from child agents under `{:sensor, tag}` and
     do not participate in child-agent hierarchy signals.
 
+    By default sensors are unlinked but owner-monitored: a sensor crash emits
+    `jido.agent.sensor.exit` to the owning agent, and the sensor stops itself if
+    the owner exits. Use `link?: true` only for fail-fast input paths where a
+    sensor crash should also crash the owning agent runtime.
+
     ## Fields
 
     - `tag` - Agent-local tag for the sensor runtime
@@ -542,7 +547,9 @@ defmodule Jido.Agent.Directive do
     Stop a tagged sensor runtime owned by the current agent runtime.
 
     The sensor is identified by the same tag used by `StartSensor`. Missing
-    sensors are a no-op. Stopping a sensor does not emit `jido.agent.child.exit`.
+    sensors are a no-op. Stopping a sensor does not emit `jido.agent.child.exit`
+    or `jido.agent.sensor.exit`; the sensor exit signal is reserved for
+    unexpected runtime exits.
 
     ## Fields
 

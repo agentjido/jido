@@ -668,6 +668,21 @@ defmodule JidoTest.Sensor.RuntimeTest do
 
       assert_receive {:DOWN, ^ref, :process, ^pid, {:owner_down, :killed}}, 500
     end
+
+    test "ignores DOWN-shaped messages when no owner monitor exists" do
+      {:ok, pid} =
+        Runtime.start(
+          sensor: MinimalSensor,
+          context: %{agent_ref: self()}
+        )
+
+      send(pid, {:DOWN, nil, :process, nil, :boom})
+
+      assert %{owner_ref: nil} = :sys.get_state(pid)
+      assert Process.alive?(pid)
+
+      GenServer.stop(pid)
+    end
   end
 
   describe "child_spec/1" do

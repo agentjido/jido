@@ -175,7 +175,7 @@ defmodule Jido.Sensor.Runtime do
 
   @impl GenServer
   def handle_info({:DOWN, ref, :process, owner_pid, reason}, state)
-      when ref == state.owner_ref and owner_pid == state.owner_pid do
+      when is_reference(ref) and ref == state.owner_ref and owner_pid == state.owner_pid do
     Logger.debug(fn ->
       "Sensor.Runtime #{state.id} owner #{inspect(owner_pid)} exited: #{inspect(reason)}"
     end)
