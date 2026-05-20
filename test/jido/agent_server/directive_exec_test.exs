@@ -1032,6 +1032,36 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       end
     end
 
+    test "stops linked sensors without propagating controlled stop exits", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        start_directive =
+          Directive.start_sensor(:linked_temporary, LifecycleSensor, link?: true)
+
+        {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+        sensor_pid = state_with_sensor.children[{:sensor, :linked_temporary}].pid
+        sensor_ref = Process.monitor(sensor_pid)
+
+        stop_directive = Directive.stop_sensor(:linked_temporary, :cleanup)
+
+        assert {:ok, stopped_state} =
+                 DirectiveExec.exec(stop_directive, input_signal, state_with_sensor)
+
+        refute Map.has_key?(stopped_state.children, {:sensor, :linked_temporary})
+
+        assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:shutdown, :cleanup}},
+                       1_000
+
+        refute_receive {:EXIT, ^sensor_pid, _reason}, 100
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
     test "does not stop existing sensor when replacement module is invalid", %{
       state: state,
       input_signal: input_signal
