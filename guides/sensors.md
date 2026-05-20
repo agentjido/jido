@@ -123,7 +123,27 @@ Sensors that need external connections or subscriptions should establish them in
 
 ## Starting Sensors
 
-Use `Jido.Sensor.Runtime` to run a sensor:
+When a sensor is owned by an agent, prefer `StartSensor` and let the
+`AgentServer` manage delivery, monitoring, replacement, and cleanup:
+
+```elixir
+def run(_params, _context) do
+  {:ok, %{},
+   [
+     Jido.Agent.Directive.start_sensor(:metrics, MetricSensor,
+       config: %{metric: "cpu_usage", threshold: 80}
+     )
+   ]}
+end
+```
+
+The owning `AgentServer` supplies runtime context such as `:agent_ref`,
+`:agent_id`, and `:sensor_tag`. Sensors started this way are tracked under
+`{:sensor, tag}`, stop when the owning agent exits, and emit
+`jido.agent.sensor.exit` to the owner on unexpected sensor exits.
+
+Use `Jido.Sensor.Runtime` directly for standalone sensors or supervised
+application children:
 
 ```elixir
 {:ok, sensor_pid} = Jido.Sensor.Runtime.start_link(
@@ -141,6 +161,7 @@ Use `Jido.Sensor.Runtime` to run a sensor:
 | `:config` | Configuration map, validated against sensor's schema |
 | `:context` | Runtime context, including `:agent_ref` for signal delivery |
 | `:id` | Instance ID (auto-generated if not provided) |
+| `:owner_pid` | Optional owner process to monitor; the runtime stops if the owner exits |
 
 ### In Supervision Trees
 

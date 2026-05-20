@@ -72,6 +72,8 @@ Directive.adopt_child(child_pid, :recovered_worker, meta: %{restored: true})
 
 # Stop processes
 Directive.stop_child(:worker_1)
+
+# Sensor lifecycles
 Directive.start_sensor(:market_data, MyApp.MarketDataSensor,
   config: %{symbol: "AAPL", interval: 1000},
   link?: false

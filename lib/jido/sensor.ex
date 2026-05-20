@@ -4,7 +4,7 @@ defmodule Jido.Sensor do
 
   A Sensor is a pure behaviour that transforms external events into Signals.
   Sensors are stateless modules that define how to initialize, handle events,
-  and emit signals. The runtime execution is handled by a separate SensorServer.
+  and emit signals. Runtime execution is handled by `Jido.Sensor.Runtime`.
 
   ## Usage
 
@@ -30,7 +30,7 @@ defmodule Jido.Sensor do
             type: "metric.updated",
             data: %{value: value, previous: state.last_value}
           })
-          {:ok, %{state | last_value: value}, [signal]}
+          {:ok, %{state | last_value: value}, [{:emit, signal}]}
         end
       end
 
