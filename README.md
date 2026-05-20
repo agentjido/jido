@@ -94,7 +94,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Directive-Based Effects
 - Actions transform state and may perform required work
 - Directives describe runtime-owned external effects
-- Built-in directives: Emit, Spawn, SpawnAgent, StopChild, Schedule, Stop
+- Built-in directives: Emit, Spawn, SpawnAgent, StopChild, StartSensor, StopSensor, Schedule, Stop
 - Protocol-based extensibility for custom directives
 
 ### OTP Runtime Integration
@@ -297,8 +297,16 @@ State operations are internal state transitions handled by the strategy layer du
 | `Spawn`      | Spawn a generic BEAM child process               |
 | `SpawnAgent` | Spawn a tracked child Jido agent (`restart: :transient` by default) |
 | `StopChild`  | Gracefully stop and remove a tracked child agent                      |
+| `StartSensor` | Start or replace a tagged sensor runtime        |
+| `StopSensor` | Stop a tagged sensor runtime                     |
 | `Schedule`   | Schedule a delayed message                       |
 | `Stop`       | Stop the agent process                           |
+
+Sensor runtimes started by `StartSensor` are tracked under `{:sensor, tag}` and
+are owner-monitored by default. Unexpected sensor exits emit
+`jido.agent.sensor.exit` back to the owning agent; controlled `StopSensor`
+shutdowns do not. Use `link?: true` only when a sensor should fail fast with
+its owning `AgentServer`.
 
 ## Documentation
 
@@ -426,6 +434,8 @@ A: Built-in directives:
 - **SpawnAgent**: Spawn child agents
 - **AdoptChild**: Attach an orphaned or unattached child to the current parent
 - **StopChild**: Stop child processes/agents
+- **StartSensor**: Start or replace owner-monitored tagged sensor runtimes
+- **StopSensor**: Stop tagged sensor runtimes
 - **Schedule**: Schedule future actions
 - **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
 - **Stop**: Stop the agent

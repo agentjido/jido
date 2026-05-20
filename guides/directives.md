@@ -43,6 +43,8 @@ end
 | `SpawnAgent` | Spawn child Jido agent with hierarchy | Full (monitoring, exit signals, `restart: :transient` default) |
 | `AdoptChild` | Attach an orphaned or unattached child to the current parent | Full (monitoring, parent ref refresh, children map update) |
 | `StopChild` | Gracefully stop and remove a tracked child agent | Uses children map |
+| `StartSensor` | Start or replace a tagged sensor runtime | Tracked under `{:sensor, tag}` |
+| `StopSensor` | Stop a tagged sensor runtime | Uses sensor tag |
 | `Schedule` | Schedule a delayed message | — |
 | `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
 | `Stop` | Stop the agent process (self) | — |
@@ -70,6 +72,13 @@ Directive.adopt_child(child_pid, :recovered_worker, meta: %{restored: true})
 
 # Stop processes
 Directive.stop_child(:worker_1)
+
+# Sensor lifecycles
+Directive.start_sensor(:market_data, MyApp.MarketDataSensor,
+  config: %{symbol: "AAPL", interval: 1000},
+  link?: false
+)
+Directive.stop_sensor(:market_data)
 Directive.stop()
 Directive.stop(:shutdown)
 
@@ -137,6 +146,23 @@ to `:continue` or `:emit_orphan`. In that case, `Directive.adopt_child/3` is
 the explicit way to reattach the live child to a new logical parent. Jido keeps
 the active logical binding in `Jido.RuntimeStore`, so child restarts continue
 to use the current parent relationship after adoption.
+
+## Sensor Lifecycle
+
+`StartSensor` starts or replaces a tagged `Jido.Sensor` runtime and tracks it
+under `{:sensor, tag}` in the owning `AgentServer`. Sensor signals are delivered
+back to that owning agent by default.
+
+Managed sensors default to `link?: false` with explicit owner monitoring:
+
+- if the owning `AgentServer` exits, the sensor stops itself
+- if the sensor exits unexpectedly, the owner receives `jido.agent.sensor.exit`
+- controlled `StopSensor` shutdowns do not emit `jido.agent.sensor.exit`
+
+Use `link?: true` only for fail-fast input paths where an abnormal sensor exit
+should also take down the owning `AgentServer`. Even then, controlled
+replacement and `StopSensor` unlink before shutdown so intentional lifecycle
+changes stay local.
 
 ## Parent-Aware Communication
 

@@ -631,6 +631,60 @@ defmodule JidoTest.Sensor.RuntimeTest do
     end
   end
 
+  describe "start/1" do
+    test "starts the runtime unlinked to the caller" do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        {:ok, pid} =
+          Runtime.start(
+            sensor: SimpleSensor,
+            config: %{prefix: "unlinked"},
+            context: %{agent_ref: self()}
+          )
+
+        assert Process.alive?(pid)
+
+        GenServer.stop(pid)
+        refute_receive {:EXIT, ^pid, _reason}, 100
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "stops when monitored owner exits" do
+      owner = spawn(fn -> Process.sleep(:infinity) end)
+
+      {:ok, pid} =
+        Runtime.start(
+          sensor: MinimalSensor,
+          context: %{agent_ref: self()},
+          owner_pid: owner
+        )
+
+      ref = Process.monitor(pid)
+
+      Process.exit(owner, :kill)
+
+      assert_receive {:DOWN, ^ref, :process, ^pid, {:owner_down, :killed}}, 500
+    end
+
+    test "ignores DOWN-shaped messages when no owner monitor exists" do
+      {:ok, pid} =
+        Runtime.start(
+          sensor: MinimalSensor,
+          context: %{agent_ref: self()}
+        )
+
+      send(pid, {:DOWN, nil, :process, nil, :boom})
+
+      assert %{owner_ref: nil} = :sys.get_state(pid)
+      assert Process.alive?(pid)
+
+      GenServer.stop(pid)
+    end
+  end
+
   describe "child_spec/1" do
     test "returns valid child spec with default id" do
       spec = Runtime.child_spec(sensor: SimpleSensor)

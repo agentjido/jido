@@ -3,6 +3,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer.{DirectiveExec, Options, State}
+  alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
 
   defmodule TestAgent do
@@ -11,6 +12,167 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       name: "directive_exec_test_agent",
       schema: [
         counter: [type: :integer, default: 0]
+      ]
+  end
+
+  defmodule LifecycleSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_lifecycle_sensor",
+      description: "Sensor used to test StartSensor and StopSensor directives",
+      schema:
+        Zoi.object(
+          %{
+            label: Zoi.string() |> Zoi.default("default")
+          },
+          coerce: true
+        )
+
+    @impl Jido.Sensor
+    def init(config, context) do
+      {:ok, %{config: config, context: context}}
+    end
+
+    @impl Jido.Sensor
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule FailingLifecycleSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_failing_lifecycle_sensor",
+      description: "Sensor that fails during init",
+      schema: Zoi.object(%{}, coerce: true)
+
+    @impl Jido.Sensor
+    def init(_config, _context), do: {:error, :init_failed}
+
+    @impl Jido.Sensor
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule RoundTripSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_round_trip_sensor",
+      description: "Sensor used to prove StartSensor delivers signals back to the owning agent",
+      schema: Zoi.object(%{}, coerce: true)
+
+    @impl Jido.Sensor
+    def init(_config, context) do
+      {:ok, %{context: context}}
+    end
+
+    @impl Jido.Sensor
+    def handle_event(:crash, _state), do: raise("linked sensor crash")
+
+    def handle_event({:trigger, value}, state) do
+      signal =
+        Signal.new!(%{
+          source: "/sensor/directive-round-trip",
+          type: "directive.sensor.event",
+          data: %{
+            value: value,
+            agent_id: state.context.agent_id,
+            sensor_tag: state.context.sensor_tag
+          }
+        })
+
+      {:ok, state, [{:emit, signal}]}
+    end
+
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule StartRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "start_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.start_sensor(:round_trip, RoundTripSensor)
+      {:ok, %{sensor_start_requested: true}, [directive]}
+    end
+  end
+
+  defmodule StartLinkedRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "start_linked_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.start_sensor(:linked_round_trip, RoundTripSensor, link?: true)
+      {:ok, %{sensor_start_requested: true}, [directive]}
+    end
+  end
+
+  defmodule StopRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "stop_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.stop_sensor(:round_trip, :controlled_stop)
+      {:ok, %{sensor_stop_requested: true}, [directive]}
+    end
+  end
+
+  defmodule RecordRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_round_trip_sensor",
+      schema: [
+        value: [type: :any, required: true],
+        agent_id: [type: :any, required: true],
+        sensor_tag: [type: :any, required: true]
+      ]
+
+    def run(params, _context) do
+      {:ok,
+       %{
+         last_sensor_value: params.value,
+         last_sensor_agent_id: params.agent_id,
+         last_sensor_tag: params.sensor_tag
+       }}
+    end
+  end
+
+  defmodule RecordRoundTripSensorExitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_round_trip_sensor_exit",
+      schema: [
+        tag: [type: :any, required: true],
+        reason: [type: :any, required: true]
+      ]
+
+    def run(params, context) do
+      events = Map.get(context.state, :sensor_exit_events, [])
+      {:ok, %{sensor_exit_events: events ++ [params]}}
+    end
+  end
+
+  defmodule RoundTripSensorAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "directive_exec_round_trip_sensor_agent",
+      schema: [
+        sensor_start_requested: [type: :boolean, default: false],
+        sensor_stop_requested: [type: :boolean, default: false],
+        last_sensor_value: [type: :any, default: nil],
+        last_sensor_agent_id: [type: :any, default: nil],
+        last_sensor_tag: [type: :any, default: nil],
+        sensor_exit_events: [type: {:list, :any}, default: []]
+      ],
+      signal_routes: [
+        {"directive.sensor.start", StartRoundTripSensorAction},
+        {"directive.sensor.stop", StopRoundTripSensorAction},
+        {"directive.linked_sensor.start", StartLinkedRoundTripSensorAction},
+        {"directive.sensor.event", RecordRoundTripSensorAction},
+        {"jido.agent.sensor.exit", RecordRoundTripSensorExitAction}
       ]
   end
 
@@ -599,6 +761,347 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
     test "returns ok when child tag not found", %{state: state, input_signal: input_signal} do
       directive = %Directive.StopChild{tag: :nonexistent_child, reason: :normal}
+
+      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+    end
+  end
+
+  describe "StartSensor and StopSensor directives" do
+    test "starts a tagged sensor runtime", %{state: state, input_signal: input_signal} do
+      directive =
+        Directive.start_sensor(:market_data, LifecycleSensor,
+          config: %{label: "prices"},
+          meta: %{purpose: :quotes}
+        )
+
+      assert {:ok, new_state} = DirectiveExec.exec(directive, input_signal, state)
+
+      key = {:sensor, :market_data}
+      assert Map.has_key?(new_state.children, key)
+
+      child_info = new_state.children[key]
+      assert child_info.module == LifecycleSensor
+      assert child_info.tag == key
+      assert child_info.meta.kind == :sensor
+      assert child_info.meta.sensor == LifecycleSensor
+      assert child_info.meta.sensor_tag == :market_data
+      assert child_info.meta.purpose == :quotes
+      assert Process.alive?(child_info.pid)
+
+      runtime_state = :sys.get_state(child_info.pid)
+      assert runtime_state.config.label == "prices"
+      assert runtime_state.context.agent_id == state.id
+      assert runtime_state.context.sensor_tag == :market_data
+      assert runtime_state.context.sensor_origin == :directive
+
+      GenServer.stop(child_info.pid)
+    end
+
+    test "sensor started by directive emits back into the owning agent", context do
+      pid =
+        start_server(context, RoundTripSensorAgent, id: unique_id("directive-sensor-round-trip"))
+
+      start_signal =
+        Signal.new!(%{
+          source: "/test",
+          type: "directive.sensor.start",
+          data: %{}
+        })
+
+      assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.sensor_start_requested == true and
+            Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      child_info = state.children[{:sensor, :round_trip}]
+      assert child_info.module == RoundTripSensor
+      assert Process.alive?(child_info.pid)
+
+      assert :ok = SensorRuntime.event(child_info.pid, {:trigger, :from_sensor})
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.last_sensor_value == :from_sensor
+        end)
+
+      assert state.agent.state.last_sensor_agent_id == state.id
+      assert state.agent.state.last_sensor_tag == :round_trip
+
+      GenServer.stop(pid)
+    end
+
+    test "controlled stop does not emit sensor exit lifecycle signal", context do
+      pid =
+        start_server(context, RoundTripSensorAgent,
+          id: unique_id("directive-sensor-controlled-stop")
+        )
+
+      start_signal = Signal.new!(%{source: "/test", type: "directive.sensor.start", data: %{}})
+      stop_signal = Signal.new!(%{source: "/test", type: "directive.sensor.stop", data: %{}})
+
+      assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+      state =
+        eventually_state(pid, fn state ->
+          Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      sensor_pid = state.children[{:sensor, :round_trip}].pid
+      sensor_ref = Process.monitor(sensor_pid)
+
+      assert :ok = Jido.AgentServer.cast(pid, stop_signal)
+
+      assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:shutdown, :controlled_stop}},
+                     1_000
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.sensor_stop_requested == true and
+            not Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      assert state.agent.state.sensor_exit_events == []
+
+      GenServer.stop(pid)
+    end
+
+    test "unlinked directive sensor stops when the owning agent exits abnormally", context do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        pid =
+          start_server(context, RoundTripSensorAgent,
+            id: unique_id("directive-sensor-owner-down")
+          )
+
+        start_signal =
+          Signal.new!(%{
+            source: "/test",
+            type: "directive.sensor.start",
+            data: %{}
+          })
+
+        assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+        state =
+          eventually_state(pid, fn state ->
+            Map.has_key?(state.children, {:sensor, :round_trip})
+          end)
+
+        sensor_pid = state.children[{:sensor, :round_trip}].pid
+        sensor_ref = Process.monitor(sensor_pid)
+
+        Process.exit(pid, :kill)
+
+        assert_receive {:EXIT, ^pid, :killed}, 500
+
+        assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:owner_down, :killed}},
+                       1_000
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "link? true makes sensor failure fail the owning agent", context do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        pid =
+          start_server(context, RoundTripSensorAgent, id: unique_id("directive-linked-sensor"))
+
+        start_signal =
+          Signal.new!(%{
+            source: "/test",
+            type: "directive.linked_sensor.start",
+            data: %{}
+          })
+
+        assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+        state =
+          eventually_state(pid, fn state ->
+            Map.has_key?(state.children, {:sensor, :linked_round_trip})
+          end)
+
+        sensor_pid = state.children[{:sensor, :linked_round_trip}].pid
+        agent_ref = Process.monitor(pid)
+
+        assert :ok = SensorRuntime.event(sensor_pid, :crash)
+
+        assert_receive {:DOWN, ^agent_ref, :process, ^pid,
+                        {%RuntimeError{message: "linked sensor crash"}, _stack}},
+                       1_000
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "leaves state unchanged when sensor init fails", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      directive = Directive.start_sensor(:bad_sensor, FailingLifecycleSensor)
+
+      assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
+      refute Map.has_key?(state.children, {:sensor, :bad_sensor})
+    end
+
+    test "replaces an existing sensor by default", %{state: state, input_signal: input_signal} do
+      start_a =
+        Directive.start_sensor(:replaceable, LifecycleSensor, config: %{label: "a"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :replaceable}].pid
+
+      start_b =
+        Directive.start_sensor(:replaceable, LifecycleSensor, config: %{label: "b"})
+
+      assert {:ok, replaced_state} = DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+      new_pid = replaced_state.children[{:sensor, :replaceable}].pid
+      assert new_pid != old_pid
+      assert Process.alive?(new_pid)
+      refute_eventually(Process.alive?(old_pid))
+      assert :sys.get_state(new_pid).config.label == "b"
+
+      GenServer.stop(new_pid)
+    end
+
+    test "does not replace an existing sensor when replace? is false", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      start_a =
+        Directive.start_sensor(:sticky, LifecycleSensor, config: %{label: "a"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :sticky}].pid
+
+      start_b =
+        Directive.start_sensor(:sticky, LifecycleSensor,
+          config: %{label: "b"},
+          replace?: false
+        )
+
+      assert {:ok, unchanged_state} = DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+      assert unchanged_state.children[{:sensor, :sticky}].pid == old_pid
+      assert :sys.get_state(old_pid).config.label == "a"
+
+      GenServer.stop(old_pid)
+    end
+
+    test "replaces linked sensors without propagating controlled stop exits", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        start_a =
+          Directive.start_sensor(:linked_replaceable, LifecycleSensor,
+            config: %{label: "a"},
+            link?: true
+          )
+
+        {:ok, state_with_sensor} = DirectiveExec.exec(start_a, input_signal, state)
+        old_pid = state_with_sensor.children[{:sensor, :linked_replaceable}].pid
+
+        start_b =
+          Directive.start_sensor(:linked_replaceable, LifecycleSensor,
+            config: %{label: "b"},
+            link?: true
+          )
+
+        assert {:ok, replaced_state} =
+                 DirectiveExec.exec(start_b, input_signal, state_with_sensor)
+
+        new_pid = replaced_state.children[{:sensor, :linked_replaceable}].pid
+        assert new_pid != old_pid
+        assert Process.alive?(new_pid)
+        refute_receive {:EXIT, ^old_pid, {:shutdown, :replace}}, 100
+        refute_eventually(Process.alive?(old_pid))
+        assert :sys.get_state(new_pid).config.label == "b"
+
+        GenServer.stop(new_pid)
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "stops linked sensors without propagating controlled stop exits", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      previous_trap_exit = Process.flag(:trap_exit, true)
+
+      try do
+        start_directive =
+          Directive.start_sensor(:linked_temporary, LifecycleSensor, link?: true)
+
+        {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+        sensor_pid = state_with_sensor.children[{:sensor, :linked_temporary}].pid
+        sensor_ref = Process.monitor(sensor_pid)
+
+        stop_directive = Directive.stop_sensor(:linked_temporary, :cleanup)
+
+        assert {:ok, stopped_state} =
+                 DirectiveExec.exec(stop_directive, input_signal, state_with_sensor)
+
+        refute Map.has_key?(stopped_state.children, {:sensor, :linked_temporary})
+
+        assert_receive {:DOWN, ^sensor_ref, :process, ^sensor_pid, {:shutdown, :cleanup}},
+                       1_000
+
+        refute_receive {:EXIT, ^sensor_pid, _reason}, 100
+      after
+        Process.flag(:trap_exit, previous_trap_exit)
+      end
+    end
+
+    test "does not stop existing sensor when replacement module is invalid", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      start_directive =
+        Directive.start_sensor(:protected, LifecycleSensor, config: %{label: "active"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :protected}].pid
+
+      invalid_replacement =
+        Directive.start_sensor(:protected, NonExistentSensorModule, config: %{label: "bad"})
+
+      assert {:ok, unchanged_state} =
+               DirectiveExec.exec(invalid_replacement, input_signal, state_with_sensor)
+
+      assert unchanged_state.children[{:sensor, :protected}].pid == old_pid
+      assert Process.alive?(old_pid)
+      assert :sys.get_state(old_pid).config.label == "active"
+
+      GenServer.stop(old_pid)
+    end
+
+    test "stops an existing tagged sensor", %{state: state, input_signal: input_signal} do
+      start_directive = Directive.start_sensor(:temporary, LifecycleSensor)
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+
+      sensor_pid = state_with_sensor.children[{:sensor, :temporary}].pid
+
+      stop_directive = Directive.stop_sensor(:temporary, :cleanup)
+
+      assert {:ok, stopped_state} =
+               DirectiveExec.exec(stop_directive, input_signal, state_with_sensor)
+
+      refute Map.has_key?(stopped_state.children, {:sensor, :temporary})
+      refute_eventually(Process.alive?(sensor_pid))
+    end
+
+    test "returns ok when sensor tag is not found", %{state: state, input_signal: input_signal} do
+      directive = Directive.stop_sensor(:missing_sensor)
 
       assert {:ok, ^state} = DirectiveExec.exec(directive, input_signal, state)
     end

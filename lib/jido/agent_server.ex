@@ -198,6 +198,7 @@ defmodule Jido.AgentServer do
     DirectiveExec,
     Options,
     ParentRef,
+    SensorLifecycle,
     SignalRouter,
     State,
     StopChildRuntime,
@@ -205,12 +206,11 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.Agent.Directive
-  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned}
+  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, Orphaned, SensorExit}
   alias Jido.Config.Defaults
   alias Jido.Observe
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.RuntimeStore
-  alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
   alias Jido.Signal.Router, as: JidoRouter
   alias Jido.Telemetry.Formatter
@@ -1433,6 +1433,9 @@ defmodule Jido.AgentServer do
       end
     end)
 
+    # Managed sensors are monitored, not linked, so stop them explicitly.
+    SensorLifecycle.stop_all(state, reason)
+
     :ok
   end
 
@@ -2654,50 +2657,66 @@ defmodule Jido.AgentServer do
           do: spec.module.subscriptions(config, context),
           else: []
 
-      Enum.reduce(subscriptions, acc_state, fn {sensor_module, sensor_config}, inner_state ->
-        start_subscription_sensor(inner_state, spec.module, sensor_module, sensor_config, context)
+      subscriptions
+      |> List.wrap()
+      |> Enum.reduce(acc_state, fn subscription, inner_state ->
+        case normalize_plugin_subscription(subscription, spec.module) do
+          {:ok, tag, sensor_module, sensor_config} ->
+            start_subscription_sensor(
+              inner_state,
+              spec.module,
+              tag,
+              sensor_module,
+              sensor_config,
+              context
+            )
+
+          {:error, reason} ->
+            Logger.warning(fn ->
+              "Ignoring invalid subscription for plugin #{inspect(spec.module)}: #{inspect(reason)}"
+            end)
+
+            inner_state
+        end
       end)
     end)
+  end
+
+  defp normalize_plugin_subscription({sensor_module, sensor_config}, plugin_module)
+       when is_atom(sensor_module) do
+    {:ok, {:plugin, plugin_module, sensor_module}, sensor_module, sensor_config}
+  end
+
+  defp normalize_plugin_subscription({tag, sensor_module, sensor_config}, _plugin_module)
+       when is_atom(sensor_module) do
+    {:ok, tag, sensor_module, sensor_config}
+  end
+
+  defp normalize_plugin_subscription(subscription, _plugin_module) do
+    {:error, {:invalid_subscription, subscription}}
   end
 
   defp start_subscription_sensor(
          %State{} = state,
          plugin_module,
+         tag,
          sensor_module,
          sensor_config,
          context
        ) do
-    opts = [
-      sensor: sensor_module,
-      config: sensor_config,
-      context: context
-    ]
+    {:ok, state} =
+      SensorLifecycle.start(
+        state,
+        tag,
+        sensor_module,
+        sensor_config,
+        %{plugin: plugin_module, sensor: sensor_module},
+        context: context,
+        origin: {:plugin, plugin_module},
+        replace?: false
+      )
 
-    case SensorRuntime.start_link(opts) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-        tag = {:sensor, plugin_module, sensor_module}
-
-        child_info =
-          ChildInfo.new!(%{
-            pid: pid,
-            ref: ref,
-            module: sensor_module,
-            id: "#{plugin_module}-#{sensor_module}-#{inspect(pid)}",
-            tag: tag,
-            meta: %{plugin: plugin_module, sensor: sensor_module}
-          })
-
-        new_children = Map.put(state.children, tag, child_info)
-        %{state | children: new_children}
-
-      {:error, reason} ->
-        Logger.warning(fn ->
-          "Failed to start subscription sensor #{inspect(sensor_module)} for plugin #{inspect(plugin_module)}: #{inspect(reason)}"
-        end)
-
-        state
-    end
+    state
   end
 
   # ---------------------------------------------------------------------------
@@ -3134,32 +3153,79 @@ defmodule Jido.AgentServer do
   end
 
   defp handle_child_down(%State{} = state, pid, reason) do
-    {tag, state} = State.remove_child_by_pid(state, pid)
-
-    if tag do
-      Logger.debug(fn ->
-        "AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}"
+    child_info =
+      Enum.find_value(state.children, fn
+        {_tag, %{pid: ^pid} = child_info} -> child_info
+        _entry -> nil
       end)
 
-      signal =
-        ChildExit.new!(
-          %{tag: tag, pid: pid, reason: reason},
-          source: "/agent/#{state.id}"
-        )
+    {tag, state} = State.remove_child_by_pid(state, pid)
 
-      traced_signal =
-        case Trace.put(signal, Trace.new_root()) do
-          {:ok, s} -> s
-          {:error, _} -> signal
+    cond do
+      tag && SensorLifecycle.sensor_child?(child_info) ->
+        Logger.debug(fn ->
+          "AgentServer #{state.id} sensor #{inspect(tag)} exited: #{inspect(reason)}"
+        end)
+
+        signal =
+          SensorExit.new!(
+            sensor_exit_data(tag, child_info, pid, reason),
+            source: "/agent/#{state.id}"
+          )
+
+        traced_signal =
+          case Trace.put(signal, Trace.new_root()) do
+            {:ok, s} -> s
+            {:error, _} -> signal
+          end
+
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, ns} -> {:noreply, ns}
         end
 
-      case process_signal(traced_signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, ns} -> {:noreply, ns}
-      end
-    else
-      {:noreply, state}
+      tag ->
+        Logger.debug(fn ->
+          "AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}"
+        end)
+
+        signal =
+          ChildExit.new!(
+            %{tag: tag, pid: pid, reason: reason},
+            source: "/agent/#{state.id}"
+          )
+
+        traced_signal =
+          case Trace.put(signal, Trace.new_root()) do
+            {:ok, s} -> s
+            {:error, _} -> signal
+          end
+
+        case process_signal(traced_signal, state) do
+          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+          {:error, _reason, ns} -> {:noreply, ns}
+        end
+
+      true ->
+        {:noreply, state}
     end
+  end
+
+  defp sensor_exit_data({:sensor, sensor_tag}, child_info, pid, reason) do
+    sensor_exit_data(sensor_tag, child_info, pid, reason)
+  end
+
+  defp sensor_exit_data(tag, child_info, pid, reason) do
+    meta = child_info.meta || %{}
+
+    %{
+      tag: Map.get(meta, :sensor_tag, tag),
+      pid: pid,
+      reason: reason,
+      sensor: Map.get(meta, :sensor, child_info.module),
+      origin: Map.get(meta, :origin, :unknown),
+      meta: meta
+    }
   end
 
   # Wraps parent-down reasons so OTP treats them as clean shutdowns.

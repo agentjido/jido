@@ -121,6 +121,37 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     end
   end
 
+  defmodule RecordChildExitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_child_exit",
+      schema: []
+
+    def run(params, context) do
+      events = Map.get(context.state, :child_exit_events, [])
+      {:ok, %{child_exit_events: events ++ [params]}}
+    end
+  end
+
+  defmodule RecordSensorExitAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_sensor_exit",
+      schema: [
+        tag: [type: :any, required: true],
+        pid: [type: :any, required: true],
+        reason: [type: :any, required: true],
+        sensor: [type: :any, required: true],
+        origin: [type: :any, required: true],
+        meta: [type: :map, default: %{}]
+      ]
+
+    def run(params, context) do
+      events = Map.get(context.state, :sensor_exit_events, [])
+      {:ok, %{sensor_exit_events: events ++ [params]}}
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Test Plugin Modules
   # ---------------------------------------------------------------------------
@@ -155,6 +186,24 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
          %{emit_on_init: true, signal_type: "first.sensor.event", agent_ref: context.agent_ref}},
         {JidoTest.AgentServer.PluginSubscriptionsTest.SecondTestSensor,
          %{sensor_id: "multi-test", agent_ref: context.agent_ref}}
+      ]
+    end
+  end
+
+  defmodule PluginWithTaggedDuplicateSensors do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_tagged_duplicate_sensors",
+      state_key: :tagged_duplicate_sensors,
+      actions: [JidoTest.AgentServer.PluginSubscriptionsTest.SimpleAction]
+
+    @impl Jido.Plugin
+    def subscriptions(_config, context) do
+      [
+        {:fast_quotes, JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
+         %{emit_on_init: false, signal_type: "fast.sensor.event", agent_ref: context.agent_ref}},
+        {:slow_quotes, JidoTest.AgentServer.PluginSubscriptionsTest.TestSensor,
+         %{emit_on_init: false, signal_type: "slow.sensor.event", agent_ref: context.agent_ref}}
       ]
     end
   end
@@ -226,6 +275,23 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       ]
   end
 
+  defmodule AgentWithChildExitSensorPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_child_exit_sensor_plugin",
+      schema: [
+        child_exit_events: [type: {:list, :any}, default: []],
+        sensor_exit_events: [type: {:list, :any}, default: []]
+      ],
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor],
+      signal_routes: [
+        {"jido.agent.child.exit",
+         JidoTest.AgentServer.PluginSubscriptionsTest.RecordChildExitAction},
+        {"jido.agent.sensor.exit",
+         JidoTest.AgentServer.PluginSubscriptionsTest.RecordSensorExitAction}
+      ]
+  end
+
   defmodule PluginWithStaticSubscriptions do
     @moduledoc false
     use Jido.Plugin,
@@ -250,6 +316,13 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     use Jido.Agent,
       name: "agent_with_multi_sensor_plugin",
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithMultipleSensors]
+  end
+
+  defmodule AgentWithTaggedDuplicateSensorPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_tagged_duplicate_sensor_plugin",
+      plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithTaggedDuplicateSensors]
   end
 
   defmodule AgentWithNoSubscriptionsPlugin do
@@ -289,13 +362,13 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       sensor_children =
         state.children
         |> Enum.filter(fn {tag, _} ->
-          match?({:sensor, _, _}, tag)
+          match?({:sensor, _}, tag)
         end)
 
       assert length(sensor_children) == 1
 
       [{tag, child_info}] = sensor_children
-      assert {:sensor, PluginWithSensor, TestSensor} = tag
+      assert {:sensor, {:plugin, PluginWithSensor, TestSensor}} = tag
       assert Process.alive?(child_info.pid)
 
       GenServer.stop(pid)
@@ -308,7 +381,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       [{_tag, child_info}] = sensor_children
       assert child_info.ref != nil
@@ -318,10 +391,47 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       eventually_state(pid, fn state ->
         sensor_count =
           state.children
-          |> Enum.count(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+          |> Enum.count(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
         sensor_count == 0
       end)
+
+      GenServer.stop(pid)
+    end
+
+    test "unexpected sensor exits emit sensor lifecycle signals only", %{jido: jido} do
+      {:ok, pid} = Jido.AgentServer.start_link(agent: AgentWithChildExitSensorPlugin, jido: jido)
+
+      {:ok, state} = Jido.AgentServer.state(pid)
+
+      [{_tag, child_info}] =
+        state.children
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
+
+      Process.exit(child_info.pid, :boom)
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.sensor_exit_events != []
+        end)
+
+      refute Map.has_key?(state.children, {:sensor, {:plugin, PluginWithSensor, TestSensor}})
+      assert state.agent.state.child_exit_events == []
+
+      assert [
+               %{
+                 tag: {:plugin, PluginWithSensor, TestSensor},
+                 pid: sensor_pid,
+                 reason: :boom,
+                 sensor: TestSensor,
+                 origin: {:plugin, PluginWithSensor},
+                 meta: meta
+               }
+             ] = state.agent.state.sensor_exit_events
+
+      assert sensor_pid == child_info.pid
+      assert meta.kind == :sensor
+      assert meta.sensor_tag == {:plugin, PluginWithSensor, TestSensor}
 
       GenServer.stop(pid)
     end
@@ -337,7 +447,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       [{_tag, child_info}] = sensor_children
 
@@ -363,7 +473,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       [{_tag, child_info}] = sensor_children
 
@@ -390,13 +500,13 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       assert length(sensor_children) == 2
 
       sensor_modules =
         sensor_children
-        |> Enum.map(fn {{:sensor, _plugin, sensor_mod}, _} -> sensor_mod end)
+        |> Enum.map(fn {{:sensor, {:plugin, _plugin, sensor_mod}}, _} -> sensor_mod end)
         |> Enum.sort()
 
       assert sensor_modules == [SecondTestSensor, TestSensor]
@@ -404,6 +514,26 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       Enum.each(sensor_children, fn {_tag, child_info} ->
         assert Process.alive?(child_info.pid)
       end)
+
+      GenServer.stop(pid)
+    end
+
+    test "tagged subscriptions allow multiple instances of the same sensor module", %{jido: jido} do
+      {:ok, pid} =
+        Jido.AgentServer.start_link(agent: AgentWithTaggedDuplicateSensorPlugin, jido: jido)
+
+      {:ok, state} = Jido.AgentServer.state(pid)
+
+      sensor_children =
+        state.children
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
+
+      assert length(sensor_children) == 2
+      assert Map.has_key?(state.children, {:sensor, :fast_quotes})
+      assert Map.has_key?(state.children, {:sensor, :slow_quotes})
+
+      assert state.children[{:sensor, :fast_quotes}].module == TestSensor
+      assert state.children[{:sensor, :slow_quotes}].module == TestSensor
 
       GenServer.stop(pid)
     end
@@ -417,13 +547,13 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       assert length(sensor_children) == 3
 
       plugin_sensor_pairs =
         sensor_children
-        |> Enum.map(fn {{:sensor, plugin, sensor}, _} -> {plugin, sensor} end)
+        |> Enum.map(fn {{:sensor, {:plugin, plugin, sensor}}, _} -> {plugin, sensor} end)
         |> Enum.sort()
 
       assert {PluginWithMultipleSensors, SecondTestSensor} in plugin_sensor_pairs
@@ -442,7 +572,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       assert sensor_children == []
 
@@ -456,7 +586,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       assert sensor_children == []
 
@@ -470,7 +600,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       {:ok, state} = Jido.AgentServer.state(pid)
 
-      tag = {:sensor, PluginWithSensor, TestSensor}
+      tag = {:sensor, {:plugin, PluginWithSensor, TestSensor}}
       assert Map.has_key?(state.children, tag)
 
       child_info = Map.get(state.children, tag)
@@ -490,7 +620,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       sensor_children =
         state.children
-        |> Enum.filter(fn {tag, _} -> match?({:sensor, _, _}, tag) end)
+        |> Enum.filter(fn {tag, _} -> match?({:sensor, _}, tag) end)
 
       sensor_pids = Enum.map(sensor_children, fn {_, info} -> info.pid end)
 
@@ -500,6 +630,10 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
 
       eventually(fn ->
         not Process.alive?(pid)
+      end)
+
+      Enum.each(sensor_pids, fn sensor_pid ->
+        refute_eventually(Process.alive?(sensor_pid))
       end)
     end
   end
@@ -514,7 +648,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
       sensor_children =
         state.children
         |> Enum.filter(fn {tag, _} ->
-          match?({:sensor, PluginWithStaticSubscriptions, TestSensor}, tag)
+          match?({:sensor, {:plugin, PluginWithStaticSubscriptions, TestSensor}}, tag)
         end)
 
       assert length(sensor_children) == 1

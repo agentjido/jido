@@ -27,6 +27,8 @@ defmodule Jido.Agent.Directive do
     * `%SpawnAgent{}` - Spawn a child Jido agent with full hierarchy tracking
     * `%AdoptChild{}` - Attach an orphaned or unattached child to the current parent
     * `%StopChild{}` - Request a tracked child agent to stop gracefully
+    * `%StartSensor{}` - Start or replace a tagged sensor runtime
+    * `%StopSensor{}` - Stop a tagged sensor runtime
     * `%Schedule{}` - Schedule a delayed message
     * `%RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
     * `%Stop{}` - Stop the agent process (self)
@@ -64,6 +66,8 @@ defmodule Jido.Agent.Directive do
     SpawnAgent,
     AdoptChild,
     StopChild,
+    StartSensor,
+    StopSensor,
     Schedule,
     RunInstruction,
     Stop,
@@ -87,6 +91,8 @@ defmodule Jido.Agent.Directive do
           | SpawnAgent.t()
           | AdoptChild.t()
           | StopChild.t()
+          | StartSensor.t()
+          | StopSensor.t()
           | Schedule.t()
           | RunInstruction.t()
           | Stop.t()
@@ -471,6 +477,110 @@ defmodule Jido.Agent.Directive do
   end
 
   # ============================================================================
+  # StartSensor - Start a tagged sensor runtime
+  # ============================================================================
+
+  defmodule StartSensor do
+    @moduledoc """
+    Start or replace a tagged sensor runtime owned by the current agent runtime.
+
+    Sensors are tracked separately from child agents under `{:sensor, tag}` and
+    do not participate in child-agent hierarchy signals.
+
+    By default sensors are unlinked but owner-monitored: a sensor crash emits
+    `jido.agent.sensor.exit` to the owning agent, and the sensor stops itself if
+    the owner exits. Use `link?: true` only for fail-fast input paths where a
+    sensor crash should also crash the owning agent runtime.
+
+    ## Fields
+
+    - `tag` - Agent-local tag for the sensor runtime
+    - `sensor` - Sensor module to run under `Jido.Sensor.Runtime`
+    - `config` - Sensor configuration map (default: `%{}`)
+    - `meta` - Metadata stored on the tracked sensor child info (default: `%{}`)
+    - `replace?` - Stop and replace an existing sensor with this tag (default: `true`)
+    - `link?` - Link the sensor to the owning AgentServer so abnormal sensor
+      exits can take the owner down (default: `false`)
+
+    ## Examples
+
+        %StartSensor{tag: :market_data, sensor: MyApp.MarketDataSensor}
+        %StartSensor{
+          tag: {:poller, "AAPL"},
+          sensor: MyApp.MarketDataSensor,
+          config: %{symbol: "AAPL", interval: 1000}
+        }
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                tag: Zoi.any(description: "Agent-local tag for the sensor runtime"),
+                sensor: Zoi.atom(description: "Sensor module to start"),
+                config: Zoi.map(description: "Sensor configuration") |> Zoi.default(%{}),
+                meta: Zoi.map(description: "Metadata for sensor tracking") |> Zoi.default(%{}),
+                replace?:
+                  Zoi.boolean(description: "Replace an existing sensor with the same tag")
+                  |> Zoi.default(true),
+                link?:
+                  Zoi.boolean(description: "Link sensor failure to owning AgentServer")
+                  |> Zoi.default(false)
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc "Returns the Zoi schema for StartSensor."
+    @spec schema() :: Zoi.schema()
+    def schema, do: @schema
+  end
+
+  # ============================================================================
+  # StopSensor - Stop a tagged sensor runtime
+  # ============================================================================
+
+  defmodule StopSensor do
+    @moduledoc """
+    Stop a tagged sensor runtime owned by the current agent runtime.
+
+    The sensor is identified by the same tag used by `StartSensor`. Missing
+    sensors are a no-op. Stopping a sensor does not emit `jido.agent.child.exit`
+    or `jido.agent.sensor.exit`; the sensor exit signal is reserved for
+    unexpected runtime exits.
+
+    ## Fields
+
+    - `tag` - Agent-local tag for the sensor runtime
+    - `reason` - Reason for stopping (default: `:normal`)
+
+    ## Examples
+
+        %StopSensor{tag: :market_data}
+        %StopSensor{tag: {:poller, "AAPL"}, reason: :reconfigured}
+    """
+
+    @schema Zoi.struct(
+              __MODULE__,
+              %{
+                tag: Zoi.any(description: "Agent-local tag for the sensor runtime"),
+                reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
+              },
+              coerce: true
+            )
+
+    @type t :: unquote(Zoi.type_spec(@schema))
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    @doc "Returns the Zoi schema for StopSensor."
+    @spec schema() :: Zoi.schema()
+    def schema, do: @schema
+  end
+
+  # ============================================================================
   # Schedule - Delayed message scheduling
   # ============================================================================
 
@@ -709,6 +819,49 @@ defmodule Jido.Agent.Directive do
   @spec stop_child(term(), term()) :: StopChild.t()
   def stop_child(tag, reason \\ :normal) do
     %StopChild{tag: tag, reason: reason}
+  end
+
+  @doc """
+  Creates a StartSensor directive to start or replace a tagged sensor runtime.
+
+  ## Options
+
+  - `:config` - Sensor configuration map (default: `%{}`)
+  - `:meta` - Metadata stored with the tracked sensor (default: `%{}`)
+  - `:replace?` - Whether to replace an existing sensor for the tag (default: `true`)
+  - `:link?` - Link the sensor to the owning AgentServer so abnormal sensor
+    exits can take the owner down (default: `false`)
+
+  ## Examples
+
+      Directive.start_sensor(:market_data, MyApp.MarketDataSensor)
+      Directive.start_sensor({:poller, "AAPL"}, MyApp.MarketDataSensor,
+        config: %{symbol: "AAPL", interval: 1000}
+      )
+  """
+  @spec start_sensor(term(), module(), keyword()) :: StartSensor.t()
+  def start_sensor(tag, sensor, opts \\ []) do
+    %StartSensor{
+      tag: tag,
+      sensor: sensor,
+      config: Keyword.get(opts, :config, %{}),
+      meta: Keyword.get(opts, :meta, %{}),
+      replace?: Keyword.get(opts, :replace?, true),
+      link?: Keyword.get(opts, :link?, false)
+    }
+  end
+
+  @doc """
+  Creates a StopSensor directive to stop a tagged sensor runtime.
+
+  ## Examples
+
+      Directive.stop_sensor(:market_data)
+      Directive.stop_sensor({:poller, "AAPL"}, :reconfigured)
+  """
+  @spec stop_sensor(term(), term()) :: StopSensor.t()
+  def stop_sensor(tag, reason \\ :normal) do
+    %StopSensor{tag: tag, reason: reason}
   end
 
   @doc """
