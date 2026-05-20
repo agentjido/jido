@@ -19,6 +19,20 @@ defmodule Jido.AgentServer.SensorLifecycle do
   @spec start(State.t(), term(), module(), map() | keyword(), map(), keyword()) ::
           {:ok, State.t()}
   def start(%State{} = state, tag, sensor, config, meta, opts \\ []) do
+    case validate_sensor_module(sensor) do
+      :ok ->
+        start_validated(state, tag, sensor, config, meta, opts)
+
+      {:error, reason} ->
+        Logger.warning(fn ->
+          "AgentServer #{state.id} cannot start sensor #{inspect(tag)}: #{inspect(reason)}"
+        end)
+
+        {:ok, state}
+    end
+  end
+
+  defp start_validated(state, tag, sensor, config, meta, opts) do
     replace? = Keyword.get(opts, :replace?, true)
     key = child_key(tag)
 
@@ -73,54 +87,55 @@ defmodule Jido.AgentServer.SensorLifecycle do
   end
 
   defp start_new(state, tag, sensor, config, meta, opts) do
-    if is_atom(sensor) do
-      id = sensor_id(state, tag)
-      origin = Keyword.get(opts, :origin, :directive)
+    id = sensor_id(state, tag)
+    origin = Keyword.get(opts, :origin, :directive)
 
-      runtime_opts = [
-        sensor: sensor,
-        config: config,
-        context: sensor_context(state, tag, origin, Keyword.get(opts, :context, %{})),
-        id: id
-      ]
+    runtime_opts = [
+      sensor: sensor,
+      config: config,
+      context: sensor_context(state, tag, origin, Keyword.get(opts, :context, %{})),
+      id: id
+    ]
 
-      case SensorRuntime.start(runtime_opts) do
-        {:ok, pid} ->
-          ref = Process.monitor(pid)
-          key = child_key(tag)
+    case SensorRuntime.start(runtime_opts) do
+      {:ok, pid} ->
+        ref = Process.monitor(pid)
+        key = child_key(tag)
 
-          child_info =
-            ChildInfo.new!(%{
-              pid: pid,
-              ref: ref,
-              module: sensor,
-              id: id,
-              partition: state.partition,
-              tag: key,
-              meta: sensor_meta(tag, sensor, config, origin, meta)
-            })
+        child_info =
+          ChildInfo.new!(%{
+            pid: pid,
+            ref: ref,
+            module: sensor,
+            id: id,
+            partition: state.partition,
+            tag: key,
+            meta: sensor_meta(tag, sensor, config, origin, meta)
+          })
 
-          Logger.debug(fn ->
-            "AgentServer #{state.id} started sensor #{inspect(tag)} with #{inspect(sensor)}"
-          end)
+        Logger.debug(fn ->
+          "AgentServer #{state.id} started sensor #{inspect(tag)} with #{inspect(sensor)}"
+        end)
 
-          {:ok, State.add_child(state, key, child_info)}
+        {:ok, State.add_child(state, key, child_info)}
 
-        {:error, reason} ->
-          Logger.warning(fn ->
-            "AgentServer #{state.id} failed to start sensor #{inspect(tag)} with #{inspect(sensor)}: #{inspect(reason)}"
-          end)
+      {:error, reason} ->
+        Logger.warning(fn ->
+          "AgentServer #{state.id} failed to start sensor #{inspect(tag)} with #{inspect(sensor)}: #{inspect(reason)}"
+        end)
 
-          {:ok, state}
-      end
-    else
-      Logger.warning(fn ->
-        "AgentServer #{state.id} cannot start sensor #{inspect(tag)}: invalid sensor module #{inspect(sensor)}"
-      end)
-
-      {:ok, state}
+        {:ok, state}
     end
   end
+
+  defp validate_sensor_module(sensor) when is_atom(sensor) and not is_nil(sensor) do
+    case Code.ensure_loaded(sensor) do
+      {:module, _module} -> :ok
+      {:error, reason} -> {:error, {:sensor_not_loaded, sensor, reason}}
+    end
+  end
+
+  defp validate_sensor_module(sensor), do: {:error, {:invalid_sensor_module, sensor}}
 
   defp stop_by_key(state, key, reason) do
     case State.get_child(state, key) do

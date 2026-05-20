@@ -726,6 +726,29 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       GenServer.stop(old_pid)
     end
 
+    test "does not stop existing sensor when replacement module is invalid", %{
+      state: state,
+      input_signal: input_signal
+    } do
+      start_directive =
+        Directive.start_sensor(:protected, LifecycleSensor, config: %{label: "active"})
+
+      {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)
+      old_pid = state_with_sensor.children[{:sensor, :protected}].pid
+
+      invalid_replacement =
+        Directive.start_sensor(:protected, NonExistentSensorModule, config: %{label: "bad"})
+
+      assert {:ok, unchanged_state} =
+               DirectiveExec.exec(invalid_replacement, input_signal, state_with_sensor)
+
+      assert unchanged_state.children[{:sensor, :protected}].pid == old_pid
+      assert Process.alive?(old_pid)
+      assert :sys.get_state(old_pid).config.label == "active"
+
+      GenServer.stop(old_pid)
+    end
+
     test "stops an existing tagged sensor", %{state: state, input_signal: input_signal} do
       start_directive = Directive.start_sensor(:temporary, LifecycleSensor)
       {:ok, state_with_sensor} = DirectiveExec.exec(start_directive, input_signal, state)

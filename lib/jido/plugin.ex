@@ -70,7 +70,7 @@ defmodule Jido.Plugin do
   - `capabilities` - List of atoms describing what the plugin provides (default: []).
   - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
   - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
-  - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` (default: []).
+  - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` or `{tag, SensorModule, config}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
 
   For static routes and subscriptions, prefer the compile-time `signal_routes:` and `subscriptions:` options in `use Jido.Plugin`.
@@ -139,7 +139,7 @@ defmodule Jido.Plugin do
                             subscriptions:
                               Zoi.list(Zoi.any(),
                                 description:
-                                  "Sensor subscription tuples like {SensorModule, config}."
+                                  "Sensor subscription tuples like {SensorModule, config} or {tag, SensorModule, config}."
                               )
                               |> Zoi.default([]),
                             schedules:
