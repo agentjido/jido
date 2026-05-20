@@ -3,6 +3,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer.{DirectiveExec, Options, State}
+  alias Jido.Sensor.Runtime, as: SensorRuntime
   alias Jido.Signal
 
   defmodule TestAgent do
@@ -48,6 +49,85 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
 
     @impl Jido.Sensor
     def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule RoundTripSensor do
+    @moduledoc false
+    use Jido.Sensor,
+      name: "directive_exec_round_trip_sensor",
+      description: "Sensor used to prove StartSensor delivers signals back to the owning agent",
+      schema: Zoi.object(%{}, coerce: true)
+
+    @impl Jido.Sensor
+    def init(_config, context) do
+      {:ok, %{context: context}}
+    end
+
+    @impl Jido.Sensor
+    def handle_event({:trigger, value}, state) do
+      signal =
+        Signal.new!(%{
+          source: "/sensor/directive-round-trip",
+          type: "directive.sensor.event",
+          data: %{
+            value: value,
+            agent_id: state.context.agent_id,
+            sensor_tag: state.context.sensor_tag
+          }
+        })
+
+      {:ok, state, [{:emit, signal}]}
+    end
+
+    def handle_event(_event, state), do: {:ok, state}
+  end
+
+  defmodule StartRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "start_round_trip_sensor",
+      schema: []
+
+    def run(_params, _context) do
+      directive = Directive.start_sensor(:round_trip, RoundTripSensor)
+      {:ok, %{sensor_start_requested: true}, [directive]}
+    end
+  end
+
+  defmodule RecordRoundTripSensorAction do
+    @moduledoc false
+    use Jido.Action,
+      name: "record_round_trip_sensor",
+      schema: [
+        value: [type: :any, required: true],
+        agent_id: [type: :any, required: true],
+        sensor_tag: [type: :any, required: true]
+      ]
+
+    def run(params, _context) do
+      {:ok,
+       %{
+         last_sensor_value: params.value,
+         last_sensor_agent_id: params.agent_id,
+         last_sensor_tag: params.sensor_tag
+       }}
+    end
+  end
+
+  defmodule RoundTripSensorAgent do
+    @moduledoc false
+    use Jido.Agent,
+      name: "directive_exec_round_trip_sensor_agent",
+      schema: [
+        sensor_start_requested: [type: :boolean, default: false],
+        last_sensor_value: [type: :any, default: nil],
+        last_sensor_agent_id: [type: :any, default: nil],
+        last_sensor_tag: [type: :any, default: nil]
+      ],
+      signal_routes: [
+        {"directive.sensor.start", StartRoundTripSensorAction},
+        {"directive.sensor.event", RecordRoundTripSensorAction}
+      ]
   end
 
   defmodule StopOnSignalAction do
@@ -669,6 +749,42 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert runtime_state.context.sensor_origin == :directive
 
       GenServer.stop(child_info.pid)
+    end
+
+    test "sensor started by directive emits back into the owning agent", context do
+      pid =
+        start_server(context, RoundTripSensorAgent, id: unique_id("directive-sensor-round-trip"))
+
+      start_signal =
+        Signal.new!(%{
+          source: "/test",
+          type: "directive.sensor.start",
+          data: %{}
+        })
+
+      assert :ok = Jido.AgentServer.cast(pid, start_signal)
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.sensor_start_requested == true and
+            Map.has_key?(state.children, {:sensor, :round_trip})
+        end)
+
+      child_info = state.children[{:sensor, :round_trip}]
+      assert child_info.module == RoundTripSensor
+      assert Process.alive?(child_info.pid)
+
+      assert :ok = SensorRuntime.event(child_info.pid, {:trigger, :from_sensor})
+
+      state =
+        eventually_state(pid, fn state ->
+          state.agent.state.last_sensor_value == :from_sensor
+        end)
+
+      assert state.agent.state.last_sensor_agent_id == state.id
+      assert state.agent.state.last_sensor_tag == :round_trip
+
+      GenServer.stop(pid)
     end
 
     test "leaves state unchanged when sensor init fails", %{
