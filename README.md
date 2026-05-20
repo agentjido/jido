@@ -302,6 +302,12 @@ State operations are internal state transitions handled by the strategy layer du
 | `Schedule`   | Schedule a delayed message                       |
 | `Stop`       | Stop the agent process                           |
 
+Sensor runtimes started by `StartSensor` are tracked under `{:sensor, tag}` and
+are owner-monitored by default. Unexpected sensor exits emit
+`jido.agent.sensor.exit` back to the owning agent; controlled `StopSensor`
+shutdowns do not. Use `link?: true` only when a sensor should fail fast with
+its owning `AgentServer`.
+
 ## Documentation
 
 **Start here:**
@@ -428,7 +434,7 @@ A: Built-in directives:
 - **SpawnAgent**: Spawn child agents
 - **AdoptChild**: Attach an orphaned or unattached child to the current parent
 - **StopChild**: Stop child processes/agents
-- **StartSensor**: Start or replace tagged sensor runtimes
+- **StartSensor**: Start or replace owner-monitored tagged sensor runtimes
 - **StopSensor**: Stop tagged sensor runtimes
 - **Schedule**: Schedule future actions
 - **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
