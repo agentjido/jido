@@ -42,13 +42,13 @@ on:
         default: ""
 
 permissions:
-  actions: read
+  actions: write
   contents: write
 
 jobs:
   release:
     name: Release
-    uses: agentjido/github-actions/.github/workflows/jido-release.yml@v4
+    uses: agentjido/github-actions/.github/workflows/jido-release.yml@v5
     with:
       operation: ${{ inputs.operation || 'auto' }}
       tag_name: ${{ inputs.tag_name || '' }}
@@ -56,4 +56,5 @@ jobs:
       hex_dry_run: ${{ inputs.hex_dry_run || false }}
       skip_tests: ${{ inputs.skip_tests || false }}
       version_override: ${{ inputs.version_override || '' }}
-    secrets: inherit
+    secrets:
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}

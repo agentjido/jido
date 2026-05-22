@@ -250,8 +250,8 @@ defmodule JidoTest.AgentServer.TelemetryTest do
           assert {:ok, _agent} = AgentServer.call(pid, signal)
         end)
 
-      refute log =~ "Executing JidoTest.TestActions.IncrementAction"
-      refute log =~ "with params:"
+      refute log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
+      refute log =~ "params:"
       refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
 
       GenServer.stop(pid)
@@ -271,8 +271,8 @@ defmodule JidoTest.AgentServer.TelemetryTest do
           assert {:ok, _agent} = AgentServer.call(pid, signal)
         end)
 
-      assert log =~ "Executing JidoTest.TestActions.IncrementAction"
-      assert log =~ "with params:"
+      assert log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
+      assert log =~ "params:"
 
       assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
                       %{action: JidoTest.TestActions.IncrementAction}}
@@ -298,8 +298,8 @@ defmodule JidoTest.AgentServer.TelemetryTest do
           assert {:ok, _agent} = AgentServer.call(pid, signal)
         end)
 
-      refute log =~ "Executing JidoTest.TestActions.IncrementAction"
-      refute log =~ "with params:"
+      refute log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
+      refute log =~ "params:"
 
       assert_receive {:fallback_exec_instruction_opts, [opts]}
       assert Keyword.get(opts, :log_level) == :warning
