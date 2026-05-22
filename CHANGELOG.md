@@ -2,6 +2,39 @@
 
 <!-- changelog -->
 
+## [v2.3.0](https://github.com/agentjido/jido/compare/v2.2.0...v2.3.0) (2026-05-22)
+
+
+
+
+### Features:
+
+* sensor: add tagged sensor lifecycle directives by mikehostetler
+
+* observe: centralize telemetry emission by mikehostetler
+
+* error: sanitize public error payloads by mikehostetler
+
+* plugin: add phase callbacks with runtime context by mikehostetler
+
+* agent: move identity modules under agent namespace (#277) by mikehostetler
+
+* replace tzdata with time_zone_info to remove hackney dependency (#242) by dl-alexandre
+
+### Bug Fixes:
+
+* observability: quiet routed action logs (#264) by mikehostetler
+
+* ensure Elixir 1.20 compatibility (#251) by mikehostetler
+
+* expand plugin aliases in Pod macro before escaping (#239) by Jaden
+
+### Refactoring:
+
+* logging: localize lazy logger calls by mikehostetler
+
+* fix ex_slop findings by Danila Poyarkov
+
 ## [v2.2.0](https://github.com/agentjido/jido/compare/v2.1.0...v2.2.0) (2026-03-29)
 
 
