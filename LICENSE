@@ -1,4 +1,6 @@
-                                 Apache License
+Copyright 2026 Mike Hostetler <mike.hostetler@gmail.com>
+
+Apache License
                            Version 2.0, January 2004
                         http://www.apache.org/licenses/
 
@@ -186,7 +188,7 @@
       same "printed page" as the copyright notice for easier
       identification within third-party archives.
 
-   Copyright 2019 Parker Selbert
+   Copyright 2026 Mike Hostetler <mike.hostetler@gmail.com>
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
