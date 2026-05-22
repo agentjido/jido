@@ -4,7 +4,9 @@
 [![Hex Docs](https://img.shields.io/badge/hex-docs-lightgreen.svg)](https://hexdocs.pm/jido/)
 [![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
-[![Coverage Status](https://coveralls.io/repos/github/agentjido/jido/badge.svg?branch=main)](https://coveralls.io/github/agentjido/jido?branch=main)
+[![Website](https://img.shields.io/badge/website-jido.run-0f172a.svg)](https://jido.run)
+[![Ecosystem](https://img.shields.io/badge/ecosystem-jido.run-0ea5e9.svg)](https://jido.run/ecosystem)
+[![Discord](https://img.shields.io/badge/discord-join-5865F2.svg?logo=discord&logoColor=white)](https://jido.run/discord)
 
 > **Jido is an autonomous agent framework for Elixir, built for workflows and multi-agent systems.**
 <!-- package.jido.framework -->
@@ -68,7 +70,7 @@ Jido is the core package of the Jido ecosystem. The ecosystem is built around th
 | [jido](https://github.com/agentjido/jido)               | Core agent framework with state management, directives, and runtime                           |
 | [jido_ai](https://github.com/agentjido/jido_ai)         | AI/LLM integration for agents                                                                 |
 
-For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run).
+For demos and examples of what you can build with the Jido Ecosystem, see [https://jido.run](https://jido.run). For the package map and support levels, see [https://jido.run/ecosystem](https://jido.run/ecosystem).
 
 ## Why Jido?
 
@@ -480,6 +482,8 @@ A:
 
 - **Documentation**: [hexdocs.pm/jido](https://hexdocs.pm/jido)
 - **Website**: [jido.run](https://jido.run)
+- **Ecosystem**: [jido.run/ecosystem](https://jido.run/ecosystem)
+- **Discord**: [jido.run/discord](https://jido.run/discord)
 - **GitHub**: [github.com/agentjido/jido](https://github.com/agentjido/jido)
 - **Jido Workbench**: [github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
 
@@ -522,4 +526,6 @@ Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for detai
 - **Documentation**: [https://hexdocs.pm/jido](https://hexdocs.pm/jido)
 - **GitHub**: [https://github.com/agentjido/jido](https://github.com/agentjido/jido)
 - **AgentJido**: [https://jido.run](https://jido.run)
+- **Ecosystem**: [https://jido.run/ecosystem](https://jido.run/ecosystem)
+- **Discord**: [https://jido.run/discord](https://jido.run/discord)
 - **Jido Workbench**: [https://github.com/agentjido/jido_workbench](https://github.com/agentjido/jido_workbench)
