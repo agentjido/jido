@@ -39,13 +39,7 @@ defmodule Jido.Agent.State do
     strict? = Keyword.get(opts, :strict, false)
     known_keys = Keyword.keys(schema)
 
-    state_to_validate =
-      if strict? do
-        Map.take(state, known_keys)
-      else
-        Map.take(state, known_keys)
-      end
-
+    state_to_validate = Map.take(state, known_keys)
     extra_fields = Map.drop(state, known_keys)
 
     case Schema.validate(schema, state_to_validate) do
