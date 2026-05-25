@@ -84,6 +84,14 @@ defmodule JidoTest.PodTest do
       strategy: {TestStrategy, max_depth: 3}
   end
 
+  defmodule PodWithNilStrategy do
+    @moduledoc false
+    use Jido.Pod,
+      name: "pod_with_nil_strategy",
+      topology: %{},
+      strategy: nil
+  end
+
   defmodule EmptyPod do
     @moduledoc false
     use Jido.Pod,
@@ -333,10 +341,62 @@ defmodule JidoTest.PodTest do
     assert agent.agent_module == PodWithStrategy
   end
 
+  test "strategy option resolves caller aliases before pod opts are escaped" do
+    suffix = System.unique_integer([:positive])
+    pod_mod = Module.concat(__MODULE__, :"AliasedStrategyPod#{suffix}")
+    pod_name = "aliased_strategy_pod_#{suffix}"
+
+    Code.compile_string("""
+    defmodule #{inspect(pod_mod)} do
+      @moduledoc false
+      alias #{inspect(TestStrategy)}, as: Strategy
+
+      use Jido.Pod,
+        name: #{inspect(pod_name)},
+        topology: %{},
+        strategy: Strategy
+    end
+    """)
+
+    assert pod_mod.strategy() == TestStrategy
+    agent = pod_mod.new()
+    assert agent.agent_module == pod_mod
+  end
+
   test "use Jido.Pod resolves strategy {module, opts} tuple" do
     assert PodWithStrategyOpts.strategy() == TestStrategy
     assert PodWithStrategyOpts.strategy_opts() == [max_depth: 3]
     agent = PodWithStrategyOpts.new()
     assert agent.agent_module == PodWithStrategyOpts
+  end
+
+  test "strategy tuple option resolves caller aliases before pod opts are escaped" do
+    suffix = System.unique_integer([:positive])
+    pod_mod = Module.concat(__MODULE__, :"AliasedStrategyTuplePod#{suffix}")
+    pod_name = "aliased_strategy_tuple_pod_#{suffix}"
+
+    Code.compile_string("""
+    defmodule #{inspect(pod_mod)} do
+      @moduledoc false
+      alias #{inspect(TestStrategy)}, as: Strategy
+
+      use Jido.Pod,
+        name: #{inspect(pod_name)},
+        topology: %{},
+        strategy: {Strategy, max_depth: 3}
+    end
+    """)
+
+    assert pod_mod.strategy() == TestStrategy
+    assert pod_mod.strategy_opts() == [max_depth: 3]
+    agent = pod_mod.new()
+    assert agent.agent_module == pod_mod
+  end
+
+  test "nil strategy option falls back to default strategy" do
+    assert PodWithNilStrategy.strategy() == Jido.Agent.Strategy.Direct
+    assert PodWithNilStrategy.strategy_opts() == []
+    agent = PodWithNilStrategy.new()
+    assert agent.agent_module == PodWithNilStrategy
   end
 end

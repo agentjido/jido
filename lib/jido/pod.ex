@@ -76,6 +76,7 @@ defmodule Jido.Pod do
     agent_opts =
       opts
       |> Keyword.delete(:topology)
+      |> Keyword.delete(:strategy)
       |> Keyword.put(:plugins, pod_plugins ++ (user_plugins || []))
       |> then(fn resolved_opts ->
         if is_nil(strategy) do
