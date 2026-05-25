@@ -70,10 +70,20 @@ defmodule Jido.Pod do
     user_plugins =
       Definition.expand_and_eval_literal_option(Keyword.get(opts, :plugins, []), __CALLER__)
 
+    strategy =
+      Definition.expand_and_eval_literal_option(Keyword.get(opts, :strategy), __CALLER__)
+
     agent_opts =
       opts
       |> Keyword.delete(:topology)
       |> Keyword.put(:plugins, pod_plugins ++ (user_plugins || []))
+      |> then(fn resolved_opts ->
+        if is_nil(strategy) do
+          resolved_opts
+        else
+          Keyword.put(resolved_opts, :strategy, strategy)
+        end
+      end)
       |> then(fn resolved_opts ->
         if is_nil(remaining_default_plugins) do
           Keyword.delete(resolved_opts, :default_plugins)

@@ -44,6 +44,20 @@ defmodule JidoTest.PodTest do
       capabilities: []
   end
 
+  defmodule TestStrategy do
+    @moduledoc false
+    @behaviour Jido.Agent.Strategy
+
+    @impl true
+    def init(agent, _ctx), do: {agent, []}
+
+    @impl true
+    def tick(agent, _ctx), do: {agent, []}
+
+    @impl true
+    def cmd(agent, _instructions, _ctx), do: {agent, []}
+  end
+
   defmodule ExamplePod do
     @moduledoc false
     use Jido.Pod,
@@ -52,6 +66,22 @@ defmodule JidoTest.PodTest do
         planner: %{agent: WorkerAgent, manager: :planner_nodes, activation: :eager},
         reviewer: %{agent: WorkerAgent, manager: :reviewer_nodes}
       }
+  end
+
+  defmodule PodWithStrategy do
+    @moduledoc false
+    use Jido.Pod,
+      name: "pod_with_strategy",
+      topology: %{},
+      strategy: TestStrategy
+  end
+
+  defmodule PodWithStrategyOpts do
+    @moduledoc false
+    use Jido.Pod,
+      name: "pod_with_strategy_opts",
+      topology: %{},
+      strategy: {TestStrategy, max_depth: 3}
   end
 
   defmodule EmptyPod do
@@ -295,5 +325,18 @@ defmodule JidoTest.PodTest do
     assert {:ok, %{topology_version: 3}} = Pod.fetch_state(expanded_agent)
     assert {:ok, %Topology{version: 3} = topology} = Pod.fetch_topology(expanded_agent)
     assert Map.has_key?(topology.nodes, "reviewer")
+  end
+
+  test "use Jido.Pod resolves strategy module alias" do
+    assert PodWithStrategy.strategy() == TestStrategy
+    agent = PodWithStrategy.new()
+    assert agent.agent_module == PodWithStrategy
+  end
+
+  test "use Jido.Pod resolves strategy {module, opts} tuple" do
+    assert PodWithStrategyOpts.strategy() == TestStrategy
+    assert PodWithStrategyOpts.strategy_opts() == [max_depth: 3]
+    agent = PodWithStrategyOpts.new()
+    assert agent.agent_module == PodWithStrategyOpts
   end
 end
