@@ -717,7 +717,8 @@ defmodule Jido.Error do
   defp sanitize_transport(value, _depth) when is_binary(value), do: truncate_string(value)
 
   defp sanitize_transport(value, _depth)
-       when is_boolean(value) or is_number(value) or is_atom(value), do: value
+       when is_boolean(value) or is_number(value) or is_atom(value),
+       do: value
 
   defp sanitize_transport(%_{} = value, _depth) when is_exception(value) do
     %{
