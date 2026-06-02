@@ -2,6 +2,19 @@
 
 <!-- changelog -->
 
+## [v2.3.1](https://github.com/agentjido/jido/compare/v2.3.0...v2.3.1) (2026-06-02)
+
+
+
+
+### Bug Fixes:
+
+* update jido_signal lock for OTP 29 by mikehostetler
+
+* agent: simplify state validation branch by mikehostetler
+
+* pod: resolve strategy module alias in Pod.__using__/1 by Jaden
+
 ## [v2.3.0](https://github.com/agentjido/jido/compare/v2.2.0...v2.3.0) (2026-05-22)
 
 
