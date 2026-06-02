@@ -300,9 +300,15 @@ Replace `Process.sleep` with await functions for reliable tests:
 
 ```elixir
 defmodule MyAgentTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
 
   alias Jido.{AgentServer, Signal}
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "processes work without sleep", %{jido: jido} do
     {:ok, pid} = Jido.start_agent(jido, WorkerAgent)
