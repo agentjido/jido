@@ -343,11 +343,17 @@ For the full Pod-first architecture and runtime rules, see
 
 ## Testing Configuration
 
-For tests, use `JidoTest.Case` which provides an isolated Jido instance:
+For tests, start a unique Jido instance in setup:
 
 ```elixir
 defmodule MyAgentTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "agent works", %{jido: jido} do
     {:ok, pid} = Jido.start_agent(jido, MyAgent)

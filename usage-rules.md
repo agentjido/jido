@@ -19,7 +19,7 @@ Build reliable multi-agent systems by keeping decision logic pure and runtime ef
 
 ## QA Patterns
 - Start with pure `cmd/2` tests, then add AgentServer integration tests.
-- Use `JidoTest.Case` + `JidoTest.Eventually` for async runtime assertions.
+- Start an isolated Jido instance per runtime test and prefer await/polling assertions over fixed sleeps.
 - Run `mix q` (`mix quality`) and coverage checks before release.
 
 ## Avoid

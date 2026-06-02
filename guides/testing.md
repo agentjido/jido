@@ -6,13 +6,26 @@
 
 Testing Jido agents involves two approaches: pure agent testing (no runtime) and integration testing with AgentServer. This guide covers both patterns along with test isolation, async coordination, and mocking strategies.
 
-## JidoTest.Case for Isolation
+## Isolated Runtime Tests
 
-Use `JidoTest.Case` to get an isolated Jido instance per test. Each test receives its own Registry, TaskSupervisor, and AgentSupervisor—preventing cross-test interference even when running async.
+For tests that start `AgentServer` processes, start an isolated Jido instance
+per test. Each test receives its own Registry, TaskSupervisor, and
+AgentSupervisor, which prevents cross-test interference when running async.
+
+Jido's own test suite has repo-local helpers under the `JidoTest.*` namespace,
+but those modules live in `test/support` and are not part of the published
+package API. In your application tests, use plain `ExUnit.Case` and start a
+unique Jido instance in `setup`.
 
 ```elixir
 defmodule MyAgentTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "starts agent under isolated instance", %{jido: jido} do
     {:ok, pid} = Jido.start_agent(jido, MyAgent)
@@ -21,8 +34,6 @@ defmodule MyAgentTest do
 end
 ```
 
-### Context Keys
-
 The test context includes:
 
 | Key | Description |
@@ -30,19 +41,66 @@ The test context includes:
 | `:jido` | Name of the Jido instance (atom) |
 | `:jido_pid` | PID of the Jido supervisor |
 
-### Helper Functions
-
-`JidoTest.Case` provides convenience functions:
+Use the `:jido` context value when starting agents directly, and derive
+instance-specific infrastructure names from it when needed:
 
 ```elixir
-test "helper functions", %{jido: jido} = context do
-  # Start agent using helper
-  {:ok, pid} = start_test_agent(context, MyAgent, id: "test-1")
+test "uses isolated infrastructure", %{jido: jido} do
+  {:ok, pid} = Jido.start_agent(jido, MyAgent, id: "test-1")
 
-  # Get infrastructure names
-  registry = test_registry(context)
-  task_sup = test_task_supervisor(context)
-  agent_sup = test_agent_supervisor(context)
+  registry = Jido.registry_name(jido)
+  task_sup = Jido.task_supervisor_name(jido)
+  agent_sup = Jido.agent_supervisor_name(jido)
+
+  assert Jido.AgentServer.whereis(registry, "test-1") == pid
+  assert Process.whereis(task_sup)
+  assert Process.whereis(agent_sup)
+end
+```
+
+For async behavior, prefer await functions or polling over fixed sleeps. When
+you need custom polling, keep it local to the test module:
+
+```elixir
+defmodule MyAsyncAgentTest do
+  use ExUnit.Case, async: true
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
+
+  defp do_eventually(fun, deadline, interval) do
+    case fun.() do
+      result when result not in [nil, false] ->
+        result
+
+      _ ->
+        if System.monotonic_time(:millisecond) > deadline do
+          raise ExUnit.AssertionError, message: "condition not met within timeout"
+        end
+
+        Process.sleep(interval)
+        do_eventually(fun, deadline, interval)
+    end
+  end
+
+  defp eventually(fun, opts \\ []) do
+    timeout = Keyword.get(opts, :timeout, 500)
+    interval = Keyword.get(opts, :interval, 5)
+    deadline = System.monotonic_time(:millisecond) + timeout
+    do_eventually(fun, deadline, interval)
+  end
+
+  defp eventually_state(pid, fun, opts \\ []) do
+    eventually(fn ->
+      case Jido.AgentServer.state(pid) do
+        {:ok, state} -> if fun.(state), do: state, else: false
+        _ -> false
+      end
+    end, opts)
+  end
 end
 ```
 
@@ -136,9 +194,15 @@ For integration tests involving signals, directives, and real process behavior:
 
 ```elixir
 defmodule AgentIntegrationTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
 
   alias Jido.{AgentServer, Signal}
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   describe "signal processing" do
     test "synchronous call returns updated agent", %{jido: jido} do
@@ -321,8 +385,14 @@ ExUnit.start()
 
 ```elixir
 defmodule ExternalServiceTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
   use Mimic
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "mocks external service call", %{jido: jido} do
     expect(MyApp.ExternalService, :call, fn args ->
@@ -394,10 +464,16 @@ end
 
 ```elixir
 defmodule HierarchyTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
 
   alias Jido.{AgentServer, Signal}
   alias Jido.AgentServer.ParentRef
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "child receives parent reference", %{jido: jido} do
     {:ok, parent_pid} = AgentServer.start_link(
@@ -655,13 +731,12 @@ end
 | Scenario | Approach |
 |----------|----------|
 | State transformations | Pure `cmd/2` testing, no runtime |
-| Signal processing | `JidoTest.Case` + `AgentServer.call/cast` |
+| Signal processing | Isolated Jido instance + `AgentServer.call/cast` |
 | Async coordination | `Jido.await/2`, `Jido.await_child/4` |
 | External dependencies | Mimic `expect/stub/reject` |
-| Test isolation | `JidoTest.Case` per-test instances |
+| Test isolation | Unique Jido instance per test |
 
 ## Further Reading
 
-- `JidoTest.Case` — Test case module documentation
 - `Jido.Await` — Coordination API details
 - `Jido.AgentServer` — Server API reference

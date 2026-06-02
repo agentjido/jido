@@ -317,7 +317,13 @@ end
 
 ```elixir
 defmodule ErrorPolicyTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
+
+  setup do
+    jido = :"jido_test_#{System.unique_integer([:positive])}"
+    {:ok, jido_pid} = start_supervised({Jido, name: jido})
+    {:ok, jido: jido, jido_pid: jido_pid}
+  end
 
   test "max_errors policy stops agent after threshold", %{jido: jido} do
     {:ok, pid} = AgentServer.start_link(
