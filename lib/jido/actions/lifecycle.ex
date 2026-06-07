@@ -102,10 +102,15 @@ defmodule Jido.Actions.Lifecycle do
             delivery_mode: mode
           },
           _context
-        ) do
+        )
+        when is_pid(pid) do
       signal = Signal.new!(type, payload, source: source)
       directive = Directive.emit_to_pid(signal, pid, delivery_mode: mode)
       {:ok, %{sent_to: pid}, [directive]}
+    end
+
+    def run(%{target_pid: pid}, _context) do
+      {:error, {:invalid_target_pid, pid}}
     end
   end
 
