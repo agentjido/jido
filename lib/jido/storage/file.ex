@@ -23,13 +23,13 @@ defmodule Jido.Storage.File do
       ├── checkpoints/
       │   └── {key_hash}.term       # Serialized checkpoint
       └── threads/
-          └── {thread_id}/
+          └── {thread_id}/          # thread_id must be a single path segment
               ├── meta.term          # {rev, created_at, updated_at, metadata}
               └── entries.log        # Length-prefixed binary frames
 
   ## Concurrency
 
-  Uses `:global.trans/3` for thread-level locking to ensure safe concurrent access.
+  Uses `:global.trans/2` for thread-level locking to ensure safe concurrent access.
   """
 
   @behaviour Jido.Storage
@@ -59,7 +59,7 @@ defmodule Jido.Storage.File do
 
     case File.read(file_path) do
       {:ok, binary} ->
-        {:ok, :erlang.binary_to_term(binary, [:safe])}
+        safe_binary_to_term(binary, :invalid_term)
 
       {:error, :enoent} ->
         :not_found
@@ -67,8 +67,6 @@ defmodule Jido.Storage.File do
       {:error, reason} ->
         {:error, reason}
     end
-  rescue
-    ArgumentError -> {:error, :invalid_term}
   end
 
   @doc """
@@ -127,32 +125,19 @@ defmodule Jido.Storage.File do
   @spec load_thread(String.t(), opts()) :: {:ok, Thread.t()} | :not_found | {:error, term()}
   def load_thread(thread_id, opts) do
     path = Keyword.fetch!(opts, :path)
-    thread_dir = thread_path(path, thread_id)
-    meta_file = Path.join(thread_dir, "meta.term")
-    entries_file = Path.join(thread_dir, "entries.log")
 
-    with {:ok, meta_binary} <- File.read(meta_file),
+    with {:ok, thread_dir} <- thread_path(path, thread_id),
+         meta_file = Path.join(thread_dir, "meta.term"),
+         entries_file = Path.join(thread_dir, "entries.log"),
+         {:ok, meta_binary} <- File.read(meta_file),
          {:ok, entries_binary} <- File.read(entries_file),
+         {:ok, {rev, created_at, updated_at, metadata}} <- decode_meta(meta_binary),
          {:ok, entries} <- decode_entries(entries_binary) do
-      {rev, created_at, updated_at, metadata} = :erlang.binary_to_term(meta_binary, [:safe])
-
-      thread = %Thread{
-        id: thread_id,
-        rev: rev,
-        entries: entries,
-        created_at: created_at,
-        updated_at: updated_at,
-        metadata: metadata,
-        stats: %{entry_count: length(entries)}
-      }
-
-      {:ok, thread}
+      reconstruct_thread(thread_id, rev, created_at, updated_at, metadata, entries)
     else
       {:error, :enoent} -> :not_found
       {:error, reason} -> {:error, reason}
     end
-  rescue
-    ArgumentError -> {:error, :invalid_term}
   end
 
   @doc """
@@ -171,9 +156,11 @@ defmodule Jido.Storage.File do
     path = Keyword.fetch!(opts, :path)
     expected_rev = Keyword.get(opts, :expected_rev)
 
-    with_thread_lock(thread_id, fn ->
-      do_append_thread(path, thread_id, entries, expected_rev)
-    end)
+    with {:ok, thread_dir} <- thread_path(path, thread_id) do
+      with_thread_lock(path, thread_id, fn ->
+        do_append_thread(thread_id, thread_dir, entries, expected_rev)
+      end)
+    end
   end
 
   @doc """
@@ -185,11 +172,12 @@ defmodule Jido.Storage.File do
   @spec delete_thread(String.t(), opts()) :: :ok | {:error, term()}
   def delete_thread(thread_id, opts) do
     path = Keyword.fetch!(opts, :path)
-    thread_dir = thread_path(path, thread_id)
 
-    case File.rm_rf(thread_dir) do
-      {:ok, _} -> :ok
-      {:error, reason, _} -> {:error, reason}
+    with {:ok, thread_dir} <- thread_path(path, thread_id) do
+      case File.rm_rf(thread_dir) do
+        {:ok, _} -> :ok
+        {:error, reason, _} -> {:error, reason}
+      end
     end
   end
 
@@ -197,8 +185,7 @@ defmodule Jido.Storage.File do
   # Private Helpers
   # =============================================================================
 
-  defp do_append_thread(path, thread_id, entries, expected_rev) do
-    thread_dir = thread_path(path, thread_id)
+  defp do_append_thread(thread_id, thread_dir, entries, expected_rev) do
     meta_file = Path.join(thread_dir, "meta.term")
     entries_file = Path.join(thread_dir, "entries.log")
 
@@ -290,9 +277,11 @@ defmodule Jido.Storage.File do
   defp load_existing_thread(meta_file, entries_file) do
     with {:ok, meta_binary} <- File.read(meta_file),
          {:ok, entries_binary} <- File.read(entries_file),
+         {:ok, {rev, created_at, _updated_at, metadata}} <- decode_meta(meta_binary),
          {:ok, entries} <- decode_entries(entries_binary) do
-      {rev, created_at, _updated_at, metadata} = :erlang.binary_to_term(meta_binary, [:safe])
-      {:ok, rev, entries, created_at, metadata}
+      with :ok <- validate_thread_rev(rev, entries) do
+        {:ok, rev, entries, created_at, metadata}
+      end
     else
       {:error, :enoent} -> :not_found
       {:error, reason} -> {:error, reason}
@@ -339,10 +328,71 @@ defmodule Jido.Storage.File do
   defp decode_frame(_rest, _size), do: {:error, :invalid_entries_log}
 
   defp decode_entry(term_binary) do
-    {:ok, :erlang.binary_to_term(term_binary, [:safe])}
+    with {:ok, term} <- safe_binary_to_term(term_binary, :invalid_entries_log),
+         {:ok, entry} <- validate_entry(term) do
+      {:ok, entry}
+    end
+  end
+
+  defp decode_meta(binary) do
+    with {:ok, term} <- safe_binary_to_term(binary, :invalid_term),
+         {:ok, meta} <- validate_meta(term) do
+      {:ok, meta}
+    end
+  end
+
+  defp safe_binary_to_term(binary, error_reason) do
+    {:ok, :erlang.binary_to_term(binary, [:safe])}
   rescue
     ArgumentError ->
-      {:error, :invalid_entries_log}
+      {:error, error_reason}
+  end
+
+  defp validate_meta({rev, created_at, updated_at, metadata} = meta)
+       when is_integer(rev) and rev >= 0 and is_integer(created_at) and
+              is_integer(updated_at) and is_map(metadata) do
+    {:ok, meta}
+  end
+
+  defp validate_meta(_), do: {:error, :invalid_term}
+
+  defp validate_entry(%Entry{} = entry) do
+    case entry do
+      %Entry{id: id, seq: seq, at: at, kind: kind, payload: payload, refs: refs}
+      when is_binary(id) and is_integer(seq) and seq >= 0 and is_integer(at) and
+             is_atom(kind) and is_map(payload) and is_map(refs) ->
+        {:ok, entry}
+
+      _ ->
+        {:error, :invalid_entries_log}
+    end
+  end
+
+  defp validate_entry(%{id: id, seq: seq, at: at, kind: kind, payload: payload, refs: refs})
+       when is_binary(id) and is_integer(seq) and seq >= 0 and is_integer(at) and
+              is_atom(kind) and is_map(payload) and is_map(refs) do
+    {:ok, %Entry{id: id, seq: seq, at: at, kind: kind, payload: payload, refs: refs}}
+  end
+
+  defp validate_entry(_), do: {:error, :invalid_entries_log}
+
+  defp validate_thread_rev(rev, entries) do
+    if rev == length(entries), do: :ok, else: {:error, :invalid_term}
+  end
+
+  defp reconstruct_thread(thread_id, rev, created_at, updated_at, metadata, entries) do
+    with :ok <- validate_thread_rev(rev, entries) do
+      {:ok,
+       %Thread{
+         id: thread_id,
+         rev: rev,
+         entries: entries,
+         created_at: created_at,
+         updated_at: updated_at,
+         metadata: metadata,
+         stats: %{entry_count: length(entries)}
+       }}
+    end
   end
 
   defp checkpoint_path(base_path, key) do
@@ -350,8 +400,43 @@ defmodule Jido.Storage.File do
     Path.join([base_path, "checkpoints", "#{hash}.term"])
   end
 
-  defp thread_path(base_path, thread_id) do
-    Path.join([base_path, "threads", thread_id])
+  defp thread_path(base_path, thread_id) when is_binary(thread_id) and byte_size(thread_id) > 0 do
+    cond do
+      String.contains?(thread_id, <<0>>) ->
+        {:error, :invalid_thread_id}
+
+      Path.type(thread_id) == :absolute ->
+        {:error, :invalid_thread_id}
+
+      unsafe_thread_segment?(thread_id) ->
+        {:error, :invalid_thread_id}
+
+      true ->
+        threads_root = threads_root(base_path)
+        candidate = Path.expand(Path.join(threads_root, thread_id))
+
+        if inside_path?(candidate, threads_root) do
+          {:ok, candidate}
+        else
+          {:error, :invalid_thread_id}
+        end
+    end
+  end
+
+  defp thread_path(_base_path, _thread_id), do: {:error, :invalid_thread_id}
+
+  defp unsafe_thread_segment?(thread_id) do
+    thread_id in [".", ".."] or String.contains?(thread_id, ["/", "\\"])
+  end
+
+  defp threads_root(base_path), do: Path.expand(Path.join(base_path, "threads"))
+
+  defp inside_path?(candidate, root) do
+    root_parts = Path.split(root)
+    candidate_parts = Path.split(candidate)
+
+    length(candidate_parts) > length(root_parts) and
+      Enum.take(candidate_parts, length(root_parts)) == root_parts
   end
 
   defp ensure_checkpoints_dir(base_path) do
@@ -371,8 +456,9 @@ defmodule Jido.Storage.File do
     :ok
   end
 
-  defp with_thread_lock(thread_id, fun) do
-    lock_id = {:jido_thread_lock, thread_id}
+  defp with_thread_lock(base_path, thread_id, fun) do
+    lock_key = {:jido_thread_lock, Path.expand(base_path), thread_id}
+    lock_id = {lock_key, self()}
 
     :global.trans(lock_id, fn ->
       fun.()

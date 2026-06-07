@@ -77,6 +77,18 @@ defmodule JidoTest.Actions.LifecycleTest do
       assert Keyword.get(opts, :target) == target
       assert Keyword.get(opts, :delivery_mode) == :sync
     end
+
+    test "returns an error for invalid target pid" do
+      params = %{
+        target_pid: "not-a-pid",
+        signal_type: "result.ready",
+        payload: %{},
+        source: "/agent",
+        delivery_mode: :async
+      }
+
+      assert {:error, {:invalid_target_pid, "not-a-pid"}} = Lifecycle.NotifyPid.run(params, %{})
+    end
   end
 
   describe "SpawnChild" do

@@ -252,6 +252,43 @@ defmodule JidoTest.Storage.FileTest do
       assert :not_found = FileStorage.load_thread(thread_id, opts)
     end
 
+    test "thread operations reject ids that escape the configured storage root", %{
+      path: path,
+      opts: opts
+    } do
+      outside_dir =
+        Path.join(
+          Path.dirname(path),
+          "jido_file_storage_outside_#{:erlang.unique_integer([:positive])}"
+        )
+
+      sentinel = Path.join(outside_dir, "sentinel.txt")
+      File.mkdir_p!(outside_dir)
+      File.write!(sentinel, "keep")
+      on_exit(fn -> File.rm_rf!(outside_dir) end)
+
+      escaping_thread_id = Path.join(["..", "..", Path.basename(outside_dir)])
+
+      assert {:error, :invalid_thread_id} =
+               FileStorage.append_thread(escaping_thread_id, [%{kind: :note}], opts)
+
+      assert {:error, :invalid_thread_id} = FileStorage.load_thread(escaping_thread_id, opts)
+      assert {:error, :invalid_thread_id} = FileStorage.delete_thread(escaping_thread_id, opts)
+
+      assert {:error, :invalid_thread_id} =
+               FileStorage.append_thread(outside_dir, [%{kind: :note}], opts)
+
+      for invalid_thread_id <- ["tenant/thread", "tenant\\thread", ".", ".."] do
+        assert {:error, :invalid_thread_id} =
+                 FileStorage.append_thread(invalid_thread_id, [%{kind: :note}], opts)
+
+        assert {:error, :invalid_thread_id} = FileStorage.load_thread(invalid_thread_id, opts)
+        assert {:error, :invalid_thread_id} = FileStorage.delete_thread(invalid_thread_id, opts)
+      end
+
+      assert File.exists?(sentinel)
+    end
+
     test "thread entries have correct seq numbers", %{opts: opts} do
       thread_id = "seq_test_#{:erlang.unique_integer([:positive])}"
 
@@ -324,6 +361,39 @@ defmodule JidoTest.Storage.FileTest do
       :ok = File.write(entries_file, <<0, 0, 1, 0, 1, 2, 3>>)
 
       assert {:error, :invalid_entries_log} = FileStorage.load_thread(thread_id, opts)
+    end
+
+    test "load_thread/2 returns {:error, :invalid_entries_log} for invalid entry term", %{
+      opts: opts
+    } do
+      thread_id = "invalid_entry_#{:erlang.unique_integer([:positive])}"
+      path = Keyword.fetch!(opts, :path)
+
+      entry = %Entry{id: "e1", seq: 0, at: 0, kind: :message, payload: %{ok: true}, refs: %{}}
+      {:ok, _thread} = FileStorage.append_thread(thread_id, [entry], opts)
+
+      invalid_entry = :erlang.term_to_binary(%{not: :an_entry})
+      entries_file = Path.join([path, "threads", thread_id, "entries.log"])
+
+      :ok =
+        File.write(entries_file, <<byte_size(invalid_entry)::unsigned-32, invalid_entry::binary>>)
+
+      assert {:error, :invalid_entries_log} = FileStorage.load_thread(thread_id, opts)
+    end
+
+    test "load_thread/2 returns {:error, :invalid_term} for invalid metadata term", %{
+      opts: opts
+    } do
+      thread_id = "invalid_meta_#{:erlang.unique_integer([:positive])}"
+      path = Keyword.fetch!(opts, :path)
+
+      entry = %Entry{id: "e1", seq: 0, at: 0, kind: :message, payload: %{ok: true}, refs: %{}}
+      {:ok, _thread} = FileStorage.append_thread(thread_id, [entry], opts)
+
+      meta_file = Path.join([path, "threads", thread_id, "meta.term"])
+      :ok = File.write(meta_file, :erlang.term_to_binary(%{rev: 1}))
+
+      assert {:error, :invalid_term} = FileStorage.load_thread(thread_id, opts)
     end
 
     test "append_thread/3 returns {:error, :invalid_entries_log} when existing entries are corrupt",

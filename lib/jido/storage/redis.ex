@@ -41,7 +41,7 @@ defmodule Jido.Storage.Redis do
 
   ## Concurrency
 
-  Thread operations use `:global.trans/3` for distributed locking, matching
+  Thread operations use `:global.trans/2` for distributed locking, matching
   the pattern used by `Jido.Storage.ETS` and `Jido.Storage.File`.
   """
 
@@ -139,12 +139,13 @@ defmodule Jido.Storage.Redis do
   def append_thread(thread_id, entries, opts) do
     expected_rev = Keyword.get(opts, :expected_rev)
     now = System.system_time(:millisecond)
+    redis_key = thread_key(thread_id, opts)
 
-    lock_key = {:jido_storage_redis_append_thread, thread_id}
+    lock_key = {:jido_storage_redis_append_thread, redis_key}
     lock_id = {lock_key, self()}
 
     :global.trans(lock_id, fn ->
-      do_append_thread(thread_id, entries, expected_rev, now, opts)
+      do_append_thread(thread_id, redis_key, entries, expected_rev, now, opts)
     end)
   end
 
@@ -164,9 +165,8 @@ defmodule Jido.Storage.Redis do
   # Private Helpers
   # =============================================================================
 
-  defp do_append_thread(thread_id, entries, expected_rev, now, opts) do
+  defp do_append_thread(thread_id, redis_key, entries, expected_rev, now, opts) do
     command_fn = fetch_command_fn!(opts)
-    redis_key = thread_key(thread_id, opts)
 
     with {:ok, stored_thread} <- load_thread_or_new(command_fn, redis_key, now),
          :ok <- validate_expected_rev(expected_rev, stored_thread.rev) do

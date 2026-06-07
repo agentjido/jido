@@ -53,6 +53,12 @@ defmodule JidoTest.Actions.ControlTest do
 
       assert directive.signal.data == %{key: "value"}
     end
+
+    test "returns an error for invalid target pid" do
+      params = %{target_pid: "not-a-pid", signal_type: nil, payload: nil, source: nil}
+
+      assert {:error, {:invalid_target_pid, "not-a-pid"}} = Control.Forward.run(params, %{})
+    end
   end
 
   describe "Broadcast" do

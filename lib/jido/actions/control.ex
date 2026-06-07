@@ -106,7 +106,8 @@ defmodule Jido.Actions.Control do
         source: [type: :string, default: nil, doc: "New source (optional)"]
       ]
 
-    def run(%{target_pid: pid, signal_type: type, payload: payload, source: source}, context) do
+    def run(%{target_pid: pid, signal_type: type, payload: payload, source: source}, context)
+        when is_pid(pid) do
       original = context[:signal]
 
       final_type = resolve_type(type, original)
@@ -116,6 +117,10 @@ defmodule Jido.Actions.Control do
       signal = Signal.new!(final_type, final_payload, source: final_source)
       directive = Directive.emit_to_pid(signal, pid)
       {:ok, %{forwarded_to: pid}, [directive]}
+    end
+
+    def run(%{target_pid: pid}, _context) do
+      {:error, {:invalid_target_pid, pid}}
     end
 
     defp resolve_type(type, _original) when is_binary(type), do: type

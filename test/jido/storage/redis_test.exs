@@ -325,6 +325,51 @@ defmodule JidoTest.Storage.RedisTest do
       assert Enum.map(thread.entries, & &1.payload.n) == [1]
     end
 
+    test "serializes concurrent appends for the same Redis thread key" do
+      pid = start_mock_redis()
+      test_pid = self()
+      release_ref = make_ref()
+
+      opts = [
+        command_fn:
+          mock_command_fn(pid, fn
+            ["GET", "jido:th:race-th"] = command ->
+              send(test_pid, {:race_get, self()})
+
+              receive do
+                {:release_get, ^release_ref} -> handle_mock_command(pid, command)
+              after
+                1_000 -> {:error, :test_timeout}
+              end
+
+            _ ->
+              :next
+          end)
+      ]
+
+      task_a =
+        Task.async(fn ->
+          Redis.append_thread("race-th", [%{kind: :note, payload: %{n: 1}}], opts)
+        end)
+
+      task_b =
+        Task.async(fn ->
+          Redis.append_thread("race-th", [%{kind: :note, payload: %{n: 2}}], opts)
+        end)
+
+      assert_receive {:race_get, first_getter}, 500
+      refute_receive {:race_get, _second_getter}, 100
+
+      send(first_getter, {:release_get, release_ref})
+      assert_receive {:race_get, second_getter}, 500
+      send(second_getter, {:release_get, release_ref})
+
+      assert [{:ok, %Thread{}}, {:ok, %Thread{}}] = Task.await_many([task_a, task_b], 2_000)
+      assert {:ok, thread} = Redis.load_thread("race-th", redis_opts(pid))
+      assert thread.rev == 2
+      assert Enum.sort(Enum.map(thread.entries, & &1.payload.n)) == [1, 2]
+    end
+
     test "returns {:error, :invalid_term} when stored thread data is corrupt" do
       pid = start_mock_redis()
       put_raw(pid, thread_key("bad-th"), <<0, 1, 2>>)
