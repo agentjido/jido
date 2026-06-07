@@ -36,7 +36,7 @@ Build reliable agent systems by separating pure decision logic from runtime side
 ## Release Hygiene
 - Keep semver ranges stable (`~> 2.0` for Jido ecosystem peers)
 - Use Conventional Commits
-- Update `CHANGELOG.md`, guides, and examples for behavior/API changes
+- Do not modify `CHANGELOG.md`; release notes are generated from Git history during release, so keep changes focused on proper Conventional Commits.
 
 ## References
 - `README.md`
