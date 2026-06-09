@@ -320,7 +320,7 @@ defmodule JidoTest.Storage.ETSTest do
       thread_id = "thread_#{System.unique_integer([:positive])}"
       total_appends = 40
 
-      # Ensure tables are created/owned by the test process.
+      # Ensure tables are created before concurrent appends start.
       assert {:ok, _} = ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: 0}}], opts)
 
       results =
@@ -398,6 +398,53 @@ defmodule JidoTest.Storage.ETSTest do
 
       assert {:ok, :checkpoint_data} = ETS.get_checkpoint("key1", opts)
       assert {:ok, %Thread{}} = ETS.load_thread("key1", opts)
+    end
+  end
+
+  describe "table ownership" do
+    test "tables survive when first used by a short-lived process" do
+      opts = [table: unique_table(:ephemeral_owner)]
+      table = :"#{Keyword.fetch!(opts, :table)}_checkpoints"
+      owner = Process.whereis(Jido.Storage.ETS.Owner)
+
+      assert is_pid(owner)
+
+      parent = self()
+
+      {caller, ref} =
+        spawn_monitor(fn ->
+          assert :ok = ETS.put_checkpoint(:ephemeral_key, :value, opts)
+          send(parent, {:owner, :ets.info(table, :owner), self()})
+        end)
+
+      assert_receive {:owner, ^owner, ^caller}
+      assert_receive {:DOWN, ^ref, :process, ^caller, _reason}
+
+      assert :ets.whereis(table) != :undefined
+      assert {:ok, :value} = ETS.get_checkpoint(:ephemeral_key, opts)
+    end
+
+    test "fallback-created tables survive a short-lived creator" do
+      opts = [table: unique_table(:fallback_ephemeral_owner)]
+      table = :"#{Keyword.fetch!(opts, :table)}_checkpoints"
+      supervisor = Process.whereis(Jido.Supervisor)
+
+      assert is_pid(supervisor)
+
+      parent = self()
+
+      {caller, ref} =
+        spawn_monitor(fn ->
+          assert :ok = ETS.create_tables(opts)
+          true = :ets.insert(table, {:ephemeral_key, :value})
+          send(parent, {:owner, :ets.info(table, :owner), self()})
+        end)
+
+      assert_receive {:owner, ^caller, ^caller}
+      assert_receive {:DOWN, ^ref, :process, ^caller, _reason}
+
+      assert :ets.info(table, :owner) == supervisor
+      assert {:ok, :value} = ETS.get_checkpoint(:ephemeral_key, opts)
     end
   end
 end

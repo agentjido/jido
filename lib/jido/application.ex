@@ -6,7 +6,9 @@ defmodule Jido.Application do
   def start(_type, _args) do
     Jido.Telemetry.setup()
 
-    children = []
+    children = [
+      Jido.Storage.ETS.Owner
+    ]
 
     register_signal_extensions()
     Jido.Discovery.init_async()

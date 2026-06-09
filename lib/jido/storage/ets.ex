@@ -218,22 +218,47 @@ defmodule Jido.Storage.ETS do
     :"#{base}_thread_meta"
   end
 
-  defp ensure_tables(opts) do
+  @doc false
+  @spec create_tables(opts()) :: :ok
+  def create_tables(opts) do
     ensure_table(checkpoint_table(opts), [:set])
     ensure_table(threads_table(opts), [:ordered_set])
     ensure_table(meta_table(opts), [:set])
   end
 
+  defp ensure_tables(opts) do
+    case Jido.Storage.ETS.Owner.ensure_tables(opts) do
+      :ok -> :ok
+      {:error, _reason} -> create_tables(opts)
+    end
+  end
+
   defp ensure_table(name, extra_opts) do
     case :ets.whereis(name) do
       :undefined ->
-        :ets.new(name, [:named_table, :public, read_concurrency: true] ++ extra_opts)
+        _ =
+          :ets.new(
+            name,
+            [:named_table, :public, read_concurrency: true] ++ heir_opts(name) ++ extra_opts
+          )
+
+        :ok
 
       _ref ->
         :ok
     end
   rescue
     ArgumentError -> :ok
+  end
+
+  defp heir_opts(name) do
+    case Process.whereis(Jido.Supervisor) do
+      pid when is_pid(pid) and pid != self() ->
+        [{:heir, pid, {:jido_storage_ets, name}}]
+
+      _other ->
+        []
+    end
   end
 
   defp get_current_rev(table, thread_id) do
