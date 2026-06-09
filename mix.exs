@@ -392,10 +392,8 @@ defmodule Jido.MixProject do
 
       # Jido Deps
       {:deep_merge, "~> 1.0"},
-      {:jason, "~> 1.4"},
       {:nimble_options, "~> 1.1"},
       {:ok, "~> 2.3"},
-      {:phoenix_pubsub, "~> 2.1"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:poolboy, "~> 1.5"},
@@ -407,20 +405,12 @@ defmodule Jido.MixProject do
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
-      {:spec_led_ex,
-       git: "https://github.com/specleddev/specled_ex.git",
-       branch: "main",
-       only: [:dev, :test],
-       runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:doctor, "~> 0.21", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.34", only: :dev, runtime: false},
       {:excoveralls, "~> 0.18.3", only: [:dev, :test]},
-      {:expublish, "~> 2.7", only: [:dev], runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test], runtime: false},
-      {:mimic, "~> 2.0", only: :test},
-      {:stream_data, "~> 1.0", only: [:dev, :test]},
 
       # Code generation
       {:igniter, "~> 0.7", optional: true}
