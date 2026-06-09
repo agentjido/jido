@@ -44,7 +44,7 @@ defmodule Jido.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:crypto, :logger],
       mod: {Jido.Application, []}
     ]
   end
@@ -400,7 +400,6 @@ defmodule Jido.MixProject do
       {:telemetry_metrics, "~> 1.1"},
       {:crontab, "~> 1.2"},
       {:time_zone_info, "~> 0.7"},
-      {:uniq, "~> 0.6.1"},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},

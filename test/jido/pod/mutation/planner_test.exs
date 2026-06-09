@@ -15,6 +15,8 @@ defmodule JidoTest.Pod.Mutation.PlannerTest do
     use Jido.Pod, name: "mutation_planner_nested_pod"
   end
 
+  @uuid7_regex ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
+
   test "plans batched add mutations with mixed atom and string names" do
     topology = Topology.new!(name: "planner_mixed")
 
@@ -29,6 +31,7 @@ defmodule JidoTest.Pod.Mutation.PlannerTest do
     ]
 
     assert {:ok, plan} = Planner.plan(topology, ops)
+    assert plan.mutation_id =~ @uuid7_regex
     assert plan.added == [:planner, "reviewer"]
     assert plan.removed == []
     assert plan.start_requested == [:planner]
@@ -39,6 +42,21 @@ defmodule JidoTest.Pod.Mutation.PlannerTest do
     assert Topology.owner_of(plan.final_topology, "reviewer") == {:ok, :planner}
     assert Topology.dependencies_of(plan.final_topology, "reviewer") == [:planner]
     assert plan.final_topology.version == 2
+  end
+
+  test "generates unique UUIDv7 mutation IDs for each plan" do
+    topology = Topology.new!(name: "planner_mutation_ids")
+
+    ops = [
+      Mutation.add_node(:planner, %{agent: Worker, manager: :planner_manager, activation: :eager})
+    ]
+
+    assert {:ok, plan1} = Planner.plan(topology, ops)
+    assert {:ok, plan2} = Planner.plan(topology, ops)
+
+    assert plan1.mutation_id =~ @uuid7_regex
+    assert plan2.mutation_id =~ @uuid7_regex
+    assert plan1.mutation_id != plan2.mutation_id
   end
 
   test "plans batched add mutations for nested pod nodes" do
