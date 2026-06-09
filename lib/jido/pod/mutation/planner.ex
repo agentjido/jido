@@ -3,6 +3,7 @@ defmodule Jido.Pod.Mutation.Planner do
   Pure planner for live pod mutations.
   """
 
+  alias Jido.ID
   alias Jido.Pod.Mutation
   alias Jido.Pod.Mutation.{AddNode, Plan, RemoveNode, Report}
   alias Jido.Pod.Topology
@@ -20,7 +21,7 @@ defmodule Jido.Pod.Mutation.Planner do
          {:ok, added, removed} <- diff_nodes(topology, validated_final_topology),
          {:ok, start_requested, start_waves} <- build_start_plan(validated_final_topology, added),
          {:ok, stop_waves} <- stop_waves(topology, removed) do
-      mutation_id = Uniq.UUID.uuid7()
+      mutation_id = ID.uuid7()
 
       normalized_final_topology =
         TopologyState.normalize_updated_topology(topology, validated_final_topology)
