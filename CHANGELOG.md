@@ -2,6 +2,23 @@
 
 <!-- changelog -->
 
+## [v2.3.2](https://github.com/agentjido/jido/compare/v2.3.1...v2.3.2) (2026-06-09)
+
+
+
+
+### Bug Fixes:
+
+* keep ETS storage tables supervised by mikehostetler
+
+* remove ok dependency (#308) by mikehostetler
+
+* harden storage and signal target handling by mikehostetler
+
+### Refactoring:
+
+* replace deep_merge dependency (#309) by mikehostetler
+
 ## [v2.3.1](https://github.com/agentjido/jido/compare/v2.3.0...v2.3.1) (2026-06-02)
 
 
