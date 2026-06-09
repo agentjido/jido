@@ -2,8 +2,13 @@ defmodule Jido.Util.DeepMerge do
   @moduledoc false
 
   @doc false
-  @spec merge(term(), term()) :: term()
-  def merge(left, right) when is_map(left) and is_map(right) do
+  @spec merge(map() | keyword(), map() | keyword()) :: map() | keyword()
+  def merge(left, right)
+      when (is_map(left) or is_list(left)) and (is_map(right) or is_list(right)) do
+    do_merge(left, right)
+  end
+
+  defp do_merge(left, right) when is_map(left) and is_map(right) do
     if is_struct(left) or is_struct(right) do
       right
     else
@@ -11,7 +16,7 @@ defmodule Jido.Util.DeepMerge do
     end
   end
 
-  def merge(left, right) when is_list(left) and is_list(right) do
+  defp do_merge(left, right) when is_list(left) and is_list(right) do
     cond do
       keyword_list?(left) and right == [] ->
         left
@@ -24,9 +29,9 @@ defmodule Jido.Util.DeepMerge do
     end
   end
 
-  def merge(_left, right), do: right
+  defp do_merge(_left, right), do: right
 
-  defp merge_value(_key, left, right), do: merge(left, right)
+  defp merge_value(_key, left, right), do: do_merge(left, right)
 
   defp keyword_list?(list), do: Keyword.keyword?(list)
 end
