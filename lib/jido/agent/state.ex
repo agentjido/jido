@@ -10,9 +10,10 @@ defmodule Jido.Agent.State do
   """
 
   alias Jido.Action.Schema
+  alias Jido.Util.DeepMerge
 
   @doc """
-  Merges new attributes into existing state using deep merge semantics.
+  Merges new attributes into existing state using recursive map and keyword-list semantics.
   """
   @spec merge(map(), map() | keyword()) :: map()
   def merge(current_state, attrs) when is_list(attrs) do
@@ -20,7 +21,7 @@ defmodule Jido.Agent.State do
   end
 
   def merge(current_state, attrs) when is_map(attrs) do
-    DeepMerge.deep_merge(current_state, attrs)
+    DeepMerge.merge(current_state, attrs)
   end
 
   @doc """

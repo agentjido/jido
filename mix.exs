@@ -391,7 +391,6 @@ defmodule Jido.MixProject do
       {:jido_signal, "~> 2.2"},
 
       # Jido Deps
-      {:deep_merge, "~> 1.0"},
       {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},

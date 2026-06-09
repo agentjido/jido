@@ -44,7 +44,7 @@ defmodule Jido.Agent.StateOp do
     @moduledoc """
     Deep merge attributes into the agent's state.
 
-    Uses `DeepMerge.deep_merge/2` semantics - nested maps are merged recursively.
+    Uses recursive merge semantics - nested maps and keyword lists are merged recursively.
     """
 
     @schema Zoi.struct(
