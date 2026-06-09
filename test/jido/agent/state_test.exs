@@ -25,11 +25,32 @@ defmodule JidoTest.Agent.StateTest do
       assert result == %{config: %{a: 1, b: 3, c: 4}}
     end
 
+    test "deep merges nested keyword lists" do
+      current = %{config: [a: 1, b: [x: 10, y: 9]]}
+      result = State.merge(current, %{config: [b: [y: 20, z: 30], c: 4]})
+
+      assert result == %{config: [a: 1, b: [x: 10, y: 20, z: 30], c: 4]}
+    end
+
+    test "preserves keyword list when override is empty list" do
+      current = %{config: [a: 1, b: 2]}
+      result = State.merge(current, %{config: []})
+
+      assert result == %{config: [a: 1, b: 2]}
+    end
+
     test "overwrites non-map values" do
       current = %{value: 1}
       result = State.merge(current, %{value: 2})
 
       assert result == %{value: 2}
+    end
+
+    test "replaces structs instead of merging them as maps" do
+      current = %{endpoint: %URI{scheme: "http", host: "example.com"}}
+      result = State.merge(current, %{endpoint: %{scheme: "https"}})
+
+      assert result == %{endpoint: %{scheme: "https"}}
     end
   end
 

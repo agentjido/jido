@@ -138,6 +138,19 @@ defmodule JidoTest.PodTest do
     assert {:ok, %Topology{name: "custom_plugin_pod"}} = Pod.fetch_topology(agent)
   end
 
+  test "pod plugin build_state recursively merges override state" do
+    topology = Topology.new!(name: "merge_pod")
+
+    assert {:ok, state} =
+             Plugin.build_state(topology, %{
+               mutation: %{status: :running},
+               metadata: %{source: :test}
+             })
+
+    assert state.mutation == %{id: nil, status: :running, report: nil, error: nil}
+    assert state.metadata == %{source: :test}
+  end
+
   test "plugins option resolves aliased plugin modules before pod opts are escaped" do
     suffix = System.unique_integer([:positive])
     pod_mod = Module.concat(__MODULE__, :"AliasedPluginPod#{suffix}")

@@ -9,6 +9,7 @@ defmodule Jido.Pod.Plugin do
 
   alias Jido.Pod.Actions.Mutate, as: MutateAction
   alias Jido.Pod.Topology
+  alias Jido.Util.DeepMerge
 
   @state_key :__pod__
   @capability :pod
@@ -58,7 +59,7 @@ defmodule Jido.Pod.Plugin do
        mutation: %{id: nil, status: :idle, report: nil, error: nil},
        metadata: %{}
      }
-     |> deep_merge(overrides)}
+     |> DeepMerge.merge(overrides)}
   end
 
   def build_state(agent_module, overrides) when is_atom(agent_module) and is_map(overrides) do
@@ -87,15 +88,5 @@ defmodule Jido.Pod.Plugin do
        "Pod plugin mount expected an agent struct with agent_module.",
        details: %{agent: agent}
      )}
-  end
-
-  defp deep_merge(left, right) do
-    Map.merge(left, right, fn _key, left_value, right_value ->
-      if is_map(left_value) and is_map(right_value) do
-        deep_merge(left_value, right_value)
-      else
-        right_value
-      end
-    end)
   end
 end
