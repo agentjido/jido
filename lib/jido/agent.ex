@@ -209,8 +209,6 @@ defmodule Jido.Agent do
   defp ast_node?({_, meta, _}) when is_list(meta), do: true
   defp ast_node?(_other), do: false
 
-  require OK
-
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -463,8 +461,6 @@ defmodule Jido.Agent do
       alias Jido.Agent.Strategy, as: AgentStrategy
       alias Jido.Instruction
       alias Jido.Plugin.Requirements, as: PluginRequirements
-
-      require OK
     end
   end
 
@@ -999,7 +995,7 @@ defmodule Jido.Agent do
       @spec set(Agent.t(), map() | keyword()) :: Agent.agent_result()
       def set(%Agent{} = agent, attrs) do
         new_state = AgentState.merge(agent.state, Map.new(attrs))
-        OK.success(%{agent | state: new_state})
+        {:ok, %{agent | state: new_state}}
       end
 
       @doc """
@@ -1017,11 +1013,10 @@ defmodule Jido.Agent do
       def validate(%Agent{} = agent, opts \\ []) do
         case AgentState.validate(agent.state, agent.schema, opts) do
           {:ok, validated_state} ->
-            OK.success(%{agent | state: validated_state})
+            {:ok, %{agent | state: validated_state}}
 
           {:error, reason} ->
-            Jido.Error.validation_error("State validation failed", %{reason: reason})
-            |> OK.failure()
+            {:error, Jido.Error.validation_error("State validation failed", %{reason: reason})}
         end
       end
     end
@@ -1478,7 +1473,7 @@ defmodule Jido.Agent do
   @spec set(t(), map() | keyword()) :: agent_result()
   def set(%Agent{} = agent, attrs) do
     new_state = StateHelper.merge(agent.state, Map.new(attrs))
-    OK.success(%{agent | state: new_state})
+    {:ok, %{agent | state: new_state}}
   end
 
   @doc """
@@ -1488,11 +1483,10 @@ defmodule Jido.Agent do
   def validate(%Agent{} = agent, opts \\ []) do
     case StateHelper.validate(agent.state, agent.schema, opts) do
       {:ok, validated_state} ->
-        OK.success(%{agent | state: validated_state})
+        {:ok, %{agent | state: validated_state}}
 
       {:error, reason} ->
-        Error.validation_error("State validation failed", %{reason: reason})
-        |> OK.failure()
+        {:error, Error.validation_error("State validation failed", %{reason: reason})}
     end
   end
 

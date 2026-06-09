@@ -327,7 +327,10 @@ defmodule JidoTest.Storage.ETSTest do
         1..total_appends
         |> Task.async_stream(
           fn i ->
-            ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: i}}], opts)
+            case ETS.append_thread(thread_id, [%{kind: :note, payload: %{n: i}}], opts) do
+              {:ok, _thread} -> :appended
+              {:error, reason} -> {:append_failed, reason}
+            end
           end,
           max_concurrency: 20,
           ordered: false,
@@ -335,10 +338,7 @@ defmodule JidoTest.Storage.ETSTest do
         )
         |> Enum.to_list()
 
-      assert Enum.all?(results, fn
-               {:ok, {:ok, _thread}} -> true
-               _ -> false
-             end)
+      assert Enum.frequencies(results) == %{{:ok, :appended} => total_appends}
 
       assert {:ok, thread} = ETS.load_thread(thread_id, opts)
       assert thread.rev == total_appends + 1

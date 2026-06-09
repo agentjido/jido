@@ -212,6 +212,14 @@ defmodule JidoTest.AgentTest do
       {:ok, validated} = TestAgents.Basic.validate(agent, strict: true)
       refute Map.has_key?(validated.state, :extra_field)
     end
+
+    test "returns a single error tuple for invalid Zoi state" do
+      agent = TestAgents.ZoiSchema.new(state: %{status: :idle, count: "not_an_integer"})
+      result = TestAgents.ZoiSchema.validate(agent)
+
+      refute match?({:error, {:error, _reason}}, result)
+      assert {:error, %Jido.Error.ValidationError{message: "State validation failed"}} = result
+    end
   end
 
   describe "cmd/2" do

@@ -393,7 +393,6 @@ defmodule Jido.MixProject do
       # Jido Deps
       {:deep_merge, "~> 1.0"},
       {:nimble_options, "~> 1.1"},
-      {:ok, "~> 2.3"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:poolboy, "~> 1.5"},

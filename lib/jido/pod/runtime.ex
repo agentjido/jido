@@ -288,7 +288,18 @@ defmodule Jido.Pod.Runtime do
         Task.async_stream(
           wave,
           fn name ->
-            ensure_planned_node(server_pid, state, topology, requested_names, name, report, opts)
+            case ensure_planned_node(
+                   server_pid,
+                   state,
+                   topology,
+                   requested_names,
+                   name,
+                   report,
+                   opts
+                 ) do
+              {:ok, result} -> {:node_ensured, result}
+              {:error, reason} -> {:node_failed, reason}
+            end
           end,
           ordered: true,
           max_concurrency: max_concurrency,
@@ -297,8 +308,8 @@ defmodule Jido.Pod.Runtime do
         )
         |> Enum.zip(wave)
         |> Enum.map(fn
-          {{:ok, {:ok, result}}, name} -> {:ok, name, result}
-          {{:ok, {:error, reason}}, name} -> {:error, name, reason}
+          {{:ok, {:node_ensured, result}}, name} -> {:ok, name, result}
+          {{:ok, {:node_failed, reason}}, name} -> {:error, name, reason}
           {{:exit, reason}, name} -> {:error, name, {:task_exit, reason}}
         end)
 

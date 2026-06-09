@@ -20,7 +20,6 @@ defmodule Jido.Util do
 
   alias Jido.Signal.ID, as: SignalID
 
-  require OK
   require Logger
 
   @name_regex ~r/^[a-zA-Z][a-zA-Z0-9_]*$/
@@ -68,7 +67,7 @@ defmodule Jido.Util do
 
   def validate_name(name, []) when is_binary(name) do
     if Regex.match?(@name_regex, name) do
-      OK.success(name)
+      {:ok, name}
     else
       {:error,
        Jido.Error.validation_error(
