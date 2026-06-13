@@ -5,7 +5,10 @@
   "created": "2026-06-13T13:51:09Z",
   "description": "Imported architecture-review findings from fable/review. Each child issue should be validated with a failing test before implementation. Close skipped findings with an evidence-backed reason.",
   "id": "jido-wyb",
-  "labels": [],
+  "labels": [
+    "architecture-review",
+    "fable"
+  ],
   "priority": 1,
   "status": "open",
   "title": "Architecture review remediation",
