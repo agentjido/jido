@@ -14,6 +14,20 @@ Build reliable agent systems by separating pure decision logic from runtime side
 - `mix q` or `mix quality` (`format --check-formatted`, `compile --warnings-as-errors`, `credo`, `dialyzer`)
 - `mix docs` (local docs)
 
+## Work Management
+This project tracks work with `bw` (Beadwork), which persists plans, progress,
+and decisions to git so they survive compaction, session boundaries, and context
+loss.
+
+- Always run `bw prime` before starting implementation work.
+- Use one Beadwork issue per branch/PR unless the issue is explicitly split.
+- Start work with `bw start <id>` and record validation, skip decisions, PR
+  links, and CI outcomes with `bw comment <id> "..."`
+- Completing a task includes committing, pushing, closing the Beadwork issue,
+  and running `bw sync`.
+- For architecture-review findings, prefer the portable helper:
+  `scripts/bw-codex-loop.sh`.
+
 ## Architecture Snapshot
 - `Jido.Agent`: pure agent module with immutable state and `cmd/2`
 - `Jido.AgentServer`: GenServer runtime for directives, lifecycle, and message flow
