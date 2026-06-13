@@ -15,11 +15,15 @@
     {
       "text": "Started branch jido-wyb.2/f01-sync-call-task-races-the-drain-loop-agent-st in worktree /Users/mhostetler/Source/Jido/jido-jido-wyb.2 from origin/main.",
       "timestamp": "2026-06-13T14:00:36Z"
+    },
+    {
+      "text": "Automation stopped: codex exec failed for branch jido-wyb.2/f01-sync-call-task-races-the-drain-loop-agent-st.",
+      "timestamp": "2026-06-13T14:00:44Z"
     }
   ],
   "priority": 1,
   "status": "in_progress",
   "title": "F01: Sync-call task races the drain loop; agent-state updates can be silently lost",
   "type": "bug",
-  "updated_at": "2026-06-13T14:00:36Z"
+  "updated_at": "2026-06-13T14:00:44Z"
 }
