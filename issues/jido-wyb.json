@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-13T13:51:09Z",
@@ -10,8 +10,8 @@
     "fable"
   ],
   "priority": 1,
-  "status": "open",
+  "status": "in_progress",
   "title": "Architecture review remediation",
   "type": "epic",
-  "updated_at": "2026-06-13T13:51:09Z"
+  "updated_at": "2026-06-13T13:52:21Z"
 }
