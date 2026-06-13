@@ -1239,34 +1239,38 @@ defmodule Jido.AgentServer do
 
   @impl true
   def handle_info(:drain, state) do
-    case State.dequeue(state) do
-      {:empty, s} ->
-        s = %{s | processing: false}
-        s = State.set_status(s, :idle)
-        {:noreply, s}
+    if signal_call_inflight?(state) do
+      {:noreply, %{state | processing: false}}
+    else
+      case State.dequeue(state) do
+        {:empty, s} ->
+          s = %{s | processing: false}
+          s = State.set_status(s, :idle)
+          {:noreply, s}
 
-      {{:value, item}, s1} ->
-        {signal, runtime_context, directive} = normalize_directive_queue_item(item)
-        TraceContext.set_from_signal(signal)
+        {{:value, item}, s1} ->
+          {signal, runtime_context, directive} = normalize_directive_queue_item(item)
+          TraceContext.set_from_signal(signal)
 
-        result =
-          try do
-            exec_directive_with_telemetry(directive, signal, runtime_context, s1)
-          after
-            TraceContext.clear()
+          result =
+            try do
+              exec_directive_with_telemetry(directive, signal, runtime_context, s1)
+            after
+              TraceContext.clear()
+            end
+
+          case result do
+            {:ok, s2} ->
+              continue_draining(s2)
+
+            {:async, _ref, s2} ->
+              continue_draining(s2)
+
+            {:stop, reason, s2} ->
+              warn_if_normal_stop(reason, directive, s2)
+              {:stop, reason, State.set_status(s2, :stopping)}
           end
-
-        case result do
-          {:ok, s2} ->
-            continue_draining(s2)
-
-          {:async, _ref, s2} ->
-            continue_draining(s2)
-
-          {:stop, reason, s2} ->
-            warn_if_normal_stop(reason, directive, s2)
-            {:stop, reason, State.set_status(s2, :stopping)}
-        end
+      end
     end
   end
 
@@ -1382,6 +1386,7 @@ defmodule Jido.AgentServer do
         state = %{state | signal_call_inflight: nil}
         state = apply_signal_call_result(result, inflight, state)
         state = maybe_start_next_signal_call(state)
+        state = maybe_resume_drain(state)
         state = maybe_process_deferred_async_signal(state)
         {:noreply, state}
 
@@ -1391,20 +1396,24 @@ defmodule Jido.AgentServer do
   end
 
   def handle_info(:process_deferred_signal, %State{} = state) do
-    case :queue.out(state.deferred_async_signals) do
-      {{:value, signal}, q} ->
-        state = %{state | deferred_async_signals: q}
+    if signal_call_inflight?(state) do
+      {:noreply, state}
+    else
+      case :queue.out(state.deferred_async_signals) do
+        {{:value, signal}, q} ->
+          state = %{state | deferred_async_signals: q}
 
-        case process_signal(signal, state) do
-          {:ok, new_state, _resolved_action} ->
-            {:noreply, maybe_process_deferred_async_signal(new_state)}
+          case process_signal(signal, state) do
+            {:ok, new_state, _resolved_action} ->
+              {:noreply, maybe_process_deferred_async_signal(new_state)}
 
-          {:error, _reason, new_state} ->
-            {:noreply, maybe_process_deferred_async_signal(new_state)}
-        end
+            {:error, _reason, new_state} ->
+              {:noreply, maybe_process_deferred_async_signal(new_state)}
+          end
 
-      {:empty, _} ->
-        {:noreply, state}
+        {:empty, _} ->
+          {:noreply, state}
+      end
     end
   end
 
@@ -1689,6 +1698,16 @@ defmodule Jido.AgentServer do
 
   defp maybe_process_deferred_async_signal(%State{} = state), do: state
 
+  defp maybe_resume_drain(%State{signal_call_inflight: nil} = state) do
+    if State.queue_empty?(state) do
+      state
+    else
+      start_drain_if_idle(%{state | processing: false})
+    end
+  end
+
+  defp maybe_resume_drain(%State{} = state), do: state
+
   defp maybe_set_idle_status(%State{} = state) do
     if is_nil(state.signal_call_inflight) and :queue.is_empty(state.signal_call_queue) and
          :queue.is_empty(state.deferred_async_signals) and state.processing == false do
@@ -1787,6 +1806,17 @@ defmodule Jido.AgentServer do
   end
 
   defp maybe_track_child_started(state, _signal), do: state
+
+  defp process_or_defer_internal_signal(%Signal{} = signal, %State{} = state) do
+    if signal_call_inflight?(state) do
+      {:noreply, enqueue_deferred_async_signal(state, signal)}
+    else
+      case process_signal(signal, state) do
+        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
+        {:error, _reason, new_state} -> {:noreply, new_state}
+      end
+    end
+  end
 
   defp track_child_started(state, pid, child_module, child_id, child_partition, tag, meta) do
     ref = Process.monitor(pid)
@@ -3146,10 +3176,7 @@ defmodule Jido.AgentServer do
         {:error, _} -> signal
       end
 
-    case process_signal(traced_signal, orphaned_state) do
-      {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-      {:error, _reason, ns} -> {:noreply, ns}
-    end
+    process_or_defer_internal_signal(traced_signal, orphaned_state)
   end
 
   defp handle_child_down(%State{} = state, pid, reason) do
@@ -3179,10 +3206,7 @@ defmodule Jido.AgentServer do
             {:error, _} -> signal
           end
 
-        case process_signal(traced_signal, state) do
-          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-          {:error, _reason, ns} -> {:noreply, ns}
-        end
+        process_or_defer_internal_signal(traced_signal, state)
 
       tag ->
         Logger.debug(fn ->
@@ -3201,10 +3225,7 @@ defmodule Jido.AgentServer do
             {:error, _} -> signal
           end
 
-        case process_signal(traced_signal, state) do
-          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-          {:error, _reason, ns} -> {:noreply, ns}
-        end
+        process_or_defer_internal_signal(traced_signal, state)
 
       true ->
         {:noreply, state}
