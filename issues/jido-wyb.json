@@ -9,6 +9,12 @@
     "architecture-review",
     "fable"
   ],
+  "comments": [
+    {
+      "text": "Tracking epic started so child finding tickets are visible through bw ready. Individual findings still get their own branch and PR.",
+      "timestamp": "2026-06-13T13:52:21Z"
+    }
+  ],
   "priority": 1,
   "status": "in_progress",
   "title": "Architecture review remediation",
