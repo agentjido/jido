@@ -20,6 +20,8 @@ Environment:
   WORKTREE_ROOT  Parent directory for worktrees. Default: parent of repo root
   EPIC_ID        Default parent epic for run.
   EPIC_TITLE     seed-fable epic title. Default: Architecture review remediation
+  CODEX_EXEC_MODE Codex exec privilege mode. Default: bypass.
+                  Values: bypass, sandbox.
 
 Flow:
   1. seed-fable imports markdown findings into Beadwork once.
@@ -384,7 +386,11 @@ run_one_issue() {
   prepare_issue_worktree "$id" "$branch" "$worktree" "$base_ref" "$dry_run"
 
   if [[ "$dry_run" == "1" ]]; then
-    echo "[dry-run] would run: codex exec --cd \"$worktree\" --sandbox danger-full-access --ask-for-approval never \"\$(${runner} prompt $id)\""
+    if [[ "${CODEX_EXEC_MODE:-bypass}" == "sandbox" ]]; then
+      echo "[dry-run] would run: codex exec --cd \"$worktree\" --sandbox danger-full-access \"\$(${runner} prompt $id)\""
+    else
+      echo "[dry-run] would run: codex exec --cd \"$worktree\" --dangerously-bypass-approvals-and-sandbox \"\$(${runner} prompt $id)\""
+    fi
     echo "[dry-run] would inspect PR with: gh pr view --json url -q .url"
     if [[ "$watch_checks" == "1" ]]; then
       echo "[dry-run] would watch checks with: gh pr checks --watch"
@@ -396,14 +402,18 @@ run_one_issue() {
   fi
 
   prompt="$(print_prompt "$id")"
-  if ! codex exec \
-    --cd "$worktree" \
-    --sandbox danger-full-access \
-    --ask-for-approval never \
-    "$prompt"; then
-    comment "$id" "Automation stopped: codex exec failed for branch ${branch}."
-    bw sync
-    return 1
+  if [[ "${CODEX_EXEC_MODE:-bypass}" == "sandbox" ]]; then
+    if ! codex exec --cd "$worktree" --sandbox danger-full-access "$prompt"; then
+      comment "$id" "Automation stopped: codex exec failed for branch ${branch}."
+      bw sync
+      return 1
+    fi
+  else
+    if ! codex exec --cd "$worktree" --dangerously-bypass-approvals-and-sandbox "$prompt"; then
+      comment "$id" "Automation stopped: codex exec failed for branch ${branch}."
+      bw sync
+      return 1
+    fi
   fi
 
   status="$(issue_status "$id")"
