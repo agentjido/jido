@@ -20,11 +20,15 @@
     {
       "text": "Automation stopped: codex exec failed for branch jido-wyb.2/f01-sync-call-task-races-the-drain-loop-agent-st.",
       "timestamp": "2026-06-13T14:00:44Z"
+    },
+    {
+      "text": "PR #312 landed on main as squash commit 2a984c66d575f30c1ed5fd9c31ceb4145cd054ce. Local validation before merge: focused regression, AgentServer suite, full mix test, and mix q passed.",
+      "timestamp": "2026-06-26T12:54:35Z"
     }
   ],
   "priority": 1,
   "status": "closed",
   "title": "F01: Sync-call task races the drain loop; agent-state updates can be silently lost",
   "type": "bug",
-  "updated_at": "2026-06-13T14:20:09Z"
+  "updated_at": "2026-06-26T12:54:35Z"
 }
