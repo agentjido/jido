@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-07-14T13:50:07Z",
+  "description": "Check Hex and non-Hex dependencies from latest origin/main, update all safe dependency locks/configuration, run the repository CI-equivalent validation, and publish a clean Conventional Commit to GitHub.",
+  "id": "jido-hbz",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Update all project dependencies",
+  "type": "task",
+  "updated_at": "2026-07-14T13:50:07Z"
+}
