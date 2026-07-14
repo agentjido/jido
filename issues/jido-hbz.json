@@ -2,6 +2,7 @@
   "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-07-14T14:00:04Z",
   "created": "2026-07-14T13:50:07Z",
   "description": "Check Hex and non-Hex dependencies from latest origin/main, update all safe dependency locks/configuration, run the repository CI-equivalent validation, and publish a clean Conventional Commit to GitHub.",
   "id": "jido-hbz",
@@ -21,7 +22,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Update all project dependencies",
   "type": "task",
   "updated_at": "2026-07-14T14:00:04Z"
