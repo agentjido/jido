@@ -1,8 +1,7 @@
 {
-  "assignee": "Mike Hostetler",
+  "assignee": "",
   "blocked_by": [],
   "blocks": [],
-  "closed_at": "2026-07-15T16:25:01Z",
   "created": "2026-07-15T16:15:03Z",
   "description": "Address GitHub issue #315. Preserve tagged thaw results at the InstanceManager start boundary; start fresh only when storage is disabled or the checkpoint is absent; return structured thaw errors without registering a child; add regression coverage for corrupt checkpoints with an ahead-of-zero journal and verify durable data remains unchanged.",
   "id": "jido-7mc",
@@ -30,8 +29,8 @@
     }
   ],
   "priority": 2,
-  "status": "closed",
+  "status": "open",
   "title": "Fail closed on InstanceManager thaw errors",
   "type": "bug",
-  "updated_at": "2026-07-15T16:25:01Z"
+  "updated_at": "2026-07-15T17:17:42Z"
 }
