@@ -10,11 +10,15 @@
     {
       "text": "Implemented explicit fresh/restored thaw start modes and fail-closed error propagation as {:error, {:thaw_failed, reason}}. Added corrupt file-checkpoint regression with rev-2 journal invariants plus generic non-not-found error coverage. Validation: mix test test/jido/agent/instance_manager_test.exs (33 passed); mix q passed; mix test passed.",
       "timestamp": "2026-07-15T16:18:21Z"
+    },
+    {
+      "text": "Draft PR opened: https://github.com/agentjido/jido/pull/316. Commit d1d02a4; branch jido-7mc/fail-closed-thaw.",
+      "timestamp": "2026-07-15T16:19:50Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Fail closed on InstanceManager thaw errors",
   "type": "bug",
-  "updated_at": "2026-07-15T16:18:21Z"
+  "updated_at": "2026-07-15T16:19:50Z"
 }
