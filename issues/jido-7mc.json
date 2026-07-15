@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-07-15T16:15:03Z",
@@ -7,8 +7,8 @@
   "id": "jido-7mc",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Fail closed on InstanceManager thaw errors",
   "type": "bug",
-  "updated_at": "2026-07-15T16:15:03Z"
+  "updated_at": "2026-07-15T16:15:19Z"
 }
