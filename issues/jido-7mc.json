@@ -14,6 +14,10 @@
     {
       "text": "Draft PR opened: https://github.com/agentjido/jido/pull/316. Commit d1d02a4; branch jido-7mc/fail-closed-thaw.",
       "timestamp": "2026-07-15T16:19:50Z"
+    },
+    {
+      "text": "Review hardening: remove redundant Keyed lifecycle thaw (InstanceManager is its only caller and already preflights storage), add a single-read regression, and simplify the explicit thaw result gate.",
+      "timestamp": "2026-07-15T16:21:52Z"
     }
   ],
   "priority": 2,
