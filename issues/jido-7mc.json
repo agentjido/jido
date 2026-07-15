@@ -26,11 +26,15 @@
     {
       "text": "Amended review commit 58cec7f and force-pushed PR #316.",
       "timestamp": "2026-07-15T16:25:01Z"
+    },
+    {
+      "text": "Landing verification found CI matrix failures in scheduler durability integration: the test still expected a fresh agent from a corrupt checkpoint. Updated it to assert {:thaw_failed, ...}, no registry child, and unchanged checkpoint; split the live-agent cancel preservation case. Validation: scheduler integration 8 passed; mix q passed; mix test passed.",
+      "timestamp": "2026-07-15T17:18:53Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Fail closed on InstanceManager thaw errors",
   "type": "bug",
-  "updated_at": "2026-07-15T17:17:42Z"
+  "updated_at": "2026-07-15T17:18:53Z"
 }
