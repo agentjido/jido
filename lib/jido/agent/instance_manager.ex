@@ -191,7 +191,8 @@ defmodule Jido.Agent.InstanceManager do
 
   If an agent for the given key is already running, returns its pid.
   If storage is configured and a hibernated state exists, thaws it.
-  Otherwise starts a fresh agent.
+  If no checkpoint exists, starts a fresh agent. Other thaw failures return
+  `{:error, {:thaw_failed, reason}}` without starting an agent.
 
   ## Options
 
@@ -315,9 +316,12 @@ defmodule Jido.Agent.InstanceManager do
     config = get_config(manager)
     partition = effective_partition(config, opts)
 
-    # Try to thaw from storage first
-    agent_or_nil = maybe_thaw(config, key, partition)
+    with {:ok, agent_or_nil} <- maybe_thaw(config, key, partition) do
+      start_child(manager, config, key, agent_or_nil, opts, partition)
+    end
+  end
 
+  defp start_child(manager, config, key, agent_or_nil, opts, partition) do
     child_spec = build_child_spec(config, key, agent_or_nil, opts, partition)
 
     case DynamicSupervisor.start_child(dynamic_supervisor_name(manager), child_spec) do
@@ -373,7 +377,9 @@ defmodule Jido.Agent.InstanceManager do
     Supervisor.child_spec({Jido.AgentServer, base_opts}, restart: :transient)
   end
 
-  defp maybe_thaw(%{storage: nil}, _key, _partition), do: nil
+  @spec maybe_thaw(map(), key(), term()) ::
+          {:ok, Jido.Agent.t() | nil} | {:error, {:thaw_failed, term()}}
+  defp maybe_thaw(%{storage: nil}, _key, _partition), do: {:ok, nil}
 
   defp maybe_thaw(%{name: manager_name, storage: storage, agent: agent_module}, key, partition) do
     persistence_key = manager_persistence_key(manager_name, key, partition)
@@ -381,17 +387,21 @@ defmodule Jido.Agent.InstanceManager do
     case Persist.thaw(storage, agent_module, persistence_key) do
       {:ok, agent} ->
         Logger.debug(fn -> "InstanceManager thawed agent for key #{inspect(key)}" end)
-        agent
+        {:ok, agent}
 
       {:error, :not_found} ->
-        nil
+        Logger.debug(fn ->
+          "InstanceManager found no checkpoint for key #{inspect(key)}; starting fresh"
+        end)
+
+        {:ok, nil}
 
       {:error, reason} ->
         Logger.warning(fn ->
-          "InstanceManager failed to thaw agent for key #{inspect(key)}: #{inspect(reason)}"
+          "InstanceManager failed to thaw agent for key #{inspect(key)}; refusing to start: #{inspect(reason)}"
         end)
 
-        nil
+        {:error, {:thaw_failed, reason}}
     end
   end
 

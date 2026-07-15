@@ -9,10 +9,13 @@ defmodule JidoTest.Agent.InstanceManagerTest do
   alias Jido.Agent.InstanceManager
   alias Jido.Agent.Directive
   alias Jido.AgentServer
+  alias Jido.Persist
   alias Jido.Scheduler
   alias Jido.Signal
   alias Jido.Storage.ETS
+  alias Jido.Storage.File, as: FileStorage
   alias Jido.Storage.Redis
+  alias Jido.Thread
 
   # Use module attribute for manager naming to avoid atom leaks
   # Each test gets a unique integer suffix but we clean up persistent_term
@@ -75,6 +78,28 @@ defmodule JidoTest.Agent.InstanceManagerTest do
            command_fn: fn cmd -> JidoTest.Agent.InstanceManagerTest.RedisMock.command(cmd) end,
            prefix: "instance_manager_test"
          ]}
+  end
+
+  defmodule ControlledStorage do
+    @behaviour Jido.Storage
+
+    @impl true
+    def get_checkpoint(_key, opts), do: Keyword.fetch!(opts, :checkpoint_result)
+
+    @impl true
+    def put_checkpoint(_key, _data, _opts), do: :ok
+
+    @impl true
+    def delete_checkpoint(_key, _opts), do: :ok
+
+    @impl true
+    def load_thread(_thread_id, _opts), do: :not_found
+
+    @impl true
+    def append_thread(_thread_id, _entries, _opts), do: {:error, :unsupported}
+
+    @impl true
+    def delete_thread(_thread_id, _opts), do: :ok
   end
 
   # Simple test agent
@@ -580,6 +605,89 @@ defmodule JidoTest.Agent.InstanceManagerTest do
       assert beta_state.partition == :beta
       assert beta_state.agent.state.counter == 22
       assert beta_state.agent.state.__partition__ == :beta
+    end
+  end
+
+  describe "thaw failures" do
+    test "does not start or overwrite durable state after an unreadable checkpoint" do
+      manager = :"#{@manager_prefix}_thaw_failure_#{:erlang.unique_integer([:positive])}"
+      key = "corrupt-checkpoint"
+      thread_id = "durable-thread-#{:erlang.unique_integer([:positive])}"
+
+      base_dir =
+        Path.join(
+          System.tmp_dir!(),
+          "jido_instance_manager_thaw_failure_#{:erlang.unique_integer([:positive])}"
+        )
+
+      storage = {FileStorage, path: base_dir}
+      storage_opts = [path: base_dir]
+
+      thread =
+        Thread.new(id: thread_id)
+        |> Thread.append(%{kind: :message, payload: %{content: "one"}})
+        |> Thread.append(%{kind: :message, payload: %{content: "two"}})
+
+      agent = TestAgent.new(id: key)
+      agent = %{agent | state: Map.put(agent.state, :__thread__, thread)}
+
+      assert :ok = Persist.hibernate(storage, TestAgent, {manager, key}, agent)
+
+      assert [checkpoint_file] = Path.wildcard(Path.join([base_dir, "checkpoints", "*.term"]))
+      corrupt_checkpoint = <<131, 255, 0, 1>>
+      File.write!(checkpoint_file, corrupt_checkpoint)
+
+      {:ok, _} =
+        start_supervised(
+          InstanceManager.child_spec(
+            name: manager,
+            agent: TestAgent,
+            storage: storage,
+            agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+          )
+        )
+
+      on_exit(fn ->
+        :persistent_term.erase({InstanceManager, manager})
+        File.rm_rf!(base_dir)
+      end)
+
+      assert {:error, {:thaw_failed, :invalid_term}} = InstanceManager.get(manager, key)
+      assert :error = InstanceManager.lookup(manager, key)
+      assert %{count: 0, keys: []} = InstanceManager.stats(manager)
+
+      assert File.read!(checkpoint_file) == corrupt_checkpoint
+      assert {:ok, stored_thread} = FileStorage.load_thread(thread_id, storage_opts)
+      assert stored_thread.rev == 2
+      assert Enum.map(stored_thread.entries, & &1.payload.content) == ["one", "two"]
+    end
+
+    test "propagates non-not-found thaw errors without registering a child" do
+      reasons = [
+        :thread_mismatch,
+        {:restore_callback_failed, :migration_failed},
+        :storage_unavailable
+      ]
+
+      Enum.each(reasons, fn reason ->
+        manager = :"#{@manager_prefix}_thaw_reason_#{:erlang.unique_integer([:positive])}"
+
+        {:ok, _} =
+          start_supervised(
+            InstanceManager.child_spec(
+              name: manager,
+              agent: TestAgent,
+              storage: {ControlledStorage, checkpoint_result: {:error, reason}},
+              agent_opts: [jido: JidoTest.InstanceManagerTestJido]
+            )
+          )
+
+        on_exit(fn -> :persistent_term.erase({InstanceManager, manager}) end)
+
+        assert {:error, {:thaw_failed, ^reason}} = InstanceManager.get(manager, "failed-thaw")
+        assert :error = InstanceManager.lookup(manager, "failed-thaw")
+        assert InstanceManager.stats(manager).count == 0
+      end)
     end
   end
 

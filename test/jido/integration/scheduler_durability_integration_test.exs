@@ -433,8 +433,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
       :ok = AgentServer.detach(pid)
     end
 
-    test "write-through cron register and cancel do not rewrite corrupt checkpoint state",
-         context do
+    test "corrupt checkpoint prevents write-through cron registration", context do
       %{manager: manager, table: table} = start_manager(context, CronAgent)
       register_key = "corrupt-write-through-register"
       register_checkpoint_key = checkpoint_key(CronAgent, manager, register_key)
@@ -450,25 +449,17 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       assert :ok = ETS.put_checkpoint(register_checkpoint_key, register_checkpoint, table: table)
 
-      {:ok, register_pid} = get_attached(manager, register_key)
+      assert {:error, {:thaw_failed, {:invalid_checkpoint, {:invalid_state, []}}}} =
+               InstanceManager.get(manager, register_key)
 
-      assert :ok =
-               register_cron(register_pid, "* * * * * * *", job_id: :write_through_register)
+      assert :error = InstanceManager.lookup(manager, register_key)
 
-      wait_for_job(register_pid, :write_through_register, timeout: 5_000)
+      assert {:ok, ^register_checkpoint} =
+               ETS.get_checkpoint(register_checkpoint_key, table: table)
+    end
 
-      eventually(
-        fn ->
-          case ETS.get_checkpoint(register_checkpoint_key, table: table) do
-            {:ok, checkpoint} ->
-              checkpoint.state == [] and checkpoint.marker == :register_marker
-
-            _ ->
-              false
-          end
-        end,
-        timeout: 3_000
-      )
+    test "write-through cron cancel does not rewrite corrupt checkpoint state", context do
+      %{manager: manager, table: table} = start_manager(context, CronAgent)
 
       cancel_key = "corrupt-write-through-cancel"
       cancel_checkpoint_key = checkpoint_key(CronAgent, manager, cancel_key)
