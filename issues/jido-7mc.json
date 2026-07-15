@@ -18,11 +18,15 @@
     {
       "text": "Review hardening: remove redundant Keyed lifecycle thaw (InstanceManager is its only caller and already preflights storage), add a single-read regression, and simplify the explicit thaw result gate.",
       "timestamp": "2026-07-15T16:21:52Z"
+    },
+    {
+      "text": "Review result: retained Keyed lifecycle restore because it is required for DynamicSupervisor crash-restart recovery (durable cron tests fail without it). Simplified InstanceManager to one tagged {:ok, agent_or_nil} gate plus a dedicated child-start helper and documented the private result contract. Revalidation: targeted 33 passed, mix q passed, full mix test passed.",
+      "timestamp": "2026-07-15T16:24:52Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Fail closed on InstanceManager thaw errors",
   "type": "bug",
-  "updated_at": "2026-07-15T16:21:52Z"
+  "updated_at": "2026-07-15T16:24:52Z"
 }
