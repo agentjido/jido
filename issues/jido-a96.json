@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-07-20T21:41:18Z",
+  "description": "Check Hex dependencies for available updates, apply compatible updates, validate the project, and commit the lockfile changes directly to main as requested.",
+  "id": "jido-a96",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Update project dependencies",
+  "type": "task",
+  "updated_at": "2026-07-20T21:41:18Z"
+}
