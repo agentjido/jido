@@ -2,6 +2,7 @@
   "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-07-20T21:41:48Z",
   "created": "2026-07-20T21:41:18Z",
   "description": "Check Hex dependencies for available updates, apply compatible updates, validate the project, and commit the lockfile changes directly to main as requested.",
   "id": "jido-a96",
@@ -13,7 +14,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Update project dependencies",
   "type": "task",
   "updated_at": "2026-07-20T21:41:48Z"
