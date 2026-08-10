@@ -2,6 +2,19 @@
 
 <!-- changelog -->
 
+## [v2.3.3](https://github.com/agentjido/jido/compare/v2.3.2...v2.3.3) (2026-08-10)
+
+
+
+
+### Bug Fixes:
+
+* deps: update Mint for CVE-2026-59249 by mikehostetler
+
+* instance-manager: fail closed on thaw errors (#316) by mikehostetler
+
+* agent-server: serialize sync call drain races (#312) by mikehostetler
+
 ## [v2.3.2](https://github.com/agentjido/jido/compare/v2.3.1...v2.3.2) (2026-06-09)
 
 
