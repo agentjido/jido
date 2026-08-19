@@ -2,6 +2,7 @@
   "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-08-19T12:31:23Z",
   "created": "2026-08-19T11:36:53Z",
   "description": "Update the locked git_ops development dependency to 2.12.1, validate the canonical package commands, open a pull request, and merge it after required CI passes.",
   "id": "jido-mto",
@@ -21,7 +22,7 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Update git_ops to 2.12.1",
   "type": "task",
   "updated_at": "2026-08-19T12:31:23Z"
