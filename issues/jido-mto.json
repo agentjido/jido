@@ -6,9 +6,15 @@
   "description": "Update the locked git_ops development dependency to 2.12.1, validate the canonical package commands, open a pull request, and merge it after required CI passes.",
   "id": "jido-mto",
   "labels": [],
+  "comments": [
+    {
+      "text": "Opened https://github.com/agentjido/jido/pull/322. Validation passed: mix deps.get, mix compile, mix test (2,209 tests; 187 excluded), mix hex.audit. mix hex.outdated --all confirms git_ops 2.12.1 is current.",
+      "timestamp": "2026-08-19T12:12:34Z"
+    }
+  ],
   "priority": 2,
   "status": "in_progress",
   "title": "Update git_ops to 2.12.1",
   "type": "task",
-  "updated_at": "2026-08-19T11:36:58Z"
+  "updated_at": "2026-08-19T12:12:34Z"
 }
