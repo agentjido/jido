@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-08-19T11:36:53Z",
+  "description": "Update the locked git_ops development dependency to 2.12.1, validate the canonical package commands, open a pull request, and merge it after required CI passes.",
+  "id": "jido-mto",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Update git_ops to 2.12.1",
+  "type": "task",
+  "updated_at": "2026-08-19T11:36:53Z"
+}
