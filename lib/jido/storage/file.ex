@@ -150,15 +150,16 @@ defmodule Jido.Storage.File do
   Uses a global lock to ensure safe concurrent access.
   """
   @impl true
-  @spec append_thread(String.t(), [Entry.t()], opts()) ::
+  @spec append_thread(String.t(), [Jido.Storage.entry_input()], opts()) ::
           {:ok, Thread.t()} | {:error, term()}
   def append_thread(thread_id, entries, opts) do
     path = Keyword.fetch!(opts, :path)
     expected_rev = Keyword.get(opts, :expected_rev)
+    metadata = Keyword.get(opts, :metadata, %{})
 
     with {:ok, thread_dir} <- thread_path(path, thread_id) do
       with_thread_lock(path, thread_id, fn ->
-        do_append_thread(thread_id, thread_dir, entries, expected_rev)
+        do_append_thread(thread_id, thread_dir, entries, expected_rev, metadata)
       end)
     end
   end
@@ -185,12 +186,12 @@ defmodule Jido.Storage.File do
   # Private Helpers
   # =============================================================================
 
-  defp do_append_thread(thread_id, thread_dir, entries, expected_rev) do
+  defp do_append_thread(thread_id, thread_dir, entries, expected_rev, creation_metadata) do
     meta_file = Path.join(thread_dir, "meta.term")
     entries_file = Path.join(thread_dir, "entries.log")
 
     with {:ok, current_rev, current_entries, created_at, metadata} <-
-           load_thread_or_new(meta_file, entries_file),
+           load_thread_or_new(meta_file, entries_file, creation_metadata),
          :ok <- validate_expected_rev(expected_rev, current_rev),
          :ok <- ensure_thread_dir(thread_dir),
          {:ok, prepared_entries, now} <- build_prepared_entries(entries, current_entries),
@@ -210,14 +211,14 @@ defmodule Jido.Storage.File do
     end
   end
 
-  defp load_thread_or_new(meta_file, entries_file) do
+  defp load_thread_or_new(meta_file, entries_file, creation_metadata) do
     case load_existing_thread(meta_file, entries_file) do
       {:ok, rev, existing_entries, created, meta} ->
         {:ok, rev, existing_entries, created, meta}
 
       :not_found ->
         now = System.system_time(:millisecond)
-        {:ok, 0, [], now, %{}}
+        {:ok, 0, [], now, creation_metadata}
 
       {:error, reason} ->
         {:error, reason}
@@ -379,6 +380,9 @@ defmodule Jido.Storage.File do
   defp validate_thread_rev(rev, entries) do
     if rev == length(entries), do: :ok, else: {:error, :invalid_term}
   end
+
+  defp reconstruct_thread(_thread_id, _rev, _created_at, _updated_at, _metadata, []),
+    do: :not_found
 
   defp reconstruct_thread(thread_id, rev, created_at, updated_at, metadata, entries) do
     with :ok <- validate_thread_rev(rev, entries) do

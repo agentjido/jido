@@ -29,7 +29,6 @@ defmodule Jido.Storage.ETS do
   @behaviour Jido.Storage
 
   alias Jido.Thread
-  alias Jido.Thread.Entry
   alias Jido.Thread.EntryNormalizer
 
   @default_table :jido_storage
@@ -124,7 +123,7 @@ defmodule Jido.Storage.ETS do
     if the current thread revision doesn't match.
   - `:metadata` - Thread metadata to merge (only used when creating new thread).
   """
-  @spec append_thread(String.t(), [Entry.t()], opts()) ::
+  @spec append_thread(String.t(), [Jido.Storage.entry_input()], opts()) ::
           {:ok, Thread.t()} | {:error, term()}
   def append_thread(thread_id, entries, opts) do
     threads_table = threads_table(opts)
