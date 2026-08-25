@@ -10,10 +10,11 @@ defmodule Jido.Agent.Identity.Actions.Evolve do
   use Jido.Action,
     name: "identity_evolve",
     description: "Evolve agent identity over simulated time",
-    schema: [
-      days: [type: :integer, default: 0, doc: "Days of simulated time to add"],
-      years: [type: :integer, default: 0, doc: "Years of simulated time to add"]
-    ]
+    schema:
+      Zoi.object(%{
+        days: Zoi.integer(description: "Days of simulated time to add") |> Zoi.default(0),
+        years: Zoi.integer(description: "Years of simulated time to add") |> Zoi.default(0)
+      })
 
   def run(params, ctx) do
     identity =

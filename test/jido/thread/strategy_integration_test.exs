@@ -20,7 +20,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Action,
       name: "value_action",
-      schema: [value: [type: :integer, required: true]]
+      schema: Zoi.object(%{value: Zoi.integer()})
 
     def run(%{value: value}, _context), do: {:ok, %{value: value}}
   end

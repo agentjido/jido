@@ -72,6 +72,7 @@ defmodule Jido.Agent.Strategy.FSM do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
+  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Agent.StateOps
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.Strategy.State, as: StratState
@@ -171,16 +172,20 @@ defmodule Jido.Agent.Strategy.FSM do
   end
 
   @impl true
-  def cmd(
-        %Agent{} = agent,
-        [%Instruction{action: @instruction_result_action, params: result_payload}],
-        ctx
-      ) do
-    handle_instruction_result(agent, result_payload, ctx)
+  def cmd(%Agent{} = agent, [%Instruction{} = instruction] = instructions, ctx) do
+    if AgentInstruction.action(instruction) == @instruction_result_action do
+      handle_instruction_result(agent, instruction.params, ctx)
+    else
+      do_cmd(agent, instructions, ctx)
+    end
   end
 
   @impl true
   def cmd(%Agent{} = agent, instructions, ctx) when is_list(instructions) do
+    do_cmd(agent, instructions, ctx)
+  end
+
+  defp do_cmd(%Agent{} = agent, instructions, ctx) do
     state = StratState.get(agent, %{})
     opts = ctx[:strategy_opts] || []
 
@@ -318,11 +323,6 @@ defmodule Jido.Agent.Strategy.FSM do
     }
 
     dispatch_next_instruction(agent, strategy_state)
-  end
-
-  defp handle_instruction_result(agent, _result_payload, _ctx) do
-    error = Error.execution_error("Instruction result payload must be a map", %{})
-    {agent, [%Directive.Error{error: error, context: :instruction_result}]}
   end
 
   defp maybe_auto_transition(machine, false, _initial_state), do: machine

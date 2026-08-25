@@ -12,6 +12,7 @@ defmodule Jido.Observe.Config do
   When `instance` is `nil`, steps 1-2 are skipped.
   """
 
+  alias Jido.ActionCompat
   alias Jido.Config.Defaults
 
   @type instance :: atom() | nil
@@ -144,27 +145,48 @@ defmodule Jido.Observe.Config do
   end
 
   @doc """
-  Returns `Jido.Exec` options aligned with the instance observability config.
+  Returns execution options for the installed `jido_action` major version.
 
-  Jido action execution only supports coarse logger thresholds, so `:keys_only`
-  and `:none` argument modes are translated into a warning-or-higher threshold
-  to suppress verbose action/context dumps. `jido_action` telemetry only
-  supports `:full` or `:silent`, so non-full argument modes are translated into
-  `:silent` to avoid leaking full action params/context through dependency
-  telemetry spans. Full argument logging is only enabled when the instance opts
-  into `log_args: :full` or `Jido.debug(:verbose)`.
+  Version 2 keeps its logger and telemetry options. Version 3 receives only
+  the shared `timeout` and `jido` options.
   """
-  @spec action_exec_opts(instance(), keyword()) :: keyword()
-  def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
-    opts
-    |> Keyword.delete(:__jido_instance__)
-    |> Keyword.delete(:__partition__)
-    |> Keyword.put_new(:log_level, action_log_level(instance))
-    |> Keyword.put_new(:telemetry, action_telemetry_mode(instance))
+  if ActionCompat.v3?() do
+    @spec action_exec_opts(instance(), keyword()) :: keyword()
+    def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
+      opts
+      |> Keyword.take([:timeout, :jido])
+      |> maybe_put_jido_instance(instance)
+    end
+  else
+    @spec action_exec_opts(instance(), keyword()) :: keyword()
+    def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
+      opts
+      |> Keyword.delete(:__jido_instance__)
+      |> Keyword.delete(:__partition__)
+      |> Keyword.put_new(:log_level, action_log_level(instance))
+      |> Keyword.put_new(:telemetry, action_telemetry_mode(instance))
+      |> maybe_put_jido_instance(instance)
+    end
   end
 
+  defp maybe_put_jido_instance(opts, Jido) do
+    if Process.whereis(Jido.TaskSupervisor) do
+      Keyword.put_new(opts, :jido, Jido)
+    else
+      opts
+    end
+  end
+
+  defp maybe_put_jido_instance(opts, instance) when is_atom(instance) and not is_nil(instance),
+    do: Keyword.put_new(opts, :jido, instance)
+
+  defp maybe_put_jido_instance(opts, _instance), do: opts
+
   @doc """
-  Returns the effective `Jido.Exec` logger threshold for the given instance.
+  Returns the action logger threshold for the given instance.
+
+  Jido passes this value to `Jido.Exec` v2. Version 3 does not accept it as a
+  per-call option.
   """
   @spec action_log_level(instance()) :: Logger.level()
   def action_log_level(instance \\ nil) do
@@ -174,7 +196,10 @@ defmodule Jido.Observe.Config do
   end
 
   @doc """
-  Returns the effective `Jido.Exec` telemetry mode for the given instance.
+  Returns the action telemetry mode for the given instance.
+
+  Jido passes this value to `Jido.Exec` v2. Version 3 always emits its action
+  lifecycle events and does not accept this value as a per-call option.
   """
   @spec action_telemetry_mode(instance()) :: :full | :silent
   def action_telemetry_mode(instance \\ nil) do

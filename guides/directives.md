@@ -109,7 +109,7 @@ Non-persistent lifecycles keep cron state runtime-only.
 ## RunInstruction
 
 `RunInstruction` is used by strategies that want runtime-owned instruction
-execution. Instead of calling `Jido.Exec.run/1` inline, the strategy emits
+execution. Instead of running the Instruction inline, the strategy emits
 `%Directive.RunInstruction{}` and the runtime executes it, then routes the result
 back through `cmd/2` using `result_action`.
 
@@ -200,7 +200,7 @@ Here's a full example showing an action that processes an order and emits a sign
 defmodule ProcessOrderAction do
   use Jido.Action,
     name: "process_order",
-    schema: [order_id: [type: :string, required: true]]
+    schema: Zoi.object(%{order_id: Zoi.string()})
 
   alias Jido.Agent.{Directive, StateOp}
 

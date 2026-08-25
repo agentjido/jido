@@ -269,10 +269,7 @@ defmodule MyApp.Actions.SendEmail do
   use Jido.Action,
     name: "send_email",
     description: "Sends an email",
-    schema: [
-      to: [type: :string, required: true],
-      subject: [type: :string, required: true]
-    ]
+    schema: Zoi.object(%{to: Zoi.string(), subject: Zoi.string()})
 
   @impl true
   def run(params, _context) do

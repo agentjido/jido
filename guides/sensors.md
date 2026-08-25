@@ -303,7 +303,7 @@ Complete working example with an agent that reacts to sensor signals:
 defmodule HandleTickAction do
   use Jido.Action,
     name: "handle_tick",
-    schema: [count: [type: :integer, required: true]]
+    schema: Zoi.object(%{count: Zoi.integer()})
 
   def run(params, context) do
     current = Map.get(context.state, :tick_count, 0)

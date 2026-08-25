@@ -9,7 +9,7 @@ defmodule Jido.Agent.State do
   Handles deep merging and validation of agent state.
   """
 
-  alias Jido.Action.Schema
+  alias Jido.Agent.Schema
   alias Jido.Util.DeepMerge
 
   @doc """
@@ -43,8 +43,10 @@ defmodule Jido.Agent.State do
     state_to_validate = Map.take(state, known_keys)
     extra_fields = Map.drop(state, known_keys)
 
-    case Schema.validate(schema, state_to_validate) do
+    case NimbleOptions.validate(Map.to_list(state_to_validate), schema) do
       {:ok, validated} ->
+        validated = Map.new(validated)
+
         if strict? do
           {:ok, validated}
         else
@@ -58,14 +60,14 @@ defmodule Jido.Agent.State do
 
   def validate(state, schema, opts) do
     strict? = Keyword.get(opts, :strict, false)
+    known_keys = Schema.known_keys(schema)
+    extra_fields = Map.drop(state, known_keys)
 
-    case Schema.validate(schema, state) do
+    case Zoi.parse(schema, state) do
       {:ok, validated} ->
         if strict? do
           {:ok, validated}
         else
-          known_keys = Schema.known_keys(schema)
-          extra_fields = Map.drop(state, known_keys)
           {:ok, Map.merge(validated, extra_fields)}
         end
 

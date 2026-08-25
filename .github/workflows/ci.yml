@@ -24,3 +24,32 @@ jobs:
       credo_command: mix credo --min-priority higher
       docs_command: mix docs -f html
       test_command: mix test
+
+  jido-action-v3:
+    name: jido_action v3 compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      MIX_ENV: test
+    steps:
+      - name: Check out Jido
+        uses: actions/checkout@v4
+
+      - name: Set up Erlang and Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: "28"
+          elixir-version: "1.20"
+
+      - name: Select jido_action v3
+        run: |
+          perl -0pi -e 's/\{:jido_action, "~> 2\.3"\}/\{:jido_action, "~> 3.0.0-beta.1"\}/' mix.exs
+          grep -F '{:jido_action, "~> 3.0.0-beta.1"}' mix.exs
+          mix deps.unlock jido_action
+          mix deps.get
+
+      - name: Compile without Jido warnings
+        run: mix compile --warnings-as-errors
+
+      - name: Test with jido_action v3
+        run: mix test

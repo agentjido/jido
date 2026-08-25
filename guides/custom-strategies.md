@@ -8,7 +8,9 @@
 defmodule RoundRobinStrategy do
   use Jido.Agent.Strategy
 
+  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.Observe.Config, as: ObserveConfig
 
   @impl true
   def init(agent, _ctx) do
@@ -22,7 +24,7 @@ defmodule RoundRobinStrategy do
   end
 
   @impl true
-  def cmd(agent, instructions, _ctx) do
+  def cmd(agent, instructions, ctx) do
     state = StratState.get(agent, %{})
     index = Map.get(state, :current_index, 0)
 
@@ -34,7 +36,13 @@ defmodule RoundRobinStrategy do
       instruction ->
         instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
 
-        case Jido.Exec.run(instruction) do
+        exec_opts =
+          ObserveConfig.action_exec_opts(
+            ctx[:jido_instance],
+            AgentInstruction.exec_opts(instruction)
+          )
+
+        case AgentInstruction.run(instruction, exec_opts) do
           {:ok, result} ->
             agent = Jido.Agent.StateOps.apply_result(agent, result)
             agent = StratState.put(agent, %{state |
@@ -209,8 +217,10 @@ agent = StratState.clear(agent)
 defmodule MyStrategy do
   use Jido.Agent.Strategy
 
+  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.Agent.StateOps
+  alias Jido.Observe.Config, as: ObserveConfig
 
   @impl true
   def init(agent, _ctx) do
@@ -219,11 +229,17 @@ defmodule MyStrategy do
   end
 
   @impl true
-  def cmd(agent, instructions, _ctx) do
+  def cmd(agent, instructions, ctx) do
     Enum.reduce(instructions, {agent, []}, fn instruction, {acc, directives} ->
       instruction = %{instruction | context: Map.put(instruction.context, :state, acc.state)}
 
-      case Jido.Exec.run(instruction) do
+      exec_opts =
+        ObserveConfig.action_exec_opts(
+          ctx[:jido_instance],
+          AgentInstruction.exec_opts(instruction)
+        )
+
+      case AgentInstruction.run(instruction, exec_opts) do
         {:ok, result} ->
           {StateOps.apply_result(acc, result), directives}
 

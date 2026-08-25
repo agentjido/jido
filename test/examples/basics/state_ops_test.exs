@@ -25,9 +25,7 @@ defmodule JidoExampleTest.StateOpsTest do
     @moduledoc false
     use Jido.Action,
       name: "merge_metadata",
-      schema: [
-        metadata: [type: :map, required: true]
-      ]
+      schema: Zoi.object(%{metadata: Zoi.map()})
 
     def run(%{metadata: metadata}, _context) do
       {:ok, %{}, %StateOp.SetState{attrs: %{metadata: metadata}}}
@@ -38,9 +36,7 @@ defmodule JidoExampleTest.StateOpsTest do
     @moduledoc false
     use Jido.Action,
       name: "replace_all",
-      schema: [
-        new_state: [type: :map, required: true]
-      ]
+      schema: Zoi.object(%{new_state: Zoi.map()})
 
     def run(%{new_state: new_state}, _context) do
       {:ok, %{}, %StateOp.ReplaceState{state: new_state}}
@@ -62,10 +58,7 @@ defmodule JidoExampleTest.StateOpsTest do
     @moduledoc false
     use Jido.Action,
       name: "set_nested_value",
-      schema: [
-        path: [type: {:list, :atom}, required: true],
-        value: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{path: Zoi.list(Zoi.atom()), value: Zoi.any()})
 
     def run(%{path: path, value: value}, _context) do
       {:ok, %{}, %StateOp.SetPath{path: path, value: value}}
@@ -76,9 +69,7 @@ defmodule JidoExampleTest.StateOpsTest do
     @moduledoc false
     use Jido.Action,
       name: "delete_nested_value",
-      schema: [
-        path: [type: {:list, :atom}, required: true]
-      ]
+      schema: Zoi.object(%{path: Zoi.list(Zoi.atom())})
 
     def run(%{path: path}, _context) do
       {:ok, %{}, %StateOp.DeletePath{path: path}}

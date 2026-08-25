@@ -193,20 +193,26 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "action_exec_opts/2" do
-    test "adds derived exec options without overwriting explicit opts" do
+    test "uses options supported by the installed Jido.Exec version" do
       Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
 
-      opts = Config.action_exec_opts(nil, timeout: 10)
+      opts = Config.action_exec_opts(nil, timeout: 10, max_retries: 2)
 
-      assert Keyword.get(opts, :log_level) == :warning
-      assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
 
       explicit_opts =
         Config.action_exec_opts(nil, log_level: :error, telemetry: :full, timeout: 10)
 
-      assert Keyword.get(explicit_opts, :log_level) == :error
-      assert Keyword.get(explicit_opts, :telemetry) == :full
+      if apply(Jido.ActionCompat, :v3?, []) do
+        refute Keyword.has_key?(opts, :max_retries)
+        refute Keyword.has_key?(explicit_opts, :log_level)
+        refute Keyword.has_key?(explicit_opts, :telemetry)
+      else
+        assert Keyword.get(opts, :max_retries) == 2
+        assert Keyword.get(explicit_opts, :log_level) == :error
+        assert Keyword.get(explicit_opts, :telemetry) == :full
+      end
+
       assert Keyword.get(explicit_opts, :timeout) == 10
     end
 
@@ -216,8 +222,6 @@ defmodule JidoTest.Observe.ConfigTest do
       opts = Config.action_exec_opts(nil, __jido_instance__: Jido, timeout: 10)
 
       refute Keyword.has_key?(opts, :__jido_instance__)
-      assert Keyword.get(opts, :log_level) == :warning
-      assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
     end
   end

@@ -104,7 +104,7 @@ defmodule Jido.Util do
   This function ensures that all provided modules are valid Jido.Action implementations
   by checking that they:
   1. Are valid Elixir modules that can be loaded
-  2. Export the required __action_metadata__/0 function that indicates Jido.Action behavior
+  2. Satisfy the Action contract for the installed `jido_action` major version
 
   ## Parameters
 
@@ -184,8 +184,7 @@ defmodule Jido.Util do
   end
 
   defp implements_action?(module) when is_atom(module) do
-    match?({:module, _}, Code.ensure_compiled(module)) and
-      function_exported?(module, :__action_metadata__, 0)
+    Jido.ActionCompat.action?(module)
   end
 
   @doc """

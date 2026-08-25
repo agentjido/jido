@@ -5,10 +5,11 @@ defmodule Jido.Pod.Actions.Mutate do
 
   use Jido.Action,
     name: "pod_mutate",
-    schema: [
-      ops: [type: {:list, :any}, required: true],
-      opts: [type: :map, default: %{}]
-    ]
+    schema:
+      Zoi.object(%{
+        ops: Zoi.list(Zoi.any()),
+        opts: Zoi.map() |> Zoi.default(%{})
+      })
 
   def run(%{ops: ops, opts: opts}, context) do
     with {:ok, effects} <- Pod.mutation_effects(context.agent, ops, Map.to_list(opts || %{})) do

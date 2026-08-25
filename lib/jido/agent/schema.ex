@@ -5,6 +5,22 @@ defmodule Jido.Agent.Schema do
 
   alias Jido.Plugin.Spec
 
+  @doc false
+  @spec validate_config_schema(term(), keyword()) :: :ok | {:error, String.t()}
+  def validate_config_schema(value, _opts \\ [])
+
+  def validate_config_schema(value, _opts) when is_list(value), do: :ok
+
+  def validate_config_schema(value, _opts) do
+    if is_struct(value) and Zoi.Type.impl_for(value) != nil do
+      :ok
+    else
+      {:error, "must be a NimbleOptions or Zoi schema"}
+    end
+  rescue
+    _error -> {:error, "must be a NimbleOptions or Zoi schema"}
+  end
+
   @doc """
   Merges the agent's base schema with plugin schemas.
 

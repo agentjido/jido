@@ -9,7 +9,7 @@ defmodule Jido.Discovery do
 
   Discovery automatically finds and indexes:
 
-  - **Actions** - Discrete units of work (`__action_metadata__/0`)
+  - **Actions** - Discrete units of work from the installed Action contract
   - **Sensors** - Event monitoring components (`__sensor_metadata__/0`)
   - **Agents** - Autonomous workers (`__agent_metadata__/0`)
   - **Plugins** - Reusable capability packs (`__plugin_metadata__/0`)
@@ -222,7 +222,7 @@ defmodule Jido.Discovery do
     %{
       last_updated: DateTime.utc_now(),
       components: %{
-        actions: discover_components(:__action_metadata__),
+        actions: discover_actions(),
         sensors: discover_components(:__sensor_metadata__),
         agents: discover_components(:__agent_metadata__),
         plugins: discover_components(:__plugin_metadata__),
@@ -236,6 +236,22 @@ defmodule Jido.Discovery do
     |> Enum.flat_map(&modules_for/1)
     |> Enum.filter(&has_metadata_function?(&1, metadata_fun))
     |> Enum.map(&build_metadata(&1, metadata_fun))
+  end
+
+  defp discover_actions do
+    loaded_applications()
+    |> Enum.flat_map(&modules_for/1)
+    |> Enum.filter(&action_module?/1)
+    |> Enum.map(&build_action_metadata/1)
+  end
+
+  defp action_module?(module) do
+    Jido.ActionCompat.action?(module)
+  end
+
+  defp build_action_metadata(module) do
+    Jido.ActionCompat.action_metadata(module)
+    |> put_module_and_slug(module)
   end
 
   defp loaded_applications do
@@ -260,6 +276,11 @@ defmodule Jido.Discovery do
     metadata_map =
       if Keyword.keyword?(raw_metadata), do: Map.new(raw_metadata), else: raw_metadata
 
+    metadata_map
+    |> put_module_and_slug(module)
+  end
+
+  defp put_module_and_slug(metadata, module) do
     slug =
       module
       |> Atom.to_string()
@@ -267,7 +288,7 @@ defmodule Jido.Discovery do
       |> Base.url_encode64(padding: false)
       |> binary_part(0, 8)
 
-    metadata_map
+    metadata
     |> Map.put(:module, module)
     |> Map.put(:slug, slug)
   end

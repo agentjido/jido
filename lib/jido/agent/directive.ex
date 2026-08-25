@@ -623,7 +623,7 @@ defmodule Jido.Agent.Directive do
     Execute a `%Jido.Instruction{}` at runtime and route the result back to `cmd/2`.
 
     This directive lets strategies keep `cmd/2` pure by emitting instruction execution
-    requests instead of calling `Jido.Exec.run/1` directly. The runtime executes the
+    requests instead of running them directly. The runtime executes the
     instruction, builds a result payload, then calls:
 
         agent_module.cmd(agent, {result_action, payload})

@@ -109,9 +109,7 @@ Actions return tagged tuples. Return `{:error, reason}` for failures:
 defmodule MyApp.Actions.ProcessOrder do
   use Jido.Action,
     name: "process_order",
-    schema: [
-      order_id: [type: :string, required: true]
-    ]
+    schema: Zoi.object(%{order_id: Zoi.string()})
 
   def run(params, context) do
     case validate_order(params.order_id) do

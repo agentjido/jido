@@ -3,7 +3,7 @@ defmodule Jido.Agent.Strategy.Direct do
   Default execution strategy that runs instructions immediately and sequentially.
 
   This strategy:
-  - Executes each instruction via `Jido.Exec.run/1`
+  - Executes each instruction through the installed `jido_action` API
   - Merges results into agent state
   - Applies state operations (e.g., `StateOp.SetState`) to the agent
   - Returns only external directives to the caller
@@ -27,6 +27,7 @@ defmodule Jido.Agent.Strategy.Direct do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
+  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.StateOps
@@ -81,9 +82,10 @@ defmodule Jido.Agent.Strategy.Direct do
             |> Map.put(:agent_server_pid, self())
       }
 
-    exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], instruction.opts)
+    exec_opts =
+      ObserveConfig.action_exec_opts(ctx[:jido_instance], AgentInstruction.exec_opts(instruction))
 
-    case Jido.Exec.run(%{instruction | opts: exec_opts}) do
+    case AgentInstruction.run(instruction, exec_opts) do
       {:ok, result} when is_map(result) ->
         {StateOps.apply_result(agent, result), [], :ok}
 

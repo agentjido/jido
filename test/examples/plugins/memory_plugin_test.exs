@@ -29,10 +29,7 @@ defmodule JidoExampleTest.MemoryPluginTest do
     @moduledoc false
     use Jido.Action,
       name: "update_world",
-      schema: [
-        key: [type: :atom, required: true],
-        value: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{key: Zoi.atom(), value: Zoi.any()})
 
     def run(%{key: key, value: value}, context) do
       alias Jido.Memory

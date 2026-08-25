@@ -46,7 +46,7 @@ defmodule JidoTest.AgentServer.SignalCallDrainRaceTest do
     use Jido.Action, name: "race_queue_runtime_instruction"
 
     def run(_params, _context) do
-      instruction = Jido.Instruction.new!(%{action: RuntimeMutationAction})
+      instruction = Jido.Agent.Instruction.new!(RuntimeMutationAction)
 
       directive =
         Directive.run_instruction(instruction, result_action: CaptureRuntimeResultAction)

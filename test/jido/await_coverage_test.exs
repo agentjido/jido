@@ -31,9 +31,7 @@ defmodule JidoTest.AwaitCoverageTest do
     @moduledoc false
     use Jido.Action,
       name: "spawn_child",
-      schema: [
-        tag: [type: :atom, required: true]
-      ]
+      schema: Zoi.object(%{tag: Zoi.atom()})
 
     def run(%{tag: tag}, _context) do
       directive = %Jido.Agent.Directive.SpawnAgent{

@@ -719,7 +719,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       agent = SinglePluginAgent.new()
 
       {:ok, instruction} =
-        Jido.Instruction.new(%{action: IncrementAction, params: %{amount: 7}})
+        Jido.Agent.Instruction.new(IncrementAction, %{amount: 7})
 
       {updated, _directives} = SinglePluginAgent.cmd(agent, instruction)
 

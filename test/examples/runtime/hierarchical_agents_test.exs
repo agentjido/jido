@@ -69,12 +69,13 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "execute_task",
-      schema: [
-        task_id: [type: :string, required: true],
-        job_id: [type: :string, required: true],
-        operation: [type: :atom, required: true],
-        value: [type: :integer, required: true]
-      ]
+      schema:
+        Zoi.object(%{
+          task_id: Zoi.string(),
+          job_id: Zoi.string(),
+          operation: Zoi.atom(),
+          value: Zoi.integer()
+        })
 
     def run(params, context) do
       result =
@@ -116,10 +117,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_job_assign",
-      schema: [
-        job_id: [type: :string, required: true],
-        tasks: [type: {:list, :map}, required: true]
-      ]
+      schema: Zoi.object(%{job_id: Zoi.string(), tasks: Zoi.list(Zoi.map())})
 
     def run(%{job_id: job_id, tasks: tasks}, context) do
       pending = Map.get(context.state, :pending_tasks, %{})
@@ -159,14 +157,15 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "coordinator_child_started",
-      schema: [
-        parent_id: [type: :string, required: true],
-        child_id: [type: :string, required: true],
-        child_module: [type: :any, required: true],
-        tag: [type: :any, required: true],
-        pid: [type: :any, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          parent_id: Zoi.string(),
+          child_id: Zoi.string(),
+          child_module: Zoi.any(),
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(%{pid: pid, meta: meta}, _context) do
       task_signal =
@@ -191,12 +190,13 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_task_result",
-      schema: [
-        task_id: [type: :string, required: true],
-        job_id: [type: :string, required: true],
-        result: [type: :any, required: true],
-        operation: [type: :atom, required: true]
-      ]
+      schema:
+        Zoi.object(%{
+          task_id: Zoi.string(),
+          job_id: Zoi.string(),
+          result: Zoi.any(),
+          operation: Zoi.atom()
+        })
 
     def run(params, context) do
       pending = Map.get(context.state, :pending_tasks, %{})
@@ -254,10 +254,7 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "submit_job",
-      schema: [
-        job_name: [type: :string, required: true],
-        tasks: [type: {:list, :map}, required: true]
-      ]
+      schema: Zoi.object(%{job_name: Zoi.string(), tasks: Zoi.list(Zoi.map())})
 
     def run(%{job_name: job_name, tasks: tasks}, context) do
       job_id = "job-#{System.unique_integer([:positive])}"
@@ -290,14 +287,15 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "orchestrator_child_started",
-      schema: [
-        parent_id: [type: :string, required: true],
-        child_id: [type: :string, required: true],
-        child_module: [type: :any, required: true],
-        tag: [type: :any, required: true],
-        pid: [type: :any, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          parent_id: Zoi.string(),
+          child_id: Zoi.string(),
+          child_module: Zoi.any(),
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(%{pid: pid, meta: meta}, _context) do
       indexed_tasks =
@@ -322,11 +320,12 @@ defmodule JidoExampleTest.HierarchicalAgentsTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_job_result",
-      schema: [
-        job_id: [type: :string, required: true],
-        results: [type: {:list, :map}, required: true],
-        total_tasks: [type: :integer, required: true]
-      ]
+      schema:
+        Zoi.object(%{
+          job_id: Zoi.string(),
+          results: Zoi.list(Zoi.map()),
+          total_tasks: Zoi.integer()
+        })
 
     def run(params, context) do
       pending = Map.get(context.state, :pending_jobs, %{})

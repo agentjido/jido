@@ -7,6 +7,7 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   """
 
   alias Jido.Agent
+  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Instruction
   alias Jido.Thread.Agent, as: ThreadAgent
 
@@ -65,17 +66,17 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   @doc false
   @spec instruction_payload(Instruction.t()) :: map()
   def instruction_payload(%Instruction{} = instruction) do
-    payload = %{action: instruction.action}
+    payload = %{action: AgentInstruction.action(instruction)}
 
     payload =
-      if is_map(instruction.params) and map_size(instruction.params) > 0 do
+      if map_size(instruction.params) > 0 do
         Map.put(payload, :param_keys, Map.keys(instruction.params))
       else
         payload
       end
 
-    if instruction.id do
-      Map.put(payload, :instruction_id, instruction.id)
+    if AgentInstruction.id(instruction) do
+      Map.put(payload, :instruction_id, AgentInstruction.id(instruction))
     else
       payload
     end

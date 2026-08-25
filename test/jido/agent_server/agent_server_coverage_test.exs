@@ -107,9 +107,7 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Action,
       name: "many_directives",
-      schema: [
-        count: [type: :integer, default: 10]
-      ]
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(10)})
 
     alias Jido.Agent.Directive
 
@@ -161,7 +159,7 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Action,
       name: "delay_complete",
-      schema: [delay_ms: [type: :integer, default: 50]]
+      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(50)})
 
     def run(%{delay_ms: delay}, _context) do
       Process.sleep(delay)

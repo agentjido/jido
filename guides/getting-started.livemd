@@ -86,9 +86,7 @@ defmodule IncrementAction do
   use Jido.Action,
     name: "increment",
     description: "Increments the counter by a given amount",
-    schema: [
-      amount: [type: :integer, default: 1]
-    ]
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
   @impl true
   def run(params, context) do

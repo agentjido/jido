@@ -154,9 +154,7 @@ end
 defmodule ShipOrder do
   use Jido.Action,
     name: "ship_order",
-    schema: [
-      carrier: [type: :string, default: "Standard Shipping"]
-    ]
+    schema: Zoi.object(%{carrier: Zoi.string() |> Zoi.default("Standard Shipping")})
 
   @impl true
   def run(%{carrier: carrier}, context) do

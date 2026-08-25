@@ -45,11 +45,12 @@ defmodule Jido.Actions.Lifecycle do
     use Jido.Action,
       name: "notify_parent",
       description: "Emit a signal back to the parent agent",
-      schema: [
-        signal_type: [type: :string, required: true, doc: "Signal type to emit to parent"],
-        payload: [type: :map, default: %{}, doc: "Signal payload data"],
-        source: [type: :string, default: "/child", doc: "Signal source path"]
-      ]
+      schema:
+        Zoi.object(%{
+          signal_type: Zoi.string(description: "Signal type to emit to parent"),
+          payload: Zoi.map(description: "Signal payload data") |> Zoi.default(%{}),
+          source: Zoi.string(description: "Signal source path") |> Zoi.default("/child")
+        })
 
     def run(%{signal_type: type, payload: payload, source: source}, context) do
       signal = Signal.new!(type, payload, source: source)
@@ -81,17 +82,15 @@ defmodule Jido.Actions.Lifecycle do
     use Jido.Action,
       name: "notify_pid",
       description: "Emit a signal to a specific process",
-      schema: [
-        target_pid: [type: :any, required: true, doc: "Target process PID"],
-        signal_type: [type: :string, required: true, doc: "Signal type to emit"],
-        payload: [type: :map, default: %{}, doc: "Signal payload data"],
-        source: [type: :string, default: "/agent", doc: "Signal source path"],
-        delivery_mode: [
-          type: {:in, [:async, :sync]},
-          default: :async,
-          doc: "Delivery mode"
-        ]
-      ]
+      schema:
+        Zoi.object(%{
+          target_pid: Zoi.any(description: "Target process PID"),
+          signal_type: Zoi.string(description: "Signal type to emit"),
+          payload: Zoi.map(description: "Signal payload data") |> Zoi.default(%{}),
+          source: Zoi.string(description: "Signal source path") |> Zoi.default("/agent"),
+          delivery_mode:
+            Zoi.enum([:async, :sync], description: "Delivery mode") |> Zoi.default(:async)
+        })
 
     def run(
           %{
@@ -146,17 +145,16 @@ defmodule Jido.Actions.Lifecycle do
     use Jido.Action,
       name: "spawn_child",
       description: "Spawn a child agent with hierarchy tracking",
-      schema: [
-        agent_module: [type: :atom, required: true, doc: "Agent module to spawn"],
-        tag: [type: :atom, required: true, doc: "Tag for tracking this child"],
-        initial_state: [type: :map, default: %{}, doc: "Initial state for child"],
-        meta: [type: :map, default: %{}, doc: "Metadata to pass to child"],
-        restart: [
-          type: {:in, @restart_policies},
-          default: :transient,
-          doc: "Restart policy for the child"
-        ]
-      ]
+      schema:
+        Zoi.object(%{
+          agent_module: Zoi.atom(description: "Agent module to spawn"),
+          tag: Zoi.atom(description: "Tag for tracking this child"),
+          initial_state: Zoi.map(description: "Initial state for child") |> Zoi.default(%{}),
+          meta: Zoi.map(description: "Metadata to pass to child") |> Zoi.default(%{}),
+          restart:
+            Zoi.enum(@restart_policies, description: "Restart policy for the child")
+            |> Zoi.default(:transient)
+        })
 
     def run(
           %{agent_module: mod, tag: tag, initial_state: state, meta: meta, restart: restart},
@@ -186,9 +184,10 @@ defmodule Jido.Actions.Lifecycle do
     use Jido.Action,
       name: "stop_self",
       description: "Request graceful termination of this agent",
-      schema: [
-        reason: [type: :any, default: :normal, doc: "Reason for stopping"]
-      ]
+      schema:
+        Zoi.object(%{
+          reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
+        })
 
     def run(%{reason: reason}, _context) do
       directive = Directive.stop(reason)
@@ -214,10 +213,11 @@ defmodule Jido.Actions.Lifecycle do
     use Jido.Action,
       name: "stop_child",
       description: "Request graceful termination of a child agent",
-      schema: [
-        tag: [type: :atom, required: true, doc: "Tag of child to stop"],
-        reason: [type: :any, default: :normal, doc: "Reason for stopping"]
-      ]
+      schema:
+        Zoi.object(%{
+          tag: Zoi.atom(description: "Tag of child to stop"),
+          reason: Zoi.any(description: "Reason for stopping") |> Zoi.default(:normal)
+        })
 
     def run(%{tag: tag, reason: reason}, _context) do
       directive = Directive.stop_child(tag, reason)
