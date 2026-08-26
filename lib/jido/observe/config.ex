@@ -12,8 +12,11 @@ defmodule Jido.Observe.Config do
   When `instance` is `nil`, steps 1-2 are skipped.
   """
 
-  alias Jido.ActionCompat
   alias Jido.Config.Defaults
+
+  @jido_action_v3 Code.ensure_loaded?(Jido.Action) and
+                    function_exported?(Jido.Action, :api_version, 0) and
+                    apply(Jido.Action, :api_version, []) == 3
 
   @type instance :: atom() | nil
 
@@ -150,7 +153,7 @@ defmodule Jido.Observe.Config do
   Version 2 keeps its logger and telemetry options. Version 3 receives only
   the shared `timeout` and `jido` options.
   """
-  if ActionCompat.v3?() do
+  if @jido_action_v3 do
     @spec action_exec_opts(instance(), keyword()) :: keyword()
     def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
       opts

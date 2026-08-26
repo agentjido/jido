@@ -72,7 +72,6 @@ defmodule Jido.Agent.Strategy.FSM do
 
   alias Jido.Agent
   alias Jido.Agent.Directive
-  alias Jido.Agent.Instruction, as: AgentInstruction
   alias Jido.Agent.StateOps
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.Strategy.State, as: StratState
@@ -172,21 +171,16 @@ defmodule Jido.Agent.Strategy.FSM do
   end
 
   @impl true
-  def cmd(%Agent{} = agent, [%Instruction{} = instruction] = instructions, ctx) do
-    if AgentInstruction.action(instruction) == @instruction_result_action do
-      result_payload = instruction |> Map.from_struct() |> Map.fetch!(:params)
-      handle_instruction_result(agent, result_payload, ctx)
-    else
-      do_cmd(agent, instructions, ctx)
-    end
+  def cmd(
+        %Agent{} = agent,
+        [%Instruction{action: @instruction_result_action, params: result_payload}],
+        ctx
+      ) do
+    handle_instruction_result(agent, result_payload, ctx)
   end
 
   @impl true
   def cmd(%Agent{} = agent, instructions, ctx) when is_list(instructions) do
-    do_cmd(agent, instructions, ctx)
-  end
-
-  defp do_cmd(%Agent{} = agent, instructions, ctx) do
     state = StratState.get(agent, %{})
     opts = ctx[:strategy_opts] || []
 

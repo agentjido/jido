@@ -5,6 +5,10 @@ defmodule JidoTest.AgentTest do
   alias JidoTest.TestActions
   alias JidoTest.TestAgents
 
+  @jido_action_v3 Code.ensure_loaded?(Jido.Action) and
+                    function_exported?(Jido.Action, :api_version, 0) and
+                    apply(Jido.Action, :api_version, []) == 3
+
   defmodule ConfiguredRoutesAgent do
     @moduledoc false
     use Jido.Agent,
@@ -290,7 +294,7 @@ defmodule JidoTest.AgentTest do
       assert error.message == "Instruction failed"
     end
 
-    test "passes max_retries option to disable retries" do
+    test "applies the retry policy of the selected jido_action version" do
       agent = TestAgents.Basic.new()
 
       start_no_retry = System.monotonic_time(:millisecond)
@@ -318,7 +322,10 @@ defmodule JidoTest.AgentTest do
 
       assert [%Jido.Agent.Directive.Error{}] = directives_no_retry
       assert [%Jido.Agent.Directive.Error{}] = directives_default
-      assert elapsed_no_retry < elapsed_default
+
+      unless @jido_action_v3 do
+        assert elapsed_no_retry < elapsed_default
+      end
     end
 
     test "cmd/2 delegates to cmd/3 with empty opts" do

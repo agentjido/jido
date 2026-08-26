@@ -33,7 +33,7 @@ defmodule Jido.Agent do
 
   - `MyAction` - Action module with no params
   - `{MyAction, %{param: value}}` - Action with params
-  - `%Instruction{}` - An Instruction built for the installed dependency version
+  - `%Instruction{}` - Full instruction struct
   - `[...]` - List of any of the above (processed in sequence)
 
   ## Directives
@@ -856,7 +856,7 @@ defmodule Jido.Agent do
         * `{MyAction, %{param: 1}}` - Action with params
         * `{MyAction, %{param: 1}, %{context: data}}` - Action with params and context
         * `{MyAction, %{param: 1}, %{}, [timeout: 1000]}` - Action with opts
-        * `%Instruction{}` - An Instruction built with `Jido.Agent.Instruction`
+        * `%Instruction{}` - Full instruction struct
         * `[...]` - List of any of the above (processed in sequence)
 
       ## Options
@@ -913,7 +913,7 @@ defmodule Jido.Agent do
 
         instruction_context = Map.merge(action_context, base_context)
 
-        case Jido.Agent.Instruction.normalize(action, instruction_context, instruction_opts) do
+        case Instruction.normalize(action, instruction_context, instruction_opts) do
           {:ok, instructions} ->
             ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()
@@ -922,7 +922,7 @@ defmodule Jido.Agent do
               Enum.map(instructions, fn instr ->
                 strat
                 |> AgentStrategy.normalize_instruction(instr, ctx)
-                |> Jido.Agent.Instruction.put_exec_defaults(action_exec_defaults)
+                |> __apply_action_exec_defaults__(action_exec_defaults)
               end)
 
             {agent, directives} = strat.cmd(agent, normalized_instructions, ctx)
@@ -933,6 +933,21 @@ defmodule Jido.Agent do
             {agent, [%Jido.Agent.Directive.Error{error: error, context: :normalize}]}
         end
       end
+
+      defp __apply_action_exec_defaults__(%Instruction{opts: opts} = instruction, defaults)
+           when is_list(defaults) and is_list(opts) do
+        merged_opts =
+          defaults
+          |> Enum.reverse()
+          |> Enum.reduce(opts, fn
+            {key, value}, acc when is_atom(key) -> Keyword.put_new(acc, key, value)
+            _invalid, acc -> acc
+          end)
+
+        %{instruction | opts: merged_opts}
+      end
+
+      defp __apply_action_exec_defaults__(instruction, _defaults), do: instruction
 
       defp __normalize_internal_action_context__(context) when is_map(context) do
         Map.drop(context, [

@@ -154,16 +154,21 @@ def deps do
 end
 ```
 
-Jido 2.x uses `jido_action` 2.x by default. To test the experimental version 3
-compatibility shim, add a direct override:
+Jido 2.x uses `jido_action` 2.x by default. To test the proposed version
+3.0.0-beta.2 compatibility bridge, add a direct source override:
 
 ```elixir
-{:jido_action, "~> 3.0.0-beta.1", override: true}
+{:jido_action,
+ github: "agentjido/jido_action",
+ ref: "1fb922001b1f8cd8a96186fa2993d363ab488ad8",
+ override: true}
 ```
 
-Version 3 requires Elixir 1.20 or later. It also requires Zoi Action schemas and
-does not include the version 2 retry, compensation, hook, or per-call telemetry
-features. Clean and recompile Jido after you change the selected major version.
+Beta.2 supports Elixir 1.18 or later. It requires Zoi Action schemas and does
+not include the version 2 retry, compensation, hook, or per-call telemetry
+features. It supplies the temporary Instruction and Action metadata bridge
+that Jido 2 needs. Clean and recompile Jido after you change the selected major
+version.
 
 Then define a Jido instance module and add it to your supervision tree:
 

@@ -6,6 +6,9 @@ defmodule JidoTest.Observe.ConfigTest do
   alias Jido.Observe.Config
 
   @test_instance :"jido_observe_config_#{System.unique_integer([:positive])}"
+  @jido_action_v3 Code.ensure_loaded?(Jido.Action) and
+                    function_exported?(Jido.Action, :api_version, 0) and
+                    apply(Jido.Action, :api_version, []) == 3
 
   defmodule ValidTracer do
     @moduledoc false
@@ -198,16 +201,24 @@ defmodule JidoTest.Observe.ConfigTest do
 
       opts = Config.action_exec_opts(nil, timeout: 10)
 
-      assert Keyword.get(opts, :log_level) == :warning
-      assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
 
       explicit_opts =
         Config.action_exec_opts(nil, log_level: :error, telemetry: :full, timeout: 10)
 
-      assert Keyword.get(explicit_opts, :log_level) == :error
-      assert Keyword.get(explicit_opts, :telemetry) == :full
       assert Keyword.get(explicit_opts, :timeout) == 10
+
+      if @jido_action_v3 do
+        refute Keyword.has_key?(opts, :log_level)
+        refute Keyword.has_key?(opts, :telemetry)
+        refute Keyword.has_key?(explicit_opts, :log_level)
+        refute Keyword.has_key?(explicit_opts, :telemetry)
+      else
+        assert Keyword.get(opts, :log_level) == :warning
+        assert Keyword.get(opts, :telemetry) == :silent
+        assert Keyword.get(explicit_opts, :log_level) == :error
+        assert Keyword.get(explicit_opts, :telemetry) == :full
+      end
     end
 
     test "strips internal Jido instance plumbing before calling Jido.Exec" do
@@ -216,9 +227,15 @@ defmodule JidoTest.Observe.ConfigTest do
       opts = Config.action_exec_opts(nil, __jido_instance__: Jido, timeout: 10)
 
       refute Keyword.has_key?(opts, :__jido_instance__)
-      assert Keyword.get(opts, :log_level) == :warning
-      assert Keyword.get(opts, :telemetry) == :silent
       assert Keyword.get(opts, :timeout) == 10
+
+      if @jido_action_v3 do
+        refute Keyword.has_key?(opts, :log_level)
+        refute Keyword.has_key?(opts, :telemetry)
+      else
+        assert Keyword.get(opts, :log_level) == :warning
+        assert Keyword.get(opts, :telemetry) == :silent
+      end
     end
   end
 

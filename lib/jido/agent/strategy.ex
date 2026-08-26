@@ -76,6 +76,7 @@ defmodule Jido.Agent.Strategy do
   `:__strategy__`. Use `Jido.Agent.Strategy.State` helpers to manage it.
   """
 
+  alias Jido.Action.Tool, as: ActionTool
   alias Jido.Agent
   alias Jido.Agent.Strategy.State, as: StratState
 
@@ -349,11 +350,9 @@ defmodule Jido.Agent.Strategy do
   """
   @spec normalize_instruction(module(), Jido.Instruction.t(), context()) :: Jido.Instruction.t()
   def normalize_instruction(strategy_mod, %Jido.Instruction{} = instr, _ctx) do
-    action = Jido.Agent.Instruction.action(instr)
-
     spec =
       if function_exported?(strategy_mod, :action_spec, 1),
-        do: strategy_mod.action_spec(action),
+        do: strategy_mod.action_spec(instr.action),
         else: nil
 
     params =
@@ -363,7 +362,7 @@ defmodule Jido.Agent.Strategy do
           instr.params
 
         schema ->
-          normalize_with_schema(instr.params, schema, action)
+          normalize_with_schema(instr.params, schema, instr.action)
       end
 
     %Jido.Instruction{instr | params: params}
@@ -383,53 +382,12 @@ defmodule Jido.Agent.Strategy do
         end
 
       is_list(schema) ->
-        normalize_with_nimble_schema(params, schema)
+        # ActionTool preserves unknown keys as strings (atom-safe)
+        ActionTool.convert_params_using_schema(params, schema)
 
       true ->
         # No schema - leave keys as-is to prevent atom table exhaustion
         params
-    end
-  end
-
-  if Jido.ActionCompat.v3?() do
-    defp normalize_with_nimble_schema(params, schema) when is_map(params) do
-      Enum.reduce(schema, params, fn {key, field_opts}, acc ->
-        string_key = Atom.to_string(key)
-
-        case Map.pop(acc, key, :__missing__) do
-          {:__missing__, acc} ->
-            case Map.pop(acc, string_key, :__missing__) do
-              {:__missing__, acc} -> acc
-              {value, acc} -> Map.put(acc, key, coerce_nimble_value(value, field_opts[:type]))
-            end
-
-          {value, acc} ->
-            acc
-            |> Map.delete(string_key)
-            |> Map.put(key, coerce_nimble_value(value, field_opts[:type]))
-        end
-      end)
-    end
-
-    defp coerce_nimble_value(value, :integer) when is_binary(value) do
-      case Integer.parse(value) do
-        {integer, _rest} -> integer
-        :error -> value
-      end
-    end
-
-    defp coerce_nimble_value(value, :float) when is_binary(value) do
-      case Float.parse(value) do
-        {float, _rest} -> float
-        :error -> value
-      end
-    end
-
-    defp coerce_nimble_value(value, :float) when is_integer(value), do: value * 1.0
-    defp coerce_nimble_value(value, _type), do: value
-  else
-    defp normalize_with_nimble_schema(params, schema) do
-      apply(Jido.Action.Tool, :convert_params_using_schema, [params, schema])
     end
   end
 
