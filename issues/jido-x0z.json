@@ -2,6 +2,7 @@
   "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-08-26T14:25:31Z",
   "created": "2026-08-26T02:21:33Z",
   "description": "Reduce PR #324 to the smallest safe compatibility shim. Preserve the jido_action v2 path, keep only required production changes, replace broad guide and test migration with focused compatibility coverage, fix review findings, validate both supported versions, and update the existing PR.",
   "id": "jido-x0z",
@@ -25,8 +26,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Minimize jido_action v3 compatibility shim",
   "type": "task",
-  "updated_at": "2026-08-26T14:25:30Z"
+  "updated_at": "2026-08-26T14:25:31Z"
 }
