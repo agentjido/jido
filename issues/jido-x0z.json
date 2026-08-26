@@ -10,6 +10,10 @@
     {
       "text": "Reduced PR #324 from 81 files to a 24-file compatibility boundary. Validation: clean v2 compile with warnings as errors; 2215 tests passed and 187 excluded; mix q passed; clean v3 compile with warnings as errors; 7 focused v3 compatibility tests passed.",
       "timestamp": "2026-08-26T02:34:47Z"
+    },
+    {
+      "text": "User requested a second reduction pass against proposed jido_action v3.0.0-beta.2 branch feat/v3-beta2-compat at 6f798aa. Remove core-owned Action and Instruction adapters that beta.2 now supplies, then validate v2 and v3 paths.",
+      "timestamp": "2026-08-26T14:12:38Z"
     }
   ],
   "priority": 2,
