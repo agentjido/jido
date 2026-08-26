@@ -34,7 +34,9 @@ defmodule JidoExampleTest.FSMStrategyGuideTest do
     @moduledoc false
     use Jido.Action,
       name: "ship_order",
-      schema: Zoi.object(%{carrier: Zoi.string() |> Zoi.default("Standard Shipping")})
+      schema: [
+        carrier: [type: :string, default: "Standard Shipping"]
+      ]
 
     def run(%{carrier: carrier}, context) do
       case context.state[:order_status] do

@@ -154,9 +154,16 @@ def deps do
 end
 ```
 
-Jido 2.x uses `jido_action` 2.x by default. Applications can explicitly select
-`jido_action` 3.x. See the [`jido_action` compatibility guide](guides/jido-action-compatibility.md)
-before you use this opt-in override.
+Jido 2.x uses `jido_action` 2.x by default. To test the experimental version 3
+compatibility shim, add a direct override:
+
+```elixir
+{:jido_action, "~> 3.0.0-beta.1", override: true}
+```
+
+Version 3 requires Elixir 1.20 or later. It also requires Zoi Action schemas and
+does not include the version 2 retry, compensation, hook, or per-call telemetry
+features. Clean and recompile Jido after you change the selected major version.
 
 Then define a Jido instance module and add it to your supervision tree:
 
@@ -208,7 +215,9 @@ defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
     description: "Increments the counter by a given amount",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [
+      amount: [type: :integer, default: 1]
+    ]
 
   def run(params, context) do
     current = context.state[:count] || 0
@@ -335,7 +344,6 @@ its owning `AgentServer`.
 - [FSM Strategy Deep Dive](guides/fsm-strategy.livemd) - State machine workflows
 - [Worker Pools](guides/worker-pools.md) - Pre-warmed agent pools for throughput
 - [Testing Agents](guides/testing.md) - Testing patterns and best practices
-- [`jido_action` Compatibility](guides/jido-action-compatibility.md) - Use version 2 by default or explicitly select version 3
 
 **API Reference:** [hexdocs.pm/jido](https://hexdocs.pm/jido)
 

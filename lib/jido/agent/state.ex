@@ -58,6 +58,10 @@ defmodule Jido.Agent.State do
     end
   end
 
+  def validate(state, %{"type" => "object", "properties" => properties}, _opts)
+      when is_map(properties),
+      do: {:ok, state}
+
   def validate(state, schema, opts) do
     strict? = Keyword.get(opts, :strict, false)
     known_keys = Schema.known_keys(schema)

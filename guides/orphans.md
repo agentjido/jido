@@ -104,14 +104,13 @@ Example:
 defmodule HandleOrphanedAction do
   use Jido.Action,
     name: "handle_orphaned",
-    schema:
-      Zoi.object(%{
-        parent_id: Zoi.string(),
-        parent_pid: Zoi.any(),
-        tag: Zoi.any(),
-        meta: Zoi.map() |> Zoi.default(%{}),
-        reason: Zoi.any()
-      })
+    schema: [
+      parent_id: [type: :string, required: true],
+      parent_pid: [type: :any, required: true],
+      tag: [type: :any, required: true],
+      meta: [type: :map, default: %{}],
+      reason: [type: :any, required: true]
+    ]
 
   def run(params, context) do
     former_parent = Map.get(context.state, :__orphaned_from__)

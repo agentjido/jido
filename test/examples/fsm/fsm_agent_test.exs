@@ -43,7 +43,9 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "process_work",
-      schema: Zoi.object(%{work_item: Zoi.string()})
+      schema: [
+        work_item: [type: :string, required: true]
+      ]
 
     def run(%{work_item: item}, context) do
       items = Map.get(context.state, :processed_items, [])
@@ -55,7 +57,9 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "complete_task",
-      schema: Zoi.object(%{task_id: Zoi.integer()})
+      schema: [
+        task_id: [type: :integer, required: true]
+      ]
 
     def run(%{task_id: task_id}, context) do
       completed = Map.get(context.state, :completed_tasks, [])
@@ -67,7 +71,9 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "increment_counter",
-      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+      schema: [
+        amount: [type: :integer, default: 1]
+      ]
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)

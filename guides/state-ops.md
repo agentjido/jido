@@ -53,7 +53,7 @@ Merges attributes into state using `DeepMerge.deep_merge/2` semantics. Nested ma
 defmodule UpdateMetadataAction do
   use Jido.Action,
     name: "update_metadata",
-    schema: Zoi.object(%{version: Zoi.string()})
+    schema: [version: [type: :string, required: true]]
 
   def run(%{version: version}, _context) do
     {:ok, %{}, %StateOp.SetState{attrs: %{metadata: %{version: version}}}}
@@ -144,7 +144,7 @@ Sets a value at a nested path. Creates intermediate maps if they don't exist.
 defmodule UpdateConfigAction do
   use Jido.Action,
     name: "update_config",
-    schema: Zoi.object(%{timeout: Zoi.integer()})
+    schema: [timeout: [type: :integer, required: true]]
 
   def run(%{timeout: timeout}, _context) do
     {:ok, %{}, %StateOp.SetPath{path: [:config, :database, :timeout], value: timeout}}
@@ -193,7 +193,7 @@ Lists aren't deeply merged — you need to read the current value and build the 
 defmodule AppendMessageAction do
   use Jido.Action,
     name: "append_message",
-    schema: Zoi.object(%{message: Zoi.string()})
+    schema: [message: [type: :string, required: true]]
 
   def run(%{message: message}, context) do
     current_messages = get_in(context.state, [:messages]) || []
@@ -212,7 +212,7 @@ Increment a deeply nested value:
 defmodule IncrementRequestCountAction do
   use Jido.Action,
     name: "increment_request_count",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   def run(%{amount: amount}, context) do
     current = get_in(context.state, [:metrics, :requests, :count]) || 0
@@ -230,7 +230,7 @@ Return different state ops based on conditions:
 defmodule ProcessItemAction do
   use Jido.Action,
     name: "process_item",
-    schema: Zoi.object(%{item: Zoi.map()})
+    schema: [item: [type: :map, required: true]]
 
   def run(%{item: item}, context) do
     pending = Map.get(context.state, :pending_items, [])

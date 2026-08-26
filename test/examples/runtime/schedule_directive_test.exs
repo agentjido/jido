@@ -27,7 +27,10 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_timer",
-      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(100), timer_id: Zoi.string()})
+      schema: [
+        delay_ms: [type: :integer, default: 100],
+        timer_id: [type: :string, required: true]
+      ]
 
     def run(%{delay_ms: delay_ms, timer_id: timer_id}, _context) do
       tick_signal = Signal.new!("timer.tick", %{timer_id: timer_id}, source: "/timer")
@@ -45,7 +48,9 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_tick",
-      schema: Zoi.object(%{timer_id: Zoi.string()})
+      schema: [
+        timer_id: [type: :string, required: true]
+      ]
 
     def run(%{timer_id: timer_id}, context) do
       tick_count = Map.get(context.state, :tick_count, 0) + 1
@@ -57,11 +62,10 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_retryable",
-      schema:
-        Zoi.object(%{
-          max_attempts: Zoi.integer() |> Zoi.default(3),
-          retry_delay_ms: Zoi.integer() |> Zoi.default(50)
-        })
+      schema: [
+        max_attempts: [type: :integer, default: 3],
+        retry_delay_ms: [type: :integer, default: 50]
+      ]
 
     def run(%{max_attempts: max, retry_delay_ms: delay}, _context) do
       retry_signal = Signal.new!("retry.attempt", %{}, source: "/retry")
@@ -105,8 +109,10 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_timeout",
-      schema:
-        Zoi.object(%{timeout_ms: Zoi.integer() |> Zoi.default(200), request_id: Zoi.string()})
+      schema: [
+        timeout_ms: [type: :integer, default: 200],
+        request_id: [type: :string, required: true]
+      ]
 
     def run(%{timeout_ms: timeout_ms, request_id: request_id}, _context) do
       timeout_signal =
@@ -125,7 +131,10 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_response",
-      schema: Zoi.object(%{request_id: Zoi.string(), result: Zoi.any()})
+      schema: [
+        request_id: [type: :string, required: true],
+        result: [type: :any, required: true]
+      ]
 
     def run(%{request_id: request_id, result: result}, context) do
       pending = Map.get(context.state, :pending_request)
@@ -142,7 +151,9 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_timeout",
-      schema: Zoi.object(%{request_id: Zoi.string()})
+      schema: [
+        request_id: [type: :string, required: true]
+      ]
 
     def run(%{request_id: request_id}, context) do
       pending = Map.get(context.state, :pending_request)

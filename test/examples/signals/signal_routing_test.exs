@@ -26,7 +26,9 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "increment",
-      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+      schema: [
+        amount: [type: :integer, default: 1]
+      ]
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)
@@ -38,7 +40,9 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "set_name",
-      schema: Zoi.object(%{name: Zoi.string()})
+      schema: [
+        name: [type: :string, required: true]
+      ]
 
     def run(%{name: name}, _context) do
       {:ok, %{name: name}}
@@ -49,7 +53,10 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "record_event",
-      schema: Zoi.object(%{event_type: Zoi.string(), payload: Zoi.map() |> Zoi.default(%{})})
+      schema: [
+        event_type: [type: :string, required: true],
+        payload: [type: :map, default: %{}]
+      ]
 
     def run(params, context) do
       events = Map.get(context.state, :events, [])

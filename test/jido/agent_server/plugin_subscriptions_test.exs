@@ -111,7 +111,10 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Action,
       name: "record_sensor_signal",
-      schema: Zoi.object(%{value: Zoi.any(), count: Zoi.integer()})
+      schema: [
+        value: [type: :any, required: true],
+        count: [type: :integer, required: true]
+      ]
 
     def run(params, _context) do
       {:ok, %{last_sensor_value: params.value, last_sensor_count: params.count}}
@@ -134,15 +137,14 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Action,
       name: "record_sensor_exit",
-      schema:
-        Zoi.object(%{
-          tag: Zoi.any(),
-          pid: Zoi.any(),
-          reason: Zoi.any(),
-          sensor: Zoi.any(),
-          origin: Zoi.any(),
-          meta: Zoi.map() |> Zoi.default(%{})
-        })
+      schema: [
+        tag: [type: :any, required: true],
+        pid: [type: :any, required: true],
+        reason: [type: :any, required: true],
+        sensor: [type: :any, required: true],
+        origin: [type: :any, required: true],
+        meta: [type: :map, default: %{}]
+      ]
 
     def run(params, context) do
       events = Map.get(context.state, :sensor_exit_events, [])

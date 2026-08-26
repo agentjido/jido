@@ -50,18 +50,14 @@ logs are opt-in through config or `MyApp.Jido.debug(:on)`.
 
 The `:redact_sensitive` option replaces sensitive data with `[REDACTED]` in logs and telemetry.
 
-With the default `jido_action` v2 dependency, `telemetry.log_args` also controls
-how much observability data is allowed through the dependency layer:
+For Jido-managed `Jido.Exec` calls, `telemetry.log_args` also controls how much
+observability data is allowed through the underlying `jido_action` layer:
 
 - `log_args: :full` keeps verbose action logs and emits `[:jido, :action, ...]` spans
 - `log_args: :keys_only` and `:none` suppress the noisy full action start log
 - `log_args: :keys_only` and `:none` also silence dependency action spans, because
   `jido_action` only supports `:full` or `:silent` telemetry payload behavior
 - `MyApp.Jido.debug(:verbose)` re-enables full action logs and action spans for that instance
-
-The `jido_action` v3 opt-in does not accept per-call log or telemetry modes. It
-always emits its Action lifecycle telemetry. Jido still applies
-`telemetry.log_args` to Jido-owned logs and telemetry.
 
 ## Telemetry Event Reference
 

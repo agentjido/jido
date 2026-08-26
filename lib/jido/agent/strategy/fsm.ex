@@ -174,7 +174,8 @@ defmodule Jido.Agent.Strategy.FSM do
   @impl true
   def cmd(%Agent{} = agent, [%Instruction{} = instruction] = instructions, ctx) do
     if AgentInstruction.action(instruction) == @instruction_result_action do
-      handle_instruction_result(agent, instruction.params, ctx)
+      result_payload = instruction |> Map.from_struct() |> Map.fetch!(:params)
+      handle_instruction_result(agent, result_payload, ctx)
     else
       do_cmd(agent, instructions, ctx)
     end
@@ -323,6 +324,11 @@ defmodule Jido.Agent.Strategy.FSM do
     }
 
     dispatch_next_instruction(agent, strategy_state)
+  end
+
+  defp handle_instruction_result(agent, _result_payload, _ctx) do
+    error = Error.execution_error("Instruction result payload must be a map", %{})
+    {agent, [%Directive.Error{error: error, context: :instruction_result}]}
   end
 
   defp maybe_auto_transition(machine, false, _initial_state), do: machine

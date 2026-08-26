@@ -42,12 +42,11 @@ defmodule JidoExampleTest.SpawnAgentTest do
 
     use Jido.Action,
       name: "spawn_worker",
-      schema:
-        Zoi.object(%{
-          tag: Zoi.atom(),
-          meta: Zoi.map() |> Zoi.default(%{}),
-          restart: Zoi.enum(@restart_policies) |> Zoi.default(:transient)
-        })
+      schema: [
+        tag: [type: :atom, required: true],
+        meta: [type: :map, default: %{}],
+        restart: [type: {:in, @restart_policies}, default: :transient]
+      ]
 
     def run(%{tag: tag} = params, _context) do
       meta = Map.get(params, :meta, %{})
@@ -67,13 +66,12 @@ defmodule JidoExampleTest.SpawnAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "child_started",
-      schema:
-        Zoi.object(%{
-          pid: Zoi.any(),
-          child_id: Zoi.string(),
-          tag: Zoi.atom(),
-          meta: Zoi.map() |> Zoi.default(%{})
-        })
+      schema: [
+        pid: [type: :any, required: true],
+        child_id: [type: :string, required: true],
+        tag: [type: :atom, required: true],
+        meta: [type: :map, default: %{}]
+      ]
 
     def run(params, context) do
       started_events = Map.get(context.state, :child_started_events, [])
@@ -93,7 +91,10 @@ defmodule JidoExampleTest.SpawnAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "worker_result",
-      schema: Zoi.object(%{result: Zoi.any(), from_tag: Zoi.atom()})
+      schema: [
+        result: [type: :any, required: true],
+        from_tag: [type: :atom, required: true]
+      ]
 
     def run(params, context) do
       results = Map.get(context.state, :worker_results, [])
@@ -106,7 +107,10 @@ defmodule JidoExampleTest.SpawnAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "stop_worker",
-      schema: Zoi.object(%{tag: Zoi.atom(), reason: Zoi.atom() |> Zoi.default(:normal)})
+      schema: [
+        tag: [type: :atom, required: true],
+        reason: [type: :atom, default: :normal]
+      ]
 
     def run(%{tag: tag, reason: reason}, _context) do
       directive = Directive.stop_child(tag, reason)
@@ -122,7 +126,9 @@ defmodule JidoExampleTest.SpawnAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "do_work",
-      schema: Zoi.object(%{task: Zoi.string()})
+      schema: [
+        task: [type: :string, required: true]
+      ]
 
     def run(%{task: task}, context) do
       result = "Completed: #{task}"

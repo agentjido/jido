@@ -23,7 +23,9 @@ defmodule JidoExampleTest.CounterAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "increment",
-      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+      schema: [
+        amount: [type: :integer, default: 1]
+      ]
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)
@@ -35,7 +37,9 @@ defmodule JidoExampleTest.CounterAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "decrement",
-      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+      schema: [
+        amount: [type: :integer, default: 1]
+      ]
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)

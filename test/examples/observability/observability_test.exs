@@ -87,7 +87,9 @@ defmodule JidoExampleTest.ObservabilityTest do
     @moduledoc false
     use Jido.Action,
       name: "observed_work",
-      schema: Zoi.object(%{work_units: Zoi.integer() |> Zoi.default(10)})
+      schema: [
+        work_units: [type: :integer, default: 10]
+      ]
 
     def run(params, context) do
       agent_id = Map.get(context, :agent_id, "unknown")
@@ -108,7 +110,9 @@ defmodule JidoExampleTest.ObservabilityTest do
     @moduledoc false
     use Jido.Action,
       name: "observed_async",
-      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(10)})
+      schema: [
+        delay_ms: [type: :integer, default: 10]
+      ]
 
     def run(params, context) do
       agent_id = Map.get(context, :agent_id, "unknown")

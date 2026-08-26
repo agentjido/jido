@@ -391,41 +391,47 @@ defmodule Jido.Agent.Strategy do
     end
   end
 
-  defp normalize_with_nimble_schema(params, schema) when is_map(params) do
-    Enum.reduce(schema, params, fn {key, field_opts}, acc ->
-      string_key = Atom.to_string(key)
+  if Jido.ActionCompat.v3?() do
+    defp normalize_with_nimble_schema(params, schema) when is_map(params) do
+      Enum.reduce(schema, params, fn {key, field_opts}, acc ->
+        string_key = Atom.to_string(key)
 
-      case Map.pop(acc, key, :__missing__) do
-        {:__missing__, acc} ->
-          case Map.pop(acc, string_key, :__missing__) do
-            {:__missing__, acc} -> acc
-            {value, acc} -> Map.put(acc, key, coerce_nimble_value(value, field_opts[:type]))
-          end
+        case Map.pop(acc, key, :__missing__) do
+          {:__missing__, acc} ->
+            case Map.pop(acc, string_key, :__missing__) do
+              {:__missing__, acc} -> acc
+              {value, acc} -> Map.put(acc, key, coerce_nimble_value(value, field_opts[:type]))
+            end
 
-        {value, acc} ->
-          acc
-          |> Map.delete(string_key)
-          |> Map.put(key, coerce_nimble_value(value, field_opts[:type]))
+          {value, acc} ->
+            acc
+            |> Map.delete(string_key)
+            |> Map.put(key, coerce_nimble_value(value, field_opts[:type]))
+        end
+      end)
+    end
+
+    defp coerce_nimble_value(value, :integer) when is_binary(value) do
+      case Integer.parse(value) do
+        {integer, _rest} -> integer
+        :error -> value
       end
-    end)
-  end
+    end
 
-  defp coerce_nimble_value(value, :integer) when is_binary(value) do
-    case Integer.parse(value) do
-      {integer, _rest} -> integer
-      :error -> value
+    defp coerce_nimble_value(value, :float) when is_binary(value) do
+      case Float.parse(value) do
+        {float, _rest} -> float
+        :error -> value
+      end
+    end
+
+    defp coerce_nimble_value(value, :float) when is_integer(value), do: value * 1.0
+    defp coerce_nimble_value(value, _type), do: value
+  else
+    defp normalize_with_nimble_schema(params, schema) do
+      apply(Jido.Action.Tool, :convert_params_using_schema, [params, schema])
     end
   end
-
-  defp coerce_nimble_value(value, :float) when is_binary(value) do
-    case Float.parse(value) do
-      {float, _rest} -> float
-      :error -> value
-    end
-  end
-
-  defp coerce_nimble_value(value, :float) when is_integer(value), do: value * 1.0
-  defp coerce_nimble_value(value, _type), do: value
 
   defmacro __using__(_opts) do
     quote do

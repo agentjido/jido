@@ -18,8 +18,13 @@ defmodule Jido.ActionCompat do
     @doc false
     @spec action?(module()) :: boolean()
     def action?(module) when is_atom(module) do
-      match?({:module, _}, Code.ensure_compiled(module)) and
-        match?({:ok, %{kind: :action, target: ^module}}, resolve(module))
+      with {:module, _} <- Code.ensure_compiled(module),
+           {:ok, %{kind: :action, target: ^module} = executable} <- resolve(module),
+           :ok <- apply(Jido.Executable, :validate, [executable]) do
+        true
+      else
+        _error -> false
+      end
     end
 
     def action?(_module), do: false
@@ -28,8 +33,8 @@ defmodule Jido.ActionCompat do
     @spec action_metadata(module()) :: map()
     def action_metadata(module) do
       %{
-        name: module.name(),
-        description: module.description(),
+        name: optional_metadata(module, :name) || Atom.to_string(module),
+        description: optional_metadata(module, :description),
         category: optional_metadata(module, :category),
         tags: optional_metadata(module, :tags)
       }

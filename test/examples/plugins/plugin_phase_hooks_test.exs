@@ -28,7 +28,9 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Action,
       name: "process",
-      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("processed")})
+      schema: [
+        value: [type: :string, default: "processed"]
+      ]
 
     def run(%{value: value}, context) do
       log = Map.get(context.state, :log, [])
@@ -40,7 +42,9 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Action,
       name: "admin_action",
-      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("admin")})
+      schema: [
+        value: [type: :string, default: "admin"]
+      ]
 
     def run(%{value: value}, context) do
       log = Map.get(context.state, :log, [])

@@ -64,7 +64,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
     # Intercept actions to capture the action type before processing
     # Handles action module tuples from signal routing
     def on_before_cmd(agent, {action_mod, _params} = action) when is_atom(action_mod) do
-      action_name = action_mod.name()
+      action_name = action_mod.__action_metadata__().name
       agent = %{agent | state: Map.put(agent.state, :last_action_type, action_name)}
       {:ok, agent, action}
     end

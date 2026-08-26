@@ -21,11 +21,7 @@ end
 
 ## How Discovery Works
 
-Discovery uses the installed `jido_action` contract to find Action modules. It
-uses version 2 metadata functions or version 3 executable descriptors as
-needed. It continues to use component metadata functions for Sensors, Agents,
-Plugins, and Demos. Results are cached in `:persistent_term` for fast,
-concurrent reads.
+Discovery scans all loaded applications for modules that export metadata functions (`__action_metadata__/0`, `__sensor_metadata__/0`, etc.). Results are cached in `:persistent_term` for fast, concurrent reads.
 
 Components are indexed automatically when you call `use Jido.Action`, `use Jido.Sensor`, `use Jido.Agent`, or `use Jido.Plugin`.
 

@@ -26,13 +26,12 @@ defmodule JidoExampleTest.SensorDemoTest do
 
     use Jido.Action,
       name: "handle_quote",
-      schema:
-        Zoi.object(%{
-          quote: Zoi.string(),
-          category: Zoi.string() |> Zoi.default("general"),
-          emit_count: Zoi.integer() |> Zoi.default(0),
-          sensor_id: Zoi.string() |> Zoi.default("unknown")
-        })
+      schema: [
+        quote: [type: :string, required: true],
+        category: [type: :string, default: "general"],
+        emit_count: [type: :integer, default: 0],
+        sensor_id: [type: :string, default: "unknown"]
+      ]
 
     def run(params, context) do
       current_quotes = Map.get(context.state, :quotes, [])
@@ -57,12 +56,11 @@ defmodule JidoExampleTest.SensorDemoTest do
 
     use Jido.Action,
       name: "handle_github_webhook",
-      schema:
-        Zoi.object(%{
-          event: Zoi.string(),
-          payload: Zoi.map() |> Zoi.default(%{}),
-          received_at: Zoi.any()
-        })
+      schema: [
+        event: [type: :string, required: true],
+        payload: [type: :map, default: %{}],
+        received_at: [type: :any, required: false]
+      ]
 
     def run(params, context) do
       current_events = Map.get(context.state, :events, [])
@@ -86,12 +84,11 @@ defmodule JidoExampleTest.SensorDemoTest do
 
     use Jido.Action,
       name: "handle_stripe_webhook",
-      schema:
-        Zoi.object(%{
-          event: Zoi.string(),
-          payload: Zoi.map() |> Zoi.default(%{}),
-          received_at: Zoi.any()
-        })
+      schema: [
+        event: [type: :string, required: true],
+        payload: [type: :map, default: %{}],
+        received_at: [type: :any, required: false]
+      ]
 
     def run(params, context) do
       current_events = Map.get(context.state, :events, [])

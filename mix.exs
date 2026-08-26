@@ -123,7 +123,6 @@ defmodule Jido.MixProject do
           "guides/errors.md"
         ],
         Migration: [
-          "guides/jido-action-compatibility.md",
           "guides/migration.md"
         ],
         Project: [
@@ -183,7 +182,6 @@ defmodule Jido.MixProject do
         {"guides/errors.md", title: "Error Handling"},
 
         # Migration
-        {"guides/jido-action-compatibility.md", title: "jido_action Compatibility"},
         {"guides/migration.md", title: "Migrating from 1.x"},
 
         # Project
@@ -210,7 +208,6 @@ defmodule Jido.MixProject do
         ],
         Strategies: [
           Jido.Agent.Strategy,
-          Jido.Agent.Instruction,
           Jido.Agent.Strategy.Direct,
           Jido.Agent.Strategy.FSM,
           Jido.Agent.Strategy.FSM.Machine,

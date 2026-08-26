@@ -25,7 +25,9 @@ defmodule JidoExampleTest.ContextAwareRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "process",
-      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(1)})
+      schema: [
+        value: [type: :integer, default: 1]
+      ]
 
     def run(%{value: value}, context) do
       current = Map.get(context.state, :counter, 0)
@@ -37,7 +39,9 @@ defmodule JidoExampleTest.ContextAwareRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "maintenance_handler",
-      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+      schema: [
+        value: [type: :integer, default: 0]
+      ]
 
     def run(_params, _context) do
       {:ok, %{message: "system in maintenance mode"}}
@@ -48,7 +52,9 @@ defmodule JidoExampleTest.ContextAwareRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "set_mode",
-      schema: Zoi.object(%{mode: Zoi.atom()})
+      schema: [
+        mode: [type: :atom, required: true]
+      ]
 
     def run(%{mode: mode}, _context) do
       {:ok, %{mode: mode}}
@@ -59,7 +65,9 @@ defmodule JidoExampleTest.ContextAwareRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "admin_action",
-      schema: Zoi.object(%{command: Zoi.string()})
+      schema: [
+        command: [type: :string, required: true]
+      ]
 
     def run(%{command: command}, context) do
       log = Map.get(context.state, :admin_log, [])

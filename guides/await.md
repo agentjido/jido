@@ -231,7 +231,9 @@ Complete example: spawn 5 workers, await all, aggregate results.
 defmodule FanOut.ComputeAction do
   use Jido.Action,
     name: "compute",
-    schema: Zoi.object(%{input: Zoi.integer()})
+    schema: [
+      input: [type: :integer, required: true]
+    ]
 
   def run(%{input: n}, _context) do
     result = n * n

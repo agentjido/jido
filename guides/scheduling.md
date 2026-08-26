@@ -64,7 +64,7 @@ The `Schedule` directive sends a message back to your agent after a delay:
 defmodule RetryAction do
   use Jido.Action,
     name: "retry",
-    schema: Zoi.object(%{attempt: Zoi.integer() |> Zoi.default(1)})
+    schema: [attempt: [type: :integer, default: 1]]
 
   alias Jido.Agent.Directive
 

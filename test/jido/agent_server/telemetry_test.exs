@@ -6,6 +6,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.Debug
+  alias Jido.Instruction
   alias Jido.Signal
   alias JidoTest.TestActions
 
@@ -52,17 +53,12 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @impl true
     def cmd(agent, instructions, _ctx) do
       send_instruction_opts(agent, instructions)
-
-      Enum.each(instructions, fn instruction ->
-        Jido.Agent.Instruction.run(instruction, Jido.Agent.Instruction.exec_opts(instruction))
-      end)
-
+      Enum.each(instructions, &Jido.Exec.run/1)
       {agent, []}
     end
 
     defp send_instruction_opts(%{state: %{observer_pid: pid}}, instructions) when is_pid(pid) do
-      opts = Enum.map(instructions, &Jido.Agent.Instruction.exec_opts/1)
-      send(pid, {:fallback_exec_instruction_opts, opts})
+      send(pid, {:fallback_exec_instruction_opts, Enum.map(instructions, & &1.opts)})
     end
 
     defp send_instruction_opts(_agent, _instructions), do: :ok
@@ -90,7 +86,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     def cmd(agent, instructions, _ctx) do
       send(
         agent.state.observer_pid,
-        {:inspect_instruction_opts, Enum.map(instructions, &Jido.Agent.Instruction.exec_opts/1)}
+        {:inspect_instruction_opts, Enum.map(instructions, & &1.opts)}
       )
 
       {agent, []}
@@ -243,7 +239,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
   end
 
   describe "action logging integration" do
-    test "uses the installed jido_action telemetry policy", %{jido: jido} do
+    test "suppresses jido_action start logs when args are not full", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-default", jido: jido)
 
@@ -256,19 +252,12 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
       refute log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
       refute log =~ "params:"
-
-      if apply(Jido.ActionCompat, :v3?, []) do
-        assert_receive {:action_telemetry_event, [:jido, :action, :start], _, metadata}
-        assert metadata.name == "increment"
-        refute Map.has_key?(metadata, :params)
-      else
-        refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}
-      end
+      refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
 
       GenServer.stop(pid)
     end
 
-    test "maps verbose debug to the installed jido_action policy", %{jido: jido} do
+    test "enables verbose jido_action logs when instance debug is verbose", %{jido: jido} do
       Debug.enable(jido, :verbose)
       on_exit(fn -> Debug.disable(jido) end)
 
@@ -282,26 +271,18 @@ defmodule JidoTest.AgentServer.TelemetryTest do
           assert {:ok, _agent} = AgentServer.call(pid, signal)
         end)
 
-      if apply(Jido.ActionCompat, :v3?, []) do
-        refute log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
-        refute log =~ "params:"
+      assert log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
+      assert log =~ "params:"
 
-        assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
-                        %{name: "increment", kind: :instruction}}
-      else
-        assert log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
-        assert log =~ "params:"
-
-        assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
-                        %{action: TestActions.IncrementAction}}
-      end
+      assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
+                      %{action: JidoTest.TestActions.IncrementAction}}
 
       assert_receive {:action_telemetry_event, [:jido, :action, :stop], _, _}
 
       GenServer.stop(pid)
     end
 
-    test "passes version-specific execution options to custom strategies", %{jido: jido} do
+    test "passes quiet action exec opts to custom strategies", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(
           agent: FallbackExecAgent,
@@ -321,17 +302,10 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       refute log =~ "params:"
 
       assert_receive {:fallback_exec_instruction_opts, [opts]}
-      assert Keyword.get(opts, :jido) == jido
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
 
-      if apply(Jido.ActionCompat, :v3?, []) do
-        refute Keyword.has_key?(opts, :log_level)
-        refute Keyword.has_key?(opts, :telemetry)
-        assert_receive {:action_telemetry_event, [:jido, :action, :start], _, _}
-      else
-        assert Keyword.get(opts, :log_level) == :warning
-        assert Keyword.get(opts, :telemetry) == :silent
-        refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}
-      end
+      refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
 
       GenServer.stop(pid)
     end
@@ -339,29 +313,37 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     test "preserves explicit instruction opts when applying action exec defaults" do
       agent = InspectOptsAgent.new(state: %{observer_pid: self()})
 
-      {:ok, [instruction]} =
-        Jido.Agent.Instruction.normalize(TestActions.IncrementAction, %{}, timeout: 100)
+      instruction = %Instruction{
+        action: TestActions.IncrementAction,
+        opts: [log_level: :info, telemetry: :full, timeout: 100]
+      }
 
       assert {_agent, []} =
                InspectOptsAgent.cmd(agent, instruction,
-                 __jido_action_exec_defaults__: [timeout: 50]
+                 __jido_action_exec_defaults__: [log_level: :warning, telemetry: :silent]
                )
 
-      assert_receive {:inspect_instruction_opts, [[timeout: 100]]}
+      assert_receive {:inspect_instruction_opts,
+                      [[log_level: :info, telemetry: :full, timeout: 100]]}
     end
 
-    test "applies supported action exec defaults" do
+    test "applies action exec defaults without requiring keyword instruction opts" do
       agent = InspectOptsAgent.new(state: %{observer_pid: self()})
 
-      instruction = Jido.Agent.Instruction.new!(TestActions.IncrementAction)
+      instruction = %Instruction{
+        action: TestActions.IncrementAction,
+        opts: [:custom_flag]
+      }
 
       assert {_agent, []} =
                InspectOptsAgent.cmd(agent, instruction,
-                 __jido_action_exec_defaults__: [timeout: 50]
+                 __jido_action_exec_defaults__: [log_level: :warning, telemetry: :silent]
                )
 
       assert_receive {:inspect_instruction_opts, [opts]}
-      assert Keyword.get(opts, :timeout) == 50
+      assert Keyword.get(opts, :log_level) == :warning
+      assert Keyword.get(opts, :telemetry) == :silent
+      assert :custom_flag in opts
     end
   end
 

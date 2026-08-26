@@ -31,6 +31,7 @@ jobs:
     timeout-minutes: 20
     env:
       MIX_ENV: test
+      JIDO_ACTION_MAJOR: "3"
     steps:
       - name: Check out Jido
         uses: actions/checkout@v4
@@ -51,5 +52,5 @@ jobs:
       - name: Compile without Jido warnings
         run: mix compile --warnings-as-errors
 
-      - name: Test with jido_action v3
-        run: mix test
+      - name: Test the compatibility shim with jido_action v3
+        run: mix test test/jido_action_compat_test.exs

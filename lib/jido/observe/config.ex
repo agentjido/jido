@@ -157,6 +157,19 @@ defmodule Jido.Observe.Config do
       |> Keyword.take([:timeout, :jido])
       |> maybe_put_jido_instance(instance)
     end
+
+    defp maybe_put_jido_instance(opts, Jido) do
+      if Process.whereis(Jido.TaskSupervisor) do
+        Keyword.put_new(opts, :jido, Jido)
+      else
+        opts
+      end
+    end
+
+    defp maybe_put_jido_instance(opts, instance) when is_atom(instance) and not is_nil(instance),
+      do: Keyword.put_new(opts, :jido, instance)
+
+    defp maybe_put_jido_instance(opts, _instance), do: opts
   else
     @spec action_exec_opts(instance(), keyword()) :: keyword()
     def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
@@ -165,22 +178,8 @@ defmodule Jido.Observe.Config do
       |> Keyword.delete(:__partition__)
       |> Keyword.put_new(:log_level, action_log_level(instance))
       |> Keyword.put_new(:telemetry, action_telemetry_mode(instance))
-      |> maybe_put_jido_instance(instance)
     end
   end
-
-  defp maybe_put_jido_instance(opts, Jido) do
-    if Process.whereis(Jido.TaskSupervisor) do
-      Keyword.put_new(opts, :jido, Jido)
-    else
-      opts
-    end
-  end
-
-  defp maybe_put_jido_instance(opts, instance) when is_atom(instance) and not is_nil(instance),
-    do: Keyword.put_new(opts, :jido, instance)
-
-  defp maybe_put_jido_instance(opts, _instance), do: opts
 
   @doc """
   Returns the action logger threshold for the given instance.

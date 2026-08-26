@@ -28,7 +28,10 @@ defmodule JidoExampleTest.ThreadPluginTest do
     @moduledoc false
     use Jido.Action,
       name: "record_message",
-      schema: Zoi.object(%{role: Zoi.string(), content: Zoi.string()})
+      schema: [
+        role: [type: :string, required: true],
+        content: [type: :string, required: true]
+      ]
 
     def run(%{role: role, content: content}, context) do
       thread =

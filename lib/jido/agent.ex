@@ -864,9 +864,11 @@ defmodule Jido.Agent do
       The optional third argument `opts` is a keyword list merged into all instructions:
 
         * `:timeout` - Maximum time (in ms) for each action to complete
+        * `:max_retries` - Maximum retry attempts with `jido_action` v2
+        * `:backoff` - Initial retry backoff with `jido_action` v2
 
-      The `jido_action` v3 opt-in does not retry actions. Callers own retry and
-      backoff policy when they select version 3.
+      The version 3 opt-in ignores retry and backoff options. Callers own that
+      policy when they select version 3.
 
       ## Examples
 

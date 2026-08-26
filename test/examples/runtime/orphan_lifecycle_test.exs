@@ -50,7 +50,10 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "spawn_recoverable_worker",
-      schema: Zoi.object(%{tag: Zoi.atom(), child_id: Zoi.string()})
+      schema: [
+        tag: [type: :atom, required: true],
+        child_id: [type: :string, required: true]
+      ]
 
     def run(%{tag: tag, child_id: child_id}, context) do
       directive =
@@ -68,13 +71,12 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "track_child_started",
-      schema:
-        Zoi.object(%{
-          pid: Zoi.any(),
-          child_id: Zoi.string(),
-          tag: Zoi.atom(),
-          meta: Zoi.map() |> Zoi.default(%{})
-        })
+      schema: [
+        pid: [type: :any, required: true],
+        child_id: [type: :string, required: true],
+        tag: [type: :atom, required: true],
+        meta: [type: :map, default: %{}]
+      ]
 
     def run(params, context) do
       started_children = Map.get(context.state, :started_children, [])
@@ -94,7 +96,10 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "receive_worker_message",
-      schema: Zoi.object(%{text: Zoi.string(), current_parent_id: Zoi.string()})
+      schema: [
+        text: [type: :string, required: true],
+        current_parent_id: [type: :string, required: true]
+      ]
 
     def run(params, context) do
       messages = Map.get(context.state, :received_messages, [])
@@ -106,8 +111,11 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "adopt_worker",
-      schema:
-        Zoi.object(%{child: Zoi.string(), tag: Zoi.atom(), meta: Zoi.map() |> Zoi.default(%{})})
+      schema: [
+        child: [type: :string, required: true],
+        tag: [type: :atom, required: true],
+        meta: [type: :map, default: %{}]
+      ]
 
     def run(%{child: child, tag: tag, meta: meta}, _context) do
       {:ok, %{}, [Directive.adopt_child(child, tag, meta: meta)]}
@@ -122,7 +130,9 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "report_to_parent",
-      schema: Zoi.object(%{text: Zoi.string()})
+      schema: [
+        text: [type: :string, required: true]
+      ]
 
     def run(%{text: text}, context) do
       parent_ref = Map.get(context.state, :__parent__)
@@ -151,14 +161,13 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_orphaned",
-      schema:
-        Zoi.object(%{
-          parent_id: Zoi.string(),
-          parent_pid: Zoi.any(),
-          tag: Zoi.any(),
-          meta: Zoi.map() |> Zoi.default(%{}),
-          reason: Zoi.any()
-        })
+      schema: [
+        parent_id: [type: :string, required: true],
+        parent_pid: [type: :any, required: true],
+        tag: [type: :any, required: true],
+        meta: [type: :map, default: %{}],
+        reason: [type: :any, required: true]
+      ]
 
     def run(params, context) do
       orphan_events = Map.get(context.state, :orphan_events, [])

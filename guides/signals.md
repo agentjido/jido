@@ -161,7 +161,7 @@ Actions emit signals using the `Directive.Emit` directive:
 defmodule MyApp.Actions.ProcessOrder do
   use Jido.Action,
     name: "process_order",
-    schema: Zoi.object(%{order_id: Zoi.integer()})
+    schema: [order_id: [type: :integer, required: true]]
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -226,7 +226,7 @@ Directive.emit_to_parent(agent, signal)
 defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   def run(params, context) do
     current = Map.get(context.state, :counter, 0)

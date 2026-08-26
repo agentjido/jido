@@ -11,14 +11,18 @@ defmodule Jido.Agent.Schema do
 
   def validate_config_schema(value, _opts) when is_list(value), do: :ok
 
+  def validate_config_schema(%{"type" => "object", "properties" => properties}, _opts)
+      when is_map(properties),
+      do: :ok
+
   def validate_config_schema(value, _opts) do
     if is_struct(value) and Zoi.Type.impl_for(value) != nil do
       :ok
     else
-      {:error, "must be a NimbleOptions or Zoi schema"}
+      {:error, "must be a NimbleOptions, Zoi, or JSON schema"}
     end
   rescue
-    _error -> {:error, "must be a NimbleOptions or Zoi schema"}
+    _error -> {:error, "must be a NimbleOptions, Zoi, or JSON schema"}
   end
 
   @doc """

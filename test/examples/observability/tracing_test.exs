@@ -36,7 +36,9 @@ defmodule JidoExampleTest.TracingTest do
     @moduledoc false
     use Jido.Action,
       name: "start_workflow",
-      schema: Zoi.object(%{workflow_name: Zoi.string()})
+      schema: [
+        workflow_name: [type: :string, required: true]
+      ]
 
     def run(params, _context) do
       event_signal =
@@ -54,7 +56,9 @@ defmodule JidoExampleTest.TracingTest do
     @moduledoc false
     use Jido.Action,
       name: "process_step",
-      schema: Zoi.object(%{step_number: Zoi.integer()})
+      schema: [
+        step_number: [type: :integer, required: true]
+      ]
 
     def run(params, context) do
       current_step = Map.get(context.state, :step, 0)

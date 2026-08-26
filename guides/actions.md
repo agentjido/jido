@@ -19,12 +19,11 @@ defmodule MyApp.Actions.CreateOrder do
   use Jido.Action,
     name: "create_order",
     description: "Creates an order and emits a domain event",
-    schema:
-      Zoi.object(%{
-        order_id: Zoi.string(),
-        items: Zoi.list(Zoi.map()) |> Zoi.default([]),
-        total: Zoi.integer()
-      })
+    schema: [
+      order_id: [type: :string, required: true],
+      items: [type: {:list, :map}, default: []],
+      total: [type: :integer, required: true]
+    ]
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -146,7 +145,7 @@ Read current agent state from `context.state`:
 defmodule IncrementAction do
   use Jido.Action,
     name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   def run(%{amount: amount}, context) do
     current = Map.get(context.state, :counter, 0)
@@ -262,31 +261,26 @@ alias Jido.Agent.StateOp
 
 ## Schema Definition
 
-Use map-shaped Zoi schemas for code that must work with both supported
-`jido_action` versions. Object fields are required by default.
+Schemas use NimbleOptions syntax:
 
 ```elixir
 use Jido.Action,
   name: "process_order",
   description: "Processes an order with validation",
-  schema:
-    Zoi.object(%{
-      order_id: Zoi.string(),
-      amount: Zoi.integer() |> Zoi.default(1),
-      priority: Zoi.enum([:low, :medium, :high]) |> Zoi.default(:medium),
-      metadata: Zoi.map() |> Zoi.default(%{}),
-      tags: Zoi.list(Zoi.string()) |> Zoi.default([])
-    })
+  schema: [
+    order_id: [type: :string, required: true],
+    amount: [type: :integer, default: 1],
+    priority: [type: {:in, [:low, :medium, :high]}, default: :medium],
+    metadata: [type: :map, default: %{}],
+    tags: [type: {:list, :string}, default: []]
+  ]
 ```
 
-Common schema operations:
-
-- `Zoi.string()`, `Zoi.integer()`, `Zoi.atom()`, `Zoi.map()`, and `Zoi.any()` define field types.
-- `Zoi.list(schema)` defines a list of values.
-- `Zoi.enum(values)` restricts a field to a fixed set of values.
-- `Zoi.default(schema, value)` supplies a value when the field is missing.
-- `Zoi.optional(schema)` makes a field optional.
-- The `description:` option documents a field.
+Common schema options:
+- `type:` - `:string`, `:integer`, `:atom`, `:map`, `{:list, :type}`, `{:in, values}`
+- `required: true` - Validation fails if missing
+- `default: value` - Used when param not provided
+- `doc: "description"` - Documents the parameter
 
 ## Invoking Actions
 
@@ -309,6 +303,5 @@ From `cmd/2`:
 ## Further Reading
 
 - [jido_action HexDocs](https://hexdocs.pm/jido_action) — Full schema options, validation details, composition patterns
-- [`jido_action` Version Compatibility](jido-action-compatibility.md) — Version 2 default and version 3 opt-in
 - [Directives Guide](directives.md) — Complete directive reference
 - [Signals Guide](signals.md) — Signal routing and dispatch

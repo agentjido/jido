@@ -19,7 +19,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Action,
       name: "value_action",
-      schema: Zoi.object(%{value: Zoi.integer()})
+      schema: [value: [type: :integer, required: true]]
 
     def run(%{value: value}, _context), do: {:ok, %{value: value}}
   end

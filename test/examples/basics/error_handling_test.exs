@@ -40,7 +40,9 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "validate",
-      schema: Zoi.object(%{amount: Zoi.integer()})
+      schema: [
+        amount: [type: :integer, required: true]
+      ]
 
     def run(%{amount: amount}, _context) do
       if amount > 0 do
@@ -55,7 +57,9 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "retryable",
-      schema: Zoi.object(%{fail_count: Zoi.integer() |> Zoi.default(0)})
+      schema: [
+        fail_count: [type: :integer, default: 0]
+      ]
 
     def run(%{fail_count: fail_count}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1
@@ -83,11 +87,10 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "track_error",
-      schema:
-        Zoi.object(%{
-          error_message: Zoi.string(),
-          error_context: Zoi.atom() |> Zoi.default(:unknown)
-        })
+      schema: [
+        error_message: [type: :string, required: true],
+        error_context: [type: :atom, default: :unknown]
+      ]
 
     def run(%{error_message: message, error_context: ctx}, context) do
       error = Jido.Error.execution_error(message)
@@ -105,7 +108,9 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "bounded_retry",
-      schema: Zoi.object(%{max_attempts: Zoi.integer() |> Zoi.default(3)})
+      schema: [
+        max_attempts: [type: :integer, default: 3]
+      ]
 
     def run(%{max_attempts: max}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1
@@ -129,11 +134,10 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_retry",
-      schema:
-        Zoi.object(%{
-          max_attempts: Zoi.integer() |> Zoi.default(3),
-          succeed_on: Zoi.integer() |> Zoi.default(3)
-        })
+      schema: [
+        max_attempts: [type: :integer, default: 3],
+        succeed_on: [type: :integer, default: 3]
+      ]
 
     def run(%{max_attempts: max, succeed_on: succeed_on}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1

@@ -178,7 +178,7 @@ Design patterns for per-request isolation:
 ```elixir
 # Pattern 1: Stateless design - pass everything via signal
 defmodule SearchAction do
-  use Jido.Action, name: "search", schema: Zoi.object(%{query: Zoi.string()})
+  use Jido.Action, name: "search", schema: [query: [type: :string, required: true]]
 
   def run(%{query: query}, context) do
     # Use cached connection from agent state
@@ -328,7 +328,10 @@ Complete example with a pool for HTTP requests:
 defmodule MyApp.FetchAction do
   use Jido.Action,
     name: "fetch",
-    schema: Zoi.object(%{url: Zoi.string(), timeout: Zoi.integer() |> Zoi.default(5000)})
+    schema: [
+      url: [type: :string, required: true],
+      timeout: [type: :integer, default: 5000]
+    ]
 
   def run(%{url: url, timeout: timeout}, context) do
     # Use persistent HTTP client from agent state

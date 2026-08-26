@@ -131,7 +131,9 @@ The agent receives signals with type `"jido.sensor.heartbeat"` every 5 seconds.
 defmodule HandleTickAction do
   use Jido.Action,
     name: "handle_tick",
-    schema: Zoi.object(%{count: Zoi.integer()})
+    schema: [
+      count: [type: :integer, required: true]
+    ]
 
   def run(params, context) do
     current = Map.get(context.state, :tick_count, 0)

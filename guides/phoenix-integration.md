@@ -103,7 +103,7 @@ Use PubSub to broadcast agent state changes. Define an action that emits to PubS
 defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   alias Jido.Agent.Directive
 
@@ -304,7 +304,7 @@ end
 defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   def run(%{amount: amount}, context) do
     {:ok, %{count: (context.state[:count] || 0) + amount}}
@@ -314,7 +314,7 @@ end
 defmodule MyApp.Actions.Decrement do
   use Jido.Action,
     name: "decrement",
-    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
+    schema: [amount: [type: :integer, default: 1]]
 
   def run(%{amount: amount}, context) do
     {:ok, %{count: (context.state[:count] || 0) - amount}}

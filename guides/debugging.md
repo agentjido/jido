@@ -51,16 +51,12 @@ MyApp.Jido.debug_status()   # full status map with active overrides
 | `:on` | `:debug` | `:keys_only` | `:minimal` | all agents in instance |
 | `:verbose` | `:trace` | `:full` | `:all` | all agents in instance |
 
-With the default `jido_action` v2 dependency, `log_args` also controls the
-underlying Action log and telemetry level:
+For Jido-managed action execution, `log_args` also controls the underlying
+`jido_action` noise level:
 
 - `:full` enables verbose action start logs and `[:jido, :action, ...]` spans
 - `:keys_only` and `:none` suppress the old full param/context action logs
 - `Jido.debug(:verbose)` re-enables both full action logs and action spans
-
-The `jido_action` v3 opt-in always emits its Action lifecycle telemetry and does
-not accept per-call log options. Jido still applies `log_args` to its own logs
-and telemetry.
 
 Redaction is never automatically disabled. Explicit opt-in only:
 

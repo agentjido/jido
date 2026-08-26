@@ -69,9 +69,8 @@ on an outbound effect and wants the runtime or integration layer to own delivery
 # Action with params, context, and per-instruction opts
 {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{}, [timeout: 5000]})
 
-# Version-compatible instruction value
-{:ok, instruction} = Jido.Agent.Instruction.new(MyAction, %{})
-{agent, directives} = MyAgent.cmd(agent, instruction)
+# Full instruction struct
+{agent, directives} = MyAgent.cmd(agent, %Instruction{action: MyAction, params: %{}})
 
 # List of actions (processed in sequence)
 {agent, directives} = MyAgent.cmd(agent, [Action1, {Action2, %{x: 1}}])
@@ -85,17 +84,17 @@ Pass options that apply to all actions in the command:
 # With timeout (5 second limit per action)
 {agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 5000)
 
+# With timeout and no retries
+{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 1000, max_retries: 0)
+
 # Options applied to all actions in a list
 {agent, directives} = MyAgent.cmd(agent, [Action1, Action2], timeout: 5000)
 ```
 
 Supported options:
 - `:timeout` — Maximum time (in ms) for each action to complete
-
-With the default `jido_action` v2 dependency, its version 2 execution options
-are also accepted. The version 3 opt-in accepts only its smaller option set.
-Version 3 does not retry actions. A caller that needs retry or backoff policy
-must own it. See [`jido_action` Version Compatibility](jido-action-compatibility.md).
+- `:max_retries` — Maximum retry attempts on failure
+- `:backoff` — Initial backoff time in ms (doubles with each retry)
 
 ## State Management
 

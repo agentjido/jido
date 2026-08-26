@@ -87,7 +87,10 @@ Workers fetch a single URL and report back to their parent:
 defmodule FetchUrlAction do
   use Jido.Action,
     name: "fetch_url",
-    schema: Zoi.object(%{url: Zoi.string(), request_id: Zoi.string()})
+    schema: [
+      url: [type: :string, required: true],
+      request_id: [type: :string, required: true]
+    ]
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -137,7 +140,9 @@ The coordinator spawns workers and aggregates results:
 defmodule SpawnFetchersAction do
   use Jido.Action,
     name: "spawn_fetchers",
-    schema: Zoi.object(%{urls: Zoi.list(Zoi.string())})
+    schema: [
+      urls: [type: {:list, :string}, required: true]
+    ]
 
   alias Jido.Agent.Directive
 
@@ -167,7 +172,11 @@ end
 defmodule HandleChildStartedAction do
   use Jido.Action,
     name: "child_started",
-    schema: Zoi.object(%{pid: Zoi.any(), tag: Zoi.any(), meta: Zoi.map() |> Zoi.default(%{})})
+    schema: [
+      pid: [type: :any, required: true],
+      tag: [type: :any, required: true],
+      meta: [type: :map, default: %{}]
+    ]
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -189,7 +198,11 @@ end
 defmodule HandleFetchResultAction do
   use Jido.Action,
     name: "handle_result",
-    schema: Zoi.object(%{request_id: Zoi.string(), url: Zoi.string(), result: Zoi.any()})
+    schema: [
+      request_id: [type: :string, required: true],
+      url: [type: :string, required: true],
+      result: [type: :any, required: true]
+    ]
 
   alias Jido.Agent.StateOp
 
@@ -288,7 +301,10 @@ When a child crashes, the parent receives `jido.agent.child.exit`:
 defmodule HandleChildExitAction do
   use Jido.Action,
     name: "handle_child_exit",
-    schema: Zoi.object(%{tag: Zoi.atom(), reason: Zoi.any()})
+    schema: [
+      tag: [type: :atom, required: true],
+      reason: [type: :any, required: true]
+    ]
 
   def run(%{tag: tag, reason: reason}, context) do
     pending = Map.get(context.state, :pending, %{})
@@ -356,7 +372,7 @@ Use `StopChild` directive to clean up:
 defmodule CleanupWorkersAction do
   use Jido.Action,
     name: "cleanup",
-    schema: Zoi.object(%{tags: Zoi.list(Zoi.atom())})
+    schema: [tags: [type: {:list, :atom}, required: true]]
 
   alias Jido.Agent.Directive
 
@@ -393,7 +409,10 @@ defmodule ParallelFetcher do
   defmodule FetchAction do
     use Jido.Action,
       name: "fetch",
-      schema: Zoi.object(%{url: Zoi.string(), request_id: Zoi.string()})
+      schema: [
+        url: [type: :string, required: true],
+        request_id: [type: :string, required: true]
+      ]
 
     def run(%{url: url, request_id: request_id}, context) do
       result = do_fetch(url)
@@ -440,7 +459,7 @@ defmodule ParallelFetcher do
   defmodule StartAction do
     use Jido.Action,
       name: "start",
-      schema: Zoi.object(%{urls: Zoi.list(Zoi.string())})
+      schema: [urls: [type: {:list, :string}, required: true]]
 
     def run(%{urls: urls}, _context) do
       pending =
@@ -463,7 +482,7 @@ defmodule ParallelFetcher do
   defmodule ChildStartedAction do
     use Jido.Action,
       name: "child_started",
-      schema: Zoi.object(%{pid: Zoi.any() |> Zoi.optional(), meta: Zoi.map() |> Zoi.default(%{})})
+      schema: [pid: [type: :any], meta: [type: :map, default: %{}]]
 
     def run(%{pid: pid, meta: meta}, _context) do
       signal = Signal.new!("fetch", %{
@@ -478,7 +497,11 @@ defmodule ParallelFetcher do
   defmodule ResultAction do
     use Jido.Action,
       name: "result",
-      schema: Zoi.object(%{request_id: Zoi.string(), url: Zoi.string(), result: Zoi.any()})
+      schema: [
+        request_id: [type: :string, required: true],
+        url: [type: :string, required: true],
+        result: [type: :any, required: true]
+      ]
 
     def run(%{request_id: id, url: url, result: result}, context) do
       pending = Map.delete(context.state.pending, id)
