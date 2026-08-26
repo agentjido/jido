@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-08-26T02:21:33Z",
@@ -13,7 +13,7 @@
     }
   ],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Minimize jido_action v3 compatibility shim",
   "type": "task",
   "updated_at": "2026-08-26T14:12:38Z"
