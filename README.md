@@ -120,28 +120,6 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 
 ## Installation
 
-### Using Igniter (Recommended)
-
-The fastest way to get started is with [Igniter](https://hex.pm/packages/igniter):
-
-```bash
-mix igniter.install jido
-```
-
-This automatically:
-- Adds Jido to your dependencies
-- Creates a `MyApp.Jido` instance module (`use Jido, otp_app: :my_app`)
-- Creates configuration in `config/config.exs`
-- Adds `MyApp.Jido` to your supervision tree
-
-Generate an example agent to get started:
-
-```bash
-mix igniter.install jido --example
-```
-
-### Manual Installation
-
 Add `jido` to your list of dependencies in `mix.exs`:
 
 ```elixir
