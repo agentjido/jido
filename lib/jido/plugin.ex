@@ -501,7 +501,13 @@ defmodule Jido.Plugin do
   @doc false
   defmacro __before_compile__(env) do
     dynamic_routes? =
-      not is_nil(Module.get_definition(env.module, {:signal_routes, 1}))
+      case Module.get_definition(env.module, {:signal_routes, 1}) do
+        {:v1, :def, metadata, _clauses} ->
+          Keyword.get(metadata, :context) != __MODULE__
+
+        _definition ->
+          false
+      end
 
     quote do
       @doc false

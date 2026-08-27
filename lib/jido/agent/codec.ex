@@ -286,13 +286,13 @@ defmodule Jido.Agent.Codec do
               path: path ++ [index, "state_key"]
             })
 
-          {overrides, errors ++ [duplicate]}
+          {overrides, [duplicate | errors]}
         else
           {Map.put(overrides, key, value), errors}
         end
       end)
 
-    if errors == [], do: {:ok, overrides}, else: {:error, errors}
+    if errors == [], do: {:ok, overrides}, else: {:error, Enum.reverse(errors)}
   end
 
   defp diagnose_plugins_field(document, registry) do
@@ -493,12 +493,25 @@ defmodule Jido.Agent.Codec do
   defp diagnose_extension_data(record, module, registry, path) do
     case Map.fetch(record, "data") do
       {:ok, document_data} ->
-        if function_exported?(module, :decode, 2) do
-          module
-          |> invoke_extension_codec(:decode, [document_data, registry])
-          |> extension_decode_result(module, path ++ ["data"])
-        else
-          diagnose_data(document_data, registry, 0, path ++ ["data"])
+        data_path = path ++ ["data"]
+
+        case Code.ensure_loaded(module) do
+          {:module, ^module} ->
+            if function_exported?(module, :decode, 2) do
+              module
+              |> invoke_extension_codec(:decode, [document_data, registry])
+              |> extension_decode_result(module, data_path)
+            else
+              diagnose_data(document_data, registry, 0, data_path)
+            end
+
+          {:error, reason} ->
+            {:error,
+             error("trusted Agent extension module could not be loaded", %{
+               extension: module,
+               reason: reason,
+               path: data_path
+             })}
         end
 
       :error ->
@@ -751,13 +764,13 @@ defmodule Jido.Agent.Codec do
               path: path ++ ["entries", index, "key"]
             })
 
-          {map, errors ++ [duplicate]}
+          {map, [duplicate | errors]}
         else
           {Map.put(map, key, value), errors}
         end
       end)
 
-    if errors == [], do: {:ok, map}, else: {:error, errors}
+    if errors == [], do: {:ok, map}, else: {:error, Enum.reverse(errors)}
   end
 
   defp encode_plugin_defaults(%PluginDefaults{} = defaults, registry) do
@@ -1162,15 +1175,16 @@ defmodule Jido.Agent.Codec do
 
   defp collect_values(fields, initial_errors \\ []) do
     {values, errors} =
-      Enum.reduce(fields, {%{}, initial_errors}, fn {key, validator}, {values, errors} ->
+      Enum.reduce(fields, {%{}, Enum.reverse(initial_errors)}, fn {key, validator},
+                                                                  {values, errors} ->
         case validator.() do
           {:ok, value} -> {Map.put(values, key, value), errors}
-          {:error, nested} when is_list(nested) -> {values, errors ++ nested}
-          {:error, validation_error} -> {values, errors ++ [validation_error]}
+          {:error, nested} when is_list(nested) -> {values, Enum.reverse(nested, errors)}
+          {:error, validation_error} -> {values, [validation_error | errors]}
         end
       end)
 
-    if errors == [], do: {:ok, values}, else: {:error, errors}
+    if errors == [], do: {:ok, values}, else: {:error, Enum.reverse(errors)}
   end
 
   defp collect_sequence(values, validator) do
@@ -1178,12 +1192,14 @@ defmodule Jido.Agent.Codec do
       Enum.reduce(values, {[], []}, fn value, {decoded, errors} ->
         case validator.(value) do
           {:ok, item} -> {[item | decoded], errors}
-          {:error, nested} when is_list(nested) -> {decoded, errors ++ nested}
-          {:error, validation_error} -> {decoded, errors ++ [validation_error]}
+          {:error, nested} when is_list(nested) -> {decoded, Enum.reverse(nested, errors)}
+          {:error, validation_error} -> {decoded, [validation_error | errors]}
         end
       end)
 
-    if errors == [], do: {:ok, Enum.reverse(decoded)}, else: {:error, errors}
+    if errors == [],
+      do: {:ok, Enum.reverse(decoded)},
+      else: {:error, Enum.reverse(errors)}
   end
 
   defp unknown_field_errors(record, allowed, path) do

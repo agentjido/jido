@@ -103,7 +103,7 @@ defmodule Jido.Agent.Compiler do
   def compile(%Agent{} = agent, opts) do
     safely(fn ->
       with {:ok, opts} <- compile_options(opts),
-           {:ok, agent} <- validate_executable(agent, opts.compatibility_routes),
+           {:ok, agent} <- Agent.validate(agent),
            {:ok, declarations} <- effective_plugin_declarations(agent, opts),
            {:ok, plugin_instances, plugin_specs} <-
              materialize_plugins(declarations, opts.plugin_configs),
@@ -122,6 +122,7 @@ defmodule Jido.Agent.Compiler do
            schedules = plugin_schedules ++ agent_schedules,
            :ok <- validate_schedules(schedules),
            :ok <- validate_schedule_coverage(agent_schedules, routes),
+           :ok <- validate_extensions(agent.extensions),
            {:ok, semantic_identity} <- Agent.semantic_identity(agent),
            {:ok, extension_plans} <- compile_extensions(agent.extensions) do
         {:ok,

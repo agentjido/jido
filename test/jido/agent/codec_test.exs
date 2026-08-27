@@ -1,5 +1,5 @@
 defmodule Jido.Agent.CodecTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
 
   alias Jido.Agent
   alias Jido.Agent.Codec
@@ -55,6 +55,18 @@ defmodule Jido.Agent.CodecTest do
       Process.put(:codec_extension_decoded, true)
       {:ok, %{enabled: enabled, mode: :ready}}
     end
+  end
+
+  defmodule FaultingCodecExtension do
+    @behaviour Jido.Agent.Extension
+
+    @impl true
+    def encode(%{failure: :raise}, _registry), do: raise("encode failed")
+    def encode(%{failure: :throw}, _registry), do: throw(:encode_failed)
+
+    @impl true
+    def decode(%{"failure" => "raise"}, _registry), do: raise("decode failed")
+    def decode(%{"failure" => "throw"}, _registry), do: throw(:decode_failed)
   end
 
   defmodule RouteMatches do
@@ -279,6 +291,97 @@ defmodule Jido.Agent.CodecTest do
       assert {:error, error} = Codec.decode(%{document | "metadata" => value}, registry)
       assert Exception.message(error) == message
     end
+  end
+
+  test "diagnose preserves 10,000 ordered errors without quadratic accumulation" do
+    agent = Agent.new!(name: "large_invalid_agent")
+    registry = Registry.new!(%{"schemas/state" => {:schema, []}})
+    assert {:ok, document} = Codec.encode(agent, registry)
+
+    invalid_values = List.duplicate(%{"$type" => "invalid"}, 10_000)
+
+    assert {:error, %Jido.Error.Invalid{errors: errors}} =
+             Codec.diagnose(%{document | "metadata" => invalid_values}, registry)
+
+    assert length(errors) == 10_000
+    assert hd(errors).details.path == ["metadata", 0]
+    assert List.last(errors).details.path == ["metadata", 9_999]
+  end
+
+  test "extension codec failures become validation errors without partial decode" do
+    registry =
+      Registry.new!(%{
+        "schemas/state" => {:schema, []},
+        "extensions/faulting" => {:extension, FaultingCodecExtension}
+      })
+
+    for {failure, message} <- [
+          {:raise, "Agent extension encode raised"},
+          {:throw, "Agent extension encode failed"}
+        ] do
+      agent =
+        Agent.new!(
+          name: "faulting_encode_agent",
+          extensions: [
+            ExtensionDeclaration.new!(
+              module: FaultingCodecExtension,
+              data: %{failure: failure}
+            )
+          ]
+        )
+
+      assert {:error, error} = Codec.encode(agent, registry)
+      assert Exception.message(error) == message
+    end
+
+    agent = Agent.new!(name: "faulting_decode_agent")
+    assert {:ok, document} = Codec.encode(agent, registry)
+
+    for {failure, message} <- [
+          {"raise", "Agent extension decode raised"},
+          {"throw", "Agent extension decode failed"}
+        ] do
+      extension = %{
+        "module" => "extensions/faulting",
+        "data" => %{"failure" => failure},
+        "metadata" => %{"$type" => "map", "entries" => []}
+      }
+
+      invalid = %{document | "extensions" => [extension]}
+      assert {:error, error} = Codec.decode(invalid, registry)
+      assert Exception.message(error) == message
+      assert error.details.path == ["extensions", 0, "data"]
+      refute match?({:ok, %Agent{}}, Codec.decode(invalid, registry))
+    end
+  end
+
+  test "decode loads a trusted extension before callback selection" do
+    extension = JidoTest.Agent.UnloadedCodecExtension
+
+    registry =
+      Registry.new!(%{
+        "schemas/state" => {:schema, []},
+        "extensions/unloaded" => {:extension, extension}
+      })
+
+    agent = Agent.new!(name: "unloaded_extension_agent")
+    assert {:ok, document} = Codec.encode(agent, registry)
+
+    extension_document = %{
+      "module" => "extensions/unloaded",
+      "data" => true,
+      "metadata" => %{"$type" => "map", "entries" => []}
+    }
+
+    :code.purge(extension)
+    :code.delete(extension)
+    refute Code.loaded?(extension)
+
+    assert {:error, error} =
+             Codec.decode(%{document | "extensions" => [extension_document]}, registry)
+
+    assert Exception.message(error) == "unloaded extension decoder was called"
+    assert Code.loaded?(extension)
   end
 
   test "diagnose returns ordered independent errors and decode returns only the first" do

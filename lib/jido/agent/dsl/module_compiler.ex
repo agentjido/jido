@@ -246,14 +246,7 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
       @doc "Returns derived compiled data for this Agent module."
       @spec compiled() :: Jido.Agent.Compiled.t()
       def compiled do
-        compile_opts =
-          Keyword.put(
-            unquote(escaped_compile_opts),
-            :compatibility_routes,
-            signal_routes(%{agent_module: __MODULE__})
-          )
-
-        Jido.Agent.compile!(agent(), compile_opts)
+        Jido.Agent.compile!(agent(), unquote(escaped_compile_opts))
       end
     end
   end

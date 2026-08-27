@@ -121,6 +121,15 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       ]
   end
 
+  defmodule PluginWithOnlyPatterns do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "plugin_with_only_patterns",
+      state_key: :only_patterns_plugin,
+      actions: [JidoTest.AgentServer.SignalRouterTest.TestAction],
+      signal_patterns: ["pattern.only"]
+  end
+
   # =============================================================================
   # Test Fixtures - Agents
   # =============================================================================
@@ -198,6 +207,16 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
         JidoTest.AgentServer.SignalRouterTest.PluginWithRouter,
         JidoTest.AgentServer.SignalRouterTest.PluginWithPatterns
       ]
+
+    def signal_routes(_ctx), do: []
+  end
+
+  defmodule AgentWithOnlyPatternPlugin do
+    @moduledoc false
+    use Jido.Agent,
+      name: "agent_with_only_pattern_plugin",
+      schema: [],
+      plugins: [JidoTest.AgentServer.SignalRouterTest.PluginWithOnlyPatterns]
 
     def signal_routes(_ctx), do: []
   end
@@ -361,6 +380,14 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       # Should generate pattern-based routes instead
       assert %JidoRouter.Router{} = router
       # Pattern routes: signal_patterns ["nonlist.*"] x actions [TestAction]
+      assert Jido.Signal.Router.count(router) == 1
+    end
+
+    test "adds one route for a static pattern-only plugin" do
+      state = build_test_state(AgentWithOnlyPatternPlugin)
+      router = SignalRouter.build(state)
+
+      assert %JidoRouter.Router{} = router
       assert Jido.Signal.Router.count(router) == 1
     end
 

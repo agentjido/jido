@@ -134,6 +134,19 @@ defmodule Jido.AgentServer.SignalRouter do
   defp get_plugin_custom_routes(spec) do
     plugin_module = spec.module
 
+    if static_plugin_routes?(plugin_module) do
+      []
+    else
+      runtime_plugin_routes(plugin_module, spec)
+    end
+  end
+
+  defp static_plugin_routes?(plugin_module) do
+    function_exported?(plugin_module, :__jido_compiler_dynamic_routes__?, 0) and
+      not plugin_module.__jido_compiler_dynamic_routes__?()
+  end
+
+  defp runtime_plugin_routes(plugin_module, spec) do
     if function_exported?(plugin_module, :signal_routes, 1) do
       case plugin_module.signal_routes(spec.config) do
         [] -> fallback_plugin_routes(spec)

@@ -62,6 +62,89 @@ defmodule Jido.Agent.CompilerTest do
     end
   end
 
+  defmodule PatternPlugin do
+    use Jido.Plugin,
+      name: "pattern_plugin",
+      state_key: :pattern_plugin,
+      actions: [CompileAction],
+      signal_patterns: ["event.*"]
+  end
+
+  defmodule CountingManifestPlugin do
+    @behaviour Jido.Plugin
+
+    alias Jido.Plugin.{Manifest, Spec}
+
+    def __jido_compiler_manifest__ do
+      send(self(), :counting_manifest_read)
+
+      %Manifest{
+        module: __MODULE__,
+        name: "counting_manifest_plugin",
+        description: nil,
+        category: nil,
+        tags: [],
+        vsn: nil,
+        otp_app: nil,
+        capabilities: [],
+        requires: [],
+        state_key: :counting_manifest_plugin,
+        schema: nil,
+        config_schema: nil,
+        actions: [],
+        signal_routes: [],
+        schedules: [],
+        signal_patterns: [],
+        singleton: false,
+        subscriptions: []
+      }
+    end
+
+    def __jido_compiler_dynamic_routes__?, do: false
+
+    @impl true
+    def plugin_spec(config),
+      do: %Spec{
+        module: __MODULE__,
+        name: "counting_manifest_plugin",
+        state_key: :counting_manifest_plugin,
+        config: config
+      }
+
+    @impl true
+    def mount(_agent, _config), do: {:ok, %{}}
+
+    @impl true
+    def signal_routes(_config), do: []
+
+    @impl true
+    def handle_signal(_signal, _context), do: {:ok, nil}
+
+    @impl true
+    def prepare_signal(signal, _context), do: {:ok, signal, %{}}
+
+    @impl true
+    def prepare_action(_signal, _action_arg, _context), do: {:ok, %{}}
+
+    @impl true
+    def prepare_emit(signal, _context), do: {:ok, signal}
+
+    @impl true
+    def transform_result(_action, result, _context), do: result
+
+    @impl true
+    def child_spec(_config), do: nil
+
+    @impl true
+    def subscriptions(_config, _context), do: []
+
+    @impl true
+    def on_checkpoint(_plugin_state, _context), do: :keep
+
+    @impl true
+    def on_restore(_pointer, _context), do: {:ok, nil}
+  end
+
   defmodule EnvironmentSentinelPlugin do
     use Jido.Plugin,
       name: "environment_sentinel",
@@ -199,6 +282,32 @@ defmodule Jido.Agent.CompilerTest do
     refute Map.has_key?(Map.from_struct(compiled), :strategy)
     refute Process.get(:compiler_action_ran)
     refute Process.get(:compiler_plugin_mounted)
+  end
+
+  test "compile materializes each explicit plugin graph once" do
+    definition =
+      Agent.new!(
+        name: "single_pass_compile_agent",
+        plugin_defaults: :none,
+        plugins: [Plugin.new!(module: CountingManifestPlugin)]
+      )
+
+    assert {:ok, %Compiled{}} = Agent.compile(definition)
+    assert_receive :counting_manifest_read
+    refute_receive :counting_manifest_read, 20
+  end
+
+  test "compile retains static plugin pattern routes" do
+    definition =
+      Agent.new!(
+        name: "pattern_route_agent",
+        plugin_defaults: :none,
+        plugins: [Plugin.new!(module: PatternPlugin)]
+      )
+
+    assert {:ok, %Compiled{routes: [route]}} = Agent.compile(definition)
+    assert %Route{path: "pattern_plugin.event.*", target: CompileAction} = route
+    refute PatternPlugin.__jido_compiler_dynamic_routes__?()
   end
 
   test "host defaults and host config do not change the definition identity" do

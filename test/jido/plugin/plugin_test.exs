@@ -109,6 +109,7 @@ defmodule JidoTest.PluginTest do
       assert BasicPlugin.requires() == []
       assert BasicPlugin.signal_routes() == []
       assert BasicPlugin.schedules() == []
+      refute BasicPlugin.__jido_compiler_dynamic_routes__?()
     end
   end
 
@@ -335,6 +336,7 @@ defmodule JidoTest.PluginTest do
     test "custom signal_routes/1 returns custom routes" do
       result = CustomCallbackPlugin.signal_routes(%{some: :config})
       assert result == [:custom_router]
+      assert CustomCallbackPlugin.__jido_compiler_dynamic_routes__?()
     end
 
     test "custom handle_signal/2 receives signal and context" do

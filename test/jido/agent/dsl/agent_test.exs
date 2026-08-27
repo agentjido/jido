@@ -82,6 +82,7 @@ defmodule Jido.Agent.DSL.AgentTest do
     assert SparkAgent.name() == "spark_agent"
     assert SparkAgent.description() == "A Spark Agent"
     assert SparkAgent.schema() == SparkAgent.compiled().state_schema
+    assert SparkAgent.compiled().routes == Agent.compile!(SparkAgent.agent()).routes
   end
 
   test "new/1 creates an instance and keeps the command API" do
