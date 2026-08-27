@@ -499,9 +499,21 @@ defmodule Jido.Plugin do
   # Macro implementation
 
   @doc false
+  defmacro __before_compile__(env) do
+    dynamic_routes? =
+      not is_nil(Module.get_definition(env.module, {:signal_routes, 1}))
+
+    quote do
+      @doc false
+      def __jido_compiler_dynamic_routes__?, do: unquote(dynamic_routes?)
+    end
+  end
+
+  @doc false
   defp generate_behaviour_and_validation(opts) do
     quote location: :keep do
       @behaviour Jido.Plugin
+      @before_compile Jido.Plugin
 
       alias Jido.Plugin.Manifest
       alias Jido.Plugin.Spec
@@ -629,6 +641,31 @@ defmodule Jido.Plugin do
   @doc false
   defp generate_spec_and_manifest_functions do
     quote location: :keep do
+      @doc false
+      @spec __jido_compiler_manifest__() :: Manifest.t()
+      def __jido_compiler_manifest__ do
+        %Manifest{
+          module: __MODULE__,
+          name: @validated_opts.name,
+          description: @validated_opts[:description],
+          category: @validated_opts[:category],
+          tags: @validated_opts[:tags] || [],
+          vsn: @validated_opts[:vsn],
+          otp_app: @validated_opts[:otp_app],
+          capabilities: @validated_opts[:capabilities] || [],
+          requires: @validated_opts[:requires] || [],
+          state_key: @validated_opts.state_key,
+          schema: @validated_opts[:schema],
+          config_schema: @validated_opts[:config_schema],
+          actions: @validated_opts.actions,
+          signal_routes: @validated_opts[:signal_routes] || [],
+          subscriptions: @validated_opts[:subscriptions] || [],
+          schedules: @validated_opts[:schedules] || [],
+          signal_patterns: @validated_opts[:signal_patterns] || [],
+          singleton: @validated_opts[:singleton] || false
+        }
+      end
+
       @doc """
       Returns the plugin specification with optional per-agent configuration.
 

@@ -16,6 +16,8 @@ defmodule Jido.Agent.Schedules do
   Job IDs are namespaced as tuples: `{:agent_schedule, agent_name, signal_type_or_job_id}`
   """
 
+  alias Jido.Agent.Schedule
+
   @typedoc "Expanded agent schedule specification (same shape as plugin schedule specs)."
   @type schedule_spec :: %{
           cron_expression: String.t(),
@@ -66,6 +68,17 @@ defmodule Jido.Agent.Schedules do
       job_id: job_id,
       signal_type: signal_type,
       timezone: timezone
+    }
+  end
+
+  defp expand_schedule(%Schedule{} = schedule, agent_name) do
+    %{
+      cron_expression: schedule.cron_expression,
+      action: nil,
+      job_id: {:agent_schedule, agent_name, schedule.name},
+      signal_type: schedule.signal_type,
+      timezone: schedule.timezone,
+      data: schedule.data
     }
   end
 end

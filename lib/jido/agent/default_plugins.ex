@@ -104,14 +104,15 @@ defmodule Jido.Agent.DefaultPlugins do
   def apply_agent_overrides(defaults, overrides) when is_map(overrides) do
     default_state_keys = build_state_key_index(defaults)
     validate_override_keys!(overrides, default_state_keys)
+    validate_replacement_state_keys!(overrides)
 
     Enum.flat_map(defaults, fn plugin_decl ->
       mod = extract_module(plugin_decl)
-      state_key = mod.state_key()
+      state_key = compiler_state_key(mod)
 
       case Map.get(overrides, state_key) do
         nil -> [plugin_decl]
-        false -> []
+        disabled when disabled in [false, :disabled] -> []
         replacement when is_atom(replacement) -> [replacement]
         {replacement, config} when is_atom(replacement) -> [{replacement, config}]
       end
@@ -120,8 +121,8 @@ defmodule Jido.Agent.DefaultPlugins do
 
   defp build_state_key_index(defaults) do
     Enum.map(defaults, fn
-      mod when is_atom(mod) -> {mod.state_key(), mod}
-      {mod, _config} -> {mod.state_key(), mod}
+      mod when is_atom(mod) -> {compiler_state_key(mod), mod}
+      {mod, _config} -> {compiler_state_key(mod), mod}
     end)
     |> Map.new(fn {key, mod} -> {key, mod} end)
   end
@@ -140,6 +141,32 @@ defmodule Jido.Agent.DefaultPlugins do
     end
   end
 
+  defp validate_replacement_state_keys!(overrides) do
+    Enum.each(overrides, fn
+      {_state_key, disabled} when disabled in [false, :disabled] ->
+        :ok
+
+      {state_key, replacement} ->
+        replacement_module = extract_module(replacement)
+        replacement_key = compiler_state_key(replacement_module)
+
+        if replacement_key != state_key do
+          raise CompileError,
+            description:
+              "Replacement default plugin #{inspect(replacement_module)} must preserve " <>
+                "state key #{inspect(state_key)}; it declares #{inspect(replacement_key)}"
+        end
+    end)
+  end
+
   defp extract_module(mod) when is_atom(mod), do: mod
   defp extract_module({mod, _config}), do: mod
+
+  defp compiler_state_key(module) do
+    if function_exported?(module, :__jido_compiler_manifest__, 0) do
+      module.__jido_compiler_manifest__().state_key
+    else
+      module.state_key()
+    end
+  end
 end

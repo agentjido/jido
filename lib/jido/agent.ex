@@ -131,6 +131,7 @@ defmodule Jido.Agent do
   """
 
   alias Jido.Agent
+  alias Jido.Agent.Compiler
   alias Jido.Agent.Command
   alias Jido.Agent.Directive
   alias Jido.Agent.Extension.Declaration, as: ExtensionDeclaration
@@ -504,6 +505,10 @@ defmodule Jido.Agent do
   @spec __quoted_basic_accessors__() :: Macro.t()
   def __quoted_basic_accessors__ do
     quote location: :keep do
+      @doc "Returns the inert canonical Agent definition."
+      @spec definition() :: Agent.t()
+      def definition, do: @agent_definition
+
       @doc "Returns the agent's name."
       @spec name() :: String.t()
       def name, do: @validated_opts.name
@@ -789,33 +794,31 @@ defmodule Jido.Agent do
       def new(opts \\ []) do
         opts = if is_list(opts), do: Map.new(opts), else: opts
 
-        initial_state = __build_initial_state__(opts)
+        instantiate_opts =
+          opts
+          |> Map.put(:__validate_state__, false)
+          |> Map.put(:agent_module, __MODULE__)
+          |> Map.put(:compatibility_routes, signal_routes(%{agent_module: __MODULE__}))
+          |> __put_definition_jido__()
 
-        id =
-          case opts[:id] do
-            nil -> Jido.Util.generate_id()
-            "" -> Jido.Util.generate_id()
-            id when is_binary(id) -> id
-            other -> to_string(other)
+        agent =
+          case Agent.instantiate(@agent_definition, instantiate_opts) do
+            {:ok, agent} -> agent
+            {:error, error} -> raise error
           end
-
-        agent = %Agent{
-          id: id,
-          agent_module: __MODULE__,
-          name: name(),
-          description: description(),
-          state_schema: schema(),
-          state: initial_state
-        }
-
-        # Run plugin mount hooks (pure initialization)
-        agent = __mount_plugins__(agent)
 
         # Run strategy initialization (directives are dropped here;
         # AgentServer handles init directives separately)
         ctx = __strategy_ctx__()
         {initialized_agent, _directives} = strategy().init(agent, ctx)
         initialized_agent
+      end
+
+      defp __put_definition_jido__(opts) do
+        case @validated_opts[:jido] do
+          nil -> opts
+          jido -> Map.put_new(opts, :jido, jido)
+        end
       end
 
       defp __build_initial_state__(opts) do
@@ -1028,7 +1031,7 @@ defmodule Jido.Agent do
       """
       @spec validate(Agent.t(), keyword()) :: Agent.agent_result()
       def validate(%Agent{} = agent, opts \\ []) do
-        case AgentState.validate(agent.state, agent.state_schema, opts) do
+        case AgentState.validate(agent.state, schema(), opts) do
           {:ok, validated_state} ->
             {:ok, %{agent | state: validated_state}}
 
@@ -1189,6 +1192,7 @@ defmodule Jido.Agent do
                      restore: 2,
                      signal_routes: 0,
                      signal_routes: 1,
+                     definition: 0,
                      name: 0,
                      description: 0,
                      category: 0,
@@ -1266,6 +1270,11 @@ defmodule Jido.Agent do
                                   __ENV__
                                 )
 
+        @agent_definition Jido.Agent.__definition_from_macro_opts__(
+                            @validated_opts,
+                            @expanded_signal_routes
+                          )
+
         @default_plugin_list Jido.Agent.__resolve_default_plugins__(@validated_opts)
         @all_plugin_decls @default_plugin_list ++ (@validated_opts[:plugins] || [])
         @plugin_instances Jido.Agent.__normalize_plugin_instances__(@all_plugin_decls)
@@ -1297,10 +1306,7 @@ defmodule Jido.Agent do
         end
 
         # Build plugin specs from instances (for backward compatibility)
-        @plugin_specs Enum.map(@plugin_instances, fn instance ->
-                        spec = instance.module.plugin_spec(instance.config)
-                        %{spec | state_key: instance.state_key}
-                      end)
+        @plugin_specs Enum.map(@plugin_instances, &Jido.Agent.Compiler.plugin_spec/1)
 
         # Validate unique state_keys (now derived from instances)
         @plugin_state_keys Enum.map(@plugin_instances, & &1.state_key)
@@ -1347,10 +1353,7 @@ defmodule Jido.Agent do
         @plugin_actions @plugin_specs |> Enum.flat_map(& &1.actions) |> Enum.uniq()
 
         # Expand routes from all plugin instances
-        @expanded_plugin_routes Enum.flat_map(
-                                  @plugin_instances,
-                                  &Jido.Plugin.Routes.expand_routes/1
-                                )
+        @expanded_plugin_routes Jido.Agent.Compiler.legacy_plugin_routes!(@plugin_instances)
 
         # Expand schedules from all plugin instances
         @expanded_plugin_schedules Enum.flat_map(
@@ -1430,9 +1433,99 @@ defmodule Jido.Agent do
   end
 
   @doc false
+  @spec __definition_from_macro_opts__(map(), list()) :: t()
+  def __definition_from_macro_opts__(validated_opts, routes) do
+    plugins = Enum.map(validated_opts[:plugins] || [], &legacy_plugin_declaration!/1)
+    plugin_defaults = legacy_plugin_defaults!(validated_opts[:default_plugins])
+    schedules = legacy_schedules!(validated_opts[:schedules] || [])
+
+    metadata =
+      %{}
+      |> put_metadata(:category, validated_opts[:category])
+      |> put_metadata(:tags, validated_opts[:tags] || [])
+      |> put_metadata(:vsn, validated_opts[:vsn])
+
+    new!(
+      name: validated_opts.name,
+      description: validated_opts[:description],
+      state_schema: validated_opts[:schema] || [],
+      plugin_defaults: plugin_defaults,
+      plugins: plugins,
+      routes: routes,
+      schedules: schedules,
+      metadata: metadata
+    )
+  end
+
+  defp legacy_plugin_defaults!(nil), do: PluginDefaults.new!(:inherit)
+  defp legacy_plugin_defaults!(false), do: PluginDefaults.new!(:none)
+  defp legacy_plugin_defaults!(%PluginDefaults{} = defaults), do: defaults
+
+  defp legacy_plugin_defaults!(overrides) when is_map(overrides) do
+    canonical =
+      Map.new(overrides, fn
+        {key, value} when value in [false, :disabled] -> {key, :disabled}
+        {key, value} -> {key, legacy_plugin_declaration!(value)}
+      end)
+
+    PluginDefaults.new!(mode: :inherit, overrides: canonical)
+  end
+
+  defp legacy_plugin_declaration!(%AgentPlugin{} = plugin), do: plugin
+
+  defp legacy_plugin_declaration!(module) when is_atom(module),
+    do: AgentPlugin.new!(module: module)
+
+  defp legacy_plugin_declaration!({module, opts}) when is_atom(module) and is_list(opts) do
+    {as, config} = Keyword.pop(opts, :as)
+    AgentPlugin.new!(module: module, as: as, config: Map.new(config))
+  end
+
+  defp legacy_plugin_declaration!({module, config}) when is_atom(module) and is_map(config),
+    do: AgentPlugin.new!(module: module, config: config)
+
+  defp legacy_schedules!(schedules) do
+    schedules
+    |> Enum.with_index()
+    |> Enum.map(fn
+      {{cron, signal_type}, index} ->
+        legacy_schedule!(cron, signal_type, [], index)
+
+      {{cron, signal_type, opts}, index} ->
+        legacy_schedule!(cron, signal_type, opts, index)
+    end)
+  end
+
+  defp legacy_schedule!(cron, signal_type, opts, index) do
+    candidate = Keyword.get(opts, :job_id)
+    candidate = if is_nil(candidate), do: "schedule_#{index}", else: to_string(candidate)
+
+    name =
+      case Jido.Util.validate_name(candidate) do
+        {:ok, name} -> name
+        {:error, _error} -> "schedule_#{index}"
+      end
+
+    Schedule.new!(
+      name: name,
+      cron_expression: cron,
+      signal_type: signal_type,
+      timezone: Keyword.get(opts, :timezone, "Etc/UTC")
+    )
+  end
+
+  defp put_metadata(metadata, _key, nil), do: metadata
+  defp put_metadata(metadata, _key, []), do: metadata
+  defp put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
+
+  @doc false
   @spec __normalize_plugin_instances__([module() | {module(), map()}]) :: [PluginInstance.t()]
   def __normalize_plugin_instances__(plugins) do
-    Enum.map(plugins, &__validate_and_create_plugin_instance__/1)
+    Enum.map(plugins, fn plugin ->
+      plugin
+      |> legacy_plugin_declaration!()
+      |> Compiler.materialize_plugin_declaration!()
+    end)
   end
 
   @doc false
@@ -1448,34 +1541,6 @@ defmodule Jido.Agent do
       end
 
     Jido.Agent.DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
-  end
-
-  defp __validate_and_create_plugin_instance__(plugin_decl) do
-    mod = __extract_plugin_module__(plugin_decl)
-    __validate_plugin_module__(mod)
-    PluginInstance.new(plugin_decl)
-  end
-
-  defp __extract_plugin_module__(m) when is_atom(m), do: m
-  defp __extract_plugin_module__({m, _}), do: m
-
-  defp __validate_plugin_module__(mod) do
-    case Code.ensure_compiled(mod) do
-      {:module, _} -> __validate_plugin_behaviour__(mod)
-      {:error, reason} -> __raise_plugin_compile_error__(mod, reason)
-    end
-  end
-
-  defp __validate_plugin_behaviour__(mod) do
-    unless function_exported?(mod, :plugin_spec, 1) do
-      raise CompileError,
-        description: "#{inspect(mod)} does not implement Jido.Plugin (missing plugin_spec/1)"
-    end
-  end
-
-  defp __raise_plugin_compile_error__(mod, reason) do
-    raise CompileError,
-      description: "Plugin #{inspect(mod)} could not be compiled: #{inspect(reason)}"
   end
 
   # Base module functions (for direct use without `use`)
@@ -1573,6 +1638,24 @@ defmodule Jido.Agent do
   end
 
   def validate(value), do: Validation.invalid_subject(value)
+
+  @doc "Validates trusted executable contracts without running Agent work."
+  @spec validate_executable(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate_executable(%__MODULE__{} = agent), do: Compiler.validate_executable(agent)
+  def validate_executable(value), do: Validation.invalid_subject(value)
+
+  @doc "Compiles one canonical Agent definition into derived executable data."
+  @spec compile(t(), keyword() | map()) ::
+          {:ok, Jido.Agent.Compiled.t()} | {:error, Exception.t()}
+  def compile(agent, opts \\ [])
+  def compile(%__MODULE__{} = agent, opts), do: Compiler.compile(agent, opts)
+  def compile(value, _opts), do: Validation.invalid_subject(value)
+
+  @doc "Creates one complete Agent instance through explicit compilation."
+  @spec instantiate(t(), keyword() | map()) :: {:ok, t()} | {:error, Exception.t()}
+  def instantiate(agent, opts \\ [])
+  def instantiate(%__MODULE__{} = agent, opts), do: Compiler.instantiate(agent, opts)
+  def instantiate(value, _opts), do: Validation.invalid_subject(value)
 
   @doc """
   Updates agent state by merging new attributes.

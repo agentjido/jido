@@ -1,6 +1,7 @@
 defmodule JidoTest.Agent.SchedulesTest do
   use ExUnit.Case, async: true
 
+  alias Jido.Agent.Schedule
   alias Jido.Agent.Schedules
 
   describe "expand_schedules/2" do
@@ -89,6 +90,18 @@ defmodule JidoTest.Agent.SchedulesTest do
 
     test "returns empty list for empty input" do
       assert Schedules.expand_schedules([], "my_agent") == []
+    end
+
+    test "derives canonical job ID from Agent and schedule names" do
+      schedule =
+        Schedule.new!(
+          name: "heartbeat",
+          cron_expression: "* * * * *",
+          signal_type: "heartbeat.tick"
+        )
+
+      assert [spec] = Schedules.expand_schedules([schedule], "my_agent")
+      assert spec.job_id == {:agent_schedule, "my_agent", "heartbeat"}
     end
   end
 

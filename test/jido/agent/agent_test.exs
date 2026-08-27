@@ -49,7 +49,7 @@ defmodule JidoTest.AgentTest do
       assert TestAgents.Minimal.name() == "minimal_agent"
       assert TestAgents.Minimal.description() == nil
       schema = TestAgents.Minimal.schema()
-      assert is_struct(schema)
+      assert %Zoi.Types.Map{} = schema
     end
 
     test "rejects anonymous state schema callbacks" do
@@ -151,9 +151,9 @@ defmodule JidoTest.AgentTest do
       agent = TestAgents.Basic.new()
       assert agent.name == "basic_agent"
       assert agent.description == "A basic test agent"
-      assert agent.category == "test"
-      assert agent.tags == ["test", "basic"]
-      assert agent.vsn == "1.0.0"
+      assert agent.metadata.category == "test"
+      assert agent.metadata.tags == ["test", "basic"]
+      assert agent.metadata.vsn == "1.0.0"
     end
 
     test "uses default strategy" do
@@ -400,59 +400,77 @@ defmodule JidoTest.AgentTest do
   end
 
   describe "base module functions" do
-    test "Agent.new/1 creates agent from attrs (map)" do
-      {:ok, agent} = Agent.new(%{name: "test_agent", id: "test-123"})
-      assert agent.id == "test-123"
-      assert agent.name == "test_agent"
-    end
-
-    test "Agent.new/1 creates agent from attrs (keyword list)" do
-      {:ok, agent} = Agent.new(name: "test_agent", id: "kw-123")
-      assert agent.id == "kw-123"
-      assert agent.name == "test_agent"
-    end
-
-    test "Agent.new/1 auto-generates id when not provided" do
+    test "Agent.new/1 creates an inert definition from a map" do
       {:ok, agent} = Agent.new(%{name: "test_agent"})
+      assert agent.id == nil
+      assert agent.state == nil
+      assert agent.name == "test_agent"
+    end
+
+    test "Agent.new/1 creates an inert definition from a keyword list" do
+      {:ok, agent} = Agent.new(name: "test_agent")
+      assert agent.id == nil
+      assert agent.name == "test_agent"
+    end
+
+    test "Agent.instantiate/2 auto-generates id when not provided" do
+      definition = Agent.new!(name: "test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition)
       assert is_binary(agent.id)
       assert String.length(agent.id) > 0
     end
 
-    test "Agent.new/1 generates id when nil is passed" do
-      {:ok, agent} = Agent.new(%{id: nil, name: "test_agent"})
+    test "Agent.instantiate/2 generates id when nil is passed" do
+      definition = Agent.new!(name: "test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition, id: nil)
       assert is_binary(agent.id)
       assert String.length(agent.id) > 0
     end
 
-    test "Agent.new/1 generates id when empty string is passed" do
-      {:ok, agent} = Agent.new(%{id: "", name: "test_agent"})
+    test "Agent.instantiate/2 generates id when empty string is passed" do
+      definition = Agent.new!(name: "test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition, id: "")
       assert is_binary(agent.id)
       assert String.length(agent.id) > 0
     end
 
     test "Agent.set/2 updates state" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      definition = Agent.new!(name: "test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition, id: "test")
       {:ok, updated} = Agent.set(agent, %{key: "value"})
       assert updated.state.key == "value"
     end
 
-    test "Agent.new/1 returns error for invalid id type" do
-      {:error, error} = Agent.new(%{id: 12_345})
-      assert error.message == "Agent validation failed"
+    test "Agent.instantiate/2 returns error for invalid id type" do
+      definition = Agent.new!(name: "test_agent", plugin_defaults: :none)
+      {:error, error} = Agent.instantiate(definition, id: 12_345)
+      assert error.message == "Agent instance ID must be text"
     end
 
     test "Agent.validate/2 validates state against schema" do
-      {:ok, agent} =
-        Agent.new(%{id: "test", schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})})
+      definition =
+        Agent.new!(
+          name: "test_agent",
+          state_schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+          plugin_defaults: :none
+        )
 
-      {:ok, validated} = Agent.validate(agent)
+      {:ok, agent} = Agent.instantiate(definition, id: "test")
+
+      {:ok, validated} = Agent.validate(agent, [])
       assert validated.state.count == 0
     end
 
     test "Agent.validate/2 returns error for invalid state" do
-      {:ok, agent} = Agent.new(%{id: "test", schema: Zoi.object(%{count: Zoi.integer()})})
-      agent = %{agent | state: %{count: "not_an_integer"}}
-      {:error, error} = Agent.validate(agent)
+      definition =
+        Agent.new!(
+          name: "test_agent",
+          state_schema: Zoi.object(%{count: Zoi.integer()}),
+          plugin_defaults: :none
+        )
+
+      agent = %{definition | id: "test", state: %{count: "not_an_integer"}}
+      {:error, error} = Agent.validate(agent, [])
       assert error.message == "State validation failed"
     end
 

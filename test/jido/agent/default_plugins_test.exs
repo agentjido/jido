@@ -38,6 +38,15 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
       actions: [JidoTest.PluginTestAction]
   end
 
+  defmodule WrongReplacementPlugin do
+    @moduledoc false
+    use Jido.Plugin,
+      name: "wrong_replacement",
+      state_key: :wrong_key,
+      actions: [JidoTest.PluginTestAction],
+      singleton: true
+  end
+
   describe "package_defaults/0" do
     test "returns list with Thread.Plugin, Identity.Plugin, and Memory.Plugin" do
       assert DefaultPlugins.package_defaults() == [
@@ -88,6 +97,15 @@ defmodule JidoTest.Agent.DefaultPluginsTest do
         })
 
       assert result == [{ReplacementMemoryPlugin, %{timeout: 5000}}, FakeThreadPlugin]
+    end
+
+    test "replacement must preserve the selected default state key" do
+      assert_raise CompileError, ~r/must preserve state key/, fn ->
+        DefaultPlugins.apply_agent_overrides(
+          [FakeMemoryPlugin],
+          %{__memory__: WrongReplacementPlugin}
+        )
+      end
     end
 
     test "combine exclude and replace" do
