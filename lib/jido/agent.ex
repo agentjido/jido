@@ -1234,201 +1234,8 @@ defmodule Jido.Agent do
   end
 
   defmacro __using__(opts) do
-    # Get the quoted blocks from helper functions
-    module_setup = Agent.__quoted_module_setup__()
-    basic_accessors = Agent.__quoted_basic_accessors__()
-    plugin_accessors = Agent.__quoted_plugin_accessors__()
-    plugin_config_accessors = Agent.__quoted_plugin_config_accessors__()
-    strategy_accessors = Agent.__quoted_strategy_accessors__()
-    new_function = Agent.__quoted_new_function__()
-    cmd_function = Agent.__quoted_cmd_function__()
-    utility_functions = Agent.__quoted_utility_functions__()
-    callbacks = Agent.__quoted_callbacks__()
-
-    # Build compile-time validation and module attributes as a separate smaller block
-    compile_time_setup =
-      quote location: :keep do
-        # Validate config at compile time
-        @validated_opts (case Zoi.parse(Agent.config_schema(), Map.new(unquote(opts))) do
-                           {:ok, validated} ->
-                             validated
-
-                           {:error, errors} ->
-                             message =
-                               "Invalid Agent configuration for #{inspect(__MODULE__)}: #{inspect(errors)}"
-
-                             raise CompileError,
-                               description: message,
-                               file: __ENV__.file,
-                               line: __ENV__.line
-                         end)
-
-        Jido.Action.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
-
-        @expanded_signal_routes Jido.Agent.expand_and_eval_literal_option(
-                                  @validated_opts[:signal_routes] || [],
-                                  __ENV__
-                                )
-
-        @agent_definition Jido.Agent.__definition_from_macro_opts__(
-                            @validated_opts,
-                            @expanded_signal_routes
-                          )
-
-        @default_plugin_list Jido.Agent.__resolve_default_plugins__(@validated_opts)
-        @all_plugin_decls @default_plugin_list ++ (@validated_opts[:plugins] || [])
-        @plugin_instances Jido.Agent.__normalize_plugin_instances__(@all_plugin_decls)
-
-        @singleton_alias_violations @plugin_instances
-                                    |> Enum.filter(fn inst ->
-                                      inst.module.singleton?() and inst.as != nil
-                                    end)
-        if @singleton_alias_violations != [] do
-          modules =
-            Enum.map(@singleton_alias_violations, & &1.module) |> Enum.map(&inspect/1)
-
-          raise CompileError,
-            description: "Cannot alias singleton plugins: #{Enum.join(modules, ", ")}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        @singleton_modules @plugin_instances
-                           |> Enum.filter(fn inst -> inst.module.singleton?() end)
-                           |> Enum.map(& &1.module)
-        @duplicate_singletons @singleton_modules -- Enum.uniq(@singleton_modules)
-        if @duplicate_singletons != [] do
-          raise CompileError,
-            description:
-              "Duplicate singleton plugins: #{inspect(Enum.uniq(@duplicate_singletons))}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Build plugin specs from instances (for backward compatibility)
-        @plugin_specs Enum.map(@plugin_instances, &Jido.Agent.Compiler.plugin_spec/1)
-
-        # Validate unique state_keys (now derived from instances)
-        @plugin_state_keys Enum.map(@plugin_instances, & &1.state_key)
-        @duplicate_keys @plugin_state_keys -- Enum.uniq(@plugin_state_keys)
-        if @duplicate_keys != [] do
-          raise CompileError,
-            description: "Duplicate plugin state_keys: #{inspect(@duplicate_keys)}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Validate no collision with base schema keys
-        @base_schema_keys (case @validated_opts[:schema] do
-                             [] -> []
-                             %Zoi.Types.Map{fields: fields} -> Keyword.keys(fields)
-                           end)
-        @colliding_keys Enum.filter(@plugin_state_keys, &(&1 in @base_schema_keys))
-        if @colliding_keys != [] do
-          raise CompileError,
-            description:
-              "Plugin state_keys collide with agent schema: #{inspect(@colliding_keys)}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Merge schemas: base schema + nested plugin schemas
-        @plugin_schema_fields @plugin_specs
-                              |> Enum.reject(&is_nil(&1.schema))
-                              |> Map.new(&{&1.state_key, &1.schema})
-
-        @plugin_schema (case @plugin_specs do
-                          [] -> nil
-                          _plugins -> Zoi.object(@plugin_schema_fields)
-                        end)
-
-        @merged_schema (case {@validated_opts[:schema], @plugin_schema} do
-                          {[], nil} -> []
-                          {[], plugin_schema} -> plugin_schema
-                          {base_schema, nil} -> base_schema
-                          {base_schema, plugin_schema} -> Zoi.extend(base_schema, plugin_schema)
-                        end)
-
-        # Aggregate actions from plugins
-        @plugin_actions @plugin_specs |> Enum.flat_map(& &1.actions) |> Enum.uniq()
-
-        # Expand routes from all plugin instances
-        @expanded_plugin_routes Jido.Agent.Compiler.legacy_plugin_routes!(@plugin_instances)
-
-        # Expand schedules from all plugin instances
-        @expanded_plugin_schedules Enum.flat_map(
-                                     @plugin_instances,
-                                     &Jido.Plugin.Schedules.expand_schedules/1
-                                   )
-
-        # Generate routes for schedule signal types (low priority)
-        @schedule_routes Enum.flat_map(
-                           @plugin_instances,
-                           &Jido.Plugin.Schedules.schedule_routes/1
-                         )
-
-        # Expand agent-level schedules from the `schedules:` option
-        @expanded_agent_schedules Jido.Agent.Schedules.expand_schedules(
-                                    @validated_opts[:schedules] || [],
-                                    @validated_opts[:name]
-                                  )
-
-        # Generate routes for agent schedule signal types
-        @agent_schedule_routes Jido.Agent.Schedules.schedule_routes(@expanded_agent_schedules)
-
-        # Combine routes and schedule routes for conflict detection
-        @all_plugin_routes @expanded_plugin_routes ++ @schedule_routes ++ @agent_schedule_routes
-
-        @plugin_routes_result Jido.Plugin.Routes.detect_conflicts(@all_plugin_routes)
-        case @plugin_routes_result do
-          {:error, conflicts} ->
-            conflict_list = Enum.join(conflicts, "\n  - ")
-
-            raise CompileError,
-              description: "Route conflicts detected:\n  - #{conflict_list}",
-              file: __ENV__.file,
-              line: __ENV__.line
-
-          {:ok, _routes} ->
-            :ok
-        end
-
-        @validated_plugin_routes elem(@plugin_routes_result, 1)
-
-        # Validate plugin requirements at compile time
-        @plugin_config_map Map.new(@plugin_instances, fn instance ->
-                             {instance.state_key, instance.config}
-                           end)
-        @requirements_result Jido.Plugin.Requirements.validate_all_requirements(
-                               @plugin_instances,
-                               @plugin_config_map
-                             )
-        case @requirements_result do
-          {:error, missing_by_plugin} ->
-            error_msg = PluginRequirements.format_error(missing_by_plugin)
-
-            raise CompileError,
-              description: error_msg,
-              file: __ENV__.file,
-              line: __ENV__.line
-
-          {:ok, :valid} ->
-            :ok
-        end
-      end
-
-    # Combine all blocks using unquote
     quote location: :keep do
-      unquote(module_setup)
-      unquote(compile_time_setup)
-      unquote(basic_accessors)
-      unquote(plugin_accessors)
-      unquote(plugin_config_accessors)
-      unquote(strategy_accessors)
-      unquote(new_function)
-      unquote(cmd_function)
-      unquote(utility_functions)
-      unquote(callbacks)
+      use Jido.Agent.DSL.ModuleCompiler, unquote(opts)
     end
   end
 
@@ -1650,6 +1457,15 @@ defmodule Jido.Agent do
   def compile(agent, opts \\ [])
   def compile(%__MODULE__{} = agent, opts), do: Compiler.compile(agent, opts)
   def compile(value, _opts), do: Validation.invalid_subject(value)
+
+  @doc "Compiles one canonical Agent definition or raises its validation error."
+  @spec compile!(t(), keyword() | map()) :: Jido.Agent.Compiled.t() | no_return()
+  def compile!(agent, opts \\ []) do
+    case compile(agent, opts) do
+      {:ok, compiled} -> compiled
+      {:error, error} -> raise error
+    end
+  end
 
   @doc "Creates one complete Agent instance through explicit compilation."
   @spec instantiate(t(), keyword() | map()) :: {:ok, t()} | {:error, Exception.t()}
