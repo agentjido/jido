@@ -40,9 +40,7 @@ defmodule Jido.Actions.Status do
     use Jido.Action,
       name: "set_status",
       description: "Set the agent's status field",
-      schema: [
-        status: [type: :atom, required: true, doc: "Status to set"]
-      ]
+      schema: Zoi.object(%{status: Zoi.atom(description: "Status to set")})
 
     def run(%{status: status}, _context) do
       {:ok, %{status: status}}
@@ -71,9 +69,10 @@ defmodule Jido.Actions.Status do
     use Jido.Action,
       name: "mark_completed",
       description: "Mark agent as completed with optional result",
-      schema: [
-        result: [type: :any, default: nil, doc: "Optional result value"]
-      ]
+      schema:
+        Zoi.object(%{
+          result: Zoi.any(description: "Optional result value") |> Zoi.default(nil)
+        })
 
     def run(%{result: result}, _context) do
       state = %{status: :completed}
@@ -102,9 +101,10 @@ defmodule Jido.Actions.Status do
     use Jido.Action,
       name: "mark_failed",
       description: "Mark agent as failed with error reason",
-      schema: [
-        reason: [type: :any, default: :unknown_error, doc: "Error reason"]
-      ]
+      schema:
+        Zoi.object(%{
+          reason: Zoi.any(description: "Error reason") |> Zoi.default(:unknown_error)
+        })
 
     def run(%{reason: reason}, _context) do
       {:ok, %{status: :failed, error: reason}}
@@ -128,9 +128,10 @@ defmodule Jido.Actions.Status do
     use Jido.Action,
       name: "mark_working",
       description: "Mark agent as actively working",
-      schema: [
-        task_id: [type: :any, default: nil, doc: "Optional task identifier"]
-      ]
+      schema:
+        Zoi.object(%{
+          task_id: Zoi.any(description: "Optional task identifier") |> Zoi.default(nil)
+        })
 
     def run(%{task_id: task_id}, _context) do
       state = %{status: :working}

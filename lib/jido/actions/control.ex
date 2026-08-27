@@ -39,9 +39,10 @@ defmodule Jido.Actions.Control do
     use Jido.Action,
       name: "cancel",
       description: "Handle cancellation requests",
-      schema: [
-        reason: [type: :any, default: :cancelled, doc: "Cancellation reason"]
-      ]
+      schema:
+        Zoi.object(%{
+          reason: Zoi.any(description: "Cancellation reason") |> Zoi.default(:cancelled)
+        })
 
     def run(%{reason: reason}, _context) do
       {:ok, %{status: :failed, error: {:cancelled, reason}}}
@@ -99,12 +100,13 @@ defmodule Jido.Actions.Control do
     use Jido.Action,
       name: "forward",
       description: "Forward a signal to another agent",
-      schema: [
-        target_pid: [type: :any, required: true, doc: "Target process PID"],
-        signal_type: [type: :string, default: nil, doc: "New signal type (optional)"],
-        payload: [type: :map, default: nil, doc: "New payload (optional)"],
-        source: [type: :string, default: nil, doc: "New source (optional)"]
-      ]
+      schema:
+        Zoi.object(%{
+          target_pid: Zoi.any(description: "Target process PID"),
+          signal_type: Zoi.string(description: "New signal type (optional)") |> Zoi.default(nil),
+          payload: Zoi.map(description: "New payload (optional)") |> Zoi.default(nil),
+          source: Zoi.string(description: "New source (optional)") |> Zoi.default(nil)
+        })
 
     def run(%{target_pid: pid, signal_type: type, payload: payload, source: source}, context)
         when is_pid(pid) do
@@ -161,12 +163,13 @@ defmodule Jido.Actions.Control do
     use Jido.Action,
       name: "broadcast",
       description: "Broadcast a signal via PubSub",
-      schema: [
-        topic: [type: :string, required: true, doc: "PubSub topic"],
-        signal_type: [type: :string, required: true, doc: "Signal type to broadcast"],
-        payload: [type: :map, default: %{}, doc: "Signal payload"],
-        source: [type: :string, default: "/broadcast", doc: "Signal source"]
-      ]
+      schema:
+        Zoi.object(%{
+          topic: Zoi.string(description: "PubSub topic"),
+          signal_type: Zoi.string(description: "Signal type to broadcast"),
+          payload: Zoi.map(description: "Signal payload") |> Zoi.default(%{}),
+          source: Zoi.string(description: "Signal source") |> Zoi.default("/broadcast")
+        })
 
     def run(%{topic: topic, signal_type: type, payload: payload, source: source}, _context) do
       signal = Signal.new!(type, payload, source: source)
@@ -204,10 +207,11 @@ defmodule Jido.Actions.Control do
     use Jido.Action,
       name: "reply",
       description: "Reply to the signal source",
-      schema: [
-        signal_type: [type: :string, required: true, doc: "Reply signal type"],
-        payload: [type: :map, default: %{}, doc: "Reply payload"]
-      ]
+      schema:
+        Zoi.object(%{
+          signal_type: Zoi.string(description: "Reply signal type"),
+          payload: Zoi.map(description: "Reply payload") |> Zoi.default(%{})
+        })
 
     def run(%{signal_type: type, payload: payload}, context) do
       case extract_reply_to(context[:signal]) do

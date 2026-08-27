@@ -43,12 +43,13 @@ defmodule Jido.Actions.Scheduling do
     use Jido.Action,
       name: "schedule_signal",
       description: "Schedule a signal to be delivered after a delay",
-      schema: [
-        delay_ms: [type: :non_neg_integer, required: true, doc: "Delay in milliseconds"],
-        signal_type: [type: :string, required: true, doc: "Signal type to schedule"],
-        payload: [type: :map, default: %{}, doc: "Signal payload data"],
-        source: [type: :string, default: "/scheduler", doc: "Signal source path"]
-      ]
+      schema:
+        Zoi.object(%{
+          delay_ms: Zoi.integer(description: "Delay in milliseconds") |> Zoi.non_negative(),
+          signal_type: Zoi.string(description: "Signal type to schedule"),
+          payload: Zoi.map(description: "Signal payload data") |> Zoi.default(%{}),
+          source: Zoi.string(description: "Signal source path") |> Zoi.default("/scheduler")
+        })
 
     def run(%{delay_ms: delay, signal_type: type, payload: payload, source: source}, _context) do
       signal = Signal.new!(type, payload, source: source)
@@ -81,11 +82,14 @@ defmodule Jido.Actions.Scheduling do
     use Jido.Action,
       name: "schedule_timeout",
       description: "Schedule a timeout signal for deadline handling",
-      schema: [
-        timeout_ms: [type: :non_neg_integer, required: true, doc: "Timeout in milliseconds"],
-        timeout_id: [type: :any, default: :default, doc: "Identifier for this timeout"],
-        signal_type: [type: :string, default: "agent.timeout", doc: "Timeout signal type"]
-      ]
+      schema:
+        Zoi.object(%{
+          timeout_ms: Zoi.integer(description: "Timeout in milliseconds") |> Zoi.non_negative(),
+          timeout_id:
+            Zoi.any(description: "Identifier for this timeout") |> Zoi.default(:default),
+          signal_type:
+            Zoi.string(description: "Timeout signal type") |> Zoi.default("agent.timeout")
+        })
 
     def run(%{timeout_ms: timeout, timeout_id: id, signal_type: type}, _context) do
       signal = Signal.new!(type, %{timeout_id: id}, source: "/timeout")
@@ -128,13 +132,14 @@ defmodule Jido.Actions.Scheduling do
     use Jido.Action,
       name: "schedule_cron",
       description: "Schedule a recurring signal using cron expression",
-      schema: [
-        cron: [type: :string, required: true, doc: "Cron expression"],
-        job_id: [type: :any, default: nil, doc: "Job identifier for cancellation"],
-        signal_type: [type: :string, required: true, doc: "Signal type to schedule"],
-        payload: [type: :map, default: %{}, doc: "Signal payload data"],
-        timezone: [type: :string, default: nil, doc: "Timezone for cron evaluation"]
-      ]
+      schema:
+        Zoi.object(%{
+          cron: Zoi.string(description: "Cron expression"),
+          job_id: Zoi.any(description: "Job identifier for cancellation") |> Zoi.default(nil),
+          signal_type: Zoi.string(description: "Signal type to schedule"),
+          payload: Zoi.map(description: "Signal payload data") |> Zoi.default(%{}),
+          timezone: Zoi.string(description: "Timezone for cron evaluation") |> Zoi.default(nil)
+        })
 
     def run(
           %{cron: cron_expr, job_id: job_id, signal_type: type, payload: payload, timezone: tz},
@@ -163,9 +168,7 @@ defmodule Jido.Actions.Scheduling do
     use Jido.Action,
       name: "cancel_cron",
       description: "Cancel a scheduled cron job",
-      schema: [
-        job_id: [type: :any, required: true, doc: "Job identifier to cancel"]
-      ]
+      schema: Zoi.object(%{job_id: Zoi.any(description: "Job identifier to cancel")})
 
     def run(%{job_id: job_id}, _context) do
       directive = Directive.cron_cancel(job_id)
