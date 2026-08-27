@@ -45,9 +45,9 @@ defmodule Jido.Agent.RegistryTest do
     def validate_executable(_data), do: :ok
 
     @impl true
-    def registry_values(_data) do
+    def registry_values(data) do
       Process.put(:registry_extension_values_called, true)
-      []
+      [{:data, data}]
     end
 
     @impl true
@@ -286,8 +286,6 @@ defmodule Jido.Agent.RegistryTest do
           :schedule_data_value,
           :schedule_meta_key,
           :schedule_meta_value,
-          :extension_data_key,
-          :extension_data_value,
           :extension_meta_key,
           :extension_meta_value,
           :root_meta_key,
@@ -300,6 +298,13 @@ defmodule Jido.Agent.RegistryTest do
       assert {:ok, _identifier} = Registry.identifier(registry, :atom, atom)
     end
 
+    assert {:ok, _identifier} =
+             Registry.identifier(
+               registry,
+               {:extension, RegistryExtension, :data},
+               %{extension_data_key: :extension_data_value}
+             )
+
     assert {:error, %ValidationError{}} =
              Registry.identifier(registry, :action, PluginOnlyAction)
 
@@ -308,7 +313,7 @@ defmodule Jido.Agent.RegistryTest do
 
     refute Process.get(:registry_action_ran)
     refute Process.get(:registry_plugin_mounted)
-    refute Process.get(:registry_extension_values_called)
+    assert Process.get(:registry_extension_values_called)
     refute Process.get(:registry_extension_compiled)
   end
 

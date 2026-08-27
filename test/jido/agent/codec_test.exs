@@ -45,15 +45,15 @@ defmodule Jido.Agent.CodecTest do
     end
 
     @impl true
-    def encode(_data, _context) do
+    def encode(%{enabled: enabled, mode: mode}, %Registry{}) do
       Process.put(:codec_extension_encoded, true)
-      {:ok, %{}}
+      {:ok, %{"enabled" => enabled, "mode" => Atom.to_string(mode)}}
     end
 
     @impl true
-    def decode(_data, _context) do
+    def decode(%{"enabled" => enabled, "mode" => "ready"}, %Registry{}) do
       Process.put(:codec_extension_decoded, true)
-      {:ok, %{}}
+      {:ok, %{enabled: enabled, mode: :ready}}
     end
   end
 
@@ -320,8 +320,8 @@ defmodule Jido.Agent.CodecTest do
     refute Process.get(:codec_action_ran)
     refute Process.get(:codec_plugin_mounted)
     refute Process.get(:codec_extension_compiled)
-    refute Process.get(:codec_extension_encoded)
-    refute Process.get(:codec_extension_decoded)
+    assert Process.get(:codec_extension_encoded)
+    assert Process.get(:codec_extension_decoded)
   end
 
   defp full_fixture do

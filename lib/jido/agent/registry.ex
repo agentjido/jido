@@ -95,10 +95,9 @@ defmodule Jido.Agent.Registry do
   """
   @spec from_agent(Jido.Agent.t()) :: {:ok, t()} | {:error, Exception.t()}
   def from_agent(agent) do
-    with {:ok, agent} <- Jido.Agent.validate_executable(agent) do
-      agent
-      |> Jido.Agent.Registry.Deriver.entries()
-      |> new()
+    with {:ok, agent} <- Jido.Agent.validate_executable(agent),
+         {:ok, entries} <- Jido.Agent.Registry.Deriver.entries(agent) do
+      new(entries)
     end
   end
 

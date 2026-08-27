@@ -6,6 +6,7 @@ defmodule Jido.Agent.Registry.Deriver do
   alias Jido.Agent.Plugin
   alias Jido.Agent.PluginDefaults
   alias Jido.Agent.Schedule
+  alias Jido.Error
   alias Jido.Signal.Router.Route
 
   @kinds [:plugin, :action, :schema, :route_match, :extension, :atom]
@@ -19,29 +20,22 @@ defmodule Jido.Agent.Registry.Deriver do
   }
 
   @doc false
-  @spec entries(Agent.t()) :: %{String.t() => Jido.Agent.Registry.write_entry()}
+  @spec entries(Agent.t()) ::
+          {:ok, %{String.t() => Jido.Agent.Registry.write_entry()}}
+          | {:error, Exception.t()}
   def entries(%Agent{} = agent) do
-    values =
+    core_values =
       empty_values()
       |> add(:schema, agent.state_schema)
       |> collect_plugin_defaults(agent.plugin_defaults)
       |> collect_plugins(agent.plugins)
       |> collect_routes(agent.routes)
       |> collect_schedules(agent.schedules)
-      |> collect_extensions(agent.extensions)
       |> collect_data(agent.metadata)
 
-    @kinds
-    |> Enum.flat_map(fn kind ->
-      values
-      |> sorted_values(kind)
-      |> Enum.with_index(1)
-      |> Enum.map(fn {value, index} ->
-        identifier = "#{Map.fetch!(@namespaces, kind)}/generated-#{index}"
-        {identifier, {kind, value}}
-      end)
-    end)
-    |> Map.new()
+    with {:ok, values} <- collect_extensions(core_values, agent.extensions) do
+      {:ok, generated_entries(values)}
+    end
   end
 
   defp empty_values, do: Map.new(@kinds, &{&1, MapSet.new()})
@@ -57,6 +51,35 @@ defmodule Jido.Agent.Registry.Deriver do
     |> Map.fetch!(kind)
     |> MapSet.to_list()
     |> Enum.sort_by(&:erlang.term_to_binary(&1, [:deterministic]))
+  end
+
+  defp generated_entries(values) do
+    core_entries =
+      Enum.flat_map(@kinds, fn kind ->
+        values
+        |> sorted_values(kind)
+        |> Enum.with_index(1)
+        |> Enum.map(fn {value, index} ->
+          identifier = "#{Map.fetch!(@namespaces, kind)}/generated-#{index}"
+          {identifier, {kind, value}}
+        end)
+      end)
+
+    extension_entries =
+      values
+      |> Map.drop(@kinds)
+      |> Enum.flat_map(fn {kind, extension_values} ->
+        Enum.map(extension_values, &{kind, &1})
+      end)
+      |> Enum.sort_by(fn {kind, value} ->
+        :erlang.term_to_binary({kind, value}, [:deterministic])
+      end)
+      |> Enum.with_index(1)
+      |> Enum.map(fn {{kind, value}, index} ->
+        {"extension-values/generated-#{index}", {kind, value}}
+      end)
+
+    Map.new(core_entries ++ extension_entries)
   end
 
   defp collect_plugin_defaults(values, %PluginDefaults{} = defaults) do
@@ -113,14 +136,74 @@ defmodule Jido.Agent.Registry.Deriver do
   end
 
   defp collect_extensions(values, extensions) do
-    Enum.reduce(extensions, values, &collect_extension(&2, &1))
+    Enum.reduce_while(extensions, {:ok, values}, fn extension, {:ok, values} ->
+      case collect_extension(values, extension) do
+        {:ok, values} -> {:cont, {:ok, values}}
+        {:error, validation_error} -> {:halt, {:error, validation_error}}
+      end
+    end)
   end
 
   defp collect_extension(values, %ExtensionDeclaration{} = extension) do
-    values
-    |> add(:extension, extension.module)
-    |> collect_data(extension.data)
-    |> collect_data(extension.metadata)
+    values =
+      values
+      |> add(:extension, extension.module)
+      |> collect_data(extension.metadata)
+
+    if function_exported?(extension.module, :registry_values, 1) do
+      with {:ok, entries} <- extension_registry_values(extension),
+           {:ok, values} <- add_extension_values(values, extension.module, entries) do
+        {:ok, values}
+      end
+    else
+      {:ok, collect_data(values, extension.data)}
+    end
+  end
+
+  defp extension_registry_values(extension) do
+    case extension.module.registry_values(extension.data) do
+      entries when is_list(entries) ->
+        {:ok, entries}
+
+      value ->
+        {:error,
+         error("Agent extension Registry collection returned an invalid value", %{
+           extension: extension.module,
+           value: value
+         })}
+    end
+  rescue
+    exception ->
+      {:error,
+       error("Agent extension Registry collection raised", %{
+         extension: extension.module,
+         exception: exception
+       })}
+  catch
+    kind, reason ->
+      {:error,
+       error("Agent extension Registry collection failed", %{
+         extension: extension.module,
+         kind: kind,
+         reason: reason
+       })}
+  end
+
+  defp add_extension_values(values, extension, entries) do
+    Enum.reduce_while(entries, {:ok, values}, fn
+      {local_kind, value}, {:ok, values}
+      when is_atom(local_kind) and local_kind not in [nil, true, false] ->
+        kind = {:extension, extension, local_kind}
+        {:cont, {:ok, Map.update(values, kind, MapSet.new([value]), &MapSet.put(&1, value))}}
+
+      entry, {:ok, _values} ->
+        {:halt,
+         {:error,
+          error("Agent extension Registry collection returned an invalid entry", %{
+            extension: extension,
+            entry: entry
+          })}}
+    end)
   end
 
   defp collect_data(values, value)
@@ -151,4 +234,7 @@ defmodule Jido.Agent.Registry.Deriver do
   end
 
   defp collect_data(values, _value), do: values
+
+  defp error(message, details),
+    do: Error.validation_error(message, details: details)
 end

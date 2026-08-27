@@ -123,16 +123,7 @@ defmodule Jido.Agent.Compiler do
            :ok <- validate_schedules(schedules),
            :ok <- validate_schedule_coverage(agent_schedules, routes),
            {:ok, semantic_identity} <- Agent.semantic_identity(agent),
-           {:ok, extension_plans} <-
-             compile_extensions(agent.extensions, %{
-               agent: agent,
-               state_schema: state_schema,
-               plugin_instances: plugin_instances,
-               plugin_specs: plugin_specs,
-               routes: routes,
-               schedules: schedules,
-               semantic_identity: semantic_identity
-             }) do
+           {:ok, extension_plans} <- compile_extensions(agent.extensions) do
         {:ok,
          %Compiled{
            agent: Agent.definition(agent),
@@ -1091,9 +1082,6 @@ defmodule Jido.Agent.Compiler do
           :ok ->
             :ok
 
-          {:ok, _data} ->
-            :ok
-
           {:error, %_{} = validation_error} when is_exception(validation_error) ->
             {:error, validation_error}
 
@@ -1117,18 +1105,25 @@ defmodule Jido.Agent.Compiler do
     end
   end
 
-  defp compile_extensions(extensions, context) do
+  defp compile_extensions(extensions) do
     Enum.reduce_while(extensions, {:ok, %{}}, fn declaration, {:ok, plans} ->
       module = declaration.module
 
       result =
         if function_exported?(module, :compile, 2) do
-          module.compile(declaration.data, context)
+          module.compile(declaration.data, declaration.metadata)
         else
           {:ok, declaration.data}
         end
 
       case result do
+        {:ok, %Agent{}} ->
+          {:halt,
+           {:error,
+            error("Agent extension compilation cannot return a root Agent", %{
+              extension: module
+            })}}
+
         {:ok, plan} ->
           {:cont, {:ok, Map.put(plans, module, plan)}}
 

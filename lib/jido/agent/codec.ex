@@ -447,22 +447,95 @@ defmodule Jido.Agent.Codec do
   end
 
   defp diagnose_extension(%{} = record, registry, path) when not is_struct(record) do
-    fields = [
-      module: fn -> resolve_field(record, "module", :extension, registry, path) end,
-      data: fn -> diagnose_data_field(record, "data", registry, path) end,
-      metadata: fn -> diagnose_data_object_field(record, "metadata", registry, path) end
-    ]
-
     errors = unknown_field_errors(record, ["module", "data", "metadata"], path)
 
-    case collect_values(fields, errors) do
-      {:ok, attrs} -> diagnose_constructor(ExtensionDeclaration.new(attrs), path)
-      {:error, nested} -> {:error, nested}
+    case resolve_field(record, "module", :extension, registry, path) do
+      {:ok, module} ->
+        fields = [
+          data: fn -> diagnose_extension_data(record, module, registry, path) end,
+          metadata: fn -> diagnose_data_object_field(record, "metadata", registry, path) end
+        ]
+
+        case collect_values(fields, errors) do
+          {:ok, attrs} ->
+            attrs
+            |> Map.put(:module, module)
+            |> ExtensionDeclaration.new()
+            |> diagnose_constructor(path)
+
+          {:error, nested} ->
+            {:error, nested}
+        end
+
+      {:error, module_error} ->
+        data_errors =
+          if Map.has_key?(record, "data"),
+            do: [],
+            else: [
+              error("stored Agent field is required", %{path: path ++ ["data"], field: "data"})
+            ]
+
+        metadata_errors =
+          case diagnose_data_object_field(record, "metadata", registry, path) do
+            {:ok, _metadata} -> []
+            {:error, nested} when is_list(nested) -> nested
+            {:error, validation_error} -> [validation_error]
+          end
+
+        {:error, errors ++ [module_error] ++ data_errors ++ metadata_errors}
     end
   end
 
   defp diagnose_extension(_value, _registry, path) do
     {:error, error("stored Agent extension declaration must be a map", %{path: path})}
+  end
+
+  defp diagnose_extension_data(record, module, registry, path) do
+    case Map.fetch(record, "data") do
+      {:ok, document_data} ->
+        if function_exported?(module, :decode, 2) do
+          module
+          |> invoke_extension_codec(:decode, [document_data, registry])
+          |> extension_decode_result(module, path ++ ["data"])
+        else
+          diagnose_data(document_data, registry, 0, path ++ ["data"])
+        end
+
+      :error ->
+        required_field(path ++ ["data"], "data")
+    end
+  end
+
+  defp extension_decode_result({:ok, %Agent{}}, module, path) do
+    {:error,
+     error("Agent extension decode cannot return a root Agent", %{
+       extension: module,
+       path: path
+     })}
+  end
+
+  defp extension_decode_result({:ok, data}, _module, _path), do: {:ok, data}
+
+  defp extension_decode_result({:error, %_{} = validation_error}, _module, path)
+       when is_exception(validation_error),
+       do: {:error, ensure_json_path(validation_error, path)}
+
+  defp extension_decode_result({:error, reason}, module, path) do
+    {:error,
+     error("Agent extension decode failed", %{
+       extension: module,
+       reason: reason,
+       path: path
+     })}
+  end
+
+  defp extension_decode_result(value, module, path) do
+    {:error,
+     error("Agent extension decode returned an invalid value", %{
+       extension: module,
+       value: value,
+       path: path
+     })}
   end
 
   defp diagnose_record_list_field(record, field, registry, path, decoder) do
@@ -503,13 +576,6 @@ defmodule Jido.Agent.Codec do
 
       :error ->
         required_field(path ++ [field], field)
-    end
-  end
-
-  defp diagnose_data_field(record, field, registry, path) do
-    case Map.fetch(record, field) do
-      {:ok, value} -> diagnose_data(value, registry, 0, path ++ [field])
-      :error -> required_field(path ++ [field], field)
     end
   end
 
@@ -787,10 +853,96 @@ defmodule Jido.Agent.Codec do
 
   defp encode_extension(%ExtensionDeclaration{} = extension, registry) do
     with {:ok, module} <- Registry.identifier(registry, :extension, extension.module),
-         {:ok, data} <- encode_data(extension.data, registry, 0),
+         {:ok, data} <- encode_extension_data(extension, registry),
          {:ok, metadata} <- encode_data(extension.metadata, registry, 0) do
       {:ok, %{"module" => module, "data" => data, "metadata" => metadata}}
     end
+  end
+
+  defp encode_extension_data(extension, registry) do
+    if function_exported?(extension.module, :encode, 2) do
+      extension.module
+      |> invoke_extension_codec(:encode, [extension.data, registry])
+      |> extension_encode_result(extension.module)
+    else
+      encode_data(extension.data, registry, 0)
+    end
+  end
+
+  defp extension_encode_result({:ok, document_data}, _module) do
+    with :ok <- validate_extension_document_data(document_data), do: {:ok, document_data}
+  end
+
+  defp extension_encode_result({:error, %_{} = validation_error}, _module)
+       when is_exception(validation_error),
+       do: {:error, validation_error}
+
+  defp extension_encode_result({:error, reason}, module) do
+    {:error, error("Agent extension encode failed", %{extension: module, reason: reason})}
+  end
+
+  defp extension_encode_result(value, module) do
+    {:error,
+     error("Agent extension encode returned an invalid value", %{
+       extension: module,
+       value: value
+     })}
+  end
+
+  defp validate_extension_document_data(value)
+       when is_nil(value) or is_boolean(value) or is_number(value),
+       do: :ok
+
+  defp validate_extension_document_data(value) when is_binary(value), do: valid_utf8(value, [])
+
+  defp validate_extension_document_data(value) when is_list(value) do
+    if List.improper?(value) do
+      {:error, error("Agent extension document data must contain proper lists")}
+    else
+      Enum.reduce_while(value, :ok, fn item, :ok ->
+        case validate_extension_document_data(item) do
+          :ok -> {:cont, :ok}
+          {:error, validation_error} -> {:halt, {:error, validation_error}}
+        end
+      end)
+    end
+  end
+
+  defp validate_extension_document_data(value) when is_map(value) and not is_struct(value) do
+    Enum.reduce_while(value, :ok, fn
+      {key, item}, :ok when is_binary(key) ->
+        with :ok <- valid_utf8(key, []),
+             :ok <- validate_extension_document_data(item) do
+          {:cont, :ok}
+        else
+          {:error, validation_error} -> {:halt, {:error, validation_error}}
+        end
+
+      {_key, _item}, :ok ->
+        {:halt, {:error, error("Agent extension document Map keys must be strings")}}
+    end)
+  end
+
+  defp validate_extension_document_data(_value),
+    do: {:error, error("Agent extension encode must return JSON-compatible data")}
+
+  defp invoke_extension_codec(module, callback, arguments) do
+    apply(module, callback, arguments)
+  rescue
+    exception ->
+      {:error,
+       error("Agent extension #{callback} raised", %{
+         extension: module,
+         exception: exception
+       })}
+  catch
+    kind, reason ->
+      {:error,
+       error("Agent extension #{callback} failed", %{
+         extension: module,
+         kind: kind,
+         reason: reason
+       })}
   end
 
   defp encode_sequence(values, field, registry, encoder) do

@@ -3,6 +3,7 @@ defmodule Jido.Agent.DSL.Lowerer do
 
   alias Jido.Agent
   alias Jido.Agent.DSL.{Plugin, Route, Schedule}
+  alias Jido.Agent.Extension.Declaration, as: ExtensionDeclaration
   alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Agent.PluginDefaults
   alias Jido.Agent.Schedule, as: AgentSchedule
@@ -21,12 +22,14 @@ defmodule Jido.Agent.DSL.Lowerer do
          {:ok, compatibility_routes} <- lower_routes(Map.get(opts, :routes, [])),
          {:ok, compatibility_schedules} <- lower_schedules(Map.get(opts, :schedules, [])),
          {:ok, plugins, routes, schedules} <- lower_entities(entities),
+         {:ok, typed_extensions} <- lower_typed_extensions(module),
          {:ok, agent} <-
            Agent.new(
              Map.merge(root, %{
                plugins: compatibility_plugins ++ plugins,
                routes: compatibility_routes ++ routes,
-               schedules: compatibility_schedules ++ schedules
+               schedules: compatibility_schedules ++ schedules,
+               extensions: root.extensions ++ typed_extensions
              })
            ) do
       {:ok, agent}
@@ -116,6 +119,91 @@ defmodule Jido.Agent.DSL.Lowerer do
         error
     end)
   end
+
+  defp lower_typed_extensions(module) do
+    module
+    |> Spark.Dsl.Extension.get_persisted(:extensions, [])
+    |> Enum.filter(&function_exported?(&1, :agent_extension, 0))
+    |> map_list(&lower_typed_extension(&1, module))
+  end
+
+  defp lower_typed_extension(spark_extension, resource) do
+    extension = spark_extension.agent_extension()
+
+    with :ok <- matching_spark_extension(extension, spark_extension),
+         result <- invoke_extension_lowerer(spark_extension, resource),
+         {:ok, attrs} <- extension_declaration_attrs(result) do
+      attrs
+      |> Map.put(:module, extension)
+      |> ExtensionDeclaration.new()
+    end
+  end
+
+  defp matching_spark_extension(extension, spark_extension)
+       when is_atom(extension) and extension not in [nil, true, false] do
+    if Code.ensure_loaded?(extension) and function_exported?(extension, :spark_extension, 0) and
+         extension.spark_extension() == spark_extension do
+      :ok
+    else
+      {:error,
+       error("Agent Spark extension does not match its typed extension", %{
+         extension: extension,
+         spark_extension: spark_extension
+       })}
+    end
+  end
+
+  defp matching_spark_extension(extension, spark_extension) do
+    {:error,
+     error("Agent Spark extension returned an invalid typed extension module", %{
+       extension: extension,
+       spark_extension: spark_extension
+     })}
+  end
+
+  defp invoke_extension_lowerer(spark_extension, resource) do
+    if function_exported?(spark_extension, :lower, 1) do
+      spark_extension.lower(resource)
+    else
+      {:error,
+       error("Agent Spark extension must export lower/1", %{
+         spark_extension: spark_extension
+       })}
+    end
+  rescue
+    exception ->
+      {:error,
+       error("Agent Spark extension lowering raised", %{
+         spark_extension: spark_extension,
+         exception: exception
+       })}
+  catch
+    kind, reason ->
+      {:error,
+       error("Agent Spark extension lowering failed", %{
+         spark_extension: spark_extension,
+         kind: kind,
+         reason: reason
+       })}
+  end
+
+  defp extension_declaration_attrs({:ok, attrs}) when is_map(attrs) and not is_struct(attrs) do
+    case Map.keys(attrs) -- [:data, :metadata] do
+      [] -> {:ok, attrs}
+      fields -> {:error, error("Agent Spark extension returned root fields", %{fields: fields})}
+    end
+  end
+
+  defp extension_declaration_attrs({:error, %_{} = validation_error})
+       when is_exception(validation_error),
+       do: {:error, validation_error}
+
+  defp extension_declaration_attrs({:error, reason}),
+    do: {:error, error("Agent Spark extension lowering failed", %{reason: reason})}
+
+  defp extension_declaration_attrs(value),
+    do:
+      {:error, error("Agent Spark extension lowering returned an invalid value", %{value: value})}
 
   defp lower_entity(%Plugin{} = plugin) do
     case AgentPlugin.new(

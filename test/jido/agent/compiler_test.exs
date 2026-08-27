@@ -102,7 +102,7 @@ defmodule Jido.Agent.CompilerTest do
     end
 
     @impl true
-    def compile(data, context), do: {:ok, %{data: data, agent: context.agent.name}}
+    def compile(data, metadata), do: {:ok, %{data: data, metadata: metadata}}
   end
 
   defmodule InvalidPlugin do
@@ -173,7 +173,9 @@ defmodule Jido.Agent.CompilerTest do
         state_schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
         plugin_defaults: :none,
         plugins: [Plugin.new!(module: CompilePlugin)],
-        extensions: [%{module: ValidExtension, data: %{enabled: true}}]
+        extensions: [
+          %{module: ValidExtension, data: %{enabled: true}, metadata: %{owner: "compiler"}}
+        ]
       )
 
     assert {:ok, %Compiled{} = compiled} = Agent.compile(definition)
@@ -187,7 +189,12 @@ defmodule Jido.Agent.CompilerTest do
     assert compiled.capability_index.compile_test == [:compile_plugin]
     assert Enum.all?(compiled.routes, &match?(%Route{}, &1))
     assert Enum.any?(compiled.schedules, &match?({:plugin_schedule, _, _}, &1.job_id))
-    assert compiled.extension_plans[ValidExtension].agent == "compiled_agent"
+
+    assert compiled.extension_plans[ValidExtension] == %{
+             data: %{enabled: true},
+             metadata: %{owner: "compiler"}
+           }
+
     assert compiled.semantic_identity == elem(Agent.semantic_identity(definition), 1)
     refute Map.has_key?(Map.from_struct(compiled), :strategy)
     refute Process.get(:compiler_action_ran)

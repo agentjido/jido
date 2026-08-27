@@ -21,7 +21,10 @@ defmodule Jido.Agent.Extension.Declaration do
   def new(%{} = attrs) do
     with :ok <- known_keys(attrs),
          {:ok, module} <- module(Map.get(attrs, :module)),
-         {:ok, data} <- static_data(Map.get(attrs, :data, %{})),
+         :ok <- extension_module(module),
+         {:ok, data} <- normalize(module, Map.get(attrs, :data, %{})),
+         {:ok, data} <- static_data(data),
+         :ok <- validate(module, data),
          {:ok, metadata} <- metadata(Map.get(attrs, :metadata, %{})) do
       {:ok, %__MODULE__{module: module, data: data, metadata: metadata}}
     end
@@ -53,6 +56,110 @@ defmodule Jido.Agent.Extension.Declaration do
 
   defp module(value) when is_atom(value) and value not in [nil, true, false], do: {:ok, value}
   defp module(_value), do: {:error, error("agent extension module must be a module atom")}
+
+  defp extension_module(module) do
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         true <- Jido.Agent.Extension in behaviours(module) do
+      :ok
+    else
+      {:error, reason} ->
+        {:error,
+         error("Agent extension module is not available", %{extension: module, reason: reason})}
+
+      false ->
+        {:error,
+         error("Agent extension module must implement Jido.Agent.Extension", %{
+           extension: module
+         })}
+    end
+  end
+
+  defp behaviours(module) do
+    module.module_info(:attributes)
+    |> Keyword.get_values(:behaviour)
+    |> List.flatten()
+  end
+
+  defp normalize(module, data) do
+    if function_exported?(module, :normalize, 1) do
+      case invoke(module, :normalize, [data], "normalization") do
+        {:ok, %Jido.Agent{}} ->
+          {:error,
+           error("Agent extension normalization cannot return a root Agent", %{
+             extension: module
+           })}
+
+        {:ok, normalized} ->
+          {:ok, normalized}
+
+        {:error, %_{} = validation_error} when is_exception(validation_error) ->
+          {:error, validation_error}
+
+        {:error, reason} ->
+          {:error,
+           error("Agent extension normalization failed", %{
+             extension: module,
+             reason: reason
+           })}
+
+        value ->
+          {:error,
+           error("Agent extension normalization returned an invalid value", %{
+             extension: module,
+             value: value
+           })}
+      end
+    else
+      {:ok, data}
+    end
+  end
+
+  defp validate(module, data) do
+    if function_exported?(module, :validate, 1) do
+      case invoke(module, :validate, [data], "structural validation") do
+        :ok ->
+          :ok
+
+        {:error, %_{} = validation_error} when is_exception(validation_error) ->
+          {:error, validation_error}
+
+        {:error, reason} ->
+          {:error,
+           error("Agent extension structural validation failed", %{
+             extension: module,
+             reason: reason
+           })}
+
+        value ->
+          {:error,
+           error("Agent extension structural validation returned an invalid value", %{
+             extension: module,
+             value: value
+           })}
+      end
+    else
+      :ok
+    end
+  end
+
+  defp invoke(module, callback, arguments, phase) do
+    apply(module, callback, arguments)
+  rescue
+    exception ->
+      {:error,
+       error("Agent extension #{phase} raised", %{
+         extension: module,
+         exception: exception
+       })}
+  catch
+    kind, reason ->
+      {:error,
+       error("Agent extension #{phase} failed", %{
+         extension: module,
+         kind: kind,
+         reason: reason
+       })}
+  end
 
   defp static_data(value) do
     case Jido.Action.validate_static_data(value) do
