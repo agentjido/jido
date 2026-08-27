@@ -21,10 +21,11 @@ defmodule JidoTest.AgentServer.TracePropagationTest do
     @moduledoc false
     use Jido.Agent,
       name: "traced_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        received_signals: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          received_signals: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [

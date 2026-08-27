@@ -3,7 +3,7 @@ defmodule Jido.Agent.Strategy.FSM do
   An execution-phase finite state machine strategy.
 
   This strategy keeps `cmd/2` pure by validating execution-state transitions,
-  emitting `%Directive.RunInstruction{}` directives, and handling instruction
+  emitting `%Directive.RunInstruction{}` directives, and handling command
   results when the runtime routes them back through `cmd/2`.
 
   The FSM state is stored in `agent.state.__strategy__`.
@@ -64,19 +64,19 @@ defmodule Jido.Agent.Strategy.FSM do
       {agent, directives} = MyAgent.cmd(agent, SomeAction)
 
   `cmd/2` only prepares the work. Use `Jido.AgentServer` (or another runtime
-  that executes `%Directive.RunInstruction{}`) to run the instruction batch and
+  that executes `%Directive.RunInstruction{}`) to run the command batch and
   feed the result back into the strategy.
   """
 
   use Jido.Agent.Strategy
 
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Agent.Directive
   alias Jido.Agent.StateOps
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.Error
-  alias Jido.Instruction
   alias Jido.Thread.Agent, as: ThreadAgent
 
   @default_initial_state "idle"
@@ -154,8 +154,8 @@ defmodule Jido.Agent.Strategy.FSM do
         module: __MODULE__,
         initial_state: initial_state,
         auto_transition: Keyword.get(opts, :auto_transition, true),
-        pending_instructions: [],
-        current_instruction: nil,
+        pending_commands: [],
+        current_command: nil,
         deferred_directives: []
       })
 
@@ -173,14 +173,14 @@ defmodule Jido.Agent.Strategy.FSM do
   @impl true
   def cmd(
         %Agent{} = agent,
-        [%Instruction{action: @instruction_result_action, params: result_payload}],
+        [%Command{action: @instruction_result_action, params: result_payload}],
         ctx
       ) do
     handle_instruction_result(agent, result_payload, ctx)
   end
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, ctx) when is_list(instructions) do
+  def cmd(%Agent{} = agent, commands, ctx) when is_list(commands) do
     state = StratState.get(agent, %{})
     opts = ctx[:strategy_opts] || []
 
@@ -204,12 +204,12 @@ defmodule Jido.Agent.Strategy.FSM do
           | machine: machine,
             initial_state: initial_state,
             auto_transition: auto_transition,
-            pending_instructions: instructions,
-            current_instruction: nil,
+            pending_commands: commands,
+            current_command: nil,
             deferred_directives: []
         }
 
-        dispatch_next_instruction(agent, strategy_state)
+        dispatch_next_command(agent, strategy_state)
 
       {:error, reason} ->
         error = Error.execution_error("FSM transition failed", %{reason: reason})
@@ -242,19 +242,19 @@ defmodule Jido.Agent.Strategy.FSM do
     ThreadAgent.append(agent, entry)
   end
 
-  defp dispatch_next_instruction(agent, state) do
-    case Map.get(state, :pending_instructions, []) do
-      [next_instruction | rest] ->
-        agent = InstructionTracking.maybe_append_instruction_start(agent, next_instruction)
+  defp dispatch_next_command(agent, state) do
+    case Map.get(state, :pending_commands, []) do
+      [next_command | rest] ->
+        agent = InstructionTracking.maybe_append_instruction_start(agent, next_command)
 
         directives = [
-          Directive.run_instruction(next_instruction,
+          Directive.run_instruction(next_command,
             result_action: @instruction_result_action,
             meta: %{strategy: __MODULE__}
           )
         ]
 
-        state = %{state | pending_instructions: rest, current_instruction: next_instruction}
+        state = %{state | pending_commands: rest, current_command: next_command}
         agent = StratState.put(agent, state)
         {agent, directives}
 
@@ -277,8 +277,8 @@ defmodule Jido.Agent.Strategy.FSM do
     state = %{
       state
       | machine: machine,
-        pending_instructions: [],
-        current_instruction: nil,
+        pending_commands: [],
+        current_command: nil,
         deferred_directives: []
     }
 
@@ -303,7 +303,7 @@ defmodule Jido.Agent.Strategy.FSM do
     agent =
       InstructionTracking.maybe_append_instruction_end(
         agent,
-        Map.get(state, :current_instruction),
+        Map.get(state, :current_command),
         status
       )
 
@@ -317,7 +317,7 @@ defmodule Jido.Agent.Strategy.FSM do
         deferred_directives: deferred_directives
     }
 
-    dispatch_next_instruction(agent, strategy_state)
+    dispatch_next_command(agent, strategy_state)
   end
 
   defp handle_instruction_result(agent, _result_payload, _ctx) do

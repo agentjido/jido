@@ -47,9 +47,7 @@ defmodule JidoExampleTest.PodScaleTest do
     @moduledoc false
     use Jido.Agent,
       name: "example_pod_scale_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule TopologyBuilder do

@@ -62,9 +62,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     use Jido.Agent,
       name: "tracking_agent",
       strategy: {JidoTest.AgentServer.StrategyInitTest.TrackingStrategy, max_iterations: 5},
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx) do
       [
@@ -78,9 +76,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     use Jido.Agent,
       name: "directive_agent",
       strategy: JidoTest.AgentServer.StrategyInitTest.InitDirectiveStrategy,
-      schema: [
-        value: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end
@@ -89,9 +85,7 @@ defmodule JidoTest.AgentServer.StrategyInitTest do
     @moduledoc false
     use Jido.Agent,
       name: "default_strategy_agent",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ]
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
 
     def signal_routes(_ctx), do: []
   end

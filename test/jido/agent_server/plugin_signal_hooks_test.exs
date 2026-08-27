@@ -85,7 +85,7 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "default_handle_signal_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.DefaultHandleSignalPlugin]
 
     def signal_routes(_ctx) do
@@ -98,10 +98,11 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "override_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        overridden: [type: :boolean, default: false]
-      ],
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          overridden: Zoi.boolean() |> Zoi.default(false)
+        }),
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.OverridePlugin]
 
     def signal_routes(_ctx) do
@@ -117,7 +118,7 @@ defmodule JidoTest.AgentServer.PluginSignalHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "error_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalHooksTest.ErrorPlugin]
 
     def signal_routes(_ctx) do

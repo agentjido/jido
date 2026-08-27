@@ -14,9 +14,7 @@ defmodule JidoTest.InstanceTest do
   defmodule RedisTestAgent do
     use Jido.Agent,
       name: "redis_test_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     @impl true
     def signal_routes(_ctx), do: []

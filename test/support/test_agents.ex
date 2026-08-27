@@ -30,10 +30,11 @@ defmodule JidoTest.TestAgents do
     use Jido.Agent,
       name: "counter_agent",
       description: "Test agent with counter and message tracking",
-      schema: [
-        counter: [type: :integer, default: 0],
-        messages: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          messages: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [
@@ -54,10 +55,11 @@ defmodule JidoTest.TestAgents do
       category: "test",
       tags: ["test", "basic"],
       vsn: "1.0.0",
-      schema: [
-        counter: [type: :integer, default: 0],
-        status: [type: :atom, default: :idle]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:idle)
+        })
 
     def signal_routes(_ctx), do: []
   end
@@ -66,9 +68,7 @@ defmodule JidoTest.TestAgents do
     @moduledoc false
     use Jido.Agent,
       name: "hook_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
 
@@ -152,9 +152,7 @@ defmodule JidoTest.TestAgents do
     use Jido.Agent,
       name: "with_custom_strategy_agent",
       strategy: JidoTest.TestAgents.InitDirectiveStrategy,
-      schema: [
-        value: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end

@@ -52,11 +52,12 @@ defmodule JidoTest.AwaitTest do
     @moduledoc false
     use Jido.Agent,
       name: "await_agent",
-      schema: [
-        status: [type: :atom, default: :idle],
-        last_answer: [type: :any, default: nil],
-        error: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom() |> Zoi.default(:idle),
+          last_answer: Zoi.any() |> Zoi.default(nil),
+          error: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -72,10 +73,11 @@ defmodule JidoTest.AwaitTest do
     @moduledoc false
     use Jido.Agent,
       name: "child_agent",
-      schema: [
-        status: [type: :atom, default: :idle],
-        last_answer: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom() |> Zoi.default(:idle),
+          last_answer: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [{"complete", CompletingAction}]

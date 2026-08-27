@@ -61,11 +61,12 @@ defmodule JidoTest.Agent.StateTest do
       assert {:ok, ^state} = State.validate(state, [])
     end
 
-    test "validates state against NimbleOptions schema" do
-      schema = [
-        name: [type: :string, required: true],
-        count: [type: :integer, default: 0]
-      ]
+    test "validates state against a Zoi schema" do
+      schema =
+        Zoi.object(%{
+          name: Zoi.string(),
+          count: Zoi.integer() |> Zoi.default(0)
+        })
 
       state = %{name: "test", count: 5}
 
@@ -75,7 +76,7 @@ defmodule JidoTest.Agent.StateTest do
     end
 
     test "preserves extra fields in non-strict mode" do
-      schema = [name: [type: :string, required: true]]
+      schema = Zoi.object(%{name: Zoi.string()})
       state = %{name: "test", extra: "field"}
 
       assert {:ok, validated} = State.validate(state, schema)
@@ -83,7 +84,7 @@ defmodule JidoTest.Agent.StateTest do
     end
 
     test "removes extra fields in strict mode" do
-      schema = [name: [type: :string, required: true]]
+      schema = Zoi.object(%{name: Zoi.string()})
       state = %{name: "test", extra: "field"}
 
       assert {:ok, validated} = State.validate(state, schema, strict: true)
@@ -91,14 +92,14 @@ defmodule JidoTest.Agent.StateTest do
     end
 
     test "returns error for invalid state" do
-      schema = [count: [type: :integer, required: true]]
+      schema = Zoi.object(%{count: Zoi.integer()})
       state = %{count: "not an integer"}
 
       assert {:error, _} = State.validate(state, schema)
     end
 
     test "applies defaults from schema" do
-      schema = [count: [type: :integer, default: 10]]
+      schema = Zoi.object(%{count: Zoi.integer() |> Zoi.default(10)})
       state = %{}
 
       assert {:ok, validated} = State.validate(state, schema)
@@ -128,12 +129,13 @@ defmodule JidoTest.Agent.StateTest do
       assert State.defaults_from_schema([]) == %{}
     end
 
-    test "extracts defaults from NimbleOptions schema" do
-      schema = [
-        name: [type: :string, default: "default_name"],
-        count: [type: :integer, default: 0],
-        status: [type: :atom]
-      ]
+    test "extracts defaults from a Zoi schema" do
+      schema =
+        Zoi.object(%{
+          name: Zoi.string() |> Zoi.default("default_name"),
+          count: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.optional()
+        })
 
       defaults = State.defaults_from_schema(schema)
 
@@ -147,10 +149,11 @@ defmodule JidoTest.Agent.StateTest do
     end
 
     test "only includes keys with defaults" do
-      schema = [
-        with_default: [type: :string, default: "value"],
-        without_default: [type: :integer, required: true]
-      ]
+      schema =
+        Zoi.object(%{
+          with_default: Zoi.string() |> Zoi.default("value"),
+          without_default: Zoi.integer()
+        })
 
       defaults = State.defaults_from_schema(schema)
 

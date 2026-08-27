@@ -33,10 +33,11 @@ defmodule JidoExampleTest.DefaultPluginsPersistenceTest do
     use Jido.Agent,
       name: "full_agent",
       description: "Agent with all three default plugins for persistence testing",
-      schema: [
-        counter: [type: :integer, default: 0],
-        status: [type: :atom, default: :idle]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:idle)
+        })
   end
 
   # ===========================================================================

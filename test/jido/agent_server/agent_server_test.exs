@@ -53,10 +53,11 @@ defmodule JidoTest.AgentServerTest do
     @moduledoc false
     use Jido.Agent,
       name: "test_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        messages: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          messages: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     alias JidoTest.TestActions
 
@@ -259,10 +260,11 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "non_blocking_agent",
-          schema: [
-            counter: [type: :integer, default: 0],
-            slow_done: [type: :boolean, default: false]
-          ]
+          schema:
+            Zoi.object(%{
+              counter: Zoi.integer() |> Zoi.default(0),
+              slow_done: Zoi.boolean() |> Zoi.default(false)
+            })
 
         def signal_routes(_ctx) do
           [
@@ -304,10 +306,11 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "buffered_signal_agent",
-          schema: [
-            counter: [type: :integer, default: 0],
-            slow_done: [type: :boolean, default: false]
-          ]
+          schema:
+            Zoi.object(%{
+              counter: Zoi.integer() |> Zoi.default(0),
+              slow_done: Zoi.boolean() |> Zoi.default(false)
+            })
 
         def signal_routes(_ctx) do
           [
@@ -643,7 +646,7 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "slow_agent",
-          schema: [value: [type: :integer, default: 0]]
+          schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
         def signal_routes(_ctx) do
           [{"slow", SlowAction}]
@@ -710,9 +713,7 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "schedule_tracking_agent",
-          schema: [
-            pings: [type: :integer, default: 0]
-          ]
+          schema: Zoi.object(%{pings: Zoi.integer() |> Zoi.default(0)})
 
         def signal_routes(_ctx) do
           [
@@ -767,9 +768,7 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "multi_schedule_agent",
-          schema: [
-            events: [type: {:list, :any}, default: []]
-          ]
+          schema: Zoi.object(%{events: Zoi.list(Zoi.any()) |> Zoi.default([])})
 
         def signal_routes(_ctx) do
           [
@@ -816,9 +815,7 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "wrap_schedule_agent",
-          schema: [
-            received: [type: :any, default: nil]
-          ]
+          schema: Zoi.object(%{received: Zoi.any() |> Zoi.default(nil)})
 
         def signal_routes(_ctx) do
           [
@@ -1016,7 +1013,7 @@ defmodule JidoTest.AgentServerTest do
         @moduledoc false
         use Jido.Agent,
           name: "counter_agent",
-          schema: [drain_count: [type: :integer, default: 0]]
+          schema: Zoi.object(%{drain_count: Zoi.integer() |> Zoi.default(0)})
 
         def signal_routes(_ctx) do
           [{"slow", SlowAction2}]

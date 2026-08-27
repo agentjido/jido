@@ -29,10 +29,11 @@ defmodule JidoTest.Agent.SignalHandlingTest do
     @moduledoc false
     use Jido.Agent,
       name: "action_based_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        messages: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          messages: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [
@@ -49,10 +50,11 @@ defmodule JidoTest.Agent.SignalHandlingTest do
     @moduledoc false
     use Jido.Agent,
       name: "pre_processing_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        last_action_type: [type: :string, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          last_action_type: Zoi.string() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -64,7 +66,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
     # Intercept actions to capture the action type before processing
     # Handles action module tuples from signal routing
     def on_before_cmd(agent, {action_mod, _params} = action) when is_atom(action_mod) do
-      action_name = action_mod.__action_metadata__().name
+      action_name = action_mod.name()
       agent = %{agent | state: Map.put(agent.state, :last_action_type, action_name)}
       {:ok, agent, action}
     end
@@ -174,7 +176,7 @@ defmodule JidoTest.Agent.SignalHandlingTest do
         @moduledoc false
         use Jido.Agent,
           name: "action_modifying_agent",
-          schema: [counter: [type: :integer, default: 0]]
+          schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
         alias JidoTest.TestActions
 

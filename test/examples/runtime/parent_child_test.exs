@@ -55,10 +55,7 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Action,
       name: "spawn_worker",
-      schema: [
-        worker_tag: [type: :atom, required: true],
-        work_data: [type: :map, default: %{}]
-      ]
+      schema: Zoi.object(%{worker_tag: Zoi.atom(), work_data: Zoi.map() |> Zoi.default(%{})})
 
     def run(%{worker_tag: tag, work_data: work_data}, _context) do
       spawn_directive =
@@ -76,14 +73,15 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_child_started",
-      schema: [
-        parent_id: [type: :string, required: true],
-        child_id: [type: :string, required: true],
-        child_module: [type: :any, required: true],
-        tag: [type: :any, required: true],
-        pid: [type: :any, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          parent_id: Zoi.string(),
+          child_id: Zoi.string(),
+          child_module: Zoi.any(),
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(%{pid: pid, tag: tag, meta: meta}, context) do
       work_data = Map.get(meta, :work_data, %{})
@@ -111,11 +109,12 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Action,
       name: "process_work",
-      schema: [
-        request_id: [type: :string, required: true],
-        value: [type: :integer, default: 0],
-        operation: [type: :atom, default: :double]
-      ]
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          value: Zoi.integer() |> Zoi.default(0),
+          operation: Zoi.atom() |> Zoi.default(:double)
+        })
 
     def run(%{request_id: request_id, value: value, operation: operation}, context) do
       result =
@@ -146,11 +145,12 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_result",
-      schema: [
-        request_id: [type: :string, required: true],
-        result: [type: :any, required: true],
-        operation: [type: :atom, default: :unknown]
-      ]
+      schema:
+        Zoi.object(%{
+          request_id: Zoi.string(),
+          result: Zoi.any(),
+          operation: Zoi.atom() |> Zoi.default(:unknown)
+        })
 
     def run(%{request_id: request_id, result: result, operation: operation}, context) do
       pending = Map.get(context.state, :pending_requests, %{})
@@ -181,11 +181,12 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Agent,
       name: "coordinator_agent",
-      schema: [
-        pending_requests: [type: :map, default: %{}],
-        completed_responses: [type: {:list, :map}, default: []],
-        workers_spawned: [type: :integer, default: 0]
-      ]
+      schema:
+        Zoi.object(%{
+          pending_requests: Zoi.map() |> Zoi.default(%{}),
+          completed_responses: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          workers_spawned: Zoi.integer() |> Zoi.default(0)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -200,10 +201,11 @@ defmodule JidoExampleTest.ParentChildTest do
     @moduledoc false
     use Jido.Agent,
       name: "worker_agent",
-      schema: [
-        last_processed: [type: :map, default: nil],
-        status: [type: :atom, default: :idle]
-      ]
+      schema:
+        Zoi.object(%{
+          last_processed: Zoi.map() |> Zoi.default(nil),
+          status: Zoi.atom() |> Zoi.default(:idle)
+        })
 
     def signal_routes(_ctx) do
       [

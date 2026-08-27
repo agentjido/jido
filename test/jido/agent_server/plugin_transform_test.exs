@@ -64,7 +64,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
     @moduledoc false
     use Jido.Agent,
       name: "default_transform_agent",
-      schema: [value: [type: :integer, default: 0]],
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginTransformTest.DefaultTransformPlugin]
 
     def signal_routes(_ctx) do
@@ -77,7 +77,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
     @moduledoc false
     use Jido.Agent,
       name: "metadata_transform_agent",
-      schema: [value: [type: :integer, default: 0]],
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin]
 
     def signal_routes(_ctx) do
@@ -90,7 +90,7 @@ defmodule JidoTest.AgentServer.PluginTransformTest do
     @moduledoc false
     use Jido.Agent,
       name: "chained_transform_agent",
-      schema: [value: [type: :integer, default: 0]],
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
       plugins: [
         JidoTest.AgentServer.PluginTransformTest.MetadataTransformPlugin,
         JidoTest.AgentServer.PluginTransformTest.TimestampTransformPlugin

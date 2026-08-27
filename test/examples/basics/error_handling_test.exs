@@ -40,9 +40,7 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "validate",
-      schema: [
-        amount: [type: :integer, required: true]
-      ]
+      schema: Zoi.object(%{amount: Zoi.integer()})
 
     def run(%{amount: amount}, _context) do
       if amount > 0 do
@@ -57,9 +55,7 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "retryable",
-      schema: [
-        fail_count: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{fail_count: Zoi.integer() |> Zoi.default(0)})
 
     def run(%{fail_count: fail_count}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1
@@ -87,10 +83,11 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "track_error",
-      schema: [
-        error_message: [type: :string, required: true],
-        error_context: [type: :atom, default: :unknown]
-      ]
+      schema:
+        Zoi.object(%{
+          error_message: Zoi.string(),
+          error_context: Zoi.atom() |> Zoi.default(:unknown)
+        })
 
     def run(%{error_message: message, error_context: ctx}, context) do
       error = Jido.Error.execution_error(message)
@@ -108,9 +105,7 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "bounded_retry",
-      schema: [
-        max_attempts: [type: :integer, default: 3]
-      ]
+      schema: Zoi.object(%{max_attempts: Zoi.integer() |> Zoi.default(3)})
 
     def run(%{max_attempts: max}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1
@@ -134,10 +129,11 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_retry",
-      schema: [
-        max_attempts: [type: :integer, default: 3],
-        succeed_on: [type: :integer, default: 3]
-      ]
+      schema:
+        Zoi.object(%{
+          max_attempts: Zoi.integer() |> Zoi.default(3),
+          succeed_on: Zoi.integer() |> Zoi.default(3)
+        })
 
     def run(%{max_attempts: max, succeed_on: succeed_on}, context) do
       attempts = Map.get(context.state, :attempts, 0) + 1
@@ -188,17 +184,18 @@ defmodule JidoExampleTest.ErrorHandlingTest do
     @moduledoc false
     use Jido.Agent,
       name: "error_handling_agent",
-      schema: [
-        status: [type: :atom, default: :idle],
-        validated: [type: :boolean, default: false],
-        amount: [type: :integer, default: 0],
-        attempts: [type: :integer, default: 0],
-        stored_max_attempts: [type: :integer, default: nil],
-        stored_succeed_on: [type: :integer, default: nil],
-        result: [type: :any, default: nil],
-        error: [type: :any, default: nil],
-        error_context: [type: :atom, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom() |> Zoi.default(:idle),
+          validated: Zoi.boolean() |> Zoi.default(false),
+          amount: Zoi.integer() |> Zoi.default(0),
+          attempts: Zoi.integer() |> Zoi.default(0),
+          stored_max_attempts: Zoi.integer() |> Zoi.default(nil),
+          stored_succeed_on: Zoi.integer() |> Zoi.default(nil),
+          result: Zoi.any() |> Zoi.default(nil),
+          error: Zoi.any() |> Zoi.default(nil),
+          error_context: Zoi.atom() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [

@@ -256,7 +256,7 @@ defmodule JidoTest.AgentTest do
       agent = TestAgents.Basic.new()
 
       {:ok, instruction} =
-        Jido.Instruction.new(%{action: TestActions.BasicAction, params: %{value: 99}})
+        Jido.Instruction.new(%{target: TestActions.BasicAction, params: %{value: 99}})
 
       {updated, _directives} = TestAgents.Basic.cmd(agent, instruction)
       assert updated.state.value == 99
@@ -290,22 +290,17 @@ defmodule JidoTest.AgentTest do
       assert error.message == "Instruction failed"
     end
 
-    test "passes max_retries option to disable retries" do
+    test "does not pass removed retry options to Jido.Exec" do
       agent = TestAgents.Basic.new()
-
-      start_no_retry = System.monotonic_time(:millisecond)
 
       {_updated_no_retry, directives_no_retry} =
         TestAgents.Basic.cmd(
           agent,
           {TestActions.SlowAction, %{delay_ms: 200}},
           timeout: 10,
-          max_retries: 0
+          max_retries: 3,
+          backoff: 100
         )
-
-      elapsed_no_retry = System.monotonic_time(:millisecond) - start_no_retry
-
-      start_default = System.monotonic_time(:millisecond)
 
       {_updated_default, directives_default} =
         TestAgents.Basic.cmd(
@@ -314,11 +309,8 @@ defmodule JidoTest.AgentTest do
           timeout: 10
         )
 
-      elapsed_default = System.monotonic_time(:millisecond) - start_default
-
       assert [%Jido.Agent.Directive.Error{}] = directives_no_retry
       assert [%Jido.Agent.Directive.Error{}] = directives_default
-      assert elapsed_no_retry < elapsed_default
     end
 
     test "cmd/2 delegates to cmd/3 with empty opts" do
@@ -430,13 +422,15 @@ defmodule JidoTest.AgentTest do
     end
 
     test "Agent.validate/2 validates state against schema" do
-      {:ok, agent} = Agent.new(%{id: "test", schema: [count: [type: :integer, default: 0]]})
+      {:ok, agent} =
+        Agent.new(%{id: "test", schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})})
+
       {:ok, validated} = Agent.validate(agent)
       assert validated.state.count == 0
     end
 
     test "Agent.validate/2 returns error for invalid state" do
-      {:ok, agent} = Agent.new(%{id: "test", schema: [count: [type: :integer, required: true]]})
+      {:ok, agent} = Agent.new(%{id: "test", schema: Zoi.object(%{count: Zoi.integer()})})
       agent = %{agent | state: %{count: "not_an_integer"}}
       {:error, error} = Agent.validate(agent)
       assert error.message == "State validation failed"

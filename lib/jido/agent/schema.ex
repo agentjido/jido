@@ -5,6 +5,10 @@ defmodule Jido.Agent.Schema do
 
   alias Jido.Plugin.Spec
 
+  @doc false
+  @spec validate_config_schema(term(), keyword()) :: :ok | {:error, String.t()}
+  defdelegate validate_config_schema(value, opts \\ []), to: Jido.Schema
+
   @doc """
   Merges the agent's base schema with plugin schemas.
 

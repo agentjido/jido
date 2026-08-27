@@ -84,9 +84,7 @@ defmodule JidoTest.AgentServer.HierarchyTest do
     @moduledoc false
     use Jido.Agent,
       name: "parent_agent",
-      schema: [
-        child_events: [type: {:list, :any}, default: []]
-      ]
+      schema: Zoi.object(%{child_events: Zoi.list(Zoi.any()) |> Zoi.default([])})
 
     def signal_routes(_ctx) do
       [
@@ -103,9 +101,7 @@ defmodule JidoTest.AgentServer.HierarchyTest do
     @moduledoc false
     use Jido.Agent,
       name: "child_agent",
-      schema: [
-        orphan_events: [type: {:list, :any}, default: []]
-      ]
+      schema: Zoi.object(%{orphan_events: Zoi.list(Zoi.any()) |> Zoi.default([])})
 
     def signal_routes(_ctx) do
       [

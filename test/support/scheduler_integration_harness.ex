@@ -47,10 +47,11 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
     @moduledoc false
     use Jido.Agent,
       name: "scheduler_integration_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0],
-        ticks: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          ticks: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [
@@ -65,10 +66,11 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
     @moduledoc false
     use Jido.Agent,
       name: "scheduler_integration_scheduled_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0],
-        ticks: [type: {:list, :any}, default: []]
-      ],
+      schema:
+        Zoi.object(%{
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          ticks: Zoi.list(Zoi.any()) |> Zoi.default([])
+        }),
       schedules: [
         {"* * * * * * *", "cron.tick", job_id: :scheduled_heartbeat}
       ]

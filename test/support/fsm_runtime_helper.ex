@@ -45,6 +45,18 @@ defmodule JidoTest.Support.FSMRuntimeHelper do
       {:empty, state} ->
         {state, buffered_directives}
 
+      {{:value, {signal, _runtime_context, %Directive.RunInstruction{} = directive}}, state} ->
+        case DirectiveExec.exec(directive, signal, state) do
+          {:ok, state} ->
+            drain_run_instructions(state, buffered_directives)
+
+          {:async, _ref, state} ->
+            drain_run_instructions(state, buffered_directives)
+
+          {:stop, reason, _state} ->
+            raise "RunInstruction unexpectedly stopped: #{inspect(reason)}"
+        end
+
       {{:value, {signal, %Directive.RunInstruction{} = directive}}, state} ->
         case DirectiveExec.exec(directive, signal, state) do
           {:ok, state} ->
@@ -56,6 +68,9 @@ defmodule JidoTest.Support.FSMRuntimeHelper do
           {:stop, reason, _state} ->
             raise "RunInstruction unexpectedly stopped: #{inspect(reason)}"
         end
+
+      {{:value, {_signal, _runtime_context, directive}}, state} ->
+        drain_run_instructions(state, [directive | buffered_directives])
 
       {{:value, {_signal, directive}}, state} ->
         drain_run_instructions(state, [directive | buffered_directives])

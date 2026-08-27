@@ -50,10 +50,7 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "spawn_recoverable_worker",
-      schema: [
-        tag: [type: :atom, required: true],
-        child_id: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{tag: Zoi.atom(), child_id: Zoi.string()})
 
     def run(%{tag: tag, child_id: child_id}, context) do
       directive =
@@ -71,12 +68,13 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "track_child_started",
-      schema: [
-        pid: [type: :any, required: true],
-        child_id: [type: :string, required: true],
-        tag: [type: :atom, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          pid: Zoi.any(),
+          child_id: Zoi.string(),
+          tag: Zoi.atom(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(params, context) do
       started_children = Map.get(context.state, :started_children, [])
@@ -96,10 +94,7 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "receive_worker_message",
-      schema: [
-        text: [type: :string, required: true],
-        current_parent_id: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{text: Zoi.string(), current_parent_id: Zoi.string()})
 
     def run(params, context) do
       messages = Map.get(context.state, :received_messages, [])
@@ -111,11 +106,8 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "adopt_worker",
-      schema: [
-        child: [type: :string, required: true],
-        tag: [type: :atom, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{child: Zoi.string(), tag: Zoi.atom(), meta: Zoi.map() |> Zoi.default(%{})})
 
     def run(%{child: child, tag: tag, meta: meta}, _context) do
       {:ok, %{}, [Directive.adopt_child(child, tag, meta: meta)]}
@@ -130,9 +122,7 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "report_to_parent",
-      schema: [
-        text: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{text: Zoi.string()})
 
     def run(%{text: text}, context) do
       parent_ref = Map.get(context.state, :__parent__)
@@ -161,13 +151,14 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_orphaned",
-      schema: [
-        parent_id: [type: :string, required: true],
-        parent_pid: [type: :any, required: true],
-        tag: [type: :any, required: true],
-        meta: [type: :map, default: %{}],
-        reason: [type: :any, required: true]
-      ]
+      schema:
+        Zoi.object(%{
+          parent_id: Zoi.string(),
+          parent_pid: Zoi.any(),
+          tag: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{}),
+          reason: Zoi.any()
+        })
 
     def run(params, context) do
       orphan_events = Map.get(context.state, :orphan_events, [])
@@ -202,11 +193,12 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Agent,
       name: "orphan_lifecycle_coordinator",
-      schema: [
-        spawned_children: [type: {:list, :string}, default: []],
-        started_children: [type: {:list, :map}, default: []],
-        received_messages: [type: {:list, :map}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          spawned_children: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          started_children: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          received_messages: Zoi.list(Zoi.map()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [
@@ -222,10 +214,11 @@ defmodule JidoExampleTest.OrphanLifecycleTest do
     @moduledoc false
     use Jido.Agent,
       name: "recoverable_worker",
-      schema: [
-        reports: [type: {:list, :map}, default: []],
-        orphan_events: [type: {:list, :map}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          reports: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          orphan_events: Zoi.list(Zoi.map()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [

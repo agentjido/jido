@@ -170,10 +170,11 @@ defmodule JidoTest.AgentPluginIntegrationTest do
     use Jido.Agent,
       name: "mixed_schema_agent",
       default_plugins: false,
-      schema: [
-        base_counter: [type: :integer, default: 100],
-        base_mode: [type: :atom, default: :initial]
-      ],
+      schema:
+        Zoi.object(%{
+          base_counter: Zoi.integer() |> Zoi.default(100),
+          base_mode: Zoi.atom() |> Zoi.default(:initial)
+        }),
       plugins: [JidoTest.AgentPluginIntegrationTest.CounterPlugin]
   end
 
@@ -719,7 +720,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       agent = SinglePluginAgent.new()
 
       {:ok, instruction} =
-        Jido.Instruction.new(%{action: IncrementAction, params: %{amount: 7}})
+        Jido.Instruction.new(%{target: IncrementAction, params: %{amount: 7}})
 
       {updated, _directives} = SinglePluginAgent.cmd(agent, instruction)
 

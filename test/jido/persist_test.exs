@@ -13,10 +13,11 @@ defmodule JidoTest.PersistTest do
   defmodule TestAgent do
     use Jido.Agent,
       name: "test_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        status: [type: :atom, default: :idle]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:idle)
+        })
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -25,7 +26,7 @@ defmodule JidoTest.PersistTest do
   defmodule CustomAgent do
     use Jido.Agent,
       name: "custom_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -59,7 +60,7 @@ defmodule JidoTest.PersistTest do
   defmodule RuntimeStateCheckpointAgent do
     use Jido.Agent,
       name: "runtime_state_checkpoint_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -83,7 +84,7 @@ defmodule JidoTest.PersistTest do
   defmodule RaisingCheckpointAgent do
     use Jido.Agent,
       name: "raising_checkpoint_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -97,7 +98,7 @@ defmodule JidoTest.PersistTest do
   defmodule InvalidCheckpointStateAgent do
     use Jido.Agent,
       name: "invalid_checkpoint_state_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -118,7 +119,7 @@ defmodule JidoTest.PersistTest do
   defmodule RaisingRestoreAgent do
     use Jido.Agent,
       name: "raising_restore_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []
@@ -132,7 +133,7 @@ defmodule JidoTest.PersistTest do
   defmodule LenientRestoreAgent do
     use Jido.Agent,
       name: "lenient_restore_agent",
-      schema: [value: [type: :string, default: ""]]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
 
     @impl true
     def signal_routes(_ctx), do: []

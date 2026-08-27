@@ -28,9 +28,7 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Action,
       name: "process",
-      schema: [
-        value: [type: :string, default: "processed"]
-      ]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("processed")})
 
     def run(%{value: value}, context) do
       log = Map.get(context.state, :log, [])
@@ -42,9 +40,7 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Action,
       name: "admin_action",
-      schema: [
-        value: [type: :string, default: "admin"]
-      ]
+      schema: Zoi.object(%{value: Zoi.string() |> Zoi.default("admin")})
 
     def run(%{value: value}, context) do
       log = Map.get(context.state, :log, [])
@@ -155,10 +151,11 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "global_phase_agent",
-      schema: [
-        log: [type: {:list, :string}, default: []],
-        last_action: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          log: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          last_action: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [JidoExampleTest.PluginPhaseHooksTest.LoggingPlugin]
 
     def signal_routes(_ctx) do
@@ -173,10 +170,11 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "pattern_filtered_agent",
-      schema: [
-        log: [type: {:list, :string}, default: []],
-        last_action: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          log: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          last_action: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [
         JidoExampleTest.PluginPhaseHooksTest.AuditPlugin,
         JidoExampleTest.PluginPhaseHooksTest.RejectPlugin
@@ -195,10 +193,11 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "override_agent",
-      schema: [
-        log: [type: {:list, :string}, default: []],
-        last_action: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          log: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          last_action: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [JidoExampleTest.PluginPhaseHooksTest.AdminOverridePlugin]
 
     def signal_routes(_ctx) do
@@ -213,10 +212,11 @@ defmodule JidoExampleTest.PluginPhaseHooksTest do
     @moduledoc false
     use Jido.Agent,
       name: "enriched_agent",
-      schema: [
-        log: [type: {:list, :string}, default: []],
-        last_action: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          log: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          last_action: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [JidoExampleTest.PluginPhaseHooksTest.ResultEnricherPlugin]
 
     def signal_routes(_ctx) do

@@ -28,9 +28,7 @@ defmodule JidoExampleTest.PluginBasicsTest do
     @moduledoc false
     use Jido.Action,
       name: "add_note",
-      schema: [
-        text: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{text: Zoi.string()})
 
     def run(%{text: text}, context) do
       notes = get_in(context.state, [:notes, :entries]) || []

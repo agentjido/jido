@@ -57,10 +57,11 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "scheduler_integration_plugin_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0],
-        ticks: [type: {:list, :any}, default: []]
-      ],
+      schema:
+        Zoi.object(%{
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          ticks: Zoi.list(Zoi.any()) |> Zoi.default([])
+        }),
       plugins: [ScheduledPlugin]
   end
 
@@ -72,9 +73,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "scheduler_restore_counting_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     @impl true
     def signal_routes(_ctx), do: []

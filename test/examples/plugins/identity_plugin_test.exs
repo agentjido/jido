@@ -67,9 +67,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
       default_plugins: %{
         __identity__: {CustomIdentityPlugin, %{profile: %{age: 5, origin: :spawned}}}
       },
-      schema: [
-        status: [type: :atom, default: :idle]
-      ]
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
   end
 
   defmodule NoIdentityAgent do
@@ -78,9 +76,7 @@ defmodule JidoExampleTest.IdentityPluginTest do
       name: "no_identity",
       description: "Agent with identity plugin disabled",
       default_plugins: %{__identity__: false},
-      schema: [
-        value: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 
   # ===========================================================================

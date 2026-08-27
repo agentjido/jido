@@ -3,7 +3,7 @@ defmodule Jido.Agent.Strategy.Direct do
   Default execution strategy that runs instructions immediately and sequentially.
 
   This strategy:
-  - Executes each instruction via `Jido.Exec.run/1`
+  - Executes each command at the `Jido.Exec.run/4` boundary
   - Merges results into agent state
   - Applies state operations (e.g., `StateOp.SetState`) to the agent
   - Returns only external directives to the caller
@@ -26,21 +26,21 @@ defmodule Jido.Agent.Strategy.Direct do
   use Jido.Agent.Strategy
 
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Agent.Directive
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Agent.Strategy.InstructionTracking
   alias Jido.Agent.StateOps
   alias Jido.Error
-  alias Jido.Instruction
   alias Jido.Thread.Agent, as: ThreadAgent
 
   @impl true
-  def cmd(%Agent{} = agent, instructions, ctx) when is_list(instructions) do
+  def cmd(%Agent{} = agent, commands, ctx) when is_list(commands) do
     agent = maybe_ensure_thread(agent, ctx)
 
     {final_agent, reversed_directives} =
-      Enum.reduce(instructions, {agent, []}, fn instruction, {acc_agent, acc_directives} ->
-        {new_agent, new_directives} = run_instruction_with_tracking(acc_agent, instruction, ctx)
+      Enum.reduce(commands, {agent, []}, fn command, {acc_agent, acc_directives} ->
+        {new_agent, new_directives} = run_command_with_tracking(acc_agent, command, ctx)
         {new_agent, Enum.reverse(new_directives) ++ acc_directives}
       end)
 
@@ -58,32 +58,28 @@ defmodule Jido.Agent.Strategy.Direct do
     end
   end
 
-  defp run_instruction_with_tracking(agent, %Instruction{} = instruction, ctx) do
+  defp run_command_with_tracking(agent, %Command{} = command, ctx) do
     if ThreadAgent.has_thread?(agent) do
-      agent = InstructionTracking.append_instruction_start(agent, instruction)
-      {agent, directives, status} = run_instruction(agent, instruction, ctx)
-      agent = InstructionTracking.append_instruction_end(agent, instruction, status)
+      agent = InstructionTracking.append_instruction_start(agent, command)
+      {agent, directives, status} = run_command(agent, command, ctx)
+      agent = InstructionTracking.append_instruction_end(agent, command, status)
       {agent, directives}
     else
-      {agent, directives, _status} = run_instruction(agent, instruction, ctx)
+      {agent, directives, _status} = run_command(agent, command, ctx)
       {agent, directives}
     end
   end
 
-  defp run_instruction(agent, %Instruction{} = instruction, ctx) do
-    instruction =
-      %{
-        instruction
-        | context:
-            instruction.context
-            |> Map.put(:state, agent.state)
-            |> Map.put(:agent, agent)
-            |> Map.put(:agent_server_pid, self())
-      }
+  defp run_command(agent, %Command{} = command, ctx) do
+    runtime_context = %{
+      state: agent.state,
+      agent: agent,
+      agent_server_pid: self()
+    }
 
-    exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], instruction.opts)
+    exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], command.opts)
 
-    case Jido.Exec.run(%{instruction | opts: exec_opts}) do
+    case Command.run(command, runtime_context, exec_opts) do
       {:ok, result} when is_map(result) ->
         {StateOps.apply_result(agent, result), [], :ok}
 

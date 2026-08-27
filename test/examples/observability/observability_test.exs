@@ -87,9 +87,7 @@ defmodule JidoExampleTest.ObservabilityTest do
     @moduledoc false
     use Jido.Action,
       name: "observed_work",
-      schema: [
-        work_units: [type: :integer, default: 10]
-      ]
+      schema: Zoi.object(%{work_units: Zoi.integer() |> Zoi.default(10)})
 
     def run(params, context) do
       agent_id = Map.get(context, :agent_id, "unknown")
@@ -110,9 +108,7 @@ defmodule JidoExampleTest.ObservabilityTest do
     @moduledoc false
     use Jido.Action,
       name: "observed_async",
-      schema: [
-        delay_ms: [type: :integer, default: 10]
-      ]
+      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(10)})
 
     def run(params, context) do
       agent_id = Map.get(context, :agent_id, "unknown")
@@ -144,10 +140,11 @@ defmodule JidoExampleTest.ObservabilityTest do
     @moduledoc false
     use Jido.Agent,
       name: "observe_example_agent",
-      schema: [
-        last_result: [type: :integer, default: nil],
-        async_result: [type: :integer, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          last_result: Zoi.integer() |> Zoi.default(nil),
+          async_result: Zoi.integer() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [

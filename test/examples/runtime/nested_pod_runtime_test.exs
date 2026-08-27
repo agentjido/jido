@@ -32,9 +32,7 @@ defmodule JidoExampleTest.NestedPodRuntimeTest do
     @moduledoc false
     use Jido.Agent,
       name: "example_nested_pod_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule EditorialPod do

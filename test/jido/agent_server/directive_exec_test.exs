@@ -10,9 +10,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Agent,
       name: "directive_exec_test_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defmodule LifecycleSensor do
@@ -124,11 +122,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Action,
       name: "record_round_trip_sensor",
-      schema: [
-        value: [type: :any, required: true],
-        agent_id: [type: :any, required: true],
-        sensor_tag: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{value: Zoi.any(), agent_id: Zoi.any(), sensor_tag: Zoi.any()})
 
     def run(params, _context) do
       {:ok,
@@ -144,10 +138,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Action,
       name: "record_round_trip_sensor_exit",
-      schema: [
-        tag: [type: :any, required: true],
-        reason: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{tag: Zoi.any(), reason: Zoi.any()})
 
     def run(params, context) do
       events = Map.get(context.state, :sensor_exit_events, [])
@@ -159,14 +150,15 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Agent,
       name: "directive_exec_round_trip_sensor_agent",
-      schema: [
-        sensor_start_requested: [type: :boolean, default: false],
-        sensor_stop_requested: [type: :boolean, default: false],
-        last_sensor_value: [type: :any, default: nil],
-        last_sensor_agent_id: [type: :any, default: nil],
-        last_sensor_tag: [type: :any, default: nil],
-        sensor_exit_events: [type: {:list, :any}, default: []]
-      ],
+      schema:
+        Zoi.object(%{
+          sensor_start_requested: Zoi.boolean() |> Zoi.default(false),
+          sensor_stop_requested: Zoi.boolean() |> Zoi.default(false),
+          last_sensor_value: Zoi.any() |> Zoi.default(nil),
+          last_sensor_agent_id: Zoi.any() |> Zoi.default(nil),
+          last_sensor_tag: Zoi.any() |> Zoi.default(nil),
+          sensor_exit_events: Zoi.list(Zoi.any()) |> Zoi.default([])
+        }),
       signal_routes: [
         {"directive.sensor.start", StartRoundTripSensorAction},
         {"directive.sensor.stop", StopRoundTripSensorAction},
@@ -180,9 +172,7 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Action,
       name: "stop_on_signal",
-      schema: [
-        reason: [type: :any, default: :normal]
-      ]
+      schema: Zoi.object(%{reason: Zoi.any() |> Zoi.default(:normal)})
 
     alias Jido.Agent.Directive
 
@@ -201,10 +191,11 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Agent,
       name: "directive_exec_stop_aware_agent",
-      schema: [
-        observer_pid: [type: :any, default: nil],
-        stop_reason: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          observer_pid: Zoi.any() |> Zoi.default(nil),
+          stop_reason: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -240,14 +231,15 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Action,
       name: "capture_result_action",
-      schema: [
-        status: [type: :atom, required: true],
-        result: [type: :map, default: %{}],
-        reason: [type: :any, default: nil],
-        effects: [type: :any, default: []],
-        instruction: [type: :any, default: nil],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom(),
+          result: Zoi.map() |> Zoi.default(%{}),
+          reason: Zoi.any() |> Zoi.default(nil),
+          effects: Zoi.any() |> Zoi.default([]),
+          command: Zoi.any() |> Zoi.default(nil),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(params, _context) do
       {:ok,
@@ -264,14 +256,15 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
     @moduledoc false
     use Jido.Action,
       name: "capture_result_emit_action",
-      schema: [
-        status: [type: :atom, required: true],
-        result: [type: :map, default: %{}],
-        reason: [type: :any, default: nil],
-        effects: [type: :any, default: []],
-        instruction: [type: :any, default: nil],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom(),
+          result: Zoi.map() |> Zoi.default(%{}),
+          reason: Zoi.any() |> Zoi.default(nil),
+          effects: Zoi.any() |> Zoi.default([]),
+          command: Zoi.any() |> Zoi.default(nil),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(_params, _context) do
       directive = Directive.emit(%{type: "capture.result.event"})
@@ -511,10 +504,10 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       state: state,
       input_signal: input_signal
     } do
-      instruction = Jido.Instruction.new!(%{action: RunInstructionSuccessAction})
+      command = Jido.Agent.Command.new!(RunInstructionSuccessAction)
 
       directive =
-        Directive.run_instruction(instruction,
+        Directive.run_instruction(command,
           result_action: CaptureResultAction,
           meta: %{source: :test}
         )
@@ -532,10 +525,10 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       state: state,
       input_signal: input_signal
     } do
-      instruction = Jido.Instruction.new!(%{action: RunInstructionFailureAction})
+      command = Jido.Agent.Command.new!(RunInstructionFailureAction)
 
       directive =
-        Directive.run_instruction(instruction,
+        Directive.run_instruction(command,
           result_action: CaptureResultEmitAction
         )
 
@@ -543,8 +536,10 @@ defmodule JidoTest.AgentServer.DirectiveExecTest do
       assert state.agent.state.captured_emit == true
       assert State.queue_length(state) == 1
 
-      assert {{:value, {^input_signal, %Directive.Emit{signal: %{type: "capture.result.event"}}}},
-              _state} = State.dequeue(state)
+      assert {{:value,
+               {^input_signal, _runtime_context,
+                %Directive.Emit{signal: %{type: "capture.result.event"}}}}, _state} =
+               State.dequeue(state)
     end
   end
 

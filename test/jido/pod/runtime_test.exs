@@ -18,9 +18,7 @@ defmodule JidoTest.Pod.RuntimeTest do
     @moduledoc false
     use Jido.Agent,
       name: "pod_runtime_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule ReviewPod do

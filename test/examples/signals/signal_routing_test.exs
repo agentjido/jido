@@ -26,9 +26,7 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "increment",
-      schema: [
-        amount: [type: :integer, default: 1]
-      ]
+      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)
@@ -40,9 +38,7 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "set_name",
-      schema: [
-        name: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{name: Zoi.string()})
 
     def run(%{name: name}, _context) do
       {:ok, %{name: name}}
@@ -53,10 +49,7 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Action,
       name: "record_event",
-      schema: [
-        event_type: [type: :string, required: true],
-        payload: [type: :map, default: %{}]
-      ]
+      schema: Zoi.object(%{event_type: Zoi.string(), payload: Zoi.map() |> Zoi.default(%{})})
 
     def run(params, context) do
       events = Map.get(context.state, :events, [])
@@ -79,11 +72,12 @@ defmodule JidoExampleTest.SignalRoutingTest do
     @moduledoc false
     use Jido.Agent,
       name: "routed_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        name: [type: :string, default: ""],
-        events: [type: {:list, :map}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          name: Zoi.string() |> Zoi.default(""),
+          events: Zoi.list(Zoi.map()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [

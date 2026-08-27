@@ -31,9 +31,7 @@ defmodule JidoExampleTest.MutablePodRuntimeTest do
     @moduledoc false
     use Jido.Agent,
       name: "example_mutable_pod_review_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule MutableReviewPod do

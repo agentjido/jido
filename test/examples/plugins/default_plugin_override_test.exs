@@ -43,9 +43,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
     use Jido.Agent,
       name: "default_agent",
       description: "Plain agent — gets Thread.Plugin automatically",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ]
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
   end
 
   defmodule OverriddenAgent do
@@ -53,9 +51,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
     use Jido.Agent,
       name: "overridden_agent",
       description: "Replaces Thread.Plugin with CustomThreadPlugin",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ],
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)}),
       default_plugins: %{__thread__: CustomThreadPlugin}
   end
 
@@ -64,9 +60,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
     use Jido.Agent,
       name: "configured_agent",
       description: "Replaces Thread.Plugin with CustomThreadPlugin + config",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ],
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)}),
       default_plugins: %{__thread__: {CustomThreadPlugin, %{max_entries: 50}}}
   end
 
@@ -75,9 +69,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
     use Jido.Agent,
       name: "disabled_agent",
       description: "Disables only the __thread__ default plugin",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ],
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)}),
       default_plugins: %{__thread__: false}
   end
 
@@ -86,9 +78,7 @@ defmodule JidoExampleTest.DefaultPluginOverrideTest do
     use Jido.Agent,
       name: "bare_agent",
       description: "Disables all default plugins entirely",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ],
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)}),
       default_plugins: false
   end
 

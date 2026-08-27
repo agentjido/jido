@@ -148,66 +148,6 @@ defmodule JidoTest.ErrorTest do
     end
   end
 
-  describe "format_nimble_config_error/3" do
-    test "formats error without keys path" do
-      nimble_error = %NimbleOptions.ValidationError{keys_path: [], message: "invalid option"}
-      result = Error.format_nimble_config_error(nimble_error, "Agent", TestAgent)
-
-      assert result =~ "Invalid configuration"
-      assert result =~ "invalid option"
-    end
-
-    test "formats error with keys path" do
-      nimble_error = %NimbleOptions.ValidationError{
-        keys_path: [:schema, :name],
-        message: "required"
-      }
-
-      result = Error.format_nimble_config_error(nimble_error, "Agent", TestAgent)
-
-      assert result =~ "Invalid configuration"
-      assert result =~ "[:schema, :name]"
-    end
-
-    test "handles binary and other error types" do
-      assert Error.format_nimble_config_error("plain string error", "Agent", TestAgent) ==
-               "plain string error"
-
-      assert Error.format_nimble_config_error({:error, :unknown}, "Agent", TestAgent) =~
-               ":error"
-    end
-  end
-
-  describe "format_nimble_validation_error/3" do
-    test "formats validation error without keys path" do
-      nimble_error = %NimbleOptions.ValidationError{keys_path: [], message: "invalid value"}
-      result = Error.format_nimble_validation_error(nimble_error, "Action", TestAction)
-
-      assert result =~ "Invalid parameters"
-      assert result =~ "invalid value"
-    end
-
-    test "formats validation error with keys path" do
-      nimble_error = %NimbleOptions.ValidationError{
-        keys_path: [:params, :id],
-        message: "must be integer"
-      }
-
-      result = Error.format_nimble_validation_error(nimble_error, "Action", TestAction)
-
-      assert result =~ "Invalid parameters"
-      assert result =~ "[:params, :id]"
-    end
-
-    test "handles binary and other validation error types" do
-      assert Error.format_nimble_validation_error("plain string", "Action", TestAction) ==
-               "plain string"
-
-      assert Error.format_nimble_validation_error({:error, :bad}, "Action", TestAction) =~
-               ":error"
-    end
-  end
-
   describe "to_map/1" do
     @to_map_cases [
       # {description, error_expr, expected_type}

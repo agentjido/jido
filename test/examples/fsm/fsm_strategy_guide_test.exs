@@ -34,9 +34,7 @@ defmodule JidoExampleTest.FSMStrategyGuideTest do
     @moduledoc false
     use Jido.Action,
       name: "ship_order",
-      schema: [
-        carrier: [type: :string, default: "Standard Shipping"]
-      ]
+      schema: Zoi.object(%{carrier: Zoi.string() |> Zoi.default("Standard Shipping")})
 
     def run(%{carrier: carrier}, context) do
       case context.state[:order_status] do
@@ -68,16 +66,17 @@ defmodule JidoExampleTest.FSMStrategyGuideTest do
     use Jido.Agent,
       name: "guide_order_agent",
       description: "Order workflow agent used in the FSM strategy guide",
-      schema: [
-        order_id: [type: :string],
-        customer: [type: :string],
-        items: [type: {:list, :map}, default: []],
-        total: [type: :float, default: 0.0],
-        order_status: [type: :atom, default: :pending],
-        shipped_via: [type: :string, default: nil],
-        shipped_at: [type: :any, default: nil],
-        delivered_at: [type: :any, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          order_id: Zoi.string() |> Zoi.optional(),
+          customer: Zoi.string() |> Zoi.optional(),
+          items: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          total: Zoi.float() |> Zoi.default(0.0),
+          order_status: Zoi.atom() |> Zoi.default(:pending),
+          shipped_via: Zoi.string() |> Zoi.default(nil),
+          shipped_at: Zoi.any() |> Zoi.default(nil),
+          delivered_at: Zoi.any() |> Zoi.default(nil)
+        }),
       signal_routes: [
         {"order.confirm", ConfirmOrder},
         {"order.ship", ShipOrder},

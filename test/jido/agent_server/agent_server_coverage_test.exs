@@ -25,9 +25,7 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "simple_test_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
@@ -39,11 +37,12 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "before_hook_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        before_called: [type: :boolean, default: false],
-        intercepted_action: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          before_called: Zoi.boolean() |> Zoi.default(false),
+          intercepted_action: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
@@ -64,10 +63,11 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "after_hook_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        after_called: [type: :boolean, default: false]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          after_called: Zoi.boolean() |> Zoi.default(false)
+        })
 
     def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
@@ -83,11 +83,12 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "both_hooks_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        before_called: [type: :boolean, default: false],
-        after_called: [type: :boolean, default: false]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          before_called: Zoi.boolean() |> Zoi.default(false),
+          after_called: Zoi.boolean() |> Zoi.default(false)
+        })
 
     def signal_routes(_ctx) do
       [{"increment", JidoTest.TestActions.IncrementAction}]
@@ -107,9 +108,7 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Action,
       name: "many_directives",
-      schema: [
-        count: [type: :integer, default: 10]
-      ]
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(10)})
 
     alias Jido.Agent.Directive
 
@@ -128,10 +127,11 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "many_directives_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        directive_count: [type: :integer, default: 0]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          directive_count: Zoi.integer() |> Zoi.default(0)
+        })
 
     def signal_routes(_ctx) do
       [{"many_directives", ManyDirectivesAction}]
@@ -161,7 +161,7 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Action,
       name: "delay_complete",
-      schema: [delay_ms: [type: :integer, default: 50]]
+      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(50)})
 
     def run(%{delay_ms: delay}, _context) do
       Process.sleep(delay)
@@ -174,11 +174,12 @@ defmodule JidoTest.AgentServerCoverageTest do
     @moduledoc false
     use Jido.Agent,
       name: "completion_agent",
-      schema: [
-        status: [type: :atom, default: :pending],
-        last_answer: [type: :any, default: nil],
-        error: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom() |> Zoi.default(:pending),
+          last_answer: Zoi.any() |> Zoi.default(nil),
+          error: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [

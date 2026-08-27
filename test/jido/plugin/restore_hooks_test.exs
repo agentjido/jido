@@ -96,21 +96,21 @@ defmodule JidoTest.Plugin.RestoreHooksTest do
   defmodule AgentWithMixedPlugins do
     use Jido.Agent,
       name: "restore_mixed_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [KeepPlugin, DropPlugin, ExternalizePlugin]
   end
 
   defmodule AgentWithThreadPlugin do
     use Jido.Agent,
       name: "restore_thread_agent",
-      schema: [counter: [type: :integer, default: 0]]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defmodule AgentWithSchemaOnly do
     use Jido.Agent,
       name: "restore_schema_only_agent",
       default_plugins: false,
-      schema: [counter: [type: :integer, default: 0]]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   describe "restore calls plugin on_restore/2" do

@@ -9,7 +9,7 @@ defmodule Jido.Agent.State do
   Handles deep merging and validation of agent state.
   """
 
-  alias Jido.Action.Schema
+  alias Jido.Agent.Schema
   alias Jido.Util.DeepMerge
 
   @doc """
@@ -25,7 +25,7 @@ defmodule Jido.Agent.State do
   end
 
   @doc """
-  Validates state against a schema (NimbleOptions or Zoi).
+  Validates state against a Zoi schema.
   Returns validated state as a map.
 
   By default (non-strict mode), extra fields not in the schema are preserved.
@@ -36,36 +36,16 @@ defmodule Jido.Agent.State do
 
   def validate(state, [], _opts), do: {:ok, state}
 
-  def validate(state, schema, opts) when is_list(schema) do
-    strict? = Keyword.get(opts, :strict, false)
-    known_keys = Keyword.keys(schema)
-
-    state_to_validate = Map.take(state, known_keys)
-    extra_fields = Map.drop(state, known_keys)
-
-    case Schema.validate(schema, state_to_validate) do
-      {:ok, validated} ->
-        if strict? do
-          {:ok, validated}
-        else
-          {:ok, Map.merge(validated, extra_fields)}
-        end
-
-      {:error, _} = error ->
-        error
-    end
-  end
-
   def validate(state, schema, opts) do
     strict? = Keyword.get(opts, :strict, false)
+    known_keys = Schema.known_keys(schema)
+    extra_fields = Map.drop(state, known_keys)
 
-    case Schema.validate(schema, state) do
+    case Zoi.parse(schema, state) do
       {:ok, validated} ->
         if strict? do
           {:ok, validated}
         else
-          known_keys = Schema.known_keys(schema)
-          extra_fields = Map.drop(state, known_keys)
           {:ok, Map.merge(validated, extra_fields)}
         end
 
@@ -79,15 +59,6 @@ defmodule Jido.Agent.State do
   """
   @spec defaults_from_schema(term()) :: map()
   def defaults_from_schema([]), do: %{}
-
-  def defaults_from_schema(schema) when is_list(schema) do
-    Enum.reduce(schema, %{}, fn {key, opts}, acc ->
-      case Keyword.fetch(opts, :default) do
-        {:ok, default} -> Map.put(acc, key, default)
-        :error -> acc
-      end
-    end)
-  end
 
   def defaults_from_schema(zoi_schema) do
     Jido.Agent.Schema.defaults_from_zoi_schema(zoi_schema)

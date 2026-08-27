@@ -387,7 +387,7 @@ defmodule JidoTest.PluginLifecycleTest do
       defmodule NoPluginAgent do
         use Jido.Agent,
           name: "no_plugin_agent",
-          schema: [counter: [type: :integer, default: 0]]
+          schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
         def signal_routes(_ctx) do
           [{"test.action", JidoTest.PluginLifecycleTest.NoPluginAction}]

@@ -47,10 +47,11 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "scheduler_integration_plugin_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0],
-        ticks: [type: {:list, :any}, default: []]
-      ],
+      schema:
+        Zoi.object(%{
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          ticks: Zoi.list(Zoi.any()) |> Zoi.default([])
+        }),
       plugins: [ScheduledPlugin]
   end
 

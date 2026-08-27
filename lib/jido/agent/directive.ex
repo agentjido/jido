@@ -30,7 +30,7 @@ defmodule Jido.Agent.Directive do
     * `%StartSensor{}` - Start or replace a tagged sensor runtime
     * `%StopSensor{}` - Stop a tagged sensor runtime
     * `%Schedule{}` - Schedule a delayed message
-    * `%RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
+    * `%RunInstruction{}` - Execute an Agent command at runtime and route result to `cmd/2`
     * `%Stop{}` - Stop the agent process (self)
 
   ## Usage
@@ -46,7 +46,7 @@ defmodule Jido.Agent.Directive do
       %Directive.Schedule{delay_ms: 5000, message: :timeout}
 
       # Execute instruction at runtime
-      %Directive.RunInstruction{instruction: instruction, result_action: :fsm_instruction_result}
+      %Directive.RunInstruction{command: command, result_action: :fsm_instruction_result}
 
   ## Extensibility
 
@@ -620,17 +620,17 @@ defmodule Jido.Agent.Directive do
 
   defmodule RunInstruction do
     @moduledoc """
-    Execute a `%Jido.Instruction{}` at runtime and route the result back to `cmd/2`.
+    Execute a `Jido.Agent.Command` at runtime and route the result back to `cmd/2`.
 
-    This directive lets strategies keep `cmd/2` pure by emitting instruction execution
-    requests instead of calling `Jido.Exec.run/1` directly. The runtime executes the
-    instruction, builds a result payload, then calls:
+    This directive lets strategies keep `cmd/2` pure by emitting execution requests.
+    The runtime converts an executable command to a strict `Jido.Instruction`, runs it,
+    builds a result payload, then calls:
 
         agent_module.cmd(agent, {result_action, payload})
 
     ## Fields
 
-    - `instruction` - The `%Jido.Instruction{}` to execute
+    - `command` - The `Jido.Agent.Command` to execute
     - `result_action` - Internal action atom/module for result handling in `cmd/2`
     - `meta` - Optional metadata echoed in the result payload
     """
@@ -638,7 +638,7 @@ defmodule Jido.Agent.Directive do
     @schema Zoi.struct(
               __MODULE__,
               %{
-                instruction: Zoi.any(description: "%Jido.Instruction{} to execute"),
+                command: Zoi.any(description: "Jido.Agent.Command to execute"),
                 result_action:
                   Zoi.any(
                     description: "Action used when routing execution result back into cmd/2"
@@ -890,10 +890,10 @@ defmodule Jido.Agent.Directive do
       Directive.run_instruction(instruction)
       Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
   """
-  @spec run_instruction(Jido.Instruction.t(), keyword()) :: RunInstruction.t()
-  def run_instruction(%Jido.Instruction{} = instruction, opts \\ []) do
+  @spec run_instruction(Jido.Agent.Command.t(), keyword()) :: RunInstruction.t()
+  def run_instruction(%Jido.Agent.Command{} = command, opts \\ []) do
     %RunInstruction{
-      instruction: instruction,
+      command: command,
       result_action: Keyword.get(opts, :result_action, :instruction_result),
       meta: Keyword.get(opts, :meta, %{})
     }

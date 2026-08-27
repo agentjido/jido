@@ -20,10 +20,11 @@ defmodule JidoTest.AgentServer.StatusTest do
     use Jido.Agent,
       name: "test_agent",
       strategy: Jido.Agent.Strategy.Direct,
-      schema: [
-        counter: [type: :integer, default: 0],
-        status: [type: :atom, default: :idle]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:idle)
+        })
 
     def signal_routes(_ctx) do
       [

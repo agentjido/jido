@@ -3,10 +3,11 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
   import ExUnit.CaptureLog
 
+  alias Jido.Agent.Command
   alias Jido.Agent.Directive
   alias Jido.AgentServer
   alias Jido.Debug
-  alias Jido.Instruction
+  alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Signal
   alias JidoTest.TestActions
 
@@ -33,9 +34,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "telemetry_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx) do
       [
@@ -51,9 +50,14 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     use Jido.Agent.Strategy
 
     @impl true
-    def cmd(agent, instructions, _ctx) do
-      send_instruction_opts(agent, instructions)
-      Enum.each(instructions, &Jido.Exec.run/1)
+    def cmd(agent, commands, ctx) do
+      send_instruction_opts(agent, commands)
+
+      Enum.each(commands, fn command ->
+        exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], command.opts)
+        Command.run(command, %{}, exec_opts)
+      end)
+
       {agent, []}
     end
 
@@ -68,9 +72,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "fallback_exec_agent",
-      schema: [
-        observer_pid: [type: :any, default: nil]
-      ],
+      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)}),
       strategy: FallbackExecStrategy
 
     def signal_routes(_ctx) do
@@ -97,9 +99,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "inspect_opts_agent",
-      schema: [
-        observer_pid: [type: :any, default: nil]
-      ],
+      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)}),
       strategy: InspectOptsStrategy
   end
 
@@ -239,7 +239,7 @@ defmodule JidoTest.AgentServer.TelemetryTest do
   end
 
   describe "action logging integration" do
-    test "suppresses jido_action start logs when args are not full", %{jido: jido} do
+    test "receives jido_action lifecycle telemetry without dependency logs", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(agent: TelemetryAgent, id: "telemetry-log-default", jido: jido)
 
@@ -252,12 +252,16 @@ defmodule JidoTest.AgentServer.TelemetryTest do
 
       refute log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
       refute log =~ "params:"
-      refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
+
+      assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
+                      %{name: "increment", kind: :instruction}}
+
+      assert_receive {:action_telemetry_event, [:jido, :action, :stop], _, _}
 
       GenServer.stop(pid)
     end
 
-    test "enables verbose jido_action logs when instance debug is verbose", %{jido: jido} do
+    test "verbose instance debug controls Jido signal logs", %{jido: jido} do
       Debug.enable(jido, :verbose)
       on_exit(fn -> Debug.disable(jido) end)
 
@@ -271,18 +275,17 @@ defmodule JidoTest.AgentServer.TelemetryTest do
           assert {:ok, _agent} = AgentServer.call(pid, signal)
         end)
 
-      assert log =~ "Starting execution of JidoTest.TestActions.IncrementAction"
-      assert log =~ "params:"
+      assert log =~ "[signal] type=increment"
 
       assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
-                      %{action: JidoTest.TestActions.IncrementAction}}
+                      %{name: "increment", kind: :instruction}}
 
       assert_receive {:action_telemetry_event, [:jido, :action, :stop], _, _}
 
       GenServer.stop(pid)
     end
 
-    test "passes quiet action exec opts to custom strategies", %{jido: jido} do
+    test "passes the Jido routing option to custom strategies", %{jido: jido} do
       {:ok, pid} =
         AgentServer.start_link(
           agent: FallbackExecAgent,
@@ -302,10 +305,10 @@ defmodule JidoTest.AgentServer.TelemetryTest do
       refute log =~ "params:"
 
       assert_receive {:fallback_exec_instruction_opts, [opts]}
-      assert Keyword.get(opts, :log_level) == :warning
-      assert Keyword.get(opts, :telemetry) == :silent
+      assert Keyword.get(opts, :jido) == jido
 
-      refute_receive {:action_telemetry_event, [:jido, :action, :start], _, _}, 50
+      assert_receive {:action_telemetry_event, [:jido, :action, :start], _,
+                      %{name: "increment", kind: :instruction}}
 
       GenServer.stop(pid)
     end
@@ -313,13 +316,13 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     test "preserves explicit instruction opts when applying action exec defaults" do
       agent = InspectOptsAgent.new(state: %{observer_pid: self()})
 
-      instruction = %Instruction{
+      command = %Command{
         action: TestActions.IncrementAction,
         opts: [log_level: :info, telemetry: :full, timeout: 100]
       }
 
       assert {_agent, []} =
-               InspectOptsAgent.cmd(agent, instruction,
+               InspectOptsAgent.cmd(agent, command,
                  __jido_action_exec_defaults__: [log_level: :warning, telemetry: :silent]
                )
 
@@ -330,20 +333,20 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     test "applies action exec defaults without requiring keyword instruction opts" do
       agent = InspectOptsAgent.new(state: %{observer_pid: self()})
 
-      instruction = %Instruction{
+      command = %Command{
         action: TestActions.IncrementAction,
-        opts: [:custom_flag]
+        opts: [custom_flag: true]
       }
 
       assert {_agent, []} =
-               InspectOptsAgent.cmd(agent, instruction,
+               InspectOptsAgent.cmd(agent, command,
                  __jido_action_exec_defaults__: [log_level: :warning, telemetry: :silent]
                )
 
       assert_receive {:inspect_instruction_opts, [opts]}
       assert Keyword.get(opts, :log_level) == :warning
       assert Keyword.get(opts, :telemetry) == :silent
-      assert :custom_flag in opts
+      assert opts[:custom_flag] == true
     end
   end
 

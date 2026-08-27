@@ -28,10 +28,7 @@ defmodule JidoExampleTest.ThreadPluginTest do
     @moduledoc false
     use Jido.Action,
       name: "record_message",
-      schema: [
-        role: [type: :string, required: true],
-        content: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{role: Zoi.string(), content: Zoi.string()})
 
     def run(%{role: role, content: content}, context) do
       thread =
@@ -75,10 +72,11 @@ defmodule JidoExampleTest.ThreadPluginTest do
     use Jido.Agent,
       name: "chat_agent",
       description: "Agent with default thread plugin for conversation history",
-      schema: [
-        last_role: [type: :string, default: nil],
-        summary: [type: :string, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          last_role: Zoi.string() |> Zoi.default(nil),
+          summary: Zoi.string() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -94,9 +92,7 @@ defmodule JidoExampleTest.ThreadPluginTest do
       name: "stateless_agent",
       description: "Agent with thread plugin explicitly disabled",
       default_plugins: %{__thread__: false},
-      schema: [
-        value: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 
   # ===========================================================================

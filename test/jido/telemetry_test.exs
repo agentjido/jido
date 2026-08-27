@@ -10,9 +10,7 @@ defmodule JidoTest.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "telemetry_test_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end

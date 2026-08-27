@@ -51,9 +51,7 @@ defmodule JidoTest.AgentServer.CronTickDeliveryTest do
     @moduledoc false
     use Jido.Agent,
       name: "cron_tick_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx) do
       [

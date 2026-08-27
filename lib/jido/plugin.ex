@@ -110,9 +110,11 @@ defmodule Jido.Plugin do
                               |> Zoi.optional(),
                             schema:
                               Zoi.any(description: "Zoi schema for plugin state.")
+                              |> Zoi.refine({Jido.Schema, :validate_config_schema, []})
                               |> Zoi.optional(),
                             config_schema:
                               Zoi.any(description: "Zoi schema for per-agent configuration.")
+                              |> Zoi.refine({Jido.Schema, :validate_config_schema, []})
                               |> Zoi.optional(),
                             signal_patterns:
                               Zoi.list(Zoi.string(), description: "Signal patterns for routing.")
@@ -513,6 +515,14 @@ defmodule Jido.Plugin do
                              description:
                                "Invalid plugin configuration:\n#{Zoi.prettify_errors(errors)}"
                        end)
+
+      Jido.Schema.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
+
+      Jido.Schema.ensure_static_schema!(
+        @validated_opts[:config_schema],
+        :config_schema,
+        __ENV__
+      )
     end
   end
 

@@ -387,11 +387,10 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 2.3"},
+      {:jido_action, "~> 3.0.0-beta.1"},
       {:jido_signal, "~> 2.2"},
 
       # Jido Deps
-      {:nimble_options, "~> 1.1"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:poolboy, "~> 1.5"},

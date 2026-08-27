@@ -19,23 +19,12 @@
 #     category: :system,
 #     tags: [:bus, :monitoring],
 #     vsn: "1.0.0",
-#     schema: [
-#       bus_name: [
-#         type: :atom,
-#         required: true,
-#         doc: "Name of the bus to monitor"
-#       ],
-#       stream_id: [
-#         type: :string,
-#         required: true,
-#         doc: "Stream ID to monitor"
-#       ],
-#       filter_source: [
-#         type: :string,
-#         required: false,
-#         doc: "Optional source ID to filter out"
-#       ]
-#     ]
+#     schema: Zoi.object(%{
+#       bus_name: Zoi.atom(description: "Name of the bus to monitor"),
+#       stream_id: Zoi.string(description: "Stream ID to monitor"),
+#       filter_source:
+#         Zoi.string(description: "Optional source ID to filter out") |> Zoi.optional()
+#     })
 
 #   require Logger
 

@@ -76,8 +76,8 @@ defmodule Jido.Agent.Strategy do
   `:__strategy__`. Use `Jido.Agent.Strategy.State` helpers to manage it.
   """
 
-  alias Jido.Action.Tool, as: ActionTool
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Agent.Strategy.State, as: StratState
 
   @type context :: %{
@@ -164,20 +164,20 @@ defmodule Jido.Agent.Strategy do
   Execute instructions against the agent.
 
   Called by `MyAgent.cmd/2` after normalization. Receives a list of
-  already-normalized `Instruction` structs. Must return the updated agent
+  already-normalized Agent commands. Must return the updated agent
   and any external directives.
 
   ## Parameters
 
     * `agent` - The current agent struct
-    * `instructions` - List of normalized `Instruction` structs
+    * `commands` - List of normalized Agent commands
     * `context` - Execution context with `:agent_module` and `:strategy_opts`
 
   ## Returns
 
     * `{updated_agent, directives}` - The new agent state and external effects
   """
-  @callback cmd(agent :: Agent.t(), instructions :: [Jido.Instruction.t()], ctx :: context()) ::
+  @callback cmd(agent :: Agent.t(), commands :: [Command.t()], ctx :: context()) ::
               {Agent.t(), [Agent.directive()]}
 
   @doc """
@@ -332,7 +332,7 @@ defmodule Jido.Agent.Strategy do
   end
 
   @doc """
-  Normalizes instruction params using the strategy's action_spec.
+  Normalizes command params using the strategy's action_spec.
 
   If the strategy implements `action_spec/1` and returns a schema for the
   action, params are normalized (string keys → atoms, type coercion via Zoi).
@@ -341,36 +341,36 @@ defmodule Jido.Agent.Strategy do
   ## Parameters
 
     * `strategy_mod` - The strategy module
-    * `instruction` - The instruction to normalize
+    * `command` - The command to normalize
     * `ctx` - Execution context
 
   ## Returns
 
-    * Updated instruction with normalized params
+    * Updated command with normalized params
   """
-  @spec normalize_instruction(module(), Jido.Instruction.t(), context()) :: Jido.Instruction.t()
-  def normalize_instruction(strategy_mod, %Jido.Instruction{} = instr, _ctx) do
+  @spec normalize_command(module(), Command.t(), context()) :: Command.t()
+  def normalize_command(strategy_mod, %Command{} = command, _ctx) do
     spec =
       if function_exported?(strategy_mod, :action_spec, 1),
-        do: strategy_mod.action_spec(instr.action),
+        do: strategy_mod.action_spec(command.action),
         else: nil
 
     params =
       case spec && spec[:schema] do
         nil ->
           # No schema - leave keys as-is to prevent atom table exhaustion
-          instr.params
+          command.params
 
         schema ->
-          normalize_with_schema(instr.params, schema, instr.action)
+          normalize_with_schema(command.params, schema, command.action)
       end
 
-    %Jido.Instruction{instr | params: params}
+    %{command | params: params}
   end
 
   defp normalize_with_schema(params, schema, action) do
     cond do
-      is_struct(schema) ->
+      Jido.Schema.zoi_schema?(schema) ->
         # Zoi with coerce: true handles string->atom conversion safely
         # Only schema-defined keys become atoms; unknown keys are stripped
         case Zoi.parse(schema, params) do
@@ -380,10 +380,6 @@ defmodule Jido.Agent.Strategy do
           {:error, err} ->
             raise ArgumentError, "Invalid params for #{inspect(action)}: #{inspect(err)}"
         end
-
-      is_list(schema) ->
-        # ActionTool preserves unknown keys as strings (atom-safe)
-        ActionTool.convert_params_using_schema(params, schema)
 
       true ->
         # No schema - leave keys as-is to prevent atom table exhaustion

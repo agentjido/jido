@@ -19,7 +19,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Action,
       name: "value_action",
-      schema: [value: [type: :integer, required: true]]
+      schema: Zoi.object(%{value: Zoi.integer()})
 
     def run(%{value: value}, _context), do: {:ok, %{value: value}}
   end
@@ -82,7 +82,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     use Jido.Agent,
       name: "fsm_test_agent",
       strategy: Jido.Agent.Strategy.FSM,
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end

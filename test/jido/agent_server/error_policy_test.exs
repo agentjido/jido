@@ -10,9 +10,7 @@ defmodule JidoTest.AgentServer.ErrorPolicyTest do
     @moduledoc false
     use Jido.Agent,
       name: "error_policy_test_agent",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defp build_state(error_policy, jido \\ :test_jido) do

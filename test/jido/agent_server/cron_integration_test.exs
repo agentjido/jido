@@ -52,10 +52,11 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "cron_test_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0],
-        ticks: [type: {:list, :any}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          ticks: Zoi.list(Zoi.any()) |> Zoi.default([])
+        })
 
     def signal_routes(_ctx) do
       [

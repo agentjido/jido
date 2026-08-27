@@ -43,9 +43,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "process_work",
-      schema: [
-        work_item: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{work_item: Zoi.string()})
 
     def run(%{work_item: item}, context) do
       items = Map.get(context.state, :processed_items, [])
@@ -57,9 +55,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "complete_task",
-      schema: [
-        task_id: [type: :integer, required: true]
-      ]
+      schema: Zoi.object(%{task_id: Zoi.integer()})
 
     def run(%{task_id: task_id}, context) do
       completed = Map.get(context.state, :completed_tasks, [])
@@ -71,9 +67,7 @@ defmodule JidoExampleTest.FSMAgentTest do
     @moduledoc false
     use Jido.Action,
       name: "increment_counter",
-      schema: [
-        amount: [type: :integer, default: 1]
-      ]
+      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :counter, 0)
@@ -91,11 +85,12 @@ defmodule JidoExampleTest.FSMAgentTest do
       name: "simple_fsm_agent",
       description: "Basic FSM agent with default transitions",
       strategy: Jido.Agent.Strategy.FSM,
-      schema: [
-        processed_items: [type: {:list, :string}, default: []],
-        last_item: [type: :string, default: nil],
-        counter: [type: :integer, default: 0]
-      ]
+      schema:
+        Zoi.object(%{
+          processed_items: Zoi.list(Zoi.string()) |> Zoi.default([]),
+          last_item: Zoi.string() |> Zoi.default(nil),
+          counter: Zoi.integer() |> Zoi.default(0)
+        })
   end
 
   defmodule TaskFSMAgent do
@@ -104,9 +99,7 @@ defmodule JidoExampleTest.FSMAgentTest do
       name: "task_fsm_agent",
       description: "FSM agent for task processing",
       strategy: Jido.Agent.Strategy.FSM,
-      schema: [
-        completed_tasks: [type: {:list, :integer}, default: []]
-      ]
+      schema: Zoi.object(%{completed_tasks: Zoi.list(Zoi.integer()) |> Zoi.default([])})
   end
 
   defmodule CustomTransitionAgent do
@@ -123,9 +116,7 @@ defmodule JidoExampleTest.FSMAgentTest do
            "done" => ["ready"],
            "error" => ["ready"]
          }},
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defmodule NoAutoTransitionAgent do
@@ -134,9 +125,7 @@ defmodule JidoExampleTest.FSMAgentTest do
       name: "no_auto_transition_agent",
       description: "FSM agent that stays in processing state",
       strategy: {Jido.Agent.Strategy.FSM, auto_transition: false},
-      schema: [
-        counter: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defp run_cmd(agent_module, agent, action) do

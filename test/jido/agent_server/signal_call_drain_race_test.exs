@@ -46,10 +46,10 @@ defmodule JidoTest.AgentServer.SignalCallDrainRaceTest do
     use Jido.Action, name: "race_queue_runtime_instruction"
 
     def run(_params, _context) do
-      instruction = Jido.Instruction.new!(%{action: RuntimeMutationAction})
+      command = Jido.Agent.Command.new!(RuntimeMutationAction)
 
       directive =
-        Directive.run_instruction(instruction, result_action: CaptureRuntimeResultAction)
+        Directive.run_instruction(command, result_action: CaptureRuntimeResultAction)
 
       {:ok, %{}, [directive]}
     end
@@ -59,12 +59,13 @@ defmodule JidoTest.AgentServer.SignalCallDrainRaceTest do
     @moduledoc false
     use Jido.Agent,
       name: "signal_call_drain_race_agent",
-      schema: [
-        test_pid: [type: :any, default: nil],
-        call_done: [type: :boolean, default: false],
-        runtime_done: [type: :boolean, default: false],
-        instruction_seen: [type: :boolean, default: false]
-      ]
+      schema:
+        Zoi.object(%{
+          test_pid: Zoi.any() |> Zoi.default(nil),
+          call_done: Zoi.boolean() |> Zoi.default(false),
+          runtime_done: Zoi.boolean() |> Zoi.default(false),
+          instruction_seen: Zoi.boolean() |> Zoi.default(false)
+        })
 
     def signal_routes(_ctx) do
       [

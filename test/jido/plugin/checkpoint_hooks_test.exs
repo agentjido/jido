@@ -41,13 +41,13 @@ defmodule JidoTest.Plugin.CheckpointHooksTest do
   defmodule AgentWithThreadPlugin do
     use Jido.Agent,
       name: "checkpoint_thread_agent",
-      schema: [counter: [type: :integer, default: 0]]
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
   end
 
   defmodule AgentWithMixedPlugins do
     use Jido.Agent,
       name: "checkpoint_mixed_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [KeepPlugin, DropPlugin]
   end
 

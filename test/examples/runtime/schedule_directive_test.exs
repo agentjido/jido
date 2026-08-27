@@ -27,10 +27,7 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_timer",
-      schema: [
-        delay_ms: [type: :integer, default: 100],
-        timer_id: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.default(100), timer_id: Zoi.string()})
 
     def run(%{delay_ms: delay_ms, timer_id: timer_id}, _context) do
       tick_signal = Signal.new!("timer.tick", %{timer_id: timer_id}, source: "/timer")
@@ -48,9 +45,7 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_tick",
-      schema: [
-        timer_id: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{timer_id: Zoi.string()})
 
     def run(%{timer_id: timer_id}, context) do
       tick_count = Map.get(context.state, :tick_count, 0) + 1
@@ -62,10 +57,11 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_retryable",
-      schema: [
-        max_attempts: [type: :integer, default: 3],
-        retry_delay_ms: [type: :integer, default: 50]
-      ]
+      schema:
+        Zoi.object(%{
+          max_attempts: Zoi.integer() |> Zoi.default(3),
+          retry_delay_ms: Zoi.integer() |> Zoi.default(50)
+        })
 
     def run(%{max_attempts: max, retry_delay_ms: delay}, _context) do
       retry_signal = Signal.new!("retry.attempt", %{}, source: "/retry")
@@ -109,10 +105,8 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "start_timeout",
-      schema: [
-        timeout_ms: [type: :integer, default: 200],
-        request_id: [type: :string, required: true]
-      ]
+      schema:
+        Zoi.object(%{timeout_ms: Zoi.integer() |> Zoi.default(200), request_id: Zoi.string()})
 
     def run(%{timeout_ms: timeout_ms, request_id: request_id}, _context) do
       timeout_signal =
@@ -131,10 +125,7 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_response",
-      schema: [
-        request_id: [type: :string, required: true],
-        result: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{request_id: Zoi.string(), result: Zoi.any()})
 
     def run(%{request_id: request_id, result: result}, context) do
       pending = Map.get(context.state, :pending_request)
@@ -151,9 +142,7 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "handle_timeout",
-      schema: [
-        request_id: [type: :string, required: true]
-      ]
+      schema: Zoi.object(%{request_id: Zoi.string()})
 
     def run(%{request_id: request_id}, context) do
       pending = Map.get(context.state, :pending_request)
@@ -174,19 +163,20 @@ defmodule JidoExampleTest.ScheduleDirectiveTest do
     @moduledoc false
     use Jido.Agent,
       name: "timer_agent",
-      schema: [
-        status: [type: :atom, default: :idle],
-        timer_id: [type: :string, default: nil],
-        tick_count: [type: :integer, default: 0],
-        last_tick_timer: [type: :string, default: nil],
-        attempts: [type: :integer, default: 0],
-        max_attempts: [type: :integer, default: 3],
-        retry_delay_ms: [type: :integer, default: 50],
-        result: [type: :any, default: nil],
-        request_id: [type: :string, default: nil],
-        pending_request: [type: :string, default: nil],
-        started_at: [type: :any, default: nil]
-      ]
+      schema:
+        Zoi.object(%{
+          status: Zoi.atom() |> Zoi.default(:idle),
+          timer_id: Zoi.string() |> Zoi.default(nil),
+          tick_count: Zoi.integer() |> Zoi.default(0),
+          last_tick_timer: Zoi.string() |> Zoi.default(nil),
+          attempts: Zoi.integer() |> Zoi.default(0),
+          max_attempts: Zoi.integer() |> Zoi.default(3),
+          retry_delay_ms: Zoi.integer() |> Zoi.default(50),
+          result: Zoi.any() |> Zoi.default(nil),
+          request_id: Zoi.string() |> Zoi.default(nil),
+          pending_request: Zoi.string() |> Zoi.default(nil),
+          started_at: Zoi.any() |> Zoi.default(nil)
+        })
 
     def signal_routes(_ctx) do
       [

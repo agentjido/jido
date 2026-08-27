@@ -2,6 +2,7 @@ defmodule JidoTest.Agent.StrategyTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Agent.Strategy
   alias Jido.Agent.Strategy.Snapshot
 
@@ -27,7 +28,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
     def action_spec(:simple_action) do
       %{
-        schema: [value: [type: :integer, required: true]],
+        schema: Zoi.object(%{value: Zoi.integer()}, coerce: true),
         doc: "A simple action"
       }
     end
@@ -131,17 +132,17 @@ defmodule JidoTest.Agent.StrategyTest do
     end
   end
 
-  describe "normalize_instruction/3" do
+  describe "normalize_command/3" do
     test "preserves string keys when no action_spec (atom-safe)" do
       {:ok, _agent} = Agent.new(%{id: "test"})
 
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :unknown_action,
         params: %{"foo" => "bar", "nested" => %{"key" => "value"}}
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(MinimalStrategy, command, ctx)
 
       # Keys remain as strings to prevent atom table exhaustion
       assert normalized.params["foo"] == "bar"
@@ -151,33 +152,33 @@ defmodule JidoTest.Agent.StrategyTest do
     test "normalizes with Zoi schema" do
       {:ok, _agent} = Agent.new(%{id: "test"})
 
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :special_action,
         params: %{"value" => 42}
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(TestStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(TestStrategy, command, ctx)
 
       assert normalized.params.value == 42
     end
 
-    test "normalizes with NimbleOptions schema" do
+    test "normalizes a second Zoi schema" do
       {:ok, _agent} = Agent.new(%{id: "test"})
 
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :simple_action,
         params: %{"value" => 42}
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(TestStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(TestStrategy, command, ctx)
 
       assert normalized.params[:value] == 42
     end
 
     test "raises on invalid params for Zoi schema" do
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :special_action,
         params: %{"value" => "not_a_number_that_can_be_parsed"}
       }
@@ -185,31 +186,31 @@ defmodule JidoTest.Agent.StrategyTest do
       ctx = %{agent_module: nil, strategy_opts: []}
 
       assert_raise ArgumentError, ~r/Invalid params/, fn ->
-        Strategy.normalize_instruction(TestStrategy, instruction, ctx)
+        Strategy.normalize_command(TestStrategy, command, ctx)
       end
     end
 
     test "handles already-atom keys" do
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :unknown_action,
         params: %{foo: "bar", baz: 123}
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(MinimalStrategy, command, ctx)
 
       assert normalized.params.foo == "bar"
       assert normalized.params.baz == 123
     end
 
     test "handles non-map params" do
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :unknown_action,
         params: "just a string"
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(MinimalStrategy, command, ctx)
 
       assert normalized.params == "just a string"
     end
@@ -252,12 +253,12 @@ defmodule JidoTest.Agent.StrategyTest do
       {:ok, agent} = Agent.new(%{id: "test"})
       ctx = %{agent_module: nil, strategy_opts: []}
 
-      instructions = [
-        %Jido.Instruction{action: :action1, params: %{}},
-        %Jido.Instruction{action: :action2, params: %{}}
+      commands = [
+        %Command{action: :action1, params: %{}},
+        %Command{action: :action2, params: %{}}
       ]
 
-      {updated_agent, directives} = TestStrategy.cmd(agent, instructions, ctx)
+      {updated_agent, directives} = TestStrategy.cmd(agent, commands, ctx)
 
       assert updated_agent.state.cmd_count == 2
       assert directives == []
@@ -304,7 +305,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
   describe "atom-safe key handling" do
     test "preserves mixed key types without atomization" do
-      instruction = %Jido.Instruction{
+      command = %Command{
         action: :unknown_action,
         params: %{
           :atom_key => "value1",
@@ -314,7 +315,7 @@ defmodule JidoTest.Agent.StrategyTest do
       }
 
       ctx = %{agent_module: nil, strategy_opts: []}
-      normalized = Strategy.normalize_instruction(MinimalStrategy, instruction, ctx)
+      normalized = Strategy.normalize_command(MinimalStrategy, command, ctx)
 
       # Existing atom keys remain atoms, string keys stay strings (atom-safe)
       assert normalized.params.atom_key == "value1"

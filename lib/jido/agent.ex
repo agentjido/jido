@@ -33,7 +33,8 @@ defmodule Jido.Agent do
 
   - `MyAction` - Action module with no params
   - `{MyAction, %{param: value}}` - Action with params
-  - `%Instruction{}` - Full instruction struct
+  - `%Jido.Agent.Command{}` - Full Agent command value
+  - `%Instruction{}` - Executable invocation imported as an Agent command
   - `[...]` - List of any of the above (processed in sequence)
 
   ## Directives
@@ -74,10 +75,10 @@ defmodule Jido.Agent do
         use Jido.Agent,
           name: "my_agent",
           description: "My custom agent",
-          schema: [
-            status: [type: :atom, default: :idle],
-            counter: [type: :integer, default: 0]
-          ]
+          schema: Zoi.object(%{
+                    status: Zoi.atom() |> Zoi.default(:idle),
+                    counter: Zoi.integer() |> Zoi.default(0)
+                  })
       end
 
   ### Working with Agents
@@ -110,17 +111,8 @@ defmodule Jido.Agent do
 
   ## State Schema Types
 
-  Agent supports two schema formats for state validation:
+  Agent uses Zoi schemas for state validation:
 
-  1. **NimbleOptions schemas** (familiar, legacy):
-     ```elixir
-     schema: [
-       status: [type: :atom, default: :idle],
-       counter: [type: :integer, default: 0]
-     ]
-     ```
-
-  2. **Zoi schemas** (recommended for new code):
      ```elixir
      schema: Zoi.object(%{
        status: Zoi.atom() |> Zoi.default(:idle),
@@ -128,7 +120,9 @@ defmodule Jido.Agent do
      })
      ```
 
-  Both are handled transparently by the Agent module.
+  Schemas must contain only static data. Refinement and transform callbacks must
+  use `{Module, :function, args}` MFA values. Anonymous callbacks and lazy schemas
+  cause a compile error.
 
   ## Pure Functional Design
 
@@ -136,9 +130,10 @@ defmodule Jido.Agent do
   Server/OTP integration is handled separately by `Jido.AgentServer`.
   """
 
-  alias Jido.Action.Schema
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Agent.Directive
+  alias Jido.Agent.Schema
   alias Jido.Agent.State, as: StateHelper
   alias Jido.Error
   alias Jido.Instruction
@@ -234,9 +229,7 @@ defmodule Jido.Agent do
                 Zoi.string(description: "Version")
                 |> Zoi.optional(),
               schema:
-                Zoi.any(
-                  description: "NimbleOptions or Zoi schema for validating the Agent's state"
-                )
+                Zoi.any(description: "Zoi schema for validating the Agent's state")
                 |> Zoi.default([]),
               state:
                 Zoi.map(description: "Current state")
@@ -255,7 +248,16 @@ defmodule Jido.Agent do
   def schema, do: @schema
 
   # Action input types
-  @type action :: module() | {module(), map()} | Instruction.t() | [action()]
+  @type action ::
+          module()
+          | atom()
+          | Jido.Flow.t()
+          | {term(), map()}
+          | {term(), map(), map()}
+          | {term(), map(), map(), keyword()}
+          | Command.t()
+          | Instruction.t()
+          | [action()]
 
   # Directive types (runtime-owned external effects only - never modify agent state)
   # See Jido.Agent.Directive for structured payload modules
@@ -285,10 +287,7 @@ defmodule Jido.Agent do
                              Zoi.string(description: "Version")
                              |> Zoi.optional(),
                            schema:
-                             Zoi.any(
-                               description:
-                                 "NimbleOptions or Zoi schema for validating the Agent's state."
-                             )
+                             Zoi.any(description: "Zoi schema for validating the Agent's state.")
                              |> Zoi.refine({Schema, :validate_config_schema, []})
                              |> Zoi.default([]),
                            strategy:
@@ -457,9 +456,9 @@ defmodule Jido.Agent do
       @behaviour Jido.Agent
 
       alias Jido.Agent
+      alias Jido.Agent.Command
       alias Jido.Agent.State, as: AgentState
       alias Jido.Agent.Strategy, as: AgentStrategy
-      alias Jido.Instruction
       alias Jido.Plugin.Requirements, as: PluginRequirements
     end
   end
@@ -856,16 +855,15 @@ defmodule Jido.Agent do
         * `{MyAction, %{param: 1}}` - Action with params
         * `{MyAction, %{param: 1}, %{context: data}}` - Action with params and context
         * `{MyAction, %{param: 1}, %{}, [timeout: 1000]}` - Action with opts
-        * `%Instruction{}` - Full instruction struct
+        * `%Jido.Agent.Command{}` - Full Agent command
+        * `%Jido.Instruction{}` - Executable invocation imported as an Agent command
         * `[...]` - List of any of the above (processed in sequence)
 
       ## Options
 
-      The optional third argument `opts` is a keyword list merged into all instructions:
+      The optional third argument `opts` is a keyword list merged into all commands:
 
         * `:timeout` - Maximum time (in ms) for each action to complete
-        * `:max_retries` - Maximum retry attempts on failure
-        * `:backoff` - Initial backoff time in ms (doubles with each retry)
 
       ## Examples
 
@@ -893,7 +891,7 @@ defmodule Jido.Agent do
           |> Keyword.get(:__jido_action_context__, %{})
           |> __normalize_internal_action_context__()
 
-        instruction_opts =
+        command_opts =
           opts
           |> Keyword.delete(:__jido_instance__)
           |> Keyword.delete(:__partition__)
@@ -908,21 +906,21 @@ defmodule Jido.Agent do
             %{state: agent.state}
           end
 
-        instruction_context = Map.merge(action_context, base_context)
+        command_context = Map.merge(action_context, base_context)
 
-        case Instruction.normalize(action, instruction_context, instruction_opts) do
-          {:ok, instructions} ->
+        case Command.normalize(action, command_context, command_opts) do
+          {:ok, commands} ->
             ctx = __strategy_ctx__(jido_instance, partition)
             strat = strategy()
 
-            normalized_instructions =
-              Enum.map(instructions, fn instr ->
+            normalized_commands =
+              Enum.map(commands, fn command ->
                 strat
-                |> AgentStrategy.normalize_instruction(instr, ctx)
-                |> __apply_action_exec_defaults__(action_exec_defaults)
+                |> AgentStrategy.normalize_command(command, ctx)
+                |> Command.put_exec_defaults(action_exec_defaults)
               end)
 
-            {agent, directives} = strat.cmd(agent, normalized_instructions, ctx)
+            {agent, directives} = strat.cmd(agent, normalized_commands, ctx)
             __do_after_cmd__(agent, action, directives)
 
           {:error, reason} ->
@@ -930,21 +928,6 @@ defmodule Jido.Agent do
             {agent, [%Jido.Agent.Directive.Error{error: error, context: :normalize}]}
         end
       end
-
-      defp __apply_action_exec_defaults__(%Instruction{opts: opts} = instruction, defaults)
-           when is_list(defaults) and is_list(opts) do
-        merged_opts =
-          defaults
-          |> Enum.reverse()
-          |> Enum.reduce(opts, fn
-            {key, value}, acc when is_atom(key) -> Keyword.put_new(acc, key, value)
-            _invalid, acc -> acc
-          end)
-
-        %{instruction | opts: merged_opts}
-      end
-
-      defp __apply_action_exec_defaults__(instruction, _defaults), do: instruction
 
       defp __normalize_internal_action_context__(context) when is_map(context) do
         Map.drop(context, [
@@ -1241,6 +1224,8 @@ defmodule Jido.Agent do
                                file: __ENV__.file,
                                line: __ENV__.line
                          end)
+
+        Jido.Schema.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
 
         @expanded_signal_routes Jido.Agent.expand_and_eval_literal_option(
                                   @validated_opts[:signal_routes] || [],

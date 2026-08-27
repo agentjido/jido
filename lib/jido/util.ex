@@ -99,12 +99,12 @@ defmodule Jido.Util do
 
   @doc """
   Validates that all modules in a list implement the Jido.Action behavior.
-  Used as a custom validator for NimbleOptions.
+  Used to validate action modules in plugin configuration.
 
   This function ensures that all provided modules are valid Jido.Action implementations
   by checking that they:
   1. Are valid Elixir modules that can be loaded
-  2. Export the required __action_metadata__/0 function that indicates Jido.Action behavior
+  2. Export the Jido v3 executable marker
 
   ## Parameters
 
@@ -185,12 +185,15 @@ defmodule Jido.Util do
 
   defp implements_action?(module) when is_atom(module) do
     match?({:module, _}, Code.ensure_compiled(module)) and
-      function_exported?(module, :__action_metadata__, 0)
+      match?(
+        {:ok, %Jido.Executable{kind: :action, target: ^module}},
+        Jido.Executable.resolve(module)
+      )
   end
 
   @doc """
   Validates that a module is a valid Elixir module that can be loaded.
-  Used as a custom validator for NimbleOptions.
+  Used to validate module configuration values.
 
   ## Parameters
 
@@ -229,7 +232,7 @@ defmodule Jido.Util do
 
   @doc """
   Validates that a module is a valid Elixir module that can be compiled.
-  Used as a custom validator for NimbleOptions that handles compilation order.
+  Used to validate module configuration values when compilation order matters.
 
   Uses Code.ensure_compiled/1 which blocks until the module finishes compilation
   or returns an error, making it safe for parallel compilation scenarios.

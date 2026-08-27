@@ -107,9 +107,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     use Jido.Agent,
       name: "test_agent",
       description: "Test agent for instance manager tests",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       actions: []
   end
 
@@ -153,9 +151,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     @moduledoc false
     use Jido.Agent,
       name: "durable_cron_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)})
 
     @impl true
     def signal_routes(_ctx) do
@@ -171,9 +167,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
     @moduledoc false
     use Jido.Agent,
       name: "declarative_conflict_agent",
-      schema: [
-        tick_count: [type: :integer, default: 0]
-      ],
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)}),
       schedules: [
         {"* * * * *", "cron.tick", job_id: :declarative_conflict}
       ]

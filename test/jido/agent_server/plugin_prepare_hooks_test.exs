@@ -404,13 +404,14 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     use Jido.Agent,
       name: "runtime_agent",
-      schema: [
-        runtime_principal_id: [type: :string, default: nil],
-        runtime_scope: [type: :string, default: nil],
-        prepared_signal_type: [type: :string, default: nil],
-        payload: [type: :string, default: nil],
-        params_contain_principal?: [type: :boolean, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          runtime_principal_id: Zoi.string() |> Zoi.default(nil),
+          runtime_scope: Zoi.string() |> Zoi.default(nil),
+          prepared_signal_type: Zoi.string() |> Zoi.default(nil),
+          payload: Zoi.string() |> Zoi.default(nil),
+          params_contain_principal?: Zoi.boolean() |> Zoi.default(nil)
+        }),
       plugins: [IdentityPlugin, AuthorizationPlugin]
 
     def signal_routes(_ctx), do: [{"incoming.verified", RecordRuntimeContextAction}]
@@ -421,13 +422,14 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     use Jido.Agent,
       name: "context_override_agent",
-      schema: [
-        runtime_principal_id: [type: :string, default: nil],
-        runtime_scope: [type: :string, default: nil],
-        prepared_signal_type: [type: :string, default: nil],
-        payload: [type: :string, default: nil],
-        params_contain_principal?: [type: :boolean, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          runtime_principal_id: Zoi.string() |> Zoi.default(nil),
+          runtime_scope: Zoi.string() |> Zoi.default(nil),
+          prepared_signal_type: Zoi.string() |> Zoi.default(nil),
+          payload: Zoi.string() |> Zoi.default(nil),
+          params_contain_principal?: Zoi.boolean() |> Zoi.default(nil)
+        }),
       plugins: [ActionContextOverridePlugin, IdentityPlugin, AuthorizationPlugin]
   end
 
@@ -536,14 +538,15 @@ defmodule JidoTest.AgentServer.PluginPrepareHooksTest do
 
     use Jido.Agent,
       name: "emit_agent",
-      schema: [
-        emitted_signal_type: [type: :string, default: nil],
-        emitted_payload: [type: :string, default: nil],
-        emitted_input_signal_type: [type: :string, default: nil],
-        emitted_runtime_principal_id: [type: :string, default: nil],
-        emitted_saw_directive_dispatch?: [type: :boolean, default: nil],
-        emitted_saw_context_dispatch?: [type: :boolean, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          emitted_signal_type: Zoi.string() |> Zoi.default(nil),
+          emitted_payload: Zoi.string() |> Zoi.default(nil),
+          emitted_input_signal_type: Zoi.string() |> Zoi.default(nil),
+          emitted_runtime_principal_id: Zoi.string() |> Zoi.default(nil),
+          emitted_saw_directive_dispatch?: Zoi.boolean() |> Zoi.default(nil),
+          emitted_saw_context_dispatch?: Zoi.boolean() |> Zoi.default(nil)
+        }),
       plugins: [IdentityPlugin, AuthorizationPlugin, PrepareEmitPlugin]
 
     def signal_routes(_ctx) do

@@ -8,11 +8,12 @@ defmodule JidoTest.Integration.HibernateThawTest do
   defmodule WorkflowAgent do
     use Jido.Agent,
       name: "workflow_agent",
-      schema: [
-        step: [type: :integer, default: 0],
-        status: [type: :atom, default: :pending],
-        data: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          step: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:pending),
+          data: Zoi.map() |> Zoi.default(%{})
+        })
 
     @impl true
     def signal_routes(_ctx), do: []

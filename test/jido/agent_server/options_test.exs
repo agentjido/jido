@@ -10,7 +10,7 @@ defmodule JidoTest.AgentServer.OptionsTest do
     @moduledoc false
     use Jido.Agent,
       name: "valid_agent",
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 
   describe "new/1 with keyword list" do

@@ -15,9 +15,7 @@ defmodule JidoTest.Pod.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "pod_telemetry_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule ReviewPod do

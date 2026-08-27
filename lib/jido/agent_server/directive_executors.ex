@@ -68,29 +68,28 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.RunInstruction
 
   require Logger
 
+  alias Jido.Agent.Command
   alias Jido.AgentServer.State
   alias Jido.Observe.Config, as: ObserveConfig
 
   def exec(
-        %{instruction: instruction, result_action: result_action, meta: meta},
+        %{command: command, result_action: result_action, meta: meta},
         input_signal,
         state
       ) do
-    runtime_context = Map.get(state, :current_runtime_context, %{})
-
-    enriched_instruction = %{
-      instruction
-      | context: Map.put(instruction.context || %{}, :state, state.agent.state)
-    }
+    runtime_context =
+      state
+      |> Map.get(:current_runtime_context, %{})
+      |> Map.put(:state, state.agent.state)
 
     execution_payload =
-      enriched_instruction
-      |> then(fn instruction ->
-        exec_opts = ObserveConfig.action_exec_opts(state.jido, instruction.opts)
-        Jido.Exec.run(%{instruction | opts: exec_opts})
+      command
+      |> then(fn command ->
+        exec_opts = ObserveConfig.action_exec_opts(state.jido, command.opts)
+        Command.run(command, runtime_context, exec_opts)
       end)
       |> normalize_result_payload()
-      |> Map.put(:instruction, instruction)
+      |> Map.put(:command, command)
       |> Map.put(:meta, meta || %{})
 
     {agent, directives} =

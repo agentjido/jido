@@ -20,7 +20,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Action,
       name: "value_action",
-      schema: [value: [type: :integer, required: true]]
+      schema: Zoi.object(%{value: Zoi.integer()})
 
     def run(%{value: value}, _context), do: {:ok, %{value: value}}
   end
@@ -39,7 +39,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     use Jido.Agent,
       name: "direct_test_agent",
       strategy: Jido.Agent.Strategy.Direct,
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end
@@ -49,7 +49,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     use Jido.Agent,
       name: "direct_thread_agent",
       strategy: {Jido.Agent.Strategy.Direct, thread?: true},
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end
@@ -59,7 +59,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     use Jido.Agent,
       name: "fsm_test_agent",
       strategy: StrategyFSM,
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end
@@ -69,7 +69,7 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     use Jido.Agent,
       name: "fsm_thread_agent",
       strategy: {StrategyFSM, thread?: true},
-      schema: [value: [type: :integer, default: 0]]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
   end

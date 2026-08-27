@@ -84,7 +84,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "signal_rewrite_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.SignalRewritePlugin]
 
     def signal_routes(_ctx) do
@@ -124,10 +124,11 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "override_with_signal_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        marker: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          marker: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.OverrideWithSignalPlugin]
 
     def signal_routes(_ctx) do
@@ -174,7 +175,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "chained_signal_rewrite_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [
         JidoTest.AgentServer.PluginSignalPhaseTest.AddPrefixPlugin,
         JidoTest.AgentServer.PluginSignalPhaseTest.MultiplyAmountPlugin
@@ -208,11 +209,12 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "signal_context_agent",
-      schema: [
-        context_signal_type: [type: :string, default: nil],
-        context_principal_id: [type: :string, default: nil],
-        context_params_unchanged?: [type: :boolean, default: false]
-      ],
+      schema:
+        Zoi.object(%{
+          context_signal_type: Zoi.string() |> Zoi.default(nil),
+          context_principal_id: Zoi.string() |> Zoi.default(nil),
+          context_params_unchanged?: Zoi.boolean() |> Zoi.default(false)
+        }),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.SignalContextPlugin]
 
     def signal_routes(_ctx) do
@@ -296,10 +298,11 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "filtered_reject_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        other: [type: :integer, default: 0]
-      ],
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          other: Zoi.integer() |> Zoi.default(0)
+        }),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.RejectAllPlugin]
 
     def signal_routes(_ctx) do
@@ -329,7 +332,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "global_phase_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.GlobalPhasePlugin]
 
     def signal_routes(_ctx) do
@@ -358,7 +361,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "wildcard_pattern_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.WildcardPatternPlugin]
 
     def signal_routes(_ctx) do
@@ -454,10 +457,11 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "action_aware_transform_agent",
-      schema: [
-        counter: [type: :integer, default: 0],
-        marker: [type: :string, default: nil]
-      ],
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          marker: Zoi.string() |> Zoi.default(nil)
+        }),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.ActionAwareTransformPlugin]
 
     def signal_routes(_ctx) do
@@ -527,7 +531,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "crashing_hs_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.CrashingHandleSignalPlugin]
 
     def signal_routes(_ctx) do
@@ -555,7 +559,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "crashing_transform_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.CrashingTransformPlugin]
 
     def signal_routes(_ctx) do
@@ -647,7 +651,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
     @moduledoc false
     use Jido.Agent,
       name: "instance_context_agent",
-      schema: [counter: [type: :integer, default: 0]],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [JidoTest.AgentServer.PluginSignalPhaseTest.InstanceContextPlugin]
 
     def signal_routes(_ctx) do

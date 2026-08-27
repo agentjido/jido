@@ -111,10 +111,7 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Action,
       name: "record_sensor_signal",
-      schema: [
-        value: [type: :any, required: true],
-        count: [type: :integer, required: true]
-      ]
+      schema: Zoi.object(%{value: Zoi.any(), count: Zoi.integer()})
 
     def run(params, _context) do
       {:ok, %{last_sensor_value: params.value, last_sensor_count: params.count}}
@@ -137,14 +134,15 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Action,
       name: "record_sensor_exit",
-      schema: [
-        tag: [type: :any, required: true],
-        pid: [type: :any, required: true],
-        reason: [type: :any, required: true],
-        sensor: [type: :any, required: true],
-        origin: [type: :any, required: true],
-        meta: [type: :map, default: %{}]
-      ]
+      schema:
+        Zoi.object(%{
+          tag: Zoi.any(),
+          pid: Zoi.any(),
+          reason: Zoi.any(),
+          sensor: Zoi.any(),
+          origin: Zoi.any(),
+          meta: Zoi.map() |> Zoi.default(%{})
+        })
 
     def run(params, context) do
       events = Map.get(context.state, :sensor_exit_events, [])
@@ -264,10 +262,11 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Agent,
       name: "agent_with_routed_sensor_plugin",
-      schema: [
-        last_sensor_value: [type: :any, default: nil],
-        last_sensor_count: [type: :integer, default: 0]
-      ],
+      schema:
+        Zoi.object(%{
+          last_sensor_value: Zoi.any() |> Zoi.default(nil),
+          last_sensor_count: Zoi.integer() |> Zoi.default(0)
+        }),
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithRoutedSensor],
       signal_routes: [
         {"plugin.sensor.delivered",
@@ -279,10 +278,11 @@ defmodule JidoTest.AgentServer.PluginSubscriptionsTest do
     @moduledoc false
     use Jido.Agent,
       name: "agent_with_child_exit_sensor_plugin",
-      schema: [
-        child_exit_events: [type: {:list, :any}, default: []],
-        sensor_exit_events: [type: {:list, :any}, default: []]
-      ],
+      schema:
+        Zoi.object(%{
+          child_exit_events: Zoi.list(Zoi.any()) |> Zoi.default([]),
+          sensor_exit_events: Zoi.list(Zoi.any()) |> Zoi.default([])
+        }),
       plugins: [JidoTest.AgentServer.PluginSubscriptionsTest.PluginWithSensor],
       signal_routes: [
         {"jido.agent.child.exit",

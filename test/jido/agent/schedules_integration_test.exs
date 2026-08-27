@@ -16,7 +16,7 @@ defmodule JidoTest.Agent.SchedulesIntegrationTest do
   defmodule ScheduledAgent do
     use Jido.Agent,
       name: "scheduled_agent",
-      schema: [tick_count: [type: :integer, default: 0]],
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)}),
       schedules: [
         {"* * * * * * *", "agent.tick", job_id: :tick}
       ]
@@ -29,7 +29,7 @@ defmodule JidoTest.Agent.SchedulesIntegrationTest do
   defmodule MultiScheduleAgent do
     use Jido.Agent,
       name: "multi_schedule_agent",
-      schema: [tick_count: [type: :integer, default: 0]],
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)}),
       schedules: [
         {"* * * * *", "heartbeat.tick", job_id: :heartbeat},
         {"@daily", "cleanup.run", job_id: :cleanup, timezone: "America/New_York"}
@@ -43,7 +43,7 @@ defmodule JidoTest.Agent.SchedulesIntegrationTest do
   defmodule NoScheduleAgent do
     use Jido.Agent,
       name: "no_schedule_agent",
-      schema: [tick_count: [type: :integer, default: 0]]
+      schema: Zoi.object(%{tick_count: Zoi.integer() |> Zoi.default(0)})
   end
 
   describe "agent with schedules" do

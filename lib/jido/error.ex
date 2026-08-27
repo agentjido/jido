@@ -596,54 +596,6 @@ defmodule Jido.Error do
     end
   end
 
-  @doc """
-  Formats a NimbleOptions configuration error.
-  """
-  @spec format_nimble_config_error(any(), String.t(), module()) :: String.t()
-  def format_nimble_config_error(
-        %NimbleOptions.ValidationError{keys_path: [], message: message},
-        module_type,
-        module
-      ) do
-    "Invalid configuration for #{module_type} (#{module}): #{message}"
-  end
-
-  def format_nimble_config_error(
-        %NimbleOptions.ValidationError{keys_path: keys_path, message: message},
-        module_type,
-        module
-      ) do
-    "Invalid configuration for #{module_type} (#{module}) at #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_nimble_config_error(error, _module_type, _module) when is_binary(error), do: error
-  def format_nimble_config_error(error, _module_type, _module), do: inspect(error)
-
-  @doc """
-  Formats a NimbleOptions validation error for parameters.
-  """
-  @spec format_nimble_validation_error(any(), String.t(), module()) :: String.t()
-  def format_nimble_validation_error(
-        %NimbleOptions.ValidationError{keys_path: [], message: message},
-        module_type,
-        module
-      ) do
-    "Invalid parameters for #{module_type} (#{module}): #{message}"
-  end
-
-  def format_nimble_validation_error(
-        %NimbleOptions.ValidationError{keys_path: keys_path, message: message},
-        module_type,
-        module
-      ) do
-    "Invalid parameters for #{module_type} (#{module}) at #{inspect(keys_path)}: #{message}"
-  end
-
-  def format_nimble_validation_error(error, _module_type, _module) when is_binary(error),
-    do: error
-
-  def format_nimble_validation_error(error, _module_type, _module), do: inspect(error)
-
   @doc false
   def capture_stacktrace do
     {:current_stacktrace, stacktrace} = Process.info(self(), :current_stacktrace)

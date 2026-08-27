@@ -9,7 +9,7 @@ defmodule Jido.Discovery do
 
   Discovery automatically finds and indexes:
 
-  - **Actions** - Discrete units of work (`__action_metadata__/0`)
+  - **Actions** - Executable Action modules (`Jido.Executable`)
   - **Sensors** - Event monitoring components (`__sensor_metadata__/0`)
   - **Agents** - Autonomous workers (`__agent_metadata__/0`)
   - **Plugins** - Reusable capability packs (`__plugin_metadata__/0`)
@@ -222,13 +222,20 @@ defmodule Jido.Discovery do
     %{
       last_updated: DateTime.utc_now(),
       components: %{
-        actions: discover_components(:__action_metadata__),
+        actions: discover_actions(),
         sensors: discover_components(:__sensor_metadata__),
         agents: discover_components(:__agent_metadata__),
         plugins: discover_components(:__plugin_metadata__),
         demos: discover_components(:__jido_demo__)
       }
     }
+  end
+
+  defp discover_actions do
+    loaded_applications()
+    |> Enum.flat_map(&modules_for/1)
+    |> Enum.filter(&action_module?/1)
+    |> Enum.map(&build_action_metadata/1)
   end
 
   defp discover_components(metadata_fun) do
@@ -254,12 +261,34 @@ defmodule Jido.Discovery do
     Code.ensure_loaded?(module) and function_exported?(module, fun, 0)
   end
 
+  defp action_module?(module) do
+    Code.ensure_loaded?(module) and
+      match?(
+        {:ok, %Jido.Executable{kind: :action, target: ^module}},
+        Jido.Executable.resolve(module)
+      )
+  end
+
+  defp build_action_metadata(module) do
+    %{
+      name: module.name(),
+      description: module.description(),
+      category: nil,
+      tags: []
+    }
+    |> put_module_and_slug(module)
+  end
+
   defp build_metadata(module, metadata_fun) do
     raw_metadata = apply(module, metadata_fun, [])
 
     metadata_map =
       if Keyword.keyword?(raw_metadata), do: Map.new(raw_metadata), else: raw_metadata
 
+    put_module_and_slug(metadata_map, module)
+  end
+
+  defp put_module_and_slug(metadata, module) do
     slug =
       module
       |> Atom.to_string()
@@ -267,7 +296,7 @@ defmodule Jido.Discovery do
       |> Base.url_encode64(padding: false)
       |> binary_part(0, 8)
 
-    metadata_map
+    metadata
     |> Map.put(:module, module)
     |> Map.put(:slug, slug)
   end

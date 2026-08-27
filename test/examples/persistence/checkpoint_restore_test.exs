@@ -62,9 +62,7 @@ defmodule JidoExampleTest.CheckpointRestoreTest do
     use Jido.Agent,
       name: "checkpointable_agent",
       description: "Agent with mixed checkpoint plugin strategies",
-      schema: [
-        counter: [type: :integer, default: 0]
-      ],
+      schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
       plugins: [
         JidoExampleTest.CheckpointRestoreTest.CachePlugin,
         JidoExampleTest.CheckpointRestoreTest.SessionPlugin

@@ -29,11 +29,12 @@ defmodule JidoExampleTest.PersistenceStorageTest do
     use Jido.Agent,
       name: "persistable_agent",
       description: "An agent demonstrating persistence with ETS storage",
-      schema: [
-        counter: [type: :integer, default: 0],
-        status: [type: :atom, default: :idle],
-        notes: [type: {:list, :string}, default: []]
-      ]
+      schema:
+        Zoi.object(%{
+          counter: Zoi.integer() |> Zoi.default(0),
+          status: Zoi.atom() |> Zoi.default(:idle),
+          notes: Zoi.list(Zoi.string()) |> Zoi.default([])
+        })
   end
 
   # ===========================================================================

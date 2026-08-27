@@ -18,9 +18,7 @@ defmodule JidoTest.Pod.MutationRuntimeTest do
     @moduledoc false
     use Jido.Agent,
       name: "pod_mutation_worker",
-      schema: [
-        role: [type: :string, default: "worker"]
-      ]
+      schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
   end
 
   defmodule SlowMountPlugin do

@@ -7,17 +7,17 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   """
 
   alias Jido.Agent
-  alias Jido.Instruction
+  alias Jido.Agent.Command
   alias Jido.Thread.Agent, as: ThreadAgent
 
   @doc """
   Append an `:instruction_start` thread entry.
   """
-  @spec append_instruction_start(Agent.t(), Instruction.t()) :: Agent.t()
-  def append_instruction_start(agent, %Instruction{} = instruction) do
+  @spec append_instruction_start(Agent.t(), Command.t()) :: Agent.t()
+  def append_instruction_start(agent, %Command{} = command) do
     entry = %{
       kind: :instruction_start,
-      payload: instruction_payload(instruction)
+      payload: instruction_payload(command)
     }
 
     ThreadAgent.append(agent, entry)
@@ -26,11 +26,11 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   @doc """
   Append an `:instruction_end` thread entry.
   """
-  @spec append_instruction_end(Agent.t(), Instruction.t(), atom()) :: Agent.t()
-  def append_instruction_end(agent, %Instruction{} = instruction, status) do
+  @spec append_instruction_end(Agent.t(), Command.t(), atom()) :: Agent.t()
+  def append_instruction_end(agent, %Command{} = command, status) do
     entry = %{
       kind: :instruction_end,
-      payload: Map.put(instruction_payload(instruction), :status, status)
+      payload: Map.put(instruction_payload(command), :status, status)
     }
 
     ThreadAgent.append(agent, entry)
@@ -39,10 +39,10 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   @doc """
   Conditionally append `:instruction_start` when thread tracking is enabled.
   """
-  @spec maybe_append_instruction_start(Agent.t(), Instruction.t()) :: Agent.t()
-  def maybe_append_instruction_start(agent, %Instruction{} = instruction) do
+  @spec maybe_append_instruction_start(Agent.t(), Command.t()) :: Agent.t()
+  def maybe_append_instruction_start(agent, %Command{} = command) do
     if ThreadAgent.has_thread?(agent) do
-      append_instruction_start(agent, instruction)
+      append_instruction_start(agent, command)
     else
       agent
     end
@@ -51,31 +51,31 @@ defmodule Jido.Agent.Strategy.InstructionTracking do
   @doc """
   Conditionally append `:instruction_end` when thread tracking is enabled.
   """
-  @spec maybe_append_instruction_end(Agent.t(), Instruction.t() | nil, atom()) :: Agent.t()
+  @spec maybe_append_instruction_end(Agent.t(), Command.t() | nil, atom()) :: Agent.t()
   def maybe_append_instruction_end(agent, nil, _status), do: agent
 
-  def maybe_append_instruction_end(agent, %Instruction{} = instruction, status) do
+  def maybe_append_instruction_end(agent, %Command{} = command, status) do
     if ThreadAgent.has_thread?(agent) do
-      append_instruction_end(agent, instruction, status)
+      append_instruction_end(agent, command, status)
     else
       agent
     end
   end
 
   @doc false
-  @spec instruction_payload(Instruction.t()) :: map()
-  def instruction_payload(%Instruction{} = instruction) do
-    payload = %{action: instruction.action}
+  @spec instruction_payload(Command.t()) :: map()
+  def instruction_payload(%Command{} = command) do
+    payload = %{action: command.action}
 
     payload =
-      if is_map(instruction.params) and map_size(instruction.params) > 0 do
-        Map.put(payload, :param_keys, Map.keys(instruction.params))
+      if is_map(command.params) and map_size(command.params) > 0 do
+        Map.put(payload, :param_keys, Map.keys(command.params))
       else
         payload
       end
 
-    if instruction.id do
-      Map.put(payload, :instruction_id, instruction.id)
+    if command.metadata[:id] do
+      Map.put(payload, :instruction_id, command.metadata[:id])
     else
       payload
     end

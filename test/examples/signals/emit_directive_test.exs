@@ -28,11 +28,12 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "create_order",
-      schema: [
-        order_id: [type: :string, required: true],
-        items: [type: {:list, :map}, default: []],
-        total: [type: :integer, required: true]
-      ]
+      schema:
+        Zoi.object(%{
+          order_id: Zoi.string(),
+          items: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          total: Zoi.integer()
+        })
 
     def run(params, context) do
       orders = Map.get(context.state, :orders, [])
@@ -61,10 +62,8 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "process_payment",
-      schema: [
-        order_id: [type: :string, required: true],
-        payment_method: [type: :string, default: "card"]
-      ]
+      schema:
+        Zoi.object(%{order_id: Zoi.string(), payment_method: Zoi.string() |> Zoi.default("card")})
 
     def run(params, _context) do
       order_id = params.order_id
@@ -85,9 +84,7 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "multi_emit",
-      schema: [
-        event_count: [type: :integer, default: 3]
-      ]
+      schema: Zoi.object(%{event_count: Zoi.integer() |> Zoi.default(3)})
 
     def run(%{event_count: count}, _context) do
       emissions =
@@ -108,12 +105,13 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Agent,
       name: "order_agent",
-      schema: [
-        orders: [type: {:list, :map}, default: []],
-        last_order_id: [type: :string, default: nil],
-        last_payment: [type: :map, default: nil],
-        emitted_count: [type: :integer, default: 0]
-      ]
+      schema:
+        Zoi.object(%{
+          orders: Zoi.list(Zoi.map()) |> Zoi.default([]),
+          last_order_id: Zoi.string() |> Zoi.default(nil),
+          last_payment: Zoi.map() |> Zoi.default(nil),
+          emitted_count: Zoi.integer() |> Zoi.default(0)
+        })
 
     def signal_routes(_ctx) do
       [
@@ -128,9 +126,7 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "internal_increment",
-      schema: [
-        amount: [type: :integer, default: 1]
-      ]
+      schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
     def run(%{amount: amount}, context) do
       current = Map.get(context.state, :count, 0)
@@ -151,10 +147,7 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Action,
       name: "internal_print_count",
-      schema: [
-        previous_count: [type: :integer, required: true],
-        count: [type: :integer, required: true]
-      ]
+      schema: Zoi.object(%{previous_count: Zoi.integer(), count: Zoi.integer()})
 
     def run(%{previous_count: previous_count, count: count}, context) do
       if is_pid(context.state.observer),
@@ -168,11 +161,12 @@ defmodule JidoExampleTest.EmitDirectiveTest do
     @moduledoc false
     use Jido.Agent,
       name: "internal_emit_agent",
-      schema: [
-        count: [type: :integer, default: 0],
-        observer: [type: :any, default: nil],
-        last_seen_count: [type: :integer, default: 0]
-      ]
+      schema:
+        Zoi.object(%{
+          count: Zoi.integer() |> Zoi.default(0),
+          observer: Zoi.any() |> Zoi.default(nil),
+          last_seen_count: Zoi.integer() |> Zoi.default(0)
+        })
 
     def signal_routes(_ctx) do
       [

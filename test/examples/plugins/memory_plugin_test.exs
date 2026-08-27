@@ -29,10 +29,7 @@ defmodule JidoExampleTest.MemoryPluginTest do
     @moduledoc false
     use Jido.Action,
       name: "update_world",
-      schema: [
-        key: [type: :atom, required: true],
-        value: [type: :any, required: true]
-      ]
+      schema: Zoi.object(%{key: Zoi.atom(), value: Zoi.any()})
 
     def run(%{key: key, value: value}, context) do
       alias Jido.Memory
@@ -61,9 +58,7 @@ defmodule JidoExampleTest.MemoryPluginTest do
     use Jido.Agent,
       name: "memory_agent",
       description: "Agent with default memory plugin",
-      schema: [
-        status: [type: :atom, default: :idle]
-      ]
+      schema: Zoi.object(%{status: Zoi.atom() |> Zoi.default(:idle)})
   end
 
   defmodule NoMemoryAgent do
@@ -72,9 +67,7 @@ defmodule JidoExampleTest.MemoryPluginTest do
       name: "no_memory_agent",
       description: "Agent with memory plugin disabled",
       default_plugins: %{__memory__: false},
-      schema: [
-        value: [type: :integer, default: 0]
-      ]
+      schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
   end
 
   # ===========================================================================
