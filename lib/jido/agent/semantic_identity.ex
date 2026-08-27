@@ -8,14 +8,6 @@ defmodule Jido.Agent.SemanticIdentity do
   @identity_version 1
 
   @doc false
-  @spec semantic_digest(Agent.t()) :: String.t()
-  def semantic_digest(%Agent{} = agent) do
-    agent
-    |> for_agent()
-    |> Map.fetch!(:digest)
-  end
-
-  @doc false
   @spec for_agent(Agent.t()) :: map()
   def for_agent(%Agent{} = agent) do
     agent
@@ -23,14 +15,13 @@ defmodule Jido.Agent.SemanticIdentity do
     |> identity()
   end
 
-  @doc false
   @spec identity(map()) :: %{
           version: 1,
           algorithm: :sha256,
           digest: String.t(),
           uuid: String.t()
         }
-  def identity(canonical_identity_map) when is_map(canonical_identity_map) do
+  defp identity(canonical_identity_map) when is_map(canonical_identity_map) do
     raw_digest =
       {:jido_agent_identity, @identity_version, canonical_identity_map}
       |> hash_term()
@@ -43,19 +34,17 @@ defmodule Jido.Agent.SemanticIdentity do
     }
   end
 
-  @doc false
   @spec hash_term(term()) :: binary()
-  def hash_term(term) do
+  defp hash_term(term) do
     term
     |> :erlang.term_to_binary([:deterministic])
     |> then(&:crypto.hash(:sha256, &1))
   end
 
-  @doc false
   @spec uuid_v8(binary()) :: String.t()
-  def uuid_v8(
-        <<time_low::32, time_mid::16, version_bits::16, variant_bits::16, node::48, _::binary>>
-      ) do
+  defp uuid_v8(
+         <<time_low::32, time_mid::16, version_bits::16, variant_bits::16, node::48, _::binary>>
+       ) do
     version_bits = bor(band(version_bits, 0x0FFF), 0x8000)
     variant_bits = bor(band(variant_bits, 0x3FFF), 0x8000)
 

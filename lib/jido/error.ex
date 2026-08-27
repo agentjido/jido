@@ -49,6 +49,8 @@ defmodule Jido.Error do
   defmodule Invalid do
     @moduledoc false
     use Splode.ErrorClass, class: :invalid
+
+    @type t :: %__MODULE__{errors: [term()]}
   end
 
   defmodule Execution do

@@ -245,7 +245,15 @@ defmodule Jido.Agent.Compiler do
     do: {:error, error("Agent #{label} options must be a keyword list or map")}
 
   defp duplicate_value(values) do
-    (values -- Enum.uniq(values)) |> List.first()
+    Enum.reduce_while(values, MapSet.new(), fn value, seen ->
+      if MapSet.member?(seen, value),
+        do: {:halt, value},
+        else: {:cont, MapSet.put(seen, value)}
+    end)
+    |> then(fn
+      %MapSet{} -> nil
+      duplicate -> duplicate
+    end)
   end
 
   defp jido_option(nil), do: :ok
@@ -453,7 +461,7 @@ defmodule Jido.Agent.Compiler do
         else
           Enum.flat_map(defaults, fn declaration ->
             {:ok, manifest} = plugin_manifest(declaration.module)
-            state_key = derived_state_key(manifest.state_key, declaration.as)
+            state_key = Instance.derive_state_key(manifest.state_key, declaration.as)
 
             case Map.get(policy.overrides, state_key) do
               nil -> [declaration]
@@ -470,7 +478,7 @@ defmodule Jido.Agent.Compiler do
   defp default_index(defaults) do
     Enum.reduce_while(defaults, {:ok, %{}}, fn declaration, {:ok, acc} ->
       with {:ok, manifest} <- plugin_manifest(declaration.module) do
-        state_key = derived_state_key(manifest.state_key, declaration.as)
+        state_key = Instance.derive_state_key(manifest.state_key, declaration.as)
 
         if Map.has_key?(acc, state_key) do
           {:halt,
@@ -503,7 +511,7 @@ defmodule Jido.Agent.Compiler do
 
       {key, %AgentPlugin{} = replacement}, :ok ->
         with {:ok, manifest} <- plugin_manifest(replacement.module) do
-          replacement_key = derived_state_key(manifest.state_key, replacement.as)
+          replacement_key = Instance.derive_state_key(manifest.state_key, replacement.as)
 
           if replacement_key == key do
             {:cont, :ok}
@@ -543,8 +551,8 @@ defmodule Jido.Agent.Compiler do
   defp materialize_plugin(%AgentPlugin{} = declaration, host_configs) do
     with {:ok, manifest} <- plugin_manifest(declaration.module),
          :ok <- singleton_alias(manifest, declaration.as),
-         state_key = derived_state_key(manifest.state_key, declaration.as),
-         route_prefix = derived_route_prefix(manifest.name, declaration.as),
+         state_key = Instance.derive_state_key(manifest.state_key, declaration.as),
+         route_prefix = Instance.derive_route_prefix(manifest.name, declaration.as),
          {:ok, config} <- resolved_plugin_config(declaration, state_key, manifest, host_configs) do
       instance = %Instance{
         module: declaration.module,
@@ -1295,14 +1303,6 @@ defmodule Jido.Agent.Compiler do
     end
   end
 
-  defp derived_state_key(base_key, nil), do: base_key
-
-  defp derived_state_key(base_key, as) do
-    String.to_atom("#{base_key}_#{as}")
-  end
-
-  defp derived_route_prefix(name, nil), do: name
-  defp derived_route_prefix(name, as), do: "#{as}.#{name}"
   defp prefixed_path(prefix, path), do: "#{prefix}.#{path}"
 
   defp action_name(action) do
@@ -1326,11 +1326,16 @@ defmodule Jido.Agent.Compiler do
   defp error(message, details \\ %{}),
     do: Error.validation_error(message, details: details)
 
-  defp prefix_error(%{details: details} = validation_error, path) when is_map(details),
-    do: %{
-      validation_error
-      | details: Map.put(details, :path, path ++ Map.get(details, :path, []))
-    }
+  defp prefix_error(validation_error, path) do
+    details = Map.get(validation_error, :details)
 
-  defp prefix_error(validation_error, _path), do: validation_error
+    if is_map(details) do
+      %{
+        validation_error
+        | details: Map.put(details, :path, path ++ Map.get(details, :path, []))
+      }
+    else
+      validation_error
+    end
+  end
 end

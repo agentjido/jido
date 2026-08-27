@@ -40,6 +40,8 @@ defmodule Jido.Agent.DSL.Macros do
 
   alias Jido.Agent.DSL.MacroSupport
 
+  @route_match_error "agent route matches must be stable external unary function captures"
+
   defmacro plugin(module, options) do
     entity(module, options, extension_module("Plugin"), :__plugin__, __CALLER__)
   end
@@ -128,19 +130,14 @@ defmodule Jido.Agent.DSL.Macros do
        when is_tuple(remote) do
     case remote do
       {{:., _dot_meta, [_module, function]}, _call_meta, []} when is_atom(function) -> :ok
-      _local -> route_match_error!(caller)
+      _local -> MacroSupport.compile_error!(caller, @route_match_error)
     end
   end
 
   defp validate_match_ast!(value, _caller) when is_function(value, 1), do: :ok
-  defp validate_match_ast!(_value, caller), do: route_match_error!(caller)
 
-  defp route_match_error!(caller) do
-    MacroSupport.compile_error!(
-      caller,
-      "agent route matches must be stable external unary function captures"
-    )
-  end
+  defp validate_match_ast!(_value, caller),
+    do: MacroSupport.compile_error!(caller, @route_match_error)
 
   defp extension_module(name), do: Module.concat(Jido.Agent.DSL.Extension.Agent, name)
 end

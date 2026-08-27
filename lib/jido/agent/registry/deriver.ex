@@ -223,10 +223,7 @@ defmodule Jido.Agent.Registry.Deriver do
   end
 
   defp collect_data(values, value) when is_map(value) do
-    value
-    |> Map.to_list()
-    |> Enum.sort_by(fn {key, _item} -> :erlang.term_to_binary(key, [:deterministic]) end)
-    |> Enum.reduce(values, fn {key, item}, values ->
+    Enum.reduce(value, values, fn {key, item}, values ->
       values
       |> collect_data(key)
       |> collect_data(item)

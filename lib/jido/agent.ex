@@ -145,7 +145,6 @@ defmodule Jido.Agent do
   alias Jido.Error
   alias Jido.Instruction
   alias Jido.Plugin.Instance, as: PluginInstance
-  alias Jido.Plugin.Requirements, as: PluginRequirements
 
   @doc false
   def expand_aliases_in_ast(ast, caller_env) do
@@ -483,24 +482,6 @@ defmodule Jido.Agent do
     checkpoint: 2,
     restore: 2
   ]
-
-  # Helper functions that generate quoted code for the __using__ macro.
-  # This approach reduces the size of the main quote block to avoid
-  # "long quote blocks" and "nested too deep" Credo warnings.
-
-  @doc false
-  @spec __quoted_module_setup__() :: Macro.t()
-  def __quoted_module_setup__ do
-    quote location: :keep do
-      @behaviour Jido.Agent
-
-      alias Jido.Agent
-      alias Jido.Agent.Command
-      alias Jido.Agent.State, as: AgentState
-      alias Jido.Agent.Strategy, as: AgentStrategy
-      alias Jido.Plugin.Requirements, as: PluginRequirements
-    end
-  end
 
   @doc false
   @spec __quoted_basic_accessors__() :: Macro.t()
@@ -1043,234 +1024,10 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc false
-  @spec __quoted_callbacks__() :: Macro.t()
-  def __quoted_callbacks__ do
-    before_after = __quoted_callback_before_after__()
-    routes = __quoted_callback_routes__()
-    checkpoint = __quoted_callback_checkpoint__()
-    restore = __quoted_callback_restore__()
-    overridables = __quoted_callback_overridables__()
-    helpers = __quoted_callback_helpers__()
-
-    quote location: :keep do
-      unquote(before_after)
-      unquote(routes)
-      unquote(checkpoint)
-      unquote(restore)
-      unquote(overridables)
-      unquote(helpers)
-    end
-  end
-
-  defp __quoted_callback_before_after__ do
-    quote location: :keep do
-      # Default callback implementations
-
-      @impl true
-      @spec on_before_cmd(Agent.t(), Agent.action()) :: {:ok, Agent.t(), Agent.action()}
-      def on_before_cmd(agent, action), do: {:ok, agent, action}
-
-      @impl true
-      @spec on_after_cmd(Agent.t(), Agent.action(), [Agent.directive()]) ::
-              {:ok, Agent.t(), [Agent.directive()]}
-      def on_after_cmd(agent, _action, directives), do: {:ok, agent, directives}
-    end
-  end
-
-  defp __quoted_callback_routes__ do
-    quote location: :keep do
-      @impl true
-      @spec signal_routes() :: list()
-      def signal_routes, do: @expanded_signal_routes
-
-      @impl true
-      @spec signal_routes(map()) :: list()
-      def signal_routes(_ctx), do: signal_routes()
-    end
-  end
-
-  defp __quoted_callback_checkpoint__ do
-    quote location: :keep do
-      @impl true
-      def checkpoint(agent, ctx) do
-        {state, externalized, externalized_keys} =
-          Enum.reduce(@plugin_instances, {agent.state, %{}, %{}}, fn instance,
-                                                                     {state_acc, ext_acc,
-                                                                      keys_acc} ->
-            plugin_state = Map.get(state_acc, instance.state_key)
-            config = instance.config || %{}
-
-            case instance.module.on_checkpoint(plugin_state, Map.put(ctx, :config, config)) do
-              {:externalize, key, pointer} ->
-                {Map.delete(state_acc, instance.state_key), Map.put(ext_acc, key, pointer),
-                 Map.put(keys_acc, key, instance.state_key)}
-
-              :drop ->
-                {Map.delete(state_acc, instance.state_key), ext_acc, keys_acc}
-
-              :keep ->
-                {state_acc, ext_acc, keys_acc}
-            end
-          end)
-
-        base = %{
-          version: 1,
-          agent_module: __MODULE__,
-          id: agent.id,
-          state: state
-        }
-
-        base =
-          if externalized_keys == %{},
-            do: base,
-            else: Map.put(base, :externalized_keys, externalized_keys)
-
-        {:ok, Map.merge(base, externalized)}
-      end
-    end
-  end
-
-  defp __quoted_callback_restore__ do
-    quote location: :keep do
-      @impl true
-      def restore(data, ctx) do
-        data = normalize_keys(data)
-        agent = new(id: data[:id])
-        base_state = data[:state] || %{}
-        agent = %{agent | state: Map.merge(agent.state, base_state)}
-        externalized_keys = data[:externalized_keys] || %{}
-
-        Enum.reduce_while(@plugin_instances, {:ok, agent}, fn instance, {:ok, acc} ->
-          config = instance.config || %{}
-          restore_ctx = Map.put(ctx, :config, config)
-
-          ext_key =
-            Enum.find_value(externalized_keys, fn {k, v} ->
-              if v == instance.state_key, do: k
-            end)
-
-          pointer = if ext_key, do: data[ext_key]
-
-          if pointer do
-            case instance.module.on_restore(pointer, restore_ctx) do
-              {:ok, nil} ->
-                {:cont, {:ok, acc}}
-
-              {:ok, restored_state} ->
-                {:cont,
-                 {:ok, %{acc | state: Map.put(acc.state, instance.state_key, restored_state)}}}
-
-              {:error, reason} ->
-                {:halt, {:error, reason}}
-            end
-          else
-            {:cont, {:ok, acc}}
-          end
-        end)
-      end
-
-      defp normalize_keys(map) when is_map(map) do
-        Map.new(map, fn
-          {k, v} when is_binary(k) -> {existing_atom_or_original(k), v}
-          pair -> pair
-        end)
-      end
-
-      defp existing_atom_or_original(key) do
-        String.to_existing_atom(key)
-      rescue
-        ArgumentError -> key
-      end
-    end
-  end
-
-  defp __quoted_callback_overridables__ do
-    quote location: :keep do
-      defoverridable on_before_cmd: 2,
-                     on_after_cmd: 3,
-                     checkpoint: 2,
-                     restore: 2,
-                     signal_routes: 0,
-                     signal_routes: 1,
-                     definition: 0,
-                     name: 0,
-                     description: 0,
-                     category: 0,
-                     tags: 0,
-                     vsn: 0,
-                     schema: 0,
-                     strategy: 0,
-                     strategy_opts: 0,
-                     plugins: 0,
-                     plugin_specs: 0,
-                     plugin_instances: 0,
-                     actions: 0,
-                     capabilities: 0,
-                     signal_types: 0,
-                     plugin_config: 1,
-                     plugin_state: 2,
-                     plugin_routes: 0,
-                     plugin_schedules: 0
-    end
-  end
-
-  defp __quoted_callback_helpers__ do
-    quote location: :keep do
-      defp __strategy_ctx__(jido_instance \\ nil, partition \\ nil) do
-        %{
-          agent_module: __MODULE__,
-          strategy_opts: strategy_opts(),
-          jido_instance: jido_instance,
-          partition: partition
-        }
-      end
-
-      # Private helper for after hook dispatch
-      defp __do_after_cmd__(agent, msg, directives) do
-        {:ok, agent, directives} = on_after_cmd(agent, msg, directives)
-        {agent, directives}
-      end
-    end
-  end
-
   defmacro __using__(opts) do
     quote location: :keep do
       use Jido.Agent.DSL.ModuleCompiler, unquote(opts)
     end
-  end
-
-  @doc false
-  @spec __definition_from_macro_opts__(map(), list()) :: t()
-  def __definition_from_macro_opts__(validated_opts, routes) do
-    plugins = Enum.map(validated_opts[:plugins] || [], &legacy_plugin_declaration!/1)
-    plugin_defaults = legacy_plugin_defaults!(validated_opts[:default_plugins])
-    schedules = legacy_schedules!(validated_opts[:schedules] || [])
-
-    new!(
-      name: validated_opts.name,
-      description: validated_opts[:description],
-      state_schema: validated_opts[:schema] || [],
-      plugin_defaults: plugin_defaults,
-      plugins: plugins,
-      routes: routes,
-      schedules: schedules,
-      metadata: %{}
-    )
-  end
-
-  defp legacy_plugin_defaults!(nil), do: PluginDefaults.new!(:inherit)
-  defp legacy_plugin_defaults!(false), do: PluginDefaults.new!(:none)
-  defp legacy_plugin_defaults!(%PluginDefaults{} = defaults), do: defaults
-
-  defp legacy_plugin_defaults!(overrides) when is_map(overrides) do
-    canonical =
-      Map.new(overrides, fn
-        {key, value} when value in [false, :disabled] -> {key, :disabled}
-        {key, value} -> {key, legacy_plugin_declaration!(value)}
-      end)
-
-    PluginDefaults.new!(mode: :inherit, overrides: canonical)
   end
 
   defp legacy_plugin_declaration!(%AgentPlugin{} = plugin), do: plugin
@@ -1285,36 +1042,6 @@ defmodule Jido.Agent do
 
   defp legacy_plugin_declaration!({module, config}) when is_atom(module) and is_map(config),
     do: AgentPlugin.new!(module: module, config: config)
-
-  defp legacy_schedules!(schedules) do
-    schedules
-    |> Enum.with_index()
-    |> Enum.map(fn
-      {{cron, signal_type}, index} ->
-        legacy_schedule!(cron, signal_type, [], index)
-
-      {{cron, signal_type, opts}, index} ->
-        legacy_schedule!(cron, signal_type, opts, index)
-    end)
-  end
-
-  defp legacy_schedule!(cron, signal_type, opts, index) do
-    candidate = Keyword.get(opts, :job_id)
-    candidate = if is_nil(candidate), do: "schedule_#{index}", else: to_string(candidate)
-
-    name =
-      case Jido.Util.validate_name(candidate) do
-        {:ok, name} -> name
-        {:error, _error} -> "schedule_#{index}"
-      end
-
-    Schedule.new!(
-      name: name,
-      cron_expression: cron,
-      signal_type: signal_type,
-      timezone: Keyword.get(opts, :timezone, "Etc/UTC")
-    )
-  end
 
   @doc false
   @spec __normalize_plugin_instances__([module() | {module(), map()}]) :: [PluginInstance.t()]

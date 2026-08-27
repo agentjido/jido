@@ -210,7 +210,6 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
     new_function = Agent.__quoted_new_function__()
     cmd_function = Agent.__quoted_cmd_function__()
     utility_functions = Agent.__quoted_utility_functions__()
-    escaped_agent = Macro.escape(agent)
     escaped_source_map = Macro.escape(source_map)
     escaped_compile_opts = Macro.escape(compile_opts)
 
@@ -238,7 +237,7 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
 
       @doc "Returns the inert canonical Agent definition."
       @spec agent() :: Jido.Agent.t()
-      def agent, do: unquote(escaped_agent)
+      def agent, do: definition()
 
       @doc false
       @spec __jido_agent_source_map__() :: Jido.Agent.Compiled.source_map()
@@ -304,14 +303,16 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
     agent = %{agent | state: Map.merge(agent.state, base_state)}
     externalized_keys = data[:externalized_keys] || %{}
 
+    external_keys_by_state_key =
+      Enum.reduce(externalized_keys, %{}, fn {external_key, state_key}, acc ->
+        Map.put_new(acc, state_key, external_key)
+      end)
+
     Enum.reduce_while(module.plugin_instances(), {:ok, agent}, fn instance, {:ok, acc} ->
       config = instance.config || %{}
       restore_ctx = Map.put(ctx, :config, config)
 
-      external_key =
-        Enum.find_value(externalized_keys, fn {key, state_key} ->
-          if state_key == instance.state_key, do: key
-        end)
+      external_key = Map.get(external_keys_by_state_key, instance.state_key)
 
       pointer = if external_key, do: data[external_key]
 
@@ -378,9 +379,6 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
       name: agent.name,
       description: agent.description,
       schema: agent.state_schema,
-      plugins: agent.plugins,
-      signal_routes: runtime_opts.compatibility_signal_routes,
-      schedules: runtime_opts.compatibility_schedules ++ dsl_schedules,
       strategy: runtime_opts.strategy,
       jido: runtime_opts.jido,
       category: runtime_opts.category,

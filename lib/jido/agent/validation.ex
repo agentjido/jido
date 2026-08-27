@@ -267,16 +267,27 @@ defmodule Jido.Agent.Validation do
     do: {:error, error("agent #{field} must be a list", %{path: [field]})}
 
   defp unique(values, key_function, field, label) do
-    values
-    |> Enum.map(key_function)
-    |> then(fn keys -> keys -- Enum.uniq(keys) end)
-    |> case do
-      [] ->
+    case first_duplicate(values, key_function) do
+      nil ->
         :ok
 
-      [duplicate | _] ->
+      duplicate ->
         {:error, error("duplicate Agent #{label}", %{path: [field], value: duplicate})}
     end
+  end
+
+  defp first_duplicate(values, key_function) do
+    Enum.reduce_while(values, MapSet.new(), fn value, seen ->
+      key = key_function.(value)
+
+      if MapSet.member?(seen, key),
+        do: {:halt, key},
+        else: {:cont, MapSet.put(seen, key)}
+    end)
+    |> then(fn
+      %MapSet{} -> nil
+      duplicate -> duplicate
+    end)
   end
 
   defp metadata(value) do

@@ -47,7 +47,7 @@ defmodule Jido.AgentServer.SignalRouter do
 
   Returns an empty router if no routes are found or if building fails.
   """
-  @spec build(State.t()) :: SignalRouter.Router.t()
+  @spec build(State.t()) :: SignalRouter.t()
   def build(%State{} = state) do
     routes =
       []
