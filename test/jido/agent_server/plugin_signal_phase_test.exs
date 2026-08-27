@@ -42,7 +42,7 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
 
     def run(params, context) do
       signal = Map.fetch!(context, :signal)
-      principal_id = get_in(signal.extensions, ["jido.identity", "principal_id"])
+      principal_id = Signal.get_context(signal, "jidoprincipalid")
 
       {:ok, %{},
        %StateOp.SetState{
@@ -195,13 +195,9 @@ defmodule JidoTest.AgentServer.PluginSignalPhaseTest do
 
     @impl Jido.Plugin
     def handle_signal(signal, _context) do
-      extension =
-        signal.extensions
-        |> Map.get("jido.identity", %{})
-        |> Map.put("principal_id", "agent_from_plugin")
-
-      {:ok,
-       {:continue, %{signal | extensions: Map.put(signal.extensions, "jido.identity", extension)}}}
+      with {:ok, signal} <- Signal.put_context(signal, "jidoprincipalid", "agent_from_plugin") do
+        {:ok, {:continue, signal}}
+      end
     end
   end
 

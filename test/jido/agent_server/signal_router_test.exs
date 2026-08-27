@@ -285,7 +285,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count > 0
+      assert Jido.Signal.Router.count(router) > 0
     end
 
     test "builds router from use Jido.Agent signal_routes option" do
@@ -293,7 +293,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count == 1
+      assert Jido.Signal.Router.count(router) == 1
     end
 
     test "builds router when agent defines legacy signal_routes/0 callback" do
@@ -301,7 +301,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count == 1
+      assert Jido.Signal.Router.count(router) == 1
     end
 
     test "returns empty router when agent doesn't export signal_routes/1" do
@@ -309,7 +309,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count == 0
+      assert Jido.Signal.Router.count(router) == 0
     end
   end
 
@@ -320,7 +320,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
 
       assert %JidoRouter.Router{} = router
       # Should have routes from both strategy and agent
-      assert router.route_count >= 2
+      assert Jido.Signal.Router.count(router) >= 2
     end
 
     test "handles strategy without signal_routes/1 function" do
@@ -339,7 +339,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
 
       assert %JidoRouter.Router{} = router
       # Should have routes from plugin signal_routes and pattern-based routes
-      assert router.route_count > 0
+      assert Jido.Signal.Router.count(router) > 0
     end
 
     test "handles plugin signal_routes/1 returning empty list - falls back to pattern routes" do
@@ -349,7 +349,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       # Should generate pattern-based routes instead
       assert %JidoRouter.Router{} = router
       # Pattern routes: signal_patterns ["nil.*"] x actions [TestAction]
-      assert router.route_count == 1
+      assert Jido.Signal.Router.count(router) == 1
     end
 
     test "handles plugin signal_routes/1 returning non-list value - falls back to pattern routes" do
@@ -359,7 +359,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       # Should generate pattern-based routes instead
       assert %JidoRouter.Router{} = router
       # Pattern routes: signal_patterns ["nonlist.*"] x actions [TestAction]
-      assert router.route_count == 1
+      assert Jido.Signal.Router.count(router) == 1
     end
 
     test "generates routes from plugin routes definition" do
@@ -370,7 +370,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       assert %JidoRouter.Router{} = router
       # PluginWithRouter has 2 custom routes, PluginWithPatterns has 2 explicit routes
       # Total: 2 + 2 = 4 routes
-      assert router.route_count == 4
+      assert Jido.Signal.Router.count(router) == 4
     end
   end
 
@@ -381,7 +381,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
 
       assert %JidoRouter.Router{} = router
       # Should have 2 routes with match functions
-      assert router.route_count == 2
+      assert Jido.Signal.Router.count(router) == 2
     end
 
     test "normalizes 4-tuple routes with match functions and priority" do
@@ -389,7 +389,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count == 2
+      assert Jido.Signal.Router.count(router) == 2
     end
   end
 
@@ -474,7 +474,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
 
       assert %JidoRouter.Router{} = router
       # Strategy: 2 routes, Agent: 1 route, Plugin: 2 routes = 5 total
-      assert router.route_count == 5
+      assert Jido.Signal.Router.count(router) == 5
     end
   end
 
@@ -484,7 +484,7 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
       router = SignalRouter.build(state)
 
       assert %JidoRouter.Router{} = router
-      assert router.route_count == 0
+      assert Jido.Signal.Router.count(router) == 0
     end
   end
 end

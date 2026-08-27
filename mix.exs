@@ -315,8 +315,7 @@ defmodule Jido.MixProject do
           Jido.Thread.Entry,
           Jido.Thread.Plugin,
           Jido.Thread.Store,
-          Jido.Thread.Store.Adapters.InMemory,
-          Jido.Thread.Store.Adapters.JournalBacked
+          Jido.Thread.Store.Adapters.InMemory
         ],
         Memory: [
           Jido.Memory,
@@ -388,7 +387,10 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, "~> 3.0.0-beta.1"},
-      {:jido_signal, "~> 2.2"},
+      {:jido_signal,
+       github: "agentjido/jido_signal",
+       ref: "53819ff3246dbda1d89218d613b692c8a80e5c4b",
+       override: true},
 
       # Jido Deps
       {:splode, "~> 0.3.0"},

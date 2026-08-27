@@ -406,7 +406,7 @@ defmodule Jido.Await do
   def cancel(server, opts \\ []) do
     reason = Keyword.get(opts, :reason, :client_cancelled)
 
-    signal = Jido.Signal.new!("jido.agent.cancel", %{reason: reason})
+    signal = Jido.Signal.new!("jido.agent.cancel", %{reason: reason}, source: "/jido/await")
     AgentServer.cast(server, signal)
   end
 

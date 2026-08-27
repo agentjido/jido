@@ -19,17 +19,14 @@ defmodule Jido.AgentServer.Signal.ChildStarted do
   use Jido.Signal,
     type: "jido.agent.child.started",
     default_source: "/agent",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
-    schema: [
-      parent_id: [type: :string, required: true, doc: "ID of the parent agent"],
-      child_id: [type: :string, required: true, doc: "ID of the child agent"],
-      child_partition: [type: :any, doc: "Partition of the child agent"],
-      child_module: [type: :any, required: true, doc: "Module of the child agent"],
-      tag: [type: :any, required: true, doc: "Tag used when spawning"],
-      pid: [type: :any, required: true, doc: "PID of the child process"],
-      meta: [type: :map, default: %{}, doc: "Metadata passed during spawn"]
-    ]
+    schema:
+      Zoi.object(%{
+        parent_id: Zoi.string(description: "ID of the parent agent"),
+        child_id: Zoi.string(description: "ID of the child agent"),
+        child_partition: Zoi.any(description: "Partition of the child agent") |> Zoi.optional(),
+        child_module: Zoi.any(description: "Module of the child agent"),
+        tag: Zoi.any(description: "Tag used when spawning"),
+        pid: Zoi.any(description: "PID of the child process"),
+        meta: Zoi.map(description: "Metadata passed during spawn") |> Zoi.default(%{})
+      })
 end

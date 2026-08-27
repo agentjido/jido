@@ -40,7 +40,7 @@ defmodule JidoTest.AgentServer.SignalTest do
     end
 
     test "new! raises on missing required fields" do
-      assert_raise RuntimeError, fn ->
+      assert_raise Zoi.ParseError, fn ->
         Orphaned.new!(%{parent_id: "parent-123", parent_pid: self(), tag: :worker, meta: %{}})
       end
     end
@@ -159,7 +159,7 @@ defmodule JidoTest.AgentServer.SignalTest do
           reason: :normal
         })
 
-      assert signal.specversion == "1.0.2"
+      assert signal.specversion == "1.0"
     end
 
     test "signals have auto-generated ids" do

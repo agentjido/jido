@@ -3,11 +3,6 @@ defmodule Jido.AgentServer.Signal.Scheduled do
 
   use Jido.Signal,
     type: "jido.scheduled",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
-    schema: [
-      message: [type: :any, required: true, doc: "The scheduled message payload"]
-    ]
+    default_source: "/agent",
+    schema: Zoi.object(%{message: Zoi.any(description: "The scheduled message payload")})
 end

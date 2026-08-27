@@ -19,16 +19,14 @@ defmodule Jido.AgentServer.Signal.SensorExit do
 
   use Jido.Signal,
     type: "jido.agent.sensor.exit",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
-    schema: [
-      tag: [type: :any, required: true, doc: "Tag assigned to the sensor runtime"],
-      pid: [type: :any, required: true, doc: "PID of the sensor process that exited"],
-      reason: [type: :any, required: true, doc: "Exit reason from the sensor process"],
-      sensor: [type: :any, required: true, doc: "Sensor module that was running"],
-      origin: [type: :any, required: true, doc: "Origin that started the sensor"],
-      meta: [type: :map, default: %{}, doc: "Metadata stored with the sensor"]
-    ]
+    default_source: "/agent",
+    schema:
+      Zoi.object(%{
+        tag: Zoi.any(description: "Tag assigned to the sensor runtime"),
+        pid: Zoi.any(description: "PID of the sensor process that exited"),
+        reason: Zoi.any(description: "Exit reason from the sensor process"),
+        sensor: Zoi.any(description: "Sensor module that was running"),
+        origin: Zoi.any(description: "Origin that started the sensor"),
+        meta: Zoi.map(description: "Metadata stored with the sensor") |> Zoi.default(%{})
+      })
 end

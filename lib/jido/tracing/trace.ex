@@ -2,13 +2,18 @@ defmodule Jido.Tracing.Trace do
   @moduledoc """
   Trace data helpers for signal correlation.
 
-  Provides functions to create and attach trace data to signals using
-  the Jido.Signal.Ext.Trace extension (namespace: "correlation").
+  Provides functions to create and attach trace data with CloudEvents
+  extension context attributes.
   """
 
   alias Jido.Signal
 
-  @trace_namespace "correlation"
+  @context_names %{
+    trace_id: "jidotraceid",
+    span_id: "jidospanid",
+    parent_span_id: "jidoparentspanid",
+    causation_id: "jidocausationid"
+  }
 
   @doc """
   Creates a new root trace with fresh trace_id and span_id.
@@ -44,16 +49,22 @@ defmodule Jido.Tracing.Trace do
   end
 
   @doc """
-  Attaches trace data to a signal using the correlation extension.
+  Attaches trace data to a signal with the v3 Signal context API.
   """
   @spec put(Signal.t(), map()) :: {:ok, Signal.t()} | {:error, term()}
   def put(%Signal{} = signal, trace_data) when is_map(trace_data) do
-    filtered_data =
-      trace_data
-      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-      |> Map.new()
+    Enum.reduce_while(@context_names, {:ok, signal}, fn {key, context_name}, {:ok, signal} ->
+      case Map.get(trace_data, key) do
+        nil ->
+          {:cont, {:ok, signal}}
 
-    Signal.put_extension(signal, @trace_namespace, filtered_data)
+        value ->
+          case Signal.put_context(signal, context_name, value) do
+            {:ok, signal} -> {:cont, {:ok, signal}}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+      end
+    end)
   end
 
   def put(_signal, _trace_data) do
@@ -65,7 +76,14 @@ defmodule Jido.Tracing.Trace do
   """
   @spec get(Signal.t()) :: map() | nil
   def get(%Signal{} = signal) do
-    Signal.get_extension(signal, @trace_namespace)
+    trace_data =
+      Map.new(@context_names, fn {key, context_name} ->
+        {key, Signal.get_context(signal, context_name)}
+      end)
+      |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+      |> Map.new()
+
+    if map_size(trace_data) == 0, do: nil, else: trace_data
   end
 
   defp generate_id do

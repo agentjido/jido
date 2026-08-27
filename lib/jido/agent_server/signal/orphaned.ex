@@ -18,15 +18,15 @@ defmodule Jido.AgentServer.Signal.Orphaned do
 
   use Jido.Signal,
     type: "jido.agent.orphaned",
-    extension_policy: [
-      {Jido.Signal.Ext.Trace, :optional},
-      {Jido.Signal.Ext.Dispatch, :optional}
-    ],
-    schema: [
-      parent_id: [type: :string, required: true, doc: "ID of the parent agent that died"],
-      parent_pid: [type: :any, required: true, doc: "PID of the parent process that died"],
-      tag: [type: :any, required: true, doc: "Tag assigned by the former parent"],
-      meta: [type: :map, default: %{}, doc: "Metadata copied from the former parent reference"],
-      reason: [type: :any, required: true, doc: "Exit reason from the parent process"]
-    ]
+    default_source: "/agent",
+    schema:
+      Zoi.object(%{
+        parent_id: Zoi.string(description: "ID of the parent agent that died"),
+        parent_pid: Zoi.any(description: "PID of the parent process that died"),
+        tag: Zoi.any(description: "Tag assigned by the former parent"),
+        meta:
+          Zoi.map(description: "Metadata copied from the former parent reference")
+          |> Zoi.default(%{}),
+        reason: Zoi.any(description: "Exit reason from the parent process")
+      })
 end
