@@ -473,16 +473,14 @@ defmodule MyApp.RequestHandler do
 
     Logger.metadata(trace_id: trace_id)
 
-    signal = Signal.new!("process_request", conn.params,
-      source: "/api/request",
-      extensions: %{
-        "jido_ext_trace" => %{
-          "trace_id" => trace_id,
-          "span_id" => generate_span_id(),
-          "parent_span_id" => nil
-        }
-      }
-    )
+    signal = Signal.new!("process_request", conn.params, source: "/api/request")
+
+    {:ok, signal} =
+      Jido.Tracing.Trace.put(signal, %{
+        trace_id: trace_id,
+        span_id: generate_span_id(),
+        parent_span_id: nil
+      })
 
     {:ok, result} = AgentServer.call(pid, signal)
     result

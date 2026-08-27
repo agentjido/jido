@@ -61,7 +61,7 @@ Jido agents follow a functional state architecture:
 defmodule MyAgent do
   use Jido.Agent,
     name: "my_agent",
-    schema: [count: [type: :integer, default: 0]]
+    schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 end
 
 agent = MyAgent.new()

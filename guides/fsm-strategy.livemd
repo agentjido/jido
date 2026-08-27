@@ -29,7 +29,7 @@ The FSM state lives in `agent.state.__strategy__`.
 
 ## Key Contract
 
-The built-in FSM strategy always enters `"processing"` while instructions are
+The built-in FSM strategy always enters `"processing"` while commands are
 running. That means custom transition maps must include `"processing"` as the
 runtime execution state.
 
@@ -45,16 +45,16 @@ Use your regular agent state for domain workflow data such as
 defmodule OrderAgent do
   use Jido.Agent,
     name: "order_agent",
-    schema: [
-      order_id: [type: :string],
-      customer: [type: :string],
-      items: [type: {:list, :map}, default: []],
-      total: [type: :float, default: 0.0],
-      order_status: [type: :atom, default: :pending],
-      shipped_via: [type: :string, default: nil],
-      shipped_at: [type: :any, default: nil],
-      delivered_at: [type: :any, default: nil]
-    ],
+    schema: Zoi.object(%{
+              order_id: Zoi.string() |> Zoi.optional(),
+              customer: Zoi.string() |> Zoi.optional(),
+              items: Zoi.list(Zoi.map()) |> Zoi.default([]),
+              total: Zoi.float() |> Zoi.default(0.0),
+              order_status: Zoi.atom() |> Zoi.default(:pending),
+              shipped_via: Zoi.string() |> Zoi.default(nil),
+              shipped_at: Zoi.any() |> Zoi.default(nil),
+              delivered_at: Zoi.any() |> Zoi.default(nil)
+            }),
     signal_routes: [
       {"order.confirm", ConfirmOrder},
       {"order.ship", ShipOrder},
@@ -95,7 +95,7 @@ If no transitions are provided, the strategy uses:
 ## Runtime Execution
 
 `MyAgent.cmd/2` stays pure under this strategy. It prepares work and returns
-directives; it does not execute instructions inline.
+directives; it does not execute commands inline.
 
 Use `Jido.AgentServer.call/3` to run a signal through the runtime:
 
@@ -119,7 +119,7 @@ snap = OrderAgent.strategy_snapshot(agent)
 
 snap.status              # :idle or :running
 snap.done?               # false for the default runtime flow
-snap.result              # last instruction result
+snap.result              # last command result
 snap.details[:fsm_state] # "ready" or "processing"
 ```
 
@@ -154,9 +154,7 @@ end
 defmodule ShipOrder do
   use Jido.Action,
     name: "ship_order",
-    schema: [
-      carrier: [type: :string, default: "Standard Shipping"]
-    ]
+    schema: Zoi.object(%{carrier: Zoi.string() |> Zoi.default("Standard Shipping")})
 
   @impl true
   def run(%{carrier: carrier}, context) do
@@ -192,16 +190,16 @@ defmodule OrderAgent do
   use Jido.Agent,
     name: "order_agent",
     description: "Handles order lifecycle while FSM tracks execution state",
-    schema: [
-      order_id: [type: :string],
-      customer: [type: :string],
-      items: [type: {:list, :map}, default: []],
-      total: [type: :float, default: 0.0],
-      order_status: [type: :atom, default: :pending],
-      shipped_via: [type: :string, default: nil],
-      shipped_at: [type: :any, default: nil],
-      delivered_at: [type: :any, default: nil]
-    ],
+    schema: Zoi.object(%{
+              order_id: Zoi.string() |> Zoi.optional(),
+              customer: Zoi.string() |> Zoi.optional(),
+              items: Zoi.list(Zoi.map()) |> Zoi.default([]),
+              total: Zoi.float() |> Zoi.default(0.0),
+              order_status: Zoi.atom() |> Zoi.default(:pending),
+              shipped_via: Zoi.string() |> Zoi.default(nil),
+              shipped_at: Zoi.any() |> Zoi.default(nil),
+              delivered_at: Zoi.any() |> Zoi.default(nil)
+            }),
     signal_routes: [
       {"order.confirm", ConfirmOrder},
       {"order.ship", ShipOrder},
@@ -346,7 +344,7 @@ pattern.
 | Concept | Purpose |
 |---------|---------|
 | `strategy: {FSM, opts}` | Configure execution-state tracking around `cmd/2` |
-| `"processing"` | Runtime state entered while instructions execute |
+| `"processing"` | Runtime state entered while commands execute |
 | `AgentServer.call/3` | Executes `%Directive.RunInstruction{}` and returns the updated agent |
 | `strategy_snapshot/1` | Inspect execution state without reading internals |
 | `agent.state` | Store domain workflow data such as `order_status` |

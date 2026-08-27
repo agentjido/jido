@@ -178,7 +178,7 @@ Design patterns for per-request isolation:
 ```elixir
 # Pattern 1: Stateless design - pass everything via signal
 defmodule SearchAction do
-  use Jido.Action, name: "search", schema: [query: [type: :string, required: true]]
+  use Jido.Action, name: "search", schema: Zoi.object(%{query: Zoi.string()})
 
   def run(%{query: query}, context) do
     # Use cached connection from agent state
@@ -328,10 +328,7 @@ Complete example with a pool for HTTP requests:
 defmodule MyApp.FetchAction do
   use Jido.Action,
     name: "fetch",
-    schema: [
-      url: [type: :string, required: true],
-      timeout: [type: :integer, default: 5000]
-    ]
+    schema: Zoi.object(%{url: Zoi.string(), timeout: Zoi.integer() |> Zoi.default(5000)})
 
   def run(%{url: url, timeout: timeout}, context) do
     # Use persistent HTTP client from agent state
@@ -353,10 +350,7 @@ end
 defmodule MyApp.FetcherAgent do
   use Jido.Agent,
     name: "fetcher",
-    schema: [
-      http_client: [type: :any, required: true],
-      last_fetch: [type: :map, default: nil]
-    ],
+    schema: Zoi.object(%{http_client: Zoi.any(), last_fetch: Zoi.map() |> Zoi.default(nil)}),
     signal_routes: [{"fetch", MyApp.FetchAction}]
 end
 
@@ -448,9 +442,7 @@ Pre-warm agents with expensive initialization:
 defmodule MyApp.MLAgent do
   use Jido.Agent,
     name: "ml_agent",
-    schema: [
-      model: [type: :any, required: true]
-    ]
+    schema: Zoi.object(%{model: Zoi.any()})
 
   # Model loaded once at pool startup, reused across requests
 end

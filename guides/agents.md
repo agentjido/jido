@@ -21,10 +21,10 @@ defmodule MyAgent do
     category: "example",                     # Optional
     tags: ["demo"],                          # Default: []
     vsn: "1.0.0",                            # Optional
-    schema: [                                # State schema (see below)
-      status: [type: :atom, default: :idle],
-      counter: [type: :integer, default: 0]
-    ],
+    schema: Zoi.object(%{
+              status: Zoi.atom() |> Zoi.default(:idle),
+              counter: Zoi.integer() |> Zoi.default(0)
+            }),
     strategy: Jido.Agent.Strategy.Direct,    # Default
     plugins: [MyPlugin],                     # Default: []
     default_plugins: true,                   # Load built-in plugins (Default: true)
@@ -66,11 +66,16 @@ on an outbound effect and wants the runtime or integration layer to own delivery
 # Action with params and context
 {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{user_id: 123}})
 
-# Action with params, context, and per-instruction opts
+# Action with params, context, and per-command options
 {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{}, [timeout: 5000]})
 
-# Full instruction struct
-{agent, directives} = MyAgent.cmd(agent, %Instruction{action: MyAction, params: %{}})
+# Full Agent command
+command = Jido.Agent.Command.new!(MyAction, %{value: 42}, %{}, timeout: 5000)
+{agent, directives} = MyAgent.cmd(agent, command)
+
+# A strict executable instruction is imported as an Agent command
+instruction = Jido.Instruction.new!(target: MyAction, params: %{value: 42})
+{agent, directives} = MyAgent.cmd(agent, instruction)
 
 # List of actions (processed in sequence)
 {agent, directives} = MyAgent.cmd(agent, [Action1, {Action2, %{x: 1}}])
@@ -84,17 +89,12 @@ Pass options that apply to all actions in the command:
 # With timeout (5 second limit per action)
 {agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 5000)
 
-# With timeout and no retries
-{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 1000, max_retries: 0)
-
 # Options applied to all actions in a list
 {agent, directives} = MyAgent.cmd(agent, [Action1, Action2], timeout: 5000)
 ```
 
 Supported options:
 - `:timeout` — Maximum time (in ms) for each action to complete
-- `:max_retries` — Maximum retry attempts on failure
-- `:backoff` — Initial backoff time in ms (doubles with each retry)
 
 ## State Management
 
@@ -157,21 +157,11 @@ Use cases:
 
 ## Schema Options
 
-Agent state is validated against a schema. Two formats are supported:
-
-### NimbleOptions (legacy, familiar)
-
-```elixir
-use Jido.Agent,
-  name: "my_agent",
-  schema: [
-    status: [type: :atom, default: :idle],
-    counter: [type: :integer, default: 0],
-    config: [type: {:map, :atom, :string}, default: %{}]
-  ]
-```
-
-### Zoi (recommended for new code)
+Agent state is validated against a Zoi schema. Fields are required by default.
+Use `Zoi.optional/1` for optional fields and `Zoi.default/2` for default values.
+Schemas must contain only static data. Use `{Module, :function, args}` MFA values
+for `Zoi.refine/2` and `Zoi.transform/2` callbacks. Anonymous callbacks and lazy
+schemas cause a compile error.
 
 ```elixir
 use Jido.Agent,
@@ -182,8 +172,6 @@ use Jido.Agent,
     config: Zoi.map() |> Zoi.default(%{})
   })
 ```
-
-Both are handled transparently by the Agent module.
 
 ## Creating Agents
 

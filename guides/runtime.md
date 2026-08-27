@@ -59,7 +59,7 @@ Signal → AgentServer.call/cast
        → drain loop via DirectiveExec
        → plugin prepare_emit/2 for emitted signals
        → dispatch
-       → (for RunInstruction) execute instruction → call Agent.cmd/3 with result_action
+       → (for RunInstruction) execute Agent command → call Agent.cmd/3 with result_action
        → transform_result/3 on synchronous call return only
 ```
 

@@ -30,9 +30,7 @@ defmodule MyApp.OrderReviewPod do
       planner: %{agent: MyApp.PlannerAgent, manager: :planner_members, activation: :eager},
       reviewer: %{agent: MyApp.ReviewerAgent, manager: :reviewer_members, activation: :lazy}
     },
-    schema: [
-      phase: [type: :atom, default: :planning]
-    ]
+    schema: Zoi.object(%{phase: Zoi.atom() |> Zoi.default(:planning)})
 end
 ```
 
@@ -72,9 +70,7 @@ This is the shortest end-to-end Pod story in core Jido:
 defmodule MyApp.ReviewWorkerAgent do
   use Jido.Agent,
     name: "review_worker",
-    schema: [
-      role: [type: :string, default: "worker"]
-    ]
+    schema: Zoi.object(%{role: Zoi.string() |> Zoi.default("worker")})
 end
 
 defmodule MyApp.ReviewPod do

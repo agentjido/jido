@@ -19,11 +19,11 @@ defmodule MyApp.Actions.CreateOrder do
   use Jido.Action,
     name: "create_order",
     description: "Creates an order and emits a domain event",
-    schema: [
-      order_id: [type: :string, required: true],
-      items: [type: {:list, :map}, default: []],
-      total: [type: :integer, required: true]
-    ]
+    schema: Zoi.object(%{
+              order_id: Zoi.string(),
+              items: Zoi.list(Zoi.map()) |> Zoi.default([]),
+              total: Zoi.integer()
+            })
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -145,7 +145,7 @@ Read current agent state from `context.state`:
 defmodule IncrementAction do
   use Jido.Action,
     name: "increment",
-    schema: [amount: [type: :integer, default: 1]]
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
   def run(%{amount: amount}, context) do
     current = Map.get(context.state, :counter, 0)
@@ -206,10 +206,10 @@ Directive.stop(:normal)                          # Stop self
 ```elixir
 defmodule MyAgent do
   use Jido.Agent,
-    schema: [
-      counter: [type: :integer, default: 0],
-      orders: [type: {:list, :map}, default: []]
-    ]
+    schema: Zoi.object(%{
+              counter: Zoi.integer() |> Zoi.default(0),
+              orders: Zoi.list(Zoi.map()) |> Zoi.default([])
+            })
 end
 
 # context.state = %{counter: 0, orders: []}
@@ -261,26 +261,24 @@ alias Jido.Agent.StateOp
 
 ## Schema Definition
 
-Schemas use NimbleOptions syntax:
+Actions use Zoi schemas. Fields are required by default:
 
 ```elixir
 use Jido.Action,
   name: "process_order",
   description: "Processes an order with validation",
-  schema: [
-    order_id: [type: :string, required: true],
-    amount: [type: :integer, default: 1],
-    priority: [type: {:in, [:low, :medium, :high]}, default: :medium],
-    metadata: [type: :map, default: %{}],
-    tags: [type: {:list, :string}, default: []]
-  ]
+  schema: Zoi.object(%{
+    order_id: Zoi.string(description: "Order ID"),
+    amount: Zoi.integer() |> Zoi.default(1),
+    priority: Zoi.enum([:low, :medium, :high]) |> Zoi.default(:medium),
+    metadata: Zoi.map() |> Zoi.default(%{}),
+    tags: Zoi.list(Zoi.string()) |> Zoi.default([])
+  })
 ```
 
-Common schema options:
-- `type:` - `:string`, `:integer`, `:atom`, `:map`, `{:list, :type}`, `{:in, values}`
-- `required: true` - Validation fails if missing
-- `default: value` - Used when param not provided
-- `doc: "description"` - Documents the parameter
+Use Zoi constructors such as `Zoi.string/1`, `Zoi.integer/1`, `Zoi.map/1`,
+`Zoi.list/2`, and `Zoi.enum/2`. Pass `description:` to a constructor. Use
+`Zoi.optional/1` and `Zoi.default/2` to add field rules.
 
 ## Invoking Actions
 

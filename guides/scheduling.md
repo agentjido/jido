@@ -14,10 +14,10 @@ The simplest way to add recurring jobs is to declare them in your agent definiti
 defmodule MyAgent do
   use Jido.Agent,
     name: "my_agent",
-    schema: [
-      tick_count: [type: :integer, default: 0],
-      last_cleanup: [type: :any, default: nil]
-    ],
+    schema: Zoi.object(%{
+              tick_count: Zoi.integer() |> Zoi.default(0),
+              last_cleanup: Zoi.any() |> Zoi.default(nil)
+            }),
     schedules: [
       {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat},
       {"@daily", "cleanup.run", job_id: :cleanup, timezone: "America/New_York"}
@@ -64,7 +64,7 @@ The `Schedule` directive sends a message back to your agent after a delay:
 defmodule RetryAction do
   use Jido.Action,
     name: "retry",
-    schema: [attempt: [type: :integer, default: 1]]
+    schema: Zoi.object(%{attempt: Zoi.integer() |> Zoi.default(1)})
 
   alias Jido.Agent.Directive
 
@@ -321,10 +321,10 @@ Here's a complete agent that generates a daily report using declarative schedule
 defmodule DailyReportAgent do
   use Jido.Agent,
     name: "daily_report_agent",
-    schema: [
-      last_report_at: [type: {:custom, DateTime, :from_iso8601, []}, default: nil],
-      report_count: [type: :integer, default: 0]
-    ],
+    schema: Zoi.object(%{
+      last_report_at: Zoi.datetime(coerce: true) |> Zoi.nullable() |> Zoi.default(nil),
+      report_count: Zoi.integer() |> Zoi.default(0)
+    }),
     schedules: [
       {"0 6 * * *", "report.generate",
         job_id: :daily_report, timezone: "America/New_York"}

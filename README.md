@@ -44,9 +44,7 @@ defmodule MyAgent do
   use Jido.Agent,
     name: "my_agent",
     description: "My custom agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ]
+    schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 end
 
 {agent, directives} = MyAgent.cmd(agent, action)
@@ -91,7 +89,7 @@ Jido isn't "better GenServer" - it's a formalized agent pattern built *on* GenSe
 ### Immutable Agent Architecture
 - Functional agent state model inspired by Elm/Redux
 - `cmd/2` as the core operation: actions in, updated agent + directives out
-- Schema-validated state with NimbleOptions or Zoi
+- Schema-validated state with Zoi
 
 ### Directive-Based Effects
 - Actions transform state and may perform required work
@@ -154,6 +152,10 @@ def deps do
 end
 ```
 
+The v3 development branch uses `jido_action` 3.0.0-beta.1 and the jido_signal
+v3 release baseline. It requires Elixir 1.20 or later. Actions, Agents, Plugins,
+Sensors, and Signals use static Zoi schemas.
+
 Then define a Jido instance module and add it to your supervision tree:
 
 ```elixir
@@ -188,9 +190,7 @@ defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
     description: "A simple counter agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ],
+    schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
     signal_routes: [
       {"increment", MyApp.Actions.Increment}
     ]
@@ -204,9 +204,7 @@ defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
     description: "Increments the counter by a given amount",
-    schema: [
-      amount: [type: :integer, default: 1]
-    ]
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
   def run(params, context) do
     current = context.state[:count] || 0
@@ -408,9 +406,7 @@ defmodule MyAgent do
   use Jido.Agent,
     name: "my_agent",
     description: "My custom agent",
-    schema: [
-      count: [type: :integer, default: 0]
-    ]
+    schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 end
 
 {agent, directives} = MyAgent.cmd(agent, action)
@@ -439,7 +435,7 @@ A: Built-in directives:
 - **StartSensor**: Start or replace owner-monitored tagged sensor runtimes
 - **StopSensor**: Stop tagged sensor runtimes
 - **Schedule**: Schedule future actions
-- **RunInstruction**: Execute an instruction at runtime and route the result back to `cmd/2`
+- **RunInstruction**: Execute an Agent command at runtime and route the result back to `cmd/2`
 - **Stop**: Stop the agent
 - **Cron / CronCancel**: Register and cancel cron-based schedules
 

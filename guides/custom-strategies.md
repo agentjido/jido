@@ -8,7 +8,9 @@
 defmodule RoundRobinStrategy do
   use Jido.Agent.Strategy
 
+  alias Jido.Agent.Command
   alias Jido.Agent.Strategy.State, as: StratState
+  alias Jido.Observe.Config, as: ObserveConfig
 
   @impl true
   def init(agent, _ctx) do
@@ -22,19 +24,20 @@ defmodule RoundRobinStrategy do
   end
 
   @impl true
-  def cmd(agent, instructions, _ctx) do
+  def cmd(agent, commands, ctx) do
     state = StratState.get(agent, %{})
     index = Map.get(state, :current_index, 0)
 
-    # Execute only the instruction at current index
-    case Enum.at(instructions, rem(index, length(instructions))) do
+    # Execute only the command at the current index
+    case Enum.at(commands, rem(index, length(commands))) do
       nil ->
         {agent, []}
 
-      instruction ->
-        instruction = %{instruction | context: Map.put(instruction.context, :state, agent.state)}
+      command ->
+        runtime_context = %{state: agent.state, agent: agent, agent_server_pid: self()}
+        exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], command.opts)
 
-        case Jido.Exec.run(instruction) do
+        case Command.run(command, runtime_context, exec_opts) do
           {:ok, result} ->
             agent = Jido.Agent.StateOps.apply_result(agent, result)
             agent = StratState.put(agent, %{state |
@@ -68,7 +71,7 @@ end
 
 Strategies control three things:
 
-1. **Execution** — How `cmd/2` processes instructions
+1. **Execution** — How `cmd/2` processes Agent commands
 2. **Routing** — Which signals map to which actions (via `signal_routes/1`)
 3. **State** — Tracking execution progress in `agent.state.__strategy__`
 
@@ -77,11 +80,14 @@ Strategies control three things:
 ### `cmd/3`
 
 ```elixir
-@callback cmd(agent :: Agent.t(), instructions :: [Instruction.t()], ctx :: context()) ::
+@callback cmd(agent :: Agent.t(), commands :: [Command.t()], ctx :: context()) ::
             {Agent.t(), [directive()]}
 ```
 
-This is the only required callback. It receives normalized instructions and must return the updated agent plus any directives.
+This is the only required callback. It receives normalized Agent commands and
+must return the updated agent plus any directives. Use `Command.run/3` for an
+executable command. This function creates the strict `Jido.Instruction` only at
+the `Jido.Exec` boundary.
 
 ## Optional Callbacks
 
@@ -139,7 +145,7 @@ Schema for strategy-specific actions. Enables parameter normalization.
 @impl true
 def action_spec(:my_internal_action) do
   %{
-    schema: [query: [type: :string, required: true]],
+    schema: Zoi.object(%{query: Zoi.string()}),
     doc: "Internal action for this strategy"
   }
 end
@@ -209,8 +215,10 @@ agent = StratState.clear(agent)
 defmodule MyStrategy do
   use Jido.Agent.Strategy
 
+  alias Jido.Agent.Command
   alias Jido.Agent.Strategy.State, as: StratState
   alias Jido.Agent.StateOps
+  alias Jido.Observe.Config, as: ObserveConfig
 
   @impl true
   def init(agent, _ctx) do
@@ -219,11 +227,12 @@ defmodule MyStrategy do
   end
 
   @impl true
-  def cmd(agent, instructions, _ctx) do
-    Enum.reduce(instructions, {agent, []}, fn instruction, {acc, directives} ->
-      instruction = %{instruction | context: Map.put(instruction.context, :state, acc.state)}
+  def cmd(agent, commands, ctx) do
+    Enum.reduce(commands, {agent, []}, fn command, {acc, directives} ->
+      runtime_context = %{state: acc.state, agent: acc, agent_server_pid: self()}
+      exec_opts = ObserveConfig.action_exec_opts(ctx[:jido_instance], command.opts)
 
-      case Jido.Exec.run(instruction) do
+      case Command.run(command, runtime_context, exec_opts) do
         {:ok, result} ->
           {StateOps.apply_result(acc, result), directives}
 

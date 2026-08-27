@@ -492,11 +492,12 @@ Called during hibernate to serialize the agent:
 defmodule MyAgent do
   use Jido.Agent,
     name: "my_agent",
-    schema: [
-      user_id: [type: :string, required: true],
-      session_data: [type: :map, default: %{}],
-      temp_cache: [type: :map, default: %{}]  # Don't persist this
-    ]
+    schema: Zoi.object(%{
+      user_id: Zoi.string(),
+      session_data: Zoi.map() |> Zoi.default(%{}),
+      # Do not persist this field.
+      temp_cache: Zoi.map() |> Zoi.default(%{})
+    })
 
   @impl true
   def checkpoint(agent, _ctx) do
@@ -1018,10 +1019,7 @@ This durability scope is intentionally narrow:
 defmodule MyApp.SessionAgent do
   use Jido.Agent,
     name: "session_agent",
-    schema: [
-      user_id: [type: :string, required: true],
-      cart: [type: {:list, :map}, default: []]
-    ]
+    schema: Zoi.object(%{user_id: Zoi.string(), cart: Zoi.list(Zoi.map()) |> Zoi.default([])})
 
   @impl true
   def checkpoint(agent, _ctx) do

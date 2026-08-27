@@ -63,10 +63,10 @@ defmodule CounterAgent do
   use Jido.Agent,
     name: "counter",
     description: "A simple counter agent",
-    schema: [
-      count: [type: :integer, default: 0],
-      status: [type: :atom, default: :idle]
-    ]
+    schema: Zoi.object(%{
+              count: Zoi.integer() |> Zoi.default(0),
+              status: Zoi.atom() |> Zoi.default(:idle)
+            })
 end
 ```
 
@@ -86,9 +86,7 @@ defmodule IncrementAction do
   use Jido.Action,
     name: "increment",
     description: "Increments the counter by a given amount",
-    schema: [
-      amount: [type: :integer, default: 1]
-    ]
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
   @impl true
   def run(params, context) do
@@ -127,10 +125,10 @@ defmodule CounterAgentWithSignals do
   use Jido.Agent,
     name: "counter_with_signals",
     description: "Counter that responds to signals",
-    schema: [
-      count: [type: :integer, default: 0],
-      status: [type: :atom, default: :idle]
-    ]
+    schema: Zoi.object(%{
+              count: Zoi.integer() |> Zoi.default(0),
+              status: Zoi.atom() |> Zoi.default(:idle)
+            })
 
   alias Jido.Signal
 

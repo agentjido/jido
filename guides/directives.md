@@ -46,7 +46,7 @@ end
 | `StartSensor` | Start or replace a tagged sensor runtime | Tracked under `{:sensor, tag}` |
 | `StopSensor` | Stop a tagged sensor runtime | Uses sensor tag |
 | `Schedule` | Schedule a delayed message | — |
-| `RunInstruction` | Execute `%Instruction{}` at runtime and route result back through `cmd/2` | — |
+| `RunInstruction` | Execute an Agent command at runtime and route result back through `cmd/2` | — |
 | `Stop` | Stop the agent process (self) | — |
 | `Cron` | Recurring scheduled execution | — |
 | `CronCancel` | Cancel a cron job | — |
@@ -87,8 +87,9 @@ Directive.schedule(5000, :timeout)
 Directive.cron("*/5 * * * *", :tick, job_id: :heartbeat)
 Directive.cron_cancel(:heartbeat)
 
-# Runtime instruction execution
-Directive.run_instruction(instruction, result_action: :fsm_instruction_result)
+# Runtime command execution
+command = Jido.Agent.Command.new!(MyAction, %{value: 42})
+Directive.run_instruction(command, result_action: :fsm_instruction_result)
 
 # Errors
 Directive.error(Jido.Error.validation_error("Invalid input"))
@@ -108,10 +109,11 @@ Non-persistent lifecycles keep cron state runtime-only.
 
 ## RunInstruction
 
-`RunInstruction` is used by strategies that want runtime-owned instruction
-execution. Instead of calling `Jido.Exec.run/1` inline, the strategy emits
-`%Directive.RunInstruction{}` and the runtime executes it, then routes the result
-back through `cmd/2` using `result_action`.
+`RunInstruction` is used by strategies that want runtime-owned execution. The
+strategy emits a `%Directive.RunInstruction{}` with a `Jido.Agent.Command`. The
+runtime converts an executable command to the strict `Jido.Instruction` value
+at the `Jido.Exec.run/4` boundary. It then routes the result back through
+`cmd/2` using `result_action`.
 
 ## Spawn vs SpawnAgent
 
@@ -200,7 +202,7 @@ Here's a full example showing an action that processes an order and emits a sign
 defmodule ProcessOrderAction do
   use Jido.Action,
     name: "process_order",
-    schema: [order_id: [type: :string, required: true]]
+    schema: Zoi.object(%{order_id: Zoi.string()})
 
   alias Jido.Agent.{Directive, StateOp}
 

@@ -21,12 +21,6 @@ def deps do
 end
 ```
 
-Or use Igniter:
-
-```bash
-mix igniter.install ash_jido
-```
-
 ## Basic Usage
 
 Add the `AshJido` extension to your Ash resource and declare which actions to expose:
@@ -84,9 +78,9 @@ Wire Ash-generated actions into your Jido agent's signal routing:
 defmodule MyApp.OrderAgent do
   use Jido.Agent,
     name: "order_processor",
-    schema: [
-      current_order_id: [type: {:or, [:string, nil]}, default: nil]
-    ],
+    schema: Zoi.object(%{
+      current_order_id: Zoi.string() |> Zoi.nullable() |> Zoi.default(nil)
+    }),
     signal_routes: [
       {"order.place", MyApp.Order.Jido.Place},
       {"order.confirm", MyApp.Order.Jido.Confirm},
@@ -230,11 +224,11 @@ end
 defmodule MyApp.FulfillmentAgent do
   use Jido.Agent,
     name: "fulfillment",
-    schema: [
-      order_id: [type: :string, required: true],
-      customer_email: [type: :string, required: true],
-      step: [type: :atom, default: :pending]
-    ],
+    schema: Zoi.object(%{
+              order_id: Zoi.string(),
+              customer_email: Zoi.string(),
+              step: Zoi.atom() |> Zoi.default(:pending)
+            }),
     signal_routes: [
       {"fulfillment.start", MyApp.Actions.BeginFulfillment},
       {"fulfillment.complete", MyApp.Actions.CompleteFulfillment}

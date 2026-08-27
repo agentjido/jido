@@ -101,7 +101,7 @@ Declare static routes at compile time with the `signal_routes:` option:
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]],
+    schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
     signal_routes: [
       {"increment", MyApp.Actions.Increment},
       {"decrement", MyApp.Actions.Decrement},
@@ -161,7 +161,7 @@ Actions emit signals using the `Directive.Emit` directive:
 defmodule MyApp.Actions.ProcessOrder do
   use Jido.Action,
     name: "process_order",
-    schema: [order_id: [type: :integer, required: true]]
+    schema: Zoi.object(%{order_id: Zoi.integer()})
 
   alias Jido.Agent.Directive
   alias Jido.Signal
@@ -226,7 +226,7 @@ Directive.emit_to_parent(agent, signal)
 defmodule MyApp.Actions.Increment do
   use Jido.Action,
     name: "increment",
-    schema: [amount: [type: :integer, default: 1]]
+    schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.default(1)})
 
   def run(params, context) do
     current = Map.get(context.state, :counter, 0)
@@ -238,7 +238,7 @@ end
 defmodule MyApp.CounterAgent do
   use Jido.Agent,
     name: "counter",
-    schema: [counter: [type: :integer, default: 0]],
+    schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)}),
     signal_routes: [{"increment", MyApp.Actions.Increment}]
 end
 
