@@ -133,7 +133,13 @@ defmodule Jido.Agent do
   alias Jido.Agent
   alias Jido.Agent.Command
   alias Jido.Agent.Directive
+  alias Jido.Agent.Extension.Declaration, as: ExtensionDeclaration
+  alias Jido.Agent.Plugin, as: AgentPlugin
+  alias Jido.Agent.PluginDefaults
+  alias Jido.Agent.Schedule
+  alias Jido.Agent.SemanticIdentity
   alias Jido.Agent.State, as: StateHelper
+  alias Jido.Agent.Validation
   alias Jido.Error
   alias Jido.Instruction
   alias Jido.Plugin.Instance, as: PluginInstance
@@ -218,29 +224,61 @@ defmodule Jido.Agent do
               description:
                 Zoi.string(description: "Agent description")
                 |> Zoi.optional(),
-              category:
-                Zoi.string(description: "Agent category")
-                |> Zoi.optional(),
-              tags:
-                Zoi.list(Zoi.string(), description: "Tags")
-                |> Zoi.default([]),
-              vsn:
-                Zoi.string(description: "Version")
-                |> Zoi.optional(),
-              schema:
-                Zoi.any(description: "Zoi schema for validating the Agent's state")
+              state_schema:
+                Zoi.any(description: "Static Zoi schema for Agent state")
                 |> Zoi.default([]),
               state:
-                Zoi.map(description: "Current state")
+                Zoi.any(description: "Current instance state")
+                |> Zoi.optional(),
+              plugin_defaults:
+                Zoi.any(description: "Authored default-plugin policy")
+                |> Zoi.default(%PluginDefaults{}),
+              plugins:
+                Zoi.list(Zoi.any(), description: "Canonical plugin declarations")
+                |> Zoi.default([]),
+              routes:
+                Zoi.list(Zoi.any(), description: "Canonical Signal Router routes")
+                |> Zoi.default([]),
+              schedules:
+                Zoi.list(Zoi.any(), description: "Canonical schedule declarations")
+                |> Zoi.default([]),
+              extensions:
+                Zoi.list(Zoi.any(), description: "Canonical extension declarations")
+                |> Zoi.default([]),
+              metadata:
+                Zoi.map(description: "Portable author metadata")
                 |> Zoi.default(%{})
             },
             coerce: true
           )
 
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @type t :: %__MODULE__{
+          id: String.t() | nil,
+          state: map() | nil,
+          agent_module: module() | nil,
+          name: String.t() | nil,
+          description: String.t() | nil,
+          state_schema: Jido.Action.schema(),
+          plugin_defaults: PluginDefaults.t(),
+          plugins: [AgentPlugin.t()],
+          routes: [Jido.Signal.Router.Route.t()],
+          schedules: [Schedule.t()],
+          extensions: [ExtensionDeclaration.t()],
+          metadata: Jido.Agent.Data.object()
+        }
 
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  defstruct id: nil,
+            state: nil,
+            agent_module: nil,
+            name: nil,
+            description: nil,
+            state_schema: [],
+            plugin_defaults: %PluginDefaults{},
+            plugins: [],
+            routes: [],
+            schedules: [],
+            extensions: [],
+            metadata: %{}
 
   @doc "Returns the Zoi schema for Agent."
   @spec schema() :: Zoi.schema()
@@ -766,10 +804,7 @@ defmodule Jido.Agent do
           agent_module: __MODULE__,
           name: name(),
           description: description(),
-          category: category(),
-          tags: tags(),
-          vsn: vsn(),
-          schema: schema(),
+          state_schema: schema(),
           state: initial_state
         }
 
@@ -993,7 +1028,7 @@ defmodule Jido.Agent do
       """
       @spec validate(Agent.t(), keyword()) :: Agent.agent_result()
       def validate(%Agent{} = agent, opts \\ []) do
-        case AgentState.validate(agent.state, agent.schema, opts) do
+        case AgentState.validate(agent.state, agent.state_schema, opts) do
           {:ok, validated_state} ->
             {:ok, %{agent | state: validated_state}}
 
@@ -1446,24 +1481,98 @@ defmodule Jido.Agent do
   # Base module functions (for direct use without `use`)
 
   @doc """
-  Creates a new agent from attributes.
+  Creates one inert canonical Agent definition from attributes.
 
-  For module-based agents, use `MyAgent.new/1` instead.
+  This function does not create an ID, state, module binding, process, plugin
+  mount, or callback invocation.
   """
-  @spec new(map() | keyword()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
+  @spec new(map() | keyword() | t()) :: {:ok, t()} | {:error, Exception.t()}
+  def new(%__MODULE__{} = agent), do: agent |> Map.from_struct() |> new()
 
-  def new(attrs) when is_map(attrs) do
-    attrs_with_id = normalize_agent_id(attrs)
-
-    case Zoi.parse(@schema, attrs_with_id) do
-      {:ok, agent} ->
-        {:ok, agent}
-
-      {:error, errors} ->
-        {:error, Error.validation_error("Agent validation failed", %{errors: errors})}
+  def new(attrs) do
+    with {:ok, attrs} <- Validation.new(attrs) do
+      {:ok, struct!(__MODULE__, attrs)}
     end
   end
+
+  @doc "Creates one inert canonical Agent definition or raises its validation error."
+  @spec new!(map() | keyword() | t()) :: t() | no_return()
+  def new!(attrs) do
+    case new(attrs) do
+      {:ok, agent} -> agent
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Projects an Agent definition from a definition or instance value."
+  @spec definition(t()) :: t()
+  def definition(%__MODULE__{} = agent) do
+    %{agent | id: nil, state: nil, agent_module: nil}
+  end
+
+  @doc "Returns the stable semantic Map view of an Agent definition."
+  @spec to_map(t()) :: map()
+  def to_map(%__MODULE__{} = agent) do
+    agent = definition(agent)
+
+    %{
+      name: agent.name,
+      description: agent.description,
+      state_schema: agent.state_schema,
+      plugin_defaults: PluginDefaults.to_map(agent.plugin_defaults),
+      plugins: Enum.map(agent.plugins, &AgentPlugin.to_map/1),
+      routes: Enum.map(agent.routes, &route_to_map/1),
+      schedules: Enum.map(agent.schedules, &Schedule.to_map/1),
+      extensions: Enum.map(agent.extensions, &ExtensionDeclaration.to_map/1),
+      metadata: agent.metadata
+    }
+  end
+
+  @doc "Returns normalized Agent definition data and semantic identity."
+  @spec explain(t()) :: {:ok, map()} | {:error, Exception.t()}
+  def explain(%__MODULE__{} = agent) do
+    with {:ok, agent} <- validate(agent) do
+      definition = definition(agent)
+      semantic_map = to_map(definition)
+      lifecycle = if is_nil(agent.id), do: :definition, else: :instance
+
+      {:ok,
+       Map.merge(semantic_map, %{
+         version: 1,
+         kind: :agent,
+         lifecycle: lifecycle,
+         identity: SemanticIdentity.for_agent(definition),
+         diagnostics: %{
+           plugin_count: length(definition.plugins),
+           route_count: length(definition.routes),
+           schedule_count: length(definition.schedules),
+           extension_count: length(definition.extensions)
+         }
+       })}
+    end
+  end
+
+  def explain(value), do: Validation.invalid_subject(value)
+
+  @doc "Returns the deterministic SHA-256 and UUIDv8 identity for an Agent definition."
+  @spec semantic_identity(t()) :: {:ok, map()} | {:error, Exception.t()}
+  def semantic_identity(%__MODULE__{} = agent) do
+    with {:ok, agent} <- validate(agent) do
+      {:ok, agent |> definition() |> SemanticIdentity.for_agent()}
+    end
+  end
+
+  def semantic_identity(value), do: Validation.invalid_subject(value)
+
+  @doc "Validates and normalizes the canonical Agent structure."
+  @spec validate(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate(%__MODULE__{} = agent) do
+    with {:ok, attrs} <- agent |> Map.from_struct() |> Validation.validate() do
+      {:ok, struct!(__MODULE__, attrs)}
+    end
+  end
+
+  def validate(value), do: Validation.invalid_subject(value)
 
   @doc """
   Updates agent state by merging new attributes.
@@ -1475,11 +1584,11 @@ defmodule Jido.Agent do
   end
 
   @doc """
-  Validates agent state against its schema.
+  Validates instance state against its state schema.
   """
-  @spec validate(t(), keyword()) :: agent_result()
-  def validate(%Agent{} = agent, opts \\ []) do
-    case StateHelper.validate(agent.state, agent.schema, opts) do
+  @spec validate_state(t(), keyword()) :: agent_result()
+  def validate_state(%Agent{} = agent, opts \\ []) do
+    case StateHelper.validate(agent.state, agent.state_schema, opts) do
       {:ok, validated_state} ->
         {:ok, %{agent | state: validated_state}}
 
@@ -1488,11 +1597,16 @@ defmodule Jido.Agent do
     end
   end
 
-  defp normalize_agent_id(attrs) do
-    case Map.get(attrs, :id) do
-      nil -> Map.put(attrs, :id, Jido.Util.generate_id())
-      "" -> Map.put(attrs, :id, Jido.Util.generate_id())
-      _ -> attrs
-    end
+  @doc false
+  @spec validate(t(), keyword()) :: agent_result()
+  def validate(%Agent{} = agent, opts), do: validate_state(agent, opts)
+
+  defp route_to_map(%Jido.Signal.Router.Route{} = route) do
+    %{
+      path: route.path,
+      target: route.target,
+      priority: route.priority,
+      match: route.match
+    }
   end
 end
