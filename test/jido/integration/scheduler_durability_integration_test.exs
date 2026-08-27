@@ -24,8 +24,6 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
     ScheduledCronAgent
   }
 
-  alias JidoTest.Support.FailingTimeZoneDatabase
-
   @moduletag :integration
   @moduletag :scheduler_integration
   @moduletag capture_log: true
@@ -116,7 +114,6 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
     on_exit(fn ->
       :persistent_term.erase({InstanceManager, manager_name})
       cleanup_storage_tables(table)
-      Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
     end)
 
     %{manager: manager_name, table: table}
@@ -303,7 +300,7 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
           Jido.Scheduler.build_cron_spec(
             "* * * * * * *",
             Signal.new!("cron.tick", %{kind: :replayed}, source: "/test"),
-            "America/New_York"
+            "Invalid/Nowhere"
           )
       }
 
@@ -321,9 +318,6 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
 
       log =
         capture_log(fn ->
-          # Simulate time zone database failure
-          Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
-
           {:ok, pid} = get_attached(manager, instance_key)
 
           eventually(
@@ -335,7 +329,6 @@ defmodule JidoTest.Integration.SchedulerDurabilityIntegrationTest do
           )
 
           :ok = AgentServer.detach(pid)
-          Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
           wait_for_idle_shutdown(pid)
         end)
 

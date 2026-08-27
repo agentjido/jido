@@ -1101,9 +1101,8 @@ defmodule JidoTest.AgentServerTest do
       job_id = {:plugin_schedule, :scheduled_plugin, ScheduledAction}
       assert Map.has_key?(state.cron_jobs, job_id)
 
-      cron_pid = Map.get(state.cron_jobs, job_id)
+      cron_pid = state.cron_jobs |> Map.fetch!(job_id) |> GenServer.whereis()
       assert is_pid(cron_pid)
-      assert Process.alive?(cron_pid)
 
       GenServer.stop(pid)
     end
@@ -1124,8 +1123,8 @@ defmodule JidoTest.AgentServerTest do
       {:ok, state} = AgentServer.state(pid)
 
       job_id = {:plugin_schedule, :scheduled_plugin, ScheduledAction}
-      cron_pid = Map.get(state.cron_jobs, job_id)
-      assert Process.alive?(cron_pid)
+      cron_pid = state.cron_jobs |> Map.fetch!(job_id) |> GenServer.whereis()
+      assert is_pid(cron_pid)
 
       cron_ref = Process.monitor(cron_pid)
       GenServer.stop(pid)

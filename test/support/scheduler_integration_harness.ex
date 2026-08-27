@@ -159,11 +159,11 @@ defmodule JidoTest.Support.SchedulerIntegrationHarness do
         case AgentServer.state(pid) do
           {:ok, state} ->
             case Map.get(state.cron_jobs, job_id) do
-              job_pid when is_pid(job_pid) ->
-                if Process.alive?(job_pid), do: job_pid, else: false
-
-              _ ->
+              nil ->
                 false
+
+              job ->
+                GenServer.whereis(job) || false
             end
 
           _ ->

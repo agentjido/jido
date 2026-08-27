@@ -89,11 +89,7 @@ defimpl Jido.AgentServer.DirectiveExec, for: Jido.Agent.Directive.CronCancel do
   defp persist_cron_specs(_state, _cron_specs), do: :ok
 
   defp drop_runtime_job(%State{} = state, logical_id),
-    do:
-      Jido.AgentServer.untrack_cron_job(state, logical_id,
-        cancel?: true,
-        drop_runtime_spec?: true
-      )
+    do: Jido.AgentServer.untrack_cron_job(state, logical_id)
 
   defp drop_runtime_job(state, logical_id) do
     {Map.get(state.cron_jobs, logical_id),

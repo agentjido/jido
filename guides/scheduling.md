@@ -2,9 +2,9 @@
 
 **After:** You can schedule delayed and recurring work reliably.
 
-Jido provides three scheduling mechanisms: declarative schedules in the agent definition, one-time delays via `Schedule`, and dynamic recurring jobs via `Cron`. All are timer-based and tied to the agent's process lifecycle.
+Jido provides three scheduling mechanisms: declarative schedules in the agent definition, one-time delays via `Schedule`, and dynamic recurring jobs via `Cron`. All are tied to the agent's process lifecycle.
 
-Dynamic cron scheduling now lives in Jido core so durable runtime registrations survive hibernate/thaw while keeping the implementation intentionally small. `crontab` parses cron expressions and the configured time zone database resolves named timezones.
+SchedEx calculates cron run times. A supervisor in each Jido instance owns the cron job processes. Jido keeps only the agent ownership and durability rules that SchedEx does not provide.
 
 ## Declarative Schedules
 
@@ -157,15 +157,14 @@ Directive.cron("0 9 * * *", morning_signal,
 
 Default timezone is `Etc/UTC`.
 
-Jido does **not** mutate the global calendar timezone database at runtime.
-Named timezones use Jido's configured time zone database, which defaults to `TimeZoneInfo.TimeZoneDatabase`:
+Jido uses the standard Elixir time zone database. Elixir supports only UTC by default. To use named time zones, add a time zone database package and configure it for Elixir:
 
 ```elixir
 # config/config.exs
-config :jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
+config :elixir, :time_zone_database, TimeZoneInfo.TimeZoneDatabase
 ```
 
-You can override that setting if your application needs a different `Calendar.TimeZoneDatabase` implementation.
+You can use another `Calendar.TimeZoneDatabase` implementation, such as `Tz.TimeZoneDatabase` or `Tzdata.TimeZoneDatabase`.
 
 If timezone configuration is missing or invalid, cron registration returns
 `{:error, {:invalid_timezone, reason}}` and the agent process stays alive.
@@ -235,10 +234,11 @@ If persistence fails, registration/cancellation is isolated and the agent keeps 
 
 - Invalid dynamic cron input (bad cron/timezone) does not crash `AgentServer`.
 - Scheduler startup/runtime failures are non-fatal to the owning agent.
-- Cron runtime pids are monitored separately from child lifecycle monitors.
-- Abnormal cron job exits trigger capped exponential-backoff restart from in-memory runtime specs while the owning `AgentServer` remains alive.
+- Each Jido instance has a `DynamicSupervisor` for cron jobs.
+- The supervisor restarts an abnormal cron job without restarting its agent.
+- Each cron tick only enqueues a signal for its agent.
 - Only dynamic `Directive.cron/3` registrations are restored after thaw/restart from durable `cron_specs`.
-- Normal/shutdown cron exits are treated as expected removal (no restart).
+- A normal job stop removes that job without a restart.
 
 ### Missed-Run Behavior
 
@@ -248,7 +248,7 @@ Example: An agent with a `@daily` job at midnight crashes at 11:50 PM and restar
 
 ### Cleanup on Termination
 
-When an agent stops (normal or crash), all its cron jobs are automatically cancelled in the `terminate/2` callback. You don't need to manually clean up.
+Each cron job monitors its owning agent. When the agent stops, its jobs stop without a restart. You do not need to clean them up manually.
 
 ## Idempotency Patterns
 

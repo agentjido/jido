@@ -393,8 +393,7 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:poolboy, "~> 1.5"},
       {:telemetry_metrics, "~> 1.1"},
-      {:crontab, "~> 1.2"},
-      {:time_zone_info, "~> 0.7"},
+      {:sched_ex, github: "SchedEx/SchedEx", ref: "37c8b124470b58cd021db7b1b1a8b929369b7917"},
 
       # Development & Test Dependencies
       {:git_ops, "~> 2.9", only: :dev, runtime: false},

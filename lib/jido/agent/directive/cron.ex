@@ -28,7 +28,6 @@ defmodule Jido.Agent.Directive.Cron do
   require Logger
 
   alias Jido.AgentServer
-  alias Jido.AgentServer.CronRuntimeSpec
 
   @schema Zoi.struct(
             __MODULE__,
@@ -61,15 +60,9 @@ defmodule Jido.Agent.Directive.Cron do
     logical_id = logical_id || make_ref()
 
     with {:ok, cron_spec} <- Jido.Scheduler.validate_and_build_cron_spec(cron_expr, message, tz),
-         runtime_spec =
-           CronRuntimeSpec.dynamic(
-             cron_spec.cron_expression,
-             cron_spec.message,
-             cron_spec.timezone
-           ),
-         {:ok, pid} <- AgentServer.start_runtime_cron_job(state, logical_id, runtime_spec),
+         {:ok, job} <- AgentServer.start_dynamic_cron_job(state, logical_id, cron_spec),
          {:ok, persisted_state} <-
-           persist_then_commit_registration(state, pid, logical_id, cron_spec, runtime_spec) do
+           persist_then_commit_registration(state, job, logical_id, cron_spec) do
       Logger.debug(fn ->
         "AgentServer #{agent_id} registered cron job #{inspect(logical_id)}: #{cron_expr}"
       end)
@@ -90,13 +83,12 @@ defmodule Jido.Agent.Directive.Cron do
     end
   end
 
-  defp persist_then_commit_registration(state, new_pid, logical_id, cron_spec, runtime_spec) do
+  defp persist_then_commit_registration(state, new_job, logical_id, cron_spec) do
     proposed_specs = Map.put(state.cron_specs, logical_id, cron_spec)
 
     case AgentServer.persist_cron_specs(state, proposed_specs) do
       :ok ->
-        tracked_state =
-          AgentServer.track_cron_job(state, logical_id, new_pid, runtime_spec: runtime_spec)
+        tracked_state = AgentServer.track_cron_job(state, logical_id, new_job)
 
         committed_state = %{tracked_state | cron_specs: proposed_specs}
 
@@ -109,15 +101,14 @@ defmodule Jido.Agent.Directive.Cron do
           reason: reason
         })
 
-        tracked_state =
-          AgentServer.track_cron_job(state, logical_id, new_pid, runtime_spec: runtime_spec)
+        tracked_state = AgentServer.track_cron_job(state, logical_id, new_job)
 
         committed_state = %{tracked_state | cron_specs: proposed_specs}
 
         {:ok, committed_state}
 
       {:error, reason} ->
-        Jido.Scheduler.cancel(new_pid)
+        Jido.Scheduler.cancel(new_job)
 
         AgentServer.emit_cron_telemetry_event(state, :persist_failure, %{
           job_id: logical_id,
@@ -130,8 +121,7 @@ defmodule Jido.Agent.Directive.Cron do
   end
 
   defp handle_failed_registration(state, logical_id, :drop) do
-    {_pid, runtime_state} =
-      AgentServer.untrack_cron_job(state, logical_id, cancel?: true, drop_runtime_spec?: true)
+    {_job, runtime_state} = AgentServer.untrack_cron_job(state, logical_id)
 
     %{runtime_state | cron_specs: Map.delete(runtime_state.cron_specs, logical_id)}
   end

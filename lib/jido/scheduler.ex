@@ -1,12 +1,11 @@
 defmodule Jido.Scheduler do
   @moduledoc """
-  Per-agent cron scheduling with internal timer processes.
+  Per-agent cron scheduling backed by SchedEx.
 
-  `Jido.Scheduler` is intentionally lightweight and process-local:
-  each registered cron job is backed by a dedicated process owned by the
-  caller (typically the owning `Jido.AgentServer`).
+  Each registered agent job runs under the Jido instance scheduler supervisor.
+  A small owner-bound process stops the job when its agent stops.
 
-  The runtime stores live job processes in `AgentServer.State.cron_jobs` and
+  The runtime stores stable job names in `AgentServer.State.cron_jobs` and
   separately stores durable schedule definitions in `AgentServer.State.cron_specs`.
   The durable specs are persisted through `Jido.Persist` for InstanceManager-
   managed agents.
@@ -133,85 +132,39 @@ defmodule Jido.Scheduler do
     end
   end
 
-  @doc """
-  Starts a recurring cron job.
+  @doc false
+  @spec start_child(atom(), pid(), (-> term()), String.t(), keyword()) ::
+          {:ok, GenServer.server()} | {:error, term()}
+  def start_child(jido, owner_pid, fun, cron_expr, opts \\ [])
+      when is_atom(jido) and is_pid(owner_pid) and is_function(fun, 0) and
+             is_binary(cron_expr) and is_list(opts) do
+    with {:ok, timezone} <- validate_timezone_option(Keyword.get(opts, :timezone)) do
+      generation = make_ref()
+      name = job_name(jido, generation)
 
-  Returns `{:ok, pid}` where `pid` is the scheduler job process that can be
-  used to cancel the job later.
+      child_opts = [
+        fun: fun,
+        cron_expr: cron_expr,
+        timezone: timezone,
+        owner_pid: owner_pid,
+        name: name
+      ]
 
-  ## Options
-
-  - `:timezone` - Timezone for the cron expression (default: "Etc/UTC")
-
-  ## Examples
-
-      {:ok, pid} = Jido.Scheduler.run_every(MyModule, :work, [], "*/5 * * * *")
-      {:ok, pid} = Jido.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
-  """
-  @spec run_every(module(), atom(), list(), String.t(), keyword()) ::
-          {:ok, pid()} | {:error, term()}
-  def run_every(module, function, args, cron_expr, opts \\ []) do
-    run_every(fn -> apply(module, function, args) end, cron_expr, opts)
-  end
-
-  @doc """
-  Starts a recurring cron job with a function.
-
-  ## Examples
-
-      {:ok, pid} = Jido.Scheduler.run_every(fn -> IO.puts("tick") end, "* * * * *")
-  """
-  @spec run_every((-> any()), term(), term()) :: {:ok, pid()} | {:error, term()}
-  def run_every(fun, cron_expr, opts \\ [])
-
-  def run_every(fun, cron_expr, opts)
-      when is_function(fun, 0) and is_binary(cron_expr) and is_list(opts) do
-    with {:ok, timezone} <- validate_timezone_option(Keyword.get(opts, :timezone)),
-         {:ok, schedule} <- Job.prepare_schedule(cron_expr, timezone) do
-      Job.start(fun, schedule, self())
-    end
-  end
-
-  def run_every(fun, cron_expr, opts) when is_function(fun, 0) and is_list(opts) do
-    validate_cron_expression_type(cron_expr)
-  end
-
-  def run_every(fun, _cron_expr, _opts) when is_function(fun, 0),
-    do: {:error, {:invalid_scheduler_options, :invalid_type}}
-
-  @doc """
-  Cancels a running cron job.
-
-  ## Examples
-
-      {:ok, pid} = Jido.Scheduler.run_every(MyModule, :work, [], "* * * * *")
-      :ok = Jido.Scheduler.cancel(pid)
-  """
-  @spec cancel(pid()) :: :ok
-  def cancel(pid) when is_pid(pid) do
-    if Process.alive?(pid) do
-      ref = Process.monitor(pid)
-
-      try do
-        GenServer.stop(pid, :normal, 5_000)
-      catch
-        :exit, _ ->
-          if Process.alive?(pid), do: Process.exit(pid, :kill)
+      case DynamicSupervisor.start_child(Jido.scheduler_name(jido), {Job, child_opts}) do
+        {:ok, _pid} -> {:ok, name}
+        {:error, reason} -> {:error, reason}
+        :ignore -> {:error, {:invalid_schedule, cron_expr, timezone}}
       end
-
-      wait_for_shutdown(pid, ref)
     end
-
-    :ok
   end
 
-  @doc """
-  Checks if a cron job process is still alive.
-  """
-  @spec alive?(pid()) :: boolean()
-  def alive?(pid) when is_pid(pid) do
-    Process.alive?(pid)
+  defp job_name(jido, generation) do
+    {:via, Registry, {Jido.registry_name(jido), {:scheduler_job, generation}}}
   end
+
+  @doc false
+  @spec cancel(GenServer.server()) :: :ok
+  def cancel(job), do: GenServer.cast(job, :stop)
 
   @spec normalize_cron_spec(term()) :: {:ok, cron_spec()} | {:error, term()}
   defp normalize_cron_spec(spec) when is_map(spec) do
@@ -240,26 +193,6 @@ defmodule Jido.Scheduler do
       Map.has_key?(map, key) -> Map.get(map, key)
       Map.has_key?(map, string_key) -> Map.get(map, string_key)
       true -> nil
-    end
-  end
-
-  defp wait_for_shutdown(pid, ref) do
-    receive do
-      {:DOWN, ^ref, :process, ^pid, _reason} ->
-        :ok
-    after
-      250 ->
-        if Process.alive?(pid) do
-          Process.exit(pid, :kill)
-
-          receive do
-            {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
-          after
-            1_000 -> :ok
-          end
-        else
-          Process.demonitor(ref, [:flush])
-        end
     end
   end
 

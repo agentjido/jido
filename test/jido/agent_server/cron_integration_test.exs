@@ -11,7 +11,6 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
   alias Jido.Persist
   alias Jido.Signal
   alias Jido.Storage.ETS
-  alias JidoTest.Support.FailingTimeZoneDatabase
 
   defmodule CronCountAction do
     @moduledoc false
@@ -67,6 +66,9 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
     end
   end
 
+  defp job_pid(job), do: GenServer.whereis(job)
+  defp job_alive?(job), do: is_pid(job_pid(job))
+
   describe "cron job registration" do
     test "agent can register a cron job", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-1", jido: jido)
@@ -85,9 +87,8 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       state = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :heartbeat) end)
 
-      job_pid = state.cron_jobs[:heartbeat]
-      assert is_pid(job_pid)
-      assert Process.alive?(job_pid)
+      job = state.cron_jobs[:heartbeat]
+      assert job_alive?(job)
 
       GenServer.stop(pid)
     end
@@ -112,9 +113,8 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       assert Map.has_key?(state.cron_jobs, :daily)
       assert Map.has_key?(state.cron_jobs, :hourly)
 
-      for {_id, job_pid} <- state.cron_jobs do
-        assert is_pid(job_pid)
-        assert Process.alive?(job_pid)
+      for {_id, job} <- state.cron_jobs do
+        assert job_alive?(job)
       end
 
       GenServer.stop(pid)
@@ -134,7 +134,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :updatable) end)
       first_job_pid = state1.cron_jobs[:updatable]
-      assert is_pid(first_job_pid)
+      assert job_alive?(first_job_pid)
 
       register_signal2 =
         Signal.new!(%{
@@ -152,7 +152,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       assert map_size(state2.cron_jobs) == 1
       second_job_pid = state2.cron_jobs[:updatable]
-      assert is_pid(second_job_pid)
+      assert job_alive?(second_job_pid)
 
       refute first_job_pid == second_job_pid
 
@@ -194,7 +194,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
           state.cron_jobs[:stable] == job_pid and state.cron_specs[:stable] == cron_spec
         end)
 
-      assert Process.alive?(job_pid)
+      assert job_alive?(job_pid)
       assert state2.cron_specs[:stable].cron_expression == "* * * * *"
 
       GenServer.stop(pid)
@@ -314,21 +314,14 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
         |> then(fn agent ->
           cron_specs = %{
             skipped:
-              Jido.Scheduler.build_cron_spec("* * * * *", restored_signal, "America/New_York")
+              Jido.Scheduler.build_cron_spec("* * * * *", restored_signal, "Invalid/Nowhere")
           }
 
           %{agent | state: Map.put(agent.state, scheduler_key, cron_specs)}
         end)
 
-      on_exit(fn ->
-        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
-      end)
-
       log =
         capture_log(fn ->
-          # Simulate time zone database failure
-          Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
-
           {:ok, pid} =
             AgentServer.start_link(
               agent: agent,
@@ -350,7 +343,6 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
           refute Map.has_key?(checkpoint.state || %{}, scheduler_key)
 
           GenServer.stop(pid)
-          Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
         end)
 
       assert log =~ "failed to register cron job :skipped"
@@ -373,7 +365,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal)
 
       state = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :timezone_test) end)
-      assert is_pid(state.cron_jobs[:timezone_test])
+      assert job_alive?(state.cron_jobs[:timezone_test])
 
       GenServer.stop(pid)
     end
@@ -465,31 +457,29 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal)
 
       state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :restartable) end)
-      original_job_pid = state1.cron_jobs[:restartable]
+      job = state1.cron_jobs[:restartable]
+      original_job_pid = job_pid(job)
       assert is_pid(original_job_pid)
-      assert Process.alive?(original_job_pid)
 
       Process.exit(original_job_pid, :kill)
 
-      state2 =
-        eventually_state(
-          pid,
-          fn state ->
-            new_pid = Map.get(state.cron_jobs, :restartable)
-            is_pid(new_pid) and new_pid != original_job_pid and Process.alive?(new_pid)
+      restarted_job_pid =
+        eventually(
+          fn ->
+            new_pid = job_pid(job)
+            if is_pid(new_pid) and new_pid != original_job_pid, do: new_pid, else: false
           end,
           timeout: 6_000
         )
 
-      restarted_job_pid = state2.cron_jobs[:restartable]
-      refute restarted_job_pid == original_job_pid
+      assert is_pid(restarted_job_pid)
       assert Process.alive?(pid)
       refute_received {:DOWN, ^server_ref, :process, ^pid, _}
 
       GenServer.stop(pid)
     end
 
-    test "cancel removes durable spec even when runtime pid is already gone", %{jido: jido} do
+    test "cancel removes durable spec after a supervised restart", %{jido: jido} do
       {:ok, pid} = AgentServer.start_link(agent: CronTestAgent, id: "cron-test-9b", jido: jido)
 
       register_signal =
@@ -502,18 +492,21 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal)
 
       state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :gone_runtime) end)
-      job_pid = state1.cron_jobs[:gone_runtime]
-      assert is_pid(job_pid)
+      job = state1.cron_jobs[:gone_runtime]
+      original_job_pid = job_pid(job)
+      assert is_pid(original_job_pid)
 
-      Process.exit(job_pid, :shutdown)
+      Process.exit(original_job_pid, :kill)
 
       eventually_state(
         pid,
         fn state ->
-          not Map.has_key?(state.cron_jobs, :gone_runtime) and
+          restarted_pid = job_pid(job)
+
+          is_pid(restarted_pid) and restarted_pid != original_job_pid and
             Map.has_key?(state.cron_specs, :gone_runtime)
         end,
-        timeout: 2_000
+        timeout: 6_000
       )
 
       cancel_signal =
@@ -552,9 +545,8 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal)
 
       state1 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :cancellable) end)
-      job_pid = state1.cron_jobs[:cancellable]
-      assert is_pid(job_pid)
-      assert Process.alive?(job_pid)
+      job = state1.cron_jobs[:cancellable]
+      assert job_alive?(job)
 
       cancel_signal =
         Signal.new!(%{
@@ -567,7 +559,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
 
       eventually_state(pid, fn state -> not Map.has_key?(state.cron_jobs, :cancellable) end)
 
-      eventually(fn -> not Process.alive?(job_pid) end)
+      eventually(fn -> not job_alive?(job) end)
 
       GenServer.stop(pid)
     end
@@ -624,7 +616,7 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal2)
 
       state2 = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :toggle) end)
-      assert is_pid(state2.cron_jobs[:toggle])
+      assert job_alive?(state2.cron_jobs[:toggle])
 
       GenServer.stop(pid)
     end
@@ -644,13 +636,12 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       :ok = AgentServer.cast(pid, register_signal)
 
       state = eventually_state(pid, fn state -> Map.has_key?(state.cron_jobs, :cleanup_test) end)
-      job_pid = state.cron_jobs[:cleanup_test]
-      assert is_pid(job_pid)
-      assert Process.alive?(job_pid)
+      job = state.cron_jobs[:cleanup_test]
+      assert job_alive?(job)
 
       GenServer.stop(pid)
 
-      eventually(fn -> not Process.alive?(job_pid) end)
+      eventually(fn -> not job_alive?(job) end)
     end
 
     test "multiple cron jobs are all cleaned up on termination", %{jido: jido} do
@@ -670,17 +661,16 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       end
 
       state = eventually_state(pid, fn state -> map_size(state.cron_jobs) == 3 end)
-      job_pids = Enum.map(job_ids, fn id -> state.cron_jobs[id] end)
+      jobs = Enum.map(job_ids, fn id -> state.cron_jobs[id] end)
 
-      for job_pid <- job_pids do
-        assert is_pid(job_pid)
-        assert Process.alive?(job_pid)
+      for job <- jobs do
+        assert job_alive?(job)
       end
 
       GenServer.stop(pid)
 
-      for job_pid <- job_pids do
-        eventually(fn -> not Process.alive?(job_pid) end)
+      for job <- jobs do
+        eventually(fn -> not job_alive?(job) end)
       end
     end
   end
@@ -708,8 +698,8 @@ defmodule JidoTest.AgentServer.CronIntegrationTest do
       job_pid2 = state2.cron_jobs[:shared_name]
 
       refute job_pid1 == job_pid2
-      assert Process.alive?(job_pid1)
-      assert Process.alive?(job_pid2)
+      assert job_alive?(job_pid1)
+      assert job_alive?(job_pid2)
 
       GenServer.stop(pid1)
       GenServer.stop(pid2)

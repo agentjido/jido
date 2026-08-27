@@ -480,22 +480,6 @@ defmodule JidoTest.TelemetryTest do
 
       assert :ok =
                Telemetry.handle_event(
-                 [:jido, :agent_server, :cron, :restart_scheduled],
-                 %{},
-                 %{agent_id: "test", job_id: :job, reason: :killed, delay_ms: 500},
-                 nil
-               )
-
-      assert :ok =
-               Telemetry.handle_event(
-                 [:jido, :agent_server, :cron, :restart_succeeded],
-                 %{},
-                 %{agent_id: "test", job_id: :job, cron_expression: "* * * * *"},
-                 nil
-               )
-
-      assert :ok =
-               Telemetry.handle_event(
                  [:jido, :agent_server, :cron, :persist_failure],
                  %{},
                  %{agent_id: "test", job_id: :job, reason: :boom},

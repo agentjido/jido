@@ -373,6 +373,8 @@ defmodule Jido do
       {Registry, keys: :unique, name: registry_name(name)},
       {Jido.RuntimeStore, name: runtime_store},
       {DynamicSupervisor,
+       name: scheduler_name(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5},
+      {DynamicSupervisor,
        name: agent_supervisor_name(name),
        strategy: :one_for_one,
        max_restarts: 1000,

@@ -973,7 +973,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           timeout: 3_000
         )
 
-      assert is_pid(state2.cron_jobs[:after_kill_register])
+      assert is_pid(GenServer.whereis(state2.cron_jobs[:after_kill_register]))
       :ok = AgentServer.detach(pid2)
     end
 
@@ -1121,7 +1121,7 @@ defmodule JidoTest.Agent.InstanceManagerTest do
           timeout: 3_000
         )
 
-      assert is_pid(state2.cron_jobs[conflict_job_id])
+      assert is_pid(GenServer.whereis(state2.cron_jobs[conflict_job_id]))
 
       store_key = {DeclarativeConflictAgent, {manager, instance_key}}
       scheduler_key = Scheduler.cron_specs_state_key()

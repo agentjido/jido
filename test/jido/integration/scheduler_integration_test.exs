@@ -12,9 +12,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
   import ExUnit.CaptureLog
   import JidoTest.Support.SchedulerIntegrationHarness
 
-  alias Jido.AgentServer
   alias Jido.Signal
-  alias JidoTest.Support.FailingTimeZoneDatabase
 
   @moduletag :integration
   @moduletag :scheduler_integration
@@ -59,53 +57,11 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
     {:plugin_schedule, :scheduler_integration_plugin, PluginTickAction}
   end
 
+  defp runtime_pid(state, job_id) do
+    state.cron_jobs |> Map.fetch!(job_id) |> GenServer.whereis()
+  end
+
   describe "runtime scheduler failures" do
-    test "cron job enters retry mode during time zone database failure and resumes after recovery",
-         context do
-      on_exit(fn ->
-        Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
-      end)
-
-      pid = start_cron_agent(context, id: unique_id("scheduler-retry"))
-
-      assert :ok =
-               register_cron(pid, "* * * * * * *",
-                 job_id: :heartbeat,
-                 timezone: "America/New_York"
-               )
-
-      job_pid = wait_for_job(pid, :heartbeat, timeout: 5_000)
-      wait_for_tick_count(pid, 1, timeout: 5_000)
-
-      server_ref = Process.monitor(pid)
-
-      # Simulate time zone database failure
-      Application.put_env(:jido, :time_zone_database, FailingTimeZoneDatabase)
-
-      eventually(fn -> Process.alive?(pid) end, timeout: 2_000)
-
-      eventually(fn -> Process.alive?(job_pid) and :sys.get_state(job_pid).retrying? end,
-        timeout: 5_000
-      )
-
-      {:ok, state_during_outage} = AgentServer.state(pid)
-      assert state_during_outage.cron_jobs[:heartbeat] == job_pid
-      assert Process.alive?(job_pid)
-
-      baseline = state_during_outage.agent.state.tick_count
-
-      # Restore working database
-      Application.put_env(:jido, :time_zone_database, TimeZoneInfo.TimeZoneDatabase)
-
-      eventually(fn -> Process.alive?(job_pid) and not :sys.get_state(job_pid).retrying? end,
-        timeout: 5_000
-      )
-
-      wait_for_tick_count(pid, baseline + 1, timeout: 8_000)
-
-      refute_received {:DOWN, ^server_ref, :process, ^pid, _reason}
-    end
-
     test "non-durable cron payload is isolated and later cron registrations still work",
          context do
       pid = start_cron_agent(context, id: unique_id("scheduler-bad-message"))
@@ -145,8 +101,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       state = state(pid)
       refute Map.has_key?(state.cron_jobs, :bad_message)
       refute Map.has_key?(state.cron_specs, :bad_message)
-      assert is_pid(state.cron_jobs[:good_message])
-      assert Process.alive?(state.cron_jobs[:good_message])
+      assert is_pid(runtime_pid(state, :good_message))
       refute_received {:DOWN, ^server_ref, :process, ^pid, _reason}
       assert log =~ "failed to register cron job :bad_message"
     end
@@ -172,6 +127,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
 
       alpha_job_pid = wait_for_job(pid, :alpha, timeout: 5_000)
       beta_job_pid = wait_for_job(pid, :beta, timeout: 5_000)
+      alpha_job = state(pid).cron_jobs[:alpha]
 
       eventually(
         fn ->
@@ -190,11 +146,9 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       restarted_alpha_pid =
         eventually(
           fn ->
-            state = state(pid)
-            new_alpha_pid = state.cron_jobs[:alpha]
+            new_alpha_pid = GenServer.whereis(alpha_job)
 
-            if is_pid(new_alpha_pid) and new_alpha_pid != alpha_job_pid and
-                 Process.alive?(new_alpha_pid) do
+            if is_pid(new_alpha_pid) and new_alpha_pid != alpha_job_pid do
               new_alpha_pid
             else
               false
@@ -204,7 +158,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
         )
 
       assert Process.alive?(beta_job_pid)
-      assert state(pid).cron_jobs[:beta] == beta_job_pid
+      assert runtime_pid(state(pid), :beta) == beta_job_pid
       assert Process.alive?(restarted_alpha_pid)
 
       eventually(
@@ -229,7 +183,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       eventually(fn -> tick_count(pid) >= 1 end, timeout: 5_000)
 
       state = state(pid)
-      assert state.cron_jobs[job_id] == job_pid
+      assert runtime_pid(state, job_id) == job_pid
       assert state.cron_specs == %{}
     end
 
@@ -238,6 +192,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
 
       job_id = scheduled_job_id()
       original_job_pid = wait_for_job(pid, job_id, timeout: 5_000)
+      job = state(pid).cron_jobs[job_id]
       assert Process.alive?(original_job_pid)
 
       Process.exit(original_job_pid, :kill)
@@ -245,11 +200,9 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       restarted_job_pid =
         eventually(
           fn ->
-            state = state(pid)
-            new_job_pid = state.cron_jobs[job_id]
+            new_job_pid = GenServer.whereis(job)
 
-            if is_pid(new_job_pid) and new_job_pid != original_job_pid and
-                 Process.alive?(new_job_pid) do
+            if is_pid(new_job_pid) and new_job_pid != original_job_pid do
               new_job_pid
             else
               false
@@ -280,7 +233,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       )
 
       state = state(pid)
-      assert state.cron_jobs[job_id] == job_pid
+      assert runtime_pid(state, job_id) == job_pid
       assert state.cron_specs == %{}
     end
 
@@ -289,6 +242,7 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
 
       job_id = plugin_job_id()
       original_job_pid = wait_for_job(pid, job_id, timeout: 5_000)
+      job = state(pid).cron_jobs[job_id]
       assert Process.alive?(original_job_pid)
 
       Process.exit(original_job_pid, :kill)
@@ -296,11 +250,9 @@ defmodule JidoTest.Integration.SchedulerIntegrationTest do
       restarted_job_pid =
         eventually(
           fn ->
-            current_state = state(pid)
-            new_job_pid = current_state.cron_jobs[job_id]
+            new_job_pid = GenServer.whereis(job)
 
-            if is_pid(new_job_pid) and new_job_pid != original_job_pid and
-                 Process.alive?(new_job_pid) do
+            if is_pid(new_job_pid) and new_job_pid != original_job_pid do
               new_job_pid
             else
               false
