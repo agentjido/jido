@@ -1,7 +1,6 @@
 defmodule JidoTest.AgentPluginIntegrationTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Agent.Schema
   alias Jido.Plugin.Spec
 
   # =============================================================================
@@ -233,8 +232,9 @@ defmodule JidoTest.AgentPluginIntegrationTest do
       schema = SinglePluginAgent.schema()
 
       assert is_struct(schema)
-      keys = Schema.known_keys(schema)
-      assert :counter_plugin in keys
+
+      assert {:ok, %{counter_plugin: %{count: 0}}} =
+               Zoi.parse(schema, %{counter_plugin: %{}})
     end
 
     test "new/0 initializes plugin state with defaults under state_key" do
@@ -620,11 +620,23 @@ defmodule JidoTest.AgentPluginIntegrationTest do
   # =============================================================================
 
   describe "schema merging" do
+    test "plugin state keys cannot replace base schema fields" do
+      assert_raise CompileError, ~r/Plugin state_keys collide with agent schema/, fn ->
+        defmodule SchemaCollisionAgent do
+          use Jido.Agent,
+            name: "schema_collision_agent",
+            default_plugins: false,
+            schema: Zoi.object(%{counter_plugin: Zoi.map()}),
+            plugins: [JidoTest.AgentPluginIntegrationTest.CounterPlugin]
+        end
+      end
+    end
+
     test "merged schema contains plugin state_keys" do
       schema = MixedSchemaAgent.schema()
-      keys = Schema.known_keys(schema)
 
-      assert :counter_plugin in keys
+      assert {:ok, state} = Zoi.parse(schema, %{counter_plugin: %{}})
+      assert Map.has_key?(state, :counter_plugin)
     end
 
     test "defaults from both base and skill are applied in new/0" do

@@ -9,8 +9,18 @@ defmodule Jido.Agent.State do
   Handles deep merging and validation of agent state.
   """
 
-  alias Jido.Agent.Schema
   alias Jido.Util.DeepMerge
+
+  @doc false
+  @spec validate_schema(term(), keyword()) :: :ok | {:error, String.t()}
+  def validate_schema(value, opts \\ [])
+
+  def validate_schema([], _opts), do: :ok
+
+  def validate_schema(%Zoi.Types.Map{fields: fields}, _opts) when is_list(fields), do: :ok
+
+  def validate_schema(_value, _opts),
+    do: {:error, "must be a field-based Zoi map schema"}
 
   @doc """
   Merges new attributes into existing state using recursive map and keyword-list semantics.
@@ -36,22 +46,9 @@ defmodule Jido.Agent.State do
 
   def validate(state, [], _opts), do: {:ok, state}
 
-  def validate(state, schema, opts) do
-    strict? = Keyword.get(opts, :strict, false)
-    known_keys = Schema.known_keys(schema)
-    extra_fields = Map.drop(state, known_keys)
-
-    case Zoi.parse(schema, state) do
-      {:ok, validated} ->
-        if strict? do
-          {:ok, validated}
-        else
-          {:ok, Map.merge(validated, extra_fields)}
-        end
-
-      {:error, _} = error ->
-        error
-    end
+  def validate(state, %Zoi.Types.Map{} = schema, opts) do
+    unrecognized_keys = if Keyword.get(opts, :strict, false), do: :strip, else: :preserve
+    Zoi.parse(%{schema | unrecognized_keys: unrecognized_keys}, state)
   end
 
   @doc """
@@ -60,7 +57,14 @@ defmodule Jido.Agent.State do
   @spec defaults_from_schema(term()) :: map()
   def defaults_from_schema([]), do: %{}
 
-  def defaults_from_schema(zoi_schema) do
-    Jido.Agent.Schema.defaults_from_zoi_schema(zoi_schema)
+  def defaults_from_schema(%Zoi.Types.Map{fields: fields}) do
+    Enum.reduce(fields, %{}, fn
+      {key, %Zoi.Types.Default{} = schema}, defaults ->
+        {:ok, value} = Zoi.parse(schema, nil)
+        Map.put(defaults, key, value)
+
+      {_key, _schema}, defaults ->
+        defaults
+    end)
   end
 end

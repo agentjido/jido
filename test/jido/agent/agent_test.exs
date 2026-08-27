@@ -51,6 +51,26 @@ defmodule JidoTest.AgentTest do
       schema = TestAgents.Minimal.schema()
       assert is_struct(schema)
     end
+
+    test "rejects anonymous state schema callbacks" do
+      assert_raise CompileError, ~r/anonymous functions are not supported/, fn ->
+        defmodule AnonymousSchemaAgent do
+          use Jido.Agent,
+            name: "anonymous_schema_agent",
+            schema: Zoi.object(%{value: Zoi.string() |> Zoi.refine(fn _value -> :ok end)})
+        end
+      end
+    end
+
+    test "rejects lazy state schemas" do
+      assert_raise CompileError, ~r/lazy schemas are not supported/, fn ->
+        defmodule LazySchemaAgent do
+          use Jido.Agent,
+            name: "lazy_schema_agent",
+            schema: Zoi.object(%{value: Zoi.lazy(fn -> Zoi.string() end)})
+        end
+      end
+    end
   end
 
   describe "signal routes configuration" do

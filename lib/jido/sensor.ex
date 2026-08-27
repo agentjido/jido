@@ -150,7 +150,7 @@ defmodule Jido.Sensor do
                               |> Zoi.optional(),
                             schema:
                               Zoi.any(description: "Zoi schema for config validation.")
-                              |> Zoi.refine({Jido.Schema, :validate_config_schema, []})
+                              |> Zoi.refine({Jido.Action, :validate_config_schema, []})
                               |> Zoi.optional()
                           },
                           coerce: true
@@ -181,7 +181,7 @@ defmodule Jido.Sensor do
                              line: __ENV__.line
                        end)
 
-      Jido.Schema.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
+      Jido.Action.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
 
       @doc "Returns the sensor's name."
       @spec name() :: String.t()

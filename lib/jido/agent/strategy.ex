@@ -370,7 +370,7 @@ defmodule Jido.Agent.Strategy do
 
   defp normalize_with_schema(params, schema, action) do
     cond do
-      Jido.Schema.zoi_schema?(schema) ->
+      is_struct(schema) and Zoi.Type.impl_for(schema) != nil ->
         # Zoi with coerce: true handles string->atom conversion safely
         # Only schema-defined keys become atoms; unknown keys are stripped
         case Zoi.parse(schema, params) do

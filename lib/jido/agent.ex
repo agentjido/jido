@@ -133,7 +133,6 @@ defmodule Jido.Agent do
   alias Jido.Agent
   alias Jido.Agent.Command
   alias Jido.Agent.Directive
-  alias Jido.Agent.Schema
   alias Jido.Agent.State, as: StateHelper
   alias Jido.Error
   alias Jido.Instruction
@@ -288,7 +287,7 @@ defmodule Jido.Agent do
                              |> Zoi.optional(),
                            schema:
                              Zoi.any(description: "Zoi schema for validating the Agent's state.")
-                             |> Zoi.refine({Schema, :validate_config_schema, []})
+                             |> Zoi.refine({Jido.Agent.State, :validate_schema, []})
                              |> Zoi.default([]),
                            strategy:
                              Zoi.any(
@@ -794,7 +793,7 @@ defmodule Jido.Agent do
           @plugin_specs
           |> Enum.reject(fn spec -> spec.schema == nil end)
           |> Enum.map(fn spec ->
-            plugin_state_defaults = Jido.Agent.Schema.defaults_from_zoi_schema(spec.schema)
+            plugin_state_defaults = AgentState.defaults_from_schema(spec.schema)
             {spec.state_key, plugin_state_defaults}
           end)
           |> Map.new()
@@ -1225,7 +1224,7 @@ defmodule Jido.Agent do
                                line: __ENV__.line
                          end)
 
-        Jido.Schema.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
+        Jido.Action.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
 
         @expanded_signal_routes Jido.Agent.expand_and_eval_literal_option(
                                   @validated_opts[:signal_routes] || [],
@@ -1279,7 +1278,10 @@ defmodule Jido.Agent do
         end
 
         # Validate no collision with base schema keys
-        @base_schema_keys Jido.Agent.Schema.known_keys(@validated_opts[:schema])
+        @base_schema_keys (case @validated_opts[:schema] do
+                             [] -> []
+                             %Zoi.Types.Map{fields: fields} -> Keyword.keys(fields)
+                           end)
         @colliding_keys Enum.filter(@plugin_state_keys, &(&1 in @base_schema_keys))
         if @colliding_keys != [] do
           raise CompileError,
@@ -1290,10 +1292,21 @@ defmodule Jido.Agent do
         end
 
         # Merge schemas: base schema + nested plugin schemas
-        @merged_schema Jido.Agent.Schema.merge_with_plugins(
-                         @validated_opts[:schema],
-                         @plugin_specs
-                       )
+        @plugin_schema_fields @plugin_specs
+                              |> Enum.reject(&is_nil(&1.schema))
+                              |> Map.new(&{&1.state_key, &1.schema})
+
+        @plugin_schema (case @plugin_specs do
+                          [] -> nil
+                          _plugins -> Zoi.object(@plugin_schema_fields)
+                        end)
+
+        @merged_schema (case {@validated_opts[:schema], @plugin_schema} do
+                          {[], nil} -> []
+                          {[], plugin_schema} -> plugin_schema
+                          {base_schema, nil} -> base_schema
+                          {base_schema, plugin_schema} -> Zoi.extend(base_schema, plugin_schema)
+                        end)
 
         # Aggregate actions from plugins
         @plugin_actions @plugin_specs |> Enum.flat_map(& &1.actions) |> Enum.uniq()

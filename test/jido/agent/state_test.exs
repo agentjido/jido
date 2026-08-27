@@ -3,6 +3,21 @@ defmodule JidoTest.Agent.StateTest do
 
   alias Jido.Agent.State
 
+  describe "validate_schema/2" do
+    test "accepts field-based Zoi map schemas and the empty sentinel" do
+      assert :ok = State.validate_schema(Zoi.object(%{name: Zoi.string()}))
+      assert :ok = State.validate_schema([])
+    end
+
+    test "rejects non-map and open map schemas" do
+      assert {:error, "must be a field-based Zoi map schema"} =
+               State.validate_schema(Zoi.string())
+
+      assert {:error, "must be a field-based Zoi map schema"} =
+               State.validate_schema(Zoi.map())
+    end
+  end
+
   describe "merge/2" do
     test "merges keyword list into current state" do
       current = %{a: 1, b: 2}

@@ -258,7 +258,6 @@ defmodule Jido.MixProject do
         "Agent Internals": [
           Jido.Agent.DefaultPlugins,
           Jido.Agent.State,
-          Jido.Agent.Schema,
           Jido.AgentServer.State,
           Jido.AgentServer.State.Lifecycle,
           Jido.AgentServer.Status,
