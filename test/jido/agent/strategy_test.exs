@@ -6,6 +6,11 @@ defmodule JidoTest.Agent.StrategyTest do
   alias Jido.Agent.Strategy
   alias Jido.Agent.Strategy.Snapshot
 
+  defp new_agent(attrs) do
+    definition = Agent.new!(name: "strategy_test_agent", plugin_defaults: :none)
+    Agent.instantiate(definition, attrs)
+  end
+
   defmodule TestStrategy do
     @moduledoc false
     use Jido.Agent.Strategy
@@ -67,8 +72,9 @@ defmodule JidoTest.Agent.StrategyTest do
   defmodule ContextCaptureAgent do
     @moduledoc false
     use Jido.Agent,
-      name: "context_capture_agent",
-      strategy: JidoTest.Agent.StrategyTest.ContextCaptureStrategy
+      name: "context_capture_agent"
+
+    def strategy, do: JidoTest.Agent.StrategyTest.ContextCaptureStrategy
 
     def signal_routes(_ctx), do: []
   end
@@ -99,7 +105,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
   describe "default_snapshot/1" do
     test "returns snapshot with default values" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       snapshot = Strategy.default_snapshot(agent)
 
       assert %Snapshot{} = snapshot
@@ -111,7 +117,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
     test "returns snapshot with strategy state" do
       {:ok, agent} =
-        Agent.new(%{
+        new_agent(%{
           id: "test",
           state: %{
             __strategy__: %{
@@ -134,7 +140,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
   describe "normalize_command/3" do
     test "preserves string keys when no action_spec (atom-safe)" do
-      {:ok, _agent} = Agent.new(%{id: "test"})
+      {:ok, _agent} = new_agent(%{id: "test"})
 
       command = %Command{
         action: :unknown_action,
@@ -150,7 +156,7 @@ defmodule JidoTest.Agent.StrategyTest do
     end
 
     test "normalizes with Zoi schema" do
-      {:ok, _agent} = Agent.new(%{id: "test"})
+      {:ok, _agent} = new_agent(%{id: "test"})
 
       command = %Command{
         action: :special_action,
@@ -164,7 +170,7 @@ defmodule JidoTest.Agent.StrategyTest do
     end
 
     test "normalizes a second Zoi schema" do
-      {:ok, _agent} = Agent.new(%{id: "test"})
+      {:ok, _agent} = new_agent(%{id: "test"})
 
       command = %Command{
         action: :simple_action,
@@ -218,7 +224,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
   describe "__using__/1 macro" do
     test "provides default init/2 implementation" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: nil, strategy_opts: []}
 
       {result_agent, directives} = MinimalStrategy.init(agent, ctx)
@@ -228,7 +234,7 @@ defmodule JidoTest.Agent.StrategyTest do
     end
 
     test "provides default tick/2 implementation" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: nil, strategy_opts: []}
 
       {result_agent, directives} = MinimalStrategy.tick(agent, ctx)
@@ -238,7 +244,7 @@ defmodule JidoTest.Agent.StrategyTest do
     end
 
     test "provides default snapshot/2 implementation" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: nil, strategy_opts: []}
 
       snapshot = MinimalStrategy.snapshot(agent, ctx)
@@ -250,7 +256,7 @@ defmodule JidoTest.Agent.StrategyTest do
 
   describe "custom strategy implementation" do
     test "cmd/3 is called properly" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: nil, strategy_opts: []}
 
       commands = [

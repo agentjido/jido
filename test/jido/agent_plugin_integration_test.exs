@@ -621,7 +621,7 @@ defmodule JidoTest.AgentPluginIntegrationTest do
 
   describe "schema merging" do
     test "plugin state keys cannot replace base schema fields" do
-      assert_raise CompileError, ~r/Plugin state_keys collide with agent schema/, fn ->
+      assert_raise CompileError, ~r/plugin state key collides with Agent state schema/, fn ->
         defmodule SchemaCollisionAgent do
           use Jido.Agent,
             name: "schema_collision_agent",

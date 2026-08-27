@@ -169,8 +169,9 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
     @moduledoc false
     use Jido.Agent,
       name: "agent_with_strategy",
-      strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes,
       schema: []
+
+    def strategy, do: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes
 
     def signal_routes(_ctx) do
       [{"agent.route", JidoTest.AgentServer.SignalRouterTest.TestAction}]
@@ -181,8 +182,9 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
     @moduledoc false
     use Jido.Agent,
       name: "agent_with_strategy_no_routes",
-      strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithoutRoutes,
       schema: []
+
+    def strategy, do: JidoTest.AgentServer.SignalRouterTest.StrategyWithoutRoutes
 
     def signal_routes(_ctx), do: []
   end
@@ -460,9 +462,10 @@ defmodule JidoTest.AgentServer.SignalRouterTest do
         @moduledoc false
         use Jido.Agent,
           name: "combined_agent",
-          strategy: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes,
           schema: [],
           plugins: [JidoTest.AgentServer.SignalRouterTest.PluginWithRouter]
+
+        def strategy, do: JidoTest.AgentServer.SignalRouterTest.StrategyWithRoutes
 
         def signal_routes(_ctx) do
           [{"combined.agent", JidoTest.AgentServer.SignalRouterTest.TestAction}]

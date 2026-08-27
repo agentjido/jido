@@ -38,7 +38,6 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "direct_test_agent",
-      strategy: Jido.Agent.Strategy.Direct,
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
 
     def signal_routes(_ctx), do: []
@@ -48,8 +47,9 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "direct_thread_agent",
-      strategy: {Jido.Agent.Strategy.Direct, thread?: true},
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy_opts, do: [thread?: true]
 
     def signal_routes(_ctx), do: []
   end
@@ -58,8 +58,9 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "fsm_test_agent",
-      strategy: StrategyFSM,
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: StrategyFSM
 
     def signal_routes(_ctx), do: []
   end
@@ -68,8 +69,10 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     @moduledoc false
     use Jido.Agent,
       name: "fsm_thread_agent",
-      strategy: {StrategyFSM, thread?: true},
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: StrategyFSM
+    def strategy_opts, do: [thread?: true]
 
     def signal_routes(_ctx), do: []
   end
@@ -297,7 +300,8 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
 
   describe "FSM init with thread?" do
     test "appends checkpoint entry on init when thread? enabled" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      definition = Agent.new!(name: "thread_fsm_test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition, id: "test")
 
       ctx = %{
         agent_module: FSMTestAgent,
@@ -318,7 +322,8 @@ defmodule JidoTest.Thread.StrategyIntegrationTest do
     end
 
     test "no checkpoint when thread? not enabled" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      definition = Agent.new!(name: "thread_fsm_test_agent", plugin_defaults: :none)
+      {:ok, agent} = Agent.instantiate(definition, id: "test")
       ctx = %{agent_module: FSMTestAgent, strategy_opts: []}
 
       {agent, _directives} = StrategyFSM.init(agent, ctx)

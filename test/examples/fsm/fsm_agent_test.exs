@@ -84,13 +84,14 @@ defmodule JidoExampleTest.FSMAgentTest do
     use Jido.Agent,
       name: "simple_fsm_agent",
       description: "Basic FSM agent with default transitions",
-      strategy: Jido.Agent.Strategy.FSM,
       schema:
         Zoi.object(%{
           processed_items: Zoi.list(Zoi.string()) |> Zoi.default([]),
           last_item: Zoi.string() |> Zoi.default(nil),
           counter: Zoi.integer() |> Zoi.default(0)
         })
+
+    def strategy, do: Jido.Agent.Strategy.FSM
   end
 
   defmodule TaskFSMAgent do
@@ -98,8 +99,9 @@ defmodule JidoExampleTest.FSMAgentTest do
     use Jido.Agent,
       name: "task_fsm_agent",
       description: "FSM agent for task processing",
-      strategy: Jido.Agent.Strategy.FSM,
       schema: Zoi.object(%{completed_tasks: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+    def strategy, do: Jido.Agent.Strategy.FSM
   end
 
   defmodule CustomTransitionAgent do
@@ -107,16 +109,21 @@ defmodule JidoExampleTest.FSMAgentTest do
     use Jido.Agent,
       name: "custom_transition_agent",
       description: "FSM agent with custom transitions",
-      strategy:
-        {Jido.Agent.Strategy.FSM,
-         initial_state: "ready",
-         transitions: %{
-           "ready" => ["processing"],
-           "processing" => ["ready", "done", "error"],
-           "done" => ["ready"],
-           "error" => ["ready"]
-         }},
       schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+
+    def strategy_opts do
+      [
+        initial_state: "ready",
+        transitions: %{
+          "ready" => ["processing"],
+          "processing" => ["ready", "done", "error"],
+          "done" => ["ready"],
+          "error" => ["ready"]
+        }
+      ]
+    end
   end
 
   defmodule NoAutoTransitionAgent do
@@ -124,8 +131,10 @@ defmodule JidoExampleTest.FSMAgentTest do
     use Jido.Agent,
       name: "no_auto_transition_agent",
       description: "FSM agent that stays in processing state",
-      strategy: {Jido.Agent.Strategy.FSM, auto_transition: false},
       schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+    def strategy_opts, do: [auto_transition: false]
   end
 
   defp run_cmd(agent_module, agent, action) do

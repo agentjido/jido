@@ -8,30 +8,42 @@ SchedEx calculates cron run times. A supervisor in each Jido instance owns the c
 
 ## Declarative Schedules
 
-The simplest way to add recurring jobs is to declare them in your agent definition. Schedules target signal types, which get routed through `signal_routes/1` like any other signal:
+The simplest way to add recurring jobs is to declare them in the Agent DSL.
+Schedules target signal types. Routes send these signals to Actions:
 
 ```elixir
 defmodule MyAgent do
-  use Jido.Agent,
-    name: "my_agent",
-    schema: Zoi.object(%{
-              tick_count: Zoi.integer() |> Zoi.default(0),
-              last_cleanup: Zoi.any() |> Zoi.default(nil)
-            }),
-    schedules: [
-      {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat},
-      {"@daily", "cleanup.run", job_id: :cleanup, timezone: "America/New_York"}
-    ],
-    signal_routes: [
-      {"heartbeat.tick", HeartbeatAction},
-      {"cleanup.run", CleanupAction}
-    ]
+  use Jido.Agent, name: "my_agent"
+
+  agent do
+    state_schema(
+      Zoi.object(%{
+        tick_count: Zoi.integer() |> Zoi.default(0),
+        last_cleanup: Zoi.any() |> Zoi.default(nil)
+      })
+    )
+
+    route("heartbeat.tick", HeartbeatAction)
+    route("cleanup.run", CleanupAction)
+
+    schedule("heartbeat", "*/5 * * * *", "heartbeat.tick")
+
+    schedule("cleanup", "@daily", "cleanup.run",
+      timezone: "America/New_York",
+      data: %{source: "daily_schedule"}
+    )
+  end
 end
 ```
 
-Declarative schedules are registered automatically when the AgentServer starts. They flow through the normal signal routing pipeline — the same `signal_routes/1`, strategy, and `cmd/2` that handle all other signals.
+Each declaration lowers to `Jido.Agent.Schedule`. Declarative schedules are
+registered when AgentServer starts. They use the normal route and `cmd/2`
+pipeline.
 
 ### Schedule Format
+
+The old schedule tuples remain available through the keyword compatibility
+lowerer:
 
 ```elixir
 schedules: [

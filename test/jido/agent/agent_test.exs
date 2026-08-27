@@ -147,13 +147,14 @@ defmodule JidoTest.AgentTest do
       assert agent.state.status == :idle
     end
 
-    test "populates agent metadata" do
+    test "keeps discovery metadata outside the canonical agent" do
       agent = TestAgents.Basic.new()
       assert agent.name == "basic_agent"
       assert agent.description == "A basic test agent"
-      assert agent.metadata.category == "test"
-      assert agent.metadata.tags == ["test", "basic"]
-      assert agent.metadata.vsn == "1.0.0"
+      assert agent.metadata == %{}
+      assert TestAgents.Basic.category() == "test"
+      assert TestAgents.Basic.tags() == ["test", "basic"]
+      assert TestAgents.Basic.vsn() == "1.0.0"
     end
 
     test "uses default strategy" do

@@ -85,6 +85,7 @@ defmodule Jido.MixProject do
         ],
         Fundamentals: [
           "guides/agents.md",
+          "guides/agent-builder.md",
           "guides/actions.md",
           "guides/signals.md",
           "guides/directives.md",
@@ -104,6 +105,7 @@ defmodule Jido.MixProject do
           "guides/observability.md",
           "guides/testing.md",
           "guides/configuration.md",
+          "guides/agent-storage.md",
           "guides/storage.md",
           "guides/worker-pools.md",
           "guides/scheduling.md"
@@ -144,6 +146,7 @@ defmodule Jido.MixProject do
 
         # Fundamentals
         {"guides/agents.md", title: "Agents"},
+        {"guides/agent-builder.md", title: "Agent Builder"},
         {"guides/actions.md", title: "Actions"},
         {"guides/signals.md", title: "Signals & Routing"},
         {"guides/directives.md", title: "Directives"},
@@ -163,6 +166,7 @@ defmodule Jido.MixProject do
         {"guides/observability.md", title: "Observability"},
         {"guides/testing.md", title: "Testing"},
         {"guides/configuration.md", title: "Configuration"},
+        {"guides/agent-storage.md", title: "Agent Definition Storage"},
         {"guides/storage.md", title: "Persistence & Storage"},
         {"guides/worker-pools.md", title: "Worker Pools"},
         {"guides/scheduling.md", title: "Scheduling"},

@@ -72,8 +72,9 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "fallback_exec_agent",
-      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)}),
-      strategy: FallbackExecStrategy
+      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)})
+
+    def strategy, do: FallbackExecStrategy
 
     def signal_routes(_ctx) do
       [{"fallback_exec", JidoTest.TestActions.IncrementAction}]
@@ -99,8 +100,9 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "inspect_opts_agent",
-      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)}),
-      strategy: InspectOptsStrategy
+      schema: Zoi.object(%{observer_pid: Zoi.any() |> Zoi.default(nil)})
+
+    def strategy, do: InspectOptsStrategy
   end
 
   defmodule RaisingStrategy do
@@ -115,8 +117,9 @@ defmodule JidoTest.AgentServer.TelemetryTest do
     @moduledoc false
     use Jido.Agent,
       name: "raising_agent",
-      schema: [],
-      strategy: RaisingStrategy
+      schema: []
+
+    def strategy, do: RaisingStrategy
 
     def signal_routes(_ctx), do: [{"explode", JidoTest.TestActions.IncrementAction}]
   end

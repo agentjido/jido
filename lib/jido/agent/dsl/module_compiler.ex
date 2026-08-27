@@ -120,7 +120,7 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
     validate_known_keys!(raw_opts, env)
     validate_alias_conflicts!(raw_opts, env)
 
-    opts = Map.new(raw_opts)
+    opts = raw_opts |> Agent.expand_and_eval_literal_option(env) |> Map.new()
 
     state_schema =
       cond do
@@ -133,7 +133,7 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
       Jido.Action.ensure_static_schema!(state_schema, :state_schema, env)
     end
 
-    strategy = validate_strategy!(Map.get(opts, :strategy, Jido.Agent.Strategy.Direct), env)
+    strategy = compatibility_strategy!(opts, env)
     metadata = compatibility_metadata(Map.get(opts, :metadata, %{}), opts, env)
 
     root_opts =
@@ -516,22 +516,37 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
     end
   end
 
-  defp validate_strategy!(module, _env) when is_atom(module), do: module
+  defp compatibility_strategy!(opts, env) do
+    case Map.fetch(opts, :strategy) do
+      :error ->
+        Jido.Agent.Strategy.Direct
 
-  defp validate_strategy!({module, options}, _env)
-       when is_atom(module) and is_list(options),
-       do: {module, options}
+      {:ok, Jido.Agent.Strategy.Direct = strategy} ->
+        warn_direct_strategy(env)
+        strategy
 
-  defp validate_strategy!(_strategy, env) do
-    compile_error!(env, "legacy Agent strategy must be a module or {module, options}")
+      {:ok, {Jido.Agent.Strategy.Direct, options} = strategy} when is_list(options) ->
+        warn_direct_strategy(env)
+        strategy
+
+      {:ok, _custom_strategy} ->
+        compile_error!(
+          env,
+          "custom Agent strategies are not supported by v3 authoring; remove the strategy option and migrate execution to Actions, routes, or a trusted runtime module binding"
+        )
+    end
   end
 
-  defp compatibility_metadata(metadata, opts, _env)
+  defp warn_direct_strategy(env) do
+    IO.warn(
+      "the Direct strategy option is obsolete and is not part of the canonical Agent definition; remove strategy: Jido.Agent.Strategy.Direct",
+      Macro.Env.stacktrace(env)
+    )
+  end
+
+  defp compatibility_metadata(metadata, _opts, _env)
        when is_map(metadata) and not is_struct(metadata) do
     metadata
-    |> put_metadata(:category, Map.get(opts, :category))
-    |> put_metadata(:tags, Map.get(opts, :tags, []))
-    |> put_metadata(:vsn, Map.get(opts, :vsn))
   end
 
   defp compatibility_metadata(_metadata, _opts, env) do
@@ -594,10 +609,6 @@ defmodule Jido.Agent.DSL.ModuleCompiler do
 
   defp maybe_put(map, key, value, true), do: Map.put(map, key, value)
   defp maybe_put(map, _key, _value, false), do: map
-
-  defp put_metadata(metadata, _key, nil), do: metadata
-  defp put_metadata(metadata, _key, []), do: metadata
-  defp put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   defp first_duplicate(values) do
     values

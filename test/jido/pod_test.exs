@@ -72,16 +72,19 @@ defmodule JidoTest.PodTest do
     @moduledoc false
     use Jido.Pod,
       name: "pod_with_strategy",
-      topology: %{},
-      strategy: TestStrategy
+      topology: %{}
+
+    def strategy, do: TestStrategy
   end
 
   defmodule PodWithStrategyOpts do
     @moduledoc false
     use Jido.Pod,
       name: "pod_with_strategy_opts",
-      topology: %{},
-      strategy: {TestStrategy, max_depth: 3}
+      topology: %{}
+
+    def strategy, do: TestStrategy
+    def strategy_opts, do: [max_depth: 3]
   end
 
   defmodule PodWithNilStrategy do
@@ -348,62 +351,61 @@ defmodule JidoTest.PodTest do
     assert Map.has_key?(topology.nodes, "reviewer")
   end
 
-  test "use Jido.Pod resolves strategy module alias" do
+  test "use Jido.Pod can use a trusted runtime strategy binding" do
     assert PodWithStrategy.strategy() == TestStrategy
     agent = PodWithStrategy.new()
     assert agent.agent_module == PodWithStrategy
   end
 
-  test "strategy option resolves caller aliases before pod opts are escaped" do
+  test "custom strategy option returns migration help" do
     suffix = System.unique_integer([:positive])
     pod_mod = Module.concat(__MODULE__, :"AliasedStrategyPod#{suffix}")
     pod_name = "aliased_strategy_pod_#{suffix}"
 
-    Code.compile_string("""
-    defmodule #{inspect(pod_mod)} do
-      @moduledoc false
-      alias #{inspect(TestStrategy)}, as: Strategy
+    assert_raise CompileError,
+                 ~r/custom Agent strategies are not supported by v3 authoring/,
+                 fn ->
+                   Code.compile_string("""
+                   defmodule #{inspect(pod_mod)} do
+                     @moduledoc false
+                     alias #{inspect(TestStrategy)}, as: Strategy
 
-      use Jido.Pod,
-        name: #{inspect(pod_name)},
-        topology: %{},
-        strategy: Strategy
-    end
-    """)
-
-    assert pod_mod.strategy() == TestStrategy
-    agent = pod_mod.new()
-    assert agent.agent_module == pod_mod
+                     use Jido.Pod,
+                       name: #{inspect(pod_name)},
+                       topology: %{},
+                       strategy: Strategy
+                   end
+                   """)
+                 end
   end
 
-  test "use Jido.Pod resolves strategy {module, opts} tuple" do
+  test "use Jido.Pod can use trusted runtime strategy options" do
     assert PodWithStrategyOpts.strategy() == TestStrategy
     assert PodWithStrategyOpts.strategy_opts() == [max_depth: 3]
     agent = PodWithStrategyOpts.new()
     assert agent.agent_module == PodWithStrategyOpts
   end
 
-  test "strategy tuple option resolves caller aliases before pod opts are escaped" do
+  test "custom strategy tuple returns migration help" do
     suffix = System.unique_integer([:positive])
     pod_mod = Module.concat(__MODULE__, :"AliasedStrategyTuplePod#{suffix}")
     pod_name = "aliased_strategy_tuple_pod_#{suffix}"
 
-    Code.compile_string("""
-    defmodule #{inspect(pod_mod)} do
-      @moduledoc false
-      alias #{inspect(TestStrategy)}, as: Strategy
+    assert_raise CompileError,
+                 ~r/custom Agent strategies are not supported by v3 authoring/,
+                 fn ->
+                   Code.compile_string("""
+                   defmodule #{inspect(pod_mod)} do
+                     @moduledoc false
+                     alias #{inspect(TestStrategy)}, as: Strategy
 
-      use Jido.Pod,
-        name: #{inspect(pod_name)},
-        topology: %{},
-        strategy: {Strategy, max_depth: 3}
-    end
-    """)
-
-    assert pod_mod.strategy() == TestStrategy
-    assert pod_mod.strategy_opts() == [max_depth: 3]
-    agent = pod_mod.new()
-    assert agent.agent_module == pod_mod
+                     use Jido.Pod,
+                       name: #{inspect(pod_name)},
+                       topology: %{},
+                       strategy: {Strategy, max_depth: 3}
+                   end
+                   """)
+                 end
   end
 
   test "nil strategy option falls back to default strategy" do

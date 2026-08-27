@@ -1,36 +1,57 @@
 # Jido Usage Rules
 
 ## Intent
-Build reliable multi-agent systems by keeping decision logic pure and runtime effects explicit.
-<!-- package.jido.pure_cmd package.jido.runtime_separation -->
 
-## Core Contracts
-- Treat `cmd/2` as the core agent contract: `{updated_agent, directives}`.
-- Keep agent logic pure; directives describe external effects only.
-- Use **Zoi-first** schemas for new agents, directives, plugins, and signals.
-- Preserve tagged tuple and structured error contracts at public boundaries.
-- Use AgentServer/runtime modules for process concerns, not agent module internals.
+Build reliable Agent systems. Keep decision logic pure. Keep runtime effects
+explicit.
 
-## Library Author Patterns
-- Author actions for domain behavior; let agents orchestrate state + directive emission.
-- Use `Directive.SpawnAgent` / `Directive.StopChild` for hierarchy, not ad-hoc child tracking.
-- Use signals for cross-agent communication instead of direct process coupling.
-- Keep plugin/sensor concerns isolated and composable.
+## Agent authoring
 
-## QA Patterns
-- Start with pure `cmd/2` tests, then add AgentServer integration tests.
-- Start an isolated Jido instance per runtime test and prefer await/polling assertions over fixed sleeps.
-- Run `mix q` (`mix quality`) and coverage checks before release.
+- Use `%Jido.Agent{}` as the one canonical Agent root.
+- Use `Jido.Agent.new/1` or `new!/1` for inert definitions.
+- Use `Jido.Agent.instantiate/2` for a definition that must become an instance.
+- Use generated `MyAgent.agent/0` for the definition.
+- Use generated `MyAgent.new/1` for normal module instance creation.
+- Use generated `MyAgent.validate/2` only as the temporary state-validation shim.
+- Use native data, Builder, the module DSL, or Codec documents to author the same definition.
+- Use static named MFA callbacks in schemas. Do not use anonymous functions or closures.
+- Do not select a strategy in new Agent authoring.
 
-## Avoid
-- Embedding runtime side effects directly in core state transition code.
-- Using directives as a hidden state-mutation mechanism.
-- Tight coupling between unrelated agent modules.
+## Storage
+
+- Store definitions through `Jido.Agent.Codec` and `Jido.Agent.Registry`.
+- Let the caller own JSON encoding and decoding.
+- Keep `id`, `state`, `agent_module`, and strategy data out of Codec documents.
+- Use runtime persistence APIs for Agent instance state.
+
+## Runtime
+
+- Treat `cmd/2` as the core Agent contract: `{updated_agent, directives}`.
+- Keep Agent logic pure. Directives describe external effects only.
+- Use AgentServer and runtime modules for processes, timers, and delivery.
+- Keep `jido` and `agent_module` as runtime or compile bindings only.
+- Keep `category`, `tags`, and `vsn` as discovery or package metadata only.
+
+## Plugins and routes
+
+- Use canonical `Jido.Agent.Plugin` and `Jido.Agent.PluginDefaults` values.
+- Use Actions for domain work.
+- Use routes to select Actions for signals.
+- Use `Directive.SpawnAgent` and `Directive.StopChild` for Agent hierarchy.
+- Use signals for cross-Agent communication.
+
+## Quality
+
+- Start with pure `cmd/2` tests. Then add AgentServer integration tests.
+- Use an isolated Jido instance for each runtime test.
+- Prefer eventual assertions to fixed sleeps.
+- Run `mix quality` and the full test suite before release.
 
 ## References
-- `README.md`
-- `guides/`
+
+- `guides/agents.md`
+- `guides/agent-builder.md`
+- `guides/agent-storage.md`
+- `guides/migration.md`
 - `test/AGENTS.md`
 - `AGENTS.md`
-- https://hexdocs.pm/jido
-- https://hexdocs.pm/usage_rules/readme.html#usage-rules

@@ -15,6 +15,11 @@ defmodule JidoTest.TelemetryTest do
     def signal_routes(_ctx), do: []
   end
 
+  defp new_agent(id) do
+    definition = Agent.new!(name: "telemetry_test_definition", plugin_defaults: :none)
+    Agent.instantiate(definition, id: id)
+  end
+
   defp with_telemetry_env(temp_value, fun) when is_function(fun, 0) do
     previous =
       case Application.fetch_env(:jido, :telemetry) do
@@ -70,7 +75,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits start and stop events" do
-      {:ok, agent} = Agent.new(%{id: "test-span-cmd"})
+      {:ok, agent} = new_agent("test-span-cmd")
 
       result =
         apply(Telemetry, :span_agent_cmd, [agent, :test_action, fn -> {agent, []} end])
@@ -89,7 +94,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "includes directive count in stop event" do
-      {:ok, agent} = Agent.new(%{id: "test-span-directives"})
+      {:ok, agent} = new_agent("test-span-directives")
 
       apply(Telemetry, :span_agent_cmd, [
         agent,
@@ -102,7 +107,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits exception event on error" do
-      {:ok, agent} = Agent.new(%{id: "test-span-error"})
+      {:ok, agent} = new_agent("test-span-error")
 
       assert_raise RuntimeError, "test error", fn ->
         apply(Telemetry, :span_agent_cmd, [
@@ -159,7 +164,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits init start and stop events" do
-      {:ok, agent} = Agent.new(%{id: "test-strategy-init"})
+      {:ok, agent} = new_agent("test-strategy-init")
 
       apply(Telemetry, :span_strategy, [agent, :init, TestAgent, fn -> {agent, []} end])
 
@@ -178,7 +183,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits cmd start and stop events" do
-      {:ok, agent} = Agent.new(%{id: "test-strategy-cmd"})
+      {:ok, agent} = new_agent("test-strategy-cmd")
 
       apply(Telemetry, :span_strategy, [
         agent,
@@ -195,7 +200,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits tick start and stop events" do
-      {:ok, agent} = Agent.new(%{id: "test-strategy-tick"})
+      {:ok, agent} = new_agent("test-strategy-tick")
 
       apply(Telemetry, :span_strategy, [agent, :tick, TestAgent, fn -> :ok end])
 
@@ -204,7 +209,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "emits exception event on error" do
-      {:ok, agent} = Agent.new(%{id: "test-strategy-exception"})
+      {:ok, agent} = new_agent("test-strategy-exception")
 
       assert_raise RuntimeError, "strategy error", fn ->
         apply(Telemetry, :span_strategy, [
@@ -232,7 +237,7 @@ defmodule JidoTest.TelemetryTest do
     end
 
     test "handles non-tuple result gracefully" do
-      {:ok, agent} = Agent.new(%{id: "test-strategy-non-tuple"})
+      {:ok, agent} = new_agent("test-strategy-non-tuple")
 
       result =
         apply(Telemetry, :span_strategy, [agent, :tick, TestAgent, fn -> :just_ok end])

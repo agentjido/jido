@@ -119,8 +119,9 @@ defmodule JidoTest.TestAgents do
   defmodule CustomStrategy do
     @moduledoc false
     use Jido.Agent,
-      name: "custom_strategy_agent",
-      strategy: JidoTest.TestAgents.CountingStrategy
+      name: "custom_strategy_agent"
+
+    def strategy, do: JidoTest.TestAgents.CountingStrategy
 
     def signal_routes(_ctx), do: []
   end
@@ -128,8 +129,10 @@ defmodule JidoTest.TestAgents do
   defmodule StrategyWithOpts do
     @moduledoc false
     use Jido.Agent,
-      name: "strategy_opts_agent",
-      strategy: {JidoTest.TestAgents.CountingStrategy, max_depth: 5}
+      name: "strategy_opts_agent"
+
+    def strategy, do: JidoTest.TestAgents.CountingStrategy
+    def strategy_opts, do: [max_depth: 5]
 
     def signal_routes(_ctx), do: []
   end
@@ -151,8 +154,9 @@ defmodule JidoTest.TestAgents do
     @moduledoc "Agent with a strategy that emits directives from init/2"
     use Jido.Agent,
       name: "with_custom_strategy_agent",
-      strategy: JidoTest.TestAgents.InitDirectiveStrategy,
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: JidoTest.TestAgents.InitDirectiveStrategy
 
     def signal_routes(_ctx), do: []
   end

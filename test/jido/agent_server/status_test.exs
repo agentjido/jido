@@ -19,7 +19,6 @@ defmodule JidoTest.AgentServer.StatusTest do
   defmodule TestAgent do
     use Jido.Agent,
       name: "test_agent",
-      strategy: Jido.Agent.Strategy.Direct,
       schema:
         Zoi.object(%{
           counter: Zoi.integer() |> Zoi.default(0),

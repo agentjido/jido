@@ -136,13 +136,17 @@ defmodule Jido.AgentServer.SignalRouter do
 
     if function_exported?(plugin_module, :signal_routes, 1) do
       case plugin_module.signal_routes(spec.config) do
-        [] -> []
+        [] -> fallback_plugin_routes(spec)
         routes when is_list(routes) -> routes
-        _other -> []
+        _other -> fallback_plugin_routes(spec)
       end
     else
-      []
+      fallback_plugin_routes(spec)
     end
+  end
+
+  defp fallback_plugin_routes(spec) do
+    Jido.Plugin.Routes.from_patterns(spec.signal_patterns || [], spec.actions || [])
   end
 
   defp normalize_routes(routes, default_priority) do

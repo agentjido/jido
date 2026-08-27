@@ -81,15 +81,20 @@ defmodule JidoExampleTest.FSMStrategyGuideTest do
         {"order.confirm", ConfirmOrder},
         {"order.ship", ShipOrder},
         {"order.deliver", DeliverOrder}
-      ],
-      strategy:
-        {Jido.Agent.Strategy.FSM,
-         initial_state: "ready",
-         transitions: %{
-           "ready" => ["processing"],
-           "processing" => ["ready"]
-         },
-         auto_transition: true}
+      ]
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+
+    def strategy_opts do
+      [
+        initial_state: "ready",
+        transitions: %{
+          "ready" => ["processing"],
+          "processing" => ["ready"]
+        },
+        auto_transition: true
+      ]
+    end
   end
 
   defp wait_for_idle!(pid) do

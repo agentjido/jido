@@ -42,7 +42,7 @@ defmodule JidoTest.Plugin.SingletonCompileTest do
     end
 
     test "agent raises when singleton plugin is aliased" do
-      assert_raise ArgumentError, ~r/Cannot alias singleton plugin/, fn ->
+      assert_raise CompileError, ~r/singleton plugin cannot use an alias/, fn ->
         defmodule AliasedSingletonAgent do
           use Jido.Agent,
             name: "aliased_singleton",
@@ -52,7 +52,7 @@ defmodule JidoTest.Plugin.SingletonCompileTest do
     end
 
     test "agent raises CompileError when singleton plugin is duplicated" do
-      assert_raise CompileError, ~r/Duplicate singleton plugins/, fn ->
+      assert_raise CompileError, ~r/Duplicate plugin state_keys/, fn ->
         defmodule DuplicateSingletonAgent do
           use Jido.Agent,
             name: "duplicate_singleton",

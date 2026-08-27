@@ -1,9 +1,10 @@
 defmodule Jido.Agent do
   @moduledoc """
-  An Agent is an immutable data structure that holds state and can be updated
-  via commands. This module provides a minimal, data-first API:
+  An Agent is one immutable value with an explicit definition and instance
+  boundary. This module provides a data-first API:
 
-  - `new/1` - Create a new agent
+  - `new/1` - Create an inert Agent definition
+  - `instantiate/2` - Create an Agent instance from a definition
   - `set/2` - Update state directly
   - `validate/2` - Validate agent state against schema
   - `cmd/2` - Execute actions: `(agent, action) -> {agent, directives}`
@@ -75,15 +76,17 @@ defmodule Jido.Agent do
         use Jido.Agent,
           name: "my_agent",
           description: "My custom agent",
-          schema: Zoi.object(%{
-                    status: Zoi.atom() |> Zoi.default(:idle),
-                    counter: Zoi.integer() |> Zoi.default(0)
-                  })
+          state_schema: Zoi.object(%{
+                          status: Zoi.atom() |> Zoi.default(:idle),
+                          counter: Zoi.integer() |> Zoi.default(0)
+                        })
       end
 
   ### Working with Agents
 
-      # Create a new agent (fully initialized including strategy state)
+      definition = MyAgent.agent()
+
+      # Create an instance from the generated definition
       agent = MyAgent.new()
       agent = MyAgent.new(id: "custom-id", state: %{counter: 10})
 
@@ -95,12 +98,10 @@ defmodule Jido.Agent do
       # Update state directly
       {:ok, agent} = MyAgent.set(agent, %{status: :running})
 
-  ## Strategy Initialization
-
-  `new/1` automatically calls `strategy.init/2` to initialize strategy-specific
-  state. Any directives returned by strategy init are dropped here since they
-  require a runtime to execute. When using `AgentServer`, it handles strategy
-  init directives separately during startup.
+  `Jido.Agent.new/1` is inert. Generated `MyAgent.new/1` delegates to
+  `instantiate/2`. The generated module keeps a temporary Direct execution
+  callback binding for current `cmd/2` and AgentServer compatibility. This
+  binding is outside Agent equality, Codec data, and semantic identity.
 
   ## Lifecycle Hooks
 
@@ -743,7 +744,7 @@ defmodule Jido.Agent do
   @spec __quoted_strategy_accessors__() :: Macro.t()
   def __quoted_strategy_accessors__ do
     quote location: :keep do
-      @doc "Returns the execution strategy module for this agent."
+      @doc "Returns the temporary runtime execution callback module."
       @spec strategy() :: module()
       def strategy do
         case @validated_opts[:strategy] do
@@ -752,7 +753,7 @@ defmodule Jido.Agent do
         end
       end
 
-      @doc "Returns the strategy options for this agent."
+      @doc "Returns temporary runtime execution callback options."
       @spec strategy_opts() :: keyword()
       def strategy_opts do
         case @validated_opts[:strategy] do
@@ -780,9 +781,9 @@ defmodule Jido.Agent do
       @doc """
       Creates a new agent with optional initial state.
 
-      The agent is fully initialized including strategy state. For the default
-      Direct strategy, this is a no-op. For custom strategies, any state
-      initialization is applied (but directives are only processed by AgentServer).
+      This generated compatibility constructor delegates to
+      `Jido.Agent.instantiate/2`. It also runs the trusted module execution init
+      callback. AgentServer processes init directives separately.
 
       ## Examples
 
@@ -807,8 +808,8 @@ defmodule Jido.Agent do
             {:error, error} -> raise error
           end
 
-        # Run strategy initialization (directives are dropped here;
-        # AgentServer handles init directives separately)
+        # Run the temporary trusted execution callback binding. Directives are
+        # dropped here. AgentServer handles init directives separately.
         ctx = __strategy_ctx__()
         {initialized_agent, _directives} = strategy().init(agent, ctx)
         initialized_agent
@@ -1246,12 +1247,6 @@ defmodule Jido.Agent do
     plugin_defaults = legacy_plugin_defaults!(validated_opts[:default_plugins])
     schedules = legacy_schedules!(validated_opts[:schedules] || [])
 
-    metadata =
-      %{}
-      |> put_metadata(:category, validated_opts[:category])
-      |> put_metadata(:tags, validated_opts[:tags] || [])
-      |> put_metadata(:vsn, validated_opts[:vsn])
-
     new!(
       name: validated_opts.name,
       description: validated_opts[:description],
@@ -1260,7 +1255,7 @@ defmodule Jido.Agent do
       plugins: plugins,
       routes: routes,
       schedules: schedules,
-      metadata: metadata
+      metadata: %{}
     )
   end
 
@@ -1320,10 +1315,6 @@ defmodule Jido.Agent do
       timezone: Keyword.get(opts, :timezone, "Etc/UTC")
     )
   end
-
-  defp put_metadata(metadata, _key, nil), do: metadata
-  defp put_metadata(metadata, _key, []), do: metadata
-  defp put_metadata(metadata, key, value), do: Map.put(metadata, key, value)
 
   @doc false
   @spec __normalize_plugin_instances__([module() | {module(), map()}]) :: [PluginInstance.t()]

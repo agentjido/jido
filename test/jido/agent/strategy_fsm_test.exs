@@ -6,6 +6,11 @@ defmodule JidoTest.Agent.StrategyFSMTest do
   alias Jido.Agent.Strategy.State, as: StratState
   alias JidoTest.Support.FSMRuntimeHelper
 
+  defp new_agent(attrs) do
+    definition = Agent.new!(name: "strategy_fsm_test_agent", plugin_defaults: :none)
+    Agent.instantiate(definition, attrs)
+  end
+
   defmodule SimpleAction do
     @moduledoc false
     use Jido.Action,
@@ -81,8 +86,9 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Agent,
       name: "fsm_test_agent",
-      strategy: Jido.Agent.Strategy.FSM,
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+
+    def strategy, do: Jido.Agent.Strategy.FSM
 
     def signal_routes(_ctx), do: []
   end
@@ -91,15 +97,20 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Agent,
       name: "custom_fsm_agent",
-      strategy:
-        {Jido.Agent.Strategy.FSM,
-         initial_state: "ready",
-         transitions: %{
-           "ready" => ["processing"],
-           "processing" => ["ready", "done"],
-           "done" => ["ready"]
-         }},
       schema: []
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+
+    def strategy_opts do
+      [
+        initial_state: "ready",
+        transitions: %{
+          "ready" => ["processing"],
+          "processing" => ["ready", "done"],
+          "done" => ["ready"]
+        }
+      ]
+    end
 
     def signal_routes(_ctx), do: []
   end
@@ -108,15 +119,20 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Agent,
       name: "invalid_custom_fsm_agent",
-      strategy:
-        {Jido.Agent.Strategy.FSM,
-         initial_state: "ready",
-         transitions: %{
-           "ready" => ["working"],
-           "working" => ["ready", "done"],
-           "done" => ["ready"]
-         }},
       schema: []
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+
+    def strategy_opts do
+      [
+        initial_state: "ready",
+        transitions: %{
+          "ready" => ["working"],
+          "working" => ["ready", "done"],
+          "done" => ["ready"]
+        }
+      ]
+    end
 
     def signal_routes(_ctx), do: []
   end
@@ -125,15 +141,20 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     @moduledoc false
     use Jido.Agent,
       name: "no_auto_transition_agent",
-      strategy:
-        {Jido.Agent.Strategy.FSM,
-         initial_state: "idle",
-         auto_transition: false,
-         transitions: %{
-           "idle" => ["processing"],
-           "processing" => ["idle", "completed"]
-         }},
       schema: []
+
+    def strategy, do: Jido.Agent.Strategy.FSM
+
+    def strategy_opts do
+      [
+        initial_state: "idle",
+        auto_transition: false,
+        transitions: %{
+          "idle" => ["processing"],
+          "processing" => ["idle", "completed"]
+        }
+      ]
+    end
 
     def signal_routes(_ctx), do: []
   end
@@ -176,7 +197,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
 
   describe "init/2" do
     test "initializes with default transitions" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: FSMTestAgent, strategy_opts: []}
 
       {agent, directives} = FSM.init(agent, ctx)
@@ -190,7 +211,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     end
 
     test "initializes with custom transitions from strategy_opts" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
 
       ctx = %{
         agent_module: CustomFSMAgent,
@@ -208,7 +229,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     end
 
     test "respects auto_transition option" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
       ctx = %{agent_module: NoAutoTransitionAgent, strategy_opts: [auto_transition: false]}
 
       {agent, _} = FSM.init(agent, ctx)
@@ -395,7 +416,7 @@ defmodule JidoTest.Agent.StrategyFSMTest do
     end
 
     test "maps FSM states to strategy statuses" do
-      {:ok, agent} = Agent.new(%{id: "test"})
+      {:ok, agent} = new_agent(%{id: "test"})
 
       test_cases = [
         {"idle", :idle, false},

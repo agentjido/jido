@@ -144,7 +144,7 @@ defmodule JidoTest.PluginMountTest do
     end
 
     test "plugin mount error raises with clear message" do
-      assert_raise Jido.Error.InternalError, ~r/Plugin mount failed/, fn ->
+      assert_raise Jido.Error.ValidationError, ~r/Agent plugin mount failed/, fn ->
         ErrorMountAgent.new()
       end
     end

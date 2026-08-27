@@ -2,200 +2,190 @@
 
 <!-- covers: jido.agents_and_actions.schema_defined_agents jido.agents_and_actions.pure_cmd_contract -->
 
-**After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
+An Agent definition is one inert `%Jido.Agent{}` value. It contains author data
+such as the name, state schema, plugins, routes, schedules, extensions, and
+portable metadata. It does not contain an instance ID or instance state.
 
-Agents are immutable data structures that hold state and respond to actions. The
-core operation is `cmd/2` (or `cmd/3` with options), which processes actions and
-returns an updated agent plus any runtime-owned directives.
+An Agent instance uses the same struct. An instance also has `id`, `state`, and
+an optional `agent_module` runtime binding.
 
-Jido keeps agent decision logic pure. Actions may be pure or effectful.
-Directives are for effects you want the runtime to own.
+## Definition and instance boundary
 
-## Defining an Agent
+`Jido.Agent.new/1` and `Jido.Agent.new!/1` make definitions. They do not make an
+ID, mount plugins, run callbacks, or start a process.
 
 ```elixir
-defmodule MyAgent do
+definition =
+  Jido.Agent.new!(
+    name: "counter_agent",
+    state_schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+    plugin_defaults: :none
+  )
+
+nil = definition.id
+nil = definition.state
+
+{:ok, instance} =
+  Jido.Agent.instantiate(definition, id: "counter-1", state: %{count: 4})
+```
+
+A generated Agent module keeps the normal instance constructor:
+
+```elixir
+defmodule MyApp.CounterAgent do
   use Jido.Agent,
-    name: "my_agent",                        # Required - alphanumeric + underscores
-    description: "My custom agent",          # Optional
-    category: "example",                     # Optional
-    tags: ["demo"],                          # Default: []
-    vsn: "1.0.0",                            # Optional
-    schema: Zoi.object(%{
-              status: Zoi.atom() |> Zoi.default(:idle),
-              counter: Zoi.integer() |> Zoi.default(0)
-            }),
-    strategy: Jido.Agent.Strategy.Direct,    # Default
-    plugins: [MyPlugin],                     # Default: []
-    default_plugins: true,                   # Load built-in plugins (Default: true)
-    schedules: [                             # Declarative cron schedules (Default: [])
-      {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat}
-    ]
+    name: "counter_agent",
+    state_schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
 end
+
+definition = MyApp.CounterAgent.agent()
+instance = MyApp.CounterAgent.new(id: "counter-1", state: %{count: 4})
+{:ok, instance} = MyApp.CounterAgent.validate(instance)
 ```
 
-## The `cmd/2` and `cmd/3` Contract
+Use `agent/0` to get the inert definition. `new/1` delegates to
+`Jido.Agent.instantiate/2`. `validate/2` is a temporary state-validation shim.
 
-The fundamental operation:
+## Four authoring forms
+
+All four forms make the same `%Jido.Agent{}` definition.
+
+### Native Elixir data
 
 ```elixir
-{agent, directives} = MyAgent.cmd(agent, action)
-{agent, directives} = MyAgent.cmd(agent, action, opts)
+definition =
+  Jido.Agent.new!(
+    name: "support_agent",
+    description: "Handles support requests",
+    state_schema: MyApp.AgentSchemas.support_state(),
+    plugin_defaults: :none,
+    plugins: [
+      Jido.Agent.Plugin.new!(module: MyApp.SupportPlugin, config: %{queue: "main"})
+    ],
+    routes: [{"support.requested", MyApp.HandleSupport}],
+    metadata: %{owner: "support"}
+  )
 ```
 
-**Key invariants:**
-
-- The returned `agent` is always complete—no "apply directives" step needed
-- `directives` describe runtime-owned external effects only—they never modify
-  agent state
-- Agent decision logic stays explicit and testable
-
-Use an effectful action when the current step needs a result back now to continue
-reasoning or update state. Use a directive when the workflow has already decided
-on an outbound effect and wants the runtime or integration layer to own delivery.
-
-**Action formats:**
+### Builder
 
 ```elixir
-# Action module with no params
-{agent, directives} = MyAgent.cmd(agent, MyAction)
-
-# Action with params
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
-
-# Action with params and context
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{user_id: 123}})
-
-# Action with params, context, and per-command options
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{}, [timeout: 5000]})
-
-# Full Agent command
-command = Jido.Agent.Command.new!(MyAction, %{value: 42}, %{}, timeout: 5000)
-{agent, directives} = MyAgent.cmd(agent, command)
-
-# A strict executable instruction is imported as an Agent command
-instruction = Jido.Instruction.new!(target: MyAction, params: %{value: 42})
-{agent, directives} = MyAgent.cmd(agent, instruction)
-
-# List of actions (processed in sequence)
-{agent, directives} = MyAgent.cmd(agent, [Action1, {Action2, %{x: 1}}])
+definition =
+  Jido.Agent.Builder.new("support_agent")
+  |> Jido.Agent.Builder.description("Handles support requests")
+  |> Jido.Agent.Builder.state_schema(MyApp.AgentSchemas.support_state())
+  |> Jido.Agent.Builder.plugin_defaults(:none)
+  |> Jido.Agent.Builder.plugin(MyApp.SupportPlugin, config: %{queue: "main"})
+  |> Jido.Agent.Builder.route("support.requested", MyApp.HandleSupport)
+  |> Jido.Agent.Builder.metadata(%{owner: "support"})
+  |> Jido.Agent.Builder.build!()
 ```
 
-**Execution options via `cmd/3`:**
-
-Pass options that apply to all actions in the command:
+### Module DSL
 
 ```elixir
-# With timeout (5 second limit per action)
-{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 5000)
+defmodule MyApp.SupportAgent do
+  use Jido.Agent,
+    name: "support_agent",
+    description: "Handles support requests",
+    metadata: %{owner: "support"}
 
-# Options applied to all actions in a list
-{agent, directives} = MyAgent.cmd(agent, [Action1, Action2], timeout: 5000)
-```
-
-Supported options:
-- `:timeout` — Maximum time (in ms) for each action to complete
-
-## State Management
-
-### `set/2` — Update State
-
-Deep-merges attributes into agent state:
-
-```elixir
-{:ok, agent} = MyAgent.set(agent, %{status: :running})
-{:ok, agent} = MyAgent.set(agent, counter: 5)
-```
-
-### `validate/2` — Validate Against Schema
-
-```elixir
-# Validate state, keeping extra fields
-{:ok, agent} = MyAgent.validate(agent)
-
-# Strict mode: only schema-defined fields are kept
-{:ok, agent} = MyAgent.validate(agent, strict: true)
-```
-
-## Lifecycle Hooks
-
-Optional callbacks for pure transformations before/after command processing.
-
-### `on_before_cmd/2`
-
-Called before action processing. Transform agent or action:
-
-```elixir
-def on_before_cmd(agent, action) do
-  # Example: log the action being processed
-  {:ok, agent} = set(agent, %{last_action: inspect(action)})
-  {:ok, agent, action}
+  agent do
+    state_schema(MyApp.AgentSchemas.support_state())
+    plugin_defaults(:none)
+    plugin(MyApp.SupportPlugin, config: %{queue: "main"})
+    route("support.requested", MyApp.HandleSupport)
+  end
 end
+
+definition = MyApp.SupportAgent.agent()
 ```
 
-Use cases:
-- Mirror action params into agent state
-- Add default params based on current state
-- Enforce invariants before execution
+The keyword names `schema`, `signal_routes`, and `default_plugins` continue to
+work during migration. New code must use `state_schema`, `routes` or `route`,
+and `plugin_defaults`.
 
-### `on_after_cmd/3`
+### Stored document
 
-Called after action processing. Transform agent or directives:
-
-```elixir
-def on_after_cmd(agent, action, directives) do
-  # Example: auto-validate after every command
-  {:ok, agent} = validate(agent)
-  {:ok, agent, directives}
-end
-```
-
-Use cases:
-- Auto-validate state after changes
-- Derive computed fields
-- Add invariant checks
-
-## Schema Options
-
-Agent state is validated against a Zoi schema. Fields are required by default.
-Use `Zoi.optional/1` for optional fields and `Zoi.default/2` for default values.
-Schemas must contain only static data. Use `{Module, :function, args}` MFA values
-for `Zoi.refine/2` and `Zoi.transform/2` callbacks. Anonymous callbacks and lazy
-schemas cause a compile error.
+The Codec works with JSON-compatible Elixir terms. The application owns the
+JSON library.
 
 ```elixir
-use Jido.Agent,
-  name: "my_agent",
-  schema: Zoi.object(%{
-    status: Zoi.atom() |> Zoi.default(:idle),
-    counter: Zoi.integer() |> Zoi.default(0),
-    config: Zoi.map() |> Zoi.default(%{})
+registry =
+  Jido.Agent.Registry.new!(%{
+    "schemas/support-state" => {:schema, MyApp.AgentSchemas.support_state()},
+    "plugins/support" => {:plugin, MyApp.SupportPlugin},
+    "actions/handle-support" => {:action, MyApp.HandleSupport},
+    "atoms/owner" => {:atom, :owner}
   })
+
+{:ok, document} = Jido.Agent.Codec.encode(definition, registry)
+json = Jason.encode!(document)
+
+{:ok, decoded} =
+  json
+  |> Jason.decode!()
+  |> Jido.Agent.Codec.decode(registry)
 ```
 
-## Creating Agents
+See [Agent Storage](agent-storage.md) for the full storage boundary.
+
+## Static state schemas
+
+Schemas must contain static data. Use a named MFA callback for a refinement or
+transform. Do not put an anonymous function or closure in a schema.
 
 ```elixir
-# Create with defaults
-agent = MyAgent.new()
+defmodule MyApp.AgentSchemas do
+  def counter_state do
+    Zoi.object(%{
+      count:
+        Zoi.integer()
+        |> Zoi.refine({__MODULE__, :nonnegative, []})
+        |> Zoi.default(0)
+    })
+  end
 
-# Create with custom ID
-agent = MyAgent.new(id: "custom-id")
-
-# Create with initial state
-agent = MyAgent.new(state: %{counter: 10})
+  def nonnegative(value) when value >= 0, do: :ok
+  def nonnegative(_value), do: {:error, "must be nonnegative"}
+end
 ```
 
-If the module is primarily a durable coordinator for named collaborators, use
-`Jido.Pod` instead of `Jido.Agent`. `Jido.Pod` wraps the same agent model and
-adds a canonical topology plus a reserved singleton pod plugin.
+Structural validation, executable validation, decode, and compile do not run
+Agent work or start processes. Instantiation is the first boundary that makes
+runtime state and mounts plugins.
 
-## Further Reading
+## Commands and directives
 
-- [Actions](actions.md) — Defining actions that transform agent state
-- [State Operations](state-ops.md) — Internal state transitions during `cmd/2`
-- [Directives](directives.md) — External effects emitted by agents
-- [Strategies](strategies.md) — Execution strategies for `cmd/2`
-- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (identity, thread) and how to override them
-- [Pods](pods.md) — Manager-led durable topologies built on top of agents
-- `Jido.Agent` — Full module documentation
+The core operation is `cmd/2`:
+
+```elixir
+{instance, directives} = MyApp.SupportAgent.cmd(instance, MyApp.HandleSupport)
+
+{instance, directives} =
+  MyApp.SupportAgent.cmd(instance, {MyApp.HandleSupport, %{ticket_id: "T-1"}})
+```
+
+The returned instance is complete. Directives describe runtime-owned external
+effects. They do not change Agent state.
+
+## Runtime and discovery bindings
+
+`agent_module` and `jido` are runtime or compile bindings. They do not change
+definition equality, Codec data, or semantic identity.
+
+`category`, `tags`, and `vsn` are discovery or package metadata. Generated
+modules can expose these values, but the values are not canonical Agent fields.
+
+An old explicit Direct strategy option gives a migration warning. Remove the
+option. A custom strategy declaration gives a compile error with migration
+help. New Agent authoring does not select a strategy.
+
+## Further reading
+
+- [Agent Builder](agent-builder.md)
+- [Agent Storage](agent-storage.md)
+- [Actions](actions.md)
+- [Plugins](plugins.md)
+- [Scheduling](scheduling.md)
+- [Migration](migration.md)

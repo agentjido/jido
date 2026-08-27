@@ -57,7 +57,41 @@ end
 
 ## Using Plugins
 
-Attach plugins to agents via the `plugins:` option:
+Declare plugins in the Agent DSL. Each declaration lowers to a canonical
+`Jido.Agent.Plugin` value:
+
+```elixir
+defmodule MyAgent do
+  use Jido.Agent, name: "my_agent"
+
+  agent do
+    plugin_defaults(:none)
+    plugin(MyApp.ChatPlugin)
+    plugin(MyApp.DatabasePlugin, as: :primary, config: %{pool_size: 5})
+  end
+end
+```
+
+Native Agent data can contain `Jido.Agent.Plugin` values:
+
+```elixir
+definition =
+  Jido.Agent.new!(
+    name: "my_agent",
+    plugin_defaults: :none,
+    plugins: [
+      Jido.Agent.Plugin.new!(module: MyApp.ChatPlugin),
+      Jido.Agent.Plugin.new!(
+        module: MyApp.DatabasePlugin,
+        as: :primary,
+        config: %{pool_size: 5}
+      )
+    ]
+  )
+```
+
+The old module and tuple forms remain available through the keyword
+compatibility lowerer:
 
 ```elixir
 defmodule MyAgent do
@@ -70,7 +104,9 @@ defmodule MyAgent do
 end
 ```
 
-Plugins are mounted during `new/1`. Each plugin's state is initialized under its `state_key`.
+Generated `MyAgent.new/1` mounts plugins when it instantiates the definition.
+`Jido.Agent.new/1` is inert and does not mount plugins. Each plugin's state is
+initialized under its `state_key` during instantiation.
 
 ## State Isolation
 
@@ -84,7 +120,7 @@ agent.state = %{
 }
 
 # Access plugin state
-chat_state = MyAgent.plugin_state(agent, :chat)
+chat_state = MyAgent.plugin_state(agent, MyApp.ChatPlugin)
 ```
 
 This prevents plugins from interfering with each other's state.
@@ -464,7 +500,30 @@ agent = MemoryAgent.append_to_space(agent, :tasks, %{id: "t1", text: "Check sens
 
 ### Overriding and Disabling Defaults
 
-Default plugins can be controlled per-agent using the `default_plugins:` option with a map keyed by state key:
+The canonical definition stores a `Jido.Agent.PluginDefaults` policy. Use
+`plugin_defaults(:none)` in the module DSL to disable all host defaults:
+
+```elixir
+agent do
+  plugin_defaults(:none)
+end
+```
+
+Use `Jido.Agent.PluginDefaults.new!/1` for a native definition with overrides:
+
+```elixir
+policy =
+  Jido.Agent.PluginDefaults.new!(
+    mode: :inherit,
+    overrides: %{
+      __identity__: :disabled,
+      __memory__: Jido.Agent.Plugin.new!(module: MyApp.PersistentMemoryPlugin)
+    }
+  )
+```
+
+The keyword compatibility lowerer still maps `default_plugins:` maps and
+`false` to the canonical policy:
 
 ```elixir
 # Disable identity state (keep thread)
@@ -498,7 +557,8 @@ use Jido.Agent,
   default_plugins: false
 ```
 
-> **Note:** `default_plugins:` only controls built-in defaults. To add new plugins, use the `plugins:` option.
+`default_plugins:` controls host defaults only. Use plugin declarations to add
+plugins.
 
 For pod-wrapped agents, the reserved `:__pod__` plugin can be replaced but
 should not be disabled. See [Pods](pods.md) for the pod-specific contract.
