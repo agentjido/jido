@@ -385,11 +385,8 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 3.0.0-beta.1"},
-      {:jido_signal,
-       github: "agentjido/jido_signal",
-       ref: "53819ff3246dbda1d89218d613b692c8a80e5c4b",
-       override: true},
+      {:jido_action, "~> 3.0.0-beta.2"},
+      {:jido_signal, "~> 3.0.0-beta.2"},
 
       # Jido Deps
       {:splode, "~> 0.3.0"},
