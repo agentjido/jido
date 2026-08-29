@@ -1,0 +1,29 @@
+{
+  "assignee": "Mike Hostetler",
+  "blocked_by": [],
+  "blocks": [],
+  "closed_at": "2026-08-29T22:09:49Z",
+  "created": "2026-08-29T21:59:12Z",
+  "description": "Use the shared runner override to route the jido CI, review, and release Linux jobs to blacksmith-2vcpu-ubuntu-2404. Preserve workflow behavior, permissions, matrices, release gates, and security controls.",
+  "id": "jido-s20",
+  "labels": [],
+  "comments": [
+    {
+      "text": "Changed only the CI, review, and release workflow callers. Added the fixed runner label blacksmith-2vcpu-ubuntu-2404. YAML parsing, actionlint, git diff --check, and exact three-file scope validation passed. Mix checks were not run because no source, dependency, script, or action version changed.",
+      "timestamp": "2026-08-29T22:00:40Z"
+    },
+    {
+      "text": "Opened PR https://github.com/agentjido/jido/pull/328. Waiting for the CI and review workflows to complete on Blacksmith.",
+      "timestamp": "2026-08-29T22:04:31Z"
+    },
+    {
+      "text": "CI passed on PR #328. All active CI, test matrix, quality, review, and summary checks completed successfully on Blacksmith runners. Existing Experimental Compile and CodeSmith checks were skipped by design.",
+      "timestamp": "2026-08-29T22:09:49Z"
+    }
+  ],
+  "priority": 2,
+  "status": "closed",
+  "title": "Migrate Linux jobs to Blacksmith runners",
+  "type": "task",
+  "updated_at": "2026-08-29T22:09:49Z"
+}
