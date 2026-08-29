@@ -19,3 +19,5 @@ jobs:
   review:
     name: Jido Review
     uses: agentjido/github-actions/.github/workflows/jido-review.yml@v5
+    with:
+      runner: blacksmith-2vcpu-ubuntu-2404
