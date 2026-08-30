@@ -28,10 +28,9 @@ defmodule MyApp.ChatPlugin do
       messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
       model: Zoi.string() |> Zoi.default("gpt-4")
     }),
-    signal_patterns: ["chat.*"],
     signal_routes: [
-      {"chat.send", MyApp.Actions.SendMessage},
-      {"chat.history", MyApp.Actions.ListHistory}
+      {"send", MyApp.Actions.SendMessage},
+      {"history", MyApp.Actions.ListHistory}
     ]
 end
 ```
@@ -51,8 +50,8 @@ end
 | `description` | Human-readable description |
 | `schema` | Zoi schema for plugin state defaults |
 | `config_schema` | Zoi schema for per-agent configuration |
-| `signal_patterns` | List of signal patterns for routing |
-| `signal_routes` | Static signal route tuples (`{"type", Action}`) |
+| `signal_patterns` | Patterns that select which signals run plugin signal hooks |
+| `signal_routes` | Static routes relative to the plugin's route prefix |
 | `category`, `vsn`, `tags` | Metadata for organization |
 
 ## Using Plugins
@@ -147,11 +146,14 @@ defmodule MyApp.ChatPlugin do
     state_key: :chat,
     actions: [MyApp.Actions.SendMessage, MyApp.Actions.ListHistory],
     signal_routes: [
-      {"chat.send", MyApp.Actions.SendMessage},
-      {"chat.history", MyApp.Actions.ListHistory}
+      {"send", MyApp.Actions.SendMessage},
+      {"history", MyApp.Actions.ListHistory}
     ]
 end
 ```
+
+Static plugin routes are relative to the plugin's route prefix. For this
+plugin, Jido expands `"send"` to `"chat.send"`.
 
 Use the `signal_routes/1` callback only when routes must be computed from runtime config.
 

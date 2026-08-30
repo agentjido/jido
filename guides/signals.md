@@ -128,9 +128,10 @@ defmodule MyStrategy do
 end
 ```
 
-### Plugin Signal Patterns
+### Plugin Signal Patterns and Routes
 
-Plugins use `signal_patterns` to declare which signals they handle:
+Plugins use `signal_patterns` to select which inbound signals run their signal
+hooks. Compile-time `signal_routes` map relative paths to Actions:
 
 ```elixir
 defmodule MyApp.ChatPlugin do
@@ -140,11 +141,14 @@ defmodule MyApp.ChatPlugin do
     actions: [MyApp.Actions.SendMessage, MyApp.Actions.ClearHistory],
     signal_patterns: ["chat.*"],
     signal_routes: [
-      {"chat.send", MyApp.Actions.SendMessage},
-      {"chat.clear", MyApp.Actions.ClearHistory}
+      {"send", MyApp.Actions.SendMessage},
+      {"clear", MyApp.Actions.ClearHistory}
     ]
 end
 ```
+
+Jido prefixes each static plugin route with the plugin route prefix. Here,
+`"send"` becomes `"chat.send"` and `"clear"` becomes `"chat.clear"`.
 
 Pattern matching:
 - `"chat.*"` — matches `chat.message`, `chat.clear`, etc.

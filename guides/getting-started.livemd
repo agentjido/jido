@@ -116,13 +116,42 @@ Key points:
 - Actions may be pure or effectful when they need a result back now
 - Directives describe runtime-owned effects and never modify state
 
-## Step 4: Handle Signals with AgentServer
+## Step 4: Route Signals with AgentServer
 
 For real applications, agents run inside AgentServer - a GenServer that handles signals and executes directives.
 
-First, let's add signal handling to our agent:
+AgentServer routes each signal type to an Action. We already have
+`IncrementAction`, so define the other counter actions and declare the complete
+signal routes on the agent:
 
 ```elixir
+defmodule DecrementAction do
+  use Jido.Action,
+    name: "decrement",
+    description: "Decrements the counter by a given amount",
+    schema: [
+      amount: [type: :integer, default: 1]
+    ]
+
+  @impl true
+  def run(params, context) do
+    current = context.state[:count] || 0
+    {:ok, %{count: current - params.amount}}
+  end
+end
+
+defmodule ResetAction do
+  use Jido.Action,
+    name: "reset",
+    description: "Resets the counter to zero",
+    schema: []
+
+  @impl true
+  def run(_params, _context) do
+    {:ok, %{count: 0}}
+  end
+end
+
 defmodule CounterAgentWithSignals do
   use Jido.Agent,
     name: "counter_with_signals",
@@ -130,31 +159,12 @@ defmodule CounterAgentWithSignals do
     schema: [
       count: [type: :integer, default: 0],
       status: [type: :atom, default: :idle]
+    ],
+    signal_routes: [
+      {"counter.increment", IncrementAction},
+      {"counter.decrement", DecrementAction},
+      {"counter.reset", ResetAction}
     ]
-
-  alias Jido.Signal
-
-  @impl true
-  def handle_signal(agent, %Signal{type: "counter.increment"} = signal) do
-    amount = signal.data[:amount] || 1
-    current = agent.state[:count]
-    {:ok, agent} = set(agent, count: current + amount)
-    {agent, []}
-  end
-
-  def handle_signal(agent, %Signal{type: "counter.decrement"} = signal) do
-    amount = signal.data[:amount] || 1
-    current = agent.state[:count]
-    {:ok, agent} = set(agent, count: current - amount)
-    {agent, []}
-  end
-
-  def handle_signal(agent, %Signal{type: "counter.reset"}) do
-    {:ok, agent} = set(agent, count: 0)
-    {agent, []}
-  end
-
-  def handle_signal(agent, _signal), do: {agent, []}
 end
 ```
 

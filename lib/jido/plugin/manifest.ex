@@ -21,9 +21,9 @@ defmodule Jido.Plugin.Manifest do
   - `schema` - Zoi schema for plugin state
   - `config_schema` - Zoi schema for per-agent config
   - `actions` - List of action modules
-  - `signal_routes` - List of signal route tuples like `{"post", ActionModule}`
+  - `signal_routes` - Static routes relative to the plugin route prefix, such as `{"post", ActionModule}`
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}`
-  - `signal_patterns` - Legacy signal patterns for routing
+  - `signal_patterns` - Patterns that gate inbound signal hooks and support legacy route fallback
   - `subscriptions` - Sensor subscriptions provided by this plugin
   """
 
@@ -53,7 +53,8 @@ defmodule Jido.Plugin.Manifest do
                 Zoi.list(Zoi.atom(), description: "List of action modules") |> Zoi.default([]),
               signal_routes:
                 Zoi.list(Zoi.any(),
-                  description: "Signal route tuples like {\"post\", ActionModule}"
+                  description:
+                    "Static routes relative to the plugin route prefix, such as {\"post\", ActionModule}"
                 )
                 |> Zoi.default([]),
               schedules:
@@ -62,7 +63,9 @@ defmodule Jido.Plugin.Manifest do
                 )
                 |> Zoi.default([]),
               signal_patterns:
-                Zoi.list(Zoi.string(), description: "Legacy signal patterns")
+                Zoi.list(Zoi.string(),
+                  description: "Inbound hook patterns and legacy route fallback patterns"
+                )
                 |> Zoi.default([]),
               singleton:
                 Zoi.boolean(description: "Whether plugin is singleton")

@@ -16,8 +16,7 @@ defmodule MyApp.CounterPlugin do
       value: Zoi.integer() |> Zoi.default(0),
       last_updated: Zoi.any() |> Zoi.optional()
     }),
-    signal_patterns: ["counter.*"],
-    signal_routes: [{"counter.increment", MyApp.IncrementAction}]
+    signal_routes: [{"increment", MyApp.IncrementAction}]
 end
 ```
 
@@ -85,8 +84,7 @@ defmodule MyApp.CounterPlugin do
       value: Zoi.integer() |> Zoi.default(0),
       last_updated: Zoi.any() |> Zoi.optional()
     }),
-    signal_patterns: ["counter.*"],
-    signal_routes: [{"counter.increment", MyApp.IncrementAction}]
+    signal_routes: [{"increment", MyApp.IncrementAction}]
 end
 ```
 
@@ -103,8 +101,8 @@ end
 | Option | Description |
 |--------|-------------|
 | `schema` | Zoi schema for plugin state with defaults |
-| `signal_patterns` | Patterns this plugin handles (e.g., `"counter.*"`) |
-| `signal_routes` | Static signal route tuples (`{"type", Action}`) |
+| `signal_patterns` | Patterns that select which signals run the plugin's signal hooks |
+| `signal_routes` | Static routes relative to the plugin's route prefix |
 
 ### Step 3: Attach to an Agent
 
@@ -164,10 +162,14 @@ use Jido.Plugin,
   state_key: :counter,
   actions: [MyApp.IncrementAction, MyApp.ResetAction],
   signal_routes: [
-    {"counter.increment", MyApp.IncrementAction},
-    {"counter.reset", MyApp.ResetAction}
+    {"increment", MyApp.IncrementAction},
+    {"reset", MyApp.ResetAction}
   ]
 ```
+
+Static plugin routes are relative to the plugin's route prefix. A plugin named
+`"counter"` expands `"increment"` to `"counter.increment"`. Do not repeat the
+plugin name in a static route.
 
 Use `signal_routes/1` only for dynamic routes that depend on config.
 
