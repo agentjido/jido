@@ -21,6 +21,7 @@ jobs:
     uses: agentjido/github-actions/.github/workflows/jido-ci.yml@v5
     secrets: inherit
     with:
+      runner: blacksmith-2vcpu-ubuntu-2404
       credo_command: mix credo --min-priority higher
       docs_command: mix docs -f html
       test_command: mix test
