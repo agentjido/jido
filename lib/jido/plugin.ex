@@ -31,10 +31,9 @@ defmodule Jido.Plugin do
             messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
             model: Zoi.string() |> Zoi.default("gpt-4")
           }),
-          signal_patterns: ["chat.*"],
           signal_routes: [
-            {"chat.send", MyApp.Actions.SendMessage},
-            {"chat.history", MyApp.Actions.ListHistory}
+            {"send", MyApp.Actions.SendMessage},
+            {"history", MyApp.Actions.ListHistory}
           ]
 
         @impl Jido.Plugin
@@ -65,11 +64,11 @@ defmodule Jido.Plugin do
   - `vsn` - Optional version string.
   - `schema` - Optional Zoi schema for plugin state.
   - `config_schema` - Optional Zoi schema for per-agent config.
-  - `signal_patterns` - List of signal pattern strings (default: []).
+  - `signal_patterns` - Patterns that select which inbound signals run plugin signal hooks (default: []).
   - `tags` - List of tag strings (default: []).
   - `capabilities` - List of atoms describing what the plugin provides (default: []).
   - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
-  - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
+  - `signal_routes` - Static routes relative to the plugin route prefix, such as `{"post", ActionModule}` (default: []).
   - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` or `{tag, SensorModule, config}` (default: []).
   - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
 
@@ -115,7 +114,9 @@ defmodule Jido.Plugin do
                               Zoi.any(description: "Zoi schema for per-agent configuration.")
                               |> Zoi.optional(),
                             signal_patterns:
-                              Zoi.list(Zoi.string(), description: "Signal patterns for routing.")
+                              Zoi.list(Zoi.string(),
+                                description: "Patterns that select inbound plugin signal hooks."
+                              )
                               |> Zoi.default([]),
                             tags:
                               Zoi.list(Zoi.string(), description: "Tags for categorization.")
@@ -133,7 +134,8 @@ defmodule Jido.Plugin do
                               |> Zoi.default([]),
                             signal_routes:
                               Zoi.list(Zoi.any(),
-                                description: "Signal route tuples like {\"post\", ActionModule}."
+                                description:
+                                  "Static routes relative to the plugin route prefix, such as {\"post\", ActionModule}."
                               )
                               |> Zoi.default([]),
                             subscriptions:
