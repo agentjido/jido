@@ -9,6 +9,8 @@ defmodule Jido.Agent.StateBudget do
   alias Jido.Agent
   alias Jido.Error
 
+  @type result :: {:ok, Agent.t()} | {:error, Error.ValidationError.t()}
+
   @doc "Returns the effective state budget, including the agent module's limit."
   @spec limit(Agent.t()) :: non_neg_integer() | nil
   def limit(agent) do
@@ -27,7 +29,7 @@ defmodule Jido.Agent.StateBudget do
   end
 
   @doc "Checks the full state and returns the agent or a structured error."
-  @spec check(Agent.t()) :: Agent.agent_result()
+  @spec check(Agent.t()) :: result()
   def check(agent) do
     case limit(agent) do
       nil -> {:ok, agent}
@@ -64,7 +66,7 @@ defmodule Jido.Agent.StateBudget do
   end
 
   @doc "Checks a proposed replacement while retaining the previous budget."
-  @spec transition(Agent.t(), Agent.t()) :: Agent.agent_result()
+  @spec transition(Agent.t(), Agent.t()) :: result()
   def transition(previous, %Agent{} = candidate) do
     candidate
     |> Map.put(:max_state_size, limit(previous))
@@ -73,7 +75,7 @@ defmodule Jido.Agent.StateBudget do
   end
 
   @doc false
-  @spec check_for_module(Agent.t(), module()) :: Agent.agent_result()
+  @spec check_for_module(Agent.t(), module()) :: result()
   def check_for_module(%Agent{} = agent, module) do
     check(%{agent | agent_module: module})
   end
@@ -81,7 +83,7 @@ defmodule Jido.Agent.StateBudget do
   def check_for_module(agent, _module), do: check(agent)
 
   @doc "Replaces the state or returns a structured budget error."
-  @spec replace(Agent.t(), map()) :: Agent.agent_result()
+  @spec replace(Agent.t(), map()) :: result()
   def replace(%Agent{} = agent, state), do: check(%{agent | state: state})
 
   @doc "Replaces the state, raising a validation error if the budget is exceeded."
