@@ -10,11 +10,15 @@
     {
       "text": "Implemented the optional external-term state budget. Validation: full suite passed 2234 tests with 187 excluded; final runtime, persistence and budget checks passed 122 tests; compile with warnings as errors and format checks passed. New PR will remain open for user review.",
       "timestamp": "2026-09-04T15:29:39Z"
+    },
+    {
+      "text": "PR opened for user review: https://github.com/agentjido/jido/pull/337. Do not merge without user review.",
+      "timestamp": "2026-09-04T15:31:02Z"
     }
   ],
   "priority": 2,
   "status": "in_progress",
   "title": "Add an optional agent state size budget",
   "type": "task",
-  "updated_at": "2026-09-04T15:29:39Z"
+  "updated_at": "2026-09-04T15:31:02Z"
 }
