@@ -46,7 +46,7 @@ defmodule Jido.Memory.Agent do
   @doc "Put memory into agent state."
   @spec put(Agent.t(), Memory.t()) :: Agent.t()
   def put(%Agent{} = agent, %Memory{} = memory) do
-    %{agent | state: Map.put(agent.state, @key, memory)}
+    Jido.Agent.StateBudget.replace!(agent, Map.put(agent.state, @key, memory))
   end
 
   @doc "Update memory using a function."

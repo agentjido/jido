@@ -366,7 +366,7 @@ defmodule Jido.Plugin do
       def transform_result(_action, agent, _context) do
         # Add metadata to returned agent
         new_state = Map.put(agent.state, :last_call_at, DateTime.utc_now())
-        %{agent | state: new_state}
+        Jido.Agent.StateBudget.replace!(agent, new_state)
       end
   """
   @callback transform_result(action :: module() | String.t(), result :: term(), context :: map()) ::

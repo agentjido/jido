@@ -117,6 +117,50 @@ Deep-merges attributes into agent state:
 {:ok, agent} = MyAgent.validate(agent, strict: true)
 ```
 
+### Optional state size budget
+
+Set `max_state_size` to a byte limit when you define an agent:
+
+```elixir
+use Jido.Agent,
+  name: "bounded_agent",
+  max_state_size: 10 * 1024 * 1024
+```
+
+The default is `nil` (no limit). Jido measures the complete `agent.state` with
+`:erlang.external_size/1`, including plugin, thread, and strategy data. This is
+an external term size, not a process heap or total memory limit. The calculation
+visits the state, so its cost grows with the state. No size calculation runs when
+the limit is `nil`.
+
+`set/2`, `validate/2`, and `restore/2` return
+`{:error, %Jido.Error.ValidationError{kind: :state_size}}` when the candidate state
+exceeds the limit. Error details contain `max_state_size` and `actual_state_size`.
+`MyAgent.new/1` keeps its existing struct return contract and raises this error
+for oversized initial state. The base `Jido.Agent.new/1` returns a tagged error.
+
+A failed `cmd/2` or `cmd/3` returns the original agent and one error directive
+with `context: :state_size`. It discards the command's other directives. This
+also applies to before/after hooks and custom strategies. An action that has
+already performed an external effect cannot be rolled back.
+
+Core state helpers that return a struct, such as `StateOps.apply_result/2`,
+`Strategy.State.put/2`, and the thread, memory, and plugin state helpers, raise
+the same validation error. The command boundary converts it to an error
+directive. `Jido.Agent.StateBudget.replace/2` is a tagged-result boundary for
+custom code that replaces the complete state.
+
+AgentServer checks initial state, command results, and directive results before
+it accepts them. Runtime references count towards the limit. Persistence checks
+the complete state after thread and plugin restoration. Leave room for runtime
+metadata when you choose a budget. If mandatory orphan metadata cannot fit,
+the runtime stops with a structured shutdown reason.
+
+Jido does not choose which data to delete. The application can compact its state
+and retry. Direct Elixir struct or map edits cannot be intercepted; call
+`validate/2` or a checked state helper before you use such a value. An arbitrary
+custom callback that replaces the public API must also use these checks.
+
 ## Lifecycle Hooks
 
 Optional callbacks for pure transformations before/after command processing.

@@ -25,7 +25,7 @@ defmodule Jido.Agent.Identity.Agent do
   @doc "Put identity state into agent state."
   @spec put(Agent.t(), Identity.t()) :: Agent.t()
   def put(%Agent{} = agent, %Identity{} = identity) do
-    %{agent | state: Map.put(agent.state, @key, identity)}
+    Jido.Agent.StateBudget.replace!(agent, Map.put(agent.state, @key, identity))
   end
 
   @doc "Update identity state using a function."

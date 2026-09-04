@@ -202,7 +202,10 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
         case Persist.thaw(lifecycle.storage, state.agent_module, persistence_key) do
           {:ok, restored_agent} ->
             {restored_agent, restored_cron_specs} = extract_cron_specs(restored_agent)
-            %{state | agent: restored_agent, cron_specs: restored_cron_specs}
+
+            state
+            |> Jido.AgentServer.State.update_agent(restored_agent)
+            |> Map.put(:cron_specs, restored_cron_specs)
 
           {:error, :not_found} ->
             state
@@ -258,8 +261,6 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
 
     {cleaned_agent, cron_specs}
   end
-
-  defp extract_cron_specs(agent), do: {agent, %{}}
 
   defp maybe_start_idle_timer(state) do
     lifecycle = state.lifecycle

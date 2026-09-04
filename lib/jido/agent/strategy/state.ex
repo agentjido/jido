@@ -61,7 +61,7 @@ defmodule Jido.Agent.Strategy.State do
   """
   @spec put(Agent.t(), t()) :: Agent.t()
   def put(%Agent{} = agent, new_state) when is_map(new_state) do
-    %{agent | state: Map.put(agent.state, @key, new_state)}
+    Jido.Agent.StateBudget.replace!(agent, Map.put(agent.state, @key, new_state))
   end
 
   @doc """

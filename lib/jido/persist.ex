@@ -409,15 +409,20 @@ defmodule Jido.Persist do
     with {:ok, checkpoint} <- validate_checkpoint(checkpoint),
          checkpoint <- Identity.migrate_checkpoint(checkpoint),
          {:ok, agent} <- restore_agent(agent_module, checkpoint, ctx),
-         {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint) do
-      agent = attach_scheduler_manifest(agent, checkpoint)
-
+         {:ok, agent} <- rehydrate_thread(adapter, opts, agent, checkpoint),
+         agent <- attach_scheduler_manifest(agent, checkpoint),
+         {:ok, agent} <- Jido.Agent.StateBudget.check_for_module(agent, agent_module) do
       Logger.debug(fn ->
         "Persist.thaw completed for #{inspect(agent_module)} id=#{checkpoint.id}"
       end)
 
       {:ok, agent}
     end
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:error, error},
+        else: reraise(error, __STACKTRACE__)
   end
 
   @spec restore_agent(agent_module(), checkpoint(), map()) :: {:ok, agent()} | {:error, term()}

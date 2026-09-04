@@ -148,7 +148,7 @@ defmodule Jido.Pod.TopologyState do
       |> Map.put(:topology, topology)
       |> Map.put(:topology_version, topology.version)
 
-    %{agent | state: Map.put(agent.state, state_key, updated_state)}
+    Jido.Agent.StateBudget.replace!(agent, Map.put(agent.state, state_key, updated_state))
   end
 
   defp topology_changed?(%Topology{} = left, %Topology{} = right) do

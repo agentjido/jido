@@ -238,6 +238,10 @@ defmodule Jido.Agent do
                   description: "NimbleOptions or Zoi schema for validating the Agent's state"
                 )
                 |> Zoi.default([]),
+              max_state_size:
+                Zoi.integer(description: "Maximum external term size of state in bytes")
+                |> Zoi.min(0)
+                |> Zoi.optional(),
               state:
                 Zoi.map(description: "Current state")
                 |> Zoi.default(%{})
@@ -291,6 +295,12 @@ defmodule Jido.Agent do
                              )
                              |> Zoi.refine({Schema, :validate_config_schema, []})
                              |> Zoi.default([]),
+                           max_state_size:
+                             Zoi.integer(
+                               description: "Maximum external term size of state in bytes"
+                             )
+                             |> Zoi.min(0)
+                             |> Zoi.optional(),
                            strategy:
                              Zoi.any(
                                description:
@@ -491,6 +501,10 @@ defmodule Jido.Agent do
       @doc "Returns the merged schema (base + plugin schemas)."
       @spec schema() :: Zoi.schema() | keyword()
       def schema, do: @merged_schema
+
+      @doc "Returns the optional byte budget for the complete agent state."
+      @spec max_state_size() :: non_neg_integer() | nil
+      def max_state_size, do: @validated_opts[:max_state_size]
 
       @doc false
       @spec __agent_metadata__() :: map()
@@ -772,7 +786,8 @@ defmodule Jido.Agent do
           tags: tags(),
           vsn: vsn(),
           schema: schema(),
-          state: initial_state
+          state: initial_state,
+          max_state_size: max_state_size()
         }
 
         # Run plugin mount hooks (pure initialization)
@@ -782,7 +797,7 @@ defmodule Jido.Agent do
         # AgentServer handles init directives separately)
         ctx = __strategy_ctx__()
         {initialized_agent, _directives} = strategy().init(agent, ctx)
-        initialized_agent
+        Jido.Agent.StateBudget.check!(initialized_agent)
       end
 
       defp __build_initial_state__(opts) do
@@ -881,7 +896,19 @@ defmodule Jido.Agent do
 
       @spec cmd(Agent.t(), Agent.action(), keyword()) :: Agent.cmd_result()
       def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
-        {:ok, agent, action} = on_before_cmd(agent, action)
+        Jido.Agent.StateBudget.command(agent, fn agent ->
+          __cmd_with_budget__(agent, action, opts)
+        end)
+      end
+
+      defp __cmd_with_budget__(original, action, opts) do
+        {:ok, agent, action} = on_before_cmd(original, action)
+
+        agent =
+          case Jido.Agent.StateBudget.transition(original, agent) do
+            {:ok, candidate} -> candidate
+            {:error, error} -> raise error
+          end
 
         jido_instance = Keyword.get(opts, :__jido_instance__)
         partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
@@ -995,7 +1022,7 @@ defmodule Jido.Agent do
       @spec set(Agent.t(), map() | keyword()) :: Agent.agent_result()
       def set(%Agent{} = agent, attrs) do
         new_state = AgentState.merge(agent.state, Map.new(attrs))
-        {:ok, %{agent | state: new_state}}
+        Jido.Agent.StateBudget.replace(agent, new_state)
       end
 
       @doc """
@@ -1013,7 +1040,7 @@ defmodule Jido.Agent do
       def validate(%Agent{} = agent, opts \\ []) do
         case AgentState.validate(agent.state, agent.schema, opts) do
           {:ok, validated_state} ->
-            {:ok, %{agent | state: validated_state}}
+            Jido.Agent.StateBudget.replace(agent, validated_state)
 
           {:error, reason} ->
             {:error, Jido.Error.validation_error("State validation failed", %{reason: reason})}
@@ -1147,6 +1174,10 @@ defmodule Jido.Agent do
             {:cont, {:ok, acc}}
           end
         end)
+        |> case do
+          {:ok, restored} -> Jido.Agent.StateBudget.check(restored)
+          {:error, _} = error -> error
+        end
       end
 
       defp normalize_keys(map) when is_map(map) do
@@ -1460,7 +1491,7 @@ defmodule Jido.Agent do
 
     case Zoi.parse(@schema, attrs_with_id) do
       {:ok, agent} ->
-        {:ok, agent}
+        Jido.Agent.StateBudget.check(agent)
 
       {:error, errors} ->
         {:error, Error.validation_error("Agent validation failed", %{errors: errors})}
@@ -1473,7 +1504,7 @@ defmodule Jido.Agent do
   @spec set(t(), map() | keyword()) :: agent_result()
   def set(%Agent{} = agent, attrs) do
     new_state = StateHelper.merge(agent.state, Map.new(attrs))
-    {:ok, %{agent | state: new_state}}
+    Jido.Agent.StateBudget.replace(agent, new_state)
   end
 
   @doc """
@@ -1483,7 +1514,7 @@ defmodule Jido.Agent do
   def validate(%Agent{} = agent, opts \\ []) do
     case StateHelper.validate(agent.state, agent.schema, opts) do
       {:ok, validated_state} ->
-        {:ok, %{agent | state: validated_state}}
+        Jido.Agent.StateBudget.replace(agent, validated_state)
 
       {:error, reason} ->
         {:error, Error.validation_error("State validation failed", %{reason: reason})}

@@ -164,7 +164,8 @@ defmodule Jido.AgentServer.State do
       storage: opts.storage
     ]
 
-    with {:ok, lifecycle} <- LifecycleState.new(lifecycle_opts) do
+    with {:ok, agent} <- Jido.Agent.StateBudget.check_for_module(agent, agent_module),
+         {:ok, lifecycle} <- LifecycleState.new(lifecycle_opts) do
       attrs = %{
         id: opts.id,
         agent_module: agent_module,
@@ -223,7 +224,10 @@ defmodule Jido.AgentServer.State do
       state
       | parent: parent,
         orphaned_from: nil,
-        agent: inject_runtime_refs(state.agent, state.partition, parent, nil)
+        agent:
+          Jido.Agent.StateBudget.check!(
+            inject_runtime_refs(state.agent, state.partition, parent, nil)
+          )
     }
   end
 
@@ -236,7 +240,10 @@ defmodule Jido.AgentServer.State do
       state
       | parent: nil,
         orphaned_from: parent,
-        agent: inject_runtime_refs(state.agent, state.partition, nil, parent)
+        agent:
+          Jido.Agent.StateBudget.check!(
+            inject_runtime_refs(state.agent, state.partition, nil, parent)
+          )
     }
   end
 
@@ -245,7 +252,10 @@ defmodule Jido.AgentServer.State do
       state
       | parent: nil,
         orphaned_from: nil,
-        agent: inject_runtime_refs(state.agent, state.partition, nil, nil)
+        agent:
+          Jido.Agent.StateBudget.check!(
+            inject_runtime_refs(state.agent, state.partition, nil, nil)
+          )
     }
   end
 
@@ -254,10 +264,12 @@ defmodule Jido.AgentServer.State do
   """
   @spec update_agent(t(), struct()) :: t()
   def update_agent(%__MODULE__{} = state, agent) do
-    %{
-      state
-      | agent: inject_runtime_refs(agent, state.partition, state.parent, state.orphaned_from)
-    }
+    candidate = inject_runtime_refs(agent, state.partition, state.parent, state.orphaned_from)
+
+    case Jido.Agent.StateBudget.transition(state.agent, candidate) do
+      {:ok, candidate} -> %{state | agent: candidate}
+      {:error, error} -> raise error
+    end
   end
 
   @doc """
