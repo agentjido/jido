@@ -262,8 +262,6 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
     {cleaned_agent, cron_specs}
   end
 
-  defp extract_cron_specs(agent), do: {agent, %{}}
-
   defp maybe_start_idle_timer(state) do
     lifecycle = state.lifecycle
     timeout = lifecycle.idle_timeout
