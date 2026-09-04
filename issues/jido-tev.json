@@ -2,6 +2,7 @@
   "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
+  "closed_at": "2026-09-04T15:31:03Z",
   "created": "2026-09-04T15:22:14Z",
   "description": "Implement GitHub issue agentjido/jido#332. Enforce an opt-in serialized byte budget at core state update, command, runtime, and restore boundaries. Add regression tests and documentation. Open a PR and leave it for user review.",
   "id": "jido-tev",
@@ -17,8 +18,8 @@
     }
   ],
   "priority": 2,
-  "status": "in_progress",
+  "status": "closed",
   "title": "Add an optional agent state size budget",
   "type": "task",
-  "updated_at": "2026-09-04T15:31:02Z"
+  "updated_at": "2026-09-04T15:31:03Z"
 }
