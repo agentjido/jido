@@ -372,6 +372,27 @@ defmodule JidoTest.ErrorTest do
       assert Jason.encode!(metadata)
     end
 
+    test "bounds long invalid binaries and redacts them under sensitive keys" do
+      for value <- [
+            :binary.copy(<<255>>, 2048),
+            String.duplicate("x", 700) <> <<255>>,
+            <<255>> <> String.duplicate("x", 700)
+          ] do
+        leaf = %{value: value, password: value}
+        error = Error.execution_error("Failed", details: %{a: %{b: %{c: leaf}}})
+        result = Error.to_map(error)
+
+        assert result.details.a.b.c.password == "[REDACTED]"
+        assert String.valid?(result.details.a.b.c.value)
+        assert String.length(result.details.a.b.c.value) <= 512 + String.length("...(truncated)")
+        assert Jason.encode!(result)
+
+        metadata = Jido.Observe.exception_metadata(:error, error)
+        assert metadata.error == result
+        assert Jason.encode!(metadata)
+      end
+    end
+
     test "still stops containers and opaque terms at the depth limit" do
       values = [%{value: "hidden"}, ["hidden"], %BadInspect{token: "hidden"}, {:value, "hidden"}]
       error = Error.execution_error("Failed", details: %{a: %{b: %{c: values}}})
