@@ -84,6 +84,7 @@ defmodule Jido.MixProject do
           "guides/observability-intro.md"
         ],
         Fundamentals: [
+          "guides/storage-conformance.md",
           "guides/agents.md",
           "guides/actions.md",
           "guides/signals.md",

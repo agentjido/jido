@@ -1,6 +1,14 @@
 defmodule JidoTest.Storage.ETSTest do
   use ExUnit.Case, async: true
 
+  use JidoTest.StorageCheckpointConformance,
+    adapter: Jido.Storage.ETS,
+    setup: quote(do: [table: unique_table(:checkpoint_conformance)])
+
+  use JidoTest.StorageThreadConformance,
+    adapter: Jido.Storage.ETS,
+    setup: quote(do: [table: unique_table(:thread_conformance)])
+
   alias Jido.Storage
   alias Jido.Storage.ETS
   alias Jido.Thread

@@ -135,7 +135,8 @@ defmodule Jido.Storage.Redis do
   end
 
   @impl true
-  @spec append_thread(String.t(), [term()], opts()) :: {:ok, Thread.t()} | {:error, term()}
+  @spec append_thread(String.t(), [Jido.Storage.entry_input()], opts()) ::
+          {:ok, Thread.t()} | {:error, term()}
   def append_thread(thread_id, entries, opts) do
     expected_rev = Keyword.get(opts, :expected_rev)
     now = System.system_time(:millisecond)
