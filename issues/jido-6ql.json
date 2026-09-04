@@ -3,14 +3,14 @@
   "blocked_by": [],
   "blocks": [],
   "created": "2026-06-26T12:46:59Z",
-  "description": "bw 0.13.1 → 0.13.2 is available.\n\n## What's new\n\n## 0.13.2 — 2026-06-19\n\n- **`bw close --recursive` / `-r`** — close an issue *and its entire subtree* in a single commit. Descendants close leaf-up (children before parents); already-closed members are skipped silently, so a re-run mops up stragglers. The root records your `--reason` verbatim while each descendant records `closed with parent \u003croot-id\u003e`. External issues that become fully unblocked are surfaced (and deduped); unblocks internal to the subtree are suppressed as noise. The non-recursive path is unchanged.\n\n  ```\n  $ bw close epic-abc --recursive\n  ```\n\n- **`bw ready` surfaces work hidden under claimed-but-open epics and deferred parents** — two cases where the live frontier could vanish are fixed:\n  - Running `bw start \u003cchild\u003e` moves only that child to `in_progress` without promoting its parent epic. The epic stayed `open` as a display root and suppressed its whole subtree, so `bw ready` collapsed to just the epic. It now drills in and surfaces the open, unblocked siblings.\n  - A future-deferred epic acted as a display root and hid its open, unblocked children from the global ready list. Those children now appear (under a `❄` deferred-parent marker).\n\n## To upgrade\n\nRun `bw upgrade --yes` or `bw upgrade` for interactive mode.\n",
+  "description": "bw 0.13.2 → 0.13.3 is available.\n\n## What's new\n\n## 0.13.3 — 2026-09-03\n\n- **`bw sync` no longer fails with `object not found` / `packfile not found` or silently corrupts the beadwork branch** — `git fetch` can trigger auto-gc, which repacks the object database out of process and deletes packfiles that `bw`'s long-lived in-memory git handle still had indexed. Depending on timing, sync would either die with:\n\n  ```\n  error: walk local commits: object not found\n  ```\n\n  or, worse, read a merge input as *empty* and write a merge commit that wiped the branch's contents. Sync now reopens its git state after every successful fetch, so it always sees the freshly-fetched objects and refs. As defense in depth, merge inputs that can't be read are now hard errors instead of being treated as empty trees, commit walks that fail partway abort instead of returning a short ancestor set, and both the merge and the push refuse to produce a beadwork branch that is missing `.bwconfig`. A regression test reproduces the external-repack scenario end to end. (Fixes #138.)\n\n- **`install.sh` no longer gets rate-limited** — the installer looked up the latest release via `api.github.com`, which allows only 60 unauthenticated requests per hour per IP. On shared egress (CI runners, office NATs) this frequently failed with \"could not determine latest version\". It now follows the unauthenticated `github.com/.../releases/latest` redirect instead, which has no rate limit.\n\n## To upgrade\n\nRun `bw upgrade --yes` or `bw upgrade` for interactive mode.\n",
   "id": "jido-6ql",
   "labels": [
     "beadwork-upgrade"
   ],
   "priority": 1,
   "status": "open",
-  "title": "Upgrade bw to 0.13.2",
+  "title": "Upgrade bw to 0.13.3",
   "type": "task",
-  "updated_at": "2026-06-26T12:46:59Z"
+  "updated_at": "2026-09-04T15:21:50Z"
 }
