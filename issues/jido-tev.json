@@ -1,5 +1,5 @@
 {
-  "assignee": "",
+  "assignee": "Mike Hostetler",
   "blocked_by": [],
   "blocks": [],
   "created": "2026-09-04T15:22:14Z",
@@ -7,8 +7,8 @@
   "id": "jido-tev",
   "labels": [],
   "priority": 2,
-  "status": "open",
+  "status": "in_progress",
   "title": "Add an optional agent state size budget",
   "type": "task",
-  "updated_at": "2026-09-04T15:22:14Z"
+  "updated_at": "2026-09-04T15:22:27Z"
 }
