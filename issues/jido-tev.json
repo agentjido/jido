@@ -1,0 +1,14 @@
+{
+  "assignee": "",
+  "blocked_by": [],
+  "blocks": [],
+  "created": "2026-09-04T15:22:14Z",
+  "description": "Implement GitHub issue agentjido/jido#332. Enforce an opt-in serialized byte budget at core state update, command, runtime, and restore boundaries. Add regression tests and documentation. Open a PR and leave it for user review.",
+  "id": "jido-tev",
+  "labels": [],
+  "priority": 2,
+  "status": "open",
+  "title": "Add an optional agent state size budget",
+  "type": "task",
+  "updated_at": "2026-09-04T15:22:14Z"
+}
