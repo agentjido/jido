@@ -37,7 +37,7 @@ defmodule Jido.Thread.Agent do
   @doc "Put thread into agent state"
   @spec put(Agent.t(), Thread.t()) :: Agent.t()
   def put(%Agent{} = agent, %Thread{} = thread) do
-    %{agent | state: Map.put(agent.state, @key, thread)}
+    Jido.Agent.StateBudget.replace!(agent, Map.put(agent.state, @key, thread))
   end
 
   @doc "Update thread using a function"

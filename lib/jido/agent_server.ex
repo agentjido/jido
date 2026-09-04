@@ -1034,6 +1034,11 @@ defmodule Jido.AgentServer do
     state = start_drain_if_idle(state)
 
     {:noreply, State.set_status(state, :idle)}
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:stop, error, state},
+        else: reraise(error, __STACKTRACE__)
   end
 
   defp init_signal do
@@ -1125,11 +1130,12 @@ defmodule Jido.AgentServer do
         {:reply, {:error, :invalid_parent}, state}
 
       true ->
+        attached_state = State.attach_parent(state, parent_ref)
+
         case persist_parent_binding(state.jido, state.id, state.partition, parent_ref) do
           :ok ->
             new_state =
-              state
-              |> State.attach_parent(parent_ref)
+              attached_state
               |> maybe_monitor_parent()
               |> State.record_debug_event(:parent_adopted, %{
                 parent_id: parent_ref.id,
@@ -1148,6 +1154,11 @@ defmodule Jido.AgentServer do
             {:reply, {:error, reason}, state}
         end
     end
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:reply, {:error, error}, state},
+        else: reraise(error, __STACKTRACE__)
   end
 
   def handle_call({:adopt_child, child, tag, meta}, _from, %State{} = state) do
@@ -1605,7 +1616,15 @@ defmodule Jido.AgentServer do
         agent_cmd_opts(state, signal, runtime_context)
       )
 
-    {:ok, agent, List.wrap(directives), action_arg, signal, runtime_context}
+    directives = List.wrap(directives)
+
+    case Enum.find(directives, &match?(%Directive.Error{context: :state_size}, &1)) do
+      %Directive.Error{error: error} ->
+        {:error, error, directives, signal, runtime_context}
+
+      nil ->
+        {:ok, agent, directives, action_arg, signal, runtime_context}
+    end
   end
 
   defp apply_signal_call_result(result, inflight, %State{} = state) do
@@ -1636,7 +1655,11 @@ defmodule Jido.AgentServer do
                 runtime_context
               )
 
-            GenServer.reply(from, {:ok, transformed_agent})
+            case Jido.Agent.StateBudget.transition(enq_state.agent, transformed_agent) do
+              {:ok, transformed_agent} -> GenServer.reply(from, {:ok, transformed_agent})
+              {:error, error} -> GenServer.reply(from, {:error, error})
+            end
+
             enq_state
 
           {:error, :queue_overflow} ->
@@ -1685,6 +1708,14 @@ defmodule Jido.AgentServer do
         GenServer.reply(from, {:error, reason})
         maybe_set_idle_status(state)
     end
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size do
+        GenServer.reply(inflight.from, {:error, error})
+        maybe_set_idle_status(state)
+      else
+        reraise(error, __STACKTRACE__)
+      end
   end
 
   defp maybe_process_deferred_async_signal(%State{signal_call_inflight: nil} = state) do
@@ -1988,6 +2019,14 @@ defmodule Jido.AgentServer do
         Logger.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
         {:error, :queue_overflow, state}
     end
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size do
+        directive = %Directive.Error{error: error, context: :state_size}
+        enqueue_error_directive(error, signal, [directive], state, runtime_context)
+      else
+        reraise(error, __STACKTRACE__)
+      end
   end
 
   # ---------------------------------------------------------------------------
@@ -3026,6 +3065,11 @@ defmodule Jido.AgentServer do
       true ->
         {:error, Jido.Error.validation_error("Invalid agent")}
     end
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:error, error},
+        else: reraise(error, __STACKTRACE__)
   end
 
   # ---------------------------------------------------------------------------
@@ -3153,6 +3197,11 @@ defmodule Jido.AgentServer do
     end)
 
     {:noreply, orphaned_state}
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:stop, {:shutdown, error}, state},
+        else: reraise(error, __STACKTRACE__)
   end
 
   defp handle_parent_down(%State{on_parent_death: :emit_orphan} = state, _pid, reason) do
@@ -3177,6 +3226,11 @@ defmodule Jido.AgentServer do
       end
 
     process_or_defer_internal_signal(traced_signal, orphaned_state)
+  rescue
+    error in Jido.Error.ValidationError ->
+      if error.kind == :state_size,
+        do: {:stop, {:shutdown, error}, state},
+        else: reraise(error, __STACKTRACE__)
   end
 
   defp handle_child_down(%State{} = state, pid, reason) do
@@ -3381,6 +3435,7 @@ defmodule Jido.AgentServer do
       result =
         directive
         |> DirectiveExec.exec(signal, state)
+        |> check_directive_state(state)
         |> clear_current_runtime_context()
 
       emit_telemetry(
@@ -3390,6 +3445,17 @@ defmodule Jido.AgentServer do
       )
 
       result
+    rescue
+      error in Jido.Error.ValidationError ->
+        if error.kind == :state_size do
+          error_directive = %Directive.Error{error: error, context: :state_size}
+
+          error_directive
+          |> DirectiveExec.exec(signal, state)
+          |> clear_current_runtime_context()
+        else
+          reraise(error, __STACKTRACE__)
+        end
     catch
       kind, reason ->
         emit_telemetry(
@@ -3399,6 +3465,20 @@ defmodule Jido.AgentServer do
         )
 
         :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
+  defp check_directive_state(result, previous) do
+    index = tuple_size(result) - 1
+    candidate = elem(result, index)
+
+    case Jido.Agent.StateBudget.transition(previous.agent, candidate.agent) do
+      {:ok, agent} ->
+        checked = State.update_agent(%{candidate | agent: agent}, agent)
+        put_elem(result, index, checked)
+
+      {:error, error} ->
+        raise error
     end
   end
 
