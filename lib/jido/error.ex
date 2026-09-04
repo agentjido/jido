@@ -516,6 +516,13 @@ defmodule Jido.Error do
 
   The returned map is suitable for transport and reporting boundaries. It
   includes bounded, sanitized details and never includes stacktraces by default.
+
+  Details traverse at most #{@transport_max_depth} container levels, with up to
+  #{@transport_max_items} entries per map or list. Scalar leaves are kept at the
+  depth limit, so validation paths retain field names and list indexes. Strings
+  are limited to #{@transport_max_string} characters plus a truncation suffix.
+  Invalid UTF-8 binaries use bounded inspection.
+  Deeper containers and opaque terms are replaced with `#{@depth_limit}`.
   """
   @spec to_map(any()) :: map()
   def to_map(error) do
@@ -713,12 +720,16 @@ defmodule Jido.Error do
   end
 
   defp sanitize_transport(value, depth \\ @transport_max_depth)
-  defp sanitize_transport(_value, 0), do: @depth_limit
-  defp sanitize_transport(value, _depth) when is_binary(value), do: truncate_string(value)
+
+  defp sanitize_transport(value, _depth) when is_binary(value) do
+    if String.valid?(value), do: truncate_string(value), else: safe_inspect(value)
+  end
 
   defp sanitize_transport(value, _depth)
        when is_boolean(value) or is_number(value) or is_atom(value),
        do: value
+
+  defp sanitize_transport(_value, 0), do: @depth_limit
 
   defp sanitize_transport(%_{} = value, _depth) when is_exception(value) do
     %{
