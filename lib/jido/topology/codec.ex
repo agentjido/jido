@@ -39,7 +39,7 @@ defmodule Jido.Topology.Codec do
   def encode(definition) do
     with {:ok, definition} <- Topology.new(definition),
          {:ok, registry} <- Value.registry(definition),
-         {:ok, document} <- encode(definition, registry),
+         {:ok, document} <- encode_validated(definition, registry),
          do: {:ok, document, registry}
   end
 
@@ -47,7 +47,11 @@ defmodule Jido.Topology.Codec do
   def encode(definition, registry) do
     with {:ok, definition} <- Topology.new(definition),
          {:ok, registry} <- Registry.new(registry),
-         {:ok, schema} <- Registry.identifier(registry, :schema, definition.schema),
+         do: encode_validated(definition, registry)
+  end
+
+  defp encode_validated(definition, registry) do
+    with {:ok, schema} <- Registry.identifier(registry, :schema, definition.schema),
          {:ok, metadata} <- Value.encode(definition.metadata, registry),
          {:ok, collections} <-
            Authoring.traverse(@collections, fn kind ->

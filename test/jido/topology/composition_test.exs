@@ -47,7 +47,10 @@ defmodule Jido.Topology.CompositionTest do
 
     assert {:error, opts_error} = Topology.instantiate(definition, unexpected: true)
     assert Exception.message(opts_error) =~ "Unknown"
-    assert {:error, input_error} = Topology.instantiate(definition, id: "root", input: %{worker_count: -1})
+
+    assert {:error, input_error} =
+             Topology.instantiate(definition, id: "root", input: %{worker_count: -1})
+
     assert Exception.message(input_error) =~ "input"
 
     assert {:error, root_error} = Topology.instantiate(definition, id: "root")
@@ -56,7 +59,9 @@ defmodule Jido.Topology.CompositionTest do
   end
 
   test "direct Plan construction still checks the declaration graph" do
-    definition = Builder.new(name: "cycle") |> Builder.group(:workers, Cell, count: 0) |> Builder.build!()
+    definition =
+      Builder.new(name: "cycle") |> Builder.group(:workers, Cell, count: 0) |> Builder.build!()
+
     [group] = definition.groups
     invalid = %{definition | groups: [%{group | depends_on: ["workers"]}]}
 
