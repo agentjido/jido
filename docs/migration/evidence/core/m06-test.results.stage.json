@@ -1,0 +1,1458 @@
+{
+  "stage": "M06",
+  "source_tests_retained": 750,
+  "suite_counts": {
+    "passed": 756
+  },
+  "contracts": [
+    {
+      "category": "catalog",
+      "id": "01_01_minimal_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 7,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test direct and live execution agree on route defaults and Signal overrides",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 2944
+        },
+        {
+          "line": 36,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test the Action rejects an invalid amount before it can change state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 1888
+        },
+        {
+          "line": 57,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test instances from one definition keep separate state and identity",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 1034
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_02_typed_command_agent",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 10,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test construction preserves defaults and root constraints with and without Plugin state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 3217
+        },
+        {
+          "line": 42,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test route defaults merge shallowly before direct and live Action validation",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 6923
+        },
+        {
+          "line": 102,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test an invalid candidate cannot commit or dispatch after successful Action execution",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 7213
+        },
+        {
+          "line": 127,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test direct and live routing failures share one error contract and leave the Server usable",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 2131
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_03_plugin_state_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 9,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test domain and Plugin state become visible in the same commit",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 6508
+        },
+        {
+          "line": 21,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test an Action cannot change Plugin-owned state or dispatch its otherwise valid effect",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 1704
+        },
+        {
+          "line": 40,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test invalid Plugin output rejects the domain candidate and preserves the prior commit",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 7690
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_04_directive_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 8,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test every handler observes committed state and dispatch follows batch order",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 12830
+        },
+        {
+          "line": 31,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test an invalid later Directive prevents the entire commit and all dispatch",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 13309
+        },
+        {
+          "line": 55,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test a failed second dispatch preserves the commit and prevents the third effect",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 1680
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_05_controlled_turn_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 8,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test queued work starts with the prior Turn's committed state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 12374
+        },
+        {
+          "line": 53,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test cancellation terminates abandoned work and preserves valid queued work",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 12869
+        },
+        {
+          "line": 97,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test a caller timeout ends waiting without cancelling a started Turn",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 113077
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_01_sequential_flow",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.SequentialFlowTest",
+          "name": "test a compiled inline Step can use new bindings through Builder and stored JSON",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs",
+          "failure": null,
+          "time_us": 1439
+        },
+        {
+          "line": 34,
+          "module": "JidoTest.Examples.Workflow.SequentialFlowTest",
+          "name": "test dependencies hold intermediate state and direct/live output agrees",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs",
+          "failure": null,
+          "time_us": 3449
+        },
+        {
+          "line": 53,
+          "module": "JidoTest.Examples.Workflow.SequentialFlowTest",
+          "name": "test an intermediate failure stops its dependent and keeps an existing commit",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs",
+          "failure": null,
+          "time_us": 3307
+        },
+        {
+          "line": 70,
+          "module": "JidoTest.Examples.Workflow.SequentialFlowTest",
+          "name": "test Flow input, Flow output, and Agent candidate schemas reject at distinct boundaries",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs",
+          "failure": null,
+          "time_us": 14121
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_02_effectful_steps",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 12,
+          "module": "JidoTest.Examples.Workflow.EffectfulStepsTest",
+          "name": "test caller context reaches Flow steps and only selected output persists and restores",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs",
+          "failure": null,
+          "time_us": 2221
+        },
+        {
+          "line": 43,
+          "module": "JidoTest.Examples.Workflow.EffectfulStepsTest",
+          "name": "test guard rejection prevents the call while late rejection cannot undo it",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs",
+          "failure": null,
+          "time_us": 3051
+        },
+        {
+          "line": 78,
+          "module": "JidoTest.Examples.Workflow.EffectfulStepsTest",
+          "name": "test context is isolated between Turns and repeated success advances only the commit revision",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs",
+          "failure": null,
+          "time_us": 2299
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_03_conditional_routes",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 6,
+          "module": "JidoTest.Examples.Workflow.ConditionalRoutesTest",
+          "name": "test only the first matching option runs and the fallback remains lazy",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs",
+          "failure": null,
+          "time_us": 1601
+        },
+        {
+          "line": 23,
+          "module": "JidoTest.Examples.Workflow.ConditionalRoutesTest",
+          "name": "test explicit expected errors select fallback and permanent errors select rejection",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs",
+          "failure": null,
+          "time_us": 1702
+        },
+        {
+          "line": 52,
+          "module": "JidoTest.Examples.Workflow.ConditionalRoutesTest",
+          "name": "test a selected Action failure does not enter another option or otherwise",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs",
+          "failure": null,
+          "time_us": 1569
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_04_parallel_join",
+      "counts": {
+        "passed": 5
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.ParallelJoinTest",
+          "name": "test named commands apply defaults and reject invalid input before either branch",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs",
+          "failure": null,
+          "time_us": 3272
+        },
+        {
+          "line": 30,
+          "module": "JidoTest.Examples.Workflow.ParallelJoinTest",
+          "name": "test independent work overlaps and the join waits for both results",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs",
+          "failure": null,
+          "time_us": 2703
+        },
+        {
+          "line": 58,
+          "module": "JidoTest.Examples.Workflow.ParallelJoinTest",
+          "name": "test a concurrency limit of one prevents overlap",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs",
+          "failure": null,
+          "time_us": 851
+        },
+        {
+          "line": 71,
+          "module": "JidoTest.Examples.Workflow.ParallelJoinTest",
+          "name": "test branch failure permits already started work to finish but prevents the join",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs",
+          "failure": null,
+          "time_us": 2321
+        },
+        {
+          "line": 94,
+          "module": "JidoTest.Examples.Workflow.ParallelJoinTest",
+          "name": "test cancellation stops every Flow worker and the next Turn uses fresh context",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs",
+          "failure": null,
+          "time_us": 9970
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_05_ordered_batch",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.OrderedBatchTest",
+          "name": "test reverse Map completion feeds an ordered serial Reduce",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs",
+          "failure": null,
+          "time_us": 2410
+        },
+        {
+          "line": 46,
+          "module": "JidoTest.Examples.Workflow.OrderedBatchTest",
+          "name": "test collected errors keep their source position under reversed completion",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs",
+          "failure": null,
+          "time_us": 1823
+        },
+        {
+          "line": 80,
+          "module": "JidoTest.Examples.Workflow.OrderedBatchTest",
+          "name": "test fail-fast stops pending items and rejects the batch and its dependent Reduce",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs",
+          "failure": null,
+          "time_us": 1956
+        },
+        {
+          "line": 108,
+          "module": "JidoTest.Examples.Workflow.OrderedBatchTest",
+          "name": "test empty Map and Reduce return their empty result without invoking a body",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs",
+          "failure": null,
+          "time_us": 3606
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_06_bounded_iteration",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.BoundedIterationTest",
+          "name": "test initial completion skips the body and final allowed repair succeeds",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs",
+          "failure": null,
+          "time_us": 1429
+        },
+        {
+          "line": 28,
+          "module": "JidoTest.Examples.Workflow.BoundedIterationTest",
+          "name": "test exhaustion runs exactly three bodies and preserves the prior result",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs",
+          "failure": null,
+          "time_us": 1621
+        },
+        {
+          "line": 47,
+          "module": "JidoTest.Examples.Workflow.BoundedIterationTest",
+          "name": "test invalid initial or replacement state stops before another iteration",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs",
+          "failure": null,
+          "time_us": 1885
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_07_nested_flow",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.NestedFlowTest",
+          "name": "test child calls keep separate results and share context without intermediate commits",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs",
+          "failure": null,
+          "time_us": 2084
+        },
+        {
+          "line": 36,
+          "module": "JidoTest.Examples.Workflow.NestedFlowTest",
+          "name": "test child input and output contracts stop the parent and preserve its prior commit",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs",
+          "failure": null,
+          "time_us": 3179
+        },
+        {
+          "line": 71,
+          "module": "JidoTest.Examples.Workflow.NestedFlowTest",
+          "name": "test a nested Action error keeps its typed cause and the parent can run again",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs",
+          "failure": null,
+          "time_us": 2733
+        },
+        {
+          "line": 98,
+          "module": "JidoTest.Examples.Workflow.NestedFlowTest",
+          "name": "test the parent execution timeout also stops a blocked child",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs",
+          "failure": null,
+          "time_us": 202914
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_08_executable_continuation",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.Workflow.ExecutableContinuationTest",
+          "name": "test Flow and Action continuations share context and commit only the terminal result",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs",
+          "failure": null,
+          "time_us": 1965
+        },
+        {
+          "line": 29,
+          "module": "JidoTest.Examples.Workflow.ExecutableContinuationTest",
+          "name": "test one continuation budget bounds the whole chain without an intermediate commit",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs",
+          "failure": null,
+          "time_us": 1973
+        },
+        {
+          "line": 54,
+          "module": "JidoTest.Examples.Workflow.ExecutableContinuationTest",
+          "name": "test the terminal Flow validates its output after prior executables finish",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs",
+          "failure": null,
+          "time_us": 2882
+        },
+        {
+          "line": 69,
+          "module": "JidoTest.Examples.Workflow.ExecutableContinuationTest",
+          "name": "test an execution timeout ends the active chain and stops its worker",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs",
+          "failure": null,
+          "time_us": 202656
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "02_09_approval_workflow",
+      "counts": {
+        "passed": 5
+      },
+      "tests": [
+        {
+          "line": 36,
+          "module": "JidoTest.Examples.Workflow.ApprovalWorkflowTest",
+          "name": "test approval commits before a process-free Plugin books and a later Signal completes",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs",
+          "failure": null,
+          "time_us": 9432
+        },
+        {
+          "line": 69,
+          "module": "JidoTest.Examples.Workflow.ApprovalWorkflowTest",
+          "name": "test a valid stale revision fails selection and cancelled work cannot be approved",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs",
+          "failure": null,
+          "time_us": 4846
+        },
+        {
+          "line": 99,
+          "module": "JidoTest.Examples.Workflow.ApprovalWorkflowTest",
+          "name": "test queued duplicate approval creates only one provider attempt",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs",
+          "failure": null,
+          "time_us": 15726
+        },
+        {
+          "line": 124,
+          "module": "JidoTest.Examples.Workflow.ApprovalWorkflowTest",
+          "name": "test stale and duplicate result Signals cannot replace a terminal booking",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs",
+          "failure": null,
+          "time_us": 10146
+        },
+        {
+          "line": 157,
+          "module": "JidoTest.Examples.Workflow.ApprovalWorkflowTest",
+          "name": "test provider failure enters through a separate result Turn",
+          "status": "passed",
+          "file": "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs",
+          "failure": null,
+          "time_us": 8855
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_01_model_response",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.LLM.ModelResponseTest",
+          "name": "test exact input and selected output cross direct and live boundaries",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_01_model_response/model_response_test.exs",
+          "failure": null,
+          "time_us": 1013
+        },
+        {
+          "line": 30,
+          "module": "JidoTest.Examples.LLM.ModelResponseTest",
+          "name": "test bad input makes no call and bad output preserves a prior commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_01_model_response/model_response_test.exs",
+          "failure": null,
+          "time_us": 1516
+        },
+        {
+          "line": 43,
+          "module": "JidoTest.Examples.LLM.ModelResponseTest",
+          "name": "test transient fallback records both calls; auth and malformed fallback preserve state",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_01_model_response/model_response_test.exs",
+          "failure": null,
+          "time_us": 1003
+        },
+        {
+          "line": 60,
+          "module": "JidoTest.Examples.LLM.ModelResponseTest",
+          "name": "test execution deadline terminates a blocked provider worker",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_01_model_response/model_response_test.exs",
+          "failure": null,
+          "time_us": 202051
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_02_conversation_history",
+      "counts": {
+        "passed": 2
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.LLM.ConversationHistoryTest",
+          "name": "test two Turns use actual history; duplicates and errors preserve it",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_02_conversation_history/conversation_history_test.exs",
+          "failure": null,
+          "time_us": 1907
+        },
+        {
+          "line": 33,
+          "module": "JidoTest.Examples.LLM.ConversationHistoryTest",
+          "name": "test persisted history restores and the next Turn uses a fresh client",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_02_conversation_history/conversation_history_test.exs",
+          "failure": null,
+          "time_us": 1853
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_03_tool_call",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 12,
+          "module": "JidoTest.Examples.LLM.ToolCallTest",
+          "name": "test a typed tool result retains its call ID in the final model input",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_03_tool_call/tool_call_test.exs",
+          "failure": null,
+          "time_us": 1204
+        },
+        {
+          "line": 34,
+          "module": "JidoTest.Examples.LLM.ToolCallTest",
+          "name": "test unknown tools, bad arguments, and denied operations make zero tool calls",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_03_tool_call/tool_call_test.exs",
+          "failure": null,
+          "time_us": 2886
+        },
+        {
+          "line": 57,
+          "module": "JidoTest.Examples.LLM.ToolCallTest",
+          "name": "test SDK tool schema prevents direct invalid execution",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_03_tool_call/tool_call_test.exs",
+          "failure": null,
+          "time_us": 245
+        },
+        {
+          "line": 71,
+          "module": "JidoTest.Examples.LLM.ToolCallTest",
+          "name": "test tool failure and late answer failure preserve prior state but keep external effects",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_03_tool_call/tool_call_test.exs",
+          "failure": null,
+          "time_us": 2801
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_04_tool_loop",
+      "counts": {
+        "passed": 11
+      },
+      "tests": [
+        {
+          "line": 16,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test one Signal runs the complete effectful ReAct Flow and commits once",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 4199
+        },
+        {
+          "line": 37,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test a failed Flow keeps Agent state but does not undo completed effects",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 2612
+        },
+        {
+          "line": 62,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test several tool calls remain inside one committed Turn",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 3442
+        },
+        {
+          "line": 97,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test an unknown tool fails without a commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 12521
+        },
+        {
+          "line": 108,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test a tool error preserves its completed model effect but does not commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 1689
+        },
+        {
+          "line": 123,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test malformed model output fails before any tool effect",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 3298
+        },
+        {
+          "line": 138,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test the application step budget bounds recursive tool use",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 4573
+        },
+        {
+          "line": 166,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test a provider timeout fails without a commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 3575
+        },
+        {
+          "line": 177,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test cancelling the active Turn stops model work and keeps Agent state",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 2853
+        },
+        {
+          "line": 204,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test intermediate rounds expose prior state and the final transcript commits once",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 4634
+        },
+        {
+          "line": 260,
+          "module": "JidoTest.Examples.LLM.ReActAgentTest",
+          "name": "test the SDK continuation bound is separate from the model-step budget",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs",
+          "failure": null,
+          "time_us": 1110
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_05_parallel_tools",
+      "counts": {
+        "passed": 5
+      },
+      "tests": [
+        {
+          "line": 7,
+          "module": "JidoTest.Examples.LLM.ParallelToolsTest",
+          "name": "test two real workers overlap; reverse completion retains call order",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs",
+          "failure": null,
+          "time_us": 3485
+        },
+        {
+          "line": 42,
+          "module": "JidoTest.Examples.LLM.ParallelToolsTest",
+          "name": "test a finite plan obeys the serial limit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs",
+          "failure": null,
+          "time_us": 52945
+        },
+        {
+          "line": 63,
+          "module": "JidoTest.Examples.LLM.ParallelToolsTest",
+          "name": "test complete plan admission rejects duplicate IDs, unknown names, and bad arguments before any effect",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs",
+          "failure": null,
+          "time_us": 3468
+        },
+        {
+          "line": 84,
+          "module": "JidoTest.Examples.LLM.ParallelToolsTest",
+          "name": "test empty tools and collected item errors reach the model with stable correlation",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs",
+          "failure": null,
+          "time_us": 3438
+        },
+        {
+          "line": 109,
+          "module": "JidoTest.Examples.LLM.ParallelToolsTest",
+          "name": "test cancellation terminates all active tools and preserves a prior commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs",
+          "failure": null,
+          "time_us": 3731
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_06_grounded_answer",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 10,
+          "module": "JidoTest.Examples.LLM.GroundedAnswerTest",
+          "name": "test retrieval and generation receive exact inputs before validated provenance commits",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs",
+          "failure": null,
+          "time_us": 1326
+        },
+        {
+          "line": 27,
+          "module": "JidoTest.Examples.LLM.GroundedAnswerTest",
+          "name": "test no evidence makes zero model calls; bad identity, revision, or page cannot replace prior state",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs",
+          "failure": null,
+          "time_us": 3851
+        },
+        {
+          "line": 68,
+          "module": "JidoTest.Examples.LLM.GroundedAnswerTest",
+          "name": "test resolver receives committed history and web search requires explicit permission",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs",
+          "failure": null,
+          "time_us": 1968
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_07_output_repair",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 5,
+          "module": "JidoTest.Examples.LLM.OutputRepairTest",
+          "name": "test valid first output makes one call and invalid output sends specific feedback",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_07_output_repair/output_repair_test.exs",
+          "failure": null,
+          "time_us": 1544
+        },
+        {
+          "line": 27,
+          "module": "JidoTest.Examples.LLM.OutputRepairTest",
+          "name": "test last allowed repair succeeds; exhaustion makes exactly three calls and preserves it",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_07_output_repair/output_repair_test.exs",
+          "failure": null,
+          "time_us": 1897
+        },
+        {
+          "line": 52,
+          "module": "JidoTest.Examples.LLM.OutputRepairTest",
+          "name": "test provider failure is not an automatic repair",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_07_output_repair/output_repair_test.exs",
+          "failure": null,
+          "time_us": 1230
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_08_context_compaction",
+      "counts": {
+        "passed": 2
+      },
+      "tests": [
+        {
+          "line": 14,
+          "module": "JidoTest.Examples.LLM.ContextCompactionTest",
+          "name": "test compaction reads committed history; queued messages survive and enter the next model input once",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_08_context_compaction/context_compaction_test.exs",
+          "failure": null,
+          "time_us": 7577
+        },
+        {
+          "line": 65,
+          "module": "JidoTest.Examples.LLM.ContextCompactionTest",
+          "name": "test fact loss, malformed summary, and byte overflow preserve committed messages",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_08_context_compaction/context_compaction_test.exs",
+          "failure": null,
+          "time_us": 2503
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_09_subagent_delegation",
+      "counts": {
+        "passed": 6
+      },
+      "tests": [
+        {
+          "line": 18,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test portable Directives start a real child; independent model work follows the pending commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 8223
+        },
+        {
+          "line": 65,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test stale and duplicate results cannot complete another request; duplicate IDs make no model call",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 16242
+        },
+        {
+          "line": 113,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test invalid specialist selection starts no child and performs no specialist effect",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 1498
+        },
+        {
+          "line": 130,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test child model failure becomes a correlated result and a new request can succeed",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 21755
+        },
+        {
+          "line": 159,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test child process loss cannot leave the parent request pending",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 7794
+        },
+        {
+          "line": 182,
+          "module": "JidoTest.Examples.LLM.SubagentDelegationTest",
+          "name": "test the child's execution deadline ends blocked model work and reports failure",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs",
+          "failure": null,
+          "time_us": 1014902
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "03_10_recursive_analysis",
+      "counts": {
+        "passed": 26
+      },
+      "tests": [
+        {
+          "line": 57,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test direct evaluation and Server execution agree and commit only the complete result",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 7561
+        },
+        {
+          "line": 80,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test empty and all-success inputs return empty counts",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 5345
+        },
+        {
+          "line": 100,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test irregular trees and both traversal orders agree with an independent oracle",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 418405
+        },
+        {
+          "line": 128,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test a selected range reads only its records from a larger corpus",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 7450
+        },
+        {
+          "line": 151,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test max_depth stops work before the allowance is exceeded",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2558
+        },
+        {
+          "line": 151,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test max_calls stops work before the allowance is exceeded",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 1955
+        },
+        {
+          "line": 151,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test max_steps stops work before the allowance is exceeded",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 1932
+        },
+        {
+          "line": 151,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test max_read_records stops work before the allowance is exceeded",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2233
+        },
+        {
+          "line": 151,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test max_bytes stops work before the allowance is exceeded",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2202
+        },
+        {
+          "line": 173,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test the byte budget is shared across siblings and retains completed read effects",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2538
+        },
+        {
+          "line": 187,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test call and step budgets are shared across siblings",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 4259
+        },
+        {
+          "line": 202,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test exact work limits succeed",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 7296
+        },
+        {
+          "line": 220,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test gaps, overlaps, repeated ranges, and non-reducing recursion fail before reads",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 4817
+        },
+        {
+          "line": 241,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test malformed model replies and invalid transitions are rejected",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 4042
+        },
+        {
+          "line": 259,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test false leaf counts and false parent counts cannot commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 4746
+        },
+        {
+          "line": 276,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test a late model failure preserves the last committed answer and permits retry",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 8711
+        },
+        {
+          "line": 294,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test unknown corpora and ranges outside the corpus fail before model calls",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2035
+        },
+        {
+          "line": 305,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test invalid request schemas and missing clients fail before external work",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 5032
+        },
+        {
+          "line": 323,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test malformed store data and false byte totals fail without a commit",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 5019
+        },
+        {
+          "line": 355,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test a skewed tree reaches the exact depth limit and rejects the next level",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 54597
+        },
+        {
+          "line": 388,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test the final result can contain more services than any leaf result",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 417214
+        },
+        {
+          "line": 397,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test adapter exceptions and stopped stores return structured errors",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 2514
+        },
+        {
+          "line": 410,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test cancellation stops recursive work after a read and preserves committed state",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 4863
+        },
+        {
+          "line": 431,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test an execution deadline terminates a blocked model",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 503728
+        },
+        {
+          "line": 448,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test queued requests retain their own client context and commit in order",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 12743
+        },
+        {
+          "line": 470,
+          "module": "JidoTest.Examples.LLM.RecursiveLanguageModelTest",
+          "name": "test a large tree stays within leaf bounds across concurrent Agents",
+          "status": "passed",
+          "file": "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs",
+          "failure": null,
+          "time_us": 1892089
+        }
+      ]
+    },
+    {
+      "category": "shared_group_files",
+      "id": "01_basic",
+      "counts": {
+        "passed": 6
+      },
+      "tests": [
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.MinimalAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 2923
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.TypedCommandAgent.patch_profile through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 6762
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.TypedCommandAgent.set_count through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 35984
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.PluginStateAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 36834
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.DirectiveAgent.set_count through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 31623
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.ControlledTurnAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 31074
+        }
+      ]
+    },
+    {
+      "category": "research",
+      "id": "99_06_checkpoint_identity",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 14,
+          "module": "JidoTest.Persistence.CheckpointIdentityTest",
+          "name": "test a valid record retains the requested Agent ID, state, and revision",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_identity_test.exs",
+          "failure": null,
+          "time_us": 840
+        },
+        {
+          "line": 20,
+          "module": "JidoTest.Persistence.CheckpointIdentityTest",
+          "name": "test a mismatched record envelope is rejected",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_identity_test.exs",
+          "failure": null,
+          "time_us": 433
+        },
+        {
+          "line": 29,
+          "module": "JidoTest.Persistence.CheckpointIdentityTest",
+          "name": "test a matching envelope cannot hide a different Agent ID in the checkpoint",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_identity_test.exs",
+          "failure": null,
+          "time_us": 706
+        }
+      ]
+    },
+    {
+      "category": "research",
+      "id": "99_07_checkpoint_portability",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 15,
+          "module": "JidoTest.Persistence.CheckpointPortabilityTest",
+          "name": "test nested portable values survive a save and load",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_portability_test.exs",
+          "failure": null,
+          "time_us": 830
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Persistence.CheckpointPortabilityTest",
+          "name": "test save rejects a process handle before it reaches the adapter",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_portability_test.exs",
+          "failure": null,
+          "time_us": 1601
+        },
+        {
+          "line": 36,
+          "module": "JidoTest.Persistence.CheckpointPortabilityTest",
+          "name": "test load rejects a nested process handle supplied by storage",
+          "status": "passed",
+          "file": "test/jido/persistence/checkpoint_portability_test.exs",
+          "failure": null,
+          "time_us": 431
+        }
+      ]
+    },
+    {
+      "category": "research",
+      "id": "99_08_indeterminate_write",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 35,
+          "module": "JidoTest.Persistence.IndeterminateWriteTest",
+          "name": "test a confirmed write commits state and permits post-commit output",
+          "status": "passed",
+          "file": "test/jido/persistence/indeterminate_write_test.exs",
+          "failure": null,
+          "time_us": 1616
+        },
+        {
+          "line": 46,
+          "module": "JidoTest.Persistence.IndeterminateWriteTest",
+          "name": "test an uncertain reply can follow a stored write without dispatching its Directive",
+          "status": "passed",
+          "file": "test/jido/persistence/indeterminate_write_test.exs",
+          "failure": null,
+          "time_us": 101774
+        },
+        {
+          "line": 57,
+          "module": "JidoTest.Persistence.IndeterminateWriteTest",
+          "name": "test an indeterminate write prevents evaluation of the next Action on stale state",
+          "status": "passed",
+          "file": "test/jido/persistence/indeterminate_write_test.exs",
+          "failure": null,
+          "time_us": 203211
+        },
+        {
+          "line": 75,
+          "module": "JidoTest.Persistence.IndeterminateWriteTest",
+          "name": "test a raised callback after storage also prevents later Action evaluation",
+          "status": "passed",
+          "file": "test/jido/persistence/indeterminate_write_test.exs",
+          "failure": null,
+          "time_us": 203707
+        }
+      ]
+    }
+  ]
+}

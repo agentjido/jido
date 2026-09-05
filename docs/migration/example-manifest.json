@@ -686,7 +686,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_01_model_response",
       "prepared_directory": "lib/examples/03_llm/03_01_model_response",
       "prepared_files": [
@@ -733,7 +733,7 @@
       ],
       "baseline_tests_executed": 2,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_02_conversation_history",
       "prepared_directory": "lib/examples/03_llm/03_02_conversation_history",
       "prepared_files": [
@@ -780,7 +780,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_03_tool_call",
       "prepared_directory": "lib/examples/03_llm/03_03_tool_call",
       "prepared_files": [
@@ -827,7 +827,7 @@
       ],
       "baseline_tests_executed": 11,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_04_tool_loop",
       "prepared_directory": "lib/examples/03_llm/03_04_tool_loop",
       "prepared_files": [
@@ -874,7 +874,7 @@
       ],
       "baseline_tests_executed": 5,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_05_parallel_tools",
       "prepared_directory": "lib/examples/03_llm/03_05_parallel_tools",
       "prepared_files": [
@@ -921,7 +921,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_06_grounded_answer",
       "prepared_directory": "lib/examples/03_llm/03_06_grounded_answer",
       "prepared_files": [
@@ -968,7 +968,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_07_output_repair",
       "prepared_directory": "lib/examples/03_llm/03_07_output_repair",
       "prepared_files": [
@@ -1015,7 +1015,7 @@
       ],
       "baseline_tests_executed": 2,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_08_context_compaction",
       "prepared_directory": "lib/examples/03_llm/03_08_context_compaction",
       "prepared_files": [
@@ -1062,7 +1062,7 @@
       ],
       "baseline_tests_executed": 6,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_09_subagent_delegation",
       "prepared_directory": "lib/examples/03_llm/03_09_subagent_delegation",
       "prepared_files": [
@@ -1115,7 +1115,7 @@
       ],
       "baseline_tests_executed": 26,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M06, evidence/core/m06-test.results.stage.json",
       "prepared_id": "03_10_recursive_analysis",
       "prepared_directory": "lib/examples/03_llm/03_10_recursive_analysis",
       "prepared_files": [

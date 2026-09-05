@@ -103,3 +103,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m05-compile.json`, `evidence/core/m05-test.json`
 and `evidence/core/m05-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M06
+
+All ten LLM fixtures pass 66 checks. Tests use deterministic adapters. They preserve tool validation and ordering, history, repair limits, child delegation and the recursive corpus oracle. The stress runner is copied for its separate M13 scale check.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 756}]` in 22.487 seconds, with normal concurrency.
+See `evidence/core/m06-compile.json`, `evidence/core/m06-test.json`
+and `evidence/core/m06-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
