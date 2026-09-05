@@ -66,6 +66,61 @@ defmodule JidoTest.UtilTest do
     end
   end
 
+  describe "validation result contracts" do
+    test "preserves values and ignores options other than the empty list" do
+      for value <- [TestActions.BasicAction, [TestActions.BasicAction], []] do
+        assert Util.validate_actions(value, []) == {:ok, value}
+
+        for opts <- [[validate: false], [unknown: true], :ignored, nil, %{}] do
+          assert Util.validate_actions(value, opts) == :ok
+          assert Util.validate_name("Valid_123", opts) == :ok
+        end
+      end
+
+      assert Util.validate_name("Valid_123", []) == {:ok, "Valid_123"}
+    end
+
+    test "preserves complete validation errors across option forms" do
+      for opts <- [[], [validate: true], :ignored] do
+        for name <- ["", "1invalid", "invalid-name"] do
+          assert_validation_error(
+            Util.validate_name(name, opts),
+            {:error,
+             Jido.Error.validation_error(
+               "The name must start with a letter and contain only letters, numbers, and underscores.",
+               field: :name
+             )}
+          )
+        end
+
+        for name <- [nil, :name, 42, [], %{}] do
+          assert_validation_error(
+            Util.validate_name(name, opts),
+            {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
+          )
+        end
+
+        for actions <- [Enum, NonExistentModule, [TestActions.BasicAction, Enum]] do
+          assert_validation_error(
+            Util.validate_actions(actions, opts),
+            {:error,
+             Jido.Error.validation_error(
+               "All actions must implement the Jido.Action behavior",
+               kind: :action,
+               subject: actions
+             )}
+          )
+        end
+      end
+    end
+
+    test "keeps unsupported action inputs as function clause errors" do
+      for opts <- [[], [validate: true], :ignored], input <- [42, "action", %{}, [42]] do
+        assert_raise FunctionClauseError, fn -> Util.validate_actions(input, opts) end
+      end
+    end
+  end
+
   describe "validate_module/1" do
     test "validates existing module" do
       assert {:ok, Enum} = Util.validate_module(Enum)
@@ -137,6 +192,32 @@ defmodule JidoTest.UtilTest do
       assert {:ok, ^pid} = Util.whereis(pid)
     end
 
+    test "returns a dead pid and ignores options" do
+      {pid, ref} = spawn_monitor(fn -> :ok end)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
+      assert Util.whereis(pid, :ignored) == {:ok, pid}
+    end
+
+    test "tuple registry takes precedence and atom keys become strings", %{jido: jido} do
+      registry = Jido.registry_name(jido)
+      pid = self()
+      {:ok, _} = Registry.register(registry, "util_contract", :value)
+
+      for name <- [:util_contract, "util_contract"] do
+        assert Util.whereis({name, registry}, registry: MissingRegistry) == {:ok, pid}
+        assert Util.whereis({name, registry}, :ignored) == {:ok, pid}
+        assert Util.whereis(name, registry: registry) == {:ok, pid}
+      end
+    end
+
+    test "preserves the exact error for absent or false registry options" do
+      for opts <- [[], [registry: nil], [registry: false]] do
+        assert_raise ArgumentError, ":registry option is required", fn ->
+          Util.whereis(:util_contract, opts)
+        end
+      end
+    end
+
     test "returns not_found for unregistered names", %{jido: jido} do
       registry = Jido.registry_name(jido)
 
@@ -167,5 +248,9 @@ defmodule JidoTest.UtilTest do
       assert :ok = Util.cond_log(:info, :invalid, "invalid level")
       assert :ok = Util.cond_log(:debug, :info, "with opts", domain: [:test])
     end
+  end
+
+  defp assert_validation_error({:error, actual}, {:error, expected}) do
+    assert Map.delete(actual, :stacktrace) == Map.delete(expected, :stacktrace)
   end
 end
