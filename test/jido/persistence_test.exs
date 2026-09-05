@@ -80,9 +80,16 @@ defmodule JidoTest.PersistenceTest do
 
     for reply <- [{:ok, :invalid}, {:ok, %URI{}}, {:error, :checkpoint_failed}] do
       agent = CheckpointAgent.new!(id: unique_id("callback"), state: %{reply: reply})
-      expected = Agent.checkpoint(agent)
-      assert {:error, _} = expected
-      assert ^expected = Persistence.save_agent(persistence, agent)
+
+      case reply do
+        {:ok, invalid} ->
+          assert {:error, %Jido.Error.ValidationError{details: %{checkpoint: ^invalid}}} =
+                   Persistence.save_agent(persistence, agent)
+
+        {:error, reason} ->
+          assert {:error, ^reason} = Persistence.save_agent(persistence, agent)
+      end
+
       assert {:error, :not_found} = Persistence.load_agent(persistence, CheckpointAgent, agent.id)
     end
 
