@@ -108,6 +108,14 @@ defmodule JidoTest.Plugin.SchedulerOccurrenceTest do
     assert :ok = Scheduler.validate_cron_state(%{plain: spec}, [])
   end
 
+  test "delayed schedule construction keeps invalid values for later validation" do
+    signal = tick()
+    assert Scheduler.schedule(10, signal) == %Scheduler.Schedule{delay_ms: 10, signal: signal}
+    invalid = Scheduler.schedule(-1, :not_a_signal)
+    assert invalid == %Scheduler.Schedule{delay_ms: -1, signal: :not_a_signal}
+    assert {:error, _} = Scheduler.validate_directive(invalid, [])
+  end
+
   test "timezone defaults are shared by validation and stored definitions" do
     for timezone <- [nil, "", "Etc/UTC"] do
       assert {:ok, directive} =

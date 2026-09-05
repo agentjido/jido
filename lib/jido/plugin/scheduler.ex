@@ -85,8 +85,6 @@ defmodule Jido.Plugin.Scheduler do
 
   @doc "Creates one delayed Signal Directive."
   @spec schedule(non_neg_integer(), Signal.t()) :: Schedule.t()
-  def schedule(delay_ms, %Signal{} = signal), do: %Schedule{delay_ms: delay_ms, signal: signal}
-
   def schedule(delay_ms, signal), do: %Schedule{delay_ms: delay_ms, signal: signal}
 
   @doc "Creates one recurring Signal Directive."
