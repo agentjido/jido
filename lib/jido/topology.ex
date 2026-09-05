@@ -9,7 +9,7 @@ defmodule Jido.Topology do
   """
 
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Instance, Validation}
+  alias Jido.Topology.{Composition, Instance, Plan, Validation}
 
   @schema Zoi.struct(
             __MODULE__,
@@ -58,13 +58,15 @@ defmodule Jido.Topology do
 
   @doc "Validates static authoring data."
   @spec new(map() | keyword() | t()) :: {:ok, t()} | {:error, Exception.t()}
-  def new(%__MODULE__{} = definition), do: definition |> Map.from_struct() |> new()
-
   def new(attrs) do
+    with {:ok, definition, _composed} <- new_with_composition(attrs), do: {:ok, definition}
+  end
+
+  defp new_with_composition(attrs) do
     with {:ok, attrs} <- Validation.definition(attrs),
-         :ok <- Jido.Topology.Composition.validate(attrs),
+         {:ok, composed} <- Composition.flatten(attrs),
          {:ok, definition} <- Zoi.parse(@schema, attrs),
-         do: {:ok, definition}
+         do: {:ok, definition, composed}
   end
 
   @doc "Validates a definition or raises its error."
@@ -73,12 +75,12 @@ defmodule Jido.Topology do
   @doc "Validates instance input and builds a stable local execution plan."
   @spec instantiate(t(), map() | keyword()) :: {:ok, Instance.t()} | {:error, Exception.t()}
   def instantiate(definition, opts) do
-    with {:ok, definition} <- new(definition),
+    with {:ok, definition, composed} <- new_with_composition(definition),
          {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, [:id, :input]),
          {:ok, id} <- Validation.key(Map.get(opts, :id)),
          {:ok, input} <- Validation.parse_input(definition.schema, Map.get(opts, :input, %{})),
-         {:ok, plan} <- Jido.Topology.Plan.build(definition, id, input) do
+         {:ok, plan} <- Plan.build_composed(definition, id, input, composed) do
       {:ok, %Instance{id: id, definition: definition, input: input, plan: plan}}
     end
   end

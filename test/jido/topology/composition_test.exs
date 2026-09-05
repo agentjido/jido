@@ -31,6 +31,40 @@ defmodule Jido.Topology.CompositionTest do
     assert instance.definition.startup.concurrency == 4
   end
 
+  test "direct Plan construction equals instance planning with normalized input" do
+    for input <- [%{east_workers: 0, west_workers: 2}, %{east_workers: 3, west_workers: 1}] do
+      instance = ComposedSystem.new!(id: "direct/plan", input: input)
+      assert {:ok, plan} = Plan.build(instance.definition, instance.id, instance.input)
+      assert plan == instance.plan
+    end
+  end
+
+  test "instance validation keeps graph, options, input, and root import error order" do
+    definition = WorkerTeam.topology()
+    invalid = %{definition | exports: [%{key: "missing", kind: :agent, from: "missing"}]}
+    assert {:error, graph_error} = Topology.new(invalid)
+    assert {:error, ^graph_error} = Topology.instantiate(invalid, unexpected: true)
+
+    assert {:error, opts_error} = Topology.instantiate(definition, unexpected: true)
+    assert Exception.message(opts_error) =~ "Unknown"
+    assert {:error, input_error} = Topology.instantiate(definition, id: "root", input: %{worker_count: -1})
+    assert Exception.message(input_error) =~ "input"
+
+    assert {:error, root_error} = Topology.instantiate(definition, id: "root")
+    assert Exception.message(root_error) =~ "unbound imports"
+    assert {:error, ^root_error} = Plan.build(invalid, "root", %{})
+  end
+
+  test "direct Plan construction still checks the declaration graph" do
+    definition = Builder.new(name: "cycle") |> Builder.group(:workers, Cell, count: 0) |> Builder.build!()
+    [group] = definition.groups
+    invalid = %{definition | groups: [%{group | depends_on: ["workers"]}]}
+
+    assert {:error, error} = Plan.build(invalid, "cycle", %{})
+    assert Exception.message(error) =~ "cycle"
+    assert {:error, ^error} = Topology.instantiate(invalid, id: "cycle")
+  end
+
   test "inputs and identities are isolated while Bus bindings share one owner" do
     instance = ComposedSystem.new!(id: "system", input: %{east_workers: 1, west_workers: 2})
     east = instance.plan.agents["component/east/group/workers/1"]

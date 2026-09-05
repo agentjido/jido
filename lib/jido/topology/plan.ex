@@ -22,7 +22,17 @@ defmodule Jido.Topology.Plan do
   def build(definition, id, input) do
     with :ok <- root_imports(definition),
          {:ok, composed} <- Composition.flatten(definition),
-         {:ok, inputs} <- Composition.inputs(definition, input),
+         do: expand_plan(definition, id, input, composed)
+  end
+
+  # The caller must supply the composition from this definition's validation.
+  @doc false
+  def build_composed(definition, id, input, composed) do
+    with :ok <- root_imports(definition), do: expand_plan(definition, id, input, composed)
+  end
+
+  defp expand_plan(definition, id, input, composed) do
+    with {:ok, inputs} <- Composition.inputs(definition, input),
          {:ok, expanded} <- expand(composed.nodes, inputs, definition.startup.max_agents),
          {:ok, agents} <-
            Authoring.traverse(expanded, &agent(&1, id, Map.fetch!(inputs, &1.scope))),
