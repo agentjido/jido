@@ -43,6 +43,21 @@ defmodule Jido.AgentServerRuntimeTest do
       ]
   end
 
+  defmodule ObservedExec do
+    def run_async(executable, input, context, opts) do
+      test = Map.get(input, :test) || get_in(input, [:signal, Access.key(:data), :test])
+      Process.put(__MODULE__, test)
+      Jido.Exec.run_async(executable, input, context, opts)
+    end
+
+    def handle_message(handle, message) do
+      send(Process.get(__MODULE__), {:exec_message, message})
+      Jido.Exec.handle_message(handle, message)
+    end
+
+    defdelegate cancel(handle), to: Jido.Exec
+  end
+
   defmodule CountedDirective do
     defstruct [:test]
   end
@@ -361,6 +376,40 @@ defmodule Jido.AgentServerRuntimeTest do
     end
   end
 
+  test "Exec receives general messages and unowned DOWN events after attachment handling", %{
+    jido: jido
+  } do
+    {:ok, server} = Jido.start_agent(jido, OwnedExecutionAgent, exec_module: ObservedExec)
+    owner = start_supervised!({Elixir.Agent, fn -> nil end})
+    assert :ok = Server.attach(server, owner)
+    gate = make_ref()
+    test = self()
+
+    caller =
+      Task.async(fn ->
+        Server.call(server, signal("owned.action", %{test: test, gate: gate, label: :routing}))
+      end)
+
+    assert_receive {:owned_execution, :routing, worker}, 2_000
+    {:running, state} = :sys.get_state(server)
+    owner_ref = Map.fetch!(state.attachments, owner)
+    Elixir.Agent.stop(owner)
+    eventually(fn -> Server.status(server).runtime.lifecycle.attached == 0 end)
+    refute_received {:exec_message, {:DOWN, ^owner_ref, :process, ^owner, _}}
+
+    unknown = make_ref()
+    down = {:DOWN, unknown, :process, owner, :normal}
+    send(server, down)
+    send(server, {:exec_probe, gate})
+    assert Server.status(server).phase == :running
+    assert_receive {:exec_message, ^down}
+    assert_receive {:exec_message, {:exec_probe, ^gate}}
+    send(worker, {:release, gate})
+    assert {:ok, _} = Task.await(caller)
+    eventually(fn -> Server.status(server).phase == :idle end)
+    assert Server.status(server).state_version == 1
+  end
+
   test "Agent death stops its linked Exec and Action work", %{jido: jido} do
     id = unique_id("owned-exec-stop")
     {:ok, agent} = Jido.start_agent(jido, OwnedExecutionAgent, id: id)
@@ -582,6 +631,59 @@ defmodule Jido.AgentServerRuntimeTest do
 
     send(worker, {:release, gate})
     eventually(fn -> Server.status(pid).phase == :idle end)
+  end
+
+  test "Directive task exit retains the commit and ignores stale timeouts", %{jido: jido} do
+    test = self()
+
+    policy = fn error, outcome ->
+      send(test, {:dispatch_failed, error, outcome})
+      :continue
+    end
+
+    {:ok, pid} =
+      Jido.start_agent(jido, SlowDirectiveAgent, directive_timeout: 10_000, error_policy: policy)
+
+    gate = make_ref()
+
+    assert {:ok, committed} =
+             Server.call(pid, signal("directive.slow", %{test: test, gate: gate}))
+
+    assert_receive {:plugin_directive_blocked, ^gate, worker}
+    monitor = Process.monitor(worker)
+    {:directing, state} = :sys.get_state(pid)
+    %{task: task, timer: timer} = state.directive_task
+    send(pid, {:timeout, make_ref(), {:directive_timeout, task.ref}})
+    send(pid, {:timeout, timer, {:directive_timeout, make_ref()}})
+    assert Server.status(pid).phase == :directing
+    Process.exit(worker, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}
+
+    assert_receive {:dispatch_failed, %Jido.Error.ExecutionError{},
+                    %Outcome{
+                      status: :failed,
+                      stage: :directive,
+                      committed?: true,
+                      directives: %{failed: 1, failed_index: 0}
+                    }}
+
+    eventually(fn -> Server.status(pid).phase == :idle end)
+    assert Server.snapshot(pid) == %{agent: committed, state_version: 1}
+    assert Process.read_timer(timer) == false
+
+    next_gate = make_ref()
+    assert {:ok, _} = Server.call(pid, signal("directive.slow", %{test: test, gate: next_gate}))
+    assert_receive {:plugin_directive_blocked, ^next_gate, next_worker}
+    {:directing, next_state} = :sys.get_state(pid)
+    send(pid, {task.ref, {:error, :stale}})
+    send(pid, {:timeout, timer, {:directive_timeout, task.ref}})
+    assert Server.status(pid).phase == :directing
+    send(next_worker, {:release, next_gate})
+    eventually(fn -> Server.status(pid).phase == :idle end)
+    assert Process.read_timer(next_state.directive_task.timer) == false
+    {:monitors, monitors} = Process.info(pid, :monitors)
+    refute {:process, next_worker} in monitors
+    assert Server.status(pid).state_version == 2
   end
 
   test "times out owned Plugin Directive work and records exact progress", %{jido: jido} do

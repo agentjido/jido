@@ -843,8 +843,7 @@ defmodule Jido.AgentServer do
         :admitting,
         %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
       ) do
-    Process.demonitor(ref, [:flush])
-    cancel_task_timer(pending.timer)
+    release_task_result(pending)
     data = %{data | admission_task: nil}
 
     case result do
@@ -877,7 +876,7 @@ defmodule Jido.AgentServer do
         :admitting,
         %State{admission_task: %{task: %Task{ref: task_ref} = task, timer: timer}} = data
       ) do
-    _result = Task.shutdown(task, :brutal_kill)
+    shutdown_task(task)
     data = %{data | admission_task: nil}
 
     error =
@@ -895,8 +894,7 @@ defmodule Jido.AgentServer do
         :directing,
         %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
       ) do
-    Process.demonitor(ref, [:flush])
-    cancel_directive_timer(pending.timer)
+    release_task_result(pending)
     data = %{data | directive_task: nil}
 
     directive_result =
@@ -915,7 +913,7 @@ defmodule Jido.AgentServer do
         :directing,
         %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
       ) do
-    cancel_directive_timer(pending.timer)
+    cancel_task_timer(pending.timer)
     data = %{data | directive_task: nil}
 
     error =
@@ -934,7 +932,7 @@ defmodule Jido.AgentServer do
           directive_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending
         } = data
       ) do
-    _result = Task.shutdown(task, :brutal_kill)
+    shutdown_task(task)
     data = %{data | directive_task: nil}
 
     error =
@@ -963,12 +961,8 @@ defmodule Jido.AgentServer do
     :keep_state_and_data
   end
 
-  def handle_event(:info, message, :running, %State{active: %ActiveTurn{} = active} = data) do
-    case data.exec_module.handle_message(active.exec_handle, message) do
-      {:done, result} -> finish_turn(result, data)
-      :ignore -> :keep_state_and_data
-      {:error, error} -> fail_turn(error, :execute, data)
-    end
+  def handle_event(:info, message, :running, %State{active: %ActiveTurn{}} = data) do
+    handle_exec_message(message, data)
   end
 
   def handle_event(:info, _message, phase, %State{})
@@ -1016,8 +1010,8 @@ defmodule Jido.AgentServer do
     end
 
     stop_plugin_readiness(data.plugin_bootstrap)
-    stop_admission_task(data.admission_task)
-    stop_directive_task(data.directive_task)
+    stop_task(data.admission_task)
+    stop_task(data.directive_task)
 
     if data.directive_task do
       finish_span_error(data.directive_task.span, {:agent_stopped, reason})
@@ -1093,21 +1087,22 @@ defmodule Jido.AgentServer do
 
   defp stop_plugin_readiness(nil), do: :ok
 
-  defp stop_admission_task(%{task: %Task{} = task} = pending) do
+  defp release_task_result(%{task: %Task{ref: ref}, timer: timer}) do
+    Process.demonitor(ref, [:flush])
+    cancel_task_timer(timer)
+  end
+
+  defp stop_task(%{task: %Task{} = task} = pending) do
     cancel_task_timer(Map.get(pending, :timer))
+    shutdown_task(task)
+  end
+
+  defp stop_task(nil), do: :ok
+
+  defp shutdown_task(%Task{} = task) do
     _result = Task.shutdown(task, :brutal_kill)
     :ok
   end
-
-  defp stop_admission_task(nil), do: :ok
-
-  defp stop_directive_task(%{task: %Task{} = task} = pending) do
-    cancel_directive_timer(Map.get(pending, :timer))
-    _result = Task.shutdown(task, :brutal_kill)
-    :ok
-  end
-
-  defp stop_directive_task(nil), do: :ok
 
   defp initial_command(%Signal{} = signal, context, %State{} = data) do
     context = Map.merge(context, %{jido: data.jido, partition: data.partition})
@@ -1350,7 +1345,7 @@ defmodule Jido.AgentServer do
   end
 
   defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    stop_admission_task(data.admission_task)
+    stop_task(data.admission_task)
     finish_span_error(active.span, :cancelled)
     TraceContext.clear()
     outcome = turn_outcome(data, :cancelled, :prepare, :cancelled)
@@ -1560,8 +1555,6 @@ defmodule Jido.AgentServer do
   defp start_task_timer(timeout, tag, task_ref) do
     :erlang.start_timer(timeout, self(), {tag, task_ref})
   end
-
-  defp cancel_directive_timer(timer), do: cancel_task_timer(timer)
 
   defp cancel_task_timer(nil), do: :ok
 

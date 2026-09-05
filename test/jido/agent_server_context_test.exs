@@ -9,6 +9,14 @@ defmodule Jido.AgentServerContextTest do
 
     @impl true
     def admit(_runtime, command, _opts) do
+      if gate = Map.get(command.context, :gate) do
+        send(command.context.observer, {:admission_blocked, gate, self()})
+
+        receive do
+          {:release, ^gate} -> :ok
+        end
+      end
+
       send(command.context.observer, {:context_admitted, command.context, command.signal})
       {:ok, %{command | context: Map.put(command.context, :admitted, true)}}
     end
@@ -53,6 +61,117 @@ defmodule Jido.AgentServerContextTest do
       schema: Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)}),
       routes: [{"context.input", Emit}],
       plugins: [ContextPlugin]
+  end
+
+  for failure <- [:exit, :timeout] do
+    @failure failure
+    test "admission #{@failure} preserves state and releases the worker", %{jido: jido} do
+      test = self()
+
+      policy = fn error, outcome ->
+        send(test, {:admission_failed, error, outcome})
+        :continue
+      end
+
+      {:ok, server} =
+        Jido.start_agent(jido, Agent, directive_timeout: 10_000, error_policy: policy)
+
+      before = Server.snapshot(server)
+      gate = make_ref()
+
+      caller =
+        Task.async(fn ->
+          Server.call(server, signal("context.input", %{value: 7}),
+            context: %{observer: test, gate: gate}
+          )
+        end)
+
+      assert_receive {:admission_blocked, ^gate, worker}, 2_000
+      monitor = Process.monitor(worker)
+      {:admitting, state} = :sys.get_state(server)
+      %{task: task, timer: timer} = state.admission_task
+
+      send(server, {:timeout, make_ref(), {:admission_timeout, task.ref}})
+      send(server, {:timeout, timer, {:admission_timeout, make_ref()}})
+      assert Server.status(server).phase == :admitting
+
+      if @failure == :exit do
+        Process.exit(worker, :kill)
+      else
+        send(server, {:timeout, timer, {:admission_timeout, task.ref}})
+      end
+
+      assert {:error, error} = Task.await(caller)
+      assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 2_000
+      assert_receive {:admission_failed, ^error, outcome}, 2_000
+      assert outcome.stage == :prepare
+      assert outcome.status == if(@failure == :exit, do: :failed, else: :timed_out)
+      refute outcome.committed?
+      assert Server.snapshot(server) == before
+      assert Server.status(server).phase == :idle
+      refute_received {:context_executed, _}
+
+      send(server, {task.ref, {:error, :stale}})
+      send(server, {:timeout, timer, {:admission_timeout, task.ref}})
+      assert Server.status(server).phase == :idle
+
+      assert {:ok, committed} =
+               Server.call(server, signal("context.input", %{value: 8}),
+                 context: %{observer: test}
+               )
+
+      assert committed.state == %{value: 8, context_plugin: 1}
+    end
+  end
+
+  test "admission cancellation stops its worker before the reply", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Agent, directive_timeout: 10_000)
+    before = Server.snapshot(server)
+    test = self()
+    gate = make_ref()
+
+    caller =
+      Task.async(fn ->
+        Server.call(server, signal("context.input", %{value: 7}),
+          context: %{observer: test, gate: gate}
+        )
+      end)
+
+    assert_receive {:admission_blocked, ^gate, worker}, 2_000
+    monitor = Process.monitor(worker)
+    {:admitting, state} = :sys.get_state(server)
+    assert :ok = Server.cancel(server)
+    refute Process.alive?(worker)
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 2_000
+    assert {:error, :cancelled} = Task.await(caller)
+    assert Process.read_timer(state.admission_task.timer) == false
+    assert Server.snapshot(server) == before
+    assert Server.status(server).phase == :idle
+  end
+
+  test "admission result releases its monitor and timer", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Agent, directive_timeout: 10_000)
+    test = self()
+    gate = make_ref()
+
+    caller =
+      Task.async(fn ->
+        Server.call(server, signal("context.input", %{value: 7}),
+          context: %{observer: test, gate: gate}
+        )
+      end)
+
+    assert_receive {:admission_blocked, ^gate, worker}, 2_000
+    {:admitting, state} = :sys.get_state(server)
+    %{task: task, timer: timer} = state.admission_task
+    send(worker, {:release, gate})
+    assert {:ok, _} = Task.await(caller)
+    eventually(fn -> Server.status(server).phase == :idle end)
+    assert Process.read_timer(timer) == false
+    {:monitors, monitors} = Process.info(server, :monitors)
+    refute {:process, worker} in monitors
+    send(server, {task.ref, {:error, :stale}})
+    assert Server.status(server).state_version == 1
   end
 
   test "context crosses Plugin admission and execution but is not copied to state or Signals", %{
