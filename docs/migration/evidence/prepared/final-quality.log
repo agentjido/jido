@@ -1,0 +1,30 @@
+Compiling 78 files (.ex)
+Checking 372 source files (this might take a while) ...
+
+Please report incorrect results: https://github.com/rrrene/credo/issues
+
+Analysis took 0.1 seconds (0.1s to load, 0.00s running 0 checks on 372 files)
+4259 mods/funs, found no issues.
+
+Showing priority issues: ↑ ↗ →  (use `mix credo explain` to explain issues, `mix credo --help` for options).
+Finding suitable PLTs
+Checking PLT...
+[:abnf_parsec, :asn1, :bunt, :compiler, :credo, :crontab, :crypto, :decimal, :dotenvy, :eex, :elixir, :ex_unit, :excoveralls, :file_system, :finch, :flow, :gen_stage, :hpax, :idna, :inets, :jason, :jido, :jido_action, :jido_signal, :jsv, :kernel, :llm_db, :logger, :mime, :mint, :mix, :mnesia, :multigraph, :nimble_options, :nimble_parsec, :nimble_pool, :public_key, :req, :req_llm, :runic, :sched_ex, :server_sent_events, :spark, :splode, :ssl, :stdlib, :telemetry, :telemetry_metrics, :texture, :toml, :tools, :uniq, :websockex, :xmerl, :zoi]
+PLT is up to date!
+No :ignore_warnings opt specified in mix.exs and default does not exist.
+
+Starting Dialyzer
+[
+  check_plt: false,
+  init_plt: ~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/dialyxir_erlang-29.0.5_elixir-1.20.3_deps-dev.plt",
+  files: [~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.OrderedBatch.Collected.beam",
+   ~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.Factory.Workshop.Command.beam",
+   ~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Action.Generated.Inline.Aef2e6ea980bf2364de25d98416cd47b75ffea9d19a347f1d2d3a805aa628e661.beam",
+   ~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.NestedFlow.Write.beam",
+   ~c"/Users/mhostetler/.codex/worktrees/0d9b/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.TurnObservation.Deliver.beam",
+   ...],
+  ...
+]
+Total errors: 0, Skipped: 0, Unnecessary Skips: 0
+done in 0m5.92s
+done (passed successfully)

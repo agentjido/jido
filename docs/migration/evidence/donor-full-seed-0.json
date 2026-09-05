@@ -1,0 +1,21 @@
+{
+  "source_commit": "ba00fcf1f76563c9a94a01c69c2f16190997fd28",
+  "source_status": "",
+  "command": [
+    "mix",
+    "test",
+    "--include",
+    "example",
+    "--include",
+    "integration",
+    "--include",
+    "flaky",
+    "--seed",
+    "0",
+    "--trace"
+  ],
+  "started_utc": "2026-09-05T13:47:02.770580+00:00",
+  "duration_seconds": 172.41,
+  "exit_code": 2,
+  "runtime": "Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit]\n\nElixir 1.20.3 (compiled with Erlang/OTP 29)\n"
+}

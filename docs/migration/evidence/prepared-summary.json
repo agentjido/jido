@@ -1,0 +1,319 @@
+{
+  "prepared_source_commit": "bf6c9fbec569cb6438b6a1629a2768058d439d1f",
+  "report_commit": "741058d128928d05bdee109f3c6a0425eb82db89",
+  "original_donor_commit": "ba00fcf1f76563c9a94a01c69c2f16190997fd28",
+  "core_commit": "a31b74306d4498ee47732c18b993abd4c26542bd",
+  "core_lib_test_files": 278,
+  "donor_lib_test_files": 418,
+  "inventory_rows": 632,
+  "source_hashes": 667,
+  "catalog_fixtures": 52,
+  "integration_scenarios": 10,
+  "research_items": 8,
+  "test_runs": {
+    "final-full-seed-0": {
+      "revision": "08117d155d8ef2cfd096d6497dd3c5b22bc79df9",
+      "exit_code": 2,
+      "duration_seconds": 156.66,
+      "command": [
+        "mix",
+        "test",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--seed",
+        "0",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 1005,
+          "failed": 1
+        }
+      ],
+      "failures": [
+        {
+          "file": "test/jido/agent/distributed_authority_test.exs",
+          "name": "test one logical identity has at most one live cluster owner",
+          "line": 32
+        }
+      ]
+    },
+    "final-coverage": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 2,
+      "duration_seconds": 169.619,
+      "command": [
+        "mix",
+        "test",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--cover",
+        "--seed",
+        "0",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 1005,
+          "failed": 1
+        }
+      ],
+      "failures": [
+        {
+          "file": "test/jido/agent/distributed_authority_test.exs",
+          "name": "test one logical identity has at most one live cluster owner",
+          "line": 32
+        }
+      ]
+    },
+    "final-serial": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 2,
+      "duration_seconds": 179.423,
+      "command": [
+        "mix",
+        "test",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--seed",
+        "0",
+        "--trace",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 1005,
+          "failed": 1
+        }
+      ],
+      "failures": [
+        {
+          "file": "test/jido/agent/distributed_authority_test.exs",
+          "name": "test one logical identity has at most one live cluster owner",
+          "line": 32
+        }
+      ]
+    },
+    "final-regression-repeat": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 0,
+      "duration_seconds": 70.494,
+      "command": [
+        "mix",
+        "test",
+        "test/jido/agent/remote_api_test.exs",
+        "test/jido/agent/scheduled_occurrence_test.exs",
+        "test/jido/agent/scheduled_occurrence_recovery_test.exs",
+        "test/jido/instance_test.exs",
+        "test/integration/fixed_group/fixed_group_test.exs",
+        "test/integration/elastic_group/elastic_group_test.exs",
+        "test/jido/agent/startup_test.exs",
+        "test/jido/agent/stateless_directive_test.exs",
+        "test/jido/persistence/checkpoint_identity_test.exs",
+        "test/jido/persistence/checkpoint_portability_test.exs",
+        "test/jido/persistence/indeterminate_write_test.exs",
+        "test/jido/agent/naming_contract_test.exs",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--seed",
+        "0",
+        "--repeat-until-failure",
+        "4",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 42
+        },
+        {
+          "passed": 42
+        },
+        {
+          "passed": 42
+        },
+        {
+          "passed": 42
+        },
+        {
+          "passed": 42
+        }
+      ],
+      "failures": []
+    },
+    "final-quality": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 0,
+      "duration_seconds": 9.359,
+      "command": [
+        "mix",
+        "quality"
+      ]
+    },
+    "final-docs": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 0,
+      "duration_seconds": 1.341,
+      "command": [
+        "mix",
+        "docs",
+        "--no-open"
+      ]
+    },
+    "final-package": {
+      "revision": "7e18634af891286189cd77b27184f223acaf147f",
+      "exit_code": 0,
+      "duration_seconds": 0.496,
+      "command": [
+        "mix",
+        "hex.build"
+      ]
+    },
+    "scoped-final-full-seed-0": {
+      "revision": "bf6c9fbec569cb6438b6a1629a2768058d439d1f",
+      "exit_code": 0,
+      "duration_seconds": 152.918,
+      "command": [
+        "mix",
+        "test",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--seed",
+        "0",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 1005,
+          "excluded": 1
+        }
+      ],
+      "failures": [],
+      "skips": [
+        {
+          "file": "test/jido/agent/distributed_authority_test.exs",
+          "name": "test one logical identity has at most one live cluster owner",
+          "capability": "DIST-03",
+          "reason": "User deferred cluster-exclusive ownership during migration plan review on 2026-09-05. The assertion is retained; this skip does not establish ownership support."
+        }
+      ]
+    },
+    "scoped-full-seed-0": {
+      "revision": "17f3d85c7a424ae9aa681e77290feb4b32b02a59",
+      "exit_code": 2,
+      "duration_seconds": 151.434,
+      "command": [
+        "mix",
+        "test",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--include",
+        "flaky",
+        "--seed",
+        "0",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "passed": 1004,
+          "failed": 1,
+          "excluded": 1
+        }
+      ]
+    },
+    "scoped-workshop-repeat": {
+      "revision": "bf6c9fbec569cb6438b6a1629a2768058d439d1f",
+      "exit_code": 0,
+      "duration_seconds": 34.043,
+      "command": [
+        "mix",
+        "test",
+        "test/examples/06_factory/06_02_three_agent_system/workshop_test.exs:105",
+        "--include",
+        "example",
+        "--include",
+        "integration",
+        "--seed",
+        "0",
+        "--repeat-until-failure",
+        "4",
+        "--formatter",
+        "ExUnit.CLIFormatter",
+        "--formatter",
+        "JidoTest.MigrationFormatter"
+      ],
+      "counts": [
+        {
+          "excluded": 8,
+          "passed": 1
+        },
+        {
+          "excluded": 8,
+          "passed": 1
+        },
+        {
+          "excluded": 8,
+          "passed": 1
+        },
+        {
+          "excluded": 8,
+          "passed": 1
+        },
+        {
+          "excluded": 8,
+          "passed": 1
+        }
+      ]
+    }
+  },
+  "coverage_percent": 83.0,
+  "coverage_threshold_percent": 80,
+  "limitation": "DIST-03 is skipped by user request. Cluster-exclusive ownership remains unimplemented. Previous Credo run had zero checks. Core transfer and beta QA have not run.",
+  "allowed_skips": [
+    {
+      "file": "test/jido/agent/distributed_authority_test.exs",
+      "name": "test one logical identity has at most one live cluster owner",
+      "capability": "DIST-03",
+      "reason": "User deferred cluster-exclusive ownership during migration plan review on 2026-09-05. The assertion is retained; this skip does not establish ownership support."
+    }
+  ]
+}

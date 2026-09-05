@@ -1,0 +1,15 @@
+{
+  "command": [
+    "mix",
+    "hex.build"
+  ],
+  "revision": "7e18634af891286189cd77b27184f223acaf147f",
+  "branch": "prep/agent-migration",
+  "status_before": "?? docs/migration-preparation/concurrency-probe.exs\n?? docs/migration-preparation/evidence/\n?? docs/migration-preparation/prepared-source.json",
+  "runtime": "Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit]\n\nElixir 1.20.3 (compiled with Erlang/OTP 29)",
+  "cwd": "/Users/mhostetler/.codex/worktrees/0d9b/jido_v3",
+  "started_utc": "2026-09-05T15:44:53.566055+00:00",
+  "log": "final-package.log",
+  "exit_code": 0,
+  "duration_seconds": 0.496
+}

@@ -1,0 +1,1664 @@
+{
+  "source_commit": "ba00fcf1f76563c9a94a01c69c2f16190997fd28",
+  "core_base_commit": "a31b74306d4498ee47732c18b993abd4c26542bd",
+  "mapping_note": "Paths are proposed; no code was transferred. Module/API mapping is in 01-contracts.md. Full source hashes are in sources.json.",
+  "baseline": "evidence/donor-full-seed-0.json",
+  "catalog": [
+    {
+      "id": "01_01_minimal_actor",
+      "core_id": "01_01_minimal_agent",
+      "group": "01_basic",
+      "commit": "M02",
+      "source_directory": "lib/examples/01_basic/01_01_minimal_actor",
+      "target_directory": "lib/examples/01_basic/01_01_minimal_agent",
+      "source_files": [
+        "lib/examples/01_basic/01_01_minimal_actor/minimal_actor.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/01_basic/01_01_minimal_actor.md",
+      "target_profile": "docs/examples/profiles/01_basic/01_01_minimal_agent.md",
+      "acceptance_obligation": "Direct/live agreement and instance isolation.",
+      "donor_tests": [
+        "test/examples/01_basic/01_01_minimal_actor/minimal_actor_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "01_02_typed_command_actor",
+      "core_id": "01_02_typed_command_agent",
+      "group": "01_basic",
+      "commit": "M02",
+      "source_directory": "lib/examples/01_basic/01_02_typed_command_actor",
+      "target_directory": "lib/examples/01_basic/01_02_typed_command_agent",
+      "source_files": [
+        "lib/examples/01_basic/01_02_typed_command_actor/typed_command_actor.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/01_basic/01_02_typed_command_actor.md",
+      "target_profile": "docs/examples/profiles/01_basic/01_02_typed_command_agent.md",
+      "acceptance_obligation": "Construction, route selection, input validation, and complete candidate validation.",
+      "donor_tests": [
+        "test/examples/01_basic/01_02_typed_command_actor/typed_command_actor_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "01_03_plugin_state_actor",
+      "core_id": "01_03_plugin_state_agent",
+      "group": "01_basic",
+      "commit": "M02",
+      "source_directory": "lib/examples/01_basic/01_03_plugin_state_actor",
+      "target_directory": "lib/examples/01_basic/01_03_plugin_state_agent",
+      "source_files": [
+        "lib/examples/01_basic/01_03_plugin_state_actor/plugin_state_actor.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/01_basic/01_03_plugin_state_actor.md",
+      "target_profile": "docs/examples/profiles/01_basic/01_03_plugin_state_agent.md",
+      "acceptance_obligation": "Plugin state ownership and atomic domain/Plugin commit.",
+      "donor_tests": [
+        "test/examples/01_basic/01_03_plugin_state_actor/plugin_state_actor_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "01_04_directive_actor",
+      "core_id": "01_04_directive_agent",
+      "group": "01_basic",
+      "commit": "M02",
+      "source_directory": "lib/examples/01_basic/01_04_directive_actor",
+      "target_directory": "lib/examples/01_basic/01_04_directive_agent",
+      "source_files": [
+        "lib/examples/01_basic/01_04_directive_actor/directive_actor.ex",
+        "lib/examples/01_basic/01_04_directive_actor/effects.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/01_basic/01_04_directive_actor.md",
+      "target_profile": "docs/examples/profiles/01_basic/01_04_directive_agent.md",
+      "acceptance_obligation": "Whole-batch validation and ordered post-commit dispatch.",
+      "donor_tests": [
+        "test/examples/01_basic/01_04_directive_actor/directive_actor_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "01_05_controlled_turn_actor",
+      "core_id": "01_05_controlled_turn_agent",
+      "group": "01_basic",
+      "commit": "M02",
+      "source_directory": "lib/examples/01_basic/01_05_controlled_turn_actor",
+      "target_directory": "lib/examples/01_basic/01_05_controlled_turn_agent",
+      "source_files": [
+        "lib/examples/01_basic/01_05_controlled_turn_actor/controlled_turn_actor.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/01_basic/01_05_controlled_turn_actor.md",
+      "target_profile": "docs/examples/profiles/01_basic/01_05_controlled_turn_agent.md",
+      "acceptance_obligation": "Turn serialization, cancellation, queued work, and caller timeout.",
+      "donor_tests": [
+        "test/examples/01_basic/01_05_controlled_turn_actor/controlled_turn_actor_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_01_sequential_flow",
+      "core_id": "02_01_sequential_flow",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_01_sequential_flow",
+      "target_directory": "lib/examples/02_workflow/02_01_sequential_flow",
+      "source_files": [
+        "lib/examples/02_workflow/02_01_sequential_flow/sequential_flow.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_01_sequential_flow.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_01_sequential_flow.md",
+      "acceptance_obligation": "Input and output schemas, result dependencies, control dependencies, and one complete commit.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_02_effectful_steps",
+      "core_id": "02_02_effectful_steps",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_02_effectful_steps",
+      "target_directory": "lib/examples/02_workflow/02_02_effectful_steps",
+      "source_files": [
+        "lib/examples/02_workflow/02_02_effectful_steps/effectful_steps.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_02_effectful_steps.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_02_effectful_steps.md",
+      "acceptance_obligation": "Transient caller context, effect guards, explicit output projection, idempotency, and persistence.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_03_conditional_routes",
+      "core_id": "02_03_conditional_routes",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_03_conditional_routes",
+      "target_directory": "lib/examples/02_workflow/02_03_conditional_routes",
+      "source_files": [
+        "lib/examples/02_workflow/02_03_conditional_routes/conditional_routes.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_03_conditional_routes.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_03_conditional_routes.md",
+      "acceptance_obligation": "First-match Choice, lazy branch work, explicit failure capture, and selected-Action errors.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_04_parallel_join",
+      "core_id": "02_04_parallel_join",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_04_parallel_join",
+      "target_directory": "lib/examples/02_workflow/02_04_parallel_join",
+      "source_files": [
+        "lib/examples/02_workflow/02_04_parallel_join/parallel_join.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_04_parallel_join.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_04_parallel_join.md",
+      "acceptance_obligation": "Concurrent independent steps, join dependencies, execution limits, failure, and cancellation.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs"
+      ],
+      "baseline_tests_executed": 5,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_05_ordered_batch",
+      "core_id": "02_05_ordered_batch",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_05_ordered_batch",
+      "target_directory": "lib/examples/02_workflow/02_05_ordered_batch",
+      "source_files": [
+        "lib/examples/02_workflow/02_05_ordered_batch/ordered_batch.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_05_ordered_batch.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_05_ordered_batch.md",
+      "acceptance_obligation": "Ordered Map results, collected errors, fail-fast commit behavior, empty input, and serial Reduce.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_06_bounded_iteration",
+      "core_id": "02_06_bounded_iteration",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_06_bounded_iteration",
+      "target_directory": "lib/examples/02_workflow/02_06_bounded_iteration",
+      "source_files": [
+        "lib/examples/02_workflow/02_06_bounded_iteration/bounded_iteration.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_06_bounded_iteration.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_06_bounded_iteration.md",
+      "acceptance_obligation": "Initial completion, exact loop bounds, and validation of initial and replacement state.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_07_nested_flow",
+      "core_id": "02_07_nested_flow",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_07_nested_flow",
+      "target_directory": "lib/examples/02_workflow/02_07_nested_flow",
+      "source_files": [
+        "lib/examples/02_workflow/02_07_nested_flow/nested_flow.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_07_nested_flow.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_07_nested_flow.md",
+      "acceptance_obligation": "Separate child result scopes, shared context, child schemas, typed failures, and shared timeout.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_08_executable_continuation",
+      "core_id": "02_08_executable_continuation",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_08_executable_continuation",
+      "target_directory": "lib/examples/02_workflow/02_08_executable_continuation",
+      "source_files": [
+        "lib/examples/02_workflow/02_08_executable_continuation/executable_continuation.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_08_executable_continuation.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_08_executable_continuation.md",
+      "acceptance_obligation": "Dispatch, shared context and continuation budget, terminal output validation, and timeout.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "02_09_approval_workflow",
+      "core_id": "02_09_approval_workflow",
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_directory": "lib/examples/02_workflow/02_09_approval_workflow",
+      "target_directory": "lib/examples/02_workflow/02_09_approval_workflow",
+      "source_files": [
+        "lib/examples/02_workflow/02_09_approval_workflow/approval_workflow.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/02_workflow/02_09_approval_workflow.md",
+      "target_profile": "docs/examples/profiles/02_workflow/02_09_approval_workflow.md",
+      "acceptance_obligation": "Separate approval Turns, post-commit Plugin dispatch, correlation, duplicates, and provider failure.",
+      "donor_tests": [
+        "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs"
+      ],
+      "baseline_tests_executed": 5,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_01_model_response",
+      "core_id": "03_01_model_response",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_01_model_response",
+      "target_directory": "lib/examples/03_llm/03_01_model_response",
+      "source_files": [
+        "lib/examples/03_llm/03_01_model_response/model_response.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_01_model_response.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_01_model_response.md",
+      "acceptance_obligation": "One typed response, transient client context, selected persisted fields, and explicit fallback policy.",
+      "donor_tests": [
+        "test/examples/03_llm/03_01_model_response/model_response_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_01_model_response/model_response_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_02_conversation_history",
+      "core_id": "03_02_conversation_history",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_02_conversation_history",
+      "target_directory": "lib/examples/03_llm/03_02_conversation_history",
+      "source_files": [
+        "lib/examples/03_llm/03_02_conversation_history/conversation_history.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_02_conversation_history.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_02_conversation_history.md",
+      "acceptance_obligation": "Actual history across Turns, duplicate rejection, and restore with a fresh client.",
+      "donor_tests": [
+        "test/examples/03_llm/03_02_conversation_history/conversation_history_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_02_conversation_history/conversation_history_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_03_tool_call",
+      "core_id": "03_03_tool_call",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_03_tool_call",
+      "target_directory": "lib/examples/03_llm/03_03_tool_call",
+      "source_files": [
+        "lib/examples/03_llm/03_03_tool_call/tool_call.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_03_tool_call.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_03_tool_call.md",
+      "acceptance_obligation": "An approved name resolves to a typed Action; invalid input stops before tool effects.",
+      "donor_tests": [
+        "test/examples/03_llm/03_03_tool_call/tool_call_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_03_tool_call/tool_call_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_04_tool_loop",
+      "core_id": "03_04_tool_loop",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_04_tool_loop",
+      "target_directory": "lib/examples/03_llm/03_04_tool_loop",
+      "source_files": [
+        "lib/examples/03_llm/03_04_tool_loop/react_agent.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_04_tool_loop.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_04_tool_loop.md",
+      "acceptance_obligation": "Flow Dispatch and continuation carry model/tool rounds to one terminal commit.",
+      "donor_tests": [
+        "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_04_tool_loop/react_agent_test.exs"
+      ],
+      "baseline_tests_executed": 11,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_05_parallel_tools",
+      "core_id": "03_05_parallel_tools",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_05_parallel_tools",
+      "target_directory": "lib/examples/03_llm/03_05_parallel_tools",
+      "source_files": [
+        "lib/examples/03_llm/03_05_parallel_tools/parallel_tools.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_05_parallel_tools.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_05_parallel_tools.md",
+      "acceptance_obligation": "Validate a complete tool plan, run concurrent Actions with Map, and retain call-ID order.",
+      "donor_tests": [
+        "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs"
+      ],
+      "baseline_tests_executed": 5,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_06_grounded_answer",
+      "core_id": "03_06_grounded_answer",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_06_grounded_answer",
+      "target_directory": "lib/examples/03_llm/03_06_grounded_answer",
+      "source_files": [
+        "lib/examples/03_llm/03_06_grounded_answer/grounded_answer.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_06_grounded_answer.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_06_grounded_answer.md",
+      "acceptance_obligation": "Retrieve evidence, generate an answer, and validate citation identity, revision, and page before commit.",
+      "donor_tests": [
+        "test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_07_output_repair",
+      "core_id": "03_07_output_repair",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_07_output_repair",
+      "target_directory": "lib/examples/03_llm/03_07_output_repair",
+      "source_files": [
+        "lib/examples/03_llm/03_07_output_repair/output_repair.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_07_output_repair.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_07_output_repair.md",
+      "acceptance_obligation": "Flow Iterate carries validation feedback through at most three model attempts.",
+      "donor_tests": [
+        "test/examples/03_llm/03_07_output_repair/output_repair_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_07_output_repair/output_repair_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_08_context_compaction",
+      "core_id": "03_08_context_compaction",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_08_context_compaction",
+      "target_directory": "lib/examples/03_llm/03_08_context_compaction",
+      "source_files": [
+        "lib/examples/03_llm/03_08_context_compaction/context_compaction.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_08_context_compaction.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_08_context_compaction.md",
+      "acceptance_obligation": "Compact committed history and retain recent and queued messages under an explicit byte limit.",
+      "donor_tests": [
+        "test/examples/03_llm/03_08_context_compaction/context_compaction_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_08_context_compaction/context_compaction_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_09_subagent_delegation",
+      "core_id": "03_09_subagent_delegation",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_09_subagent_delegation",
+      "target_directory": "lib/examples/03_llm/03_09_subagent_delegation",
+      "source_files": [
+        "lib/examples/03_llm/03_09_subagent_delegation/subagent_delegation.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_09_subagent_delegation.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_09_subagent_delegation.md",
+      "acceptance_obligation": "Spawn a real child Actor, transfer client context explicitly, and correlate result and failure Signals.",
+      "donor_tests": [
+        "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs"
+      ],
+      "baseline_tests_executed": 6,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "03_10_recursive_analysis",
+      "core_id": "03_10_recursive_analysis",
+      "group": "03_llm",
+      "commit": "M06",
+      "source_directory": "lib/examples/03_llm/03_10_recursive_analysis",
+      "target_directory": "lib/examples/03_llm/03_10_recursive_analysis",
+      "source_files": [
+        "lib/examples/03_llm/03_10_recursive_analysis/contracts.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/corpus.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/fixtures.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/recursive_language_model.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/runner.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/scripted_model.ex",
+        "lib/examples/03_llm/03_10_recursive_analysis/stress.exs"
+      ],
+      "donor_profile": "docs/examples/profiles/03_llm/03_10_recursive_analysis.md",
+      "target_profile": "docs/examples/profiles/03_llm/03_10_recursive_analysis.md",
+      "acceptance_obligation": "This example tests execution and data boundaries. Model decisions are scripted. It does not measure model reasoning quality or execute model-generated code. The single supported query is `:failed_jobs_by_service`.",
+      "donor_tests": [
+        "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs"
+      ],
+      "baseline_tests_executed": 26,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_01_scheduled_signals",
+      "core_id": "04_01_scheduled_signals",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_01_scheduled_signals",
+      "target_directory": "lib/examples/04_runtime/04_01_scheduled_signals",
+      "source_files": [
+        "lib/examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_01_scheduled_signals.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_01_scheduled_signals.md",
+      "acceptance_obligation": "A Scheduler Directive produces a later Signal and a separate commit. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_02_keyed_timers",
+      "core_id": "04_02_keyed_timers",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_02_keyed_timers",
+      "target_directory": "lib/examples/04_runtime/04_02_keyed_timers",
+      "source_files": [
+        "lib/examples/04_runtime/04_02_keyed_timers/burst_buncher.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_02_keyed_timers.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_02_keyed_timers.md",
+      "acceptance_obligation": "An example Plugin replaces one keyed timer, ignores stale generations, and flushes one ordered batch. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_03_bus_delivery",
+      "core_id": "04_03_bus_delivery",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_03_bus_delivery",
+      "target_directory": "lib/examples/04_runtime/04_03_bus_delivery",
+      "source_files": [
+        "lib/examples/04_runtime/04_03_bus_delivery/bus_delivery.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_03_bus_delivery.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_03_bus_delivery.md",
+      "acceptance_obligation": "A real Bus Client delivers ordered records, retries failed Turns, and acknowledges after commit. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_03_bus_delivery/bus_delivery_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_03_bus_delivery/bus_delivery_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_04_managed_jobs",
+      "core_id": "04_04_managed_jobs",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_04_managed_jobs",
+      "target_directory": "lib/examples/04_runtime/04_04_managed_jobs",
+      "source_files": [
+        "lib/examples/04_runtime/04_04_managed_jobs/managed_jobs.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_04_managed_jobs.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_04_managed_jobs.md",
+      "acceptance_obligation": "An Actor-owned Plugin starts a linked task after commit and sends a later terminal Signal. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_04_managed_jobs/managed_jobs_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_04_managed_jobs/managed_jobs_test.exs"
+      ],
+      "baseline_tests_executed": 6,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_05_runtime_inspection",
+      "core_id": "04_05_runtime_inspection",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_05_runtime_inspection",
+      "target_directory": "lib/examples/04_runtime/04_05_runtime_inspection",
+      "source_files": [
+        "lib/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_05_runtime_inspection.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_05_runtime_inspection.md",
+      "acceptance_obligation": "Public inspection exposes committed state and its matching revision while work is active. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_06_state_recovery",
+      "core_id": "04_06_state_recovery",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_06_state_recovery",
+      "target_directory": "lib/examples/04_runtime/04_06_state_recovery",
+      "source_files": [
+        "lib/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_06_state_recovery.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_06_state_recovery.md",
+      "acceptance_obligation": "A restored Actor retains its complete state, duplicate ledger, and commit revision. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs"
+      ],
+      "baseline_tests_executed": 5,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_07_input_deduplication",
+      "core_id": "04_07_input_deduplication",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_07_input_deduplication",
+      "target_directory": "lib/examples/04_runtime/04_07_input_deduplication",
+      "source_files": [
+        "lib/examples/04_runtime/04_07_input_deduplication/deduplicating_inbox.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_07_input_deduplication.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_07_input_deduplication.md",
+      "acceptance_obligation": "A stable input ID rejects duplicate work before a new commit; invalid input consumes no ID. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_07_input_deduplication/deduplicating_inbox_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_07_input_deduplication/deduplicating_inbox_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_08_commit_outbox",
+      "core_id": "04_08_commit_outbox",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_08_commit_outbox",
+      "target_directory": "lib/examples/04_runtime/04_08_commit_outbox",
+      "source_files": [
+        "lib/examples/04_runtime/04_08_commit_outbox/audit_outbox.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_08_commit_outbox.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_08_commit_outbox.md",
+      "acceptance_obligation": "Business state and audit intent restore together; manual sink delivery can safely repeat. Read this after the Basic and Workflow groups.",
+      "donor_tests": [
+        "test/examples/04_runtime/04_08_commit_outbox/audit_outbox_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/04_runtime/04_08_commit_outbox/audit_outbox_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_09_actor_observation",
+      "core_id": "04_09_agent_observation",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_09_actor_observation",
+      "target_directory": "lib/examples/04_runtime/04_09_agent_observation",
+      "source_files": [
+        "lib/examples/04_runtime/04_09_actor_observation/demo.exs",
+        "lib/examples/04_runtime/04_09_actor_observation/event_probe.ex",
+        "lib/examples/04_runtime/04_09_actor_observation/turn_observation.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_09_actor_observation.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_09_agent_observation.md",
+      "acceptance_obligation": "SDK telemetry reports Actor lifecycle, Turn settlement, commits, and Directive outcomes without command wrappers or application-generated events.",
+      "donor_tests": [
+        "test/jido/observe/actor_lifecycle_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/observe/agent_lifecycle_test.exs"
+      ],
+      "baseline_tests_executed": 9,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_10_causal_trace",
+      "core_id": "04_10_causal_trace",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_10_causal_trace",
+      "target_directory": "lib/examples/04_runtime/04_10_causal_trace",
+      "source_files": [
+        "lib/examples/04_runtime/04_10_causal_trace/causal_trace.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_10_causal_trace.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_10_causal_trace.md",
+      "acceptance_obligation": "Child creation, work, results, retries, restore, and restart retain explicit trace and cause identities across local and remote Actor Turns.",
+      "donor_tests": [
+        "test/jido/observe/causal_trace_test.exs",
+        "test/jido/observe/remote_causal_trace_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/observe/causal_trace_test.exs",
+        "test/jido/observe/remote_causal_trace_test.exs"
+      ],
+      "baseline_tests_executed": 12,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_11_recoverable_delivery",
+      "core_id": "04_11_recoverable_delivery",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_11_recoverable_delivery",
+      "target_directory": "lib/examples/04_runtime/04_11_recoverable_delivery",
+      "source_files": [
+        "lib/examples/04_runtime/04_11_recoverable_delivery/delivery_worker.ex",
+        "lib/examples/04_runtime/04_11_recoverable_delivery/demo.exs",
+        "lib/examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_11_recoverable_delivery.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_11_recoverable_delivery.md",
+      "acceptance_obligation": "Business state and delivery intent commit together. A supervised Plugin resumes pending output after Actor or Plugin loss and confirms completion in a new Turn.",
+      "donor_tests": [
+        "test/jido/actor/effect_recovery_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/effect_recovery_test.exs"
+      ],
+      "baseline_tests_executed": 11,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_12_pending_job_recovery",
+      "core_id": "04_12_pending_job_recovery",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_12_pending_job_recovery",
+      "target_directory": "lib/examples/04_runtime/04_12_pending_job_recovery",
+      "source_files": [
+        "lib/examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_12_pending_job_recovery.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_12_pending_job_recovery.md",
+      "acceptance_obligation": "Saved input, approval, attempt identity, retry, cancellation, and stale-result rejection recover after Actor, Plugin, parent, or VM loss.",
+      "donor_tests": [
+        "test/jido/actor/pending_job_recovery_test.exs",
+        "test/jido/actor/pending_job_vm_recovery_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/pending_job_recovery_test.exs",
+        "test/jido/agent/pending_job_vm_recovery_test.exs"
+      ],
+      "baseline_tests_executed": 7,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "04_13_durable_scheduling",
+      "core_id": "04_13_durable_scheduling",
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_directory": "lib/examples/04_runtime/04_13_durable_scheduling",
+      "target_directory": "lib/examples/04_runtime/04_13_durable_scheduling",
+      "source_files": [
+        "lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_probe.ex",
+        "lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/04_runtime/04_13_durable_scheduling.md",
+      "target_profile": "docs/examples/profiles/04_runtime/04_13_durable_scheduling.md",
+      "acceptance_obligation": "The Scheduler saves one logical occurrence before delivery and removes it only when the business result commits. Generation and occurrence identity reject stale or duplicate work.",
+      "donor_tests": [
+        "test/jido/actor/scheduled_occurrence_recovery_test.exs",
+        "test/jido/actor/scheduled_occurrence_test.exs",
+        "test/jido/plugin/durable_scheduler_test.exs",
+        "test/jido/plugin/scheduler_occurrence_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/scheduled_occurrence_recovery_test.exs",
+        "test/jido/agent/scheduled_occurrence_test.exs",
+        "test/jido/plugin/durable_scheduler_test.exs",
+        "test/jido/plugin/scheduler_occurrence_test.exs"
+      ],
+      "baseline_tests_executed": 25,
+      "baseline_failures": [
+        {
+          "test": "test runtime ticks carry a logical occurrence ID independent of Signal delivery",
+          "module": "JidoTest.Actor.ScheduledOccurrenceTest",
+          "file": "test/jido/actor/scheduled_occurrence_test.exs",
+          "line": 33
+        }
+      ],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_01_child_lifecycle",
+      "core_id": "05_01_child_lifecycle",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_01_child_lifecycle",
+      "target_directory": "lib/examples/05_multi_agent/05_01_child_lifecycle",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex",
+        "lib/examples/05_multi_agent/05_01_child_lifecycle/worker.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_01_child_lifecycle.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_01_child_lifecycle.md",
+      "acceptance_obligation": "A parent starts real children, tracks a restarted PID with the same ID, and stops owned processes. Read this after the Runtime group and the previous Multi-agent example.",
+      "donor_tests": [
+        "test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs"
+      ],
+      "baseline_tests_executed": 3,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_02_correlated_requests",
+      "core_id": "05_02_correlated_requests",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_02_correlated_requests",
+      "target_directory": "lib/examples/05_multi_agent/05_02_correlated_requests",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_02_correlated_requests/correlated_requests.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_02_correlated_requests.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_02_correlated_requests.md",
+      "acceptance_obligation": "Pending parent state, independent child work, and a later correlated reply form separate Turns. Read this after the Runtime group and the previous Multi-agent example.",
+      "donor_tests": [
+        "test/examples/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs"
+      ],
+      "baseline_tests_executed": 6,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_03_bounded_workers",
+      "core_id": "05_03_bounded_workers",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_03_bounded_workers",
+      "target_directory": "lib/examples/05_multi_agent/05_03_bounded_workers",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_03_bounded_workers/bounded_workers.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_03_bounded_workers.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_03_bounded_workers.md",
+      "acceptance_obligation": "At most eight live children reuse fixed slots; each result admits one queued item and results retain input order. Read this after the Runtime group and the previous Multi-agent example.",
+      "donor_tests": [
+        "test/examples/05_multi_agent/05_03_bounded_workers/bounded_workers_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/05_multi_agent/05_03_bounded_workers/bounded_workers_test.exs"
+      ],
+      "baseline_tests_executed": 5,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_04_actor_hierarchy",
+      "core_id": "05_04_agent_hierarchy",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_04_actor_hierarchy",
+      "target_directory": "lib/examples/05_multi_agent/05_04_agent_hierarchy",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_04_actor_hierarchy/actor_hierarchy.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_04_actor_hierarchy.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_04_agent_hierarchy.md",
+      "acceptance_obligation": "Each Actor owns direct children; branch loss is isolated and root shutdown removes the whole subtree. Read this after the Runtime group and the previous Multi-agent example.",
+      "donor_tests": [
+        "test/examples/05_multi_agent/05_04_actor_hierarchy/actor_hierarchy_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/05_multi_agent/05_04_agent_hierarchy/agent_hierarchy_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_05_remote_child",
+      "core_id": "05_05_remote_child",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_05_remote_child",
+      "target_directory": "lib/examples/05_multi_agent/05_05_remote_child",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_05_remote_child/demo.exs",
+        "lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_05_remote_child.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_05_remote_child.md",
+      "acceptance_obligation": "A parent places and owns a child Actor on a selected Erlang node. Signals, restart, stop, parent loss, delayed creation, and request identity use the same Actor contract across nodes.",
+      "donor_tests": [
+        "test/jido/actor/child_placement_test.exs",
+        "test/jido/actor/distributed_child_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/child_placement_test.exs",
+        "test/jido/agent/distributed_child_test.exs"
+      ],
+      "baseline_tests_executed": 16,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "05_06_remote_lifecycle",
+      "core_id": "05_06_remote_lifecycle",
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_directory": "lib/examples/05_multi_agent/05_06_remote_lifecycle",
+      "target_directory": "lib/examples/05_multi_agent/05_06_remote_lifecycle",
+      "source_files": [
+        "lib/examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/05_multi_agent/05_06_remote_lifecycle.md",
+      "target_profile": "docs/examples/profiles/05_multi_agent/05_06_remote_lifecycle.md",
+      "acceptance_obligation": "A parent distinguishes a confirmed remote process exit from an unreachable node, stops remote work after parent loss, and requires explicit replacement after reconnect.",
+      "donor_tests": [
+        "test/jido/actor/remote_lifecycle_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/remote_lifecycle_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "06_01_live_conversation",
+      "core_id": "06_01_live_conversation",
+      "group": "06_factory",
+      "commit": "M09",
+      "source_directory": "lib/examples/06_factory/06_01_live_conversation",
+      "target_directory": "lib/examples/06_factory/06_01_live_conversation",
+      "source_files": [
+        "lib/examples/06_factory/06_01_live_conversation/conversation.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/06_factory/06_01_live_conversation.md",
+      "target_profile": "docs/examples/profiles/06_factory/06_01_live_conversation.md",
+      "acceptance_obligation": "One Actor calls ReqLLM directly and stores text history across turns. Tests exercise real provider request encoding and response decoding with local HTTP responses. Duplicates start no model request; errors preserve committed history. A live provider key is required for the interactive demo. The local Anthropic key returned HTTP 401. The OpenAI key succeeded with `openai:gpt-4.1-mini` through the chat launcher. Errors show the provider message and key setting without the key value.",
+      "donor_tests": [
+        "test/examples/06_factory/06_01_live_conversation/conversation_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/06_factory/06_01_live_conversation/conversation_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "06_02_three_actor_system",
+      "core_id": "06_02_three_agent_system",
+      "group": "06_factory",
+      "commit": "M09",
+      "source_directory": "lib/examples/06_factory/06_02_three_actor_system",
+      "target_directory": "lib/examples/06_factory/06_02_three_agent_system",
+      "source_files": [
+        "lib/examples/06_factory/06_02_three_actor_system/conversation.ex",
+        "lib/examples/06_factory/06_02_three_actor_system/system.ex",
+        "lib/examples/06_factory/06_02_three_actor_system/work_item.ex",
+        "lib/examples/06_factory/06_02_three_actor_system/workshop.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/06_factory/06_02_three_actor_system.md",
+      "target_profile": "docs/examples/profiles/06_factory/06_02_three_agent_system.md",
+      "acceptance_obligation": "A System Actor owns a conversation Actor and a factory manager. The manager checks a FIFO queue each second and starts one temporary worker Actor per item, with at most one worker active. Workers perform three timed demonstration steps. ReqLLM tools send commands and read queue, worker, job, scheduler, and event data. The factory sends result Signals through the owner to the conversation. Model work runs in an owned task after commit, so events can arrive while the model is busy. IEx prints answers and events. Tests cover queue order, capacity, control, stale progress, worker failure, completion, and shutdown. The live OpenAI workshop probe passed. Chat sessions stream text while factory events remain available. Tool arguments are complete before execution. The final answer is not printed a second time. Requests such as `add 3 jobs to the factory` use a batch tool with numbered demo goals and distinct IDs. Zoi validates inputs before a command reaches the factory. Batch retries return the same IDs. Invalid goals or insufficient space reject the whole batch.",
+      "donor_tests": [
+        "test/examples/06_factory/06_02_three_actor_system/batch_test.exs",
+        "test/examples/06_factory/06_02_three_actor_system/system_test.exs",
+        "test/examples/06_factory/06_02_three_actor_system/workshop_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/06_factory/06_02_three_agent_system/batch_test.exs",
+        "test/examples/06_factory/06_02_three_agent_system/system_test.exs",
+        "test/examples/06_factory/06_02_three_agent_system/workshop_test.exs"
+      ],
+      "baseline_tests_executed": 26,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "06_03_department_factory",
+      "core_id": "06_03_department_factory",
+      "group": "06_factory",
+      "commit": "M09",
+      "source_directory": "lib/examples/06_factory/06_03_department_factory",
+      "target_directory": "lib/examples/06_factory/06_03_department_factory",
+      "source_files": [
+        "lib/examples/06_factory/06_03_department_factory/department.ex",
+        "lib/examples/06_factory/06_03_department_factory/orchestrator.ex",
+        "lib/examples/06_factory/06_03_department_factory/plan.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/06_factory/06_03_department_factory.md",
+      "target_profile": "docs/examples/profiles/06_factory/06_03_department_factory.md",
+      "acceptance_obligation": "The factory runs a fixed dependency plan through Research, Design, Build, and Quality Actors. Each head calls ReqLLM and produces a text artifact. At most two steps run at once. Result identity, pause, cancellation, failure, and seven-Actor shutdown are tested. Durable replay, real code execution, and delivery are future work in the larger orchestrator plan.",
+      "donor_tests": [
+        "test/examples/06_factory/06_03_department_factory/orchestrator_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/06_factory/06_03_department_factory/orchestrator_test.exs"
+      ],
+      "baseline_tests_executed": 4,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "06_04_flow_factory",
+      "core_id": "06_04_flow_factory",
+      "group": "06_factory",
+      "commit": "M09",
+      "source_directory": "lib/examples/06_factory/06_04_flow_factory",
+      "target_directory": "lib/examples/06_factory/06_04_flow_factory",
+      "source_files": [
+        "lib/examples/06_factory/06_04_flow_factory/README.md",
+        "lib/examples/06_factory/06_04_flow_factory/contract.ex",
+        "lib/examples/06_factory/06_04_flow_factory/demo.exs",
+        "lib/examples/06_factory/06_04_flow_factory/mission.ex",
+        "lib/examples/06_factory/06_04_flow_factory/pipeline.ex",
+        "lib/examples/06_factory/06_04_flow_factory/runner.ex",
+        "lib/examples/06_factory/06_04_flow_factory/worker.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/06_factory/06_04_flow_factory.md",
+      "target_profile": "docs/examples/profiles/06_factory/06_04_flow_factory.md",
+      "acceptance_obligation": "A Mission Actor owns nine department Actors. A Plugin runs a Jido Flow after commit. The Flow joins parallel research and design, maps work to API, UI, and Test workers, integrates their artifacts, and joins Quality and optional Security reviews. Iterate allows two repairs. Handoff receives the accepted revision.",
+      "donor_tests": [
+        "test/examples/06_factory/06_04_flow_factory/flow_factory_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/06_factory/06_04_flow_factory/flow_factory_test.exs"
+      ],
+      "baseline_tests_executed": 14,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "07_01_independent",
+      "core_id": "07_01_independent",
+      "group": "07_topology",
+      "commit": "M10",
+      "source_directory": "lib/examples/07_topology/07_01_independent",
+      "target_directory": "lib/examples/07_topology/07_01_independent",
+      "source_files": [
+        "lib/examples/07_topology/07_01_independent/independent.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/07_topology/07_01_independent.md",
+      "target_profile": "docs/examples/profiles/07_topology/07_01_independent.md",
+      "acceptance_obligation": "Two Actors start from one static topology. Their state and lifecycle are independent.",
+      "donor_tests": [
+        "test/examples/07_topology/07_01_independent/independent_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/07_topology/07_01_independent/independent_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "07_02_hierarchy",
+      "core_id": "07_02_hierarchy",
+      "group": "07_topology",
+      "commit": "M10",
+      "source_directory": "lib/examples/07_topology/07_02_hierarchy",
+      "target_directory": "lib/examples/07_topology/07_02_hierarchy",
+      "source_files": [
+        "lib/examples/07_topology/07_02_hierarchy/hierarchy.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/07_topology/07_02_hierarchy.md",
+      "target_profile": "docs/examples/profiles/07_topology/07_02_hierarchy.md",
+      "acceptance_obligation": "A coordinator owns one leader. The leader owns three workers. All processes remain in the Jido Actor pool.",
+      "donor_tests": [
+        "test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/07_topology/07_02_hierarchy/hierarchy_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "07_03_bus_swarm",
+      "core_id": "07_03_bus_swarm",
+      "group": "07_topology",
+      "commit": "M10",
+      "source_directory": "lib/examples/07_topology/07_03_bus_swarm",
+      "target_directory": "lib/examples/07_topology/07_03_bus_swarm",
+      "source_files": [
+        "lib/examples/07_topology/07_03_bus_swarm/formats.ex",
+        "lib/examples/07_topology/07_03_bus_swarm/swarm.ex",
+        "lib/examples/07_topology/07_03_bus_swarm/swarm.json"
+      ],
+      "donor_profile": "docs/examples/profiles/07_topology/07_03_bus_swarm.md",
+      "target_profile": "docs/examples/profiles/07_topology/07_03_bus_swarm.md",
+      "acceptance_obligation": "A stored JSON definition starts 1000 workers and one coordinator. One Bus Signal reaches every worker. The test sets Jido task capacity to 4096.",
+      "donor_tests": [
+        "test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/07_topology/07_03_bus_swarm/bus_swarm_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "07_04_keyed_accounts",
+      "core_id": "07_04_keyed_accounts",
+      "group": "07_topology",
+      "commit": "M10",
+      "source_directory": "lib/examples/07_topology/07_04_keyed_accounts",
+      "target_directory": "lib/examples/07_topology/07_04_keyed_accounts",
+      "source_files": [
+        "lib/examples/07_topology/07_04_keyed_accounts/accounts.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/07_topology/07_04_keyed_accounts.md",
+      "target_profile": "docs/examples/profiles/07_topology/07_04_keyed_accounts.md",
+      "acceptance_obligation": "Account records supply stable group member keys and initial labels. Reordering the records does not change Actor identity.",
+      "donor_tests": [
+        "test/examples/07_topology/07_04_keyed_accounts/keyed_accounts_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/07_topology/07_04_keyed_accounts/keyed_accounts_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    },
+    {
+      "id": "07_05_composed_system",
+      "core_id": "07_05_composed_system",
+      "group": "07_topology",
+      "commit": "M10",
+      "source_directory": "lib/examples/07_topology/07_05_composed_system",
+      "target_directory": "lib/examples/07_topology/07_05_composed_system",
+      "source_files": [
+        "lib/examples/07_topology/07_05_composed_system/README.md",
+        "lib/examples/07_topology/07_05_composed_system/composed_system.ex",
+        "lib/examples/07_topology/07_05_composed_system/composed_system.json",
+        "lib/examples/07_topology/07_05_composed_system/formats.ex",
+        "lib/examples/07_topology/07_05_composed_system/worker_team.ex"
+      ],
+      "donor_profile": "docs/examples/profiles/07_topology/07_05_composed_system.md",
+      "target_profile": "docs/examples/profiles/07_topology/07_05_composed_system.md",
+      "acceptance_obligation": "Two copies of a reusable team use separate inputs and stable identities. One root-owned Bus supplies both teams. Public exports provide access to leaders, workers, and the shared Bus. The root director owns the two leaders; each leader owns its workers. DSL, Builder, and JSON forms produce the same plan.",
+      "donor_tests": [
+        "test/examples/07_topology/07_05_composed_system/composed_system_test.exs"
+      ],
+      "target_tests": [
+        "test/examples/07_topology/07_05_composed_system/composed_system_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [],
+      "migration_status": "planned; not transferred"
+    }
+  ],
+  "shared_group_files": [
+    {
+      "group": "01_basic",
+      "commit": "M02",
+      "source_files": [],
+      "test_files": [
+        "test/examples/01_basic/authoring_formats_test.exs"
+      ],
+      "baseline_tests_executed": 6
+    },
+    {
+      "group": "02_workflow",
+      "commit": "M05",
+      "source_files": [
+        "lib/examples/02_workflow/observation.ex"
+      ],
+      "test_files": [],
+      "baseline_tests_executed": 0
+    },
+    {
+      "group": "03_llm",
+      "commit": "M06",
+      "source_files": [
+        "lib/examples/03_llm/README.md",
+        "lib/examples/03_llm/adapter.ex"
+      ],
+      "test_files": [],
+      "baseline_tests_executed": 0
+    },
+    {
+      "group": "04_runtime",
+      "commit": "M07",
+      "source_files": [
+        "lib/examples/04_runtime/README.md"
+      ],
+      "test_files": [],
+      "baseline_tests_executed": 0
+    },
+    {
+      "group": "05_multi_agent",
+      "commit": "M08",
+      "source_files": [
+        "lib/examples/05_multi_agent/README.md"
+      ],
+      "test_files": [],
+      "baseline_tests_executed": 0
+    },
+    {
+      "group": "06_factory",
+      "commit": "M09",
+      "source_files": [
+        "lib/examples/06_factory/README.md",
+        "lib/examples/06_factory/async.ex",
+        "lib/examples/06_factory/chat.exs",
+        "lib/examples/06_factory/error.ex",
+        "lib/examples/06_factory/iex.ex",
+        "lib/examples/06_factory/inspection.ex",
+        "lib/examples/06_factory/model.ex",
+        "lib/examples/06_factory/orchestrator-plan.md",
+        "lib/examples/06_factory/protocol.ex",
+        "lib/examples/06_factory/tools.ex",
+        "lib/examples/06_factory/workshop_probe.exs"
+      ],
+      "test_files": [
+        "test/examples/06_factory/streaming_test.exs"
+      ],
+      "baseline_tests_executed": 9
+    },
+    {
+      "group": "07_topology",
+      "commit": "M10",
+      "source_files": [
+        "lib/examples/07_topology/README.md",
+        "lib/examples/07_topology/cell.ex"
+      ],
+      "test_files": [],
+      "baseline_tests_executed": 0
+    }
+  ],
+  "support_files": [
+    "test/support/actor_fixtures.ex",
+    "test/support/actor_runtime_fixtures.ex",
+    "test/support/agent_case.ex",
+    "test/support/basic_sdk_case.ex",
+    "test/support/causal_trace_fixtures.ex",
+    "test/support/distributed_authority_fixtures.ex",
+    "test/support/eventually.ex",
+    "test/support/factory_http.ex",
+    "test/support/factory_sse.ex",
+    "test/support/feature_sdk_case.ex",
+    "test/support/integration_bus_input.ex",
+    "test/support/integration_crypto.ex",
+    "test/support/jido_case.ex",
+    "test/support/llm_sdk_case.ex",
+    "test/support/peer_case.ex",
+    "test/support/recovery_fixtures.ex",
+    "test/support/remote_child_fixtures.ex",
+    "test/support/scheduled_occurrence_fixtures.ex",
+    "test/support/signal_collector.ex",
+    "test/support/test_actions.ex",
+    "test/support/test_tracer.ex",
+    "test/support/workflow_sdk_case.ex"
+  ],
+  "topology_core_tests": [
+    "test/jido/topology/authoring_test.exs",
+    "test/jido/topology/composition_runtime_test.exs",
+    "test/jido/topology/composition_test.exs",
+    "test/jido/topology/controller_test.exs"
+  ],
+  "integration_scenarios": [
+    {
+      "id": "audit",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/audit/audit_test.exs",
+        "test/integration/audit/example_test.exs"
+      ],
+      "target_files": [
+        "test/integration/audit/audit_test.exs",
+        "test/integration/audit/example_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "coordinator",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/coordinator/coordinator_test.exs",
+        "test/integration/coordinator/example_test.exs"
+      ],
+      "target_files": [
+        "test/integration/coordinator/coordinator_test.exs",
+        "test/integration/coordinator/example_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "elastic_group",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/elastic_group/elastic_group_test.exs",
+        "test/integration/elastic_group/example_test.exs"
+      ],
+      "target_files": [
+        "test/integration/elastic_group/elastic_group_test.exs",
+        "test/integration/elastic_group/example_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [
+        {
+          "test": "test an elastic group scales, reclaims failed work, drains, and returns to its minimum",
+          "module": "JidoTest.Integration.ElasticGroupTest",
+          "file": "test/integration/elastic_group/elastic_group_test.exs",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "fixed_group",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/fixed_group/example_test.exs",
+        "test/integration/fixed_group/fixed_group_test.exs"
+      ],
+      "target_files": [
+        "test/integration/fixed_group/example_test.exs",
+        "test/integration/fixed_group/fixed_group_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": [
+        {
+          "test": "test a fixed group owns stable children and coordinates work through the Bus",
+          "module": "JidoTest.Integration.FixedGroupTest",
+          "file": "test/integration/fixed_group/fixed_group_test.exs",
+          "line": 12
+        }
+      ]
+    },
+    {
+      "id": "identity",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/identity/example_test.exs",
+        "test/integration/identity/identity_test.exs"
+      ],
+      "target_files": [
+        "test/integration/identity/example_test.exs",
+        "test/integration/identity/identity_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "inbox",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/inbox/example_test.exs",
+        "test/integration/inbox/inbox_test.exs"
+      ],
+      "target_files": [
+        "test/integration/inbox/example_test.exs",
+        "test/integration/inbox/inbox_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "purpose_loop",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/purpose_loop/example_test.exs",
+        "test/integration/purpose_loop/purpose_loop_test.exs"
+      ],
+      "target_files": [
+        "test/integration/purpose_loop/example_test.exs",
+        "test/integration/purpose_loop/purpose_loop_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": []
+    },
+    {
+      "id": "react",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/react/example_test.exs",
+        "test/integration/react/react_test.exs"
+      ],
+      "target_files": [
+        "test/integration/react/example_test.exs",
+        "test/integration/react/react_test.exs"
+      ],
+      "baseline_tests_executed": 2,
+      "baseline_failures": []
+    },
+    {
+      "id": "secure_signal",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/secure_signal/example_test.exs",
+        "test/integration/secure_signal/secure_signal_test.exs"
+      ],
+      "target_files": [
+        "test/integration/secure_signal/example_test.exs",
+        "test/integration/secure_signal/secure_signal_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    },
+    {
+      "id": "subscription",
+      "commit": "M11",
+      "source_files": [
+        "test/integration/subscription/example_test.exs",
+        "test/integration/subscription/subscription_test.exs"
+      ],
+      "target_files": [
+        "test/integration/subscription/example_test.exs",
+        "test/integration/subscription/subscription_test.exs"
+      ],
+      "baseline_tests_executed": 1,
+      "baseline_failures": []
+    }
+  ],
+  "research": [
+    {
+      "id": "99_01_progress_observation",
+      "source_files": [
+        "lib/examples/99_research/99_01_progress_observation/README.md"
+      ],
+      "donor_tests": [],
+      "target_tests": [],
+      "commit": "design backlog",
+      "baseline_tests_executed": 0,
+      "baseline_failures": []
+    },
+    {
+      "id": "99_02_distributed_authority",
+      "source_files": [
+        "lib/examples/99_research/99_02_distributed_authority/README.md",
+        "lib/examples/99_research/99_02_distributed_authority/distributed_authority_probe.ex"
+      ],
+      "donor_tests": [
+        "test/jido/actor/distributed_authority_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/agent/distributed_authority_test.exs"
+      ],
+      "commit": "M11 scope decision",
+      "baseline_tests_executed": 2,
+      "baseline_failures": [
+        {
+          "test": "test one logical identity has at most one live cluster owner",
+          "module": "JidoTest.Actor.DistributedAuthorityTest",
+          "file": "test/jido/actor/distributed_authority_test.exs",
+          "line": 32
+        }
+      ]
+    },
+    {
+      "id": "99_03_input_resource_lifecycle",
+      "source_files": [
+        "lib/examples/99_research/99_03_input_resource_lifecycle/README.md"
+      ],
+      "donor_tests": [],
+      "target_tests": [],
+      "commit": "design backlog",
+      "baseline_tests_executed": 0,
+      "baseline_failures": []
+    },
+    {
+      "id": "99_04_handoff_reconciliation",
+      "source_files": [
+        "lib/examples/99_research/99_04_handoff_reconciliation/README.md"
+      ],
+      "donor_tests": [],
+      "target_tests": [],
+      "commit": "design backlog",
+      "baseline_tests_executed": 0,
+      "baseline_failures": []
+    },
+    {
+      "id": "99_05_capacity_deadlines_cleanup",
+      "source_files": [
+        "lib/examples/99_research/99_05_capacity_deadlines_cleanup/README.md"
+      ],
+      "donor_tests": [],
+      "target_tests": [],
+      "commit": "design backlog",
+      "baseline_tests_executed": 0,
+      "baseline_failures": []
+    },
+    {
+      "id": "99_06_checkpoint_identity",
+      "source_files": [
+        "lib/examples/99_research/99_06_checkpoint_identity/README.md",
+        "lib/examples/99_research/99_06_checkpoint_identity/checkpoint_identity_probe.ex",
+        "lib/examples/99_research/99_06_checkpoint_identity/demo.exs"
+      ],
+      "donor_tests": [
+        "test/jido/persistence/checkpoint_identity_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/persistence/checkpoint_identity_test.exs"
+      ],
+      "commit": "M03",
+      "baseline_tests_executed": 3,
+      "baseline_failures": [
+        {
+          "test": "test a matching envelope cannot hide a different Actor ID in the checkpoint",
+          "module": "JidoTest.Persistence.CheckpointIdentityTest",
+          "file": "test/jido/persistence/checkpoint_identity_test.exs",
+          "line": 29
+        }
+      ]
+    },
+    {
+      "id": "99_07_checkpoint_portability",
+      "source_files": [
+        "lib/examples/99_research/99_07_checkpoint_portability/README.md",
+        "lib/examples/99_research/99_07_checkpoint_portability/checkpoint_portability_probe.ex",
+        "lib/examples/99_research/99_07_checkpoint_portability/demo.exs"
+      ],
+      "donor_tests": [
+        "test/jido/persistence/checkpoint_portability_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/persistence/checkpoint_portability_test.exs"
+      ],
+      "commit": "M03",
+      "baseline_tests_executed": 3,
+      "baseline_failures": [
+        {
+          "test": "test load rejects a nested process handle supplied by storage",
+          "module": "JidoTest.Persistence.CheckpointPortabilityTest",
+          "file": "test/jido/persistence/checkpoint_portability_test.exs",
+          "line": 36
+        }
+      ]
+    },
+    {
+      "id": "99_08_indeterminate_write",
+      "source_files": [
+        "lib/examples/99_research/99_08_indeterminate_write/README.md",
+        "lib/examples/99_research/99_08_indeterminate_write/demo.exs",
+        "lib/examples/99_research/99_08_indeterminate_write/indeterminate_write_probe.ex"
+      ],
+      "donor_tests": [
+        "test/jido/persistence/indeterminate_write_test.exs"
+      ],
+      "target_tests": [
+        "test/jido/persistence/indeterminate_write_test.exs"
+      ],
+      "commit": "M03",
+      "baseline_tests_executed": 3,
+      "baseline_failures": [
+        {
+          "test": "test an indeterminate write prevents evaluation of the next Action on stale state",
+          "module": "JidoTest.Persistence.IndeterminateWriteTest",
+          "file": "test/jido/persistence/indeterminate_write_test.exs",
+          "line": 45
+        }
+      ]
+    }
+  ]
+}

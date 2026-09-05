@@ -1,0 +1,40 @@
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 4
+Excluding tags: [:test]
+Including tags: [location: {"test/examples/06_factory/06_02_three_agent_system/workshop_test.exs", 105}]
+
+.
+Finished in 6.1 seconds (6.1s async, 0.00s sync)
+
+Result: 1 passed, 8 excluded
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 3
+Excluding tags: [:test]
+Including tags: [location: {"test/examples/06_factory/06_02_three_agent_system/workshop_test.exs", 105}]
+
+.
+Finished in 5.9 seconds (5.9s async, 0.00s sync)
+
+Result: 1 passed, 8 excluded
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 2
+Excluding tags: [:test]
+Including tags: [location: {"test/examples/06_factory/06_02_three_agent_system/workshop_test.exs", 105}]
+
+.
+Finished in 5.9 seconds (5.9s async, 0.00s sync)
+
+Result: 1 passed, 8 excluded
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 1
+Excluding tags: [:test]
+Including tags: [location: {"test/examples/06_factory/06_02_three_agent_system/workshop_test.exs", 105}]
+
+.
+Finished in 5.9 seconds (5.9s async, 0.00s sync)
+
+Result: 1 passed, 8 excluded
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 0
+Excluding tags: [:test]
+Including tags: [location: {"test/examples/06_factory/06_02_three_agent_system/workshop_test.exs", 105}]
+
+.
+Finished in 6.9 seconds (6.9s async, 0.00s sync)
+
+Result: 1 passed, 8 excluded

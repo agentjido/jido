@@ -1,0 +1,59 @@
+{
+  "command": [
+    "mix",
+    "test",
+    "test/jido/agent/remote_api_test.exs",
+    "test/jido/agent/scheduled_occurrence_test.exs",
+    "test/jido/agent/scheduled_occurrence_recovery_test.exs",
+    "test/jido/instance_test.exs",
+    "test/integration/fixed_group/fixed_group_test.exs",
+    "test/integration/elastic_group/elastic_group_test.exs",
+    "test/jido/agent/startup_test.exs",
+    "test/jido/agent/stateless_directive_test.exs",
+    "test/jido/persistence/checkpoint_identity_test.exs",
+    "test/jido/persistence/checkpoint_portability_test.exs",
+    "test/jido/persistence/indeterminate_write_test.exs",
+    "test/jido/agent/naming_contract_test.exs",
+    "--include",
+    "example",
+    "--include",
+    "integration",
+    "--include",
+    "flaky",
+    "--seed",
+    "0",
+    "--repeat-until-failure",
+    "4",
+    "--formatter",
+    "ExUnit.CLIFormatter",
+    "--formatter",
+    "JidoTest.MigrationFormatter"
+  ],
+  "revision": "7e18634af891286189cd77b27184f223acaf147f",
+  "branch": "prep/agent-migration",
+  "status_before": "?? docs/migration-preparation/concurrency-probe.exs\n?? docs/migration-preparation/evidence/\n?? docs/migration-preparation/prepared-source.json",
+  "runtime": "Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit]\n\nElixir 1.20.3 (compiled with Erlang/OTP 29)",
+  "cwd": "/Users/mhostetler/.codex/worktrees/0d9b/jido_v3",
+  "started_utc": "2026-09-05T15:31:18.455775+00:00",
+  "log": "final-regression-repeat.log",
+  "exit_code": 0,
+  "duration_seconds": 70.494,
+  "suites": [
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    }
+  ],
+  "results": "final-regression-repeat.results.jsonl"
+}

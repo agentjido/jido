@@ -1,0 +1,40 @@
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 4
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..........................................
+Finished in 13.7 seconds (0.9s async, 12.7s sync)
+
+Result: 42 passed
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 3
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..........................................
+Finished in 14.0 seconds (0.5s async, 13.4s sync)
+
+Result: 42 passed
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 2
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..........................................
+Finished in 13.0 seconds (0.5s async, 12.4s sync)
+
+Result: 42 passed
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 1
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..........................................
+Finished in 12.9 seconds (0.5s async, 12.4s sync)
+
+Result: 42 passed
+Running ExUnit with seed: 0, max_cases: 20, remaining_runs: 0
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..........................................
+Finished in 14.0 seconds (0.5s async, 13.5s sync)
+
+Result: 42 passed

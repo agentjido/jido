@@ -1,0 +1,13 @@
+{
+  "command": [
+    "mix",
+    "test",
+    "test/jido/actor/scheduled_occurrence_test.exs:33",
+    "--seed",
+    "0",
+    "--repeat-until-failure",
+    "5"
+  ],
+  "duration_seconds": 12.37,
+  "exit_code": 0
+}

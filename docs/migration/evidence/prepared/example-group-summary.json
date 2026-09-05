@@ -1,0 +1,55 @@
+{
+  "result_source": "final-full-seed-0.results.jsonl",
+  "groups": [
+    {
+      "group": "01_basic",
+      "fixtures": 5,
+      "tests": 22,
+      "passed": 22,
+      "failed": 0
+    },
+    {
+      "group": "02_workflow",
+      "fixtures": 9,
+      "tests": 35,
+      "passed": 35,
+      "failed": 0
+    },
+    {
+      "group": "03_llm",
+      "fixtures": 10,
+      "tests": 66,
+      "passed": 66,
+      "failed": 0
+    },
+    {
+      "group": "04_runtime",
+      "fixtures": 13,
+      "tests": 94,
+      "passed": 94,
+      "failed": 0
+    },
+    {
+      "group": "05_multi_agent",
+      "fixtures": 6,
+      "tests": 38,
+      "passed": 38,
+      "failed": 0
+    },
+    {
+      "group": "06_factory",
+      "fixtures": 4,
+      "tests": 57,
+      "passed": 57,
+      "failed": 0
+    },
+    {
+      "group": "07_topology",
+      "fixtures": 5,
+      "tests": 5,
+      "passed": 5,
+      "failed": 0
+    }
+  ],
+  "topology_core_tests": 47
+}

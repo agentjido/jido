@@ -1,0 +1,74 @@
+{
+  "status": "pass",
+  "prepared_source_commit": "bf6c9fbec569cb6438b6a1629a2768058d439d1f",
+  "report_commit": "741058d128928d05bdee109f3c6a0425eb82db89",
+  "source_hashes_checked": 667,
+  "original_source_hashes_checked": 659,
+  "donor_report_hashes_checked": 424,
+  "copied_evidence_files_checked": 38,
+  "catalog_fixtures": 52,
+  "integration_scenarios": 10,
+  "research_items": 8,
+  "manifest_paths_checked": 288,
+  "core_files_accounted_for": 278,
+  "donor_files_accounted_for": 418,
+  "inventory_rows": 632,
+  "markdown_documents": 10,
+  "local_links_checked": 106,
+  "test_results": {
+    "final-full-seed-0": [
+      {
+        "passed": 1005,
+        "failed": 1
+      }
+    ],
+    "final-coverage": [
+      {
+        "passed": 1005,
+        "failed": 1
+      }
+    ],
+    "final-serial": [
+      {
+        "passed": 1005,
+        "failed": 1
+      }
+    ],
+    "final-regression-repeat": [
+      {
+        "passed": 42
+      },
+      {
+        "passed": 42
+      },
+      {
+        "passed": 42
+      },
+      {
+        "passed": 42
+      },
+      {
+        "passed": 42
+      }
+    ],
+    "scoped-final-full-seed-0": [
+      {
+        "passed": 1005,
+        "excluded": 1
+      }
+    ]
+  },
+  "new_mix_commands": 3,
+  "allowed_skips": [
+    {
+      "file": "test/jido/agent/distributed_authority_test.exs",
+      "name": "test one logical identity has at most one live cluster owner",
+      "capability": "DIST-03",
+      "reason": "User deferred cluster-exclusive ownership during migration plan review on 2026-09-05. The assertion is retained; this skip does not establish ownership support."
+    }
+  ],
+  "prepared_working_tree": "clean",
+  "original_donor_working_tree": "clean",
+  "core_tracked_files": "unchanged outside docs/migration",
+  "errors": []
+}

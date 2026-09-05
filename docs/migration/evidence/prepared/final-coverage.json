@@ -1,0 +1,35 @@
+{
+  "command": [
+    "mix",
+    "test",
+    "--include",
+    "example",
+    "--include",
+    "integration",
+    "--include",
+    "flaky",
+    "--cover",
+    "--seed",
+    "0",
+    "--formatter",
+    "ExUnit.CLIFormatter",
+    "--formatter",
+    "JidoTest.MigrationFormatter"
+  ],
+  "revision": "7e18634af891286189cd77b27184f223acaf147f",
+  "branch": "prep/agent-migration",
+  "status_before": "?? docs/migration-preparation/concurrency-probe.exs\n?? docs/migration-preparation/evidence/\n?? docs/migration-preparation/prepared-source.json",
+  "runtime": "Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit]\n\nElixir 1.20.3 (compiled with Erlang/OTP 29)",
+  "cwd": "/Users/mhostetler/.codex/worktrees/0d9b/jido_v3",
+  "started_utc": "2026-09-05T15:20:29.523656+00:00",
+  "log": "final-coverage.log",
+  "exit_code": 2,
+  "duration_seconds": 169.619,
+  "suites": [
+    {
+      "passed": 1005,
+      "failed": 1
+    }
+  ],
+  "results": "final-coverage.results.jsonl"
+}

@@ -1,0 +1,68 @@
+{
+  "prepared_source_commit": "7e18634af891286189cd77b27184f223acaf147f",
+  "source_hash_count": 424,
+  "source_hash_mismatches": [],
+  "checked_current_link_files": 529,
+  "missing_current_links": [],
+  "old_executable_names": [
+    {
+      "file": "test/jido/agent/naming_contract_test.exs",
+      "line": 25,
+      "text": "|> Map.merge(%{kind: :actor, actor_module: Probe, actor_id: agent.id})"
+    },
+    {
+      "file": "test/jido/agent/naming_contract_test.exs",
+      "line": 28,
+      "text": "old_key = String.replace_prefix(key, \"jido:agent:v1:\", \"jido:actor:v1:\")"
+    },
+    {
+      "file": "test/jido/agent/naming_contract_test.exs",
+      "line": 42,
+      "text": "assert {:error, _reason} = Codec.decode(%{document | \"type\" => \"jido.actor\"}, registry)"
+    }
+  ],
+  "old_names_only_in_negative_format_tests": true,
+  "name_map_files": 455,
+  "renamed_paths": 97,
+  "missing_name_map_targets": [],
+  "catalog_fixtures": 52,
+  "application_scenarios": 10,
+  "changelog_changed": false,
+  "saved_donor_commit": "ba00fcf1f76563c9a94a01c69c2f16190997fd28",
+  "saved_donor_status": "",
+  "final-full-seed-0": [
+    {
+      "passed": 1005,
+      "failed": 1
+    }
+  ],
+  "final-coverage": [
+    {
+      "passed": 1005,
+      "failed": 1
+    }
+  ],
+  "final-serial": [
+    {
+      "passed": 1005,
+      "failed": 1
+    }
+  ],
+  "final-regression-repeat": [
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    },
+    {
+      "passed": 42
+    }
+  ]
+}
