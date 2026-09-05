@@ -1,13 +1,29 @@
-# DIST-03 acceptance notes
+# FA-10: Fenced distributed ownership
 
-The enabled two-node test proves cross-node restore and stale-revision
-rejection. Its second assertion exposes the missing cluster owner claim:
+Status: **Works with an explicit external authority**.
 
-```shell
-mix test test/jido/agent/distributed_authority_test.exs --seed 0
+Result on 2026-09-05: **4 passing checks; 0 failing acceptance checks.** All checks are enabled.
+
+## Feature and proof
+
+Two Erlang nodes run real inventory Agents. Replacement fences old admission before Action work. Storage and the sink reject stale tokens. Authority loss rejects work. A disconnected old owner remains fenced after reconnection.
+
+## Required change
+
+No core feature is required for this controlled proof under the current admit callback and persistence adapter. Preserve an authority check before Action work if the proposed Plugin API removes admit/3.
+
+## Scope
+
+The external authority is a controlled GenServer, not a consensus service or production lease provider. Claim, byte writes, and sink checks serialize there. Core-only exclusive activation remains unsupported; the existing skipped DIST-03 test is unchanged. The disconnect test blocks automatic reconnection with a temporary peer cookie change.
+
+## Run
+
+From the jido repository:
+
+```sh
+mix test test/examples/99_research/99_02_distributed_authority --include example --seed 0
 ```
 
-Define the authority and partition policy before changing the assertion.
+This command passes with the current core. The extension policy is part of the example.
 
-[Capability notes](../../../../lib/examples/99_research/99_02_distributed_authority/README.md) ·
-[Evidence](../../../../docs/examples/dist-03-results.md)
+[Source](../../../../lib/examples/99_research/99_02_distributed_authority/fenced_inventory.ex) · [Tests](fenced_inventory_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)

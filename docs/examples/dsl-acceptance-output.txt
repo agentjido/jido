@@ -1,0 +1,316 @@
+Compiling 7 files (.ex)
+Generated jido app
+Running ExUnit with seed: 0, max_cases: 1
+Excluding tags: [:flaky, :skip, :integration]
+Including tags: [:example]
+
+
+JidoTest.Examples.PluginIsolationTest [test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs]
+  * test a Plugin updates its own state after a successful Action [L#6]
+  * test a Plugin updates its own state after a successful Action (1.6ms) [L#6]
+  * test an Action cannot overwrite Plugin state and a failed live turn preserves state [L#13]
+  * test an Action cannot overwrite Plugin state and a failed live turn preserves state (7.9ms) [L#13]
+  * test the audit callback can observe only its intended total field [L#22]
+  * test the audit callback can observe only its intended total field (1.1ms) [L#22]
+
+  1) test the audit callback can observe only its intended total field (JidoTest.Examples.PluginIsolationTest)
+     test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:22
+     Assertion with == failed
+     code:  assert candidate.state.observed_fields == [:total]
+     left:  [:total, :audit, :first_input, :observed_fields, :customer_secret]
+     right: [:total]
+     stacktrace:
+       test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:24: (test)
+
+  * test a later Plugin cannot replace an earlier Plugin's prepared input [L#27]
+  * test a later Plugin cannot replace an earlier Plugin's prepared input (0.8ms) [L#27]
+
+  2) test a later Plugin cannot replace an earlier Plugin's prepared input (JidoTest.Examples.PluginIsolationTest)
+     test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:27
+     Assertion with == failed
+     code:  assert candidate.state.first_input == "original"
+     left:  "replaced"
+     right: "original"
+     stacktrace:
+       test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:31: (test)
+
+
+JidoTest.Examples.RouteSelectionTest [test/examples/99_research/99_09_route_selection/route_selection_test.exs]
+  * test a single route produces equal direct and live state [L#6]
+  * test a single route produces equal direct and live state (3.9ms) [L#6]
+  * test an unmatched input reaches the fallback [L#16]
+  * test an unmatched input reaches the fallback (1.5ms) [L#16]
+  * test an exact route wins when wildcard routes also match [L#23]
+  * test an exact route wins when wildcard routes also match (0.9ms) [L#23]
+
+  3) test an exact route wins when wildcard routes also match (JidoTest.Examples.RouteSelectionTest)
+     test/examples/99_research/99_09_route_selection/route_selection_test.exs:23
+     match (=) failed
+     code:  assert {:ok, agent, []} = Jido.Agent.cmd(Example.new(:fallback), Example.signal("order.create"))
+     left:  {:ok, agent, []}
+     right: {:error,
+             %Jido.Error.RoutingError{
+               message: "Agent Signal must resolve to exactly one executable",
+               target: "order.create",
+               details: %{
+                 count: 3,
+                 targets: [
+                   {Jido.Examples.RouteSelection.Record,
+                    %{handler: "create"}},
+                   {Jido.Examples.RouteSelection.Record,
+                    %{handler: "order"}},
+                   {Jido.Examples.RouteSelection.Record,
+                    %{handler: "fallback"}}
+                 ]
+               },
+               splode: nil,
+               bread_crumbs: [],
+               vars: [],
+               path: [],
+               stacktrace: #Splode.Stacktrace<>,
+               class: :routing
+             }}
+     stacktrace:
+       test/examples/99_research/99_09_route_selection/route_selection_test.exs:24: (test)
+
+  * test preparation cannot replace the executable selected by the source Signal [L#30]
+  * test preparation cannot replace the executable selected by the source Signal (0.7ms) [L#30]
+
+  4) test preparation cannot replace the executable selected by the source Signal (JidoTest.Examples.RouteSelectionTest)
+     test/examples/99_research/99_09_route_selection/route_selection_test.exs:30
+     Assertion with == failed
+     code:  assert agent.state.handler == "create"
+     left:  "cancel"
+     right: "create"
+     stacktrace:
+       test/examples/99_research/99_09_route_selection/route_selection_test.exs:34: (test)
+
+
+JidoTest.Examples.DurableDeleteTest [test/examples/99_research/99_13_durable_delete/durable_delete_test.exs]
+  * test revision checks reject a stale writer while the record exists [L#13]
+  * test revision checks reject a stale writer while the record exists (0.5ms) [L#13]
+  * test deletion makes the order unavailable [L#21]
+  * test deletion makes the order unavailable (2.4ms) [L#21]
+  * test a delayed initial writer cannot restore a deleted order [L#26]
+  * test a delayed initial writer cannot restore a deleted order (0.4ms) [L#26]
+
+  5) test a delayed initial writer cannot restore a deleted order (JidoTest.Examples.DurableDeleteTest)
+     test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:26
+     match (=) failed
+     code:  assert {:error, _deleted_or_conflict} = DurableDelete.delayed_write(c.store, c.order)
+     left:  {:error, _deleted_or_conflict}
+     right: :ok
+     stacktrace:
+       test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:28: (test)
+
+
+JidoTest.Examples.RuntimeReconstructionTest [test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs]
+  * test saved state rebuilds the feed through the existing public pull API [L#14]
+  * test saved state rebuilds the feed through the existing public pull API (9.7ms) [L#14]
+  * test replacement Init supplies committed owned state and its version [L#35]
+  * test replacement Init supplies committed owned state and its version (2.0ms) [L#35]
+
+  6) test replacement Init supplies committed owned state and its version (JidoTest.Examples.RuntimeReconstructionTest)
+     test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35
+     Assertion with == failed
+     code:  assert Map.get(init, :plugin_state) == %{name: "B"}
+     left:  nil
+     right: %{name: "B"}
+     stacktrace:
+       test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:40: (test)
+
+
+JidoTest.Examples.HandoffTest [test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs]
+  * test acknowledgement transfers authority and late or duplicate results cannot replace it [L#14]
+  * test acknowledgement transfers authority and late or duplicate results cannot replace it (28.2ms) [L#14]
+  * test an unavailable recipient leaves the old owner and the transfer can be aborted [L#39]
+  * test an unavailable recipient leaves the old owner and the transfer can be aborted (15.5ms) [L#39]
+  * test a recipient crash clears the offer and reconciliation uses a new generation [L#49]
+  * test a recipient crash clears the offer and reconciliation uses a new generation (47.4ms) [L#49]
+
+JidoTest.Examples.StateMigrationTest [test/examples/99_research/99_15_state_migration/state_migration_test.exs]
+  * test a predeclared schema migrates domain and Plugin state in one live commit [L#8]
+  * test a predeclared schema migrates domain and Plugin state in one live commit (4.9ms) [L#8]
+  * test invalid target state leaves both domain and Plugin state unchanged [L#22]
+  * test invalid target state leaves both domain and Plugin state unchanged (4.1ms) [L#22]
+  * test a saved migration survives process replacement and does not run twice [L#31]
+  * test a saved migration survives process replacement and does not run twice (8.3ms) [L#31]
+  * test a running old definition can migrate to a state format outside its old schema [L#52]
+  * test a running old definition can migrate to a state format outside its old schema (3.1ms) [L#52]
+
+  7) test a running old definition can migrate to a state format outside its old schema (JidoTest.Examples.StateMigrationTest)
+     test/examples/99_research/99_15_state_migration/state_migration_test.exs:52
+     match (=) failed
+     code:  assert {:ok, upgraded} = StateMigration.migrate(server)
+     left:  {:ok, upgraded}
+     right: {:error,
+             %Jido.Error.ValidationError{
+               message: "Agent state does not match its schema",
+               kind: :input,
+               subject: :state,
+               details: %{
+                 errors: [
+                   %Zoi.Error{
+                     code: :invalid_literal,
+                     issue: {"invalid literal: expected %{expected}",
+                      [expected: 1]},
+                     message: "invalid literal: expected 1",
+                     path: [:wallet, :format]
+                   },
+                   %Zoi.Error{
+                     code: :required,
+                     issue: {"is required", [key: :balance]},
+                     message: "is required",
+                     path: [:wallet, :balance]
+                   }
+                 ]
+               },
+               splode: nil,
+               bread_crumbs: [],
+               vars: [],
+               path: [],
+               stacktrace: #Splode.Stacktrace<>,
+               class: :invalid
+             }}
+     stacktrace:
+       test/examples/99_research/99_15_state_migration/state_migration_test.exs:55: (test)
+
+
+JidoTest.Examples.StableReferenceTest [test/examples/99_research/99_11_stable_reference/stable_reference_test.exs]
+  * test a saved application reference survives persistent process replacement [L#21]
+  * test a saved application reference survives persistent process replacement (7.5ms) [L#21]
+  * test equal IDs in separate namespaces reach separate conversations [L#45]
+  * test equal IDs in separate namespaces reach separate conversations (1.1ms) [L#45]
+  * test durable identity survives rebinding the same namespace to a new local instance [L#60]
+  * test durable identity survives rebinding the same namespace to a new local instance (1.0ms) [L#60]
+
+  8) test durable identity survives rebinding the same namespace to a new local instance (JidoTest.Examples.StableReferenceTest)
+     test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:60
+     match (=) failed
+     code:  assert {:ok, _} =
+              Jido.thaw(c.other, Conversation, c.ref.id, partition: c.ref.partition, persistence: c.store)
+     left:  {:ok, _}
+     right: {:error, :not_found}
+     stacktrace:
+       test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:71: (test)
+
+
+JidoTest.Examples.SharedBudgetTest [test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs]
+  * test concurrent teams share one active limit and one queue limit [L#22]
+  * test concurrent teams share one active limit and one queue limit (7.7ms) [L#22]
+  * test expired queued jobs never start and worker loss releases capacity [L#56]
+  * test expired queued jobs never start and worker loss releases capacity (6.8ms) [L#56]
+  * test service shutdown closes every active Agent, Action, and call Task [L#79]
+  * test service shutdown closes every active Agent, Action, and call Task (1.3ms) [L#79]
+
+JidoTest.Examples.ProgressObservationTest [test/examples/99_research/99_01_progress_observation/progress_observation_test.exs]
+  * test waiting reasons are queryable and cancellation clears the wait [L#13]
+  * test waiting reasons are queryable and cancellation clears the wait (1.8ms) [L#13]
+  * test live progress stays bounded while committed state is unchanged [L#24]
+  * test live progress stays bounded while committed state is unchanged (0.7ms) [L#24]
+  * test observer loss and reconnect preserve the terminal result [L#55]
+  * test observer loss and reconnect preserve the terminal result (0.6ms) [L#55]
+  * test cancellation stops active work without committing partial progress [L#70]
+  * test cancellation stops active work without committing partial progress (0.9ms) [L#70]
+  * test terminal state survives persistent Agent replacement and a new observer [L#99]
+  * test terminal state survives persistent Agent replacement and a new observer (1.8ms) [L#99]
+
+JidoTest.Examples.TopologyUpgradeTest [test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs]
+  * test pure plans identify additions, removals, changed definitions, and retained Agents [L#13]
+  * test pure plans identify additions, removals, changed definitions, and retained Agents (2.6ms) [L#13]
+  * test invalid target validation has no effect on a running topology [L#35]
+  * test invalid target validation has no effect on a running topology (2.5ms) [L#35]
+  * test the target worker definition changes executed behavior [L#44]
+  * test the target worker definition changes executed behavior (2.2ms) [L#44]
+  * test full controller replacement can grow the topology and restore saved worker state [L#55]
+  * test full controller replacement can grow the topology and restore saved worker state (6.4ms) [L#55]
+  * test a live target grows three workers to five while unchanged Agents retain PID and state [L#80]
+  * test a live target grows three workers to five while unchanged Agents retain PID and state (3.9ms) [L#80]
+
+  9) test a live target grows three workers to five while unchanged Agents retain PID and state (JidoTest.Examples.TopologyUpgradeTest)
+     test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:80
+     match (=) failed
+     code:  assert {:ok, updated} = Controller.start_link(jido: c.jido, topology: target)
+     left:  {:ok, updated}
+     right: {:error, {:already_started, #PID<0.4831.0>}}
+     stacktrace:
+       test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:90: (test)
+
+
+JidoTest.Examples.DefinitionRevisionTest [test/examples/99_research/99_12_definition_revision/definition_revision_test.exs]
+  * test the same definition restores the complete saved state [L#16]
+  * test the same definition restores the complete saved state (53.4ms) [L#16]
+  * test a new definition revision is rejected even when the saved state remains valid [L#22]
+  * test a new definition revision is rejected even when the saved state remains valid (106.5ms) [L#22]
+
+ 10) test a new definition revision is rejected even when the saved state remains valid (JidoTest.Examples.DefinitionRevisionTest)
+     test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:22
+     match (=) failed
+     code:  assert {:error, _revision_mismatch} = Jido.Agent.restore(c.module, c.checkpoint)
+     left:  {:error, _revision_mismatch}
+     right: {:ok,
+             %Jido.Agent{
+               id: "cart",
+               module: Jido.Examples.DefinitionRevision.Cart,
+               name: "research_versioned_cart",
+               state: %{total: 20},
+               description: nil,
+               max_state_size: nil,
+               schema: #Zoi.map<
+                 coerce: false,
+                 unrecognized_keys: :strip,
+                 fields: %{
+                   total: #Zoi.integer<coerce: false, default: 0>
+                 }
+               >,
+               metadata: %{definition_revision: 2},
+               plugins: [],
+               routes: []
+             }}
+     stacktrace:
+       test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:25: (test)
+
+
+JidoTest.Examples.TurnUpgradeTest [test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs]
+  * test without a deployment both Flow steps use revision 1 [L#16]
+  * test without a deployment both Flow steps use revision 1 (13.4ms) [L#16]
+  * test loading code while idle changes real behavior on the same Agent PID [L#22]
+  * test loading code while idle changes real behavior on the same Agent PID (29.5ms) [L#22]
+  * test an active Turn finishes on its old revision before the next Turn uses new code [L#32]
+  * test an active Turn finishes on its old revision before the next Turn uses new code (30.9ms) [L#32]
+
+ 11) test an active Turn finishes on its old revision before the next Turn uses new code (JidoTest.Examples.TurnUpgradeTest)
+     test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs:32
+     Assertion with == failed
+     code:  assert active.state == %{total: 2, revisions: [1, 1]}
+     left:  %{total: 11, revisions: [1, 2]}
+     right: %{total: 2, revisions: [1, 1]}
+     stacktrace:
+       test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs:47: (test)
+
+
+JidoTest.Examples.FencedInventoryTest [test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs]
+  * test replacement on a second node fences the old activation before Action work [L#21]
+17:38:18.916 [warning] [signal.error] type=inventory.record error=%{message: "activation has no write authority", type: :validation_error, details: %{cause: "{:error, :stale_owner}"}, retryable?: false} duration=3.43ms
+
+  * test replacement on a second node fences the old activation before Action work (1128.3ms) [L#21]
+  * test storage and the external sink reject a stale token even outside admission [L#37]
+  * test storage and the external sink reject a stale token even outside admission (972.0ms) [L#37]
+  * test authority loss rejects work without executing the Action [L#57]
+17:38:21.644 [warning] [signal.error] type=inventory.record error=%{message: "activation has no write authority", type: :validation_error, details: %{cause: "{:error, :authority_unavailable}"}, retryable?: false} duration=12.2ms
+
+  * test authority loss rejects work without executing the Action (1724.2ms) [L#57]
+  * test a disconnected old owner stays fenced after reconnection [L#67]
+17:38:23.319 [error] ** Connection attempt from node :"jido_dist_b-5826-89956@127.0.0.1" rejected. Invalid challenge reply. **
+
+
+17:38:23.348 [warning] [signal.error] type=inventory.record error=%{message: "activation has no write authority", type: :validation_error, details: %{cause: "{:error, :authority_unavailable}"}, retryable?: false} duration=22.91ms
+
+17:38:23.427 [warning] [signal.error] type=inventory.record error=%{message: "activation has no write authority", type: :validation_error, details: %{cause: "{:error, :stale_owner}"}, retryable?: false} duration=232μs
+
+  * test a disconnected old owner stays fenced after reconnection (1778.0ms) [L#67]
+
+Finished in 6.1 seconds (0.2s async, 5.8s sync)
+
+Result: 34/45 passed
+Failed: 11 tests

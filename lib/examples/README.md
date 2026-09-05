@@ -1,3 +1,8 @@
+> Current acceptance runs, 2026-09-05: [ten feature probes](../../docs/examples/feature-acceptance-results.md)
+> and [three live-upgrade examples](../../docs/examples/live-upgrade-results.md) have 34 passing
+> checks and 11 failing checks across nine proposed core features. All 45 checks
+> are enabled. These reports supersede older research counts for these targets.
+
 # Jido V3 examples
 
 The current catalog has 52 fixtures in seven groups. All use the implemented

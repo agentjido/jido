@@ -1,0 +1,99 @@
+Compiling 3 files (.ex)
+Generated jido app
+Running ExUnit with seed: 0, max_cases: 1
+Excluding tags: [:flaky, :skip, :integration]
+Including tags: [:example]
+
+
+JidoTest.Examples.StateMigrationTest [test/examples/99_research/99_15_state_migration/state_migration_test.exs]
+  * test a predeclared schema migrates domain and Plugin state in one live commit [L#8]
+  * test a predeclared schema migrates domain and Plugin state in one live commit (5.7ms) [L#8]
+  * test invalid target state leaves both domain and Plugin state unchanged [L#22]
+  * test invalid target state leaves both domain and Plugin state unchanged (3.7ms) [L#22]
+  * test a saved migration survives process replacement and does not run twice [L#31]
+  * test a saved migration survives process replacement and does not run twice (8.4ms) [L#31]
+  * test a running old definition can migrate to a state format outside its old schema [L#52]
+  * test a running old definition can migrate to a state format outside its old schema (3.5ms) [L#52]
+
+  1) test a running old definition can migrate to a state format outside its old schema (JidoTest.Examples.StateMigrationTest)
+     test/examples/99_research/99_15_state_migration/state_migration_test.exs:52
+     match (=) failed
+     code:  assert {:ok, upgraded} = StateMigration.migrate(server)
+     left:  {:ok, upgraded}
+     right: {:error,
+             %Jido.Error.ValidationError{
+               message: "Agent state does not match its schema",
+               kind: :input,
+               subject: :state,
+               details: %{
+                 errors: [
+                   %Zoi.Error{
+                     code: :invalid_literal,
+                     issue: {"invalid literal: expected %{expected}",
+                      [expected: 1]},
+                     message: "invalid literal: expected 1",
+                     path: [:wallet, :format]
+                   },
+                   %Zoi.Error{
+                     code: :required,
+                     issue: {"is required", [key: :balance]},
+                     message: "is required",
+                     path: [:wallet, :balance]
+                   }
+                 ]
+               },
+               splode: nil,
+               bread_crumbs: [],
+               vars: [],
+               path: [],
+               stacktrace: #Splode.Stacktrace<>,
+               class: :invalid
+             }}
+     stacktrace:
+       test/examples/99_research/99_15_state_migration/state_migration_test.exs:55: (test)
+
+
+JidoTest.Examples.TopologyUpgradeTest [test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs]
+  * test pure plans identify additions, removals, changed definitions, and retained Agents [L#13]
+  * test pure plans identify additions, removals, changed definitions, and retained Agents (2.9ms) [L#13]
+  * test invalid target validation has no effect on a running topology [L#35]
+  * test invalid target validation has no effect on a running topology (3.1ms) [L#35]
+  * test the target worker definition changes executed behavior [L#44]
+  * test the target worker definition changes executed behavior (2.8ms) [L#44]
+  * test full controller replacement can grow the topology and restore saved worker state [L#55]
+  * test full controller replacement can grow the topology and restore saved worker state (6.8ms) [L#55]
+  * test a live target grows three workers to five while unchanged Agents retain PID and state [L#80]
+  * test a live target grows three workers to five while unchanged Agents retain PID and state (3.8ms) [L#80]
+
+  2) test a live target grows three workers to five while unchanged Agents retain PID and state (JidoTest.Examples.TopologyUpgradeTest)
+     test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:80
+     match (=) failed
+     code:  assert {:ok, updated} = Controller.start_link(jido: c.jido, topology: target)
+     left:  {:ok, updated}
+     right: {:error, {:already_started, #PID<0.3881.0>}}
+     stacktrace:
+       test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:90: (test)
+
+
+JidoTest.Examples.TurnUpgradeTest [test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs]
+  * test without a deployment both Flow steps use revision 1 [L#16]
+  * test without a deployment both Flow steps use revision 1 (13.3ms) [L#16]
+  * test loading code while idle changes real behavior on the same Agent PID [L#22]
+  * test loading code while idle changes real behavior on the same Agent PID (30.6ms) [L#22]
+  * test an active Turn finishes on its old revision before the next Turn uses new code [L#32]
+  * test an active Turn finishes on its old revision before the next Turn uses new code (30.1ms) [L#32]
+
+  3) test an active Turn finishes on its old revision before the next Turn uses new code (JidoTest.Examples.TurnUpgradeTest)
+     test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs:32
+     Assertion with == failed
+     code:  assert active.state == %{total: 2, revisions: [1, 1]}
+     left:  %{total: 11, revisions: [1, 2]}
+     right: %{total: 2, revisions: [1, 1]}
+     stacktrace:
+       test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs:47: (test)
+
+
+Finished in 0.2 seconds (0.1s async, 0.1s sync)
+
+Result: 9/12 passed
+Failed: 3 tests

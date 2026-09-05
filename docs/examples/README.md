@@ -1,5 +1,10 @@
+> Current acceptance runs, 2026-09-05: [ten feature probes](feature-acceptance-results.md)
+> and [three live-upgrade examples](live-upgrade-results.md) have 34 passing
+> checks and 11 failing checks across nine proposed core features. All 45 checks
+> are enabled. These reports supersede older research counts for these targets.
+
 > Donor history and research. Counts and result claims below describe an earlier
-> source snapshot. Use [the core execution record](../migration/10-execution-record.md) for the migration result.
+> source snapshot. Use [the migration guide](../../guides/migration.md) for current API changes.
 
 # Jido example catalog
 
