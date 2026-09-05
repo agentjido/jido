@@ -153,3 +153,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m10-compile.json`, `evidence/core/m10-diagnostic-full.json`
 and `evidence/core/m10-diagnostic-full.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M11
+
+All ten application scenarios pass, including saved group recovery, newer attempts and stale-result rejection. The complete prepared set now passes in core. DIST-03 is the only excluded test; its original assertion and stated limit remain intact. All other research and real-node tests ran.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 1011, 'excluded': 1}]` in 161.877 seconds, with normal concurrency.
+See `evidence/core/m11-compile.json`, `evidence/core/m11-test.json`
+and `evidence/core/m11-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.

@@ -2799,7 +2799,7 @@
         "test/integration/audit/audit_test.exs",
         "test/integration/audit/example_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -2832,7 +2832,7 @@
         "test/integration/coordinator/coordinator_test.exs",
         "test/integration/coordinator/example_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -2872,7 +2872,7 @@
         "test/integration/elastic_group/elastic_group_test.exs",
         "test/integration/elastic_group/example_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 2
       },
@@ -2912,7 +2912,7 @@
         "test/integration/fixed_group/example_test.exs",
         "test/integration/fixed_group/fixed_group_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -2945,7 +2945,7 @@
         "test/integration/identity/example_test.exs",
         "test/integration/identity/identity_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -2978,7 +2978,7 @@
         "test/integration/inbox/example_test.exs",
         "test/integration/inbox/inbox_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -3011,7 +3011,7 @@
         "test/integration/purpose_loop/example_test.exs",
         "test/integration/purpose_loop/purpose_loop_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 2
       },
@@ -3044,7 +3044,7 @@
         "test/integration/react/example_test.exs",
         "test/integration/react/react_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 2
       },
@@ -3077,7 +3077,7 @@
         "test/integration/secure_signal/example_test.exs",
         "test/integration/secure_signal/secure_signal_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
@@ -3110,7 +3110,7 @@
         "test/integration/subscription/example_test.exs",
         "test/integration/subscription/subscription_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M11, evidence/core/m11-test.results.stage.json",
       "source_test_counts": {
         "passed": 1
       },
