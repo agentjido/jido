@@ -3308,7 +3308,7 @@
       "original_donor_tests": [
         "test/jido/persistence/checkpoint_identity_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M03, evidence/core/m03-test.results.stage.json",
       "source_test_counts": {
         "passed": 3
       },
@@ -3356,7 +3356,7 @@
       "original_donor_tests": [
         "test/jido/persistence/checkpoint_portability_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M03, evidence/core/m03-test.results.stage.json",
       "source_test_counts": {
         "passed": 3
       },
@@ -3404,7 +3404,7 @@
       "original_donor_tests": [
         "test/jido/persistence/indeterminate_write_test.exs"
       ],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M03, evidence/core/m03-test.results.stage.json",
       "source_test_counts": {
         "passed": 4
       },

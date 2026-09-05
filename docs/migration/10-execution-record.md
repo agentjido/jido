@@ -64,3 +64,15 @@ assigned to M12, before beta QA.
 All command records use Elixir 1.20.3 / OTP 29.0.5. The per-file hashes identify
 runtime and test content. Script-only additions after a test run do not change
 that tested runtime content.
+
+## M03 — persistence boundaries
+
+The cumulative suite passes 654 tests with zero failures or skips in 8.708
+seconds. This includes all ten identity, portability and uncertain-write probes,
+plus ETS, File, Redis adapter and direct/live persistence tests. The assertions
+and fixtures match the pinned source. Unknown writes and raised callbacks stop
+the writer; old envelope formats are rejected. Mock Redis checks do not prove
+real Redis failover. Compilation with warnings as errors passes.
+
+Commands and test selections: `evidence/core/m03-compile.json`,
+`evidence/core/m03-test.json`, and `evidence/core/m03-test.results.stage.json`.
