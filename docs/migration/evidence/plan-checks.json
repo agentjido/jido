@@ -13,7 +13,7 @@
   "core_files_accounted_for": 278,
   "donor_files_accounted_for": 418,
   "inventory_rows": 632,
-  "markdown_documents": 10,
+  "markdown_documents": 12,
   "local_links_checked": 106,
   "test_results": {
     "final-full-seed-0": [
@@ -69,6 +69,6 @@
   ],
   "prepared_working_tree": "clean",
   "original_donor_working_tree": "clean",
-  "core_tracked_files": "unchanged outside docs/migration",
+  "core_tracked_files": "evolving target; checked separately",
   "errors": []
 }

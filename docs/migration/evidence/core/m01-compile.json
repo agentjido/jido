@@ -1,0 +1,17 @@
+{
+  "command": [
+    "mix",
+    "compile",
+    "--warnings-as-errors"
+  ],
+  "revision": "f67eeb1e54709be13bb25d13b5d81f00909d8b41",
+  "tracked_tree": "95a8c0d1f83db5bf86e2d0f26e9ea26783538041",
+  "branch": "v3-spike",
+  "status_before": "M docs/migration/evidence/plan-checks.json\n M docs/migration/verify_plan.py\n?? docs/migration/09-legacy-contracts.md\n?? docs/migration/legacy-dispositions.json\n?? docs/migration/transfer-plan.json\n?? docs/migration/verify_target.py\n?? scripts/\n?? test/support/migration_formatter.ex",
+  "runtime": "Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit]\n\nElixir 1.20.3 (compiled with Erlang/OTP 29)",
+  "cwd": "/Users/mhostetler/Source/Jido/proj_jido_core/jido",
+  "started_utc": "2026-09-05T16:31:24.516943+00:00",
+  "log": "m01-compile.log",
+  "exit_code": 0,
+  "duration_seconds": 2.422
+}

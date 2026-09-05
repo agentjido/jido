@@ -154,10 +154,10 @@ original_checkout = CORE.parent / 'jido_v3'
 assert git(original_checkout, 'rev-parse', 'HEAD').decode().strip() == source['original_donor_commit']
 assert git(original_checkout, 'status', '--porcelain').decode() == ''
 git(CORE, 'merge-base', '--is-ancestor', source['core_commit'], 'HEAD')
-# M00 adds this plan above the fixed implementation baseline. During M01,
-# separate this input audit from checks of the evolving migration target.
-assert git(CORE, 'diff', source['core_commit'], '--name-only', '--', '.',
-           ':(exclude)docs/migration/**').decode() == ''
+# Input hashes refer to immutable Git objects. The target can change after M00.
+# verify_target.py checks the evolving implementation separately.
+git(CORE, 'merge-base', '--is-ancestor',
+    'f67eeb1e54709be13bb25d13b5d81f00909d8b41', 'HEAD')
 
 result = dict(status='pass', prepared_source_commit=source['donor_commit'],
               report_commit=source['donor_report_commit'],
@@ -172,6 +172,6 @@ result = dict(status='pass', prepared_source_commit=source['donor_commit'],
               test_results=suite_results, new_mix_commands=3,
               allowed_skips=allowed,
               prepared_working_tree='clean', original_donor_working_tree='clean',
-              core_tracked_files='unchanged outside docs/migration', errors=[])
+              core_tracked_files='evolving target; checked separately', errors=[])
 (PLAN / 'evidence/plan-checks.json').write_text(json.dumps(result, indent=2) + '\n')
 print(json.dumps(result, indent=2))

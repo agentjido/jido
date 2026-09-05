@@ -239,8 +239,17 @@ defmodule JidoExampleTest.ObservabilityTest do
 
       assert is_integer(measurements.duration)
       assert metadata.kind == :error
-      assert %RuntimeError{message: "Intentional failure"} = metadata.error
-      assert is_list(metadata.stacktrace)
+
+      assert metadata.error == %{
+               type: :internal,
+               message: "Intentional failure",
+               details: %{},
+               retryable?: true
+             }
+
+      refute Map.has_key?(metadata, :stacktrace)
+      assert metadata.error_type == :internal
+      assert metadata.retryable?
     end
   end
 
