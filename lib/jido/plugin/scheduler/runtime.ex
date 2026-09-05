@@ -211,35 +211,31 @@ defmodule Jido.Plugin.Scheduler.Runtime do
     runtime = runtime |> stop_changed_jobs(desired) |> Map.put(:desired_cron, desired)
 
     Enum.reduce_while(desired, {:ok, runtime}, fn {job_id, spec}, {:ok, runtime} ->
-      case Map.get(runtime.cron_jobs, job_id) do
-        {^spec, job, _ref} ->
-          if Process.alive?(job) do
-            {:cont, {:ok, runtime}}
-          else
-            runtime = drop_cron_job(runtime, job_id)
+      case ensure_cron_job(runtime, job_id, spec) do
+        {:ok, runtime} ->
+          {:cont, {:ok, runtime}}
 
-            case start_tracked_cron(runtime, job_id, spec) do
-              {:ok, runtime} ->
-                {:cont, {:ok, runtime}}
-
-              {:error, reason, runtime} ->
-                {:halt, {:error, {:cron_activation_failed, job_id, reason}, runtime}}
-            end
-          end
-
-        nil ->
-          case start_tracked_cron(runtime, job_id, spec) do
-            {:ok, runtime} ->
-              {:cont, {:ok, runtime}}
-
-            {:error, reason, runtime} ->
-              {:halt, {:error, {:cron_activation_failed, job_id, reason}, runtime}}
-          end
+        {:error, reason, runtime} ->
+          {:halt, {:error, {:cron_activation_failed, job_id, reason}, runtime}}
       end
     end)
     |> case do
       {:ok, runtime} -> {:ok, schedule_pending(runtime, 0)}
       error -> error
+    end
+  end
+
+  defp ensure_cron_job(runtime, job_id, spec) do
+    case Map.get(runtime.cron_jobs, job_id) do
+      {^spec, job, _ref} ->
+        if Process.alive?(job) do
+          {:ok, runtime}
+        else
+          runtime |> drop_cron_job(job_id) |> start_tracked_cron(job_id, spec)
+        end
+
+      nil ->
+        start_tracked_cron(runtime, job_id, spec)
     end
   end
 

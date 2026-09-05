@@ -85,8 +85,6 @@ defmodule Jido.Plugin.Scheduler do
 
   @doc "Creates one delayed Signal Directive."
   @spec schedule(non_neg_integer(), Signal.t()) :: Schedule.t()
-  def schedule(delay_ms, %Signal{} = signal), do: %Schedule{delay_ms: delay_ms, signal: signal}
-
   def schedule(delay_ms, signal), do: %Schedule{delay_ms: delay_ms, signal: signal}
 
   @doc "Creates one recurring Signal Directive."
@@ -130,7 +128,7 @@ defmodule Jido.Plugin.Scheduler do
   def validate_cron_state(cron, _opts) do
     Enum.reduce_while(cron, :ok, fn {job_id, spec}, :ok ->
       with :ok <- validate_durable_id(job_id),
-           {:ok, _validated} <-
+           {:ok, _timezone} <-
              validate_cron_spec(spec.cron_expression, spec.message, spec.timezone),
            :ok <- validate_occurrence(spec.message, Map.get(spec, :generation)),
            :ok <- validate_durable_message(Map.get(spec, :pending)),
@@ -185,11 +183,11 @@ defmodule Jido.Plugin.Scheduler do
   def validate_directive(%Cron{} = directive, _opts) do
     with {:ok, directive} <- Zoi.parse(Cron.schema(), Map.from_struct(directive)),
          :ok <- validate_durable_id(directive.job_id),
-         {:ok, spec} <-
+         {:ok, timezone} <-
            validate_cron_spec(directive.cron, directive.signal, directive.timezone),
          :ok <- validate_occurrence(directive.signal, directive.generation),
          :ok <- validate_delivery(directive) do
-      {:ok, %{directive | timezone: spec.timezone}}
+      {:ok, %{directive | timezone: timezone}}
     end
   end
 
@@ -283,10 +281,12 @@ defmodule Jido.Plugin.Scheduler do
   defp validate_delivery(_directive), do: :ok
 
   defp validate_cron_spec(cron_expression, message, timezone) do
-    with {:ok, spec} <- validate_and_build_cron_spec(cron_expression, message, timezone),
-         :ok <- validate_cron_syntax(spec.cron_expression),
-         :ok <- validate_timezone_support(spec.timezone) do
-      {:ok, spec}
+    with :ok <- validate_cron_expression_type(cron_expression),
+         {:ok, timezone} <- validate_timezone_option(timezone),
+         :ok <- validate_durable_message(message),
+         :ok <- validate_cron_syntax(cron_expression),
+         :ok <- validate_timezone_support(timezone) do
+      {:ok, timezone}
     end
   end
 
@@ -306,27 +306,14 @@ defmodule Jido.Plugin.Scheduler do
     end
   end
 
-  defp validate_and_build_cron_spec(cron_expression, message, timezone) do
-    with :ok <- validate_cron_expression_type(cron_expression),
-         {:ok, normalized_timezone} <- validate_timezone_option(timezone),
-         :ok <- validate_durable_message(message) do
-      {:ok,
-       %{
-         cron_expression: cron_expression,
-         message: message,
-         timezone: normalized_timezone
-       }}
-    end
-  end
-
   defp validate_cron_expression_type(cron_expression) when is_binary(cron_expression), do: :ok
 
   defp validate_cron_expression_type(_cron_expression),
     do: {:error, {:invalid_cron, :invalid_type}}
 
-  defp validate_timezone_option(nil), do: {:ok, @default_timezone}
-  defp validate_timezone_option(""), do: {:ok, @default_timezone}
-  defp validate_timezone_option(timezone) when is_binary(timezone), do: {:ok, timezone}
+  defp validate_timezone_option(timezone) when is_nil(timezone) or is_binary(timezone),
+    do: {:ok, normalize_timezone_value(timezone)}
+
   defp validate_timezone_option(_timezone), do: {:error, {:invalid_timezone, :invalid_type}}
 
   defp normalize_timezone_value(nil), do: @default_timezone
