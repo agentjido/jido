@@ -17,9 +17,9 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 - Full suite: `mix test --include example --include integration --include flaky`.
 - Compile with `mix compile --warnings-as-errors`.
 - Keep coverage at 80%. Run meaningful lint, Dialyzer, docs and package checks.
-- See `test/AGENTS.md` and `docs/migration/08-execution-goal.md`.
+- See `test/AGENTS.md` and `guides/testing.md`.
 
 ## History
 
 Use Conventional Commits. Do not edit `CHANGELOG.md`; release notes are generated.
-Keep migration commits local. Preserve the pinned donor inputs and published history.
+Preserve donor history and published history.

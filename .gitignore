@@ -35,3 +35,7 @@ RELEASE.md
 NOTES.md
 PLAN.md
 plans/
+
+# Local migration and review records
+/docs/migration/
+/docs/reviews/

@@ -1,8 +1,8 @@
 # Jido V3 examples
 
 The current catalog has 52 fixtures in seven groups. All use the implemented
-Agent and AgentServer contract. Each source and test path is recorded in the
-[checked manifest](../../docs/migration/example-manifest.json).
+Agent and AgentServer contract. The group guides below link to their source
+and tests.
 
 | Group | Fixtures | Source and tests |
 | --- | ---: | --- |
@@ -28,5 +28,5 @@ analysis stress runner and 1,000-worker Topology test are independent scale
 checks. They do not prove multi-host capacity.
 
 [Historical research](../../docs/examples/README.md) retains earlier plans and
-results. Use the [core execution record](../../docs/migration/10-execution-record.md)
-for current results and [migration guide](../../guides/migration.md) for V2 changes.
+results. Use the [testing guide](../../guides/testing.md) for current test commands
+and the [migration guide](../../guides/migration.md) for V2 changes.

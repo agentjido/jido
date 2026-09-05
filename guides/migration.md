@@ -90,10 +90,8 @@ storage has one BEAM owner per directory. See [storage limits](storage.md).
 | Old observation event/configuration contracts | V3 lifecycle, Turn, commit, directive and safe error fields |
 | Built-in control/status/lifecycle Actions | Explicit application Actions and supported runtime directives |
 
-The [file and test register](../docs/migration/legacy-dispositions.json) records
-all 278 baseline files and all 2,299 baseline test identities. Each entry names
-its current checks or its retired interface and guide. The original source remains
-in Git at `a31b74306d4498ee47732c18b993abd4c26542bd`.
+The original source remains in Git at
+`a31b74306d4498ee47732c18b993abd4c26542bd`.
 
 ## Downstream packages and checks
 
@@ -105,10 +103,9 @@ They do not validate model quality or a paid provider session.
 
 All 52 fixtures, shared support, supporting core tests, and ten application
 scenarios are required. Run the full command from [testing](testing.md).
-The [execution record](../docs/migration/10-execution-record.md) lists tested
-source hashes and results. The seed campaign, continuous workload, runtime
-matrix, coverage, lint, Dialyzer, docs, and fresh package consumer must pass before
-local beta QA is complete.
+Repeated test runs, recovery and scale checks, the runtime matrix, coverage,
+lint, Dialyzer, docs, and a fresh package consumer must pass before local beta
+QA is complete.
 
 The documents under `docs/design` are pending proposals. Their Ref facade,
 Plugin pipeline, and replacement persistence architecture are not part of this
