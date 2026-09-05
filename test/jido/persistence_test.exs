@@ -8,6 +8,94 @@ defmodule JidoTest.PersistenceTest do
   alias Jido.Signal
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
 
+  defmodule ConfiguredInstance do
+    def __jido_persistence__, do: {ETS, table: __MODULE__}
+  end
+
+  defmodule DisabledInstance do
+    def __jido_persistence__, do: nil
+  end
+
+  defmodule InvalidInstance do
+    def __jido_persistence__, do: {:invalid, :options}
+  end
+
+  defmodule RaisingInstance do
+    def __jido_persistence__, do: raise("invalid instance config")
+  end
+
+  defmodule CheckpointAgent do
+    use Jido.Agent, name: "checkpoint_contract", schema: Zoi.object(%{reply: Zoi.any()})
+
+    @impl true
+    def checkpoint(agent, _context), do: agent.state.reply
+  end
+
+  test "instance sources use their default namespace and honor explicit overrides" do
+    agent = RuntimeAgent.new!(id: unique_id("namespace"))
+    direct = ConfiguredInstance.__jido_persistence__()
+
+    for {opts, namespace} <- [
+          {[], ConfiguredInstance},
+          {[instance: nil], nil},
+          {[instance: :override], :override}
+        ] do
+      assert :ok = Persistence.save_agent(ConfiguredInstance, agent, opts)
+
+      assert {:ok, ^agent} =
+               Persistence.load_agent(direct, RuntimeAgent, agent.id, instance: namespace)
+
+      assert {:ok, ^agent} =
+               Persistence.load_agent(ConfiguredInstance, RuntimeAgent, agent.id, opts)
+
+      assert :ok = Persistence.delete_agent(ConfiguredInstance, RuntimeAgent, agent.id, opts)
+
+      assert {:error, :not_found} =
+               Persistence.load_agent(direct, RuntimeAgent, agent.id, instance: namespace)
+    end
+  end
+
+  test "source resolution preserves disabled and invalid configuration errors" do
+    agent = RuntimeAgent.new!(id: unique_id("config"))
+
+    for call <- [
+          &Persistence.save_agent(&1, agent),
+          &Persistence.load_agent(&1, RuntimeAgent, agent.id),
+          &Persistence.delete_agent(&1, RuntimeAgent, agent.id)
+        ] do
+      for source <- [nil, false, :inherit, DisabledInstance] do
+        assert {:error, :persistence_not_configured} = call.(source)
+      end
+
+      for source <- [InvalidInstance, RaisingInstance, {:invalid, :options}] do
+        assert {:error, {:invalid_persistence_config, _}} = call.(source)
+      end
+
+      assert {:error, {:invalid_persistence_adapter, String}} = call.(String)
+    end
+  end
+
+  test "checkpoint callback failures and invalid revisions cannot write a record" do
+    persistence = adapter(:callback)
+
+    for reply <- [{:ok, :invalid}, {:ok, %URI{}}, {:error, :checkpoint_failed}] do
+      agent = CheckpointAgent.new!(id: unique_id("callback"), state: %{reply: reply})
+      expected = Agent.checkpoint(agent)
+      assert {:error, _} = expected
+      assert ^expected = Persistence.save_agent(persistence, agent)
+      assert {:error, :not_found} = Persistence.load_agent(persistence, CheckpointAgent, agent.id)
+    end
+
+    agent = RuntimeAgent.new!(id: unique_id("revision"))
+
+    for revision <- [-1, nil, "0"] do
+      assert {:error, {:invalid_checkpoint, :shape}} =
+               Persistence.save_agent(persistence, agent, revision: revision)
+    end
+
+    assert {:error, :not_found} = Persistence.load_agent(persistence, RuntimeAgent, agent.id)
+  end
+
   defmodule RaisingAdapter do
     @behaviour Jido.Persistence.Adapter
 

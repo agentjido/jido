@@ -156,24 +156,18 @@ defmodule Jido.Persistence do
 
   defp resolve_instance_config(_jido), do: {:ok, nil}
 
-  defp resolve_source(source, opts) when is_atom(source) and not is_nil(source) do
-    if function_exported?(source, :__jido_persistence__, 0) do
-      with {:ok, config} <- resolve_instance_config(source),
-           {:ok, config} <- require_adapter(config) do
-        {:ok, config, Keyword.get(opts, :instance, source)}
-      end
-    else
-      with {:ok, config} <- resolve_config(source, nil),
-           {:ok, config} <- require_adapter(config) do
-        {:ok, config, Keyword.get(opts, :instance)}
-      end
-    end
-  end
-
   defp resolve_source(source, opts) do
-    with {:ok, config} <- resolve_config(source, nil),
+    {config_result, default_instance} =
+      if is_atom(source) and not is_nil(source) and
+           function_exported?(source, :__jido_persistence__, 0) do
+        {resolve_instance_config(source), source}
+      else
+        {resolve_config(source, nil), nil}
+      end
+
+    with {:ok, config} <- config_result,
          {:ok, config} <- require_adapter(config) do
-      {:ok, config, Keyword.get(opts, :instance)}
+      {:ok, config, Keyword.get(opts, :instance, default_instance)}
     end
   end
 
@@ -259,8 +253,7 @@ defmodule Jido.Persistence do
     }
 
     with true <- is_integer(revision) and revision >= 0,
-         {:ok, checkpoint} <- Agent.checkpoint(agent, context),
-         true <- is_map(checkpoint) do
+         {:ok, checkpoint} <- Agent.checkpoint(agent, context) do
       record = %{
         format: @format_version,
         kind: :agent,
