@@ -20,6 +20,102 @@ defmodule JidoTest.Observe.ConfigTest do
     def span_exception(_ctx, _kind, _reason, _stacktrace), do: :ok
   end
 
+  defmodule ConfigInstance do
+    def __otp_app__, do: :jido_observe_config_test
+  end
+
+  @settings [
+    {:telemetry_log_level, :telemetry, :log_level, :telemetry_log_level, :debug, :error, :info},
+    {:telemetry_log_args, :telemetry, :log_args, :telemetry_log_args, :full, :none, :keys_only},
+    {:slow_signal_threshold_ms, :telemetry, :slow_signal_threshold_ms, :slow_signal_threshold_ms,
+     0, 12, 24},
+    {:slow_directive_threshold_ms, :telemetry, :slow_directive_threshold_ms,
+     :slow_directive_threshold_ms, 0, 13, 25},
+    {:interesting_signal_types, :telemetry, :interesting_signal_types, :interesting_signal_types,
+     [], ["instance"], ["global"]},
+    {:observe_log_level, :observability, :log_level, :observe_log_level, :debug, :error, :info},
+    {:debug_events, :observability, :debug_events, :observe_debug_events, :all, :minimal, :off},
+    {:redact_sensitive?, :observability, :redact_sensitive, :redact_sensitive, false, true, true},
+    {:tracer, :observability, :tracer, :tracer, ValidTracer, Jido.Observe.NoopTracer,
+     ValidTracer},
+    {:tracer_failure_mode, :observability, :tracer_failure_mode, :tracer_failure_mode, :strict,
+     :warn, :strict},
+    {:debug_max_events, :telemetry, :debug_max_events, :debug_max_events, 0, 14, 26}
+  ]
+
+  for {getter, group, key, override_key, override_value, instance_value, global_value} <-
+        @settings do
+    test "#{getter} preserves lazy nil-only precedence and normalization" do
+      getter = unquote(getter)
+      group = unquote(group)
+      key = unquote(key)
+      override_key = unquote(override_key)
+      override_value = unquote(Macro.escape(override_value))
+      instance_value = unquote(Macro.escape(instance_value))
+      global_value = unquote(Macro.escape(global_value))
+      saved_global = Application.fetch_env(:jido, group)
+      saved_instance = Application.fetch_env(:jido_observe_config_test, ConfigInstance)
+
+      on_exit(fn ->
+        restore_env(:jido, group, saved_global)
+        restore_env(:jido_observe_config_test, ConfigInstance, saved_instance)
+        Debug.reset(ConfigInstance)
+      end)
+
+      Application.delete_env(:jido, group)
+      default = apply(Config, getter, [nil])
+      Application.put_env(:jido, group, [{key, global_value}])
+
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [
+        {group, [{key, instance_value}]}
+      ])
+
+      put_override(override_key, override_value)
+      assert apply(Config, getter, [ConfigInstance]) == override_value
+      assert apply(Config, getter, [nil]) == global_value
+
+      put_override(override_key, nil)
+      assert apply(Config, getter, [ConfigInstance]) == instance_value
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [{group, [{key, nil}]}])
+      assert apply(Config, getter, [ConfigInstance]) == global_value
+      Application.delete_env(:jido, group)
+      assert apply(Config, getter, [ConfigInstance]) == default
+
+      # Malformed lower-priority config must never be read after a selected value.
+      Application.put_env(:jido, group, :unreadable)
+      Application.put_env(:jido_observe_config_test, ConfigInstance, :unreadable)
+      put_override(override_key, override_value)
+      assert apply(Config, getter, [ConfigInstance]) == override_value
+      put_override(override_key, %{invalid: true})
+      assert apply(Config, getter, [ConfigInstance]) == default
+      put_override(override_key, false)
+      assert apply(Config, getter, [ConfigInstance]) == default
+
+      put_override(override_key, nil)
+
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [
+        {group, [{key, instance_value}]}
+      ])
+
+      assert apply(Config, getter, [ConfigInstance]) == instance_value
+
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [
+        {group, [{key, %{invalid: true}}]}
+      ])
+
+      assert apply(Config, getter, [ConfigInstance]) == default
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [{group, [{key, false}]}])
+      assert apply(Config, getter, [ConfigInstance]) == default
+    end
+  end
+
+  defp put_override(key, value) do
+    :persistent_term.put({:jido_debug, ConfigInstance}, %{level: :on, overrides: %{key => value}})
+  end
+
+  defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)
+  defp restore_env(app, key, :error), do: Application.delete_env(app, key)
+
   setup do
     Debug.reset(@test_instance)
 

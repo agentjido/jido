@@ -34,86 +34,60 @@ defmodule Jido.Observe.Config do
 
   @doc "Returns the telemetry log level for the given instance."
   @spec telemetry_log_level(instance()) :: :trace | :debug | :info | :warning | :error
-  def telemetry_log_level(instance \\ nil)
-
-  def telemetry_log_level(nil) do
-    global_telemetry(:log_level, Defaults.telemetry_log_level())
-    |> normalize_telemetry_log_level()
-  end
-
-  def telemetry_log_level(instance) do
-    with nil <- Jido.Debug.override(instance, :telemetry_log_level),
-         nil <- instance_telemetry(instance, :log_level) do
-      global_telemetry(:log_level, Defaults.telemetry_log_level())
-    end
+  def telemetry_log_level(instance \\ nil) do
+    resolve(
+      instance,
+      :telemetry,
+      :log_level,
+      :telemetry_log_level,
+      Defaults.telemetry_log_level()
+    )
     |> normalize_telemetry_log_level()
   end
 
   @doc "Returns the argument logging mode for the given instance."
   @spec telemetry_log_args(instance()) :: :keys_only | :full | :none
-  def telemetry_log_args(instance \\ nil)
-
-  def telemetry_log_args(nil) do
-    global_telemetry(:log_args, Defaults.telemetry_log_args())
-    |> normalize_telemetry_log_args()
-  end
-
-  def telemetry_log_args(instance) do
-    with nil <- Jido.Debug.override(instance, :telemetry_log_args),
-         nil <- instance_telemetry(instance, :log_args) do
-      global_telemetry(:log_args, Defaults.telemetry_log_args())
-    end
+  def telemetry_log_args(instance \\ nil) do
+    resolve(instance, :telemetry, :log_args, :telemetry_log_args, Defaults.telemetry_log_args())
     |> normalize_telemetry_log_args()
   end
 
   @doc "Returns the slow signal threshold in milliseconds."
   @spec slow_signal_threshold_ms(instance()) :: non_neg_integer()
-  def slow_signal_threshold_ms(instance \\ nil)
-
-  def slow_signal_threshold_ms(nil),
-    do:
-      global_telemetry(:slow_signal_threshold_ms, Defaults.slow_signal_threshold_ms())
-      |> normalize_non_neg_integer(Defaults.slow_signal_threshold_ms())
-
-  def slow_signal_threshold_ms(instance) do
-    with nil <- Jido.Debug.override(instance, :slow_signal_threshold_ms),
-         nil <- instance_telemetry(instance, :slow_signal_threshold_ms) do
-      global_telemetry(:slow_signal_threshold_ms, Defaults.slow_signal_threshold_ms())
-    end
+  def slow_signal_threshold_ms(instance \\ nil) do
+    resolve(
+      instance,
+      :telemetry,
+      :slow_signal_threshold_ms,
+      :slow_signal_threshold_ms,
+      Defaults.slow_signal_threshold_ms()
+    )
     |> normalize_non_neg_integer(Defaults.slow_signal_threshold_ms())
   end
 
   @doc "Returns the slow directive threshold in milliseconds."
   @spec slow_directive_threshold_ms(instance()) :: non_neg_integer()
-  def slow_directive_threshold_ms(instance \\ nil)
-
-  def slow_directive_threshold_ms(nil),
-    do:
-      global_telemetry(:slow_directive_threshold_ms, Defaults.slow_directive_threshold_ms())
-      |> normalize_non_neg_integer(Defaults.slow_directive_threshold_ms())
-
-  def slow_directive_threshold_ms(instance) do
-    with nil <- Jido.Debug.override(instance, :slow_directive_threshold_ms),
-         nil <- instance_telemetry(instance, :slow_directive_threshold_ms) do
-      global_telemetry(:slow_directive_threshold_ms, Defaults.slow_directive_threshold_ms())
-    end
+  def slow_directive_threshold_ms(instance \\ nil) do
+    resolve(
+      instance,
+      :telemetry,
+      :slow_directive_threshold_ms,
+      :slow_directive_threshold_ms,
+      Defaults.slow_directive_threshold_ms()
+    )
     |> normalize_non_neg_integer(Defaults.slow_directive_threshold_ms())
   end
 
   @doc "Returns the list of signal types considered interesting."
   @spec interesting_signal_types(instance()) :: [String.t()]
-  def interesting_signal_types(instance \\ nil)
-
-  def interesting_signal_types(nil),
-    do:
-      global_telemetry(:interesting_signal_types, Defaults.interesting_signal_types())
-      |> normalize_interesting_signal_types()
-
-  def interesting_signal_types(instance) do
-    with nil <- Jido.Debug.override(instance, :interesting_signal_types),
-         nil <- instance_telemetry(instance, :interesting_signal_types) do
-      global_telemetry(:interesting_signal_types, Defaults.interesting_signal_types())
-    end
+  def interesting_signal_types(instance \\ nil) do
+    resolve(
+      instance,
+      :telemetry,
+      :interesting_signal_types,
+      :interesting_signal_types,
+      Defaults.interesting_signal_types()
+    )
     |> normalize_interesting_signal_types()
   end
 
@@ -194,35 +168,27 @@ defmodule Jido.Observe.Config do
 
   @doc "Returns the observability log level for the given instance."
   @spec observe_log_level(instance()) :: Logger.level()
-  def observe_log_level(instance \\ nil)
-
-  def observe_log_level(nil) do
-    global_observability(:log_level, Defaults.observe_log_level())
-    |> normalize_observe_log_level()
-  end
-
-  def observe_log_level(instance) do
-    with nil <- Jido.Debug.override(instance, :observe_log_level),
-         nil <- instance_observability(instance, :log_level) do
-      global_observability(:log_level, Defaults.observe_log_level())
-    end
+  def observe_log_level(instance \\ nil) do
+    resolve(
+      instance,
+      :observability,
+      :log_level,
+      :observe_log_level,
+      Defaults.observe_log_level()
+    )
     |> normalize_observe_log_level()
   end
 
   @doc "Returns the debug events mode for the given instance."
   @spec debug_events(instance()) :: :off | :minimal | :all
-  def debug_events(instance \\ nil)
-
-  def debug_events(nil) do
-    global_observability(:debug_events, Defaults.observe_debug_events())
-    |> normalize_debug_events()
-  end
-
-  def debug_events(instance) do
-    with nil <- Jido.Debug.override(instance, :observe_debug_events),
-         nil <- instance_observability(instance, :debug_events) do
-      global_observability(:debug_events, Defaults.observe_debug_events())
-    end
+  def debug_events(instance \\ nil) do
+    resolve(
+      instance,
+      :observability,
+      :debug_events,
+      :observe_debug_events,
+      Defaults.observe_debug_events()
+    )
     |> normalize_debug_events()
   end
 
@@ -234,52 +200,34 @@ defmodule Jido.Observe.Config do
 
   @doc "Returns true if sensitive data should be redacted."
   @spec redact_sensitive?(instance()) :: boolean()
-  def redact_sensitive?(instance \\ nil)
-
-  def redact_sensitive?(nil),
-    do:
-      global_observability(:redact_sensitive, Defaults.redact_sensitive())
-      |> normalize_boolean()
-
-  def redact_sensitive?(instance) do
-    with nil <- Jido.Debug.override(instance, :redact_sensitive),
-         nil <- instance_observability(instance, :redact_sensitive) do
-      global_observability(:redact_sensitive, Defaults.redact_sensitive())
-    end
+  def redact_sensitive?(instance \\ nil) do
+    resolve(
+      instance,
+      :observability,
+      :redact_sensitive,
+      :redact_sensitive,
+      Defaults.redact_sensitive()
+    )
     |> normalize_boolean()
   end
 
   @doc "Returns the tracer module for the given instance."
   @spec tracer(instance()) :: module()
-  def tracer(instance \\ nil)
-
-  def tracer(nil) do
-    global_observability(:tracer, Defaults.tracer())
-    |> normalize_tracer()
-  end
-
-  def tracer(instance) do
-    with nil <- Jido.Debug.override(instance, :tracer),
-         nil <- instance_observability(instance, :tracer) do
-      global_observability(:tracer, Defaults.tracer())
-    end
+  def tracer(instance \\ nil) do
+    resolve(instance, :observability, :tracer, :tracer, Defaults.tracer())
     |> normalize_tracer()
   end
 
   @doc "Returns tracer callback failure handling mode."
   @spec tracer_failure_mode(instance()) :: :warn | :strict
-  def tracer_failure_mode(instance \\ nil)
-
-  def tracer_failure_mode(nil) do
-    global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
-    |> normalize_tracer_failure_mode()
-  end
-
-  def tracer_failure_mode(instance) do
-    with nil <- Jido.Debug.override(instance, :tracer_failure_mode),
-         nil <- instance_observability(instance, :tracer_failure_mode) do
-      global_observability(:tracer_failure_mode, Defaults.tracer_failure_mode())
-    end
+  def tracer_failure_mode(instance \\ nil) do
+    resolve(
+      instance,
+      :observability,
+      :tracer_failure_mode,
+      :tracer_failure_mode,
+      Defaults.tracer_failure_mode()
+    )
     |> normalize_tracer_failure_mode()
   end
 
@@ -287,41 +235,37 @@ defmodule Jido.Observe.Config do
 
   @doc "Returns the maximum number of debug events to store."
   @spec debug_max_events(instance()) :: non_neg_integer()
-  def debug_max_events(instance \\ nil)
-
-  def debug_max_events(nil) do
-    global_telemetry(:debug_max_events, Defaults.debug_max_events())
-    |> normalize_non_neg_integer(Defaults.debug_max_events())
-  end
-
-  def debug_max_events(instance) do
-    with nil <- Jido.Debug.override(instance, :debug_max_events),
-         nil <- instance_telemetry(instance, :debug_max_events) do
-      global_telemetry(:debug_max_events, Defaults.debug_max_events())
-    end
+  def debug_max_events(instance \\ nil) do
+    resolve(
+      instance,
+      :telemetry,
+      :debug_max_events,
+      :debug_max_events,
+      Defaults.debug_max_events()
+    )
     |> normalize_non_neg_integer(Defaults.debug_max_events())
   end
 
   # --- Private helpers ---
 
-  defp instance_telemetry(instance, key) do
-    otp_app = instance_otp_app(instance)
+  defp resolve(nil, group, key, _override_key, default) do
+    global_config(group, key, default)
+  end
 
-    if otp_app do
-      otp_app
-      |> Application.get_env(instance, [])
-      |> Keyword.get(:telemetry, [])
-      |> Keyword.get(key)
+  defp resolve(instance, group, key, override_key, default) do
+    with nil <- Jido.Debug.override(instance, override_key),
+         nil <- instance_config(instance, group, key) do
+      global_config(group, key, default)
     end
   end
 
-  defp instance_observability(instance, key) do
+  defp instance_config(instance, group, key) do
     otp_app = instance_otp_app(instance)
 
     if otp_app do
       otp_app
       |> Application.get_env(instance, [])
-      |> Keyword.get(:observability, [])
+      |> Keyword.get(group, [])
       |> Keyword.get(key)
     end
   end
@@ -333,12 +277,8 @@ defmodule Jido.Observe.Config do
     end
   end
 
-  defp global_telemetry(key, default) do
-    :jido |> Application.get_env(:telemetry, []) |> Keyword.get(key, default)
-  end
-
-  defp global_observability(key, default) do
-    :jido |> Application.get_env(:observability, []) |> Keyword.get(key, default)
+  defp global_config(group, key, default) do
+    :jido |> Application.get_env(group, []) |> Keyword.get(key, default)
   end
 
   defp normalize_action_log_level(level, :full), do: logger_level_for_action(level)
