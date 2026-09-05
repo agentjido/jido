@@ -2119,7 +2119,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M09, evidence/core/m09-test.results.stage.json",
       "prepared_id": "06_01_live_conversation",
       "prepared_directory": "lib/examples/06_factory/06_01_live_conversation",
       "prepared_files": [
@@ -2173,7 +2173,7 @@
       ],
       "baseline_tests_executed": 26,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M09, evidence/core/m09-test.results.stage.json",
       "prepared_id": "06_02_three_agent_system",
       "prepared_directory": "lib/examples/06_factory/06_02_three_agent_system",
       "prepared_files": [
@@ -2232,7 +2232,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M09, evidence/core/m09-test.results.stage.json",
       "prepared_id": "06_03_department_factory",
       "prepared_directory": "lib/examples/06_factory/06_03_department_factory",
       "prepared_files": [
@@ -2289,7 +2289,7 @@
       ],
       "baseline_tests_executed": 14,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M09, evidence/core/m09-test.results.stage.json",
       "prepared_id": "06_04_flow_factory",
       "prepared_directory": "lib/examples/06_factory/06_04_flow_factory",
       "prepared_files": [

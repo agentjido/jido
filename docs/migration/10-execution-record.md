@@ -133,3 +133,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m08-compile.json`, `evidence/core/m08-test.json`
 and `evidence/core/m08-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M09
+
+All four Factory systems pass their 48 direct checks. Shared streaming adds nine checks across seven test files. Tests use real local HTTP/SSE adapters, the real worker timing barrier and the nine-worker Flow graph. No provider key or paid session is used.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 945}]` in 152.15 seconds, with normal concurrency.
+See `evidence/core/m09-compile.json`, `evidence/core/m09-test.json`
+and `evidence/core/m09-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
