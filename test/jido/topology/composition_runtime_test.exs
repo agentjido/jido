@@ -92,6 +92,57 @@ defmodule Jido.Topology.CompositionRuntimeTest do
     assert :ok = Controller.await_ready(controller)
   end
 
+  test "child activation keeps the parent PID from dispatch", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Builder.new(name: "parent-snapshot")
+      |> Builder.agent(:parent, Cell)
+      |> Builder.agent(:child, SlowCell)
+      |> Builder.owns(:parent, :child)
+      |> Builder.startup(task_timeout: 5_000, retry_interval: 60_000)
+      |> Builder.build!(id: "parent-snapshot")
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance})
+    assert_receive {:readiness_blocked, gate}, 1_000
+    parent = Controller.whereis_agent(controller, :parent)
+
+    {_, runtime, _, _} =
+      Enum.find(Supervisor.which_children(controller), &(elem(&1, 0) == Controller.Runtime))
+
+    # Remove the live ready entry after dispatch. The task must keep its snapshot.
+    :sys.replace_state(runtime, fn state -> %{state | ready: %{}} end)
+    send(gate, :release)
+    assert :ok = Controller.await_ready(controller)
+    child = Controller.whereis_agent(controller, :child)
+    assert Server.children(parent)["agent/child"].pid == child
+  end
+
+  test "a failed parent blocks child activation", %{jido: jido} do
+    {:ok, unrelated} = Jido.start_agent(jido, Cell, id: "blocked-parent/agent/parent")
+
+    instance =
+      Builder.new(name: "blocked-parent")
+      |> Builder.agent(:parent, Cell)
+      |> Builder.agent(:child, Cell)
+      |> Builder.owns(:parent, :child)
+      |> Builder.startup(retry_interval: 60_000)
+      |> Builder.build!(id: "blocked-parent")
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance})
+
+    eventually(fn ->
+      Controller.status(controller).errors == %{
+        "agent/parent" => :agent_identity_in_use,
+        "agent/child" => {:dependencies_unavailable, ["agent/parent"]}
+      }
+    end)
+
+    assert Controller.whereis_agent(controller, :child) == nil
+    assert Process.alive?(unrelated)
+  end
+
   test "a team failure leaves the shared Bus and the other team running", %{jido: jido} do
     instance =
       Builder.new(ComposedSystem)

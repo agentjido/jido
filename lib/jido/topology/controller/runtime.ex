@@ -155,7 +155,7 @@ defmodule Jido.Topology.Controller.Runtime do
           safely(fn ->
             case Jido.whereis_agent(state.jido, spec.id) do
               nil -> :ok
-              pid -> if owned?(pid, spec, state), do: Jido.stop_agent(state.jido, pid)
+              pid -> if owned?(pid, spec, state.instance.id), do: Jido.stop_agent(state.jido, pid)
             end
           end)
       end
@@ -213,8 +213,11 @@ defmodule Jido.Topology.Controller.Runtime do
   defp dispatch(key, state) do
     supervisor = Controller.name(state.jido, state.instance.id, :tasks)
 
+    member = spec(key, state)
+    context = task_context(key, member, state)
+
     task =
-      Task.Supervisor.async_nolink(supervisor, fn -> safely(fn -> ensure(key, state) end) end)
+      Task.Supervisor.async_nolink(supervisor, fn -> safely(fn -> ensure(member, context) end) end)
 
     timer =
       Process.send_after(
@@ -251,55 +254,64 @@ defmodule Jido.Topology.Controller.Runtime do
     %{state | phase: phase, waiters: if(phase == :ready, do: %{}, else: state.waiters)}
   end
 
-  defp ensure(key, state) do
-    case Map.fetch(state.instance.plan.resources, key) do
-      {:ok, resource} -> ensure_bus(resource, state)
-      :error -> ensure_agent(Map.fetch!(state.instance.plan.agents, key), state)
+  defp task_context(key, member, state) do
+    if Map.has_key?(state.instance.plan.resources, key) do
+      %{jido: state.jido, pool: Controller.name(state.jido, state.instance.id, :resources)}
+    else
+      bus_ids =
+        Map.new(member.subscriptions, fn sub ->
+          {sub.bus, Map.fetch!(state.instance.plan.resources, sub.bus).id}
+        end)
+
+      %{
+        jido: state.jido,
+        instance_id: state.instance.id,
+        parent: if(member.parent, do: Map.fetch!(state.ready, member.parent)),
+        bus_ids: bus_ids,
+        retry_interval: state.instance.definition.startup.retry_interval
+      }
     end
   end
 
-  defp ensure_bus(spec, state) do
-    pool = Controller.name(state.jido, state.instance.id, :resources)
-
-    case Bus.whereis(spec.id, jido: state.jido) do
+  defp ensure(spec, %{pool: pool} = context) do
+    case Bus.whereis(spec.id, jido: context.jido) do
       {:ok, pid} ->
         if Enum.any?(DynamicSupervisor.which_children(pool), &(elem(&1, 1) == pid)),
           do: {:ok, pid},
           else: {:error, :bus_identity_in_use}
 
       _ ->
-        options = Keyword.merge(spec.config, name: spec.id, jido: state.jido)
+        options = Keyword.merge(spec.config, name: spec.id, jido: context.jido)
         DynamicSupervisor.start_child(pool, {Bus, options})
     end
   end
 
-  defp ensure_agent(spec, state) do
-    missing = Enum.reject(spec.depends_on, &Map.has_key?(state.ready, &1))
+  defp ensure(spec, context) do
+    with {:ok, pid} <- activate(spec, context),
+         :ok <- Server.await_ready(pid),
+         :ok <- subscriptions_ready(pid, spec),
+         :ok <- bind_parent(pid, spec, context),
+         do: {:ok, pid}
+  end
 
-    if missing != [] do
-      {:error, {:dependencies_unavailable, missing}}
-    else
-      with {:ok, pid} <- activate(spec, state),
-           :ok <- Server.await_ready(pid),
-           :ok <- subscriptions_ready(pid, spec),
-           :ok <- bind_parent(pid, spec, state),
-           do: {:ok, pid}
+  defp activate(spec, context) do
+    case Jido.whereis_agent(context.jido, spec.id) do
+      nil ->
+        start_agent(spec, context)
+
+      pid ->
+        if owned?(pid, spec, context.instance_id),
+          do: {:ok, pid},
+          else: {:error, :agent_identity_in_use}
     end
   end
 
-  defp activate(spec, state) do
-    case Jido.whereis_agent(state.jido, spec.id) do
-      nil -> start_agent(spec, state)
-      pid -> if owned?(pid, spec, state), do: {:ok, pid}, else: {:error, :agent_identity_in_use}
-    end
-  end
-
-  defp start_agent(spec, state) do
-    with {:ok, pid} <- Controller.Activation.start(spec, state) do
-      if owned?(pid, spec, state) do
+  defp start_agent(spec, context) do
+    with {:ok, pid} <- Controller.Activation.start(spec, context) do
+      if owned?(pid, spec, context.instance_id) do
         {:ok, pid}
       else
-        Jido.stop_agent(state.jido, pid)
+        Jido.stop_agent(context.jido, pid)
         {:error, :restored_agent_identity_in_use}
       end
     end
@@ -316,9 +328,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp bind_parent(_pid, %{parent: nil}, _state), do: :ok
 
-  defp bind_parent(pid, spec, state) do
-    parent = Map.fetch!(state.ready, spec.parent)
-
+  defp bind_parent(pid, spec, %{parent: parent}) do
     case Map.get(Server.children(parent), spec.key) do
       %{pid: ^pid} -> :ok
       nil -> Server.adopt_child(parent, pid, spec.key)
@@ -326,13 +336,13 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
-  defp marker(spec, state), do: %{id: state.instance.id, key: spec.key}
+  defp marker(spec, instance_id), do: %{id: instance_id, key: spec.key}
 
-  defp owned?(pid, spec, state) do
+  defp owned?(pid, spec, instance_id) do
     agent = Server.agent(pid)
 
     agent.module == spec.module and
-      Map.get(agent.metadata, "jido.topology") == marker(spec, state)
+      Map.get(agent.metadata, "jido.topology") == marker(spec, instance_id)
   end
 
   defp safely(fun) do
