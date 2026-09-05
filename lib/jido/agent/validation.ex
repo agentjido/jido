@@ -130,32 +130,19 @@ defmodule Jido.Agent.Validation do
   end
 
   defp build_definition(attrs) do
-    schema = Map.get(attrs, :schema, Zoi.object(%{}))
-    module = Map.get(attrs, :module, Agent)
-
-    with {:ok, name} <- validate_name(Map.get(attrs, :name)),
-         {:ok, description} <- validate_description(Map.get(attrs, :description)),
-         :ok <- validate_module(module),
-         :ok <- Jido.Agent.StateBudget.validate_limit(Map.get(attrs, :max_state_size)),
-         {:ok, plugins} <- Plugin.canonical_declarations(Map.get(attrs, :plugins, [])),
-         :ok <- State.validate_schema(schema),
-         {:ok, _complete_schema} <- Plugin.compose_schema(schema, plugins),
-         {:ok, routes} <- validate_routes(Map.get(attrs, :routes, [])),
-         {:ok, metadata} <- validate_metadata(Map.get(attrs, :metadata, %{})) do
-      {:ok,
-       %Agent{
-         id: nil,
-         module: module,
-         name: name,
-         description: description,
-         max_state_size: Map.get(attrs, :max_state_size),
-         schema: schema,
-         plugins: plugins,
-         state: nil,
-         routes: routes,
-         metadata: metadata
-       }}
-    end
+    %Agent{
+      id: nil,
+      module: Map.get(attrs, :module, Agent),
+      name: Map.get(attrs, :name),
+      description: Map.get(attrs, :description),
+      max_state_size: Map.get(attrs, :max_state_size),
+      schema: Map.get(attrs, :schema, Zoi.object(%{})),
+      plugins: Map.get(attrs, :plugins, []),
+      state: nil,
+      routes: Map.get(attrs, :routes, []),
+      metadata: Map.get(attrs, :metadata, %{})
+    }
+    |> validate_common()
   end
 
   defp validate_common(%Agent{} = agent) do
