@@ -24,7 +24,6 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
          bus_ref: nil,
          config: config,
          pending: nil,
-         reconnect_timer: nil,
          reconnect_token: nil,
          retry_timer: nil,
          subscription_id: nil
@@ -83,7 +82,7 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   end
 
   def handle_info({:reconnect, token}, %{reconnect_token: token} = state) do
-    state = %{state | reconnect_timer: nil, reconnect_token: nil}
+    state = %{state | reconnect_token: nil}
 
     case connect(state) do
       {:ok, state} -> {:noreply, state}
@@ -132,8 +131,8 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   defp schedule_reconnect(state) do
     token = make_ref()
-    timer = Process.send_after(self(), {:reconnect, token}, state.config.retry_delay_ms)
-    %{state | reconnect_timer: timer, reconnect_token: token}
+    Process.send_after(self(), {:reconnect, token}, state.config.retry_delay_ms)
+    %{state | reconnect_token: token}
   end
 
   defp connect(state) do

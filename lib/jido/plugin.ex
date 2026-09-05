@@ -365,18 +365,7 @@ defmodule Jido.Plugin do
       [runtime_ref, directive, context, spec.options],
       "Agent Plugin Directive dispatch failed"
     )
-    |> case do
-      :ok ->
-        :ok
-
-      {:error, _reason} = error ->
-        error
-
-      result ->
-        plugin_invalid("Agent Plugin dispatch/4 returned an invalid result", spec.module, %{
-          result: result
-        })
-    end
+    |> validate_status_result(spec.module, "Agent Plugin dispatch/4 returned an invalid result")
   end
 
   @doc false
@@ -390,20 +379,10 @@ defmodule Jido.Plugin do
         [runtime_ref, spec.options],
         "Agent Plugin readiness check failed"
       )
-      |> case do
-        :ok ->
-          :ok
-
-        {:error, _reason} = error ->
-          error
-
-        result ->
-          plugin_invalid(
-            "Agent Plugin await_ready/2 returned an invalid result",
-            spec.module,
-            %{result: result}
-          )
-      end
+      |> validate_status_result(
+        spec.module,
+        "Agent Plugin await_ready/2 returned an invalid result"
+      )
     else
       :ok
     end
@@ -667,16 +646,7 @@ defmodule Jido.Plugin do
       safe_apply(module, :prepare, [command, opts], "Agent Plugin prepare/2 failed")
       |> case do
         {:ok, %Command{} = prepared} ->
-          with {:ok, prepared} <- Command.validate(prepared),
-               true <- prepared.agent == command.agent do
-            {:ok, prepared}
-          else
-            false ->
-              plugin_invalid("Agent Plugin cannot replace the Agent", module, %{})
-
-            {:error, _reason} = error ->
-              error
-          end
+          validate_command_agent(prepared, command, module, %{})
 
         {:error, _reason} = error ->
           error
@@ -735,16 +705,7 @@ defmodule Jido.Plugin do
   defp validate_admission_result(result, original, module) do
     case result do
       {:ok, %Command{} = command} ->
-        with {:ok, command} <- Command.validate(command),
-             true <- command.agent == original.agent do
-          {:ok, command}
-        else
-          false ->
-            plugin_invalid("Agent Plugin cannot replace the Agent", module, %{callback: :admit})
-
-          {:error, _reason} = error ->
-            error
-        end
+        validate_command_agent(command, original, module, %{callback: :admit})
 
       {:error, _reason} = error ->
         error
@@ -756,6 +717,26 @@ defmodule Jido.Plugin do
           %{result: invalid_result}
         )
     end
+  end
+
+  defp validate_command_agent(command, original, module, replacement_details) do
+    with {:ok, command} <- Command.validate(command),
+         true <- command.agent == original.agent do
+      {:ok, command}
+    else
+      false ->
+        plugin_invalid("Agent Plugin cannot replace the Agent", module, replacement_details)
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp validate_status_result(:ok, _module, _message), do: :ok
+  defp validate_status_result({:error, _reason} = error, _module, _message), do: error
+
+  defp validate_status_result(result, module, message) do
+    plugin_invalid(message, module, %{result: result})
   end
 
   defp callback_modules(specs, function, arity) do
