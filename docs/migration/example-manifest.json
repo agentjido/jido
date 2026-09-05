@@ -1828,7 +1828,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_01_child_lifecycle",
       "prepared_directory": "lib/examples/05_multi_agent/05_01_child_lifecycle",
       "prepared_files": [
@@ -1877,7 +1877,7 @@
       ],
       "baseline_tests_executed": 6,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_02_correlated_requests",
       "prepared_directory": "lib/examples/05_multi_agent/05_02_correlated_requests",
       "prepared_files": [
@@ -1924,7 +1924,7 @@
       ],
       "baseline_tests_executed": 5,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_03_bounded_workers",
       "prepared_directory": "lib/examples/05_multi_agent/05_03_bounded_workers",
       "prepared_files": [
@@ -1971,7 +1971,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_04_agent_hierarchy",
       "prepared_directory": "lib/examples/05_multi_agent/05_04_agent_hierarchy",
       "prepared_files": [
@@ -2021,7 +2021,7 @@
       ],
       "baseline_tests_executed": 16,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_05_remote_child",
       "prepared_directory": "lib/examples/05_multi_agent/05_05_remote_child",
       "prepared_files": [
@@ -2072,7 +2072,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M08, evidence/core/m08-test.results.stage.json",
       "prepared_id": "05_06_remote_lifecycle",
       "prepared_directory": "lib/examples/05_multi_agent/05_06_remote_lifecycle",
       "prepared_files": [

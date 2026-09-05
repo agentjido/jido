@@ -1,0 +1,314 @@
+Compiling 5 files (.ex)
+Generated jido app
+Running ExUnit with seed: 0, max_cases: 20
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+................................................................................................................................................................................................................................................................................................................................................................    warning: incompatible types given to Jido.Util.DeepMerge.merge/2:
+
+        Jido.Util.DeepMerge.merge(%{}, :not_mergeable)
+
+    given types:
+
+        empty_map(), -:not_mergeable-
+
+    but expected one of:
+
+        (
+          empty_list() or map() or non_empty_list(term(), term()),
+          empty_list() or map() or non_empty_list(term(), term())
+        )
+
+    type warning found at:
+    │
+ 52 │         DeepMerge.merge(%{}, :not_mergeable)
+    │                   ~
+    │
+    └─ test/jido/util/deep_merge_test.exs:52:19: JidoTest.Util.DeepMergeTest."test merge/2 requires mergeable top-level inputs"/1
+
+    warning: the following clause cannot match because the previous clauses already matched all possible values:
+
+        _ ->
+
+    it attempts to match on the result of:
+
+        schema
+
+    which has the already matched type:
+
+        dynamic(%Zoi.Types.Struct{
+          module: Jido.Observe.SpanCtx,
+          fields:
+            non_empty_list(
+              {:event_prefix,
+               %Zoi.Types.Array{
+                 inner: %Zoi.Types.Atom{
+                   meta: %Zoi.Types.Meta{
+                     effects: empty_list(),
+                     metadata: empty_list(),
+                     required: nil,
+                     error: nil,
+                     description: nil,
+                     example: nil,
+                     typespec: nil,
+                     deprecated: nil
+                   }
+                 },
+                 min_length: nil,
+                 max_length: nil,
+                 length: nil,
+                 unique_items: nil,
+                 coerce: false,
+                 meta: %Zoi.Types.Meta{
+                   effects: empty_list(),
+                   metadata: empty_list(),
+                   required: true,
+                   error: nil,
+                   description: binary(),
+                   example: nil,
+                   typespec: nil,
+                   deprecated: nil
+                 }
+               }} or
+                {:metadata,
+                 %Zoi.Types.Map{
+                   key_type: %Zoi.Types.Any{
+                     meta: %Zoi.Types.Meta{
+                       effects: empty_list(),
+                       metadata: empty_list(),
+                       required: nil,
+                       error: nil,
+                       description: nil,
+                       example: nil,
+                       typespec: nil,
+                       deprecated: nil
+                     }
+                   },
+                   value_type: %Zoi.Types.Any{
+                     meta: %Zoi.Types.Meta{
+                       effects: empty_list(),
+                       metadata: empty_list(),
+                       required: nil,
+                       error: nil,
+                       description: nil,
+                       example: nil,
+                       typespec: nil,
+                       deprecated: nil
+                     }
+                   },
+                   fields: nil,
+                   unrecognized_keys: :strip,
+                   coerce: false,
+                   empty_values: empty_list(),
+                   meta: %Zoi.Types.Meta{
+                     effects: empty_list(),
+                     metadata: empty_list(),
+                     required: true,
+                     error: nil,
+                     description: binary(),
+                     example: nil,
+                     typespec: nil,
+                     deprecated: nil
+                   }
+                 }} or
+                {:tracer_ctx,
+                 %Zoi.Types.Any{
+                   meta: %Zoi.Types.Meta{
+                     effects: empty_list(),
+                     metadata: empty_list(),
+                     required: false,
+                     error: nil,
+                     description: binary(),
+                     example: nil,
+                     typespec: nil,
+                     deprecated: nil
+                   }
+                 }} or
+                {:tracer_module,
+                 %Zoi.Types.Atom{
+                   meta: %Zoi.Types.Meta{
+                     effects: empty_list(),
+                     metadata: empty_list(),
+                     required: false,
+                     error: nil,
+                     description: binary(),
+                     example: nil,
+                     typespec: nil,
+                     deprecated: nil
+                   }
+                 }} or
+                {:start_system_time or :start_time,
+                 %Zoi.Types.Integer{
+                   gte: nil,
+                   lte: nil,
+                   gt: nil,
+                   lt: nil,
+                   multiple_of: nil,
+                   coerce: false,
+                   meta: %Zoi.Types.Meta{
+                     effects: empty_list(),
+                     metadata: empty_list(),
+                     required: true,
+                     error: nil,
+                     description: binary(),
+                     example: nil,
+                     typespec: nil,
+                     deprecated: nil
+                   }
+                 }}
+            ),
+          unrecognized_keys: :strip,
+          coerce: true,
+          empty_values: empty_list(),
+          meta: %Zoi.Types.Meta{
+            effects: empty_list(),
+            metadata: empty_list(),
+            required: nil,
+            error: nil,
+            description: nil,
+            example: nil,
+            typespec: nil,
+            deprecated: nil
+          }
+        })
+
+    type warning found at:
+    │
+ 16 │       assert is_struct(schema)
+    │       ~~~~~~~~~~~~~~~~~~~~~~~~
+    │
+    └─ test/jido/observe/span_ctx_test.exs:16: JidoTest.Observe.SpanCtxTest."test schema/0 returns the Zoi schema"/1
+
+    warning: incompatible types given to Jido.Observe.SpanCtx.new!/1:
+
+        Jido.Observe.SpanCtx.new!("not a map")
+
+    given types:
+
+        -binary()-
+
+    but expected one of:
+
+        map()
+
+    type warning found at:
+    │
+ 74 │         SpanCtx.new!("not a map")
+    │                 ~
+    │
+    └─ test/jido/observe/span_ctx_test.exs:74:17: JidoTest.Observe.SpanCtxTest."test new!/1 raises on non-map input"/1
+
+    warning: incompatible types given to Jido.ID.uuid7/2:
+
+        Jido.ID.uuid7(1.0, <<0::integer-size(80)>>)
+
+    given types:
+
+        -float()-, binary()
+
+    but expected one of:
+
+        integer(), binary()
+
+    type warning found at:
+    │
+ 85 │         ID.uuid7(1.0, <<0::80>>)
+    │            ~
+    │
+    └─ test/jido/id_test.exs:85:12: JidoTest.IDTest."test uuid7/2 rejects timestamps outside the 48-bit UUIDv7 range"/1
+
+    warning: incompatible types given to Jido.ID.uuid7/2:
+
+        Jido.ID.uuid7(0, :not_binary)
+
+    given types:
+
+        integer(), -:not_binary-
+
+    but expected one of:
+
+        integer(), binary()
+
+    type warning found at:
+    │
+ 99 │         ID.uuid7(0, :not_binary)
+    │            ~
+    │
+    └─ test/jido/id_test.exs:99:12: JidoTest.IDTest."test uuid7/2 rejects random inputs that are not 80 bits"/1
+
+......................................................................................................................................................
+11:42:23.077 [warning] [signal.error] type=examples.jobs.settle error=%{message: "attempt result is stale", type: :validation_error, details: %{}, retryable?: false} duration=6.36ms
+.
+11:42:24.582 [warning] [signal.error] type=examples.jobs.settle error=%{message: "attempt result is stale", type: :validation_error, details: %{}, retryable?: false} duration=23.94ms
+.........
+11:42:31.343 [warning] [signal.error] type=test.remote.hold error=%{message: "\"{:parent_down, :cancelled}\"", type: :internal, details: %{}, retryable?: true} duration=20.75ms
+
+11:42:31.367 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, :spawn_request_closed}\"", type: :internal, details: %{}, retryable?: true} duration=440μs
+
+11:42:31.370 [error] Agent Directive handling failed
+.
+11:42:32.620 [warning] [signal.error] type=test.remote.hold error=%{message: "\"{:parent_down, :cancelled}\"", type: :internal, details: %{}, retryable?: true} duration=21.66ms
+...............................................................................
+11:42:47.976 [warning] [signal.error] type=test.remote.hold error=%{message: "\"{:parent_down, :cancelled}\"", type: :internal, details: %{}, retryable?: true} duration=23.86ms
+
+11:42:47.995 [warning] [signal.error] type=test.remote.hold error=%{message: "\"{:parent_down, :cancelled}\"", type: :internal, details: %{}, retryable?: true} duration=5.83ms
+.
+11:42:48.988 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_missing@127.0.0.1\\\", {4, #Reference<0.1267743784.785121281.12726>}, :noconnection}\"", type: :internal, details: %{}, retryable?: true} duration=5.05ms
+
+11:42:48.989 [error] Agent Directive handling failed
+.
+11:42:50.136 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, {:invalid_agent_module, JidoTest.OnlyOriginAgent}}\"", type: :internal, details: %{}, retryable?: true} duration=6.16ms
+
+11:42:50.139 [error] Agent Directive handling failed
+
+11:42:50.151 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, :jido_instance_not_running}\"", type: :internal, details: %{}, retryable?: true} duration=5.8ms
+
+11:42:50.151 [error] Agent Directive handling failed
+.
+11:42:51.212 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, {:child_identity_in_use, \\\"parent/worker\\\"}}\"", type: :internal, details: %{}, retryable?: true} duration=9.02ms
+
+11:42:51.214 [error] Agent Directive handling failed
+
+11:42:51.241 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_tag_in_use, :worker}\"", type: :internal, details: %{}, retryable?: true} duration=53μs
+
+11:42:51.241 [error] Agent Directive handling failed
+.
+11:42:52.353 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-12805-74514@127.0.0.1\\\", {4, #Reference<0.2166351167.1590689793.2341>}, :timeout}\"", type: :internal, details: %{}, retryable... duration=104.23ms
+
+11:42:52.355 [error] Agent Directive handling failed
+
+11:42:52.361 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_pending, :worker, :\\\"jido_dist_b-12805-74514@127.0.0.1\\\", {4, #Reference<0.2166351167.1590689793.2341>}}\"", type: :internal, details: %{}, retryable?: true} duration=22μs
+
+11:42:52.361 [error] Agent Directive handling failed
+
+11:42:52.463 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-12805-74514@127.0.0.1\\\", {4, #Reference<0.2166351167.1590689793.2341>}, :timeout}\"", type: :internal, details: %{}, retryable... duration=100.67ms
+
+11:42:52.463 [error] Agent Directive handling failed
+.
+11:42:53.559 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-12869-74514@127.0.0.1\\\", {4, #Reference<0.1298924357.1859387393.30500>}, :timeout}\"", type: :internal, details: %{}, retryabl... duration=104.33ms
+
+11:42:53.561 [error] Agent Directive handling failed
+....
+11:42:57.396 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-26595-74514@127.0.0.1\\\", {4, #Reference<0.425886327.2932867073.172834>}, :timeout}\"", type: :internal, details: %{}, retryabl... duration=104.65ms
+
+11:42:57.398 [error] Agent Directive handling failed
+
+11:42:57.449 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, :spawn_request_closed}\"", type: :internal, details: %{}, retryable?: true} duration=260μs
+
+11:42:57.449 [error] Agent Directive handling failed
+.........................................................................................................................................................................................................
+11:43:00.844 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-14981-74514@127.0.0.1\\\", {14, #Reference<0.3289633528.3738697729.37552>}, :timeout}\"", type: :internal, details: %{}, retryab... duration=103.96ms
+
+11:43:00.846 [error] Agent Directive handling failed
+
+11:43:00.952 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:child_spawn_indeterminate, :worker, :\\\"jido_dist_b-14981-74514@127.0.0.1\\\", {14, #Reference<0.3289633528.3738697729.37552>}, :timeout}\"", type: :internal, details: %{}, retryab... duration=100.67ms
+
+11:43:00.953 [error] Agent Directive handling failed
+..
+11:43:03.113 [warning] [directive.error] type=SpawnAgent error=%{message: "\"{:spawn_agent_failed, :jido_instance_not_running}\"", type: :internal, details: %{}, retryable?: true} duration=14.04ms
+
+11:43:03.115 [error] Agent Directive handling failed
+....................................................................................
+Finished in 57.5 seconds (2.2s async, 55.3s sync)
+
+Result: 888 passed

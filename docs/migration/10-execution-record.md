@@ -123,3 +123,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m07-compile.json`, `evidence/core/m07-test.json`
 and `evidence/core/m07-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M08
+
+All six Multi-agent fixtures pass 38 checks. Real child startup, restart, bounded workers, hierarchy shutdown, remote placement, disconnect and explicit replacement after reconnect remain unchanged. These checks do not establish cluster-exclusive ownership.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 888}]` in 60.263 seconds, with normal concurrency.
+See `evidence/core/m08-compile.json`, `evidence/core/m08-test.json`
+and `evidence/core/m08-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
