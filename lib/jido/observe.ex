@@ -235,13 +235,14 @@ defmodule Jido.Observe do
   """
   @spec finish_span_error(span_ctx(), atom(), term(), list()) :: :ok
   def finish_span_error(%SpanCtx{} = span_ctx, kind, reason, stacktrace) do
+    emit_exception_event(span_ctx, kind, reason)
+
     invoke_tracer_callback(
       span_ctx,
       :span_exception,
       [span_ctx.tracer_ctx, kind, reason, stacktrace],
       :ok,
-      "span_exception/4",
-      fn -> emit_exception_event(span_ctx, kind, reason, stacktrace) end
+      "span_exception/4"
     )
 
     :ok
@@ -600,13 +601,13 @@ defmodule Jido.Observe do
     rescue
       e ->
         stacktrace = __STACKTRACE__
-        emit_exception_event(span_ctx, :error, e, stacktrace)
+        emit_exception_event(span_ctx, :error, e)
         Process.put(key, %{count: 1, outcome: {:raised, :error, e, stacktrace}})
         reraise e, stacktrace
     catch
       kind, reason ->
         stacktrace = __STACKTRACE__
-        emit_exception_event(span_ctx, kind, reason, stacktrace)
+        emit_exception_event(span_ctx, kind, reason)
         Process.put(key, %{count: 1, outcome: {:raised, kind, reason, stacktrace}})
         :erlang.raise(kind, reason, stacktrace)
     end
@@ -658,7 +659,7 @@ defmodule Jido.Observe do
     measurements
   end
 
-  defp emit_exception_event(%SpanCtx{} = span_ctx, kind, reason, _stacktrace) do
+  defp emit_exception_event(%SpanCtx{} = span_ctx, kind, reason) do
     duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
 
     error_metadata =
@@ -672,13 +673,8 @@ defmodule Jido.Observe do
          callback,
          args,
          fallback,
-         callback_name,
-         before_fun \\ nil
+         callback_name
        ) do
-    if is_function(before_fun, 0) do
-      before_fun.()
-    end
-
     try do
       apply(span_ctx.tracer_module || tracer(span_ctx.metadata), callback, args)
     rescue
