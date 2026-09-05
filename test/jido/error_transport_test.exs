@@ -18,6 +18,84 @@ defmodule JidoTest.ErrorTransportTest do
     def run(params, _context), do: {:ok, params}
   end
 
+  describe "transport key policy" do
+    test "redacts sensitive keys in maps and key-value lists without changing key names" do
+      keys = [
+        :api_key,
+        "API.KEY",
+        "prefixApiKeySuffix",
+        :authorization,
+        "AUTHORIZATION-header",
+        :credential,
+        "userCredentials",
+        :password,
+        "pass / word",
+        :private_key,
+        "PRIVATE-KEY",
+        :secret,
+        "clientSecretValue",
+        :token,
+        "accessToken",
+        "to\tken",
+        "seécret"
+      ]
+
+      for key <- keys, entries <- [%{key => "hidden"}, [{key, "hidden"}]] do
+        error = Error.execution_error("Failed", details: %{nested: entries})
+        result = Error.to_map(error)
+
+        assert result.details.nested == %{key => "[REDACTED]"}
+        assert Jido.Observe.exception_metadata(:error, error).error == result
+        refute Jason.encode!(result) =~ "hidden"
+      end
+    end
+
+    test "redaction takes priority over stacktrace omission" do
+      for key <- [:token_stacktrace, "STACK.TRACE-password", "secretStackTrace"],
+          entries <- [%{key => <<255>>}, [{key, <<255>>}]] do
+        error = Error.execution_error("Failed", details: %{nested: entries})
+        assert Error.to_map(error).details.nested == %{key => "[REDACTED]"}
+      end
+    end
+
+    test "keeps key handling for invalid binaries and non-string map keys" do
+      details = %{
+        <<255>> => "visible",
+        (<<255>> <> "TOKEN") => "hidden",
+        {:password, 1} => "hidden",
+        123 => "visible"
+      }
+
+      error = Error.execution_error("Failed", details: %{nested: details})
+
+      assert Error.to_map(error).details.nested == %{
+               <<255>> => "visible",
+               (<<255>> <> "TOKEN") => "[REDACTED]",
+               "{:password, 1}" => "[REDACTED]",
+               "123" => "visible"
+             }
+    end
+
+    test "omits stacktrace variants and keeps ordinary keys visible" do
+      for key <- [
+            :stacktrace,
+            :stack_trace,
+            "StackTrace",
+            "call-stack.trace-value",
+            "sta ck/trace"
+          ] do
+        for entries <- [%{key => "hidden"}, [{key, "hidden"}]] do
+          error = Error.execution_error("Failed", details: %{nested: entries})
+          assert Error.to_map(error).details.nested == %{key => "[OMITTED]"}
+        end
+      end
+
+      details = %{"api" => 1, "key" => 2, "stack" => 3, "trace" => 4, name: "visible"}
+      error = Error.execution_error("Failed", details: %{nested: details})
+      assert Error.to_map(error).details.nested == details
+    end
+  end
+
   describe "transport boundaries from current main" do
     test "preserves field names and indexes in validation paths" do
       for path <- [[:name], ["name"], [:users, 0, :name], ["users", 19, "name"]] do
