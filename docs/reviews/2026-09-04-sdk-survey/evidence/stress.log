@@ -1,0 +1,195 @@
+Waiting for lock on the build directory (held by process 81997)
+{
+  "runtime": {
+    "otp": "29",
+    "elixir": "1.20.3"
+  },
+  "config": {
+    "records": 100000,
+    "leaf": 64,
+    "actors": 4,
+    "rounds": 3
+  },
+  "results": [
+    {
+      "actor": 1,
+      "runs": [
+        {
+          "round": 1,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1116.1
+        },
+        {
+          "round": 2,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1178.9
+        },
+        {
+          "round": 3,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1077.8
+        }
+      ],
+      "commits": 3
+    },
+    {
+      "actor": 2,
+      "runs": [
+        {
+          "round": 1,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1116.9
+        },
+        {
+          "round": 2,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1172.2
+        },
+        {
+          "round": 3,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1080.8
+        }
+      ],
+      "commits": 3
+    },
+    {
+      "actor": 3,
+      "runs": [
+        {
+          "round": 1,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1115.9
+        },
+        {
+          "round": 2,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1156.7
+        },
+        {
+          "round": 3,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1066.4
+        }
+      ],
+      "commits": 3
+    },
+    {
+      "actor": 4,
+      "runs": [
+        {
+          "round": 1,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1112.1
+        },
+        {
+          "round": 2,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1193.1
+        },
+        {
+          "round": 3,
+          "usage": {
+            "calls": 4095,
+            "max_depth": 11,
+            "records_read": 100000,
+            "bytes_read": 13768890,
+            "peak_read_records": 49,
+            "steps": 8190
+          },
+          "elapsed_ms": 1077.9
+        }
+      ],
+      "commits": 3
+    }
+  ],
+  "elapsed_ms": 3425.7,
+  "corpus_bytes": 13768890,
+  "expected_counts": {
+    "service-0": 2858,
+    "service-1": 2857,
+    "service-2": 2857,
+    "service-3": 2857,
+    "service-4": 2857,
+    "service-5": 2857,
+    "service-6": 2857
+  },
+  "successful_runs": 12
+}

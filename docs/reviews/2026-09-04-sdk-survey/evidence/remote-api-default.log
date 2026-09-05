@@ -1,0 +1,15 @@
+Remote API audit: %{
+  local_control: {:ok, %{value: 1}},
+  local_liveness: true,
+  remote_liveness: {:error, ":badarg"},
+  local_expired_call: {:exit,
+   "{:timeout, {:gen_statem, :call, [#PID<29468.202.0>, {:signal, #Reference<29468.2137381996.3002335233.188326>, %Jido.Signal{data: %{value: 4}, id: \"01a06dd9-b19e-7420-b38a-35bfe28ce6e3\", type: \"examples.remote.record\", time: nil, ...}, ...}, ...]}}"},
+  monotonic_clock_difference_ms: 6572,
+  younger_to_older_default_timeout: {:error, :admission_timeout},
+  local_state_after_expired_call: %{value: 3},
+  local_revision_after_expired_call: 1,
+  older_to_younger_expired_call: {:exit,
+   "{:timeout, {:gen_statem, :call, [#PID<29468.202.0>, {:signal, #Reference<29467.659616700.1391198209.125065>, %Jido.Signal{data: %{value: 3}, id: \"01a06dd9-b11f-706a-bd08-c3b436148640\", type: \"examples.remote.record\", time: nil, ...}, ...}, ...]}}"},
+  younger_state_after_expired_call: %{value: 3},
+  younger_revision_after_expired_call: 1
+}

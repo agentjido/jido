@@ -1,36 +1,20 @@
-# Jido Usage Rules
+# Jido usage rules
 
-## Intent
-Build reliable multi-agent systems by keeping decision logic pure and runtime effects explicit.
-<!-- package.jido.pure_cmd package.jido.runtime_separation -->
+Use the implemented V3 Agent contract. A definition has no instance identity or
+state. Instantiate it before use. Send Signals to Actions or Flows.
+Direct `Jido.Agent.cmd/3` returns `{:ok, candidate, directives}` or an error.
+A live `AgentServer.call/3` returns `{:ok, committed_agent}` or an error.
 
-## Core Contracts
-- Treat `cmd/2` as the core agent contract: `{updated_agent, directives}`.
-- Keep agent logic pure; directives describe external effects only.
-- Use **Zoi-first** schemas for new agents, directives, plugins, and signals.
-- Preserve tagged tuple and structured error contracts at public boundaries.
-- Use AgentServer/runtime modules for process concerns, not agent module internals.
+Return complete candidate state. Actions and Flows can perform I/O before commit;
+application idempotency must account for a later failure. Directives run after a
+live commit. Ordinary directives do not acquire automatic crash recovery.
+Declare Plugins explicitly and preserve their owned state keys and callback order.
 
-## Library Author Patterns
-- Author actions for domain behavior; let agents orchestrate state + directive emission.
-- Use `Directive.SpawnAgent` / `Directive.StopChild` for hierarchy, not ad-hoc child tracking.
-- Use signals for cross-agent communication instead of direct process coupling.
-- Keep plugin/sensor concerns isolated and composable.
+Keep runtime PIDs and handles out of checkpoints. Use typed schemas, safe error
+maps, instance and partition scope, owned children, and explicit resource cleanup.
+An optional `max_state_size` bounds complete state in external term bytes.
 
-## QA Patterns
-- Start with pure `cmd/2` tests, then add AgentServer integration tests.
-- Start an isolated Jido instance per runtime test and prefer await/polling assertions over fixed sleeps.
-- Run `mix q` (`mix quality`) and coverage checks before release.
-
-## Avoid
-- Embedding runtime side effects directly in core state transition code.
-- Using directives as a hidden state-mutation mechanism.
-- Tight coupling between unrelated agent modules.
-
-## References
-- `README.md`
-- `guides/`
-- `test/AGENTS.md`
-- `AGENTS.md`
-- https://hexdocs.pm/jido
-- https://hexdocs.pm/usage_rules/readme.html#usage-rules
+Test direct values and live behavior. Use controlled barriers for concurrency and
+failure tests. Run the full catalog and integration acceptance, not just default
+`mix test`. Do not add an exclusion to hide a failure. Follow
+[the migration guide](guides/migration.md) for removed V2 interfaces and storage.

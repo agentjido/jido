@@ -11,6 +11,7 @@ defmodule Jido.Agent.Validation do
     :module,
     :name,
     :description,
+    :max_state_size,
     :schema,
     :plugins,
     :state,
@@ -101,7 +102,7 @@ defmodule Jido.Agent.Validation do
          {:ok, id} <- validate_id(agent.id),
          {:ok, schema} <- complete_schema(agent),
          {:ok, state} <- State.validate(agent.state, schema) do
-      {:ok, %{agent | id: id, state: state}}
+      Jido.Agent.StateBudget.check(%{agent | id: id, state: state})
     end
   end
 
@@ -135,6 +136,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, name} <- validate_name(Map.get(attrs, :name)),
          {:ok, description} <- validate_description(Map.get(attrs, :description)),
          :ok <- validate_module(module),
+         :ok <- Jido.Agent.StateBudget.validate_limit(Map.get(attrs, :max_state_size)),
          {:ok, plugins} <- Plugin.canonical_declarations(Map.get(attrs, :plugins, [])),
          :ok <- State.validate_schema(schema),
          {:ok, _complete_schema} <- Plugin.compose_schema(schema, plugins),
@@ -146,6 +148,7 @@ defmodule Jido.Agent.Validation do
          module: module,
          name: name,
          description: description,
+         max_state_size: Map.get(attrs, :max_state_size),
          schema: schema,
          plugins: plugins,
          state: nil,
@@ -159,6 +162,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, name} <- validate_name(agent.name),
          {:ok, description} <- validate_description(agent.description),
          :ok <- validate_module(agent.module),
+         :ok <- Jido.Agent.StateBudget.validate_limit(agent.max_state_size),
          {:ok, plugins} <- Plugin.canonical_declarations(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
          {:ok, _complete_schema} <- Plugin.compose_schema(agent.schema, plugins),

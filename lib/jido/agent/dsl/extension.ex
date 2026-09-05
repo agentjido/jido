@@ -46,7 +46,7 @@ defmodule Jido.Agent.DSL.Extension do
   }
   @agent %Spark.Dsl.Section{
     name: :agent,
-    schema: [schema: [type: :any], metadata: [type: :map]],
+    schema: [schema: [type: :any], metadata: [type: :map], max_state_size: [type: :any]],
     entities: [@plugin]
   }
   @routes %Spark.Dsl.Section{

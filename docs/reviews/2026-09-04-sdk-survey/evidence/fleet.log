@@ -1,0 +1,13 @@
+Local fleet audit: %{
+  actors: 1500,
+  successful_commits: 1500,
+  concurrency: 32,
+  start_ms: 260.18,
+  work_ms: 91.626,
+  stop_ms: 28.926,
+  p50_call_us: 573,
+  p95_call_us: 895,
+  ready_vm_memory_delta_bytes: 29508458,
+  remaining_actors: 0,
+  remaining_owned_tasks: 0
+}

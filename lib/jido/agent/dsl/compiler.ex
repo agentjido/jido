@@ -19,7 +19,14 @@ defmodule Jido.Agent.DSL.Compiler do
 
     config =
       Map.merge(
-        %{description: nil, schema: Zoi.object(%{}), metadata: %{}, routes: [], plugins: []},
+        %{
+          description: nil,
+          schema: Zoi.object(%{}),
+          metadata: %{},
+          routes: [],
+          plugins: [],
+          max_state_size: nil
+        },
         Map.merge(config, fields)
       )
 
@@ -54,7 +61,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
   defp block_fields(dsl, routes, plugins, env) do
     fields =
-      Enum.reduce([:schema, :metadata], %{}, fn key, acc ->
+      Enum.reduce([:schema, :metadata, :max_state_size], %{}, fn key, acc ->
         case Extension.fetch_opt(dsl, [:agent], key) do
           {:ok, value} -> Map.put(acc, key, value)
           :error -> acc

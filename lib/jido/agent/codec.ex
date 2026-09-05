@@ -56,6 +56,11 @@ defmodule Jido.Agent.Codec do
         "routes" => routes
       }
 
+      document =
+        if is_nil(agent.max_state_size),
+          do: document,
+          else: Map.put(document, "max_state_size", agent.max_state_size)
+
       with :ok <- Data.check_document(document), do: {:ok, document}
     end
   end
@@ -63,7 +68,7 @@ defmodule Jido.Agent.Codec do
   @doc "Decodes one neutral Agent definition."
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- object(document, @fields),
+         :ok <- definition_object(document),
          :ok <- version(document, "jido.agent"),
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :agent),
@@ -76,6 +81,7 @@ defmodule Jido.Agent.Codec do
         module: module,
         name: document["name"],
         description: document["description"],
+        max_state_size: document["max_state_size"],
         schema: schema,
         metadata: metadata,
         plugins: plugins,
@@ -88,6 +94,11 @@ defmodule Jido.Agent.Codec do
   def decode(document, registry, opts) do
     with {:ok, definition} <- decode(document, registry), do: Agent.instantiate(definition, opts)
   end
+
+  defp definition_object(document) when is_map(document) and not is_struct(document),
+    do: object(Map.delete(document, "max_state_size"), @fields)
+
+  defp definition_object(document), do: object(document, @fields)
 
   defp encode_route(route, registry) do
     {target, defaults} = target(route.target)

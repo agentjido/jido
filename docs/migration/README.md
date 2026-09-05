@@ -7,14 +7,16 @@ source into core Jido on `v3-spike`. The source now uses `Jido.Agent` and
 `Jido.AgentServer`. Its required persistence, group, scheduling, and remote
 lifecycle fixes are committed. The original Actor donor remains unchanged.
 
-No implementation has been transferred to core. This folder contains the
-proposed core commit sequence, source evidence, and acceptance criteria.
+The complete prepared runtime, all 52 fixtures and all ten application scenarios
+are now in core. M12 adds current-main protections and completes the old-feature
+audit. The seed campaign, continuous workload and beta QA remain pending. See
+[the execution record](10-execution-record.md) for tested checkpoints.
 
 ## Fixed inputs
 
 | Input | Revision | Role |
 | --- | --- | --- |
-| Core `v3-spike` | `a31b74306d4498ee47732c18b993abd4c26542bd` | Current branch with the earlier planning document |
+| Core source baseline | `a31b74306d4498ee47732c18b993abd4c26542bd` | Historical baseline with the earlier planning document |
 | Core implementation base | `10ebacd4b84e79b9d5496872b94a0232c36f9c90` | SchedEx fix, before Actor introduction |
 | Prepared Agent source | `bf6c9fbec569cb6438b6a1629a2768058d439d1f` | Tested source to transfer |
 | Preparation report | `741058d128928d05bdee109f3c6a0425eb82db89` | Child commit containing the report and evidence |

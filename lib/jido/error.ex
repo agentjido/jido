@@ -118,7 +118,7 @@ defmodule Jido.Error do
     ## Fields
 
     - `message` - Human-readable error message
-    - `kind` - Category: `:input`, `:action`, `:config`
+    - `kind` - Category: `:input`, `:action`, `:config`, `:state_size`
     - `subject` - The invalid value (field name, action module, etc.)
     - `details` - Additional context
     """
@@ -128,7 +128,7 @@ defmodule Jido.Error do
 
     @type t :: %__MODULE__{
             message: String.t(),
-            kind: :input | :action | :config | nil,
+            kind: :input | :action | :config | :state_size | nil,
             subject: any(),
             details: map()
           }
@@ -319,7 +319,7 @@ defmodule Jido.Error do
 
   ## Options
 
-  - `:kind` - Category: `:input`, `:action`, `:config`
+  - `:kind` - Category: `:input`, `:action`, `:config`, `:state_size`
   - `:subject` - The invalid value
   - `:field` - Alias for `:subject` (for input validation)
   - `:action` - Alias for `:subject` with `kind: :action`
@@ -519,6 +519,13 @@ defmodule Jido.Error do
 
   The returned map is suitable for transport and reporting boundaries. It
   includes bounded, sanitized details and never includes stacktraces by default.
+
+  Details traverse at most #{@transport_max_depth} container levels, with up to
+  #{@transport_max_items} entries per map or list. Scalar leaves are kept at the
+  depth limit, so validation paths retain field names and list indexes. Strings
+  are limited to #{@transport_max_string} characters plus a truncation suffix.
+  Invalid UTF-8 binaries use bounded inspection.
+  Deeper containers and opaque terms are replaced with `#{@depth_limit}`.
   """
   @spec to_map(any()) :: map()
   def to_map(error) do
@@ -668,12 +675,16 @@ defmodule Jido.Error do
   end
 
   defp sanitize_transport(value, depth \\ @transport_max_depth)
-  defp sanitize_transport(_value, 0), do: @depth_limit
-  defp sanitize_transport(value, _depth) when is_binary(value), do: truncate_string(value)
+
+  defp sanitize_transport(value, _depth) when is_binary(value) do
+    if String.valid?(value), do: truncate_string(value), else: safe_inspect(value)
+  end
 
   defp sanitize_transport(value, _depth)
        when is_boolean(value) or is_number(value) or is_atom(value),
        do: value
+
+  defp sanitize_transport(_value, 0), do: @depth_limit
 
   defp sanitize_transport(%_{} = value, _depth) when is_exception(value) do
     %{

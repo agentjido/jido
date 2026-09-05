@@ -1,201 +1,28 @@
-# Agents
+# Agent values and state
 
-<!-- covers: jido.agents_and_actions.schema_defined_agents jido.agents_and_actions.pure_cmd_contract -->
+An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.agent()` or
+`Jido.Agent.new/1` to create a definition. Call `MyAgent.new/1` or
+`Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.
+Instance options contain only `:id` and `:state`.
 
-**After:** You can define agents with schemas, hooks, and the `cmd/2`/`cmd/3` contract.
+Declare a static `Zoi.object` schema. The complete state includes Plugin-owned
+keys. Unknown keys and invalid values fail validation. `Jido.Agent.set/2`
+merges domain attributes and validates the complete result. An Action returns
+a complete candidate state from `context.agent_state`.
 
-Agents are immutable data structures that hold state and respond to actions. The
-core operation is `cmd/2` (or `cmd/3` with options), which processes actions and
-returns an updated agent plus any runtime-owned directives.
+Set `max_state_size: bytes` on a definition, in `use Jido.Agent`, through
+`Builder.max_state_size/2`, or in the `agent` block. The default is `nil`.
+The size is `:erlang.external_size(state)`, including Plugin state. It is not
+heap size. The smaller module and definition limits apply. Construction,
+validation, transition, command output, restore, and live commit check the limit.
+An oversized result returns `Jido.Error.ValidationError` with `kind: :state_size`,
+`subject: :state`, and the actual and maximum sizes. It does not commit or
+execute its directives. A nil limit avoids the size calculation.
 
-Jido keeps agent decision logic pure. Actions may be pure or effectful.
-Directives are for effects you want the runtime to own.
+Codec documents retain a non-nil limit in the optional `max_state_size` field.
+Module restore uses the current module definition. Generic Agent checkpoints
+retain their saved definition. A module limit still applies to a manually
+changed struct. A byte limit does not make nonportable data safe to store.
 
-## Defining an Agent
-
-```elixir
-defmodule MyAgent do
-  use Jido.Agent,
-    name: "my_agent",                        # Required - alphanumeric + underscores
-    description: "My custom agent",          # Optional
-    category: "example",                     # Optional
-    tags: ["demo"],                          # Default: []
-    vsn: "1.0.0",                            # Optional
-    schema: Zoi.object(%{
-              status: Zoi.atom() |> Zoi.default(:idle),
-              counter: Zoi.integer() |> Zoi.default(0)
-            }),
-    strategy: Jido.Agent.Strategy.Direct,    # Default
-    plugins: [MyPlugin],                     # Default: []
-    default_plugins: true,                   # Load built-in plugins (Default: true)
-    schedules: [                             # Declarative cron schedules (Default: [])
-      {"*/5 * * * *", "heartbeat.tick", job_id: :heartbeat}
-    ]
-end
-```
-
-## The `cmd/2` and `cmd/3` Contract
-
-The fundamental operation:
-
-```elixir
-{agent, directives} = MyAgent.cmd(agent, action)
-{agent, directives} = MyAgent.cmd(agent, action, opts)
-```
-
-**Key invariants:**
-
-- The returned `agent` is always complete—no "apply directives" step needed
-- `directives` describe runtime-owned external effects only—they never modify
-  agent state
-- Agent decision logic stays explicit and testable
-
-Use an effectful action when the current step needs a result back now to continue
-reasoning or update state. Use a directive when the workflow has already decided
-on an outbound effect and wants the runtime or integration layer to own delivery.
-
-**Action formats:**
-
-```elixir
-# Action module with no params
-{agent, directives} = MyAgent.cmd(agent, MyAction)
-
-# Action with params
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
-
-# Action with params and context
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{user_id: 123}})
-
-# Action with params, context, and per-command options
-{agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}, %{}, [timeout: 5000]})
-
-# Full Agent command
-command = Jido.Agent.Command.new!(MyAction, %{value: 42}, %{}, timeout: 5000)
-{agent, directives} = MyAgent.cmd(agent, command)
-
-# A strict executable instruction is imported as an Agent command
-instruction = Jido.Instruction.new!(target: MyAction, params: %{value: 42})
-{agent, directives} = MyAgent.cmd(agent, instruction)
-
-# List of actions (processed in sequence)
-{agent, directives} = MyAgent.cmd(agent, [Action1, {Action2, %{x: 1}}])
-```
-
-**Execution options via `cmd/3`:**
-
-Pass options that apply to all actions in the command:
-
-```elixir
-# With timeout (5 second limit per action)
-{agent, directives} = MyAgent.cmd(agent, MyAction, timeout: 5000)
-
-# Options applied to all actions in a list
-{agent, directives} = MyAgent.cmd(agent, [Action1, Action2], timeout: 5000)
-```
-
-Supported options:
-- `:timeout` — Maximum time (in ms) for each action to complete
-
-## State Management
-
-### `set/2` — Update State
-
-Deep-merges attributes into agent state:
-
-```elixir
-{:ok, agent} = MyAgent.set(agent, %{status: :running})
-{:ok, agent} = MyAgent.set(agent, counter: 5)
-```
-
-### `validate/2` — Validate Against Schema
-
-```elixir
-# Validate state, keeping extra fields
-{:ok, agent} = MyAgent.validate(agent)
-
-# Strict mode: only schema-defined fields are kept
-{:ok, agent} = MyAgent.validate(agent, strict: true)
-```
-
-## Lifecycle Hooks
-
-Optional callbacks for pure transformations before/after command processing.
-
-### `on_before_cmd/2`
-
-Called before action processing. Transform agent or action:
-
-```elixir
-def on_before_cmd(agent, action) do
-  # Example: log the action being processed
-  {:ok, agent} = set(agent, %{last_action: inspect(action)})
-  {:ok, agent, action}
-end
-```
-
-Use cases:
-- Mirror action params into agent state
-- Add default params based on current state
-- Enforce invariants before execution
-
-### `on_after_cmd/3`
-
-Called after action processing. Transform agent or directives:
-
-```elixir
-def on_after_cmd(agent, action, directives) do
-  # Example: auto-validate after every command
-  {:ok, agent} = validate(agent)
-  {:ok, agent, directives}
-end
-```
-
-Use cases:
-- Auto-validate state after changes
-- Derive computed fields
-- Add invariant checks
-
-## Schema Options
-
-Agent state is validated against a Zoi schema. Fields are required by default.
-Use `Zoi.optional/1` for optional fields and `Zoi.default/2` for default values.
-Schemas must contain only static data. Use `{Module, :function, args}` MFA values
-for `Zoi.refine/2` and `Zoi.transform/2` callbacks. Anonymous callbacks and lazy
-schemas cause a compile error.
-
-```elixir
-use Jido.Agent,
-  name: "my_agent",
-  schema: Zoi.object(%{
-    status: Zoi.atom() |> Zoi.default(:idle),
-    counter: Zoi.integer() |> Zoi.default(0),
-    config: Zoi.map() |> Zoi.default(%{})
-  })
-```
-
-## Creating Agents
-
-```elixir
-# Create with defaults
-agent = MyAgent.new()
-
-# Create with custom ID
-agent = MyAgent.new(id: "custom-id")
-
-# Create with initial state
-agent = MyAgent.new(state: %{counter: 10})
-```
-
-If the module is primarily a durable coordinator for named collaborators, use
-`Jido.Pod` instead of `Jido.Agent`. `Jido.Pod` wraps the same agent model and
-adds a canonical topology plus a reserved singleton pod plugin.
-
-## Further Reading
-
-- [Actions](actions.md) — Defining actions that transform agent state
-- [State Operations](state-ops.md) — Internal state transitions during `cmd/2`
-- [Directives](directives.md) — External effects emitted by agents
-- [Strategies](strategies.md) — Execution strategies for `cmd/2`
-- [Plugins — Default Plugins](plugins.md#default-plugins) — Built-in plugins (identity, thread) and how to override them
-- [Pods](pods.md) — Manager-led durable topologies built on top of agents
-- `Jido.Agent` — Full module documentation
+See the [complete example](../README.md#example) and
+[authoring tests](../test/jido/agent/authoring_test.exs).

@@ -1,6 +1,6 @@
 # Code replacement map
 
-Status: proposed. The [inventory](file-inventory.csv) is a comparison of tracked
+Status: implemented through M12; see the final file and test register. The [inventory](file-inventory.csv) is a comparison of tracked
 files, not a dead-code proof. `review-remove` means that the path is absent from
 the prepared Agent donor. Remove it only after its behavior
 and callers have a recorded disposition.
@@ -52,9 +52,9 @@ They form these work groups. Their tests must be assigned before removal.
 | `thread/{agent,plugin,store}.ex`, `thread/store/*` | Remove runtime integration; retain standalone Thread values | Conversation History, ReAct integration, compaction and restore |
 | `observe/event_contract.ex`, `telemetry/config.ex` | Compare and replace event/config validation | Explicit Agent telemetry map; transport-safety tests and downstream event consumers |
 
-Old public features without a proven replacement remain open scope decisions.
-They cannot disappear solely because the donor lacks their files. The final
-beta migration guide must identify removals and any replacement package.
+The M12 [migration guide](../../guides/migration.md) identifies each removal and
+its supported direction. The [test register](legacy-dispositions.json) maps every
+baseline test. A replacement test does not establish V2 source compatibility.
 
 ## Tests and support code
 

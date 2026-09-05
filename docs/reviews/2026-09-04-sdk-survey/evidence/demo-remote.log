@@ -1,0 +1,8 @@
+Distributed Actor capability probe: %{
+  origin_node: :"jido_example_a-3586-81995@127.0.0.1",
+  requested_node: :"jido_example_b-3618-81995@127.0.0.1",
+  actual_child_node: :"jido_example_b-3618-81995@127.0.0.1",
+  remote_pid_command: :passed,
+  remote_child_placement: :passed,
+  remote_child_stop: :passed
+}

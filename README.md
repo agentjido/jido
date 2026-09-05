@@ -111,15 +111,29 @@ supervise a persistence adapter process.
 
 ## Installation
 
-Add `jido` to your dependencies:
+This branch is a local V3 candidate. It is not a published 3.0 release.
+For local development, point your application at this checkout:
 
 ```elixir
 def deps do
   [
-    {:jido, "~> 3.0"}
+    {:jido, path: "../jido"}
   ]
 end
 ```
+
+## Guides and validation
+
+See [migration from V2](guides/migration.md), [Agent state](guides/agents.md),
+[runtime controls](guides/runtime.md), [Plugins](guides/plugins.md), and
+[persistence](guides/storage.md). The [example catalog](lib/examples/README.md)
+has 52 fixtures plus ten application scenarios. Run their complete acceptance
+before using the candidate.
+
+[Design documents](docs/design/README.md) contain deferred proposals. They do
+not define the API implemented by this branch. The Ref facade, new Plugin
+pipeline, and replacement persistence design are outside this migration.
+Cluster-exclusive ownership is not supported.
 
 ## License
 

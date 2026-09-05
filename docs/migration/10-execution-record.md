@@ -163,3 +163,17 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m11-compile.json`, `evidence/core/m11-test.json`
 and `evidence/core/m11-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M12
+
+Completed the 278-file and 2,299-test legacy audit. Added current-main state-size and safe transport protections, seven retained lifecycle regressions, dependency maintenance and current guides. All 667 donor paths have an exact source hash or a documented deviation. The final full run passes with only DIST-03 excluded. The earlier compile and exact-field test failures remain in evidence. The exact-field assertion now includes max_state_size and its nil default; all prior fields remain required. See 11-main-maintenance.md and legacy-audit-summary.json.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 1040, 'excluded': 1}]` in 150.936 seconds, with normal concurrency.
+See `evidence/core/m12-compile-final.json`, `evidence/core/m12-test-final.json`
+and `evidence/core/m12-test-final.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+Two lines in the historical donor `demo-observation.log` have trailing spaces.
+The file retains its exact source hash. The whitespace check excludes historical
+review logs and passes for the remaining change. This does not exclude any test.

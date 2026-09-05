@@ -1,6 +1,7 @@
 # Proposed commit sequence
 
-Status: core sequence approved; implementation has not started. Donor preparation is complete.
+Status: core sequence approved; implementation has reached M12. Donor preparation is complete.
+The execution record holds actual commits and results. M13/M14 remain pending.
 These are logical final core commits. Refine their
 boundaries after the source dependency check, but keep each final commit
 buildable. Add a breaking-change footer where a public contract changes.

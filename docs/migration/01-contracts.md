@@ -104,3 +104,21 @@ table and at least one representative compilation/contract check before beta.
 Do not rewrite the sibling packages as an unrecorded part of core migration.
 The donor Factory tests use ReqLLM directly and therefore do not prove
 `jido_ai` compatibility.
+
+## Current-main protection added in M12
+
+`max_state_size` is an optional non-negative byte limit on an Agent definition.
+Its default is nil. It applies to complete state, including Plugin keys, using
+`:erlang.external_size/1`. Module limits cannot be removed with a struct update.
+Construction, validation, transition, restore and live finalization enforce it.
+The exact Agent field assertion now includes this field and its nil default.
+
+Builder, DSL and Codec retain the limit. Authoring JSON adds an optional
+`max_state_size` field only for a non-nil limit; existing unbounded documents
+retain their prior shape. Invalid limits fail validation. Checkpoint restoration
+validates against the current module limit, or the saved generic definition.
+See [state-size tests](../../test/jido/agent/state_budget_test.exs).
+
+Validation error transport preserves bounded scalar field names and list indexes.
+Hostile binaries are safe for JSON transport; redaction and depth/size bounds
+remain active. See [transport tests](../../test/jido/error_transport_test.exs).

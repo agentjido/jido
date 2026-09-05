@@ -80,6 +80,12 @@ defmodule Jido.MixProject do
       ],
       extras: [
         {"README.md", title: "Home"},
+        {"guides/migration.md", title: "V2 migration"},
+        {"guides/agents.md", title: "Agent values"},
+        {"guides/core-loop.md", title: "Command and commit"},
+        {"guides/runtime.md", title: "Runtime controls"},
+        {"guides/plugins.md", title: "Plugins"},
+        {"guides/storage.md", title: "Persistence"},
         {"LICENSE", title: "Apache 2.0 License"}
       ],
       extra_section: "Guides",
@@ -89,6 +95,8 @@ defmodule Jido.MixProject do
         Core: [
           Jido,
           Jido.Agent,
+          Jido.Agent.StateBudget,
+          Jido.Topology,
           Jido.AgentServer,
           Jido.Agent.Directive
         ],
@@ -185,6 +193,7 @@ defmodule Jido.MixProject do
         ".formatter.exs",
         "README.md",
         "usage-rules.md",
+        "guides",
         "LICENSE"
       ],
       maintainers: ["Mike Hostetler"],
@@ -209,7 +218,7 @@ defmodule Jido.MixProject do
       {:spark, "~> 2.7"},
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
-      {:telemetry_metrics, "~> 1.1"},
+      {:telemetry_metrics, "~> 1.2"},
       {:sched_ex, "~> 1.2.1"},
       {:req_llm, "~> 1.21", optional: true},
       {:dotenvy, "~> 1.1", optional: true},

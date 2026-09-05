@@ -3501,5 +3501,10 @@
       "capability": "DIST-03",
       "reason": "User deferred cluster-exclusive ownership during migration plan review on 2026-09-05. The assertion is retained; this skip does not establish ownership support."
     }
+  ],
+  "core_required_regression_tests": [
+    "test/jido/agent/state_budget_test.exs",
+    "test/jido/error_transport_test.exs",
+    "test/jido/agent/idle_lifecycle_test.exs"
   ]
 }

@@ -10,6 +10,7 @@ agent_locals = [
   plugin: 2,
   schema: 1,
   metadata: 1,
+  max_state_size: 1,
   defaults: 1,
   priority: 1,
   match: 1,

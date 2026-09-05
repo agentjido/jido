@@ -1,0 +1,227 @@
+{
+  "baseline": "668cc2d1fc88f544000f6f8b340b514be9d84bc4",
+  "files": [
+    {
+      "path": "guides/agents.md",
+      "baseline_sha256": "2d47b5f82d5a5b9d77c53db198ab5179d145812bbfd58266ff355f58d47689e4",
+      "decision": "rewrite for V3",
+      "reason": "An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.agent()` or\n`Jido.Agent.new/1` to create a definition. Call `MyAgent.new/1` or\n`Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.\nInstance options contain only `:id` and `:state`."
+    },
+    {
+      "path": "guides/actions.md",
+      "baseline_sha256": "c009edb3d91244a923c3e40ac1317df945710b7e6ed9564559a02b3a65ac79b7",
+      "decision": "rewrite for V3",
+      "reason": "Route a Signal to one `Jido.Action` or `Jido.Flow`. The selected executable\nreceives Signal data as input. It receives current state in `context.agent_state`,\nand identity and Signal in `context.agent_id` and `context.signal`.\nThese context keys are reserved."
+    },
+    {
+      "path": "guides/core-loop.md",
+      "baseline_sha256": "400624ddc1aa9d1685a78c828da9ae9b3cf986313bd98f3f708ea3253a423a33",
+      "decision": "rewrite for V3",
+      "reason": "Direct execution is `Jido.Agent.cmd(agent, signal, options)`. Success returns\n`{:ok, candidate_agent, directives}`. It starts no Agent Server and does not\ncommit a live state or dispatch the returned directives."
+    },
+    {
+      "path": "guides/signals.md",
+      "baseline_sha256": "dcb5adc0ada6ac6b5609db712f1cc4ac461acaed3d9dc9c76e74792553ec4b3d",
+      "decision": "rewrite for V3",
+      "reason": "Construct input with `Jido.Signal.new/3` or `new!/3`. Use a type, map data, and\nsource. Declare routes in the Agent definition or the Spark `routes` block."
+    },
+    {
+      "path": "guides/runtime.md",
+      "baseline_sha256": "889c839663ff1854b40fb5436523f4f46c2846beae24f96d4d04a039ac04af97",
+      "decision": "rewrite for V3",
+      "reason": "Start an instance with `Jido.start/1` or a supervised module that uses `Jido`.\nCall `Jido.start_agent(instance, MyAgent, id: id, initial_state: state)`.\nThe live API accepts a PID. `Jido.whereis_agent/3` resolves an ID in its instance\nand partition. A second local registration for that identity fails."
+    },
+    {
+      "path": "guides/plugins.md",
+      "baseline_sha256": "b91700a278e3416e31bbb5853ba2c9558df6a8ec7f9ab15323a8742871626e5e",
+      "decision": "rewrite for V3",
+      "reason": "Declare Plugins explicitly in the Agent definition. `use Jido.Plugin` supplies\nthe V3 behavior. A Plugin can implement these separate operations:"
+    },
+    {
+      "path": "guides/directives.md",
+      "baseline_sha256": "4e8c91f1e30ba398ebb48e897032e57f0ae13ce14a7746a3e117f5f85d715875",
+      "decision": "rewrite for V3",
+      "reason": "An Action or Flow can return typed directives with its complete candidate state.\nThe Server validates the batch before commit and dispatches it after commit.\nDirect execution returns the batch to the caller without dispatch."
+    },
+    {
+      "path": "guides/storage.md",
+      "baseline_sha256": "cf88012c2b175820d7671850adfba45bcebb33d7d1630f4f181dac7986caa64c",
+      "decision": "rewrite for V3",
+      "reason": "Configure `persistence: {Adapter, options}` on the Jido instance. Jido does not\nstart the adapter's process. Implement the binary `Jido.Persistence.Adapter`\ncontract, including atomic compare-and-swap. A live success follows the confirmed\nwrite. A stale revision fails. An indeterminate write result stops that writer;\nit cannot evaluate another Action. Reactivation loads authoritative state."
+    },
+    {
+      "path": "guides/scheduling.md",
+      "baseline_sha256": "7cd2099ca7e710c89f5a87fa49de133feec1e8f8f24c916b94e99095dd9552e1",
+      "decision": "rewrite for V3",
+      "reason": "Declare `Jido.Plugin.Scheduler` explicitly. Use its typed directives to schedule\nSignals, cancel work, and acknowledge durable occurrences. Scheduler state belongs\nto the Plugin. Heartbeat supplies periodic input. The old Scheduler wrapper,\nAgent `schedules` declarations, and native cron directives are removed."
+    },
+    {
+      "path": "guides/orphans.md",
+      "baseline_sha256": "85b2399281c31f76618a5a6c1195b4c845f8ee9778311293b4cc3795c5f74fa9",
+      "decision": "rewrite for V3",
+      "reason": "Use `SpawnAgent` to create an owned child with a stable tag. Use `StopChild` or\n`AgentServer.stop_child/3` to stop it. Inspect `AgentServer.children/1`.\nParent bindings and child monitors belong to the runtime. Keep process handles\nout of persisted Agent state."
+    },
+    {
+      "path": "guides/orchestration.md",
+      "baseline_sha256": "1874ae0e10b7bba5503cddc9875cb1f3beb2ed2dd99e87429f840227bec9d044",
+      "decision": "rewrite for V3",
+      "reason": "Use Flows for one executable graph. Use owned children for separate live Agents.\nUse `Jido.Topology` to author and start a static system through DSL, Builder, or\nCodec. The forms share validation and planning. Composition supports imports,\nexports, bindings, keyed identities, and local supervision."
+    },
+    {
+      "path": "guides/observability.md",
+      "baseline_sha256": "15360f09d9feef4a00d0c95aaf4950a0633cffea20c03098bd3bceb851272273",
+      "decision": "rewrite for V3",
+      "reason": "`Jido.Observe` supplies spans, safe error metadata, and tracer integration.\nThe live Agent events cover lifecycle, admission, execution, commit, and directive\nwork. Use the committed revision and terminal outcome to distinguish a failed\ncommand from a failure after commit. Update old event consumers to the V3 fields."
+    },
+    {
+      "path": "guides/errors.md",
+      "baseline_sha256": "2b56519200237bae7489cc1bad78087b7c5f46610065a5dec0d306c922818441",
+      "decision": "rewrite for V3",
+      "reason": "Public failures use tagged tuples and structured exceptions. A validation error\ncan identify an input, action, configuration, or complete-state size limit.\nA routing error means that the Signal did not select one valid executable.\nA caller timeout does not imply that active work was cancelled."
+    },
+    {
+      "path": "guides/configuration.md",
+      "baseline_sha256": "e299a603baec3fac2bc706a7890f7268559545e04d1681ed5d0dee3956aac521",
+      "decision": "rewrite for V3",
+      "reason": "Put a named Jido instance under your application's supervisor. A module can use\n`Jido` with `otp_app` and optional `persistence` configuration. Explicit instance\nnames keep Registries, task supervisors, Bus scope, and runtime stores separate."
+    },
+    {
+      "path": "guides/multi-tenancy.md",
+      "baseline_sha256": "f7afa4439bf1797d28aa12064807ff953650ad6adddf63fe7902bb18c59f41b2",
+      "decision": "rewrite for V3",
+      "reason": "Use separate named Jido instances for separate infrastructure ownership. Within\nan instance, pass `partition: value` consistently to startup, lookup, listing,\nparent binding, and persistence operations. The same Agent ID can exist in\ndifferent partitions. Omitted partition means the default scope."
+    },
+    {
+      "path": "guides/sensors.md",
+      "baseline_sha256": "07b1dba067b3355bff3c24b6743847ebb3d000403bbc4c2a31598c4749fc35fc",
+      "decision": "rewrite for V3",
+      "reason": "V3 uses explicit input Plugins. `Jido.Plugin.Heartbeat` provides periodic input;\n`Jido.Plugin.Bus` owns Bus subscriptions; `Jido.Plugin.SensorManager` owns\nconfigured resource processes. These resources send Signals into the Agent path.\nThey do not write committed Agent state directly."
+    },
+    {
+      "path": "guides/state-ops.md",
+      "baseline_sha256": "9e9abeb680223363460071c9816f984cad7f75e264f20d716e1e499bd6951718",
+      "decision": "rewrite for V3",
+      "reason": "The V2 StateOp structs and StateOps execution pipeline are removed. An Action or\nFlow now returns the complete next state. Keep unchanged fields from\n`context.agent_state`. For direct domain updates, use `Jido.Agent.set/2`."
+    },
+    {
+      "path": "guides/strategies.md",
+      "baseline_sha256": "48e264ca713e20f7ffdba5169c4a2d1ae050156e52098f2559dbed72ebc66c8c",
+      "decision": "rewrite for V3",
+      "reason": "The V2 Strategy behavior, FSM Strategy, instruction tracking, and Strategy state\nhelpers are removed. Route a Signal to one Action or Flow. Keep domain modes and\ntransition rules in the declared state schema and executable logic."
+    },
+    {
+      "path": "guides/worker-pools.md",
+      "baseline_sha256": "3b7c634dd770d79774e47511d2e614e9f6bfea5212e6994a7ef696877b7516c2",
+      "decision": "rewrite for V3",
+      "reason": "The public V2 WorkerPool and InstanceManager APIs are removed. V3 retains\nAgentServer owner attachment, detach, touch, and idle-timeout controls.\nIt does not supply the old pre-warmed worker pool or automatic checkout facade."
+    },
+    {
+      "path": "guides/pods.md",
+      "baseline_sha256": "df11ef668e8aae41e79a6a0029fa6ae22aca95664a89bb401100af560d67fe5c",
+      "decision": "rewrite for V3",
+      "reason": "The V2 Pod structs, mutation planner, mutable runtime, topology state, and mutation\ndirectives are removed. Use static `Jido.Topology` for composition and owned\nchildren for Agent lifecycle. Fixed and Elastic Group examples show application\nrecovery, but they do not provide a compatible Pod mutation API."
+    },
+    {
+      "path": "guides/await.md",
+      "baseline_sha256": "f9b29628913055392fa889ea2736451451a144474d110d705461625f5ebb694f",
+      "decision": "rewrite for V3",
+      "reason": "The V2 Await facade and status-based polling helpers are removed. Use\n`AgentServer.call/3` for a commit reply. Use `send_request/3` and\n`receive_response/2` when sending and waiting must be separate. Use\n`await_ready/2` for runtime startup readiness."
+    },
+    {
+      "path": "guides/discovery.md",
+      "baseline_sha256": "6ece4c3dabee6f44243b1ce37a7b19f9243fa0d045f686b38b595db97a43bec8",
+      "decision": "rewrite for V3",
+      "reason": "V3 does not include the V2 Discovery service or its listing facade. Keep an\nexplicit application list of Agent modules or Topology definitions. Runtime\n`list_agents` lists live registered Agents in an instance and partition; it is\nnot module discovery."
+    },
+    {
+      "path": "guides/phoenix-integration.md",
+      "baseline_sha256": "9701cc73ed64d11e122596c3cc62d18e28f84c888b15e09860be53b3b341befe",
+      "decision": "rewrite for V3",
+      "reason": "Supervise a named Jido instance with the Phoenix application. Keep request\nvalidation and authorization in the application. Send validated Signals to the\nselected Agent. Treat a call reply as a commit result, and model later external\ncompletion separately."
+    },
+    {
+      "path": "guides/ash-integration.md",
+      "baseline_sha256": "8ee9bc2b4e4c59ac1403eb97846cc8b79953c4a66ee1b3f854c5976b67b8b832",
+      "decision": "rewrite for V3",
+      "reason": "Use an Action or Flow to call application-owned Ash resources. Declare input and\noutput schemas and define external idempotency. A Jido state commit does not\nroll back an earlier Ash transaction or remote operation."
+    },
+    {
+      "path": "guides/debugging.md",
+      "baseline_sha256": "cd5aaecc7fc1c74132aebf730a07831f9f4af8d40acf706b858ddd7f5a5e43e3",
+      "decision": "rewrite for V3",
+      "reason": "Use `AgentServer.agent/1`, `snapshot/1`, and `status/1`. The status shows the phase,\nactive Turn, postponed count, mailbox count, and runtime lifecycle controls.\nUse `children/1` for ownership. The old Server State shape is not a public contract."
+    },
+    {
+      "path": "guides/observability-intro.md",
+      "baseline_sha256": "c846f56c7ffedb4dfe49d97744e65df19f59c129323466d12deefa00d6c01a13",
+      "decision": "rewrite for V3",
+      "reason": "First identify the Agent and committed state revision. Then inspect its runtime\nphase and active Turn. A failed command and a failed directive have different\ncommit states. Use terminal outcome data to distinguish them."
+    },
+    {
+      "path": "guides/runtime-patterns.md",
+      "baseline_sha256": "b6d940fd26a4f9e7282fb33470313a4135fae79aee405f7a02cfc17f08393db4",
+      "decision": "rewrite for V3",
+      "reason": "Use one Signal for one Turn. Use saved IDs for work that must survive retries.\nKeep durable intent in validated Agent or Plugin state. Let owned resources\nperform the work and send completion through another Signal. Acknowledge work\nin the same commit as its business result where the example requires it."
+    },
+    {
+      "path": "guides/your-first-plugin.md",
+      "baseline_sha256": "78a49b3bc095c3b7dad6244182583cf087b71abc61693e8286d23425480cd929",
+      "decision": "rewrite for V3",
+      "reason": "Start with `use Jido.Plugin`. Implement only the capability's required callbacks.\nFor owned state, declare a key and schema through `state_spec/1`, then return\n`{:ok, next_owned_state}` from `update_state/3`. Keep the Agent's domain keys\nunder the Action's control."
+    },
+    {
+      "path": "guides/your-first-sensor.md",
+      "baseline_sha256": "b85cbdbd810ee372270203c43631c3b9998574a7b05e1b0aa98c4c29d19aafae",
+      "decision": "rewrite for V3",
+      "reason": "Port an old Sensor into an explicit V3 input Plugin. Define who owns its process,\nhow readiness is reported, which Signals it emits, and how it stops. Keep its\nprocess handles in runtime state. Store only portable business intent in Agent\nstate when recovery is required."
+    },
+    {
+      "path": "guides/custom-strategies.md",
+      "baseline_sha256": "52d44572b6f7ce6adf0bed4a796c214bbb165d44344a6229410dec4534d28a90",
+      "decision": "rewrite for V3",
+      "reason": "The Strategy callback contract is removed. Express domain transitions in an\nAction or Flow, route a Signal to it, and return the complete next state.\nMove runtime resources and typed effects into an explicit Plugin."
+    },
+    {
+      "path": "guides/getting-started.livemd",
+      "baseline_sha256": "7acb578cb537553f41a326e4fd0a111329a8e8075a021b379f79682540f60050",
+      "decision": "rewrite for V3",
+      "reason": "The V2 setup cells are retired because their construction and command contracts\nchanged. Run the complete local example from [the repository README](../README.md)\nin IEx after `mix deps.get`. The V3 candidate is local until explicitly published."
+    },
+    {
+      "path": "guides/fsm-strategy.livemd",
+      "baseline_sha256": "68a50ed46fdfe6723c3b987d1b6c9c970cc297f0370dc4e8827f85acd59c4a2b",
+      "decision": "rewrite for V3",
+      "reason": "The V2 FSM Strategy is removed. The old notebook remains in Git history.\nUse an Action or Flow with explicit domain modes and state validation.\nSee [execution after V2](strategies.md) and the\n[Workflow examples](../lib/examples/02_workflow/README.md).\n"
+    },
+    {
+      "path": "guides/migration.md",
+      "baseline_sha256": "029b7a13a74b9eae0b7d7463f00fdaff1c37b00ebb29ad76b5718a3d74d7370d",
+      "decision": "rewrite for V3",
+      "reason": "State the implemented contract, its limits and required tests."
+    },
+    {
+      "path": "guides/testing.md",
+      "baseline_sha256": "712078c0179c23f33ab32323ffd7cefd63309437d9ff936b0d89a5d7eddded8f",
+      "decision": "rewrite for V3",
+      "reason": "State the implemented contract, its limits and required tests."
+    },
+    {
+      "path": "usage-rules.md",
+      "baseline_sha256": "66b059a3a6ced3782c012457fb9f4c392dc26292c7f3baea8688cad6390f7061",
+      "decision": "rewrite for V3",
+      "reason": "State the implemented contract, its limits and required tests."
+    },
+    {
+      "path": "README.md",
+      "baseline_sha256": "394ce6b8822d0bd1777c9c7481821aad4bfa1f3183134446e0bbf041fba99b68",
+      "decision": "rewrite for V3",
+      "reason": "State the implemented contract, its limits and required tests."
+    },
+    {
+      "path": "lib/examples/README.md",
+      "baseline_sha256": "14538300a020216c23e4a66352877f8f51e5458faa7119b9c4f3d22bd69a9f7d",
+      "decision": "rewrite for V3",
+      "reason": "State the implemented contract, its limits and required tests."
+    }
+  ]
+}

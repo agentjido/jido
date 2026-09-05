@@ -1,0 +1,327 @@
+Running ExUnit with seed: 0, max_cases: 20
+Excluding tags: [:flaky, :example, :skip]
+Including tags: [:integration]
+
+
+
+  1) test a fixed group owns stable children and coordinates work through the Bus (JidoTest.Integration.FixedGroupTest)
+     /tmp/jido-v3-survey-20260904/fixed_scoped_diagnostic_test.exs:14
+     Assertion with == failed
+     code:  assert Server.actor(restarted.pid).state.handled == ["task-8"]
+     left:  ["task-2", "task-5", "task-8"]
+     right: ["task-8"]
+     stacktrace:
+       /tmp/jido-v3-survey-20260904/fixed_scoped_diagnostic_test.exs:103: (test)
+
+Elastic failure state: %{
+  controller: %{
+    queue: [],
+    group_id: "elastic-group-423",
+    min_workers: 2,
+    max_workers: 10,
+    desired_workers: ["elastic-group-423/worker-1",
+     "elastic-group-423/worker-2", "elastic-group-423/worker-3",
+     "elastic-group-423/worker-4", "elastic-group-423/worker-5",
+     "elastic-group-423/worker-6", "elastic-group-423/worker-7",
+     "elastic-group-423/worker-8", "elastic-group-423/worker-9",
+     "elastic-group-423/worker-10"],
+    in_flight: %{
+      "elastic-task-1" => %{
+        task: %{
+          id: "elastic-task-1",
+          value: 1,
+          delay_ms: 20,
+          retry_delay_ms: 20
+        },
+        worker_id: "elastic-group-423/worker-1"
+      }
+    },
+    member_starts: %{
+      "elastic-group-423/environment" => 1,
+      "elastic-group-423/monitor" => 1,
+      "elastic-group-423/worker-1" => 2,
+      "elastic-group-423/worker-10" => 1,
+      "elastic-group-423/worker-2" => 1,
+      "elastic-group-423/worker-3" => 1,
+      "elastic-group-423/worker-4" => 1,
+      "elastic-group-423/worker-5" => 1,
+      "elastic-group-423/worker-6" => 1,
+      "elastic-group-423/worker-7" => 1,
+      "elastic-group-423/worker-8" => 1,
+      "elastic-group-423/worker-9" => 1
+    },
+    results: %{
+      "elastic-task-10" => %{
+        result: 30,
+        worker_id: "elastic-group-423/worker-10"
+      },
+      "elastic-task-11" => %{
+        result: 33,
+        worker_id: "elastic-group-423/worker-2"
+      },
+      "elastic-task-12" => %{
+        result: 36,
+        worker_id: "elastic-group-423/worker-3"
+      },
+      "elastic-task-13" => %{
+        result: 39,
+        worker_id: "elastic-group-423/worker-4"
+      },
+      "elastic-task-2" => %{result: 6, worker_id: "elastic-group-423/worker-2"},
+      "elastic-task-3" => %{result: 9, worker_id: "elastic-group-423/worker-3"},
+      "elastic-task-4" => %{result: 12, worker_id: "elastic-group-423/worker-4"},
+      "elastic-task-5" => %{result: 15, worker_id: "elastic-group-423/worker-5"},
+      "elastic-task-6" => %{result: 18, worker_id: "elastic-group-423/worker-6"},
+      "elastic-task-7" => %{result: 21, worker_id: "elastic-group-423/worker-7"},
+      "elastic-task-8" => %{result: 24, worker_id: "elastic-group-423/worker-8"},
+      "elastic-task-9" => %{result: 27, worker_id: "elastic-group-423/worker-9"}
+    },
+    exits: [%{reason: :killed, member_id: "elastic-group-423/worker-1"}],
+    generation: 1,
+    low_observations: 0,
+    draining_workers: [],
+    worker_status: %{
+      "elastic-group-423/worker-1" => :busy,
+      "elastic-group-423/worker-10" => :ready,
+      "elastic-group-423/worker-2" => :ready,
+      "elastic-group-423/worker-3" => :ready,
+      "elastic-group-423/worker-4" => :ready,
+      "elastic-group-423/worker-5" => :ready,
+      "elastic-group-423/worker-6" => :ready,
+      "elastic-group-423/worker-7" => :ready,
+      "elastic-group-423/worker-8" => :ready,
+      "elastic-group-423/worker-9" => :ready
+    },
+    worker_indexes: %{
+      "elastic-group-423/worker-1" => 1,
+      "elastic-group-423/worker-10" => 10,
+      "elastic-group-423/worker-2" => 2,
+      "elastic-group-423/worker-3" => 3,
+      "elastic-group-423/worker-4" => 4,
+      "elastic-group-423/worker-5" => 5,
+      "elastic-group-423/worker-6" => 6,
+      "elastic-group-423/worker-7" => 7,
+      "elastic-group-423/worker-8" => 8,
+      "elastic-group-423/worker-9" => 9
+    },
+    next_worker_index: 11,
+    persistent_members: ["elastic-group-423/environment",
+     "elastic-group-423/monitor"],
+    scale_down_observations: 2
+  },
+  children: %{
+    :monitor => %{
+      events: ["elastic.control.member.ready", "elastic.control.member.ready",
+       "elastic.control.member.ready", "elastic.control.member.ready",
+       "elastic.control.member.ready", "elastic.control.member.ready",
+       "elastic.control.worker.busy", "elastic.control.worker.busy",
+       "elastic.control.worker.busy", "elastic.control.member.ready",
+       "elastic.control.worker.busy", "elastic.control.worker.busy",
+       "elastic.control.member.ready", "elastic.control.worker.busy",
+       "elastic.control.member.ready", "elastic.control.worker.busy",
+       "elastic.control.member.ready", "elastic.control.member.ready",
+       "elastic.control.worker.busy", "elastic.control.worker.busy",
+       "elastic.control.member.ready", "elastic.control.worker.busy",
+       "elastic.control.worker.failed", "elastic.control.member.ready",
+       "elastic.control.worker.ready", "elastic.control.worker.ready",
+       "elastic.control.worker.ready", "elastic.control.worker.busy",
+       "elastic.control.worker.ready", "elastic.control.worker.busy",
+       "elastic.control.worker.ready", "elastic.control.worker.ready",
+       "elastic.control.worker.busy", "elastic.control.worker.ready",
+       "elastic.control.worker.ready", "elastic.control.worker.ready",
+       "elastic.control.worker.ready", "elastic.control.worker.ready",
+       "elastic.control.worker.ready"],
+      group_id: "elastic-group-423",
+      generation: 1,
+      counts: %{
+        "elastic.control.member.ready" => 13,
+        "elastic.control.worker.busy" => 13,
+        "elastic.control.worker.failed" => 1,
+        "elastic.control.worker.ready" => 12
+      }
+    },
+    :environment => %{
+      ignored: 0,
+      group_id: "elastic-group-423",
+      results: %{
+        "elastic-task-10" => %{
+          result: 30,
+          worker_id: "elastic-group-423/worker-10",
+          task_id: "elastic-task-10"
+        },
+        "elastic-task-11" => %{
+          result: 33,
+          worker_id: "elastic-group-423/worker-2",
+          task_id: "elastic-task-11"
+        },
+        "elastic-task-12" => %{
+          result: 36,
+          worker_id: "elastic-group-423/worker-3",
+          task_id: "elastic-task-12"
+        },
+        "elastic-task-13" => %{
+          result: 39,
+          worker_id: "elastic-group-423/worker-4",
+          task_id: "elastic-task-13"
+        },
+        "elastic-task-2" => %{
+          result: 6,
+          worker_id: "elastic-group-423/worker-2",
+          task_id: "elastic-task-2"
+        },
+        "elastic-task-3" => %{
+          result: 9,
+          worker_id: "elastic-group-423/worker-3",
+          task_id: "elastic-task-3"
+        },
+        "elastic-task-4" => %{
+          result: 12,
+          worker_id: "elastic-group-423/worker-4",
+          task_id: "elastic-task-4"
+        },
+        "elastic-task-5" => %{
+          result: 15,
+          worker_id: "elastic-group-423/worker-5",
+          task_id: "elastic-task-5"
+        },
+        "elastic-task-6" => %{
+          result: 18,
+          worker_id: "elastic-group-423/worker-6",
+          task_id: "elastic-task-6"
+        },
+        "elastic-task-7" => %{
+          result: 21,
+          worker_id: "elastic-group-423/worker-7",
+          task_id: "elastic-task-7"
+        },
+        "elastic-task-8" => %{
+          result: 24,
+          worker_id: "elastic-group-423/worker-8",
+          task_id: "elastic-task-8"
+        },
+        "elastic-task-9" => %{
+          result: 27,
+          worker_id: "elastic-group-423/worker-9",
+          task_id: "elastic-task-9"
+        }
+      },
+      generation: 1,
+      duplicates: 0
+    },
+    "worker-1" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :busy,
+      group_id: "elastic-group-423",
+      handled: [],
+      member_id: "elastic-group-423/worker-1",
+      generation: 1,
+      current_task: %{id: "elastic-task-1", value: 1, delay_ms: 5000}
+    },
+    "worker-10" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-10"],
+      member_id: "elastic-group-423/worker-10",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-2" => %{
+      scheduler: %{cron: %{}},
+      ignored: 12,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-2", "elastic-task-11"],
+      member_id: "elastic-group-423/worker-2",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-3" => %{
+      scheduler: %{cron: %{}},
+      ignored: 12,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-3", "elastic-task-12"],
+      member_id: "elastic-group-423/worker-3",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-4" => %{
+      scheduler: %{cron: %{}},
+      ignored: 12,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-4", "elastic-task-13"],
+      member_id: "elastic-group-423/worker-4",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-5" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-5"],
+      member_id: "elastic-group-423/worker-5",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-6" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-6"],
+      member_id: "elastic-group-423/worker-6",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-7" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-7"],
+      member_id: "elastic-group-423/worker-7",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-8" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-8"],
+      member_id: "elastic-group-423/worker-8",
+      generation: 1,
+      current_task: %{}
+    },
+    "worker-9" => %{
+      scheduler: %{cron: %{}},
+      ignored: 13,
+      phase: :ready,
+      group_id: "elastic-group-423",
+      handled: ["elastic-task-9"],
+      member_id: "elastic-group-423/worker-9",
+      generation: 1,
+      current_task: %{}
+    }
+  }
+}
+
+
+  2) test an elastic group scales, reclaims failed work, drains, and returns to its minimum (JidoTest.Integration.ElasticGroupTest)
+     /tmp/jido-v3-survey-20260904/elastic_scoped_diagnostic_test.exs:12
+     Condition not met within timeout. Last result: false
+     code: eventually(
+     stacktrace:
+       (jido 2.3.3) test/support/eventually.ex:41: JidoTest.Eventually.do_eventually/4
+       /tmp/jido-v3-survey-20260904/elastic_scoped_diagnostic_test.exs:79: (test)
+
+
+Finished in 6.1 seconds (0.00s async, 6.1s sync)
+
+Result: 0/2 passed
+Failed: 2 tests

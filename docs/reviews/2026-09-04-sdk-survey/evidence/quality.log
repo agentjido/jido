@@ -1,0 +1,29 @@
+Checking 292 source files (this might take a while) ...
+
+Please report incorrect results: https://github.com/rrrene/credo/issues
+
+Analysis took 0.07 seconds (0.07s to load, 0.00s running 0 checks on 292 files)
+3512 mods/funs, found no issues.
+
+Showing priority issues: ↑ ↗ →  (use `mix credo explain` to explain issues, `mix credo --help` for options).
+Finding suitable PLTs
+Checking PLT...
+[:asn1, :bunt, :compiler, :credo, :crontab, :crypto, :decimal, :eex, :elixir, :ex_unit, :excoveralls, :file_system, :flow, :gen_stage, :inets, :jason, :jido, :jido_action, :jido_signal, :kernel, :logger, :mix, :mnesia, :multigraph, :public_key, :runic, :sched_ex, :spark, :splode, :ssl, :stdlib, :telemetry, :telemetry_metrics, :tools, :uniq, :xmerl, :zoi]
+PLT is up to date!
+No :ignore_warnings opt specified in mix.exs and default does not exist.
+
+Starting Dialyzer
+[
+  check_plt: false,
+  init_plt: ~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/dialyxir_erlang-29.0.5_elixir-1.20.3_deps-dev.plt",
+  files: [~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.OrderedBatch.Collected.beam",
+   ~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.NestedFlow.Write.beam",
+   ~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Actor.DSL.Macros.beam",
+   ~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Examples.TurnObservation.Deliver.beam",
+   ~c"/Users/mhostetler/Source/Jido/proj_jido_core/jido_v3/_build/dev/lib/jido/ebin/Elixir.Jido.Flow.Generated.InlineStep.A8af215d8270926161c4b2f85520d2ed7d84f7954a2c7f72ee1eced0aefd69ccf.beam",
+   ...],
+  ...
+]
+Total errors: 0, Skipped: 0, Unnecessary Skips: 0
+done in 0m4.66s
+done (passed successfully)

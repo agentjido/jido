@@ -2,8 +2,9 @@
 
 The approved V3 source is the implementation contract. The file register in
 `legacy-dispositions.json` records every old `lib` and `test` file before removal.
-It includes each old test name and public function name for the M12 audit.
-An assigned replacement is not a claim that its acceptance check has passed.
+It includes every baseline test identity and public function name. M12 assigned
+each to retained assertions, a V3 replacement contract, or an explicit retirement.
+The register links each entry to a current guide and executed checks.
 
 The cutover removes these public V2 contracts:
 
@@ -14,7 +15,7 @@ The cutover removes these public V2 contracts:
 | DirectiveExec protocol and built-in lifecycle/status Actions | Use the V3 runtime directives and explicit application Actions. Custom executors require a port. |
 | Sensor callbacks and cron directives | Use input Plugins, Heartbeat, SensorManager and Scheduler. The old Sensor callback interface is removed. |
 | Persist, Storage and Thread stores | Use Persistence adapters and the Agent envelope. Old stored data requires an explicit application conversion. No automatic conversion is supplied. |
-| InstanceManager attachment and idle policies; worker pools | Use instance startup, child ownership and explicit bounded workers. Automatic idle eviction, attachment and pre-warmed pools are removed. |
+| InstanceManager attachment and idle policies; worker pools | Use instance startup, child ownership and explicit bounded workers. AgentServer attachment, detach, touch and idle timeout remain. The InstanceManager facade and pre-warmed pool API are removed. |
 | Pod and live Pod mutation | Use child ownership, application group recovery and static Topology. Live mutation has no equivalent in this release. |
 | Await facade and old status fields | Use AgentServer request results, cancellation and inspection. Application completion remains an application contract. |
 | Discovery | No V3 discovery service is supplied. Explicit module lists replace discovery where needed. |
@@ -24,7 +25,7 @@ The cutover removes these public V2 contracts:
 
 The old source remains in Git at the recorded core baseline. Its tests are not
 left as excluded files in the active suite. The register names the behavior
-checks that replace them. M12 must check the retained safety obligations:
+checks that replace them. The complete gate checks these retained safety obligations:
 state validation and isolation, safe errors, partition scope, storage faults,
 ownership, shutdown, timers, and state-size limits from current main.
 

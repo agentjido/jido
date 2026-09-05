@@ -1,0 +1,8 @@
+Waiting for lock on the build directory (held by process 81995)
+Waiting for lock on the build directory (held by process 81999)
+Committed intent; sink has accepted the write: %{value: 7, delivery: %{pending: %{"effect-1" => 7}, completed: %{}}}
+Restored; worker retried and committed confirmation: %{
+  state: %{value: 7, delivery: %{pending: %{}, completed: %{"effect-1" => 7}}},
+  revision: 2
+}
+One external record: %{"effect-1" => 7}
