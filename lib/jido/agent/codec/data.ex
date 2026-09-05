@@ -98,8 +98,9 @@ defmodule Jido.Agent.Codec.Data do
              _ ->
                Authoring.error("Invalid map entry")
            end),
-         true <- length(pairs) == map_size(Map.new(pairs)) do
-      {:ok, Map.new(pairs)}
+         decoded = Map.new(pairs),
+         true <- length(pairs) == map_size(decoded) do
+      {:ok, decoded}
     else
       false -> Authoring.error("Duplicate decoded map key")
       error -> error
