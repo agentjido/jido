@@ -148,6 +148,47 @@ defmodule Jido.Plugin.BusTest do
     eventually(fn -> Server.agent(agent).state.values == [11] end)
   end
 
+  test "Client ignores stale reconnect messages after reconnecting", %{jido: jido} do
+    bus = start_supervised!({Bus, name: :plugin_bus, jido: jido}, id: :reconnect_test_bus)
+
+    init = %Jido.Plugin.Init{
+      agent_server: self(),
+      agent_id: unique_id("reconnect-token"),
+      module: Client,
+      jido: jido,
+      options: [bus: :plugin_bus, retry_delay_ms: 60_000]
+    }
+
+    client = start_supervised!({Jido.Plugin.Bus.Client.Runtime, init})
+    assert :ok = GenServer.call(client, :await_ready)
+    monitor = Process.monitor(bus)
+    assert :ok = stop_supervised(:reconnect_test_bus)
+    assert_receive {:DOWN, ^monitor, :process, ^bus, :shutdown}
+
+    token = eventually(fn -> :sys.get_state(client).reconnect_token end)
+    send(client, {:reconnect, token})
+    # The call is a barrier after the failed reconnect attempt.
+    assert {:error, :not_ready} = GenServer.call(client, :await_ready)
+    next_token = :sys.get_state(client).reconnect_token
+    assert is_reference(next_token)
+    refute next_token == token
+
+    new_bus = start_supervised!({Bus, name: :plugin_bus, jido: jido}, id: :reconnect_test_bus)
+    send(client, {:reconnect, token})
+    assert {:error, :not_ready} = GenServer.call(client, :await_ready)
+    assert :sys.get_state(client).reconnect_token == next_token
+
+    send(client, {:reconnect, next_token})
+    assert :ok = GenServer.call(client, :await_ready)
+    connected = :sys.get_state(client)
+    assert connected.bus == new_bus
+    assert connected.reconnect_token == nil
+
+    send(client, {:reconnect, token})
+    send(client, {:reconnect, next_token})
+    assert :sys.get_state(client) == connected
+  end
+
   test "Client reconnects when its owned Bus restarts", %{jido: jido} do
     {:ok, agent} = Jido.start_agent(jido, OwnedBusAgent, id: unique_id("owned-restart"))
     children = Server.children(agent)
