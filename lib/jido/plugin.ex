@@ -144,57 +144,6 @@ defmodule Jido.Plugin do
   end
 
   @doc false
-  def compose_schema!(domain_schema, declarations) do
-    case compose_schema(domain_schema, declarations) do
-      {:ok, schema} -> schema
-      {:error, error} -> raise error
-    end
-  end
-
-  @doc false
-  @spec validate_composed_schema(Zoi.schema(), [Spec.t()]) ::
-          :ok | {:error, Exception.t()}
-  def validate_composed_schema(%Zoi.Types.Map{fields: fields}, specs) when is_list(fields) do
-    Enum.reduce_while(specs, :ok, fn
-      %Spec{state_key: nil}, :ok ->
-        {:cont, :ok}
-
-      %Spec{module: module, state_key: key, state_schema: expected}, :ok ->
-        case Keyword.fetch(fields, key) do
-          {:ok, actual} ->
-            if equivalent_field_schema?(actual, expected) do
-              {:cont, :ok}
-            else
-              {:halt,
-               invalid("Agent Plugin state schema does not match", %{
-                 plugin: module,
-                 state_key: key,
-                 expected: expected,
-                 actual: actual
-               })}
-            end
-
-          :error ->
-            {:halt,
-             invalid("Agent Plugin state key is missing from the composed schema", %{
-               plugin: module,
-               state_key: key
-             })}
-        end
-    end)
-  end
-
-  def validate_composed_schema(schema, _specs),
-    do: invalid("Agent schema must be a field-based Zoi object", %{schema: schema})
-
-  defp equivalent_field_schema?(%{meta: actual_meta} = actual, %{meta: expected_meta} = expected) do
-    %{actual | meta: %{actual_meta | required: nil}} ==
-      %{expected | meta: %{expected_meta | required: nil}}
-  end
-
-  defp equivalent_field_schema?(actual, expected), do: actual == expected
-
-  @doc false
   @spec prepare(Command.t(), [declaration()]) ::
           {:ok, Command.t(), [Spec.t()]} | {:error, term()}
   def prepare(%Command{} = command, declarations) do

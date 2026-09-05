@@ -167,13 +167,6 @@ defmodule Jido.Telemetry.Agent do
 
   def result_metadata(_result), do: %{status: :ok}
 
-  def error_status(:cancelled), do: :cancelled
-  def error_status({:parent_down, :cancelled}), do: :cancelled
-  def error_status({:child_spawn_indeterminate, _, _, _, _}), do: :indeterminate
-
-  def error_status(reason),
-    do: metadata_error_status(error_metadata(reason))
-
   defp result_error_status(:cancelled, _metadata), do: :cancelled
   defp result_error_status({:parent_down, :cancelled}, _metadata), do: :cancelled
 

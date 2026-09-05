@@ -244,12 +244,6 @@ defmodule Jido.Util do
     {:error, Jido.Error.validation_error("Module must be an atom", kind: :config, field: :module)}
   end
 
-  @doc false
-  @spec pluck(Enumerable.t(), atom()) :: list()
-  def pluck(enumerable, field) do
-    Enum.map(enumerable, &Map.get(&1, field))
-  end
-
   @type server :: pid() | atom() | binary() | {name :: atom() | binary(), registry :: module()}
 
   @doc """

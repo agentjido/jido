@@ -337,13 +337,4 @@ defmodule JidoTest.ErrorTest do
       assert Error.extract_message("plain string") =~ "plain string"
     end
   end
-
-  describe "capture_stacktrace/0" do
-    test "returns current stacktrace" do
-      stacktrace = Error.capture_stacktrace()
-
-      assert is_list(stacktrace)
-      assert stacktrace != []
-    end
-  end
 end

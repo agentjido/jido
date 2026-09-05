@@ -49,10 +49,6 @@ defmodule JidoTest.Observe.CompletionContractTest do
 
     assert_received :error_projected
     refute_received :error_projected
-
-    assert AgentTelemetry.error_status(%CountingError{}) == :timed_out
-    assert_received :error_projected
-    refute_received :error_projected
   end
 
   test "projection failure retains safe metadata and status" do
@@ -64,13 +60,10 @@ defmodule JidoTest.Observe.CompletionContractTest do
 
       assert_received :error_projected
       refute_received :error_projected
-      assert AgentTelemetry.error_status(error) == :error
-      assert_received :error_projected
-      refute_received :error_projected
     end
   end
 
-  test "raw special statuses and public error status stay consistent" do
+  test "result metadata preserves special statuses and classifies public errors" do
     for {reason, status} <- [
           {:cancelled, :cancelled},
           {{:parent_down, :cancelled}, :cancelled},
@@ -81,8 +74,6 @@ defmodule JidoTest.Observe.CompletionContractTest do
         ] do
       assert AgentTelemetry.result_metadata({:error, reason}) ==
                Map.put(AgentTelemetry.error_metadata(reason), :status, status)
-
-      assert AgentTelemetry.error_status(reason) == status
     end
 
     assert AgentTelemetry.result_metadata({:ok, :value}) == %{status: :ok}

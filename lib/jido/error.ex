@@ -595,12 +595,6 @@ defmodule Jido.Error do
     end
   end
 
-  @doc false
-  def capture_stacktrace do
-    {:current_stacktrace, stacktrace} = Process.info(self(), :current_stacktrace)
-    Enum.drop(stacktrace, 2)
-  end
-
   defp public_message(error) when is_exception(error),
     do: truncate_string(Exception.message(error))
 

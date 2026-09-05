@@ -147,22 +147,6 @@ defmodule JidoTest.UtilTest do
     end
   end
 
-  describe "pluck/2" do
-    test "extracts field from list of maps" do
-      list = [%{name: "a", value: 1}, %{name: "b", value: 2}]
-      assert Util.pluck(list, :name) == ["a", "b"]
-    end
-
-    test "returns nil for missing fields" do
-      list = [%{name: "a"}, %{other: "b"}]
-      assert Util.pluck(list, :name) == ["a", nil]
-    end
-
-    test "handles empty list" do
-      assert Util.pluck([], :name) == []
-    end
-  end
-
   describe "via_tuple/2" do
     test "creates via tuple with default and custom registry", %{jido: jido} do
       registry = Jido.registry_name(jido)
