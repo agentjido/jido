@@ -39,3 +39,7 @@ plans/
 # Local migration and review records
 /docs/migration/
 /docs/reviews/
+
+# Local benchmark reports
+/bench/results/
+/bench/__pycache__/

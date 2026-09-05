@@ -86,6 +86,7 @@ defmodule Jido.MixProject do
         {"guides/runtime.md", title: "Runtime controls"},
         {"guides/plugins.md", title: "Plugins"},
         {"guides/storage.md", title: "Persistence"},
+        {"guides/benchmarks.md", title: "Core benchmarks"},
         {"LICENSE", title: "Apache 2.0 License"}
       ],
       extra_section: "Guides",
