@@ -502,6 +502,31 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Codec.decode(document, registry, state: %{count: "bad"})
   end
 
+  test "decoded map aliases reject duplicates after all entries decode" do
+    alias Jido.Agent.Codec.Data
+
+    registry = Registry.new!(%{"key" => {:atom, :key}, "alias" => {:alias, "key"}})
+    key = %{"$type" => "atom", "id" => "key"}
+    same_key = %{"$type" => "atom", "id" => "alias"}
+    entries = [[key, 1], [same_key, 2]]
+
+    assert {:ok, %{"other" => 2, key: 1}} =
+             Data.decode(%{"$type" => "map", "entries" => [[key, 1], ["other", 2]]}, registry)
+
+    assert {:error, error} = Data.decode(%{"$type" => "map", "entries" => entries}, registry)
+    assert Exception.message(error) =~ "Duplicate decoded map key"
+
+    for {tail, message} <- [
+          {["invalid"], "Invalid map entry"},
+          {["later", %{"$type" => "unknown"}], "Invalid tagged authoring value"}
+        ] do
+      assert {:error, error} =
+               Data.decode(%{"$type" => "map", "entries" => entries ++ [tail]}, registry)
+
+      assert Exception.message(error) =~ message
+    end
+  end
+
   test "Codec bounds documents and rejects runtime data on encode" do
     {:ok, document, registry} = Codec.encode(Counter.agent())
     deep = Enum.reduce(1..102, nil, fn _, acc -> [acc] end)

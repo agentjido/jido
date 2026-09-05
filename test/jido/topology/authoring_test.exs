@@ -179,6 +179,37 @@ defmodule Jido.Topology.AuthoringTest do
     assert {:error, _} = Codec.decode(%{document | "groups" => nil}, Formats.registry())
   end
 
+  test "both Codec entry points validate definitions before encoding" do
+    definition = Swarm.topology()
+    invalid = %{definition | metadata: %{pid: self()}}
+    assert {:error, error} = Topology.new(invalid)
+    assert {:error, derived_error} = Codec.encode(invalid)
+    assert {:error, supplied_error} = Codec.encode(invalid, :invalid_registry)
+    assert Map.drop(derived_error, [:stacktrace]) == Map.drop(error, [:stacktrace])
+    assert Map.drop(supplied_error, [:stacktrace]) == Map.drop(error, [:stacktrace])
+
+    assert {:error, _} = Codec.encode(definition, :invalid_registry)
+    assert {:error, _} = Codec.encode(definition, %{})
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert document["version"] == 2
+    assert {:ok, ^document} = Codec.encode(definition, registry)
+
+    v1 = document |> Map.drop(~w(includes imports exports)) |> Map.put("version", 1)
+    assert {:ok, ^definition} = Codec.decode(v1, registry)
+  end
+
+  test "both Codec entry points retain data and output document bounds" do
+    definition = Swarm.topology()
+    {:ok, _, registry} = Codec.encode(definition)
+    deep = Enum.reduce(1..102, nil, fn _, acc -> [acc] end)
+
+    for value <- [deep, List.duplicate(0, 10_001), String.duplicate("a", 1_048_577)] do
+      oversized = %{definition | metadata: %{"value" => value}}
+      assert {:error, _} = Codec.encode(oversized)
+      assert {:error, _} = Codec.encode(oversized, registry)
+    end
+  end
+
   test "Codec excludes instance and runtime data" do
     assert {:ok, instance} = Swarm.new(id: "private", input: %{worker_count: 2})
     assert {:error, _} = Codec.encode(instance)
