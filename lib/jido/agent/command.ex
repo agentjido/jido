@@ -1,194 +1,84 @@
 defmodule Jido.Agent.Command do
   @moduledoc """
-  Defines one command that an Agent strategy can process.
+  The input value passed through the Agent Plugin chain.
 
-  A command can name an executable Action or Flow. It can also name an
-  internal strategy operation that is not executable. Execution options are
-  Agent policy and stay on the command. They are not stored in
-  `Jido.Instruction` metadata.
+  A Plugin can inspect the Agent and can prepare the Signal or caller context.
+  It cannot replace the Agent value or change executable output.
   """
 
-  alias Jido.Instruction
+  alias Jido.Error
 
   @schema Zoi.struct(
             __MODULE__,
             %{
-              action: Zoi.any(description: "Action, Flow, or internal strategy operation"),
-              params: Zoi.map(description: "Command parameters") |> Zoi.default(%{}),
-              context: Zoi.map(description: "Command context") |> Zoi.default(%{}),
-              metadata: Zoi.map(description: "Invocation metadata") |> Zoi.default(%{}),
-              opts: Zoi.any(description: "Agent execution policy options") |> Zoi.default([])
-            },
-            coerce: true
+              agent: Zoi.any(description: "Current immutable Agent value"),
+              signal: Zoi.any(description: "Signal for this command"),
+              context: Zoi.map(description: "Caller execution context") |> Zoi.default(%{})
+            }
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
-
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for Agent commands."
+  @doc "Returns the Zoi schema for an Agent command."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
-  @doc "Creates one Agent command."
-  @spec new(term(), map() | keyword(), map() | keyword(), keyword(), map() | keyword()) ::
-          {:ok, t()} | {:error, term()}
-  def new(action, params \\ %{}, context \\ %{}, opts \\ [], metadata \\ %{}) do
-    with :ok <- validate_action(action),
-         {:ok, params} <- normalize_map(params, :params),
-         {:ok, context} <- normalize_map(context, :context),
-         :ok <- validate_opts(opts),
-         {:ok, metadata} <- normalize_map(metadata, :metadata) do
-      {:ok,
-       %__MODULE__{
-         action: action,
-         params: params,
-         context: context,
-         metadata: metadata,
-         opts: opts
-       }}
+  @doc "Creates one validated Agent command."
+  @spec new(Jido.Agent.t(), Jido.Signal.t(), map()) ::
+          {:ok, t()} | {:error, Exception.t()}
+  def new(agent, signal, context \\ %{}) do
+    validate(%__MODULE__{agent: agent, signal: signal, context: context})
+  end
+
+  @doc "Validates one Agent command."
+  @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate(%__MODULE__{} = command) do
+    cond do
+      not agent?(command.agent) ->
+        invalid("Agent command must contain a Jido.Agent", %{agent: command.agent})
+
+      not signal?(command.signal) ->
+        invalid("Agent command must contain a Jido.Signal", %{signal: command.signal})
+
+      not is_map(command.context) or is_struct(command.context) ->
+        invalid("Agent command context must be a map", %{context: command.context})
+
+      true ->
+        {:ok, command}
     end
   end
 
-  @doc "Creates one Agent command or raises."
-  @spec new!(term(), map() | keyword(), map() | keyword(), keyword(), map() | keyword()) :: t()
-  def new!(action, params \\ %{}, context \\ %{}, opts \\ [], metadata \\ %{}) do
-    case new(action, params, context, opts, metadata) do
-      {:ok, command} -> command
-      {:error, reason} -> raise ArgumentError, "invalid Agent command: #{inspect(reason)}"
-    end
-  end
-
-  @doc "Normalizes Agent command input into a list of commands."
-  @spec normalize(term(), map() | keyword(), keyword()) :: {:ok, [t()]} | {:error, term()}
-  def normalize(input, context \\ %{}, opts \\ []) do
-    with {:ok, context} <- normalize_map(context, :context),
-         :ok <- validate_opts(opts) do
-      normalize_input(input, context, opts)
-    end
-  end
-
-  defp normalize_input(inputs, context, opts) when is_list(inputs) do
-    Enum.reduce_while(inputs, {:ok, []}, fn input, {:ok, commands} ->
-      case normalize_single(input, context, opts) do
-        {:ok, command} -> {:cont, {:ok, [command | commands]}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
-      {:ok, commands} -> {:ok, Enum.reverse(commands)}
-      error -> error
-    end
-  end
-
-  defp normalize_input(input, context, opts) do
-    case normalize_single(input, context, opts) do
-      {:ok, command} -> {:ok, [command]}
-      error -> error
-    end
-  end
-
-  defp normalize_single(%__MODULE__{} = command, context, opts) do
-    with :ok <- validate_opts(command.opts) do
-      {:ok,
-       %{
-         command
-         | context: Map.merge(command.context || %{}, context),
-           opts: Keyword.merge(command.opts, opts)
-       }}
-    end
-  end
-
-  defp normalize_single(%Instruction{} = instruction, context, opts) do
-    new(
-      instruction.target,
-      instruction.params,
-      Map.merge(instruction.context || %{}, context),
-      opts,
-      instruction.metadata
-    )
-  end
-
-  defp normalize_single(action, context, opts) when is_atom(action) do
-    new(action, %{}, context, opts)
-  end
-
-  defp normalize_single(%Jido.Flow{} = flow, context, opts) do
-    new(flow, %{}, context, opts)
-  end
-
-  defp normalize_single({action, params}, context, opts) do
-    new(action, params, context, opts)
-  end
-
-  defp normalize_single({action, params, item_context}, context, opts) do
-    with {:ok, item_context} <- normalize_map(item_context, :context) do
-      new(action, params, Map.merge(item_context, context), opts)
-    end
-  end
-
-  defp normalize_single({action, params, item_context, item_opts}, context, opts) do
-    with {:ok, item_context} <- normalize_map(item_context, :context),
-         :ok <- validate_opts(item_opts) do
-      new(action, params, Map.merge(item_context, context), Keyword.merge(item_opts, opts))
-    end
-  end
-
-  defp normalize_single(input, _context, _opts), do: {:error, {:invalid_command, input}}
+  def validate(value), do: invalid("Expected a Jido.Agent.Command value", %{value: value})
 
   @doc false
-  @spec put_exec_defaults(t(), keyword()) :: t()
-  def put_exec_defaults(%__MODULE__{} = command, defaults) when is_list(defaults) do
-    merged_opts =
-      defaults
-      |> Enum.reverse()
-      |> Enum.reduce(command.opts, fn
-        {key, value}, acc when is_atom(key) -> Keyword.put_new(acc, key, value)
-        _invalid, acc -> acc
-      end)
+  @spec normalize_context(term()) :: {:ok, map()} | {:error, Exception.t()}
+  def normalize_context(nil), do: {:ok, %{}}
 
-    %{command | opts: merged_opts}
-  end
+  def normalize_context(context)
+      when is_map(context) and not is_struct(context),
+      do: {:ok, context}
 
-  def put_exec_defaults(%__MODULE__{} = command, _defaults), do: command
-
-  @doc false
-  @spec run(t(), map(), keyword()) :: term()
-  def run(%__MODULE__{} = command, runtime_context \\ %{}, exec_opts \\ [])
-      when is_map(runtime_context) and is_list(exec_opts) do
-    instruction_attrs = %{
-      target: command.action,
-      params: command.params,
-      context: Map.merge(command.context, runtime_context),
-      metadata: command.metadata
-    }
-
-    with {:ok, instruction} <- Instruction.new(instruction_attrs) do
-      Jido.Exec.run(instruction, %{}, %{}, exec_opts)
-    end
-  end
-
-  defp validate_action(action) when is_atom(action) and not is_nil(action), do: :ok
-  defp validate_action(%Jido.Flow{}), do: :ok
-  defp validate_action(action), do: {:error, {:invalid_action, action}}
-
-  defp normalize_map(nil, _field), do: {:ok, %{}}
-  defp normalize_map(value, _field) when is_map(value), do: {:ok, value}
-
-  defp normalize_map(value, field) when is_list(value) do
-    if Keyword.keyword?(value) do
-      {:ok, Map.new(value)}
+  def normalize_context(context) when is_list(context) do
+    if Keyword.keyword?(context) do
+      {:ok, Map.new(context)}
     else
-      {:error, {:invalid_map, field, value}}
+      invalid("Agent caller context must be a map or keyword list", %{context: context})
     end
   end
 
-  defp normalize_map(value, field), do: {:error, {:invalid_map, field, value}}
-
-  defp validate_opts(opts) when is_list(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: {:error, {:invalid_options, opts}}
+  def normalize_context(context) do
+    invalid("Agent caller context must be a map or keyword list", %{context: context})
   end
 
-  defp validate_opts(opts), do: {:error, {:invalid_options, opts}}
+  defp agent?(%{__struct__: Jido.Agent}), do: true
+  defp agent?(_value), do: false
+
+  defp signal?(%{__struct__: Jido.Signal}), do: true
+  defp signal?(_value), do: false
+
+  defp invalid(message, details) do
+    {:error, Error.validation_error(message, kind: :config, details: details)}
+  end
 end

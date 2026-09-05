@@ -1,114 +1,71 @@
 defmodule Jido.AgentServer.State do
-  @moduledoc """
-  Internal state for AgentServer GenServer.
-
-  > #### Internal Module {: .warning}
-  > This module is internal to the AgentServer implementation. Its API may
-  > change without notice. Use `Jido.AgentServer.state/1` to retrieve state.
-
-  This struct holds all runtime state for an agent instance including
-  the agent itself, directive queue, hierarchy tracking, and configuration.
-  """
-
-  require Logger
-
-  alias Jido.AgentServer.{ChildInfo, Options, ParentRef}
-  alias Jido.AgentServer.State.Lifecycle, as: LifecycleState
-
-  @type status :: :initializing | :idle | :processing | :stopping
+  @moduledoc false
 
   @schema Zoi.struct(
             __MODULE__,
             %{
-              # Core identity
-              id: Zoi.string(description: "Instance ID"),
-              agent_module: Zoi.atom(description: "Agent module"),
-              agent: Zoi.any(description: "The Jido.Agent struct"),
-
-              # Status and processing
-              status:
-                Zoi.atom(description: "Current server status") |> Zoi.default(:initializing),
-              processing:
-                Zoi.boolean(description: "Whether currently processing directives")
+              agent: Zoi.any(description: "Live immutable Agent value"),
+              plugin_specs: Zoi.list(Zoi.any(), description: "Validated Agent Plugin specs"),
+              jido: Zoi.any(description: "Owning Jido instance") |> Zoi.optional(),
+              partition: Zoi.any(description: "Logical Agent partition") |> Zoi.optional(),
+              registry: Zoi.any(description: "Jido instance Registry") |> Zoi.optional(),
+              registered?:
+                Zoi.boolean(description: "Whether the Agent is Registry named")
                 |> Zoi.default(false),
-              queue:
-                Zoi.any(description: "Directive queue (:queue.queue())")
-                |> Zoi.default(:queue.new()),
-              signal_call_inflight:
-                Zoi.any(description: "In-flight synchronous signal call context")
-                |> Zoi.optional(),
-              signal_call_queue:
-                Zoi.any(description: "Queued synchronous signal call requests")
-                |> Zoi.default(:queue.new()),
-              deferred_async_signals:
-                Zoi.any(description: "Async signals buffered while sync call is in-flight")
-                |> Zoi.default(:queue.new()),
-
-              # Hierarchy
-              parent: Zoi.any(description: "Parent reference") |> Zoi.optional(),
-              orphaned_from:
-                Zoi.any(description: "Former parent reference after orphaning") |> Zoi.optional(),
-              children: Zoi.map(description: "Map of tag => ChildInfo") |> Zoi.default(%{}),
-              on_parent_death:
-                Zoi.atom(description: "Behavior on parent death") |> Zoi.default(:stop),
-
-              # Cron jobs
-              cron_jobs:
-                Zoi.map(description: "Map of job_id => stable scheduler job name")
-                |> Zoi.default(%{}),
-              cron_specs:
-                Zoi.map(description: "Map of job_id => durable cron registration spec")
-                |> Zoi.default(%{}),
-              skip_schedules:
-                Zoi.boolean(description: "Skip registering plugin schedules")
-                |> Zoi.default(false),
-              restored_from_storage:
-                Zoi.boolean(description: "Whether the startup agent was already thawed")
-                |> Zoi.default(false),
-
-              # Configuration
-              jido: Zoi.atom(description: "Jido instance name (required)"),
-              partition:
-                Zoi.any(description: "Logical partition within the Jido instance")
-                |> Zoi.optional(),
-              default_dispatch: Zoi.any(description: "Default dispatch config") |> Zoi.optional(),
+              exec_module: Zoi.atom(description: "Executable runtime module"),
+              exec_opts: Zoi.any(description: "Executable runtime options"),
+              max_postponed_signals: Zoi.any(description: "Postponed Signal admission limit"),
+              postponed_tokens: Zoi.any(description: "Bounded postponed Signal token set"),
+              max_directives_per_turn: Zoi.any(description: "Directive batch limit"),
+              directive_timeout: Zoi.any(description: "Plugin and external Directive timeout"),
+              default_dispatch:
+                Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
               error_policy:
-                Zoi.any(description: "Error handling policy") |> Zoi.default(:log_only),
-              max_queue_size: Zoi.integer(description: "Max queue size") |> Zoi.default(10_000),
-              registry: Zoi.atom(description: "Registry module"),
-              spawn_fun: Zoi.any(description: "Custom spawn function") |> Zoi.optional(),
-
-              # Routing
-              signal_router:
-                Zoi.any(description: "Jido.Signal.Router for signal routing")
-                |> Zoi.optional(),
-
-              # Observability
+                Zoi.any(description: "Agent Server error policy") |> Zoi.default(:log_only),
               error_count:
-                Zoi.integer(description: "Count of errors for max_errors policy")
-                |> Zoi.default(0),
-              metrics: Zoi.map(description: "Runtime metrics") |> Zoi.default(%{}),
-              completion_waiters:
-                Zoi.map(description: "Map of ref => waiter for completion notifications")
+                Zoi.integer(description: "Consecutive runtime error count") |> Zoi.default(0),
+              parent: Zoi.any(description: "Current logical parent") |> Zoi.optional(),
+              orphaned_from: Zoi.any(description: "Former logical parent") |> Zoi.optional(),
+              children:
+                Zoi.map(description: "Tracked Agent and Plugin children") |> Zoi.default(%{}),
+              child_spawn_requests:
+                Zoi.map(
+                  description: "Remote child creation identities, including unresolved starts"
+                )
                 |> Zoi.default(%{}),
-
-              # Lifecycle (InstanceManager integration: attachment tracking, idle timeout, storage)
-              lifecycle: Zoi.any(description: "Lifecycle state (State.Lifecycle.t())"),
-
-              # Debug mode
+              on_parent_death: Zoi.atom(description: "Parent death policy") |> Zoi.default(:stop),
+              pool: Zoi.atom(description: "Owning Agent InstanceManager") |> Zoi.optional(),
+              pool_key: Zoi.any(description: "Agent InstanceManager key") |> Zoi.optional(),
+              idle_timeout:
+                Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
+              persistence:
+                Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
+              attachments:
+                Zoi.any(description: "Attached owner process set") |> Zoi.default(MapSet.new()),
+              attachment_monitors:
+                Zoi.map(description: "Attachment monitor references") |> Zoi.default(%{}),
+              idle_timer: Zoi.any(description: "Current idle timer") |> Zoi.optional(),
+              spawn_fun:
+                Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
               debug:
-                Zoi.boolean(description: "Whether debug mode is enabled") |> Zoi.default(false),
+                Zoi.boolean(description: "Enable the Agent event buffer") |> Zoi.default(false),
               debug_events:
-                Zoi.list(Zoi.any(), description: "Ring buffer of debug events (max 500)")
-                |> Zoi.default([]),
+                Zoi.list(Zoi.any(), description: "Recent Agent runtime events") |> Zoi.default([]),
               debug_max_events:
-                Zoi.integer(description: "Max debug events in ring buffer")
-                |> Zoi.default(500),
-              current_runtime_context:
-                Zoi.map(description: "Runtime context for the directive currently being drained")
-                |> Zoi.default(%{})
-            },
-            coerce: true
+                Zoi.integer(description: "Maximum recent runtime events") |> Zoi.default(500),
+              state_version: Zoi.integer(description: "Agent commit revision"),
+              activation_id:
+                Zoi.string(description: "Telemetry activation identity") |> Zoi.optional(),
+              activation_span:
+                Zoi.any(description: "Activation telemetry span") |> Zoi.optional(),
+              active: Zoi.any(description: "Active Turn lifecycle record"),
+              plugin_bootstrap:
+                Zoi.any(description: "Active Plugin readiness check") |> Zoi.optional(),
+              admission_task:
+                Zoi.any(description: "Active Plugin admission task") |> Zoi.optional(),
+              directive_task:
+                Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional()
+            }
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
@@ -119,333 +76,21 @@ defmodule Jido.AgentServer.State do
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
-  @doc """
-  Creates a new State from validated Options, agent module, and agent struct.
-
-  If a parent reference is provided, it's injected into the agent's state
-  as `agent.state.__parent__` so agents can use `Directive.emit_to_parent/3`.
-  """
-  @spec from_options(Options.t(), module(), struct()) :: {:ok, t()} | {:error, term()}
-  def from_options(%Options{} = opts, agent_module, agent) do
-    agent = inject_runtime_refs(agent, opts.partition, opts.parent, nil)
-    {agent, staged_cron_specs} = Jido.Scheduler.extract_staged_cron_specs(agent)
-
-    {restored_cron_specs, invalid_cron_specs} =
-      Jido.Scheduler.classify_cron_specs(staged_cron_specs)
-
-    Enum.each(invalid_cron_specs, fn {job_id, spec, reason} ->
-      Logger.error(fn ->
-        "AgentServer #{opts.id} dropped malformed persisted cron spec #{inspect(job_id)}: #{inspect(spec)} (#{inspect(reason)})"
-      end)
-    end)
-
-    lifecycle_opts = [
-      lifecycle_mod: opts.lifecycle_mod,
-      pool: opts.pool,
-      pool_key: opts.pool_key,
-      idle_timeout: opts.idle_timeout,
-      storage: opts.storage
-    ]
-
-    with {:ok, lifecycle} <- LifecycleState.new(lifecycle_opts) do
-      attrs = %{
-        id: opts.id,
-        agent_module: agent_module,
-        agent: agent,
-        status: :initializing,
-        processing: false,
-        queue: :queue.new(),
-        signal_call_inflight: nil,
-        signal_call_queue: :queue.new(),
-        deferred_async_signals: :queue.new(),
-        parent: opts.parent,
-        orphaned_from: nil,
-        children: %{},
-        on_parent_death: opts.on_parent_death,
-        jido: opts.jido,
-        partition: opts.partition,
-        default_dispatch: opts.default_dispatch,
-        error_policy: opts.error_policy,
-        max_queue_size: opts.max_queue_size,
-        registry: opts.registry,
-        spawn_fun: opts.spawn_fun,
-        cron_jobs: %{},
-        cron_specs: restored_cron_specs,
-        skip_schedules: opts.skip_schedules,
-        restored_from_storage: opts.restored_from_storage,
-        error_count: 0,
-        metrics: %{},
-        completion_waiters: %{},
-        lifecycle: lifecycle,
-        debug: opts.debug,
-        debug_events: [],
-        debug_max_events: Jido.Observe.Config.debug_max_events(opts.jido),
-        current_runtime_context: %{}
-      }
-
-      Zoi.parse(@schema, attrs)
-    end
+  @doc false
+  def add_child(%__MODULE__{} = state, key, child) do
+    %{state | children: Map.put(state.children, key, child)}
   end
 
-  defp inject_runtime_refs(agent, partition, parent, orphaned_from) do
-    %{agent | state: put_runtime_refs(agent.state, partition, parent, orphaned_from)}
+  @doc false
+  def remove_child(%__MODULE__{} = state, key) do
+    %{state | children: Map.delete(state.children, key)}
   end
 
-  @doc """
-  Attaches a parent reference to the runtime and agent state.
-  """
-  @spec attach_parent(t(), ParentRef.t()) :: t()
-  def attach_parent(%__MODULE__{} = state, %ParentRef{} = parent) do
-    %{
-      state
-      | parent: parent,
-        orphaned_from: nil,
-        agent: inject_runtime_refs(state.agent, state.partition, parent, nil)
-    }
-  end
+  @doc false
+  def child(%__MODULE__{} = state, key), do: Map.get(state.children, key)
 
-  @doc """
-  Transitions the runtime into an orphaned state, preserving the former parent.
-  """
-  @spec orphan_parent(t()) :: t()
-  def orphan_parent(%__MODULE__{parent: %ParentRef{} = parent} = state) do
-    %{
-      state
-      | parent: nil,
-        orphaned_from: parent,
-        agent: inject_runtime_refs(state.agent, state.partition, nil, parent)
-    }
-  end
-
-  def orphan_parent(%__MODULE__{} = state) do
-    %{
-      state
-      | parent: nil,
-        orphaned_from: nil,
-        agent: inject_runtime_refs(state.agent, state.partition, nil, nil)
-    }
-  end
-
-  @doc """
-  Updates the agent in state.
-  """
-  @spec update_agent(t(), struct()) :: t()
-  def update_agent(%__MODULE__{} = state, agent) do
-    %{
-      state
-      | agent: inject_runtime_refs(agent, state.partition, state.parent, state.orphaned_from)
-    }
-  end
-
-  @doc """
-  Sets the status.
-  """
-  @spec set_status(t(), status()) :: t()
-  def set_status(%__MODULE__{} = state, status)
-      when status in [:initializing, :idle, :processing, :stopping] do
-    %{state | status: status}
-  end
-
-  @doc """
-  Enqueues a directive with its triggering signal for later execution.
-  """
-  @spec enqueue(t(), Jido.Signal.t(), struct()) :: {:ok, t()} | {:error, :queue_overflow}
-  def enqueue(%__MODULE__{queue: queue, max_queue_size: max} = state, signal, directive) do
-    if :queue.len(queue) >= max do
-      {:error, :queue_overflow}
-    else
-      {:ok, %{state | queue: :queue.in({signal, directive}, queue)}}
-    end
-  end
-
-  @doc """
-  Enqueues a directive with its triggering signal and runtime context.
-  """
-  @spec enqueue(t(), Jido.Signal.t(), map(), struct()) :: {:ok, t()} | {:error, :queue_overflow}
-  def enqueue(
-        %__MODULE__{queue: queue, max_queue_size: max} = state,
-        signal,
-        runtime_context,
-        directive
-      )
-      when is_map(runtime_context) do
-    if :queue.len(queue) >= max do
-      {:error, :queue_overflow}
-    else
-      {:ok, %{state | queue: :queue.in({signal, runtime_context, directive}, queue)}}
-    end
-  end
-
-  @doc """
-  Enqueues multiple directives from a single signal.
-  """
-  @spec enqueue_all(t(), Jido.Signal.t(), [struct()]) :: {:ok, t()} | {:error, :queue_overflow}
-  def enqueue_all(state, _signal, []), do: {:ok, state}
-
-  def enqueue_all(%__MODULE__{} = state, signal, [directive | rest]) do
-    case enqueue(state, signal, directive) do
-      {:ok, new_state} -> enqueue_all(new_state, signal, rest)
-      error -> error
-    end
-  end
-
-  @doc """
-  Enqueues multiple directives with runtime context from a single signal.
-  """
-  @spec enqueue_all(t(), Jido.Signal.t(), map(), [struct()]) ::
-          {:ok, t()} | {:error, :queue_overflow}
-  def enqueue_all(state, _signal, _runtime_context, []), do: {:ok, state}
-
-  def enqueue_all(%__MODULE__{} = state, signal, runtime_context, [directive | rest])
-      when is_map(runtime_context) do
-    case enqueue(state, signal, runtime_context, directive) do
-      {:ok, new_state} -> enqueue_all(new_state, signal, runtime_context, rest)
-      error -> error
-    end
-  end
-
-  @doc """
-  Dequeues the next directive for processing.
-  """
-  @spec dequeue(t()) ::
-          {{:value, {Jido.Signal.t(), struct()} | {Jido.Signal.t(), map(), struct()}}, t()}
-          | {:empty, t()}
-  def dequeue(%__MODULE__{queue: queue} = state) do
-    case :queue.out(queue) do
-      {{:value, item}, new_queue} ->
-        {{:value, normalize_queue_item(item)}, %{state | queue: new_queue}}
-
-      {:empty, _} ->
-        {:empty, state}
-    end
-  end
-
-  defp normalize_queue_item({signal, runtime_context, directive})
-       when map_size(runtime_context) == 0 do
-    {signal, directive}
-  end
-
-  defp normalize_queue_item(item), do: item
-
-  @doc """
-  Returns the current queue length.
-  """
-  @spec queue_length(t()) :: non_neg_integer()
-  def queue_length(%__MODULE__{queue: queue}) do
-    :queue.len(queue)
-  end
-
-  @doc """
-  Checks if the queue is empty.
-  """
-  @spec queue_empty?(t()) :: boolean()
-  def queue_empty?(%__MODULE__{queue: queue}) do
-    :queue.is_empty(queue)
-  end
-
-  @doc """
-  Adds a child to the children map.
-  """
-  @spec add_child(t(), term(), ChildInfo.t()) :: t()
-  def add_child(%__MODULE__{children: children} = state, tag, %ChildInfo{} = child) do
-    %{state | children: Map.put(children, tag, child)}
-  end
-
-  @doc """
-  Removes a child by tag.
-  """
-  @spec remove_child(t(), term()) :: t()
-  def remove_child(%__MODULE__{children: children} = state, tag) do
-    %{state | children: Map.delete(children, tag)}
-  end
-
-  @doc """
-  Removes a child by PID.
-  """
-  @spec remove_child_by_pid(t(), pid()) :: {term() | nil, t()}
-  def remove_child_by_pid(%__MODULE__{children: children} = state, pid) do
-    case Enum.find(children, fn {_tag, child} -> child.pid == pid end) do
-      {tag, _child} ->
-        {tag, %{state | children: Map.delete(children, tag)}}
-
-      nil ->
-        {nil, state}
-    end
-  end
-
-  @doc """
-  Gets a child by tag.
-  """
-  @spec get_child(t(), term()) :: ChildInfo.t() | nil
-  def get_child(%__MODULE__{children: children}, tag) do
-    Map.get(children, tag)
-  end
-
-  defp put_runtime_refs(agent_state, partition, parent, orphaned_from) do
-    agent_state
-    |> maybe_put_state_key(:__partition__, partition)
-    |> maybe_put_state_key(:__parent__, parent)
-    |> maybe_put_state_key(:__orphaned_from__, orphaned_from)
-  end
-
-  defp maybe_put_state_key(state, key, nil), do: Map.delete(state, key)
-  defp maybe_put_state_key(state, key, value), do: Map.put(state, key, value)
-
-  @doc """
-  Increments the error count.
-  """
-  @spec increment_error_count(t()) :: t()
-  def increment_error_count(%__MODULE__{error_count: count} = state) do
-    %{state | error_count: count + 1}
-  end
-
-  @doc """
-  Records a debug event if debug mode is enabled.
-
-  Events are stored in a ring buffer (max 500 entries).
-  Each event includes a monotonic timestamp for relative timing.
-  """
-  @spec record_debug_event(t(), atom(), map()) :: t()
-  def record_debug_event(%__MODULE__{} = state, type, data) do
-    if state.debug || Jido.Debug.enabled?(state.jido) do
-      event = %{
-        at: System.monotonic_time(:millisecond),
-        type: type,
-        data: data,
-        jido_instance: state.jido,
-        jido_partition: state.partition
-      }
-
-      new_events = Enum.take([event | state.debug_events], state.debug_max_events)
-      %{state | debug_events: new_events}
-    else
-      state
-    end
-  end
-
-  @doc """
-  Returns recent debug events, newest first.
-
-  ## Options
-
-  - `:limit` - Maximum number of events to return (default: all)
-  """
-  @spec get_debug_events(t(), keyword()) :: [map()]
-  def get_debug_events(%__MODULE__{debug_events: events}, opts \\ []) do
-    limit = Keyword.get(opts, :limit)
-
-    case limit do
-      nil -> events
-      n when is_integer(n) and n > 0 -> Enum.take(events, n)
-      _ -> events
-    end
-  end
-
-  @doc """
-  Enables or disables debug mode at runtime.
-  """
-  @spec set_debug(t(), boolean()) :: t()
-  def set_debug(%__MODULE__{} = state, enabled) when is_boolean(enabled) do
-    %{state | debug: enabled}
+  @doc false
+  def child_by_ref(%__MODULE__{} = state, ref) do
+    Enum.find(state.children, fn {_key, child} -> child.ref == ref end)
   end
 end

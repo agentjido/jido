@@ -3,9 +3,8 @@ defmodule JidoTest.InstanceTest do
 
   import JidoTest.Eventually
 
-  alias Jido.Storage.Redis
-  alias Jido.Thread
-  alias JidoTest.TestAgents.Minimal
+  alias Jido.AgentServer, as: Server
+  alias Jido.Persistence.Redis
 
   defmodule TestInstance do
     use Jido, otp_app: :jido_test_instance
@@ -15,25 +14,17 @@ defmodule JidoTest.InstanceTest do
     use Jido.Agent,
       name: "redis_test_agent",
       schema: Zoi.object(%{counter: Zoi.integer() |> Zoi.default(0)})
-
-    @impl true
-    def signal_routes(_ctx), do: []
   end
 
   defmodule RedisMock do
     def child_spec(opts) do
-      %{
-        id: __MODULE__,
-        start: {__MODULE__, :start_link, [opts]}
-      }
+      %{id: __MODULE__, start: {__MODULE__, :start_link, [opts]}}
     end
 
-    def start_link(_opts \\ []) do
-      Agent.start_link(fn -> %{} end, name: __MODULE__)
-    end
+    def start_link(_opts \\ []), do: Elixir.Agent.start_link(fn -> %{} end, name: __MODULE__)
 
     def command(command) do
-      Agent.get_and_update(__MODULE__, fn state ->
+      Elixir.Agent.get_and_update(__MODULE__, fn state ->
         case command do
           ["GET", key] ->
             {{:ok, Map.get(state, key)}, state}
@@ -44,11 +35,22 @@ defmodule JidoTest.InstanceTest do
           ["SET", key, value, "PX", _ttl] ->
             {{:ok, "OK"}, Map.put(state, key, value)}
 
+          ["EVAL", _script, "1", key, mode, expected, value, _ttl] ->
+            matches? =
+              case mode do
+                "missing" -> not Map.has_key?(state, key)
+                "value" -> Map.get(state, key) == expected
+              end
+
+            if matches?,
+              do: {{:ok, 1}, Map.put(state, key, value)},
+              else: {{:ok, 0}, state}
+
           ["DEL" | keys] ->
             deleted = Enum.count(keys, &Map.has_key?(state, &1))
             {{:ok, deleted}, Map.drop(state, keys)}
 
-          _ ->
+          _other ->
             {{:ok, {:echo, command}}, state}
         end
       end)
@@ -59,18 +61,17 @@ defmodule JidoTest.InstanceTest do
     module =
       Module.concat(__MODULE__, :"InlineRedisInstance#{System.unique_integer([:positive])}")
 
-    source = """
+    Code.compile_string("""
     defmodule #{inspect(module)} do
       use Jido,
         otp_app: :jido_test_instance,
-        storage: {Jido.Storage.Redis, [
-          command_fn: fn cmd -> JidoTest.InstanceTest.RedisMock.command(cmd) end,
+        persistence: {Jido.Persistence.Redis, [
+          command_fn: fn command -> JidoTest.InstanceTest.RedisMock.command(command) end,
           prefix: #{inspect(prefix)}
         ]}
     end
-    """
+    """)
 
-    Code.compile_string(source)
     module
   end
 
@@ -79,290 +80,147 @@ defmodule JidoTest.InstanceTest do
     :code.delete(module)
   end
 
+  defp stop_test_instance do
+    if pid = Process.whereis(TestInstance) do
+      try do
+        Supervisor.stop(pid, :normal, 5_000)
+      catch
+        :exit, _reason -> :ok
+      end
+    end
+
+    :ok
+  end
+
   setup do
+    stop_test_instance()
     Application.put_env(:jido_test_instance, TestInstance, max_tasks: 500)
     {:ok, _pid} = start_supervised({RedisMock, []})
 
     on_exit(fn ->
       Application.delete_env(:jido_test_instance, TestInstance)
-
-      if pid = Process.whereis(TestInstance) do
-        try do
-          Supervisor.stop(pid, :normal, 5000)
-        catch
-          :exit, _ -> :ok
-        end
-      end
+      stop_test_instance()
     end)
 
     :ok
   end
 
-  describe "instance module definition" do
-    test "generates child_spec/1" do
-      spec = TestInstance.child_spec([])
+  test "instance module exposes configuration and a child specification" do
+    assert TestInstance.config()[:max_tasks] == 500
+    assert TestInstance.config(max_tasks: 1_000)[:max_tasks] == 1_000
 
-      assert spec.id == TestInstance
-      assert spec.type == :supervisor
-      assert {Jido, :start_link, [opts]} = spec.start
-      assert Keyword.get(opts, :name) == TestInstance
-    end
-
-    test "generates config/1 that reads from application env" do
-      config = TestInstance.config()
-
-      assert Keyword.get(config, :max_tasks) == 500
-    end
-
-    test "config/1 merges runtime overrides" do
-      config = TestInstance.config(max_tasks: 1000, extra: :value)
-
-      assert Keyword.get(config, :max_tasks) == 1000
-      assert Keyword.get(config, :extra) == :value
-    end
-
-    test "child_spec/1 accepts runtime overrides" do
-      spec = TestInstance.child_spec(max_tasks: 2000)
-
-      assert {Jido, :start_link, [opts]} = spec.start
-      assert Keyword.get(opts, :max_tasks) == 2000
-    end
-
-    test "supports anonymous Redis command_fn in __jido_storage__/0" do
-      module = compile_inline_redis_instance("inline-storage")
-      on_exit(fn -> unload_module(module) end)
-
-      assert {Redis, opts} = module.__jido_storage__()
-      assert is_function(opts[:command_fn], 1)
-      assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
-      assert opts[:prefix] == "inline-storage"
-    end
-
-    test "hibernate and thaw work through a dynamically compiled Redis instance" do
-      module = compile_inline_redis_instance("inline-persist")
-      on_exit(fn -> unload_module(module) end)
-
-      agent =
-        RedisTestAgent.new(id: "redis-instance-agent")
-        |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
-        |> then(fn agent ->
-          thread =
-            Thread.new(id: "redis-thread")
-            |> Thread.append(%{kind: :note, payload: %{text: "saved"}})
-
-          %{agent | state: Map.put(agent.state, :__thread__, thread)}
-        end)
-
-      assert :ok = module.hibernate(agent)
-      assert {:ok, thawed} = module.thaw(RedisTestAgent, "redis-instance-agent")
-      assert thawed.state.counter == 42
-      assert thawed.state[:__thread__].id == "redis-thread"
-      assert Thread.entry_count(thawed.state[:__thread__]) == 1
-    end
-
-    test "partitioned and unpartitioned checkpoints coexist through an instance module" do
-      module = compile_inline_redis_instance("inline-partition-persist")
-      on_exit(fn -> unload_module(module) end)
-
-      unpartitioned =
-        RedisTestAgent.new(id: "shared-partition-key")
-        |> then(fn agent -> %{agent | state: %{agent.state | counter: 10}} end)
-
-      partitioned =
-        RedisTestAgent.new(id: "shared-partition-key")
-        |> then(fn agent ->
-          %{agent | state: agent.state |> Map.put(:counter, 20) |> Map.put(:__partition__, :blue)}
-        end)
-
-      assert :ok = module.hibernate(unpartitioned)
-      assert :ok = module.hibernate(partitioned, partition: :blue)
-
-      assert {:ok, thawed_unpartitioned} = module.thaw(RedisTestAgent, "shared-partition-key")
-
-      assert {:ok, thawed_partitioned} =
-               module.thaw(RedisTestAgent, "shared-partition-key", partition: :blue)
-
-      assert thawed_unpartitioned.state.counter == 10
-      assert Map.get(thawed_unpartitioned.state, :__partition__) == nil
-
-      assert thawed_partitioned.state.counter == 20
-      assert thawed_partitioned.state.__partition__ == :blue
-    end
-
-    test "hibernate rejects conflicting partition metadata" do
-      agent =
-        RedisTestAgent.new(id: "partition-conflict")
-        |> then(fn agent -> %{agent | state: Map.put(agent.state, :__partition__, :alpha)} end)
-
-      assert {:error, %Jido.Error.ValidationError{}} =
-               TestInstance.hibernate(agent, partition: :beta)
-    end
+    spec = TestInstance.child_spec(max_tasks: 2_000)
+    assert spec.id == TestInstance
+    assert spec.type == :supervisor
+    assert {Jido, :start_link, [opts]} = spec.start
+    assert opts[:name] == TestInstance
+    assert opts[:max_tasks] == 2_000
   end
 
-  describe "instance lifecycle" do
-    test "start_link/1 starts the supervisor" do
-      {:ok, pid} = TestInstance.start_link()
+  test "an inline instance keeps its Redis persistence function" do
+    module = compile_inline_redis_instance("inline-persistence")
+    on_exit(fn -> unload_module(module) end)
 
-      assert is_pid(pid)
-      assert Process.alive?(pid)
-      assert Process.whereis(TestInstance) == pid
-    end
-
-    test "starts TaskSupervisor as child" do
-      {:ok, _pid} = TestInstance.start_link()
-
-      task_sup = TestInstance.task_supervisor_name()
-      assert Process.whereis(task_sup) != nil
-    end
-
-    test "starts Registry as child" do
-      {:ok, _pid} = TestInstance.start_link()
-
-      reg = TestInstance.registry_name()
-      assert Process.whereis(reg) != nil
-    end
-
-    test "starts RuntimeStore as child" do
-      {:ok, _pid} = TestInstance.start_link()
-
-      runtime_store = TestInstance.runtime_store_name()
-      assert Process.whereis(runtime_store) != nil
-    end
-
-    test "starts AgentSupervisor as child" do
-      {:ok, _pid} = TestInstance.start_link()
-
-      agent_sup = TestInstance.agent_supervisor_name()
-      assert Process.whereis(agent_sup) != nil
-    end
+    assert {Redis, opts} = module.__jido_persistence__()
+    assert is_function(opts[:command_fn], 1)
+    assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
+    assert opts[:prefix] == "inline-persistence"
   end
 
-  describe "instance agent API" do
-    test "start_agent/2 starts an agent" do
-      {:ok, _sup_pid} = TestInstance.start_link()
+  test "hibernate and thaw work through an instance module" do
+    module = compile_inline_redis_instance("inline-persist")
+    on_exit(fn -> unload_module(module) end)
+    start_supervised!(module)
 
-      {:ok, agent_pid} = TestInstance.start_agent(Minimal, id: "test-1")
+    agent =
+      RedisTestAgent.new!(id: "redis-instance-agent")
+      |> then(fn agent -> %{agent | state: %{agent.state | counter: 42}} end)
 
-      assert is_pid(agent_pid)
-      assert Process.alive?(agent_pid)
-    end
-
-    test "whereis/1 looks up an agent by ID" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      {:ok, agent_pid} = TestInstance.start_agent(Minimal, id: "lookup-test")
-
-      found_pid = TestInstance.whereis("lookup-test")
-      assert found_pid == agent_pid
-    end
-
-    test "whereis/1 returns nil for unknown ID" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      assert TestInstance.whereis("nonexistent") == nil
-    end
-
-    test "list_agents/0 lists all agents" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      {:ok, _} = TestInstance.start_agent(Minimal, id: "list-1")
-      {:ok, _} = TestInstance.start_agent(Minimal, id: "list-2")
-
-      agents = TestInstance.list_agents()
-      ids = Enum.map(agents, fn {id, _pid} -> id end)
-
-      assert "list-1" in ids
-      assert "list-2" in ids
-    end
-
-    test "agent_count/0 returns count of running agents" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      assert TestInstance.agent_count() == 0
-
-      {:ok, _} = TestInstance.start_agent(Minimal, id: "count-1")
-      assert TestInstance.agent_count() == 1
-
-      {:ok, _} = TestInstance.start_agent(Minimal, id: "count-2")
-      assert TestInstance.agent_count() == 2
-    end
-
-    test "stop_agent/1 stops an agent by ID" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      {:ok, pid} = TestInstance.start_agent(Minimal, id: "stop-test")
-
-      assert TestInstance.whereis("stop-test") != nil
-      # Monitor before stopping to ensure we catch the DOWN
-      ref = Process.monitor(pid)
-      assert :ok = TestInstance.stop_agent("stop-test")
-      # Wait for the process to actually terminate
-      assert_receive {:DOWN, ^ref, :process, ^pid, _}, 1000
-      # Use eventually to wait for registry to update
-      eventually(fn -> TestInstance.whereis("stop-test") == nil end)
-    end
-
-    test "stop_agent/1 stops an agent by pid" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      {:ok, pid} = TestInstance.start_agent(Minimal, id: "stop-pid-test")
-
-      assert Process.alive?(pid)
-      assert :ok = TestInstance.stop_agent(pid)
-      refute Process.alive?(pid)
-    end
-
-    test "partitions isolate same agent IDs within one instance" do
-      {:ok, _sup_pid} = TestInstance.start_link()
-
-      {:ok, unpartitioned_pid} = TestInstance.start_agent(Minimal, id: "shared-id")
-      {:ok, alpha_pid} = TestInstance.start_agent(Minimal, id: "shared-id", partition: :alpha)
-      {:ok, beta_pid} = TestInstance.start_agent(Minimal, id: "shared-id", partition: :beta)
-
-      assert unpartitioned_pid != alpha_pid
-      assert alpha_pid != beta_pid
-
-      assert TestInstance.whereis("shared-id") == unpartitioned_pid
-      assert TestInstance.whereis("shared-id", partition: :alpha) == alpha_pid
-      assert TestInstance.whereis("shared-id", partition: :beta) == beta_pid
-
-      assert TestInstance.list_agents() == [{"shared-id", unpartitioned_pid}]
-      assert TestInstance.list_agents(partition: :alpha) == [{"shared-id", alpha_pid}]
-      assert TestInstance.list_agents(partition: :beta) == [{"shared-id", beta_pid}]
-
-      assert TestInstance.agent_count() == 1
-      assert TestInstance.agent_count(partition: :alpha) == 1
-      assert TestInstance.agent_count(partition: :beta) == 1
-
-      assert :ok = TestInstance.stop_agent("shared-id", partition: :alpha)
-      eventually(fn -> TestInstance.whereis("shared-id", partition: :alpha) == nil end)
-
-      assert TestInstance.whereis("shared-id") == unpartitioned_pid
-      assert TestInstance.whereis("shared-id", partition: :beta) == beta_pid
-    end
+    assert {:ok, pid} = module.start_agent(agent, restore: false)
+    assert :ok = module.hibernate(pid)
+    assert {:ok, thawed_pid} = module.thaw(RedisTestAgent, agent.id)
+    assert Server.agent(thawed_pid).state.counter == 42
   end
 
-  describe "supervision tree integration" do
-    test "can be used in Supervisor.start_link/2" do
-      children = [TestInstance]
+  test "partitioned Agent checkpoints use separate keys" do
+    module = compile_inline_redis_instance("inline-partition-persist")
+    on_exit(fn -> unload_module(module) end)
+    start_supervised!(module)
 
-      {:ok, sup_pid} = Supervisor.start_link(children, strategy: :one_for_one)
+    agent =
+      RedisTestAgent.new!(id: "shared-partition-key")
+      |> then(fn agent -> %{agent | state: %{agent.state | counter: 10}} end)
 
-      assert Process.alive?(sup_pid)
-      assert Process.whereis(TestInstance) != nil
+    partitioned = %{agent | state: %{agent.state | counter: 20}}
 
-      Supervisor.stop(sup_pid, :normal, 5000)
-    end
+    assert {:ok, pid} = module.start_agent(agent, restore: false)
 
-    test "can be used with runtime options in supervision tree" do
-      children = [{TestInstance, max_tasks: 3000}]
+    assert {:ok, partitioned_pid} =
+             module.start_agent(partitioned, partition: :blue, restore: false)
 
-      {:ok, sup_pid} = Supervisor.start_link(children, strategy: :one_for_one)
+    assert :ok = module.hibernate(pid)
+    assert :ok = module.hibernate(partitioned_pid)
 
-      assert Process.alive?(sup_pid)
-      assert Process.whereis(TestInstance) != nil
+    assert {:ok, restored_pid} = module.thaw(RedisTestAgent, agent.id)
 
-      Supervisor.stop(sup_pid, :normal, 5000)
-    end
+    assert {:ok, restored_partitioned_pid} =
+             module.thaw(RedisTestAgent, agent.id, partition: :blue)
+
+    assert Server.agent(restored_pid).state.counter == 10
+    assert Server.agent(restored_partitioned_pid).state.counter == 20
+  end
+
+  test "starts the Agent runtime supervision tree" do
+    {:ok, pid} = TestInstance.start_link()
+
+    assert Process.whereis(TestInstance) == pid
+    assert Process.whereis(TestInstance.task_supervisor_name())
+    assert Process.whereis(TestInstance.registry_name())
+    assert Process.whereis(TestInstance.runtime_store_name())
+    assert Process.whereis(TestInstance.agent_supervisor_name())
+  end
+
+  test "instance Agent APIs start, find, list, count, and stop Agents" do
+    {:ok, _pid} = TestInstance.start_link()
+
+    {:ok, first} = TestInstance.start_agent(RedisTestAgent, id: "agent-1")
+    {:ok, second} = TestInstance.start_agent(RedisTestAgent, id: "agent-2")
+
+    assert TestInstance.whereis_agent("agent-1") == first
+    assert TestInstance.whereis_agent("missing") == nil
+
+    assert Enum.sort(TestInstance.list_agents()) ==
+             Enum.sort([{"agent-1", first}, {"agent-2", second}])
+
+    assert TestInstance.agent_count() == 2
+
+    monitor = Process.monitor(first)
+    assert :ok = TestInstance.stop_agent("agent-1")
+    assert_receive {:DOWN, ^monitor, :process, ^first, _reason}, 1_000
+    eventually(fn -> TestInstance.whereis_agent("agent-1") == nil end)
+
+    assert :ok = TestInstance.stop_agent(second)
+    assert TestInstance.agent_count() == 0
+  end
+
+  test "partitions isolate equal Agent ids" do
+    {:ok, _pid} = TestInstance.start_link()
+
+    {:ok, plain} = TestInstance.start_agent(RedisTestAgent, id: "shared")
+    {:ok, blue} = TestInstance.start_agent(RedisTestAgent, id: "shared", partition: :blue)
+
+    assert TestInstance.whereis_agent("shared") == plain
+    assert TestInstance.whereis_agent("shared", partition: :blue) == blue
+    assert TestInstance.list_agents() == [{"shared", plain}]
+    assert TestInstance.list_agents(partition: :blue) == [{"shared", blue}]
+  end
+
+  test "works as a child in another Supervisor" do
+    {:ok, supervisor} = Supervisor.start_link([TestInstance], strategy: :one_for_one)
+
+    assert Process.alive?(supervisor)
+    assert Process.whereis(TestInstance)
+
+    Supervisor.stop(supervisor, :normal, 5_000)
   end
 end

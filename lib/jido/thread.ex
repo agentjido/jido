@@ -1,12 +1,15 @@
 defmodule Jido.Thread do
   @moduledoc """
-  An append-only log of interaction entries.
+  An optional append-only value for interaction entries.
 
-  Thread is the canonical record of "what happened" in a conversation
-  or workflow. It is provider-agnostic and never modified destructively.
+  Applications can store a Thread in an Agent schema and return its complete
+  next value as ordinary Agent state. The application owns its history format,
+  retention, and model-context projection. A list of message maps is sufficient
+  when entry identity, timestamps, and references are not needed.
 
-  LLM context is derived from Thread via projection functions, not
-  stored directly in Thread.
+  Thread has no Plugin, runtime process, or automatic message capture. Its
+  append API returns a new value; it does not commit Agent state. Convenience
+  constructors and append can read the clock and generate missing identifiers.
 
   ## Example
 
@@ -45,6 +48,10 @@ defmodule Jido.Thread do
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc "Returns the Zoi schema for Thread."
+  @spec schema() :: Zoi.schema()
+  def schema, do: @schema
 
   @doc "Create a new empty thread"
   @spec new(keyword()) :: t()

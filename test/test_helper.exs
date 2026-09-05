@@ -1,7 +1,10 @@
-# Suppress the Discovery module's info log during startup
-# The capture_log: true option captures test logs, but Discovery logs happen
-# before tests run. We handle this by temporarily setting compile_time_purge_level.
-# However, since that's a compile-time option, we accept the Discovery log.
+# Load the local provider catalog before concurrent test compilation starts.
+# This reads packaged metadata and makes no provider request. Otherwise the
+# first timed HTTP/SSE test can wait behind code loading for unrelated tests.
+{:ok, _model} = ReqLLM.model("anthropic:claude-haiku-4-5")
 
 ExUnit.start()
-ExUnit.configure(exclude: [:skip, :flaky, :example])
+
+# Focused schema and snapshot probes: mix test --only basic_contract
+# Basic SDK integration suite: mix test --include integration test/examples/01_basic
+ExUnit.configure(exclude: [:skip, :flaky, :example, :integration])

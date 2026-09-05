@@ -37,14 +37,6 @@ defmodule JidoTest.ErrorTest do
       assert error.kind == :action
       assert error.subject == SomeAction
     end
-
-    test "creates a validation error for sensor (convenience)" do
-      error = Error.validation_error("Sensor failed", sensor: SomeSensor)
-
-      assert error.message == "Sensor failed"
-      assert error.kind == :sensor
-      assert error.subject == SomeSensor
-    end
   end
 
   describe "execution_error/2" do
@@ -155,8 +147,6 @@ defmodule JidoTest.ErrorTest do
        :validation_error},
       {"validation error with kind: :action",
        Error.validation_error("Bad action", action: SomeAction), :invalid_action},
-      {"validation error with kind: :sensor",
-       Error.validation_error("Bad sensor", sensor: SomeSensor), :invalid_sensor},
       {"validation error with kind: :config", Error.validation_error("Bad config", kind: :config),
        :config_error},
       {"execution error", Error.execution_error("Failed"), :execution_error},

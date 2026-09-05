@@ -8,7 +8,7 @@ defmodule Jido.Error do
 
   | Error | Use Case |
   |-------|----------|
-  | `ValidationError` | Invalid inputs, actions, sensors, configs |
+  | `ValidationError` | Invalid inputs, actions, and configs |
   | `ExecutionError` | Runtime failures during execution or planning |
   | `RoutingError` | Signal routing and dispatch failures |
   | `TimeoutError` | Operation timeouts |
@@ -113,12 +113,12 @@ defmodule Jido.Error do
     @moduledoc """
     Error for validation failures.
 
-    Covers invalid inputs, actions, sensors, and configurations.
+    Covers invalid inputs, actions, and configurations.
 
     ## Fields
 
     - `message` - Human-readable error message
-    - `kind` - Category: `:input`, `:action`, `:sensor`, `:config`
+    - `kind` - Category: `:input`, `:action`, `:config`
     - `subject` - The invalid value (field name, action module, etc.)
     - `details` - Additional context
     """
@@ -128,7 +128,7 @@ defmodule Jido.Error do
 
     @type t :: %__MODULE__{
             message: String.t(),
-            kind: :input | :action | :sensor | :config | nil,
+            kind: :input | :action | :config | nil,
             subject: any(),
             details: map()
           }
@@ -181,6 +181,13 @@ defmodule Jido.Error do
   defmodule RoutingError do
     @moduledoc """
     Error for signal routing and dispatch failures.
+
+    Agent command preparation uses this public type for missing routes, invalid
+    Signal types, and multiple matching executable targets. This applies to
+    direct Agent commands and live Agent Server calls. A wrapped Signal Router
+    error retains its details and retry hints, with the original error stored
+    in `details.cause`. Multiple matching targets include `details.count` and
+    `details.targets`.
 
     ## Fields
 
@@ -312,11 +319,10 @@ defmodule Jido.Error do
 
   ## Options
 
-  - `:kind` - Category: `:input`, `:action`, `:sensor`, `:config`
+  - `:kind` - Category: `:input`, `:action`, `:config`
   - `:subject` - The invalid value
   - `:field` - Alias for `:subject` (for input validation)
   - `:action` - Alias for `:subject` with `kind: :action`
-  - `:sensor` - Alias for `:subject` with `kind: :sensor`
   - `:details` - Additional context map
 
   ## Examples
@@ -332,7 +338,6 @@ defmodule Jido.Error do
     {kind, subject} =
       cond do
         opts[:action] -> {:action, opts[:action]}
-        opts[:sensor] -> {:sensor, opts[:sensor]}
         opts[:field] -> {:input, opts[:field]}
         true -> {opts[:kind], opts[:subject]}
       end
@@ -471,13 +476,11 @@ defmodule Jido.Error do
   @non_retryable_error_type_strings ~w[
     validation_error
     invalid_action
-    invalid_sensor
     config_error
   ]
   @known_error_type_strings %{
     "validation_error" => :validation_error,
     "invalid_action" => :invalid_action,
-    "invalid_sensor" => :invalid_sensor,
     "config_error" => :config_error,
     "planning_error" => :planning_error,
     "execution_error" => :execution_error,
@@ -836,7 +839,7 @@ defmodule Jido.Error do
   defp default_retryable?(error), do: error |> unified_type() |> default_retryable_for_type?()
 
   defp default_retryable_for_type?(type)
-       when type in [:validation_error, :invalid_action, :invalid_sensor, :config_error],
+       when type in [:validation_error, :invalid_action, :config_error],
        do: false
 
   defp default_retryable_for_type?(type) when is_binary(type),
@@ -846,7 +849,6 @@ defmodule Jido.Error do
 
   # Maps error structs to unified type atoms
   defp unified_type(%ValidationError{kind: :action}), do: :invalid_action
-  defp unified_type(%ValidationError{kind: :sensor}), do: :invalid_sensor
   defp unified_type(%ValidationError{kind: :config}), do: :config_error
   defp unified_type(%ValidationError{}), do: :validation_error
   defp unified_type(%ExecutionError{phase: :planning}), do: :planning_error

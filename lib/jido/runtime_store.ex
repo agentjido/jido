@@ -4,7 +4,7 @@ defmodule Jido.RuntimeStore do
 
   `RuntimeStore` is an internal control-plane store owned by each Jido instance.
   It backs ephemeral runtime data that needs a stable home outside individual
-  agent processes, such as logical parent-child relationship bindings.
+  Agent processes, such as logical parent-child relationship bindings.
 
   The ETS table itself is owned by the Jido instance supervisor, while the
   `RuntimeStore` process provides the logical API. That lets the table survive

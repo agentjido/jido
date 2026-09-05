@@ -1,46 +1,25 @@
-# AGENTS.md - Jido Guide
+# Jido development instructions
 
-## Intent
-Build reliable agent systems by separating pure decision logic from runtime side-effect execution.
+Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 
-## Runtime Baseline
-- Elixir `~> 1.18`
-- OTP `27+` (release QA baseline)
+## Contract
 
-## Commands
-- `mix test` (default alias excludes `:flaky`)
-- `mix test --include flaky` (full suite)
-- `mix test --cover` (coverage gate)
-- `mix q` or `mix quality` (`format --check-formatted`, `compile --warnings-as-errors`, `credo`, `dialyzer`)
-- `mix docs` (local docs)
+- `Jido.Agent` holds complete domain state. A Signal selects one Action or Flow.
+- Direct success is `{:ok, candidate, directives}`. Failure returns a structured error.
+- Actions and Flows can perform I/O. A failed Turn preserves committed state; it cannot undo completed external work.
+- `Jido.AgentServer` owns live state, serial Turns, admission, commit and effects.
+- Keep the implemented Plugin callback order and Plugin state ownership.
+- Use static Zoi schemas. Preserve structured errors at public boundaries.
 
-## Architecture Snapshot
-- `Jido.Agent`: pure agent module with immutable state and `cmd/2`
-- `Jido.AgentServer`: GenServer runtime for directives, lifecycle, and message flow
-- `Jido.Agent.Directive.*`: typed effect descriptors (`Emit`, `SpawnAgent`, `StopChild`, etc.)
-- `Jido.Agent.StateOp.*`: internal state transition operations applied by strategy layer
-- Plugins/sensors provide capability composition without coupling core agent logic
+## Checks
 
-## Standards
-- Keep `cmd/2` pure: same input => same `{agent, directives}` output
-- Keep directives for external effects only; do not rely on directives for state mutation
-- Use **Zoi-first** schemas for new agent/plugin/signal contracts
-- Preserve tagged tuple and structured error contracts at public boundaries
-- Keep cross-agent communication on signals/directives, not ad-hoc process messages
+- Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
+- Full suite: `mix test --include example --include integration --include flaky`.
+- Compile with `mix compile --warnings-as-errors`.
+- Keep coverage at 80%. Run meaningful lint, Dialyzer, docs and package checks.
+- See `test/AGENTS.md` and `docs/migration/08-execution-goal.md`.
 
-## Testing and QA
-- Prefer pure agent tests first, then AgentServer/runtime integration tests
-- Use helpers from `test/AGENTS.md` (`JidoTest.Case`, `JidoTest.Eventually`) for async assertions
-- Avoid `Process.sleep/1` in tests; assert eventual state/event behavior
+## History
 
-## Release Hygiene
-- Keep semver ranges stable (`~> 2.0` for Jido ecosystem peers)
-- Use Conventional Commits
-- Do not modify `CHANGELOG.md`; release notes are generated from Git history during release, so keep changes focused on proper Conventional Commits.
-
-## References
-- `README.md`
-- `usage-rules.md`
-- `guides/`
-- `test/AGENTS.md`
-- https://hexdocs.pm/jido
+Use Conventional Commits. Do not edit `CHANGELOG.md`; release notes are generated.
+Keep migration commits local. Preserve the pinned donor inputs and published history.

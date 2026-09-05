@@ -23,7 +23,7 @@ defmodule Jido.Thread.Entry do
   - `signal_id` - Associated signal ID
   - `instruction_id` - Associated instruction ID
   - `action` - Action module name
-  - `agent_id` - Agent ID
+  - `agent_id` - Elixir.Agent ID
   - `parent_thread_id` / `child_thread_id` - Thread relationships
   """
 

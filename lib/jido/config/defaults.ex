@@ -13,26 +13,11 @@ defmodule Jido.Config.Defaults do
 
   @jido_shutdown_timeout_ms 10_000
 
-  @agent_server_shutdown_timeout_ms 5_000
-  @agent_server_call_timeout_ms 5_000
-  @agent_server_await_timeout_ms 10_000
-
-  @await_timeout_ms 10_000
-  @await_child_timeout_ms 30_000
-
-  @worker_pool_checkout_timeout_ms 5_000
-  @worker_pool_call_timeout_ms 5_000
-
-  @instance_manager_stop_timeout_ms 5_000
-
   @telemetry_log_level :info
   @telemetry_log_args :keys_only
   @slow_signal_threshold_ms 10
   @slow_directive_threshold_ms 5
-  @interesting_signal_types [
-    "jido.strategy.init",
-    "jido.strategy.complete"
-  ]
+  @interesting_signal_types []
   @observe_log_level :info
   @observe_debug_events :off
   @redact_sensitive false
@@ -43,38 +28,6 @@ defmodule Jido.Config.Defaults do
   @doc "Default shutdown timeout for the top-level Jido supervisor."
   @spec jido_shutdown_timeout_ms() :: pos_integer()
   def jido_shutdown_timeout_ms, do: @jido_shutdown_timeout_ms
-
-  @doc "Default shutdown timeout for AgentServer workers."
-  @spec agent_server_shutdown_timeout_ms() :: pos_integer()
-  def agent_server_shutdown_timeout_ms, do: @agent_server_shutdown_timeout_ms
-
-  @doc "Default timeout for synchronous AgentServer calls."
-  @spec agent_server_call_timeout_ms() :: pos_integer()
-  def agent_server_call_timeout_ms, do: @agent_server_call_timeout_ms
-
-  @doc "Default timeout for AgentServer.await_completion/2."
-  @spec agent_server_await_timeout_ms() :: pos_integer()
-  def agent_server_await_timeout_ms, do: @agent_server_await_timeout_ms
-
-  @doc "Default timeout for Jido.Await helpers."
-  @spec await_timeout_ms() :: pos_integer()
-  def await_timeout_ms, do: @await_timeout_ms
-
-  @doc "Default timeout for Jido.await_child/4."
-  @spec await_child_timeout_ms() :: pos_integer()
-  def await_child_timeout_ms, do: @await_child_timeout_ms
-
-  @doc "Default checkout timeout for worker pools."
-  @spec worker_pool_checkout_timeout_ms() :: pos_integer()
-  def worker_pool_checkout_timeout_ms, do: @worker_pool_checkout_timeout_ms
-
-  @doc "Default call timeout when signaling pooled agents."
-  @spec worker_pool_call_timeout_ms() :: pos_integer()
-  def worker_pool_call_timeout_ms, do: @worker_pool_call_timeout_ms
-
-  @doc "Default graceful-stop timeout for instance-managed agents."
-  @spec instance_manager_stop_timeout_ms() :: pos_integer()
-  def instance_manager_stop_timeout_ms, do: @instance_manager_stop_timeout_ms
 
   @doc "Default telemetry log level."
   @spec telemetry_log_level() :: telemetry_log_level()

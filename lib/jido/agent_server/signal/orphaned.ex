@@ -1,32 +1,15 @@
 defmodule Jido.AgentServer.Signal.Orphaned do
-  @moduledoc """
-  Emitted when a child survives logical parent death and becomes orphaned.
-
-  Delivered to the child itself as `jido.agent.orphaned` after the runtime has
-  already cleared the current parent reference. This lets child actions make
-  decisions using the former-parent snapshot without accidentally treating the
-  dead parent as still attached.
-
-  ## Fields
-
-  - `:parent_id` - ID of the former parent agent
-  - `:parent_pid` - PID of the former parent process
-  - `:tag` - Tag the former parent used for this child
-  - `:meta` - Former parent metadata from the child's prior `ParentRef`
-  - `:reason` - Exit reason from the former parent process
-  """
+  @moduledoc false
 
   use Jido.Signal,
     type: "jido.agent.orphaned",
     default_source: "/agent",
     schema:
       Zoi.object(%{
-        parent_id: Zoi.string(description: "ID of the parent agent that died"),
-        parent_pid: Zoi.any(description: "PID of the parent process that died"),
-        tag: Zoi.any(description: "Tag assigned by the former parent"),
-        meta:
-          Zoi.map(description: "Metadata copied from the former parent reference")
-          |> Zoi.default(%{}),
-        reason: Zoi.any(description: "Exit reason from the parent process")
+        parent_id: Zoi.string(description: "Former parent Agent id"),
+        parent_pid: Zoi.any(description: "Former parent PID"),
+        tag: Zoi.any(description: "Former relationship tag"),
+        meta: Zoi.map(description: "Former relationship metadata") |> Zoi.default(%{}),
+        reason: Zoi.any(description: "Parent exit reason")
       })
 end

@@ -1,6 +1,6 @@
 defmodule Jido.Thread.EntryNormalizer do
   @moduledoc """
-  Shared entry normalization for thread and storage append paths.
+  Shared entry normalization for Thread append paths.
 
   Ensures all adapters apply the same defaults and attribute extraction for
   `%Jido.Thread.Entry{}` structs and plain maps.

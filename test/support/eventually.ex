@@ -9,9 +9,6 @@ defmodule JidoTest.Eventually do
       # Wait for a condition
       eventually(fn -> GenServer.call(pid, :ready?) end)
 
-      # Wait for agent state to satisfy predicate
-      eventually_state(pid, fn state -> state.counter > 0 end)
-
       # Assert with custom timeout
       assert_eventually some_async_condition?(), timeout: 1000
   """
@@ -52,28 +49,6 @@ defmodule JidoTest.Eventually do
       result ->
         Process.sleep(interval)
         do_eventually(fun, deadline, interval, result)
-    end
-  end
-
-  @doc """
-  Polls AgentServer.state/1 until `fun.(state)` returns true.
-
-  ## Examples
-
-      eventually_state(pid, fn state -> state.counter == 5 end)
-      eventually_state(pid, & &1.ready?, timeout: 1000)
-  """
-  def eventually_state(pid, fun, opts \\ []) do
-    eventually(
-      fn -> check_state(pid, fun) end,
-      opts
-    )
-  end
-
-  defp check_state(pid, fun) do
-    case Jido.AgentServer.state(pid) do
-      {:ok, state} -> if fun.(state), do: state, else: false
-      _ -> false
     end
   end
 

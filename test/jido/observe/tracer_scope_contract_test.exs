@@ -432,22 +432,22 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
 
   test "warn mode prevents cross-process scoped invocation from double-running function" do
     Application.put_env(:jido, :observability, tracer: CrossProcessInvokeTracer)
-    {:ok, counter} = Agent.start_link(fn -> 0 end)
+    {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
 
     on_exit(fn ->
-      if Process.alive?(counter), do: Agent.stop(counter)
+      if Process.alive?(counter), do: Elixir.Agent.stop(counter)
     end)
 
     log =
       capture_log(fn ->
         assert :ok =
                  Observe.with_span([:jido, :scope, :cross_process, :warn], %{}, fn ->
-                   Agent.update(counter, &(&1 + 1))
+                   Elixir.Agent.update(counter, &(&1 + 1))
                    :ok
                  end)
       end)
 
-    assert Agent.get(counter, & &1) == 1
+    assert Elixir.Agent.get(counter, & &1) == 1
     assert log =~ "with_span_scope/3 must execute wrapped function in caller process"
   end
 
@@ -474,20 +474,20 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
       tracer_failure_mode: :strict
     )
 
-    {:ok, counter} = Agent.start_link(fn -> 0 end)
+    {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
 
     on_exit(fn ->
-      if Process.alive?(counter), do: Agent.stop(counter)
+      if Process.alive?(counter), do: Elixir.Agent.stop(counter)
     end)
 
     assert_raise RuntimeError, ~r/tracer with_span_scope\/3 failed/, fn ->
       Observe.with_span([:jido, :scope, :cross_process, :strict], %{}, fn ->
-        Agent.update(counter, &(&1 + 1))
+        Elixir.Agent.update(counter, &(&1 + 1))
         :ok
       end)
     end
 
-    assert Agent.get(counter, & &1) == 0
+    assert Elixir.Agent.get(counter, & &1) == 0
   end
 
   test "finish_span uses tracer pinned at start even if config changes" do

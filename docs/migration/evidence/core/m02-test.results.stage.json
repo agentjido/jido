@@ -1,0 +1,261 @@
+{
+  "stage": "M02",
+  "source_tests_retained": 605,
+  "suite_counts": {
+    "passed": 611
+  },
+  "contracts": [
+    {
+      "category": "catalog",
+      "id": "01_01_minimal_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 7,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test direct and live execution agree on route defaults and Signal overrides",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 2520
+        },
+        {
+          "line": 36,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test the Action rejects an invalid amount before it can change state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 2297
+        },
+        {
+          "line": 57,
+          "module": "JidoTest.Examples.Basic.MinimalAgentTest",
+          "name": "test instances from one definition keep separate state and identity",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
+          "failure": null,
+          "time_us": 1069
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_02_typed_command_agent",
+      "counts": {
+        "passed": 4
+      },
+      "tests": [
+        {
+          "line": 10,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test construction preserves defaults and root constraints with and without Plugin state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 3676
+        },
+        {
+          "line": 42,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test route defaults merge shallowly before direct and live Action validation",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 8286
+        },
+        {
+          "line": 102,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test an invalid candidate cannot commit or dispatch after successful Action execution",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 7688
+        },
+        {
+          "line": 127,
+          "module": "JidoTest.Examples.Basic.TypedCommandAgentTest",
+          "name": "test direct and live routing failures share one error contract and leave the Server usable",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs",
+          "failure": null,
+          "time_us": 2101
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_03_plugin_state_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 9,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test domain and Plugin state become visible in the same commit",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 7198
+        },
+        {
+          "line": 21,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test an Action cannot change Plugin-owned state or dispatch its otherwise valid effect",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 1822
+        },
+        {
+          "line": 40,
+          "module": "JidoTest.Examples.Basic.PluginStateAgentTest",
+          "name": "test invalid Plugin output rejects the domain candidate and preserves the prior commit",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs",
+          "failure": null,
+          "time_us": 7570
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_04_directive_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 8,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test every handler observes committed state and dispatch follows batch order",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 12331
+        },
+        {
+          "line": 31,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test an invalid later Directive prevents the entire commit and all dispatch",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 12850
+        },
+        {
+          "line": 55,
+          "module": "JidoTest.Examples.Basic.DirectiveAgentTest",
+          "name": "test a failed second dispatch preserves the commit and prevents the third effect",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs",
+          "failure": null,
+          "time_us": 1476
+        }
+      ]
+    },
+    {
+      "category": "catalog",
+      "id": "01_05_controlled_turn_agent",
+      "counts": {
+        "passed": 3
+      },
+      "tests": [
+        {
+          "line": 8,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test queued work starts with the prior Turn's committed state",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 12113
+        },
+        {
+          "line": 53,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test cancellation terminates abandoned work and preserves valid queued work",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 12886
+        },
+        {
+          "line": 97,
+          "module": "JidoTest.Examples.Basic.ControlledTurnAgentTest",
+          "name": "test a caller timeout ends waiting without cancelling a started Turn",
+          "status": "passed",
+          "file": "test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs",
+          "failure": null,
+          "time_us": 112939
+        }
+      ]
+    },
+    {
+      "category": "shared_group_files",
+      "id": "01_basic",
+      "counts": {
+        "passed": 6
+      },
+      "tests": [
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.MinimalAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 3130
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.TypedCommandAgent.patch_profile through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 7574
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.TypedCommandAgent.set_count through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 37062
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.PluginStateAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 37992
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.DirectiveAgent.set_count through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 32714
+        },
+        {
+          "line": 26,
+          "module": "JidoTest.Examples.Basic.AuthoringFormatsTest",
+          "name": "test all authoring formats execute Jido.Examples.ControlledTurnAgent.increment through the same runtime",
+          "status": "passed",
+          "file": "test/examples/01_basic/authoring_formats_test.exs",
+          "failure": null,
+          "time_us": 33285
+        }
+      ]
+    }
+  ]
+}

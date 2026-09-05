@@ -1,821 +1,898 @@
 defmodule Jido.Plugin do
   @moduledoc """
-  A Plugin is a composable capability that can be attached to an agent.
+  A declared capability for one `Jido.Agent` module.
 
-  Plugins encapsulate:
-  - A set of actions the agent can perform
-  - State schema for plugin-specific data (nested under `state_key`)
-  - Configuration schema for per-agent customization
-  - Signal routing rules
-  - Optional lifecycle hooks and child processes
+  A Plugin can admit live command input, prepare pure command input, transform
+  outbound Signals, own one portable Agent state key, own Directive types, and
+  start one supervised runtime process. A Directive can reduce Plugin state
+  without a runtime, or dispatch runtime work after commit. Each part is
+  optional. A Plugin module can occur only once in one Agent definition. A
+  runtime root, when supplied, must use `restart: :permanent`. It can supervise
+  shorter-lived work below that root.
 
-  ## Lifecycle
+  Live admission runs before pure command preparation and routing. Outbound
+  Signal transformation runs after correlation data is added and before
+  delivery. These live callbacks run outside the Agent Server process and can
+  use the Plugin runtime. Command preparation and state reduction stay pure and
+  run before the Agent commit. Runtime Directive dispatch runs only after the
+  commit. A runtime Plugin never receives the complete private server state.
 
-  1. **Compile-time**: Plugin is declared in agent's `plugins:` option
-  2. **Agent.new/1**: `mount/2` is called to initialize plugin state (pure)
-  3. **AgentServer.init/1**: `child_spec/1` processes are started and monitored
-  4. **Signal processing**: `handle_signal/2` runs before routing, can override or abort
-  5. **Prepare signal**: `prepare_signal/2` can verify/rewrite the effective signal and contribute runtime context
-  6. **Prepare action**: `prepare_action/3` can authorize the resolved action using runtime context
-  7. **Before signal emit dispatch**: `prepare_emit/2` can rewrite outbound emitted signals or dispatch
-  8. **After cmd/3 (call path)**: `transform_result/3` wraps call results
+  Directive dispatch does not require a Plugin process. A Plugin without
+  `child_spec/1` receives `nil` as the runtime reference in `dispatch/4`. The
+  Agent Server runs that callback in its supervised task with the same timeout,
+  ordering, and failure rules as dispatch through a Plugin process. Declare a
+  child only when the capability needs a connection, timer, or other live state.
 
-  ## Example Plugin
+  Message history belongs in the application's Agent schema. Actions return
+  the complete next history with the rest of the Agent state. History needs no
+  Plugin or Directive. `Jido.Thread` remains an optional application data value.
 
-      defmodule MyApp.ChatPlugin do
-        use Jido.Plugin,
-          name: "chat",
-          state_key: :chat,
-          actions: [MyApp.Actions.SendMessage, MyApp.Actions.ListHistory],
-          schema: Zoi.object(%{
-            messages: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            model: Zoi.string() |> Zoi.default("gpt-4")
-          }),
-          signal_patterns: ["chat.*"],
-          signal_routes: [
-            {"chat.send", MyApp.Actions.SendMessage},
-            {"chat.history", MyApp.Actions.ListHistory}
-          ]
+  Define a Plugin with `use Jido.Plugin`:
+
+      defmodule MyApp.AuditPlugin do
+        use Jido.Plugin
 
         @impl Jido.Plugin
-        def mount(agent, config) do
-          # Custom initialization beyond schema defaults
-          {:ok, %{initialized_at: DateTime.utc_now()}}
-        end
+        def prepare(command, _opts), do: {:ok, command}
       end
 
-  ## Using Plugins
-
-      defmodule MyAgent do
-        use Jido.Agent,
-          name: "my_agent",
-          plugins: [
-            MyApp.ChatPlugin,
-            {MyApp.DatabasePlugin, %{pool_size: 5}}
-          ]
-      end
-
-  ## Configuration Options
-
-  - `name` - Required. The plugin name (letters, numbers, underscores).
-  - `state_key` - Required. Atom key for plugin state in agent.
-  - `actions` - Required. List of action modules.
-  - `description` - Optional description.
-  - `category` - Optional category.
-  - `vsn` - Optional version string.
-  - `schema` - Optional Zoi schema for plugin state.
-  - `config_schema` - Optional Zoi schema for per-agent config.
-  - `signal_patterns` - List of signal pattern strings (default: []).
-  - `tags` - List of tag strings (default: []).
-  - `capabilities` - List of atoms describing what the plugin provides (default: []).
-  - `requires` - List of requirements like `{:config, :token}`, `{:app, :req}`, `{:plugin, :http}` (default: []).
-  - `signal_routes` - List of signal route tuples like `{"post", ActionModule}` (default: []).
-  - `subscriptions` - List of sensor subscription tuples like `{SensorModule, config}` or `{tag, SensorModule, config}` (default: []).
-  - `schedules` - List of schedule tuples like `{"*/5 * * * *", ActionModule}` (default: []).
-
-  For static routes and subscriptions, prefer the compile-time `signal_routes:` and `subscriptions:` options in `use Jido.Plugin`.
-  Use the `signal_routes/1` and `subscriptions/2` callbacks only for dynamic generation based on runtime config.
+  Module options belong in the Agent Plugin declaration. `use Jido.Plugin`
+  does not accept options.
   """
 
-  alias Jido.Plugin.Manifest
-  alias Jido.Plugin.Spec
-
-  @plugin_config_schema Zoi.object(
-                          %{
-                            name:
-                              Zoi.string(
-                                description:
-                                  "The name of the Plugin. Must contain only letters, numbers, and underscores."
-                              )
-                              |> Zoi.refine({__MODULE__, :validate_plugin_name, []}),
-                            state_key:
-                              Zoi.atom(description: "The key for plugin state in agent state."),
-                            actions:
-                              Zoi.list(Zoi.atom(), description: "List of action modules.")
-                              |> Zoi.refine({__MODULE__, :validate_plugin_actions, []}),
-                            description:
-                              Zoi.string(description: "A description of what the Plugin does.")
-                              |> Zoi.optional(),
-                            category:
-                              Zoi.string(description: "The category of the Plugin.")
-                              |> Zoi.optional(),
-                            vsn:
-                              Zoi.string(description: "Version")
-                              |> Zoi.optional(),
-                            otp_app:
-                              Zoi.atom(
-                                description:
-                                  "OTP application for loading config from Application.get_env."
-                              )
-                              |> Zoi.optional(),
-                            schema:
-                              Zoi.any(description: "Zoi schema for plugin state.")
-                              |> Zoi.refine({Jido.Agent.State, :validate_schema, []})
-                              |> Zoi.optional(),
-                            config_schema:
-                              Zoi.any(description: "Zoi schema for per-agent configuration.")
-                              |> Zoi.refine({Jido.Action, :validate_config_schema, []})
-                              |> Zoi.optional(),
-                            signal_patterns:
-                              Zoi.list(Zoi.string(), description: "Signal patterns for routing.")
-                              |> Zoi.default([]),
-                            tags:
-                              Zoi.list(Zoi.string(), description: "Tags for categorization.")
-                              |> Zoi.default([]),
-                            capabilities:
-                              Zoi.list(Zoi.atom(),
-                                description: "Capabilities provided by this plugin."
-                              )
-                              |> Zoi.default([]),
-                            requires:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Requirements like {:config, :token}, {:app, :req}, {:plugin, :http}."
-                              )
-                              |> Zoi.default([]),
-                            signal_routes:
-                              Zoi.list(Zoi.any(),
-                                description: "Signal route tuples like {\"post\", ActionModule}."
-                              )
-                              |> Zoi.default([]),
-                            subscriptions:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Sensor subscription tuples like {SensorModule, config} or {tag, SensorModule, config}."
-                              )
-                              |> Zoi.default([]),
-                            schedules:
-                              Zoi.list(Zoi.any(),
-                                description:
-                                  "Schedule tuples like {\"*/5 * * * *\", ActionModule}."
-                              )
-                              |> Zoi.default([]),
-                            singleton:
-                              Zoi.boolean(
-                                description: "If true, plugin cannot be aliased or duplicated."
-                              )
-                              |> Zoi.default(false)
-                          },
-                          coerce: true
-                        )
-
-  @doc false
-  @spec config_schema() :: Zoi.schema()
-  def config_schema, do: @plugin_config_schema
-
-  @doc false
-  @spec validate_plugin_name(String.t(), keyword()) :: :ok | {:error, String.t()}
-  def validate_plugin_name(name, _opts \\ []) do
-    case Jido.Util.validate_name(name, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        :ok
-    end
-  end
-
-  @doc false
-  @spec validate_plugin_actions([module()], keyword()) :: :ok | {:error, String.t()}
-  def validate_plugin_actions(actions, _opts \\ []) do
-    case Jido.Util.validate_actions(actions, []) do
-      {:error, %{message: message}} when is_binary(message) ->
-        {:error, message}
-
-      _ ->
-        :ok
-    end
-  end
-
-  # Callbacks
-
-  @doc """
-  Returns the plugin specification with optional per-agent configuration.
-
-  This is the primary interface for getting plugin metadata and configuration.
-  """
-  @callback plugin_spec(config :: map()) :: Spec.t()
-
-  @doc """
-  Called when the plugin is mounted to an agent during `new/1`.
-
-  Use this to initialize plugin-specific state beyond schema defaults.
-  This is a pure function - no side effects allowed.
-
-  ## Parameters
-
-  - `agent` - The agent struct (with state from previously mounted plugins)
-  - `config` - Per-agent configuration for this plugin
-
-  ## Returns
-
-  - `{:ok, plugin_state}` - Map to merge into plugin's state slice
-  - `{:ok, nil}` - No additional state (schema defaults only)
-  - `{:error, reason}` - Raises during agent creation
-
-  ## Example
-
-      def mount(_agent, config) do
-        {:ok, %{initialized_at: DateTime.utc_now(), api_key: config[:api_key]}}
-      end
-  """
-  @callback mount(agent :: term(), config :: map()) :: {:ok, map() | nil} | {:error, term()}
-
-  @doc """
-  Returns the signal routes for this plugin.
-
-  The signal routes determine how signals are routed to handlers.
-  Prefer compile-time `signal_routes:` in `use Jido.Plugin` for static routes,
-  and implement this callback only for dynamic route generation.
-  """
-  @callback signal_routes(config :: map()) :: term()
-
-  @doc """
-  Pre-routing hook called before signal routing in AgentServer.
-
-  Can inspect, log, transform, or override which action runs for a signal.
-  Hooks execute in plugin declaration order. The first `{:override, ...}`
-  short-circuits; the first `{:error, ...}` aborts. Plugins with non-empty
-  `signal_patterns` only receive signals matching those patterns; plugins
-  with empty patterns receive all inbound signals for this phase.
-
-  This callback remains broad for backwards compatibility and route override.
-  Prefer `prepare_signal/2` for identity, encryption, canonicalization, and
-  runtime context extraction.
-
-  ## Parameters
-
-  - `signal` - The incoming `Jido.Signal` struct (may be modified by earlier plugins)
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`
-
-  ## Returns
-
-  - `{:ok, nil}` or `{:ok, :continue}` - Continue to normal routing
-  - `{:ok, {:continue, %Signal{}}}` - Rewrite the signal and continue routing
-  - `{:ok, {:override, action_spec}}` - Bypass router, use this action instead
-  - `{:ok, {:override, action_spec, %Signal{}}}` - Bypass router with rewritten signal
-  - `{:error, reason}` - Abort signal processing with error
-
-  ## Example
-
-      def handle_signal(signal, _context) do
-        if signal.type == "admin.override" do
-          {:ok, {:override, MyApp.AdminAction}}
-        else
-          {:ok, :continue}
-        end
-      end
-  """
-  @callback handle_signal(signal :: term(), context :: map()) ::
-              {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
-
-  @doc """
-  Pre-routing hook called after `handle_signal/2` rewrites and before routing.
-
-  Plugins can verify, decrypt, canonicalize, or rewrite the final effective
-  signal and contribute runtime context. Returned context is merged into the
-  context given to routed actions and later plugin phases. This is the preferred
-  inbound hook for identity and encrypted communication extensions because it
-  cannot override routing and has an explicit runtime context contract. Plugins
-  may not provide reserved runtime keys such as `:state`, `:signal`, `:agent`,
-  `:agent_server_pid`, `:input_signal`, `:directive`, or `:dispatch`;
-  duplicate context keys fail closed.
-
-  ## Parameters
-
-  - `signal` - The effective `Jido.Signal` struct after `handle_signal/2`
-    hooks have run.
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  - `{:ok, signal, runtime_context_delta}` - Continue with possibly rewritten signal
-    and runtime context.
-  - `{:error, reason}` - Abort signal processing with error.
-  """
-  @callback prepare_signal(signal :: term(), context :: map()) ::
-              {:ok, term(), map()} | {:error, term()}
-
-  @doc """
-  Post-routing hook called after routing and before action execution.
-
-  Plugins can authorize the resolved action using the prepared signal and
-  accumulated runtime context. This hook cannot rewrite the signal or action;
-  it can only contribute additional runtime context or fail closed.
-
-  ## Parameters
-
-  - `signal` - The prepared `Jido.Signal` struct after `prepare_signal/2`
-  - `action_arg` - The resolved action argument that will be passed to the
-    agent command phase
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  - `{:ok, runtime_context_delta}` - Continue with additional runtime context.
-  - `{:error, reason}` - Abort signal processing with error.
-  """
-  @callback prepare_action(signal :: term(), action_arg :: term(), context :: map()) ::
-              {:ok, map()} | {:error, term()}
-
-  @doc """
-  Pre-emit hook called before an emitted signal is dispatched.
-
-  This hook is intended for outbound signal signing, trace enrichment, and other
-  signal-level transformations that must happen after an action returns an emit
-  directive but before runtime dispatch. The context includes `:input_signal`,
-  `:runtime_context`, `:directive`, `:dispatch`, plugin metadata, agent
-  metadata, `:jido_instance`, and `:partition`.
-
-  ## Returns
-
-  - `{:ok, signal}` - Continue with the prepared signal and existing dispatch.
-  - `{:ok, signal, dispatch}` - Continue with the prepared signal and rewritten
-    dispatch.
-  - `{:error, reason}` - Abort the emit through the configured error policy.
-  """
-  @callback prepare_emit(signal :: term(), context :: map()) ::
-              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
-
-  @doc """
-  Caller view transform for the agent returned from `AgentServer.call/3`.
-
-  Called after signal processing on the **synchronous call path only**.
-  Does not affect `cast/2`, `handle_info`, routing, authorization, dispatch, or
-  internal server state — only the agent struct returned to the caller.
-  Transforms chain through all plugins in declaration order, so this callback is
-  display/return shaping and is not a security hook.
-
-  ## Parameters
-
-  - `action` - The resolved action module that was executed, or the signal
-    type string when no single module can be determined
-  - `result` - The agent struct to transform
-  - `context` - Map with `:agent`, `:agent_module`, `:plugin`, `:plugin_spec`,
-    `:plugin_instance`, `:config`, `:runtime_context`
-
-  ## Returns
-
-  The transformed agent struct (or original if no transformation needed).
-
-  ## Example
-
-      def transform_result(_action, agent, _context) do
-        # Add metadata to returned agent
-        new_state = Map.put(agent.state, :last_call_at, DateTime.utc_now())
-        %{agent | state: new_state}
-      end
-  """
-  @callback transform_result(action :: module() | String.t(), result :: term(), context :: map()) ::
-              term()
-
-  @doc """
-  Returns child specification(s) for supervised processes.
-
-  Called during `AgentServer.init/1`. Returned processes are
-  started and monitored. If any crash, AgentServer receives exit signals.
-
-  ## Parameters
-
-  - `config` - Per-agent configuration for this plugin
-
-  ## Returns
-
-  - `nil` - No child processes
-  - `Supervisor.child_spec()` - Single child
-  - `[Supervisor.child_spec()]` - Multiple children
-
-  ## Example
-
-      def child_spec(config) do
-        %{
-          id: {__MODULE__, :worker},
-          start: {MyWorker, :start_link, [config]}
-        }
-      end
-  """
-  @callback child_spec(config :: map()) ::
-              nil | Supervisor.child_spec() | [Supervisor.child_spec()]
-
-  @doc """
-  Returns a list of sensors to be started for this plugin.
-
-  Called during `AgentServer.init/1` to start and monitor
-  plugin-specific sensors. These sensors are managed and monitored by the
-  agent runtime and can emit signals back to it.
-
-  ## Parameters
-
-  - `config` - Per-agent configuration for this plugin
-  - `context` - A map containing:
-    - `:agent_id` - The unique identifier of the agent
-    - `:agent_ref` - A reference (PID or via-tuple) to the AgentServer
-    - `:agent_module` - The module of the agent
-    - `:plugin_spec` - The specification of the current plugin
-    - `:jido_instance` - The Jido instance name
-
-  ## Returns
-
-  List of `{sensor_module, sensor_opts}` tuples or `{tag, sensor_module, sensor_opts}`
-  tuples. Each sensor will be started under a `Jido.Sensor.Runtime`. Use the
-  tagged form when a plugin starts multiple instances of the same sensor module.
-
-  ## Example
-
-      def subscriptions(_config, context) do
-        [
-          {MyApp.Sensors.MarketData, %{symbol: "AAPL", interval: 1000}},
-          {Jido.Sensors.Heartbeat, %{interval: 5000, agent_ref: context.agent_ref}}
-        ]
-      end
-  """
-  @type sensor_subscription ::
-          {module(), keyword() | map()} | {term(), module(), keyword() | map()}
-
-  @callback subscriptions(config :: map(), context :: map()) ::
-              [sensor_subscription()]
-
-  @doc """
-  Called during checkpoint to determine how this plugin's state should be persisted.
-
-  Plugins can declare one of three strategies for their state slice:
-
-  - `:keep` — Include in checkpoint state as-is (default)
-  - `:drop` — Exclude from checkpoint (transient/ephemeral state)
-  - `{:externalize, key, pointer}` — Strip from checkpoint state and store a
-    pointer separately. The pointer is a lightweight reference (e.g., `%{id, rev}`)
-    that can be used to rehydrate the full state on restore.
-
-  ## Parameters
-
-  - `plugin_state` - The plugin's current state slice (may be nil)
-  - `context` - Map with checkpoint context (e.g., `:config`)
-
-  ## Returns
-
-  - `:keep` — Include plugin state in checkpoint (default)
-  - `:drop` — Exclude from checkpoint
-  - `{:externalize, key, pointer}` — Store pointer under `key` in checkpoint
-
-  ## Example
-
-      def on_checkpoint(%Thread{} = thread, _ctx) do
-        {:externalize, :thread, %{id: thread.id, rev: thread.rev}}
-      end
-
-      def on_checkpoint(nil, _ctx), do: :keep
-  """
-  @callback on_checkpoint(plugin_state :: term(), context :: map()) ::
-              {:externalize, key :: atom(), pointer :: term()} | :keep | :drop
-
-  @doc """
-  Called during restore to rehydrate externalized plugin state.
-
-  When a plugin's `on_checkpoint/2` returns `{:externalize, key, pointer}`,
-  the pointer is stored in the checkpoint. During restore, `on_restore/2`
-  is called with that pointer to allow the plugin to reconstruct its state.
-
-  For plugins that require IO to restore (e.g., loading a thread from storage),
-  returning `{:ok, nil}` signals that the state will be rehydrated by the
-  persistence layer (e.g., `Jido.Persist`).
-
-  ## Parameters
-
-  - `pointer` - The pointer stored during checkpoint (from `on_checkpoint/2`)
-  - `context` - Map with restore context (e.g., `:config`)
-
-  ## Returns
-
-  - `{:ok, restored_state}` — The restored plugin state
-  - `{:ok, nil}` — State will be rehydrated externally (e.g., by Persist)
-  - `{:error, reason}` — Restore failed
-  """
-  @callback on_restore(pointer :: term(), context :: map()) ::
-              {:ok, term()} | {:error, term()}
-
-  # Macro implementation
-
-  @doc false
-  defp generate_behaviour_and_validation(opts) do
+  alias Jido.Agent.Command
+  alias Jido.Plugin.{DirectiveContext, Init, SignalContext, Spec}
+  alias Jido.Error
+
+  @type result :: {:ok, proposed_state :: map(), directives :: [struct()]} | {:error, term()}
+  @type declaration :: module() | {module(), keyword()}
+  @type state_spec :: :none | {atom(), Zoi.schema()}
+
+  @doc "Defines one v3 Agent Plugin."
+  defmacro __using__([]) do
     quote location: :keep do
       @behaviour Jido.Plugin
 
-      alias Jido.Plugin.Manifest
-      alias Jido.Plugin.Spec
-
-      @validated_opts (case Zoi.parse(Jido.Plugin.config_schema(), Enum.into(unquote(opts), %{})) do
-                         {:ok, validated} ->
-                           validated
-
-                         {:error, errors} ->
-                           raise CompileError,
-                             description:
-                               "Invalid plugin configuration:\n#{Zoi.prettify_errors(errors)}"
-                       end)
-
-      Jido.Action.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
-
-      Jido.Action.ensure_static_schema!(
-        @validated_opts[:config_schema],
-        :config_schema,
-        __ENV__
-      )
-    end
-  end
-
-  @doc false
-  defp generate_accessor_functions do
-    [
-      generate_core_accessors(),
-      generate_optional_accessors(),
-      generate_list_accessors()
-    ]
-  end
-
-  defp generate_core_accessors do
-    quote location: :keep do
-      @doc "Returns the plugin's name."
-      @spec name() :: String.t()
-      def name, do: @validated_opts.name
-
-      @doc "Returns the key used to store plugin state in the agent."
-      @spec state_key() :: atom()
-      def state_key, do: @validated_opts.state_key
-
-      @doc "Returns the list of action modules provided by this plugin."
-      @spec actions() :: [module()]
-      def actions, do: @validated_opts.actions
-    end
-  end
-
-  defp generate_optional_accessors do
-    quote location: :keep do
-      @doc "Returns the plugin's description."
-      @spec description() :: String.t() | nil
-      def description, do: @validated_opts[:description]
-
-      @doc "Returns the plugin's category."
-      @spec category() :: String.t() | nil
-      def category, do: @validated_opts[:category]
-
-      @doc "Returns the plugin's version."
-      @spec vsn() :: String.t() | nil
-      def vsn, do: @validated_opts[:vsn]
-
-      @doc "Returns the OTP application for config resolution."
-      @spec otp_app() :: atom() | nil
-      def otp_app, do: @validated_opts[:otp_app]
-
-      @doc "Returns the Zoi schema for plugin state."
-      @spec schema() :: Zoi.schema() | nil
-      def schema, do: @validated_opts[:schema]
-
-      @doc "Returns the Zoi schema for per-agent configuration."
-      @spec config_schema() :: Zoi.schema() | nil
-      def config_schema, do: @validated_opts[:config_schema]
-    end
-  end
-
-  defp generate_list_accessors do
-    [
-      generate_pattern_accessors(),
-      generate_requirement_accessors()
-    ]
-  end
-
-  defp generate_pattern_accessors do
-    quote location: :keep do
-      @doc "Returns the signal patterns this plugin handles."
-      @spec signal_patterns() :: [String.t()]
-      def signal_patterns, do: @validated_opts[:signal_patterns] || []
-
-      @doc "Returns the plugin's tags."
-      @spec tags() :: [String.t()]
-      def tags, do: @validated_opts[:tags] || []
-
-      @doc "Returns the capabilities provided by this plugin."
-      @spec capabilities() :: [atom()]
-      def capabilities, do: @validated_opts[:capabilities] || []
-
-      @doc "Returns whether this plugin is a singleton."
-      @spec singleton?() :: boolean()
-      def singleton?, do: @validated_opts[:singleton] || false
-    end
-  end
-
-  defp generate_requirement_accessors do
-    quote location: :keep do
-      @doc "Returns the requirements for this plugin."
-      @spec requires() :: [tuple()]
-      def requires, do: @validated_opts[:requires] || []
-
-      @doc "Returns the signal routes for this plugin."
-      @spec signal_routes() :: [tuple()]
-      def signal_routes, do: @validated_opts[:signal_routes] || []
-
-      @doc "Returns the sensor subscriptions for this plugin."
-      @spec subscriptions() :: [Jido.Plugin.sensor_subscription()]
-      def subscriptions, do: @validated_opts[:subscriptions] || []
-
-      @doc "Returns the schedules for this plugin."
-      @spec schedules() :: [tuple()]
-      def schedules, do: @validated_opts[:schedules] || []
-    end
-  end
-
-  @doc false
-  defp generate_spec_and_manifest_functions do
-    quote location: :keep do
-      @doc """
-      Returns the plugin specification with optional per-agent configuration.
-
-      ## Examples
-
-          spec = MyModule.plugin_spec(%{})
-          spec = MyModule.plugin_spec(%{custom_option: true})
-      """
-      @spec plugin_spec(map()) :: Spec.t()
-      @impl Jido.Plugin
-      def plugin_spec(config \\ %{}) do
-        %Spec{
-          module: __MODULE__,
-          name: name(),
-          state_key: state_key(),
-          description: description(),
-          category: category(),
-          vsn: vsn(),
-          schema: schema(),
-          config_schema: config_schema(),
-          config: config,
-          signal_patterns: signal_patterns(),
-          tags: tags(),
-          actions: actions()
-        }
-      end
-
-      @doc """
-      Returns the plugin manifest with all metadata.
-
-      The manifest provides compile-time metadata for discovery
-      and introspection, including capabilities, requirements,
-      signal routes, and schedules.
-      """
-      @spec manifest() :: Manifest.t()
-      def manifest do
-        %Manifest{
-          module: __MODULE__,
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags(),
-          vsn: vsn(),
-          otp_app: otp_app(),
-          capabilities: capabilities(),
-          requires: requires(),
-          state_key: state_key(),
-          schema: schema(),
-          config_schema: config_schema(),
-          actions: actions(),
-          signal_routes: signal_routes(),
-          subscriptions: subscriptions(),
-          schedules: schedules(),
-          signal_patterns: signal_patterns(),
-          singleton: singleton?()
-        }
-      end
-
-      @doc """
-      Returns metadata for Jido.Discovery integration.
-
-      This function is used by `Jido.Discovery` to index plugins
-      for fast lookup and filtering.
-      """
-      @spec __plugin_metadata__() :: map()
-      def __plugin_metadata__ do
-        %{
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags()
-        }
-      end
-    end
-  end
-
-  @doc false
-  defp generate_default_callbacks do
-    quote location: :keep do
       @doc false
-      @spec mount(term(), map()) :: {:ok, map() | nil} | {:error, term()}
-      @impl Jido.Plugin
-      def mount(_agent, _config), do: {:ok, %{}}
-
-      @doc false
-      @spec signal_routes(map()) :: [tuple()]
-      @impl Jido.Plugin
-      def signal_routes(_config), do: []
-
-      @doc false
-      @spec handle_signal(term(), map()) ::
-              {:ok, term()} | {:ok, {:override, term()}} | {:error, term()}
-      @impl Jido.Plugin
-      def handle_signal(_signal, _context), do: {:ok, nil}
-
-      @doc false
-      @spec prepare_signal(term(), map()) :: {:ok, term(), map()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_signal(signal, _context), do: {:ok, signal, %{}}
-
-      @doc false
-      @spec prepare_action(term(), term(), map()) :: {:ok, map()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_action(_signal, _action_arg, _context), do: {:ok, %{}}
-
-      @doc false
-      @spec prepare_emit(term(), map()) ::
-              {:ok, term()} | {:ok, term(), term()} | {:error, term()}
-      @impl Jido.Plugin
-      def prepare_emit(signal, _context), do: {:ok, signal}
-
-      @doc false
-      @spec transform_result(module() | String.t(), term(), map()) :: term()
-      @impl Jido.Plugin
-      def transform_result(_action, result, _context), do: result
-
-      @doc false
-      @spec child_spec(map()) :: nil | Supervisor.child_spec() | [Supervisor.child_spec()]
-      @impl Jido.Plugin
-      def child_spec(_config), do: nil
-
-      @doc false
-      @spec subscriptions(map(), map()) :: [Jido.Plugin.sensor_subscription()]
-      @impl Jido.Plugin
-      def subscriptions(_config, _context), do: subscriptions()
-
-      @doc false
-      @spec on_checkpoint(term(), map()) ::
-              {:externalize, atom(), term()} | :keep | :drop
-      @impl Jido.Plugin
-      def on_checkpoint(_plugin_state, _context), do: :keep
-
-      @doc false
-      @spec on_restore(term(), map()) :: {:ok, term()} | {:error, term()}
-      @impl Jido.Plugin
-      def on_restore(_pointer, _context), do: {:ok, nil}
-    end
-  end
-
-  @doc false
-  defp generate_defoverridable do
-    quote location: :keep do
-      defoverridable [
-        {:mount, 2},
-        {:signal_routes, 0},
-        {:signal_routes, 1},
-        {:handle_signal, 2},
-        {:prepare_signal, 2},
-        {:prepare_action, 3},
-        {:prepare_emit, 2},
-        {:transform_result, 3},
-        {:child_spec, 1},
-        {:subscriptions, 2},
-        {:on_checkpoint, 2},
-        {:on_restore, 2},
-        {:name, 0},
-        {:state_key, 0},
-        {:actions, 0},
-        {:description, 0},
-        {:category, 0},
-        {:vsn, 0},
-        {:otp_app, 0},
-        {:schema, 0},
-        {:config_schema, 0},
-        {:signal_patterns, 0},
-        {:tags, 0},
-        {:capabilities, 0},
-        {:requires, 0},
-        {:schedules, 0},
-        {:singleton?, 0}
-      ]
+      def __jido_plugin__, do: :agent
     end
   end
 
   defmacro __using__(opts) do
-    behaviour_and_validation = generate_behaviour_and_validation(opts)
-    accessor_functions = generate_accessor_functions()
-    spec_and_manifest = generate_spec_and_manifest_functions()
-    default_callbacks = generate_default_callbacks()
-    defoverridable_block = generate_defoverridable()
-
-    [
-      behaviour_and_validation,
-      accessor_functions,
-      spec_and_manifest,
-      default_callbacks,
-      defoverridable_block
-    ]
+    raise ArgumentError,
+          "use Jido.Plugin does not accept options; put options in the Agent plugins declaration, got: #{Macro.to_string(opts)}"
   end
+
+  @callback prepare(command :: Command.t(), opts :: keyword()) ::
+              {:ok, Command.t()} | {:error, term()}
+  @callback admit(runtime_ref :: term() | nil, command :: Command.t(), opts :: keyword()) ::
+              {:ok, Command.t()} | {:error, term()}
+  @callback prepare_dispatch(
+              runtime_ref :: term() | nil,
+              signal :: Jido.Signal.t(),
+              context :: SignalContext.t(),
+              opts :: keyword()
+            ) :: {:ok, Jido.Signal.t()} | {:error, term()}
+  @callback state_spec(opts :: keyword()) :: state_spec()
+  @callback update_state(plugin_state :: term(), directives :: [struct()], opts :: keyword()) ::
+              {:ok, plugin_state :: term()} | {:error, term()}
+  @callback directives(opts :: keyword()) :: [module()]
+  @callback validate_directive(directive :: struct(), opts :: keyword()) ::
+              {:ok, struct()} | {:error, term()}
+  @callback dispatch(
+              runtime_ref :: term() | nil,
+              directive :: struct(),
+              context :: DirectiveContext.t(),
+              opts :: keyword()
+            ) :: :ok | {:error, term()}
+  @callback await_ready(runtime_ref :: term(), opts :: keyword()) :: :ok | {:error, term()}
+
+  @optional_callbacks prepare: 2,
+                      admit: 3,
+                      prepare_dispatch: 4,
+                      state_spec: 1,
+                      update_state: 3,
+                      directives: 1,
+                      validate_directive: 2,
+                      dispatch: 4,
+                      await_ready: 2
+
+  @doc false
+  @spec normalize_all([declaration()]) :: {:ok, [Spec.t()]} | {:error, Exception.t()}
+  def normalize_all(declarations) when is_list(declarations) do
+    with {:ok, specs} <- normalize_specs(declarations),
+         :ok <- unique_modules(specs),
+         :ok <- unique_state_keys(specs),
+         :ok <- unique_directives(specs) do
+      {:ok, specs}
+    end
+  end
+
+  def normalize_all(value), do: invalid("Agent Plugins must be a list", %{plugins: value})
+
+  @doc false
+  @spec canonical_declarations([declaration()]) ::
+          {:ok, [{module(), keyword()}]} | {:error, Exception.t()}
+  def canonical_declarations(declarations) do
+    with {:ok, specs} <- normalize_all(declarations) do
+      {:ok, Enum.map(specs, &{&1.module, &1.options})}
+    end
+  end
+
+  @doc false
+  @spec compose_schema(Zoi.schema(), [declaration()]) ::
+          {:ok, Zoi.schema()} | {:error, Exception.t()}
+  def compose_schema(%Zoi.Types.Map{fields: fields} = domain_schema, declarations)
+      when is_list(fields) do
+    with {:ok, specs} <- normalize_all(declarations),
+         :ok <- state_key_conflicts(fields, specs) do
+      plugin_fields =
+        Enum.reduce(specs, %{}, fn
+          %Spec{state_key: nil}, fields -> fields
+          %Spec{state_key: key, state_schema: schema}, fields -> Map.put(fields, key, schema)
+        end)
+
+      # Keep Zoi's field normalization without replacing the root refinements
+      # and other metadata that must also validate Plugin composition.
+      extended = Zoi.extend(domain_schema, plugin_fields)
+      {:ok, %{domain_schema | fields: extended.fields}}
+    end
+  end
+
+  def compose_schema(schema, _declarations) do
+    invalid("Agent domain schema must be a field-based Zoi object", %{schema: schema})
+  end
+
+  @doc false
+  def compose_schema!(domain_schema, declarations) do
+    case compose_schema(domain_schema, declarations) do
+      {:ok, schema} -> schema
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc false
+  @spec validate_composed_schema(Zoi.schema(), [Spec.t()]) ::
+          :ok | {:error, Exception.t()}
+  def validate_composed_schema(%Zoi.Types.Map{fields: fields}, specs) when is_list(fields) do
+    Enum.reduce_while(specs, :ok, fn
+      %Spec{state_key: nil}, :ok ->
+        {:cont, :ok}
+
+      %Spec{module: module, state_key: key, state_schema: expected}, :ok ->
+        case Keyword.fetch(fields, key) do
+          {:ok, actual} ->
+            if equivalent_field_schema?(actual, expected) do
+              {:cont, :ok}
+            else
+              {:halt,
+               invalid("Agent Plugin state schema does not match", %{
+                 plugin: module,
+                 state_key: key,
+                 expected: expected,
+                 actual: actual
+               })}
+            end
+
+          :error ->
+            {:halt,
+             invalid("Agent Plugin state key is missing from the composed schema", %{
+               plugin: module,
+               state_key: key
+             })}
+        end
+    end)
+  end
+
+  def validate_composed_schema(schema, _specs),
+    do: invalid("Agent schema must be a field-based Zoi object", %{schema: schema})
+
+  defp equivalent_field_schema?(%{meta: actual_meta} = actual, %{meta: expected_meta} = expected) do
+    %{actual | meta: %{actual_meta | required: nil}} ==
+      %{expected | meta: %{expected_meta | required: nil}}
+  end
+
+  defp equivalent_field_schema?(actual, expected), do: actual == expected
+
+  @doc false
+  @spec prepare(Command.t(), [declaration()]) ::
+          {:ok, Command.t(), [Spec.t()]} | {:error, term()}
+  def prepare(%Command{} = command, declarations) do
+    with {:ok, command} <- Command.validate(command),
+         {:ok, specs} <- normalize_all(declarations),
+         {:ok, command} <- prepare_all(command, specs) do
+      {:ok, command, specs}
+    end
+  end
+
+  @doc false
+  @spec prepare_specs(Command.t(), [Spec.t()]) ::
+          {:ok, Command.t(), [Spec.t()]} | {:error, term()}
+  def prepare_specs(%Command{} = command, specs) when is_list(specs) do
+    with {:ok, command} <- Command.validate(command),
+         {:ok, command} <- prepare_all(command, specs) do
+      {:ok, command, specs}
+    end
+  end
+
+  @doc false
+  @spec admits?([Spec.t()]) :: boolean()
+  def admits?(specs) when is_list(specs) do
+    Enum.any?(specs, &function_exported?(&1.module, :admit, 3))
+  end
+
+  @doc false
+  @spec admission_modules([Spec.t()]) :: [module()]
+  def admission_modules(specs) when is_list(specs) do
+    callback_modules(specs, :admit, 3)
+  end
+
+  @doc false
+  @spec dispatch_modules([Spec.t()]) :: [module()]
+  def dispatch_modules(specs) when is_list(specs) do
+    callback_modules(specs, :prepare_dispatch, 4)
+  end
+
+  @doc false
+  @spec admit(Command.t(), [Spec.t()], %{optional(module()) => term() | nil}) ::
+          {:ok, Command.t()} | {:error, term()}
+  def admit(%Command{} = command, specs, runtime_refs)
+      when is_list(specs) and is_map(runtime_refs) do
+    with {:ok, command} <- Command.validate(command) do
+      Enum.reduce_while(specs, {:ok, command}, fn spec, {:ok, current} ->
+        case admit_one(current, spec, Map.get(runtime_refs, spec.module)) do
+          {:ok, admitted} -> {:cont, {:ok, admitted}}
+          {:error, _reason} = error -> {:halt, error}
+        end
+      end)
+    end
+  end
+
+  @doc false
+  @spec prepare_dispatch(
+          Jido.Signal.t(),
+          [Spec.t()],
+          %{optional(module()) => term() | nil},
+          SignalContext.t(),
+          map()
+        ) :: {:ok, Jido.Signal.t()} | {:error, term()}
+  def prepare_dispatch(%Jido.Signal{} = signal, specs, runtime_refs, context, agent_state)
+      when is_list(specs) and is_map(runtime_refs) and is_map(agent_state) do
+    specs
+    |> Enum.reverse()
+    |> Enum.reduce_while({:ok, signal}, fn spec, {:ok, current} ->
+      plugin_context = %{
+        context
+        | plugin_state: plugin_state(agent_state, spec.state_key)
+      }
+
+      case prepare_dispatch_one(
+             current,
+             spec,
+             Map.get(runtime_refs, spec.module),
+             plugin_context
+           ) do
+        {:ok, prepared} -> {:cont, {:ok, prepared}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  @doc false
+  @spec protect_state(result(), map(), [Spec.t()]) :: result()
+  def protect_state({:ok, state, _directives} = result, original_state, specs) do
+    case changed_keys(original_state, state, state_keys(specs)) do
+      [] ->
+        result
+
+      keys ->
+        {:error,
+         plugin_error("Agent executable changed Plugin-owned state", :core, %{keys: keys})}
+    end
+  end
+
+  def protect_state(result, _original_state, _specs), do: result
+
+  @doc false
+  @spec update_state(result(), [Spec.t()]) :: result()
+  def update_state(result, specs), do: apply_state_updates(result, specs)
+
+  @doc false
+  @spec child_specs(Init.t(), [declaration()]) ::
+          {:ok, [Supervisor.child_spec()]} | {:error, Exception.t()}
+  def child_specs(%Init{} = init, declarations) do
+    with {:ok, specs} <- normalize_all(declarations) do
+      child_specs_for(specs, fn spec ->
+        %{init | module: spec.module, options: spec.options}
+      end)
+    end
+  end
+
+  @doc "Gets the current state owned by one Plugin runtime."
+  @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
+  def state(%Init{agent_server: agent_server, module: module}, timeout \\ 5_000) do
+    Jido.AgentServer.plugin_state(agent_server, module, timeout)
+  catch
+    :exit, reason -> {:error, {:agent_server_unavailable, reason}}
+  end
+
+  @doc false
+  def state_keys(specs), do: specs |> Enum.map(& &1.state_key) |> Enum.reject(&is_nil/1)
+
+  @doc false
+  def directive_owner(specs, %{__struct__: directive_module}) do
+    Enum.find(specs, &(directive_module in &1.directive_modules))
+  end
+
+  def directive_owner(_specs, _directive), do: nil
+
+  @doc false
+  def validate_directive(%Spec{} = spec, %{__struct__: directive_module} = directive) do
+    safe_apply(
+      spec.module,
+      :validate_directive,
+      [directive, spec.options],
+      "Agent Plugin Directive validation failed"
+    )
+    |> case do
+      {:ok, %{__struct__: ^directive_module} = validated} ->
+        {:ok, validated}
+
+      {:ok, %{__struct__: validated_module}} ->
+        plugin_invalid(
+          "Agent Plugin validate_directive/2 changed Directive type",
+          spec.module,
+          %{expected: directive_module, actual: validated_module}
+        )
+
+      {:error, _reason} = error ->
+        error
+
+      result ->
+        plugin_invalid(
+          "Agent Plugin validate_directive/2 returned an invalid result",
+          spec.module,
+          %{result: result}
+        )
+    end
+  end
+
+  @doc false
+  def dispatch(%Spec{} = spec, runtime_ref, directive, %DirectiveContext{} = context) do
+    safe_apply(
+      spec.module,
+      :dispatch,
+      [runtime_ref, directive, context, spec.options],
+      "Agent Plugin Directive dispatch failed"
+    )
+    |> case do
+      :ok ->
+        :ok
+
+      {:error, _reason} = error ->
+        error
+
+      result ->
+        plugin_invalid("Agent Plugin dispatch/4 returned an invalid result", spec.module, %{
+          result: result
+        })
+    end
+  end
+
+  @doc false
+  def await_ready(%Spec{runtime?: false}, _runtime_ref), do: :ok
+
+  def await_ready(%Spec{} = spec, runtime_ref) do
+    if function_exported?(spec.module, :await_ready, 2) do
+      safe_apply(
+        spec.module,
+        :await_ready,
+        [runtime_ref, spec.options],
+        "Agent Plugin readiness check failed"
+      )
+      |> case do
+        :ok ->
+          :ok
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          plugin_invalid(
+            "Agent Plugin await_ready/2 returned an invalid result",
+            spec.module,
+            %{result: result}
+          )
+      end
+    else
+      :ok
+    end
+  end
+
+  defp normalize_specs(declarations) do
+    declarations
+    |> Enum.reduce_while({:ok, []}, fn declaration, {:ok, specs} ->
+      case normalize(declaration) do
+        {:ok, spec} -> {:cont, {:ok, [spec | specs]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, specs} -> {:ok, Enum.reverse(specs)}
+      error -> error
+    end
+  end
+
+  defp normalize(module) when is_atom(module), do: build_spec(module, [])
+
+  defp normalize({module, opts}) when is_atom(module) and is_list(opts) do
+    if Keyword.keyword?(opts) do
+      build_spec(module, opts)
+    else
+      invalid("Agent Plugin options must be a keyword list", %{
+        plugin: module,
+        options: opts
+      })
+    end
+  end
+
+  defp normalize(declaration),
+    do: invalid("Invalid Agent Plugin declaration", %{plugin: declaration})
+
+  defp build_spec(module, opts) do
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         :ok <- validate_plugin_contract(module),
+         :ok <- plugin_has_capability(module),
+         {:ok, {state_key, state_schema}} <- read_state_spec(module, opts),
+         {:ok, directive_modules} <- read_directives(module, opts),
+         :ok <- validate_directive_contract(module, directive_modules),
+         :ok <- validate_state_update_contract(module, state_key) do
+      {:ok,
+       %Spec{
+         module: module,
+         options: opts,
+         state_key: state_key,
+         state_schema: state_schema,
+         directive_modules: directive_modules,
+         dispatch?: function_exported?(module, :dispatch, 4),
+         runtime?: function_exported?(module, :child_spec, 1)
+       }}
+    else
+      {:error, %_{} = error} ->
+        {:error, error}
+
+      {:error, reason} ->
+        invalid("Agent Plugin could not be loaded", %{plugin: module, reason: reason})
+    end
+  end
+
+  defp validate_plugin_contract(module) do
+    behaviours =
+      module.module_info(:attributes)
+      |> Keyword.get_values(:behaviour)
+      |> List.flatten()
+
+    marker =
+      if function_exported?(module, :__jido_plugin__, 0) do
+        safe_apply(module, :__jido_plugin__, [], "Agent Plugin marker failed")
+      else
+        :missing
+      end
+
+    cond do
+      Jido.Plugin in behaviours and marker == :agent ->
+        :ok
+
+      match?({:error, _reason}, marker) ->
+        marker
+
+      true ->
+        invalid("Agent Plugin must use Jido.Plugin", %{plugin: module})
+    end
+  end
+
+  defp plugin_has_capability(module) do
+    callbacks = [
+      prepare: 2,
+      admit: 3,
+      prepare_dispatch: 4,
+      state_spec: 1,
+      update_state: 3,
+      directives: 1,
+      child_spec: 1
+    ]
+
+    if Enum.any?(callbacks, fn {name, arity} -> function_exported?(module, name, arity) end) do
+      :ok
+    else
+      invalid("Agent Plugin defines no capability", %{plugin: module})
+    end
+  end
+
+  defp read_state_spec(module, opts) do
+    if function_exported?(module, :state_spec, 1) do
+      safe_apply(module, :state_spec, [opts], "Agent Plugin state_spec/1 failed")
+      |> validate_state_spec(module)
+    else
+      {:ok, {nil, nil}}
+    end
+  end
+
+  defp validate_state_spec(:none, _module), do: {:ok, {nil, nil}}
+
+  defp validate_state_spec({key, %{__struct__: _type} = schema}, module) when is_atom(key) do
+    case Jido.Action.validate_static_data(schema) do
+      :ok ->
+        {:ok, {key, schema}}
+
+      {:error, reason} ->
+        invalid("Agent Plugin state schema must contain static data", %{
+          plugin: module,
+          state_key: key,
+          reason: reason
+        })
+    end
+  end
+
+  defp validate_state_spec(value, module),
+    do:
+      invalid("Agent Plugin state_spec/1 returned an invalid value", %{
+        plugin: module,
+        value: value
+      })
+
+  defp read_directives(module, opts) do
+    directives =
+      if function_exported?(module, :directives, 1) do
+        safe_apply(module, :directives, [opts], "Agent Plugin directives/1 failed")
+      else
+        []
+      end
+
+    cond do
+      not is_list(directives) ->
+        invalid("Agent Plugin directives/1 must return a list", %{
+          plugin: module,
+          directives: directives
+        })
+
+      Enum.any?(directives, &(not is_atom(&1))) ->
+        invalid("Agent Plugin Directive modules must be atoms", %{
+          plugin: module,
+          directives: directives
+        })
+
+      Enum.uniq(directives) != directives ->
+        invalid("Agent Plugin Directive modules must be unique", %{
+          plugin: module,
+          directives: directives
+        })
+
+      Enum.any?(directives, &Jido.Agent.Directive.built_in_module?/1) ->
+        invalid("Agent Plugin cannot own a built-in Directive", %{
+          plugin: module,
+          directives: Enum.filter(directives, &Jido.Agent.Directive.built_in_module?/1)
+        })
+
+      true ->
+        {:ok, directives}
+    end
+  end
+
+  defp validate_directive_contract(module, directives) do
+    validates? = function_exported?(module, :validate_directive, 2)
+    reduces? = function_exported?(module, :update_state, 3)
+    dispatches? = function_exported?(module, :dispatch, 4)
+
+    cond do
+      directives != [] and not validates? ->
+        invalid("Agent Plugin with Directives must define validate_directive/2", %{
+          plugin: module
+        })
+
+      directives != [] and not reduces? and not dispatches? ->
+        invalid("Agent Plugin Directives must update state or dispatch runtime work", %{
+          plugin: module
+        })
+
+      dispatches? and directives == [] ->
+        invalid("Agent Plugin dispatch/4 requires declared Directives", %{plugin: module})
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_state_update_contract(module, nil) do
+    if function_exported?(module, :update_state, 3) do
+      invalid("Agent Plugin update_state/3 requires state_spec/1", %{plugin: module})
+    else
+      :ok
+    end
+  end
+
+  defp validate_state_update_contract(_module, _state_key), do: :ok
+
+  defp unique_modules(specs) do
+    unique_by(specs, & &1.module, "Agent Plugin modules must be unique", :plugin)
+  end
+
+  defp unique_state_keys(specs) do
+    specs
+    |> Enum.reject(&is_nil(&1.state_key))
+    |> unique_by(& &1.state_key, "Agent Plugin state keys must be unique", :state_key)
+  end
+
+  defp unique_directives(specs) do
+    specs
+    |> Enum.flat_map(fn spec -> Enum.map(spec.directive_modules, &{&1, spec.module}) end)
+    |> unique_by(&elem(&1, 0), "Agent Plugin Directive ownership must be unique", :directive)
+  end
+
+  defp unique_by(values, key_fun, message, detail_key) do
+    case values
+         |> Enum.group_by(key_fun)
+         |> Enum.find(fn {_key, group} -> length(group) > 1 end) do
+      nil -> :ok
+      {key, group} -> invalid(message, %{detail_key => key, declarations: group})
+    end
+  end
+
+  defp state_key_conflicts(fields, specs) do
+    domain_keys = MapSet.new(Keyword.keys(fields))
+
+    case Enum.find(specs, &(&1.state_key && MapSet.member?(domain_keys, &1.state_key))) do
+      nil ->
+        :ok
+
+      spec ->
+        invalid("Agent Plugin state key conflicts with the Agent domain schema", %{
+          plugin: spec.module,
+          state_key: spec.state_key
+        })
+    end
+  end
+
+  defp prepare_all(command, specs) do
+    Enum.reduce_while(specs, {:ok, command}, fn spec, {:ok, command} ->
+      case prepare_one(command, spec) do
+        {:ok, command} -> {:cont, {:ok, command}}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp prepare_one(command, %Spec{module: module, options: opts}) do
+    if function_exported?(module, :prepare, 2) do
+      safe_apply(module, :prepare, [command, opts], "Agent Plugin prepare/2 failed")
+      |> case do
+        {:ok, %Command{} = prepared} ->
+          with {:ok, prepared} <- Command.validate(prepared),
+               true <- prepared.agent == command.agent do
+            {:ok, prepared}
+          else
+            false ->
+              plugin_invalid("Agent Plugin cannot replace the Agent", module, %{})
+
+            {:error, _reason} = error ->
+              error
+          end
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          plugin_invalid("Agent Plugin prepare/2 returned an invalid result", module, %{
+            result: result
+          })
+      end
+    else
+      {:ok, command}
+    end
+  end
+
+  defp admit_one(command, %Spec{module: module, options: opts}, runtime_ref) do
+    if function_exported?(module, :admit, 3) do
+      safe_apply(module, :admit, [runtime_ref, command, opts], "Agent Plugin admission failed")
+      |> validate_admission_result(command, module)
+    else
+      {:ok, command}
+    end
+  end
+
+  defp prepare_dispatch_one(
+         signal,
+         %Spec{module: module, options: opts},
+         runtime_ref,
+         context
+       ) do
+    if function_exported?(module, :prepare_dispatch, 4) do
+      safe_apply(
+        module,
+        :prepare_dispatch,
+        [runtime_ref, signal, context, opts],
+        "Agent Plugin outbound Signal preparation failed"
+      )
+      |> case do
+        {:ok, %Jido.Signal{} = prepared} ->
+          {:ok, prepared}
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          plugin_invalid(
+            "Agent Plugin prepare_dispatch/4 returned an invalid result",
+            module,
+            %{result: result}
+          )
+      end
+    else
+      {:ok, signal}
+    end
+  end
+
+  defp validate_admission_result(result, original, module) do
+    case result do
+      {:ok, %Command{} = command} ->
+        with {:ok, command} <- Command.validate(command),
+             true <- command.agent == original.agent do
+          {:ok, command}
+        else
+          false ->
+            plugin_invalid("Agent Plugin cannot replace the Agent", module, %{callback: :admit})
+
+          {:error, _reason} = error ->
+            error
+        end
+
+      {:error, _reason} = error ->
+        error
+
+      invalid_result ->
+        plugin_invalid(
+          "Agent Plugin admit/3 returned an invalid result",
+          module,
+          %{result: invalid_result}
+        )
+    end
+  end
+
+  defp callback_modules(specs, function, arity) do
+    specs
+    |> Enum.filter(&function_exported?(&1.module, function, arity))
+    |> Enum.map(& &1.module)
+  end
+
+  defp plugin_state(_state, nil), do: nil
+  defp plugin_state(state, key), do: Map.get(state, key)
+
+  defp apply_state_updates({:ok, state, directives}, specs) do
+    Enum.reduce_while(specs, {:ok, state, directives}, fn spec, {:ok, state, directives} ->
+      if function_exported?(spec.module, :update_state, 3) do
+        current = Map.get(state, spec.state_key)
+        owned_directives = owned_directives(directives, spec)
+
+        result =
+          safe_apply(
+            spec.module,
+            :update_state,
+            [current, owned_directives, spec.options],
+            "Agent Plugin update_state/3 failed"
+          )
+
+        case result do
+          {:ok, next} ->
+            case Zoi.parse(spec.state_schema, next) do
+              {:ok, validated} ->
+                {:cont, {:ok, Map.put(state, spec.state_key, validated), directives}}
+
+              {:error, errors} ->
+                {:halt,
+                 plugin_invalid("Agent Plugin state is invalid", spec.module, %{errors: errors})}
+            end
+
+          {:error, _reason} = error ->
+            {:halt, error}
+
+          invalid_result ->
+            {:halt,
+             plugin_invalid(
+               "Agent Plugin update_state/3 returned an invalid result",
+               spec.module,
+               %{result: invalid_result}
+             )}
+        end
+      else
+        {:cont, {:ok, state, directives}}
+      end
+    end)
+  end
+
+  defp apply_state_updates(result, _specs), do: result
+
+  defp owned_directives(directives, %Spec{directive_modules: modules}) do
+    Enum.filter(directives, fn
+      %{__struct__: module} -> module in modules
+      _directive -> false
+    end)
+  end
+
+  defp changed_keys(before, after_state, keys) when is_map(before) and is_map(after_state) do
+    Enum.filter(keys, &(Map.fetch(before, &1) != Map.fetch(after_state, &1)))
+  end
+
+  defp child_specs_for(specs, init_fun) do
+    specs
+    |> Enum.reduce_while({:ok, []}, fn spec, {:ok, child_specs} ->
+      case child_spec(spec, init_fun.(spec)) do
+        :none -> {:cont, {:ok, child_specs}}
+        {:ok, child_spec} -> {:cont, {:ok, [child_spec | child_specs]}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+    |> case do
+      {:ok, child_specs} -> {:ok, Enum.reverse(child_specs)}
+      error -> error
+    end
+  end
+
+  defp child_spec(%Spec{runtime?: false}, _init), do: :none
+
+  defp child_spec(%Spec{} = spec, %Init{} = init) do
+    try do
+      {spec.module, init}
+      |> Supervisor.child_spec(id: spec.module)
+      |> validate_child_spec(spec.module)
+    rescue
+      error ->
+        invalid("Agent Plugin child_spec/1 raised", %{plugin: spec.module, error: error})
+    catch
+      kind, reason ->
+        invalid("Agent Plugin child_spec/1 failed", %{
+          plugin: spec.module,
+          kind: kind,
+          reason: reason
+        })
+    end
+  end
+
+  defp validate_child_spec(%{start: {module, function, args}} = spec, plugin)
+       when is_atom(module) and is_atom(function) and is_list(args) do
+    case Map.get(spec, :restart, :permanent) do
+      :permanent ->
+        {:ok, spec}
+
+      restart ->
+        invalid("Agent Plugin runtime root must use :permanent restart", %{
+          plugin: plugin,
+          restart: restart
+        })
+    end
+  end
+
+  defp validate_child_spec(spec, plugin),
+    do:
+      invalid("Agent Plugin child_spec/1 returned an invalid child specification", %{
+        plugin: plugin,
+        child_spec: spec
+      })
+
+  defp safe_apply(module, function, args, message) do
+    apply(module, function, args)
+  rescue
+    error -> {:error, plugin_error(message, module, %{error: error})}
+  catch
+    kind, reason ->
+      {:error, plugin_error(message, module, %{kind: kind, reason: reason})}
+  end
+
+  defp plugin_invalid(message, module, details),
+    do: {:error, plugin_error(message, module, details)}
+
+  defp plugin_error(message, module, details),
+    do: Error.execution_error(message, details: Map.put(details, :plugin, module))
+
+  defp invalid(message, details),
+    do: {:error, Error.validation_error(message, kind: :config, details: details)}
 end

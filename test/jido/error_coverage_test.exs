@@ -20,13 +20,6 @@ defmodule JidoTest.ErrorCoverageTest do
       assert error.subject == SomeAction
     end
 
-    test "validation_error with map opts and sensor key" do
-      error = Error.validation_error("Bad sensor", %{sensor: SomeSensor})
-
-      assert error.kind == :sensor
-      assert error.subject == SomeSensor
-    end
-
     test "execution_error accepts map opts" do
       error = Error.execution_error("Failed", %{phase: :planning, details: %{step: 1}})
 
@@ -91,21 +84,6 @@ defmodule JidoTest.ErrorCoverageTest do
 
       assert error.kind == :action
       assert error.subject == MyModule.SomeAction
-    end
-
-    test "sensor key sets kind to :sensor and subject to the sensor module" do
-      error = Error.validation_error("Invalid sensor", sensor: MyModule.SomeSensor)
-
-      assert error.kind == :sensor
-      assert error.subject == MyModule.SomeSensor
-    end
-
-    test "action key takes precedence over sensor key" do
-      error =
-        Error.validation_error("Test", action: ActionModule, sensor: SensorModule)
-
-      assert error.kind == :action
-      assert error.subject == ActionModule
     end
 
     test "field key infers kind :input" do
@@ -206,12 +184,6 @@ defmodule JidoTest.ErrorCoverageTest do
       error = Error.validation_error("Bad", kind: :action, subject: SomeAction)
       result = Error.to_map(error)
       assert result.type == :invalid_action
-    end
-
-    test "ValidationError with kind :sensor returns :invalid_sensor" do
-      error = Error.validation_error("Bad", kind: :sensor, subject: SomeSensor)
-      result = Error.to_map(error)
-      assert result.type == :invalid_sensor
     end
 
     test "ValidationError with kind :config returns :config_error" do

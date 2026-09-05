@@ -557,32 +557,38 @@
     {
       "source": "lib/examples/99_research/99_07_checkpoint_portability/README.md",
       "target": "lib/examples/99_research/99_07_checkpoint_portability/README.md",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/99_07_checkpoint_portability/checkpoint_portability_probe.ex",
       "target": "lib/examples/99_research/99_07_checkpoint_portability/checkpoint_portability_probe.ex",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/99_07_checkpoint_portability/demo.exs",
       "target": "lib/examples/99_research/99_07_checkpoint_portability/demo.exs",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/99_08_indeterminate_write/README.md",
       "target": "lib/examples/99_research/99_08_indeterminate_write/README.md",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/99_08_indeterminate_write/demo.exs",
       "target": "lib/examples/99_research/99_08_indeterminate_write/demo.exs",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/99_08_indeterminate_write/indeterminate_write_probe.ex",
       "target": "lib/examples/99_research/99_08_indeterminate_write/indeterminate_write_probe.ex",
-      "stage": "M11"
+      "stage": "M03",
+      "stage_reason": "Source fixture for required persistence regressions in M03."
     },
     {
       "source": "lib/examples/99_research/README.md",
@@ -1173,7 +1179,12 @@
     {
       "source": "test/AGENTS.md",
       "target": "test/AGENTS.md",
-      "stage": "M02"
+      "stage": "M02",
+      "core_sha256": "8cfb224eae1bb446f1c52203f6923c9fa3c27b02a35b42a089a9fa376178221b",
+      "reason": "Describe the approved V3 command contract and exact full-suite requirement.",
+      "checks": [
+        "docs/migration/08-execution-goal.md"
+      ]
     },
     {
       "source": "test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs",
@@ -2383,7 +2394,13 @@
     {
       "source": "mix.exs",
       "target": "mix.exs",
-      "stage": "M02"
+      "stage": "M02",
+      "core_sha256": "317a688c711ea0c897d37f42d6b590b8c08fe7093d47cb726b25882be5fc3da1",
+      "reason": "Package only core modules. Keep the existing usage rules file. Factory examples remain local and can use optional clients.",
+      "checks": [
+        "mix hex.build",
+        "fresh package consumer (M14)"
+      ]
     },
     {
       "source": "mix.lock",

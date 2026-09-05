@@ -1,7 +1,6 @@
 defmodule Jido do
   use Supervisor
 
-  alias Jido.Agent.WorkerPool
   alias Jido.Config.Defaults
   alias Jido.RuntimeStore
 
@@ -21,24 +20,24 @@ defmodule Jido do
 
       children = [MyApp.Jido]
 
-  Start and manage agents:
+  Start and manage Agents:
 
       {:ok, pid} = MyApp.Jido.start_agent(MyAgent, id: "agent-1")
-      pid = MyApp.Jido.whereis("agent-1")
+      pid = MyApp.Jido.whereis_agent("agent-1")
       agents = MyApp.Jido.list_agents()
       :ok = MyApp.Jido.stop_agent("agent-1")
 
   ## Core Concepts
 
-  Jido agents are immutable data structures. The core operation is `cmd/2`:
+  Jido Agents are immutable data structures. The core operation is `cmd/2`:
 
-      {agent, directives} = MyAgent.cmd(agent, MyAction)
+      {:ok, agent, directives} = MyAgent.cmd(agent, signal)
 
-  - **Agents** — Immutable structs updated via commands
-  - **Actions** — Functions that transform agent state and may perform work
+  - **Agents** — Immutable structs updated through Signals
+  - **Actions** — Functions that transform Agent state and may perform work
   - **Directives** — Runtime-owned external effects (signals, processes, etc.)
 
-  Jido keeps agent decision logic pure. Actions may be pure or effectful.
+  Jido keeps Agent decision logic pure. Actions may be pure or effectful.
   Directives are for effects you want the runtime to own. If a step needs a
   result back now to continue reasoning or update state, an effectful action is
   acceptable; if delivery should belong to the runtime or an integration layer,
@@ -57,13 +56,11 @@ defmodule Jido do
           {:ok, jido: jido, jido_pid: jido_pid}
         end
 
-        test "agent works", %{jido: jido} do
+        test "Agent works", %{jido: jido} do
           {:ok, pid} = Jido.start_agent(jido, MyAgent)
           # ...
         end
       end
-
-  See `Jido.Agent` for defining agents and `Jido.Await` for coordination.
   """
 
   @doc """
@@ -72,6 +69,8 @@ defmodule Jido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
+    - `:persistence` - Optional `Jido.Persistence.Adapter` module or
+      `{module, options}` tuple. The default is no durable persistence.
 
   ## Example
 
@@ -86,13 +85,11 @@ defmodule Jido do
   Optionally configure in `config/config.exs` to customize defaults:
 
       config :my_app, MyApp.Jido,
-        max_tasks: 2000,
-        agent_pools: []
+        max_tasks: 2000
   """
   defmacro __using__(opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
-    storage = Keyword.get(opts, :storage, {Jido.Storage.ETS, [table: :jido_storage]})
-    default_plugins = Keyword.get(opts, :default_plugins, nil)
+    persistence = Keyword.get(opts, :persistence)
 
     quote location: :keep do
       @otp_app unquote(otp_app)
@@ -101,24 +98,9 @@ defmodule Jido do
       @spec __otp_app__() :: unquote(otp_app)
       def __otp_app__, do: @otp_app
 
-      @doc "Returns the storage configuration for this Jido instance."
-      @spec __jido_storage__() :: {module(), keyword()}
-      def __jido_storage__, do: Jido.Storage.normalize_storage(unquote(storage))
-
-      require Jido.Agent.DefaultPlugins
-
-      @default_plugins Jido.Agent.DefaultPlugins.resolve_instance_defaults(
-                         @otp_app,
-                         __MODULE__,
-                         unquote(Macro.escape(default_plugins))
-                       )
-
-      # The typespec for __default_plugins__ triggers a `contract_supertype`
-      # warning from dialyzer.
-      @dialyzer {:nowarn_function, [__default_plugins__: 0]}
-      @doc "Returns the default plugins for agents bound to this Jido instance."
-      @spec __default_plugins__() :: [module() | {module(), map()}]
-      def __default_plugins__, do: @default_plugins
+      @doc "Returns the optional persistence adapter for this Jido instance."
+      @spec __jido_persistence__() :: {module(), keyword()} | nil
+      def __jido_persistence__, do: Jido.Persistence.normalize_adapter(unquote(persistence))
 
       @doc false
       def child_spec(init_arg \\ []) do
@@ -155,34 +137,41 @@ defmodule Jido do
 
       defoverridable config: 1
 
-      @doc "Starts an agent under this Jido instance."
-      @spec start_agent(module() | struct(), keyword()) :: DynamicSupervisor.on_start_child()
+      @doc "Starts an Agent under this Jido instance."
+      @spec start_agent(module() | Jido.Agent.t(), keyword()) ::
+              DynamicSupervisor.on_start_child()
       def start_agent(agent, opts \\ []) do
         Jido.start_agent(__MODULE__, agent, opts)
       end
 
-      @doc "Stops an agent (by pid or id) under this Jido instance."
+      @doc "Stops an Agent by PID or id under this Jido instance."
       @spec stop_agent(pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-      def stop_agent(pid_or_id, opts \\ []) when is_list(opts) do
+      def stop_agent(pid_or_id, opts \\ []) do
         Jido.stop_agent(__MODULE__, pid_or_id, opts)
       end
 
-      @doc "Looks up an agent by ID under this Jido instance."
-      @spec whereis(String.t(), keyword()) :: pid() | nil
-      def whereis(id, opts \\ []) when is_binary(id) and is_list(opts) do
-        Jido.whereis(__MODULE__, id, opts)
+      @doc "Looks up an Agent by id under this Jido instance."
+      @spec whereis_agent(String.t(), keyword()) :: pid() | nil
+      def whereis_agent(id, opts \\ []) do
+        Jido.whereis_agent(__MODULE__, id, opts)
       end
 
-      @doc "Lists all agents under this Jido instance."
+      @doc "Lists all Agents under this Jido instance."
       @spec list_agents(keyword()) :: [{String.t(), pid()}]
-      def list_agents(opts \\ []) when is_list(opts) do
-        Jido.list_agents(__MODULE__, opts)
+      def list_agents(opts \\ []), do: Jido.list_agents(__MODULE__, opts)
+
+      @doc "Returns the count of live Agents under this Jido instance."
+      @spec agent_count(keyword()) :: non_neg_integer()
+      def agent_count(opts \\ []), do: Jido.agent_count(__MODULE__, opts)
+
+      @doc "Persists and stops one live Agent Server."
+      def hibernate(server, opts \\ []) do
+        Jido.hibernate(__MODULE__, server, opts)
       end
 
-      @doc "Returns the count of running agents under this Jido instance."
-      @spec agent_count(keyword()) :: non_neg_integer()
-      def agent_count(opts \\ []) when is_list(opts) do
-        Jido.agent_count(__MODULE__, opts)
+      @doc "Restores and starts one persisted Agent."
+      def thaw(agent_module, agent_id, opts \\ []) do
+        Jido.thaw(__MODULE__, agent_module, agent_id, opts)
       end
 
       @doc "Returns the Registry name for this Jido instance."
@@ -201,18 +190,6 @@ defmodule Jido do
       @spec runtime_store_name() :: atom()
       def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
 
-      @doc "Hibernate an agent to storage."
-      @spec hibernate(Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
-      def hibernate(agent, opts \\ []) when is_list(opts) do
-        Jido.hibernate(__MODULE__, agent, opts)
-      end
-
-      @doc "Thaw an agent from storage."
-      @spec thaw(module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-      def thaw(agent_module, key, opts \\ []) when is_list(opts) do
-        Jido.thaw(__MODULE__, agent_module, key, opts)
-      end
-
       @doc """
       Controls debug mode for this Jido instance.
 
@@ -220,7 +197,7 @@ defmodule Jido do
       - `debug(:on)` — enable developer-friendly verbosity
       - `debug(:verbose)` — enable maximum detail
       - `debug(:off)` — disable debug overrides
-      - `debug(pid)` — toggle per-agent debug mode
+      - `debug(pid)` — enable debug mode for one Agent Server
       - `debug(:on, redact: false)` — also disable redaction
       """
       @spec debug() :: Jido.Debug.level()
@@ -233,7 +210,7 @@ defmodule Jido do
       @spec debug(Jido.Debug.level(), keyword()) :: :ok
       def debug(level, opts) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level, opts)
 
-      @doc "Returns recent debug events from an agent's ring buffer."
+      @doc "Returns recent debug events from an Agent Server ring buffer."
       @spec recent(pid(), non_neg_integer()) :: {:ok, [map()]} | {:error, term()}
       def recent(pid, limit \\ 50), do: Jido.AgentServer.recent_events(pid, limit: limit)
 
@@ -372,8 +349,7 @@ defmodule Jido do
        name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
       {Registry, keys: :unique, name: registry_name(name)},
       {Jido.RuntimeStore, name: runtime_store},
-      {DynamicSupervisor,
-       name: scheduler_name(name), strategy: :one_for_one, max_restarts: 1000, max_seconds: 5},
+      {Jido.AgentServer.SpawnRegistry, jido: name},
       {DynamicSupervisor,
        name: agent_supervisor_name(name),
        strategy: :one_for_one,
@@ -381,10 +357,7 @@ defmodule Jido do
        max_seconds: 5}
     ]
 
-    pool_children =
-      WorkerPool.build_pool_child_specs(name, Keyword.get(opts, :agent_pools, []))
-
-    Supervisor.init(base_children ++ pool_children, strategy: :one_for_one)
+    Supervisor.init(base_children, strategy: :one_for_one)
   end
 
   @doc """
@@ -404,19 +377,11 @@ defmodule Jido do
 
   @doc "Returns the TaskSupervisor name for a Jido instance."
   @spec task_supervisor_name(atom()) :: atom()
-  def task_supervisor_name(name), do: Module.concat(name, TaskSupervisor)
+  def task_supervisor_name(name), do: Jido.Exec.task_supervisor_name(name)
 
   @doc "Returns the RuntimeStore name for a Jido instance."
   @spec runtime_store_name(atom()) :: atom()
   def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
-
-  @doc "Returns the Scheduler name for a Jido instance."
-  @spec scheduler_name(atom()) :: atom()
-  def scheduler_name(name), do: Module.concat(name, Scheduler)
-
-  @doc "Returns the AgentPool name for a specific pool in a Jido instance."
-  @spec agent_pool_name(atom(), atom()) :: atom()
-  def agent_pool_name(name, pool_name), do: Module.concat([name, AgentPool, pool_name])
 
   @doc false
   @spec partition_key(term(), partition() | nil) :: term()
@@ -433,104 +398,102 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Starts an agent under a specific Jido instance.
+  Starts one Agent under the selected Jido instance supervisor.
 
-  ## Examples
+  The Agent Server links to its supervisor, not to the calling process. Caller
+  exit does not stop the Agent. Use `Jido.AgentServer.start_link/1` when the
+  calling process must own that link.
 
-      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent)
-      {:ok, pid} = Jido.start_agent(MyApp.Jido, MyAgent, id: "custom-id")
+  Options must be a keyword list. An omitted `:id` generates a new identity;
+  an explicit ID must be a nonempty string. An existing Agent instance keeps
+  its ID and state and rejects instance overrides. A live ID is unique within
+  its instance and partition. Starting a duplicate returns an error and leaves
+  the existing Agent unchanged.
+
+  This is the standard example startup API. Domain command functions can stay
+  in the Agent module; they do not need a matching startup wrapper.
   """
-  @spec start_agent(atom(), module() | struct(), keyword()) :: DynamicSupervisor.on_start_child()
+  @spec start_agent(atom(), module() | Jido.Agent.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
   def start_agent(jido_instance, agent, opts \\ []) when is_atom(jido_instance) do
-    child_spec = {Jido.AgentServer, Keyword.merge(opts, agent: agent, jido: jido_instance)}
-    DynamicSupervisor.start_child(agent_supervisor_name(jido_instance), child_spec)
-  end
+    if is_list(opts) and Keyword.keyword?(opts) do
+      child_spec =
+        {Jido.AgentServer, Keyword.merge(opts, agent: agent, jido: jido_instance, register: true)}
 
-  @doc """
-  Stops an agent by pid or id.
-
-  ## Examples
-
-      :ok = Jido.stop_agent(MyApp.Jido, pid)
-      :ok = Jido.stop_agent(MyApp.Jido, "agent-id")
-  """
-  @spec stop_agent(atom(), pid() | String.t()) :: :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid) when is_atom(jido_instance) and is_pid(pid) do
-    DynamicSupervisor.terminate_child(agent_supervisor_name(jido_instance), pid)
-  end
-
-  def stop_agent(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
-    case whereis(jido_instance, id) do
-      nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid)
+      case DynamicSupervisor.start_child(agent_supervisor_name(jido_instance), child_spec) do
+        {:ok, pid} -> agent_ready_result(pid)
+        {:ok, pid, _info} -> agent_ready_result(pid)
+        result -> result
+      end
+    else
+      {:error,
+       Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
     end
   end
 
+  @doc "Stops one v3 Agent by PID or id."
   @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid, _opts)
-      when is_atom(jido_instance) and is_pid(pid) do
-    stop_agent(jido_instance, pid)
+  def stop_agent(jido_instance, pid_or_id, opts \\ [])
+
+  def stop_agent(jido_instance, pid, _opts) when is_atom(jido_instance) and is_pid(pid) do
+    Jido.AgentServer.stop(pid)
+  catch
+    :exit, {:noproc, _details} -> {:error, :not_found}
+    :exit, {:normal, _details} -> :ok
   end
 
   def stop_agent(jido_instance, id, opts)
       when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
-    case whereis(jido_instance, id, opts) do
+    case whereis_agent(jido_instance, id, opts) do
       nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid)
+      pid -> stop_agent(jido_instance, pid, opts)
     end
   end
 
-  @doc """
-  Looks up an agent by ID in a Jido instance's registry.
-
-  Returns the pid if found, nil otherwise.
-
-  ## Examples
-
-      pid = Jido.whereis(MyApp.Jido, "agent-123")
-  """
-  @spec whereis(atom(), String.t()) :: pid() | nil
-  def whereis(jido_instance, id) when is_atom(jido_instance) and is_binary(id) do
-    whereis(jido_instance, id, [])
-  end
-
-  @spec whereis(atom(), String.t(), keyword()) :: pid() | nil
-  def whereis(jido_instance, id, opts)
+  @doc "Looks up one v3 Agent by id."
+  @spec whereis_agent(atom(), String.t(), keyword()) :: pid() | nil
+  def whereis_agent(jido_instance, id, opts \\ [])
       when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
-    registry_key = partition_key(id, Keyword.get(opts, :partition))
-
-    case Registry.lookup(registry_name(jido_instance), registry_key) do
-      [{pid, _}] -> pid
-      [] -> nil
-    end
+    Jido.AgentServer.whereis(
+      registry_name(jido_instance),
+      id,
+      partition: Keyword.get(opts, :partition)
+    )
   end
 
-  @doc """
-  Fetches the persisted logical parent binding for a child agent.
+  @doc "Lists all v3 Agents in one Jido instance."
+  @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
+  def list_agents(jido_instance, opts \\ [])
+      when is_atom(jido_instance) and is_list(opts) do
+    partition = Keyword.get(opts, :partition)
 
-  This is the stable runtime relationship lookup API for orchestration layers
-  that need to inspect the live parent/child graph without depending on raw
-  `RuntimeStore` hive layout.
+    jido_instance
+    |> registry_name()
+    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Enum.flat_map(fn
+      {{:agent, key}, pid} ->
+        case unwrap_partition_key(key) do
+          {^partition, id} when is_binary(id) -> [{id, pid}]
+          {nil, id} when is_nil(partition) and is_binary(id) -> [{id, pid}]
+          _other -> []
+        end
 
-  Returns `{:ok, binding}` when present, or `:error` when no binding exists.
-
-  ## Examples
-
-      {:ok, binding} = Jido.parent_binding(MyApp.Jido, "child-123")
-      assert binding.parent_id == "parent-456"
-  """
-  @spec parent_binding(atom(), String.t()) :: {:ok, map()} | :error
-  def parent_binding(jido_instance, child_id)
-      when is_atom(jido_instance) and is_binary(child_id) do
-    parent_binding(jido_instance, child_id, [])
+      _entry ->
+        []
+    end)
+    |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
   end
 
-  @spec parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
-  def parent_binding(jido_instance, child_id, opts)
-      when is_atom(jido_instance) and is_binary(child_id) and is_list(opts) do
+  @doc "Returns the count of live v3 Agents in one Jido instance."
+  @spec agent_count(atom(), keyword()) :: non_neg_integer()
+  def agent_count(jido_instance, opts \\ []), do: length(list_agents(jido_instance, opts))
+
+  @doc "Fetches one v3 Agent logical-parent binding."
+  @spec agent_parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
+  def agent_parent_binding(jido_instance, child_id, opts \\ []) do
     case RuntimeStore.fetch(
            jido_instance,
-           :relationships,
+           :agent_relationships,
            partition_key(child_id, Keyword.get(opts, :partition))
          ) do
       {:ok, binding} -> normalize_parent_binding(binding)
@@ -538,119 +501,23 @@ defmodule Jido do
     end
   end
 
-  @doc """
-  Lists all agents running in a Jido instance.
-
-  Returns a list of `{id, pid}` tuples.
-
-  ## Examples
-
-      agents = Jido.list_agents(MyApp.Jido)
-      # => [{"agent-1", #PID<0.123.0>}, {"agent-2", #PID<0.124.0>}]
-  """
-  @spec list_agents(atom()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance) when is_atom(jido_instance) do
-    list_agents(jido_instance, [])
-  end
-
-  @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
-    registry_name(jido_instance)
-    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
-    |> filter_agent_registry_entries(Keyword.get(opts, :partition))
-  end
-
-  @doc """
-  Returns the count of running agents in a Jido instance.
-
-  ## Examples
-
-      count = Jido.agent_count(MyApp.Jido)
-      # => 5
-  """
-  @spec agent_count(atom()) :: non_neg_integer()
-  def agent_count(jido_instance) when is_atom(jido_instance) do
-    agent_count(jido_instance, [])
-  end
-
-  @spec agent_count(atom(), keyword()) :: non_neg_integer()
-  def agent_count(jido_instance, opts) when is_atom(jido_instance) and is_list(opts) do
-    jido_instance
-    |> list_agents(opts)
-    |> length()
-  end
-
-  # ---------------------------------------------------------------------------
-  # Persistence
-  # ---------------------------------------------------------------------------
-
-  @doc "Hibernate an agent using the given Jido instance."
-  @spec hibernate(atom(), Jido.Agent.t()) :: :ok | {:error, term()}
-  def hibernate(jido_instance, agent) when is_atom(jido_instance) do
-    hibernate(jido_instance, agent, [])
-  end
-
-  @spec hibernate(atom(), Jido.Agent.t(), keyword()) :: :ok | {:error, term()}
-  def hibernate(jido_instance, agent, opts) when is_atom(jido_instance) and is_list(opts) do
-    with {:ok, agent} <- maybe_put_partition(agent, Keyword.get(opts, :partition)) do
-      Jido.Persist.hibernate(jido_instance, agent)
-    end
-  end
-
-  @doc "Thaw an agent using the given Jido instance."
-  @spec thaw(atom(), module(), term()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-  def thaw(jido_instance, agent_module, key) when is_atom(jido_instance) do
-    thaw(jido_instance, agent_module, key, [])
-  end
-
-  @spec thaw(atom(), module(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}
-  def thaw(jido_instance, agent_module, key, opts)
+  @doc "Persists and stops one live Agent Server."
+  @spec hibernate(atom(), Jido.AgentServer.server(), keyword()) ::
+          :ok | {:error, term()}
+  def hibernate(jido_instance, server, opts \\ [])
       when is_atom(jido_instance) and is_list(opts) do
-    partition = Keyword.get(opts, :partition)
-
-    jido_instance
-    |> Jido.Persist.thaw(agent_module, partition_key(key, partition))
-    |> case do
-      {:ok, agent} -> maybe_put_partition(agent, partition)
-      {:error, _reason} = error -> error
-    end
+    Jido.AgentServer.hibernate(server, opts)
   end
 
-  defp filter_agent_registry_entries(entries, partition) do
-    Enum.flat_map(entries, fn {registry_key, pid} ->
-      case unwrap_partition_key(registry_key) do
-        {^partition, id} when is_binary(id) ->
-          [{id, pid}]
-
-        {nil, id} when is_nil(partition) and is_binary(id) ->
-          [{id, pid}]
-
-        _other ->
-          []
-      end
-    end)
+  @doc "Restores and starts one persisted Agent."
+  @spec thaw(atom(), module(), String.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def thaw(jido_instance, agent_module, agent_id, opts \\ [])
+      when is_atom(jido_instance) and is_atom(agent_module) and is_binary(agent_id) and
+             is_list(opts) do
+    opts = opts |> Keyword.put(:id, agent_id) |> Keyword.put(:restore, :required)
+    start_agent(jido_instance, agent_module, opts)
   end
-
-  defp maybe_put_partition(%{state: state} = agent, nil) when is_map(state), do: {:ok, agent}
-
-  defp maybe_put_partition(%{state: state} = agent, partition) when is_map(state) do
-    case Map.get(state, :__partition__) do
-      nil ->
-        {:ok, %{agent | state: Map.put(state, :__partition__, partition)}}
-
-      ^partition ->
-        {:ok, agent}
-
-      agent_partition ->
-        {:error,
-         Jido.Error.validation_error("partition does not match agent runtime state", %{
-           partition: partition,
-           agent_partition: agent_partition
-         })}
-    end
-  end
-
-  defp maybe_put_partition(agent, _partition), do: {:ok, agent}
 
   defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
        when is_binary(parent_id) do
@@ -665,104 +532,14 @@ defmodule Jido do
 
   defp normalize_parent_binding(_binding), do: :error
 
-  # ---------------------------------------------------------------------------
-  # Discovery
-  # ---------------------------------------------------------------------------
+  defp agent_ready_result(pid) do
+    case Jido.AgentServer.await_ready(pid) do
+      :ok ->
+        {:ok, pid}
 
-  @doc "Lists discovered Actions with optional filtering."
-  defdelegate list_actions(opts \\ []), to: Jido.Discovery
-
-  @doc "Lists discovered Sensors with optional filtering."
-  defdelegate list_sensors(opts \\ []), to: Jido.Discovery
-
-  @doc "Lists discovered Plugins with optional filtering."
-  defdelegate list_plugins(opts \\ []), to: Jido.Discovery
-
-  @doc "Lists discovered Demos with optional filtering."
-  defdelegate list_demos(opts \\ []), to: Jido.Discovery
-
-  @doc "Gets an Action by its slug."
-  defdelegate get_action_by_slug(slug), to: Jido.Discovery
-
-  @doc "Gets a Sensor by its slug."
-  defdelegate get_sensor_by_slug(slug), to: Jido.Discovery
-
-  @doc "Gets a Plugin by its slug."
-  defdelegate get_plugin_by_slug(slug), to: Jido.Discovery
-
-  @doc "Refreshes the Discovery catalog."
-  defdelegate refresh_discovery(), to: Jido.Discovery, as: :refresh
-
-  # ---------------------------------------------------------------------------
-  # Agent Coordination
-  # ---------------------------------------------------------------------------
-
-  @doc """
-  Wait for an agent to reach a terminal status.
-
-  See `Jido.Await.completion/3` for details.
-  """
-  defdelegate await(server, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :completion
-
-  @doc """
-  Wait for a child agent to reach a terminal status.
-
-  See `Jido.Await.child/4` for details.
-  """
-  defdelegate await_child(
-                server,
-                child_tag,
-                timeout_ms \\ Defaults.await_child_timeout_ms(),
-                opts \\ []
-              ),
-              to: Jido.Await,
-              as: :child
-
-  @doc """
-  Wait for all agents to reach terminal status.
-
-  See `Jido.Await.all/3` for details.
-  """
-  defdelegate await_all(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :all
-
-  @doc """
-  Wait for any agent to reach terminal status.
-
-  See `Jido.Await.any/3` for details.
-  """
-  defdelegate await_any(servers, timeout_ms \\ Defaults.await_timeout_ms(), opts \\ []),
-    to: Jido.Await,
-    as: :any
-
-  @doc """
-  Get the PIDs of all children of a parent agent.
-
-  See `Jido.Await.get_children/1` for details.
-  """
-  defdelegate get_children(parent_server), to: Jido.Await
-
-  @doc """
-  Get a specific child's PID by tag.
-
-  See `Jido.Await.get_child/2` for details.
-  """
-  defdelegate get_child(parent_server, child_tag), to: Jido.Await
-
-  @doc """
-  Check if an agent process is alive and responding.
-
-  See `Jido.Await.alive?/1` for details.
-  """
-  defdelegate alive?(server), to: Jido.Await
-
-  @doc """
-  Request graceful cancellation of an agent.
-
-  See `Jido.Await.cancel/2` for details.
-  """
-  defdelegate cancel(server, opts \\ []), to: Jido.Await
+      {:error, reason} ->
+        if Process.alive?(pid), do: Process.exit(pid, :shutdown)
+        {:error, reason}
+    end
+  end
 end

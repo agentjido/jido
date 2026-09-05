@@ -33,3 +33,34 @@ remain in core after the API port. Both failed runs remain in the evidence.
 
 Runtime: Elixir 1.20.3 / OTP 29.0.5. Exact commands are in the linked command
 records. These V2 results are not V3 acceptance.
+
+## M02 — runtime replacement and Basic examples
+
+The complete Agent, AgentServer, Plugin and persistence unit uses the pinned
+source. This includes the prepared remote, hibernation, scheduler and Registry
+fixes. Topology remains assigned to M10. The cutover removes 213 recorded V2
+paths. The old observation example remains, with V3 routes, complete candidate
+state and the same six behavior checks.
+
+The checkpoint-identity fixture and its shared byte store arrive in M02 because
+the naming tests need them. Support that needs later examples arrives with those
+examples. These stage changes are recorded in `transfer-plan.json`.
+
+Package files include core modules and the existing usage rules. They exclude
+`lib/examples`, which uses optional model clients. Local example paths do not
+change. The dependency set uses Action beta.6, Signal beta.2 and SchedEx 1.2.1.
+`mix deps.get` passed; its log records a Mint advisory. The main-branch fix is
+assigned to M12, before beta QA.
+
+- `m02-compile-final.json`: compilation with warnings as errors passed.
+- `m02-test.json`: 611 tests passed, zero failures or skips, 31.818 seconds
+  including test dependency compilation. ExUnit took 5.4 seconds.
+- `m02-test.results.stage.json`: all 605 introduced source tests are present.
+  Five Basic fixtures pass 16 checks; shared authoring adds six checks.
+  The retained observation example adds six checks to the source total.
+- The input audit passes. The target audit checks 178 transferred paths.
+  No current Actor runtime or temporary alias was introduced.
+
+All command records use Elixir 1.20.3 / OTP 29.0.5. The per-file hashes identify
+runtime and test content. Script-only additions after a test run do not change
+that tested runtime content.

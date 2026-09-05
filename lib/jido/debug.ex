@@ -1,6 +1,6 @@
 defmodule Jido.Debug do
   @moduledoc """
-  Per-instance debug mode for Jido agents.
+  Per-instance debug mode for Jido Agents.
 
   Provides a single entrypoint to control observability verbosity
   at runtime, scoped to a specific Jido instance.

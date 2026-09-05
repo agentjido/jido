@@ -6,8 +6,9 @@ defmodule Jido.AgentServer.Signal.ChildExit do
     default_source: "/agent",
     schema:
       Zoi.object(%{
-        tag: Zoi.any(description: "Tag assigned to the child when spawned"),
-        pid: Zoi.any(description: "PID of the child process that exited"),
-        reason: Zoi.any(description: "Exit reason from the child process")
+        tag: Zoi.any(description: "Tracked child tag"),
+        child_id: Zoi.string(description: "Child Agent id"),
+        pid: Zoi.any(description: "Child Agent Server PID"),
+        reason: Zoi.any(description: "Process exit reason")
       })
 end

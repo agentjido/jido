@@ -25,7 +25,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M02, evidence/core/m02-test.results.stage.json",
       "prepared_id": "01_01_minimal_agent",
       "prepared_directory": "lib/examples/01_basic/01_01_minimal_agent",
       "prepared_files": [
@@ -72,7 +72,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M02, evidence/core/m02-test.results.stage.json",
       "prepared_id": "01_02_typed_command_agent",
       "prepared_directory": "lib/examples/01_basic/01_02_typed_command_agent",
       "prepared_files": [
@@ -119,7 +119,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M02, evidence/core/m02-test.results.stage.json",
       "prepared_id": "01_03_plugin_state_agent",
       "prepared_directory": "lib/examples/01_basic/01_03_plugin_state_agent",
       "prepared_files": [
@@ -167,7 +167,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M02, evidence/core/m02-test.results.stage.json",
       "prepared_id": "01_04_directive_agent",
       "prepared_directory": "lib/examples/01_basic/01_04_directive_agent",
       "prepared_files": [
@@ -216,7 +216,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M02, evidence/core/m02-test.results.stage.json",
       "prepared_id": "01_05_controlled_turn_agent",
       "prepared_directory": "lib/examples/01_basic/01_05_controlled_turn_agent",
       "prepared_files": [

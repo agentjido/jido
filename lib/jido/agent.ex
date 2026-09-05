@@ -1,1498 +1,567 @@
 defmodule Jido.Agent do
   @moduledoc """
-  An Agent is an immutable data structure that holds state and can be updated
-  via commands. This module provides a minimal, data-first API:
+  The canonical immutable Agent value.
 
-  - `new/1` - Create a new agent
-  - `set/2` - Update state directly
-  - `validate/2` - Validate agent state against schema
-  - `cmd/2` - Execute actions: `(agent, action) -> {agent, directives}`
+  One Agent value has two valid forms. A definition has no identity or state.
+  An instance has a non-empty identity and complete portable state. Use
+  `new/1` to create a definition and `instantiate/2` to create an instance.
+  `cmd/3` applies one Signal to an instance and returns a new Agent plus
+  Directives. It does not start or own a process or commit live state.
 
-  ## Core Pattern
+  The selected Action or Flow can perform synchronous external work. A failed
+  command returns no candidate but does not undo completed I/O. Applications
+  own external idempotency and recovery. Preparation and state assembly are
+  deterministic for fixed inputs and executable results; changing external
+  responses can change those results. Use fixed or recorded responses when
+  reproducible evaluation is required.
 
-  The fundamental operation is `cmd/2`:
+  Agent Plugins can prepare command input before routing. A Plugin cannot
+  change domain output. A stateful Plugin can reduce its own declared state
+  field after executable work. The Agent validates one complete state proposal.
 
-      {agent, directives} = MyAgent.cmd(agent, MyAction)
-      {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
-      {agent, directives} = MyAgent.cmd(agent, [Action1, Action2])
+  Default Signal routing accepts an executable target or `{executable, defaults}`.
+  The defaults map is combined with the Signal data using
+  `Map.merge(defaults, signal.data)`. Signal values take precedence. The merge
+  is shallow: a supplied nested map replaces the corresponding default map.
+  An empty Signal data map uses all defaults; non-map data returns a validation
+  error. The executable validates the combined input before execution. Invalid
+  supplied values do not fall back to defaults. The Signal in execution context
+  keeps its original data.
 
-  Key invariants:
-  - The returned `agent` is **always complete** — no "apply directives" step needed
-  - `directives` are **runtime-owned external effects only** — they never modify agent state
-  - Agent decision logic stays explicit and testable
+      routes: [{"counter.add", {MyApp.Add, %{amount: 1}}}]
 
-  Jido keeps agent decision logic pure. Actions may be pure or effectful.
-  Directives are for effects you want the runtime to own. If a step needs a
-  result back now to continue reasoning or update state, an effectful action is
-  acceptable; if delivery should belong to the runtime or an integration layer,
-  return a directive.
+  With this route, `%{}` uses amount 1 and `%{amount: 7}` uses amount 7.
+  Route maps are caller-overridable defaults. This changes the earlier behavior,
+  which replaced the complete input with the route map. Applications that need
+  fixed behavior must enforce it in the Action or construct the input explicitly
+  in `handle_signal/2`.
 
-  ## Action Formats
+  Routing failures during command preparation return `Jido.Error.RoutingError`
+  through both `cmd/3` and `Jido.AgentServer.call/3`. Missing routes, invalid
+  Signal types, and multiple matching targets use this public type. Errors from
+  the Signal Router retain their message, details, and retry hints; the original
+  error is available in `details.cause`. The target is the original error target
+  or, when absent, the Signal type. Multiple matches include `details.count` and
+  `details.targets`.
 
-  `cmd/2` accepts actions in these forms:
+  ## Spark authoring
 
-  - `MyAction` - Action module with no params
-  - `{MyAction, %{param: value}}` - Action with params
-  - `%Jido.Agent.Command{}` - Full Agent command value
-  - `%Instruction{}` - Executable invocation imported as an Agent command
-  - `[...]` - List of any of the above (processed in sequence)
+  An Agent module can use keyword configuration or Spark blocks:
 
-  ## Directives
+      defmodule MyApp.Counter do
+        use Jido.Agent, name: "counter"
 
-  Directives are effect descriptions for the runtime to interpret. They are
-  **strictly outbound** - the agent never receives directives as input.
-
-  Directives are bare structs (no tuple wrappers). Built-in directives
-  (see `Jido.Agent.Directive`):
-
-  - `%Directive.Emit{}` - Dispatch a signal via `Jido.Signal.Dispatch`
-  - `%Directive.Error{}` - Signal an error (wraps `Jido.Error.t()`)
-  - `%Directive.Spawn{}` - Spawn a child process
-  - `%Directive.Schedule{}` - Schedule a delayed message
-  - `%Directive.RunInstruction{}` - Execute an instruction at runtime and route result to `cmd/2`
-  - `%Directive.Stop{}` - Stop the agent process
-
-  The Emit directive integrates with `Jido.Signal` for dispatch:
-
-      # Emit with default dispatch config
-      %Directive.Emit{signal: my_signal}
-
-      # Emit to PubSub topic
-      %Directive.Emit{signal: my_signal, dispatch: {:pubsub, topic: "events"}}
-
-      # Emit to a specific process
-      %Directive.Emit{signal: my_signal, dispatch: {:pid, target: pid}}
-
-  External packages can define custom directive structs without modifying core.
-
-  Directives never modify agent state — that's handled by the returned agent.
-
-  ## Usage
-
-  ### Defining an Agent Module
-
-      defmodule MyAgent do
-        use Jido.Agent,
-          name: "my_agent",
-          description: "My custom agent",
-          schema: Zoi.object(%{
-                    status: Zoi.atom() |> Zoi.default(:idle),
-                    counter: Zoi.integer() |> Zoi.default(0)
-                  })
-      end
-
-  ### Working with Agents
-
-      # Create a new agent (fully initialized including strategy state)
-      agent = MyAgent.new()
-      agent = MyAgent.new(id: "custom-id", state: %{counter: 10})
-
-      # Execute actions
-      {agent, directives} = MyAgent.cmd(agent, MyAction)
-      {agent, directives} = MyAgent.cmd(agent, {MyAction, %{value: 42}})
-      {agent, directives} = MyAgent.cmd(agent, [Action1, Action2])
-
-      # Update state directly
-      {:ok, agent} = MyAgent.set(agent, %{status: :running})
-
-  ## Strategy Initialization
-
-  `new/1` automatically calls `strategy.init/2` to initialize strategy-specific
-  state. Any directives returned by strategy init are dropped here since they
-  require a runtime to execute. When using `AgentServer`, it handles strategy
-  init directives separately during startup.
-
-  ## Lifecycle Hooks
-
-  Agents support two optional callbacks:
-
-  - `on_before_cmd/2` - Called before command processing (pure transformations only)
-  - `on_after_cmd/3` - Called after command processing (pure transformations only)
-
-  ## State Schema Types
-
-  Agent uses Zoi schemas for state validation:
-
-     ```elixir
-     schema: Zoi.object(%{
-       status: Zoi.atom() |> Zoi.default(:idle),
-       counter: Zoi.integer() |> Zoi.default(0)
-     })
-     ```
-
-  Schemas must contain only static data. Refinement and transform callbacks must
-  use `{Module, :function, args}` MFA values. Anonymous callbacks and lazy schemas
-  cause a compile error.
-
-  ## Pure Functional Design
-
-  The Agent struct is immutable. All operations return new agent structs.
-  Server/OTP integration is handled separately by `Jido.AgentServer`.
-  """
-
-  alias Jido.Agent
-  alias Jido.Agent.Command
-  alias Jido.Agent.Directive
-  alias Jido.Agent.State, as: StateHelper
-  alias Jido.Error
-  alias Jido.Instruction
-  alias Jido.Plugin.Instance, as: PluginInstance
-  alias Jido.Plugin.Requirements, as: PluginRequirements
-
-  @doc false
-  def expand_aliases_in_ast(ast, caller_env) do
-    Macro.prewalk(ast, fn
-      {:__aliases__, _, _} = alias_node -> Macro.expand(alias_node, caller_env)
-      other -> other
-    end)
-  end
-
-  @doc false
-  def expand_and_eval_literal_option(value, caller_env) do
-    case value do
-      nil ->
-        nil
-
-      value when is_atom(value) or is_binary(value) or is_number(value) ->
-        value
-
-      %_{} = struct ->
-        struct
-
-      {:__aliases__, _, _} = alias_node ->
-        Macro.expand(alias_node, caller_env)
-
-      value when is_list(value) ->
-        Enum.map(value, fn
-          {key, nested_value} ->
-            {
-              expand_and_eval_literal_option(key, caller_env),
-              expand_and_eval_literal_option(nested_value, caller_env)
-            }
-
-          nested_value ->
-            expand_and_eval_literal_option(nested_value, caller_env)
-        end)
-
-      value when is_map(value) ->
-        Map.new(value, fn {key, nested_value} ->
-          {
-            expand_and_eval_literal_option(key, caller_env),
-            expand_and_eval_literal_option(nested_value, caller_env)
-          }
-        end)
-
-      value when is_tuple(value) ->
-        if ast_node?(value) do
-          value
-          |> expand_aliases_in_ast(caller_env)
-          |> Code.eval_quoted([], caller_env)
-          |> elem(0)
-        else
-          value
-          |> Tuple.to_list()
-          |> Enum.map(&expand_and_eval_literal_option(&1, caller_env))
-          |> List.to_tuple()
+        agent do
+          schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
         end
 
-      other ->
-        other
-    end
-  end
+        routes do
+          signal_source "/counter"
 
-  defp ast_node?({_, meta, _}) when is_list(meta), do: true
-  defp ast_node?(_other), do: false
+          route "counter.add", MyApp.Add do
+            defaults %{amount: 1}
+            define :add, args: [{:optional, :amount}]
+          end
+        end
+      end
+
+  A nested `define` generates `add_signal`, `add_signal!`, and a live `add`
+  helper. For example, `Counter.add_signal(2)` returns `{:ok, signal}`, and
+  `Counter.add(server, 2, timeout: 5000)` calls `Jido.AgentServer.call/3`.
+  Omitted optional arguments remain absent so route defaults apply normally.
+  Extra payload fields use `input: %{...}`; Signal envelope options use
+  `signal: [...]`. Only live helpers accept `context` and `timeout` options.
+  Helpers package input; Plugins and executables validate it during execution.
+
+  Exposed routes must be exact and have no match predicate. Routes without
+  `define` keep normal wildcard and predicate support and generate no helpers.
+  A field cannot appear in both keyword and block configuration.
+
+  `Jido.Agent.Builder` and `Jido.Agent.Codec` provide runtime and JSON authoring
+  forms through the same construction validator. Use `new/2` for an Agent
+  module and instance options. These forms preserve the definition and instance
+  boundaries above.
+  """
+
+  alias Jido.Agent.{State, Turn}
+  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Validation
+  alias Jido.Error
+  alias Jido.Signal
+  alias Jido.Signal.Router
+
+  @checkpoint_version 1
 
   @schema Zoi.struct(
             __MODULE__,
             %{
               id:
-                Zoi.string(description: "Unique agent identifier")
+                Zoi.string(description: "Unique Agent instance identifier")
+                |> Zoi.nullable()
                 |> Zoi.optional(),
-              agent_module:
-                Zoi.atom(description: "Concrete agent module that created this struct")
-                |> Zoi.optional(),
-              name:
-                Zoi.string(description: "Agent name")
-                |> Zoi.optional(),
+              module: Zoi.atom(description: "Agent behavior module"),
+              name: Zoi.string(description: "Agent name"),
               description:
                 Zoi.string(description: "Agent description")
+                |> Zoi.nullable()
                 |> Zoi.optional(),
-              category:
-                Zoi.string(description: "Agent category")
-                |> Zoi.optional(),
-              tags:
-                Zoi.list(Zoi.string(), description: "Tags")
-                |> Zoi.default([]),
-              vsn:
-                Zoi.string(description: "Version")
-                |> Zoi.optional(),
-              schema:
-                Zoi.any(description: "Zoi schema for validating the Agent's state")
+              schema: Zoi.any(description: "Static Zoi schema for Agent-owned state"),
+              plugins:
+                Zoi.list(Zoi.any(), description: "Canonical ordered Plugin declarations")
                 |> Zoi.default([]),
               state:
-                Zoi.map(description: "Current state")
-                |> Zoi.default(%{})
+                Zoi.map(description: "Current complete Agent instance state")
+                |> Zoi.nullable()
+                |> Zoi.optional(),
+              routes:
+                Zoi.list(Zoi.any(), description: "Canonical Signal Router routes")
+                |> Zoi.default([]),
+              metadata: Zoi.map(description: "Portable Agent metadata") |> Zoi.default(%{})
             },
             coerce: true
           )
 
   @type t :: unquote(Zoi.type_spec(@schema))
+  @type handle_result :: {:ok, Turn.t()} | {:error, term()}
+
+  @callback handle_signal(signal :: Signal.t(), agent :: t()) :: handle_result()
+  @callback checkpoint(agent :: t(), context :: map()) :: {:ok, map()} | {:error, term()}
+  @callback restore(checkpoint :: map(), context :: map()) :: {:ok, t()} | {:error, term()}
+
+  @optional_callbacks checkpoint: 2, restore: 2
 
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for Agent."
+  @doc "Defines one Agent module with a reusable definition and default Signal behavior."
+  defmacro __using__(opts) do
+    quote location: :keep do
+      use Jido.Agent.DSL
+      use Jido.Action.Inline
+      @before_compile Jido.Agent.DSL.Compiler
+      @behaviour Jido.Agent
+
+      @jido_agent_options unquote(opts)
+
+      @doc "Returns the neutral canonical Agent definition."
+      @spec agent() :: Jido.Agent.t()
+      def agent do
+        case Jido.Agent.__definition_from_module__(__MODULE__, __agent_config__()) do
+          {:ok, agent} -> agent
+          {:error, error} -> raise error
+        end
+      end
+
+      @doc "Returns the Agent name."
+      @spec name() :: String.t()
+      def name, do: Map.fetch!(__agent_config__(), :name)
+
+      @doc "Returns the Agent description."
+      @spec description() :: String.t() | nil
+      def description, do: Map.get(__agent_config__(), :description)
+
+      @doc "Returns the authored Agent state schema."
+      @spec domain_schema() :: Zoi.schema()
+      def domain_schema, do: Map.get(__agent_config__(), :schema, Zoi.object(%{}))
+
+      @doc "Returns the authored Agent state schema."
+      @spec schema() :: Zoi.schema()
+      def schema, do: domain_schema()
+
+      @doc "Returns the complete state schema, including Plugin-owned state."
+      @spec complete_schema() :: Zoi.schema()
+      def complete_schema, do: Jido.Agent.complete_schema!(agent())
+
+      @doc "Returns the canonical Agent routes."
+      @spec routes() :: list()
+      def routes, do: agent().routes
+
+      @doc "Returns the Action target compiled for one inline route."
+      @spec route_action(String.t()) :: module()
+      def route_action(path) do
+        Jido.Action.Inline.target!(__MODULE__, host: Jido.Agent, route: path, role: :action)
+      end
+
+      @doc "Returns the canonical ordered Agent Plugin declarations."
+      @spec plugins() :: list()
+      def plugins, do: agent().plugins
+
+      @doc "Returns portable Agent metadata."
+      @spec metadata() :: map()
+      def metadata, do: agent().metadata
+
+      @doc "Creates one Agent instance from this module definition."
+      @spec new(map() | keyword()) :: {:ok, Jido.Agent.t()} | {:error, Exception.t()}
+      def new(overrides \\ []) do
+        Jido.Agent.__new_from_module__(__MODULE__, __agent_config__(), overrides)
+      end
+
+      @doc "Creates one Agent instance or raises its validation error."
+      @spec new!(map() | keyword()) :: Jido.Agent.t() | no_return()
+      def new!(overrides \\ []) do
+        case new(overrides) do
+          {:ok, agent} -> agent
+          {:error, error} -> raise error
+        end
+      end
+
+      @doc "Applies one Signal to an Agent value without starting a Server."
+      @spec cmd(Jido.Agent.t(), Jido.Signal.t(), keyword()) ::
+              {:ok, Jido.Agent.t(), [struct()]} | {:error, term()}
+      def cmd(agent, signal, opts \\ []), do: Jido.Agent.cmd(agent, signal, opts)
+
+      @impl Jido.Agent
+      def handle_signal(signal, context), do: Jido.Agent.handle_signal(signal, context)
+
+      @impl Jido.Agent
+      def checkpoint(agent, context), do: Jido.Agent.default_checkpoint(agent, context)
+
+      @impl Jido.Agent
+      def restore(checkpoint, context),
+        do: Jido.Agent.default_restore(__MODULE__, checkpoint, context)
+
+      defoverridable handle_signal: 2, checkpoint: 2, restore: 2
+    end
+  end
+
+  @doc "Returns the Zoi schema for the canonical Agent value."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
-  # Action input types
-  @type action ::
-          module()
-          | atom()
-          | Jido.Flow.t()
-          | {term(), map()}
-          | {term(), map(), map()}
-          | {term(), map(), map(), keyword()}
-          | Command.t()
-          | Instruction.t()
-          | [action()]
+  @doc "Creates one validated neutral Agent definition."
+  @spec new(map() | keyword() | t()) :: {:ok, t()} | {:error, Exception.t()}
+  def new(attrs), do: Validation.new(attrs)
 
-  # Directive types (runtime-owned external effects only - never modify agent state)
-  # See Jido.Agent.Directive for structured payload modules
-  @type directive :: Directive.t()
+  @doc "Creates an Agent instance from a module and instance options."
+  @spec new(module(), map() | keyword()) :: {:ok, t()} | {:error, Exception.t()}
+  def new(module, opts) when is_atom(module) do
+    with {:module, ^module} <- Code.ensure_loaded(module) do
+      if function_exported?(module, :__agent_config__, 0),
+        do: __new_from_module__(module, module.__agent_config__(), opts),
+        else: Jido.Agent.Authoring.error("Expected an Agent module")
+    else
+      _ -> Jido.Agent.Authoring.error("Agent module could not be loaded")
+    end
+  end
 
-  @type agent_result :: {:ok, t()} | {:error, Error.t()}
-  @type cmd_result :: {t(), [directive()]}
+  def new(_module, _opts), do: Jido.Agent.Authoring.error("Expected an Agent module")
 
-  @agent_config_schema Zoi.object(
-                         %{
-                           name:
-                             Zoi.string(
-                               description:
-                                 "The name of the Agent. Must contain only letters, numbers, and underscores."
-                             )
-                             |> Zoi.refine({Jido.Util, :validate_name, []}),
-                           description:
-                             Zoi.string(description: "A description of what the Agent does.")
-                             |> Zoi.optional(),
-                           category:
-                             Zoi.string(description: "The category of the Agent.")
-                             |> Zoi.optional(),
-                           tags:
-                             Zoi.list(Zoi.string(), description: "Tags")
-                             |> Zoi.default([]),
-                           vsn:
-                             Zoi.string(description: "Version")
-                             |> Zoi.optional(),
-                           schema:
-                             Zoi.any(description: "Zoi schema for validating the Agent's state.")
-                             |> Zoi.refine({Jido.Agent.State, :validate_schema, []})
-                             |> Zoi.default([]),
-                           strategy:
-                             Zoi.any(
-                               description:
-                                 "Execution strategy module or {module, opts}. Default: Jido.Agent.Strategy.Direct"
-                             )
-                             |> Zoi.default(Jido.Agent.Strategy.Direct),
-                           plugins:
-                             Zoi.list(Zoi.any(),
-                               description: "Plugin modules or {module, config} tuples"
-                             )
-                             |> Zoi.default([]),
-                           signal_routes:
-                             Zoi.list(Zoi.any(),
-                               description:
-                                 "Compile-time signal route table. Each route maps signal type/pattern to an action target."
-                             )
-                             |> Zoi.default([]),
-                           default_plugins:
-                             Zoi.any(
-                               description:
-                                 "Override default plugins. false to disable all, or map of %{state_key => false | Module | {Module, config}}"
-                             )
-                             |> Zoi.optional(),
-                           schedules:
-                             Zoi.list(Zoi.any(),
-                               description:
-                                 "Declarative cron schedules as {cron_expr, signal_type} or {cron_expr, signal_type, opts}"
-                             )
-                             |> Zoi.default([]),
-                           jido:
-                             Zoi.atom(
-                               description:
-                                 "Jido instance module for resolving default plugins at compile time"
-                             )
-                             |> Zoi.optional()
-                         },
-                         coerce: true
-                       )
+  @doc "Creates an Agent instance from a module or raises its error."
+  @spec new!(module(), map() | keyword()) :: t()
+  def new!(module, opts) do
+    case new(module, opts) do
+      {:ok, agent} -> agent
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Creates one neutral Agent definition or raises its validation error."
+  @spec new!(map() | keyword() | t()) :: t() | no_return()
+  def new!(attrs) do
+    case new(attrs) do
+      {:ok, agent} -> agent
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Creates one Agent instance from a neutral definition."
+  @spec instantiate(t(), map() | keyword()) :: {:ok, t()} | {:error, Exception.t()}
+  def instantiate(%__MODULE__{} = definition, overrides \\ []) do
+    Validation.instantiate(definition, overrides)
+  end
+
+  @doc "Creates one Agent instance or raises its validation error."
+  @spec instantiate!(t(), map() | keyword()) :: t() | no_return()
+  def instantiate!(%__MODULE__{} = definition, overrides \\ []) do
+    case instantiate(definition, overrides) do
+      {:ok, agent} -> agent
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Validates one Agent value."
+  @spec validate(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate(value), do: Validation.validate(value)
+
+  @doc "Validates one neutral Agent definition."
+  @spec validate_definition(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate_definition(value), do: Validation.validate_definition(value)
+
+  @doc "Validates one Agent instance."
+  @spec validate_instance(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate_instance(value), do: Validation.validate_instance(value)
+
+  @doc "Returns true when the value is a neutral Agent definition."
+  @spec definition?(term()) :: boolean()
+  def definition?(%__MODULE__{id: nil, state: nil}), do: true
+  def definition?(_value), do: false
+
+  @doc "Returns true when the value has complete Agent instance data."
+  @spec instance?(term()) :: boolean()
+  def instance?(%__MODULE__{id: id, state: state})
+      when is_binary(id) and byte_size(id) > 0 and is_map(state) and not is_struct(state),
+      do: true
+
+  def instance?(_value), do: false
+
+  @doc "Returns the neutral canonical definition for an Agent value."
+  @spec definition(t()) :: t()
+  def definition(%__MODULE__{} = agent), do: %{agent | id: nil, state: nil}
+
+  @doc "Returns the complete state schema, including Plugin-owned state."
+  @spec complete_schema(t()) :: {:ok, Zoi.schema()} | {:error, Exception.t()}
+  def complete_schema(%__MODULE__{} = agent) do
+    Jido.Plugin.compose_schema(agent.schema, agent.plugins)
+  end
+
+  @doc "Returns the complete state schema or raises its validation error."
+  @spec complete_schema!(t()) :: Zoi.schema() | no_return()
+  def complete_schema!(%__MODULE__{} = agent) do
+    case complete_schema(agent) do
+      {:ok, schema} -> schema
+      {:error, error} -> raise error
+    end
+  end
+
+  @doc "Returns the complete portable Agent value as a map."
+  @spec to_map(t()) :: map()
+  def to_map(%__MODULE__{} = agent) do
+    %{
+      id: agent.id,
+      module: agent.module,
+      name: agent.name,
+      description: agent.description,
+      schema: agent.schema,
+      plugins: agent.plugins,
+      state: agent.state,
+      routes: Enum.map(agent.routes, &route_to_map/1),
+      metadata: agent.metadata
+    }
+  end
+
+  @doc "Builds a domain-only checkpoint through the Agent module callback."
+  @spec checkpoint(t(), map()) :: {:ok, map()} | {:error, term()}
+  def checkpoint(%__MODULE__{} = agent, context \\ %{}) when is_map(context) do
+    with {:ok, agent} <- validate_instance(agent),
+         {:ok, checkpoint} <-
+           invoke_persistence_callback(:checkpoint, fn ->
+             if agent.module != __MODULE__ and function_exported?(agent.module, :checkpoint, 2),
+               do: agent.module.checkpoint(agent, context),
+               else: default_checkpoint(agent, context)
+           end),
+         :ok <- validate_checkpoint_output(checkpoint) do
+      {:ok, checkpoint}
+    end
+  end
+
+  @doc "Restores an Agent through its module callback."
+  @spec restore(module(), map(), map()) :: {:ok, t()} | {:error, term()}
+  def restore(module, checkpoint, context \\ %{})
+      when is_atom(module) and is_map(checkpoint) and is_map(context) do
+    with {:ok, agent} <-
+           invoke_persistence_callback(:restore, fn ->
+             if module != __MODULE__ and function_exported?(module, :restore, 2),
+               do: module.restore(checkpoint, context),
+               else: default_restore(module, checkpoint, context)
+           end),
+         {:ok, agent} <- validate_instance(agent),
+         :ok <- validate_restored_module(agent, module) do
+      {:ok, agent}
+    end
+  end
 
   @doc false
-  @spec config_schema() :: Zoi.schema()
-  def config_schema, do: @agent_config_schema
+  def default_checkpoint(%__MODULE__{} = agent, _context) do
+    {:ok,
+     %{
+       version: @checkpoint_version,
+       kind: :agent,
+       agent_module: agent.module,
+       id: agent.id,
+       definition: definition(agent),
+       state: agent.state
+     }}
+  end
 
-  # Callbacks
+  @doc false
+  def default_restore(module, checkpoint, _context) when is_atom(module) and is_map(checkpoint) do
+    with :ok <- validate_checkpoint(checkpoint, module),
+         {:ok, definition} <- restore_definition(module, checkpoint),
+         {:ok, agent} <-
+           instantiate(definition, id: checkpoint.id, state: Map.fetch!(checkpoint, :state)) do
+      {:ok, agent}
+    end
+  end
+
+  @doc false
+  @spec __definition_from_module__(module(), map() | keyword()) ::
+          {:ok, t()} | {:error, Exception.t()}
+  def __definition_from_module__(module, definition) when is_atom(module) do
+    Validation.definition_from_module(module, definition)
+  end
+
+  @doc false
+  @spec __new_from_module__(module(), map() | keyword(), map() | keyword()) ::
+          {:ok, t()} | {:error, Exception.t()}
+  def __new_from_module__(module, definition, overrides) when is_atom(module) do
+    Validation.new_from_module(module, definition, overrides)
+  end
+
+  @doc false
+  @spec transition(t(), term()) :: {:ok, t()} | {:error, Exception.t()}
+  def transition(%__MODULE__{} = agent, next_state) do
+    with {:ok, agent} <- validate_instance(agent),
+         {:ok, schema} <- complete_schema(agent),
+         {:ok, state} <- State.validate(next_state, schema) do
+      {:ok, %{agent | state: state}}
+    end
+  end
+
+  @doc "Merges domain attributes and validates the complete next Agent state."
+  @spec set(t(), map() | keyword()) :: {:ok, t()} | {:error, Exception.t()}
+  def set(%__MODULE__{} = agent, attrs) do
+    with {:ok, attrs} <- normalize_domain_attrs(attrs),
+         :ok <- validate_domain_attrs(agent, attrs) do
+      transition(agent, State.merge(agent.state, attrs))
+    end
+  end
+
+  @doc "Applies one Signal to an Agent value without starting a Server."
+  @spec cmd(t(), Signal.t(), keyword()) ::
+          {:ok, t(), [struct()]} | {:error, term()}
+  def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts \\ []) when is_list(opts),
+    do: Runner.run(agent, signal, opts)
 
   @doc """
-  Called before command processing. Can transform the agent or action.
-  Must be pure - no side effects. Return `{:ok, agent, action}` to continue.
+  Routes one Signal to exactly one executable turn.
 
-  This hook runs once per `cmd/2` call, with the action as passed (which may be a list).
-  It is not a per-instruction hook.
+  A plain target receives Signal data. A `{target, defaults}` route shallowly
+  merges the defaults with Signal data, with Signal values taking precedence.
+  Both forms require map data. A custom callback can construct its own Turn
+  input instead of using this default routing behavior.
 
-  Use cases:
-  - Mirror action params into agent state (e.g., save last_query before processing)
-  - Add default params that depend on current state
-  - Enforce invariants or guards before execution
+  Route selection failures use `Jido.Error.RoutingError`. When `cmd/3` or the
+  Agent Server invokes a custom callback, a returned Signal routing error is
+  also normalized to this type.
   """
-  @callback on_before_cmd(agent :: t(), action :: term()) ::
-              {:ok, t(), term()}
+  def handle_signal(%Signal{} = signal, %__MODULE__{} = agent),
+    do: Runner.prepare_default_turn(signal, agent)
 
-  @doc """
-  Called after command processing. Can transform the agent or directives.
-  Must be pure - no side effects. Return `{:ok, agent, directives}` to continue.
+  defp normalize_domain_attrs(attrs) when is_map(attrs) and not is_struct(attrs),
+    do: {:ok, attrs}
 
-  Use cases:
-  - Auto-validate state after changes
-  - Derive computed fields
-  - Add invariant checks
-  """
-  @callback on_after_cmd(agent :: t(), action :: term(), directives :: [directive()]) ::
-              {:ok, t(), [directive()]}
-
-  @doc """
-  Returns signal routes for this agent.
-
-  Routes map signal types to action modules. AgentServer uses these routes
-  to map incoming signals to actions for execution via cmd/2.
-
-  ## Route Formats
-
-  - `{path, ActionModule}` - Simple mapping (priority 0)
-  - `{path, ActionModule, priority}` - With priority
-  - `{path, {ActionModule, %{static: params}}}` - With static params
-  - `{path, match_fn, ActionModule}` - With pattern matching
-  - `{path, match_fn, ActionModule, priority}` - Full spec
-
-  ## Context
-
-  The context map currently contains:
-  - `agent_module` - The agent module
-
-  ## Examples
-
-      use Jido.Agent,
-        name: "my_agent",
-        signal_routes: [
-          {"user.created", HandleUserCreatedAction},
-          {"counter.increment", IncrementAction},
-          {"payment.*", fn s -> s.data.amount > 100 end, LargePaymentAction, 10}
-        ]
-  """
-  @callback signal_routes() :: [Jido.Signal.Router.route_spec()]
-  @callback signal_routes(ctx :: map()) :: [Jido.Signal.Router.route_spec()]
-
-  @doc """
-  Serializes the agent for persistence.
-
-  Called by `Jido.Persist.hibernate/2` before writing to storage.
-  The default implementation passes the full agent state through.
-  `Jido.Persist` enforces invariants (e.g., stripping `:__thread__`
-  and storing a pointer) after this callback returns.
-
-  ## Parameters
-
-  - `agent` - The agent to serialize
-  - `ctx` - Context map (may contain jido instance, options)
-
-  ## Returns
-
-  - `{:ok, serializable_data}` - Data to persist
-  - `{:error, reason}` - Serialization failed
-  """
-  @callback checkpoint(agent :: t(), ctx :: map()) :: {:ok, map()} | {:error, term()}
-
-  @doc """
-  Restores an agent from persisted data.
-
-  Called by `Jido.Persist.thaw/3` after loading from storage.
-  The Thread is reattached separately by Persist after restore.
-
-  If not implemented, a default restoration is used that:
-  - Creates a new agent with the persisted id
-  - Merges the persisted state
-
-  ## Parameters
-
-  - `data` - The persisted data (from checkpoint/2)
-  - `ctx` - Context map (may contain jido instance, options)
-
-  ## Returns
-
-  - `{:ok, agent}` - Restored agent (without thread attached)
-  - `{:error, reason}` - Restoration failed
-  """
-  @callback restore(data :: map(), ctx :: map()) :: {:ok, t()} | {:error, term()}
-
-  @optional_callbacks [
-    on_before_cmd: 2,
-    on_after_cmd: 3,
-    signal_routes: 0,
-    signal_routes: 1,
-    checkpoint: 2,
-    restore: 2
-  ]
-
-  # Helper functions that generate quoted code for the __using__ macro.
-  # This approach reduces the size of the main quote block to avoid
-  # "long quote blocks" and "nested too deep" Credo warnings.
-
-  @doc false
-  @spec __quoted_module_setup__() :: Macro.t()
-  def __quoted_module_setup__ do
-    quote location: :keep do
-      @behaviour Jido.Agent
-
-      alias Jido.Agent
-      alias Jido.Agent.Command
-      alias Jido.Agent.State, as: AgentState
-      alias Jido.Agent.Strategy, as: AgentStrategy
-      alias Jido.Plugin.Requirements, as: PluginRequirements
+  defp normalize_domain_attrs(attrs) when is_list(attrs) do
+    if Keyword.keyword?(attrs) do
+      {:ok, Map.new(attrs)}
+    else
+      invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
     end
   end
 
-  @doc false
-  @spec __quoted_basic_accessors__() :: Macro.t()
-  def __quoted_basic_accessors__ do
-    quote location: :keep do
-      @doc "Returns the agent's name."
-      @spec name() :: String.t()
-      def name, do: @validated_opts.name
-
-      @doc "Returns the agent's description."
-      @spec description() :: String.t() | nil
-      def description, do: @validated_opts[:description]
-
-      @doc "Returns the agent's category."
-      @spec category() :: String.t() | nil
-      def category, do: @validated_opts[:category]
-
-      @doc "Returns the agent's tags."
-      @spec tags() :: [String.t()]
-      def tags, do: @validated_opts[:tags] || []
-
-      @doc "Returns the agent's version."
-      @spec vsn() :: String.t() | nil
-      def vsn, do: @validated_opts[:vsn]
-
-      @doc "Returns the merged schema (base + plugin schemas)."
-      @spec schema() :: Zoi.schema() | keyword()
-      def schema, do: @merged_schema
-
-      @doc false
-      @spec __agent_metadata__() :: map()
-      def __agent_metadata__ do
-        %{
-          module: __MODULE__,
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags(),
-          vsn: vsn(),
-          actions: actions(),
-          schema: schema()
-        }
-      end
-    end
+  defp normalize_domain_attrs(attrs) do
+    invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
   end
 
-  @doc false
-  @spec __quoted_plugin_accessors__() :: Macro.t()
-  def __quoted_plugin_accessors__ do
-    basic_plugin_accessors = __quoted_basic_plugin_accessors__()
-    computed_plugin_accessors = __quoted_computed_plugin_accessors__()
-
-    quote location: :keep do
-      unquote(basic_plugin_accessors)
-      unquote(computed_plugin_accessors)
-    end
-  end
-
-  defp __quoted_basic_plugin_accessors__ do
-    quote location: :keep do
-      @doc """
-      Returns the list of plugin modules attached to this agent (deduplicated).
-
-      For multi-instance plugins, the module appears once regardless of how many
-      instances are mounted.
-
-      ## Example
-
-          MyAgent.plugins()
-          # => [MyApp.SlackPlugin, MyApp.OpenAIPlugin]
-      """
-      @spec plugins() :: [module()]
-      def plugins do
-        @plugin_instances
-        |> Enum.map(& &1.module)
-        |> Enum.uniq()
-      end
-
-      @doc "Returns the list of plugin specs attached to this agent."
-      @spec plugin_specs() :: [Jido.Plugin.Spec.t()]
-      def plugin_specs, do: @plugin_specs
-
-      @doc "Returns the list of plugin instances attached to this agent."
-      @spec plugin_instances() :: [Jido.Plugin.Instance.t()]
-      def plugin_instances, do: @plugin_instances
-
-      @doc "Returns the list of actions from all attached plugins."
-      @spec actions() :: [module()]
-      def actions, do: @plugin_actions
-    end
-  end
-
-  defp __quoted_computed_plugin_accessors__ do
-    quote location: :keep do
-      @doc """
-      Returns the union of all capabilities from all mounted plugin instances.
-
-      Capabilities are atoms describing what the agent can do based on its
-      mounted plugins.
-
-      ## Example
-
-          MyAgent.capabilities()
-          # => [:messaging, :channel_management, :chat, :embeddings]
-      """
-      @spec capabilities() :: [atom()]
-      def capabilities do
-        @plugin_instances
-        |> Enum.flat_map(fn instance -> instance.manifest.capabilities || [] end)
-        |> Enum.uniq()
-      end
-
-      @doc """
-      Returns all expanded route signal types from plugin routes.
-
-      These are the fully-prefixed signal types that the agent can handle.
-
-      ## Example
-
-          MyAgent.signal_types()
-          # => ["slack.post", "slack.channels.list", "openai.chat"]
-      """
-      @spec signal_types() :: [String.t()]
-      def signal_types do
-        @validated_plugin_routes
-        |> Enum.map(fn {signal_type, _action, _priority} -> signal_type end)
-      end
-
-      @doc "Returns the expanded and validated plugin routes."
-      @spec plugin_routes() :: [{String.t(), module(), integer()}]
-      def plugin_routes, do: @validated_plugin_routes
-
-      @doc "Returns the expanded plugin and agent schedules."
-      @spec plugin_schedules() :: [
-              Jido.Plugin.Schedules.schedule_spec() | Jido.Agent.Schedules.schedule_spec()
-            ]
-      def plugin_schedules, do: @expanded_plugin_schedules ++ @expanded_agent_schedules
-    end
-  end
-
-  @doc false
-  @spec __quoted_plugin_config_accessors__() :: Macro.t()
-  def __quoted_plugin_config_accessors__ do
-    plugin_config_public = __quoted_plugin_config_public__()
-    plugin_config_helpers = __quoted_plugin_config_helpers__()
-    plugin_state_public = __quoted_plugin_state_public__()
-    plugin_state_helpers = __quoted_plugin_state_helpers__()
-
-    quote location: :keep do
-      unquote(plugin_config_public)
-      unquote(plugin_config_helpers)
-      unquote(plugin_state_public)
-      unquote(plugin_state_helpers)
-    end
-  end
-
-  defp __quoted_plugin_config_public__ do
-    quote location: :keep do
-      @doc """
-      Returns the configuration for a specific plugin.
-
-      Accepts either a module or a `{module, as_alias}` tuple for multi-instance plugins.
-      """
-      @spec plugin_config(module() | {module(), atom()}) :: map() | nil
-      def plugin_config(plugin_mod) when is_atom(plugin_mod) do
-        __find_plugin_config_by_module__(plugin_mod)
-      end
-
-      def plugin_config({plugin_mod, as_alias}) when is_atom(plugin_mod) and is_atom(as_alias) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod and &1.as == as_alias)) do
-          nil -> nil
-          instance -> instance.config
-        end
-      end
-    end
-  end
-
-  defp __quoted_plugin_config_helpers__ do
-    quote location: :keep do
-      defp __find_plugin_config_by_module__(plugin_mod) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod and is_nil(&1.as))) do
-          nil -> __find_plugin_config_fallback__(plugin_mod)
-          instance -> instance.config
-        end
-      end
-
-      defp __find_plugin_config_fallback__(plugin_mod) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod)) do
-          nil -> nil
-          instance -> instance.config
-        end
-      end
-    end
-  end
-
-  defp __quoted_plugin_state_public__ do
-    quote location: :keep do
-      @doc """
-      Returns the state slice for a specific plugin.
-
-      Accepts either a module or a `{module, as_alias}` tuple for multi-instance plugins.
-      """
-      @spec plugin_state(Agent.t(), module() | {module(), atom()}) :: map() | nil
-      def plugin_state(agent, plugin_mod) when is_atom(plugin_mod) do
-        __find_plugin_state_by_module__(agent, plugin_mod)
-      end
-
-      def plugin_state(agent, {plugin_mod, as_alias})
-          when is_atom(plugin_mod) and is_atom(as_alias) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod and &1.as == as_alias)) do
-          nil -> nil
-          instance -> Map.get(agent.state, instance.state_key)
-        end
-      end
-    end
-  end
-
-  defp __quoted_plugin_state_helpers__ do
-    quote location: :keep do
-      defp __find_plugin_state_by_module__(agent, plugin_mod) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod and is_nil(&1.as))) do
-          nil -> __find_plugin_state_fallback__(agent, plugin_mod)
-          instance -> Map.get(agent.state, instance.state_key)
-        end
-      end
-
-      defp __find_plugin_state_fallback__(agent, plugin_mod) do
-        case Enum.find(@plugin_instances, &(&1.module == plugin_mod)) do
-          nil -> nil
-          instance -> Map.get(agent.state, instance.state_key)
-        end
-      end
-    end
-  end
-
-  @doc false
-  @spec __quoted_strategy_accessors__() :: Macro.t()
-  def __quoted_strategy_accessors__ do
-    quote location: :keep do
-      @doc "Returns the execution strategy module for this agent."
-      @spec strategy() :: module()
-      def strategy do
-        case @validated_opts[:strategy] do
-          {mod, _opts} -> mod
-          mod -> mod
-        end
-      end
-
-      @doc "Returns the strategy options for this agent."
-      @spec strategy_opts() :: keyword()
-      def strategy_opts do
-        case @validated_opts[:strategy] do
-          {_mod, opts} -> opts
-          _ -> []
-        end
-      end
-    end
-  end
-
-  @doc false
-  @spec __quoted_new_function__() :: Macro.t()
-  def __quoted_new_function__ do
-    new_fn = __quoted_new_fn_definition__()
-    mount_plugins_fn = __quoted_mount_plugins_definition__()
-
-    quote location: :keep do
-      unquote(new_fn)
-      unquote(mount_plugins_fn)
-    end
-  end
-
-  defp __quoted_new_fn_definition__ do
-    quote location: :keep do
-      @doc """
-      Creates a new agent with optional initial state.
-
-      The agent is fully initialized including strategy state. For the default
-      Direct strategy, this is a no-op. For custom strategies, any state
-      initialization is applied (but directives are only processed by AgentServer).
-
-      ## Examples
-
-          agent = #{inspect(__MODULE__)}.new()
-          agent = #{inspect(__MODULE__)}.new(id: "custom-id")
-          agent = #{inspect(__MODULE__)}.new(state: %{counter: 10})
-      """
-      @spec new(keyword() | map()) :: Agent.t()
-      def new(opts \\ []) do
-        opts = if is_list(opts), do: Map.new(opts), else: opts
-
-        initial_state = __build_initial_state__(opts)
-
-        id =
-          case opts[:id] do
-            nil -> Jido.Util.generate_id()
-            "" -> Jido.Util.generate_id()
-            id when is_binary(id) -> id
-            other -> to_string(other)
-          end
-
-        agent = %Agent{
-          id: id,
-          agent_module: __MODULE__,
-          name: name(),
-          description: description(),
-          category: category(),
-          tags: tags(),
-          vsn: vsn(),
-          schema: schema(),
-          state: initial_state
-        }
-
-        # Run plugin mount hooks (pure initialization)
-        agent = __mount_plugins__(agent)
-
-        # Run strategy initialization (directives are dropped here;
-        # AgentServer handles init directives separately)
-        ctx = __strategy_ctx__()
-        {initialized_agent, _directives} = strategy().init(agent, ctx)
-        initialized_agent
-      end
-
-      defp __build_initial_state__(opts) do
-        # Build initial state from base schema defaults
-        base_defaults = AgentState.defaults_from_schema(@validated_opts[:schema])
-
-        # Build plugin defaults nested under their state_keys
-        # Skip plugins with nil schema (they manage their own state lifecycle)
-        plugin_defaults =
-          @plugin_specs
-          |> Enum.reject(fn spec -> spec.schema == nil end)
-          |> Enum.map(fn spec ->
-            plugin_state_defaults = AgentState.defaults_from_schema(spec.schema)
-            {spec.state_key, plugin_state_defaults}
-          end)
-          |> Map.new()
-
-        # Merge: base defaults + plugin defaults + provided state
-        schema_defaults = Map.merge(base_defaults, plugin_defaults)
-        Map.merge(schema_defaults, opts[:state] || %{})
-      end
-    end
-  end
-
-  defp __quoted_mount_plugins_definition__ do
-    quote location: :keep do
-      defp __mount_plugins__(agent) do
-        Enum.reduce(@plugin_specs, agent, fn spec, agent_acc ->
-          __mount_single_plugin__(agent_acc, spec)
-        end)
-      end
-
-      defp __mount_single_plugin__(agent_acc, spec) do
-        mod = spec.module
-        config = spec.config || %{}
-
-        case mod.mount(agent_acc, config) do
-          {:ok, plugin_state} when is_map(plugin_state) ->
-            current_plugin_state = Map.get(agent_acc.state, spec.state_key, %{})
-            merged_plugin_state = Map.merge(current_plugin_state, plugin_state)
-            new_state = Map.put(agent_acc.state, spec.state_key, merged_plugin_state)
-            %{agent_acc | state: new_state}
-
-          {:ok, nil} ->
-            agent_acc
-
-          {:error, reason} ->
-            raise Jido.Error.internal_error(
-                    "Plugin mount failed for #{inspect(mod)}",
-                    %{plugin: mod, reason: reason}
-                  )
-        end
-      end
-    end
-  end
-
-  @doc false
-  @spec __quoted_cmd_function__() :: Macro.t()
-  def __quoted_cmd_function__ do
-    quote location: :keep do
-      @doc """
-      Execute actions against the agent: `(agent, action) -> {agent, directives}`
-
-      This is the core operation. Actions modify state and may perform required
-      work; directives are runtime-owned external effects.
-      Execution is delegated to the configured strategy (default: Direct).
-
-      ## Action Formats
-
-        * `MyAction` - Action module with no params
-        * `{MyAction, %{param: 1}}` - Action with params
-        * `{MyAction, %{param: 1}, %{context: data}}` - Action with params and context
-        * `{MyAction, %{param: 1}, %{}, [timeout: 1000]}` - Action with opts
-        * `%Jido.Agent.Command{}` - Full Agent command
-        * `%Jido.Instruction{}` - Executable invocation imported as an Agent command
-        * `[...]` - List of any of the above (processed in sequence)
-
-      ## Options
-
-      The optional third argument `opts` is a keyword list merged into all commands:
-
-        * `:timeout` - Maximum time (in ms) for each action to complete
-
-      ## Examples
-
-          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction)
-          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, {MyAction, %{value: 42}})
-          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, [Action1, Action2])
-
-          # With per-call options (merged into all instructions)
-          {agent, directives} = #{inspect(__MODULE__)}.cmd(agent, MyAction, timeout: 5000)
-      """
-      @spec cmd(Agent.t(), Agent.action()) :: Agent.cmd_result()
-      def cmd(%Agent{} = agent, action), do: cmd(agent, action, [])
-
-      @spec cmd(Agent.t(), Agent.action(), keyword()) :: Agent.cmd_result()
-      def cmd(%Agent{} = agent, action, opts) when is_list(opts) do
-        {:ok, agent, action} = on_before_cmd(agent, action)
-
-        jido_instance = Keyword.get(opts, :__jido_instance__)
-        partition = Keyword.get(opts, :__partition__, Map.get(agent.state, :__partition__))
-        action_exec_defaults = Keyword.get(opts, :__jido_action_exec_defaults__, [])
-        signal = Keyword.get(opts, :__jido_signal__)
-
-        action_context =
-          opts
-          |> Keyword.get(:__jido_action_context__, %{})
-          |> __normalize_internal_action_context__()
-
-        command_opts =
-          opts
-          |> Keyword.delete(:__jido_instance__)
-          |> Keyword.delete(:__partition__)
-          |> Keyword.delete(:__jido_action_exec_defaults__)
-          |> Keyword.delete(:__jido_signal__)
-          |> Keyword.delete(:__jido_action_context__)
-
-        base_context =
-          if signal do
-            %{state: agent.state, signal: signal}
-          else
-            %{state: agent.state}
-          end
-
-        command_context = Map.merge(action_context, base_context)
-
-        case Command.normalize(action, command_context, command_opts) do
-          {:ok, commands} ->
-            ctx = __strategy_ctx__(jido_instance, partition)
-            strat = strategy()
-
-            normalized_commands =
-              Enum.map(commands, fn command ->
-                strat
-                |> AgentStrategy.normalize_command(command, ctx)
-                |> Command.put_exec_defaults(action_exec_defaults)
-              end)
-
-            {agent, directives} = strat.cmd(agent, normalized_commands, ctx)
-            __do_after_cmd__(agent, action, directives)
-
-          {:error, reason} ->
-            error = Jido.Error.validation_error("Invalid action", %{reason: reason})
-            {agent, [%Jido.Agent.Directive.Error{error: error, context: :normalize}]}
-        end
-      end
-
-      defp __normalize_internal_action_context__(context) when is_map(context) do
-        Map.drop(context, [
-          :state,
-          :signal,
-          :agent,
-          :agent_server_pid,
-          :input_signal,
-          :directive,
-          :dispatch
-        ])
-      end
-
-      defp __normalize_internal_action_context__(_context), do: %{}
-    end
-  end
-
-  @doc false
-  @spec __quoted_utility_functions__() :: Macro.t()
-  def __quoted_utility_functions__ do
-    quote location: :keep do
-      @doc """
-      Returns a stable, public view of the strategy's execution state.
-
-      Use this instead of inspecting `agent.state.__strategy__` directly.
-      Returns a `Jido.Agent.Strategy.Snapshot` struct with:
-      - `status` - Coarse execution status
-      - `done?` - Whether strategy reached terminal state
-      - `result` - Main output if any
-      - `details` - Additional strategy-specific metadata
-      """
-      @spec strategy_snapshot(Agent.t()) :: Jido.Agent.Strategy.Snapshot.t()
-      def strategy_snapshot(%Agent{} = agent) do
-        ctx = __strategy_ctx__(nil, Map.get(agent.state, :__partition__))
-        strategy().snapshot(agent, ctx)
-      end
-
-      @doc """
-      Updates the agent's state by merging new attributes.
-
-      Uses deep merge semantics - nested maps are merged recursively.
-
-      ## Examples
-
-          {:ok, agent} = #{inspect(__MODULE__)}.set(agent, %{status: :running})
-          {:ok, agent} = #{inspect(__MODULE__)}.set(agent, counter: 5)
-      """
-      @spec set(Agent.t(), map() | keyword()) :: Agent.agent_result()
-      def set(%Agent{} = agent, attrs) do
-        new_state = AgentState.merge(agent.state, Map.new(attrs))
-        {:ok, %{agent | state: new_state}}
-      end
-
-      @doc """
-      Validates the agent's state against its schema.
-
-      ## Options
-        * `:strict` - When true, only schema-defined fields are kept (default: false)
-
-      ## Examples
-
-          {:ok, agent} = #{inspect(__MODULE__)}.validate(agent)
-          {:ok, agent} = #{inspect(__MODULE__)}.validate(agent, strict: true)
-      """
-      @spec validate(Agent.t(), keyword()) :: Agent.agent_result()
-      def validate(%Agent{} = agent, opts \\ []) do
-        case AgentState.validate(agent.state, agent.schema, opts) do
-          {:ok, validated_state} ->
-            {:ok, %{agent | state: validated_state}}
-
-          {:error, reason} ->
-            {:error, Jido.Error.validation_error("State validation failed", %{reason: reason})}
-        end
-      end
-    end
-  end
-
-  @doc false
-  @spec __quoted_callbacks__() :: Macro.t()
-  def __quoted_callbacks__ do
-    before_after = __quoted_callback_before_after__()
-    routes = __quoted_callback_routes__()
-    checkpoint = __quoted_callback_checkpoint__()
-    restore = __quoted_callback_restore__()
-    overridables = __quoted_callback_overridables__()
-    helpers = __quoted_callback_helpers__()
-
-    quote location: :keep do
-      unquote(before_after)
-      unquote(routes)
-      unquote(checkpoint)
-      unquote(restore)
-      unquote(overridables)
-      unquote(helpers)
-    end
-  end
-
-  defp __quoted_callback_before_after__ do
-    quote location: :keep do
-      # Default callback implementations
-
-      @impl true
-      @spec on_before_cmd(Agent.t(), Agent.action()) :: {:ok, Agent.t(), Agent.action()}
-      def on_before_cmd(agent, action), do: {:ok, agent, action}
-
-      @impl true
-      @spec on_after_cmd(Agent.t(), Agent.action(), [Agent.directive()]) ::
-              {:ok, Agent.t(), [Agent.directive()]}
-      def on_after_cmd(agent, _action, directives), do: {:ok, agent, directives}
-    end
-  end
-
-  defp __quoted_callback_routes__ do
-    quote location: :keep do
-      @impl true
-      @spec signal_routes() :: list()
-      def signal_routes, do: @expanded_signal_routes
-
-      @impl true
-      @spec signal_routes(map()) :: list()
-      def signal_routes(_ctx), do: signal_routes()
-    end
-  end
-
-  defp __quoted_callback_checkpoint__ do
-    quote location: :keep do
-      @impl true
-      def checkpoint(agent, ctx) do
-        {state, externalized, externalized_keys} =
-          Enum.reduce(@plugin_instances, {agent.state, %{}, %{}}, fn instance,
-                                                                     {state_acc, ext_acc,
-                                                                      keys_acc} ->
-            plugin_state = Map.get(state_acc, instance.state_key)
-            config = instance.config || %{}
-
-            case instance.module.on_checkpoint(plugin_state, Map.put(ctx, :config, config)) do
-              {:externalize, key, pointer} ->
-                {Map.delete(state_acc, instance.state_key), Map.put(ext_acc, key, pointer),
-                 Map.put(keys_acc, key, instance.state_key)}
-
-              :drop ->
-                {Map.delete(state_acc, instance.state_key), ext_acc, keys_acc}
-
-              :keep ->
-                {state_acc, ext_acc, keys_acc}
-            end
-          end)
-
-        base = %{
-          version: 1,
-          agent_module: __MODULE__,
-          id: agent.id,
-          state: state
-        }
-
-        base =
-          if externalized_keys == %{},
-            do: base,
-            else: Map.put(base, :externalized_keys, externalized_keys)
-
-        {:ok, Map.merge(base, externalized)}
-      end
-    end
-  end
-
-  defp __quoted_callback_restore__ do
-    quote location: :keep do
-      @impl true
-      def restore(data, ctx) do
-        data = normalize_keys(data)
-        agent = new(id: data[:id])
-        base_state = data[:state] || %{}
-        agent = %{agent | state: Map.merge(agent.state, base_state)}
-        externalized_keys = data[:externalized_keys] || %{}
-
-        Enum.reduce_while(@plugin_instances, {:ok, agent}, fn instance, {:ok, acc} ->
-          config = instance.config || %{}
-          restore_ctx = Map.put(ctx, :config, config)
-
-          ext_key =
-            Enum.find_value(externalized_keys, fn {k, v} ->
-              if v == instance.state_key, do: k
-            end)
-
-          pointer = if ext_key, do: data[ext_key]
-
-          if pointer do
-            case instance.module.on_restore(pointer, restore_ctx) do
-              {:ok, nil} ->
-                {:cont, {:ok, acc}}
-
-              {:ok, restored_state} ->
-                {:cont,
-                 {:ok, %{acc | state: Map.put(acc.state, instance.state_key, restored_state)}}}
-
-              {:error, reason} ->
-                {:halt, {:error, reason}}
-            end
-          else
-            {:cont, {:ok, acc}}
-          end
-        end)
-      end
-
-      defp normalize_keys(map) when is_map(map) do
-        Map.new(map, fn
-          {k, v} when is_binary(k) -> {existing_atom_or_original(k), v}
-          pair -> pair
-        end)
-      end
-
-      defp existing_atom_or_original(key) do
-        String.to_existing_atom(key)
-      rescue
-        ArgumentError -> key
-      end
-    end
-  end
-
-  defp __quoted_callback_overridables__ do
-    quote location: :keep do
-      defoverridable on_before_cmd: 2,
-                     on_after_cmd: 3,
-                     checkpoint: 2,
-                     restore: 2,
-                     signal_routes: 0,
-                     signal_routes: 1,
-                     name: 0,
-                     description: 0,
-                     category: 0,
-                     tags: 0,
-                     vsn: 0,
-                     schema: 0,
-                     strategy: 0,
-                     strategy_opts: 0,
-                     plugins: 0,
-                     plugin_specs: 0,
-                     plugin_instances: 0,
-                     actions: 0,
-                     capabilities: 0,
-                     signal_types: 0,
-                     plugin_config: 1,
-                     plugin_state: 2,
-                     plugin_routes: 0,
-                     plugin_schedules: 0
-    end
-  end
-
-  defp __quoted_callback_helpers__ do
-    quote location: :keep do
-      defp __strategy_ctx__(jido_instance \\ nil, partition \\ nil) do
-        %{
-          agent_module: __MODULE__,
-          strategy_opts: strategy_opts(),
-          jido_instance: jido_instance,
-          partition: partition
-        }
-      end
-
-      # Private helper for after hook dispatch
-      defp __do_after_cmd__(agent, msg, directives) do
-        {:ok, agent, directives} = on_after_cmd(agent, msg, directives)
-        {agent, directives}
-      end
-    end
-  end
-
-  defmacro __using__(opts) do
-    # Get the quoted blocks from helper functions
-    module_setup = Agent.__quoted_module_setup__()
-    basic_accessors = Agent.__quoted_basic_accessors__()
-    plugin_accessors = Agent.__quoted_plugin_accessors__()
-    plugin_config_accessors = Agent.__quoted_plugin_config_accessors__()
-    strategy_accessors = Agent.__quoted_strategy_accessors__()
-    new_function = Agent.__quoted_new_function__()
-    cmd_function = Agent.__quoted_cmd_function__()
-    utility_functions = Agent.__quoted_utility_functions__()
-    callbacks = Agent.__quoted_callbacks__()
-
-    # Build compile-time validation and module attributes as a separate smaller block
-    compile_time_setup =
-      quote location: :keep do
-        # Validate config at compile time
-        @validated_opts (case Zoi.parse(Agent.config_schema(), Map.new(unquote(opts))) do
-                           {:ok, validated} ->
-                             validated
-
-                           {:error, errors} ->
-                             message =
-                               "Invalid Agent configuration for #{inspect(__MODULE__)}: #{inspect(errors)}"
-
-                             raise CompileError,
-                               description: message,
-                               file: __ENV__.file,
-                               line: __ENV__.line
-                         end)
-
-        Jido.Action.ensure_static_schema!(@validated_opts[:schema], :schema, __ENV__)
-
-        @expanded_signal_routes Jido.Agent.expand_and_eval_literal_option(
-                                  @validated_opts[:signal_routes] || [],
-                                  __ENV__
-                                )
-
-        @default_plugin_list Jido.Agent.__resolve_default_plugins__(@validated_opts)
-        @all_plugin_decls @default_plugin_list ++ (@validated_opts[:plugins] || [])
-        @plugin_instances Jido.Agent.__normalize_plugin_instances__(@all_plugin_decls)
-
-        @singleton_alias_violations @plugin_instances
-                                    |> Enum.filter(fn inst ->
-                                      inst.module.singleton?() and inst.as != nil
-                                    end)
-        if @singleton_alias_violations != [] do
-          modules =
-            Enum.map(@singleton_alias_violations, & &1.module) |> Enum.map(&inspect/1)
-
-          raise CompileError,
-            description: "Cannot alias singleton plugins: #{Enum.join(modules, ", ")}",
-            file: __ENV__.file,
-            line: __ENV__.line
+  defp validate_domain_attrs(agent, attrs) do
+    case agent.schema do
+      %Zoi.Types.Map{fields: fields} ->
+        invalid_keys = Map.keys(attrs) -- Keyword.keys(fields)
+
+        if invalid_keys == [] do
+          :ok
+        else
+          {:error,
+           Error.validation_error("Agent.set/2 accepts only domain state keys",
+             details: %{keys: invalid_keys}
+           )}
         end
 
-        @singleton_modules @plugin_instances
-                           |> Enum.filter(fn inst -> inst.module.singleton?() end)
-                           |> Enum.map(& &1.module)
-        @duplicate_singletons @singleton_modules -- Enum.uniq(@singleton_modules)
-        if @duplicate_singletons != [] do
-          raise CompileError,
-            description:
-              "Duplicate singleton plugins: #{inspect(Enum.uniq(@duplicate_singletons))}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Build plugin specs from instances (for backward compatibility)
-        @plugin_specs Enum.map(@plugin_instances, fn instance ->
-                        spec = instance.module.plugin_spec(instance.config)
-                        %{spec | state_key: instance.state_key}
-                      end)
-
-        # Validate unique state_keys (now derived from instances)
-        @plugin_state_keys Enum.map(@plugin_instances, & &1.state_key)
-        @duplicate_keys @plugin_state_keys -- Enum.uniq(@plugin_state_keys)
-        if @duplicate_keys != [] do
-          raise CompileError,
-            description: "Duplicate plugin state_keys: #{inspect(@duplicate_keys)}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Validate no collision with base schema keys
-        @base_schema_keys (case @validated_opts[:schema] do
-                             [] -> []
-                             %Zoi.Types.Map{fields: fields} -> Keyword.keys(fields)
-                           end)
-        @colliding_keys Enum.filter(@plugin_state_keys, &(&1 in @base_schema_keys))
-        if @colliding_keys != [] do
-          raise CompileError,
-            description:
-              "Plugin state_keys collide with agent schema: #{inspect(@colliding_keys)}",
-            file: __ENV__.file,
-            line: __ENV__.line
-        end
-
-        # Merge schemas: base schema + nested plugin schemas
-        @plugin_schema_fields @plugin_specs
-                              |> Enum.reject(&is_nil(&1.schema))
-                              |> Map.new(&{&1.state_key, &1.schema})
-
-        @plugin_schema (case @plugin_specs do
-                          [] -> nil
-                          _plugins -> Zoi.object(@plugin_schema_fields)
-                        end)
-
-        @merged_schema (case {@validated_opts[:schema], @plugin_schema} do
-                          {[], nil} -> []
-                          {[], plugin_schema} -> plugin_schema
-                          {base_schema, nil} -> base_schema
-                          {base_schema, plugin_schema} -> Zoi.extend(base_schema, plugin_schema)
-                        end)
-
-        # Aggregate actions from plugins
-        @plugin_actions @plugin_specs |> Enum.flat_map(& &1.actions) |> Enum.uniq()
-
-        # Expand routes from all plugin instances
-        @expanded_plugin_routes Enum.flat_map(
-                                  @plugin_instances,
-                                  &Jido.Plugin.Routes.expand_routes/1
-                                )
-
-        # Expand schedules from all plugin instances
-        @expanded_plugin_schedules Enum.flat_map(
-                                     @plugin_instances,
-                                     &Jido.Plugin.Schedules.expand_schedules/1
-                                   )
-
-        # Generate routes for schedule signal types (low priority)
-        @schedule_routes Enum.flat_map(
-                           @plugin_instances,
-                           &Jido.Plugin.Schedules.schedule_routes/1
-                         )
-
-        # Expand agent-level schedules from the `schedules:` option
-        @expanded_agent_schedules Jido.Agent.Schedules.expand_schedules(
-                                    @validated_opts[:schedules] || [],
-                                    @validated_opts[:name]
-                                  )
-
-        # Generate routes for agent schedule signal types
-        @agent_schedule_routes Jido.Agent.Schedules.schedule_routes(@expanded_agent_schedules)
-
-        # Combine routes and schedule routes for conflict detection
-        @all_plugin_routes @expanded_plugin_routes ++ @schedule_routes ++ @agent_schedule_routes
-
-        @plugin_routes_result Jido.Plugin.Routes.detect_conflicts(@all_plugin_routes)
-        case @plugin_routes_result do
-          {:error, conflicts} ->
-            conflict_list = Enum.join(conflicts, "\n  - ")
-
-            raise CompileError,
-              description: "Route conflicts detected:\n  - #{conflict_list}",
-              file: __ENV__.file,
-              line: __ENV__.line
-
-          {:ok, _routes} ->
-            :ok
-        end
-
-        @validated_plugin_routes elem(@plugin_routes_result, 1)
-
-        # Validate plugin requirements at compile time
-        @plugin_config_map Map.new(@plugin_instances, fn instance ->
-                             {instance.state_key, instance.config}
-                           end)
-        @requirements_result Jido.Plugin.Requirements.validate_all_requirements(
-                               @plugin_instances,
-                               @plugin_config_map
-                             )
-        case @requirements_result do
-          {:error, missing_by_plugin} ->
-            error_msg = PluginRequirements.format_error(missing_by_plugin)
-
-            raise CompileError,
-              description: error_msg,
-              file: __ENV__.file,
-              line: __ENV__.line
-
-          {:ok, :valid} ->
-            :ok
-        end
-      end
-
-    # Combine all blocks using unquote
-    quote location: :keep do
-      unquote(module_setup)
-      unquote(compile_time_setup)
-      unquote(basic_accessors)
-      unquote(plugin_accessors)
-      unquote(plugin_config_accessors)
-      unquote(strategy_accessors)
-      unquote(new_function)
-      unquote(cmd_function)
-      unquote(utility_functions)
-      unquote(callbacks)
+      _schema ->
+        {:error, Error.validation_error("Agent domain schema must be a Zoi object")}
     end
   end
 
-  @doc false
-  @spec __normalize_plugin_instances__([module() | {module(), map()}]) :: [PluginInstance.t()]
-  def __normalize_plugin_instances__(plugins) do
-    Enum.map(plugins, &__validate_and_create_plugin_instance__/1)
+  defp route_to_map(%Router.Route{} = route) do
+    %{path: route.path, target: route.target, priority: route.priority, match: route.match}
   end
 
-  @doc false
-  @spec __resolve_default_plugins__(map()) :: [module() | {module(), map()}]
-  def __resolve_default_plugins__(agent_opts) do
-    jido_module = agent_opts[:jido]
-
-    base_defaults =
-      if jido_module != nil and function_exported?(jido_module, :__default_plugins__, 0) do
-        jido_module.__default_plugins__()
-      else
-        Jido.Agent.DefaultPlugins.package_defaults()
-      end
-
-    Jido.Agent.DefaultPlugins.apply_agent_overrides(base_defaults, agent_opts[:default_plugins])
+  defp invoke_persistence_callback(callback, fun) do
+    case fun.() do
+      {:ok, value} -> {:ok, value}
+      {:error, reason} -> {:error, reason}
+      value -> {:error, {callback, :invalid_return, value}}
+    end
+  rescue
+    error -> {:error, {callback, :raised, error}}
+  catch
+    kind, reason -> {:error, {callback, kind, reason}}
   end
 
-  defp __validate_and_create_plugin_instance__(plugin_decl) do
-    mod = __extract_plugin_module__(plugin_decl)
-    __validate_plugin_module__(mod)
-    PluginInstance.new(plugin_decl)
-  end
+  defp validate_checkpoint(checkpoint, module) do
+    cond do
+      Map.get(checkpoint, :version) != @checkpoint_version ->
+        invalid("Agent checkpoint version is invalid", %{version: Map.get(checkpoint, :version)})
 
-  defp __extract_plugin_module__(m) when is_atom(m), do: m
-  defp __extract_plugin_module__({m, _}), do: m
+      Map.get(checkpoint, :kind) != :agent ->
+        invalid("Agent checkpoint kind is invalid", %{kind: Map.get(checkpoint, :kind)})
 
-  defp __validate_plugin_module__(mod) do
-    case Code.ensure_compiled(mod) do
-      {:module, _} -> __validate_plugin_behaviour__(mod)
-      {:error, reason} -> __raise_plugin_compile_error__(mod, reason)
+      Map.get(checkpoint, :agent_module) != module ->
+        invalid("Agent checkpoint module does not match", %{
+          expected: module,
+          actual: Map.get(checkpoint, :agent_module)
+        })
+
+      not is_binary(Map.get(checkpoint, :id)) or Map.get(checkpoint, :id) == "" ->
+        invalid("Agent checkpoint id is invalid", %{id: Map.get(checkpoint, :id)})
+
+      not is_map(Map.get(checkpoint, :state)) ->
+        invalid("Agent checkpoint state must be a map", %{state: Map.get(checkpoint, :state)})
+
+      true ->
+        :ok
     end
   end
 
-  defp __validate_plugin_behaviour__(mod) do
-    unless function_exported?(mod, :plugin_spec, 1) do
-      raise CompileError,
-        description: "#{inspect(mod)} does not implement Jido.Plugin (missing plugin_spec/1)"
+  defp validate_checkpoint_output(checkpoint)
+       when is_map(checkpoint) and not is_struct(checkpoint),
+       do: :ok
+
+  defp validate_checkpoint_output(checkpoint) do
+    invalid("Agent checkpoint callback must return a map", %{checkpoint: checkpoint})
+  end
+
+  defp validate_restored_module(%__MODULE__{module: module}, module), do: :ok
+
+  defp validate_restored_module(%__MODULE__{} = agent, module) do
+    invalid("Restored Agent module does not match", %{
+      expected: module,
+      actual: agent.module
+    })
+  end
+
+  defp restore_definition(__MODULE__, checkpoint) do
+    case Map.get(checkpoint, :definition) do
+      %__MODULE__{} = definition ->
+        validate_definition(definition)
+
+      %{} = definition ->
+        definition
+        |> Map.take([:module, :name, :description, :schema, :plugins, :routes, :metadata])
+        |> new()
+
+      value ->
+        invalid("Agent checkpoint definition is invalid", %{definition: value})
     end
   end
 
-  defp __raise_plugin_compile_error__(mod, reason) do
-    raise CompileError,
-      description: "Plugin #{inspect(mod)} could not be compiled: #{inspect(reason)}"
-  end
-
-  # Base module functions (for direct use without `use`)
-
-  @doc """
-  Creates a new agent from attributes.
-
-  For module-based agents, use `MyAgent.new/1` instead.
-  """
-  @spec new(map() | keyword()) :: {:ok, t()} | {:error, term()}
-  def new(attrs) when is_list(attrs), do: new(Map.new(attrs))
-
-  def new(attrs) when is_map(attrs) do
-    attrs_with_id = normalize_agent_id(attrs)
-
-    case Zoi.parse(@schema, attrs_with_id) do
-      {:ok, agent} ->
-        {:ok, agent}
-
-      {:error, errors} ->
-        {:error, Error.validation_error("Agent validation failed", %{errors: errors})}
+  defp restore_definition(module, _checkpoint) do
+    case module.agent() do
+      %__MODULE__{} = definition -> validate_definition(definition)
+      value -> invalid("Agent definition callback returned an invalid value", %{value: value})
     end
   end
 
-  @doc """
-  Updates agent state by merging new attributes.
-  """
-  @spec set(t(), map() | keyword()) :: agent_result()
-  def set(%Agent{} = agent, attrs) do
-    new_state = StateHelper.merge(agent.state, Map.new(attrs))
-    {:ok, %{agent | state: new_state}}
-  end
-
-  @doc """
-  Validates agent state against its schema.
-  """
-  @spec validate(t(), keyword()) :: agent_result()
-  def validate(%Agent{} = agent, opts \\ []) do
-    case StateHelper.validate(agent.state, agent.schema, opts) do
-      {:ok, validated_state} ->
-        {:ok, %{agent | state: validated_state}}
-
-      {:error, reason} ->
-        {:error, Error.validation_error("State validation failed", %{reason: reason})}
-    end
-  end
-
-  defp normalize_agent_id(attrs) do
-    case Map.get(attrs, :id) do
-      nil -> Map.put(attrs, :id, Jido.Util.generate_id())
-      "" -> Map.put(attrs, :id, Jido.Util.generate_id())
-      _ -> attrs
-    end
+  defp invalid(message, details) do
+    {:error, Error.validation_error(message, kind: :config, details: details)}
   end
 end

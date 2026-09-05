@@ -100,7 +100,7 @@ defmodule JidoExampleTest.ObservabilityTest do
           %{last_result: result}
         end
       )
-      |> then(&{:ok, &1})
+      |> then(&{:ok, Map.merge(context.agent_state, &1)})
     end
   end
 
@@ -128,7 +128,7 @@ defmodule JidoExampleTest.ObservabilityTest do
         end)
 
       result = Task.await(task)
-      {:ok, %{async_result: result}}
+      {:ok, %{context.agent_state | async_result: result}}
     end
   end
 
@@ -138,19 +138,18 @@ defmodule JidoExampleTest.ObservabilityTest do
 
   defmodule ObserveExampleAgent do
     @moduledoc false
-    use Jido.Agent,
-      name: "observe_example_agent",
-      schema:
-        Zoi.object(%{
-          last_result: Zoi.integer() |> Zoi.default(nil),
-          async_result: Zoi.integer() |> Zoi.default(nil)
-        })
+    use Jido.Agent, name: "observe_example_agent"
 
-    def signal_routes(_ctx) do
-      [
-        {"observed_work", ObservedWorkAction},
-        {"observed_async", ObservedAsyncAction}
-      ]
+    agent do
+      schema Zoi.object(%{
+               last_result: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil),
+               async_result: Zoi.integer() |> Zoi.nullable() |> Zoi.default(nil)
+             })
+    end
+
+    routes do
+      route "observed_work", ObservedWorkAction
+      route "observed_async", ObservedAsyncAction
     end
   end
 

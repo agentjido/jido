@@ -5,13 +5,6 @@ defmodule Jido.Application do
   @doc false
   def start(_type, _args) do
     Jido.Telemetry.setup()
-
-    children = [
-      Jido.Storage.ETS.Owner
-    ]
-
-    Jido.Discovery.init_async()
-
-    Supervisor.start_link(children, strategy: :one_for_one, name: Jido.Supervisor)
+    Supervisor.start_link([], strategy: :one_for_one, name: Jido.Supervisor)
   end
 end

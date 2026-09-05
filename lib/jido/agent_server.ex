@@ -1,3270 +1,2662 @@
 defmodule Jido.AgentServer do
   @moduledoc """
-  GenServer runtime for Jido agents.
+  The responsive OTP owner for one live `Jido.Agent`.
 
-  AgentServer is the "Act" side of the Jido framework: while Agents "think"
-  (pure decision logic via `cmd/2`), AgentServer "acts" by executing the
-  directives they emit. Signal routing happens in AgentServer, keeping
-  Agents purely action-oriented.
+  This Server uses four active `:gen_statem` states: `:idle`, `:admitting`,
+  `:running`, and `:directing`. One Signal selects one Action or Flow. Live
+  Plugin admission, `Jido.Exec`, and outbound Plugin work run asynchronously.
+  The Server commits only the terminal complete state result. It then
+  interprets returned Directives in list order before it accepts the next
+  Signal.
 
-  ## Architecture
+  The Agent state commit is atomic. Turn execution is not a transaction across
+  external systems: an Action or Flow can complete I/O before returning an
+  error. That failure preserves committed Agent state but does not undo the
+  I/O. Applications own external idempotency and recovery.
 
-  - Single GenServer per agent under `Jido.AgentSupervisor`
-  - Internal directive queue with drain loop for non-blocking processing
-  - Registry-based naming via `Jido.Registry`
-  - Logical parent-child hierarchy via state tracking + monitors
+  Signals that arrive during a turn are postponed by OTP. OTP retains each full
+  postponed event. The Server keeps bounded admission tokens so it can reject
+  excess work. This limit does not bound messages that have not yet reached the
+  state-machine callback.
 
-  Jido's parent-child hierarchy is **logical**, not OTP supervisory ancestry.
-  Parent and child agents are still OTP peers under a supervisor; the parent
-  relationship is represented explicitly with `Jido.AgentServer.ParentRef`,
-  runtime monitors, and lifecycle signals.
+  The Server assigns one stable UUID7 to each admitted Turn. It keeps a private
+  `ActiveTurn` until execution and all post-commit Directives stop. It then
+  creates one public `Jido.Agent.Turn.Outcome`. A custom two-argument error
+  policy receives the original error and this Outcome. When debug mode is on,
+  the terminal debug event also contains the Outcome.
 
-  ## Public API
+  Before a commit, the Server writes either an instance-owned runtime checkpoint
+  or a configured durable persistence record. This prevents a transient Agent
+  restart from using its old initialization value. Persistence records survive
+  a complete Jido instance restart. A stopping policy uses a clean shutdown and
+  does not restart the Agent from old state.
 
-  - `start/1` - Start under DynamicSupervisor
-  - `start_link/1` - Start linked to caller
-  - `call/3` - Synchronous signal processing
-  - `cast/2` - Asynchronous signal processing
-  - `state/1` - Get full State struct
-  - `whereis/1` - Registry lookup by ID (default registry)
-  - `whereis/2` - Registry lookup by ID (specific registry)
+  `state_version` is the commit revision. Each successful Turn advances it once,
+  even when the complete state equals the prior state. The checkpoint stores
+  that revision before the caller receives success. To reject a duplicate
+  without a commit, an Action can return `{:error, reason}`. No separate no-op
+  result is required. A failure after commit does not undo the revision.
 
-  ## Signal Flow
-
-   ```
-   Signal → AgentServer.call/cast
-         → plugin handle_signal/2
-         → plugin prepare_signal/2
-         → route_signal_to_action (via strategy/agent/plugin routes)
-         → plugin prepare_action/3
-         → Agent.cmd/3
-         → {agent, directives}
-         → directives queued with prepared signal and runtime context
-         → drain loop executes via DirectiveExec protocol
-         → plugin prepare_emit/2 for emitted signals
-         → dispatch
-         → transform_result/3 on synchronous call return only
-   ```
-
-   Signal routing is owned by AgentServer, not the Agent. Strategies can define
-  `signal_routes/1` to map signal types to strategy commands. Unmatched signals
-  fall back to `{signal.type, signal.data}` as the action.
-
-  ## Options
-
-  - `:jido` - Jido instance name for registry scoping (default: `Jido`)
-  - `:agent` - Agent module or struct (required)
-  - `:id` - Instance ID (auto-generated if not provided)
-  - `:initial_state` - Initial state map for agent
-  - `:registry` - Registry module (default: `Jido.Registry`)
-  - `:default_dispatch` - Default dispatch config for Emit directives (fallback: current agent pid)
-  - `:error_policy` - Error handling policy
-  - `:max_queue_size` - Max directive queue size (default: 10_000)
-  - `:parent` - Parent reference for hierarchy
-  - `:on_parent_death` - Behavior when parent dies:
-    - `:stop` - stop the child
-    - `:continue` - keep running and become orphaned
-    - `:emit_orphan` - become orphaned and process `jido.agent.orphaned`
-  - `:spawn_fun` - Custom function for spawning children
-  - `:debug` - Enable debug mode with event buffer (default: `false`)
-
-  ## Agent Resolution
-
-  The `:agent` option accepts:
-
-  - **Module name** - Must implement `new/0` or `new/1`
-    - `new/1` receives `[id: id, state: initial_state]` as keyword options
-    - `new/0` creates agent with defaults; `:id` and `:initial_state` options are ignored
-  - **Agent struct** - Used directly
-    - Provide `:agent_module` option to specify the module if it differs from `agent.__struct__`
-    - The struct's ID takes precedence over the `:id` option
-
-  The `:agent_module` option is only used when `:agent` is a struct. It tells AgentServer which module implements the agent behavior (for calling `cmd/2`, lifecycle hooks, etc.).
-
-  ## Examples
-
-      # Using global Jido instance (default)
-      {:ok, pid} = AgentServer.start_link(agent: SimpleAgent)
-
-      # Using a named Jido instance
-      {:ok, pid} = AgentServer.start_link(jido: MyApp.Jido, agent: MyAgent)
-
-      # Module with new/1 - receives id and state
-      {:ok, pid} = AgentServer.start_link(
-        agent: MyAgent,
-        id: "my-id",
-        initial_state: %{counter: 42}
-      )
-
-      # Pre-built struct - requires agent_module
-      agent = MyAgent.new(id: "prebuilt", state: %{value: 99})
-      {:ok, pid} = AgentServer.start_link(agent: agent, agent_module: MyAgent)
-
-  ## Completion Detection
-
-  Agents signal completion via **state**, not process death:
-
-      # In your strategy/agent, set terminal status:
-      agent = put_in(agent.state.status, :completed)
-      agent = put_in(agent.state.last_answer, answer)
-
-      # External code polls for completion:
-      {:ok, state} = AgentServer.state(server)
-      case state.agent.state.status do
-        :completed -> state.agent.state.last_answer
-        :failed -> {:error, state.agent.state.error}
-        _ -> :still_running
-      end
-
-  This follows Elm/Redux semantics where completion is a state concern.
-  The process stays alive until explicitly stopped or supervised.
-
-  **Do NOT** use `{:stop, ...}` from DirectiveExec for normal completion—this
-  causes race conditions with async work and skips lifecycle hooks.
-  See `Jido.AgentServer.DirectiveExec` for details.
-
-  ## Debugging
-
-  AgentServer can record recent events in an in-memory ring buffer (max 50)
-  to help diagnose what happened inside a running agent.
-
-  Enable at start:
-
-      {:ok, pid} = AgentServer.start_link(agent: MyAgent, debug: true)
-
-  Or toggle at runtime:
-
-      :ok = AgentServer.set_debug(pid, true)
-
-  Retrieve recent events (newest-first):
-
-      {:ok, events} = AgentServer.recent_events(pid, limit: 10)
-
-  Each event has the shape `%{at: monotonic_ms, type: atom(), data: map()}`.
-  Event types include `:signal_received` and `:directive_started`.
-
-  Returns `{:error, :debug_not_enabled}` if debug mode is off.
-
-  > **Note:** This is a development aid, not an audit log. Events are not
-  > persisted and the buffer has fixed capacity.
-
-  ## Orphans and Adoption
-
-  If a child is configured with `on_parent_death: :continue` or `:emit_orphan`,
-  the runtime clears the current parent reference immediately when the logical
-  parent dies:
-
-  - `state.parent` becomes `nil`
-  - `agent.state.__parent__` becomes `nil`
-  - the former parent is preserved in `state.orphaned_from`
-  - the former parent is preserved in `agent.state.__orphaned_from__`
-
-  This prevents children from continuing to route signals to a dead parent via
-  `Jido.Agent.Directive.emit_to_parent/3`.
-
-  Reattachment is explicit. A replacement parent can adopt the live child with
-  `Jido.Agent.Directive.adopt_child/3`, which refreshes the child's live parent
-  reference and monitoring relationship.
-
-  Relationship bindings are mirrored into `Jido.RuntimeStore`, so when a child
-  later restarts it rehydrates its current logical parent from instance runtime
-  state instead of falling back to stale startup metadata.
-
-  ## Timeout Diagnostics
-
-  When `await_completion/2` times out, it returns a diagnostic map:
-
-      {:error, {:timeout, %{
-        hint: "Agent is idle but await_completion is blocking",
-        server_status: :idle,
-        queue_length: 0,
-        iteration: nil,
-        waited_ms: 5000
-      }}}
-
-  Use this to understand why the agent hasn't completed:
-  - `:idle` with empty queue → agent finished but state doesn't match await condition
-  - `:waiting` → strategy is waiting (e.g., for LLM response)
-  - `:running` → still processing directives
+  Exec roots, Action tasks, Flow tasks, and asynchronous Directives run under
+  the Jido instance Task Supervisor. The Server also links each Exec root to
+  itself. Active execution cannot outlive its Agent owner.
   """
 
-  use GenServer
+  @behaviour :gen_statem
 
   require Logger
 
+  alias Jido.Agent
+  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Directive
+  alias Jido.Agent.Turn.Outcome
+  alias Jido.Plugin
+  alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
+  alias Jido.Plugin.SignalContext, as: PluginSignalContext
+
   alias Jido.AgentServer.{
+    ActiveTurn,
     ChildInfo,
-    DirectiveExec,
+    DirectiveContext,
+    DirectiveRuntime,
     Options,
     ParentRef,
-    SensorLifecycle,
-    SignalRouter,
-    State,
-    StopChildRuntime,
-    Status
+    PluginLifecycle,
+    RuntimeCheckpoint,
+    State
   }
 
-  alias Jido.Agent.Directive
-  alias Jido.AgentServer.Signal.{ChildExit, ChildStarted, CronTick, Orphaned, SensorExit}
-  alias Jido.Config.Defaults
+  alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
+  alias Jido.Error
   alias Jido.Observe
-  alias Jido.Observe.Config, as: ObserveConfig
-  alias Jido.RuntimeStore
   alias Jido.Signal
-  alias Jido.Signal.Router, as: JidoRouter
-  alias Jido.Telemetry.Formatter
+  alias Jido.Telemetry.Agent, as: AgentTelemetry
   alias Jido.Tracing.Context, as: TraceContext
-  alias Jido.Tracing.Trace
 
-  @type server :: pid() | atom() | {:via, module(), term()} | String.t()
-  @relationship_hive :relationships
-  @reserved_runtime_context_keys [
-    :state,
-    :signal,
-    :agent,
-    :agent_server_pid,
-    :input_signal,
-    :directive,
-    :dispatch
-  ]
-
-  # ---------------------------------------------------------------------------
-  # Public API
-  # ---------------------------------------------------------------------------
+  @type server :: pid() | atom() | {:global, term()} | {:via, module(), term()}
+  @type signal_result :: {:ok, Agent.t()} | {:error, term()}
 
   @doc """
-  Starts an AgentServer under `Jido.AgentSupervisor`.
+  Starts one Agent Server linked to the calling process.
 
-  ## Examples
-
-      {:ok, pid} = Jido.AgentServer.start(agent: MyAgent)
-      {:ok, pid} = Jido.AgentServer.start(agent: MyAgent, id: "my-agent")
+  Use `Jido.start_agent/3` for instance-supervised ownership instead.
   """
-  @spec start(keyword() | map()) :: DynamicSupervisor.on_start_child()
-  def start(opts) do
-    child_spec = {__MODULE__, opts}
-
-    jido_instance =
-      if is_list(opts), do: Keyword.get(opts, :jido), else: Map.get(opts, :jido)
-
-    supervisor =
-      case jido_instance do
-        nil -> Jido.AgentSupervisor
-        instance -> Jido.agent_supervisor_name(instance)
-      end
-
-    DynamicSupervisor.start_child(supervisor, child_spec)
-  end
-
-  @doc """
-  Starts an AgentServer linked to the calling process.
-
-  ## Options
-
-  See module documentation for full list of options.
-
-  ## Examples
-
-      {:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent)
-      {:ok, pid} = Jido.AgentServer.start_link(agent: MyAgent, id: "custom-123")
-      {:ok, pid} = Jido.AgentServer.start_link(jido: MyApp.Jido, agent: MyAgent)
-  """
-  @spec start_link(keyword() | map()) :: GenServer.on_start()
-  def start_link(opts) when is_list(opts) or is_map(opts) do
-    # Extract GenServer options (like :name) from agent opts
-    {genserver_opts, agent_opts} = extract_genserver_opts(opts)
-    GenServer.start_link(__MODULE__, agent_opts, genserver_opts)
-  end
-
-  defp extract_genserver_opts(opts) when is_list(opts) do
-    case Keyword.pop(opts, :name) do
-      {nil, agent_opts} -> {[], agent_opts}
-      {name, agent_opts} -> {[name: name], agent_opts}
-    end
-  end
-
-  defp extract_genserver_opts(opts) when is_map(opts) do
-    case Map.pop(opts, :name) do
-      {nil, agent_opts} -> {[], agent_opts}
-      {name, agent_opts} -> {[name: name], agent_opts}
-    end
-  end
-
-  @doc """
-  Returns a child_spec for supervision.
-  """
-  @spec child_spec(keyword() | map()) :: Supervisor.child_spec()
-  def child_spec(opts) do
-    id = opts[:id] || __MODULE__
-
-    %{
-      id: id,
-      start: {__MODULE__, :start_link, [opts]},
-      shutdown: Defaults.agent_server_shutdown_timeout_ms(),
-      restart: :permanent,
-      type: :worker
-    }
-  end
-
-  @doc """
-  Synchronously sends a signal and waits for processing.
-
-  Returns the updated agent struct after signal processing.
-  Directives are still executed asynchronously via the drain loop.
-
-  ## Returns
-
-  * `{:ok, agent}` - Signal processed successfully
-  * `{:error, :not_found}` - Server not found via registry
-  * `{:error, :invalid_server}` - Unsupported server reference
-  * Exits with `{:noproc, ...}` if process dies during call
-
-  ## Examples
-
-      {:ok, agent} = Jido.AgentServer.call(pid, signal)
-      {:ok, agent} = Jido.AgentServer.call("agent-id", signal, 10_000)
-  """
-  @spec call(server(), Signal.t(), timeout()) :: {:ok, struct()} | {:error, term()}
-  def call(server, %Signal{} = signal, timeout \\ Defaults.agent_server_call_timeout_ms()) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:signal, signal}, timeout)
-    end
-  end
-
-  @doc """
-  Asynchronously sends a signal for processing.
-
-  Returns immediately. The signal is processed in the background.
-
-  ## Returns
-
-  * `:ok` - Signal queued successfully
-  * `{:error, :not_found}` - Server not found via registry
-  * `{:error, :invalid_server}` - Unsupported server reference
-
-  ## Examples
-
-      :ok = Jido.AgentServer.cast(pid, signal)
-      :ok = Jido.AgentServer.cast("agent-id", signal)
-  """
-  @spec cast(server(), Signal.t()) :: :ok | {:error, term()}
-  def cast(server, %Signal{} = signal) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, {:signal, signal})
-    end
-  end
-
-  @doc """
-  Gets the full State struct for an agent.
-
-  ## Returns
-
-  * `{:ok, state}` - Full State struct retrieved
-  * `{:error, :not_found}` - Server not found via registry
-  * `{:error, :invalid_server}` - Unsupported server reference
-
-  ## Examples
-
-      {:ok, state} = Jido.AgentServer.state(pid)
-      {:ok, state} = Jido.AgentServer.state("agent-id")
-  """
-  @spec state(server()) :: {:ok, State.t()} | {:error, term()}
-  def state(server) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, :get_state)
-    end
-  end
-
-  @doc """
-  Wait for an agent to reach a terminal status (`:completed` or `:failed`).
-
-  This is an event-driven wait - the caller blocks until the agent's state
-  transitions to a terminal status, then receives the result immediately.
-  No polling is involved.
-
-  ## Options
-
-  - `:status_path` - Path to status field in agent.state (default: `[:status]`)
-  - `:result_path` - Path to result field (default: `[:last_answer]`)
-  - `:error_path` - Path to error field (default: `[:error]`)
-
-  ## Returns
-
-  - `{:ok, %{status: :completed | :failed, result: any()}}` - Agent reached terminal status
-  - `{:error, :not_found}` - Server not found
-  - Exits with `{:timeout, ...}` if GenServer.call times out
-
-  ## Examples
-
-      {:ok, result} = AgentServer.await_completion(pid, timeout: 10_000)
-  """
-  @spec await_completion(server(), keyword()) :: {:ok, map()} | {:error, term()}
-  def await_completion(server, opts \\ []) do
-    timeout = Keyword.get(opts, :timeout, Defaults.agent_server_await_timeout_ms())
-    waiter_id = make_ref()
-    opts = Keyword.put(opts, :waiter_id, waiter_id)
-
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:await_completion, opts}, timeout)
-      catch
-        :exit, {:timeout, _} ->
-          GenServer.cast(pid, {:cancel_await_completion, waiter_id})
-
-          case status(server) do
-            {:ok, s} -> {:error, {:timeout, build_timeout_diagnostic(s, timeout)}}
-            _ -> {:error, :timeout}
-          end
+  @spec start_link(keyword()) :: :gen_statem.start_ret()
+  def start_link(opts) when is_list(opts) do
+    with {:ok, options} <- Options.new(opts) do
+      case server_name(options) do
+        nil -> :gen_statem.start_link(__MODULE__, options, [])
+        name -> :gen_statem.start_link(name, __MODULE__, options, [])
       end
     end
   end
 
-  defp build_timeout_diagnostic(status, timeout_ms) do
-    %{
-      waited_ms: timeout_ms,
-      server_status: status.snapshot.status,
-      queue_length: Status.queue_length(status),
-      iteration: Status.iteration(status),
-      hint: infer_timeout_hint(status)
-    }
-  end
-
-  defp infer_timeout_hint(status) do
-    case status.snapshot.status do
-      :waiting -> "Strategy is waiting (possibly for LLM response)"
-      :running -> "Strategy is running (processing directives)"
-      :idle -> "Agent is idle but await_completion is blocking"
-      _ -> nil
-    end
-  end
-
   @doc """
-  Gets runtime status for an agent process.
+  Starts one Agent Server under its Jido instance supervisor.
 
-  Returns a `Status` struct combining the strategy snapshot with process metadata.
-  This provides a stable API for querying agent status without depending on internal
-  `__strategy__` state structure.
-
-  ## Returns
-
-  * `{:ok, status}` - Status struct with snapshot and metadata
-  * `{:error, :not_found}` - Server not found via registry
-  * `{:error, :invalid_server}` - Unsupported server reference
-
-  ## Examples
-
-      {:ok, agent_status} = Jido.AgentServer.status(pid)
-
-      # Check completion
-      if agent_status.snapshot.done? do
-        IO.puts("Result: " <> inspect(agent_status.snapshot.result))
-      end
-
-      # Use delegate helpers
-      case Status.status(agent_status) do
-        :success -> {:done, Status.result(agent_status)}
-        :failure -> {:error, Status.details(agent_status)}
-        _ -> :continue
-      end
+  The Server links to that supervisor. It does not link to the original caller.
   """
-  @spec status(server()) :: {:ok, Status.t()} | {:error, term()}
-  def status(server) do
-    with {:ok, pid} <- resolve_server(server),
-         {:ok, %State{agent: agent, agent_module: agent_module} = state} <-
-           GenServer.call(pid, :get_state) do
-      snapshot = agent_module.strategy_snapshot(agent)
-
-      {:ok,
-       %Status{
-         agent_module: agent_module,
-         agent_id: state.id,
-         pid: pid,
-         snapshot: snapshot,
-         raw_state: agent.state
-       }}
-    end
-  end
-
-  @doc """
-  Streams status updates by polling at regular intervals.
-
-  Returns a Stream that yields status snapshots. Useful for monitoring agent
-  execution without manual polling loops.
-
-  ## Options
-
-  - `:interval_ms` - Polling interval in milliseconds (default: 100)
-
-  ## Examples
-
-      # Poll until completion
-      AgentServer.stream_status(pid, interval_ms: 50)
-      |> Enum.reduce_while(nil, fn status, _acc ->
-        case Status.status(status) do
-          :success -> {:halt, {:ok, Status.result(status)}}
-          :failure -> {:halt, {:error, Status.details(status)}}
-          _ -> {:cont, nil}
+  @spec start(keyword()) :: DynamicSupervisor.on_start_child()
+  def start(opts) when is_list(opts) do
+    case Keyword.get(opts, :jido) do
+      jido when is_atom(jido) and not is_nil(jido) ->
+        case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), {__MODULE__, opts}) do
+          {:ok, pid} -> ready_result(pid)
+          {:ok, pid, _info} -> ready_result(pid)
+          result -> result
         end
-      end)
 
-      # Take first 10 snapshots
-      AgentServer.stream_status(pid)
-      |> Enum.take(10)
-  """
-  @spec stream_status(server(), keyword()) :: Enumerable.t()
-  def stream_status(server, opts \\ []) do
-    interval_ms = Keyword.get(opts, :interval_ms, 100)
-
-    Stream.repeatedly(fn ->
-      case status(server) do
-        {:ok, status} ->
-          Process.sleep(interval_ms)
-          status
-
-        {:error, reason} ->
-          raise "Failed to get status: #{inspect(reason)}"
-      end
-    end)
-  end
-
-  @doc """
-  Enables or disables debug mode at runtime.
-
-  When debug mode is enabled, the agent records recent events in a ring buffer
-  for diagnostic purposes.
-
-  ## Examples
-
-      :ok = AgentServer.set_debug(pid, true)
-      # ... run some operations ...
-      {:ok, events} = AgentServer.recent_events(pid)
-  """
-  @spec set_debug(server(), boolean()) :: :ok | {:error, term()}
-  def set_debug(server, enabled) when is_boolean(enabled) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:set_debug, enabled})
+      _value ->
+        {:error, :jido_instance_required}
     end
   end
 
+  @doc "Returns a child specification for one Agent Server."
+  @spec child_spec(keyword()) :: Supervisor.child_spec()
+  def child_spec(opts) do
+    id = Keyword.get(opts, :id, make_ref())
+    default_restart = if Keyword.get(opts, :jido), do: :transient, else: :temporary
+    restart = Keyword.get(opts, :restart, default_restart)
+
+    %{
+      id: {__MODULE__, id},
+      start: {__MODULE__, :start_link, [opts]},
+      type: :worker,
+      restart: restart,
+      shutdown: 5_000
+    }
+  end
+
+  @call_schema Zoi.object(
+                 %{
+                   timeout:
+                     Zoi.union([Zoi.integer() |> Zoi.min(0), Zoi.literal(:infinity)])
+                     |> Zoi.default(5_000),
+                   context: Zoi.any() |> Zoi.default(%{})
+                 },
+                 unrecognized_keys: :error
+               )
+
+  @type call_option :: {:timeout, timeout()} | {:context, map() | keyword() | nil}
+
   @doc """
-  Retrieves recent debug events from the agent's event buffer.
+  Sends one Signal and waits for its commit or failure.
 
-  Events are returned newest-first. Each event includes:
-  - `:at` - Monotonic timestamp in milliseconds
-  - `:type` - Event type atom (e.g., `:signal_received`, `:directive_started`)
-  - `:data` - Event-specific data map
+  The third argument accepts a timeout or a keyword list with `:timeout` and
+  `:context`. The default timeout is 5,000 milliseconds. Context accepts a map,
+  keyword list, or `nil`, as in `Jido.Agent.cmd/3`.
 
-  Returns `{:error, :debug_not_enabled}` if debug mode is off.
+  Caller context passes through Plugin admission and preparation to execution.
+  It belongs to this Turn, including its post-commit Plugin work. Jido does not
+  add it to Signal data, Agent or Plugin state, persistence, or emitted Signals.
+  Application code must select any values it wants to store or emit.
 
-  ## Options
+  A durable revision conflict returns `{:error, {:persistence_failed, :conflict}}`
+  before live state changes or Directives run. The configured error policy
+  decides whether the Server continues or stops. It does not reload or retry
+  the command automatically; external Action work may already have completed.
+  Uncertain persistence commit errors stop the Server before more work can run.
+  The write can have completed even if its reply was lost. A new activation
+  must restore the stored state before it can continue.
 
-  - `:limit` - Maximum number of events to return (default: all, max 50)
+  `:agent_id`, `:agent_state`, and `:signal` are reserved execution keys. The
+  Server supplies its own `:jido` and `:partition` values. Caller timeout stops
+  waiting; it does not cancel execution that has already started.
+  Admission time starts at the caller. Remote admission queries the caller's
+  monotonic clock with a one-second bound and counts the query duration.
+  An unavailable clock rejects admission. No wall-clock agreement is required.
+  Infinite admission budgets do not query a remote clock.
 
-  ## Examples
-
-      {:ok, events} = AgentServer.recent_events(pid, limit: 10)
+      Server.call(server, signal, context: %{client: client}, timeout: 10_000)
   """
-  @spec recent_events(server(), keyword()) :: {:ok, [map()]} | {:error, term()}
-  def recent_events(server, opts \\ []) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.call(pid, {:recent_events, opts})
+  @spec call(server(), Signal.t(), timeout() | [call_option()]) :: signal_result()
+  def call(server, signal, timeout_or_opts \\ 5_000)
+
+  def call(server, %Signal{} = signal, opts) when is_list(opts) do
+    with {:ok, opts} <- validate_keyword(opts, :call),
+         {:ok, options} <- parse_call_options(opts),
+         {:ok, context} <- Jido.Agent.Command.normalize_context(options.context) do
+      call_with_context(server, signal, options.timeout, context)
     end
   end
 
-  @doc """
-  Looks up an agent by ID in a specific registry.
-
-  Returns the pid if found, nil otherwise.
-
-  ## Examples
-
-      pid = Jido.AgentServer.whereis(MyApp.Jido.Registry, "agent-123")
-      # => #PID<0.123.0>
-  """
-  @spec whereis(module(), String.t()) :: pid() | nil
-  def whereis(registry, id) when is_atom(registry) and is_binary(id) do
-    whereis(registry, id, [])
+  def call(server, %Signal{} = signal, timeout) do
+    call_with_context(server, signal, timeout, %{})
   end
 
+  defp parse_call_options(opts) do
+    case Zoi.parse(@call_schema, Map.new(opts)) do
+      {:ok, options} ->
+        {:ok, options}
+
+      {:error, issues} ->
+        {:error,
+         Error.validation_error("Invalid Agent Server call options", details: %{issues: issues})}
+    end
+  end
+
+  defp call_with_context(server, signal, timeout, context) do
+    :gen_statem.call(
+      server,
+      {:signal, make_ref(), signal, admission_deadline(timeout), context},
+      timeout
+    )
+  end
+
+  @doc "Sends one asynchronous Signal. Delivery is best effort under overload."
+  @spec cast(server(), Signal.t()) :: :ok
+  def cast(server, %Signal{} = signal) do
+    :gen_statem.cast(server, {:signal, make_ref(), signal})
+  end
+
+  @doc "Stops one Agent Server through its normal OTP termination path."
+  @spec stop(server(), term(), timeout()) :: :ok
+  def stop(server, reason \\ :shutdown, timeout \\ 5_000) do
+    :gen_statem.stop(server, normalize_stop_reason(reason), timeout)
+  end
+
+  @doc "Returns the current portable state owned by one declared Plugin."
+  @spec plugin_state(server(), module(), timeout()) :: {:ok, term()} | {:error, term()}
+  def plugin_state(server, plugin, timeout \\ 5_000) when is_atom(plugin) do
+    :gen_statem.call(server, {:plugin_state, plugin}, timeout)
+  end
+
+  @doc "Starts an asynchronous request for one Signal."
+  @spec send_request(server(), Signal.t(), timeout()) :: term()
+  def send_request(server, %Signal{} = signal, timeout \\ 5_000) do
+    :gen_statem.send_request(
+      server,
+      {:signal, make_ref(), signal, admission_deadline(timeout)}
+    )
+  end
+
+  @doc "Receives the response for `send_request/3`."
+  @spec receive_response(term(), timeout()) :: term()
+  def receive_response(request_id, timeout \\ 5_000) do
+    :gen_statem.receive_response(request_id, timeout)
+  end
+
+  @doc "Returns the current committed Agent."
+  @spec agent(server(), timeout()) :: Agent.t()
+  def agent(server, timeout \\ 5_000), do: :gen_statem.call(server, :agent, timeout)
+
+  @doc "Returns a narrow view of the Agent turn state."
+  @spec status(server(), timeout()) :: map()
+  def status(server, timeout \\ 5_000), do: :gen_statem.call(server, :status, timeout)
+
+  @doc "Waits until Agent runtime children are ready."
+  @spec await_ready(server(), timeout()) :: :ok | {:error, term()}
+  def await_ready(server, timeout \\ 5_000) do
+    :gen_statem.call(server, :await_ready, timeout)
+  catch
+    :exit, reason -> {:error, normalize_ready_error(reason)}
+  end
+
+  @doc "Cancels the active executable turn."
+  @spec cancel(server(), timeout()) :: :ok | {:error, term()}
+  def cancel(server, timeout \\ 5_000), do: :gen_statem.call(server, :cancel, timeout)
+
+  @doc "Cancels one active executable Turn only when its stable id still matches."
+  @spec cancel_turn(server(), String.t(), timeout()) :: :ok | {:error, term()}
+  def cancel_turn(server, turn_id, timeout \\ 5_000) when is_binary(turn_id) do
+    :gen_statem.call(server, {:cancel, turn_id}, timeout)
+  end
+
+  @doc "Enables or disables the bounded Agent runtime event buffer."
+  @spec set_debug(server(), boolean(), timeout()) :: :ok
+  def set_debug(server, enabled, timeout \\ 5_000) when is_boolean(enabled) do
+    :gen_statem.call(server, {:set_debug, enabled}, timeout)
+  end
+
+  @doc "Returns recent Agent runtime events in newest-first order."
+  @spec recent_events(server(), keyword(), timeout()) :: {:ok, [map()]} | {:error, term()}
+  def recent_events(server, opts \\ [], timeout \\ 5_000) when is_list(opts) do
+    :gen_statem.call(server, {:recent_events, opts}, timeout)
+  end
+
+  @doc "Returns the PID for an Agent id in one Registry."
   @spec whereis(module(), String.t(), keyword()) :: pid() | nil
-  def whereis(registry, id, opts)
-      when is_atom(registry) and is_binary(id) and is_list(opts) do
-    key = Jido.partition_key(id, Keyword.get(opts, :partition))
+  def whereis(registry, id, opts \\ []) when is_atom(registry) and is_binary(id) do
+    key = registry_key(id, Keyword.get(opts, :partition))
 
     case Registry.lookup(registry, key) do
-      [{pid, _}] -> pid
+      [{pid, _value}] -> if Process.alive?(pid), do: pid
       [] -> nil
     end
   end
 
-  @doc """
-  Returns a via tuple for Registry-based naming.
-
-  ## Examples
-
-      name = Jido.AgentServer.via_tuple("agent-id", MyApp.Jido.Registry)
-      GenServer.call(name, :get_state)
-  """
-  @spec via_tuple(String.t(), module()) :: {:via, Registry, {module(), term()}}
-  def via_tuple(id, registry) when is_binary(id) and is_atom(registry) do
-    via_tuple(id, registry, [])
-  end
-
+  @doc "Returns a Registry via tuple for an Agent id."
   @spec via_tuple(String.t(), module(), keyword()) :: {:via, Registry, {module(), term()}}
-  def via_tuple(id, registry, opts)
-      when is_binary(id) and is_atom(registry) and is_list(opts) do
-    {:via, Registry, {registry, Jido.partition_key(id, Keyword.get(opts, :partition))}}
+  def via_tuple(id, registry, opts \\ []) when is_binary(id) and is_atom(registry) do
+    {:via, Registry, {registry, registry_key(id, Keyword.get(opts, :partition))}}
   end
 
   @doc """
-  Check if the agent server process is alive.
+  Returns true when the Agent Server is alive.
+
+  Remote checks have a one-second limit. False means that liveness could not
+  be confirmed; it does not prove process exit during a network failure.
   """
   @spec alive?(server()) :: boolean()
-  def alive?(server) when is_pid(server), do: Process.alive?(server)
+  def alive?(server) when is_pid(server) and node(server) == node(), do: Process.alive?(server)
+
+  def alive?(server) when is_pid(server) do
+    :erpc.call(node(server), Process, :alive?, [server], 1_000)
+  catch
+    _kind, _reason -> false
+  end
 
   def alive?(server) do
-    case resolve_server(server) do
-      {:ok, pid} -> Process.alive?(pid)
-      {:error, _} -> false
+    case GenServer.whereis(server) do
+      pid when is_pid(pid) -> alive?(pid)
+      _value -> false
     end
+  end
+
+  @doc "Attaches an owner process and prevents idle hibernation."
+  @spec attach(server(), pid(), timeout()) :: :ok | {:error, term()}
+  def attach(server, owner_pid \\ self(), timeout \\ 5_000) when is_pid(owner_pid) do
+    :gen_statem.call(server, {:attach, owner_pid}, timeout)
+  end
+
+  @doc "Detaches an owner process. The idle timer starts after the last detach."
+  @spec detach(server(), pid(), timeout()) :: :ok | {:error, term()}
+  def detach(server, owner_pid \\ self(), timeout \\ 5_000) when is_pid(owner_pid) do
+    :gen_statem.call(server, {:detach, owner_pid}, timeout)
+  end
+
+  @doc "Resets the idle timer without attaching an owner process."
+  @spec touch(server()) :: :ok
+  def touch(server), do: :gen_statem.cast(server, :touch)
+
+  @doc false
+  @spec adopt_parent(server(), ParentRef.t()) :: {:ok, map()} | {:error, term()}
+  def adopt_parent(server, %ParentRef{} = parent) do
+    :gen_statem.call(server, {:adopt_parent, parent})
   end
 
   @doc false
-  @spec adopt_parent(server(), ParentRef.t()) ::
-          {:ok, %{id: String.t(), agent_module: module(), partition: term() | nil}}
-          | {:error, term()}
-  def adopt_parent(server, %ParentRef{} = parent_ref) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:adopt_parent, parent_ref})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
-      end
-    end
+  def creation_info(server) do
+    {:ok, :gen_statem.call(server, :creation_info, 1_000)}
+  catch
+    :exit, reason -> {:uncertain, {:child_identity_unavailable, reason}}
   end
 
-  @doc """
-  Adopts a live child into this agent's logical child map.
-
-  This updates both the child's live parent reference and the manager's tracked
-  `state.children` map before returning.
-  """
-  @spec adopt_child(server(), pid() | String.t(), term(), map()) ::
-          {:ok, pid()} | {:error, term()}
+  @doc "Adopts one orphaned Agent as a tracked child."
+  @spec adopt_child(server(), pid() | String.t(), term(), map()) :: :ok | {:error, term()}
   def adopt_child(server, child, tag, meta \\ %{}) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:adopt_child, child, tag, meta})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
-      end
-    end
+    :gen_statem.call(server, {:adopt_child, child, tag, meta})
   end
 
-  @doc """
-  Requests graceful termination of a tracked child agent.
-
-  This is the runtime counterpart to `Directive.stop_child/2`.
-  """
+  @doc "Stops one tracked child Agent."
   @spec stop_child(server(), term(), term()) :: :ok | {:error, term()}
   def stop_child(server, tag, reason \\ :normal) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:stop_child, tag, reason})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
-      end
-    end
+    :gen_statem.call(server, {:stop_child, tag, reason})
   end
 
-  # ---------------------------------------------------------------------------
-  # Attachment API (for Jido.Agent.InstanceManager integration)
-  # ---------------------------------------------------------------------------
+  @doc "Returns a public view of tracked Agent and Plugin children."
+  @spec children(server(), timeout()) :: map()
+  def children(server, timeout \\ 5_000), do: :gen_statem.call(server, :children, timeout)
 
   @doc """
-  Attaches a process to this agent, tracking it as an active consumer.
+  Returns the committed Agent and its commit revision as `:state_version`.
 
-  When attached, the agent will not idle-timeout. The agent monitors the
-  attached process and automatically detaches it on exit.
-
-  Used by `Jido.Agent.InstanceManager` to track LiveView sockets, WebSocket handlers,
-  or any process that needs the agent to stay alive.
-
-  ## Examples
-
-      {:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, key)
-      :ok = Jido.AgentServer.attach(pid)
-
-      # With explicit owner
-      :ok = Jido.AgentServer.attach(pid, socket_pid)
+  Every successful Turn increases the revision once, even when the Agent state
+  is unchanged. A failure before commit preserves both state and revision.
+  A Directive failure after commit does not undo that commit.
   """
-  @spec attach(server(), pid()) :: :ok | {:error, term()}
-  def attach(server, owner_pid \\ self()) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:attach, owner_pid})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
+  @spec snapshot(server(), timeout()) :: map()
+  def snapshot(server, timeout \\ 5_000), do: :gen_statem.call(server, :snapshot, timeout)
+
+  @doc "Persists and stops one Agent Server after it becomes idle."
+  @spec hibernate(server(), keyword()) :: :ok | {:error, term()}
+  def hibernate(server, opts \\ []) when is_list(opts) do
+    {timeout, opts} = Keyword.pop(opts, :timeout, 5_000)
+    pid = GenServer.whereis(server)
+    ref = Process.monitor(pid)
+
+    try do
+      case :gen_statem.call(pid, {:hibernate, opts}, timeout) do
+        :ok ->
+          receive do
+            {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+          after
+            timeout -> exit({:timeout, {__MODULE__, :hibernate, [server, opts]}})
+          end
+
+        error ->
+          error
       end
+    after
+      Process.demonitor(ref, [:flush])
     end
   end
 
-  @doc """
-  Detaches a process from this agent.
+  @impl true
+  def callback_mode, do: :handle_event_function
 
-  If this was the last attachment and `idle_timeout` is configured,
-  the idle timer starts.
+  @impl true
+  def init(%Options{} = opts) do
+    Process.flag(:trap_exit, true)
 
-  Note: You don't need to call this explicitly if the attached process
-  exits normally — the monitor will handle cleanup automatically.
+    with {:ok, restored_agent, restored_version} <- restore_initial_agent(opts),
+         {:ok, agent} <- Agent.validate_instance(restored_agent),
+         {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
+         {:ok, exec_module} <- validate_exec_module(opts.exec_module),
+         {:ok, exec_opts} <- validate_keyword(opts.exec_opts, :exec_opts),
+         {:ok, max_postponed_signals} <-
+           validate_limit(opts.max_postponed_signals, :max_postponed_signals),
+         {:ok, max_directives_per_turn} <-
+           validate_limit(opts.max_directives_per_turn, :max_directives_per_turn) do
+      parent = opts |> restore_parent(agent) |> monitor_parent()
 
-  ## Examples
+      data = %State{
+        agent: agent,
+        plugin_specs: plugin_specs,
+        jido: opts.jido,
+        partition: opts.partition,
+        registry: opts.registry,
+        registered?: opts.register,
+        exec_module: exec_module,
+        exec_opts: exec_opts,
+        max_postponed_signals: max_postponed_signals,
+        postponed_tokens: MapSet.new(),
+        max_directives_per_turn: max_directives_per_turn,
+        directive_timeout: opts.directive_timeout,
+        default_dispatch: opts.default_dispatch,
+        error_policy: opts.error_policy,
+        error_count: 0,
+        parent: parent,
+        orphaned_from: nil,
+        children: %{},
+        on_parent_death: opts.on_parent_death,
+        pool: opts.pool,
+        pool_key: opts.pool_key,
+        idle_timeout: opts.idle_timeout,
+        persistence: opts.persistence,
+        attachments: MapSet.new(),
+        attachment_monitors: %{},
+        idle_timer: nil,
+        spawn_fun: opts.spawn_fun,
+        debug: opts.debug,
+        debug_events: [],
+        debug_max_events: opts.debug_max_events,
+        state_version: restored_version,
+        activation_id: Signal.ID.generate!(),
+        active: nil,
+        plugin_bootstrap: nil,
+        admission_task: nil,
+        directive_task: nil
+      }
 
-      :ok = Jido.AgentServer.detach(pid)
-  """
-  @spec detach(server(), pid()) :: :ok | {:error, term()}
-  def detach(server, owner_pid \\ self()) do
-    with {:ok, pid} <- resolve_server(server) do
-      try do
-        GenServer.call(pid, {:detach, owner_pid})
-      catch
-        :exit, {:noproc, _} -> {:error, :not_found}
-        :exit, {:timeout, _} -> {:error, :timeout}
-        :exit, reason -> {:error, reason}
-      end
+      span =
+        AgentTelemetry.start(
+          :lifecycle,
+          Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, :activate)
+        )
+
+      {:ok, :initializing, %{data | activation_span: span},
+       [{:next_event, :internal, :bootstrap}]}
+    else
+      {:error, reason} -> {:stop, reason}
     end
   end
 
-  @doc """
-  Touches the agent to reset the idle timer.
+  def handle_event(:internal, :bootstrap, :initializing, %State{} = data) do
+    case PluginLifecycle.start_all(data) do
+      {:ok, data} ->
+        {:keep_state, start_plugin_readiness(data)}
 
-  Use this for request-based activity tracking (e.g., HTTP requests)
-  where you don't want to maintain a persistent attachment.
-
-  ## Examples
-
-      # In a controller
-      {:ok, pid} = Jido.Agent.InstanceManager.get(:sessions, key)
-      :ok = Jido.AgentServer.touch(pid)
-  """
-  @spec touch(server()) :: :ok | {:error, term()}
-  def touch(server) do
-    with {:ok, pid} <- resolve_server(server) do
-      GenServer.cast(pid, :touch)
+      {:error, reason, data} ->
+        PluginLifecycle.stop_all(data, :shutdown)
+        {:stop, {:shutdown, {:bootstrap_failed, reason}}, data}
     end
   end
 
-  @doc false
-  @spec start_dynamic_cron_job(State.t(), term(), Jido.Scheduler.cron_spec()) ::
-          {:ok, GenServer.server()} | {:error, term()}
-  def start_dynamic_cron_job(%State{} = state, logical_id, cron_spec) do
-    signal =
-      case cron_spec.message do
-        %Signal{} = signal ->
-          signal
+  def handle_event(
+        :info,
+        {:plugin_readiness, token, :ok},
+        :initializing,
+        %State{plugin_bootstrap: %{token: token, ref: ref}} = data
+      ) do
+    Process.demonitor(ref, [:flush])
 
-        message ->
-          CronTick.new!(%{job_id: logical_id, message: message}, source: "/agent/#{state.id}")
+    AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
+      state_version: data.state_version
+    })
+
+    data = %{data | plugin_bootstrap: nil, activation_span: nil}
+    notify_parent_online(data)
+    {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
+  end
+
+  def handle_event(
+        :info,
+        {:plugin_readiness, token, {:error, reason}},
+        :initializing,
+        %State{plugin_bootstrap: %{token: token, ref: ref}} = data
+      ) do
+    Process.demonitor(ref, [:flush])
+    {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
+  end
+
+  def handle_event({:call, _from}, :await_ready, :initializing, %State{}) do
+    {:keep_state_and_data, [:postpone]}
+  end
+
+  def handle_event({:call, from}, :await_ready, _phase, %State{}) do
+    {:keep_state_and_data, [{:reply, from, :ok}]}
+  end
+
+  @impl true
+  def handle_event({:call, from}, :agent, _phase, %State{} = data) do
+    {:keep_state_and_data, [{:reply, from, data.agent}]}
+  end
+
+  def handle_event({:call, from}, {:plugin_state, plugin}, _phase, %State{} = data) do
+    reply =
+      case Enum.find(data.plugin_specs, &(&1.module == plugin)) do
+        nil -> {:error, {:plugin_not_declared, plugin}}
+        spec -> {:ok, plugin_state_value(data.agent.state, spec.state_key)}
       end
 
-    start_runtime_cron_job(
-      state,
-      cron_spec.cron_expression,
-      cron_spec.timezone,
-      signal
-    )
+    {:keep_state_and_data, [{:reply, from, reply}]}
   end
 
-  defp start_runtime_cron_job(%State{} = state, cron_expr, timezone, signal) do
-    agent_pid = self()
-
-    Jido.Scheduler.start_child(
-      state.jido,
-      agent_pid,
-      fn -> Jido.AgentServer.cast(agent_pid, signal) end,
-      cron_expr,
-      timezone: timezone
-    )
+  def handle_event({:call, from}, :status, phase, %State{} = data) do
+    {:keep_state_and_data, [{:reply, from, public_status(phase, data)}]}
   end
 
-  defp register_runtime_cron_job(state, logical_id, cron_expr, timezone, signal, label) do
-    case start_runtime_cron_job(state, cron_expr, timezone, signal) do
-      {:ok, job} ->
-        {:ok, track_cron_job(state, logical_id, job)}
+  def handle_event({:call, from}, :creation_info, _phase, %State{} = data) do
+    info = %{
+      agent_id: data.agent.id,
+      agent_module: data.agent.module,
+      partition: data.partition,
+      activation_id: data.activation_id,
+      parent: data.parent
+    }
+
+    {:keep_state_and_data, [{:reply, from, info}]}
+  end
+
+  def handle_event({:call, from}, :children, _phase, %State{} = data) do
+    children = Map.new(data.children, fn {key, child} -> {key, public_child(child)} end)
+    {:keep_state_and_data, [{:reply, from, children}]}
+  end
+
+  def handle_event({:call, from}, :snapshot, _phase, %State{} = data) do
+    snapshot = %{
+      agent: data.agent,
+      state_version: data.state_version
+    }
+
+    {:keep_state_and_data, [{:reply, from, snapshot}]}
+  end
+
+  def handle_event({:call, from}, {:hibernate, opts}, :idle, %State{} = data) do
+    case persist_agent(data, data.agent, data.state_version, :hibernate, opts) do
+      :ok ->
+        {:stop_and_reply, {:shutdown, :hibernate}, [{:reply, from, :ok}], data}
+
+      {:error, _reason} = error ->
+        {:keep_state_and_data, [{:reply, from, error}]}
+    end
+  end
+
+  def handle_event({:call, _from}, {:hibernate, _opts}, phase, %State{})
+      when phase in [:admitting, :running, :directing] do
+    {:keep_state_and_data, [:postpone]}
+  end
+
+  def handle_event({:call, from}, {:attach, owner_pid}, _phase, %State{} = data) do
+    case attach_owner(data, owner_pid) do
+      {:ok, next_data} ->
+        {:keep_state, next_data, [{:reply, from, :ok}]}
 
       {:error, reason} ->
-        Logger.error(fn ->
-          "AgentServer #{state.id} failed to register #{label} #{inspect(logical_id)}: #{inspect(reason)}"
+        {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
+  end
+
+  def handle_event({:call, from}, {:detach, owner_pid}, phase, %State{} = data) do
+    next_data = data |> detach_owner(owner_pid) |> maybe_start_idle_timer(phase)
+    {:keep_state, next_data, [{:reply, from, :ok}]}
+  end
+
+  def handle_event(:cast, :touch, phase, %State{} = data) do
+    {:keep_state, data |> cancel_idle_timer() |> maybe_start_idle_timer(phase)}
+  end
+
+  def handle_event({:call, from}, {:set_debug, enabled}, _phase, %State{} = data)
+      when is_boolean(enabled) do
+    next_data = %{
+      data
+      | debug: enabled,
+        debug_events: if(enabled, do: data.debug_events, else: [])
+    }
+
+    {:keep_state, next_data, [{:reply, from, :ok}]}
+  end
+
+  def handle_event({:call, from}, {:recent_events, opts}, _phase, %State{} = data) do
+    if data.debug do
+      limit = opts |> Keyword.get(:limit, data.debug_max_events) |> normalize_event_limit()
+      {:keep_state_and_data, [{:reply, from, {:ok, Enum.take(data.debug_events, limit)}}]}
+    else
+      {:keep_state_and_data, [{:reply, from, {:error, :debug_not_enabled}}]}
+    end
+  end
+
+  def handle_event({:call, from}, {:adopt_parent, %ParentRef{} = parent}, _phase, data) do
+    case attach_parent(data, parent) do
+      {:ok, next_data} ->
+        reply = relationship_info(next_data)
+        {:keep_state, next_data, [{:reply, from, {:ok, reply}}]}
+
+      {:error, reason} ->
+        {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
+  end
+
+  def handle_event({:call, from}, {:adopt_child, child, tag, meta}, _phase, data) do
+    directive = %Directive.AdoptChild{child: child, tag: tag, meta: meta}
+
+    case DirectiveRuntime.handle(directive, directive_context(data), data) do
+      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
+      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
+  end
+
+  def handle_event({:call, from}, {:stop_child, tag, reason}, _phase, data) do
+    directive = %Directive.StopChild{tag: tag, reason: reason}
+
+    case DirectiveRuntime.handle(directive, directive_context(data), data) do
+      {:ok, next_data} ->
+        {:keep_state, next_data, [{:reply, from, :ok}]}
+
+      {:error, error, _next_data} ->
+        {:keep_state_and_data, [{:reply, from, {:error, error}}]}
+    end
+  end
+
+  def handle_event({:call, from}, :cancel, :idle, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :idle}}]}
+  end
+
+  def handle_event({:call, from}, :cancel, :admitting, %State{} = data) do
+    cancel_admission(from, data)
+  end
+
+  def handle_event({:call, from}, :cancel, :running, %State{} = data) do
+    cancel_active(from, data)
+  end
+
+  def handle_event({:call, from}, :cancel, :directing, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :directing}}]}
+  end
+
+  def handle_event({:call, from}, {:cancel, _turn_id}, :idle, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+  end
+
+  def handle_event(
+        {:call, from},
+        {:cancel, turn_id},
+        :admitting,
+        %State{active: %ActiveTurn{turn_id: turn_id}} = data
+      ) do
+    cancel_admission(from, data)
+  end
+
+  def handle_event({:call, from}, {:cancel, _turn_id}, :admitting, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+  end
+
+  def handle_event(
+        {:call, from},
+        {:cancel, turn_id},
+        :running,
+        %State{active: %ActiveTurn{turn_id: turn_id}} = data
+      ) do
+    cancel_active(from, data)
+  end
+
+  def handle_event({:call, from}, {:cancel, _turn_id}, :running, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+  end
+
+  def handle_event({:call, from}, {:cancel, _turn_id}, :directing, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+  end
+
+  def handle_event({:call, from}, {:signal, token, %Signal{} = signal, deadline}, phase, data) do
+    handle_event({:call, from}, {:signal, token, signal, deadline, %{}}, phase, data)
+  end
+
+  def handle_event(
+        {:call, from},
+        {:signal, token, %Signal{} = signal, deadline, _context},
+        :initializing,
+        %State{} = data
+      ) do
+    postpone_call(from, token, signal, deadline, data)
+  end
+
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :initializing, %State{} = data) do
+    postpone_cast(token, signal, data)
+  end
+
+  def handle_event(
+        {:call, from},
+        {:signal, token, %Signal{} = signal, deadline, context},
+        :idle,
+        %State{} = data
+      ) do
+    data = forget_postponed(data, token)
+
+    if admission_expired?(deadline) do
+      {:keep_state, data, [{:reply, from, {:error, :admission_timeout}}]}
+    else
+      start_turn(signal, from, context, data)
+    end
+  end
+
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :idle, %State{} = data) do
+    start_turn(signal, nil, %{}, forget_postponed(data, token))
+  end
+
+  def handle_event(
+        {:call, from},
+        {:signal, token, %Signal{} = signal, deadline, _context},
+        :admitting,
+        %State{} = data
+      ) do
+    if reentrant_admission_call?(from, data.admission_task) do
+      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_admission}}]}
+    else
+      postpone_call(from, token, signal, deadline, data)
+    end
+  end
+
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :admitting, %State{} = data) do
+    postpone_cast(token, signal, data)
+  end
+
+  def handle_event(
+        {:call, from},
+        {:signal, token, %Signal{} = signal, deadline, _context},
+        :running,
+        %State{} = data
+      ) do
+    if reentrant_turn_call?(from, data.active) do
+      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_turn}}]}
+    else
+      postpone_call(from, token, signal, deadline, data)
+    end
+  end
+
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :running, %State{} = data) do
+    postpone_cast(token, signal, data)
+  end
+
+  def handle_event(
+        {:call, from},
+        {:signal, token, %Signal{} = signal, deadline, _context},
+        :directing,
+        %State{} = data
+      ) do
+    if reentrant_directive_call?(from, data.directive_task) do
+      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
+    else
+      postpone_call(from, token, signal, deadline, data)
+    end
+  end
+
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :directing, %State{} = data) do
+    postpone_cast(token, signal, data)
+  end
+
+  def handle_event(:info, {:signal, %Signal{} = signal}, _phase, %State{}) do
+    cast(self(), signal)
+    :keep_state_and_data
+  end
+
+  def handle_event(
+        :info,
+        {:agent_child_online, pid, child_id, _child_module, _child_partition, tag, _meta},
+        _phase,
+        %State{} = data
+      ) do
+    case verify_child_online(pid, child_id, tag, data) do
+      {:ok, info} ->
+        {:keep_state, track_online_child(data, pid, info)}
+
+      {:error, _reason} ->
+        :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:plugin_runtime_ready, lifecycle_pid, plugin, runtime_pid},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    case State.child(data, key) do
+      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
+        {:keep_state, State.add_child(data, key, %{child | pid: runtime_pid})}
+
+      _child ->
+        :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        :initializing,
+        %State{plugin_bootstrap: %{ref: ref}} = data
+      ) do
+    {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
+  end
+
+  def handle_event(
+        :info,
+        {ref, result},
+        :admitting,
+        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    Process.demonitor(ref, [:flush])
+    cancel_task_timer(pending.timer)
+    data = %{data | admission_task: nil}
+
+    case result do
+      {:ok, %Jido.Agent.Command{} = command} -> begin_turn_execution(command, data)
+      {:error, reason} -> fail_turn(reason, :prepare, data)
+      other -> fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        :admitting,
+        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    cancel_task_timer(pending.timer)
+    data = %{data | admission_task: nil}
+
+    error =
+      Error.execution_error("Agent Plugin admission task exited",
+        details: %{reason: reason}
+      )
+
+    fail_turn(error, :prepare, data)
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:admission_timeout, task_ref}},
+        :admitting,
+        %State{admission_task: %{task: %Task{ref: task_ref} = task, timer: timer}} = data
+      ) do
+    _result = Task.shutdown(task, :brutal_kill)
+    data = %{data | admission_task: nil}
+
+    error =
+      Error.timeout_error("Agent Plugin admission timed out",
+        timeout: data.directive_timeout,
+        details: %{turn_id: data.active.turn_id}
+      )
+
+    fail_turn(error, :prepare, data)
+  end
+
+  def handle_event(
+        :info,
+        {ref, result},
+        :directing,
+        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    Process.demonitor(ref, [:flush])
+    cancel_directive_timer(pending.timer)
+    data = %{data | directive_task: nil}
+
+    directive_result =
+      case result do
+        :ok -> {:ok, data}
+        {:error, reason} -> {:error, reason, data}
+        other -> {:error, {:invalid_plugin_dispatch_result, other}, data}
+      end
+
+    complete_directive(directive_result, pending.rest, pending.context, pending.span)
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        :directing,
+        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    cancel_directive_timer(pending.timer)
+    data = %{data | directive_task: nil}
+
+    error =
+      Error.execution_error("Agent Plugin Directive task exited",
+        details: %{reason: reason}
+      )
+
+    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span, :exit)
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:directive_timeout, task_ref}},
+        :directing,
+        %State{
+          directive_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending
+        } = data
+      ) do
+    _result = Task.shutdown(task, :brutal_kill)
+    data = %{data | directive_task: nil}
+
+    error =
+      Error.timeout_error("Agent Directive timed out",
+        timeout: data.directive_timeout,
+        details: %{turn_id: data.active.turn_id}
+      )
+
+    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span)
+  end
+
+  def handle_event(:info, {:DOWN, ref, :process, pid, reason}, phase, %State{} = data) do
+    handle_process_down(ref, pid, reason, phase, data)
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, ref, :agent_idle_timeout},
+        :idle,
+        %State{idle_timer: ref} = data
+      ) do
+    {:stop, {:shutdown, :idle_timeout}, %{data | idle_timer: nil}}
+  end
+
+  def handle_event(:info, {:timeout, _ref, :agent_idle_timeout}, _phase, %State{}) do
+    :keep_state_and_data
+  end
+
+  def handle_event(:info, message, :running, %State{active: %ActiveTurn{} = active} = data) do
+    case data.exec_module.handle_message(active.exec_handle, message) do
+      {:done, result} -> finish_turn(result, data)
+      :ignore -> :keep_state_and_data
+      {:error, error} -> fail_turn(error, :execute, data)
+    end
+  end
+
+  def handle_event(:info, _message, phase, %State{})
+      when phase in [:idle, :admitting, :directing],
+      do: :keep_state_and_data
+
+  def handle_event(:internal, {:handle_directives, [], context}, :directing, %State{} = data) do
+    continue_directives([], context, data)
+  end
+
+  def handle_event(
+        :internal,
+        {:handle_directives, [directive | rest], context},
+        :directing,
+        %State{} = data
+      ) do
+    handle_one_directive(directive, rest, context, data)
+  end
+
+  def handle_event({:call, from}, _request, _phase, %State{}) do
+    {:keep_state_and_data, [{:reply, from, {:error, :unknown_call}}]}
+  end
+
+  def handle_event(_event_type, _event, _phase, %State{}), do: :keep_state_and_data
+
+  @impl true
+  def terminate(reason, _phase, %State{} = data) do
+    AgentTelemetry.finish(data.activation_span, AgentTelemetry.result_metadata({:error, reason}))
+    metadata = Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, :stop)
+    AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
+  end
+
+  defp terminate_agent(reason, data) do
+    if match?(%ActiveTurn{exec_handle: handle} when not is_nil(handle), data.active) do
+      try do
+        _result = data.exec_module.cancel(data.active.exec_handle)
+      catch
+        _kind, _reason -> :ok
+      end
+    end
+
+    stop_plugin_readiness(data.plugin_bootstrap)
+    stop_admission_task(data.admission_task)
+    stop_directive_task(data.directive_task)
+
+    if data.directive_task do
+      finish_span_error(data.directive_task.span, {:agent_stopped, reason})
+    end
+
+    AgentTelemetry.interrupted(data, reason)
+    cancel_idle_timer(data)
+    maybe_persist_on_stop(reason, data)
+    maybe_delete_runtime_checkpoint(reason, data)
+    retire_remote_spawn(reason, data)
+    PluginLifecycle.stop_all(data, :shutdown)
+    TraceContext.clear()
+    :ok
+  end
+
+  defp start_turn(%Signal{} = signal, from, context, %State{} = data) do
+    data = cancel_idle_timer(data)
+    {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+    span = start_signal_span(signal, data)
+    active = ActiveTurn.new(signal, from, data.state_version, span)
+    data = %{data | active: active}
+    metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
+
+    semantic =
+      AgentTelemetry.start(:turn, Map.merge(metadata, %{stage: :evaluate, committed?: false}), %{
+        state_version_before: data.state_version
+      })
+
+    data = %{data | active: %{active | telemetry_span: semantic}}
+
+    try do
+      with {:ok, command} <- initial_command(signal, context, data) do
+        if Plugin.admits?(data.plugin_specs) do
+          start_admission_task(command, data)
+        else
+          begin_turn_execution(command, data)
+        end
+      else
+        {:error, reason} -> fail_turn(reason, :prepare, data)
+      end
+    rescue
+      error ->
+        finish_span_fault(span, :error, error, __STACKTRACE__)
+        AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, error), :error)
+        TraceContext.clear()
+        reraise error, __STACKTRACE__
+    catch
+      kind, reason ->
+        finish_span_fault(span, kind, reason, __STACKTRACE__)
+        AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, reason), kind)
+        TraceContext.clear()
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
+  defp start_plugin_readiness(%State{} = data) do
+    owner = self()
+    token = make_ref()
+
+    {pid, ref} =
+      spawn_monitor(fn ->
+        send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
+      end)
+
+    %{data | plugin_bootstrap: %{pid: pid, ref: ref, token: token}}
+  end
+
+  defp stop_plugin_readiness(%{pid: pid, ref: ref}) do
+    Process.demonitor(ref, [:flush])
+    if Process.alive?(pid), do: Process.exit(pid, :shutdown)
+    :ok
+  end
+
+  defp stop_plugin_readiness(nil), do: :ok
+
+  defp stop_admission_task(%{task: %Task{} = task} = pending) do
+    cancel_task_timer(Map.get(pending, :timer))
+    _result = Task.shutdown(task, :brutal_kill)
+    :ok
+  end
+
+  defp stop_admission_task(nil), do: :ok
+
+  defp stop_directive_task(%{task: %Task{} = task} = pending) do
+    cancel_directive_timer(Map.get(pending, :timer))
+    _result = Task.shutdown(task, :brutal_kill)
+    :ok
+  end
+
+  defp stop_directive_task(nil), do: :ok
+
+  defp initial_command(%Signal{} = signal, context, %State{} = data) do
+    context = Map.merge(context, %{jido: data.jido, partition: data.partition})
+    Jido.Agent.Command.new(data.agent, signal, context)
+  end
+
+  defp start_admission_task(command, %State{} = data) do
+    with {:ok, runtime_refs} <-
+           plugin_runtime_refs(data, Plugin.admission_modules(data.plugin_specs)) do
+      supervisor = Jido.Exec.task_supervisor_name(data.jido)
+
+      task =
+        Task.Supervisor.async(supervisor, fn ->
+          Plugin.admit(command, data.plugin_specs, runtime_refs)
         end)
 
-        {:error, reason, state}
-    end
-  end
-
-  @doc false
-  @spec track_cron_job(State.t(), term(), GenServer.server()) :: State.t()
-  def track_cron_job(%State{} = state, logical_id, job) do
-    {_old_job, state} = untrack_cron_job(state, logical_id)
-
-    %{state | cron_jobs: Map.put(state.cron_jobs, logical_id, job)}
-  end
-
-  @doc false
-  @spec untrack_cron_job(State.t(), term()) :: {GenServer.server() | nil, State.t()}
-  def untrack_cron_job(%State{} = state, logical_id) do
-    {job, cron_jobs} = Map.pop(state.cron_jobs, logical_id)
-
-    if job, do: Jido.Scheduler.cancel(job)
-
-    {job, %{state | cron_jobs: cron_jobs}}
-  end
-
-  @doc false
-  @spec persist_cron_specs(State.t(), map()) :: :ok | {:error, term()}
-  def persist_cron_specs(%State{} = state, cron_specs) when is_map(cron_specs) do
-    lifecycle_mod = state.lifecycle.mod
-    cron_specs = Jido.Scheduler.normalize_cron_specs(cron_specs)
-
-    if function_exported?(lifecycle_mod, :persist_cron_specs, 2) do
-      lifecycle_mod.persist_cron_specs(state, cron_specs)
+      timer = start_task_timer(data.directive_timeout, :admission_timeout, task.ref)
+      {:next_state, :admitting, %{data | admission_task: %{task: task, timer: timer}}}
     else
-      :ok
+      {:error, reason} -> fail_turn(reason, :prepare, data)
+    end
+  rescue
+    error -> fail_turn(error, :prepare, data)
+  catch
+    kind, reason -> fail_turn({kind, reason}, :prepare, data)
+  end
+
+  defp begin_turn_execution(%Jido.Agent.Command{} = command, %State{} = data) do
+    # Admission receives the original Signal. Attach the Turn trace only at
+    # the existing execution boundary, after admission has finished.
+    signal =
+      if Jido.Tracing.Trace.get(command.signal) do
+        command.signal
+      else
+        case Jido.Tracing.Trace.put(command.signal, data.active.telemetry_span.metadata) do
+          {:ok, traced} -> traced
+          {:error, _} -> command.signal
+        end
+      end
+
+    {signal, _trace} = TraceContext.ensure_from_signal(signal)
+    command = %{command | signal: signal}
+
+    case start_exec(command, data) do
+      {:ok, handle, prepared} ->
+        active = ActiveTurn.begin_execution(data.active, handle, prepared)
+        {:next_state, :running, %{data | active: active}}
+
+      {:error, reason} ->
+        fail_turn(reason, :prepare, data)
     end
   end
 
-  @doc false
-  @spec emit_cron_telemetry_event(State.t(), atom(), map()) :: :ok
-  def emit_cron_telemetry_event(%State{} = state, event, metadata \\ %{})
-      when is_atom(event) and is_map(metadata) do
-    emit_telemetry(
-      [:jido, :agent_server, :cron, event],
-      %{system_time: System.system_time()},
-      Map.merge(
-        %{
-          agent_id: state.id,
-          agent_module: state.agent_module,
-          jido_instance: state.jido,
-          jido_partition: state.partition
-        },
-        metadata
+  defp start_exec(%Jido.Agent.Command{} = command, %State{} = data) do
+    exec_opts = Keyword.put(data.exec_opts, :jido, data.jido)
+    command_options = Keyword.put(exec_opts, :context, command.context)
+
+    with {:ok, prepared} <-
+           Runner.prepare(command.agent, command.signal, command_options, data.plugin_specs),
+         {:ok, handle} <- start_async_exec(prepared, data.exec_module),
+         :ok <- link_exec(handle) do
+      {:ok, handle, prepared}
+    end
+  end
+
+  defp link_exec(%{pid: pid}) when is_pid(pid) do
+    Process.link(pid)
+    :ok
+  end
+
+  defp link_exec(_handle), do: :ok
+
+  defp start_async_exec(prepared, exec_module) do
+    {:ok,
+     exec_module.run_async(
+       prepared.turn.executable,
+       prepared.turn.input,
+       prepared.context,
+       prepared.exec_opts
+     )}
+  rescue
+    error -> {:error, error}
+  catch
+    kind, reason -> {:error, {kind, reason}}
+  end
+
+  defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
+    case result do
+      {:error, reason} ->
+        fail_turn(reason, :execute, data)
+
+      {:error, reason, _extras} ->
+        fail_turn(reason, :execute, data)
+
+      _result ->
+        case Runner.finish_for_server(prepared, result) do
+          {:ok, agent, directives} -> finish_success(agent, directives, data)
+          {:error, reason} -> fail_turn(reason, :finalize, data)
+        end
+    end
+  end
+
+  defp finish_success(%Agent{} = agent, directives, %State{} = data) do
+    with {:ok, directives} <- prepare_directives(directives, data) do
+      commit_turn(agent, directives, data)
+    else
+      {:error, reason} -> fail_turn(reason, :finalize, data)
+    end
+  end
+
+  defp commit_turn(agent, directives, %State{active: %ActiveTurn{} = active} = data) do
+    # This is a commit revision, not a count of distinct state values.
+    version = data.state_version + 1
+
+    result =
+      AgentTelemetry.with_span(
+        :commit,
+        Map.put(AgentTelemetry.turn_metadata(data), :stage, :commit),
+        fn -> persist_commit(data, agent, version) end
       )
+
+    case result do
+      :ok -> commit_checkpointed_turn(agent, directives, version, active, data)
+      {:error, reason} -> fail_turn({:persistence_failed, reason}, :commit, data)
+    end
+  end
+
+  defp commit_checkpointed_turn(agent, directives, version, active, data) do
+    committed_active = ActiveTurn.mark_committed(active, version, length(directives))
+    AgentTelemetry.committed(data, version, length(directives))
+
+    next_data =
+      data
+      |> Map.merge(%{
+        agent: agent,
+        state_version: version,
+        active: committed_active
+      })
+      |> record_event(:turn_committed, %{
+        turn_id: active.turn_id,
+        signal_id: active.effective_signal.id,
+        signal_type: active.effective_signal.type,
+        state_version: version,
+        directive_count: length(directives)
+      })
+
+    actions =
+      reply_action(active.caller, {:ok, agent}) ++
+        directive_actions(directives, agent.id, active)
+
+    phase = if directives == [], do: :idle, else: :directing
+
+    next_data =
+      if directives == [] do
+        outcome = turn_outcome(next_data, :succeeded, :commit, nil)
+        next_data |> complete_outcome(outcome) |> maybe_start_idle_timer(phase)
+      else
+        maybe_start_idle_timer(next_data, phase)
+      end
+
+    finish_span(active.span, %{directive_count: length(directives), state_version: version})
+    if phase == :idle, do: TraceContext.clear()
+    {:next_state, phase, next_data, actions}
+  end
+
+  defp fail_turn(reason, stage, %State{active: %ActiveTurn{} = active} = data) do
+    finish_span_error(active.span, reason)
+    TraceContext.clear()
+    signal = active.effective_signal || active.source_signal
+    maybe_log_cast_failure(active.caller, signal, reason, data.agent.id)
+    outcome = turn_outcome(data, outcome_status(reason), stage, reason)
+
+    next_data =
+      data
+      |> Map.update!(:error_count, &(&1 + 1))
+      |> complete_outcome(outcome)
+
+    decision =
+      case reason do
+        {:persistence_failed, failure} ->
+          if uncertain_write?(failure),
+            do: {:stop, {:shutdown, {:persistence_failed, failure}}, next_data},
+            else: error_policy_decision(outcome, next_data)
+
+        _reason ->
+          error_policy_decision(outcome, next_data)
+      end
+
+    case decision do
+      {:continue, policy_data} ->
+        {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle),
+         reply_action(active.caller, {:error, reason})}
+
+      {:stop, stop_reason, policy_data} ->
+        replies = reply_action(active.caller, {:error, reason})
+        stop_reason = normalize_stop_reason(stop_reason)
+
+        if replies == [] do
+          {:stop, stop_reason, policy_data}
+        else
+          {:stop_and_reply, stop_reason, replies, policy_data}
+        end
+    end
+  end
+
+  defp uncertain_write?(:indeterminate), do: true
+  defp uncertain_write?({:indeterminate, _reason}), do: true
+
+  defp uncertain_write?(%Error.ExecutionError{details: %{operation: :compare_and_swap}}),
+    do: true
+
+  defp uncertain_write?(_reason), do: false
+
+  defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
+    case data.exec_module.cancel(active.exec_handle) do
+      :ok ->
+        finish_span_error(active.span, :cancelled)
+        TraceContext.clear()
+        outcome = turn_outcome(data, :cancelled, :execute, :cancelled)
+        next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
+
+        actions =
+          reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
+
+        {:next_state, :idle, next_data, actions}
+
+      {:error, error} ->
+        finish_span_error(active.span, error)
+        TraceContext.clear()
+        outcome = turn_outcome(data, :indeterminate, :execute, error)
+        next_data = complete_outcome(data, outcome)
+
+        actions =
+          reply_action(active.caller, {:error, error}) ++
+            [{:reply, cancel_from, {:error, error}}]
+
+        {:stop_and_reply, {:shutdown, {:exec_cancellation_failed, error}}, actions, next_data}
+    end
+  end
+
+  defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
+    stop_admission_task(data.admission_task)
+    finish_span_error(active.span, :cancelled)
+    TraceContext.clear()
+    outcome = turn_outcome(data, :cancelled, :prepare, :cancelled)
+
+    next_data =
+      data
+      |> Map.put(:admission_task, nil)
+      |> complete_outcome(outcome)
+      |> maybe_start_idle_timer(:idle)
+
+    actions = reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
+    {:next_state, :idle, next_data, actions}
+  end
+
+  defp prepare_directives(directives, %State{} = data) do
+    with :ok <- ensure_directive_limit(directives, data.max_directives_per_turn),
+         :ok <- ensure_terminal_directive_last(directives) do
+      {:ok, directives}
+    end
+  end
+
+  defp handle_one_directive(directive, rest, context, data) do
+    span = start_directive_span(directive, context, data)
+
+    if DirectiveRuntime.signal_directive?(directive) do
+      start_signal_directive(directive, rest, context, span, data)
+    else
+      handle_directive(directive, rest, context, span, data)
+    end
+  end
+
+  defp start_signal_directive(
+         directive,
+         rest,
+         context,
+         span,
+         %State{active: %ActiveTurn{} = active} = data
+       ) do
+    modules = Plugin.dispatch_modules(data.plugin_specs)
+
+    with {:ok, prepared_directive, target} <-
+           DirectiveRuntime.prepare_signal(directive, context, data),
+         {:ok, runtime_refs} <- plugin_runtime_refs(data, modules) do
+      plugin_context = %PluginSignalContext{
+        turn_id: active.turn_id,
+        agent_id: data.agent.id,
+        source_signal: active.source_signal,
+        effective_signal: active.effective_signal,
+        turn_context: active.turn_context,
+        target: target,
+        state_version: data.state_version,
+        plugin_state: nil,
+        jido: data.jido,
+        partition: data.partition
+      }
+
+      agent_server = self()
+
+      start_directive_task(
+        fn ->
+          with {:ok, signal} <-
+                 Plugin.prepare_dispatch(
+                   prepared_directive.signal,
+                   data.plugin_specs,
+                   runtime_refs,
+                   plugin_context,
+                   data.agent.state
+                 ) do
+            prepared_directive
+            |> Map.put(:signal, signal)
+            |> DirectiveRuntime.dispatch_prepared(data, agent_server)
+          end
+        end,
+        rest,
+        context,
+        span,
+        data
+      )
+    else
+      {:error, reason} -> complete_directive({:error, reason, data}, rest, context, span)
+    end
+  end
+
+  defp handle_directive(directive, rest, context, span, data) do
+    if Directive.built_in?(directive) do
+      directive
+      |> DirectiveRuntime.handle(context, data)
+      |> complete_directive(rest, context, span)
+    else
+      start_plugin_directive(directive, rest, context, span, data)
+    end
+  end
+
+  defp complete_directive(result, rest, context, span, fault_kind \\ nil) do
+    case result do
+      {:ok, next_data} ->
+        finish_span(span, %{result: :ok})
+        active = ActiveTurn.mark_directive_completed(next_data.active)
+        continue_directives(rest, context, %{next_data | active: active})
+
+      {:error, reason, next_data} ->
+        if fault_kind,
+          do: finish_span_fault(span, fault_kind, reason, []),
+          else: finish_span_error(span, reason)
+
+        Logger.error("Agent Directive handling failed",
+          agent_id: context.agent_id,
+          signal_type: context.signal.type,
+          reason: inspect(reason)
+        )
+
+        active = ActiveTurn.mark_directive_failed(next_data.active)
+
+        next_data =
+          next_data
+          |> Map.put(:active, active)
+          |> record_event(:directive_failed, %{
+            turn_id: active.turn_id,
+            reason: reason
+          })
+
+        outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
+        next_data = complete_outcome(next_data, outcome)
+
+        apply_directive_error_policy(outcome, next_data)
+
+      {:stop, reason, next_data} ->
+        finish_span(span, %{result: :stop})
+        active = ActiveTurn.mark_directive_completed(next_data.active)
+        next_data = %{next_data | active: active}
+        outcome = turn_outcome(next_data, :succeeded, :directive, nil)
+        {:stop, normalize_stop_reason(reason), complete_outcome(next_data, outcome)}
+    end
+  end
+
+  defp start_plugin_directive(directive, rest, context, span, %State{} = data) do
+    case Plugin.directive_owner(data.plugin_specs, directive) do
+      %Jido.Plugin.Spec{dispatch?: false} ->
+        complete_directive({:ok, data}, rest, context, span)
+
+      %Jido.Plugin.Spec{} = plugin ->
+        dispatch_plugin_directive(plugin, directive, rest, context, span, data)
+
+      nil ->
+        complete_directive(
+          {:error, {:unsupported_agent_directive, directive}, data},
+          rest,
+          context,
+          span
+        )
+    end
+  end
+
+  defp dispatch_plugin_directive(
+         plugin,
+         directive,
+         rest,
+         context,
+         span,
+         %State{active: %ActiveTurn{} = active} = data
+       ) do
+    plugin_context = %PluginDirectiveContext{
+      turn_id: active.turn_id,
+      agent_id: data.agent.id,
+      source_signal: context.source_signal,
+      effective_signal: context.signal,
+      state_version: data.state_version,
+      plugin_state: plugin_state_value(data.agent.state, plugin.state_key),
+      turn_context: context.turn_context,
+      jido: data.jido,
+      partition: data.partition
+    }
+
+    # A restarting Plugin can need Agent state to become ready. Resolve its
+    # reference in the bounded task so the Agent can answer that state query.
+    start_directive_task(
+      fn ->
+        with {:ok, runtime_ref} <- plugin_runtime_ref(data, plugin) do
+          Plugin.dispatch(plugin, runtime_ref, directive, plugin_context)
+        end
+      end,
+      rest,
+      context,
+      span,
+      data
+    )
+  end
+
+  defp start_directive_task(fun, rest, context, span, data) do
+    supervisor = Jido.Exec.task_supervisor_name(data.jido)
+    task = Task.Supervisor.async(supervisor, fun)
+    timer = start_directive_timer(data.directive_timeout, task.ref)
+    pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
+    {:keep_state, %{data | directive_task: pending}}
+  rescue
+    error -> complete_directive({:error, error, data}, rest, context, span)
+  catch
+    kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
+  end
+
+  defp start_directive_timer(timeout, task_ref) do
+    start_task_timer(timeout, :directive_timeout, task_ref)
+  end
+
+  defp start_task_timer(:infinity, _tag, _task_ref), do: nil
+
+  defp start_task_timer(timeout, tag, task_ref) do
+    :erlang.start_timer(timeout, self(), {tag, task_ref})
+  end
+
+  defp cancel_directive_timer(timer), do: cancel_task_timer(timer)
+
+  defp cancel_task_timer(nil), do: :ok
+
+  defp cancel_task_timer(timer) do
+    _result = :erlang.cancel_timer(timer)
+    :ok
+  end
+
+  defp plugin_state_value(_state, nil), do: nil
+  defp plugin_state_value(state, key), do: Map.get(state, key)
+
+  defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do
+    TraceContext.clear()
+    outcome = turn_outcome(data, :succeeded, :directive, nil)
+    next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
+    {:next_state, :idle, next_data}
+  end
+
+  defp continue_directives(rest, context, data) do
+    {:keep_state, data, [{:next_event, :internal, {:handle_directives, rest, context}}]}
+  end
+
+  defp directive_actions([], _agent_id, _active), do: []
+
+  defp directive_actions(directives, agent_id, %ActiveTurn{} = active) do
+    context = %DirectiveContext{
+      turn_id: active.turn_id,
+      agent_id: agent_id,
+      source_signal: active.source_signal,
+      signal: active.effective_signal,
+      turn_context: active.turn_context
+    }
+
+    [{:next_event, :internal, {:handle_directives, directives, context}}]
+  end
+
+  defp public_status(phase, %State{} = data) do
+    message_queue_len =
+      case Process.info(self(), :message_queue_len) do
+        {:message_queue_len, length} -> length
+        nil -> 0
+      end
+
+    %{
+      phase: phase,
+      agent_id: data.agent.id,
+      state_version: data.state_version,
+      admission: %{
+        postponed: MapSet.size(data.postponed_tokens),
+        limit: data.max_postponed_signals,
+        message_queue_len: message_queue_len
+      },
+      runtime: %{
+        partition: data.partition,
+        parent: public_parent(data.parent),
+        child_count: map_size(data.children),
+        pending_child_spawns: pending_child_spawns(data),
+        error_count: data.error_count,
+        lifecycle: %{
+          pool: data.pool,
+          attached: MapSet.size(data.attachments),
+          idle_timeout: data.idle_timeout,
+          idle_timer?: not is_nil(data.idle_timer)
+        }
+      },
+      active: public_active(data.active)
+    }
+  end
+
+  defp public_active(nil), do: nil
+
+  defp public_active(%ActiveTurn{} = active) do
+    signal = active.effective_signal || active.source_signal
+
+    %{
+      turn_id: active.turn_id,
+      source_signal_id: active.source_signal.id,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      start_version: active.start_version,
+      committed_version: active.committed_version
+    }
+  end
+
+  defp postpone_call(from, token, _signal, deadline, %State{} = data) do
+    cond do
+      admission_expired?(deadline) ->
+        {:keep_state, forget_postponed(data, token),
+         [{:reply, from, {:error, :admission_timeout}}]}
+
+      MapSet.member?(data.postponed_tokens, token) ->
+        {:keep_state_and_data, [:postpone]}
+
+      admission_full?(data) ->
+        {:keep_state_and_data, [{:reply, from, {:error, overload_error(data)}}]}
+
+      true ->
+        {:keep_state, remember_postponed(data, token), [:postpone]}
+    end
+  end
+
+  defp postpone_cast(token, signal, %State{} = data) do
+    cond do
+      MapSet.member?(data.postponed_tokens, token) ->
+        {:keep_state_and_data, [:postpone]}
+
+      admission_full?(data) ->
+        Logger.warning("Agent Signal cast dropped because the Server is overloaded",
+          agent_id: data.agent.id,
+          signal_id: signal.id,
+          signal_type: signal.type
+        )
+
+        :keep_state_and_data
+
+      true ->
+        {:keep_state, remember_postponed(data, token), [:postpone]}
+    end
+  end
+
+  defp remember_postponed(%State{} = data, token) do
+    %{data | postponed_tokens: MapSet.put(data.postponed_tokens, token)}
+  end
+
+  defp forget_postponed(%State{} = data, token) do
+    %{data | postponed_tokens: MapSet.delete(data.postponed_tokens, token)}
+  end
+
+  defp admission_full?(%State{max_postponed_signals: :infinity}), do: false
+
+  defp admission_full?(%State{} = data) do
+    MapSet.size(data.postponed_tokens) >= data.max_postponed_signals
+  end
+
+  defp overload_error(%State{} = data) do
+    {:overloaded,
+     %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
+  end
+
+  defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})
+       when is_pid(caller) and is_pid(root) do
+    related_exec_process?(caller, root, %{}, 0)
+  end
+
+  defp reentrant_turn_call?(_from, _active), do: false
+
+  defp reentrant_admission_call?({caller, _tag}, %{task: %Task{pid: root}})
+       when is_pid(caller) and is_pid(root) do
+    related_exec_process?(caller, root, %{}, 0)
+  end
+
+  defp reentrant_admission_call?(_from, _admission_task), do: false
+
+  defp reentrant_directive_call?({caller, _tag}, %{task: %Task{pid: root}})
+       when is_pid(caller) and is_pid(root) do
+    related_exec_process?(caller, root, %{}, 0)
+  end
+
+  defp reentrant_directive_call?(_from, _directive_task), do: false
+
+  defp plugin_runtime_refs(%State{} = data, modules) do
+    Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
+      spec = Enum.find(data.plugin_specs, &(&1.module == module))
+
+      case plugin_runtime_ref(data, spec) do
+        {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, module, runtime_ref)}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp plugin_runtime_ref(_data, %Jido.Plugin.Spec{runtime?: false}), do: {:ok, nil}
+
+  defp plugin_runtime_ref(data, %Jido.Plugin.Spec{module: module}) do
+    PluginLifecycle.runtime_ref(data, module)
+  end
+
+  defp related_exec_process?(pid, root, _visited, _depth) when pid == root, do: true
+  defp related_exec_process?(_pid, _root, _visited, depth) when depth >= 8, do: false
+
+  defp related_exec_process?(pid, root, visited, depth) do
+    if Map.has_key?(visited, pid) do
+      false
+    else
+      visited = Map.put(visited, pid, true)
+
+      pid
+      |> exec_process_parents()
+      |> Enum.any?(&related_exec_process?(&1, root, visited, depth + 1))
+    end
+  end
+
+  defp exec_process_parents(pid) when node(pid) != node(), do: []
+
+  defp exec_process_parents(pid) do
+    monitored_by =
+      case Process.info(pid, :monitored_by) do
+        {:monitored_by, pids} -> pids
+        nil -> []
+      end
+
+    callers =
+      case Process.info(pid, :dictionary) do
+        {:dictionary, dictionary} ->
+          dictionary
+          |> Keyword.get(:"$callers", [])
+          |> List.wrap()
+
+        nil ->
+          []
+      end
+
+    (monitored_by ++ callers)
+    |> Enum.filter(&is_pid/1)
+    |> Enum.uniq()
+  end
+
+  defp ensure_directive_limit(_directives, :infinity), do: :ok
+
+  defp ensure_directive_limit(directives, limit) when length(directives) <= limit, do: :ok
+
+  defp ensure_directive_limit(directives, limit) do
+    {:error, {:too_many_directives, %{count: length(directives), limit: limit}}}
+  end
+
+  defp ensure_terminal_directive_last(directives) do
+    case Enum.find_index(directives, &match?(%Directive.Stop{}, &1)) do
+      nil -> :ok
+      index when index == length(directives) - 1 -> :ok
+      index -> {:error, {:terminal_directive_not_last, %{index: index}}}
+    end
+  end
+
+  defp validate_exec_module(module) when is_atom(module) do
+    required = [run_async: 4, handle_message: 2, cancel: 1]
+
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         true <-
+           Enum.all?(required, fn {name, arity} -> function_exported?(module, name, arity) end) do
+      {:ok, module}
+    else
+      _reason ->
+        {:error,
+         Error.validation_error("Agent Server Exec module has an invalid contract",
+           kind: :config,
+           details: %{module: module}
+         )}
+    end
+  end
+
+  defp validate_exec_module(module) do
+    {:error,
+     Error.validation_error("Agent Server Exec module must be a module",
+       kind: :config,
+       details: %{module: module}
+     )}
+  end
+
+  defp validate_keyword(value, _field) when is_list(value) and value == [], do: {:ok, value}
+
+  defp validate_keyword(value, field) when is_list(value) do
+    if Keyword.keyword?(value) do
+      {:ok, value}
+    else
+      {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
+    end
+  end
+
+  defp validate_keyword(_value, field) do
+    {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
+  end
+
+  defp validate_limit(:infinity, _field), do: {:ok, :infinity}
+  defp validate_limit(value, _field) when is_integer(value) and value >= 0, do: {:ok, value}
+
+  defp validate_limit(value, field) do
+    {:error,
+     Error.validation_error("#{field} must be :infinity or a non-negative integer",
+       field: field,
+       details: %{value: value}
+     )}
+  end
+
+  defp maybe_log_cast_failure(nil, signal, reason, agent_id) do
+    Logger.error("Agent Signal cast failed",
+      agent_id: agent_id,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      reason: inspect(reason)
+    )
+  end
+
+  defp maybe_log_cast_failure(_from, _signal, _reason, _agent_id), do: :ok
+
+  defp handle_process_down(ref, pid, reason, phase, %State{} = data) do
+    case Map.fetch(data.attachment_monitors, ref) do
+      {:ok, ^pid} ->
+        next_data =
+          data
+          |> remove_attachment(ref, pid)
+          |> maybe_start_idle_timer(phase)
+
+        {:keep_state, next_data}
+
+      _other ->
+        cond do
+          match?(%ParentRef{ref: ^ref, pid: ^pid}, data.parent) ->
+            handle_parent_down(reason, data)
+
+          child_entry = State.child_by_ref(data, ref) ->
+            handle_child_down(child_entry, pid, reason, data)
+
+          phase == :running and match?(%ActiveTurn{}, data.active) ->
+            handle_exec_message({:DOWN, ref, :process, pid, reason}, data)
+
+          true ->
+            :keep_state_and_data
+        end
+    end
+  end
+
+  defp handle_exec_message(message, %State{active: %ActiveTurn{} = active} = data) do
+    case data.exec_module.handle_message(active.exec_handle, message) do
+      {:done, result} -> finish_turn(result, data)
+      :ignore -> :keep_state_and_data
+      {:error, error} -> fail_turn(error, :execute, data)
+    end
+  end
+
+  defp handle_child_down({key, %ChildInfo{kind: :plugin} = child}, pid, reason, data) do
+    next_data = State.remove_child(data, key)
+    {:stop, {:plugin_runtime_down, child.module, pid, reason}, next_data}
+  end
+
+  defp handle_child_down({key, %ChildInfo{} = child}, pid, reason, data) do
+    next_data = State.remove_child(data, key)
+
+    next_data =
+      if clean_child_exit?(reason) do
+        _ = delete_child_relationship(data, child)
+        %{next_data | child_spawn_requests: Map.delete(next_data.child_spawn_requests, key)}
+      else
+        next_data
+      end
+
+    signal =
+      ChildExit.new!(
+        %{tag: child.tag, child_id: child.id, pid: pid, reason: reason},
+        source: "/agent/#{data.agent.id}"
+      )
+
+    cast(self(), signal)
+    {:keep_state, next_data}
+  end
+
+  defp clean_child_exit?(:normal), do: true
+  defp clean_child_exit?(:shutdown), do: true
+  defp clean_child_exit?({:shutdown, _reason}), do: true
+  defp clean_child_exit?(_reason), do: false
+
+  defp handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
+    next_data = %{data | parent: nil, orphaned_from: parent}
+    _ = delete_own_relationship(next_data)
+
+    case data.on_parent_death do
+      :stop ->
+        next_data = cancel_active_for_parent(next_data)
+        {:stop, {:shutdown, {:parent_down, reason}}, next_data}
+
+      :continue ->
+        {:keep_state, next_data}
+
+      :emit_orphan ->
+        signal =
+          Orphaned.new!(
+            %{
+              parent_id: parent.id,
+              parent_pid: parent.pid,
+              tag: parent.tag,
+              meta: parent.meta,
+              reason: reason
+            },
+            source: "/agent/#{data.agent.id}"
+          )
+
+        cast(self(), signal)
+        {:keep_state, next_data}
+    end
+  end
+
+  defp cancel_active_for_parent(%State{active: %ActiveTurn{exec_handle: handle} = active} = data)
+       when not is_nil(handle) do
+    {status, error} =
+      case data.exec_module.cancel(handle) do
+        :ok -> {:cancelled, {:parent_down, :cancelled}}
+        {:error, reason} -> {:indeterminate, {:parent_down, {:cancellation_failed, reason}}}
+      end
+
+    finish_span_error(active.span, error)
+    TraceContext.clear()
+    outcome = turn_outcome(data, status, :execute, error)
+    if active.caller, do: :gen_statem.reply(active.caller, {:error, {:parent_down, :cancelled}})
+    complete_outcome(data, outcome)
+  catch
+    _kind, _reason ->
+      finish_span_error(active.span, {:parent_down, :cancelled})
+      TraceContext.clear()
+      outcome = turn_outcome(data, :indeterminate, :execute, {:parent_down, :cancelled})
+      complete_outcome(data, outcome)
+  end
+
+  defp cancel_active_for_parent(data), do: data
+
+  defp attach_parent(%State{parent: %ParentRef{}}, _parent), do: {:error, :already_has_parent}
+
+  defp attach_parent(%State{} = data, %ParentRef{pid: pid} = parent) do
+    cond do
+      pid == self() ->
+        {:error, :cannot_adopt_self}
+
+      not is_pid(pid) or not Process.alive?(pid) ->
+        {:error, :parent_not_alive}
+
+      true ->
+        monitored = %{parent | ref: Process.monitor(pid)}
+        next_data = %{data | parent: monitored, orphaned_from: nil}
+
+        case persist_own_relationship(next_data) do
+          :ok ->
+            {:ok, next_data}
+
+          {:error, reason} ->
+            Process.demonitor(monitored.ref, [:flush])
+            {:error, {:relationship_persist_failed, reason}}
+        end
+    end
+  end
+
+  defp monitor_parent(nil), do: nil
+
+  defp monitor_parent(%ParentRef{pid: pid} = parent) when is_pid(pid) do
+    %{parent | ref: Process.monitor(pid)}
+  end
+
+  defp restore_parent(%Options{parent: %ParentRef{} = parent}, _agent), do: parent
+
+  defp restore_parent(%Options{jido: jido, partition: partition}, agent)
+       when is_atom(jido) and not is_nil(jido) do
+    with {:ok, binding} <- Jido.agent_parent_binding(jido, agent.id, partition: partition),
+         parent_pid when is_pid(parent_pid) <-
+           whereis(Jido.registry_name(jido), binding.parent_id,
+             partition: binding.parent_partition
+           ),
+         true <- Process.alive?(parent_pid),
+         {:ok, parent} <-
+           ParentRef.new(%{
+             pid: parent_pid,
+             id: binding.parent_id,
+             partition: binding.parent_partition,
+             tag: binding.tag,
+             creation_cause: Map.get(binding, :creation_cause),
+             meta: binding.meta
+           }) do
+      parent
+    else
+      _reason -> nil
+    end
+  end
+
+  defp restore_parent(%Options{}, _agent), do: nil
+
+  defp notify_parent_online(%State{parent: %ParentRef{} = parent} = data) do
+    send(
+      parent.pid,
+      {:agent_child_online, self(), data.agent.id, data.agent.module, data.partition, parent.tag,
+       parent.meta}
     )
 
     :ok
   end
 
-  # ---------------------------------------------------------------------------
-  # GenServer Callbacks
-  # ---------------------------------------------------------------------------
+  defp notify_parent_online(%State{}), do: :ok
 
-  @impl true
-  def init(raw_opts) do
-    opts = if is_map(raw_opts), do: Map.to_list(raw_opts), else: raw_opts
+  defp verify_child_online(pid, child_id, tag, %State{} = data) do
+    case creation_info(pid) do
+      {:ok,
+       %{agent_id: ^child_id, parent: %ParentRef{pid: owner, id: parent_id, tag: ^tag} = parent} =
+           info}
+      when owner == self() and parent_id == data.agent.id ->
+        with :ok <- verify_child_placement(pid, tag, parent, data), do: {:ok, info}
 
-    with {:ok, options} <- Options.new(opts),
-         {:ok, options} <- hydrate_parent_from_runtime_store(options),
-         {:ok, agent_module, agent} <- resolve_agent(options),
-         {:ok, state} <- State.from_options(options, agent_module, agent),
-         :ok <- maybe_register_global(options, state) do
-      # Monitor parent if present
-      state = maybe_monitor_parent(state)
-
-      {:ok, state, {:continue, :post_init}}
-    else
-      {:error, reason} ->
-        {:stop, reason}
+      _other ->
+        {:error, :parent_mismatch}
     end
   end
 
-  defp maybe_register_global(%Options{register_global: false}, _state), do: :ok
+  defp verify_child_placement(pid, tag, parent, data) do
+    case Map.get(data.child_spawn_requests, tag) do
+      %{request_id: request, directive: %{node: target}} ->
+        if node(pid) == target and parent.spawn_ref == request,
+          do: :ok,
+          else: {:error, :spawn_request_mismatch}
 
-  defp maybe_register_global(%Options{register_global: true}, state) do
-    case Registry.register(state.registry, Jido.partition_key(state.id, state.partition), %{}) do
-      {:ok, _} ->
+      nil when node(pid) == node() ->
         :ok
 
-      {:error, {:already_registered, pid}} when pid == self() ->
-        :ok
+      nil ->
+        {:error, :unknown_remote_child}
+    end
+  end
+
+  defp pending_child_spawns(data) do
+    for {tag, %{status: :pending} = request} <- data.child_spawn_requests, into: %{} do
+      {tag, %{node: request.directive.node, request_id: request.request_id}}
+    end
+  end
+
+  defp track_online_child(data, pid, info) do
+    tag = info.parent.tag
+    meta = info.parent.meta
+
+    data =
+      case Map.fetch(data.child_spawn_requests, tag) do
+        {:ok, request} ->
+          %{
+            data
+            | child_spawn_requests:
+                Map.put(data.child_spawn_requests, tag, %{request | status: :active})
+          }
+
+        :error ->
+          data
+      end
+
+    case State.child(data, tag) do
+      %ChildInfo{pid: ^pid} ->
+        data
+
+      existing ->
+        if match?(%ChildInfo{}, existing), do: Process.demonitor(existing.ref, [:flush])
+
+        child =
+          ChildInfo.new!(
+            pid: pid,
+            ref: Process.monitor(pid),
+            module: info.agent_module,
+            id: info.agent_id,
+            activation_id: info.activation_id,
+            creation_cause: info.parent.creation_cause,
+            partition: info.partition,
+            tag: tag,
+            kind: :agent,
+            meta: meta
+          )
+
+        _ = persist_child_relationship(data, child)
+
+        signal =
+          Jido.AgentServer.Signal.ChildStarted.for_child(
+            data.agent.id,
+            child,
+            not is_nil(existing)
+          )
+
+        cast(self(), signal)
+        State.add_child(data, tag, child)
+    end
+  end
+
+  defp relationship_info(%State{} = data) do
+    %{
+      agent_id: data.agent.id,
+      agent_module: data.agent.module,
+      partition: data.partition,
+      parent: public_parent(data.parent)
+    }
+  end
+
+  defp directive_context(%State{} = data) do
+    signal = Signal.new!(type: "jido.agent.runtime", source: "/agent/#{data.agent.id}", data: %{})
+
+    %DirectiveContext{
+      agent_id: data.agent.id,
+      source_signal: signal,
+      signal: signal
+    }
+  end
+
+  defp public_child(%ChildInfo{} = child), do: public_child_map(child)
+
+  defp public_child_map(%ChildInfo{} = child) do
+    %{
+      pid: child.pid,
+      module: child.module,
+      id: child.id,
+      partition: child.partition,
+      tag: child.tag,
+      kind: child.kind,
+      meta: child.meta
+    }
+  end
+
+  defp public_parent(nil), do: nil
+
+  defp public_parent(%ParentRef{} = parent) do
+    %{
+      pid: parent.pid,
+      id: parent.id,
+      partition: parent.partition,
+      tag: parent.tag,
+      spawn_ref: parent.spawn_ref,
+      meta: parent.meta
+    }
+  end
+
+  defp apply_directive_error_policy(%Outcome{} = outcome, data) do
+    next_data = %{data | error_count: data.error_count + 1}
+
+    case error_policy_decision(outcome, next_data) do
+      {:continue, policy_data} ->
+        TraceContext.clear()
+        {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle)}
+
+      {:stop, stop_reason, policy_data} ->
+        {:stop, {:shutdown, stop_reason}, policy_data}
+    end
+  end
+
+  defp error_policy_decision(%Outcome{}, %State{error_policy: :log_only} = data),
+    do: {:continue, data}
+
+  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: :stop_on_error} = data),
+    do: {:stop, {:agent_error, outcome.error}, data}
+
+  defp error_policy_decision(
+         %Outcome{} = outcome,
+         %State{error_policy: {:max_errors, max}} = data
+       ) do
+    if data.error_count >= max,
+      do: {:stop, {:max_agent_errors, outcome.error}, data},
+      else: {:continue, data}
+  end
+
+  defp error_policy_decision(
+         %Outcome{} = outcome,
+         %State{error_policy: {:emit_signal, dispatch}} = data
+       ) do
+    source_signal = outcome.effective_signal || outcome.source_signal
+
+    if source_signal.type != "jido.agent.error" do
+      signal =
+        Signal.new!(
+          type: "jido.agent.error",
+          source: "/agent/#{data.agent.id}",
+          data: %{
+            agent_id: data.agent.id,
+            turn_id: outcome.id,
+            status: outcome.status,
+            stage: outcome.stage,
+            committed?: outcome.committed?,
+            error: Error.to_map(outcome.error)
+          }
+        )
+
+      context = directive_context(data)
+
+      _ =
+        DirectiveRuntime.handle(
+          %Directive.Emit{signal: signal, dispatch: dispatch},
+          context,
+          data
+        )
+    end
+
+    {:continue, data}
+  end
+
+  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: policy} = data)
+       when is_function(policy, 2) do
+    case policy.(outcome.error, outcome) do
+      :continue -> {:continue, data}
+      {:stop, stop_reason} -> {:stop, stop_reason, data}
+      other -> {:stop, {:invalid_error_policy_result, other}, data}
+    end
+  rescue
+    error -> {:stop, {:error_policy_failed, error}, data}
+  end
+
+  defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
+    do: ActiveTurn.outcome(active, agent.id, status, stage, error)
+
+  defp complete_outcome(%State{} = data, %Outcome{} = outcome) do
+    AgentTelemetry.settled(data, outcome)
+    signal = outcome.effective_signal || outcome.source_signal
+    event = if outcome.status == :succeeded, do: :turn_completed, else: :turn_failed
+
+    data
+    |> Map.put(:active, nil)
+    |> then(fn data ->
+      if outcome.status == :succeeded, do: %{data | error_count: 0}, else: data
+    end)
+    |> record_event(event, %{
+      turn_id: outcome.id,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      stage: outcome.stage,
+      reason: outcome.error,
+      outcome: outcome
+    })
+  end
+
+  defp outcome_status({:child_spawn_indeterminate, _tag, _node, _request, _reason}),
+    do: :indeterminate
+
+  defp outcome_status(reason) do
+    case Error.to_map(reason) do
+      %{type: :timeout} -> :timed_out
+      _error -> :failed
+    end
+  end
+
+  defp record_event(%State{debug: false} = data, _event, _metadata), do: data
+
+  defp record_event(%State{} = data, event, metadata) do
+    entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
+    events = Enum.take([entry | data.debug_events], data.debug_max_events)
+    %{data | debug_events: events}
+  end
+
+  defp start_signal_span(signal, data) do
+    safe_start_span([:jido, :agent_server, :signal], %{
+      agent_id: data.agent.id,
+      agent_module: data.agent.module,
+      signal_type: signal.type,
+      jido_instance: data.jido,
+      jido_partition: data.partition
+    })
+  end
+
+  defp start_directive_span(directive, context, data) do
+    legacy =
+      safe_start_span([:jido, :agent_server, :directive], %{
+        agent_id: context.agent_id,
+        agent_module: data.agent.module,
+        signal_type: context.signal.type,
+        directive_type: directive_type(directive),
+        jido_instance: data.jido,
+        jido_partition: data.partition
+      })
+
+    metadata =
+      Map.merge(AgentTelemetry.turn_metadata(data), %{
+        directive_module: Map.get(directive, :__struct__),
+        stage: :directive,
+        committed?: true
+      })
+
+    telemetry =
+      AgentTelemetry.start(:directive, metadata, %{
+        directive_index: data.active.directive_completed_count
+      })
+
+    %{legacy: legacy, telemetry: telemetry}
+  end
+
+  defp safe_start_span(prefix, metadata) do
+    Observe.start_span(prefix, metadata)
+  rescue
+    _error -> nil
+  catch
+    _kind, _reason -> nil
+  end
+
+  defp finish_span(nil, _measurements), do: :ok
+
+  defp finish_span(%{legacy: legacy, telemetry: telemetry}, measurements) do
+    finish_span(legacy, measurements)
+    AgentTelemetry.finish(telemetry, %{status: :ok})
+  end
+
+  defp finish_span(span, measurements) do
+    Observe.finish_span(span, measurements)
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp finish_span_error(nil, _reason), do: :ok
+
+  defp finish_span_error(%{legacy: legacy, telemetry: telemetry}, reason) do
+    finish_span_error(legacy, reason)
+    AgentTelemetry.finish(telemetry, AgentTelemetry.result_metadata({:error, reason}))
+  end
+
+  defp finish_span_error(span, reason) do
+    Observe.finish_span_error(span, :error, reason, [])
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp finish_span_fault(nil, _kind, _reason, _stacktrace), do: :ok
+
+  defp finish_span_fault(%{legacy: legacy, telemetry: telemetry}, kind, reason, stacktrace) do
+    finish_span_fault(legacy, kind, reason, stacktrace)
+    metadata = AgentTelemetry.result_metadata({:error, reason}) |> Map.put(:kind, kind)
+    AgentTelemetry.finish(telemetry, metadata, %{}, :exception)
+  end
+
+  defp finish_span_fault(span, kind, reason, stacktrace) do
+    Observe.finish_span_error(span, kind, reason, stacktrace)
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp directive_type(%{__struct__: module}), do: module |> Module.split() |> List.last()
+  defp directive_type(_directive), do: "Custom"
+
+  defp normalize_event_limit(limit) when is_integer(limit) and limit >= 0, do: limit
+  defp normalize_event_limit(_limit), do: 0
+
+  defp persist_own_relationship(%State{jido: jido, parent: %ParentRef{} = parent} = data)
+       when is_atom(jido) and not is_nil(jido) do
+    Jido.RuntimeStore.put(
+      jido,
+      :agent_relationships,
+      Jido.partition_key(data.agent.id, data.partition),
+      %{
+        parent_id: parent.id,
+        parent_partition: parent.partition,
+        tag: parent.tag,
+        creation_cause: parent.creation_cause,
+        meta: parent.meta
+      }
+    )
+  end
+
+  defp persist_own_relationship(_data), do: :ok
+
+  defp persist_child_relationship(%State{jido: jido} = data, %ChildInfo{} = child)
+       when is_atom(jido) and not is_nil(jido) do
+    Jido.RuntimeStore.put(
+      jido,
+      :agent_relationships,
+      Jido.partition_key(child.id, child.partition),
+      %{
+        parent_id: data.agent.id,
+        parent_partition: data.partition,
+        tag: child.tag,
+        creation_cause: child.creation_cause,
+        meta: child.meta
+      }
+    )
+  end
+
+  defp persist_child_relationship(%State{}, %ChildInfo{}), do: :ok
+
+  defp delete_own_relationship(%State{jido: jido} = data)
+       when is_atom(jido) and not is_nil(jido) do
+    Jido.RuntimeStore.delete(
+      jido,
+      :agent_relationships,
+      Jido.partition_key(data.agent.id, data.partition)
+    )
+  end
+
+  defp delete_own_relationship(_data), do: :ok
+
+  defp delete_child_relationship(%State{jido: jido}, child)
+       when is_atom(jido) and not is_nil(jido) do
+    Jido.RuntimeStore.delete(
+      jido,
+      :agent_relationships,
+      Jido.partition_key(child.id, child.partition)
+    )
+  end
+
+  defp delete_child_relationship(_data, _child), do: :ok
+
+  defp attach_owner(%State{} = data, owner_pid) do
+    cond do
+      owner_pid == self() ->
+        {:error, :cannot_attach_self}
+
+      not Process.alive?(owner_pid) ->
+        {:error, :owner_not_alive}
+
+      MapSet.member?(data.attachments, owner_pid) ->
+        {:ok, cancel_idle_timer(data)}
+
+      true ->
+        ref = Process.monitor(owner_pid)
+
+        {:ok,
+         %{
+           cancel_idle_timer(data)
+           | attachments: MapSet.put(data.attachments, owner_pid),
+             attachment_monitors: Map.put(data.attachment_monitors, ref, owner_pid)
+         }}
+    end
+  end
+
+  defp detach_owner(%State{} = data, owner_pid) do
+    case Enum.find(data.attachment_monitors, fn {_ref, pid} -> pid == owner_pid end) do
+      {ref, ^owner_pid} ->
+        Process.demonitor(ref, [:flush])
+        remove_attachment(data, ref, owner_pid)
+
+      nil ->
+        data
+    end
+  end
+
+  defp remove_attachment(%State{} = data, ref, owner_pid) do
+    %{
+      data
+      | attachments: MapSet.delete(data.attachments, owner_pid),
+        attachment_monitors: Map.delete(data.attachment_monitors, ref)
+    }
+  end
+
+  defp maybe_start_idle_timer(%State{} = data, phase) when phase != :idle, do: data
+
+  defp maybe_start_idle_timer(%State{idle_timeout: :infinity} = data, :idle), do: data
+
+  defp maybe_start_idle_timer(%State{idle_timer: timer} = data, :idle)
+       when not is_nil(timer),
+       do: data
+
+  defp maybe_start_idle_timer(%State{} = data, :idle) do
+    if MapSet.size(data.attachments) == 0 do
+      timer = :erlang.start_timer(data.idle_timeout, self(), :agent_idle_timeout)
+      %{data | idle_timer: timer}
+    else
+      data
+    end
+  end
+
+  defp cancel_idle_timer(%State{idle_timer: nil} = data), do: data
+
+  defp cancel_idle_timer(%State{idle_timer: timer} = data) do
+    _ = :erlang.cancel_timer(timer)
+    %{data | idle_timer: nil}
+  end
+
+  defp restore_initial_agent(%Options{restore: false} = opts) do
+    {:ok, opts.agent, opts.state_version}
+  end
+
+  defp restore_initial_agent(%Options{persistence: nil, restore: :required}) do
+    {:error, :persistence_not_configured}
+  end
+
+  defp restore_initial_agent(%Options{persistence: nil} = opts) do
+    {agent, version} = RuntimeCheckpoint.restore(opts)
+    {:ok, agent, version}
+  end
+
+  defp restore_initial_agent(%Options{} = opts) do
+    load_opts = [instance: opts.jido, partition: opts.partition]
+
+    case Jido.Persistence.load_agent_with_revision(
+           opts.persistence,
+           opts.agent.module,
+           opts.agent.id,
+           load_opts
+         ) do
+      {:ok, agent, version} ->
+        {:ok, agent, version}
+
+      {:error, :not_found} when opts.restore == :if_found ->
+        {:ok, opts.agent, opts.state_version}
 
       {:error, _reason} = error ->
         error
     end
   end
 
-  @impl true
-  def handle_continue(:post_init, state) do
-    agent_module = state.agent_module
-
-    state =
-      if function_exported?(agent_module, :strategy, 0) do
-        strategy = agent_module.strategy()
-
-        strategy_opts =
-          if function_exported?(agent_module, :strategy_opts, 0),
-            do: agent_module.strategy_opts(),
-            else: []
-
-        ctx = %{
-          agent_module: agent_module,
-          strategy_opts: strategy_opts,
-          jido_instance: state.jido,
-          partition: state.partition
-        }
-
-        {agent, directives} = strategy.init(state.agent, ctx)
-
-        state = State.update_agent(state, agent)
-
-        case State.enqueue_all(state, init_signal(), List.wrap(directives)) do
-          {:ok, enq_state} ->
-            enq_state
-
-          {:error, :queue_overflow} ->
-            Logger.warning(fn ->
-              "AgentServer #{state.id} queue overflow during strategy init"
-            end)
-
-            state
-        end
-      else
-        state
-      end
-
-    signal_router = SignalRouter.build(state)
-    state = %{state | signal_router: signal_router}
-
-    # Start plugin children
-    state = start_plugin_children(state)
-
-    # Start plugin subscription sensors
-    state = start_plugin_subscriptions(state)
-
-    # Initialize lifecycle module (may restore state for keyed lifecycle)
-    lifecycle_opts = [
-      idle_timeout: state.lifecycle.idle_timeout,
-      pool: state.lifecycle.pool,
-      pool_key: state.lifecycle.pool_key,
-      storage: state.lifecycle.storage
-    ]
-
-    state = state.lifecycle.mod.init(lifecycle_opts, state)
-
-    # Register plugin schedules (cron jobs)
-    state = register_plugin_schedules(state)
-    state = register_restored_cron_specs(state)
-    state = maybe_persist_parent_binding(state)
-
-    notify_parent_of_startup(state)
-
-    state = start_drain_if_idle(state)
-
-    {:noreply, State.set_status(state, :idle)}
+  defp persist_commit(%State{persistence: nil} = data, agent, version) do
+    RuntimeCheckpoint.put(data, agent, version)
   end
 
-  defp init_signal do
-    Signal.new!("jido.strategy.init", %{}, source: "/agent/system")
+  defp persist_commit(%State{} = data, agent, version) do
+    persist_agent(data, agent, version, :commit)
   end
 
-  @impl true
-  def handle_call({:signal, %Signal{} = signal}, from, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+  defp persist_agent(data, agent, version, reason, extra_opts \\ [])
 
-    try do
-      state =
-        state
-        |> enqueue_signal_call(from, traced_signal)
-        |> maybe_start_next_signal_call()
+  defp persist_agent(%State{persistence: nil}, %Agent{}, _version, _reason, _extra_opts),
+    do: {:error, :persistence_not_configured}
 
-      {:noreply, state}
-    after
-      TraceContext.clear()
-    end
+  defp persist_agent(%State{} = data, %Agent{} = agent, version, reason, extra_opts) do
+    opts =
+      extra_opts
+      |> Keyword.put(:instance, data.jido)
+      |> Keyword.put(:partition, data.partition)
+      |> Keyword.put(:revision, version)
+      |> Keyword.put(:expected_revision, data.state_version)
+      |> Keyword.put(:reason, reason)
+
+    Jido.Persistence.save_agent(data.persistence, agent, opts)
   end
 
-  def handle_call(:get_state, _from, state) do
-    {:reply, {:ok, state}, state}
-  end
+  defp maybe_persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
+  defp maybe_persist_on_stop({:shutdown, {:persistence_failed, _reason}}, %State{}), do: :ok
 
-  def handle_call({:set_debug, enabled}, _from, %State{} = state) do
-    new_state = State.set_debug(state, enabled)
-    {:reply, :ok, new_state}
-  end
+  defp maybe_persist_on_stop(reason, %State{persistence: persistence} = data)
+       when not is_nil(persistence) do
+    if clean_shutdown?(reason) do
+      case persist_agent(data, data.agent, data.state_version, :stop) do
+        :ok ->
+          :ok
 
-  def handle_call({:recent_events, opts}, _from, %State{} = state) do
-    if state.debug || Jido.Debug.enabled?(state.jido) do
-      events = State.get_debug_events(state, opts)
-      {:reply, {:ok, events}, state}
-    else
-      {:reply, {:error, :debug_not_enabled}, state}
-    end
-  end
-
-  def handle_call({:await_completion, opts}, from, %State{} = state) do
-    status_path = Keyword.get(opts, :status_path, [:status])
-    result_path = Keyword.get(opts, :result_path, [:last_answer])
-    error_path = Keyword.get(opts, :error_path, [:error])
-    waiter_id = Keyword.get(opts, :waiter_id)
-
-    case completion_from_agent_state(state.agent.state, status_path, result_path, error_path) do
-      {:ok, result} ->
-        {:reply, {:ok, result}, state}
-
-      :pending ->
-        {caller_pid, _tag} = from
-        monitor_ref = Process.monitor(caller_pid)
-
-        waiter = %{
-          from: from,
-          monitor_ref: monitor_ref,
-          waiter_id: waiter_id,
-          status_path: status_path,
-          result_path: result_path,
-          error_path: error_path
-        }
-
-        new_waiters = Map.put(state.completion_waiters, monitor_ref, waiter)
-        {:noreply, %{state | completion_waiters: new_waiters}}
-    end
-  end
-
-  def handle_call({:attach, owner_pid}, _from, state) do
-    case state.lifecycle.mod.handle_event({:attach, owner_pid}, state) do
-      {:cont, new_state} -> {:reply, :ok, new_state}
-      {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
-    end
-  end
-
-  def handle_call({:detach, owner_pid}, _from, state) do
-    case state.lifecycle.mod.handle_event({:detach, owner_pid}, state) do
-      {:cont, new_state} -> {:reply, :ok, new_state}
-      {:stop, reason, new_state} -> {:stop, reason, :ok, new_state}
-    end
-  end
-
-  def handle_call({:adopt_parent, %ParentRef{} = parent_ref}, _from, %State{} = state) do
-    cond do
-      not is_nil(state.parent) ->
-        {:reply, {:error, :already_attached}, state}
-
-      not is_pid(parent_ref.pid) ->
-        {:reply, {:error, :invalid_parent}, state}
-
-      true ->
-        case persist_parent_binding(state.jido, state.id, state.partition, parent_ref) do
-          :ok ->
-            new_state =
-              state
-              |> State.attach_parent(parent_ref)
-              |> maybe_monitor_parent()
-              |> State.record_debug_event(:parent_adopted, %{
-                parent_id: parent_ref.id,
-                tag: parent_ref.tag
-              })
-
-            {:reply,
-             {:ok,
-              %{
-                id: new_state.id,
-                agent_module: new_state.agent_module,
-                partition: new_state.partition
-              }}, new_state}
-
-          {:error, reason} ->
-            {:reply, {:error, reason}, state}
-        end
-    end
-  end
-
-  def handle_call({:adopt_child, child, tag, meta}, _from, %State{} = state) do
-    with :ok <- ensure_adopt_tag_available(state, tag),
-         {:ok, child_pid} <- resolve_adopt_child(child, state),
-         :ok <- ensure_adopt_not_self(child_pid),
-         {:ok, child_runtime} <- perform_child_adoption(child_pid, tag, meta, state) do
-      child_info =
-        ChildInfo.new!(%{
-          pid: child_pid,
-          ref: Process.monitor(child_pid),
-          module: child_runtime.agent_module,
-          id: child_runtime.id,
-          partition: child_runtime.partition,
-          tag: tag,
-          meta: meta
-        })
-
-      new_state =
-        state
-        |> State.add_child(tag, child_info)
-        |> State.record_debug_event(:child_adopted, %{child_id: child_runtime.id, tag: tag})
-
-      {:reply, {:ok, child_pid}, new_state}
-    else
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
-  end
-
-  def handle_call({:stop_child, tag, reason}, _from, %State{} = state) do
-    signal =
-      Signal.new!(
-        "jido.agent.stop_child",
-        %{tag: tag, reason: reason},
-        source: "/agent/#{state.id}"
-      )
-
-    {:ok, new_state} = StopChildRuntime.exec(tag, reason, signal, state)
-    {:reply, :ok, new_state}
-  end
-
-  def handle_call(_msg, _from, state) do
-    {:reply, {:error, :unknown_call}, state}
-  end
-
-  @impl true
-  def handle_cast(:touch, state) do
-    case state.lifecycle.mod.handle_event(:touch, state) do
-      {:cont, new_state} -> {:noreply, new_state}
-      {:stop, reason, new_state} -> {:stop, reason, new_state}
-    end
-  end
-
-  def handle_cast({:cancel_await_completion, waiter_id}, %State{} = state) do
-    remaining_waiters =
-      Enum.reduce(state.completion_waiters, %{}, fn {monitor_ref, waiter}, acc ->
-        if waiter.waiter_id == waiter_id do
-          Process.demonitor(waiter.monitor_ref, [:flush])
-          acc
-        else
-          Map.put(acc, monitor_ref, waiter)
-        end
-      end)
-
-    {:noreply, %{state | completion_waiters: remaining_waiters}}
-  end
-
-  def handle_cast({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      if signal_call_inflight?(state) do
-        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
-      else
-        case process_signal(traced_signal, state) do
-          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-          {:error, _reason, new_state} -> {:noreply, new_state}
-        end
-      end
-    after
-      TraceContext.clear()
-    end
-  end
-
-  def handle_cast(_msg, state) do
-    {:noreply, state}
-  end
-
-  @impl true
-  def handle_info(:drain, state) do
-    if signal_call_inflight?(state) do
-      {:noreply, %{state | processing: false}}
-    else
-      case State.dequeue(state) do
-        {:empty, s} ->
-          s = %{s | processing: false}
-          s = State.set_status(s, :idle)
-          {:noreply, s}
-
-        {{:value, item}, s1} ->
-          {signal, runtime_context, directive} = normalize_directive_queue_item(item)
-          TraceContext.set_from_signal(signal)
-
-          result =
-            try do
-              exec_directive_with_telemetry(directive, signal, runtime_context, s1)
-            after
-              TraceContext.clear()
-            end
-
-          case result do
-            {:ok, s2} ->
-              continue_draining(s2)
-
-            {:async, _ref, s2} ->
-              continue_draining(s2)
-
-            {:stop, reason, s2} ->
-              warn_if_normal_stop(reason, directive, s2)
-              {:stop, reason, State.set_status(s2, :stopping)}
-          end
+        {:error, error} ->
+          Logger.error("Agent persistence failed during shutdown",
+            agent_id: data.agent.id,
+            pool: data.pool,
+            reason: inspect(error)
+          )
       end
     end
   end
 
-  def handle_info({:scheduled_signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
+  defp maybe_persist_on_stop(_reason, %State{}), do: :ok
 
-    try do
-      if signal_call_inflight?(state) do
-        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
-      else
-        case process_signal(traced_signal, state) do
-          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-          {:error, _reason, new_state} -> {:noreply, new_state}
-        end
-      end
-    after
-      TraceContext.clear()
-    end
+  defp maybe_delete_runtime_checkpoint(reason, %State{} = data) do
+    if clean_shutdown?(reason), do: RuntimeCheckpoint.delete(data), else: :ok
   end
 
-  def handle_info({:DOWN, ref, :process, pid, reason}, state) do
-    # First check if this is an attachment monitor
-    case Map.get(state.lifecycle.attachment_monitors, ref) do
-      ^pid ->
-        # Attachment process died, delegate to lifecycle
-        case state.lifecycle.mod.handle_event({:down, ref, pid}, state) do
-          {:cont, state} -> {:noreply, state}
-          {:stop, reason, state} -> {:stop, reason, state}
-        end
-
-      _ ->
-        # Not an attachment, check completion waiters using O(1) map lookup by monitor ref
-        {_popped_waiter, new_waiters} = Map.pop(state.completion_waiters, ref)
-        state = %{state | completion_waiters: new_waiters}
-
-        if match?(%{parent: %ParentRef{pid: ^pid}}, state) do
-          handle_parent_down(state, pid, reason)
-        else
-          handle_child_down(state, pid, reason)
-        end
-    end
-  end
-
-  def handle_info({:timeout, ref, :lifecycle_idle_timeout}, state) do
-    if state.lifecycle.idle_timer == ref do
-      # Clear the timer so stale messages don't trigger after cancel/reset.
-      state = %{state | lifecycle: %{state.lifecycle | idle_timer: nil}}
-
-      case state.lifecycle.mod.handle_event(:idle_timeout, state) do
-        {:cont, state} -> {:noreply, state}
-        {:stop, reason, state} -> {:stop, reason, state}
-      end
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_info({:signal, %Signal{} = signal}, state) do
-    {traced_signal, _ctx} = TraceContext.ensure_from_signal(signal)
-
-    try do
-      if signal_call_inflight?(state) do
-        {:noreply, enqueue_deferred_async_signal(state, traced_signal)}
-      else
-        case process_signal(traced_signal, state) do
-          {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-          {:error, _reason, new_state} -> {:noreply, new_state}
-        end
-      end
-    after
-      TraceContext.clear()
-    end
-  end
-
-  def handle_info({:signal_call_result, ref, result}, %State{} = state) do
-    case state.signal_call_inflight do
-      %{ref: ^ref} = inflight ->
-        state = %{state | signal_call_inflight: nil}
-        state = apply_signal_call_result(result, inflight, state)
-        state = maybe_start_next_signal_call(state)
-        state = maybe_resume_drain(state)
-        state = maybe_process_deferred_async_signal(state)
-        {:noreply, state}
-
-      _ ->
-        {:noreply, state}
-    end
-  end
-
-  def handle_info(:process_deferred_signal, %State{} = state) do
-    if signal_call_inflight?(state) do
-      {:noreply, state}
-    else
-      case :queue.out(state.deferred_async_signals) do
-        {{:value, signal}, q} ->
-          state = %{state | deferred_async_signals: q}
-
-          case process_signal(signal, state) do
-            {:ok, new_state, _resolved_action} ->
-              {:noreply, maybe_process_deferred_async_signal(new_state)}
-
-            {:error, _reason, new_state} ->
-              {:noreply, maybe_process_deferred_async_signal(new_state)}
-          end
-
-        {:empty, _} ->
-          {:noreply, state}
-      end
-    end
-  end
-
-  def handle_info(_msg, state) do
-    {:noreply, state}
-  end
-
-  defp normalize_directive_queue_item({signal, runtime_context, directive})
-       when is_map(runtime_context) do
-    {signal, runtime_context, directive}
-  end
-
-  defp normalize_directive_queue_item({signal, directive}) do
-    {signal, %{}, directive}
-  end
-
-  @impl true
-  def terminate(reason, state) do
-    # Delegate to lifecycle module for storage-backed hibernation
-    state.lifecycle.mod.terminate(reason, state)
-
-    # Managed sensors are monitored, not linked, so stop them explicitly.
-    SensorLifecycle.stop_all(state, reason)
-
+  defp retire_remote_spawn(reason, %State{parent: %ParentRef{spawn_ref: request}, jido: jido})
+       when not is_nil(request) and not is_nil(jido) do
+    if clean_shutdown?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
     :ok
+  catch
+    :exit, _ -> :ok
   end
 
-  # ---------------------------------------------------------------------------
-  # Internal: Signal Processing
-  # ---------------------------------------------------------------------------
+  defp retire_remote_spawn(_reason, _data), do: :ok
 
-  defp enqueue_signal_call(%State{} = state, from, %Signal{} = signal) do
-    q = :queue.in({from, signal}, state.signal_call_queue)
-    %{state | signal_call_queue: q}
+  defp clean_shutdown?(:normal), do: true
+  defp clean_shutdown?(:shutdown), do: true
+  defp clean_shutdown?({:shutdown, _reason}), do: true
+  defp clean_shutdown?(_reason), do: false
+
+  defp normalize_stop_reason(:normal), do: :normal
+  defp normalize_stop_reason(:shutdown), do: :shutdown
+  defp normalize_stop_reason({:shutdown, _reason} = reason), do: reason
+  defp normalize_stop_reason(reason), do: {:shutdown, reason}
+
+  defp reply_action(nil, _reply), do: []
+  defp reply_action(from, reply), do: [{:reply, from, reply}]
+
+  defp server_name(%Options{name: name}) when not is_nil(name), do: normalize_name(name)
+
+  defp server_name(%Options{register: true, registry: registry, agent: agent} = opts)
+       when is_atom(registry) and not is_nil(registry) do
+    via_tuple(agent.id, registry, partition: opts.partition)
   end
 
-  defp enqueue_deferred_async_signal(%State{} = state, %Signal{} = signal) do
-    q = :queue.in(signal, state.deferred_async_signals)
-    %{state | deferred_async_signals: q}
-  end
-
-  defp signal_call_inflight?(%State{signal_call_inflight: inflight}), do: not is_nil(inflight)
-
-  defp maybe_start_next_signal_call(%State{signal_call_inflight: nil} = state) do
-    case :queue.out(state.signal_call_queue) do
-      {{:value, {from, signal}}, q} ->
-        start_time = System.monotonic_time()
-        metadata = build_signal_metadata(state, signal)
-        ref = make_ref()
-
-        state =
-          state
-          |> Map.put(:signal_call_queue, q)
-          |> Map.put(:signal_call_inflight, %{
-            ref: ref,
-            from: from,
-            signal: signal,
-            start_time: start_time,
-            metadata: metadata
-          })
-          |> State.record_debug_event(:signal_received, %{type: signal.type, id: signal.id})
-          |> State.set_status(:processing)
-
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :start],
-          %{system_time: System.system_time()},
-          metadata
-        )
-
-        start_signal_call_task(ref, signal, state)
-        state
-
-      {:empty, _} ->
-        maybe_set_idle_status(state)
-    end
-  end
-
-  defp maybe_start_next_signal_call(%State{} = state), do: state
-
-  defp start_signal_call_task(ref, signal, state_snapshot) do
-    parent = self()
-
-    runner = fn ->
-      result =
-        try do
-          compute_signal_call_result(signal, state_snapshot)
-        catch
-          kind, reason ->
-            {:exception, kind, reason, __STACKTRACE__}
-        end
-
-      send(parent, {:signal_call_result, ref, result})
-    end
-
-    task_sup =
-      if state_snapshot.jido, do: Jido.task_supervisor_name(state_snapshot.jido), else: nil
-
-    case task_sup && Process.whereis(task_sup) do
-      pid when is_pid(pid) ->
-        Task.Supervisor.start_child(task_sup, runner)
-
-      _ ->
-        spawn(runner)
-        {:ok, nil}
-    end
-  end
-
-  defp compute_signal_call_result(%Signal{} = signal, %State{signal_router: router} = state) do
-    case run_plugin_signal_hooks(signal, state) do
-      {:error, error} ->
-        error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
-        {:error, error, [error_directive], signal, %{}}
-
-      {:override, action_spec, modified_signal} ->
-        effective_signal = modified_signal || signal
-
-        compute_signal_call_with_action(effective_signal, action_spec, state)
-
-      {:continue, modified_signal} ->
-        case run_plugin_prepare_signal_hooks(modified_signal, state) do
-          {:ok, prepared_signal, runtime_context} ->
-            case route_to_actions(router, prepared_signal) do
-              {:ok, actions} ->
-                compute_signal_call_with_action(
-                  prepared_signal,
-                  actions,
-                  state,
-                  runtime_context
-                )
-
-              {:error, reason} ->
-                error =
-                  Jido.Error.routing_error("No route for signal", %{
-                    signal_type: prepared_signal.type,
-                    reason: reason
-                  })
-
-                error_directive = %Directive.Error{error: error, context: :routing}
-                {:error, error, [error_directive], prepared_signal, runtime_context}
-            end
-
-          {:error, error} ->
-            error_directive = %Directive.Error{error: error, context: :plugin_prepare_signal}
-            {:error, error, [error_directive], modified_signal, %{}}
-        end
-    end
-  end
-
-  defp compute_signal_call_with_action(signal, action_spec, state, runtime_context \\ nil) do
-    case maybe_prepare_signal(signal, state, runtime_context) do
-      {:ok, prepared_signal, runtime_context} ->
-        action_arg = action_arg_from_spec(action_spec)
-
-        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, runtime_context) do
-          {:ok, runtime_context} ->
-            compute_signal_call_dispatch(prepared_signal, action_arg, state, runtime_context)
-
-          {:error, error} ->
-            error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
-            {:error, error, [error_directive], prepared_signal, runtime_context}
-        end
-
-      {:error, error} ->
-        error_directive = %Directive.Error{error: error, context: :plugin_prepare_signal}
-        {:error, error, [error_directive], signal, %{}}
-    end
-  end
-
-  defp maybe_prepare_signal(signal, state, nil) do
-    run_plugin_prepare_signal_hooks(signal, state)
-  end
-
-  defp maybe_prepare_signal(signal, _state, runtime_context) when is_map(runtime_context) do
-    {:ok, signal, runtime_context}
-  end
-
-  defp compute_signal_call_dispatch(signal, action_arg, state, runtime_context) do
-    {agent, directives} =
-      state.agent_module.cmd(
-        state.agent,
-        action_arg,
-        agent_cmd_opts(state, signal, runtime_context)
-      )
-
-    {:ok, agent, List.wrap(directives), action_arg, signal, runtime_context}
-  end
-
-  defp apply_signal_call_result(result, inflight, %State{} = state) do
-    %{from: from, signal: _signal, start_time: start_time, metadata: metadata} = inflight
-    duration = System.monotonic_time() - start_time
-
-    case result do
-      {:ok, agent, directives, resolved_action, effective_signal, runtime_context} ->
-        state = State.update_agent(state, agent)
-        state = maybe_notify_completion_waiters(state)
-
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :stop],
-          %{duration: duration},
-          Map.merge(metadata, signal_stop_metadata(directives))
-        )
-
-        case State.enqueue_all(state, effective_signal, runtime_context, directives) do
-          {:ok, enq_state} ->
-            enq_state = start_drain_if_idle(enq_state)
-
-            transformed_agent =
-              run_plugin_transform_hooks(
-                enq_state.agent,
-                resolved_action,
-                effective_signal,
-                enq_state,
-                runtime_context
-              )
-
-            GenServer.reply(from, {:ok, transformed_agent})
-            enq_state
-
-          {:error, :queue_overflow} ->
-            emit_telemetry(
-              [:jido, :agent_server, :queue, :overflow],
-              %{queue_size: state.max_queue_size},
-              metadata
-            )
-
-            Logger.warning(fn ->
-              "AgentServer #{state.id} queue overflow, dropping directives"
-            end)
-
-            GenServer.reply(from, {:error, :queue_overflow})
-            maybe_set_idle_status(state)
-        end
-
-      {:error, reason, directives, effective_signal, runtime_context} ->
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :stop],
-          %{duration: duration},
-          Map.merge(metadata, %{error: reason})
-        )
-
-        state =
-          case State.enqueue_all(state, effective_signal, runtime_context, directives) do
-            {:ok, enq_state} -> start_drain_if_idle(enq_state)
-            {:error, :queue_overflow} -> state
-          end
-
-        GenServer.reply(from, {:error, reason})
-        maybe_set_idle_status(state)
-
-      {:exception, kind, reason, stacktrace} ->
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :exception],
-          %{duration: duration},
-          Map.merge(metadata, Observe.exception_metadata(kind, reason))
-        )
-
-        Logger.error(fn ->
-          "Signal call task failed for #{state.id}: #{inspect(kind)} #{inspect(reason)}\n" <>
-            Exception.format_stacktrace(stacktrace)
-        end)
-
-        GenServer.reply(from, {:error, reason})
-        maybe_set_idle_status(state)
-    end
-  end
-
-  defp maybe_process_deferred_async_signal(%State{signal_call_inflight: nil} = state) do
-    if :queue.is_empty(state.deferred_async_signals) do
-      maybe_set_idle_status(state)
-    else
-      send(self(), :process_deferred_signal)
-      state
-    end
-  end
-
-  defp maybe_process_deferred_async_signal(%State{} = state), do: state
-
-  defp maybe_resume_drain(%State{signal_call_inflight: nil} = state) do
-    if State.queue_empty?(state) do
-      state
-    else
-      start_drain_if_idle(%{state | processing: false})
-    end
-  end
-
-  defp maybe_resume_drain(%State{} = state), do: state
-
-  defp maybe_set_idle_status(%State{} = state) do
-    if is_nil(state.signal_call_inflight) and :queue.is_empty(state.signal_call_queue) and
-         :queue.is_empty(state.deferred_async_signals) and state.processing == false do
-      State.set_status(state, :idle)
-    else
-      state
-    end
-  end
-
-  defp process_signal(%Signal{} = signal, %State{signal_router: router} = state) do
-    start_time = System.monotonic_time()
-    metadata = build_signal_metadata(state, signal)
-
-    # Record debug event for signal received
-    state =
-      State.record_debug_event(state, :signal_received, %{
-        type: signal.type,
-        id: signal.id
-      })
-
-    state = maybe_track_child_started(state, signal)
-
-    emit_telemetry(
-      [:jido, :agent_server, :signal, :start],
-      %{system_time: System.system_time()},
-      metadata
-    )
-
-    try do
-      do_process_signal(signal, router, state, start_time, metadata)
-    catch
-      kind, reason ->
-        emit_telemetry(
-          [:jido, :agent_server, :signal, :exception],
-          %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, Observe.exception_metadata(kind, reason))
-        )
-
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
-  end
-
-  defp build_signal_metadata(state, signal) do
-    trace_metadata = TraceContext.to_telemetry_metadata()
-
-    %{
-      agent_id: state.id,
-      agent_module: state.agent_module,
-      signal_type: signal.type,
-      jido_instance: state.jido,
-      jido_partition: state.partition
-    }
-    |> Map.merge(trace_metadata)
-  end
-
-  defp signal_stop_metadata(directives) when is_list(directives) do
-    %{
-      directive_count: length(directives),
-      directive_types: Formatter.summarize_directives(directives)
-    }
-  end
-
-  defp maybe_track_child_started(
-         %State{id: state_id} = state,
-         %Signal{type: "jido.agent.child.started", data: data}
-       )
-       when is_map(data) do
-    with %{
-           parent_id: ^state_id,
-           tag: tag,
-           pid: pid,
-           child_id: child_id,
-           child_module: child_module
-         } <-
-           data,
-         true <- is_pid(pid),
-         true <- is_binary(child_id),
-         true <- is_atom(child_module) do
-      meta = Map.get(data, :meta, %{})
-      child_partition = Map.get(data, :child_partition)
-
-      case State.get_child(state, tag) do
-        %ChildInfo{pid: ^pid} ->
-          state
-
-        %ChildInfo{ref: ref} ->
-          Process.demonitor(ref, [:flush])
-          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
-
-        nil ->
-          track_child_started(state, pid, child_module, child_id, child_partition, tag, meta)
-      end
-    else
-      _ -> state
-    end
-  end
-
-  defp maybe_track_child_started(state, _signal), do: state
-
-  defp process_or_defer_internal_signal(%Signal{} = signal, %State{} = state) do
-    if signal_call_inflight?(state) do
-      {:noreply, enqueue_deferred_async_signal(state, signal)}
-    else
-      case process_signal(signal, state) do
-        {:ok, new_state, _resolved_action} -> {:noreply, new_state}
-        {:error, _reason, new_state} -> {:noreply, new_state}
-      end
-    end
-  end
-
-  defp track_child_started(state, pid, child_module, child_id, child_partition, tag, meta) do
-    ref = Process.monitor(pid)
-
-    child_info =
-      ChildInfo.new!(%{
-        pid: pid,
-        ref: ref,
-        module: child_module,
-        id: child_id,
-        partition: child_partition,
-        tag: tag,
-        meta: meta
-      })
-
-    State.add_child(state, tag, child_info)
-  end
-
-  defp do_process_signal(signal, router, state, start_time, metadata) do
-    case run_plugin_signal_hooks(signal, state) do
-      {:error, error} ->
-        handle_plugin_hook_error(error, signal, state)
-
-      {:override, action_spec, modified_signal} ->
-        effective_signal = modified_signal || signal
-
-        handle_prepared_signal_and_action(
-          effective_signal,
-          action_spec,
-          state,
-          start_time,
-          metadata
-        )
-
-      {:continue, modified_signal} ->
-        case run_plugin_prepare_signal_hooks(modified_signal, state) do
-          {:ok, prepared_signal, runtime_context} ->
-            handle_signal_routing(
-              prepared_signal,
-              router,
-              state,
-              start_time,
-              metadata,
-              runtime_context
-            )
-
-          {:error, error} ->
-            handle_prepare_signal_error(error, modified_signal, state)
-        end
-    end
-  end
-
-  defp handle_plugin_hook_error(error, signal, state) do
-    error_directive = %Directive.Error{error: error, context: :plugin_handle_signal}
-    enqueue_error_directive(error, signal, [error_directive], state)
-  end
-
-  defp handle_prepared_signal_and_action(signal, action_spec, state, start_time, metadata) do
-    case run_plugin_prepare_signal_hooks(signal, state) do
-      {:ok, prepared_signal, runtime_context} ->
-        action_arg = action_arg_from_spec(action_spec)
-
-        case run_plugin_prepare_action_hooks(prepared_signal, action_arg, state, runtime_context) do
-          {:ok, runtime_context} ->
-            dispatch_action(
-              prepared_signal,
-              action_arg,
-              state,
-              start_time,
-              metadata,
-              runtime_context
-            )
-
-          {:error, error} ->
-            handle_prepare_action_error(error, prepared_signal, state, runtime_context)
-        end
-
-      {:error, error} ->
-        handle_prepare_signal_error(error, signal, state)
-    end
-  end
-
-  defp handle_prepare_signal_error(error, signal, state) do
-    error_directive = %Directive.Error{error: error, context: :plugin_prepare_signal}
-    enqueue_error_directive(error, signal, [error_directive], state)
-  end
-
-  defp handle_prepare_action_error(error, signal, state, runtime_context) do
-    error_directive = %Directive.Error{error: error, context: :plugin_prepare_action}
-    enqueue_error_directive(error, signal, [error_directive], state, runtime_context)
-  end
-
-  defp handle_signal_routing(signal, router, state, start_time, metadata, runtime_context) do
-    case route_to_actions(router, signal) do
-      {:ok, actions} ->
-        action_arg = action_arg_from_spec(actions)
-
-        case run_plugin_prepare_action_hooks(signal, action_arg, state, runtime_context) do
-          {:ok, runtime_context} ->
-            dispatch_action(signal, action_arg, state, start_time, metadata, runtime_context)
-
-          {:error, error} ->
-            handle_prepare_action_error(error, signal, state, runtime_context)
-        end
+  defp server_name(%Options{}), do: nil
+
+  defp ready_result(pid) do
+    case await_ready(pid) do
+      :ok ->
+        {:ok, pid}
 
       {:error, reason} ->
-        handle_routing_error(reason, signal, state, start_time, metadata)
-    end
-  end
-
-  defp handle_routing_error(reason, signal, state, start_time, metadata) do
-    emit_telemetry(
-      [:jido, :agent_server, :signal, :stop],
-      %{duration: System.monotonic_time() - start_time},
-      Map.merge(metadata, %{error: reason})
-    )
-
-    error =
-      Jido.Error.routing_error("No route for signal", %{
-        signal_type: signal.type,
-        reason: reason
-      })
-
-    error_directive = %Directive.Error{error: error, context: :routing}
-    enqueue_error_directive(error, signal, [error_directive], state)
-  end
-
-  defp enqueue_error_directive(error, signal, directives, state) do
-    case State.enqueue_all(state, signal, directives) do
-      {:ok, enq_state} -> {:error, error, start_drain_if_idle(enq_state)}
-      {:error, :queue_overflow} -> {:error, error, state}
-    end
-  end
-
-  defp enqueue_error_directive(error, signal, directives, state, runtime_context) do
-    case State.enqueue_all(state, signal, runtime_context, directives) do
-      {:ok, enq_state} -> {:error, error, start_drain_if_idle(enq_state)}
-      {:error, :queue_overflow} -> {:error, error, state}
-    end
-  end
-
-  defp dispatch_action(signal, action_arg, state, start_time, metadata, runtime_context) do
-    agent_module = state.agent_module
-
-    {agent, directives} =
-      agent_module.cmd(state.agent, action_arg, agent_cmd_opts(state, signal, runtime_context))
-
-    directives = List.wrap(directives)
-    state = State.update_agent(state, agent)
-    state = maybe_notify_completion_waiters(state)
-
-    emit_telemetry(
-      [:jido, :agent_server, :signal, :stop],
-      %{duration: System.monotonic_time() - start_time},
-      Map.merge(metadata, signal_stop_metadata(directives))
-    )
-
-    case State.enqueue_all(state, signal, runtime_context, directives) do
-      {:ok, enq_state} ->
-        {:ok, start_drain_if_idle(enq_state), action_arg}
-
-      {:error, :queue_overflow} ->
-        emit_telemetry(
-          [:jido, :agent_server, :queue, :overflow],
-          %{queue_size: state.max_queue_size},
-          metadata
-        )
-
-        Logger.warning(fn -> "AgentServer #{state.id} queue overflow, dropping directives" end)
-        {:error, :queue_overflow, state}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Signal Routing
-  # ---------------------------------------------------------------------------
-
-  defp route_to_actions(router, signal) do
-    case JidoRouter.route(router, signal) do
-      {:ok, targets} when targets != [] ->
-        actions = Enum.map(targets, &target_to_action(&1, signal))
-        {:ok, actions}
-
-      {:error, %{details: %{reason: :no_handlers_found}}} ->
-        default_system_action(signal)
-
-      {:error, reason} ->
+        if Process.alive?(pid), do: Process.exit(pid, :shutdown)
         {:error, reason}
     end
   end
 
-  defp default_system_action(%Signal{type: "jido.agent.stop", data: data}) do
-    params = if is_map(data), do: data, else: %{}
-    {:ok, [{Jido.Actions.Lifecycle.StopSelf, params}]}
-  end
-
-  defp default_system_action(_signal), do: {:error, :no_matching_route}
-
-  defp action_arg_from_spec([single]), do: single
-  defp action_arg_from_spec(list) when is_list(list), do: list
-  defp action_arg_from_spec(other), do: other
-
-  defp target_to_action({:strategy_cmd, cmd}, %Signal{data: data}) do
-    {cmd, data}
-  end
-
-  defp target_to_action({:strategy_tick}, _signal) do
-    {:strategy_tick, %{}}
-  end
-
-  defp target_to_action({:custom, _term}, %Signal{data: data}) do
-    {:custom, data}
-  end
-
-  defp target_to_action(mod, %Signal{data: data}) when is_atom(mod) do
-    {mod, data}
-  end
-
-  defp target_to_action({mod, params}, _signal) when is_atom(mod) and is_map(params) do
-    {mod, params}
-  end
-
-  defp agent_cmd_opts(%State{} = state, %Signal{} = signal, action_context) do
-    [
-      __jido_instance__: state.jido,
-      __partition__: state.partition,
-      __jido_action_exec_defaults__: ObserveConfig.action_exec_opts(state.jido, []),
-      __jido_signal__: signal,
-      __jido_action_context__: action_context
-    ]
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Plugin Signal Hooks
-  # ---------------------------------------------------------------------------
-
-  @doc false
-  @spec prepare_emit_signal(Signal.t(), Signal.t(), State.t(), term(), term(), map()) ::
-          {:ok, Signal.t(), term()} | {:error, term()}
-  def prepare_emit_signal(
-        %Signal{} = signal,
-        %Signal{} = input_signal,
-        %State{} = state,
-        directive,
-        dispatch,
-        runtime_context
-      )
-      when is_map(runtime_context) do
-    run_plugin_prepare_emit_hooks(
-      signal,
-      input_signal,
-      state,
-      directive,
-      dispatch,
-      runtime_context
-    )
-  end
-
-  defp run_plugin_signal_hooks(%Signal{} = signal, %State{} = state) do
-    agent_module = state.agent_module
-
-    specs_and_instances = get_plugin_specs_and_instances(agent_module)
-
-    Enum.reduce_while(specs_and_instances, {:continue, signal}, fn {spec, instance},
-                                                                   {_, current_signal} ->
-      if signal_matches_plugin?(current_signal, spec) do
-        case invoke_plugin_handle_signal(instance, spec, current_signal, state, agent_module) do
-          {:cont, :continue} ->
-            {:cont, {:continue, current_signal}}
-
-          {:cont, {:continue, new_signal}} ->
-            {:cont, {:continue, new_signal}}
-
-          {:halt, {:override, action_spec}} ->
-            {:halt, {:override, action_spec}}
-
-          {:halt, {:override, action_spec, new_signal}} ->
-            {:halt, {:override, action_spec, new_signal}}
-
-          {:halt, {:error, error}} ->
-            {:halt, {:error, error}}
-        end
-      else
-        {:cont, {:continue, current_signal}}
-      end
-    end)
-    |> normalize_hook_result()
-  end
-
-  defp run_plugin_prepare_signal_hooks(%Signal{} = signal, %State{} = state) do
-    agent_module = state.agent_module
-    specs_and_instances = get_plugin_specs_and_instances(agent_module)
-
-    Enum.reduce_while(specs_and_instances, {:ok, signal, %{}}, fn {spec, instance},
-                                                                  {:ok, current_signal,
-                                                                   runtime_context} ->
-      if signal_matches_plugin?(current_signal, spec) do
-        case invoke_plugin_prepare_signal(
-               instance,
-               spec,
-               current_signal,
-               state,
-               agent_module,
-               runtime_context
-             ) do
-          {:ok, prepared_signal, runtime_context_delta} ->
-            case merge_plugin_runtime_context(
-                   runtime_context,
-                   runtime_context_delta,
-                   spec.module,
-                   :prepare_signal
-                 ) do
-              {:ok, merged_context} ->
-                {:cont, {:ok, prepared_signal, merged_context}}
-
-              {:error, error} ->
-                {:halt, {:error, error}}
-            end
-
-          {:error, error} ->
-            {:halt, {:error, error}}
-        end
-      else
-        {:cont, {:ok, current_signal, runtime_context}}
-      end
-    end)
-  end
-
-  defp run_plugin_prepare_action_hooks(
-         %Signal{} = signal,
-         action_arg,
-         %State{} = state,
-         runtime_context
-       )
-       when is_map(runtime_context) do
-    agent_module = state.agent_module
-    specs_and_instances = get_plugin_specs_and_instances(agent_module)
-
-    Enum.reduce_while(specs_and_instances, {:ok, runtime_context}, fn {spec, instance},
-                                                                      {:ok, current_context} ->
-      if signal_matches_plugin?(signal, spec) do
-        case invoke_plugin_prepare_action(
-               instance,
-               spec,
-               signal,
-               action_arg,
-               state,
-               agent_module,
-               current_context
-             ) do
-          {:ok, runtime_context_delta} ->
-            case merge_plugin_runtime_context(
-                   current_context,
-                   runtime_context_delta,
-                   spec.module,
-                   :prepare_action
-                 ) do
-              {:ok, merged_context} -> {:cont, {:ok, merged_context}}
-              {:error, error} -> {:halt, {:error, error}}
-            end
-
-          {:error, error} ->
-            {:halt, {:error, error}}
-        end
-      else
-        {:cont, {:ok, current_context}}
-      end
-    end)
-  end
-
-  defp run_plugin_prepare_emit_hooks(
-         %Signal{} = signal,
-         %Signal{} = input_signal,
-         %State{} = state,
-         directive,
-         dispatch,
-         runtime_context
-       )
-       when is_map(runtime_context) do
-    agent_module = state.agent_module
-    specs_and_instances = get_plugin_specs_and_instances(agent_module)
-
-    Enum.reduce_while(specs_and_instances, {:ok, signal, dispatch}, fn {spec, instance},
-                                                                       {:ok, current_signal,
-                                                                        current_dispatch} ->
-      case invoke_plugin_prepare_emit(
-             instance,
-             spec,
-             current_signal,
-             input_signal,
-             state,
-             agent_module,
-             directive,
-             current_dispatch,
-             runtime_context
-           ) do
-        {:ok, prepared_signal, prepared_dispatch} ->
-          {:cont, {:ok, prepared_signal, prepared_dispatch}}
-
-        {:error, error} ->
-          {:halt, {:error, error}}
-      end
-    end)
-  end
-
-  defp merge_plugin_runtime_context(runtime_context, runtime_context_delta, plugin, phase)
-       when is_map(runtime_context_delta) do
-    keys = Map.keys(runtime_context_delta)
-    reserved_keys = Enum.filter(keys, &(&1 in @reserved_runtime_context_keys))
-    duplicate_keys = Enum.filter(keys, &Map.has_key?(runtime_context, &1))
-
-    cond do
-      reserved_keys != [] ->
-        {:error,
-         Jido.Error.execution_error("Plugin #{phase} returned reserved runtime context keys", %{
-           plugin: plugin,
-           keys: reserved_keys
-         })}
-
-      duplicate_keys != [] ->
-        {:error,
-         Jido.Error.execution_error("Plugin #{phase} returned duplicate runtime context keys", %{
-           plugin: plugin,
-           keys: duplicate_keys
-         })}
-
-      true ->
-        {:ok, Map.merge(runtime_context, runtime_context_delta)}
-    end
-  end
-
-  defp normalize_hook_result({:continue, signal}), do: {:continue, signal}
-  defp normalize_hook_result({:override, action_spec}), do: {:override, action_spec, nil}
-
-  defp normalize_hook_result({:override, action_spec, signal}),
-    do: {:override, action_spec, signal}
-
-  defp normalize_hook_result({:error, error}), do: {:error, error}
-
-  defp signal_matches_plugin?(_signal, %{signal_patterns: []}), do: true
-  defp signal_matches_plugin?(_signal, %{signal_patterns: nil}), do: true
-
-  defp signal_matches_plugin?(%Signal{type: type}, %{signal_patterns: patterns}) do
-    Enum.any?(patterns, &signal_type_matches?(type, &1))
-  end
-
-  defp signal_type_matches?(type, pattern) do
-    cond do
-      pattern == type ->
-        true
-
-      String.ends_with?(pattern, ".*") ->
-        prefix = String.trim_trailing(pattern, ".*")
-        String.starts_with?(type, prefix <> ".")
-
-      String.contains?(pattern, "*") ->
-        pattern_regex =
-          pattern
-          |> Regex.escape()
-          |> String.replace("\\*", "[^.]*")
-
-        Regex.match?(~r/^#{pattern_regex}$/, type)
-
-      true ->
-        false
-    end
-  end
-
-  defp get_plugin_specs_and_instances(agent_module) do
-    specs =
-      if function_exported?(agent_module, :plugin_specs, 0),
-        do: agent_module.plugin_specs(),
-        else: []
-
-    instances =
-      if function_exported?(agent_module, :plugin_instances, 0),
-        do: agent_module.plugin_instances(),
-        else: []
-
-    Enum.zip(specs, instances)
-  end
-
-  defp plugin_context(instance, spec, state, agent_module, extra \\ %{}) do
-    %{
-      agent: state.agent,
-      agent_module: agent_module,
-      plugin: spec.module,
-      plugin_spec: spec,
-      plugin_instance: instance,
-      config: spec.config || %{},
-      jido_instance: state.jido,
-      partition: state.partition
-    }
-    |> Map.merge(extra)
-  end
-
-  defp invoke_plugin_handle_signal(instance, spec, signal, state, agent_module) do
-    context = plugin_context(instance, spec, state, agent_module)
-
-    try do
-      case spec.module.handle_signal(signal, context) do
-        {:ok, {:override, action_spec}} ->
-          {:halt, {:override, action_spec}}
-
-        {:ok, {:continue, %Signal{} = new_signal}} ->
-          {:cont, {:continue, new_signal}}
-
-        {:ok, {:override, action_spec, %Signal{} = new_signal}} ->
-          {:halt, {:override, action_spec, new_signal}}
-
-        {:ok, _} ->
-          {:cont, :continue}
-
-        {:error, reason} ->
-          error =
-            Jido.Error.execution_error(
-              "Plugin handle_signal failed",
-              %{plugin: spec.module, reason: reason}
-            )
-
-          {:halt, {:error, error}}
-      end
-    rescue
-      e ->
-        Logger.error(fn ->
-          "Plugin #{inspect(spec.module)} handle_signal crashed: #{Exception.message(e)}"
-        end)
-
-        error =
-          Jido.Error.execution_error(
-            "Plugin handle_signal crashed",
-            %{plugin: spec.module, exception: Exception.message(e)}
-          )
-
-        {:halt, {:error, error}}
-    end
-  end
-
-  defp invoke_plugin_prepare_signal(
-         instance,
-         spec,
-         signal,
-         state,
-         agent_module,
-         runtime_context
-       ) do
-    context =
-      plugin_context(instance, spec, state, agent_module, %{runtime_context: runtime_context})
-
-    try do
-      if function_exported?(spec.module, :prepare_signal, 2) do
-        case spec.module.prepare_signal(signal, context) do
-          {:ok, %Signal{} = prepared_signal, runtime_context_delta}
-          when is_map(runtime_context_delta) ->
-            {:ok, prepared_signal, runtime_context_delta}
-
-          {:error, reason} ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_signal failed",
-                %{plugin: spec.module, reason: reason}
-              )
-
-            {:error, error}
-
-          other ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_signal returned invalid result",
-                %{plugin: spec.module, result: other}
-              )
-
-            {:error, error}
-        end
-      else
-        {:ok, signal, %{}}
-      end
-    rescue
-      e ->
-        Logger.error(fn ->
-          "Plugin #{inspect(spec.module)} prepare_signal crashed: #{Exception.message(e)}"
-        end)
-
-        error =
-          Jido.Error.execution_error(
-            "Plugin prepare_signal crashed",
-            %{plugin: spec.module, exception: Exception.message(e)}
-          )
-
-        {:error, error}
-    end
-  end
-
-  defp invoke_plugin_prepare_action(
-         instance,
-         spec,
-         signal,
-         action_arg,
-         state,
-         agent_module,
-         runtime_context
-       ) do
-    context =
-      plugin_context(instance, spec, state, agent_module, %{runtime_context: runtime_context})
-
-    try do
-      if function_exported?(spec.module, :prepare_action, 3) do
-        case spec.module.prepare_action(signal, action_arg, context) do
-          {:ok, runtime_context_delta} when is_map(runtime_context_delta) ->
-            {:ok, runtime_context_delta}
-
-          {:error, reason} ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_action failed",
-                %{plugin: spec.module, reason: reason}
-              )
-
-            {:error, error}
-
-          other ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_action returned invalid result",
-                %{plugin: spec.module, result: other}
-              )
-
-            {:error, error}
-        end
-      else
-        {:ok, %{}}
-      end
-    rescue
-      e ->
-        Logger.error(fn ->
-          "Plugin #{inspect(spec.module)} prepare_action crashed: #{Exception.message(e)}"
-        end)
-
-        error =
-          Jido.Error.execution_error(
-            "Plugin prepare_action crashed",
-            %{plugin: spec.module, exception: Exception.message(e)}
-          )
-
-        {:error, error}
-    end
-  end
-
-  defp invoke_plugin_prepare_emit(
-         instance,
-         spec,
-         signal,
-         input_signal,
-         state,
-         agent_module,
-         directive,
-         dispatch,
-         runtime_context
-       ) do
-    context =
-      plugin_context(instance, spec, state, agent_module, %{
-        runtime_context: runtime_context,
-        input_signal: input_signal,
-        directive: directive,
-        dispatch: dispatch
-      })
-
-    try do
-      if function_exported?(spec.module, :prepare_emit, 2) do
-        case spec.module.prepare_emit(signal, context) do
-          {:ok, %Signal{} = prepared_signal} ->
-            {:ok, prepared_signal, dispatch}
-
-          {:ok, %Signal{} = prepared_signal, prepared_dispatch} ->
-            {:ok, prepared_signal, prepared_dispatch}
-
-          {:error, reason} ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_emit failed",
-                %{plugin: spec.module, reason: reason}
-              )
-
-            {:error, error}
-
-          other ->
-            error =
-              Jido.Error.execution_error(
-                "Plugin prepare_emit returned invalid result",
-                %{plugin: spec.module, result: other}
-              )
-
-            {:error, error}
-        end
-      else
-        {:ok, signal, dispatch}
-      end
-    rescue
-      e ->
-        Logger.error(fn ->
-          "Plugin #{inspect(spec.module)} prepare_emit crashed: #{Exception.message(e)}"
-        end)
-
-        error =
-          Jido.Error.execution_error(
-            "Plugin prepare_emit crashed",
-            %{plugin: spec.module, exception: Exception.message(e)}
-          )
-
-        {:error, error}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Plugin Transform Hooks
-  # ---------------------------------------------------------------------------
-
-  defp run_plugin_transform_hooks(
-         agent,
-         resolved_action,
-         original_signal,
-         %State{} = state,
-         runtime_context
-       ) do
-    agent_module = state.agent_module
-
-    specs_and_instances = get_plugin_specs_and_instances(agent_module)
-
-    action_term = normalize_action_for_transform(resolved_action, original_signal)
-
-    Enum.reduce(specs_and_instances, agent, fn {spec, instance}, agent_acc ->
-      context =
-        plugin_context(instance, spec, %{state | agent: agent_acc}, agent_module, %{
-          runtime_context: runtime_context
-        })
-
-      try do
-        spec.module.transform_result(action_term, agent_acc, context)
-      rescue
-        e ->
-          Logger.error(fn ->
-            "Plugin #{inspect(spec.module)} transform_result crashed: #{Exception.message(e)}"
-          end)
-
-          agent_acc
-      end
-    end)
-  end
-
-  defp normalize_action_for_transform(resolved_action, original_signal) do
-    case resolved_action do
-      mod when is_atom(mod) and not is_nil(mod) -> mod
-      {mod, _params} when is_atom(mod) -> mod
-      {mod, _params, _context} when is_atom(mod) -> mod
-      {mod, _params, _context, _opts} when is_atom(mod) -> mod
-      [{mod, _params} | _] when is_atom(mod) -> mod
-      [{mod, _params, _context} | _] when is_atom(mod) -> mod
-      [{mod, _params, _context, _opts} | _] when is_atom(mod) -> mod
-      [mod | _] when is_atom(mod) -> mod
-      _ -> original_signal.type
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Plugin Children
-  # ---------------------------------------------------------------------------
-
-  @doc false
-  defp start_plugin_children(%State{} = state) do
-    agent_module = state.agent_module
-
-    plugin_specs =
-      if function_exported?(agent_module, :plugin_specs, 0),
-        do: agent_module.plugin_specs(),
-        else: []
-
-    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
-      config = spec.config || %{}
-      start_plugin_spec_children(acc_state, spec.module, config)
-    end)
-  end
-
-  defp start_plugin_spec_children(state, plugin_module, config) do
-    case plugin_module.child_spec(config) do
-      nil ->
-        state
-
-      %{} = child_spec ->
-        start_plugin_child(state, plugin_module, child_spec)
-
-      list when is_list(list) ->
-        Enum.reduce(list, state, fn cs, s ->
-          start_plugin_child(s, plugin_module, cs)
-        end)
-
-      other ->
-        Logger.warning(fn ->
-          "Invalid child_spec from plugin #{inspect(plugin_module)}: #{inspect(other)}"
-        end)
-
-        state
-    end
-  end
-
-  defp start_plugin_child(%State{} = state, plugin_module, %{start: {m, f, a}} = spec) do
-    case apply(m, f, a) do
-      {:ok, pid} ->
-        ref = Process.monitor(pid)
-        tag = {:plugin, plugin_module, spec[:id] || m}
-
-        child_info =
-          ChildInfo.new!(%{
-            pid: pid,
-            ref: ref,
-            module: plugin_module,
-            id: "#{plugin_module}-#{inspect(pid)}",
-            tag: tag,
-            meta: %{child_spec_id: spec[:id]}
-          })
-
-        new_children = Map.put(state.children, tag, child_info)
-        %{state | children: new_children}
-
-      {:error, reason} ->
-        Logger.error(fn ->
-          "Failed to start plugin child #{inspect(plugin_module)}: #{inspect(reason)}"
-        end)
-
-        state
-    end
-  end
-
-  defp start_plugin_child(%State{} = state, plugin_module, spec) do
-    Logger.warning(fn ->
-      "Plugin child_spec missing :start key for #{inspect(plugin_module)}: #{inspect(spec)}"
-    end)
-
-    state
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Plugin Subscriptions
-  # ---------------------------------------------------------------------------
-
-  @doc false
-  defp start_plugin_subscriptions(%State{} = state) do
-    agent_module = state.agent_module
-
-    plugin_specs =
-      if function_exported?(agent_module, :plugin_specs, 0),
-        do: agent_module.plugin_specs(),
-        else: []
-
-    Enum.reduce(plugin_specs, state, fn spec, acc_state ->
-      context = %{
-        agent_ref: via_tuple(acc_state.id, acc_state.registry, partition: acc_state.partition),
-        agent_id: acc_state.id,
-        agent_module: agent_module,
-        plugin_spec: spec,
-        jido_instance: acc_state.jido,
-        partition: acc_state.partition
-      }
-
-      config = spec.config || %{}
-
-      subscriptions =
-        if function_exported?(spec.module, :subscriptions, 2),
-          do: spec.module.subscriptions(config, context),
-          else: []
-
-      subscriptions
-      |> List.wrap()
-      |> Enum.reduce(acc_state, fn subscription, inner_state ->
-        case normalize_plugin_subscription(subscription, spec.module) do
-          {:ok, tag, sensor_module, sensor_config} ->
-            start_subscription_sensor(
-              inner_state,
-              spec.module,
-              tag,
-              sensor_module,
-              sensor_config,
-              context
-            )
-
-          {:error, reason} ->
-            Logger.warning(fn ->
-              "Ignoring invalid subscription for plugin #{inspect(spec.module)}: #{inspect(reason)}"
-            end)
-
-            inner_state
-        end
-      end)
-    end)
-  end
-
-  defp normalize_plugin_subscription({sensor_module, sensor_config}, plugin_module)
-       when is_atom(sensor_module) do
-    {:ok, {:plugin, plugin_module, sensor_module}, sensor_module, sensor_config}
-  end
-
-  defp normalize_plugin_subscription({tag, sensor_module, sensor_config}, _plugin_module)
-       when is_atom(sensor_module) do
-    {:ok, tag, sensor_module, sensor_config}
-  end
-
-  defp normalize_plugin_subscription(subscription, _plugin_module) do
-    {:error, {:invalid_subscription, subscription}}
-  end
-
-  defp start_subscription_sensor(
-         %State{} = state,
-         plugin_module,
-         tag,
-         sensor_module,
-         sensor_config,
-         context
-       ) do
-    {:ok, state} =
-      SensorLifecycle.start(
-        state,
-        tag,
-        sensor_module,
-        sensor_config,
-        %{plugin: plugin_module, sensor: sensor_module},
-        context: context,
-        origin: {:plugin, plugin_module},
-        replace?: false
-      )
-
-    state
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Plugin Schedules
-  # ---------------------------------------------------------------------------
-
-  @doc false
-  defp register_plugin_schedules(%State{skip_schedules: true} = state) do
-    Logger.debug(fn -> "AgentServer #{state.id} skipping plugin schedules" end)
-    state
-  end
-
-  defp register_plugin_schedules(%State{} = state) do
-    agent_module = state.agent_module
-
-    schedules =
-      if function_exported?(agent_module, :plugin_schedules, 0),
-        do: agent_module.plugin_schedules(),
-        else: []
-
-    Enum.reduce(schedules, state, fn schedule_spec, acc_state ->
-      register_schedule(acc_state, schedule_spec)
-    end)
-  end
-
-  defp register_restored_cron_specs(%State{cron_specs: cron_specs} = state)
-       when map_size(cron_specs) == 0,
-       do: state
-
-  defp register_restored_cron_specs(%State{} = state) do
-    Enum.reduce(state.cron_specs, state, fn {job_id, spec}, acc_state ->
-      register_restored_cron_spec(acc_state, job_id, spec)
-    end)
-  end
-
-  defp register_restored_cron_spec(
-         %State{} = state,
-         job_id,
-         %{cron_expression: cron_expr, message: message, timezone: timezone}
-       ) do
-    if Map.has_key?(state.cron_jobs, job_id) do
-      Logger.warning(fn ->
-        "AgentServer #{state.id} skipping restored cron job #{inspect(job_id)} " <>
-          "because declarative/plugin schedule already exists"
-      end)
-
-      new_cron_specs = Map.delete(state.cron_specs, job_id)
-      cleaned_state = %{state | cron_specs: new_cron_specs}
-
-      case persist_cron_specs(cleaned_state, new_cron_specs) do
-        :ok ->
-          cleaned_state
-
-        {:error, reason} ->
-          emit_cron_telemetry_event(cleaned_state, :persist_failure, %{
-            job_id: job_id,
-            reason: reason
-          })
-
-          cleaned_state
-      end
-    else
-      {:ok, new_state} =
-        Directive.Cron.register(state, cron_expr, message, job_id, timezone, on_failure: :drop)
-
-      new_state
-    end
-  end
-
-  defp register_restored_cron_spec(%State{} = state, job_id, invalid_spec) do
-    Logger.error(fn ->
-      "AgentServer #{state.id} skipped invalid persisted cron spec #{inspect(job_id)}: #{inspect(invalid_spec)}"
-    end)
-
-    state
-  end
-
-  defp register_schedule(%State{} = state, schedule_spec) do
-    %{
-      cron_expression: cron_expr,
-      action: _action,
-      job_id: job_id,
-      signal_type: signal_type,
-      timezone: timezone
-    } = schedule_spec
-
-    signal = Signal.new!(signal_type, %{}, source: "/agent/#{state.id}/schedule")
-
-    case register_runtime_cron_job(
-           state,
-           job_id,
-           cron_expr,
-           timezone,
-           signal,
-           "schedule"
-         ) do
-      {:ok, new_state} ->
-        Logger.debug(fn ->
-          "AgentServer #{state.id} registered schedule #{inspect(job_id)}: #{cron_expr}"
-        end)
-
-        new_state
-
-      {:error, _reason, failed_state} ->
-        failed_state
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Drain Loop
-  # ---------------------------------------------------------------------------
-
-  defp start_drain_if_idle(%State{processing: false} = state) do
-    send(self(), :drain)
-    %{state | processing: true, status: :processing}
-  end
-
-  defp start_drain_if_idle(%State{} = state), do: state
-
-  defp continue_draining(state) do
-    state = maybe_notify_completion_waiters(state)
-
-    if State.queue_empty?(state) do
-      {:noreply, %{state | processing: false} |> State.set_status(:idle)}
-    else
-      send(self(), :drain)
-      {:noreply, %{state | processing: true, status: :processing}}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Completion Detection
-  # ---------------------------------------------------------------------------
-
-  defp completion_from_agent_state(agent_state, status_path, result_path, error_path) do
-    case get_in(agent_state, status_path) do
-      :completed ->
-        {:ok, %{status: :completed, result: get_in(agent_state, result_path)}}
-
-      :failed ->
-        {:ok, %{status: :failed, result: get_in(agent_state, error_path)}}
-
-      _ ->
-        :pending
-    end
-  end
-
-  defp maybe_notify_completion_waiters(%State{completion_waiters: waiters} = state)
-       when map_size(waiters) == 0 do
-    state
-  end
-
-  defp maybe_notify_completion_waiters(%State{completion_waiters: waiters, agent: agent} = state) do
-    {to_notify, still_waiting} =
-      Enum.split_with(waiters, fn {_ref, waiter} ->
-        completion_from_agent_state(
-          agent.state,
-          waiter.status_path,
-          waiter.result_path,
-          waiter.error_path
-        ) != :pending
-      end)
-
-    Enum.each(to_notify, fn {_ref, waiter} ->
-      {:ok, result} =
-        completion_from_agent_state(
-          agent.state,
-          waiter.status_path,
-          waiter.result_path,
-          waiter.error_path
-        )
-
-      Process.demonitor(waiter.monitor_ref, [:flush])
-      GenServer.reply(waiter.from, {:ok, result})
-    end)
-
-    %{state | completion_waiters: Map.new(still_waiting)}
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Agent Resolution
-  # ---------------------------------------------------------------------------
-
-  defp resolve_agent(%Options{
-         agent: agent,
-         agent_module: explicit_module,
-         initial_state: init_state,
-         id: id
-       }) do
-    cond do
-      is_atom(agent) ->
-        cond do
-          function_exported?(agent, :new, 1) ->
-            # new/1 accepts keyword options like [id: ..., state: ...]
-            {:ok, agent, agent.new(id: id, state: init_state)}
-
-          function_exported?(agent, :new, 0) ->
-            {:ok, agent, agent.new()}
-
-          true ->
-            {:error, Jido.Error.validation_error("Agent module must implement new/0 or new/1")}
-        end
-
-      is_struct(agent) ->
-        # For pre-built agents, use explicit agent_module if provided
-        # Otherwise fall back to the struct module (may not work for Jido.Agent structs)
-        agent_module = explicit_module || agent.__struct__
-        {:ok, agent_module, agent}
-
-      true ->
-        {:error, Jido.Error.validation_error("Invalid agent")}
-    end
-  end
-
-  # ---------------------------------------------------------------------------
-  # Internal: Server Resolution
-  # ---------------------------------------------------------------------------
-
-  defp resolve_server(pid) when is_pid(pid), do: {:ok, pid}
-
-  defp resolve_server({:via, _, _} = via) do
-    case GenServer.whereis(via) do
-      nil -> {:error, :not_found}
-      pid -> {:ok, pid}
-    end
-  end
-
-  defp resolve_server(name) when is_atom(name) do
-    case GenServer.whereis(name) do
-      nil -> {:error, :not_found}
-      pid -> {:ok, pid}
-    end
-  end
-
-  defp resolve_server(id) when is_binary(id) do
-    # String IDs require explicit registry lookup via Jido.whereis/2
-    {:error,
-     {:invalid_server,
-      "String IDs require explicit registry lookup. Use Jido.whereis(MyApp.Jido, \"#{id}\", partition: ...) first or pass the pid directly."}}
-  end
-
-  defp resolve_server(_), do: {:error, :invalid_server}
-
-  # ---------------------------------------------------------------------------
-  # Internal: Hierarchy
-  # ---------------------------------------------------------------------------
-
-  defp ensure_adopt_tag_available(state, tag) do
-    case State.get_child(state, tag) do
-      nil -> :ok
-      _child -> {:error, {:tag_in_use, tag}}
-    end
-  end
-
-  defp resolve_adopt_child(pid, _state) when is_pid(pid) do
-    if Process.alive?(pid), do: {:ok, pid}, else: {:error, :child_not_alive}
-  end
-
-  defp resolve_adopt_child(id, state) when is_binary(id) do
-    case Jido.whereis(state.jido, id, partition: state.partition) do
-      pid when is_pid(pid) -> {:ok, pid}
-      nil -> {:error, :child_not_found}
-    end
-  end
-
-  defp resolve_adopt_child(child, _state), do: {:error, {:invalid_child, child}}
-
-  defp ensure_adopt_not_self(pid) when pid == self(), do: {:error, :cannot_adopt_self}
-  defp ensure_adopt_not_self(_pid), do: :ok
-
-  defp perform_child_adoption(child_pid, tag, meta, state) do
-    parent_ref =
-      ParentRef.new!(%{
-        pid: self(),
-        id: state.id,
-        partition: state.partition,
-        tag: tag,
-        meta: meta
-      })
-
-    adopt_parent(child_pid, parent_ref)
-  end
+  defp normalize_ready_error(
+         {{:shutdown, {:bootstrap_failed, reason}}, {:gen_statem, :call, _details}}
+       ),
+       do: {:bootstrap_failed, reason}
 
-  defp maybe_monitor_parent(%State{parent: %ParentRef{pid: pid}} = state) when is_pid(pid) do
-    Process.monitor(pid)
-    state
-  end
-
-  defp maybe_monitor_parent(state), do: state
-
-  defp notify_parent_of_startup(%State{parent: %ParentRef{} = parent} = state)
-       when is_pid(parent.pid) do
-    child_started =
-      ChildStarted.new!(
-        %{
-          parent_id: parent.id,
-          child_id: state.id,
-          child_partition: state.partition,
-          child_module: state.agent_module,
-          tag: parent.tag,
-          pid: self(),
-          meta: parent.meta || %{}
-        },
-        source: "/agent/#{state.id}"
-      )
-
-    traced_child_started =
-      case Trace.put(child_started, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> child_started
-      end
-
-    _ = cast(parent.pid, traced_child_started)
-    :ok
-  end
-
-  defp notify_parent_of_startup(_state), do: :ok
-
-  defp handle_parent_down(%State{on_parent_death: :stop} = state, _pid, reason) do
-    _ = clear_parent_binding(state.jido, state.id, state.partition)
-    stop_reason = wrap_parent_down_reason(reason)
-
-    Logger.info(fn ->
-      "AgentServer #{state.id} stopping: parent died (#{inspect(reason)}), " <>
-        "wrapped stop_reason: #{inspect(stop_reason)}"
-    end)
-
-    {:stop, stop_reason, State.set_status(state, :stopping)}
-  end
-
-  defp handle_parent_down(%State{on_parent_death: :continue} = state, _pid, reason) do
-    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
-
-    Logger.info(fn ->
-      "AgentServer #{state.id} continuing as orphan after parent #{former_parent.id} died " <>
-        "(#{inspect(reason)})"
-    end)
-
-    {:noreply, orphaned_state}
-  end
-
-  defp handle_parent_down(%State{on_parent_death: :emit_orphan} = state, _pid, reason) do
-    {former_parent, orphaned_state} = transition_to_orphan(state, reason)
-
-    signal =
-      Orphaned.new!(
-        %{
-          parent_id: former_parent.id,
-          parent_pid: former_parent.pid,
-          tag: former_parent.tag,
-          meta: former_parent.meta || %{},
-          reason: reason
-        },
-        source: "/agent/#{orphaned_state.id}"
-      )
-
-    traced_signal =
-      case Trace.put(signal, Trace.new_root()) do
-        {:ok, s} -> s
-        {:error, _} -> signal
-      end
-
-    process_or_defer_internal_signal(traced_signal, orphaned_state)
-  end
-
-  defp handle_child_down(%State{} = state, pid, reason) do
-    child_info =
-      Enum.find_value(state.children, fn
-        {_tag, %{pid: ^pid} = child_info} -> child_info
-        _entry -> nil
-      end)
-
-    {tag, state} = State.remove_child_by_pid(state, pid)
-
-    cond do
-      tag && SensorLifecycle.sensor_child?(child_info) ->
-        Logger.debug(fn ->
-          "AgentServer #{state.id} sensor #{inspect(tag)} exited: #{inspect(reason)}"
-        end)
-
-        signal =
-          SensorExit.new!(
-            sensor_exit_data(tag, child_info, pid, reason),
-            source: "/agent/#{state.id}"
-          )
-
-        traced_signal =
-          case Trace.put(signal, Trace.new_root()) do
-            {:ok, s} -> s
-            {:error, _} -> signal
-          end
-
-        process_or_defer_internal_signal(traced_signal, state)
-
-      tag ->
-        Logger.debug(fn ->
-          "AgentServer #{state.id} child #{inspect(tag)} exited: #{inspect(reason)}"
-        end)
-
-        signal =
-          ChildExit.new!(
-            %{tag: tag, pid: pid, reason: reason},
-            source: "/agent/#{state.id}"
-          )
-
-        traced_signal =
-          case Trace.put(signal, Trace.new_root()) do
-            {:ok, s} -> s
-            {:error, _} -> signal
-          end
-
-        process_or_defer_internal_signal(traced_signal, state)
-
-      true ->
-        {:noreply, state}
-    end
-  end
-
-  defp sensor_exit_data({:sensor, sensor_tag}, child_info, pid, reason) do
-    sensor_exit_data(sensor_tag, child_info, pid, reason)
-  end
-
-  defp sensor_exit_data(tag, child_info, pid, reason) do
-    meta = child_info.meta || %{}
-
-    %{
-      tag: Map.get(meta, :sensor_tag, tag),
-      pid: pid,
-      reason: reason,
-      sensor: Map.get(meta, :sensor, child_info.module),
-      origin: Map.get(meta, :origin, :unknown),
-      meta: meta
-    }
-  end
+  defp normalize_ready_error({:timeout, {:gen_statem, :call, _details}}), do: :timeout
+  defp normalize_ready_error({:noproc, {:gen_statem, :call, _details}}), do: :not_running
+  defp normalize_ready_error(reason), do: reason
 
-  # Wraps parent-down reasons so OTP treats them as clean shutdowns.
-  # OTP only considers :normal, :shutdown, and {:shutdown, term} as "normal" exits.
-  # All other reasons get logged as errors by the default GenServer logger.
-  defp wrap_parent_down_reason(:normal), do: {:shutdown, {:parent_down, :normal}}
-  defp wrap_parent_down_reason(:noproc), do: {:shutdown, {:parent_down, :noproc}}
-  defp wrap_parent_down_reason(:shutdown), do: {:shutdown, {:parent_down, :shutdown}}
-  defp wrap_parent_down_reason({:shutdown, _} = r), do: {:shutdown, {:parent_down, r}}
-  defp wrap_parent_down_reason(reason), do: {:shutdown, {:parent_down, reason}}
+  defp registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
 
-  defp transition_to_orphan(%State{parent: %ParentRef{} = former_parent} = state, reason) do
-    _ = clear_parent_binding(state.jido, state.id, state.partition)
+  defp normalize_name(name) when is_atom(name), do: {:local, name}
+  defp normalize_name({:global, _term} = name), do: name
+  defp normalize_name({:via, _module, _term} = name), do: name
 
-    orphaned_state =
-      state
-      |> State.orphan_parent()
-      |> State.record_debug_event(:orphaned, %{
-        former_parent_id: former_parent.id,
-        tag: former_parent.tag,
-        reason: reason
-      })
-
-    {former_parent, orphaned_state}
-  end
-
-  defp hydrate_parent_from_runtime_store(%Options{} = options) do
-    case Jido.parent_binding(options.jido, options.id, partition: options.partition) do
-      {:ok, %{parent_id: parent_id, parent_partition: parent_partition, tag: tag, meta: meta}} ->
-        parent =
-          case Jido.whereis(options.jido, parent_id, partition: parent_partition) do
-            pid when is_pid(pid) ->
-              ParentRef.new!(%{
-                pid: pid,
-                id: parent_id,
-                partition: parent_partition,
-                tag: tag,
-                meta: normalize_parent_meta(meta)
-              })
-
-            nil ->
-              _ = clear_parent_binding(options.jido, options.id, options.partition)
-              nil
-          end
-
-        {:ok, %{options | parent: parent}}
-
-      :error ->
-        {:ok, options}
-    end
-  end
-
-  defp maybe_persist_parent_binding(%State{parent: %ParentRef{} = parent} = state) do
-    case Jido.parent_binding(state.jido, state.id, partition: state.partition) do
-      {:ok, _binding} ->
-        state
-
-      :error ->
-        case persist_parent_binding(state.jido, state.id, state.partition, parent) do
-          :ok ->
-            state
-
-          {:error, reason} ->
-            Logger.warning(fn ->
-              "AgentServer #{state.id} failed to persist parent binding: #{inspect(reason)}"
-            end)
-
-            state
-        end
-    end
-  end
-
-  defp maybe_persist_parent_binding(state), do: state
-
-  defp persist_parent_binding(jido, child_id, child_partition, %ParentRef{} = parent_ref)
-       when is_atom(jido) and is_binary(child_id) do
-    RuntimeStore.put(jido, @relationship_hive, Jido.partition_key(child_id, child_partition), %{
-      parent_id: parent_ref.id,
-      parent_partition: parent_ref.partition,
-      tag: parent_ref.tag,
-      meta: normalize_parent_meta(parent_ref.meta)
-    })
-  end
-
-  defp clear_parent_binding(jido, child_id, child_partition)
-       when is_atom(jido) and is_binary(child_id) do
-    RuntimeStore.delete(jido, @relationship_hive, Jido.partition_key(child_id, child_partition))
-  end
-
-  defp normalize_parent_meta(meta) when is_map(meta), do: meta
-  defp normalize_parent_meta(_meta), do: %{}
-
-  # ---------------------------------------------------------------------------
-  # Internal: Telemetry
-  # ---------------------------------------------------------------------------
-
-  defp exec_directive_with_telemetry(directive, signal, runtime_context, state) do
-    start_time = System.monotonic_time()
-    state = %{state | current_runtime_context: runtime_context}
-
-    directive_type =
-      directive.__struct__ |> Module.split() |> List.last()
-
-    # Record debug event for directive execution
-    state =
-      State.record_debug_event(state, :directive_started, %{
-        type: directive_type,
-        signal_type: signal.type
-      })
-
-    trace_metadata = TraceContext.to_telemetry_metadata()
-
-    metadata =
-      %{
-        agent_id: state.id,
-        agent_module: state.agent_module,
-        directive_type: directive_type,
-        directive: directive,
-        signal_type: signal.type,
-        jido_instance: state.jido,
-        jido_partition: state.partition
-      }
-      |> Map.merge(trace_metadata)
-
-    emit_telemetry(
-      [:jido, :agent_server, :directive, :start],
-      %{system_time: System.system_time()},
-      metadata
-    )
-
-    try do
-      result =
-        directive
-        |> DirectiveExec.exec(signal, state)
-        |> clear_current_runtime_context()
-
-      emit_telemetry(
-        [:jido, :agent_server, :directive, :stop],
-        %{duration: System.monotonic_time() - start_time},
-        Map.merge(metadata, %{result: result_type(result)})
-      )
-
-      result
-    catch
-      kind, reason ->
-        emit_telemetry(
-          [:jido, :agent_server, :directive, :exception],
-          %{duration: System.monotonic_time() - start_time},
-          Map.merge(metadata, Observe.exception_metadata(kind, reason))
-        )
-
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+  defp normalize_name(name) do
+    raise ArgumentError,
+          "Agent Server name must be an atom, :global tuple, or :via tuple, got: #{inspect(name)}"
   end
 
-  defp clear_current_runtime_context({:ok, %State{} = state}) do
-    {:ok, %{state | current_runtime_context: %{}}}
-  end
-
-  defp clear_current_runtime_context({:async, ref, %State{} = state}) do
-    {:async, ref, %{state | current_runtime_context: %{}}}
-  end
+  defp admission_deadline(:infinity), do: :infinity
 
-  defp clear_current_runtime_context({:stop, reason, %State{} = state}) do
-    {:stop, reason, %{state | current_runtime_context: %{}}}
+  defp admission_deadline(timeout) when is_integer(timeout) and timeout >= 0 do
+    {node(), System.monotonic_time(:millisecond) + timeout}
   end
 
-  defp result_type({:ok, _}), do: :ok
-  defp result_type({:async, _, _}), do: :async
-  defp result_type({:stop, _, _}), do: :stop
+  defp admission_expired?(:infinity), do: false
 
-  defp emit_telemetry(event, measurements, metadata) do
-    Observe.emit_event(event, measurements, metadata)
+  defp admission_expired?({origin, deadline}) when origin == node() do
+    System.monotonic_time(:millisecond) >= deadline
   end
 
-  # Warn when {:stop, ...} is used with normal-looking reasons.
-  # This indicates likely misuse - normal completion should use state.status instead.
-  defp warn_if_normal_stop(reason, directive, state)
-       when reason in [:normal, :completed, :ok, :done, :success] do
-    directive_type = directive.__struct__ |> Module.split() |> List.last()
-
-    Logger.warning(fn ->
-      """
-      AgentServer #{state.id} received {:stop, #{inspect(reason)}, ...} from directive #{directive_type}.
-
-      This is a HARD STOP: pending directives and async work will be lost, and on_after_cmd/3 will NOT run.
-
-      For normal completion, set state.status to :completed/:failed instead and avoid returning {:stop, ...}.
-      External code should poll AgentServer.state/1 and check status, not rely on process death.
-
-      {:stop, ...} should only be used for abnormal/framework-level termination.
-      """
-    end)
+  defp admission_expired?({origin, deadline}) do
+    # Compare in the clock domain that created the deadline. Count the full
+    # query duration to avoid granting more time because its reply was delayed.
+    started = System.monotonic_time(:millisecond)
+    now = :erpc.call(origin, System, :monotonic_time, [:millisecond], 1_000)
+    elapsed = System.monotonic_time(:millisecond) - started
+    now + elapsed >= deadline
+  catch
+    _kind, _reason -> true
   end
-
-  defp warn_if_normal_stop(_reason, _directive, _state), do: :ok
 end

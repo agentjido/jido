@@ -62,7 +62,8 @@ defmodule Jido.Util do
 
   """
   @spec validate_name(any()) :: {:ok, String.t()} | {:error, Jido.Error.ValidationError.t()}
-  @spec validate_name(any(), keyword()) :: :ok | {:error, Jido.Error.ValidationError.t()}
+  @spec validate_name(any(), keyword()) ::
+          :ok | {:ok, String.t()} | {:error, Jido.Error.ValidationError.t()}
   def validate_name(name, opts \\ [])
 
   def validate_name(name, []) when is_binary(name) do
