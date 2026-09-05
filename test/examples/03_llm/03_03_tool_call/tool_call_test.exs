@@ -62,7 +62,7 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
                Jido.Examples.ToolCall.Search,
                %{id: "x", query: [], operation: :read},
                %{tools: client(tools)},
-               jido: jido
+               task_supervisor: Jido.task_supervisor_name(jido)
              )
 
     assert calls(tools) == []

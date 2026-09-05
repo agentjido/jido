@@ -54,7 +54,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
 
     handle =
       Jido.Exec.run_async(Pipeline, Map.from_struct(intent), context,
-        jido: state.init.jido,
+        task_supervisor: Jido.task_supervisor_name(state.init.jido),
         max_concurrency: 3,
         timeout: timeout
       )

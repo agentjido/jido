@@ -376,8 +376,13 @@ defmodule Jido do
   def agent_supervisor_name(name), do: Module.concat(name, AgentSupervisor)
 
   @doc "Returns the TaskSupervisor name for a Jido instance."
-  @spec task_supervisor_name(atom()) :: atom()
-  def task_supervisor_name(name), do: Jido.Exec.task_supervisor_name(name)
+  @spec task_supervisor_name(atom() | nil) :: atom()
+  def task_supervisor_name(nil), do: Jido.Exec.TaskSupervisor
+  def task_supervisor_name(name) when is_atom(name), do: Module.concat(name, TaskSupervisor)
+
+  def task_supervisor_name(name) do
+    raise ArgumentError, "Jido instance must be an atom or nil, got: #{inspect(name)}"
+  end
 
   @doc "Returns the RuntimeStore name for a Jido instance."
   @spec runtime_store_name(atom()) :: atom()

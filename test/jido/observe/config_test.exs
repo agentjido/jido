@@ -24,6 +24,14 @@ defmodule JidoTest.Observe.ConfigTest do
     def __otp_app__, do: :jido_observe_config_test
   end
 
+  defmodule TaskOwner do
+    use Jido.Action, name: "observe_config_task_owner"
+
+    def run(_input, %{task_supervisor: supervisor}) do
+      {:ok, %{owned: self() in Task.Supervisor.children(supervisor)}}
+    end
+  end
+
   @settings [
     {:telemetry_log_level, :telemetry, :log_level, :telemetry_log_level, :debug, :error, :info},
     {:telemetry_log_args, :telemetry, :log_args, :telemetry_log_args, :full, :none, :keys_only},
@@ -286,6 +294,29 @@ defmodule JidoTest.Observe.ConfigTest do
   end
 
   describe "action_exec_opts/2" do
+    test "runs Actions under the selected Jido instance" do
+      start_supervised!({Jido, name: @test_instance})
+      supervisor = Jido.task_supervisor_name(@test_instance)
+
+      for opts <- [
+            Config.action_exec_opts(@test_instance, timeout: 1_000),
+            Config.action_exec_opts(nil, jido: @test_instance, timeout: 1_000)
+          ] do
+        assert {:ok, %{owned: true}} =
+                 Jido.Exec.run(TaskOwner, %{}, %{task_supervisor: supervisor}, opts)
+      end
+    end
+
+    test "uses an explicit supervisor PID before the instance default" do
+      supervisor = start_supervised!(Task.Supervisor)
+
+      opts =
+        Config.action_exec_opts(@test_instance, task_supervisor: supervisor, timeout: 1_000)
+
+      assert {:ok, %{owned: true}} =
+               Jido.Exec.run(TaskOwner, %{}, %{task_supervisor: supervisor}, opts)
+    end
+
     test "adds derived exec options without overwriting explicit opts" do
       Application.put_env(:jido, :telemetry, log_level: :debug, log_args: :keys_only)
 

@@ -122,23 +122,26 @@ defmodule Jido.Observe.Config do
   """
   @spec action_exec_opts(instance(), keyword()) :: keyword()
   def action_exec_opts(instance \\ nil, opts \\ []) when is_list(opts) do
-    opts
-    |> Keyword.take([:timeout, :jido])
-    |> maybe_put_jido_instance(instance)
+    exec_opts = Keyword.take(opts, [:timeout, :task_supervisor])
+
+    case Keyword.fetch(opts, :jido) do
+      {:ok, jido} -> Keyword.put_new(exec_opts, :task_supervisor, Jido.task_supervisor_name(jido))
+      :error -> maybe_put_task_supervisor(exec_opts, instance)
+    end
   end
 
-  defp maybe_put_jido_instance(opts, Jido) do
+  defp maybe_put_task_supervisor(opts, Jido) do
     if Process.whereis(Jido.TaskSupervisor) do
-      Keyword.put_new(opts, :jido, Jido)
+      Keyword.put_new(opts, :task_supervisor, Jido.task_supervisor_name(Jido))
     else
       opts
     end
   end
 
-  defp maybe_put_jido_instance(opts, instance) when is_atom(instance) and not is_nil(instance),
-    do: Keyword.put_new(opts, :jido, instance)
+  defp maybe_put_task_supervisor(opts, instance) when is_atom(instance) and not is_nil(instance),
+    do: Keyword.put_new(opts, :task_supervisor, Jido.task_supervisor_name(instance))
 
-  defp maybe_put_jido_instance(opts, _instance), do: opts
+  defp maybe_put_task_supervisor(opts, _instance), do: opts
 
   @doc """
   Returns the action logger threshold for the given instance.

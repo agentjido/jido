@@ -351,7 +351,7 @@ defmodule Jido.AgentServerRuntimeTest do
     {:ok, agent} =
       Jido.start_agent(jido, OwnedExecutionAgent, id: unique_id("owned-execution"))
 
-    task_supervisor = Process.whereis(Jido.Exec.task_supervisor_name(jido))
+    task_supervisor = Process.whereis(Jido.task_supervisor_name(jido))
     assert is_pid(task_supervisor)
     test = self()
 

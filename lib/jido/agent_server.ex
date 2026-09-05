@@ -1112,7 +1112,7 @@ defmodule Jido.AgentServer do
   defp start_admission_task(command, %State{} = data) do
     with {:ok, runtime_refs} <-
            plugin_runtime_refs(data, Plugin.admission_modules(data.plugin_specs)) do
-      supervisor = Jido.Exec.task_supervisor_name(data.jido)
+      supervisor = Jido.task_supervisor_name(data.jido)
 
       task =
         Task.Supervisor.async(supervisor, fn ->
@@ -1157,7 +1157,9 @@ defmodule Jido.AgentServer do
   end
 
   defp start_exec(%Jido.Agent.Command{} = command, %State{} = data) do
-    exec_opts = Keyword.put(data.exec_opts, :jido, data.jido)
+    exec_opts =
+      Keyword.put(data.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
+
     command_options = Keyword.put(exec_opts, :context, command.context)
 
     with {:ok, prepared} <-
@@ -1535,7 +1537,7 @@ defmodule Jido.AgentServer do
   end
 
   defp start_directive_task(fun, rest, context, span, data) do
-    supervisor = Jido.Exec.task_supervisor_name(data.jido)
+    supervisor = Jido.task_supervisor_name(data.jido)
     task = Task.Supervisor.async(supervisor, fun)
     timer = start_directive_timer(data.directive_timeout, task.ref)
     pending = %{task: task, timer: timer, rest: rest, context: context, span: span}

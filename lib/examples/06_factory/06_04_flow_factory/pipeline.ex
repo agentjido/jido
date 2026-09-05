@@ -233,7 +233,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Repair do
 
     # Iterate expects a completed body result. The nested run uses the remaining mission time.
     Jido.Exec.run(Cycle, params, context,
-      jido: context.factory_jido,
+      task_supervisor: Jido.task_supervisor_name(context.factory_jido),
       max_concurrency: 3,
       timeout: max(context.flow_deadline - System.monotonic_time(:millisecond), 0)
     )
