@@ -186,6 +186,32 @@ defmodule JidoTest.UtilTest do
       assert {:ok, ^pid} = Util.whereis(pid)
     end
 
+    test "returns a dead pid and ignores options" do
+      {pid, ref} = spawn_monitor(fn -> :ok end)
+      assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1000
+      assert Util.whereis(pid, :ignored) == {:ok, pid}
+    end
+
+    test "tuple registry takes precedence and atom keys become strings", %{jido: jido} do
+      registry = Jido.registry_name(jido)
+      pid = self()
+      {:ok, _} = Registry.register(registry, "util_contract", :value)
+
+      for name <- [:util_contract, "util_contract"] do
+        assert Util.whereis({name, registry}, registry: MissingRegistry) == {:ok, pid}
+        assert Util.whereis({name, registry}, :ignored) == {:ok, pid}
+        assert Util.whereis(name, registry: registry) == {:ok, pid}
+      end
+    end
+
+    test "preserves the exact error for absent or false registry options" do
+      for opts <- [[], [registry: nil], [registry: false]] do
+        assert_raise ArgumentError, ":registry option is required", fn ->
+          Util.whereis(:util_contract, opts)
+        end
+      end
+    end
+
     test "returns not_found for unregistered names", %{jido: jido} do
       registry = Jido.registry_name(jido)
 

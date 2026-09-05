@@ -320,21 +320,8 @@ defmodule Jido.Util do
 
   def whereis(pid, _opts) when is_pid(pid), do: {:ok, pid}
 
-  def whereis({name, registry}, _opts) when is_atom(registry) do
-    name = if is_atom(name), do: Atom.to_string(name), else: name
-
-    case Registry.lookup(registry, name) do
-      [{pid, _}] -> {:ok, pid}
-      [] -> {:error, :not_found}
-    end
-  end
-
   def whereis(name, opts) do
-    registry =
-      Keyword.get(opts, :registry) ||
-        raise ArgumentError, ":registry option is required"
-
-    name = if is_atom(name), do: Atom.to_string(name), else: name
+    {:via, Registry, {registry, name}} = via_tuple(name, opts)
 
     case Registry.lookup(registry, name) do
       [{pid, _}] -> {:ok, pid}
