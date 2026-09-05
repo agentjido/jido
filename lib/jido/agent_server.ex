@@ -448,8 +448,7 @@ defmodule Jido.AgentServer do
         pool_key: opts.pool_key,
         idle_timeout: opts.idle_timeout,
         persistence: opts.persistence,
-        attachments: MapSet.new(),
-        attachment_monitors: %{},
+        attachments: %{},
         idle_timer: nil,
         spawn_fun: opts.spawn_fun,
         debug: opts.debug,
@@ -1623,7 +1622,7 @@ defmodule Jido.AgentServer do
         error_count: data.error_count,
         lifecycle: %{
           pool: data.pool,
-          attached: MapSet.size(data.attachments),
+          attached: map_size(data.attachments),
           idle_timeout: data.idle_timeout,
           idle_timer?: not is_nil(data.idle_timer)
         }
@@ -1858,11 +1857,11 @@ defmodule Jido.AgentServer do
   defp maybe_log_cast_failure(_from, _signal, _reason, _agent_id), do: :ok
 
   defp handle_process_down(ref, pid, reason, phase, %State{} = data) do
-    case Map.fetch(data.attachment_monitors, ref) do
-      {:ok, ^pid} ->
+    case Map.fetch(data.attachments, pid) do
+      {:ok, ^ref} ->
         next_data =
           data
-          |> remove_attachment(ref, pid)
+          |> remove_attachment(pid)
           |> maybe_start_idle_timer(phase)
 
         {:keep_state, next_data}
@@ -2454,7 +2453,7 @@ defmodule Jido.AgentServer do
       not Process.alive?(owner_pid) ->
         {:error, :owner_not_alive}
 
-      MapSet.member?(data.attachments, owner_pid) ->
+      Map.has_key?(data.attachments, owner_pid) ->
         {:ok, cancel_idle_timer(data)}
 
       true ->
@@ -2463,29 +2462,24 @@ defmodule Jido.AgentServer do
         {:ok,
          %{
            cancel_idle_timer(data)
-           | attachments: MapSet.put(data.attachments, owner_pid),
-             attachment_monitors: Map.put(data.attachment_monitors, ref, owner_pid)
+           | attachments: Map.put(data.attachments, owner_pid, ref)
          }}
     end
   end
 
   defp detach_owner(%State{} = data, owner_pid) do
-    case Enum.find(data.attachment_monitors, fn {_ref, pid} -> pid == owner_pid end) do
-      {ref, ^owner_pid} ->
+    case Map.fetch(data.attachments, owner_pid) do
+      {:ok, ref} ->
         Process.demonitor(ref, [:flush])
-        remove_attachment(data, ref, owner_pid)
+        remove_attachment(data, owner_pid)
 
-      nil ->
+      :error ->
         data
     end
   end
 
-  defp remove_attachment(%State{} = data, ref, owner_pid) do
-    %{
-      data
-      | attachments: MapSet.delete(data.attachments, owner_pid),
-        attachment_monitors: Map.delete(data.attachment_monitors, ref)
-    }
+  defp remove_attachment(%State{} = data, owner_pid) do
+    %{data | attachments: Map.delete(data.attachments, owner_pid)}
   end
 
   defp maybe_start_idle_timer(%State{} = data, phase) when phase != :idle, do: data
@@ -2497,7 +2491,7 @@ defmodule Jido.AgentServer do
        do: data
 
   defp maybe_start_idle_timer(%State{} = data, :idle) do
-    if MapSet.size(data.attachments) == 0 do
+    if map_size(data.attachments) == 0 do
       timer = :erlang.start_timer(data.idle_timeout, self(), :agent_idle_timeout)
       %{data | idle_timer: timer}
     else

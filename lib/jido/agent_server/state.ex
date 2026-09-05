@@ -41,9 +41,8 @@ defmodule Jido.AgentServer.State do
               persistence:
                 Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
               attachments:
-                Zoi.any(description: "Attached owner process set") |> Zoi.default(MapSet.new()),
-              attachment_monitors:
-                Zoi.map(description: "Attachment monitor references") |> Zoi.default(%{}),
+                Zoi.map(description: "Attached owner PIDs and monitor references")
+                |> Zoi.default(%{}),
               idle_timer: Zoi.any(description: "Current idle timer") |> Zoi.optional(),
               spawn_fun:
                 Zoi.any(description: "Optional process spawn function") |> Zoi.optional(),
