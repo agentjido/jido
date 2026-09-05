@@ -7,10 +7,15 @@ defmodule JidoTest.Agent.ScheduledOccurrenceTest do
   alias Jido.Plugin.Scheduler
   alias JidoTest.ScheduledOccurrenceFixtures.{Clock, TimedAgent}
 
-  setup do
+  setup %{jido_pid: jido_pid} do
     start_supervised!({Clock, []})
     path = Path.join(System.tmp_dir!(), unique_id("jido-occurrence"))
-    on_exit(fn -> File.rm_rf!(path) end)
+
+    on_exit(fn ->
+      refute Process.alive?(jido_pid)
+      File.rm_rf!(path)
+    end)
+
     {:ok, agent_id: unique_id(), persistence: {Jido.Persistence.File, path: path}}
   end
 

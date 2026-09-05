@@ -1,3 +1,6 @@
+# This example prints results for its user.
+# credo:disable-for-this-file Credo.Check.Warning.IoInspect
+
 # Run with mix run lib/examples/05_multi_agent/05_05_remote_child/demo.exs.
 # Starts and stops a real owned child on the requested remote node.
 defmodule Jido.Examples.RemoteChildDemo do

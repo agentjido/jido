@@ -16,7 +16,7 @@ validation, ordering, timeout, and failure rules. A replacement runtime starts
 from current committed Plugin state.
 
 The Action cannot change protected Plugin keys. A Plugin cannot replace the
-Agent value. Plugin declarations are normalized to `Jido.Plugin.Spec`.
+Agent value. Plugin declarations are validated when the Agent value is built.
 Old manifests, mounts, dependency requirements, and V2 callbacks require a port.
 
 See the [Plugin example](../lib/examples/01_basic/README.md),

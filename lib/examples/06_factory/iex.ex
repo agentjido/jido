@@ -1,3 +1,6 @@
+# This example prints results for its user.
+# credo:disable-for-this-file Credo.Check.Warning.IoInspect
+
 defmodule Jido.Examples.Factory.IEx do
   @moduledoc "An IEx session for live conversation, a three-Agent workshop, or a department factory."
   alias Jido.AgentServer, as: Server

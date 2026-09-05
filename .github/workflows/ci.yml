@@ -22,6 +22,9 @@ jobs:
     secrets: inherit
     with:
       runner: blacksmith-2vcpu-ubuntu-2404
-      credo_command: mix credo --min-priority higher
-      docs_command: mix docs -f html
-      test_command: mix test
+      credo_command: mix credo --strict --only warning
+      docs_command: mix docs --no-open -f html --warnings-as-errors
+      test_command: mix test --include integration --include example --include flaky --seed 0
+      # The V3 integration branch retains an unreleased Git dependency. Check
+      # Hex publication when changes reach main, including its merge queue.
+      validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}

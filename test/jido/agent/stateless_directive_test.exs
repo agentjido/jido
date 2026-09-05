@@ -119,6 +119,8 @@ defmodule Jido.Agent.StatelessDirectiveTest do
           assert_receive {:effect_failed, _reason, _outcome}, 1_000
         rescue
           error in ExUnit.AssertionError ->
+            # Preserve process state when the assertion fails.
+            # credo:disable-for-next-line Credo.Check.Warning.IoInspect
             IO.inspect(
               {failure,
                Process.info(server, [:current_stacktrace, :message_queue_len, :messages])},

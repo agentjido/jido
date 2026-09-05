@@ -14,7 +14,8 @@ defmodule JidoTest.Case do
       end
 
   Each test gets a unique Jido instance that is automatically started before
-  the test and stopped after it completes. This ensures complete test isolation.
+  the test and stopped before its cleanup callbacks run. This ensures complete
+  test isolation, including persistence writes during shutdown.
 
   ## Context
 
@@ -67,11 +68,12 @@ defmodule JidoTest.Case do
 
   ## Examples
 
-      unique_id()        # "test-12345"
-      unique_id("agent") # "agent-12346"
+      unique_id()        # "test-<random suffix>"
+      unique_id("agent") # "agent-<random suffix>"
   """
   def unique_id(prefix \\ "test") do
-    "#{prefix}-#{System.unique_integer([:positive])}"
+    suffix = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+    "#{prefix}-#{suffix}"
   end
 
   @doc """
@@ -92,7 +94,7 @@ defmodule JidoTest.Case do
     test_id = System.unique_integer([:positive])
     jido_name = :"jido_test_#{test_id}"
 
-    {:ok, jido_pid} = Jido.start_link(name: jido_name)
+    jido_pid = start_supervised!({Jido, name: jido_name})
 
     {:ok, Map.merge(context, %{jido: jido_name, jido_pid: jido_pid})}
   end

@@ -6,10 +6,15 @@ defmodule JidoTest.Agent.PendingJobRecoveryTest do
   alias Jido.Examples.PendingJobRecovery, as: Agent
   alias Jido.Examples.ManagedJobs.Jobs
 
-  setup do
+  setup %{jido_pid: jido_pid} do
     suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
     path = Path.join(System.tmp_dir!(), "jido-job-recovery-#{suffix}")
-    on_exit(fn -> File.rm_rf!(path) end)
+
+    on_exit(fn ->
+      refute Process.alive?(jido_pid)
+      File.rm_rf!(path)
+    end)
+
     {:ok, persistence: {Jido.Persistence.File, path: path}, agent_id: unique_id()}
   end
 

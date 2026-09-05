@@ -321,6 +321,8 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
       error in ExUnit.AssertionError ->
         factory = Jido.whereis_agent(jido, session.factory_id)
 
+        # Preserve process state when the assertion fails.
+        # credo:disable-for-next-line Credo.Check.Warning.IoInspect
         IO.inspect(
           %{
             factory: Server.snapshot(factory),
