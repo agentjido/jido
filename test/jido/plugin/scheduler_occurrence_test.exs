@@ -108,6 +108,51 @@ defmodule JidoTest.Plugin.SchedulerOccurrenceTest do
     assert :ok = Scheduler.validate_cron_state(%{plain: spec}, [])
   end
 
+  test "timezone defaults are shared by validation and stored definitions" do
+    for timezone <- [nil, "", "Etc/UTC"] do
+      assert {:ok, directive} =
+               Scheduler.validate_directive(
+                 Scheduler.cron(:plain, "* * * * *", tick(), timezone: timezone),
+                 []
+               )
+
+      assert directive.timezone == "Etc/UTC"
+      assert Scheduler.build_cron_spec("* * * * *", tick(), timezone).timezone == "Etc/UTC"
+    end
+  end
+
+  test "cron state validation preserves the first error when several fields are invalid" do
+    invalid_message = %{tick() | data: %{pid: self()}}
+
+    for {cron, message, timezone, reason} <- [
+          {nil, invalid_message, 123, {:invalid_cron, :invalid_type}},
+          {"bad cron", invalid_message, 123, {:invalid_timezone, :invalid_type}},
+          {"bad cron", invalid_message, "Not/AZone", {:invalid_message, :non_durable_term}}
+        ] do
+      assert {:error, error} =
+               Scheduler.validate_cron_state(
+                 %{job: %{cron_expression: cron, message: message, timezone: timezone}},
+                 []
+               )
+
+      assert error == "invalid cron state for :job: #{inspect(reason)}"
+    end
+
+    assert {:error, syntax_error} =
+             Scheduler.validate_directive(
+               Scheduler.cron(:job, "bad cron", tick(), timezone: "Not/AZone"),
+               []
+             )
+
+    assert {:invalid_cron, _} = syntax_error
+
+    assert {:error, {:invalid_timezone, _}} =
+             Scheduler.validate_directive(
+               Scheduler.cron(:job, "* * * * *", tick(), timezone: "Not/AZone"),
+               []
+             )
+  end
+
   test "tracked schedules reject reserved template metadata" do
     {:ok, tagged} = Occurrence.attach(tick(), @scope, "job-1", 1, @instant)
 
