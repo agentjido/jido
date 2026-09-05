@@ -45,6 +45,27 @@ defmodule Jido.Agent.IdleLifecycleTest do
     assert %{attached: 0, idle_timer?: true} = Server.status(server).runtime.lifecycle
   end
 
+  test "DOWN requires the current owner and monitor reference", %{jido: jido} do
+    owner = start_supervised!({Elixir.Agent, fn -> nil end})
+    {:ok, server} = Jido.start_agent(jido, IdleAgent, idle_timeout: 10_000)
+    assert :ok = Server.attach(server, owner)
+    {:idle, state} = :sys.get_state(server)
+    old_ref = Map.fetch!(state.attachments, owner)
+    assert :ok = Server.detach(server, owner)
+    assert :ok = Server.attach(server, owner)
+    {:idle, state} = :sys.get_state(server)
+    current_ref = Map.fetch!(state.attachments, owner)
+    refute current_ref == old_ref
+
+    send(server, {:DOWN, old_ref, :process, owner, :normal})
+    send(server, {:DOWN, current_ref, :process, self(), :normal})
+    assert %{attached: 1, idle_timer?: false} = Server.status(server).runtime.lifecycle
+
+    Elixir.Agent.stop(owner)
+    eventually(fn -> Server.status(server).runtime.lifecycle.attached == 0 end)
+    assert %{attached: 0, idle_timer?: true} = Server.status(server).runtime.lifecycle
+  end
+
   test "owner death releases the attachment and a timer stops the server", %{jido: jido} do
     owner = start_supervised!({Elixir.Agent, fn -> nil end})
     {:ok, server} = Jido.start_agent(jido, IdleAgent, idle_timeout: 10_000)
