@@ -3,6 +3,89 @@ defmodule JidoTest.RuntimeStoreTest do
 
   alias Jido.RuntimeStore
 
+  test "a stopped worker returns the fallback for each operation", %{jido: jido} do
+    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+
+    for {call, fallback} <- calls(jido) do
+      assert call.() == fallback
+    end
+  end
+
+  test "a normal exit during a call returns each operation's fallback", %{jido: jido} do
+    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+
+    for {call, fallback} <- calls(jido) do
+      worker = start_call_worker(jido)
+      task = Task.async(call)
+      assert_receive {:request, ^worker, _request}, 1_000
+      ref = Process.monitor(worker)
+      send(worker, {:exit, :normal})
+      assert_receive {:DOWN, ^ref, :process, ^worker, :normal}, 1_000
+      assert Task.await(task) == fallback
+    end
+  end
+
+  test "an abnormal worker exit reaches the caller", %{jido: jido} do
+    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    worker = start_call_worker(jido)
+    task = Task.async(fn -> catch_exit(RuntimeStore.fetch(jido, :hive, :key)) end)
+    assert_receive {:request, ^worker, _request}, 1_000
+    send(worker, {:exit, :shutdown})
+    assert {:shutdown, {GenServer, :call, _}} = Task.await(task)
+  end
+
+  test "a write timeout propagates even when the worker later completes it", %{jido: jido} do
+    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+    worker = start_call_worker(jido)
+    task = Task.async(fn -> catch_exit(RuntimeStore.put(jido, :hive, :key, :value)) end)
+    assert_receive {:request, ^worker, {:put, :hive, :key, :value}}, 1_000
+    assert {:timeout, {GenServer, :call, _}} = Task.await(task, 6_000)
+    send(worker, :complete)
+    assert_receive {:completed, ^worker}, 1_000
+    assert [{{:hive, :key}, :value}] = :ets.lookup(Jido.runtime_store_name(jido), {:hive, :key})
+  end
+
+  defp calls(jido) do
+    [
+      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, :error},
+      {fn -> RuntimeStore.get(jido, :hive, :key, :default) end, :default},
+      {fn -> RuntimeStore.put(jido, :hive, :key, :value) end, {:error, :not_running}},
+      {fn -> RuntimeStore.delete(jido, :hive, :key) end, {:error, :not_running}},
+      {fn -> RuntimeStore.list(jido, :hive) end, []}
+    ]
+  end
+
+  defp start_call_worker(jido) do
+    observer = self()
+
+    worker =
+      spawn(fn ->
+        receive do
+          {:"$gen_call", from, request} ->
+            send(observer, {:request, self(), request})
+
+            receive do
+              {:exit, reason} ->
+                exit(reason)
+
+              :complete ->
+                {:put, hive, key, value} = request
+                :ets.insert(Jido.runtime_store_name(jido), {{hive, key}, value})
+                GenServer.reply(from, :ok)
+                send(observer, {:completed, self()})
+            after
+              10_000 -> exit(:barrier_timeout)
+            end
+        after
+          10_000 -> exit(:request_timeout)
+        end
+      end)
+
+    on_exit(fn -> Process.exit(worker, :kill) end)
+    Process.register(worker, Jido.runtime_store_name(jido))
+    worker
+  end
+
   describe "RuntimeStore" do
     test "supports put/get/fetch/delete within a hive", %{jido: jido} do
       assert :error == RuntimeStore.fetch(jido, :relationships, "child-1")
