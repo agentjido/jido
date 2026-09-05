@@ -66,6 +66,55 @@ defmodule JidoTest.UtilTest do
     end
   end
 
+  describe "validation result contracts" do
+    test "preserves values and ignores options other than the empty list" do
+      for value <- [TestActions.BasicAction, [TestActions.BasicAction], []] do
+        assert Util.validate_actions(value, []) == {:ok, value}
+
+        for opts <- [[validate: false], [unknown: true], :ignored, nil, %{}] do
+          assert Util.validate_actions(value, opts) == :ok
+          assert Util.validate_name("Valid_123", opts) == :ok
+        end
+      end
+
+      assert Util.validate_name("Valid_123", []) == {:ok, "Valid_123"}
+    end
+
+    test "preserves complete validation errors across option forms" do
+      for opts <- [[], [validate: true], :ignored] do
+        for name <- ["", "1invalid", "invalid-name"] do
+          assert Util.validate_name(name, opts) ==
+                   {:error,
+                    Jido.Error.validation_error(
+                      "The name must start with a letter and contain only letters, numbers, and underscores.",
+                      field: :name
+                    )}
+        end
+
+        for name <- [nil, :name, 42, [], %{}] do
+          assert Util.validate_name(name, opts) ==
+                   {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
+        end
+
+        for actions <- [Enum, NonExistentModule, [TestActions.BasicAction, Enum]] do
+          assert Util.validate_actions(actions, opts) ==
+                   {:error,
+                    Jido.Error.validation_error(
+                      "All actions must implement the Jido.Action behavior",
+                      kind: :action,
+                      subject: actions
+                    )}
+        end
+      end
+    end
+
+    test "keeps unsupported action inputs as function clause errors" do
+      for opts <- [[], [validate: true], :ignored], input <- [42, "action", %{}, [42]] do
+        assert_raise FunctionClauseError, fn -> Util.validate_actions(input, opts) end
+      end
+    end
+  end
+
   describe "validate_module/1" do
     test "validates existing module" do
       assert {:ok, Enum} = Util.validate_module(Enum)

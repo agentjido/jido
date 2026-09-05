@@ -78,24 +78,12 @@ defmodule Jido.Util do
     end
   end
 
-  def validate_name(name, _opts) when is_binary(name) do
-    if Regex.match?(@name_regex, name) do
-      :ok
-    else
-      {:error,
-       Jido.Error.validation_error(
-         "The name must start with a letter and contain only letters, numbers, and underscores.",
-         field: :name
-       )}
-    end
-  end
-
   def validate_name(_, []) do
     {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
   end
 
-  def validate_name(_, _opts) do
-    {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
+  def validate_name(name, _opts) do
+    with {:ok, _name} <- validate_name(name, []), do: :ok
   end
 
   @doc """
@@ -148,18 +136,6 @@ defmodule Jido.Util do
     end
   end
 
-  def validate_actions(actions, _opts) when is_list(actions) do
-    if Enum.all?(actions, &implements_action?/1) do
-      :ok
-    else
-      {:error,
-       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
-         kind: :action,
-         subject: actions
-       )}
-    end
-  end
-
   def validate_actions(action, []) when is_atom(action) do
     if implements_action?(action) do
       {:ok, action}
@@ -172,16 +148,8 @@ defmodule Jido.Util do
     end
   end
 
-  def validate_actions(action, _opts) when is_atom(action) do
-    if implements_action?(action) do
-      :ok
-    else
-      {:error,
-       Jido.Error.validation_error("All actions must implement the Jido.Action behavior",
-         kind: :action,
-         subject: action
-       )}
-    end
+  def validate_actions(actions, _opts) when is_list(actions) or is_atom(actions) do
+    with {:ok, _actions} <- validate_actions(actions, []), do: :ok
   end
 
   defp implements_action?(module) when is_atom(module) do
