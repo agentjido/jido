@@ -43,7 +43,8 @@ defmodule Jido.Topology.CompositionTest do
     definition = WorkerTeam.topology()
     invalid = %{definition | exports: [%{key: "missing", kind: :agent, from: "missing"}]}
     assert {:error, graph_error} = Topology.new(invalid)
-    assert {:error, ^graph_error} = Topology.instantiate(invalid, unexpected: true)
+    assert {:error, instance_error} = Topology.instantiate(invalid, unexpected: true)
+    assert Map.drop(instance_error, [:stacktrace]) == Map.drop(graph_error, [:stacktrace])
 
     assert {:error, opts_error} = Topology.instantiate(definition, unexpected: true)
     assert Exception.message(opts_error) =~ "Unknown"
@@ -55,7 +56,8 @@ defmodule Jido.Topology.CompositionTest do
 
     assert {:error, root_error} = Topology.instantiate(definition, id: "root")
     assert Exception.message(root_error) =~ "unbound imports"
-    assert {:error, ^root_error} = Plan.build(invalid, "root", %{})
+    assert {:error, plan_error} = Plan.build(invalid, "root", %{})
+    assert Map.drop(plan_error, [:stacktrace]) == Map.drop(root_error, [:stacktrace])
   end
 
   test "direct Plan construction still checks the declaration graph" do
@@ -67,7 +69,8 @@ defmodule Jido.Topology.CompositionTest do
 
     assert {:error, error} = Plan.build(invalid, "cycle", %{})
     assert Exception.message(error) =~ "cycle"
-    assert {:error, ^error} = Topology.instantiate(invalid, id: "cycle")
+    assert {:error, instance_error} = Topology.instantiate(invalid, id: "cycle")
+    assert Map.drop(instance_error, [:stacktrace]) == Map.drop(error, [:stacktrace])
   end
 
   test "inputs and identities are isolated while Bus bindings share one owner" do

@@ -183,8 +183,10 @@ defmodule Jido.Topology.AuthoringTest do
     definition = Swarm.topology()
     invalid = %{definition | metadata: %{pid: self()}}
     assert {:error, error} = Topology.new(invalid)
-    assert {:error, ^error} = Codec.encode(invalid)
-    assert {:error, ^error} = Codec.encode(invalid, :invalid_registry)
+    assert {:error, derived_error} = Codec.encode(invalid)
+    assert {:error, supplied_error} = Codec.encode(invalid, :invalid_registry)
+    assert Map.drop(derived_error, [:stacktrace]) == Map.drop(error, [:stacktrace])
+    assert Map.drop(supplied_error, [:stacktrace]) == Map.drop(error, [:stacktrace])
 
     assert {:error, _} = Codec.encode(definition, :invalid_registry)
     assert {:error, _} = Codec.encode(definition, %{})
