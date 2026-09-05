@@ -160,8 +160,10 @@ defmodule Jido.Telemetry.Agent do
   defp interruption_kind({:shutdown, _reason}), do: nil
   defp interruption_kind(_reason), do: :exit
 
-  def result_metadata({:error, reason}),
-    do: Map.put(error_metadata(reason), :status, error_status(reason))
+  def result_metadata({:error, reason}) do
+    metadata = error_metadata(reason)
+    Map.put(metadata, :status, result_error_status(reason, metadata))
+  end
 
   def result_metadata(_result), do: %{status: :ok}
 
@@ -170,7 +172,18 @@ defmodule Jido.Telemetry.Agent do
   def error_status({:child_spawn_indeterminate, _, _, _, _}), do: :indeterminate
 
   def error_status(reason),
-    do: if(error_metadata(reason).error_type == :timeout, do: :timed_out, else: :error)
+    do: metadata_error_status(error_metadata(reason))
+
+  defp result_error_status(:cancelled, _metadata), do: :cancelled
+  defp result_error_status({:parent_down, :cancelled}, _metadata), do: :cancelled
+
+  defp result_error_status({:child_spawn_indeterminate, _, _, _, _}, _metadata),
+    do: :indeterminate
+
+  defp result_error_status(_reason, metadata), do: metadata_error_status(metadata)
+
+  defp metadata_error_status(%{error_type: :timeout}), do: :timed_out
+  defp metadata_error_status(_metadata), do: :error
 
   def error_metadata(reason) do
     public = Error.to_map(reason)
