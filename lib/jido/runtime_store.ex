@@ -165,13 +165,7 @@ defmodule Jido.RuntimeStore do
     server = Jido.runtime_store_name(instance)
 
     try do
-      case GenServer.whereis(server) do
-        nil ->
-          fallback
-
-        _pid ->
-          GenServer.call(server, request)
-      end
+      GenServer.call(server, request)
     catch
       :exit, {:noproc, _} -> fallback
       :exit, {:normal, _} -> fallback
