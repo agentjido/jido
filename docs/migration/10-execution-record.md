@@ -113,3 +113,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m06-compile.json`, `evidence/core/m06-test.json`
 and `evidence/core/m06-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M07
+
+All 13 Runtime fixtures pass 94 checks, including the supporting core files outside the catalog folders. The prepared assertions prove commit-before-ack delivery, replay, saved job attempts, early timer handling, durable occurrence identity and remote trace/VM recovery. All transferred source and test bytes remain unchanged.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 850}]` in 37.714 seconds, with normal concurrency.
+See `evidence/core/m07-compile.json`, `evidence/core/m07-test.json`
+and `evidence/core/m07-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
