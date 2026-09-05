@@ -8,6 +8,8 @@ post-commit effects, persistence faults, remote lifecycle and resource cleanup.
 Use deterministic model adapters or local HTTP/SSE for required examples.
 
 Run `mix test --include example --include integration --include flaky --seed 0`.
+CI runs `mix test test/jido test/jido_test test/integration --include integration --include flaky --seed 0`.
+Keep `test/examples` outside CI. Run the full example selection separately.
 Only the DIST-03 test `one logical identity has at most one live cluster owner`
 in `test/jido/agent/distributed_authority_test.exs` can be skipped. Keep its
 assertion and reason. Do not exclude a group to hide a failure. A missing or empty
