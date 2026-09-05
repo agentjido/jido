@@ -38,6 +38,9 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
 
     reviews = take_roles(["quality", "security"], 0)
 
+    # Worker readiness does not acknowledge the mission's asynchronous progress commit.
+    assert_eventually(Map.has_key?(FlowFactory.status(mission).artifacts, "#{id}/integration/0"))
+
     for {_, {_, input}} <- reviews do
       assert input.inputs.package == FlowFactory.status(mission).artifacts["#{id}/integration/0"]
     end

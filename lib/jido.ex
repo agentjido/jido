@@ -417,14 +417,9 @@ defmodule Jido do
           DynamicSupervisor.on_start_child()
   def start_agent(jido_instance, agent, opts \\ []) when is_atom(jido_instance) do
     if is_list(opts) and Keyword.keyword?(opts) do
-      child_spec =
-        {Jido.AgentServer, Keyword.merge(opts, agent: agent, jido: jido_instance, register: true)}
-
-      case DynamicSupervisor.start_child(agent_supervisor_name(jido_instance), child_spec) do
-        {:ok, pid} -> agent_ready_result(pid)
-        {:ok, pid, _info} -> agent_ready_result(pid)
-        result -> result
-      end
+      opts
+      |> Keyword.merge(agent: agent, jido: jido_instance, register: true)
+      |> Jido.AgentServer.start()
     else
       {:error,
        Jido.Error.validation_error("Agent startup options must be a keyword list", kind: :config)}
@@ -531,15 +526,4 @@ defmodule Jido do
   end
 
   defp normalize_parent_binding(_binding), do: :error
-
-  defp agent_ready_result(pid) do
-    case Jido.AgentServer.await_ready(pid) do
-      :ok ->
-        {:ok, pid}
-
-      {:error, reason} ->
-        if Process.alive?(pid), do: Process.exit(pid, :shutdown)
-        {:error, reason}
-    end
-  end
 end

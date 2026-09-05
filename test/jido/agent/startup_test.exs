@@ -15,6 +15,84 @@ defmodule Jido.Agent.StartupTest do
     def start_link(_init), do: :ignore
   end
 
+  defmodule HeldIgnoredRuntimePlugin do
+    use Jido.Plugin
+    def child_spec(init), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
+
+    def start_link(init) do
+      send(init.options[:observer], {:plugin_starting, init.agent_server, self()})
+
+      receive do
+        :return_ignore -> :ignore
+      end
+    end
+  end
+
+  defmodule HeldConstructor do
+    def new(opts) do
+      observer = opts[:state].observer
+      send(observer, {:constructing_agent, self()})
+
+      receive do
+        :construct_agent ->
+          definition = %{
+            Agent.agent()
+            | plugins: [{HeldIgnoredRuntimePlugin, [observer: observer]}]
+          }
+
+          Jido.Agent.instantiate(definition, id: opts[:id])
+      end
+    end
+  end
+
+  for entry <- [:instance, :server] do
+    test "#{entry} startup preserves the error when the failed Server stops before its caller resumes",
+         %{jido: jido} do
+      observer = self()
+      id = unique_id("delayed-startup-caller")
+
+      caller =
+        Task.async(fn ->
+          case unquote(entry) do
+            :instance ->
+              Jido.start_agent(jido, HeldConstructor,
+                id: id,
+                initial_state: %{observer: observer}
+              )
+
+            :server ->
+              Server.start(
+                jido: jido,
+                agent: HeldConstructor,
+                id: id,
+                initial_state: %{observer: observer}
+              )
+          end
+        end)
+
+      assert_receive {:constructing_agent, supervisor}, 1_000
+      assert :erlang.suspend_process(caller.pid)
+
+      try do
+        send(supervisor, :construct_agent)
+        assert_receive {:plugin_starting, server, plugin}, 1_000
+        ref = Process.monitor(server)
+        send(plugin, :return_ignore)
+        assert_receive {:DOWN, ^ref, :process, ^server, _}, 1_000
+        refute Process.alive?(server)
+      after
+        :erlang.resume_process(caller.pid)
+      end
+
+      assert {:error,
+              {:bootstrap_failed,
+               {:plugin_child_start_failed, HeldIgnoredRuntimePlugin, :plugin_child_not_started}}} =
+               Task.await(caller)
+
+      eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
+    end
+  end
+
   test "dead registry entries are not returned as live Agents", %{jido: jido} do
     id = unique_id("stopped-lookup")
     assert {:ok, pid} = Jido.start_agent(jido, Agent, id: id, restart: :temporary)

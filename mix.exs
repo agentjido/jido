@@ -211,7 +211,10 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "== 3.0.0-beta.6"},
+      # Use the Flow state-copy fix until it is included in a Hex release.
+      {:jido_action,
+       git: "https://github.com/agentjido/jido_action.git",
+       ref: "83fb5f18b812b973325ee4d2c418d6cc28ebcd52"},
       {:jido_signal, "~> 3.0.0-beta.2"},
 
       # Jido Deps

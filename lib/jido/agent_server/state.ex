@@ -61,6 +61,9 @@ defmodule Jido.AgentServer.State do
               active: Zoi.any(description: "Active Turn lifecycle record"),
               plugin_bootstrap:
                 Zoi.any(description: "Active Plugin readiness check") |> Zoi.optional(),
+              startup_reply:
+                Zoi.any(description: "Temporary supervised startup reply address")
+                |> Zoi.optional(),
               admission_task:
                 Zoi.any(description: "Active Plugin admission task") |> Zoi.optional(),
               directive_task:

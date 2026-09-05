@@ -201,7 +201,26 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     worker = eventually(fn -> Jido.whereis_agent(jido, worker_id) end)
     Process.exit(worker, :kill)
     assert_eventually(HTTP.state(system.factory).jobs["first"].status == :failed, timeout: 2_000)
-    assert_eventually(HTTP.state(system.factory).active_job_id == "second", timeout: 2_000)
+
+    try do
+      assert_eventually(HTTP.state(system.factory).active_job_id == "second", timeout: 2_000)
+    rescue
+      error in ExUnit.AssertionError ->
+        scheduler = Server.children(system.factory)[{:plugin, Jido.Plugin.Scheduler}].pid
+        runtime = :sys.get_state(scheduler)
+
+        clocks =
+          Enum.map(runtime.cron_jobs, fn {key, {_, pid, _}} -> {key, :sys.get_state(pid)} end)
+
+        IO.inspect(
+          {Server.snapshot(system.factory), Server.status(system.factory), runtime, clocks},
+          label: "Factory worker-exit diagnostics",
+          limit: :infinity
+        )
+
+        reraise error, __STACKTRACE__
+    end
+
     refute Jido.whereis_agent(jido, worker_id)
   end
 

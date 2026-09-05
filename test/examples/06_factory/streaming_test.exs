@@ -314,7 +314,29 @@ defmodule JidoTest.Examples.Factory.StreamingTest do
     )
 
     assert {:ok, _} = Chat.control(session, :cancel, "event-job")
-    assert_eventually(elem(StringIO.contents(device), 1) =~ "[factory event-job cancelled]")
+
+    try do
+      assert_eventually(elem(StringIO.contents(device), 1) =~ "[factory event-job cancelled]")
+    rescue
+      error in ExUnit.AssertionError ->
+        factory = Jido.whereis_agent(jido, session.factory_id)
+
+        IO.inspect(
+          %{
+            factory: Server.snapshot(factory),
+            factory_status: Server.status(factory),
+            owner: Server.snapshot(session.owner),
+            conversation: Server.snapshot(conversation),
+            observer: :sys.get_state(session.observer),
+            output: elem(StringIO.contents(device), 1)
+          },
+          label: "Factory stream cancellation diagnostics",
+          limit: :infinity
+        )
+
+        reraise error, __STACKTRACE__
+    end
+
     output = elem(StringIO.contents(device), 1)
     assert length(Regex.scan(~r/Streamed prefix/, output)) == 1
     assert length(Regex.scan(~r/and suffix/, output)) == 1

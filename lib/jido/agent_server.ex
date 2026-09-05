@@ -82,11 +82,14 @@ defmodule Jido.AgentServer do
   Use `Jido.start_agent/3` for instance-supervised ownership instead.
   """
   @spec start_link(keyword()) :: :gen_statem.start_ret()
-  def start_link(opts) when is_list(opts) do
+  def start_link(opts) when is_list(opts), do: start_link(opts, nil)
+
+  @doc false
+  def start_link(opts, startup_reply) when is_list(opts) do
     with {:ok, options} <- Options.new(opts) do
       case server_name(options) do
-        nil -> :gen_statem.start_link(__MODULE__, options, [])
-        name -> :gen_statem.start_link(name, __MODULE__, options, [])
+        nil -> :gen_statem.start_link(__MODULE__, {options, startup_reply}, [])
+        name -> :gen_statem.start_link(name, __MODULE__, {options, startup_reply}, [])
       end
     end
   end
@@ -100,10 +103,19 @@ defmodule Jido.AgentServer do
   def start(opts) when is_list(opts) do
     case Keyword.get(opts, :jido) do
       jido when is_atom(jido) and not is_nil(jido) ->
-        case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), {__MODULE__, opts}) do
-          {:ok, pid} -> ready_result(pid)
-          {:ok, pid, _info} -> ready_result(pid)
-          result -> result
+        # Register the reply address before the child can finish bootstrap.
+        # An alias also drops a late reply when the caller stops waiting.
+        reply = :erlang.alias()
+        spec = %{child_spec(opts) | start: {__MODULE__, :start_link, [opts, reply]}}
+
+        try do
+          case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), spec) do
+            {:ok, pid} -> startup_result(pid, reply)
+            {:ok, pid, _info} -> startup_result(pid, reply)
+            result -> result
+          end
+        after
+          :erlang.unalias(reply)
         end
 
       _value ->
@@ -396,7 +408,9 @@ defmodule Jido.AgentServer do
   def callback_mode, do: :handle_event_function
 
   @impl true
-  def init(%Options{} = opts) do
+  def init(%Options{} = opts), do: init({opts, nil})
+
+  def init({%Options{} = opts, startup_reply}) do
     Process.flag(:trap_exit, true)
 
     with {:ok, restored_agent, restored_version} <- restore_initial_agent(opts),
@@ -445,6 +459,7 @@ defmodule Jido.AgentServer do
         activation_id: Signal.ID.generate!(),
         active: nil,
         plugin_bootstrap: nil,
+        startup_reply: startup_reply,
         admission_task: nil,
         directive_task: nil
       }
@@ -485,7 +500,8 @@ defmodule Jido.AgentServer do
       state_version: data.state_version
     })
 
-    data = %{data | plugin_bootstrap: nil, activation_span: nil}
+    notify_startup(data, :ok)
+    data = %{data | plugin_bootstrap: nil, activation_span: nil, startup_reply: nil}
     notify_parent_online(data)
     {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
   end
@@ -983,7 +999,12 @@ defmodule Jido.AgentServer do
   def terminate(reason, _phase, %State{} = data) do
     AgentTelemetry.finish(data.activation_span, AgentTelemetry.result_metadata({:error, reason}))
     metadata = Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, :stop)
-    AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
+
+    result =
+      AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
+
+    notify_startup(data, {:error, normalize_startup_error(reason)})
+    result
   end
 
   defp terminate_agent(reason, data) do
@@ -2607,16 +2628,40 @@ defmodule Jido.AgentServer do
 
   defp server_name(%Options{}), do: nil
 
-  defp ready_result(pid) do
-    case await_ready(pid) do
-      :ok ->
-        {:ok, pid}
+  defp startup_result(pid, reply) do
+    monitor = Process.monitor(pid)
 
-      {:error, reason} ->
-        if Process.alive?(pid), do: Process.exit(pid, :shutdown)
-        {:error, reason}
+    try do
+      receive do
+        {^reply, :ok} ->
+          {:ok, pid}
+
+        {^reply, {:error, reason}} ->
+          {:error, reason}
+
+        {:DOWN, ^monitor, :process, ^pid, reason} ->
+          receive do
+            {^reply, :ok} -> {:ok, pid}
+            {^reply, {:error, _reason} = error} -> error
+          after
+            0 -> {:error, normalize_startup_error(reason)}
+          end
+      after
+        5_000 ->
+          if Process.alive?(pid), do: Process.exit(pid, :shutdown)
+          {:error, :timeout}
+      end
+    after
+      Process.demonitor(monitor, [:flush])
     end
   end
+
+  defp notify_startup(%State{startup_reply: nil}, _result), do: :ok
+  defp notify_startup(%State{startup_reply: reply}, result), do: send(reply, {reply, result})
+
+  defp normalize_startup_error({:shutdown, reason}), do: reason
+  defp normalize_startup_error(:noproc), do: :not_running
+  defp normalize_startup_error(reason), do: reason
 
   defp normalize_ready_error(
          {{:shutdown, {:bootstrap_failed, reason}}, {:gen_statem, :call, _details}}
