@@ -107,7 +107,7 @@ defmodule JidoCoreBench.Suite do
   def settings(_), do: raise(ArgumentError, "profile must be smoke, short, or scale")
 
   defp source do
-    files = Path.wildcard(Path.expand("../**/*.exs", __DIR__)) |> Enum.sort()
+    files = Path.wildcard(Path.expand("../**/*.{exs,py}", __DIR__)) |> Enum.sort()
     tool_sha = files |> Enum.map(&File.read!/1) |> hash()
 
     %{

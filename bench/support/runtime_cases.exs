@@ -19,7 +19,15 @@ defmodule JidoCoreBench.RuntimeCases do
           "server/#{mode}/#{kind}",
           fn context ->
             a = F.agent(1, data, target)
-            {:ok, pid} = Server.start_link(agent: a, jido: JidoCoreBench, register: false)
+
+            pid =
+              if mode == :start_stop do
+                nil
+              else
+                {:ok, pid} = Server.start_link(agent: a, jido: JidoCoreBench, register: false)
+                pid
+              end
+
             %{pid: pid, agent: a, signal: F.signal(), context: context}
           end,
           fn p ->
@@ -35,6 +43,7 @@ defmodule JidoCoreBench.RuntimeCases do
                     register: false
                   )
 
+                F.barrier(p.context)
                 :ok = Server.stop(child, :normal)
                 Process.alive?(child)
 
@@ -86,7 +95,7 @@ defmodule JidoCoreBench.RuntimeCases do
         end)
 
       Map.put(workload, :cleanup, fn p ->
-        if Process.alive?(p.pid), do: Server.stop(p.pid, :normal)
+        if is_pid(p.pid) and Process.alive?(p.pid), do: Server.stop(p.pid, :normal)
         :ok
       end)
     end

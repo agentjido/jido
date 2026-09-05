@@ -142,8 +142,9 @@ accepted summary into a tracked report before raw local files are removed.
 
 Complete all 50 records. Do not count a deferred idea as tested. Finish remaining
 fixtures before testing those ideas. Run the complete suite with examples,
-coverage, format, compile with warnings as errors, lint, Dialyzer, docs, and
-package checks. Check Elixir 1.18 / OTP 27 and the available newer runtime.
+format, compile with warnings as errors, lint, Dialyzer, docs, and package checks.
+Run the 80% coverage gate on core tests and core source only. Exclude example
+modules, test fixtures, and benchmark helpers from the coverage calculation. Check Elixir 1.18 / OTP 27 and the available newer runtime.
 Push only after checks pass or after a specific existing failure is documented
 and shown to be unchanged. Do not lower the 80% coverage requirement.
 

@@ -24,3 +24,16 @@ The only approved exclusion is the DIST-03 test
 `one logical identity has at most one live cluster owner` in
 `test/jido/agent/distributed_authority_test.exs`. Cluster-exclusive ownership
 remains unsupported. Preserve the test assertion and its stated reason.
+
+## Core coverage
+
+The 80% coverage goal applies to core code in `lib/jido.ex` and `lib/jido/`.
+`coveralls.json` excludes example code, test fixtures, and benchmark helpers.
+Run core coverage with:
+
+```sh
+mix test --cover test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+```
+
+Run example tests separately for behavior checks. Their coverage is not part of
+the core coverage goal.

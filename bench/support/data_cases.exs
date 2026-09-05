@@ -75,16 +75,18 @@ defmodule JidoCoreBench.DataCases do
   end
 
   defp audit_cases do
-    record = Jido.Plugin.Audit.record(:bench, :ok)
+    records = for i <- 1..1_100, do: Jido.Plugin.Audit.record({:bench, i}, :ok, at: i)
 
     for n <- [1, 1_000], count <- [0, 1, 100] do
+      existing = Enum.take(records, n)
+      incoming = Enum.slice(records, n, count)
+      expected = Enum.take(existing ++ incoming, -1_000)
+
       F.checked(
         "audit/update/#{n}/#{count}",
-        fn _ -> %{records: List.duplicate(record, n)} end,
-        &Jido.Plugin.Audit.update_state(&1, List.duplicate(record, count), max_entries: 1_000),
-        fn {:ok, state} ->
-          F.equal!(state.records, List.duplicate(record, min(n + count, 1_000)))
-        end
+        fn _ -> %{records: existing} end,
+        &Jido.Plugin.Audit.update_state(&1, incoming, max_entries: 1_000),
+        fn {:ok, state} -> F.equal!(state.records, expected) end
       )
     end
   end

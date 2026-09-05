@@ -29,9 +29,8 @@ defmodule Jido.MixProject do
       # Coverage
       test_coverage: [
         tool: ExCoveralls,
-        summary: [threshold: 80],
-        export: "cov",
-        ignore_modules: [~r/^JidoTest\./]
+        # ExCoveralls applies the core-only 80% gate from coveralls.json.
+        export: "cov"
       ],
 
       # Dialyzer

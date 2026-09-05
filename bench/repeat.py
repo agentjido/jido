@@ -73,6 +73,10 @@ def measurements(row):
     return values
 
 
+def display(value):
+    return "unavailable" if value is None else f"{value:.3f}"
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--baseline", required=True, type=Path)
@@ -105,6 +109,10 @@ def main():
                 "roots": {key: str(value) for key, value in roots.items()}, "pairs": pairs}
     manifest_path = output / "manifest.json"
     try:
+        for side, root in roots.items():
+            print(f"Compile {side} before measurement", flush=True)
+            run(["mix", "compile", "--warnings-as-errors"], root, env,
+                output / f"{side}-compile.log", args.timeout)
         for number in range(1, args.rounds + 1):
             directory = output / f"pair-{number:02d}"
             directory.mkdir()
@@ -156,9 +164,9 @@ def main():
                  "| Case | Median time ratio | Lower-time pairs | Process byte ratio |",
                  "| --- | ---: | ---: | ---: |"]
         for case, values in sorted(summary.items()):
-            lines.append(f"| {case} | {values['time']['median']:.3f} | "
+            lines.append(f"| {case} | {display(values['time']['median'])} | "
                          f"{values['time']['improved_pairs']}/{args.rounds} | "
-                         f"{values['process_bytes']['median']:.3f} |")
+                         f"{display(values['process_bytes']['median'])} |")
         (output / "summary.md").write_text("\n".join(lines) + "\n")
         manifest["status"] = "complete"
     except BaseException as error:
