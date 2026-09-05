@@ -5,14 +5,14 @@ defmodule Jido.Topology.Controller.Activation do
   alias Jido.AgentServer, as: Server
   alias Jido.Topology.BusInputs
 
-  def start(spec, state) do
-    with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, state.jido),
-         {:ok, agent_state, version, restore} <- saved_state(spec, state, persistence),
-         {:ok, definition} <- definition(spec, state),
+  def start(spec, context) do
+    with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, context.jido),
+         {:ok, agent_state, version, restore} <- saved_state(spec, context, persistence),
+         {:ok, definition} <- definition(spec, context),
          {:ok, agent} <- Agent.instantiate(definition, id: spec.id, state: agent_state) do
       options = [
         agent: agent,
-        jido: state.jido,
+        jido: context.jido,
         register: true,
         on_parent_death: spec.on_parent_exit,
         persistence: persistence,
@@ -21,7 +21,7 @@ defmodule Jido.Topology.Controller.Activation do
       ]
 
       child = Supervisor.child_spec({Server, options}, restart: :temporary)
-      pool = Jido.agent_supervisor_name(state.jido)
+      pool = Jido.agent_supervisor_name(context.jido)
 
       with {:ok, pid} <- DynamicSupervisor.start_child(pool, child) do
         case Server.await_ready(pid) do
@@ -38,9 +38,9 @@ defmodule Jido.Topology.Controller.Activation do
 
   defp saved_state(spec, _state, nil), do: {:ok, spec.initial_state, 0, :if_found}
 
-  defp saved_state(spec, state, persistence) do
+  defp saved_state(spec, context, persistence) do
     case Jido.Persistence.load_agent_with_revision(persistence, spec.module, spec.id,
-           instance: state.jido
+           instance: context.jido
          ) do
       {:ok, agent, version} when agent.id == spec.id and agent.module == spec.module ->
         {:ok, agent.state, version, false}
@@ -56,12 +56,12 @@ defmodule Jido.Topology.Controller.Activation do
     end
   end
 
-  defp definition(spec, state) do
+  defp definition(spec, context) do
     config = Map.put(spec.module.__agent_config__(), :module, spec.module)
 
     metadata =
       Map.put(Map.get(config, :metadata, %{}), "jido.topology", %{
-        id: state.instance.id,
+        id: context.instance_id,
         key: spec.key
       })
 
@@ -74,9 +74,9 @@ defmodule Jido.Topology.Controller.Activation do
         subscriptions =
           Enum.map(spec.subscriptions, fn sub ->
             [
-              bus: Map.fetch!(state.instance.plan.resources, sub.bus).id,
+              bus: Map.fetch!(context.bus_ids, sub.bus),
               path: sub.path,
-              retry_delay_ms: state.instance.definition.startup.retry_interval
+              retry_delay_ms: context.retry_interval
             ]
           end)
 
