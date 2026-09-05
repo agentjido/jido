@@ -492,17 +492,6 @@ defmodule Jido.Error do
   @redacted "[REDACTED]"
   @omitted "[OMITTED]"
   @depth_limit "[DEPTH_LIMIT]"
-  @sensitive_key_parts MapSet.new(~w[
-    api_key
-    apikey
-    authorization
-    credential
-    credentials
-    password
-    private_key
-    secret
-    token
-  ])
   @sensitive_key_fragments ~w[
     apikey
     authorization
@@ -751,28 +740,17 @@ defmodule Jido.Error do
   end
 
   defp sensitive_key?(key) do
-    normalized_key = normalized_key(key)
-    key_parts = key_parts(normalized_key)
-    compact_key = compact_key(normalized_key)
-
-    MapSet.member?(@sensitive_key_parts, normalized_key) ||
-      Enum.any?(key_parts, &MapSet.member?(@sensitive_key_parts, &1)) ||
-      Enum.any?(@sensitive_key_fragments, &String.contains?(compact_key, &1))
+    compact_key = key |> normalized_key() |> compact_key()
+    Enum.any?(@sensitive_key_fragments, &String.contains?(compact_key, &1))
   end
 
   defp stacktrace_key?(key) do
-    normalized_key = normalized_key(key)
-    compact_key = compact_key(normalized_key)
-
-    normalized_key in ["stacktrace", "stack_trace"] ||
-      "stacktrace" in key_parts(normalized_key) ||
-      String.contains?(compact_key, "stacktrace")
+    key |> normalized_key() |> compact_key() |> String.contains?("stacktrace")
   end
 
   defp normalized_key(key) when is_atom(key), do: key |> Atom.to_string() |> String.downcase()
   defp normalized_key(key) when is_binary(key), do: String.downcase(key)
 
-  defp key_parts(key), do: String.split(key, ~r/[^a-z0-9]+/, trim: true)
   defp compact_key(key), do: String.replace(key, ~r/[^a-z0-9]+/, "")
 
   defp transport_string(value) when is_binary(value), do: truncate_string(value)
