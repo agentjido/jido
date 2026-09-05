@@ -113,7 +113,21 @@ defmodule Jido.Agent.StatelessDirectiveTest do
       assert %{phase: :directing} = Server.status(server)
       assert Server.snapshot(server) == %{agent: committed, state_version: 1}
       if failure == :killed, do: Process.exit(worker, :kill)
-      assert_receive {:effect_failed, _reason, outcome}, 1_000
+
+      {:effect_failed, _reason, outcome} =
+        try do
+          assert_receive {:effect_failed, _reason, _outcome}, 1_000
+        rescue
+          error in ExUnit.AssertionError ->
+            IO.inspect(
+              {failure,
+               Process.info(server, [:current_stacktrace, :message_queue_len, :messages])},
+              label: "directive failure diagnostics"
+            )
+
+            reraise error, __STACKTRACE__
+        end
+
       assert_receive {:DOWN, ^monitor, :process, ^worker, _reason}, 1_000
       assert outcome.committed?
       assert outcome.stage == :directive

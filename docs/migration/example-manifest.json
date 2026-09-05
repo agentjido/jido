@@ -2348,7 +2348,7 @@
       ],
       "baseline_tests_executed": 1,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M10, evidence/core/m10-diagnostic-full.results.stage.json",
       "prepared_id": "07_01_independent",
       "prepared_directory": "lib/examples/07_topology/07_01_independent",
       "prepared_files": [
@@ -2395,7 +2395,7 @@
       ],
       "baseline_tests_executed": 1,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M10, evidence/core/m10-diagnostic-full.results.stage.json",
       "prepared_id": "07_02_hierarchy",
       "prepared_directory": "lib/examples/07_topology/07_02_hierarchy",
       "prepared_files": [
@@ -2444,7 +2444,7 @@
       ],
       "baseline_tests_executed": 1,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M10, evidence/core/m10-diagnostic-full.results.stage.json",
       "prepared_id": "07_03_bus_swarm",
       "prepared_directory": "lib/examples/07_topology/07_03_bus_swarm",
       "prepared_files": [
@@ -2495,7 +2495,7 @@
       ],
       "baseline_tests_executed": 1,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M10, evidence/core/m10-diagnostic-full.results.stage.json",
       "prepared_id": "07_04_keyed_accounts",
       "prepared_directory": "lib/examples/07_topology/07_04_keyed_accounts",
       "prepared_files": [
@@ -2546,7 +2546,7 @@
       ],
       "baseline_tests_executed": 1,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M10, evidence/core/m10-diagnostic-full.results.stage.json",
       "prepared_id": "07_05_composed_system",
       "prepared_directory": "lib/examples/07_topology/07_05_composed_system",
       "prepared_files": [

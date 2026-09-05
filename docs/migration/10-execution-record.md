@@ -143,3 +143,13 @@ Compilation with warnings as errors passes. The cumulative suite result is
 See `evidence/core/m09-compile.json`, `evidence/core/m09-test.json`
 and `evidence/core/m09-test.results.stage.json` for commands, source coverage,
 per-test results and runtime. Source changes require a reason in the transfer ledger.
+
+## M10
+
+Transferred Topology and all five catalog fixtures, including the 1,000-worker test. All 52 Topology tests passed in the first run. That run failed one existing directive failure-notification test. The next full run passed all 997 tests; ten focused seeds passed all 20 selected tests. The one-second assertion and all outcome checks remain intact. Added process diagnostics for a repeated failure. The cause of the first failure is not known; retain it as an open investigation for the full seed campaign. See m10-test.json and m10-directive-0.json through m10-directive-9.json.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 997}]` in 161.311 seconds, with normal concurrency.
+See `evidence/core/m10-compile.json`, `evidence/core/m10-diagnostic-full.json`
+and `evidence/core/m10-diagnostic-full.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.

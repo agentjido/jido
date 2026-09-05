@@ -1,0 +1,354 @@
+{
+  "agents": [
+    {
+      "depends_on": [],
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "key": "director",
+      "module": "agents/cell"
+    }
+  ],
+  "connections": [],
+  "exports": [],
+  "groups": [],
+  "imports": [],
+  "includes": [
+    {
+      "bindings": [
+        {
+          "key": "events",
+          "to": "events"
+        }
+      ],
+      "inputs": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "fields/label"
+            },
+            "east"
+          ],
+          [
+            {
+              "$type": "atom",
+              "id": "fields/worker_count"
+            },
+            {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "fields/east_workers"
+              }
+            }
+          ]
+        ]
+      },
+      "key": "east",
+      "topology": {
+        "agents": [
+          {
+            "depends_on": [],
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "fields/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "fields/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "key": "coordinator",
+            "module": "agents/cell"
+          }
+        ],
+        "connections": [
+          {
+            "agent": "workers",
+            "path": "topology.work",
+            "to": "events"
+          }
+        ],
+        "exports": [
+          {
+            "from": "coordinator",
+            "key": "leader",
+            "kind": "agent"
+          },
+          {
+            "from": "workers",
+            "key": "workers",
+            "kind": "group"
+          },
+          {
+            "from": "events",
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "groups": [
+          {
+            "count": {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "fields/worker_count"
+              }
+            },
+            "depends_on": [],
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "fields/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "fields/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "key": "workers",
+            "module": "agents/cell"
+          }
+        ],
+        "imports": [
+          {
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "includes": [],
+        "metadata": {
+          "$type": "map",
+          "entries": []
+        },
+        "name": "worker_team",
+        "relationships": [
+          {
+            "child": "workers",
+            "on_parent_exit": "stop",
+            "parent": "coordinator"
+          }
+        ],
+        "resources": [],
+        "schema": "schemas/team",
+        "startup": {
+          "concurrency": 32,
+          "max_agents": 10000,
+          "ready": "all",
+          "retry_interval": 1000,
+          "task_timeout": 10000
+        },
+        "type": "jido.topology",
+        "version": 2
+      }
+    },
+    {
+      "bindings": [
+        {
+          "key": "events",
+          "to": "events"
+        }
+      ],
+      "inputs": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "fields/label"
+            },
+            "west"
+          ],
+          [
+            {
+              "$type": "atom",
+              "id": "fields/worker_count"
+            },
+            {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "fields/west_workers"
+              }
+            }
+          ]
+        ]
+      },
+      "key": "west",
+      "topology": {
+        "agents": [
+          {
+            "depends_on": [],
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "fields/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "fields/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "key": "coordinator",
+            "module": "agents/cell"
+          }
+        ],
+        "connections": [
+          {
+            "agent": "workers",
+            "path": "topology.work",
+            "to": "events"
+          }
+        ],
+        "exports": [
+          {
+            "from": "coordinator",
+            "key": "leader",
+            "kind": "agent"
+          },
+          {
+            "from": "workers",
+            "key": "workers",
+            "kind": "group"
+          },
+          {
+            "from": "events",
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "groups": [
+          {
+            "count": {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "fields/worker_count"
+              }
+            },
+            "depends_on": [],
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "fields/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "fields/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "key": "workers",
+            "module": "agents/cell"
+          }
+        ],
+        "imports": [
+          {
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "includes": [],
+        "metadata": {
+          "$type": "map",
+          "entries": []
+        },
+        "name": "worker_team",
+        "relationships": [
+          {
+            "child": "workers",
+            "on_parent_exit": "stop",
+            "parent": "coordinator"
+          }
+        ],
+        "resources": [],
+        "schema": "schemas/team",
+        "startup": {
+          "concurrency": 32,
+          "max_agents": 10000,
+          "ready": "all",
+          "retry_interval": 1000,
+          "task_timeout": 10000
+        },
+        "type": "jido.topology",
+        "version": 2
+      }
+    }
+  ],
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "name": "composed_system",
+  "relationships": [
+    {
+      "child": {
+        "$type": "topology.ref",
+        "component": "east",
+        "key": "leader"
+      },
+      "on_parent_exit": "stop",
+      "parent": "director"
+    },
+    {
+      "child": {
+        "$type": "topology.ref",
+        "component": "west",
+        "key": "leader"
+      },
+      "on_parent_exit": "stop",
+      "parent": "director"
+    }
+  ],
+  "resources": [
+    {
+      "config": [],
+      "key": "events"
+    }
+  ],
+  "schema": "schemas/composed",
+  "startup": {
+    "concurrency": 4,
+    "max_agents": 10000,
+    "ready": "all",
+    "retry_interval": 1000,
+    "task_timeout": 5000
+  },
+  "type": "jido.topology",
+  "version": 2
+}

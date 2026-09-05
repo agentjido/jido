@@ -1741,7 +1741,23 @@
     {
       "source": "test/jido/agent/stateless_directive_test.exs",
       "target": "test/jido/agent/stateless_directive_test.exs",
-      "stage": "M02"
+      "stage": "M02",
+      "core_sha256": "535513f9b107955198c8f428ca792bcff80a6d8882737b9429067804cc075ad5",
+      "reason": "Keep the original one-second assertion. Add process diagnostics after a failure. The first M10 run failed once; the cause remains under investigation during the seed campaign.",
+      "checks": [
+        "docs/migration/evidence/core/m10-test.json",
+        "docs/migration/evidence/core/m10-diagnostic-full.json",
+        "docs/migration/evidence/core/m10-directive-0.json",
+        "docs/migration/evidence/core/m10-directive-1.json",
+        "docs/migration/evidence/core/m10-directive-2.json",
+        "docs/migration/evidence/core/m10-directive-3.json",
+        "docs/migration/evidence/core/m10-directive-4.json",
+        "docs/migration/evidence/core/m10-directive-5.json",
+        "docs/migration/evidence/core/m10-directive-6.json",
+        "docs/migration/evidence/core/m10-directive-7.json",
+        "docs/migration/evidence/core/m10-directive-8.json",
+        "docs/migration/evidence/core/m10-directive-9.json"
+      ]
     },
     {
       "source": "test/jido/agent_server_context_test.exs",

@@ -1,0 +1,73 @@
+{
+  "agents": [
+    {
+      "depends_on": [],
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "key": "coordinator",
+      "module": "agents/cell"
+    }
+  ],
+  "connections": [
+    {
+      "agent": "workers",
+      "path": "topology.work",
+      "to": "work"
+    }
+  ],
+  "groups": [
+    {
+      "count": {
+        "$type": "topology.input",
+        "key": {
+          "$type": "atom",
+          "id": "fields/worker_count"
+        }
+      },
+      "depends_on": [],
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "key": "workers",
+      "module": "agents/cell"
+    }
+  ],
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        {
+          "$type": "atom",
+          "id": "fields/purpose"
+        },
+        "Bus fan-out"
+      ]
+    ]
+  },
+  "name": "bus_swarm",
+  "relationships": [
+    {
+      "child": "workers",
+      "on_parent_exit": "stop",
+      "parent": "coordinator"
+    }
+  ],
+  "resources": [
+    {
+      "config": [],
+      "key": "work"
+    }
+  ],
+  "schema": "schemas/swarm",
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "ready": "all",
+    "retry_interval": 1000
+  },
+  "type": "jido.topology",
+  "version": 1
+}

@@ -1,0 +1,8 @@
+Running ExUnit with seed: 9, max_cases: 20
+Excluding tags: [:skip]
+Including tags: [:example, :integration, :flaky]
+
+..
+Finished in 0.3 seconds (0.3s async, 0.00s sync)
+
+Result: 2 passed
