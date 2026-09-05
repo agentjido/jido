@@ -263,7 +263,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_01_sequential_flow",
       "prepared_directory": "lib/examples/02_workflow/02_01_sequential_flow",
       "prepared_files": [
@@ -310,7 +310,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_02_effectful_steps",
       "prepared_directory": "lib/examples/02_workflow/02_02_effectful_steps",
       "prepared_files": [
@@ -357,7 +357,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_03_conditional_routes",
       "prepared_directory": "lib/examples/02_workflow/02_03_conditional_routes",
       "prepared_files": [
@@ -404,7 +404,7 @@
       ],
       "baseline_tests_executed": 5,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_04_parallel_join",
       "prepared_directory": "lib/examples/02_workflow/02_04_parallel_join",
       "prepared_files": [
@@ -451,7 +451,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_05_ordered_batch",
       "prepared_directory": "lib/examples/02_workflow/02_05_ordered_batch",
       "prepared_files": [
@@ -498,7 +498,7 @@
       ],
       "baseline_tests_executed": 3,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_06_bounded_iteration",
       "prepared_directory": "lib/examples/02_workflow/02_06_bounded_iteration",
       "prepared_files": [
@@ -545,7 +545,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_07_nested_flow",
       "prepared_directory": "lib/examples/02_workflow/02_07_nested_flow",
       "prepared_files": [
@@ -592,7 +592,7 @@
       ],
       "baseline_tests_executed": 4,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_08_executable_continuation",
       "prepared_directory": "lib/examples/02_workflow/02_08_executable_continuation",
       "prepared_files": [
@@ -639,7 +639,7 @@
       ],
       "baseline_tests_executed": 5,
       "baseline_failures": [],
-      "migration_status": "prepared source verified; core transfer not performed",
+      "migration_status": "core pass: M05, evidence/core/m05-test.results.stage.json",
       "prepared_id": "02_09_approval_workflow",
       "prepared_directory": "lib/examples/02_workflow/02_09_approval_workflow",
       "prepared_files": [

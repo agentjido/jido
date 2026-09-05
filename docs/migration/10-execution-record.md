@@ -93,3 +93,13 @@ See `evidence/core/m04-compile.json`, `m04-test.json`,
 `m04-test.results.stage.json` and `m04-repeat-1.json` through
 `m04-repeat-3.json` in the same evidence folder. A partition still does not prove
 remote death or cluster-exclusive ownership.
+
+## M05
+
+All nine Workflow fixtures pass their 35 checks. They keep actual Flow dependencies, parallel execution, ordered results, loop bounds, continuation and approval Turns. Source and test bytes match the prepared source.
+
+Compilation with warnings as errors passes. The cumulative suite result is
+`[{'passed': 690}]` in 17.177 seconds, with normal concurrency.
+See `evidence/core/m05-compile.json`, `evidence/core/m05-test.json`
+and `evidence/core/m05-test.results.stage.json` for commands, source coverage,
+per-test results and runtime. Source changes require a reason in the transfer ledger.
