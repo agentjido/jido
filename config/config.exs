@@ -16,7 +16,10 @@ config :logger, :default_formatter,
     :error,
     :instruction_count,
     :queue_size,
+    :pool,
+    :reason,
     :result,
+    :signal_id,
     :signal_type,
     :span_id,
     :stacktrace,
@@ -44,7 +47,9 @@ if config_env() == :dev do
       ]
     ]
 
+  # Jido uses GitOps release tasks, not its optional Igniter installer.
   config :git_ops,
+    no_igniter?: true,
     mix_project: Jido.MixProject,
     changelog_file: "CHANGELOG.md",
     repository_url: "https://github.com/agentjido/jido",

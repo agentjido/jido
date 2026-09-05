@@ -21,4 +21,4 @@ The last removal starts the configured idle timer. `touch/1` resets that timer.
 These controls remain; the old InstanceManager facade and worker-pool API do not.
 
 Use `Jido.stop_agent/3` to stop an Agent. Use `hibernate/3` and `thaw/4` when
-persistence is configured. See [storage](storage.md) and [owned children](orphans.md).
+persistence is configured. See [storage](storage.md) and `Jido.AgentServer` for owned children.

@@ -11,7 +11,7 @@ conversion. The candidate remains local until a separate publication decision.
 | V2 use | V3 use |
 | --- | --- |
 | Module `new/1` returns a struct | `new/1` returns a tagged result; `new!/1` returns a struct or raises |
-| Generic `Agent.new` combines configuration and instance data | Build a neutral definition, then call `Agent.instantiate/2` |
+| Generic `Agent.new` combines configuration and instance data | Build a neutral definition, then call `Jido.Agent.instantiate/2` |
 | Instruction or Action input to `cmd` | Send a `Jido.Signal` that selects one Action or Flow |
 | `{agent, directives}` from `cmd` | `{:ok, candidate, directives}` or `{:error, reason}` |
 | State patches and StateOps | Return complete candidate state; use `context.agent_state` as the base |
@@ -35,7 +35,7 @@ Directives run after commit. A directive failure keeps that commit and stops the
 rest of its batch. A live call can therefore succeed before a later effect fails.
 
 Port Plugin manifests, mounts, requirements, config helpers, routes, and old
-callbacks to `Jido.Plugin.Spec` and the [V3 callbacks](plugins.md). Plugins own
+callbacks to the [V3 Plugin contract](plugins.md). Plugins own
 one declared state key and their typed directives. Optional child specifications
 start owned runtimes. A stateless dispatch Plugin receives a nil runtime.
 V2 `DirectiveExec` implementations and `directive_handler` are removed.
@@ -45,10 +45,11 @@ V2 `DirectiveExec` implementations and `directive_handler` are removed.
 Use instance and partition scope consistently. Server attachment, detach, touch,
 idle timeout, child ownership, local/remote placement, and hibernate/thaw remain.
 The public V2 InstanceManager and WorkerPool APIs are removed. There is no
-pre-warmed checkout pool. Use explicit [bounded workers](worker-pools.md).
+pre-warmed checkout pool. Use explicit bounded worker ownership, as shown in the
+[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/lib/examples/05_multi_agent/05_03_bounded_workers).
 
 The Pod API, mutable graph planner, Pod state, and mutation directives are
-removed. Use static [Topology](orchestration.md), owned children, or the explicit
+removed. Use static `Jido.Topology`, owned children, or the explicit
 Fixed/Elastic Group applications. Arbitrary live graph mutation is outside this
 release. A remote disconnect does not prove death. Cluster-exclusive ownership
 is not implemented; DIST-03 is the only approved excluded test.
@@ -102,7 +103,7 @@ those packages. Deterministic LLM and Factory examples in core use the V3 API.
 They do not validate model quality or a paid provider session.
 
 All 52 fixtures, shared support, supporting core tests, and ten application
-scenarios are required. Run the full command from [testing](testing.md).
+scenarios are required. Run `mix test --include integration --include example --include flaky --seed 0`.
 Repeated test runs, recovery and scale checks, the runtime matrix, coverage,
 lint, Dialyzer, docs, and a fresh package consumer must pass before local beta
 QA is complete.

@@ -1,3 +1,6 @@
+# This example prints results for its user.
+# credo:disable-for-this-file Credo.Check.Warning.IoInspect
+
 defmodule Jido.Examples.RecoverableDelivery.Probe do
   @moduledoc false
   alias Jido.AgentServer, as: Server

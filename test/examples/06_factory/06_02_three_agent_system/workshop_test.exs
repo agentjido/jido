@@ -212,6 +212,8 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
         clocks =
           Enum.map(runtime.cron_jobs, fn {key, {_, pid, _}} -> {key, :sys.get_state(pid)} end)
 
+        # Preserve process state when the assertion fails.
+        # credo:disable-for-next-line Credo.Check.Warning.IoInspect
         IO.inspect(
           {Server.snapshot(system.factory), Server.status(system.factory), runtime, clocks},
           label: "Factory worker-exit diagnostics",

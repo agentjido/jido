@@ -16,4 +16,4 @@ applies owned Plugin state updates, and validates the complete candidate.
 The Server commits before dispatch. A failed directive preserves that commit
 and stops later directives in its batch. Error policy then applies.
 
-See [Actions](actions.md), [Plugins](plugins.md), and [runtime controls](runtime.md).
+See `Jido.Action`, [Plugins](plugins.md), and [runtime controls](runtime.md).

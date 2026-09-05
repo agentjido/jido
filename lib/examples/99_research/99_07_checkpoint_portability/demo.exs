@@ -1,3 +1,6 @@
+# This example prints results for its user.
+# credo:disable-for-this-file Credo.Check.Warning.IoInspect
+
 alias Jido.Examples.CheckpointPortabilityProbe, as: Probe
 alias Jido.Examples.PersistenceProbeStore, as: Store
 
