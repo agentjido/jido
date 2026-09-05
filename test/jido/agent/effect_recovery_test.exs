@@ -26,10 +26,15 @@ defmodule JidoTest.Agent.EffectRecoveryTest do
     end
   end
 
-  setup %{jido: jido} do
+  setup %{jido: jido, jido_pid: jido_pid} do
     suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
     path = Path.join(System.tmp_dir!(), "jido-effect-recovery-#{suffix}")
-    on_exit(fn -> File.rm_rf!(path) end)
+
+    on_exit(fn ->
+      refute Process.alive?(jido_pid)
+      File.rm_rf!(path)
+    end)
+
     start_supervised!({Sink, jido: jido, observer: self()})
     {:ok, persistence: {Jido.Persistence.File, path: path}}
   end
