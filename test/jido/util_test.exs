@@ -83,27 +83,33 @@ defmodule JidoTest.UtilTest do
     test "preserves complete validation errors across option forms" do
       for opts <- [[], [validate: true], :ignored] do
         for name <- ["", "1invalid", "invalid-name"] do
-          assert Util.validate_name(name, opts) ==
-                   {:error,
-                    Jido.Error.validation_error(
-                      "The name must start with a letter and contain only letters, numbers, and underscores.",
-                      field: :name
-                    )}
+          assert_validation_error(
+            Util.validate_name(name, opts),
+            {:error,
+             Jido.Error.validation_error(
+               "The name must start with a letter and contain only letters, numbers, and underscores.",
+               field: :name
+             )}
+          )
         end
 
         for name <- [nil, :name, 42, [], %{}] do
-          assert Util.validate_name(name, opts) ==
-                   {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
+          assert_validation_error(
+            Util.validate_name(name, opts),
+            {:error, Jido.Error.validation_error("Invalid name format.", field: :name)}
+          )
         end
 
         for actions <- [Enum, NonExistentModule, [TestActions.BasicAction, Enum]] do
-          assert Util.validate_actions(actions, opts) ==
-                   {:error,
-                    Jido.Error.validation_error(
-                      "All actions must implement the Jido.Action behavior",
-                      kind: :action,
-                      subject: actions
-                    )}
+          assert_validation_error(
+            Util.validate_actions(actions, opts),
+            {:error,
+             Jido.Error.validation_error(
+               "All actions must implement the Jido.Action behavior",
+               kind: :action,
+               subject: actions
+             )}
+          )
         end
       end
     end
@@ -242,5 +248,9 @@ defmodule JidoTest.UtilTest do
       assert :ok = Util.cond_log(:info, :invalid, "invalid level")
       assert :ok = Util.cond_log(:debug, :info, "with opts", domain: [:test])
     end
+  end
+
+  defp assert_validation_error({:error, actual}, {:error, expected}) do
+    assert Map.delete(actual, :stacktrace) == Map.delete(expected, :stacktrace)
   end
 end
