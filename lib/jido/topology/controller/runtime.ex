@@ -20,8 +20,7 @@ defmodule Jido.Topology.Controller.Runtime do
       waiters: %{},
       phase: :starting,
       pending: MapSet.new(),
-      active: %{},
-      timed_out: MapSet.new()
+      active: %{}
     }
 
     {:ok, state, {:continue, :reconcile}}
@@ -33,37 +32,11 @@ defmodule Jido.Topology.Controller.Runtime do
   @impl true
   def handle_info(:reconcile, state), do: {:noreply, begin_pass(state)}
 
-  def handle_info({ref, result}, state) when is_reference(ref) do
-    case Map.pop(state.active, ref) do
-      {nil, _} ->
-        {:noreply, state}
+  def handle_info({ref, result}, state) when is_reference(ref),
+    do: {:noreply, complete(state, ref, result)}
 
-      {job, active} ->
-        Process.demonitor(ref, [:flush])
-        Process.cancel_timer(job.timer)
-
-        result =
-          if MapSet.member?(state.timed_out, ref),
-            do: {:error, :startup_task_timeout},
-            else: result
-
-        state = %{state | active: active, timed_out: MapSet.delete(state.timed_out, ref)}
-        {:noreply, state |> record(job.key, result) |> drive()}
-    end
-  end
-
-  def handle_info({:DOWN, ref, :process, _pid, reason}, state) do
-    case Map.pop(state.active, ref) do
-      {nil, _} ->
-        {:noreply, state}
-
-      {job, active} ->
-        Process.cancel_timer(job.timer)
-        reason = if MapSet.member?(state.timed_out, ref), do: :startup_task_timeout, else: reason
-        state = %{state | active: active, timed_out: MapSet.delete(state.timed_out, ref)}
-        {:noreply, state |> record(job.key, {:error, reason}) |> drive()}
-    end
-  end
+  def handle_info({:DOWN, ref, :process, _pid, reason}, state),
+    do: {:noreply, complete(state, ref, {:error, reason})}
 
   def handle_info({:task_timeout, ref}, state) do
     case Map.get(state.active, ref) do
@@ -72,7 +45,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
       job ->
         Process.exit(job.task.pid, :kill)
-        {:noreply, %{state | timed_out: MapSet.put(state.timed_out, ref)}}
+        {:noreply, %{state | active: Map.put(state.active, ref, %{job | timed_out?: true})}}
     end
   end
 
@@ -226,13 +199,26 @@ defmodule Jido.Topology.Controller.Runtime do
         state.instance.definition.startup.task_timeout
       )
 
-    job = %{key: key, task: task, timer: timer}
+    job = %{key: key, task: task, timer: timer, timed_out?: false}
 
     %{
       state
       | pending: MapSet.delete(state.pending, key),
         active: Map.put(state.active, task.ref, job)
     }
+  end
+
+  defp complete(state, ref, result) do
+    case Map.pop(state.active, ref) do
+      {nil, _} ->
+        state
+
+      {job, active} ->
+        Process.demonitor(ref, [:flush])
+        Process.cancel_timer(job.timer)
+        result = if job.timed_out?, do: {:error, :startup_task_timeout}, else: result
+        %{state | active: active} |> record(job.key, result) |> drive()
+    end
   end
 
   defp record(state, key, {:ok, pid}), do: %{state | ready: Map.put(state.ready, key, pid)}
