@@ -274,7 +274,8 @@
     {
       "source": "lib/examples/05_multi_agent/05_01_child_lifecycle/worker.ex",
       "target": "lib/examples/05_multi_agent/05_01_child_lifecycle/worker.ex",
-      "stage": "M08"
+      "stage": "M04",
+      "stage_reason": "Required dependency closure for remote API regression fixtures. Complete ownership acceptance remains M08."
     },
     {
       "source": "lib/examples/05_multi_agent/05_02_correlated_requests/correlated_requests.ex",
@@ -299,7 +300,8 @@
     {
       "source": "lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex",
       "target": "lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex",
-      "stage": "M08"
+      "stage": "M04",
+      "stage_reason": "Required dependency closure for remote API regression fixtures. Complete ownership acceptance remains M08."
     },
     {
       "source": "lib/examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex",

@@ -76,3 +76,20 @@ real Redis failover. Compilation with warnings as errors passes.
 
 Commands and test selections: `evidence/core/m03-compile.json`,
 `evidence/core/m03-test.json`, and `evidence/core/m03-test.results.stage.json`.
+
+## M04 — remote admission and lifecycle
+
+The cumulative suite passes 655 tests with no failures or skips in 16.151
+seconds. The peer test starts real nodes 6.1 seconds apart. Both call directions,
+call/request deadlines, infinite waits and live/dead remote PIDs pass.
+
+Three more seeds each pass all 13 remote API, instance and startup checks. These
+include immediate hibernate/thaw, current-state restart and stale Registry checks.
+The tests preserve their barriers and process cleanup. Compilation passes with
+warnings as errors. RemoteCounter and KeepState arrive early as source dependencies;
+the complete Multi-agent group remains assigned to M08.
+
+See `evidence/core/m04-compile.json`, `m04-test.json`,
+`m04-test.results.stage.json` and `m04-repeat-1.json` through
+`m04-repeat-3.json` in the same evidence folder. A partition still does not prove
+remote death or cluster-exclusive ownership.
