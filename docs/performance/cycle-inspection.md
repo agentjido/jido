@@ -39,3 +39,19 @@ Registry.identifier(registry, :value, %URI{port: 1.0}) # {:ok, "integer"}
 reverse = Map.new(registry.entries, fn {id, entry} -> {entry, id} end)
 Map.fetch(reverse, {:value, %URI{port: 1.0}}) # :error
 ```
+
+## Map and state checks
+
+These checks used runtime `3e58775f` and Elixir 1.20.3 / OTP 29.
+
+| Round | Source and finding | Decision |
+| ---: | --- | --- |
+| 12 | `DeepMerge` passes plain maps to `Map.merge/3`, which calls `:maps.merge_with/3`. The runtime iterates the smaller map. With an empty right map, `merge_with_1(none, Result, _)` returns the left map. No map entries or conflict callback are visited. | Reject a second empty-right copy-avoidance path. The runtime already returns the existing map. Preserve the separate struct replacement branch. |
+| 13 | The same runtime path selects the empty left map as its iterator and returns the right map directly. It does not traverse or copy the right map. | Reject a second empty-left copy-avoidance path. There is no full-map cost to remove. No speed gain is claimed for either empty-map idea. |
+| 25 | `Plugin.apply_state_updates/2` parses reducer output even when it equals the input. A static integer increment transform changes an unchanged reducer value from 1 to 2. `Map.put/3` then shares that validated value; it does not deep-copy the nested value. The possible large traversal is schema parsing, whose effects must run. | Reject skipping the parse for unchanged owned state. The attached probe confirms the required transform. |
+| 26 | `Agent.Validation.validate_routes/1` calls `Authoring.routes/1`. That function normalizes each route once and returns the list. It does not call `Router.new/1`. The default command handler constructs its router once later. | Reject reuse of a router within Agent validation; no router is constructed there. Server reuse is still a separate pending idea. |
+| 30 | Command preparation parses the current state. `Agent.transition/2` later parses the prior state and the proposed state. A static integer-to-string transform can make that prior state fail its second parse. A probe confirms that the Action runs before this error. Public transition also must reject an invalid prior Agent. | Reject dropping this state traversal under the current behavior contract. Schema composition reuse is a separate pending idea. |
+
+`docs/performance/probes/validation-effects.exs` checks Rounds 25 and 30.
+The map findings were read from the loaded `Map` and `:maps` BEAM abstract code.
+These checks do not supply timing evidence.

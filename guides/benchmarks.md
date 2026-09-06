@@ -28,7 +28,9 @@ snapshots, failure, and start/stop. Data cases cover Thread append, normalizatio
 last entry and slice, Audit buffers and 100-record ID batches, state budgets, deep merge, Codec, and spans.
 A no-op Plugin case measures the command preparation callback path.
 Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
-errors, and Codec encoding with a generated Registry.
+errors, and Codec encoding with a generated Registry. Budget batch cases perform
+100 checks or replacements with unlimited, module-limited, and stricter instance
+limits. Their time is for the full batch, and every returned Agent is checked.
 
 For admission task arguments, run `mix run bench/capture_admission.exs --output
 bench/results/admission-capture.json`. This separate diagnostic captures the

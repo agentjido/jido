@@ -31,7 +31,8 @@ GC counts include setup and result checks; they are not allocation totals.
 All 116 focused Agent, Server, context, Plugin, and benchmark tests passed.
 The new test checks all 1,000 caller fields and rejects each reserved key even
 when its value is nil. Each workload checks complete results and cleanup.
-Complete quality and core coverage checks are due before this fix is pushed.
+The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
+The same 11 known example failures remain outside that coverage gate.
 
 Evidence: `bench/results/round-18` and `bench/results/round-18-control`.
 

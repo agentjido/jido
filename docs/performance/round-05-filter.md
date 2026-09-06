@@ -30,8 +30,8 @@ resolution for this claim. The unchanged-code control medians were 0.996 to
 All process-peak and copied-result ratios were 1.000. No helper processes
 started or remained. Result checks compare all selected entry IDs and kinds
 in order. All 41 Thread and benchmark tests passed, including nil input,
-invalid input, no matches, and multiple kinds. Complete quality and core
-coverage checks are due before the fix is pushed.
+invalid input, no matches, and multiple kinds. The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
+The same 11 known example failures remain outside that coverage gate.
 
 Evidence: `bench/results/round-05` and `round-05-control`.
 

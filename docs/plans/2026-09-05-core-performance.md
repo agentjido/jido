@@ -1,11 +1,12 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 28 of 50 idea rounds are complete. Seven fixes were accepted (05, 07, 08,
-09, 18, 31, 39). Five ideas were rejected after measurement (01, 02, 06, 10, 11).
-Sixteen were rejected by source inspection. The other 22 rounds remain. See
-[source decisions](../performance/cycle-inspection.md) and the individual round reports.
-Rounds 05, 18, and 31 still require the complete checks before their next push.
+Status: 34 of 50 idea rounds are complete. Eight fixes were accepted (05, 07,
+08, 09, 16, 18, 31, 39). Five ideas were rejected after measurement (01, 02, 06,
+10, 11). Twenty-one were rejected by source inspection. The other 16 rounds
+remain. See [source decisions](../performance/cycle-inspection.md) and individual
+round reports. The [complete checks](../performance/phase-34-checks.md) passed
+with 83.5% core coverage; the same 11 known example failures remain.
 
 ## Aim
 
@@ -87,11 +88,11 @@ An unmeasured idea must not be reported as a measured improvement.
 | 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | accepted |
 | 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | rejected |
 | 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | rejected |
-| 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | pending |
-| 13 | Deep merge: empty left map fast path | Add empty-left fixture; struct and keyword behavior | pending |
+| 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | rejected |
+| 13 | Deep merge: empty left map fast path | Add empty-left fixture; struct and keyword behavior | rejected |
 | 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | pending |
 | 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | rejected |
-| 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | pending |
+| 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | accepted |
 | 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | pending |
 | 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | accepted |
 | 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | rejected |
@@ -100,12 +101,12 @@ An unmeasured idea must not be reported as a measured improvement.
 | 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
 | 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | rejected |
 | 24 | Plugin: index directive modules within one operation | Add many Plugin directive types; duplicate rejection | pending |
-| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | pending |
-| 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | pending |
+| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | rejected |
+| 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | rejected |
 | 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | pending |
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
 | 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | pending |
-| 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | pending |
+| 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | rejected |
 | 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | accepted |
 | 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | rejected |
 | 33 | Codec object: avoid sorting fixed field lists repeatedly | Exact allowed/missing key rejection | pending |

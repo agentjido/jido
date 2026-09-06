@@ -40,8 +40,8 @@ peak memory. The accepted target has a large time gain and lower sampled memory
 at the larger sizes. Sampled peaks are not exact allocation totals.
 
 All 85 focused authoring, Agent, and benchmark tests passed. Each workload checks
-complete decoded definitions or documents and process cleanup. Complete quality
-and core coverage checks are due before this fix is pushed.
+complete decoded definitions or documents and process cleanup. The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
+The same 11 known example failures remain outside that coverage gate.
 
 Evidence: `bench/results/round-31`, `round-31-control`, and `round-31-fixed`.
 The fixed-input diagnostic is `docs/performance/probes/round-31-memory.exs`.
