@@ -25,7 +25,7 @@
 - **Expected result:** The Actor makes progress, restores state, rejects duplicate ticks, and leaves no timer after stop.
 - **Failure cases:** Duplicate or stale tick, empty queue, work error, restore error, or leaked timer.
 - **Jido features under pressure:** Finite autonomous turns, Scheduler Plugin, persistence, idempotency, and cleanup.
-- **Source framework and links:** [Google ADK: LoopAgent](https://adk.dev/agents/workflow-agents/), [Jido integration example](../../../../examples/08_applications/purpose_loop/purpose_loop.ex)
+- **Source framework and links:** [Google ADK: LoopAgent](https://adk.dev/agents/workflow-agents/), [Jido integration example](../../../../examples/08_applications/08_08_purpose_loop/purpose_loop.ex)
 
 ## Best-effort implementation
 

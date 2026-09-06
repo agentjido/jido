@@ -25,7 +25,7 @@
 - **Expected result:** Runtime subscriptions converge to committed desired state.
 - **Failure cases:** Dispatch failure, repeated command, runtime unavailable, restart, or stale reconcile result.
 - **Jido features under pressure:** Plugin state ownership, Directive ordering, reconciliation, and post-commit failure.
-- **Source framework and links:** [Akka: distributed publish-subscribe](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../examples/08_applications/subscription/subscription.ex)
+- **Source framework and links:** [Akka: distributed publish-subscribe](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../examples/08_applications/08_02_subscription/subscription.ex)
 
 ## Best-effort implementation
 

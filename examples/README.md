@@ -5,7 +5,7 @@
 
 # Jido V3 examples
 
-The main catalog has 52 fixtures in seven groups. All use the implemented
+The main catalog has 62 fixtures in eight groups. All use the implemented
 Agent and AgentServer contract. The group guides below link to their source
 and tests.
 
@@ -18,8 +18,9 @@ and tests.
 | 05_multi_agent | 6 | [Source](05_multi_agent/README.md), [tests](../test/examples/05_multi_agent/README.md) |
 | 06_factory | 4 | [Source](06_factory/README.md), [tests](../test/examples/06_factory/README.md) |
 | 07_topology | 5 | [Source](07_topology/README.md), [tests](../test/examples/07_topology/README.md) |
+| 08_applications | 10 | [Source](08_applications/README.md), [tests](../test/examples/08_applications/README.md) |
 
-The ten [application examples](08_applications/README.md) extend this catalog.
+The application examples use IDs `08_01` through `08_10` in source and test folders.
 [Research examples](99_research/README.md) record proposed core features.
 Their tests all live under `test/examples` and use the `:example` tag.
 

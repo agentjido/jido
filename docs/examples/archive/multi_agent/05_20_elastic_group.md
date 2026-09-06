@@ -25,7 +25,7 @@
 - **Expected result:** The group scales from 2 to 10 and back to 2, reclaims failed leases, and cleans up.
 - **Failure cases:** The test covers one worker crash, work reclaim, one duplicate environment result, scale down, and cleanup. It does not cover controller restart, an expired drain deadline, or repeated start and stop.
 - **Jido features under pressure:** Dynamic topology, hysteresis, child recovery, work ownership, and large state.
-- **Source framework and links:** [Akka: cluster-aware routers](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../examples/08_applications/elastic_group/elastic_group.ex)
+- **Source framework and links:** [Akka: cluster-aware routers](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../examples/08_applications/08_10_elastic_group/elastic_group.ex)
 
 ## Next pressure
 

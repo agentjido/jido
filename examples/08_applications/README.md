@@ -19,29 +19,34 @@ Start with [Basic](../01_basic/README.md) and
 contract tests in `test/jido/`. Add each application assertion to one matching
 file under `test/examples/08_applications`.
 
-## Current Scenarios
+## Numbered examples
 
-- `audit`: A Flow commits Agent and Plugin state only after successful work.
-- `coordinator`: A Flow commits Agent-owned delegation history, starts a child Agent, sends
-  work, receives a reply, and receives a scheduled timeout.
-- `elastic_group`: A persistent controller, environment, and monitor scale
-  Workers from two to ten, reclaim failed work, and drain back to two.
-- `fixed_group`: A controller owns an environment and three Workers that
-  coordinate targeted work and results through a Signal Bus.
-- `inbox`: An input Plugin handles a burst, removes duplicate events, and
-  continues after its runtime restarts.
-- `identity`: A live Plugin verifies private-key control with a trusted public
-  key, rejects replay and forgery, and signs a correlated reply.
-- `purpose_loop`: Scheduled finite turns continue without client input, reject
-  duplicate ticks, restore committed work, and drain without runtime leaks.
-- `react`: One execution chain runs a tool loop, commits Agent-owned message
-  history once, and handles a scheduled follow-up Signal. Later Turns receive
-  prior history; a failed Turn preserves the previous commit.
-- `secure_signal`: Identity verifies an encrypted Signal before secure
-  admission decrypts its `secure` data. Replies are encrypted before they are
-  signed.
-- `subscription`: Committed Plugin state repairs external runtime state after a
-  dispatch failure and a runtime restart.
+The order starts with Plugin state and input, then adds security, child work,
+reasoning, and Agent groups. Source and test folders use the same `08_NN_name`
+ID. Keep these IDs stable and assign the next number to each new runnable example.
+
+| ID and source | What it proves | Tests |
+| --- | --- | --- |
+| [08_01_audit](08_01_audit/audit.ex) | A Flow commits Agent and Plugin state only after successful work. | [Tests](../../test/examples/08_applications/08_01_audit/audit_test.exs) |
+| [08_02_subscription](08_02_subscription/subscription.ex) | Committed Plugin state repairs external state after dispatch failure and runtime restart. | [Tests](../../test/examples/08_applications/08_02_subscription/subscription_test.exs) |
+| [08_03_inbox](08_03_inbox/inbox.ex) | An input Plugin handles bursts and duplicate events and continues after runtime restart. | [Tests](../../test/examples/08_applications/08_03_inbox/inbox_test.exs) |
+| [08_04_identity](08_04_identity/identity.ex) | A Plugin verifies private-key control, rejects replay and forgery, and signs a correlated reply. | [Tests](../../test/examples/08_applications/08_04_identity/identity_test.exs) |
+| [08_05_secure_signal](08_05_secure_signal/secure_signal.ex) | Identity verifies encrypted input before decryption. Replies are encrypted before signing. | [Tests](../../test/examples/08_applications/08_05_secure_signal/secure_signal_test.exs) |
+| [08_06_coordinator](08_06_coordinator/coordinator.ex) | One Flow commits delegation history, starts child work, and receives a reply and scheduled timeout. | [Tests](../../test/examples/08_applications/08_06_coordinator/coordinator_test.exs) |
+| [08_07_react](08_07_react/react.ex) | A tool loop commits history once, reuses it in later Turns, and preserves it after a failed Turn. | [Tests](../../test/examples/08_applications/08_07_react/react_test.exs) |
+| [08_08_purpose_loop](08_08_purpose_loop/purpose_loop.ex) | Finite scheduled Turns continue without client input, reject duplicate ticks, restore work, and drain. | [Tests](../../test/examples/08_applications/08_08_purpose_loop/purpose_loop_test.exs) |
+| [08_09_fixed_group](08_09_fixed_group/fixed_group.ex) | A controller owns an environment and three Workers that coordinate targeted work through a Bus. | [Tests](../../test/examples/08_applications/08_09_fixed_group/fixed_group_test.exs) |
+| [08_10_elastic_group](08_10_elastic_group/elastic_group.ex) | Persistent roles scale Workers from two to ten, reclaim failed work, and drain back to two. | [Tests](../../test/examples/08_applications/08_10_elastic_group/elastic_group_test.exs) |
+
+Run one numbered example:
+
+```sh
+mix test test/examples/08_applications/08_01_audit --include example --seed 0
+```
+
+Shared [Bus input](support/bus_input.ex) and [cryptographic helpers](support/crypto.ex)
+live in `support/`. They compile with the examples and have no example number.
+The backlog below contains proposed work; assign IDs when runnable examples exist.
 
 ## Test Rules
 
@@ -182,9 +187,9 @@ earlier steps.
 | Step | Example directory | Typical size | New system contract |
 | --- | --- | ---: | --- |
 | 0 | Existing examples | 1-3 Agents | Commit, child, timeout, inbox, and runtime recovery |
-| 1 | `purpose_loop` | 1 Agent | Continuous purpose through finite scheduled turns |
-| 2 | `fixed_group` | 3-5 Agents | Desired topology and Bus coordination |
-| 3 | `elastic_group` | 5-20 Agents | Demand-based start, drain, replace, and stop |
+| 1 | `08_08_purpose_loop` | 1 Agent | Continuous purpose through finite scheduled turns |
+| 2 | `08_09_fixed_group` | 3-5 Agents | Desired topology and Bus coordination |
+| 3 | `08_10_elastic_group` | 5-20 Agents | Demand-based start, drain, replace, and stop |
 | 4 | `persistent_campaign` | 5-25 Agents | A long-lived goal with persistent and temporary roles |
 | 5 | `nested_cells` | 25-50 Agents | Hierarchical ownership and local reconciliation |
 | 6 | `swarm_control` | 100+ Agents | Scale, failure isolation, and complete cleanup |
@@ -193,7 +198,7 @@ earlier steps.
 
 #### Step 1: One Continuous Purpose
 
-Add `purpose_loop/`. Start with one Agent and no Bus dependency. Give it a
+Add `08_08_purpose_loop/`. Start with one Agent and no Bus dependency. Give it a
 small deterministic purpose, such as processing one unit from a fixture-backed
 queue until the queue is empty.
 
@@ -214,7 +219,7 @@ group.
 
 #### Step 2: One Fixed Group
 
-Add `fixed_group/` after the Bus input foundation is complete. Use one Group
+Add `08_09_fixed_group/` after the Bus input foundation is complete. Use one Group
 Controller, one Environment Agent, and two or three Worker Agents. All roles
 are persistent for the life of the group.
 
@@ -235,7 +240,7 @@ bounded start, stop, or repair Directives.
 
 #### Step 3: One Elastic Group
 
-Add `elastic_group/`. Keep the Controller, Environment, and Monitor roles
+Add `08_10_elastic_group/`. Keep the Controller, Environment, and Monitor roles
 persistent. Start and stop temporary Workers from measured demand.
 
 - [x] Start with a minimum worker count and a fixed maximum worker count.

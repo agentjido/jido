@@ -64,9 +64,9 @@ separate follow-up in [issue #14](https://github.com/mikehostetler/jido_v3/issue
 
 - [Conversation History](../../examples/03_llm/03_02_conversation_history/conversation_history.ex)
   keeps user and assistant messages across Turns and rejects duplicate input.
-- [ReAct integration](../../test/examples/08_applications/react/react_test.exs) checks prior
+- [ReAct integration](../../test/examples/08_applications/08_07_react/react_test.exs) checks prior
   context, intermediate state visibility, failure, and scheduled follow-up.
-- [Coordinator integration](../../test/examples/08_applications/coordinator/coordinator_test.exs)
+- [Coordinator integration](../../test/examples/08_applications/08_06_coordinator/coordinator_test.exs)
   keeps delegation history while child work and scheduled Signals run.
 - [Plugin tests](../../test/jido/plugin/built_ins_test.exs) use a local Credits
   Plugin to retain state-only Plugin coverage without the removed Thread API.

@@ -25,7 +25,7 @@
 - **Expected result:** Valid Signals enter one turn. Forged and replayed Signals do not route.
 - **Failure cases:** Unknown key, bad signature, replayed nonce, missing correlation, or signing error.
 - **Jido features under pressure:** Admission Plugin, trace and correlation, replay protection, secrets, and outbound transform.
-- **Source framework and links:** [Semantic Kernel: agent architecture and threads](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-architecture), [Jido integration example](../../../../examples/08_applications/identity/identity.ex)
+- **Source framework and links:** [Semantic Kernel: agent architecture and threads](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-architecture), [Jido integration example](../../../../examples/08_applications/08_04_identity/identity.ex)
 
 ## Best-effort implementation
 

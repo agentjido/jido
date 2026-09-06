@@ -25,7 +25,7 @@
 - **Expected result:** Valid secure data is processed, and plaintext does not enter durable state or telemetry.
 - **Failure cases:** Bad signature, wrong key, replay, decrypt failure, unsafe state output, or encryption error.
 - **Jido features under pressure:** Plugin order, transient context, sensitive data, output filtering, and secure dispatch.
-- **Source framework and links:** [CrewAI: MCP security considerations](https://docs.crewai.com/en/mcp/security), [Jido integration example](../../../../examples/08_applications/secure_signal/secure_signal.ex)
+- **Source framework and links:** [CrewAI: MCP security considerations](https://docs.crewai.com/en/mcp/security), [Jido integration example](../../../../examples/08_applications/08_05_secure_signal/secure_signal.ex)
 
 ## Best-effort implementation
 

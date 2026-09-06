@@ -25,7 +25,7 @@
 - **Expected result:** Unique events commit once, duplicates are ignored, and restart does not lose committed input state.
 - **Failure cases:** Malformed event, concurrent duplicate, runtime restart, overload, or state limit.
 - **Jido features under pressure:** Input Plugin, mailbox admission, deduplication, burst order, and runtime recovery.
-- **Source framework and links:** [Sagents: middleware messaging](https://hexdocs.pm/sagents/middleware_messaging.html), [Jido integration example](../../../../examples/08_applications/inbox/inbox.ex)
+- **Source framework and links:** [Sagents: middleware messaging](https://hexdocs.pm/sagents/middleware_messaging.html), [Jido integration example](../../../../examples/08_applications/08_03_inbox/inbox.ex)
 
 ## Best-effort implementation
 
