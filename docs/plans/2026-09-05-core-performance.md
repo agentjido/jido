@@ -1,12 +1,12 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 42 of 50 idea rounds are complete. Eleven fixes were accepted (05, 07,
-08, 09, 14, 16, 18, 31, 36, 39, 48). Eight ideas were rejected after measurement
+Status: 43 of 50 idea rounds are complete. Twelve fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 34, 36, 39, 48). Eight ideas were rejected after measurement
 (01, 02, 06, 10, 11, 17, 20, 22). Twenty-three were rejected by source inspection.
-Eight rounds remain. The scheduler capture fix passed full checks.
+Seven rounds remain. The codec map fix passed full checks.
 See [source decisions](../performance/cycle-inspection.md) and individual reports.
-The last [complete checks](../performance/phase-42-checks.md) passed with 83.5%
+The last [complete checks](../performance/phase-43-checks.md) passed with 83.5%
 core coverage. Examples remain outside the coverage gate.
 
 ## Aim
@@ -111,7 +111,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | accepted |
 | 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | rejected |
 | 33 | Codec object: avoid sorting fixed field lists repeatedly | Exact allowed/missing key rejection | pending |
-| 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | pending |
+| 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | accepted |
 | 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | rejected |
 | 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | accepted |
 | 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | rejected |

@@ -1,0 +1,27 @@
+diff --git a/lib/jido/agent/codec/data.ex b/lib/jido/agent/codec/data.ex
+index 0cf33da4..1b8ea5e7 100644
+--- a/lib/jido/agent/codec/data.ex
++++ b/lib/jido/agent/codec/data.ex
+@@ -136,10 +136,18 @@ defmodule Jido.Agent.Codec.Data do
+ 
+   defp check(value, depth, nodes)
+        when is_map(value) and not is_struct(value) and map_size(value) <= 10_000 do
+-    if Enum.all?(Map.keys(value), &is_binary/1),
+-      do:
+-        check_list(Enum.flat_map(value, fn {k, v} -> [k, v] end), depth + 1, nodes + 1, 0, 20_000),
+-      else: Authoring.error("Document object keys must be strings")
++    if Enum.all?(Map.keys(value), &is_binary/1) do
++      Enum.reduce_while(value, {:ok, nodes + 1}, fn {key, item}, {:ok, nodes} ->
++        with {:ok, nodes} <- check(key, depth + 1, nodes),
++             {:ok, nodes} <- check(item, depth + 1, nodes) do
++          {:cont, {:ok, nodes}}
++        else
++          error -> {:halt, error}
++        end
++      end)
++    else
++      Authoring.error("Document object keys must be strings")
++    end
+   end
+ 
+   defp check(value, depth, nodes) when is_list(value),
