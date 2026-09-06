@@ -619,6 +619,61 @@ defmodule Jido.AgentTest do
   end
 
   describe "Signal and command lifecycle" do
+    test "the default handler validates a matching single route and keeps router target rules" do
+      agent = agent_with_route("counter.add", Add)
+      signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
+      [route] = agent.routes
+
+      for target <- [Add, [Add], {Add, %{by: 9, label: "default"}}] do
+        assert {:ok, %Turn{executable: Add, input: input}} =
+                 Agent.handle_signal(signal, %{agent | routes: [%{route | target: target}]})
+
+        assert input == signal.data
+      end
+
+      for priority <- [101, -101, "invalid"] do
+        assert {:error, %Jido.Error.RoutingError{details: %{cause: cause}}} =
+                 Agent.handle_signal(signal, %{agent | routes: [%{route | priority: priority}]})
+
+        assert %Jido.Signal.Error.RoutingError{} = cause
+      end
+
+      invalid = %{route | path: "counter..bad"}
+
+      assert {:error, %Jido.Error.RoutingError{details: %{cause: _}}} =
+               Agent.handle_signal(%{signal | type: invalid.path}, %{agent | routes: [invalid]})
+
+      assert {:error, %Jido.Error.RoutingError{details: %{count: 2, targets: [Add, Add]}}} =
+               Agent.handle_signal(signal, %{agent | routes: [%{route | target: [Add, Add]}]})
+
+      assert {:error, %Jido.Error.RoutingError{}} =
+               Agent.handle_signal(signal, %{agent | routes: [%{route | target: []}]})
+    end
+
+    test "single route wildcards and predicates still control selection" do
+      agent = agent_with_route("counter.add", Add)
+      signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
+      [route] = agent.routes
+
+      for path <- ["counter.*", "counter.**", "**"] do
+        assert {:ok, %Turn{executable: Add}} =
+                 Agent.handle_signal(signal, %{agent | routes: [%{route | path: path}]})
+      end
+
+      owner = self()
+
+      predicate = fn input ->
+        send(owner, {:route_predicate, input})
+        false
+      end
+
+      assert {:error, %Jido.Error.RoutingError{}} =
+               Agent.handle_signal(signal, %{agent | routes: [%{route | match: predicate}]})
+
+      assert_receive {:route_predicate, ^signal}
+      refute_received {:route_predicate, _}
+    end
+
     test "uses route input as defaults and gives Signal data precedence" do
       agent = agent_with_route("counter.static", {Add, %{by: 4, label: "default"}})
 
