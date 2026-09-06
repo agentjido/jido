@@ -5,6 +5,9 @@ Status: 44 of 50 idea rounds are complete. Twelve fixes were accepted (05, 07,
 08, 09, 14, 16, 18, 31, 34, 36, 39, 48). Nine ideas were rejected after measurement
 (01, 02, 06, 10, 11, 17, 20, 22, 28). Twenty-three were rejected by source inspection.
 Six rounds remain. The codec map fix passed full checks.
+The cycle is paused for transfer to the main `jido` checkout. The current
+Round 45 candidate is included, but is not accepted yet. See the
+[transfer status](../performance/round-45-status.md) for its evidence and open checks.
 See [source decisions](../performance/cycle-inspection.md) and individual reports.
 The last [complete checks](../performance/phase-43-checks.md) passed with 83.5%
 core coverage. Examples remain outside the coverage gate.

@@ -1,7 +1,7 @@
-# Rejected runtime trials
+# Runtime trial patches
 
-These patches preserve the rejected candidates without adding them to the
-shipping runtime history. Apply a patch only in a separate checkout of its base.
+These patches preserve rejected or replaced candidates without adding them to
+the shipping runtime history. Apply a patch only in a separate checkout of its base.
 Use `git apply --unidiff-zero PATH` because the patches omit context lines.
 They change runtime source only; use the benchmark method and conditions from
 the related round report. Raw measurements remain in local `bench/results`.
@@ -16,3 +16,4 @@ the related round report. Raw measurements remain in local `bench/results`.
 | [10-prefix.patch](10-prefix.patch) | `b4b8c1d3` | `bedabf2e` |
 | [11-full.patch](11-full.patch) | `869626ac` | `79bc0af2` |
 | [11-reuse.patch](11-reuse.patch) | `869626ac` | `f24d6590` |
+| [round-45-span-start.patch](round-45-span-start.patch) | `6fcfc2f4` | `9ccba485` (replaced; see [status](../round-45-status.md)) |

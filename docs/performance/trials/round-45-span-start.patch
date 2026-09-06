@@ -1,0 +1,44 @@
+diff --git a/lib/jido/observe.ex b/lib/jido/observe.ex
+index b37e26b9..028b49b1 100644
+--- a/lib/jido/observe.ex
++++ b/lib/jido/observe.ex
+@@ -146 +146,2 @@ defmodule Jido.Observe do
+-      with_span_legacy(event_prefix, metadata, fun)
++      span_ctx = init_span_ctx(event_prefix, enriched_metadata, tracer_module)
++      with_span_legacy(span_ctx, fun)
+@@ -176,12 +177 @@ defmodule Jido.Observe do
+-    %SpanCtx{} = span_ctx = init_span_ctx(event_prefix, metadata)
+-
+-    tracer_ctx =
+-      invoke_tracer_callback(
+-        span_ctx,
+-        :span_start,
+-        [event_prefix, span_ctx.metadata],
+-        nil,
+-        "span_start/2"
+-      )
+-
+-    %SpanCtx{span_ctx | tracer_ctx: tracer_ctx}
++    event_prefix |> init_span_ctx(metadata) |> start_tracer()
+@@ -416,2 +406,2 @@ defmodule Jido.Observe do
+-  defp with_span_legacy(event_prefix, metadata, fun) do
+-    span_ctx = start_span(event_prefix, metadata)
++  defp with_span_legacy(span_ctx, fun) do
++    span_ctx = start_tracer(span_ctx)
+@@ -433,0 +424,13 @@ defmodule Jido.Observe do
++  defp start_tracer(%SpanCtx{} = span_ctx) do
++    tracer_ctx =
++      invoke_tracer_callback(
++        span_ctx,
++        :span_start,
++        [span_ctx.event_prefix, span_ctx.metadata],
++        nil,
++        "span_start/2"
++      )
++
++    %SpanCtx{span_ctx | tracer_ctx: tracer_ctx}
++  end
++
+@@ -641 +644 @@ defmodule Jido.Observe do
+-    emit_event(event_prefix ++ [:start], %{system_time: start_system_time}, metadata)
++    :telemetry.execute(event_prefix ++ [:start], %{system_time: start_system_time}, metadata)
