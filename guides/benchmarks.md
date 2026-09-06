@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 132 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 212 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 253 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 144 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 224 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 265 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -133,3 +133,9 @@ The `codec/check_map` cases include empty, small, 1,000-entry, and 10,000-entry
 objects. They check scalar values, nested values, invalid keys, and runtime
 values. Contract tests check exact error fields except their call-site stack
 trace, including depth, node, map, string, and list limits.
+
+The `observe/batch` cases run 100 synchronous spans per sample. They cover
+Noop, legacy, and scoped tracers, with and without trace context, and with
+zero or 1,000 extra metadata fields. Each case checks its selected tracer,
+result, and retained trace context. It restores its private instance config
+after each sample. Tracer failure mode is strict in these cases.

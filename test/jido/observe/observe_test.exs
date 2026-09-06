@@ -78,6 +78,27 @@ defmodule JidoTest.ObserveTest do
       assert result == {:ok, %{data: [1, 2, 3]}}
     end
 
+    test "stop events include correlation created inside a span" do
+      TraceContext.clear()
+
+      try do
+        signal = Signal.new!("test.trace", %{}, source: "/test")
+
+        assert :ok =
+                 Observe.with_span([:jido, :test, :with_span], %{label: "kept"}, fn ->
+                   TraceContext.ensure_from_signal(signal)
+                   :ok
+                 end)
+
+        assert_receive {:telemetry_event, [:jido, :test, :with_span, :start], _, start}
+        assert start == %{label: "kept"}
+        assert_receive {:telemetry_event, [:jido, :test, :with_span, :stop], _, stop}
+        assert stop == Map.put(TraceContext.to_telemetry_metadata(), :label, "kept")
+      after
+        TraceContext.clear()
+      end
+    end
+
     test "measures duration correctly" do
       sleep_time_ms = 10
 
