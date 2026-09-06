@@ -124,6 +124,23 @@ defmodule JidoCoreBenchTest do
     assert_raise RuntimeError, ~r/64 MiB/, fn -> Measure.term_size(term) end
   end
 
+  test "an untraced helper cannot pass suite completion while it is still running" do
+    {:ok, pid} =
+      Task.Supervisor.start_child(JidoCoreBench.TaskSupervisor, fn ->
+        receive do: (:release -> :ok)
+      end)
+
+    try do
+      assert_raise RuntimeError, ~r/benchmark helper did not stop/, fn ->
+        Suite.ensure_idle!(0)
+      end
+    after
+      Task.Supervisor.terminate_child(JidoCoreBench.TaskSupervisor, pid)
+    end
+
+    assert :ok == Suite.ensure_idle!()
+  end
+
   test "comparison rejects changes in conditions and duplicate cases" do
     row = %{
       "id" => "probe",

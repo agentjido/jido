@@ -24,7 +24,9 @@ defmodule JidoCoreBench.Suite do
 
       timings =
         Map.new(workloads, fn w ->
-          {w.id, Measure.timing(w, settings.warmup, settings.samples)}
+          timing = Measure.timing(w, settings.warmup, settings.samples)
+          ensure_idle!()
+          {w.id, timing}
         end)
 
       IO.puts("Checking resources, retained terms, and process cleanup...")
@@ -33,12 +35,15 @@ defmodule JidoCoreBench.Suite do
         Enum.map(workloads, fn w ->
           IO.puts("  #{w.id}")
 
-          %{
+          row = %{
             id: w.id,
             timing: Map.fetch!(timings, w.id),
             resources: Measure.resources(w, settings.resource_samples),
             retained_terms: Measure.retained(w)
           }
+
+          ensure_idle!()
+          row
         end)
 
       %{
@@ -55,6 +60,27 @@ defmodule JidoCoreBench.Suite do
     after
       Supervisor.stop(supervisor)
     end
+  end
+
+  def ensure_idle!(timeout \\ 30_000) do
+    for pid <- Task.Supervisor.children(JidoCoreBench.TaskSupervisor) do
+      ref = Process.monitor(pid)
+
+      try do
+        receive do
+          {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+        after
+          timeout -> raise "benchmark helper did not stop: #{inspect(pid)}"
+        end
+      after
+        Process.demonitor(ref, [:flush])
+      end
+    end
+
+    if Enum.any?(Task.Supervisor.children(JidoCoreBench.TaskSupervisor), &Process.alive?/1),
+      do: raise("benchmark helpers remain after completion")
+
+    :ok
   end
 
   def workloads(profile) do
