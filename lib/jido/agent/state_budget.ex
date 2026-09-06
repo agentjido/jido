@@ -24,9 +24,12 @@ defmodule Jido.Agent.StateBudget do
   @doc "Checks the full state and returns the Agent or a structured error."
   @spec check(Agent.t()) :: {:ok, Agent.t()} | {:error, Error.ValidationError.t()}
   def check(agent) do
-    with :ok <- validate_limit(Map.get(agent, :max_state_size)),
-         :ok <- validate_limit(module_limit(agent)) do
-      case limit(agent) do
+    instance_limit = Map.get(agent, :max_state_size)
+
+    with :ok <- validate_limit(instance_limit),
+         module_limit = module_limit(agent),
+         :ok <- validate_limit(module_limit) do
+      case smaller(instance_limit, module_limit) do
         nil -> {:ok, agent}
         max -> check_size(agent, max)
       end
