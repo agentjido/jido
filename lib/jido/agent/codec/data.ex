@@ -137,8 +137,7 @@ defmodule Jido.Agent.Codec.Data do
   defp check(value, depth, nodes)
        when is_map(value) and not is_struct(value) and map_size(value) <= 10_000 do
     if Enum.all?(Map.keys(value), &is_binary/1),
-      do:
-        check_list(Enum.flat_map(value, fn {k, v} -> [k, v] end), depth + 1, nodes + 1, 0, 20_000),
+      do: check_map(:maps.iterator(value), depth + 1, nodes + 1),
       else: Authoring.error("Document object keys must be strings")
   end
 
@@ -147,6 +146,18 @@ defmodule Jido.Agent.Codec.Data do
 
   defp check(_value, _depth, _nodes),
     do: Authoring.error("Invalid or oversized JSON document value")
+
+  defp check_map(iterator, depth, nodes) do
+    case :maps.next(iterator) do
+      :none ->
+        {:ok, nodes}
+
+      {key, value, next} ->
+        with {:ok, nodes} <- check(key, depth, nodes),
+             {:ok, nodes} <- check(value, depth, nodes),
+             do: check_map(next, depth, nodes)
+    end
+  end
 
   defp check_list([], _depth, nodes, _count, _limit), do: {:ok, nodes}
 
