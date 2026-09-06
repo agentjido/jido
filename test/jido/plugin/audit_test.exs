@@ -40,6 +40,30 @@ defmodule Jido.Plugin.AuditTest do
       plugins: [Audit]
   end
 
+  test "record preserves supplied fields, including an explicit nil ID" do
+    id = Jido.Signal.ID.generate!()
+    record = Audit.record(:saved, :ok, id: id, at: 0, metadata: %{source: :test})
+
+    assert record == %Audit.Record{
+             id: id,
+             at: 0,
+             event: :saved,
+             outcome: :ok,
+             metadata: %{source: :test}
+           }
+
+    assert Audit.record(:saved, :ok, id: nil, at: 1).id == nil
+  end
+
+  test "record generates an ID when the option is absent" do
+    record = Audit.record(:saved, :ok, at: 1)
+    assert Jido.Signal.ID.valid?(record.id)
+    assert record.at == 1
+    assert record.event == :saved
+    assert record.outcome == :ok
+    assert record.metadata == %{}
+  end
+
   test "commits bounded audit records with domain state", %{jido: jido} do
     {:ok, pid} = Jido.start_agent(jido, Agent, id: unique_id("audit"))
 

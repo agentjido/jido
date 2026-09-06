@@ -26,7 +26,7 @@ defmodule Jido.Plugin.Audit do
   @spec record(term(), atom(), keyword()) :: Record.t()
   def record(event, outcome, opts \\ []) do
     %Record{
-      id: Keyword.get(opts, :id, ID.generate!()),
+      id: Keyword.get_lazy(opts, :id, &ID.generate!/0),
       at: Keyword.get(opts, :at, System.system_time(:millisecond)),
       event: event,
       outcome: outcome,
