@@ -29,7 +29,7 @@ defmodule Jido.MixProject do
       # Coverage
       test_coverage: [
         tool: ExCoveralls,
-        summary: [threshold: 80],
+        summary: [threshold: 90],
         export: "cov",
         ignore_modules: [~r/^JidoTest\./]
       ],
@@ -59,6 +59,7 @@ defmodule Jido.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test,
+        "coveralls.json": :test,
         "coveralls.cobertura": :test
       ]
     ]

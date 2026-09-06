@@ -19,6 +19,53 @@ defmodule JidoTest.ErrorTransportTest do
   end
 
   describe "transport key policy" do
+    test "normalizes absent, scalar and opaque details for JSON transport" do
+      for details <- [nil, []] do
+        assert Error.to_map(%{message: "failed", details: details}).details == %{}
+      end
+
+      assert Error.to_map(%{message: "failed", details: 42}).details == %{value: 42}
+      reference = make_ref()
+
+      result =
+        Error.to_map(%{message: "failed", details: %{reference: reference, bits: <<1::1>>}})
+
+      assert result.details.reference == inspect(reference)
+      assert result.details.bits == "<<1::size(1)>>"
+      assert Jason.encode!(result)
+
+      assert Error.to_map(%{message: %{message: 42}}).message == "42"
+
+      assert Error.to_map(%{type: "validation_error", message: "invalid"}).type ==
+               :validation_error
+
+      assert Error.to_map(%{"type" => :timeout, "message" => "late"}).type == :timeout
+
+      assert Error.execution_error("failed", details: :invalid, attempt: 3).details == %{
+               attempt: 3
+             }
+    end
+
+    test "retry hints survive transport wrappers and take priority over type defaults" do
+      for key <- [:retry, :retryable, :retryable?], hint <- [true, false] do
+        error = %{type: :validation_error, details: [{key, hint}]}
+        assert Error.retryable?(error) == hint
+        assert Error.retryable?({:error, error, [:already_completed]}) == hint
+        assert Error.retryable?(%{details: %{details: %{key => hint}}}) == hint
+      end
+
+      for hint <- [true, false], key <- [:retryable, "retryable", "retryable?"] do
+        assert Error.retryable?(%{key => hint}) == hint
+      end
+
+      refute Error.retryable?(%{type: "validation_error"})
+      refute Error.retryable?(%{"type" => :config_error})
+      refute Error.retryable?(%{"details" => %{"retry" => false}})
+      assert Error.retryable?(%{details: %{details: %{unknown: true}}})
+      assert Error.retryable?(%{details: [unknown: true]})
+      assert Error.retryable?(%{details: [:unknown]})
+    end
+
     test "redacts sensitive keys in maps and key-value lists without changing key names" do
       keys = [
         :api_key,

@@ -24,3 +24,15 @@ The only approved exclusion is the DIST-03 test
 `one logical identity has at most one live cluster owner` in
 `test/jido/agent/distributed_authority_test.exs`. Cluster-exclusive ownership
 remains unsupported. Preserve the test assertion and its stated reason.
+
+The coverage requirement is 90%. Keep total coverage above 93% to allow for
+new work. Measure the complete suite with:
+
+```sh
+mix test --include example --include integration --include flaky --seed 0 --cover
+```
+
+The Mix summary threshold and ExCoveralls minimum are both 90%. Keep the
+coverage scope and enabled acceptance checks intact when adding tests.
+Coverage runs also collect counters from the isolated BEAM test nodes before
+they stop. The report includes the same measured modules on each node.

@@ -104,4 +104,44 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
       default_dispatch: {:pid, target: self()}
     )
   end
+
+  test "the timer flushes a partial batch without another command", %{jido: jido} do
+    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 10)
+    assert {:ok, _} = BurstBuncher.add_item(buncher, "item", :value)
+
+    assert_receive {:signal,
+                    %Jido.Signal{
+                      type: "examples.buncher.batch",
+                      data: %{reason: :timeout, items: [%{id: "item"}]}
+                    }},
+                   1_000
+
+    assert Server.agent(buncher).state.buffer == []
+  end
+
+  test "a replaced timer message is ignored and shutdown cancels the pending timer", %{jido: jido} do
+    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 60_000)
+    assert {:ok, _} = BurstBuncher.add_item(buncher, "first", :one)
+    eventually(fn -> Server.status(buncher).phase == :idle end)
+    runtime = Server.children(buncher)[{:plugin, Timer}].pid
+    {old_token, old_timer, old_signal} = :sys.get_state(runtime).timers.flush
+    assert {:ok, _} = BurstBuncher.add_item(buncher, "second", :two)
+    eventually(fn -> Server.status(buncher).phase == :idle end)
+    {new_token, new_timer, _signal} = :sys.get_state(runtime).timers.flush
+    assert new_token != old_token
+    assert Process.read_timer(old_timer) == false
+    send(runtime, {:deliver, :flush, old_token, old_signal})
+    assert :ok = Timer.await_ready(runtime, [])
+    assert length(Server.agent(buncher).state.buffer) == 2
+
+    ref = Process.monitor(runtime)
+    assert :ok = Server.stop(buncher)
+    assert_receive {:DOWN, ^ref, :process, ^runtime, _}
+    assert Process.read_timer(new_timer) == false
+    assert {:error, {:buncher_timer_unavailable, _}} = Timer.await_ready(runtime, [])
+    context = struct(Jido.Plugin.DirectiveContext)
+
+    assert {:error, {:buncher_timer_unavailable, _}} =
+             Timer.dispatch(runtime, Timer.cancel(:flush), context, [])
+  end
 end

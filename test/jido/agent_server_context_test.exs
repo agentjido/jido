@@ -149,6 +149,56 @@ defmodule Jido.AgentServerContextTest do
     assert Server.status(server).phase == :idle
   end
 
+  test "queued calls retain context when admission is cancelled and excess casts are dropped", %{
+    jido: jido
+  } do
+    observer = self()
+
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        max_postponed_signals: 1,
+        directive_timeout: :infinity,
+        default_dispatch: {:pid, target: observer}
+      )
+
+    gate = make_ref()
+
+    first =
+      Task.async(fn ->
+        Server.call(server, signal("context.input", %{value: 1}),
+          context: %{observer: observer, gate: gate}
+        )
+      end)
+
+    assert_receive {:admission_blocked, ^gate, worker}, 2_000
+    active = Server.status(server).active
+    assert {:error, :stale_turn} = Server.cancel_turn(server, "stale")
+
+    second =
+      Task.async(fn ->
+        Server.call(server, signal("context.input", %{value: 2}),
+          context: %{observer: observer, request: :queued}
+        )
+      end)
+
+    eventually(fn -> Server.status(server).admission.postponed == 1 end)
+
+    log =
+      ExUnit.CaptureLog.capture_log(fn ->
+        assert :ok = Server.cast(server, signal("context.input", %{value: 99}))
+        assert :ok = Server.cancel_turn(server, active.turn_id)
+      end)
+
+    assert log =~ "Signal cast dropped"
+    assert {:error, :cancelled} = Task.await(first)
+    refute Process.alive?(worker)
+    assert {:ok, committed} = Task.await(second)
+    assert committed.state == %{value: 2, context_plugin: 1}
+    assert_receive {:context_executed, %{request: :queued}}
+    eventually(fn -> Server.status(server).phase == :idle end)
+    assert Server.snapshot(server) == %{agent: committed, state_version: 1}
+  end
+
   test "admission result releases its monitor and timer", %{jido: jido} do
     {:ok, server} = Jido.start_agent(jido, Agent, directive_timeout: 10_000)
     test = self()
