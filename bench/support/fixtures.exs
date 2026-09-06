@@ -26,6 +26,17 @@ defmodule JidoCoreBench.PreparePlugin do
   def prepare(command, _opts), do: {:ok, command}
 end
 
+defmodule JidoCoreBench.AdmitPlugin do
+  @moduledoc false
+  use Jido.Plugin
+
+  @impl true
+  def admit(_runtime, command, _opts) do
+    JidoCoreBench.Fixtures.barrier(command.context)
+    {:ok, command}
+  end
+end
+
 defmodule JidoCoreBench.Fixtures do
   @moduledoc false
   alias Jido.Agent, as: CoreAgent

@@ -1,9 +1,11 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: suite pushed. Round 07 was accepted; rounds 01, 02, and 06 were rejected after measurement.
-Eight further ideas were rejected by source inspection. Round 08 passed measurement and awaits combined checks. The other 37 rounds remain.
-See [source decisions](../performance/cycle-inspection.md).
+Status: 18 decisions are recorded. The suite and Round 07 are pushed. Rounds
+08 and 09 passed measurement and await combined checks. Rounds 01, 02, 06, 10,
+and 11 were rejected after measurement. Ten further ideas were rejected by
+source inspection. The other 32 rounds remain. See
+[source decisions](../performance/cycle-inspection.md).
 
 ## Aim
 
@@ -82,9 +84,9 @@ An unmeasured idea must not be reported as a measured improvement.
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | rejected |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
 | 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | checks pending |
-| 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | pending |
-| 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | pending |
-| 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | pending |
+| 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | checks pending |
+| 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | rejected |
+| 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | rejected |
 | 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | pending |
 | 13 | Deep merge: empty left map fast path | Add empty-left fixture; struct and keyword behavior | pending |
 | 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | pending |
@@ -110,7 +112,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | pending |
 | 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | rejected |
 | 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | pending |
-| 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | pending |
+| 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | rejected |
 | 38 | Server call: reduce default option parsing cost | Default/keyword timeout; reserved context errors | rejected |
 | 39 | Server task: reduce closure capture to required values | Large Agent state; actual task transfer size | pending |
 | 40 | Server completion: release large result/context references sooner | Result and failure barriers; state and error policy | rejected |
@@ -122,7 +124,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | pending |
 | 47 | Scheduler queue: reduce due-item scan or sorting | Add due/not-due fixture; deadline and stable ordering | pending |
 | 48 | Scheduler delivery: reduce stored transient data | Add durable enqueue/ack fixture; recovery and duplicates | pending |
-| 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | pending |
+| 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | rejected |
 | 50 | Combined fixes: repeat scale and lifecycle checks | Compare original and accepted head; 50 fresh-VM pairs | pending |
 
 ## Round record

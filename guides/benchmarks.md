@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 57 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 128 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 165 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 72 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 149 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 190 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -23,10 +23,12 @@ are ignored by Git. Keep the same scripts for both sides of a comparison.
 
 Agent cases cover construction, validation, command preparation, routing, direct
 Action and two-step Flow commands, state transition, and checkpoint/restore.
-Live server cases cover calls, Flow calls, 20 casts with a completion call,
+Live server cases cover calls, Plugin admission, Flow calls, 20 casts with a completion call,
 snapshots, failure, and start/stop. Data cases cover Thread append, normalization,
 last entry and slice, Audit buffers and 100-record ID batches, state budgets, deep merge, Codec, and spans.
 A no-op Plugin case measures the command preparation callback path.
+Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
+errors, and Codec encoding with a generated Registry.
 
 Short and scale use small state, a 1000-entry nested map, a 5000-item list, and
 a 1 MiB binary. Smoke uses small state for the main matrix; fixed boundary cases

@@ -4,7 +4,8 @@ defmodule JidoCoreBench.RuntimeCases do
   alias Jido.AgentServer, as: Server
 
   def workloads(payloads) do
-    for kind <- payloads, mode <- [:call, :flow, :burst, :snapshot, :failure, :start_stop] do
+    for kind <- payloads,
+        mode <- [:call, :admit, :flow, :burst, :snapshot, :failure, :start_stop] do
       data = F.payload(kind)
 
       target =
@@ -18,7 +19,8 @@ defmodule JidoCoreBench.RuntimeCases do
         F.checked(
           "server/#{mode}/#{kind}",
           fn context ->
-            a = F.agent(1, data, target)
+            plugins = if mode == :admit, do: [JidoCoreBench.AdmitPlugin], else: []
+            a = F.agent(1, data, target, plugins)
 
             pid =
               if mode == :start_stop do
