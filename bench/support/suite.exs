@@ -7,6 +7,7 @@ Code.require_file("edge_cases.exs", __DIR__)
 Code.require_file("merge_cases.exs", __DIR__)
 Code.require_file("plugin_cases.exs", __DIR__)
 Code.require_file("persistence_cases.exs", __DIR__)
+Code.require_file("scheduler_cases.exs", __DIR__)
 
 defmodule JidoCoreBench.Suite do
   @moduledoc false
@@ -19,7 +20,8 @@ defmodule JidoCoreBench.Suite do
     EdgeCases,
     MergeCases,
     PluginCases,
-    PersistenceCases
+    PersistenceCases,
+    SchedulerCases
   }
 
   def run(profile, filter \\ nil) do
@@ -105,7 +107,9 @@ defmodule JidoCoreBench.Suite do
       RuntimeCases.workloads(s.payloads) ++
       DataCases.workloads(s.thread_sizes) ++
       EdgeCases.workloads(s.thread_sizes, s.sizes) ++
-      MergeCases.workloads() ++ PluginCases.workloads() ++ PersistenceCases.workloads()
+      MergeCases.workloads() ++
+      PluginCases.workloads() ++
+      PersistenceCases.workloads() ++ SchedulerCases.workloads(s.payloads)
   end
 
   def write!(report, directory) do

@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 115 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 192 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 233 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 116 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 196 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 237 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -120,3 +120,11 @@ before those optimization rounds can run.
 
 Schema version 2 adds the caller collection before timing. Do not compare its
 time samples with version 1. Rerun both revisions with the same current scripts.
+
+The `scheduler/task_capture` cases call the actual scheduler runtime delivery
+handler. An owned reply fixture supplies empty Plugin state. These cases cover
+task start, argument transfer, idle result, timer removal, and process cleanup.
+They do not measure a complete Agent Server Turn or cron activation. Run
+`mix run bench/capture_scheduler.exs --output PATH` for a separate trace of the
+actual `Task.async/1` function argument. That trace supplies copy-size evidence,
+not timing evidence.
