@@ -2,7 +2,7 @@
 
 Target: `agentjido/jido`, branch `v3-spike`.
 Status: suite pushed. Round 07 was accepted; rounds 01, 02, and 06 were rejected after measurement.
-Eight further ideas were rejected by source inspection. The other 38 rounds remain.
+Eight further ideas were rejected by source inspection. Round 08 passed measurement and awaits combined checks. The other 37 rounds remain.
 See [source decisions](../performance/cycle-inspection.md).
 
 ## Aim
@@ -81,7 +81,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | rejected |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
-| 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | pending |
+| 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | checks pending |
 | 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | pending |
 | 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | pending |
 | 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | pending |
