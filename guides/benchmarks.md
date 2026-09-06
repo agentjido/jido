@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 84 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 161 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 202 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 97 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 174 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 215 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -31,6 +31,8 @@ Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
 errors, and Codec encoding with a generated Registry. Budget batch cases perform
 100 checks or replacements with unlimited, module-limited, and stricter instance
 limits. Their time is for the full batch, and every returned Agent is checked.
+Keyword merge cases cover 25-operation batches with 8, 128, or 1,024 keys,
+plus duplicate keys, empty overrides, and non-keyword replacement lists.
 
 For admission task arguments, run `mix run bench/capture_admission.exs --output
 bench/results/admission-capture.json`. This separate diagnostic captures the

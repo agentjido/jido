@@ -1,0 +1,13 @@
+diff --git a/lib/jido/agent/state_budget.ex b/lib/jido/agent/state_budget.ex
+index 81aa4df1..79dfe79f 100644
+--- a/lib/jido/agent/state_budget.ex
++++ b/lib/jido/agent/state_budget.ex
+@@ -41,0 +42,3 @@ defmodule Jido.Agent.StateBudget do
++    module = previous.module
++    max_state_size = limit(previous)
++
+@@ -43,2 +46,2 @@ defmodule Jido.Agent.StateBudget do
+-    |> Map.put(:module, previous.module)
+-    |> Map.put(:max_state_size, limit(previous))
++    |> Map.put(:module, module)
++    |> Map.put(:max_state_size, max_state_size)

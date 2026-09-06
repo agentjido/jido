@@ -4,10 +4,11 @@ Code.require_file("report.exs", __DIR__)
 Code.require_file("runtime_cases.exs", __DIR__)
 Code.require_file("data_cases.exs", __DIR__)
 Code.require_file("edge_cases.exs", __DIR__)
+Code.require_file("merge_cases.exs", __DIR__)
 
 defmodule JidoCoreBench.Suite do
   @moduledoc false
-  alias JidoCoreBench.{Fixtures, Measure, Report, RuntimeCases, DataCases, EdgeCases}
+  alias JidoCoreBench.{Fixtures, Measure, Report, RuntimeCases, DataCases, EdgeCases, MergeCases}
 
   def run(profile, filter \\ nil) do
     settings = Map.put(settings(profile), :filter, filter)
@@ -90,7 +91,9 @@ defmodule JidoCoreBench.Suite do
     Fixtures.workloads(s.sizes, s.payloads) ++
       Fixtures.boundary_workloads() ++
       RuntimeCases.workloads(s.payloads) ++
-      DataCases.workloads(s.thread_sizes) ++ EdgeCases.workloads(s.thread_sizes, s.sizes)
+      DataCases.workloads(s.thread_sizes) ++
+      EdgeCases.workloads(s.thread_sizes, s.sizes) ++
+      MergeCases.workloads()
   end
 
   def write!(report, directory) do

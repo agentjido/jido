@@ -1,9 +1,9 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 34 of 50 idea rounds are complete. Eight fixes were accepted (05, 07,
-08, 09, 16, 18, 31, 39). Five ideas were rejected after measurement (01, 02, 06,
-10, 11). Twenty-one were rejected by source inspection. The other 16 rounds
+Status: 35 of 50 idea rounds are complete. Eight fixes were accepted (05, 07,
+08, 09, 16, 18, 31, 39). Six ideas were rejected after measurement (01, 02, 06,
+10, 11, 17). Twenty-one were rejected by source inspection. The other 15 rounds
 remain. See [source decisions](../performance/cycle-inspection.md) and individual
 round reports. The [complete checks](../performance/phase-34-checks.md) passed
 with 83.5% core coverage; the same 11 known example failures remain.
@@ -93,7 +93,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | pending |
 | 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | rejected |
 | 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | accepted |
-| 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | pending |
+| 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | rejected |
 | 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | accepted |
 | 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | rejected |
 | 20 | Command: empty Plugin chain fast path | `agent/cmd`; error normalization and validation | pending |
