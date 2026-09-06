@@ -99,6 +99,8 @@ defmodule JidoCoreBench.Suite do
     File.write!(Path.join(directory, "report.md"), Report.markdown(report))
   end
 
+  def metadata, do: %{source: source(), environment: environment()}
+
   def settings("smoke"),
     do: %{
       profile: "smoke",

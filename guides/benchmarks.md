@@ -30,6 +30,13 @@ A no-op Plugin case measures the command preparation callback path.
 Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
 errors, and Codec encoding with a generated Registry.
 
+For admission task arguments, run `mix run bench/capture_admission.exs --output
+bench/results/admission-capture.json`. This separate diagnostic captures the
+actual function passed to `Task.Supervisor.async/2`, checks the completed call,
+and copies that function into a receiver. It reports whether the function holds
+the complete Server state. It supplies no timing evidence, and its copied heap
+size is one argument transfer rather than total task traffic.
+
 Short and scale use small state, a 1000-entry nested map, a 5000-item list, and
 a 1 MiB binary. Smoke uses small state for the main matrix; fixed boundary cases
 still use their stated payloads. Actions do no network or provider work.
