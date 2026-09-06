@@ -1,11 +1,11 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 27 of 50 idea rounds are complete. Six fixes were accepted (07, 08,
+Status: 28 of 50 idea rounds are complete. Seven fixes were accepted (05, 07, 08,
 09, 18, 31, 39). Five ideas were rejected after measurement (01, 02, 06, 10, 11).
-Sixteen were rejected by source inspection. The other 23 rounds remain. See
+Sixteen were rejected by source inspection. The other 22 rounds remain. See
 [source decisions](../performance/cycle-inspection.md) and the individual round reports.
-Rounds 18 and 31 still require the complete checks before their next push.
+Rounds 05, 18, and 31 still require the complete checks before their next push.
 
 ## Aim
 
@@ -80,7 +80,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 02 | Thread append: compute new entry count once | `thread/append_batch`; revision and stats | rejected |
 | 03 | Thread append: use cached base count if its invariant holds | Long existing Thread; manually built and restored values | rejected |
 | 04 | Thread slice: stop after the upper bound if order is guaranteed | `thread/slice`; gaps and custom sequence values | rejected |
-| 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
+| 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | accepted |
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | rejected |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
 | 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | accepted |

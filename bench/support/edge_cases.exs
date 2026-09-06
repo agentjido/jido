@@ -1,10 +1,58 @@
+defmodule JidoCoreBench.BudgetAgent do
+  @moduledoc false
+  use Jido.Agent,
+    name: "core_bench_budget",
+    max_state_size: 2_000_000,
+    schema: Zoi.object(%{count: Zoi.integer(), payload: Zoi.any()})
+end
+
 defmodule JidoCoreBench.EdgeCases do
   @moduledoc false
   alias JidoCoreBench.Fixtures, as: F
   alias Jido.Agent.Command.Runner
 
   def workloads(thread_sizes, route_sizes) do
-    thread_filters(thread_sizes) ++ context_cases() ++ generated_codec_cases(route_sizes)
+    thread_filters(thread_sizes) ++
+      context_cases() ++
+      generated_codec_cases(route_sizes) ++
+      budget_cases()
+  end
+
+  defp budget_cases do
+    for payload <- [:small, :large_list],
+        {mode, module, limit} <- [
+          {:unlimited, Jido.Agent, nil},
+          {:module, JidoCoreBench.BudgetAgent, nil},
+          {:stricter, JidoCoreBench.BudgetAgent, 1_000_000}
+        ],
+        operation <- [:check, :transition] do
+      F.checked(
+        "state/budget_batch/#{payload}/#{mode}/#{operation}",
+        fn _ -> %{F.agent(1, F.payload(payload)) | module: module, max_state_size: limit} end,
+        fn agent ->
+          for _ <- 1..100 do
+            case operation do
+              :check ->
+                Jido.Agent.StateBudget.check(agent)
+
+              :transition ->
+                candidate = %{agent | module: Jido.Agent, max_state_size: nil}
+                Jido.Agent.StateBudget.transition(agent, candidate)
+            end
+          end
+        end,
+        fn results -> F.equal!(length(results), 100) end
+      )
+      |> Map.put(:verify, fn agent, results ->
+        expected =
+          if operation == :check,
+            do: agent,
+            else: %{agent | max_state_size: if(mode == :module, do: 2_000_000, else: limit)}
+
+        Enum.each(results, &F.equal!(&1, {:ok, expected}))
+        :ok
+      end)
+    end
   end
 
   defp thread_filters(sizes) do
