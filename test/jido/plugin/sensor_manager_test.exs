@@ -33,6 +33,37 @@ defmodule Jido.Plugin.SensorManagerTest do
     end
   end
 
+  defmodule ControlledSensor do
+    use GenServer
+
+    def child_spec(%Init{config: %{failure: :raise}}), do: raise("invalid sensor spec")
+    def child_spec(%Init{config: %{failure: :throw}}), do: throw(:invalid_sensor_spec)
+    def child_spec(init), do: super(init)
+
+    def start_link(%Init{config: %{gate: gate}} = init) do
+      case Elixir.Agent.get_and_update(gate, fn
+             [result | rest] -> {result, rest}
+             [] -> {:ok, []}
+           end) do
+        :ok ->
+          GenServer.start_link(__MODULE__, init)
+
+        :with_info ->
+          {:ok, pid} = GenServer.start_link(__MODULE__, init)
+          {:ok, pid, :sensor_info}
+
+        :ignore ->
+          :ignore
+
+        {:error, reason} ->
+          {:error, reason}
+      end
+    end
+
+    @impl true
+    def init(init), do: {:ok, init}
+  end
+
   defmodule ReadingAction do
     use Jido.Action, name: "sensor_manager_reading"
 
@@ -114,6 +145,78 @@ defmodule Jido.Plugin.SensorManagerTest do
     eventually(fn -> Server.agent(agent).state.readings == [5, 5] end)
   end
 
+  test "reuses unchanged sensors and replaces changed configurations", %{jido: jido} do
+    {:ok, agent} = Jido.start_agent(jido, Agent)
+    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    desired = %{source: %{module: TestSensor, config: %{value: 3}}}
+
+    assert :ok = Runtime.reconcile(runtime, desired, 1, 1_000)
+    first = Runtime.sensors(runtime).source
+    assert :ok = Runtime.reconcile(runtime, desired, 2, 1_000)
+    assert Runtime.sensors(runtime).source == first
+
+    changed = put_in(desired.source.config.value, 4)
+    assert :ok = Runtime.reconcile(runtime, changed, 2, 1_000)
+    assert Runtime.sensors(runtime).source == first
+
+    ref = Process.monitor(first)
+    assert :ok = Runtime.reconcile(runtime, changed, 3, 1_000)
+    assert_receive {:DOWN, ^ref, :process, ^first, :shutdown}
+    assert Runtime.sensors(runtime).source != first
+    eventually(fn -> Server.agent(agent).state.readings == [3, 4] end)
+  end
+
+  test "retries failed starts and failed restarts without a new command", %{jido: jido} do
+    {:ok, agent} = Jido.start_agent(jido, Agent)
+    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    gate = start_supervised!({Elixir.Agent, fn -> [{:error, :offline}, :ignore, :with_info] end})
+    desired = %{source: %{module: ControlledSensor, config: %{gate: gate}}}
+
+    assert {:error, {:sensor_start_failed, :source, :offline}} =
+             Runtime.reconcile(runtime, desired, 1, 1_000)
+
+    first = eventually(fn -> Runtime.sensors(runtime)[:source] end)
+    assert Process.alive?(first)
+    Elixir.Agent.update(gate, fn _ -> [{:error, :offline}, :ok] end)
+    Process.exit(first, :kill)
+
+    replacement =
+      eventually(fn ->
+        case Runtime.sensors(runtime)[:source] do
+          pid when is_pid(pid) and pid != first -> pid
+          _ -> nil
+        end
+      end)
+
+    assert Process.alive?(replacement)
+
+    controller = child_pid(runtime, Jido.Plugin.SensorManager.Runtime.Controller)
+    send(controller, {:retry_reconcile, make_ref(), -1})
+    send(controller, {:DOWN, make_ref(), :process, self(), :normal})
+    assert Runtime.sensors(runtime) == %{source: replacement}
+  end
+
+  test "invalid child specs return errors and removing them cancels retries", %{jido: jido} do
+    {:ok, agent} = Jido.start_agent(jido, Agent)
+    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+
+    for {failure, reason, version} <- [
+          {:raise, %RuntimeError{message: "invalid sensor spec"}, 1},
+          {:throw, {:throw, :invalid_sensor_spec}, 2}
+        ] do
+      desired = %{source: %{module: ControlledSensor, config: %{failure: failure}}}
+
+      assert {:error, {:sensor_start_failed, :source, ^reason}} =
+               Runtime.reconcile(runtime, desired, version, 1_000)
+
+      assert Runtime.sensors(runtime) == %{}
+    end
+
+    assert :ok = Runtime.reconcile(runtime, %{}, 3, 1_000)
+    assert Runtime.sensors(runtime) == %{}
+    assert Process.alive?(runtime)
+  end
+
   defp child_pid(supervisor, id) do
     supervisor
     |> Supervisor.which_children()
@@ -121,5 +224,31 @@ defmodule Jido.Plugin.SensorManagerTest do
       {^id, pid, _type, _modules} when is_pid(pid) -> pid
       _child -> nil
     end)
+  end
+
+  test "sensor Directives reject nonportable data and invalid modules" do
+    for {directive, message} <- [
+          {SensorManager.start(nil, TestSensor), "Sensor tag must not be nil"},
+          {SensorManager.stop(self()), "Sensor tag must contain portable data"},
+          {SensorManager.start(:source, String), "Sensor must define child_spec/1"},
+          {SensorManager.start(:source, TestSensor, %{pid: self()}),
+           "Sensor config must contain portable data"}
+        ] do
+      assert {:error, error} = SensorManager.validate_directive(directive, [])
+      assert error.message == message
+    end
+  end
+
+  test "calls to an unavailable sensor runtime return errors" do
+    pid = spawn(fn -> :ok end)
+    ref = Process.monitor(pid)
+    assert_receive {:DOWN, ^ref, :process, ^pid, _}
+    assert {:error, {:sensor_manager_runtime_unavailable, _}} = SensorManager.await_ready(pid, [])
+
+    context =
+      struct(Jido.Plugin.DirectiveContext, plugin_state: %{desired: %{}}, state_version: 1)
+
+    assert {:error, {:sensor_manager_runtime_unavailable, _}} =
+             SensorManager.dispatch(pid, SensorManager.stop(:source), context, [])
   end
 end

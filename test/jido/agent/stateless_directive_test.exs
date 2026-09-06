@@ -111,6 +111,8 @@ defmodule Jido.Agent.StatelessDirectiveTest do
       assert_receive {:effect_started, :block, worker}
       monitor = Process.monitor(worker)
       assert %{phase: :directing} = Server.status(server)
+      assert {:error, :directing} = Server.cancel(server)
+      assert {:error, :stale_turn} = Server.cancel_turn(server, "stale")
       assert Server.snapshot(server) == %{agent: committed, state_version: 1}
       if failure == :killed, do: Process.exit(worker, :kill)
 

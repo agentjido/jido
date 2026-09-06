@@ -134,6 +134,52 @@ defmodule JidoTest.Examples.Factory.SystemTest do
     assert :ok = Chat.stop(session)
   end
 
+  test "IEx command prompt runs factory controls and keeps EOF sessions alive", %{jido: jido} do
+    alias Jido.Examples.Factory.IEx, as: Chat
+    assert {:ok, session} = Chat.start(:workshop, jido: jido)
+    assert {:ok, _} = Tools.command(jido, session.factory_id, :submit, "job", "", "Demo")
+
+    output =
+      ExUnit.CaptureIO.capture_io(
+        [input: "\n/status\n/job job\n/events\n/pause job\n/resume job\n/cancel job\n"],
+        fn -> assert :ok = Chat.chat(session) end
+      )
+
+    assert output =~ "factory:"
+    assert output =~ "job:"
+    assert output =~ "events:"
+    assert Process.alive?(session.owner)
+    assert {:ok, job} = Chat.job(session, "job")
+    assert job.job.status == :cancelled
+    assert is_list(Chat.events(session))
+    assert :ok = Chat.stop(session)
+  end
+
+  test "IEx conversation mode reports unavailable factory controls and closed sessions", %{
+    jido: jido
+  } do
+    alias Jido.Examples.Factory.IEx, as: Chat
+    assert {:ok, session} = Chat.start(:conversation, jido: jido)
+    assert {:error, :no_factory} = Chat.status(session)
+    assert {:error, :no_factory} = Chat.job(session, "job")
+    assert {:error, :no_factory} = Chat.control(session, :cancel, "job")
+    assert Chat.events(session) == []
+    assert :ok = Chat.stop(session)
+    assert {:error, :conversation_unavailable} = Chat.say(session, "Hello")
+    assert Chat.events(%{session | mode: :workshop}) == []
+    assert :ok = Chat.stop(%{session | observer: nil})
+  end
+
+  test "IEx system chat uses the local model fixture and observes the answer", %{jido: jido} do
+    alias Jido.Examples.Factory.IEx, as: Chat
+    context = HTTP.context(fn _ -> HTTP.text("System reply") end)
+    assert {:ok, session} = Chat.start(:workshop, jido: jido, context: context)
+    assert :ok = Chat.say(session, "Hello")
+    conversation = Jido.whereis_agent(jido, session.conversation_id)
+    eventually(fn -> Server.agent(conversation).state.answer == "System reply" end)
+    assert :ok = Chat.stop(session)
+  end
+
   test "IEx department startup returns only when all heads are available", %{jido: jido} do
     alias Jido.Examples.Factory.IEx, as: Chat
     assert {:ok, session} = Chat.start(:departments, jido: jido)

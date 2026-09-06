@@ -5,6 +5,6 @@
     "^bench/"
   ],
   "coverage_options": {
-    "minimum_coverage": 80
+    "minimum_coverage": 90
   }
 }

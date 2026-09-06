@@ -29,7 +29,8 @@ defmodule Jido.MixProject do
       # Coverage
       test_coverage: [
         tool: ExCoveralls,
-        # ExCoveralls applies the core-only 80% gate from coveralls.json.
+        # ExCoveralls applies the core-only 90% gate from coveralls.json.
+        summary: [threshold: 90],
         export: "cov"
       ],
 
@@ -58,6 +59,7 @@ defmodule Jido.MixProject do
         "coveralls.detail": :test,
         "coveralls.post": :test,
         "coveralls.html": :test,
+        "coveralls.json": :test,
         "coveralls.cobertura": :test
       ]
     ]

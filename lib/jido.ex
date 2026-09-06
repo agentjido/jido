@@ -438,6 +438,7 @@ defmodule Jido do
   def stop_agent(jido_instance, pid, _opts) when is_atom(jido_instance) and is_pid(pid) do
     Jido.AgentServer.stop(pid)
   catch
+    :exit, :noproc -> {:error, :not_found}
     :exit, {:noproc, _details} -> {:error, :not_found}
     :exit, {:normal, _details} -> :ok
   end

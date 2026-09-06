@@ -27,7 +27,8 @@ remains unsupported. Preserve the test assertion and its stated reason.
 
 ## Core coverage
 
-The 80% coverage goal applies to core code in `lib/jido.ex` and `lib/jido/`.
+The 90% coverage requirement applies to core code in `lib/jido.ex` and `lib/jido/`.
+Keep total core coverage above 93% to allow for new work.
 `coveralls.json` excludes example code, test fixtures, and benchmark helpers.
 Run core coverage with:
 
@@ -37,3 +38,14 @@ mix test --cover test/jido test/jido_test test/integration --include integration
 
 Run example tests separately for behavior checks. Their coverage is not part of
 the core coverage goal.
+
+To run the complete suite and measure core coverage in one run, use:
+
+```sh
+mix test --include example --include integration --include flaky --seed 0 --cover
+```
+
+The Mix summary threshold and ExCoveralls minimum are both 90%. Keep the
+coverage scope and enabled acceptance checks intact when adding tests.
+Coverage runs also collect counters from the isolated BEAM test nodes before
+they stop. The report includes the same measured modules on each node.

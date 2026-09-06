@@ -60,8 +60,24 @@ defmodule JidoTest.PeerCase do
         wait_boot: 15_000
       })
 
-    on_exit(fn -> stop_peer(peer) end)
+    coverage_files = coverage_files()
+
+    on_exit(fn ->
+      try do
+        if coverage_files != [] and Process.alive?(peer), do: collect_coverage(peer)
+      after
+        stop_peer(peer)
+      end
+    end)
+
     :ok = peer_call(peer, :code, :add_paths, [:code.get_path()])
+
+    if coverage_files != [] do
+      {:ok, _cover} = peer_call(peer, :cover, :start, [])
+      results = :peer.call(peer, :cover, :compile_beam, [coverage_files], 60_000)
+      assert Enum.all?(results, &match?({:ok, _module}, &1)), inspect(results)
+    end
+
     {:ok, _apps} = peer_call(peer, Application, :ensure_all_started, [:jido])
 
     # A temporary RPC caller cannot own the long-lived Jido instance.
@@ -75,5 +91,28 @@ defmodule JidoTest.PeerCase do
     ref = Process.monitor(peer)
     if Process.alive?(peer), do: :peer.stop(peer)
     assert_receive {:DOWN, ^ref, :process, ^peer, _reason}, 5_000
+  end
+
+  defp coverage_files do
+    if Process.whereis(:cover_server) do
+      Enum.map(:cover.modules(), fn module ->
+        {:file, file} = :cover.is_compiled(module)
+        file
+      end)
+    else
+      []
+    end
+  end
+
+  defp collect_coverage(peer) do
+    path =
+      Path.join(System.tmp_dir!(), "jido-peer-#{System.unique_integer([:positive])}.coverdata")
+
+    try do
+      :ok = :peer.call(peer, :cover, :export, [String.to_charlist(path)], 60_000)
+      :ok = :cover.import(String.to_charlist(path))
+    after
+      File.rm(path)
+    end
   end
 end
