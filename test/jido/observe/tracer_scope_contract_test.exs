@@ -432,11 +432,7 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
 
   test "warn mode prevents cross-process scoped invocation from double-running function" do
     Application.put_env(:jido, :observability, tracer: CrossProcessInvokeTracer)
-    {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
-
-    on_exit(fn ->
-      if Process.alive?(counter), do: Elixir.Agent.stop(counter)
-    end)
+    counter = start_supervised!({Elixir.Agent, fn -> 0 end})
 
     log =
       capture_log(fn ->
@@ -474,11 +470,7 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
       tracer_failure_mode: :strict
     )
 
-    {:ok, counter} = Elixir.Agent.start_link(fn -> 0 end)
-
-    on_exit(fn ->
-      if Process.alive?(counter), do: Elixir.Agent.stop(counter)
-    end)
+    counter = start_supervised!({Elixir.Agent, fn -> 0 end})
 
     assert_raise RuntimeError, ~r/tracer with_span_scope\/3 failed/, fn ->
       Observe.with_span([:jido, :scope, :cross_process, :strict], %{}, fn ->
