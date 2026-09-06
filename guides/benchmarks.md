@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 51 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 122 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 159 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 53 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 124 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 161 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -25,7 +25,7 @@ Agent cases cover construction, validation, command preparation, routing, direct
 Action and two-step Flow commands, state transition, and checkpoint/restore.
 Live server cases cover calls, Flow calls, 20 casts with a completion call,
 snapshots, failure, and start/stop. Data cases cover Thread append, normalization,
-last entry and slice, Audit buffers, state budgets, deep merge, Codec, and spans.
+last entry and slice, Audit buffers and 100-record ID batches, state budgets, deep merge, Codec, and spans.
 A no-op Plugin case measures the command preparation callback path.
 
 Short and scale use small state, a 1000-entry nested map, a 5000-item list, and
@@ -37,8 +37,10 @@ result check fails. The benchmark contract tests are in
 
 ## Measurements
 
-Time samples use the monotonic clock without tracing. Setup, checks, and cleanup
-are outside each timed interval. `agent/new` includes definition construction
+Time samples use the monotonic clock without tracing. A full caller garbage
+collection follows setup before each timed sample. This removes garbage from
+untimed setup. It does not force server or worker heaps to collect. Setup, this
+garbage collection, checks, and cleanup are outside each timed interval. `agent/new` includes definition construction
 and instantiation. Server setup is outside time samples. Burst time covers all
 21 messages; it does not measure concurrent per-caller tail latency.
 
@@ -63,7 +65,8 @@ its fixed infrastructure are not attributed to an individual case.
 | VM memory | Includes measurement tools and unrelated work |
 
 Exact lifetime memory peaks and total helper reductions are unavailable and
-recorded as `null`. Retained term probes include a separate checked operation.
+recorded as `null`. ETS tables, persistent terms, and code memory are not
+attributed to individual cases; whole-VM totals include them. Retained term probes include a separate checked operation.
 Flat transfers above 64 MiB are rejected. A full Agent result includes its schema
 and routes; a server result does not include all server internal data.
 
@@ -96,3 +99,6 @@ See the [50-round plan](https://github.com/agentjido/jido/blob/v3-spike/docs/pla
 list, acceptance gates, required tests, and commit process. Distributed load,
 complete durable recovery, scheduling, and topology need additional fixtures
 before those optimization rounds can run.
+
+Schema version 2 adds the caller collection before timing. Do not compare its
+time samples with version 1. Rerun both revisions with the same current scripts.

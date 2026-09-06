@@ -3,7 +3,7 @@ defmodule JidoCoreBench.Report do
 
   def limitations do
     [
-      "Time covers the operation only. Setup, result checks, teardown, tracing, and memory probes are outside the timed interval.",
+      "Time covers the operation only. A full caller GC removes untimed setup garbage before each sample. Setup, GC, result checks, teardown, tracing, and memory probes are outside the timed interval. This is a post-GC caller measurement; server heaps are not forced to collect.",
       "Resource runs include setup, operation, checks, and teardown. Reported memory is the largest observed barrier sample, not the exact lifetime peak.",
       "Caller reductions exclude helper work. Observed helper reductions and traced GC counts come from separate resource calls. Exact total reductions and peak memory are unavailable (null).",
       "Process memory sums the caller and observed descendants. Binary bytes deduplicate observed references; binary ownership can be shared. VM memory includes unrelated work and the observer.",

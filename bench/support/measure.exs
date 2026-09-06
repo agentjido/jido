@@ -9,6 +9,8 @@ defmodule JidoCoreBench.Measure do
       measurements =
         for _ <- 1..samples do
           with_prepared(workload, %{}, fn prepared ->
+            # Remove garbage from untimed setup before the operation starts.
+            :erlang.garbage_collect(self())
             {:reductions, before_reductions} = Process.info(self(), :reductions)
             before_time = System.monotonic_time()
             result = workload.run.(prepared)

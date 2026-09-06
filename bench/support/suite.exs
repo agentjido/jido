@@ -42,13 +42,13 @@ defmodule JidoCoreBench.Suite do
         end)
 
       %{
-        schema_version: 1,
+        schema_version: 2,
         source: source(),
         environment: environment(),
         settings: settings,
         recorded_at: DateTime.to_iso8601(DateTime.utc_now()),
         method:
-          "core-v1: untraced operation time; traced caller and supervisor descendants; callback and result barriers; checked term transfer; explicit teardown",
+          "core-v2: caller GC after setup; untraced operation time; traced caller and supervisor descendants; callback and result barriers; checked term transfer; explicit teardown",
         limitations: Report.limitations(),
         cases: cases
       }

@@ -1,7 +1,7 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: benchmark preparation. The 50 optimization rounds below have not run.
+Status: suite ready. Round 01 was rejected. Round 07 is in progress. The other 48 rounds have not run.
 
 ## Aim
 
@@ -72,13 +72,13 @@ An unmeasured idea must not be reported as a measured improvement.
 
 | Round | Target and hypothesis | Evidence and contract check | State |
 | ---: | --- | --- | --- |
-| 01 | Thread normalization: use one indexed map pass | `thread/normalize`; exact sequence, defaults, IDs | pending |
+| 01 | Thread normalization: use one list pass | `thread/normalize`; exact sequence, defaults, IDs | rejected |
 | 02 | Thread append: compute new entry count once | `thread/append_batch`; revision and stats | pending |
 | 03 | Thread append: use cached base count if its invariant holds | Long existing Thread; manually built and restored values | pending |
 | 04 | Thread slice: stop after the upper bound if order is guaranteed | `thread/slice`; gaps and custom sequence values | pending |
 | 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | pending |
-| 07 | Audit record: generate default ID only when needed | Add explicit/default ID fixture; UUID validation | pending |
+| 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | in progress |
 | 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | pending |
 | 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | pending |
 | 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | pending |

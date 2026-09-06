@@ -47,6 +47,35 @@ defmodule JidoTest.Thread.EntryNormalizerTest do
       assert Enum.map(normalized, & &1.seq) == [7, 8, 9]
     end
 
+    test "batch normalization calls the ID generator in order only for missing IDs" do
+      generator = fn ->
+        count = Process.get(:generated_entry_count, 0) + 1
+        Process.put(:generated_entry_count, count)
+        "generated_#{count}"
+      end
+
+      entries = [
+        %{"id" => "kept"},
+        %Entry{id: nil, seq: 99, at: 2, kind: :note},
+        %{},
+        %{id: "last"}
+      ]
+
+      normalized = EntryNormalizer.normalize_many(entries, 5, 1_000, id_generator: generator)
+
+      assert Enum.map(normalized, &{&1.id, &1.seq, &1.at}) ==
+               [
+                 {"kept", 5, 1_000},
+                 {"generated_1", 6, 2},
+                 {"generated_2", 7, 1_000},
+                 {"last", 8, 1_000}
+               ]
+
+      assert Process.get(:generated_entry_count) == 2
+      assert EntryNormalizer.normalize_many([], 9, 1_000, id_generator: generator) == []
+      assert Process.get(:generated_entry_count) == 2
+    end
+
     test "supports custom id generation" do
       normalized =
         EntryNormalizer.normalize(%{kind: :note}, 0, 100, id_generator: fn -> "custom_id" end)
