@@ -30,14 +30,23 @@ defmodule Jido.Agent.Codec do
   def encode(agent) do
     with {:ok, agent} <- Agent.validate(agent),
          {:ok, registry} <- Jido.Agent.Codec.Deriver.agent(agent),
-         {:ok, document} <- encode(agent, registry),
+         {:ok, document} <- encode_generated(agent, registry),
          do: {:ok, document, registry}
   end
 
   @doc "Encodes authoring data through a trusted Registry."
   def encode(agent, registry) do
-    with {:ok, agent} <- Agent.validate(agent),
-         {:ok, registry} <- Registry.new(registry),
+    with {:ok, agent} <- Agent.validate(agent), do: encode_validated(agent, registry)
+  end
+
+  defp encode_generated(%Agent{id: nil, state: nil} = agent, registry),
+    do: encode_validated(agent, registry)
+
+  # Keep instance state parsing: static schema transforms need not be idempotent.
+  defp encode_generated(agent, registry), do: encode(agent, registry)
+
+  defp encode_validated(agent, registry) do
+    with {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.identifier(registry, :agent, agent.module),
          {:ok, schema} <- Registry.identifier(registry, :schema, agent.schema),
          {:ok, metadata} <- Data.encode(agent.metadata, registry),

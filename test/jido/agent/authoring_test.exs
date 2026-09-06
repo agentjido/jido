@@ -6,6 +6,8 @@ defmodule JidoTest.Agent.AuthoringTest do
   alias Jido.Agent.Codec.Registry
   alias Jido.AgentServer, as: Server
 
+  def stringify_count(value, _opts), do: Integer.to_string(value)
+
   defmodule Add do
     use Jido.Action,
       name: "authoring_add",
@@ -472,6 +474,22 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Registry.new(%{"one" => {:alias, "two"}, "two" => {:alias, "one"}})
     assert {:error, _} = Registry.new(%{"one" => {:atom, :x}, "two" => {:atom, :x}})
     assert {:error, _} = Registry.new(%{"bad" => {:route_match, fn _ -> true end}})
+  end
+
+  test "generated Codec preserves repeated instance state parsing" do
+    schema =
+      Zoi.object(%{count: Zoi.integer() |> Zoi.transform({__MODULE__, :stringify_count, []})})
+
+    assert {:ok, definition} = Agent.new(name: "transformed", schema: schema)
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, ^definition} = Codec.decode(document, registry)
+
+    instance = %{definition | id: "transformed", state: %{count: 1}}
+    assert {:ok, %{state: %{count: "1"}}} = Agent.validate(instance)
+    assert {:ok, ^document} = Codec.encode(instance, registry)
+
+    assert {:error, %Jido.Error.ValidationError{message: "Agent state does not match its schema"}} =
+             Codec.encode(instance)
   end
 
   test "Codec rejects malformed documents without deriving atoms or modules" do
