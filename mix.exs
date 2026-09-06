@@ -226,10 +226,10 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:sched_ex, "~> 1.2.1"},
-      {:req_llm, "~> 1.21", optional: true},
-      {:dotenvy, "~> 1.1", optional: true},
 
       # Development & Test Dependencies
+      {:req_llm, "~> 1.21", only: [:dev, :test]},
+      {:dotenvy, "~> 1.1", only: [:dev, :test]},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
       {:git_hooks, "~> 0.8", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test]},
