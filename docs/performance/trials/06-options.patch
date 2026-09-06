@@ -1,0 +1,30 @@
+diff --git a/lib/jido/thread/entry_normalizer.ex b/lib/jido/thread/entry_normalizer.ex
+index f9548a3e..dbd33144 100644
+--- a/lib/jido/thread/entry_normalizer.ex
++++ b/lib/jido/thread/entry_normalizer.ex
+@@ -21 +21,6 @@ defmodule Jido.Thread.EntryNormalizer do
+-    id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
++    normalize_entry(entry, seq, now, Keyword.get(opts, :id_generator, &generate_entry_id/0))
++  end
++
++  def normalize(attrs, seq, now, opts) when is_map(attrs) do
++    normalize_entry(attrs, seq, now, Keyword.get(opts, :id_generator, &generate_entry_id/0))
++  end
+@@ -22,0 +28 @@ defmodule Jido.Thread.EntryNormalizer do
++  defp normalize_entry(%Entry{} = entry, seq, now, id_generator) do
+@@ -33,3 +39 @@ defmodule Jido.Thread.EntryNormalizer do
+-  def normalize(attrs, seq, now, opts) when is_map(attrs) do
+-    id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
+-
++  defp normalize_entry(attrs, seq, now, id_generator) when is_map(attrs) do
+@@ -50 +54,6 @@ defmodule Jido.Thread.EntryNormalizer do
+-  def normalize_many(entries, base_seq, now, opts \\ []) do
++  def normalize_many(entries, base_seq, now, opts \\ [])
++  def normalize_many([], _base_seq, _now, _opts), do: []
++
++  def normalize_many(entries, base_seq, now, opts) do
++    id_generator = Keyword.get(opts, :id_generator, &generate_entry_id/0)
++
+@@ -54 +63 @@ defmodule Jido.Thread.EntryNormalizer do
+-      normalize(entry, base_seq + idx, now, opts)
++      normalize_entry(entry, base_seq + idx, now, id_generator)

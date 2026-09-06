@@ -1,0 +1,15 @@
+diff --git a/lib/jido/plugin/audit.ex b/lib/jido/plugin/audit.ex
+index f41d18ef..292a1850 100644
+--- a/lib/jido/plugin/audit.ex
++++ b/lib/jido/plugin/audit.ex
+@@ -78 +78,9 @@ defmodule Jido.Plugin.Audit do
+-    records = Enum.take(state.records ++ records, -max_entries)
++    incoming_count = length(records)
++
++    records =
++      if incoming_count >= max_entries do
++        Enum.drop(records, incoming_count - max_entries)
++      else
++        Enum.take(state.records ++ records, -max_entries)
++      end
++

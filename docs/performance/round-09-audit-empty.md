@@ -1,6 +1,6 @@
 # Round 09: Empty Audit buffer updates
 
-Decision: **passes the measurement gate; retained for combined checks**.
+Decision: **accepted**.
 
 An empty update now counts the existing records once. It returns the current
 state when within the limit. If the state exceeds the limit, it drops the excess
@@ -24,7 +24,7 @@ The first trial used `Enum.take/2` after the explicit count when the buffer was
 too large. Reusing the count with `Enum.drop/2` removed that second size scan.
 `round-09` holds the first trial; `round-09-final` is the acceptance evidence.
 `audit-expanded-control` holds the unchanged-code control. All 13 Audit and
-benchmark contract tests passed. Combined checks remain before push.
+benchmark contract tests passed. Combined checks passed; see the [cycle checks](cycle-checks.md).
 
 Baseline: `58f8f9e374869754fa1b3b4fcbcc844416fb4c84`.
 Candidate: `b4b8c1d335bfe52296e04101dedd754402752115`.

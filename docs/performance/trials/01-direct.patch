@@ -1,0 +1,16 @@
+diff --git a/lib/jido/thread/entry_normalizer.ex b/lib/jido/thread/entry_normalizer.ex
+index f9548a3e..c6cb9d7d 100644
+--- a/lib/jido/thread/entry_normalizer.ex
++++ b/lib/jido/thread/entry_normalizer.ex
+@@ -50,6 +50,5 @@ defmodule Jido.Thread.EntryNormalizer do
+-  def normalize_many(entries, base_seq, now, opts \\ []) do
+-    entries
+-    |> Enum.with_index()
+-    |> Enum.map(fn {entry, idx} ->
+-      normalize(entry, base_seq + idx, now, opts)
+-    end)
++  def normalize_many(entries, base_seq, now, opts \\ [])
++  def normalize_many([], _base_seq, _now, _opts), do: []
++
++  def normalize_many([entry | entries], base_seq, now, opts) do
++    [normalize(entry, base_seq, now, opts) | normalize_many(entries, base_seq + 1, now, opts)]

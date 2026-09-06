@@ -1,6 +1,6 @@
 # Round 08: Generate Audit timestamps only when absent
 
-Decision: **passes the measurement gate; retained for combined checks**.
+Decision: **accepted**.
 
 `Audit.record/3` now uses a lazy timestamp default. A caller-supplied timestamp,
 including zero or nil, is preserved. An absent timestamp still reads the clock.
@@ -19,8 +19,7 @@ variation. There is no sampled memory reduction claim for this round.
 
 Tests cover default timestamp bounds, supplied nil and zero, generated IDs,
 and buffer order. All 13 Audit and benchmark contract tests passed. The paired
-result, transfer, and cleanup checks passed. Required combined checks remain
-before this fix is pushed.
+result, transfer, and cleanup checks passed. Combined checks passed; see the [cycle checks](cycle-checks.md).
 
 Local evidence: `bench/results/round-08`; control: `audit-expanded-control`.
 The manifest and raw reports contain the complete environment and source data.

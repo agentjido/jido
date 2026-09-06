@@ -1,0 +1,9 @@
+diff --git a/lib/jido/thread/entry_normalizer.ex b/lib/jido/thread/entry_normalizer.ex
+index f9548a3e..2623c09b 100644
+--- a/lib/jido/thread/entry_normalizer.ex
++++ b/lib/jido/thread/entry_normalizer.ex
+@@ -51,3 +51 @@ defmodule Jido.Thread.EntryNormalizer do
+-    entries
+-    |> Enum.with_index()
+-    |> Enum.map(fn {entry, idx} ->
++    Enum.with_index(entries, fn entry, idx ->

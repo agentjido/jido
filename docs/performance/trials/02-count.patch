@@ -1,0 +1,13 @@
+diff --git a/lib/jido/thread.ex b/lib/jido/thread.ex
+index 2631460c..63d98412 100644
+--- a/lib/jido/thread.ex
++++ b/lib/jido/thread.ex
+@@ -81,0 +82,2 @@ defmodule Jido.Thread do
++    added_count = length(prepared_entries)
++
+@@ -85 +87 @@ defmodule Jido.Thread do
+-        rev: thread.rev + length(prepared_entries),
++        rev: thread.rev + added_count,
+@@ -87 +89 @@ defmodule Jido.Thread do
+-        stats: %{thread.stats | entry_count: thread.stats.entry_count + length(prepared_entries)}
++        stats: %{thread.stats | entry_count: thread.stats.entry_count + added_count}

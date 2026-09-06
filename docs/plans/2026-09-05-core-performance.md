@@ -2,7 +2,7 @@
 
 Target: `agentjido/jido`, branch `v3-spike`.
 Status: 18 decisions are recorded. The suite and Round 07 are pushed. Rounds
-08 and 09 passed measurement and await combined checks. Rounds 01, 02, 06, 10,
+08 and 09 also passed the combined checks and were accepted. Rounds 01, 02, 06, 10,
 and 11 were rejected after measurement. Ten further ideas were rejected by
 source inspection. The other 32 rounds remain. See
 [source decisions](../performance/cycle-inspection.md).
@@ -83,8 +83,8 @@ An unmeasured idea must not be reported as a measured improvement.
 | 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | rejected |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
-| 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | checks pending |
-| 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | checks pending |
+| 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | accepted |
+| 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | accepted |
 | 10 | Audit update: drop old prefix before concatenation | Full buffer and batches; exact record order | rejected |
 | 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | rejected |
 | 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | pending |
