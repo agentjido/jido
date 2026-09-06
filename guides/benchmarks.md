@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 53 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 124 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 161 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 57 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 128 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 165 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`

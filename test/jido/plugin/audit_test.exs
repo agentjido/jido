@@ -64,6 +64,32 @@ defmodule Jido.Plugin.AuditTest do
     assert record.metadata == %{}
   end
 
+  test "record reads a default timestamp and preserves supplied timestamps" do
+    before = System.system_time(:millisecond)
+    record = Audit.record(:saved, :ok)
+    after_time = System.system_time(:millisecond)
+    assert record.at >= before and record.at <= after_time
+    assert Audit.record(:saved, :ok, at: nil).at == nil
+    assert Audit.record(:saved, :ok, at: 0).at == 0
+  end
+
+  test "buffer updates retain the last records across empty and oversized batches" do
+    records = for i <- 1..7, do: Audit.record(i, :ok, at: i)
+
+    for existing <- [[], Enum.take(records, 2), Enum.take(records, 4)],
+        incoming <- [[], Enum.drop(records, 4), records] do
+      state = %{records: existing}
+      expected = Enum.take(existing ++ incoming, -3)
+      assert Audit.update_state(state, incoming, max_entries: 3) == {:ok, %{records: expected}}
+    end
+
+    for invalid <- [0, -1, nil] do
+      assert_raise ArgumentError, fn ->
+        Audit.update_state(%{records: []}, [], max_entries: invalid)
+      end
+    end
+  end
+
   test "commits bounded audit records with domain state", %{jido: jido} do
     {:ok, pid} = Jido.start_agent(jido, Agent, id: unique_id("audit"))
 
