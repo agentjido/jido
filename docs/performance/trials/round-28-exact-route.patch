@@ -1,0 +1,39 @@
+diff --git a/lib/jido/agent/command/runner.ex b/lib/jido/agent/command/runner.ex
+index 59ee3929..d228bc93 100644
+--- a/lib/jido/agent/command/runner.ex
++++ b/lib/jido/agent/command/runner.ex
+@@ -107,8 +107,7 @@ defmodule Jido.Agent.Command.Runner do
+   @doc false
+   @spec prepare_default_turn(Signal.t(), Agent.t()) :: Agent.handle_result()
+   def prepare_default_turn(%Signal{} = signal, %Agent{} = agent) do
+-    with {:ok, router} <- Router.new(agent.routes),
+-         {:ok, [target]} <- route_one(router, signal),
++    with {:ok, [target]} <- select_target(agent.routes, signal),
+          {:ok, executable, input} <- prepare_target(target, signal),
+          {:ok, turn} <- Turn.new(executable, input) do
+       {:ok, turn}
+@@ -117,6 +116,24 @@ defmodule Jido.Agent.Command.Runner do
+     end
+   end
+ 
++  defp select_target(
++         [%Router.Route{path: path, match: nil, target: target}] = routes,
++         %Signal{type: path} = signal
++       )
++       when is_binary(path) and not is_list(target) do
++    if String.contains?(path, "*") do
++      select_from_router(routes, signal)
++    else
++      with {:ok, [route]} <- Router.normalize(routes), do: {:ok, [route.target]}
++    end
++  end
++
++  defp select_target(routes, signal), do: select_from_router(routes, signal)
++
++  defp select_from_router(routes, signal) do
++    with {:ok, router} <- Router.new(routes), do: route_one(router, signal)
++  end
++
+   defp finish(%Prepared{} = prepared, result) do
+     with {:ok, output, directives} <- normalize_exec_result(result),
+          {:ok, output, directives} <-

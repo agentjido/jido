@@ -1,10 +1,10 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 43 of 50 idea rounds are complete. Twelve fixes were accepted (05, 07,
-08, 09, 14, 16, 18, 31, 34, 36, 39, 48). Eight ideas were rejected after measurement
-(01, 02, 06, 10, 11, 17, 20, 22). Twenty-three were rejected by source inspection.
-Seven rounds remain. The codec map fix passed full checks.
+Status: 44 of 50 idea rounds are complete. Twelve fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 34, 36, 39, 48). Nine ideas were rejected after measurement
+(01, 02, 06, 10, 11, 17, 20, 22, 28). Twenty-three were rejected by source inspection.
+Six rounds remain. The codec map fix passed full checks.
 See [source decisions](../performance/cycle-inspection.md) and individual reports.
 The last [complete checks](../performance/phase-43-checks.md) passed with 83.5%
 core coverage. Examples remain outside the coverage gate.
@@ -105,7 +105,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | rejected |
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | rejected |
 | 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | rejected |
-| 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
+| 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | rejected |
 | 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | rejected |
 | 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | rejected |
 | 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | accepted |
