@@ -1110,13 +1110,15 @@ defmodule Jido.AgentServer do
   end
 
   defp start_admission_task(command, %State{} = data) do
+    plugin_specs = data.plugin_specs
+
     with {:ok, runtime_refs} <-
-           plugin_runtime_refs(data, Plugin.admission_modules(data.plugin_specs)) do
+           plugin_runtime_refs(data, Plugin.admission_modules(plugin_specs)) do
       supervisor = Jido.task_supervisor_name(data.jido)
 
       task =
         Task.Supervisor.async(supervisor, fn ->
-          Plugin.admit(command, data.plugin_specs, runtime_refs)
+          Plugin.admit(command, plugin_specs, runtime_refs)
         end)
 
       timer = start_task_timer(data.directive_timeout, :admission_timeout, task.ref)
