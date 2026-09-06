@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 97 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 174 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 215 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 115 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 192 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 233 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -33,6 +33,11 @@ errors, and Codec encoding with a generated Registry. Budget batch cases perform
 limits. Their time is for the full batch, and every returned Agent is checked.
 Keyword merge cases cover 25-operation batches with 8, 128, or 1,024 keys,
 plus duplicate keys, empty overrides, and non-keyword replacement lists.
+Plugin schema cases cover validation and preparation with up to 10,000 owned
+list items. ETS cases cover 100-operation get, put, CAS, and conflict batches
+with default and custom table options. They delete their own keys after each
+sample. The named tables remain part of the VM infrastructure; their memory
+is outside the per-case process and copied-term measurements.
 
 For admission task arguments, run `mix run bench/capture_admission.exs --output
 bench/results/admission-capture.json`. This separate diagnostic captures the

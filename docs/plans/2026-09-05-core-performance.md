@@ -1,9 +1,9 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 36 of 50 idea rounds are complete. Nine fixes were accepted (05, 07,
-08, 09, 14, 16, 18, 31, 39). Six ideas were rejected after measurement (01, 02, 06,
-10, 11, 17). Twenty-one were rejected by source inspection. The other 14 rounds
+Status: 37 of 50 idea rounds are complete. Nine fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 39). Seven ideas were rejected after measurement (01, 02, 06,
+10, 11, 17, 20). Twenty-one were rejected by source inspection. The other 13 rounds
 remain. See [source decisions](../performance/cycle-inspection.md) and individual
 round reports. The [complete checks](../performance/phase-36-checks.md) passed
 with 83.5% core coverage; the same 11 known example failures remain.
@@ -96,7 +96,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | rejected |
 | 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | accepted |
 | 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | rejected |
-| 20 | Command: empty Plugin chain fast path | `agent/cmd`; error normalization and validation | pending |
+| 20 | Command: empty Plugin chain fast path | `agent/cmd`; error normalization and validation | rejected |
 | 21 | Plugin: reuse normalized specs within one command | `plugin/prepare`; callback count and order | pending |
 | 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
 | 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | rejected |
@@ -133,8 +133,6 @@ An unmeasured idea must not be reported as a measured improvement.
 The measured work suggests this order for the remaining ideas. All remain
 pending until their own check and decision.
 
-- Round 20: test a direct `Plugin.normalize_all([])` result. Empty declarations
-  need no uniqueness scans. Keep public command validation and callbacks.
 - Round 22: return the composed schema from common Agent validation and reuse it
   for instance state parsing. Keep a fresh definition check on each call.
   Check Plugin declaration callback behavior before changing normalization.

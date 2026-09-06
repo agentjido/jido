@@ -1,0 +1,7 @@
+diff --git a/lib/jido/plugin.ex b/lib/jido/plugin.ex
+index a74a4fe7..cb1566f5 100644
+--- a/lib/jido/plugin.ex
++++ b/lib/jido/plugin.ex
+@@ -101,0 +102,2 @@ defmodule Jido.Plugin do
++  def normalize_all([]), do: {:ok, []}
++
