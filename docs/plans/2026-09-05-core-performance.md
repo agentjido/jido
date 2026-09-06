@@ -1,10 +1,11 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 19 of 50 idea rounds are complete. Four fixes were accepted (07, 08,
-09, 39). Five ideas were rejected after measurement (01, 02, 06, 10, 11).
-Ten were rejected by source inspection. The other 31 rounds remain. See
+Status: 27 of 50 idea rounds are complete. Six fixes were accepted (07, 08,
+09, 18, 31, 39). Five ideas were rejected after measurement (01, 02, 06, 10, 11).
+Sixteen were rejected by source inspection. The other 23 rounds remain. See
 [source decisions](../performance/cycle-inspection.md) and the individual round reports.
+Rounds 18 and 31 still require the complete checks before their next push.
 
 ## Aim
 
@@ -92,12 +93,12 @@ An unmeasured idea must not be reported as a measured improvement.
 | 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | rejected |
 | 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | pending |
 | 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | pending |
-| 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | pending |
-| 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | pending |
+| 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | accepted |
+| 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | rejected |
 | 20 | Command: empty Plugin chain fast path | `agent/cmd`; error normalization and validation | pending |
 | 21 | Plugin: reuse normalized specs within one command | `plugin/prepare`; callback count and order | pending |
 | 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
-| 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | pending |
+| 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | rejected |
 | 24 | Plugin: index directive modules within one operation | Add many Plugin directive types; duplicate rejection | pending |
 | 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | pending |
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | pending |
@@ -105,8 +106,8 @@ An unmeasured idea must not be reported as a measured improvement.
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
 | 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | pending |
 | 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | pending |
-| 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | pending |
-| 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | pending |
+| 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | accepted |
+| 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | rejected |
 | 33 | Codec object: avoid sorting fixed field lists repeatedly | Exact allowed/missing key rejection | pending |
 | 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | pending |
 | 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | rejected |
@@ -118,11 +119,11 @@ An unmeasured idea must not be reported as a measured improvement.
 | 41 | Server queued signals: reduce retained context copies | Add gated backlog fixture; FIFO and capacity rejection | rejected |
 | 42 | Server debug buffer: reduce append/trim cost | Add debug-on fixture; bounded history and order | pending |
 | 43 | Server snapshot: assess full state copy cost and existing lightweight APIs | `server/snapshot`; do not silently change public data | rejected |
-| 44 | Server directives: reduce continuation list copies | Add many directives; order, timeout, post-commit failure | pending |
+| 44 | Server directives: reduce continuation list copies | Add many directives; order, timeout, post-commit failure | rejected |
 | 45 | Observe: avoid duplicate metadata enrichment | `observe/span`; exact telemetry and tracer behavior | pending |
-| 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | pending |
+| 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | rejected |
 | 47 | Scheduler queue: reduce due-item scan or sorting | Add due/not-due fixture; deadline and stable ordering | pending |
-| 48 | Scheduler delivery: reduce stored transient data | Add durable enqueue/ack fixture; recovery and duplicates | pending |
+| 48 | Scheduler delivery: reduce stored transient data | Add durable enqueue/ack fixture; recovery and duplicates | rejected |
 | 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | rejected |
 | 50 | Combined fixes: repeat scale and lifecycle checks | Compare original and accepted head; 50 fresh-VM pairs | pending |
 

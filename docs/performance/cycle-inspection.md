@@ -1,7 +1,7 @@
 # Optimization ideas rejected by source inspection
 
 These are contract or cost-path checks, not measured speed improvements.
-The inspected runtime is `99b92e80`. No runtime change was retained for these
+The first inspection used runtime `99b92e80`. The later rows below used `6b999a4e`. No runtime change was retained for these
 ideas. The accepted measurement procedure remains in the 50-round plan.
 
 | Round | Source and finding | Decision |
@@ -19,3 +19,23 @@ ideas. The accepted measurement procedure remains in the 50-round plan.
 
 These decisions reject the stated hypotheses. They do not rule out a different
 design with an explicit contract change. This cycle preserves the v3 contracts.
+
+## Later inspection
+
+| Round | Source and finding | Decision |
+| ---: | --- | --- |
+| 19 | `Command.Runner.do_prepare/4` calls `Map.merge/2` once, with the caller context and three reserved values. `Command.normalize_context/1` returns a plain map unchanged. There is no chain of full context maps to remove. Keyword input requires one conversion. | Reject removal of intermediate full context maps; they are absent. The key-list cost was handled in Round 18. |
+| 23 | `Plugin.apply_state_updates/2` gets owned directives with `Enum.filter/2`. With `[]`, it returns `[]` without visiting any item or creating groups. `update_state/3` must still run: Plugins such as the turn counter can update state with no directives. | Reject a new empty grouping path and skipping reducers. There are no groups to remove, and reducers are required. |
+| 32 | `Registry.identifier/3` compares values with `==`. A Registry holding `{:value, %URI{port: 1}}` resolves a query for `%URI{port: 1.0}` to the same ID. A reverse map uses exact key equality and misses that query. `Registry.new/1` accepts the input. A local runtime probe confirmed both results. | Reject a direct reverse-map replacement. It changes accepted numeric-equivalent lookups. Numeric normalization or an indexed fallback would be a separate design. |
+| 44 | `AgentServer.handle_event/4` matches `[directive \| rest]`. `continue_directives/3` passes that same `rest` tail into the next internal event. It does not append, reverse, or rebuild the remaining directive list. The reply-action append joins at most one reply with one continuation event. | Reject continuation-list copy removal; no full tail copy is present in this path. |
+| 46 | `SpanCtx.tracer_module` already stores the selected tracer across start, stop, and exception callbacks. Failure mode is read on failure, so a runtime configuration change during a span can change warn/strict handling. Caching that value at start changes this behavior. | Reject further configuration caching across the span. The duplicate start work is a separate Round 45 idea. |
+| 48 | Durable scheduler state stores `pending` and `last_scheduled_at`. Admission compares the complete pending payload; acknowledgement finds the occurrence ID; queueing uses the last time to suppress repeats, including after acknowledgement. `Delivery.deliver/3` already creates its fresh Signal only in the delivery task. No retry attempt Signal is retained in durable state. | Reject removal of these progress fields. They are recovery and duplicate-control data, not stored transient delivery data. |
+
+Round 32 probe on Elixir 1.20.3 / OTP 29:
+
+```elixir
+registry = Registry.new!(%{"integer" => {:value, %URI{port: 1}}})
+Registry.identifier(registry, :value, %URI{port: 1.0}) # {:ok, "integer"}
+reverse = Map.new(registry.entries, fn {id, entry} -> {entry, id} end)
+Map.fetch(reverse, {:value, %URI{port: 1.0}}) # :error
+```
