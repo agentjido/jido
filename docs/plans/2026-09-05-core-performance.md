@@ -1,7 +1,9 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: suite ready. Round 01 was rejected. Round 07 was accepted. The other 48 rounds have not run.
+Status: suite pushed. Round 07 was accepted; rounds 01 and 02 were rejected after measurement.
+Nine further ideas were rejected by source inspection. The other 38 rounds remain.
+See [source decisions](../performance/cycle-inspection.md).
 
 ## Aim
 
@@ -73,9 +75,9 @@ An unmeasured idea must not be reported as a measured improvement.
 | Round | Target and hypothesis | Evidence and contract check | State |
 | ---: | --- | --- | --- |
 | 01 | Thread normalization: use one list pass | `thread/normalize`; exact sequence, defaults, IDs | rejected |
-| 02 | Thread append: compute new entry count once | `thread/append_batch`; revision and stats | pending |
-| 03 | Thread append: use cached base count if its invariant holds | Long existing Thread; manually built and restored values | pending |
-| 04 | Thread slice: stop after the upper bound if order is guaranteed | `thread/slice`; gaps and custom sequence values | pending |
+| 02 | Thread append: compute new entry count once | `thread/append_batch`; revision and stats | rejected |
+| 03 | Thread append: use cached base count if its invariant holds | Long existing Thread; manually built and restored values | rejected |
+| 04 | Thread slice: stop after the upper bound if order is guaranteed | `thread/slice`; gaps and custom sequence values | rejected |
 | 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
 | 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | pending |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
@@ -86,7 +88,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | pending |
 | 13 | Deep merge: empty left map fast path | Add empty-left fixture; struct and keyword behavior | pending |
 | 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | pending |
-| 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | pending |
+| 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | rejected |
 | 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | pending |
 | 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | pending |
 | 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | pending |
@@ -96,7 +98,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
 | 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | pending |
 | 24 | Plugin: index directive modules within one operation | Add many Plugin directive types; duplicate rejection | pending |
-| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | pending |
+| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | rejected |
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | pending |
 | 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | pending |
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
@@ -106,15 +108,15 @@ An unmeasured idea must not be reported as a measured improvement.
 | 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | pending |
 | 33 | Codec object: avoid sorting fixed field lists repeatedly | Exact allowed/missing key rejection | pending |
 | 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | pending |
-| 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | pending |
+| 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | rejected |
 | 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | pending |
 | 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | pending |
-| 38 | Server call: reduce default option parsing cost | Default/keyword timeout; reserved context errors | pending |
+| 38 | Server call: reduce default option parsing cost | Default/keyword timeout; reserved context errors | rejected |
 | 39 | Server task: reduce closure capture to required values | Large Agent state; actual task transfer size | pending |
-| 40 | Server completion: release large result/context references sooner | Result and failure barriers; state and error policy | pending |
-| 41 | Server queued signals: reduce retained context copies | Add gated backlog fixture; FIFO and capacity rejection | pending |
+| 40 | Server completion: release large result/context references sooner | Result and failure barriers; state and error policy | rejected |
+| 41 | Server queued signals: reduce retained context copies | Add gated backlog fixture; FIFO and capacity rejection | rejected |
 | 42 | Server debug buffer: reduce append/trim cost | Add debug-on fixture; bounded history and order | pending |
-| 43 | Server snapshot: assess full state copy cost and existing lightweight APIs | `server/snapshot`; do not silently change public data | pending |
+| 43 | Server snapshot: assess full state copy cost and existing lightweight APIs | `server/snapshot`; do not silently change public data | rejected |
 | 44 | Server directives: reduce continuation list copies | Add many directives; order, timeout, post-commit failure | pending |
 | 45 | Observe: avoid duplicate metadata enrichment | `observe/span`; exact telemetry and tracer behavior | pending |
 | 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | pending |
