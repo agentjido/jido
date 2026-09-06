@@ -39,6 +39,14 @@ defmodule Jido.Agent.SchemaContractTest do
     def state_spec(_opts), do: {:owned, Zoi.integer()}
   end
 
+  defmodule ConfiguredState do
+    @moduledoc false
+    use Jido.Plugin
+
+    @impl true
+    def state_spec(opts), do: {:owned, Zoi.integer() |> Zoi.min(Keyword.fetch!(opts, :minimum))}
+  end
+
   defmodule PlainAgent do
     @moduledoc false
 
@@ -71,6 +79,25 @@ defmodule Jido.Agent.SchemaContractTest do
 
     assert {:error, %ValidationError{}} =
              Jido.Agent.instantiate(definition, state: %{owned: 7, count: 2})
+  end
+
+  test "validation composes the current Plugin options and domain schema on each call" do
+    definition = %{PlainAgent.agent() | plugins: [{ConfiguredState, minimum: 0}]}
+    assert {:ok, agent} = Jido.Agent.instantiate(definition, state: %{owned: 0})
+    assert {:ok, ^agent} = Jido.Agent.validate_instance(agent)
+
+    changed = %{agent | plugins: [{ConfiguredState, minimum: 1}]}
+    assert {:error, %ValidationError{}} = Jido.Agent.validate_instance(changed)
+
+    changed = %{changed | state: %{changed.state | owned: 1}}
+    assert {:ok, ^changed} = Jido.Agent.validate_instance(changed)
+
+    changed = %{
+      changed
+      | schema: Zoi.object(%{count: Zoi.string(), history: Zoi.list(Zoi.string())})
+    }
+
+    assert {:error, %ValidationError{}} = Jido.Agent.validate_instance(changed)
   end
 
   for {label, agent_module} <- [

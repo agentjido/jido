@@ -63,8 +63,10 @@ defmodule Jido.Persistence.ETS do
   end
 
   defp table(opts) do
-    base = Keyword.get(opts, :table, @default_table)
-    :"#{base}_records"
+    case Keyword.get(opts, :table, @default_table) do
+      @default_table -> :jido_persistence_records
+      base -> :"#{base}_records"
+    end
   end
 
   defp ensure_table(name) do
