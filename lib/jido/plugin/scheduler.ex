@@ -29,7 +29,10 @@ defmodule Jido.Plugin.Scheduler do
 
   Durable delivery needs Agent persistence for recovery after Agent or VM loss.
   The fixed policy skips slots while a job is pending and slots missed offline.
-  It retries saved pending work every 100 milliseconds, one job per attempt.
+  `:delivery_interval` sets the delay between pending-work attempts in milliseconds
+  (default 100; positive integer up to 4,294,967,295). One job is tried per attempt.
+  Activation and newly queued work can start an immediate attempt. This option
+  changes runtime cadence, not occurrence identity, acknowledgement, or skip policy.
   `:delivery_timeout` sets each state-read and delivery call timeout (default
   5,000 milliseconds). External work can repeat before acknowledgement, so its
   receiver must use the occurrence ID to handle duplicates.
@@ -122,7 +125,15 @@ defmodule Jido.Plugin.Scheduler do
   def cancel(job_id), do: %Cancel{job_id: job_id}
 
   @impl Jido.Plugin
-  def state_spec(_opts), do: {@state_key, @state_schema}
+  def state_spec(opts) do
+    interval = Keyword.get(opts, :delivery_interval, 100)
+
+    unless is_integer(interval) and interval in 1..4_294_967_295 do
+      raise ArgumentError, "Scheduler delivery_interval must be an integer from 1 to 4294967295"
+    end
+
+    {@state_key, @state_schema}
+  end
 
   @doc false
   def validate_cron_state(cron, _opts) do

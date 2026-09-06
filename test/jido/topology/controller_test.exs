@@ -6,6 +6,17 @@ defmodule Jido.Topology.ControllerTest do
   alias Jido.Signal.Bus
   alias Jido.Topology.{Builder, Controller}
 
+  test "invalid repair policy fails before topology activation", %{jido: jido} do
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Controller.start_link(
+               jido: jido,
+               topology: Independent.new!(id: "invalid-repair"),
+               repair: :sometimes
+             )
+
+    assert Jido.agent_count(jido) == 0
+  end
+
   test "starts independent agents, preserves committed state, and cleans up", %{jido: jido} do
     controller =
       start_supervised!({Controller, jido: jido, topology: Independent.new!(id: "independent")})

@@ -6,15 +6,20 @@ defmodule Jido.Topology.Controller.Runtime do
   alias Jido.Signal.Bus
   alias Jido.Topology.{BusInputs, Controller, Plan}
 
-  def start_link({jido, instance}), do: GenServer.start_link(__MODULE__, {jido, instance})
+  def start_link({jido, instance, repair}),
+    do: GenServer.start_link(__MODULE__, {jido, instance, repair})
 
   @impl true
-  def init({jido, instance}) do
+  def init({jido, instance, repair}) do
     Process.flag(:trap_exit, true)
 
     state = %{
       jido: jido,
       instance: instance,
+      repair: repair,
+      reconcile_requested: false,
+      reconcile_timer: nil,
+      reconcile_token: nil,
       ready: %{},
       errors: %{},
       waiters: %{},
@@ -30,7 +35,10 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_continue(:reconcile, state), do: {:noreply, begin_pass(state)}
 
   @impl true
-  def handle_info(:reconcile, state), do: {:noreply, begin_pass(state)}
+  def handle_info({:reconcile, token}, %{reconcile_token: token} = state) when not is_nil(token),
+    do: {:noreply, request_pass(state)}
+
+  def handle_info({:reconcile, _token}, state), do: {:noreply, state}
 
   def handle_info({ref, result}, state) when is_reference(ref),
     do: {:noreply, complete(state, ref, result)}
@@ -57,6 +65,7 @@ defmodule Jido.Topology.Controller.Runtime do
     {:reply,
      %{
        status: current_phase(state),
+       repair: state.repair,
        agents: map_size(state.instance.plan.agents),
        resources: map_size(state.instance.plan.resources),
        ready: map_size(state.ready),
@@ -66,6 +75,8 @@ defmodule Jido.Topology.Controller.Runtime do
        pending: MapSet.size(state.pending)
      }, state}
   end
+
+  def handle_call(:reconcile, _from, state), do: {:reply, :ok, request_pass(state)}
 
   def handle_call({:await_ready, timeout}, from, state) do
     if current_phase(state) == :ready do
@@ -114,6 +125,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   @impl true
   def terminate(_, state) do
+    if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     Enum.each(state.active, fn {_, job} -> Task.shutdown(job.task, :brutal_kill) end)
 
     state.instance.plan.layers
@@ -143,9 +155,27 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp current_phase(state), do: state.phase
 
+  defp request_pass(state) do
+    if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
+    state = %{state | reconcile_timer: nil, reconcile_token: nil}
+
+    if map_size(state.active) > 0,
+      do: %{state | reconcile_requested: true},
+      else: begin_pass(state)
+  end
+
   defp begin_pass(state) do
     keys = Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources)
-    %{state | ready: %{}, errors: %{}, pending: MapSet.new(keys), phase: :starting} |> drive()
+
+    %{
+      state
+      | ready: %{},
+        errors: %{},
+        pending: MapSet.new(keys),
+        phase: :starting,
+        reconcile_requested: false
+    }
+    |> drive()
   end
 
   defp drive(state) do
@@ -226,6 +256,8 @@ defmodule Jido.Topology.Controller.Runtime do
   defp record(state, key, {:error, reason}),
     do: %{state | errors: Map.put(state.errors, key, reason)}
 
+  defp finish_pass(%{reconcile_requested: true} = state), do: begin_pass(state)
+
   defp finish_pass(state) do
     phase = if map_size(state.errors) == 0, do: :ready, else: :degraded
 
@@ -236,8 +268,23 @@ defmodule Jido.Topology.Controller.Runtime do
       end)
     end
 
-    Process.send_after(self(), :reconcile, state.instance.definition.startup.retry_interval)
     %{state | phase: phase, waiters: if(phase == :ready, do: %{}, else: state.waiters)}
+    |> schedule_reconcile()
+  end
+
+  defp schedule_reconcile(%{repair: :manual} = state), do: state
+
+  defp schedule_reconcile(state) do
+    token = make_ref()
+
+    timer =
+      Process.send_after(
+        self(),
+        {:reconcile, token},
+        state.instance.definition.startup.retry_interval
+      )
+
+    %{state | reconcile_timer: timer, reconcile_token: token}
   end
 
   defp task_context(key, member, state) do

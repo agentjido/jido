@@ -349,7 +349,8 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   defp finish_delivery(runtime) do
     if runtime.delivery_timeout, do: Process.cancel_timer(runtime.delivery_timeout)
-    schedule_pending(%{runtime | delivery_task: nil, delivery_timeout: nil}, 100)
+    interval = Keyword.get(runtime.options, :delivery_interval, 100)
+    schedule_pending(%{runtime | delivery_task: nil, delivery_timeout: nil}, interval)
   end
 
   defp schedule_pending(%{delivery_task: nil, pending_timer: nil} = runtime, delay) do

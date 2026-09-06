@@ -20,7 +20,9 @@ defmodule JidoTest.ScheduledOccurrenceFixtures.DurableAgent do
 
   agent do
     schema ScheduledOccurrenceRecovery.domain_schema()
-    plugin Jido.Plugin.Scheduler, config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock]
+
+    plugin Jido.Plugin.Scheduler,
+      config: [time_scale: JidoTest.ScheduledOccurrenceFixtures.Clock, delivery_interval: 250]
   end
 
   routes do

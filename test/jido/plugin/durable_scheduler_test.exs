@@ -127,6 +127,16 @@ defmodule JidoTest.Plugin.DurableSchedulerTest do
              )
   end
 
+  test "invalid delivery cadence is rejected before an Agent can start" do
+    for interval <- [0, -1, 1.5, :manual, 4_294_967_296] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.new(
+                 name: "invalid-delivery",
+                 plugins: [{Scheduler, delivery_interval: interval}]
+               )
+    end
+  end
+
   defp armed do
     assert {:ok, armed, [cron]} =
              Example.cmd(

@@ -64,6 +64,12 @@ defmodule JidoTest.Agent.ScheduledOccurrenceRecoveryTest do
 
       if reject? do
         send(Keyword.fetch!(opts, :observer), {:occurrence_write_rejected, stage})
+
+        send(
+          Keyword.fetch!(opts, :observer),
+          {:occurrence_write_rejected_at, stage, System.monotonic_time(:millisecond)}
+        )
+
         {:error, :test_storage_unavailable}
       else
         Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
@@ -158,6 +164,27 @@ defmodule JidoTest.Agent.ScheduledOccurrenceRecoveryTest do
       assert [_tick] = Server.agent(server).state.ticks
       assert Server.agent(server).state.scheduler.cron["job-1"].pending == nil
     end
+  end
+
+  test "configured delivery cadence retries the same saved work before acknowledgement", c do
+    {_adapter, opts} = c.persistence
+    c = %{c | persistence: {FaultFile, opts}}
+    Elixir.Agent.update(c.barrier, fn _ -> :result end)
+    server = start_agent(c)
+    assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
+
+    assert_receive {:occurrence_write_rejected_at, :result, first}, 1_000
+    pending = load_agent(c).state.scheduler.cron["job-1"].pending
+    assert_receive {:occurrence_write_rejected_at, :result, second}, 1_000
+    assert second - first >= 250
+    assert load_agent(c).state.scheduler.cron["job-1"].pending == pending
+    assert Server.agent(server).state.ticks == []
+
+    Elixir.Agent.update(c.barrier, fn _ -> false end)
+    {:ok, occurrence} = Scheduler.occurrence(pending)
+    ticks = await_occurrence(server, occurrence.id)
+    assert [%{occurrence: ^occurrence}] = ticks
+    assert load_agent(c).state.scheduler.cron["job-1"].pending == nil
   end
 
   test "cancelling pending work survives restore and rejects the old delivery", c do

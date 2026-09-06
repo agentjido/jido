@@ -92,6 +92,33 @@ defmodule Jido.Topology.CompositionRuntimeTest do
     assert :ok = Controller.await_ready(controller)
   end
 
+  test "repair requests during startup preserve the shared concurrency limit", %{jido: jido} do
+    :persistent_term.put({BlockReady, :observer}, self())
+    on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)
+
+    instance =
+      Builder.new(name: "requested-repair")
+      |> Builder.agent(:first, SlowCell)
+      |> Builder.agent(:second, SlowCell)
+      |> Builder.startup(concurrency: 1, task_timeout: 2_000)
+      |> Builder.build!(id: "requested-repair")
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert_receive {:readiness_blocked, first}, 1_000
+
+    for _ <- 1..10, do: assert(:ok == Controller.reconcile(controller))
+    assert %{active: 1, pending: 1} = Controller.status(controller)
+    refute_receive {:readiness_blocked, _}, 30
+    send(first, :release)
+    assert_receive {:readiness_blocked, second}, 1_000
+    assert %{active: 1, pending: 0} = Controller.status(controller)
+    send(second, :release)
+    assert :ok = Controller.await_ready(controller)
+    assert %{status: :ready, active: 0, pending: 0, ready: 2} = Controller.status(controller)
+    assert Jido.agent_count(jido) == 2
+    refute_receive {:readiness_blocked, _}, 30
+  end
+
   test "child activation keeps the parent PID from dispatch", %{jido: jido} do
     :persistent_term.put({BlockReady, :observer}, self())
     on_exit(fn -> :persistent_term.erase({BlockReady, :observer}) end)

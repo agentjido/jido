@@ -14,6 +14,13 @@ defmodule Jido.Topology.Controller do
   cluster placement, database adapter, or durable work distribution. A normal
   controller shutdown stops its Agents. Persistent state uses the Jido
   instance's configured adapter and the existing restore contract.
+
+  `:repair` defaults to `:automatic`, which repeats reconciliation using the
+  topology's `startup.retry_interval`. Use `repair: :manual` when an application
+  owns repair timing. Initial startup still runs once; later passes require
+  `reconcile/2`. Both modes use the same bounded local activation and cleanup.
+  Manual mode retains child supervision and Plugin runtime recovery. It does
+  not change the topology target or provide ownership transfer or cluster policy.
   """
   use Supervisor
 
@@ -36,12 +43,14 @@ defmodule Jido.Topology.Controller do
   @doc "Starts a local controller. Returns before the topology is ready."
   def start_link(opts) do
     with {:ok, opts} <- Authoring.attrs(opts),
-         :ok <- Authoring.keys(opts, [:jido, :topology]),
+         :ok <- Authoring.keys(opts, [:jido, :topology, :repair]),
+         repair = Map.get(opts, :repair, :automatic),
+         :ok <- validate_repair(repair),
          %Instance{} = instance <- Map.get(opts, :topology),
          {:ok, instance} <-
            Topology.instantiate(instance.definition, id: instance.id, input: instance.input),
          jido when is_atom(jido) and not is_nil(jido) <- Map.get(opts, :jido) do
-      Supervisor.start_link(__MODULE__, {jido, instance},
+      Supervisor.start_link(__MODULE__, {jido, instance, repair},
         name: name(jido, instance.id, :controller)
       )
     else
@@ -51,11 +60,11 @@ defmodule Jido.Topology.Controller do
   end
 
   @impl true
-  def init({jido, instance}) do
+  def init({jido, instance, repair}) do
     children = [
       {Task.Supervisor, name: name(jido, instance.id, :tasks)},
       {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one},
-      {Topology.Controller.Runtime, {jido, instance}}
+      {Topology.Controller.Runtime, {jido, instance, repair}}
     ]
 
     Supervisor.init(children, strategy: :one_for_all)
@@ -69,6 +78,17 @@ defmodule Jido.Topology.Controller do
   def await_ready(controller, timeout \\ 60_000),
     do: GenServer.call(runtime(controller), {:await_ready, timeout}, timeout)
 
+  @doc """
+  Requests a repair pass against the existing topology target.
+
+  Returns `:ok` after accepting the request. Use `await_ready/2` to wait for
+  readiness and `status/2` to inspect errors. Requests during an active pass
+  coalesce into one follow-up pass; they do not overlap activation tasks.
+  Unchanged live Agents retain their PIDs and state. This is not a target update.
+  """
+  def reconcile(controller, timeout \\ 5_000),
+    do: GenServer.call(runtime(controller), :reconcile, timeout)
+
   @doc "Resolves a singleton Agent or one keyed group member."
   def whereis_agent(controller, key, member \\ nil),
     do: GenServer.call(runtime(controller), {:agent, key, member})
@@ -76,6 +96,11 @@ defmodule Jido.Topology.Controller do
   @doc "Resolves a topology Bus."
   def whereis_bus(controller, key),
     do: GenServer.call(runtime(controller), {:bus, key})
+
+  defp validate_repair(repair) when repair in [:automatic, :manual], do: :ok
+
+  defp validate_repair(_repair),
+    do: Authoring.error("Controller repair must be :automatic or :manual")
 
   @doc false
   def name(jido, id, role),

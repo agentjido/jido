@@ -71,6 +71,7 @@ defmodule Jido.Topology.ControllerJobTest do
     unknown = make_ref()
     assert {:noreply, ^state} = Runtime.handle_info({unknown, {:ok, self()}}, state)
     assert {:noreply, ^state} = Runtime.handle_info({:task_timeout, unknown}, state)
+    assert {:noreply, ^state} = Runtime.handle_info({:reconcile, unknown}, state)
 
     assert {:noreply, ^state} =
              Runtime.handle_info({:DOWN, unknown, :process, self(), :normal}, state)
@@ -105,6 +106,10 @@ defmodule Jido.Topology.ControllerJobTest do
     state = %{
       jido: jido,
       instance: instance,
+      repair: :manual,
+      reconcile_requested: false,
+      reconcile_timer: nil,
+      reconcile_token: nil,
       ready: %{},
       errors: %{},
       waiters: %{},
