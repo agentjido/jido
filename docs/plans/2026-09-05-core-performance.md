@@ -1,8 +1,8 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: suite pushed. Round 07 was accepted; rounds 01 and 02 were rejected after measurement.
-Nine further ideas were rejected by source inspection. The other 38 rounds remain.
+Status: suite pushed. Round 07 was accepted; rounds 01, 02, and 06 were rejected after measurement.
+Eight further ideas were rejected by source inspection. The other 38 rounds remain.
 See [source decisions](../performance/cycle-inspection.md).
 
 ## Aim
@@ -79,7 +79,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 03 | Thread append: use cached base count if its invariant holds | Long existing Thread; manually built and restored values | rejected |
 | 04 | Thread slice: stop after the upper bound if order is guaranteed | `thread/slice`; gaps and custom sequence values | rejected |
 | 05 | Thread kind filter: avoid a list for one kind | Add mixed-kind fixture; nil and invalid kind behavior | pending |
-| 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | pending |
+| 06 | Entry normalization: avoid repeated option lookup per batch | `thread/normalize`; custom ID generator calls | rejected |
 | 07 | Audit record: generate default ID only when needed | `audit/record`; explicit/default IDs and UUID validation | accepted |
 | 08 | Audit record: get default time only when needed | Explicit/default timestamps; zero timestamps | pending |
 | 09 | Audit update: skip list copy for empty new records | `audit/update`; enforce limit on existing excess | pending |
@@ -98,7 +98,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
 | 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | pending |
 | 24 | Plugin: index directive modules within one operation | Add many Plugin directive types; duplicate rejection | pending |
-| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | rejected |
+| 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | pending |
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | pending |
 | 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | pending |
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
