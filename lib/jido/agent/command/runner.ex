@@ -163,15 +163,15 @@ defmodule Jido.Agent.Command.Runner do
   end
 
   defp reject_reserved_context(context, source) do
-    keys = Map.keys(context) |> Enum.filter(&(&1 in @reserved_context_keys))
+    if Enum.any?(@reserved_context_keys, &Map.has_key?(context, &1)) do
+      keys = Map.keys(context) |> Enum.filter(&(&1 in @reserved_context_keys))
 
-    if keys == [] do
-      :ok
-    else
       {:error,
        Error.validation_error("Agent #{source} context contains reserved keys",
          details: %{keys: keys}
        )}
+    else
+      :ok
     end
   end
 

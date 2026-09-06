@@ -756,6 +756,23 @@ defmodule Jido.AgentTest do
       end
     end
 
+    test "large caller contexts preserve their fields and reject reserved keys" do
+      agent = agent_with_route("counter.observe", ObserveExecutionBoundary)
+      signal = Signal.new!("counter.observe", %{test_pid: self()}, source: "/test")
+      context = Map.new(1..1_000, &{&1, %{value: &1}})
+
+      assert {:ok, ^agent, []} = Agent.cmd(agent, signal, context: context)
+      assert_receive {:agent_execution_boundary, _params, received}
+      assert Map.take(received, Map.keys(context)) == context
+
+      for key <- [:agent_id, :agent_state, :signal] do
+        assert {:error, %Jido.Error.ValidationError{details: %{keys: [^key]}}} =
+                 Agent.cmd(agent, signal, context: Map.put(context, key, nil))
+      end
+
+      refute_receive {:agent_execution_boundary, _, _}
+    end
+
     test "preserves executable errors without changing the source Agent" do
       agent = agent_with_route("counter.fail", Fail)
       signal = Signal.new!("counter.fail", %{}, source: "/test")
