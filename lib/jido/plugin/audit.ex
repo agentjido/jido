@@ -62,6 +62,16 @@ defmodule Jido.Plugin.Audit do
   end
 
   @impl Jido.Plugin
+  def update_state(state, [], opts) do
+    max_entries = max_entries!(opts)
+
+    if length(state.records) <= max_entries do
+      {:ok, state}
+    else
+      {:ok, %{state | records: Enum.take(state.records, -max_entries)}}
+    end
+  end
+
   def update_state(state, records, opts) do
     max_entries = max_entries!(opts)
     records = Enum.take(state.records ++ records, -max_entries)
