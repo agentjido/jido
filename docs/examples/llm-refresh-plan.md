@@ -233,7 +233,7 @@ Numbers in the destination column refer to the implemented sequence above.
 
 ## Refactor rules
 
-Use matching folders in `lib/examples/03_llm`, `test/examples/03_llm`, and the
+Use matching folders in `examples/03_llm`, `test/examples/03_llm`, and the
 profile directory. Keep source attribution and retired domain requirements in
 an archive with an explicit old-to-new mapping.
 

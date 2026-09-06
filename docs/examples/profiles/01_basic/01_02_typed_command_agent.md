@@ -30,7 +30,7 @@ Construction, route selection, input validation, and complete candidate validati
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/01_basic/01_02_typed_command_agent/typed_command_agent.ex)
+- [Source](../../../../examples/01_basic/01_02_typed_command_agent/typed_command_agent.ex)
 - [Integration tests](../../../../test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs)
 - [Basic results](../../basic-results.md)
 

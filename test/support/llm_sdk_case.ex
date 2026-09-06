@@ -14,7 +14,7 @@ defmodule JidoTest.LLMSDKCase do
       alias Jido.AgentServer, as: Server
       alias JidoTest.LLMService, as: Service
       @moduletag :example
-      @moduletag :integration
+
       @moduletag group: :llm
       @moduletag complexity: 3
     end

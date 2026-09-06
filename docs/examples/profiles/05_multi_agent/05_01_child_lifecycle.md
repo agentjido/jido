@@ -29,7 +29,7 @@ Run:
 mix test --include integration test/examples/05_multi_agent/05_01_child_lifecycle --seed 0
 ```
 
-[Source](../../../../lib/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex) ·
+[Source](../../../../examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle.ex) ·
 [Tests](../../../../test/examples/05_multi_agent/05_01_child_lifecycle/child_lifecycle_test.exs)
 
 ## Boundary and next question

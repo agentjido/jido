@@ -27,7 +27,7 @@ This profile records the earlier domain scope. See the [replacement map](README.
 
 ## Best-effort implementation
 
-- `git show 357b22a:lib/examples/03_llm/03_12_multimodal_document_agent/multimodal_document_agent.ex`
+- `git show 357b22a:examples/03_llm/03_12_multimodal_document_agent/multimodal_document_agent.ex`
 - `git show 357b22a:test/examples/03_llm/03_12_multimodal_document_agent/multimodal_document_agent_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

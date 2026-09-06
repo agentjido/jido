@@ -31,7 +31,7 @@ Tool SHA-256: `1e17fe878a82107a2dbe9f4209e9aa2464de525238297a885491538347c0b306`
 Core coverage command:
 
 ```sh
-ERL_FLAGS='+S 2:2' mix test --cover test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+ERL_FLAGS='+S 2:2' mix test --cover test/jido test/jido_test test/examples/08_applications --include integration --include flaky --seed 0
 ```
 
 ## Candidate sample

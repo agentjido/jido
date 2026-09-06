@@ -25,7 +25,7 @@
 - **Expected result:** One test proves that `Schedule` creates a later tick and therefore a second Turn and state version. One test proves that `Cron` and `Cancel` add and remove Scheduler Plugin runtime state.
 - **Failure cases:** The current example does not test restart recovery, duplicate ticks, timezone behavior, invalid cron, or late ticks after cancel.
 - **Jido features under pressure:** Scheduler Plugin, runtime commands, later mailbox input, and one commit for each Signal turn.
-- **Source framework and links:** [Akka: timers and scheduled messages](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), [Jido implementation](../../../../lib/examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex), and [Jido test](../../../../test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs)
+- **Source framework and links:** [Akka: timers and scheduled messages](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), [Jido implementation](../../../../examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex), and [Jido test](../../../../test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs)
 
 ## Next pressure
 
@@ -34,7 +34,7 @@ late-tick-after-cancel case.
 
 ## Best-effort implementation
 
-- [Code](../../../../lib/examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex)
+- [Code](../../../../examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex)
 - [Tests](../../../../test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs)
 
 The local implementation passes its mock-only tests. The tests define the

@@ -33,7 +33,7 @@ invent evidence IDs. It does not need a Plugin.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_03_feedback_summarizer/feedback_summarizer.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_03_feedback_summarizer/feedback_summarizer.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_03_feedback_summarizer/feedback_summarizer_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

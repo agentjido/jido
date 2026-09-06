@@ -29,7 +29,7 @@
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/multi_agent/05_08_round_robin_team/round_robin_team.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/multi_agent/05_08_round_robin_team/round_robin_team.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/multi_agent/05_08_round_robin_team/round_robin_team_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

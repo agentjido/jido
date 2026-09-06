@@ -33,7 +33,7 @@ or validate the Flow.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_04_parallel_join/parallel_join.ex)
+- [Source](../../../../examples/02_workflow/02_04_parallel_join/parallel_join.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_04_parallel_join/parallel_join_test.exs)
 - [Workflow results](../../workflow-results.md)
 

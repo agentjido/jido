@@ -36,7 +36,7 @@ A plain `[]` is rejected as an unsupported keyword expression.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_13_structured_output_repair/structured_output_repair.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_13_structured_output_repair/structured_output_repair.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_13_structured_output_repair/structured_output_repair_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

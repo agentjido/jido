@@ -25,7 +25,7 @@
 - **Expected result:** One successful Flow commits one success and one Audit Plugin event, then the runtime receives the same event. One later failed Flow keeps Actor and runtime state unchanged and exposes a failed, uncommitted Outcome.
 - **Failure cases:** The test covers an execute-stage Flow error. Invalid Directive, persistence failure, audit dispatch failure, restart, and several ordered records are not covered.
 - **Jido features under pressure:** Plugin contribution, outbox order, one commit, post-commit failure, and sensitive metadata.
-- **Source framework and links:** [CrewAI: event listeners](https://docs.crewai.com/en/concepts/event-listener), [Jido integration example](../../../../test/integration/audit/example_test.exs)
+- **Source framework and links:** [CrewAI: event listeners](https://docs.crewai.com/en/concepts/event-listener), [Jido integration example](../../../../examples/08_applications/audit/audit.ex)
 
 ## Next pressure
 
@@ -34,7 +34,7 @@ failure.
 
 ## Best-effort implementation
 
-- [Code](../../../../lib/examples/04_runtime/04_08_commit_outbox/audit_outbox.ex)
+- [Code](../../../../examples/04_runtime/04_08_commit_outbox/audit_outbox.ex)
 - [Tests](../../../../test/examples/04_runtime/04_08_commit_outbox/audit_outbox_test.exs)
 
 The local implementation passes its mock-only tests. The tests define the

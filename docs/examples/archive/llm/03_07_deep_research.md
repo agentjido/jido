@@ -27,7 +27,7 @@ This profile records the earlier domain scope. See the [replacement map](README.
 
 ## Best-effort implementation
 
-- `git show 357b22a:lib/examples/03_llm/03_07_deep_research/deep_research.ex`
+- `git show 357b22a:examples/03_llm/03_07_deep_research/deep_research.ex`
 - `git show 357b22a:test/examples/03_llm/03_07_deep_research/deep_research_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

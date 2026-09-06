@@ -28,7 +28,7 @@ the explicit increment helper preserves Server options and result tuples.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/01_basic/01_01_minimal_agent/minimal_agent.ex)
+- [Source](../../../../examples/01_basic/01_01_minimal_agent/minimal_agent.ex)
 - [Integration tests](../../../../test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs)
 - [Basic results](../../basic-results.md)
 

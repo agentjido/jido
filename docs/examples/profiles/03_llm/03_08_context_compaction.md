@@ -18,7 +18,7 @@ Compact committed history and retain recent and queued messages under an explici
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_08_context_compaction/context_compaction.ex)
+- [Source](../../../../examples/03_llm/03_08_context_compaction/context_compaction.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_08_context_compaction/context_compaction_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

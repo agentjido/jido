@@ -1,7 +1,7 @@
 defmodule JidoTest.Examples.Factory.FlowFactoryTest do
   use JidoTest.Case, async: true
   @moduletag :example
-  @moduletag :integration
+
   @moduletag timeout: 120_000
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Factory.FlowFactory

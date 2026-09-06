@@ -1,6 +1,5 @@
 defmodule JidoTest.Examples.LLM.ReActAgentTest do
   use JidoTest.AgentCase
-  @moduletag :integration
 
   @moduletag group: :llm
   @moduletag complexity: 3

@@ -11,14 +11,14 @@ Agent state and command contracts remain unchanged.
 
 ## Example
 
-The [Agent](../../lib/examples/04_runtime/04_09_agent_observation/turn_observation.ex)
+The [Agent](../../examples/04_runtime/04_09_agent_observation/turn_observation.ex)
 uses the Spark DSL, ordinary Actions, and a stateless output Plugin. The
-[external collector](../../lib/examples/04_runtime/04_09_agent_observation/event_probe.ex)
+[external collector](../../examples/04_runtime/04_09_agent_observation/event_probe.ex)
 listens to SDK events. It does not derive events from command replies or read
 the Agent debug buffer.
 
 ```shell
-mix run lib/examples/04_runtime/04_09_agent_observation/demo.exs
+mix run examples/04_runtime/04_09_agent_observation/demo.exs
 mix test test/jido/observe/agent_lifecycle_test.exs --seed 0
 ```
 

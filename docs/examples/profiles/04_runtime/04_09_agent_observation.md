@@ -14,9 +14,9 @@ shutdown, observer failure, safe metadata, and one terminal outcome per Turn.
 
 ```shell
 mix test test/jido/observe/agent_lifecycle_test.exs --seed 0
-mix run lib/examples/04_runtime/04_09_agent_observation/demo.exs
+mix run examples/04_runtime/04_09_agent_observation/demo.exs
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_09_agent_observation/turn_observation.ex) ·
+[Source](../../../../examples/04_runtime/04_09_agent_observation/turn_observation.ex) ·
 [Core tests](../../../../test/jido/observe/agent_lifecycle_test.exs) ·
 [Results](../../obs-01-results.md)

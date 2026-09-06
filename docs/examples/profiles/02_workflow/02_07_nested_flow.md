@@ -20,7 +20,7 @@ Separate child result scopes, shared context, child schemas, typed failures, and
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_07_nested_flow/nested_flow.ex)
+- [Source](../../../../examples/02_workflow/02_07_nested_flow/nested_flow.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_07_nested_flow/nested_flow_test.exs)
 - [Workflow results](../../workflow-results.md)
 

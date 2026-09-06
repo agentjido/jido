@@ -33,7 +33,7 @@ stale revision prevents commit. No live spreadsheet service test is included.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_12_spreadsheet_analysis/spreadsheet_analysis.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_12_spreadsheet_analysis/spreadsheet_analysis.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_12_spreadsheet_analysis/spreadsheet_analysis_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

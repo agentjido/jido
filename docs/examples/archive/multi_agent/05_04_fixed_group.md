@@ -25,7 +25,7 @@
 - **Expected result:** The test starts one environment and three stable workers, distributes nine tasks, replaces one killed worker with the same logical ID, and stops all Actor children.
 - **Failure cases:** Missing-member reconciliation, repeated start, duplicate result, and subscription cleanup are not covered by the current test.
 - **Jido features under pressure:** Desired topology, child Actors, Bus semantics, stable IDs, and cleanup.
-- **Source framework and links:** [AutoGen: teams](https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/tutorial/teams.html), [Jido integration example](../../../../test/integration/fixed_group/example_test.exs)
+- **Source framework and links:** [AutoGen: teams](https://microsoft.github.io/autogen/stable/user-guide/agentchat-user-guide/tutorial/teams.html), [Jido integration example](../../../../examples/08_applications/fixed_group/fixed_group.ex)
 
 ## Next pressure
 
@@ -34,7 +34,7 @@ and controller restart cases.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/multi_agent/05_04_fixed_group/fixed_group.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/multi_agent/05_04_fixed_group/fixed_group.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/multi_agent/05_04_fixed_group/fixed_group_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

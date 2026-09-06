@@ -52,7 +52,7 @@ business change + pending work
   -> new Turn commits completion
 ```
 
-The [REC-01 example](../../lib/examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex)
+The [REC-01 example](../../examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex)
 uses existing `Jido.Plugin.update_state/3` to record intent. A post-commit
 Directive only wakes the worker. The worker also reads committed Plugin state
 on startup and at each poll, so a lost wake-up does not lose work.

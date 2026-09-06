@@ -56,5 +56,5 @@ agent_locals = [
   import_deps: [:jido_action],
   locals_without_parens: agent_locals,
   export: [locals_without_parens: agent_locals],
-  inputs: ["{mix,.formatter}.exs", "{config,lib,test}/**/*.{ex,exs}"]
+  inputs: ["{mix,.formatter,.credo}.exs", "{config,lib,examples,test}/**/*.{ex,exs}"]
 ]

@@ -24,8 +24,8 @@ jobs:
       runner: blacksmith-2vcpu-ubuntu-2404
       credo_command: mix credo --strict --only warning
       docs_command: mix docs --no-open -f html --warnings-as-errors
-      # Examples run separately. Select paths so integration tags cannot include them.
-      test_command: mix test test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+      # Keep application scenarios in CI; run the other examples separately.
+      test_command: mix test test/jido test/jido_test test/examples/08_applications --include example --include flaky --seed 0
       # The V3 integration branch retains an unreleased Git dependency. Check
       # Hex publication when changes reach main, including its merge queue.
       validate_hex_package: ${{ github.base_ref == 'main' || github.ref == 'refs/heads/main' || github.event.merge_group.base_ref == 'refs/heads/main' }}

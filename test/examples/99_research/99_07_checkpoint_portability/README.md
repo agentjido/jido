@@ -9,4 +9,4 @@ assertion remains enabled. The fixture changes stored bytes after a valid
 save so the test reaches the load validator.
 
 [Tests](../../../jido/persistence/checkpoint_portability_test.exs) ·
-[Example](../../../../lib/examples/99_research/99_07_checkpoint_portability/README.md)
+[Example](../../../../examples/99_research/99_07_checkpoint_portability/README.md)

@@ -32,7 +32,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_06_state_recovery --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex) ·
+[Source](../../../../examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs)
 
 ## Boundary and next question

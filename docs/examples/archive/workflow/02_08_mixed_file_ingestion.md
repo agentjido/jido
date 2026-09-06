@@ -33,7 +33,7 @@ documents and explicit per-file errors commit together.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_08_mixed_file_ingestion/mixed_file_ingestion.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_08_mixed_file_ingestion/mixed_file_ingestion.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_08_mixed_file_ingestion/mixed_file_ingestion_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

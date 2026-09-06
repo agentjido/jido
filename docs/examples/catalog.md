@@ -121,8 +121,8 @@ See the [verification report](runtime-multi-agent-results.md) and [gap register]
 | `06_03_department_factory` | [Department Factory](profiles/06_factory/06_03_department_factory.md) | Four department heads execute a bounded dependency plan and return text artifacts. |
 | `06_04_flow_factory` | [Flow Factory](profiles/06_factory/06_04_flow_factory.md) | A Flow coordinates nine workers with parallel builds, review Choice, and bounded repair. |
 
-See the [run guide](../../lib/examples/06_factory/README.md) and
-[orchestrator plan](../../lib/examples/06_factory/orchestrator-plan.md).
+See the [run guide](../../examples/06_factory/README.md) and
+[orchestrator plan](../../examples/06_factory/orchestrator-plan.md).
 Factory tests use a local HTTP adapter. A live conversation succeeded with
 `openai:gpt-4.1-mini`. The live workshop probe also passed for model tools,
 scheduled work, worker cleanup, and feedback. Live department work remains unchecked.

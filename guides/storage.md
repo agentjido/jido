@@ -26,4 +26,4 @@ Storage keys start with `jido:agent:v1:`. Old V2 and Actor records require an
 explicit offline application conversion. There is no automatic conversion.
 Standalone Thread values remain, but old Thread stores and append APIs do not.
 Ordinary directives are not a durable outbox. See the
-[delivery and job examples](../lib/examples/04_runtime/README.md).
+[delivery and job examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md).

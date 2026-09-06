@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_01_progress_observation --include example 
 
 This command passes with the current core. The extension policy is part of the example.
 
-[Source](../../../../lib/examples/99_research/99_01_progress_observation/progress_observation.ex) · [Tests](progress_observation_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_01_progress_observation/progress_observation.ex) · [Tests](progress_observation_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)

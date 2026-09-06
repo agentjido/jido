@@ -8,6 +8,9 @@
 
 # Jido example catalog
 
+See the [example layout plan](layout-plan.md) for the current source and test
+locations, test selection, and package checks.
+
 This directory is a research backlog and an architecture pressure test for Jido
 V3. It does not define a new public API.
 
@@ -60,7 +63,7 @@ and admission after an uncertain write. They use no database or VM restart.
 Topology adds five fixtures for independent Agents, logical ownership, a Bus
 swarm with 1000 workers, keyed account Agents, and a composed two-team system. Spark DSL, Builder, and JSON
 produce the same definition and execution plan. See the
-[Topology guide](../../lib/examples/07_topology/README.md) and
+[Topology guide](../../examples/07_topology/README.md) and
 [spike results](topology-results.md).
 
 ## Catalog rules
@@ -68,8 +71,8 @@ produce the same definition and execution plan. See the
 Factory adds four examples using ReqLLM directly: live conversation, a
 three-Agent system with IEx chat, a factory with four department heads, and a
 larger Flow across nine workers with parallel review and bounded repair.
-See the [Factory guide](../../lib/examples/06_factory/README.md) and
-[orchestrator plan](../../lib/examples/06_factory/orchestrator-plan.md).
+See the [Factory guide](../../examples/06_factory/README.md) and
+[orchestrator plan](../../examples/06_factory/orchestrator-plan.md).
 
 The current feature sequence is ordered by learning dependencies. Each profile
 maps to one code feature group:
@@ -93,7 +96,7 @@ The example numbers follow the feature order within each category. The first exa
 
 The same ID appears in all three locations:
 
-- `lib/examples/01_basic/01_01_minimal_agent/`
+- `examples/01_basic/01_01_minimal_agent/`
 - `test/examples/01_basic/01_01_minimal_agent/`
 - `docs/examples/profiles/01_basic/01_01_minimal_agent.md`
 

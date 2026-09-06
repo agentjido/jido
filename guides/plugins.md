@@ -19,6 +19,6 @@ The Action cannot change protected Plugin keys. A Plugin cannot replace the
 Agent value. Plugin declarations are validated when the Agent value is built.
 Old manifests, mounts, dependency requirements, and V2 callbacks require a port.
 
-See the [Plugin example](../lib/examples/01_basic/README.md),
+See the [Plugin example](https://github.com/agentjido/jido/tree/v3-spike/examples/01_basic/README.md),
 [contract tests](../test/jido/agent/plugin_test.exs), and
 [runtime tests](../test/jido/agent/plugin_runtime_test.exs).

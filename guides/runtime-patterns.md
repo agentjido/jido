@@ -9,5 +9,5 @@ Use explicit child ownership and bounded concurrency. Distinguish a remote
 disconnect from process death. Test startup, failure before commit, failure after
 commit, recovery, duplicate results, stale attempts, and final cleanup.
 
-See [Runtime examples](../lib/examples/04_runtime/README.md) and
-[Multi-agent examples](../lib/examples/05_multi_agent/README.md).
+See [Runtime examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md) and
+[Multi-agent examples](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/README.md).

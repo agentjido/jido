@@ -46,7 +46,7 @@ DIST-03 cluster-owner assertion.
 mix test test/jido/agent/distributed_authority_test.exs --seed 0
 ```
 
-The [Agent probe](../../lib/examples/99_research/99_02_distributed_authority/distributed_authority_probe.ex)
+The [Agent probe](../../examples/99_research/99_02_distributed_authority/distributed_authority_probe.ex)
 uses the normal Spark Agent DSL and a typed command. The test adapter forwards
 the existing `Jido.Persistence.ETS` compare-and-swap operations to node A. It is
 an authoritative test store for the two live VMs; it is not a durable database

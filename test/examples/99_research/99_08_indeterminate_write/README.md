@@ -13,4 +13,4 @@ It confirms the stored revision before checking admission. No sleep, provider
 request, database, or VM restart is used.
 
 [Tests](../../../jido/persistence/indeterminate_write_test.exs) ·
-[Example](../../../../lib/examples/99_research/99_08_indeterminate_write/README.md)
+[Example](../../../../examples/99_research/99_08_indeterminate_write/README.md)

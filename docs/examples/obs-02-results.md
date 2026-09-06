@@ -12,10 +12,10 @@ two-node tests. No test is skipped.
 
 ## Example
 
-The [Agent example](../../lib/examples/04_runtime/04_10_causal_trace/causal_trace.ex)
+The [Agent example](../../examples/04_runtime/04_10_causal_trace/causal_trace.ex)
 sends work to two children and collects their results. It uses `SpawnAgent`,
 `EmitToChild`, and `EmitToParent`. It adds no trace fields or application telemetry.
-The external [EventProbe](../../lib/examples/04_runtime/04_09_agent_observation/event_probe.ex)
+The external [EventProbe](../../examples/04_runtime/04_09_agent_observation/event_probe.ex)
 collects SDK events for the parent and both child IDs.
 
 ```elixir

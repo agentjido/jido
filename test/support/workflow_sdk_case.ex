@@ -8,7 +8,7 @@ defmodule JidoTest.WorkflowSDKCase do
       import JidoTest.WorkflowSDKCase
       alias Jido.AgentServer, as: Server
       @moduletag :example
-      @moduletag :integration
+
       @moduletag group: :workflow
       @moduletag complexity: 2
     end

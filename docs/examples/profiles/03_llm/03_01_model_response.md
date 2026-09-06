@@ -20,7 +20,7 @@ One typed response, transient client context, selected persisted fields, and exp
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_01_model_response/model_response.ex)
+- [Source](../../../../examples/03_llm/03_01_model_response/model_response.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_01_model_response/model_response_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

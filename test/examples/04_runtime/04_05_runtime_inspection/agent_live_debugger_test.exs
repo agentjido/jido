@@ -1,6 +1,5 @@
 defmodule JidoTest.Examples.Runtime.AgentLiveDebuggerTest do
   use JidoTest.FeatureSDKCase
-  @moduletag :integration
 
   @moduletag group: :runtime
   @moduletag complexity: 3

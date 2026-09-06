@@ -7,15 +7,19 @@ and process monitors for ordering, failure, replacement, and cleanup.
 The complete suite currently runs with:
 
 ```sh
-mix test --include example --include integration --include flaky --seed 0
+mix test --include example --include flaky --seed 0
 ```
 
-Default `mix test` excludes examples, integration tests, and flaky-tagged tests.
-`mix examples` alone does not include every supporting core test or application
-scenario. Run the complete command above before release.
+Default `mix test` excludes `:example`, `:flaky`, and the approved `:skip` test.
+All example tests, including the former integration scenarios, use `:example`.
+`mix examples --seed 0` selects that complete example suite. Run the complete
+command above to include the supporting core and remote acceptance tests.
 
-The [example catalog](../lib/examples/README.md) has 52 fixtures and ten
-additional application scenarios.
+The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) has 52 fixtures and ten
+additional application scenarios. Source files live in `examples/`; tests live
+in `test/examples/`. Production builds and the Hex package exclude both trees.
+Local development and test builds compile the source examples so demos and
+shared core regression fixtures remain available.
 Deterministic model adapters and local HTTP/SSE tests require no provider key.
 Remote tests start actual BEAM peers. Keep their clock separation and shutdown
 checks. A local File adapter test does not prove multi-process storage safety.
@@ -33,16 +37,18 @@ Keep total core coverage above 93% to allow for new work.
 Run core coverage with:
 
 ```sh
-mix test --cover test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+mix test --cover test/jido test/jido_test test/examples/08_applications --include example --include flaky --seed 0
 ```
 
-Run example tests separately for behavior checks. Their coverage is not part of
-the core coverage goal.
+CI uses the same paths without `--cover`. The application examples remain in
+CI through that explicit selection. The other examples run separately.
+Example source lines do not count toward the core coverage goal; all selected
+tests can contribute coverage of the core modules they call.
 
 To run the complete suite and measure core coverage in one run, use:
 
 ```sh
-mix test --include example --include integration --include flaky --seed 0 --cover
+mix test --include example --include flaky --seed 0 --cover
 ```
 
 The Mix summary threshold and ExCoveralls minimum are both 90%. Keep the

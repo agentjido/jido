@@ -9,7 +9,7 @@ defmodule JidoTest.BasicSDKCase do
       import JidoTest.BasicSDKCase
 
       @moduletag :example
-      @moduletag :integration
+
       @moduletag group: :basic
       @moduletag complexity: 1
     end

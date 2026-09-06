@@ -30,7 +30,7 @@
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_11_session_replayed_task_board/session_replayed_task_board.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_11_session_replayed_task_board/session_replayed_task_board.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_11_session_replayed_task_board/session_replayed_task_board_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

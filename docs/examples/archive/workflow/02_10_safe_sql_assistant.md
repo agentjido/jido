@@ -33,7 +33,7 @@ database adapter is called.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_10_safe_sql_assistant/safe_sql_assistant.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_10_safe_sql_assistant/safe_sql_assistant.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_10_safe_sql_assistant/safe_sql_assistant_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

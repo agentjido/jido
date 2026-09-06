@@ -25,11 +25,11 @@
 - **Expected result:** Runtime subscriptions converge to committed desired state.
 - **Failure cases:** Dispatch failure, repeated command, runtime unavailable, restart, or stale reconcile result.
 - **Jido features under pressure:** Plugin state ownership, Directive ordering, reconciliation, and post-commit failure.
-- **Source framework and links:** [Akka: distributed publish-subscribe](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../test/integration/subscription/example_test.exs)
+- **Source framework and links:** [Akka: distributed publish-subscribe](https://doc.akka.io/libraries/akka-core/current/typed/cluster.html), [Jido integration example](../../../../examples/08_applications/subscription/subscription.ex)
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_13_subscription_reconciliation/subscription_reconciliation.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_13_subscription_reconciliation/subscription_reconciliation.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_13_subscription_reconciliation/subscription_reconciliation_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

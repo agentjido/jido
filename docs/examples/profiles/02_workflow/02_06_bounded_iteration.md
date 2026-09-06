@@ -19,7 +19,7 @@ Initial completion, exact loop bounds, and validation of initial and replacement
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_06_bounded_iteration/bounded_iteration.ex)
+- [Source](../../../../examples/02_workflow/02_06_bounded_iteration/bounded_iteration.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_06_bounded_iteration/bounded_iteration_test.exs)
 - [Workflow results](../../workflow-results.md)
 

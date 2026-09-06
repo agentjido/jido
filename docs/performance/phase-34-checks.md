@@ -25,7 +25,7 @@ Runtime commit: `3e58775f`.
 
 - Core, integration, and flaky selection: **892 passed**, one existing DIST-03
   exclusion. Core coverage: **83.5%**, above the 80% gate.
-- Coverage excludes `lib/examples/`, test fixtures, and benchmark helpers.
+- Coverage excludes `examples/`, test fixtures, and benchmark helpers.
 - Separate example selection: **272 passed, 11 failed**. Failure names and test
   modules exactly match the prior Round 39 run. No example failure was added
   or removed. These known research-example failures remain unresolved.
@@ -49,7 +49,7 @@ other map without visiting entries.
 Commands:
 
 ```sh
-ERL_FLAGS='+S 2:2' mix test --cover test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+ERL_FLAGS='+S 2:2' mix test --cover test/jido test/jido_test test/examples/08_applications --include integration --include flaky --seed 0
 ERL_FLAGS='+S 2:2' mix test test/examples --include example --include integration --include flaky --seed 0
 ERL_FLAGS='+S 2:2' mix quality
 ERL_FLAGS='+S 2:2' mix docs --no-open --warnings-as-errors

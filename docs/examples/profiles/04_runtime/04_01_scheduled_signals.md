@@ -29,7 +29,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_01_scheduled_signals --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex) ·
+[Source](../../../../examples/04_runtime/04_01_scheduled_signals/scheduled_counter.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_01_scheduled_signals/scheduled_counter_test.exs)
 
 ## Boundary and next question

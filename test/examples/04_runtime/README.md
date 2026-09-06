@@ -14,8 +14,8 @@ acceptance tests under `test/jido`, beside the core contracts that they prove.
 | [04_13_durable_scheduling](04_13_durable_scheduling/README.md) | Scheduler and scheduled occurrence core tests | 25 |
 
 ```shell
-mix test --include integration test/examples/04_runtime --seed 0
+mix test --include example test/examples/04_runtime --seed 0
 ```
 
-[Source guide](../../../lib/examples/04_runtime/README.md) ·
+[Source guide](../../../examples/04_runtime/README.md) ·
 [Catalog](../../../docs/examples/catalog.md#runtime)

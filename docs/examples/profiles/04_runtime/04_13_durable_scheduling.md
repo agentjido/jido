@@ -17,6 +17,6 @@ cancellation, generation change, failed writes, and bounded pending work.
 mix test test/jido/plugin/scheduler_occurrence_test.exs test/jido/agent/scheduled_occurrence_test.exs test/jido/plugin/durable_scheduler_test.exs test/jido/agent/scheduled_occurrence_recovery_test.exs --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex) ·
+[Source](../../../../examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex) ·
 [Core tests](../../../../test/jido/agent/scheduled_occurrence_recovery_test.exs) ·
 [Results](../../rec-03-results.md)

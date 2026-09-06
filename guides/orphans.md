@@ -14,5 +14,5 @@ A remote Agent can still run while unreachable. Reconnect and replacement need
 an explicit ownership decision. Local Registry uniqueness and storage revision
 fencing do not establish cluster-exclusive ownership.
 
-See the [Multi-agent examples](../lib/examples/05_multi_agent/README.md) and
+See the [Multi-agent examples](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/README.md) and
 [remote lifecycle tests](../test/jido/agent/remote_lifecycle_test.exs).

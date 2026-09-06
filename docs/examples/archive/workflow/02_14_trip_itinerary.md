@@ -33,7 +33,7 @@ or budget overflow fail without partial state.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_14_trip_itinerary/trip_itinerary.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_14_trip_itinerary/trip_itinerary.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_14_trip_itinerary/trip_itinerary_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

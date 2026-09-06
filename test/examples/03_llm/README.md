@@ -3,11 +3,11 @@
 This batch has ten examples and 66 enabled tests. Run all ten:
 
 ```shell
-mix test --include integration test/examples/03_llm --seed 0
+mix test --include example test/examples/03_llm --seed 0
 ```
 
 Append a numbered folder to run one fixture. The default test command excludes
-the examples; every LLM example has both `:example` and `:integration` tags.
+the examples; every LLM example has the `:example` tag.
 
 | Order | Added capability | Tests |
 | --- | --- | ---: |

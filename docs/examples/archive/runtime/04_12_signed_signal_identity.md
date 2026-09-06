@@ -25,11 +25,11 @@
 - **Expected result:** Valid Signals enter one turn. Forged and replayed Signals do not route.
 - **Failure cases:** Unknown key, bad signature, replayed nonce, missing correlation, or signing error.
 - **Jido features under pressure:** Admission Plugin, trace and correlation, replay protection, secrets, and outbound transform.
-- **Source framework and links:** [Semantic Kernel: agent architecture and threads](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-architecture), [Jido integration example](../../../../test/integration/identity/example_test.exs)
+- **Source framework and links:** [Semantic Kernel: agent architecture and threads](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-architecture), [Jido integration example](../../../../examples/08_applications/identity/identity.ex)
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_12_signed_signal_identity/signed_signal_identity.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_12_signed_signal_identity/signed_signal_identity.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_12_signed_signal_identity/signed_signal_identity_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

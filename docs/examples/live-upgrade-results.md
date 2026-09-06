@@ -21,9 +21,9 @@ change preserves the combined result: 34/45 passing checks, with the same
 
 | Example | Pass | Fail | What it proves |
 | --- | ---: | ---: | --- |
-| [Turn upgrade](../../lib/examples/99_research/99_14_turn_upgrade/README.md) | 2 | 1 | An idle Agent can use new Action code on the same PID. A code load between Flow steps mixes revisions in one Turn. |
-| [State migration](../../lib/examples/99_research/99_15_state_migration/README.md) | 3 | 1 | A static schema that accepts both formats permits atomic domain and Plugin migration. An old schema cannot accept an unplanned new format. |
-| [Topology upgrade](../../lib/examples/99_research/99_16_topology_upgrade/README.md) | 4 | 1 | Pure Agent plan comparison and full replacement work. Live target submission has no update path. |
+| [Turn upgrade](../../examples/99_research/99_14_turn_upgrade/README.md) | 2 | 1 | An idle Agent can use new Action code on the same PID. A code load between Flow steps mixes revisions in one Turn. |
+| [State migration](../../examples/99_research/99_15_state_migration/README.md) | 3 | 1 | A static schema that accepts both formats permits atomic domain and Plugin migration. An old schema cannot accept an unplanned new format. |
+| [Topology upgrade](../../examples/99_research/99_16_topology_upgrade/README.md) | 4 | 1 | Pure Agent plan comparison and full replacement work. Live target submission has no update path. |
 
 Run only these examples:
 

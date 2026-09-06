@@ -5,7 +5,7 @@
 
 Date: **2026-09-04**. Status: **Implemented with current core**.
 
-The [Remote Lifecycle Agent](../../lib/examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex)
+The [Remote Lifecycle Agent](../../examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex)
 records a child exit as `:exited`, except when the monitor reports
 `:noconnection`. It records that result as `:unreachable`. It does not infer a
 remote process death from lost connectivity.

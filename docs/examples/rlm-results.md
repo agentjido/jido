@@ -30,7 +30,7 @@ Current commands for the moved suite (the run above used the earlier path):
 mix test --include integration test/examples/03_llm/03_10_recursive_analysis
 mix test --include integration test/examples/03_llm test/examples/01_basic
 mix compile --warnings-as-errors
-mix credo suggest 'lib/examples/03_llm/03_10_recursive_analysis/*.{ex,exs}' \
+mix credo suggest 'examples/03_llm/03_10_recursive_analysis/*.{ex,exs}' \
   'test/examples/03_llm/03_10_recursive_analysis/*.exs' --strict
 ```
 
@@ -58,7 +58,7 @@ mix credo suggest 'lib/examples/03_llm/03_10_recursive_analysis/*.{ex,exs}' \
 ## Larger repeated run
 
 ```shell
-mix run lib/examples/03_llm/03_10_recursive_analysis/stress.exs \
+mix run examples/03_llm/03_10_recursive_analysis/stress.exs \
   --records 100000 --leaf 64 --agents 4 --rounds 3
 ```
 
@@ -96,7 +96,7 @@ memory limit or token budget.
 The model uses deterministic rules for one aggregation task. The example does
 not execute generated code, measure model quality, persist intermediate work,
 or recover a recursion tree after a restart. Child Agent lifecycle and recovery
-remain in the [integration backlog](../../test/integration/README.md#recursive-language-model-simulation).
+remain in the [integration backlog](../../examples/08_applications/README.md#recursive-language-model-simulation).
 
 The LLM refresh retains all 26 RLM tests in `03_10_recursive_analysis`. The
 [current LLM results](llm-results.md) cover the new ten-example sequence. The

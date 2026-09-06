@@ -35,16 +35,16 @@ services belong to the example. Every test selects real public Jido APIs.
 
 | ID | Feature | Pass | Fail | Classification |
 | --- | --- | ---: | ---: | --- |
-| FA-01 | [Route precedence and fixed selection](../../lib/examples/99_research/99_09_route_selection/README.md) | 2 | 2 | Core feature required |
-| FA-02 | [Plugin read and prepared-input isolation](../../lib/examples/99_research/99_10_plugin_isolation/README.md) | 2 | 2 | Core feature required |
-| FA-03 | [Stable Agent references and durable namespace identity](../../lib/examples/99_research/99_11_stable_reference/README.md) | 2 | 1 | Core feature required; application reference works |
-| FA-04 | [Definition revision checks on restore](../../lib/examples/99_research/99_12_definition_revision/README.md) | 1 | 1 | Core feature required |
-| FA-05 | [Durable deletion](../../lib/examples/99_research/99_13_durable_delete/README.md) | 2 | 1 | Core feature required |
-| FA-06 | [Plugin runtime reconstruction from committed state](../../lib/examples/99_research/99_03_input_resource_lifecycle/README.md) | 1 | 1 | Core feature required; public pull recovery works |
-| FA-07 | [Progress observation with recovery](../../lib/examples/99_research/99_01_progress_observation/README.md) | 5 | 0 | Works as an application extension |
-| FA-08 | [Acknowledged handoff and worker reconciliation](../../lib/examples/99_research/99_04_handoff_reconciliation/README.md) | 3 | 0 | Works as an application protocol |
-| FA-09 | [Shared work budgets](../../lib/examples/99_research/99_05_capacity_deadlines_cleanup/README.md) | 3 | 0 | Works as a local runtime extension |
-| FA-10 | [Fenced distributed ownership](../../lib/examples/99_research/99_02_distributed_authority/README.md) | 4 | 0 | Works with an explicit external authority |
+| FA-01 | [Route precedence and fixed selection](../../examples/99_research/99_09_route_selection/README.md) | 2 | 2 | Core feature required |
+| FA-02 | [Plugin read and prepared-input isolation](../../examples/99_research/99_10_plugin_isolation/README.md) | 2 | 2 | Core feature required |
+| FA-03 | [Stable Agent references and durable namespace identity](../../examples/99_research/99_11_stable_reference/README.md) | 2 | 1 | Core feature required; application reference works |
+| FA-04 | [Definition revision checks on restore](../../examples/99_research/99_12_definition_revision/README.md) | 1 | 1 | Core feature required |
+| FA-05 | [Durable deletion](../../examples/99_research/99_13_durable_delete/README.md) | 2 | 1 | Core feature required |
+| FA-06 | [Plugin runtime reconstruction from committed state](../../examples/99_research/99_03_input_resource_lifecycle/README.md) | 1 | 1 | Core feature required; public pull recovery works |
+| FA-07 | [Progress observation with recovery](../../examples/99_research/99_01_progress_observation/README.md) | 5 | 0 | Works as an application extension |
+| FA-08 | [Acknowledged handoff and worker reconciliation](../../examples/99_research/99_04_handoff_reconciliation/README.md) | 3 | 0 | Works as an application protocol |
+| FA-09 | [Shared work budgets](../../examples/99_research/99_05_capacity_deadlines_cleanup/README.md) | 3 | 0 | Works as a local runtime extension |
+| FA-10 | [Fenced distributed ownership](../../examples/99_research/99_02_distributed_authority/README.md) | 4 | 0 | Works with an explicit external authority |
 
 ## Core features to add
 
@@ -73,7 +73,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** The probe uses three explicit Agent DSL definitions and cmd/3. Route defaults and the preparation Plugin are declared in the DSL. It does not replace routing with an example-owned dispatcher.
 
-[Runnable source](../../lib/examples/99_research/99_09_route_selection/route_selection.ex) · [Acceptance tests](../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)
+[Runnable source](../../examples/99_research/99_09_route_selection/route_selection.ex) · [Acceptance tests](../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)
 
 ### FA-02: Plugin read and prepared-input isolation
 
@@ -83,7 +83,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** The intended audit projection is total only. Current core has no observes declaration. The enabled assertion marks that missing contract; the example does not claim to configure an existing isolation option. Callback isolation is an API contract, not a sandbox for untrusted BEAM code.
 
-[Runnable source](../../lib/examples/99_research/99_10_plugin_isolation/plugin_isolation.ex) · [Acceptance tests](../../test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs)
+[Runnable source](../../examples/99_research/99_10_plugin_isolation/plugin_isolation.ex) · [Acceptance tests](../../test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs)
 
 ### FA-03: Stable Agent references and durable namespace identity
 
@@ -93,7 +93,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** StableReference is an example-owned struct. Local lookup uses the current public Jido.whereis_agent/3 and AgentServer API. The passing controls do not establish a core Ref API. Storage uses the controlled in-memory byte adapter.
 
-[Runnable source](../../lib/examples/99_research/99_11_stable_reference/stable_reference.ex) · [Acceptance tests](../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)
+[Runnable source](../../examples/99_research/99_11_stable_reference/stable_reference.ex) · [Acceptance tests](../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)
 
 ### FA-04: Definition revision checks on restore
 
@@ -103,7 +103,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** Core has no definition_revision option. The probe declares the intended revision in module metadata and a function. It recompiles only its isolated Cart module in a serial test. It does not implement automatic state migration.
 
-[Runnable source](../../lib/examples/99_research/99_12_definition_revision/definition_revision.ex) · [Acceptance tests](../../test/examples/99_research/99_12_definition_revision/definition_revision_test.exs)
+[Runnable source](../../examples/99_research/99_12_definition_revision/definition_revision.ex) · [Acceptance tests](../../test/examples/99_research/99_12_definition_revision/definition_revision_test.exs)
 
 ### FA-05: Durable deletion
 
@@ -113,7 +113,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** The example uses public persistence APIs and an atomic in-memory byte adapter. It proves loss of revision history after deletion. It does not define tombstone retention or physical purge policy.
 
-[Runnable source](../../lib/examples/99_research/99_13_durable_delete/durable_delete.ex) · [Acceptance tests](../../test/examples/99_research/99_13_durable_delete/durable_delete_test.exs)
+[Runnable source](../../examples/99_research/99_13_durable_delete/durable_delete.ex) · [Acceptance tests](../../test/examples/99_research/99_13_durable_delete/durable_delete_test.exs)
 
 ### FA-06: Plugin runtime reconstruction from committed state
 
@@ -123,7 +123,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** This tests Plugin runtime loss, input generation checks, and resource cleanup. It does not test a live vendor connection or duplicate event IDs. Jido.Plugin.state/1 already supplies a working application recovery mechanism.
 
-[Runnable source](../../lib/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Acceptance tests](../../test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs)
+[Runnable source](../../examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Acceptance tests](../../test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs)
 
 ### FA-07: Progress observation with recovery
 
@@ -133,7 +133,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** The buffer has one producer and demand-based reads. It sends no queue of notifications to slow consumers. Agent state stores terminal results; it does not persist transient progress. Persistence recovery uses an in-memory test adapter, not a fresh VM or database.
 
-[Runnable source](../../lib/examples/99_research/99_01_progress_observation/progress_observation.ex) · [Acceptance tests](../../test/examples/99_research/99_01_progress_observation/progress_observation_test.exs)
+[Runnable source](../../examples/99_research/99_01_progress_observation/progress_observation.ex) · [Acceptance tests](../../test/examples/99_research/99_01_progress_observation/progress_observation_test.exs)
 
 ### FA-08: Acknowledged handoff and worker reconciliation
 
@@ -143,7 +143,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** There is one request and one live coordinator. The tests cover recipient loss, not durable coordinator loss or arbitrary network partitions. The coordinator controls accepted results; external effects require their own fencing.
 
-[Runnable source](../../lib/examples/99_research/99_04_handoff_reconciliation/handoff.ex) · [Acceptance tests](../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs)
+[Runnable source](../../examples/99_research/99_04_handoff_reconciliation/handoff.ex) · [Acceptance tests](../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs)
 
 ### FA-09: Shared work budgets
 
@@ -153,7 +153,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** Defaults are eight active jobs and 32 queued jobs; tests use two of each to force contention. Limits apply to accepted jobs, not raw BEAM mailbox messages or every internal process. Hard loss of the budget service, durable budgets, and arbitrary deep trees remain outside this proof.
 
-[Runnable source](../../lib/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget.ex) · [Acceptance tests](../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)
+[Runnable source](../../examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget.ex) · [Acceptance tests](../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)
 
 ### FA-10: Fenced distributed ownership
 
@@ -163,7 +163,7 @@ checks and current recovery mechanisms remain useful and have passing controls.
 
 **Proof limit:** The external authority is a controlled GenServer, not a consensus service or production lease provider. Claim, byte writes, and sink checks serialize there. Core-only exclusive activation remains unsupported; the existing skipped DIST-03 test is unchanged. The disconnect test blocks automatic reconnection with a temporary peer cookie change.
 
-[Runnable source](../../lib/examples/99_research/99_02_distributed_authority/fenced_inventory.ex) · [Acceptance tests](../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs)
+[Runnable source](../../examples/99_research/99_02_distributed_authority/fenced_inventory.ex) · [Acceptance tests](../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs)
 
 ## Example defects corrected during the pass
 

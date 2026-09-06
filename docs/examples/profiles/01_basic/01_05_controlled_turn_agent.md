@@ -21,7 +21,7 @@ Turn serialization, cancellation, queued work, and caller timeout.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent.ex)
+- [Source](../../../../examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent.ex)
 - [Integration tests](../../../../test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs)
 - [Basic results](../../basic-results.md)
 

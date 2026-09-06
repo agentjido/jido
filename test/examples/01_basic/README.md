@@ -18,20 +18,19 @@ Each form also executes through the real Agent Server.
 Run all 22 tests:
 
 ```shell
-mix test --include integration test/examples/01_basic
+mix test --include example test/examples/01_basic
 ```
 
-They also run with `mix examples`, `mix test --only example`, or
-`mix test --only integration`. They have both `:example` and `:integration`
-tags. The normal test command excludes them.
+They also run with `mix examples` or `mix test --only example`. All use the
+`:example` tag. The normal test command excludes them.
 
 The five implementations live in matching folders under
-[`lib/examples/01_basic`](../../../lib/examples/01_basic). Tests import those Agent
+[`examples/01_basic`](../../../examples/01_basic). Tests import those Agent
 modules. They do not define replacement Agents, Actions, or Plugins.
 
 [Shared test support](../../support/basic_sdk_case.ex) starts real Agent Servers
 under an isolated Jido instance. The
-[Effects Plugin](../../../lib/examples/01_basic/01_04_directive_agent/effects.ex) starts
+[Effects Plugin](../../../examples/01_basic/01_04_directive_agent/effects.ex) starts
 a real supervised runtime and is shared by four fixtures. Directive Agent also
 runs the same cases through `StatelessEffects`, which has no Plugin process.
 Each Directive handler reads the committed Agent through `Server.snapshot/1`. No SDK component

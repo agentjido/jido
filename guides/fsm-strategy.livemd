@@ -3,4 +3,4 @@
 The V2 FSM Strategy is removed. The old notebook remains in Git history.
 Use an Action or Flow with explicit domain modes and state validation.
 See [execution after V2](strategies.md) and the
-[Workflow examples](../lib/examples/02_workflow/README.md).
+[Workflow examples](https://github.com/agentjido/jido/tree/v3-spike/examples/02_workflow/README.md).

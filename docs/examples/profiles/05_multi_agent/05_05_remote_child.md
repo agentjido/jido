@@ -14,9 +14,9 @@ Sixteen core tests use two real Erlang nodes.
 
 ```shell
 mix test test/jido/agent/child_placement_test.exs test/jido/agent/distributed_child_test.exs --seed 0
-mix run lib/examples/05_multi_agent/05_05_remote_child/demo.exs
+mix run examples/05_multi_agent/05_05_remote_child/demo.exs
 ```
 
-[Source](../../../../lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex) ·
+[Source](../../../../examples/05_multi_agent/05_05_remote_child/remote_child.ex) ·
 [Core tests](../../../../test/jido/agent/distributed_child_test.exs) ·
 [Results](../../dist-01-results.md)

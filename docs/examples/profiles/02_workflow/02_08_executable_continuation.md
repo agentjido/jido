@@ -20,7 +20,7 @@ Dispatch, shared context and continuation budget, terminal output validation, an
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_08_executable_continuation/executable_continuation.ex)
+- [Source](../../../../examples/02_workflow/02_08_executable_continuation/executable_continuation.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_08_executable_continuation/executable_continuation_test.exs)
 - [Workflow results](../../workflow-results.md)
 

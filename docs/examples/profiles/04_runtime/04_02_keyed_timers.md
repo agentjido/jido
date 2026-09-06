@@ -30,7 +30,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_02_keyed_timers --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_02_keyed_timers/burst_buncher.ex) ·
+[Source](../../../../examples/04_runtime/04_02_keyed_timers/burst_buncher.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs)
 
 ## Boundary and next question

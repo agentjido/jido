@@ -34,7 +34,7 @@ policy.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_04_hybrid_search/hybrid_search.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_04_hybrid_search/hybrid_search.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_04_hybrid_search/hybrid_search_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

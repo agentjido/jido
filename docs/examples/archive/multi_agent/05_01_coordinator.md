@@ -25,7 +25,7 @@
 - **Expected result:** The first Flow turn commits one delegation and one Thread entry before it starts the child and sends work. The test then observes one handled task, one reply, one timeout, and one child-start event.
 - **Failure cases:** Child start failure, no reply, duplicate reply, timeout race, child crash, and late reply are not covered by the current test.
 - **Jido features under pressure:** Child lifecycle, correlation, scheduling, stale Signals, and one commit per turn.
-- **Source framework and links:** [Semantic Kernel: handoff orchestration](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-orchestration/handoff), [Jido integration example](../../../../test/integration/coordinator/example_test.exs)
+- **Source framework and links:** [Semantic Kernel: handoff orchestration](https://learn.microsoft.com/en-us/semantic-kernel/frameworks/agent/agent-orchestration/handoff), [Jido integration example](../../../../examples/08_applications/coordinator/coordinator.ex)
 
 ## Next pressure
 
@@ -34,7 +34,7 @@ result wins and a late reply cannot change it.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/multi_agent/05_01_coordinator/coordinator.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/multi_agent/05_01_coordinator/coordinator.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/multi_agent/05_01_coordinator/coordinator_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

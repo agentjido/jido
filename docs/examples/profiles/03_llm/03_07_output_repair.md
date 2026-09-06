@@ -19,7 +19,7 @@ Flow Iterate carries validation feedback through at most three model attempts.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_07_output_repair/output_repair.ex)
+- [Source](../../../../examples/03_llm/03_07_output_repair/output_repair.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_07_output_repair/output_repair_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

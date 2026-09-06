@@ -11,8 +11,8 @@ keep 20 acceptance tests under `test/jido/agent`.
 | [05_06_remote_lifecycle](05_06_remote_lifecycle/README.md) | `test/jido/agent/remote_lifecycle_test.exs` | 4 |
 
 ```shell
-mix test --include integration test/examples/05_multi_agent --seed 0
+mix test --include example test/examples/05_multi_agent --seed 0
 ```
 
-[Source guide](../../../lib/examples/05_multi_agent/README.md) ·
+[Source guide](../../../examples/05_multi_agent/README.md) ·
 [Catalog](../../../docs/examples/catalog.md#multi-agent)

@@ -32,7 +32,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_04_managed_jobs --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_04_managed_jobs/managed_jobs.ex) ·
+[Source](../../../../examples/04_runtime/04_04_managed_jobs/managed_jobs.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_04_managed_jobs/managed_jobs_test.exs)
 
 ## Boundary and next question

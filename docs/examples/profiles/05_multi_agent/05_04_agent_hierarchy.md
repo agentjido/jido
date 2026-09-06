@@ -30,7 +30,7 @@ Run:
 mix test --include integration test/examples/05_multi_agent/05_04_agent_hierarchy --seed 0
 ```
 
-[Source](../../../../lib/examples/05_multi_agent/05_04_agent_hierarchy/agent_hierarchy.ex) ·
+[Source](../../../../examples/05_multi_agent/05_04_agent_hierarchy/agent_hierarchy.ex) ·
 [Tests](../../../../test/examples/05_multi_agent/05_04_agent_hierarchy/agent_hierarchy_test.exs)
 
 ## Boundary and next question

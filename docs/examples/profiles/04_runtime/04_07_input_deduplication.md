@@ -28,7 +28,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_07_input_deduplication --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_07_input_deduplication/deduplicating_inbox.ex) ·
+[Source](../../../../examples/04_runtime/04_07_input_deduplication/deduplicating_inbox.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_07_input_deduplication/deduplicating_inbox_test.exs)
 
 ## Boundary and next question

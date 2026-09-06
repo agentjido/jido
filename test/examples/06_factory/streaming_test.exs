@@ -1,7 +1,7 @@
 defmodule JidoTest.Examples.Factory.StreamingTest do
   use JidoTest.Case, async: true
   @moduletag :example
-  @moduletag :integration
+
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Factory.{Conversation, LiveConversation, Model, Tools}
   alias Jido.Examples.Factory.IEx, as: Chat

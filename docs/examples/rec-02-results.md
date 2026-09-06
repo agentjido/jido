@@ -5,7 +5,7 @@
 
 Date: **2026-09-04**. Status: **Implemented with current core**.
 
-The [Pending Job Recovery Agent](../../lib/examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex)
+The [Pending Job Recovery Agent](../../examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex)
 reuses the existing Managed Jobs Plugin. It adds saved job input, approval,
 explicit attempt IDs, retry, and cancellation policy. No new runtime engine
 or automatic Directive replay is added.

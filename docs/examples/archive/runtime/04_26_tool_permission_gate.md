@@ -36,7 +36,7 @@ owns approval delivery and supervised resources.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_26_tool_permission_gate/tool_permission_gate.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_26_tool_permission_gate/tool_permission_gate.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_26_tool_permission_gate/tool_permission_gate_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

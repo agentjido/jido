@@ -40,7 +40,7 @@ These are the initial checks for the first three examples. The latest Flow
 factory report records the new tests and the rerun of these 43 tests.
 
 - `mix test --include integration test/examples/06_factory`: 43 passed.
-- `mix run lib/examples/06_factory/workshop_probe.exs`: passed with `openai:gpt-4.1-mini`.
+- `mix run examples/06_factory/workshop_probe.exs`: passed with `openai:gpt-4.1-mini`.
 - `mix q`: passed, including Dialyzer with no errors.
 - `mix test`: 698 of 699 passed, with 197 excluded. The sole failure is the
   previously documented cluster ownership assertion in
@@ -91,5 +91,5 @@ workers perform timed demonstration steps and do not make model requests.
 The department factory
 produces text artifacts through four real Agents. It does not run generated
 code, perform web research, or deliver an external product. The examples do
-not enable durable replay. See the [run guide](../../lib/examples/06_factory/README.md)
-and [orchestrator plan](../../lib/examples/06_factory/orchestrator-plan.md).
+not enable durable replay. See the [run guide](../../examples/06_factory/README.md)
+and [orchestrator plan](../../examples/06_factory/orchestrator-plan.md).

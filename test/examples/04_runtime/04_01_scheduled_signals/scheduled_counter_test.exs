@@ -1,6 +1,5 @@
 defmodule JidoTest.Examples.Runtime.ScheduledCounterTest do
   use JidoTest.AgentCase
-  @moduletag :integration
 
   @moduletag group: :runtime
   @moduletag complexity: 2

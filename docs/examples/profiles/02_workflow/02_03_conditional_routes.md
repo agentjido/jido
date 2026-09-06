@@ -19,7 +19,7 @@ First-match Choice, lazy branch work, explicit failure capture, and selected-Act
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_03_conditional_routes/conditional_routes.ex)
+- [Source](../../../../examples/02_workflow/02_03_conditional_routes/conditional_routes.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_03_conditional_routes/conditional_routes_test.exs)
 - [Workflow results](../../workflow-results.md)
 

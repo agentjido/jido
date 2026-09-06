@@ -14,9 +14,9 @@ delivery, recovery, unavailable output, and failed persistence writes.
 
 ```shell
 mix test test/jido/agent/effect_recovery_test.exs --seed 0
-mix run lib/examples/04_runtime/04_11_recoverable_delivery/demo.exs
+mix run examples/04_runtime/04_11_recoverable_delivery/demo.exs
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex) ·
+[Source](../../../../examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex) ·
 [Core tests](../../../../test/jido/agent/effect_recovery_test.exs) ·
 [Results](../../rec-01-results.md)

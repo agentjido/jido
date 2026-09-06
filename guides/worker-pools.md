@@ -9,5 +9,5 @@ application must define queue order, retries, cancellation, and result ordering.
 Use static Topology for a declared local system. Do not equate a Registry entry
 with a cluster ownership lease.
 
-See [bounded worker examples](../lib/examples/05_multi_agent/README.md),
-[Factory queues](../lib/examples/06_factory/README.md), and [runtime](runtime.md).
+See [bounded worker examples](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/README.md),
+[Factory queues](https://github.com/agentjido/jido/tree/v3-spike/examples/06_factory/README.md), and [runtime](runtime.md).

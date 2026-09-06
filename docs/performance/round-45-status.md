@@ -78,7 +78,7 @@ gate. Format, compile with warnings as errors, strict warning lint, Dialyzer,
 documentation, and package checks passed. Commands used `ERL_FLAGS='+S 2:2'`:
 
 ```sh
-mix coveralls test/jido test/jido_test test/integration --include integration --include flaky --seed 0
+mix coveralls test/jido test/jido_test test/examples/08_applications --include integration --include flaky --seed 0
 mix format --check-formatted docs/performance/probes/round-45-heap.exs
 mix quality
 mix docs --no-open

@@ -36,7 +36,7 @@ at runtime. This test must not require generic Turn middleware.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_21_extension_package_lifecycle/extension_package_lifecycle.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_21_extension_package_lifecycle/extension_package_lifecycle.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_21_extension_package_lifecycle/extension_package_lifecycle_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

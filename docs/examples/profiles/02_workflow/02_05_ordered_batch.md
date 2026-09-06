@@ -21,7 +21,7 @@ Ordered Map results, collected errors, fail-fast commit behavior, empty input, a
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_05_ordered_batch/ordered_batch.ex)
+- [Source](../../../../examples/02_workflow/02_05_ordered_batch/ordered_batch.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_05_ordered_batch/ordered_batch_test.exs)
 - [Workflow results](../../workflow-results.md)
 

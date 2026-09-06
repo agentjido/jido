@@ -33,7 +33,7 @@ policy. Unsupported filter operators fail before commit.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_07_metadata_filtered_search/metadata_filtered_search.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_07_metadata_filtered_search/metadata_filtered_search.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_07_metadata_filtered_search/metadata_filtered_search_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

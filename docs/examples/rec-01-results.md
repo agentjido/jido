@@ -12,12 +12,12 @@ to add an automatic core outbox.
 
 ## Contract and example
 
-The [Agent and Output Plugin](../../lib/examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex)
+The [Agent and Output Plugin](../../examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex)
 commit business state and pending delivery intent in the same Agent checkpoint.
 `Output.update_state/3` records the application's stable effect ID and value.
 A conflicting reuse of that ID rejects the whole candidate before commit.
 
-The [supervised worker](../../lib/examples/04_runtime/04_11_recoverable_delivery/delivery_worker.ex)
+The [supervised worker](../../examples/04_runtime/04_11_recoverable_delivery/delivery_worker.ex)
 reads committed Plugin state on startup and at each poll. A Deliver Directive
 only wakes it. A lost wake-up cannot lose the saved work. The worker makes one
 attempt at a time, rotates IDs, polls at 100 ms, and limits an attempt to five
@@ -37,7 +37,7 @@ this example. Production code must define retention and capacity policy.
 
 ```shell
 mix test test/jido/agent/effect_recovery_test.exs --seed 0
-mix run lib/examples/04_runtime/04_11_recoverable_delivery/demo.exs
+mix run examples/04_runtime/04_11_recoverable_delivery/demo.exs
 ```
 
 The [tests](../../test/jido/agent/effect_recovery_test.exs) pass **11 cases, with

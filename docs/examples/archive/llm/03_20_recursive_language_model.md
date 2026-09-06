@@ -22,7 +22,7 @@ This profile records the earlier domain scope. See the [replacement map](README.
 - **Directives:** None. All work occurs during the Turn.
 - **Commit contract:** A successful request commits once. Failure preserves the prior Actor state. Completed external calls remain in adapter audits. A retry repeats those calls.
 - **Source:** [Recursive Language Models](https://arxiv.org/abs/2512.24601).
-- **Code:** [Actor](../../../../lib/examples/03_llm/03_10_recursive_analysis/recursive_language_model.ex), [runner](../../../../lib/examples/03_llm/03_10_recursive_analysis/runner.ex), and [tests](../../../../test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs).
+- **Code:** [Actor](../../../../examples/03_llm/03_10_recursive_analysis/recursive_language_model.ex), [runner](../../../../examples/03_llm/03_10_recursive_analysis/runner.ex), and [tests](../../../../test/examples/03_llm/03_10_recursive_analysis/recursive_language_model_test.exs).
 
 This example tests execution and data boundaries. Model decisions are scripted.
 It does not measure model reasoning quality or execute model-generated code.
@@ -115,7 +115,7 @@ mix test --only example test/examples/03_llm/03_10_recursive_analysis
 Run a larger local workload:
 
 ```shell
-mix run lib/examples/03_llm/03_10_recursive_analysis/stress.exs \
+mix run examples/03_llm/03_10_recursive_analysis/stress.exs \
   --records 100000 --leaf 64 --actors 4 --rounds 3
 ```
 
@@ -137,5 +137,5 @@ Actor state retains the latest tree. Counts can grow with the number of distinct
 services. This example does not impose a total memory limit.
 
 There are no child Actors, restart recovery, or durable intermediate results.
-Those are separate requirements in the [integration backlog](../../../../test/integration/README.md#recursive-language-model-simulation).
+Those are separate requirements in the [integration backlog](../../../../examples/08_applications/README.md#recursive-language-model-simulation).
 See the [stress results](../../rlm-results.md) for measured outcomes.

@@ -81,6 +81,6 @@ The example generates proposals. It provides no repository execution, durable
 Flow checkpoint, result-delivery acknowledgement, or recovery after Plugin or
 VM loss. Database adapters remain outside this example.
 
-[Guide and graph](../../lib/examples/06_factory/06_04_flow_factory/README.md)
-· [Flow](../../lib/examples/06_factory/06_04_flow_factory/pipeline.ex)
+[Guide and graph](../../examples/06_factory/06_04_flow_factory/README.md)
+· [Flow](../../examples/06_factory/06_04_flow_factory/pipeline.ex)
 · [Tests](../../test/examples/06_factory/06_04_flow_factory/flow_factory_test.exs)

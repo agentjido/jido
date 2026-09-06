@@ -23,7 +23,7 @@ This profile records the earlier domain scope. See the [replacement map](README.
 - **Expected result:** Success calls the model twice and the tool once, then commits Actor state and version one time.
 - **Failure cases:** Model error after a tool call, unknown tool, tool failure, malformed model output, provider timeout, exhausted step budget, and active Turn cancellation.
 - **Jido features under pressure:** Effectful Flow execution, repeated tool-result routing, bounded continuation, cancellation, one terminal commit, and clear pre-commit effect semantics.
-- **Source framework and links:** [LlamaIndex: ReAct workflow](https://developers.llamaindex.ai/python/examples/workflow/react_agent/), `git show 357b22a:lib/examples/03_llm/03_15_react_agent/react_agent.ex`, and `git show 357b22a:test/examples/03_llm/03_15_react_agent/react_agent_test.exs`
+- **Source framework and links:** [LlamaIndex: ReAct workflow](https://developers.llamaindex.ai/python/examples/workflow/react_agent/), `git show 357b22a:examples/03_llm/03_15_react_agent/react_agent.ex`, and `git show 357b22a:test/examples/03_llm/03_15_react_agent/react_agent_test.exs`
 
 ## Burn-in result
 
@@ -38,7 +38,7 @@ Scheduler Plugin.
 
 ## Best-effort implementation
 
-- `git show 357b22a:lib/examples/03_llm/03_15_react_agent/react_agent.ex`
+- `git show 357b22a:examples/03_llm/03_15_react_agent/react_agent.ex`
 - `git show 357b22a:test/examples/03_llm/03_15_react_agent/react_agent_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

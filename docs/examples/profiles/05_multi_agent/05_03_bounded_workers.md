@@ -31,7 +31,7 @@ Run:
 mix test --include integration test/examples/05_multi_agent/05_03_bounded_workers --seed 0
 ```
 
-[Source](../../../../lib/examples/05_multi_agent/05_03_bounded_workers/bounded_workers.ex) ·
+[Source](../../../../examples/05_multi_agent/05_03_bounded_workers/bounded_workers.ex) ·
 [Tests](../../../../test/examples/05_multi_agent/05_03_bounded_workers/bounded_workers_test.exs)
 
 ## Boundary and next question

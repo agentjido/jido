@@ -36,7 +36,7 @@ No Jido core change was necessary.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_11_sequential_data_flow/sequential_data_flow.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_11_sequential_data_flow/sequential_data_flow.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_11_sequential_data_flow/sequential_data_flow_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

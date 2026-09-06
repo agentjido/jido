@@ -19,12 +19,12 @@ Each test imports the real example. No test defines replacement SDK components.
 Run the full batch:
 
 ```shell
-mix test --include integration test/examples/02_workflow --seed 0
+mix test --include example test/examples/02_workflow --seed 0
 ```
 
 Run one fixture by passing its folder instead. These tests also run in
-`mix examples` and `mix test --only integration`. Each has `:example`,
-`:integration`, and `group: :workflow` tags. Failed obligations remain enabled.
+`mix examples` and `mix test --only example`. Each has `:example` and
+`group: :workflow` tags. Failed obligations remain enabled.
 
 ## Integration boundary
 
@@ -94,7 +94,7 @@ Sequential Flow calculates its bound value with `Jido.Expr`. Its Builder test
 constructs the same expression through `Jido.Expr.new!/2`, then checks a stored
 JSON round trip. This proves the module DSL, Builder, and Codec forms.
 
-The [source folders](../../../lib/examples/02_workflow) match these nine test
+The [source folders](../../../examples/02_workflow) match these nine test
 folders. The [research archive](../../../docs/examples/archive/workflow/README.md)
 maps every old domain profile to its replacement. Arithmetic, scoring, SQL
 policy details, citations, and output wording do not need separate SDK fixtures.

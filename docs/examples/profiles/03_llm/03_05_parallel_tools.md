@@ -21,7 +21,7 @@ Validate a complete tool plan, run concurrent Actions with Map, and retain call-
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_05_parallel_tools/parallel_tools.ex)
+- [Source](../../../../examples/03_llm/03_05_parallel_tools/parallel_tools.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_05_parallel_tools/parallel_tools_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

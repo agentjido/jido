@@ -69,8 +69,8 @@ mix test --include integration test/examples/03_llm --seed 0
 mix test --include example --seed 0
 mix compile --warnings-as-errors
 mix format --check-formatted
-mix credo suggest 'lib/examples/03_llm/*.{ex,exs}' \
-  'lib/examples/03_llm/**/*.{ex,exs}' 'test/examples/03_llm/**/*.exs' \
+mix credo suggest 'examples/03_llm/*.{ex,exs}' \
+  'examples/03_llm/**/*.{ex,exs}' 'test/examples/03_llm/**/*.exs' \
   'test/support/llm_sdk_case.ex' --strict
 mix run -e 'Mix.Tasks.Docs.run([])'
 git diff --check

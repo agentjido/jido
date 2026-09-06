@@ -47,7 +47,7 @@ The current checkout contains the implementation and test paths for `counter`,
 `react_agent`, and `scheduled_counter`. Their profiles link to these local
 files.
 
-- [`test/integration/README.md`](../../test/integration/README.md) for current
+- [`examples/08_applications/README.md`](../../examples/08_applications/README.md) for current
   implemented examples and their open work.
 - [`Jido.Agent.Directive`](../../lib/jido/agent/directive.ex) for built-in
   runtime commands.

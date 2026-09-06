@@ -18,9 +18,9 @@ goals and distinct IDs. Zoi validates inputs before a command reaches the factor
 Batch retries return the same IDs. Invalid goals or insufficient space reject
 the whole batch.
 
-[Source](../../../../lib/examples/06_factory/06_02_three_agent_system/system.ex) ·
+[Source](../../../../examples/06_factory/06_02_three_agent_system/system.ex) ·
 [Tests](../../../../test/examples/06_factory/06_02_three_agent_system/system_test.exs) ·
 [Worker tests](../../../../test/examples/06_factory/06_02_three_agent_system/workshop_test.exs) ·
 [Batch tests](../../../../test/examples/06_factory/06_02_three_agent_system/batch_test.exs) ·
-[Live probe](../../../../lib/examples/06_factory/workshop_probe.exs) ·
-[Run guide](../../../../lib/examples/06_factory/README.md)
+[Live probe](../../../../examples/06_factory/workshop_probe.exs) ·
+[Run guide](../../../../examples/06_factory/README.md)

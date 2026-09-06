@@ -33,7 +33,7 @@ answer fields. Unsupported questions become explicit escalation state.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_15_typed_bank_support/typed_bank_support.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_15_typed_bank_support/typed_bank_support.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_15_typed_bank_support/typed_bank_support_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

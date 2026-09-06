@@ -113,7 +113,7 @@ emits five existing compiler warnings from test files.
 
 ## Files
 
-- [Minimal Agent](../../lib/examples/01_basic/01_01_minimal_agent/minimal_agent.ex)
-- [Typed Command Agent](../../lib/examples/01_basic/01_02_typed_command_agent/typed_command_agent.ex)
+- [Minimal Agent](../../examples/01_basic/01_01_minimal_agent/minimal_agent.ex)
+- [Typed Command Agent](../../examples/01_basic/01_02_typed_command_agent/typed_command_agent.ex)
 - [Authoring tests](../../test/examples/01_basic/authoring_formats_test.exs)
 - [Basic test guide](../../test/examples/01_basic/README.md)

@@ -19,7 +19,7 @@ Transient caller context, effect guards, explicit output projection, idempotency
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_02_effectful_steps/effectful_steps.ex)
+- [Source](../../../../examples/02_workflow/02_02_effectful_steps/effectful_steps.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_02_effectful_steps/effectful_steps_test.exs)
 - [Workflow results](../../workflow-results.md)
 

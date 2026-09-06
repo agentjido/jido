@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_03_input_resource_lifecycle --include exam
 
 This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
 
-[Source](../../../../lib/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Tests](runtime_reconstruction_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Tests](runtime_reconstruction_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)

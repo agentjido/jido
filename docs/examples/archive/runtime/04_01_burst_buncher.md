@@ -25,7 +25,7 @@
 - **Expected result:** A batch flushes once by size or time, and no item appears twice.
 - **Failure cases:** Late timer from an old generation, duplicate item, oversize item, delivery failure, or stop with data.
 - **Jido features under pressure:** Mailbox order, timer replacement, stale Signal rejection, batch state, and delivery.
-- **Source framework and links:** [Akka: Buncher timer example](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), [Jido implementation](../../../../lib/examples/04_runtime/04_02_keyed_timers/burst_buncher.ex), and [Jido test](../../../../test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs)
+- **Source framework and links:** [Akka: Buncher timer example](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), [Jido implementation](../../../../examples/04_runtime/04_02_keyed_timers/burst_buncher.ex), and [Jido test](../../../../test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs)
 
 ## Burn-in result
 
@@ -40,7 +40,7 @@ types, and runtime process are substantial ceremony for this common pattern.
 
 ## Best-effort implementation
 
-- [Code](../../../../lib/examples/04_runtime/04_02_keyed_timers/burst_buncher.ex)
+- [Code](../../../../examples/04_runtime/04_02_keyed_timers/burst_buncher.ex)
 - [Tests](../../../../test/examples/04_runtime/04_02_keyed_timers/burst_buncher_test.exs)
 
 The local implementation passes its mock-only tests. The tests define the

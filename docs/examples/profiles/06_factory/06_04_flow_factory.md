@@ -12,6 +12,6 @@ produce proposal artifacts. The example includes inspection, cancellation,
 worker cleanup, attempt identity, and a complete execution deadline. It does
 not modify repositories or persist an active Flow execution.
 
-[Guide and source](../../../../lib/examples/06_factory/06_04_flow_factory/README.md)
+[Guide and source](../../../../examples/06_factory/06_04_flow_factory/README.md)
 · [Tests](../../../../test/examples/06_factory/06_04_flow_factory/flow_factory_test.exs)
 · [Results](../../flow-factory-results.md)

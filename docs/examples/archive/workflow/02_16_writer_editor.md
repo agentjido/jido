@@ -33,7 +33,7 @@ failure leaves Actor state unchanged.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_16_writer_editor/writer_editor.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_16_writer_editor/writer_editor.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_16_writer_editor/writer_editor_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

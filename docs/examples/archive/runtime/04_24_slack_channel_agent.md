@@ -29,7 +29,7 @@
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_24_slack_channel_agent/slack_channel_agent.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_24_slack_channel_agent/slack_channel_agent.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_24_slack_channel_agent/slack_channel_agent_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

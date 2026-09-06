@@ -20,7 +20,7 @@ An approved name resolves to a typed Action; invalid input stops before tool eff
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_03_tool_call/tool_call.ex)
+- [Source](../../../../examples/03_llm/03_03_tool_call/tool_call.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_03_tool_call/tool_call_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

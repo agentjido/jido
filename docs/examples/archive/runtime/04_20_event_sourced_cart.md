@@ -29,7 +29,7 @@
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_20_event_sourced_cart/event_sourced_cart.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_20_event_sourced_cart/event_sourced_cart.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_20_event_sourced_cart/event_sourced_cart_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

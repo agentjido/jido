@@ -35,10 +35,10 @@ The business Action acknowledges in its returned candidate:
 {:ok, next_state, [Scheduler.acknowledge(occurrence.id)]}
 ```
 
-The [recovery Agent](../../lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex)
+The [recovery Agent](../../examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex)
 shows registration, the control route, completion, and cancellation. Start it
 with an Agent persistence adapter and restore enabled to recover after loss.
-The separate [identity probe](../../lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_probe.ex)
+The separate [identity probe](../../examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_probe.ex)
 continues to demonstrate metadata without durable delivery.
 
 Generation remains application state: retain it across restore and advance it

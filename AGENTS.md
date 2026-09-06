@@ -14,7 +14,7 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 ## Checks
 
 - Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
-- Full suite: `mix test --include example --include integration --include flaky`.
+- Full suite: `mix test --include example --include flaky`.
 - Compile with `mix compile --warnings-as-errors`.
 - Keep coverage at or above 90%. Aim above 93% to retain a maintenance buffer.
 - Run meaningful lint, Dialyzer, docs and package checks.

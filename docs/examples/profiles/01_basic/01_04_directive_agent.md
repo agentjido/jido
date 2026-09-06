@@ -24,7 +24,7 @@ Core tests also check dispatch timeout, task death, and result Signals.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/01_basic/01_04_directive_agent/directive_agent.ex)
+- [Source](../../../../examples/01_basic/01_04_directive_agent/directive_agent.ex)
 - [Integration tests](../../../../test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs)
 - [Basic results](../../basic-results.md)
 

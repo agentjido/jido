@@ -78,4 +78,4 @@ Keep the separate `jido_v3` repository unchanged.
 - The saved SDK survey reports 878 of 881 tests passing and additional diagnostic
   failures. These are prior results, not a fresh validation of the current files.
 - Evidence: `jido_v3/docs/reviews/2026-09-04-sdk-survey/README.md`,
-  `jido_v3/lib/examples/README.md`, and `jido_v3/test/test_helper.exs`.
+  `jido_v3/examples/README.md`, and `jido_v3/test/test_helper.exs`.

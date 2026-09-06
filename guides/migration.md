@@ -46,7 +46,7 @@ Use instance and partition scope consistently. Server attachment, detach, touch,
 idle timeout, child ownership, local/remote placement, and hibernate/thaw remain.
 The public V2 InstanceManager and WorkerPool APIs are removed. There is no
 pre-warmed checkout pool. Use explicit bounded worker ownership, as shown in the
-[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/lib/examples/05_multi_agent/05_03_bounded_workers).
+[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/05_03_bounded_workers).
 
 The Pod API, mutable graph planner, Pod state, and mutation directives are
 removed. Use static `Jido.Topology`, owned children, or the explicit
@@ -103,7 +103,7 @@ those packages. Deterministic LLM and Factory examples in core use the V3 API.
 They do not validate model quality or a paid provider session.
 
 All 52 fixtures, shared support, supporting core tests, and ten application
-scenarios are required. Run `mix test --include integration --include example --include flaky --seed 0`.
+scenarios are required. Run `mix test --include example --include flaky --seed 0`.
 Repeated test runs, recovery and scale checks, the runtime matrix, coverage,
 lint, Dialyzer, docs, and a fresh package consumer must pass before local beta
 QA is complete.

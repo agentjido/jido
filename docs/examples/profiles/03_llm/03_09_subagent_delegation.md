@@ -22,7 +22,7 @@ Spawn a real child Agent, transfer client context explicitly, and correlate resu
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_09_subagent_delegation/subagent_delegation.ex)
+- [Source](../../../../examples/03_llm/03_09_subagent_delegation/subagent_delegation.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_09_subagent_delegation/subagent_delegation_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

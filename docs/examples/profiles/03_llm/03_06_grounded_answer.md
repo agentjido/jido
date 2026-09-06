@@ -19,7 +19,7 @@ Retrieve evidence, generate an answer, and validate citation identity, revision,
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_06_grounded_answer/grounded_answer.ex)
+- [Source](../../../../examples/03_llm/03_06_grounded_answer/grounded_answer.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_06_grounded_answer/grounded_answer_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

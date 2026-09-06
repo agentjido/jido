@@ -8,4 +8,4 @@ All three tests pass. The loader rejects a different nested identity. The
 original rejection assertion remains enabled.
 
 [Tests](../../../jido/persistence/checkpoint_identity_test.exs) ·
-[Example](../../../../lib/examples/99_research/99_06_checkpoint_identity/README.md)
+[Example](../../../../examples/99_research/99_06_checkpoint_identity/README.md)

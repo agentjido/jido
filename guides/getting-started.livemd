@@ -4,6 +4,6 @@ The V2 setup cells are retired because their construction and command contracts
 changed. Run the complete local example from [the repository README](../README.md)
 in IEx after `mix deps.get`. The V3 candidate is local until explicitly published.
 
-For repeatable examples, use the [catalog](../lib/examples/README.md) and
+For repeatable examples, use the [catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) and
 its tests. See [Agent construction](agents.md), [commands](core-loop.md), and
 [the migration guide](migration.md).

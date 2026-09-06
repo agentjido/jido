@@ -15,6 +15,6 @@ Seven core tests cover pure admission rules and process and VM recovery.
 mix test test/jido/agent/pending_job_recovery_test.exs test/jido/agent/pending_job_vm_recovery_test.exs --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex) ·
+[Source](../../../../examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex) ·
 [Core tests](../../../../test/jido/agent/pending_job_recovery_test.exs) ·
 [Results](../../rec-02-results.md)

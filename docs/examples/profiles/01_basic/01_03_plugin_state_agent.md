@@ -19,7 +19,7 @@ Plugin state ownership and atomic domain/Plugin commit.
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent.ex)
+- [Source](../../../../examples/01_basic/01_03_plugin_state_agent/plugin_state_agent.ex)
 - [Integration tests](../../../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs)
 - [Basic results](../../basic-results.md)
 

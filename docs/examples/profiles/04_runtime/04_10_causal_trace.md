@@ -16,6 +16,6 @@ creation retry, restore, replacement, and OTP restart.
 mix test test/jido/observe/causal_trace_test.exs test/jido/observe/remote_causal_trace_test.exs --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_10_causal_trace/causal_trace.ex) ·
+[Source](../../../../examples/04_runtime/04_10_causal_trace/causal_trace.ex) ·
 [Core tests](../../../../test/jido/observe/causal_trace_test.exs) ·
 [Results](../../obs-02-results.md)

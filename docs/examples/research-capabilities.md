@@ -38,13 +38,13 @@ Seven solved targets now belong to the main learning sequence:
 
 | ID | Current example | Proof |
 | --- | --- | --- |
-| OBS-01 | [Agent Observation](../../lib/examples/04_runtime/04_09_agent_observation/turn_observation.ex) | Lifecycle, Turn, commit, cancellation, and terminal outcomes; 9 tests |
-| OBS-02 | [Causal Trace](../../lib/examples/04_runtime/04_10_causal_trace/causal_trace.ex) | Local and remote creation causes through retry, restore, and restart; 12 tests |
-| REC-01 | [Recoverable Delivery](../../lib/examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex) | Saved effect intent, restart, duplicate delivery, and committed confirmation; 11 tests |
-| REC-02 | [Pending Job Recovery](../../lib/examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex) | Approval, attempt identity, retry, cancellation, and restore; 7 tests |
-| REC-03 | [Durable Scheduling](../../lib/examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Occurrence identity, saved work, retry, acknowledgement, and skip policy; 25 tests |
-| DIST-01 | [Remote Child](../../lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex) | Selected-node placement, ownership, Signal exchange, and cleanup; 16 tests |
-| DIST-02 | [Remote Lifecycle](../../lib/examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex) | Disconnect, node loss, parent loss, and replacement; 4 tests |
+| OBS-01 | [Agent Observation](../../examples/04_runtime/04_09_agent_observation/turn_observation.ex) | Lifecycle, Turn, commit, cancellation, and terminal outcomes; 9 tests |
+| OBS-02 | [Causal Trace](../../examples/04_runtime/04_10_causal_trace/causal_trace.ex) | Local and remote creation causes through retry, restore, and restart; 12 tests |
+| REC-01 | [Recoverable Delivery](../../examples/04_runtime/04_11_recoverable_delivery/recoverable_delivery.ex) | Saved effect intent, restart, duplicate delivery, and committed confirmation; 11 tests |
+| REC-02 | [Pending Job Recovery](../../examples/04_runtime/04_12_pending_job_recovery/pending_job_recovery.ex) | Approval, attempt identity, retry, cancellation, and restore; 7 tests |
+| REC-03 | [Durable Scheduling](../../examples/04_runtime/04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Occurrence identity, saved work, retry, acknowledgement, and skip policy; 25 tests |
+| DIST-01 | [Remote Child](../../examples/05_multi_agent/05_05_remote_child/remote_child.ex) | Selected-node placement, ownership, Signal exchange, and cleanup; 16 tests |
+| DIST-02 | [Remote Lifecycle](../../examples/05_multi_agent/05_06_remote_lifecycle/remote_lifecycle.ex) | Disconnect, node loss, parent loss, and replacement; 4 tests |
 
 Each profile in the [catalog](catalog.md) gives its focused command. The result
 reports for [OBS-02](obs-02-results.md), [REC-03](rec-03-results.md),
@@ -58,14 +58,14 @@ boundaries are fixed and keep their enabled regression tests:
 
 | ID | Queue item | Required proof |
 | --- | --- | --- |
-| OBS-03 | [Progress observation](../../lib/examples/99_research/99_01_progress_observation/README.md) | Public progress, waiting reasons, interruption, and bounded consumers |
-| DIST-03 | [Distributed authority](../../lib/examples/99_research/99_02_distributed_authority/README.md) | One cluster owner for one stable Agent identity |
-| CTRL-01 | [Input and resource lifecycle](../../lib/examples/99_research/99_03_input_resource_lifecycle/README.md) | Typed ingress, reconnect, cancellation, expiry, and cleanup |
-| CTRL-02 | [Handoff and reconciliation](../../lib/examples/99_research/99_04_handoff_reconciliation/README.md) | Acknowledged ownership transfer and desired worker reconciliation |
-| CTRL-03 | [Capacity, deadlines, and cleanup](../../lib/examples/99_research/99_05_capacity_deadlines_cleanup/README.md) | Bounded admission, deadline behavior, and complete large-tree cleanup |
-| PERSIST-01 | [Checkpoint identity](../../lib/examples/99_research/99_06_checkpoint_identity/README.md) | Reject a loaded Agent whose identity differs from the requested identity |
-| PERSIST-02 | [Checkpoint portability](../../lib/examples/99_research/99_07_checkpoint_portability/README.md) | Reject process-local values supplied by storage |
-| PERSIST-03 | [Indeterminate write](../../lib/examples/99_research/99_08_indeterminate_write/README.md) | Prevent further Action work after an unknown write result |
+| OBS-03 | [Progress observation](../../examples/99_research/99_01_progress_observation/README.md) | Public progress, waiting reasons, interruption, and bounded consumers |
+| DIST-03 | [Distributed authority](../../examples/99_research/99_02_distributed_authority/README.md) | One cluster owner for one stable Agent identity |
+| CTRL-01 | [Input and resource lifecycle](../../examples/99_research/99_03_input_resource_lifecycle/README.md) | Typed ingress, reconnect, cancellation, expiry, and cleanup |
+| CTRL-02 | [Handoff and reconciliation](../../examples/99_research/99_04_handoff_reconciliation/README.md) | Acknowledged ownership transfer and desired worker reconciliation |
+| CTRL-03 | [Capacity, deadlines, and cleanup](../../examples/99_research/99_05_capacity_deadlines_cleanup/README.md) | Bounded admission, deadline behavior, and complete large-tree cleanup |
+| PERSIST-01 | [Checkpoint identity](../../examples/99_research/99_06_checkpoint_identity/README.md) | Reject a loaded Agent whose identity differs from the requested identity |
+| PERSIST-02 | [Checkpoint portability](../../examples/99_research/99_07_checkpoint_portability/README.md) | Reject process-local values supplied by storage |
+| PERSIST-03 | [Indeterminate write](../../examples/99_research/99_08_indeterminate_write/README.md) | Prevent further Action work after an unknown write result |
 
 The matching test notes are under
 [`test/examples/99_research`](../../test/examples/99_research/README.md). They
@@ -88,12 +88,12 @@ a child with `SpawnAgent.node`. The test fails if the child starts locally. It
 checks the remote PID, remote execution, parent and child identity, correlated
 Signals, unavailable nodes, startup failure, child stop, and parent cleanup.
 
-The [runnable example](../../lib/examples/05_multi_agent/05_05_remote_child/demo.exs)
+The [runnable example](../../examples/05_multi_agent/05_05_remote_child/demo.exs)
 uses OTP `peer` with a private cookie and an independent standard IO control
 channel:
 
 ```shell
-mix run lib/examples/05_multi_agent/05_05_remote_child/demo.exs
+mix run examples/05_multi_agent/05_05_remote_child/demo.exs
 ```
 
 This proves Erlang distribution between two local Agent nodes. It does not

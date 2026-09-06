@@ -13,7 +13,7 @@ Run date: **2026-09-03** (original catalog pass).
 > nine SDK fixtures; see [current Workflow results](workflow-results.md). LLM now
 > has ten SDK fixtures; see [current LLM results](llm-results.md).
 
-At that point, all **100 profiles** had an isolated source folder under `lib/examples`
+At that point, all **100 profiles** had an isolated source folder under `examples`
 and a matching test folder under `test/examples`. This pass added 68 source
 examples. No file under `lib/jido` was changed.
 

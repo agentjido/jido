@@ -14,4 +14,4 @@ batch do not run. Ordinary directives have no crash-replay guarantee.
 Use explicit persisted intent and acknowledgement for recoverable work.
 
 See [commit and delivery tests](../test/jido/agent/stateless_directive_test.exs)
-and the [recovery examples](../lib/examples/04_runtime/README.md).
+and the [recovery examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md).

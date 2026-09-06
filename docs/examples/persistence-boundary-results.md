@@ -19,9 +19,9 @@ outside this work.
 
 | Capability | Passing controls | Enabled failure |
 | --- | --- | --- |
-| [PERSIST-01: identity](../../lib/examples/99_research/99_06_checkpoint_identity/README.md) | Valid identity, state, and revision restore; wrong envelope rejection | A correct envelope can contain a different nested Agent ID |
-| [PERSIST-02: portability](../../lib/examples/99_research/99_07_checkpoint_portability/README.md) | Nested portable values round trip; save rejects a PID | Load accepts a nested PID supplied by storage |
-| [PERSIST-03: indeterminate write](../../lib/examples/99_research/99_08_indeterminate_write/README.md) | Confirmed write permits output; uncertain reply preserves stored bytes and sends no Directive | The next Action evaluates stale state after an uncertain write |
+| [PERSIST-01: identity](../../examples/99_research/99_06_checkpoint_identity/README.md) | Valid identity, state, and revision restore; wrong envelope rejection | A correct envelope can contain a different nested Agent ID |
+| [PERSIST-02: portability](../../examples/99_research/99_07_checkpoint_portability/README.md) | Nested portable values round trip; save rejects a PID | Load accepts a nested PID supplied by storage |
+| [PERSIST-03: indeterminate write](../../examples/99_research/99_08_indeterminate_write/README.md) | Confirmed write permits output; uncertain reply preserves stored bytes and sends no Directive | The next Action evaluates stale state after an uncertain write |
 
 ## Run
 

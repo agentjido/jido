@@ -18,7 +18,7 @@ owns reactivation and retains one static desired definition.
 The first four numbered examples cover independent Agents, a logical hierarchy,
 a Bus swarm with 1000 workers, and keyed account records. The swarm has
 checked-in DSL, Builder, and JSON forms. See the
-[guide](../../lib/examples/07_topology/README.md).
+[guide](../../examples/07_topology/README.md).
 
 ## Validation
 
@@ -101,7 +101,7 @@ also hit the 100 ms Signal delivery timeout in `ServerContextTest`. That test
 passed with all 52 topology tests, and the full suite repeat with the same
 seed did not reproduce the timeout. No acceptance test was disabled or changed.
 
-See the [composed example](../../lib/examples/07_topology/07_05_composed_system/README.md).
+See the [composed example](../../examples/07_topology/07_05_composed_system/README.md).
 Inclusion aliases are stable identity components. Instance IDs now escape
 separators as well; existing simple IDs are unchanged. An earlier instance ID
 containing `/` or `%` needs an explicit saved-identity migration before reuse.

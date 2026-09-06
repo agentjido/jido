@@ -41,7 +41,7 @@ The earlier DSL and LLM work remains in `f338208` and `90bd3c6`.
   short inline Step bodies. `jido_action` was pinned to Hex `3.0.0-beta.5`.
 - Runtime has eight feature fixtures. Multi-agent has four. Each shows an
   additional SDK feature with live runtime checks.
-- The 48 wider experiments live under `lib/examples/99_research` and
+- The 48 wider experiments live under `examples/99_research` and
   `test/examples/99_research`. All 54 original Runtime and Multi-agent profiles
   remain in the documentation archive.
 - Persistence rejects stale writes through atomic compare-and-swap. A rejected

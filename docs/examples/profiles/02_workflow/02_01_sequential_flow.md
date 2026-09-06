@@ -21,7 +21,7 @@ Input and output schemas, result dependencies, control dependencies, and one com
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_01_sequential_flow/sequential_flow.ex)
+- [Source](../../../../examples/02_workflow/02_01_sequential_flow/sequential_flow.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_01_sequential_flow/sequential_flow_test.exs)
 - [Workflow results](../../workflow-results.md)
 

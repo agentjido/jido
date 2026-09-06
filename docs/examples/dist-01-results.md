@@ -11,7 +11,7 @@ Directive.spawn_agent(Worker, :worker, node: target_node)
 
 Omitted placement remains local. An explicit node must run the same named Jido
 instance and matching Agent code. The old diagnostic `opts.node` form is now
-rejected. The [research Agent](../../lib/examples/05_multi_agent/05_05_remote_child/remote_child.ex)
+rejected. The [research Agent](../../examples/05_multi_agent/05_05_remote_child/remote_child.ex)
 uses the supported first-class field.
 
 ## Behavior and evidence
@@ -38,7 +38,7 @@ connection. Cleanup runs after failed assertions as well as successful tests.
 
 ```shell
 mix test test/jido/agent/distributed_child_test.exs test/jido/agent/child_placement_test.exs --seed 0
-mix run lib/examples/05_multi_agent/05_05_remote_child/demo.exs
+mix run examples/05_multi_agent/05_05_remote_child/demo.exs
 ```
 
 The original two-node test had one pass and one failure: SpawnAgent created the

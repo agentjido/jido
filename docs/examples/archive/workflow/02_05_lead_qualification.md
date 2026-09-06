@@ -33,7 +33,7 @@ state. The example does not invent a suspend mechanism or write to a CRM.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_05_lead_qualification/lead_qualification.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_05_lead_qualification/lead_qualification.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_05_lead_qualification/lead_qualification_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

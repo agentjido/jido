@@ -7,7 +7,6 @@ defmodule JidoTest.FeatureSDKCase do
       use JidoTest.AgentCase
       import JidoTest.FeatureSDKCase
       alias Jido.AgentServer, as: Server
-      @moduletag :integration
     end
   end
 

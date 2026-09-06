@@ -16,5 +16,5 @@ A caller timeout does not undo active work. Remote admission uses the caller's
 clock through a bounded query. Failed remote liveness checks during a partition
 do not prove that the remote process died.
 
-See the [routing example](../lib/examples/01_basic/README.md) and
+See the [routing example](https://github.com/agentjido/jido/tree/v3-spike/examples/01_basic/README.md) and
 [remote API tests](../test/jido/agent/remote_api_test.exs).

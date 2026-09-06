@@ -29,7 +29,7 @@
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/multi_agent/05_10_subagent_delegation/subagent_delegation.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/multi_agent/05_10_subagent_delegation/subagent_delegation.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/multi_agent/05_10_subagent_delegation/subagent_delegation_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

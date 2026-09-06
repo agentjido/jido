@@ -36,7 +36,7 @@ and shutdown lifecycle. The subscriber must be read-only and fail open.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_14_automatic_trace_subscriber/automatic_trace_subscriber.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_14_automatic_trace_subscriber/automatic_trace_subscriber.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_14_automatic_trace_subscriber/automatic_trace_subscriber_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

@@ -33,7 +33,7 @@ successful Action data because a Choice fallback is not an error handler.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_01_conditional_fallback/conditional_fallback.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_01_conditional_fallback/conditional_fallback.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_01_conditional_fallback/conditional_fallback_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

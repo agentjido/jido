@@ -48,7 +48,7 @@ revision from 1 to 2. These cases prove the contracts from
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_02_effectful_weather_lookup/effectful_weather_lookup.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_02_effectful_weather_lookup/effectful_weather_lookup.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_02_effectful_weather_lookup/effectful_weather_lookup_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

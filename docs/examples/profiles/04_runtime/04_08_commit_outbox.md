@@ -29,7 +29,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_08_commit_outbox --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_08_commit_outbox/audit_outbox.ex) ·
+[Source](../../../../examples/04_runtime/04_08_commit_outbox/audit_outbox.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_08_commit_outbox/audit_outbox_test.exs)
 
 ## Boundary and next question

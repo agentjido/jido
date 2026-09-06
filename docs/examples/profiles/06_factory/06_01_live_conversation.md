@@ -13,6 +13,6 @@ without the key value.
 Chat sessions stream text before completion and save only the complete answer.
 Local SSE tests cover early output, interrupted streams, and HTTP cleanup.
 
-[Source](../../../../lib/examples/06_factory/06_01_live_conversation/conversation.ex) ·
+[Source](../../../../examples/06_factory/06_01_live_conversation/conversation.ex) ·
 [Tests](../../../../test/examples/06_factory/06_01_live_conversation/conversation_test.exs) ·
-[Run guide](../../../../lib/examples/06_factory/README.md)
+[Run guide](../../../../examples/06_factory/README.md)

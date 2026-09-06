@@ -25,7 +25,7 @@
 - **Expected result:** The restored value equals the last durable commit. Duplicate Signals preserve state and create one new commit revision.
 - **Failure cases:** Corrupt snapshot, stale write authority, duplicate command, missing snapshot, or version conflict.
 - **Jido features under pressure:** Persistence adapters, restore, state version, idempotency, and structured restore errors.
-- **Source framework and links:** [Akka: event sourcing recovery concepts](https://doc.akka.io/libraries/akka-core/current/typed/persistence.html), [Jido implementation](../../../../lib/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex), and [Jido test](../../../../test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs)
+- **Source framework and links:** [Akka: event sourcing recovery concepts](https://doc.akka.io/libraries/akka-core/current/typed/persistence.html), [Jido implementation](../../../../examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex), and [Jido test](../../../../test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs)
 
 ## Burn-in result
 
@@ -50,7 +50,7 @@ a commit. No new no-op result is required.
 
 ## Best-effort implementation
 
-- [Code](../../../../lib/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex)
+- [Code](../../../../examples/04_runtime/04_06_state_recovery/persistent_counter_recovery.ex)
 - [Tests](../../../../test/examples/04_runtime/04_06_state_recovery/persistent_counter_recovery_test.exs)
 
 The current fixture passes with real SDK persistence. Stale writes cannot

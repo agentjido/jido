@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_12_definition_revision --include example -
 
 This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
 
-[Source](../../../../lib/examples/99_research/99_12_definition_revision/definition_revision.ex) · [Tests](definition_revision_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_12_definition_revision/definition_revision.ex) · [Tests](definition_revision_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)

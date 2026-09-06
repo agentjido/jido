@@ -10,6 +10,6 @@ can repair the declared system and stop it. The 1,000-worker example checks each
 worker and final cleanup. This is a local scale check, not a multi-host capacity
 claim. The old Pod mutation API is removed.
 
-See the [Topology guide](../lib/examples/07_topology/README.md),
-[bounded workers](../lib/examples/05_multi_agent/README.md), and
-[application scenarios](../test/integration/README.md).
+See the [Topology guide](https://github.com/agentjido/jido/tree/v3-spike/examples/07_topology/README.md),
+[bounded workers](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/README.md), and
+[application scenarios](https://github.com/agentjido/jido/tree/v3-spike/examples/08_applications/README.md).

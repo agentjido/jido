@@ -27,7 +27,7 @@ This profile records the earlier domain scope. See the [replacement map](README.
 
 ## Best-effort implementation
 
-- `git show 357b22a:lib/examples/03_llm/03_16_self_evaluation_loop/self_evaluation_loop.ex`
+- `git show 357b22a:examples/03_llm/03_16_self_evaluation_loop/self_evaluation_loop.ex`
 - `git show 357b22a:test/examples/03_llm/03_16_self_evaluation_loop/self_evaluation_loop_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

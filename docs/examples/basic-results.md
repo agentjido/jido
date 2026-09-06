@@ -10,7 +10,7 @@ replaced by nine SDK fixtures. See the [current Workflow results](workflow-resul
 for the new names and the preserved context, persistence, and approval checks.
 
 The Basic suite now has **five fixtures and 22 integration tests**. It
-replaces the ten domain-example groups in both `lib/examples/01_basic` and
+replaces the ten domain-example groups in both `examples/01_basic` and
 `test/examples/01_basic`. Both folders now contain the same five fixtures. Tests
 use the source Agent modules. The old research profiles are kept in
 [the archive](archive/basic); their source folders were removed.

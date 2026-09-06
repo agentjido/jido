@@ -1,6 +1,5 @@
 defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
   use JidoTest.AgentCase
-  @moduletag :integration
 
   @moduletag group: :runtime
   @moduletag complexity: 2

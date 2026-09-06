@@ -18,7 +18,7 @@ Actual history across Turns, duplicate rejection, and restore with a fresh clien
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/03_llm/03_02_conversation_history/conversation_history.ex)
+- [Source](../../../../examples/03_llm/03_02_conversation_history/conversation_history.ex)
 - [Integration tests](../../../../test/examples/03_llm/03_02_conversation_history/conversation_history_test.exs)
 - [LLM suite and results](../../llm-results.md)
 

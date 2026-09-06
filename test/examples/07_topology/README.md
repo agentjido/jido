@@ -11,4 +11,4 @@ task capacity to 4096, verifies broadcast delivery to all workers, and checks
 shutdown cleanup. No external service or database is required.
 
 Core authoring and runtime acceptance tests are in `test/jido/topology`.
-See the [example guide](../../../lib/examples/07_topology/README.md).
+See the [example guide](../../../examples/07_topology/README.md).

@@ -32,7 +32,7 @@ Run:
 mix test --include integration test/examples/05_multi_agent/05_02_correlated_requests --seed 0
 ```
 
-[Source](../../../../lib/examples/05_multi_agent/05_02_correlated_requests/correlated_requests.ex) ·
+[Source](../../../../examples/05_multi_agent/05_02_correlated_requests/correlated_requests.ex) ·
 [Tests](../../../../test/examples/05_multi_agent/05_02_correlated_requests/correlated_requests_test.exs)
 
 ## Boundary and next question

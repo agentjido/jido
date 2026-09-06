@@ -66,13 +66,17 @@ defmodule Jido.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "examples", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "examples"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp docs do
     [
       main: "readme",
       api_reference: false,
+      filter_modules: fn module, _metadata ->
+        not String.starts_with?(Atom.to_string(module), "Elixir.Jido.Examples.")
+      end,
       source_ref: "v#{@version}",
       source_url: "https://github.com/agentjido/jido",
       authors: ["Mike Hostetler <mike.hostetler@gmail.com>"],
@@ -239,9 +243,8 @@ defmodule Jido.MixProject do
 
   defp aliases do
     [
-      # Helper to run tests with trace when needed
-      # test: "test --trace --exclude flaky",
-      test: "test --preload-modules --exclude flaky --exclude example",
+      # Default exclusions are declared once in test/test_helper.exs.
+      test: "test --preload-modules",
 
       # Run the opt-in agent example suite
       examples: "test --only example",

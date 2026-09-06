@@ -25,7 +25,7 @@
 - **Expected result:** One logical occurrence causes at most one state change after restore.
 - **Failure cases:** Crash near dispatch, duplicate occurrence, missed window, invalid timezone, or cancel race.
 - **Jido features under pressure:** Persistent Plugin state, runtime reconciliation, occurrence identity, and at-least-once delivery.
-- **Source framework and links:** [Google ADK: Restate durable execution integration](https://google.github.io/adk-docs/integrations/restate/), [Akka: timers](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), Jido implementation in `bd05a32` at `lib/examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery.ex`, and Jido test in `bd05a32` at `test/examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery_test.exs`
+- **Source framework and links:** [Google ADK: Restate durable execution integration](https://google.github.io/adk-docs/integrations/restate/), [Akka: timers](https://doc.akka.io/libraries/akka-core/current/typed/interaction-patterns.html), Jido implementation in `bd05a32` at `examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery.ex`, and Jido test in `bd05a32` at `test/examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery_test.exs`
 
 ## Burn-in result
 
@@ -42,7 +42,7 @@ test is skipped until this runtime contract exists.
 
 ## Best-effort implementation
 
-- Historical source: `git show bd05a32:lib/examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery.ex`
+- Historical source: `git show bd05a32:examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery.ex`
 - Historical tests: `git show bd05a32:test/examples/99_research/90_legacy/runtime/04_18_durable_schedule_recovery/durable_schedule_recovery_test.exs`
 
 The local spike passes its mock-only tests. The complete profile **doesn't work yet**.

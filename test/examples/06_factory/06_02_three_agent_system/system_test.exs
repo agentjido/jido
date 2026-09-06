@@ -1,7 +1,7 @@
 defmodule JidoTest.Examples.Factory.SystemTest do
   use JidoTest.Case, async: true
   @moduletag :example
-  @moduletag :integration
+
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Factory.{Conversation, Tools}
   alias JidoTest.FactoryHTTP, as: HTTP

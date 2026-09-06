@@ -21,7 +21,7 @@ Separate approval Turns, post-commit Plugin dispatch, correlation, duplicates, a
 
 ## Implementation and evidence
 
-- [Source](../../../../lib/examples/02_workflow/02_09_approval_workflow/approval_workflow.ex)
+- [Source](../../../../examples/02_workflow/02_09_approval_workflow/approval_workflow.ex)
 - [Integration tests](../../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs)
 - [Workflow results](../../workflow-results.md)
 

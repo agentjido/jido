@@ -28,7 +28,7 @@ Run:
 mix test --include integration test/examples/04_runtime/04_05_runtime_inspection --seed 0
 ```
 
-[Source](../../../../lib/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex) ·
+[Source](../../../../examples/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex) ·
 [Tests](../../../../test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs)
 
 ## Boundary and next question

@@ -1,6 +1,5 @@
 defmodule JidoTest.Examples.Runtime.DeduplicatingInboxTest do
   use JidoTest.AgentCase
-  @moduletag :integration
 
   @moduletag group: :runtime
   @moduletag complexity: 3

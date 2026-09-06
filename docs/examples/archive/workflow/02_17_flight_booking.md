@@ -42,7 +42,7 @@ later result Turn. This is a local effect example, not durable booking recovery.
 
 ## Best-effort implementation
 
-- Code history: `git show ee1e641:lib/examples/02_workflow/02_17_flight_booking/flight_booking.ex`
+- Code history: `git show ee1e641:examples/02_workflow/02_17_flight_booking/flight_booking.ex`
 - Tests history: `git show ee1e641:test/examples/02_workflow/02_17_flight_booking/flight_booking_test.exs`
 
 The local implementation passes its mock-only tests. The tests define the

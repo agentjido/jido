@@ -5,7 +5,7 @@ defmodule Jido.Topology do
   Spark modules, `Jido.Topology.Builder`, and `Jido.Topology.Codec` use the
   same constructor. Construction and planning start no processes. Instance
   input is validated separately from Agent state. See the topology examples
-  in `lib/examples/07_topology` for local startup and JSON transport.
+  in `examples/07_topology` for local startup and JSON transport.
   """
 
   alias Jido.Agent.Authoring

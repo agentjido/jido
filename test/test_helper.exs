@@ -6,5 +6,5 @@
 ExUnit.start()
 
 # Focused schema and snapshot probes: mix test --only basic_contract
-# Basic SDK integration suite: mix test --include integration test/examples/01_basic
-ExUnit.configure(exclude: [:skip, :flaky, :example, :integration])
+# All examples, including application scenarios: mix examples
+ExUnit.configure(exclude: [:skip, :flaky, :example])

@@ -29,7 +29,7 @@
 
 ## Best-effort implementation
 
-- [Code](../../../../lib/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex)
+- [Code](../../../../examples/04_runtime/04_05_runtime_inspection/agent_live_debugger.ex)
 - [Tests](../../../../test/examples/04_runtime/04_05_runtime_inspection/agent_live_debugger_test.exs)
 
 The local implementation passes its mock-only tests. The tests define the
