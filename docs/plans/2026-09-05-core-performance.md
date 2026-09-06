@@ -1,11 +1,11 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 35 of 50 idea rounds are complete. Eight fixes were accepted (05, 07,
-08, 09, 16, 18, 31, 39). Six ideas were rejected after measurement (01, 02, 06,
-10, 11, 17). Twenty-one were rejected by source inspection. The other 15 rounds
+Status: 36 of 50 idea rounds are complete. Nine fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 39). Six ideas were rejected after measurement (01, 02, 06,
+10, 11, 17). Twenty-one were rejected by source inspection. The other 14 rounds
 remain. See [source decisions](../performance/cycle-inspection.md) and individual
-round reports. The [complete checks](../performance/phase-34-checks.md) passed
+round reports. The [complete checks](../performance/phase-36-checks.md) passed
 with 83.5% core coverage; the same 11 known example failures remain.
 
 ## Aim
@@ -90,7 +90,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 11 | Audit update: new batch fills the buffer | Batch at and above limit; retain exact last records | rejected |
 | 12 | Deep merge: empty right map fast path | `state/merge`; struct replacement contract | rejected |
 | 13 | Deep merge: empty left map fast path | Add empty-left fixture; struct and keyword behavior | rejected |
-| 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | pending |
+| 14 | Deep merge: avoid repeated keyword scans | Add keyword fixtures; duplicate keys and list replacement | accepted |
 | 15 | State defaults: fuse default extraction work | `agent/new`; dynamic defaults stay unsupported | rejected |
 | 16 | StateBudget: read module limit once per check | `state/budget`; stricter module/instance limit | accepted |
 | 17 | StateBudget: reduce intermediate maps in transition | Add replacement fixture; module and limit ownership | rejected |
@@ -127,6 +127,25 @@ An unmeasured idea must not be reported as a measured improvement.
 | 48 | Scheduler delivery: reduce stored transient data | Add durable enqueue/ack fixture; recovery and duplicates | rejected |
 | 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | rejected |
 | 50 | Combined fixes: repeat scale and lifecycle checks | Compare original and accepted head; 50 fresh-VM pairs | pending |
+
+## Next experiments
+
+The measured work suggests this order for the remaining ideas. All remain
+pending until their own check and decision.
+
+- Round 20: test a direct `Plugin.normalize_all([])` result. Empty declarations
+  need no uniqueness scans. Keep public command validation and callbacks.
+- Round 22: return the composed schema from common Agent validation and reuse it
+  for instance state parsing. Keep a fresh definition check on each call.
+  Check Plugin declaration callback behavior before changing normalization.
+- Round 36: test a constant table name for the default ETS base. Add get, put,
+  successful CAS, and conflicting CAS cases with exact cleanup of fixture keys.
+- Round 45: reuse the metadata and tracer already resolved at synchronous span
+  start. Keep public async spans and strict failure handling. End-of-span
+  correlation enrichment is a separate behavior and must be preserved.
+- Round 47: the relevant sort is durable pending-job selection. Compare a single
+  pass that chooses the first job after the cursor, or the smallest job on wrap,
+  with the current full sort. Check mixed term keys and stable tie behavior.
 
 ## Round record
 

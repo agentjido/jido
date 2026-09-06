@@ -30,8 +30,8 @@ is not an exact allocation or retained-copy measurement. That observation
 alone does not pass the cycle's memory acceptance gate. All copied-result
 ratios were 1.000. No helper processes started or remained.
 
-The first trial's separate one-call nil-budget check changed from about one
-clock tick to two. Its 100-check batch did not show that slowdown. The single
+The first trial's separate one-call nil-budget check changed from 42 ns to 83 ns
+in three of the five pairs. Its 100-check batch did not show that slowdown. The single
 call is too short for that ratio to support a useful performance claim.
 The second trial's corresponding single-call ratio was 0.988.
 
