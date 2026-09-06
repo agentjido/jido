@@ -1,12 +1,13 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 37 of 50 idea rounds are complete. Nine fixes were accepted (05, 07,
-08, 09, 14, 16, 18, 31, 39). Seven ideas were rejected after measurement (01, 02, 06,
-10, 11, 17, 20). Twenty-one were rejected by source inspection. The other 13 rounds
-remain. See [source decisions](../performance/cycle-inspection.md) and individual
-round reports. The [complete checks](../performance/phase-36-checks.md) passed
-with 83.5% core coverage; the same 11 known example failures remain.
+Status: 40 of 50 idea rounds are complete. Ten fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 36, 39). Eight ideas were rejected after measurement
+(01, 02, 06, 10, 11, 17, 20, 22). Twenty-two were rejected by source inspection.
+Ten rounds remain. Round 48 is reopened to measure scheduler task capture.
+See [source decisions](../performance/cycle-inspection.md) and individual reports.
+The last [complete checks](../performance/phase-40-checks.md) passed with 83.5%
+core coverage. Examples remain outside the coverage gate.
 
 ## Aim
 
@@ -97,13 +98,13 @@ An unmeasured idea must not be reported as a measured improvement.
 | 18 | Command: reject reserved keys without scanning all context keys | Add large context; exact structured errors | accepted |
 | 19 | Command: avoid intermediate context maps | `agent/prepare`; reserved context and Plugin precedence | rejected |
 | 20 | Command: empty Plugin chain fast path | `agent/cmd`; error normalization and validation | rejected |
-| 21 | Plugin: reuse normalized specs within one command | `plugin/prepare`; callback count and order | pending |
-| 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | pending |
+| 21 | Plugin: reuse normalized specs within one command | `plugin/prepare`; callback count and order | rejected |
+| 22 | Plugin: compose complete schema once within validation | `agent/validate`; reject changed Agent definitions | rejected |
 | 23 | Plugin: avoid empty directive grouping | No directives and mixed directives; ownership checks | rejected |
 | 24 | Plugin: index directive modules within one operation | Add many Plugin directive types; duplicate rejection | pending |
 | 25 | Plugin: avoid copying unchanged owned state | Add large Plugin state; protect from Action mutation | rejected |
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | rejected |
-| 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | pending |
+| 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | rejected |
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
 | 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | pending |
 | 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | rejected |
@@ -112,7 +113,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 33 | Codec object: avoid sorting fixed field lists repeatedly | Exact allowed/missing key rejection | pending |
 | 34 | Codec data: reduce intermediate lists during map traversal | Large metadata; JSON safety and depth/node limits | pending |
 | 35 | Checkpoint: avoid repeated definition construction | `agent/checkpoint`; restored identity and module | rejected |
-| 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | pending |
+| 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | accepted |
 | 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | rejected |
 | 38 | Server call: reduce default option parsing cost | Default/keyword timeout; reserved context errors | rejected |
 | 39 | Server task: reduce closure capture to required values | Large Agent state; actual task transfer size | accepted |
@@ -124,7 +125,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 45 | Observe: avoid duplicate metadata enrichment | `observe/span`; exact telemetry and tracer behavior | pending |
 | 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | rejected |
 | 47 | Scheduler queue: reduce due-item scan or sorting | Add due/not-due fixture; deadline and stable ordering | pending |
-| 48 | Scheduler delivery: reduce stored transient data | Add durable enqueue/ack fixture; recovery and duplicates | rejected |
+| 48 | Scheduler delivery: reduce task capture of runtime data | Capture actual task argument; keep durable progress and recovery | pending |
 | 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | rejected |
 | 50 | Combined fixes: repeat scale and lifecycle checks | Compare original and accepted head; 50 fresh-VM pairs | pending |
 
@@ -133,11 +134,6 @@ An unmeasured idea must not be reported as a measured improvement.
 The measured work suggests this order for the remaining ideas. All remain
 pending until their own check and decision.
 
-- Round 22: return the composed schema from common Agent validation and reuse it
-  for instance state parsing. Keep a fresh definition check on each call.
-  Check Plugin declaration callback behavior before changing normalization.
-- Round 36: test a constant table name for the default ETS base. Add get, put,
-  successful CAS, and conflicting CAS cases with exact cleanup of fixture keys.
 - Round 45: reuse the metadata and tracer already resolved at synchronous span
   start. Keep public async spans and strict failure handling. End-of-span
   correlation enrichment is a separate behavior and must be preserved.

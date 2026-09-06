@@ -55,3 +55,19 @@ These checks used runtime `3e58775f` and Elixir 1.20.3 / OTP 29.
 `docs/performance/probes/validation-effects.exs` checks Rounds 25 and 30.
 The map findings were read from the loaded `Map` and `:maps` BEAM abstract code.
 These checks do not supply timing evidence.
+
+## Command preparation and live routing
+
+These checks used runtime `763e351e`.
+
+| Round | Source and finding | Decision |
+| ---: | --- | --- |
+| 21 | `Runner.Prepared.plugin_specs` stores the specs returned by preparation. Finish passes the same specs to state protection, directive validation, and state updates. The live Server already passes its prepared specs to `Runner.prepare/4`, which uses `Plugin.prepare_specs/2`. Definition/schema validation still has its own normalization; the measured composition-reuse trial is recorded in Round 22. | Reject another specs cache around command prepare/finish. That reuse already exists. Keep fresh definition validation at its boundaries. |
+| 27 | Command routing calls `agent.module.handle_signal/2`. The existing `CustomRoutingAgent` test has no declared routes but returns a Turn for `custom.add`, changes input, and rejects other Signals. A router cached from Server startup routes cannot represent that callback behavior. | Reject substituting a startup router for the live routing boundary. Custom callbacks must remain authoritative. Round 28 tests an optimization inside the existing default handler instead. |
+
+Round 48 is reopened. The earlier finding about required durable progress fields
+still holds. A separate cost is now visible in `Scheduler.Runtime`: its
+`Task.async/1` function references `runtime.agent_server` and
+`runtime.last_delivered_job`, which can capture the full runtime map, including
+cron definitions and timers. The next test will measure the actual function
+argument before deciding whether to keep a smaller capture.

@@ -1,0 +1,23 @@
+diff --git a/lib/jido/agent/validation.ex b/lib/jido/agent/validation.ex
+index 9081f5d2..d2ee25b0 100644
+--- a/lib/jido/agent/validation.ex
++++ b/lib/jido/agent/validation.ex
+@@ -83 +83 @@ defmodule Jido.Agent.Validation do
+-    with {:ok, agent} <- validate_common(agent) do
++    with {:ok, agent, _schema} <- validate_common(agent) do
+@@ -101 +101 @@ defmodule Jido.Agent.Validation do
+-    with {:ok, agent} <- validate_common(agent),
++    with {:ok, agent, schema} <- validate_common(agent),
+@@ -103 +102,0 @@ defmodule Jido.Agent.Validation do
+-         {:ok, schema} <- complete_schema(agent),
+@@ -145,0 +145,4 @@ defmodule Jido.Agent.Validation do
++    |> case do
++      {:ok, agent, _schema} -> {:ok, agent}
++      error -> error
++    end
+@@ -155 +158 @@ defmodule Jido.Agent.Validation do
+-         {:ok, _complete_schema} <- Plugin.compose_schema(agent.schema, plugins),
++         {:ok, complete_schema} <- Plugin.compose_schema(agent.schema, plugins),
+@@ -166 +169 @@ defmodule Jido.Agent.Validation do
+-       }}
++       }, complete_schema}
