@@ -1,11 +1,10 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 18 decisions are recorded. The suite and Round 07 are pushed. Rounds
-08 and 09 also passed the combined checks and were accepted. Rounds 01, 02, 06, 10,
-and 11 were rejected after measurement. Ten further ideas were rejected by
-source inspection. The other 32 rounds remain. See
-[source decisions](../performance/cycle-inspection.md).
+Status: 19 of 50 idea rounds are complete. Four fixes were accepted (07, 08,
+09, 39). Five ideas were rejected after measurement (01, 02, 06, 10, 11).
+Ten were rejected by source inspection. The other 31 rounds remain. See
+[source decisions](../performance/cycle-inspection.md) and the individual round reports.
 
 ## Aim
 
@@ -114,7 +113,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 36 | Persistence ETS: reduce table-name work per operation | Add put/get/CAS fixture; conflict and table lifecycle | pending |
 | 37 | Persistence: reduce repeated encode/copy before CAS | Add durable server fixture; uncertain commit fail-closed | rejected |
 | 38 | Server call: reduce default option parsing cost | Default/keyword timeout; reserved context errors | rejected |
-| 39 | Server task: reduce closure capture to required values | Large Agent state; actual task transfer size | pending |
+| 39 | Server task: reduce closure capture to required values | Large Agent state; actual task transfer size | accepted |
 | 40 | Server completion: release large result/context references sooner | Result and failure barriers; state and error policy | rejected |
 | 41 | Server queued signals: reduce retained context copies | Add gated backlog fixture; FIFO and capacity rejection | rejected |
 | 42 | Server debug buffer: reduce append/trim cost | Add debug-on fixture; bounded history and order | pending |
