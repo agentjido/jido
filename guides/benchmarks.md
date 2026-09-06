@@ -11,9 +11,9 @@ ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 116 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 196 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 237 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 132 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 212 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 253 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
 Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
@@ -128,3 +128,8 @@ They do not measure a complete Agent Server Turn or cron activation. Run
 `mix run bench/capture_scheduler.exs --output PATH` for a separate trace of the
 actual `Task.async/1` function argument. That trace supplies copy-size evidence,
 not timing evidence.
+
+The `codec/check_map` cases include empty, small, 1,000-entry, and 10,000-entry
+objects. They check scalar values, nested values, invalid keys, and runtime
+values. Contract tests check exact error fields except their call-site stack
+trace, including depth, node, map, string, and list limits.
