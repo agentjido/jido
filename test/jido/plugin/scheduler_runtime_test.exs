@@ -6,6 +6,31 @@ defmodule JidoTest.Plugin.SchedulerRuntimeTest do
   alias Jido.Plugin.Scheduler.Runtime
   alias Jido.Signal
 
+  test "idle delivery keeps the cursor and removes the completed task and timeout" do
+    durable = Map.merge(spec(), %{delivery: :durable, generation: 1})
+    runtime = %{runtime() | desired_cron: %{job: durable}, last_delivered_job: :previous}
+    assert {:noreply, pending} = Runtime.handle_info(:deliver_pending, runtime)
+    timeout = pending.delivery_timeout
+    ref = pending.delivery_task.ref
+
+    assert_receive {:"$gen_call", from, {:plugin_state, Scheduler}}, 1_000
+    :gen_statem.reply(from, {:ok, %{cron: %{}}})
+    assert_receive {^ref, {:previous, :idle}}, 1_000
+
+    assert {:noreply, completed} = Runtime.handle_info({ref, {:previous, :idle}}, pending)
+
+    try do
+      assert completed.last_delivered_job == :previous
+      assert completed.desired_cron == runtime.desired_cron
+      assert completed.delivery_task == nil
+      assert completed.delivery_timeout == nil
+      assert Process.read_timer(timeout) == false
+      assert is_reference(completed.pending_timer)
+    after
+      Runtime.terminate(:normal, completed)
+    end
+  end
+
   test "reconciliation retains live jobs and replaces dead jobs before their DOWN is handled" do
     runtime = runtime()
     spec = spec()

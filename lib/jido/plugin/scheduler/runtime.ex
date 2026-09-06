@@ -94,10 +94,12 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
     if Enum.any?(runtime.desired_cron, fn {_job, spec} -> Durable.enabled?(spec) end) do
       timeout = Keyword.get(runtime.options, :delivery_timeout, 5_000)
+      agent_server = runtime.agent_server
+      previous_job = runtime.last_delivered_job
 
       task =
         Task.async(fn ->
-          Delivery.attempt(runtime.agent_server, runtime.last_delivered_job, timeout)
+          Delivery.attempt(agent_server, previous_job, timeout)
         end)
 
       timer = Process.send_after(self(), {:delivery_timeout, task.ref}, 2 * timeout + 100)
