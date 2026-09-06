@@ -1,21 +1,41 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Runtime extension boundaries
 
 [Design overview](README.md) | Previous: [Errors](errors.md)
 
-- Status: Core decisions locked; future package designs proposed
+- Status: Current extension points recorded; larger core and package designs deferred
 - Scope: Jido core, `jido_durable`, `jido_cluster`, and `jido_fabric`
 
 ## Decision labels
 
-This document uses two labels:
+This document distinguishes three states:
 
-- **Locked — Jido core:** This is part of the v3 core design. Implement it in
-  Jido before an external package depends on it.
+- **Implemented:** A public API with integration coverage on `v3-spike`.
+- **Deferred — core proposal:** A possible future core contract. Do not build
+  an extension that assumes it is available.
 - **Proposed — pending full design:** This is a design direction. Do not treat
   its API, data shape, or package ownership as final.
+
+## Implemented extension points
+
+See the [core scope guide](../../guides/core-scope.md) for the current contract.
+Core retains Builder, Codec, owned children, and public PID-based Agent Server
+operations. Persistence uses `Jido.Persistence.Adapter` with binary keys and
+values, including atomic compare-and-swap.
+
+| Extension need | Current public support |
+| --- | --- |
+| Change pending schedule delivery timing | Scheduler Plugin `delivery_interval`; stable occurrence ID and acknowledgement remain unchanged. |
+| Choose when to repair a local topology | Controller `repair: :manual`, `reconcile/2`, `status/2`, and `await_ready/2`. |
+| Own a resource or recover application work | Existing Plugin runtime, public state read, and Signal/Directive callbacks. |
+| Select a known node for an owned child | Existing explicit remote-child API. |
+| Store committed Agent state | Existing persistence adapter and checkpoint operations. |
+
+These controls do not supply a Ref facade, live target replacement, leases,
+placement, or automatic recovery scans. Add another core operation only when
+a real integration example demonstrates the missing contract.
 
 ## Goal
 
@@ -27,7 +47,10 @@ Future packages can add durable storage, recovery, automatic cluster placement,
 and transport beyond the core owned-child Signal path. They must not depend on private Agent Server state,
 private messages, or generated supervisor names.
 
-## Locked — Jido core
+## Deferred — core proposals
+
+The following sections describe the earlier target design. They are not the
+implemented data model or a prerequisite for using the current extension points.
 
 ### One Agent identity
 
@@ -144,7 +167,7 @@ package cannot weaken this rule with a permissive schema.
 
 ### Compare-and-swap persistence
 
-Persistence belongs to the Jido instance. The locked high-level contract is:
+Persistence belongs to the Jido instance. The proposed replacement contract is:
 
 ```elixir
 @callback load_agent(Jido.Agent.Ref.t()) ::
@@ -303,16 +326,18 @@ Repo before the Jido instance.
 `Plugin` has one meaning: an Agent capability with declared state, command
 callbacks, Directives, and an optional runtime.
 
-`Provider` means instance infrastructure. Persistence is the first locked
+`Provider` means instance infrastructure in this proposal. Persistence is its first
 provider boundary. A Provider does not receive Agent Turn callbacks and cannot
 change candidate Agent state.
 
 Core does not add a generic hook system. New provider boundaries require a
 separate design and fixed lifecycle semantics.
 
-## Core implementation work
+## Deferred core implementation work
 
-These changes are required in Jido v3 before a future package uses them:
+This list belongs to the earlier proposal. It does not authorize changes to
+the retained API. Some guarantees already exist through different public
+types; compare them with integration evidence before replacing anything:
 
 1. Add the required instance namespace and canonical `Jido.Agent.Ref`.
 2. Use Agent Ref for Registry, persistence, and Directives.
@@ -398,9 +423,9 @@ durable Signal admission or exactly-once delivery.
 Future designs can consider explicit providers for runtime location,
 placement, transport, and ownership. These APIs are not locked.
 
-Until those designs exist, packages must use the Ref-first instance facade.
-They must not use a generic callback, intercept an Agent Turn, or replace the
-core Commit state machine.
+Until those designs exist, extensions use the current public instance, Agent
+Server, Plugin, and persistence APIs. The Ref-first facade remains a proposal.
+Extensions must not replace the core Commit state machine.
 
 ## Package boundary test
 
@@ -417,7 +442,7 @@ actions:
 Add a small public core contract when this test fails. Do not expose the
 private implementation.
 
-## Core non-goals
+## Current core non-goals
 
 Jido core does not implement:
 
@@ -426,13 +451,12 @@ Jido core does not implement:
 - Automatic recovery scans.
 - Cluster membership or leader election.
 - Placement, replication, or consensus.
-- Remote transport or network security.
+- Transport gateways or network security beyond explicit Erlang node targeting.
 - A durable Agent mailbox.
 - Exactly-once Signal or Directive delivery.
 - Application checkpoint migrations.
-- Runtime Agent Builders or authoring Codecs.
-- Logical Agent relationship policy.
-- Per-Agent debug timelines or durable audit history.
+- Durable audit history.
 
-Core defines the local behavior and the safety contract. Future packages add
-the external mechanisms.
+The earlier proposal also removed Builders, Codecs, logical relationships,
+and local debug timelines. Those removals are deferred. The current APIs
+remain supported; this refinement changes only the extension points above.

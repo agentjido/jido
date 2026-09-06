@@ -1,12 +1,12 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Agent authoring
 
 [Design overview](README.md) | Related: [Agent](agent.md), [Plugins](plugins.md)
 
-- Status: Proposed decision
-- Defines: the one core Agent authoring path and its module contract.
+- Status: Historical module-only proposal; deferred
+- Scope: Current authoring status and the earlier module-only design.
 
 ## Implementation status
 
@@ -17,9 +17,14 @@ contract. The module-only restrictions below describe the earlier proposal;
 they do not describe the implemented authoring formats. The complete v3
 versioned-module and state migration remains separate work.
 
-## Decision
+## Historical module-only proposal
 
-Jido core has one Agent authoring path:
+The sections below describe an earlier alternative. They are not removal
+instructions for the current spike. This refinement retains DSL, Builder,
+Codec, neutral definitions, and generated route helpers. The public
+[Agent guide](../../guides/agents.md) describes construction today.
+
+The earlier proposal would give Jido core one Agent authoring path:
 
 ```text
 versioned Agent module
@@ -180,7 +185,7 @@ end
 `Jido.Agent` is outside Jido core. The example defines only the composition
 rule.
 
-## Required tests
+## Proposed tests for the historical alternative
 
 - The module macro rejects invalid or unknown static fields.
 - Every Agent module requires a positive definition revision.

@@ -1,5 +1,5 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # v3 design changes
 
@@ -7,6 +7,12 @@
 
 This document compares current spike concepts with the proposed v3 design. It
 is not a normative v3 API specification.
+
+The tables record the earlier comparison, not an active removal plan. Core
+retains DSL, Builder, Codec, owned children, and public Agent Server operations.
+Byte persistence already supports compare-and-swap. Use the
+[core scope guide](../../guides/core-scope.md) for the current baseline and
+verified extension points.
 
 ## Agent and authoring
 

@@ -1,5 +1,5 @@
-> Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> Implementation notes and deferred extensions. Review status is pending approval.
+> For the supported API, see [the current core scope](../../guides/core-scope.md).
 
 # Agent Spark DSL and authoring formats
 

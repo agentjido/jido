@@ -1,5 +1,5 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Durability guarantee
 

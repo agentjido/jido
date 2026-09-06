@@ -63,6 +63,40 @@ limit is 1000. Startup concurrency and simultaneous Agent execution are
 separate limits. A normal Bus broadcast does not retry a failed Agent turn.
 Each subscriber receives each matching Signal; this is not a work queue.
 
+## Application-controlled repair
+
+The controller uses `repair: :automatic` by default. An application can instead
+choose when the controller repeats a local repair pass:
+
+```elixir
+alias Jido.Examples.Topology.Independent
+alias Jido.Topology.Controller
+
+{:ok, controller} = Controller.start_link(
+  jido: MyApp.Jido,
+  topology: Independent.new!(id: "manual-repair"),
+  repair: :manual
+)
+:ok = Controller.await_ready(controller)
+
+left = Controller.whereis_agent(controller, :left)
+:ok = Jido.stop_agent(MyApp.Jido, left)
+
+# The application selects when to repair the existing target.
+:ok = Controller.reconcile(controller)
+:ok = Controller.await_ready(controller)
+```
+
+Manual mode performs initial startup once. It then waits for explicit repair
+requests. `reconcile/2` returns when it accepts a request; use `await_ready/2`
+for completion and `status/2` for errors. Requests during an active pass produce
+one follow-up pass and share the same concurrency limit. The independent
+example test proves that the other Agent keeps its PID and committed state.
+Child supervision and Plugin recovery continue in both modes.
+
+The request repairs the existing target. It does not resize a group, replace
+a definition, transfer ownership, or provide cluster placement.
+
 ## The three authoring forms
 
 ```elixir
@@ -128,7 +162,9 @@ validation. A group cannot act as a singleton parent.
 
 ## Lifecycle and scope
 
-The controller repairs missing Agents and ownership bindings. Topology Agents
+The controller repairs missing Agents and ownership bindings. Automatic mode
+repeats passes at `startup.retry_interval`; manual mode waits for a request.
+Topology Agents
 are temporary children in the Jido Agent pool. The controller owns reactivation
 after both normal and abnormal exits. Each repair pass checks the
 current processes and required Bus subscriptions. `status/1` reports the
@@ -140,14 +176,14 @@ A normal controller shutdown stops its owned Agents in reverse dependency
 order. It also stops its Buses and tasks. A controller worker crash can find
 its existing Agents through stable IDs and an ownership marker in metadata.
 A conflicting Agent or Bus is reported; the controller does not take it over.
-Partial startup reports `:degraded` and retries. It leaves successful members
+Partial startup reports `:degraded` and retries in automatic mode. It leaves successful members
 running. `await_ready/2` waits for all members and uses the caller's timeout.
 
-All declarations remain desired and active. A normal Agent stop or parent
-failure can stop children, but the controller will recreate missing members.
-To leave a member stopped, stop the controller. Live topology changes and
-per-member pause are outside this spike. Included topologies share one root
-controller and its execution limits.
+All declarations remain in the target. A normal Agent stop or parent failure
+can stop children. Automatic mode recreates missing members; manual mode waits
+for the application to request another pass. A pass repairs the whole target.
+Live topology changes and per-member pause are outside this spike. Included
+topologies share one root controller and its execution limits.
 
 Agent restoration uses the existing Jido persistence adapter. The controller
 loads saved state and its revision, validates identity, and reapplies the
@@ -173,5 +209,5 @@ mix quality
 The scale test boots 1000 workers plus one coordinator, publishes one Signal,
 checks every worker's committed result, and checks shutdown cleanup. The
 other tests cover authoring parity, document validation, stable identities,
-startup cycles, ownership, multiple subscriptions, failure recovery, identity
-conflicts, and restoration.
+startup cycles, ownership, multiple subscriptions, automatic and manual repair,
+concurrent repair requests, identity conflicts, and restoration.

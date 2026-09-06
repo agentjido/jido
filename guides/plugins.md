@@ -12,8 +12,10 @@ the V3 behavior. A Plugin can implement these separate operations:
 
 Optional `child_spec/1` starts an owned runtime. Without a runtime the dispatch
 callback receives `nil`. Both forms use a supervised dispatch task and the same
-validation, ordering, timeout, and failure rules. A replacement runtime starts
-from current committed Plugin state.
+validation, ordering, timeout, and failure rules. A replacement runtime can
+read current committed state through `Jido.Plugin.state/1`. Supplying that
+state and its version directly in replacement Init remains a
+[research contract](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md#fa-06-plugin-runtime-reconstruction-from-committed-state).
 
 The Action cannot change protected Plugin keys. A Plugin cannot replace the
 Agent value. Plugin declarations are validated when the Agent value is built.

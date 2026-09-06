@@ -1,18 +1,36 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Jido v3 spike design
 
 - Design status: Proposal
 - Purpose: Cohesive design base for review
 
-These documents contain proposals. The migration preparation updates the
-framework names. It retains implemented Builder, Codec, child ownership, and
-Topology behavior. The Ref facade, Plugin pipeline, and replacement persistence
-architecture are not implemented by that naming change. See the
-[prepared serialization contract](../migration/01-contracts.md).
+These documents contain deferred proposals and implementation notes. The
+[core scope guide](../../guides/core-scope.md) describes the supported API and
+extension points on `v3-spike`. Public module documentation and executable
+integration tests define the implemented behavior.
 
-## Core model
+## Current baseline
+
+Core retains Spark DSL, Builder, Codec, owned children, local Topology, and
+the public PID-based Agent Server API. Persistence uses the binary adapter
+with compare-and-swap. The proposed Ref facade, isolated Plugin pipeline,
+versioned module-only authoring, and replacement Record API are deferred.
+
+The refinement pass adds two controls: Scheduler `delivery_interval`, and
+Topology `repair: :manual` with `Controller.reconcile/2`. It creates no new
+packages and removes no authoring or relationship APIs. The
+[acceptance results](../examples/feature-acceptance-results.md) and
+[upgrade results](../examples/live-upgrade-results.md) track the remaining
+proposed contracts. A passing repair test does not prove a live upgrade.
+See the [refinement results](../examples/core-refinement-results.md) for the
+integration checks, package checks, and complete coverage run.
+
+## Proposed core model
+
+The rest of this overview describes the deferred target design. Names and
+data shapes below can differ from the implemented API.
 
 ```text
 Signal -> Action or Flow -> Commit -> Result
@@ -90,9 +108,8 @@ Read the design in this order:
     correlation, safe metadata, metrics, and logs.
 11. [Errors](errors.md) defines the Splode error set, normalization rules, and
     safe public error projection.
-12. [Runtime extension boundaries](runtime-extension-boundaries.md) locks the
-    core contracts needed by future durable, cluster, and fabric packages and
-    marks all package designs as proposed.
+12. [Runtime extension boundaries](runtime-extension-boundaries.md) separates
+    current extension points from proposed durable, cluster, and fabric work.
 
 Supporting documents:
 
@@ -102,13 +119,13 @@ Supporting documents:
   authoring, generated interfaces, Builder, and Codec support on the current SDK.
 - [v3 design changes](v3-design-changes.md) maps current contracts to the
   proposed v3 design.
-- [Delivery plan](delivery-plan.md) contains implementation steps, tests, and
-  open questions.
+- [Delivery plan](delivery-plan.md) contains the deferred implementation
+  sequence, proposed tests, and open questions.
 
 ## Document review status
 
-Design maturity and user approval are separate. A document can contain locked
-core decisions and still wait for user approval. Only an explicit user review
+Design maturity and user approval are separate. A design label does not
+establish an implemented contract. Only an explicit user review
 can move a document from `Pending approval` to `Approved`.
 
 | Document | Review status |

@@ -85,6 +85,7 @@ defmodule Jido.MixProject do
       ],
       extras: [
         {"README.md", title: "Home"},
+        {"guides/core-scope.md", title: "Core scope"},
         {"guides/migration.md", title: "V2 migration"},
         {"guides/agents.md", title: "Agent values"},
         {"guides/core-loop.md", title: "Command and commit"},

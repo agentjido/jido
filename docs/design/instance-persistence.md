@@ -1,11 +1,11 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Instance persistence
 
 [Design overview](README.md) | Previous: [Commit and effects](commit-and-effects.md) | Next: [Durability guarantee](durability-guarantee.md)
 
-- Status: Locked for Jido core
+- Status: Deferred core proposal; current persistence uses the binary adapter
 - Depends on: Jido instance, Agent Ref, Agent checkpoint, and Agent Commit.
 - Defines: the proposed instance-level load and compare-and-swap callbacks.
 

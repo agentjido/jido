@@ -124,7 +124,8 @@ end
 
 ## Guides and validation
 
-See [migration from V2](guides/migration.md), [Agent state](guides/agents.md),
+See [core scope and extension points](guides/core-scope.md),
+[migration from V2](guides/migration.md), [Agent state](guides/agents.md),
 [runtime controls](guides/runtime.md), [Plugins](guides/plugins.md), and
 [persistence](guides/storage.md). The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md)
 has 52 fixtures plus ten application scenarios. Run their complete acceptance

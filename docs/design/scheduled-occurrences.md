@@ -1,5 +1,5 @@
-> Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> Implementation notes and deferred extensions. Review status is pending approval.
+> For the supported API, see [the current core scope](../../guides/core-scope.md).
 
 # Scheduled occurrence identity and delivery
 
@@ -108,9 +108,13 @@ work. The application retains its generation counter across cancellation.
   the latest offered slot, including slots skipped while the job was pending.
 - Skip later slots while that job has pending work. Skip slots that pass while
   the Agent is offline. Retry an already committed pending occurrence on restore.
-- Retry every 100 milliseconds and rotate through pending jobs. A delivery task
-  performs one state read and one Agent call, each with a default five-second
-  timeout. The Plugin option `delivery_timeout` changes that call timeout.
+- Wait 100 milliseconds after each completed attempt by default, and rotate
+  through pending jobs. Plugin configuration `delivery_interval` sets this
+  delay to an integer from 1 through 4,294,967,295 milliseconds. Activation and
+  newly queued work can start an immediate attempt. A delivery task performs
+  one state read and one Agent call, each with a default five-second timeout.
+  `delivery_timeout` changes that call timeout. `retry_delay_ms` separately
+  controls retry after a runtime schedule fails to start.
 - Preserve completion through the Agent checkpoint. An acknowledgement is a
   data Directive; runtime notification only wakes the polling task.
 
@@ -120,6 +124,12 @@ pending record until a later attempt succeeds or the job is cancelled. External
 work can repeat before acknowledgement and must handle duplicate occurrence IDs.
 This policy does not implement a catch-up queue, an external-effect transaction,
 or distributed storage ownership.
+
+The interval integration test rejects result writes, measures two delivery
+attempts, and checks that both use the same saved pending work. After writes
+are permitted, one result commit clears the occurrence. It extends the existing
+[durable recovery tests](../../test/jido/agent/scheduled_occurrence_recovery_test.exs)
+and uses the real Scheduler runtime, Agent Turns, and File adapter.
 
 ## Plugin restart boundary
 

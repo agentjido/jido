@@ -1,14 +1,21 @@
 > Deferred design proposal. This document is pending approval. It does not define
-> the current core API. See [the implemented contract](../migration/01-contracts.md).
+> the current core API. See [the current core scope](../../guides/core-scope.md).
 
 # Delivery plan
 
 [Design overview](README.md)
 
-This document gives implementation order and verification work. Normative
-contracts remain in the linked design documents.
+This is the deferred implementation sequence for the earlier target design.
+It is not the active work plan for `v3-spike`. Several items differ from the
+implemented API or are already partly implemented. Check the
+[core scope guide](../../guides/core-scope.md) before using this sequence.
 
-## Implementation sequence
+The current refinement retains Builder, Codec, logical child ownership, and
+the public Agent Server API. It adds Scheduler delivery timing and explicit
+Topology repair requests. The removal items below require a separate scope
+decision and acceptance evidence.
+
+## Proposed implementation sequence
 
 1. Add the public value structs in the overview, their Zoi schemas, and the
    defined Splode errors.

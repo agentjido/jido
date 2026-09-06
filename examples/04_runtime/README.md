@@ -1,8 +1,8 @@
 # Runtime feature examples
 
-This sequence has 13 source fixtures. The first eight have 29 opt-in example
-tests. The five promoted capability examples have 64 core acceptance tests.
-All 93 tests pass with no skips.
+This sequence has 13 source fixtures. The first eight use opt-in example
+tests. The five promoted capability examples use the default core acceptance
+suite. Each profile gives its focused test command.
 
 | Order | Added feature | Tests |
 | --- | --- | ---: |
@@ -18,7 +18,7 @@ All 93 tests pass with no skips.
 | [04_10_causal_trace](04_10_causal_trace/causal_trace.ex) | Local and remote child work retains explicit creation causes. | 12 core |
 | [04_11_recoverable_delivery](04_11_recoverable_delivery/recoverable_delivery.ex) | A Plugin resumes committed output intent after loss. | 11 core |
 | [04_12_pending_job_recovery](04_12_pending_job_recovery/pending_job_recovery.ex) | Approval, attempt identity, retry, and cancellation survive restart. | 7 core |
-| [04_13_durable_scheduling](04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Saved schedule occurrences retry until the result commit acknowledges them. | 25 core |
+| [04_13_durable_scheduling](04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Saved schedule occurrences retry at a configured interval until the result commit acknowledges them. | 31 core |
 
 Run the opt-in example tests:
 
@@ -29,3 +29,17 @@ mix test --include example test/examples/04_runtime --seed 0
 Each promoted profile links its focused core command. See the
 [Runtime profiles](../../docs/examples/catalog.md#runtime) and the
 [research queue](../99_research/README.md).
+
+The durable scheduling fixture configures the Scheduler in its Agent DSL:
+
+```elixir
+agent do
+  plugin Jido.Plugin.Scheduler, config: [delivery_interval: 250]
+end
+```
+
+This sets the delay after each pending-work attempt to 250 milliseconds. The
+default is 100. The integration test rejects result writes, checks the interval
+and saved occurrence, then permits the result commit. Occurrence identity,
+acknowledgement, and the one-pending-occurrence limit retain their existing rules.
+See [core extension points](../../guides/core-scope.md#scheduler-delivery-interval).

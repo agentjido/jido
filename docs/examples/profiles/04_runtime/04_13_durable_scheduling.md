@@ -10,8 +10,11 @@ stale or duplicate work.
 
 ## Evidence
 
-Twenty-five core tests cover identity, Agent and Plugin loss, recovery,
+Thirty-one core tests cover identity, Agent and Plugin loss, recovery,
 cancellation, generation change, failed writes, and bounded pending work.
+They also verify a configured delivery interval and reject invalid intervals.
+The interval test uses the same saved occurrence across rejected result writes,
+then confirms that one successful result commit clears it.
 
 ```shell
 mix test test/jido/plugin/scheduler_occurrence_test.exs test/jido/agent/scheduled_occurrence_test.exs test/jido/plugin/durable_scheduler_test.exs test/jido/agent/scheduled_occurrence_recovery_test.exs --seed 0
