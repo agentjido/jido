@@ -1,12 +1,12 @@
 # Jido core performance plan
 
 Target: `agentjido/jido`, branch `v3-spike`.
-Status: 40 of 50 idea rounds are complete. Ten fixes were accepted (05, 07,
-08, 09, 14, 16, 18, 31, 36, 39). Eight ideas were rejected after measurement
-(01, 02, 06, 10, 11, 17, 20, 22). Twenty-two were rejected by source inspection.
-Ten rounds remain. Round 48 is reopened to measure scheduler task capture.
+Status: 42 of 50 idea rounds are complete. Eleven fixes were accepted (05, 07,
+08, 09, 14, 16, 18, 31, 36, 39, 48). Eight ideas were rejected after measurement
+(01, 02, 06, 10, 11, 17, 20, 22). Twenty-three were rejected by source inspection.
+Eight rounds remain. The scheduler capture fix passed full checks.
 See [source decisions](../performance/cycle-inspection.md) and individual reports.
-The last [complete checks](../performance/phase-40-checks.md) passed with 83.5%
+The last [complete checks](../performance/phase-42-checks.md) passed with 83.5%
 core coverage. Examples remain outside the coverage gate.
 
 ## Aim
@@ -106,7 +106,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 26 | Routing: reuse router within one validation operation | Route counts 1/16/64; defaults and priorities | rejected |
 | 27 | Routing: reuse prepared server routing data safely | Mutable neutral definitions and custom handle_signal | rejected |
 | 28 | Routing: direct path for one exact route | Wildcards, predicates, zero/multiple matches | pending |
-| 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | pending |
+| 29 | Agent validation: avoid repeated executable validation within a call | Action and Flow routes; invalid target error contract | rejected |
 | 30 | Agent transition: avoid duplicate full-state traversals | Large list/map and Plugin state; validation always runs | rejected |
 | 31 | Codec encode: avoid repeated Agent validation in generated-registry path | Encode 1/16/64 routes; invalid authoring definitions | accepted |
 | 32 | Codec Registry: build reverse lookup for one encode operation | Large Registry; canonical IDs and aliases | rejected |
@@ -125,7 +125,7 @@ An unmeasured idea must not be reported as a measured improvement.
 | 45 | Observe: avoid duplicate metadata enrichment | `observe/span`; exact telemetry and tracer behavior | pending |
 | 46 | Observe: reuse resolved configuration within a span | Noop/custom/strict tracer; runtime config changes | rejected |
 | 47 | Scheduler queue: reduce due-item scan or sorting | Add due/not-due fixture; deadline and stable ordering | pending |
-| 48 | Scheduler delivery: reduce task capture of runtime data | Capture actual task argument; keep durable progress and recovery | pending |
+| 48 | Scheduler delivery: reduce task capture of runtime data | Capture actual task argument; keep durable progress and recovery | accepted |
 | 49 | Topology activation: reduce repeated reference resolution | Add local multi-Agent topology; readiness and rollback | rejected |
 | 50 | Combined fixes: repeat scale and lifecycle checks | Compare original and accepted head; 50 fresh-VM pairs | pending |
 

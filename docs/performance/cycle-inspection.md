@@ -65,9 +65,17 @@ These checks used runtime `763e351e`.
 | 21 | `Runner.Prepared.plugin_specs` stores the specs returned by preparation. Finish passes the same specs to state protection, directive validation, and state updates. The live Server already passes its prepared specs to `Runner.prepare/4`, which uses `Plugin.prepare_specs/2`. Definition/schema validation still has its own normalization; the measured composition-reuse trial is recorded in Round 22. | Reject another specs cache around command prepare/finish. That reuse already exists. Keep fresh definition validation at its boundaries. |
 | 27 | Command routing calls `agent.module.handle_signal/2`. The existing `CustomRoutingAgent` test has no declared routes but returns a Turn for `custom.add`, changes input, and rejects other Signals. A router cached from Server startup routes cannot represent that callback behavior. | Reject substituting a startup router for the live routing boundary. Custom callbacks must remain authoritative. Round 28 tests an optimization inside the existing default handler instead. |
 
-Round 48 is reopened. The earlier finding about required durable progress fields
-still holds. A separate cost is now visible in `Scheduler.Runtime`: its
-`Task.async/1` function references `runtime.agent_server` and
-`runtime.last_delivered_job`, which can capture the full runtime map, including
-cron definitions and timers. The next test will measure the actual function
-argument before deciding whether to keep a smaller capture.
+Round 48 tested the separate task-capture cost and was accepted. See
+[the measured report](round-48-scheduler-capture.md). The earlier finding about
+required durable progress fields still holds.
+
+## Executable descriptor checks
+
+This check used runtime `16531024` and the pinned Action v3 dependency.
+
+| Round | Source and finding | Decision |
+| ---: | --- | --- |
+| 29 | `Validation.validate_targets/1` calls `Jido.Executable.validate/1` for each route. Module validation invokes the public executable descriptor callback before it checks required exports. The callback can return an invalid descriptor on a later route. The probe reaches that second call and returns the structured route error. An unconditional per-target cache would skip it. Flow values already have a constant descriptor validation path. | Reject unconditional repeated-target validation removal. Keep callback checks and the first invalid-route error. A cache limited to a new stable-descriptor contract is outside this cycle. |
+
+Probe: `docs/performance/probes/round-29-descriptor.exs`. This is a contract
+check, not a measured performance result.
