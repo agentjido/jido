@@ -143,7 +143,7 @@ defmodule Jido.Observe do
       span_ctx = init_span_ctx(event_prefix, enriched_metadata, tracer_module)
       with_span_scoped(span_ctx, fun)
     else
-      with_span_legacy(event_prefix, metadata, fun)
+      with_span_legacy(event_prefix, enriched_metadata, tracer_module, fun)
     end
   end
 
@@ -413,8 +413,19 @@ defmodule Jido.Observe do
     end
   end
 
-  defp with_span_legacy(event_prefix, metadata, fun) do
-    span_ctx = start_span(event_prefix, metadata)
+  defp with_span_legacy(event_prefix, metadata, tracer_module, fun) do
+    span_ctx = init_span_ctx(event_prefix, metadata, tracer_module)
+
+    tracer_ctx =
+      invoke_tracer_callback(
+        span_ctx,
+        :span_start,
+        [event_prefix, span_ctx.metadata],
+        nil,
+        "span_start/2"
+      )
+
+    span_ctx = %SpanCtx{span_ctx | tracer_ctx: tracer_ctx}
 
     try do
       result = fun.()
