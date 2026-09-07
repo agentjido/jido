@@ -161,28 +161,48 @@ defmodule Jido.Topology.DSL.Extension do
     entities: [@import_bus]
   }
   @exports_section %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports}
-  @startup_section %Spark.Dsl.Section{
+  @startup_schema [
+    concurrency: [type: :pos_integer],
+    ready: [type: {:in, [:all]}],
+    max_agents: [type: :pos_integer],
+    retry_interval: [type: :pos_integer],
+    task_timeout: [type: :pos_integer]
+  ]
+  @nested_startup_section %Spark.Dsl.Section{
     name: :startup,
     patchable?: true,
-    schema: [
-      concurrency: [type: :pos_integer],
-      ready: [type: {:in, [:all]}],
-      max_agents: [type: :pos_integer],
-      retry_interval: [type: :pos_integer],
-      task_timeout: [type: :pos_integer]
-    ]
+    schema: @startup_schema,
+    after_define: {__MODULE__, :mark_nested_startup}
+  }
+  @legacy_startup_section %{
+    @nested_startup_section
+    | after_define: {__MODULE__, :mark_legacy_startup}
   }
 
-  @topology_sections [
+  @entity_sections [
     @agents_section,
     @resources_section,
     @relationships_section,
     @connections_section,
     @topologies_section,
     @imports_section,
-    @exports_section,
-    @startup_section
+    @exports_section
   ]
+  @topology_sections @entity_sections ++ [@nested_startup_section]
+
+  @doc false
+  def mark_nested_startup do
+    quote generated: true do
+      Jido.Topology.DSL.Compiler.register_startup_location!(__MODULE__, :nested, __ENV__)
+    end
+  end
+
+  @doc false
+  def mark_legacy_startup do
+    quote generated: true do
+      Jido.Topology.DSL.Compiler.register_startup_location!(__MODULE__, :legacy, __ENV__)
+    end
+  end
 
   # Keep the current top-level blocks readable during the beta migration.
   # The compiler rejects declarations split across both locations.
@@ -195,7 +215,7 @@ defmodule Jido.Topology.DSL.Extension do
           schema: [schema: [type: :any], metadata: [type: :map]],
           sections: @topology_sections
         }
-      ] ++ @topology_sections
+      ] ++ @entity_sections ++ [@legacy_startup_section]
 end
 
 defmodule Jido.Topology.DSL do

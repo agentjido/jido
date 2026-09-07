@@ -90,6 +90,15 @@ defmodule Jido.Topology.DSL.Compiler do
     end
   end
 
+  @doc false
+  def register_startup_location!(module, location, env) do
+    case Module.get_attribute(module, :jido_topology_startup_location) do
+      nil -> Module.put_attribute(module, :jido_topology_startup_location, location)
+      ^location -> :ok
+      _other -> fail!(env, "Topology section :startup cannot be declared in both locations")
+    end
+  end
+
   defp fail_from_source(config, sources, error, env) do
     located =
       Enum.find_value(sources, fn source ->

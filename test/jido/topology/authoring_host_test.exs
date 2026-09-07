@@ -249,6 +249,32 @@ defmodule JidoTest.Topology.AuthoringHostTest do
                  end
   end
 
+  test "startup cannot be split between legacy and nested locations" do
+    module = Module.concat(__MODULE__, "SplitStartup#{System.unique_integer([:positive])}")
+
+    assert_raise CompileError,
+                 ~r/Topology section :startup cannot be declared in both locations/,
+                 fn ->
+                   compile_isolated(
+                     quote do
+                       defmodule unquote(module) do
+                         use Jido.Topology, name: "split_startup"
+
+                         startup do
+                           concurrency 1
+                         end
+
+                         topology do
+                           startup do
+                             concurrency 2
+                           end
+                         end
+                       end
+                     end
+                   )
+                 end
+  end
+
   defp compile_isolated(ast) do
     owner = self()
 
