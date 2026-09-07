@@ -26,3 +26,21 @@ changed struct. A byte limit does not make nonportable data safe to store.
 
 See the [complete example](../README.md#example) and
 [authoring tests](../test/jido/agent/authoring_test.exs).
+
+## Authoring extensions
+
+Pass Spark extension modules with `use Jido.Agent, extensions: [MyExtension]`.
+An extension can add entities to `agent do` and implement
+`c:Jido.Agent.Extension.lower_agent/2`. Core collects its schema, routes and
+Plugins first. It then calls each extension in declaration order with the
+configuration and the remaining foreign entities.
+
+Return `{:ok, config, remaining_entities}` or `{:error, exception}`. Every foreign
+entity must be consumed. The resulting configuration still passes the normal
+Agent validator. Generated route helpers use the final executable target, so
+an extension can lower a reference to an Action or Flow before helper validation.
+Duplicate extensions, unclaimed entities and invalid callback results fail.
+
+Keep this work static. Do not start a process, run an Action, or contact a
+service from a lowerer. Reuse the same semantic lowerer for data and Builder
+frontends. Extensions do not change the Agent runtime or Plugin state rules.

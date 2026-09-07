@@ -140,8 +140,10 @@ defmodule Jido.Agent do
 
   @doc "Defines one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
+    dsl_opts = if is_list(opts), do: Keyword.take(opts, [:extensions]), else: []
+
     quote location: :keep do
-      use Jido.Agent.DSL
+      use Jido.Agent.DSL, unquote(dsl_opts)
       use Jido.Action.Inline
       @before_compile Jido.Agent.DSL.Compiler
       @behaviour Jido.Agent

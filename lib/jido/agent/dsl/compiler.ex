@@ -7,10 +7,16 @@ defmodule Jido.Agent.DSL.Compiler do
   defmacro __before_compile__(env) do
     original = Module.get_attribute(env.module, :jido_agent_options)
     config = unwrap!(Authoring.attrs(original), env)
+    {extensions, config} = Map.pop(config, :extensions, [])
     # Module access can read an older loaded version during recompilation.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
     routes = Extension.get_entities(dsl, [:routes])
-    plugins = Extension.get_entities(dsl, [:agent])
+
+    {plugins, entities} =
+      dsl
+      |> Extension.get_entities([:agent])
+      |> Enum.split_with(&match?(%Jido.Agent.DSL.Plugin{}, &1))
+
     fields = block_fields(dsl, routes, plugins, env)
     overlap = Map.keys(fields) |> Enum.filter(&Map.has_key?(config, &1))
 
@@ -30,11 +36,18 @@ defmodule Jido.Agent.DSL.Compiler do
         Map.merge(config, fields)
       )
 
+    config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env)
+
+    routes =
+      if extensions == [],
+        do: routes,
+        else: lowered_interfaces(routes, Map.get(config, :routes, []), env)
+
     source = Extension.get_opt(dsl, [:routes], :signal_source)
     interfaces = interfaces(routes, source, env)
 
     generated = generate(interfaces, env)
-    block? = fields != %{} or source != nil
+    block? = fields != %{} or source != nil or extensions != []
 
     quote do
       @doc false
@@ -49,6 +62,27 @@ defmodule Jido.Agent.DSL.Compiler do
         @after_verify {Jido.Agent.DSL.Compiler, :verify}
       end
     end
+  end
+
+  defp lowered_interfaces(routes, lowered, env) do
+    lowered = unwrap!(Authoring.routes(lowered), env)
+
+    Enum.map(routes, fn route ->
+      if route.interfaces == [] do
+        route
+      else
+        case Enum.filter(lowered, &(&1.path == route.path)) do
+          [final] when is_nil(final.match) ->
+            %{route | target: final.target}
+
+          _ ->
+            fail!(
+              location(env, route),
+              "An exposed Signal type must retain exactly one route without a match predicate after lowering"
+            )
+        end
+      end
+    end)
   end
 
   def verify(module) do
