@@ -136,16 +136,21 @@ defmodule Jido.Topology.DSL.Extension do
 
   use Spark.Dsl.Extension,
     sections: [
-      %Spark.Dsl.Section{name: :topology, schema: [schema: [type: :any], metadata: [type: :map]]},
-      %Spark.Dsl.Section{name: :agents, entities: [@agent, @group]},
-      %Spark.Dsl.Section{name: :resources, entities: [@bus]},
-      %Spark.Dsl.Section{name: :relationships, entities: [@owns]},
-      %Spark.Dsl.Section{name: :connections, entities: [@subscribe]},
-      %Spark.Dsl.Section{name: :topologies, entities: [@include]},
-      %Spark.Dsl.Section{name: :imports, entities: [@import_bus]},
-      %Spark.Dsl.Section{name: :exports, entities: @exports},
+      %Spark.Dsl.Section{
+        name: :topology,
+        patchable?: true,
+        schema: [schema: [type: :any], metadata: [type: :map]]
+      },
+      %Spark.Dsl.Section{name: :agents, patchable?: true, entities: [@agent, @group]},
+      %Spark.Dsl.Section{name: :resources, patchable?: true, entities: [@bus]},
+      %Spark.Dsl.Section{name: :relationships, patchable?: true, entities: [@owns]},
+      %Spark.Dsl.Section{name: :connections, patchable?: true, entities: [@subscribe]},
+      %Spark.Dsl.Section{name: :topologies, patchable?: true, entities: [@include]},
+      %Spark.Dsl.Section{name: :imports, patchable?: true, entities: [@import_bus]},
+      %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports},
       %Spark.Dsl.Section{
         name: :startup,
+        patchable?: true,
         schema: [
           concurrency: [type: :pos_integer],
           ready: [type: {:in, [:all]}],

@@ -6,6 +6,11 @@ defmodule Jido.Topology do
   the same constructor. Declaration and planning start no processes. Instance
   input is validated separately from Agent state. See the topology examples in
   `examples/07_topology` for local startup and JSON transport.
+
+  Pass static authoring extensions with
+  `use Jido.Topology, extensions: [MyExtension]`. Each extension implements
+  `Jido.Topology.Extension` and lowers its declarations into ordinary Topology
+  configuration before common validation.
   """
 
   alias Jido.Agent.Authoring
@@ -38,8 +43,10 @@ defmodule Jido.Topology do
 
   @doc "Declares a topology module."
   defmacro __using__(opts) do
+    dsl_opts = if is_list(opts), do: Keyword.take(opts, [:extensions]), else: []
+
     quote location: :keep do
-      use Jido.Topology.DSL
+      use Jido.Topology.DSL, unquote(dsl_opts)
       import Jido.Topology.Reference, only: [input: 1, member: 1]
       import Jido.Topology.Ref, only: [ref: 2]
       @topology_options unquote(opts)

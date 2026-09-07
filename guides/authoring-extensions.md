@@ -1,10 +1,15 @@
 # Authoring Extensions
 
-An Agent authoring extension adds static declarations and lowers them into
-ordinary Agent configuration. It extends how an application describes an Agent;
-it does not add an imperative runtime path.
+An authoring extension adds static declarations and lowers them into ordinary
+Core configuration. It changes how an application describes an Agent or
+Topology. It does not add an imperative runtime path.
 
-## Implement The Contract
+## Extend Agent Authoring
+
+An Agent authoring extension lowers static declarations into ordinary Agent
+configuration.
+
+## Implement The Agent Contract
 
 An extension module implements `Jido.Agent.Extension`:
 
@@ -54,5 +59,42 @@ Plugin ownership, route selection, Agent Server admission, or commit rules.
 If an extension needs a live resource, use a Plugin runtime. If it needs a
 system of actors, use a Topology or application supervision tree.
 
+## Extend Topology Authoring
+
+A Topology authoring extension uses the same static lowering model. It can add
+one or more Spark sections, or it can add entities to existing Topology
+sections. The extension implements `Jido.Topology.Extension`:
+
+```elixir
+@behaviour Jido.Topology.Extension
+
+@impl Jido.Topology.Extension
+def lower_topology(config, foreign_entities) do
+  {:ok, updated_config, remaining_entities}
+end
+```
+
+Pass it to the Topology declaration:
+
+```elixir
+use Jido.Topology, extensions: [MyApp.TopologyExtension]
+```
+
+Core collects normal Agents, groups, Buses, relationships, connections,
+composition data, and startup policy first. It then collects foreign entities
+from all extension sections. Each extension consumes its entities in extension
+order and returns ordinary Topology configuration.
+
+The callback receives entity structs, not raw Spark section state. Put required
+lowering input in an entity. Use distinct structs for entities with different
+meanings. Preserve the relative order of entities that belong to later
+extensions. Do not depend on order between separate Spark sections.
+
+The final configuration passes the same validation, composition, planning, and
+controller paths as Builder and Codec definitions. An extension can describe a
+refined topology, but it cannot add a second activation runtime or put dynamic
+runtime data in a static definition.
+
 See [Agent DSL](agent-dsl.livemd), [Builders And Codecs](builders-and-codecs.md),
-and [Extension Boundaries](extension-boundaries.md).
+[Topology Definitions](topology-definitions.md), and
+[Extension Boundaries](extension-boundaries.md).

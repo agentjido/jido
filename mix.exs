@@ -256,6 +256,7 @@ defmodule Jido.MixProject do
           Jido.Topology.Builder,
           Jido.Topology.Codec,
           Jido.Topology.Controller,
+          Jido.Topology.Extension,
           Jido.Topology.Instance,
           Jido.Topology.Plan,
           Jido.Topology.Ref,

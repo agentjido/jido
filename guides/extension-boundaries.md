@@ -13,6 +13,7 @@ Use these public boundaries:
 - `Jido.Persistence.Adapter` for checkpoint storage
 - `Jido.Observe.Tracer` for trace export
 - Jido Signal dispatch adapters and buses for message transport
+- `Jido.Agent.Extension` and `Jido.Topology.Extension` for static DSL lowering
 - Agent and Topology builders and codecs for trusted authoring systems
 - `spawn_fun` for an application-owned remote child start
 

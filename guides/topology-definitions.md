@@ -43,6 +43,21 @@ Agent decides to create or stop workers from changing domain state.
 The controller repairs one existing target. It does not apply a new topology
 definition to a running system.
 
+## Add Refined Authoring Syntax
+
+Pass Spark extensions with
+`use Jido.Topology, extensions: [MyApp.TopologyExtension]`. A Topology extension
+implements `Jido.Topology.Extension` and lowers its static declarations into
+normal Agents, groups, Buses, relationships, connections, composition data, and
+startup policy.
+
+All foreign entities must be consumed. The lowered result passes normal
+Topology validation and uses the normal controller. Use an extension to add a
+focused application DSL. Do not use it to add another runtime or to put changing
+application data in the static topology.
+
+See [Authoring Extensions](authoring-extensions.md) for the lowering contract.
+
 ## Know Current Scope
 
 The v3 spike supports local activation, readiness, normal Bus input, logical
