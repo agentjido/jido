@@ -41,6 +41,36 @@ one executable inside one Turn and produces at most one Agent commit.
 A sequence of Server calls is different. Each call has its own Turn and commit.
 Use separate calls only when every intermediate state is valid and useful.
 
+## Use Shared Expressions In A Flow
+
+Flow uses `Jido.Expr` for bounded arithmetic, comparisons, Boolean operations,
+and string concatenation. Put these calculations in the Flow that an Agent
+route selects. The Agent uses the same `Jido.Exec` execution path for a Flow
+module and a Flow value from `Jido.Flow.Builder`.
+
+```elixir
+defmodule MyApp.AddCount do
+  use Jido.Flow, name: "add_count", schema: Zoi.object(%{amount: Zoi.integer()})
+
+  flow do
+    step "amount", action: MyApp.ValidateAmount, params: %{amount: min(input(:amount), 5)}
+    output %{count: context([:agent_state, :count]) + result("amount", :amount)}
+  end
+end
+```
+
+Here `MyApp.ValidateAmount` returns `{:ok, %{amount: amount}}`. The Flow output
+is the complete state of a counter Agent. An Agent with more fields must
+include those fields in its output too.
+
+For runtime Flow construction, import `Jido.Expr.expr/1` and insert Flow
+references with pins, for example `expr(^count + ^amount)`. The expression
+engine checks its resource limits and operand types. Expression failure
+returns an execution error and prevents the Agent state commit.
+
+Agent defaults and metadata remain data. They are not evaluated as expressions
+by the Agent or its Codec. Keep expression syntax and evaluation in Jido Action.
+
 ## Use Instructions At Execution Boundaries
 
 An Instruction stores a target, parameters, context, and metadata. Jido Action
