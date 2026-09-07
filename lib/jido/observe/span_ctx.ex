@@ -10,8 +10,8 @@ defmodule Jido.Observe.SpanCtx do
             __MODULE__,
             %{
               event_prefix: Zoi.list(Zoi.atom(), description: "Telemetry event prefix"),
-              start_time: Zoi.integer(description: "Monotonic start time in nanoseconds"),
-              start_system_time: Zoi.integer(description: "System start time in nanoseconds"),
+              start_time: Zoi.integer(description: "Monotonic start time in native units"),
+              start_system_time: Zoi.integer(description: "System start time in native units"),
               metadata: Zoi.map(description: "Event metadata"),
               tracer_module:
                 Zoi.atom(description: "Pinned tracer module for this span") |> Zoi.optional(),

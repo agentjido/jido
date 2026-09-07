@@ -484,4 +484,31 @@ defmodule JidoTest.Observe.ConfigTest do
       refute Config.interesting_signal_type?(nil, "some.random.signal")
     end
   end
+
+  test "malformed global and instance containers use defaults" do
+    saved_instance = Application.fetch_env(:jido_observe_config_test, ConfigInstance)
+
+    on_exit(fn ->
+      restore_env(:jido_observe_config_test, ConfigInstance, saved_instance)
+      Debug.reset(ConfigInstance)
+    end)
+
+    for {getter, group, _key, _override_key, _override_value, _instance_value, _global_value} <-
+          @settings do
+      saved_global = Application.fetch_env(:jido, group)
+      Application.delete_env(:jido, group)
+      default = apply(Config, getter, [nil])
+
+      Application.put_env(:jido, group, :invalid_container)
+      assert apply(Config, getter, [nil]) == default
+
+      Application.put_env(:jido_observe_config_test, ConfigInstance, :invalid_container)
+      assert apply(Config, getter, [ConfigInstance]) == default
+
+      Application.put_env(:jido_observe_config_test, ConfigInstance, [{group, :invalid_group}])
+      assert apply(Config, getter, [ConfigInstance]) == default
+
+      restore_env(:jido, group, saved_global)
+    end
+  end
 end

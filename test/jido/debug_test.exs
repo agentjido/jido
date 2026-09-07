@@ -40,6 +40,12 @@ defmodule JidoTest.DebugTest do
       assert Debug.level(@test_instance) == :verbose
     end
 
+    test "ignores a non-keyword option container" do
+      assert :ok = Debug.enable(@test_instance, :on, %{redact: false})
+      assert Debug.level(@test_instance) == :on
+      assert Debug.override(@test_instance, :redact_sensitive) == nil
+    end
+
     test "enable :off disables" do
       Debug.enable(@test_instance, :on)
       assert :ok = Debug.enable(@test_instance, :off)
@@ -132,6 +138,17 @@ defmodule JidoTest.DebugTest do
       assert is_map(status.overrides)
       assert status.overrides.telemetry_log_level == :debug
     end
+
+    test "malformed runtime state uses the disabled defaults" do
+      for state <- [:invalid, %{}, %{level: :invalid}, %{level: :on, overrides: :invalid}] do
+        :persistent_term.put({:jido_debug, @test_instance}, state)
+
+        assert Debug.level(@test_instance) == :off
+        refute Debug.enabled?(@test_instance)
+        assert Debug.override(@test_instance, :telemetry_log_level) == nil
+        assert Debug.status(@test_instance) == %{level: :off, overrides: %{}}
+      end
+    end
   end
 
   describe "maybe_enable_from_config/2" do
@@ -170,6 +187,14 @@ defmodule JidoTest.DebugTest do
       assert Debug.level(@test_instance) == :off
 
       Application.delete_env(:jido_test, @test_instance)
+    end
+
+    test "malformed instance configuration disables stale runtime state" do
+      Debug.enable(@test_instance, :on)
+      Application.put_env(:jido_test, @test_instance, :invalid_container)
+
+      assert Debug.maybe_enable_from_config(:jido_test, @test_instance) == :ok
+      assert Debug.level(@test_instance) == :off
     end
   end
 

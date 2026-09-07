@@ -27,6 +27,21 @@ defmodule JidoTest.Observe.CompletionContractTest do
     end
   end
 
+  defmodule TerminalFailureTracer do
+    @behaviour Jido.Observe.Tracer
+
+    @impl true
+    def span_start(_event, %{failure: failure}), do: failure
+
+    @impl true
+    def span_stop(:raise, _measurements), do: raise("terminal tracer failure")
+    def span_stop(:throw, _measurements), do: throw(:terminal_tracer_failure)
+    def span_stop(:exit, _measurements), do: exit(:terminal_tracer_failure)
+
+    @impl true
+    def span_exception(_ctx, _kind, _reason, _stacktrace), do: :ok
+  end
+
   test "exception event precedes tracer completion and preserves raw arguments in both modes" do
     saved = Application.fetch_env(:jido, :observability)
     event = [:jido, :completion_contract, :exception]
@@ -78,6 +93,44 @@ defmodule JidoTest.Observe.CompletionContractTest do
       assert metadata.kind == kind
       assert_received {:completion, :tracer, ^kind, ^reason, ^stacktrace}
       refute_received {:completion, _, _, _, _}
+    end
+  end
+
+  test "strict terminal tracer failures emit exactly one terminal event" do
+    saved = Application.fetch_env(:jido, :observability)
+    prefix = [:jido, :terminal_failure]
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        [prefix ++ [:stop], prefix ++ [:exception]],
+        fn event, _measurements, _metadata, pid -> send(pid, {:terminal, event}) end,
+        self()
+      )
+
+    on_exit(fn ->
+      :telemetry.detach(handler)
+
+      case saved do
+        {:ok, value} -> Application.put_env(:jido, :observability, value)
+        :error -> Application.delete_env(:jido, :observability)
+      end
+    end)
+
+    Application.put_env(:jido, :observability,
+      tracer: TerminalFailureTracer,
+      tracer_failure_mode: :strict
+    )
+
+    for failure <- [:raise, :throw, :exit] do
+      assert_raise RuntimeError, ~r/tracer span_stop\/2 failed/, fn ->
+        Observe.with_span(prefix, %{failure: failure}, fn -> :ok end)
+      end
+
+      assert_received {:terminal, event}
+      assert event == prefix ++ [:stop]
+      refute_received {:terminal, _event}
     end
   end
 

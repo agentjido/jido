@@ -76,6 +76,20 @@ defmodule Jido.Error.NormalizationTest do
       assert %Error.InternalError{} = error
       assert error.details == %{code: 500}
     end
+
+    test "all constructors normalize malformed details to maps" do
+      errors = [
+        Error.validation_error("Invalid", details: :invalid),
+        Error.execution_error("Failed", details: :invalid),
+        Error.routing_error("No route", details: :invalid),
+        Error.timeout_error("Timed out", details: :invalid),
+        Error.compensation_error("Failed", details: :invalid),
+        Error.internal_error("Internal", details: :invalid),
+        UnknownError.exception(message: "Unknown", details: :invalid)
+      ]
+
+      assert Enum.all?(errors, &is_map(&1.details))
+    end
   end
 
   describe "validation_error convenience keys" do

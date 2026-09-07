@@ -245,13 +245,15 @@ defmodule JidoTest.ObserveTest do
 
     test "duration includes time before a manual span finishes" do
       span_ctx = Observe.start_span([:jido, :test, :manual_span], %{})
-      span_ctx = %{span_ctx | start_time: span_ctx.start_time - 10_000_000}
+      elapsed = System.convert_time_unit(10, :millisecond, :native)
+      span_ctx = %{span_ctx | start_time: span_ctx.start_time - elapsed}
       Observe.finish_span(span_ctx)
 
       assert_receive {:telemetry_event, [:jido, :test, :manual_span, :stop],
                       %{duration: duration}, _}
 
-      assert duration >= 10_000_000
+      assert duration >= elapsed
+      assert Jido.Telemetry.Formatter.to_ms(duration) >= 10
     end
 
     test "returns span context struct with required keys" do
@@ -347,13 +349,15 @@ defmodule JidoTest.ObserveTest do
 
     test "duration includes time before an error span finishes" do
       span_ctx = Observe.start_span([:jido, :test, :error_span], %{})
-      span_ctx = %{span_ctx | start_time: span_ctx.start_time - 10_000_000}
+      elapsed = System.convert_time_unit(10, :millisecond, :native)
+      span_ctx = %{span_ctx | start_time: span_ctx.start_time - elapsed}
       Observe.finish_span_error(span_ctx, :error, :some_error, [])
 
       assert_receive {:telemetry_event, [:jido, :test, :error_span, :exception],
                       %{duration: duration}, _}
 
-      assert duration >= 10_000_000
+      assert duration >= elapsed
+      assert Jido.Telemetry.Formatter.to_ms(duration) >= 10
     end
   end
 

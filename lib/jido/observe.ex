@@ -8,7 +8,7 @@ defmodule Jido.Observe do
   ## Features
 
   - Automatic telemetry event emission (start/stop/exception)
-  - Duration measurement for all spans (nanoseconds)
+  - Duration measurement for all spans (native time units)
   - Automatic correlation ID enrichment from `Jido.Tracing.Context`
   - Pluggable tracer callbacks via `Jido.Observe.Tracer`
   - Threshold-based logging compatibility via `Jido.Observe.Log`
@@ -82,8 +82,8 @@ defmodule Jido.Observe do
   - `event_prefix ++ [:exception]` - emitted on error
 
   Measurements include:
-  - `:system_time` - start timestamp (nanoseconds)
-  - `:duration` - elapsed time (nanoseconds, on stop/exception)
+  - `:system_time` - start timestamp (native time units)
+  - `:duration` - elapsed time (native time units, on stop/exception)
   - Any additional measurements passed to `finish_span/2`
 
   ## Metadata Best Practices
@@ -427,10 +427,14 @@ defmodule Jido.Observe do
 
     span_ctx = %SpanCtx{span_ctx | tracer_ctx: tracer_ctx}
 
+    result = execute_legacy_fun(fun, span_ctx)
+    finish_span(span_ctx)
+    result
+  end
+
+  defp execute_legacy_fun(fun, span_ctx) do
     try do
-      result = fun.()
-      finish_span(span_ctx)
-      result
+      fun.()
     rescue
       e ->
         finish_span_error(span_ctx, :error, e, __STACKTRACE__)
@@ -646,8 +650,8 @@ defmodule Jido.Observe do
 
   defp init_span_ctx(event_prefix, metadata, tracer_module)
        when is_list(event_prefix) and is_map(metadata) and is_atom(tracer_module) do
-    start_time = System.monotonic_time(:nanosecond)
-    start_system_time = System.system_time(:nanosecond)
+    start_time = System.monotonic_time()
+    start_system_time = System.system_time()
 
     emit_event(event_prefix ++ [:start], %{system_time: start_system_time}, metadata)
 
@@ -662,7 +666,7 @@ defmodule Jido.Observe do
   end
 
   defp emit_stop_event(%SpanCtx{} = span_ctx, extra_measurements \\ %{}) do
-    duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
+    duration = System.monotonic_time() - span_ctx.start_time
     measurements = Map.merge(%{duration: duration}, extra_measurements)
 
     emit_event(span_ctx.event_prefix ++ [:stop], measurements, span_ctx.metadata)
@@ -671,7 +675,7 @@ defmodule Jido.Observe do
   end
 
   defp emit_exception_event(%SpanCtx{} = span_ctx, kind, reason) do
-    duration = System.monotonic_time(:nanosecond) - span_ctx.start_time
+    duration = System.monotonic_time() - span_ctx.start_time
 
     error_metadata =
       Map.merge(span_ctx.metadata, exception_metadata(kind, reason))
