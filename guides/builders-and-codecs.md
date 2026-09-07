@@ -30,7 +30,7 @@ revalidate earlier route targets. Build checks all current target contracts.
 Plugin declarations keep their ordered callback and ownership checks.
 
 Builder options and DSL options reject duplicate keyword keys. Direct Agent
-constructors, instance overrides, `Agent.set/2`, and caller context keep the last
+constructors, instance overrides, `Jido.Agent.set/2`, and caller context keep the last
 value for a repeated key. Supply each key once when moving between authoring
 forms. Caller context also accepts `nil` as an empty map.
 
