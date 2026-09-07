@@ -394,9 +394,10 @@ defmodule Jido.Agent do
       when is_atom(module) and is_map(checkpoint) and is_map(context) do
     with {:ok, agent} <-
            invoke_persistence_callback(:restore, fn ->
-             if module != __MODULE__ and function_exported?(module, :restore, 2),
-               do: module.restore(checkpoint, context),
-               else: default_restore(module, checkpoint, context)
+             if module != __MODULE__ and Code.ensure_loaded?(module) and
+                  function_exported?(module, :restore, 2),
+                do: module.restore(checkpoint, context),
+                else: default_restore(module, checkpoint, context)
            end),
          {:ok, agent} <- validate_instance(agent),
          :ok <- validate_restored_module(agent, module) do
@@ -565,7 +566,21 @@ defmodule Jido.Agent do
     })
   end
 
-  defp restore_definition(__MODULE__, checkpoint) do
+  defp restore_definition(__MODULE__, checkpoint), do: restore_checkpoint_definition(checkpoint)
+
+  defp restore_definition(module, checkpoint) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :__agent_config__, 0) and
+         function_exported?(module, :agent, 0) do
+      case module.agent() do
+        %__MODULE__{} = definition -> validate_definition(definition)
+        value -> invalid("Agent definition callback returned an invalid value", %{value: value})
+      end
+    else
+      restore_checkpoint_definition(checkpoint)
+    end
+  end
+
+  defp restore_checkpoint_definition(checkpoint) do
     case Map.get(checkpoint, :definition) do
       %__MODULE__{} = definition ->
         validate_definition(definition)
@@ -586,13 +601,6 @@ defmodule Jido.Agent do
 
       value ->
         invalid("Agent checkpoint definition is invalid", %{definition: value})
-    end
-  end
-
-  defp restore_definition(module, _checkpoint) do
-    case module.agent() do
-      %__MODULE__{} = definition -> validate_definition(definition)
-      value -> invalid("Agent definition callback returned an invalid value", %{value: value})
     end
   end
 

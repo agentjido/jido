@@ -1,6 +1,7 @@
 defmodule Jido.Agent.DirectiveTest do
   use JidoTest.Case, async: true
   alias Jido.Agent.Directive
+  alias Jido.Signal
 
   test "built-in validation checks Error, Spawn and child adoption fields" do
     for directive <- [
@@ -35,5 +36,34 @@ defmodule Jido.Agent.DirectiveTest do
     invalid = %{agent | state: %{count: :invalid, history: []}}
     assert {:error, _} = Directive.validate_agent_target(invalid)
     assert {:error, _} = Directive.validate(Directive.spawn_agent(invalid, :child))
+  end
+
+  test "Signal Directives validate the complete outbound envelope" do
+    signal = Signal.new!("agent.outbound", %{value: 1}, source: "/agent")
+
+    for malformed <- [
+          %{signal | id: ""},
+          %{signal | source: ""},
+          %{signal | type: ""},
+          %{signal | specversion: "2.0"},
+          %{signal | extensions: %URI{host: "example.com"}},
+          %{signal | extensions: %{"Bad_Key" => "value"}},
+          %{signal | extensions: %{"invalid" => self()}}
+        ],
+        directive <- [
+          Directive.emit(malformed),
+          Directive.emit_to_parent(malformed),
+          Directive.emit_to_child(:child, malformed)
+        ] do
+      assert {:error, _reason} = Directive.validate(directive)
+    end
+
+    for directive <- [
+          Directive.emit(signal),
+          Directive.emit_to_parent(signal),
+          Directive.emit_to_child(:child, signal)
+        ] do
+      assert {:ok, ^directive} = Directive.validate(directive)
+    end
   end
 end

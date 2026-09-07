@@ -60,6 +60,9 @@ defmodule Jido.Agent.Directive do
     :state_version
   ]
 
+  alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
+
   defmodule Error do
     @moduledoc "Reports a structured turn or runtime error to the Server policy."
 
@@ -266,9 +269,16 @@ defmodule Jido.Agent.Directive do
 
   @doc "Validates one built-in Agent Directive."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
-  def validate(%{__struct__: module, signal: %Jido.Signal{}} = directive)
-      when module in [Emit, EmitToParent, EmitToChild],
-      do: Zoi.parse(module.schema(), Map.from_struct(directive))
+  def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
+      when module in [Emit, EmitToParent, EmitToChild] do
+    with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
+         {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
+      directive
+      |> Map.from_struct()
+      |> Map.put(:signal, %{signal | extensions: extensions})
+      |> then(&Zoi.parse(module.schema(), &1))
+    end
+  end
 
   def validate(%{__struct__: module} = directive)
       when module in [Emit, EmitToParent, EmitToChild] do

@@ -41,7 +41,7 @@ defmodule Jido.Agent.StateBudget do
   def transition(previous, candidate) do
     candidate
     |> Map.put(:module, previous.module)
-    |> Map.put(:max_state_size, limit(previous))
+    |> Map.put(:max_state_size, Map.get(previous, :max_state_size))
     |> check()
   end
 
