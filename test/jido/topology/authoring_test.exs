@@ -3,7 +3,7 @@ defmodule Jido.Topology.AuthoringTest do
 
   alias Jido.Examples.Topology.{Accounts, Cell, Formats, Swarm}
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Reference}
+  alias Jido.Topology.{Builder, Codec, Plan, Ref, Reference}
 
   test "DSL, Builder, and JSON produce equal definitions and plans" do
     definition = Swarm.topology()
@@ -31,6 +31,35 @@ defmodule Jido.Topology.AuthoringTest do
     definition = Accounts.topology()
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+  end
+
+  test "every accepted Reference key survives a definition Codec round trip" do
+    for reference <- [
+          Reference.input(:initial),
+          Reference.input("initial"),
+          Reference.member(:index),
+          Reference.member("index")
+        ] do
+      definition = Topology.new!(name: "reference-round-trip", metadata: %{reference: reference})
+      assert {:ok, document, registry} = Codec.encode(definition)
+      assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    end
+  end
+
+  test "Reference constructors and static validation use the same key contract" do
+    for key <- [nil, true, false, "", String.duplicate("x", 256)] do
+      assert_raise ArgumentError, fn -> Reference.input(key) end
+      assert_raise ArgumentError, fn -> Reference.member(key) end
+    end
+
+    for reference <- [
+          %Reference{kind: :input, key: ""},
+          %Reference{kind: :other, key: :field},
+          %Ref{component: "", key: "worker"}
+        ] do
+      assert {:error, _error} =
+               Topology.new(name: "invalid-reference", metadata: %{reference: reference})
+    end
   end
 
   test "keyed identities do not depend on source ordering" do

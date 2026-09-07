@@ -40,6 +40,7 @@ defmodule Jido.Topology.Codec do
     with {:ok, definition} <- Topology.new(definition),
          {:ok, registry} <- Value.registry(definition),
          {:ok, document} <- encode_validated(definition, registry),
+         :ok <- Data.check_document(document),
          do: {:ok, document, registry}
   end
 
@@ -47,7 +48,9 @@ defmodule Jido.Topology.Codec do
   def encode(definition, registry) do
     with {:ok, definition} <- Topology.new(definition),
          {:ok, registry} <- Registry.new(registry),
-         do: encode_validated(definition, registry)
+         {:ok, document} <- encode_validated(definition, registry),
+         :ok <- Data.check_document(document),
+         do: {:ok, document}
   end
 
   defp encode_validated(definition, registry) do
@@ -70,15 +73,20 @@ defmodule Jido.Topology.Codec do
           "startup" => startup
         })
 
-      with :ok <- Data.check_document(document), do: {:ok, document}
+      {:ok, document}
     end
   end
 
   @doc "Decodes a definition without starting processes."
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- document_header(document),
          {:ok, registry} <- Registry.new(registry),
+         {:ok, attrs} <- decode_document(document, registry),
+         do: Topology.new(attrs)
+  end
+
+  defp decode_document(document, registry) do
+    with :ok <- document_header(document),
          {:ok, schema} <- Registry.resolve(registry, document["schema"], :schema),
          {:ok, metadata} <- Value.decode(document["metadata"], registry),
          {:ok, collections} <-
@@ -91,14 +99,13 @@ defmodule Jido.Topology.Codec do
                   do: {:ok, {kind, entries}}
            end),
          {:ok, startup} <- decode_entry(document["startup"], fields(:startup), registry) do
-      Topology.new(
-        Map.merge(Map.new(collections), %{
-          name: document["name"],
-          schema: schema,
-          metadata: metadata,
-          startup: startup
-        })
-      )
+      {:ok,
+       Map.merge(Map.new(collections), %{
+         name: document["name"],
+         schema: schema,
+         metadata: metadata,
+         startup: startup
+       })}
     end
   end
 
@@ -149,7 +156,7 @@ defmodule Jido.Topology.Codec do
 
   defp document_header(_), do: Authoring.error("Unknown topology document type or version")
 
-  defp encode_field(:topology, value, registry), do: encode(value, registry)
+  defp encode_field(:topology, value, registry), do: encode_validated(value, registry)
 
   defp encode_field(:bindings, values, registry),
     do: Authoring.traverse(values, &encode_entry(&1, registry))
@@ -179,7 +186,7 @@ defmodule Jido.Topology.Codec do
 
   defp encode_field(_, value, _), do: {:ok, value}
 
-  defp decode_field(:topology, value, registry), do: decode(value, registry)
+  defp decode_field(:topology, value, registry), do: decode_document(value, registry)
 
   defp decode_field(:bindings, values, registry),
     do: Authoring.traverse(values, &decode_entry(&1, [:key, :to], registry))

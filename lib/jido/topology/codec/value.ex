@@ -7,11 +7,14 @@ defmodule Jido.Topology.Codec.Value do
   def encode(value, registry, depth \\ 0)
   def encode(_, _, depth) when depth > 100, do: Authoring.error("Topology data is too deep")
 
-  def encode(%Ref{component: component, key: key}, _registry, _depth),
-    do: {:ok, %{"$type" => "topology.ref", "component" => component, "key" => key}}
+  def encode(%Ref{component: component, key: key} = reference, _registry, _depth) do
+    with :ok <- Ref.validate(reference),
+         do: {:ok, %{"$type" => "topology.ref", "component" => component, "key" => key}}
+  end
 
-  def encode(%Reference{kind: kind, key: key}, registry, depth) do
-    with {:ok, key} <- Data.encode(key, registry, depth + 1),
+  def encode(%Reference{kind: kind, key: key} = reference, registry, depth) do
+    with :ok <- Reference.validate(reference),
+         {:ok, key} <- Data.encode(key, registry, depth + 1),
          do: {:ok, %{"$type" => "topology.#{kind}", "key" => key}}
   end
 
@@ -44,9 +47,7 @@ defmodule Jido.Topology.Codec.Value do
   def decode(%{"$type" => type, "key" => key} = value, registry)
       when map_size(value) == 2 and type in ["topology.input", "topology.member"] do
     with {:ok, key} <- Data.decode(key, registry),
-         {:ok, _} <- Jido.Topology.Validation.key(key) do
-      {:ok, %Reference{kind: if(type == "topology.input", do: :input, else: :member), key: key}}
-    end
+         do: Reference.new(if(type == "topology.input", do: :input, else: :member), key)
   end
 
   def decode(%{"$type" => "map", "entries" => pairs} = value, registry)

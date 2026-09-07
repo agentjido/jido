@@ -3,7 +3,7 @@ defmodule Jido.Topology.Controller.Activation do
 
   alias Jido.Agent
   alias Jido.AgentServer, as: Server
-  alias Jido.Topology.BusInputs
+  alias Jido.Topology.{BusInputs, Validation}
 
   def start(spec, context) do
     with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, context.jido),
@@ -57,37 +57,35 @@ defmodule Jido.Topology.Controller.Activation do
   end
 
   defp definition(spec, context) do
-    config = Map.put(spec.module.__agent_config__(), :module, spec.module)
+    with {:ok, definition} <- Validation.agent_definition(spec.module) do
+      metadata =
+        Map.put(definition.metadata, "jido.topology", %{
+          id: context.instance_id,
+          key: spec.key
+        })
 
-    metadata =
-      Map.put(Map.get(config, :metadata, %{}), "jido.topology", %{
-        id: context.instance_id,
-        key: spec.key
-      })
+      definition = %{definition | metadata: metadata}
 
-    config = Map.put(config, :metadata, metadata)
+      definition =
+        if spec.subscriptions == [] do
+          definition
+        else
+          subscriptions =
+            Enum.map(spec.subscriptions, fn sub ->
+              [
+                bus: Map.fetch!(context.bus_ids, sub.bus),
+                path: sub.path,
+                retry_delay_ms: context.retry_interval
+              ]
+            end)
 
-    config =
-      if spec.subscriptions == [] do
-        config
-      else
-        subscriptions =
-          Enum.map(spec.subscriptions, fn sub ->
-            [
-              bus: Map.fetch!(context.bus_ids, sub.bus),
-              path: sub.path,
-              retry_delay_ms: context.retry_interval
-            ]
-          end)
+          %{
+            definition
+            | plugins: definition.plugins ++ [{BusInputs, subscriptions: subscriptions}]
+          }
+        end
 
-        Map.update(
-          config,
-          :plugins,
-          [{BusInputs, subscriptions: subscriptions}],
-          &(&1 ++ [{BusInputs, subscriptions: subscriptions}])
-        )
-      end
-
-    Agent.new(config)
+      Agent.new(definition)
+    end
   end
 end

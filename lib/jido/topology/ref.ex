@@ -26,7 +26,18 @@ defmodule Jido.Topology.Ref do
   end
 
   @doc false
-  def target(%__MODULE__{component: component, key: key}), do: new(component, key)
+  def validate(%__MODULE__{component: component, key: key} = reference) do
+    case new(component, key) do
+      {:ok, normalized} when normalized == reference -> :ok
+      _ -> Authoring.error("Invalid topology export reference")
+    end
+  end
+
+  @doc false
+  def target(%__MODULE__{} = reference) do
+    with :ok <- validate(reference), do: {:ok, reference}
+  end
+
   def target(value) when is_struct(value), do: Authoring.error("Invalid topology endpoint")
   def target(value), do: Jido.Topology.Validation.key(value)
 end
