@@ -95,6 +95,7 @@ defmodule Jido.Agent.Builder do
   end
 
   @doc "Appends a Plugin with its keyword or map configuration."
+  @spec plugin(t(), module(), keyword() | map()) :: t()
   def plugin(builder, module, config \\ [])
 
   def plugin(%__MODULE__{error: error} = builder, _module, _config) when not is_nil(error),

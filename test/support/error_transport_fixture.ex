@@ -7,6 +7,7 @@ defmodule JidoTest.ErrorTransport.UnrenderableError do
   def fail(:raise), do: raise("message failure")
   def fail(:throw), do: throw(:message_failure)
   def fail(:exit), do: exit(:message_failure)
+  def fail(_failure), do: "unrenderable error"
 end
 
 defimpl Inspect, for: JidoTest.ErrorTransport.UnrenderableError do

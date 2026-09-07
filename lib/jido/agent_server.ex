@@ -1830,9 +1830,10 @@ defmodule Jido.AgentServer do
     kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
   end
 
-  defp start_directive_timer(timeout, task_ref) do
-    start_task_timer(timeout, :directive_timeout, task_ref)
-  end
+  defp start_directive_timer(:infinity, _task_ref), do: nil
+
+  defp start_directive_timer(timeout, task_ref),
+    do: :erlang.start_timer(timeout, self(), {:directive_timeout, task_ref})
 
   defp start_task_timer(:infinity, _tag, _task_ref), do: nil
 

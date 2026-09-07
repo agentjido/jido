@@ -928,13 +928,6 @@ defmodule Jido.Plugin do
     end
   end
 
-  defp validate_child_spec(spec, plugin),
-    do:
-      invalid("Agent Plugin child_spec/1 returned an invalid child specification", %{
-        plugin: plugin,
-        child_spec: spec
-      })
-
   defp validate_otp_child_spec(spec, plugin) do
     case :supervisor.check_childspecs([spec]) do
       :ok ->
