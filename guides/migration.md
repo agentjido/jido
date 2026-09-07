@@ -1,113 +1,448 @@
-# Migrate from Jido V2 to the V3 candidate
+# Upgrade from Jido V2 to V3
 
-This branch transfers prepared source
-`jido_v3@bf6c9fbec569cb6438b6a1629a2768058d439d1f` into core Jido.
-The public names remain `Jido.Agent` and `Jido.AgentServer`. This is a major API
-change. It does not provide source compatibility with V2 or an automatic storage
-conversion. The candidate remains local until a separate publication decision.
+This guide covers the change from published Jido `2.3.3` to the local
+`3.0.0-beta.1` candidate. The public names remain `Jido.Agent` and
+`Jido.AgentServer`. Their contracts have changed. There is no V2 compatibility
+mode, automatic code rewrite, or automatic stored-data conversion.
 
-## Port a command
+The beta version is prepared for evaluation. It is not yet published. A version
+number does not mean that release checks have passed. See
+[validation and known gaps](#validation-and-known-gaps).
 
-| V2 use | V3 use |
+This guide follows the change-by-change structure of the
+[Ash 3.0 upgrade guide](https://ash.hexdocs.pm/upgrading-to-3-0.html).
+The Jido changes below are based on the
+[V2 source](https://github.com/agentjido/jido/tree/v2.3.3) and this candidate.
+New features that do not require a V2 code change are outside its scope.
+
+## Estimate the migration work
+
+These are relative work estimates, not elapsed-time estimates. Stored data and
+custom runtime behavior can cost more to port than the Agent definitions.
+
+| Area used in V2 | Work | Main change | Completion check |
+| --- | --- | --- | --- |
+| Agent constructors and result matches | Small | Separate definition from instance; use tagged results | Test every success and failure match |
+| NimbleOptions state schemas | Small to medium | Convert to static Zoi schemas | Test defaults, invalid values, and missing fields |
+| Direct Actions, Instruction lists, state patches | Medium | Route a Signal to one Action or Flow; return complete state | Verify unchanged fields survive each command |
+| Custom Strategy or command hooks | High | Move domain execution to Actions/Flows and policy to Plugins | Test order, rejection, and failure isolation |
+| V2 Plugins and custom directives | High | Rewrite callbacks, state ownership, and runtime setup | Test startup, commit, dispatch, restart, and cleanup |
+| Worker pools or mutable Pods | High | Use explicit owned workers and static Topology | Test capacity, cancellation, and child failure |
+| Stored Agents, Plugin checkpoints, Thread stores | High | Write and rehearse an application data conversion | Restore a backup and reconcile pending work |
+| Integrated Memory, Discovery, identity profiles | High | Select an application-owned replacement | Test the behavior the removed API supplied |
+
+## Choose the upgrade order
+
+1. Keep a working V2 revision and a copy of its dependency lock file.
+2. Inventory the affected APIs and any stored state.
+3. Update dependencies and port one small Agent with a direct command.
+4. Port state changes and command error handling.
+5. Port Plugins, directives, and live process ownership.
+6. Rehearse stored-data conversion separately from the code port.
+7. Test application behavior, then review deployment and rollback.
+
+Use a source search to find likely work. Matches are inspection points, not
+instructions to replace every name:
+
+```sh
+rg -n 'Jido\.(Agent|AgentServer|Instruction|Plugin|Storage|Sensor|Pod|Memory|Discovery)' lib test config
+rg -n 'signal_routes|on_before_cmd|on_after_cmd|StateOp|DirectiveExec|directive_handler|InstanceManager|WorkerPool' lib test config
+rg -n 'mount|prepare_signal|prepare_action|transform_result|on_checkpoint|on_restore' lib test
+```
+
+## Update dependencies and installation
+
+The candidate requires Elixir 1.18 or later. The declared OTP minimum is 27.
+Core now requires `jido_action ~> 3.0.0-beta.7` and
+`jido_signal ~> 3.0.0-beta.4`.
+
+### What you need to change
+
+For evaluation before publication, point the application at this checkout:
+
+```elixir
+{:jido, path: "../jido"}
+```
+
+After the package is published, the equivalent Hex requirement will be:
+
+```elixir
+{:jido, "~> 3.0.0-beta.1"}
+```
+
+Update direct `jido_action` and `jido_signal` constraints if your application
+has them. Review the
+[Jido Action migration guide](https://github.com/agentjido/jido_action/blob/release/v3/guides/v2-to-v3-migration.md)
+as part of the same port. An Action that works alone still needs to satisfy the
+complete-state contract when an Agent executes it.
+
+Do not assume that a V2 `jido_ai`, `jido_browser`, or custom integration works
+with Core V3. Check its Plugin, Strategy, and Server API use. Core examples do
+not prove compatibility with those packages.
+
+The Igniter installer and Jido generators are removed. Add your instance module
+to your supervision tree explicitly. Keep direct dependencies for packages your
+application uses. Core production builds do not supply the example-only
+`req_llm` or `dotenvy` dependencies.
+
+## Convert Agent schemas and constructors
+
+V2 module construction returns an Agent directly and accepts keyword schemas:
+
+```elixir
+defmodule MyApp.Counter do
+  use Jido.Agent,
+    name: "counter",
+    schema: [count: [type: :integer, default: 0]]
+end
+
+agent = MyApp.Counter.new(id: "counter-1")
+```
+
+### What you need to change
+
+Use a static Zoi schema. Module `new/1` now returns a tagged result. Use
+`new!/1` only where an exception is the intended error path:
+
+```elixir
+defmodule MyApp.Counter do
+  use Jido.Agent, name: "counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+end
+
+{:ok, agent} = MyApp.Counter.new(id: "counter-1")
+agent = MyApp.Counter.new!(id: "counter-1")
+```
+
+A definition is now a neutral `%Jido.Agent{}` with `id: nil` and `state: nil`.
+An instance has a nonempty binary ID and validated state. Separate these steps
+when using generic construction or the Builder:
+
+```elixir
+definition = MyApp.Counter.agent()
+{:ok, agent} = Jido.Agent.instantiate(definition, id: "counter-1", state: %{count: 5})
+```
+
+Do not pass live process state into a definition. Keep PIDs, references,
+connections, and timers in owned runtimes. Review any dynamic schema builders:
+V3 requires static schemas and does not provide a schema adapter.
+
+**Check:** test schema defaults and invalid state through the constructor. If you
+set `max_state_size`, test the complete state, including Plugin state. The limit
+uses external term bytes; it does not establish portability.
+
+## Send Signals and return complete state
+
+V2 direct commands can take an Action or tuple. Actions commonly return a patch,
+and the caller receives an Agent/directives pair:
+
+```elixir
+{agent, directives} = MyApp.Counter.cmd(agent, {MyApp.Increment, %{amount: 2}})
+```
+
+V3 accepts a `Jido.Signal` at the Agent command boundary. Its route must select
+exactly one Action or Flow. An Instruction list is not a command batch.
+
+### What you need to change
+
+The following is a complete replacement. The Action preserves the rest of the
+state and changes only `count`. The route also generates explicit helpers:
+
+```elixir
+defmodule MyApp.Increment do
+  use Jido.Action,
+    name: "increment",
+    schema: Zoi.object(%{amount: Zoi.integer()})
+
+  @impl Jido.Action
+  def run(%{amount: amount}, %{agent_state: state}) do
+    {:ok, %{state | count: state.count + amount}}
+  end
+end
+
+defmodule MyApp.Counter do
+  use Jido.Agent, name: "counter"
+
+  agent do
+    schema Zoi.object(%{
+      count: Zoi.integer() |> Zoi.default(0),
+      label: Zoi.string() |> Zoi.default("main")
+    })
+  end
+
+  routes do
+    signal_source "/counter"
+
+    route "counter.increment", MyApp.Increment do
+      define :increment, args: [:amount]
+    end
+  end
+end
+
+{:ok, agent} = MyApp.Counter.new(id: "counter-1")
+{:ok, signal} = MyApp.Counter.increment_signal(2)
+{:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
+# candidate.state == %{count: 2, label: "main"}
+# agent.state remains %{count: 0, label: "main"}
+```
+
+Replace patch returns such as `{:ok, %{count: next_count}}` with complete state
+based on `context.agent_state`. Do not copy V2 StateOps into the new result.
+The Action must preserve protected Plugin state keys. The owning Plugin changes
+those keys through `update_state/3`.
+
+Replace `signal_routes` with definition routes or the Spark `routes` block.
+Move a sequence of Actions into a Flow when it represents one command. A Flow
+must also produce complete domain state. Do not split it into separate live
+calls if your application requires one commit.
+
+Do not assume that an exact route overrides wildcard matches. Multiple matches
+are an error. Plugin preparation currently occurs before route selection, so a
+Plugin that changes Signal type can change the selected executable.
+
+**Check:** assert that unrelated fields survive success. Test no-match and
+multiple-match Signals. Test every pattern match that used the old two-element
+result. Direct failures now return `{:error, reason}`; they are not successful
+results with an error directive.
+
+## Separate direct execution from live commit
+
+Direct `cmd` creates a candidate. It does not update a running Agent. The Server
+owns serial Turns, validation, commit, and later directive dispatch.
+
+### What you need to change
+
+Use the live API when the application needs a committed result:
+
+```elixir
+{:ok, _instance} = Jido.start()
+{:ok, server} = Jido.start_agent(Jido.default_instance(), MyApp.Counter, id: "counter-1")
+{:ok, committed} = MyApp.Counter.increment(server, 2)
+# committed.state.count == 2
+:ok = Jido.stop_agent(Jido.default_instance(), server)
+```
+
+`Jido.AgentServer.call/3` also accepts a Signal. Use `send_request/3` and
+`receive_response/2` when sending and waiting must be separate. Replace old
+await/status facades with the documented readiness, status, and cancellation
+APIs. Use `cancel_turn/2` when cancellation must target a specific Turn.
+
+Actions and Flows can perform I/O before commit. A failed Turn preserves the
+committed Agent state, but it cannot undo completed external work. Directives
+run after commit. Failure stops the rest of that directive batch and leaves
+the commit in place. Ordinary directives are not a durable outbox.
+
+**Check:** test Action failure, invalid candidate state, persistence conflict,
+and directive failure separately. Check that retries do not duplicate external
+work. A successful live call is not proof that all later effects succeeded.
+
+## Replace Strategies and command hooks
+
+V2 Strategy, FSM Strategy, `on_before_cmd/2`, and `on_after_cmd/3` are removed.
+The Server no longer exposes the old GenServer State structure.
+
+### What you need to change
+
+| Old responsibility | V3 location |
 | --- | --- |
-| Module `new/1` returns a struct | `new/1` returns a tagged result; `new!/1` returns a struct or raises |
-| Generic `Agent.new` combines configuration and instance data | Build a neutral definition, then call `Jido.Agent.instantiate/2` |
-| Instruction or Action input to `cmd` | Send a `Jido.Signal` that selects one Action or Flow |
-| `{agent, directives}` from `cmd` | `{:ok, candidate, directives}` or `{:error, reason}` |
-| State patches and StateOps | Return complete candidate state; use `context.agent_state` as the base |
-| Strategy, FSM Strategy and before/after command hooks | Action/Flow execution and explicit V3 Plugin callbacks |
-| `signal_routes` | Definition `routes` or Spark `routes` block |
-| Context read from old Agent/Server structs | `context.agent_id`, `context.agent_state`, and `context.signal` |
-| Await/status polling facade | Live calls, separate requests, readiness and cancellation APIs |
-| `Jido.whereis` facade | `Jido.whereis_agent(instance, id, partition: partition)` |
-| Startup `initial_state` | Retained for Server options; instance constructor uses `state` |
+| Domain calculation or branching | Action or Flow |
+| State machine domain state | Fields in the Agent schema and explicit transitions |
+| Pure input preparation | Plugin `prepare/2` |
+| Admission that needs live state or a resource | Plugin `admit/3` |
+| Plugin-owned state update | Plugin `update_state/3` |
+| Runtime work after commit | Typed Plugin directive and `dispatch/4` |
+| Observation | Public snapshots/status and V3 telemetry |
 
-The [README example](../README.md#example) contains a complete Action, Agent,
-Signal helper, direct call, and live call. [Agent state](agents.md) describes
-schemas and optional state-size limits. Limits use external term bytes and
-include Plugin state. A failed candidate leaves the committed revision unchanged.
+There is no callback-for-callback Strategy adapter. Rebuild behavior around
+these boundaries. Use `context.agent_id`, `context.agent_state`, and
+`context.signal` in Actions instead of private Server fields.
 
-## Port effects and Plugins
+**Check:** verify transition order and failure behavior. Use
+`AgentServer.agent/1`, `snapshot/1`, `status/1`, and `children/1` for public
+inspection. Remove application dependencies on `:sys.get_state` tuple shapes.
 
-Actions and Flows can perform I/O before commit. Validation or storage failure
-cannot undo that I/O. Define external idempotency and retry rules.
-Directives run after commit. A directive failure keeps that commit and stops the
-rest of its batch. A live call can therefore succeed before a later effect fails.
+## Rewrite Plugins and custom directives
 
-Port Plugin manifests, mounts, requirements, config helpers, routes, and old
-callbacks to the [V3 Plugin contract](plugins.md). Plugins own
-one declared state key and their typed directives. Optional child specifications
-start owned runtimes. A stateless dispatch Plugin receives a nil runtime.
-V2 `DirectiveExec` implementations and `directive_handler` are removed.
+V2 declares Plugin metadata and state through `use` options, then initializes
+state through `mount/2`:
+
+```elixir
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin,
+    name: "counter_plugin",
+    state_key: :counter_plugin,
+    schema: Zoi.object(%{turns: Zoi.integer() |> Zoi.default(0)})
+
+  def mount(_agent, _config), do: {:ok, %{turns: 0}}
+end
+```
+
+### What you need to change
+
+V3 `use Jido.Plugin` takes no options. Declare options on the Agent. Define one
+owned state key and its schema with `state_spec/1`:
+
+```elixir
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin
+
+  @impl Jido.Plugin
+  def state_spec(_opts) do
+    {:counter_plugin, Zoi.object(%{turns: Zoi.integer()}) |> Zoi.default(%{turns: 0})}
+  end
+
+  @impl Jido.Plugin
+  def update_state(state, _directives, _opts) do
+    {:ok, %{state | turns: state.turns + 1}}
+  end
+end
+```
+
+Add `plugin MyApp.CounterPlugin` inside the Agent's `agent` block. Use
+`plugin MyPlugin, option: value` for per-Agent options. This example counts
+successful candidate reductions; only a successful live commit stores the count.
+Set a default on the owned object itself when the key can be absent. A default
+on a nested field alone does not create the outer Plugin state object.
+
+Port each capability explicitly:
+
+| V2 surface | Required V3 change |
+| --- | --- |
+| Manifest, requirements, automatic routes | Declare Plugins and routes on the Agent explicitly |
+| `mount/2` | Put portable defaults in the state schema; put runtime setup in an owned child |
+| Signal/action preparation hooks | Rewrite against `prepare/2` or `admit/3` and `Jido.Agent.Command` |
+| Emit preparation | Use `prepare_dispatch/4` with its Signal context |
+| `transform_result/3` | Put domain transformations in the Action/Flow; reduce only owned Plugin state |
+| `DirectiveExec` or `directive_handler` | Declare directive types, validate them, and implement `dispatch/4` |
+| `child_spec(config)` | Accept `Jido.Plugin.Init`; read configured options from `init.options` |
+| Plugin checkpoint/restore hooks | Convert portable owned state through the application persistence contract |
+
+A runtime root must be permanent and owned. Use `Jido.Plugin.state/1` to read
+committed owned state after a restart. `Init` does not contain a state snapshot
+or state version. `await_ready/2` can wait for reconstruction; readiness failure
+stops the owner. A Plugin without a child receives `nil` in `dispatch/4`.
+
+State ownership is not a read-security boundary. A preparation callback can
+inspect the Agent in `Jido.Agent.Command`. Later Plugins can change prepared
+input. Do not treat the proposed isolation contract as implemented behavior.
+
+**Check:** test owned state protection, callback order, readiness, owner shutdown,
+restart reconstruction, and dispatch errors. See [Plugins](plugins.md).
 
 ## Port lifecycle and composition
 
-Use instance and partition scope consistently. Server attachment, detach, touch,
-idle timeout, child ownership, local/remote placement, and hibernate/thaw remain.
-The public V2 InstanceManager and WorkerPool APIs are removed. There is no
-pre-warmed checkout pool. Use explicit bounded worker ownership, as shown in the
+Instance and partition scope remain. V3 uses explicit ownership for child Agents
+and runtime resources. V2 InstanceManager, WorkerPool, and mutable Pod APIs are
+removed.
+
+### What you need to change
+
+- Replace `Jido.whereis` with `Jido.whereis_agent(instance, id, partition: partition)`.
+  Pass the same instance and partition to startup, lookup, and persistence.
+- Keep `initial_state` for Server startup options. Use `state` for instance
+  constructors. Do not rename both options together.
+- Use `attach/2`, `detach/2`, and `touch/1` for lifetime control. The default
+  `idle_timeout` is `:infinity`.
+- Replace pool checkout with explicit bounded owned workers. There is no
+  pre-warmed checkout pool.
+- Replace Pod definitions with static `Jido.Topology`, owned children, or an
+  application-managed group. Arbitrary live graph mutation has no direct port.
+
+A remote disconnect does not prove that a child is dead. Local duplicate
+registration checks do not establish exclusive ownership across a cluster.
+
+**Check:** test shutdown, detached owners, idle expiry, worker limits, remote
+failure, and cleanup. See [runtime controls](runtime.md) and the
 [bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/05_03_bounded_workers).
 
-The Pod API, mutable graph planner, Pod state, and mutation directives are
-removed. Use static `Jido.Topology`, owned children, or the explicit
-Fixed/Elastic Group applications. Arbitrary live graph mutation is outside this
-release. A remote disconnect does not prove death. Cluster-exclusive ownership
-is not implemented; DIST-03 is the only approved excluded test.
+## Convert stored data explicitly
 
-## Port stored data
+V2 Storage checkpoints, Plugin pointers, and Thread append stores do not have
+an automatic V3 reader. Renaming an envelope is not a conversion.
 
-Use `Jido.Persistence` with a binary adapter and atomic compare-and-swap.
-Keys begin with `jido:agent:v1:` and include instance, module, partition, and ID.
-Load validates the outer record, restored identity, complete schema, and recursive
-portability. Old Actor and V2 envelopes are rejected. A format rename alone is
-not a valid conversion.
+V3 uses `Jido.Persistence` and a binary adapter with atomic compare-and-swap.
+Keys start with `jido:agent:v1:` and include instance, module, partition, and ID.
+Restore validates identity, complete state, and recursive portability.
 
-For existing data, keep an offline backup, decode it with the old application,
-construct and validate a V3 instance, then save through the V3 adapter. Define
-application-specific conversion for Plugin state and pending work. Verify identity,
-partition, history, pending work IDs, and retry attempts before activation.
-Do not run old and new writers against the same logical records during conversion.
-No converter is included in this candidate.
+### What you need to change
+
+1. Stop old writers and export a backup with the V2 application.
+2. Decode records with the old code. Record the Agent ID, module, partition,
+   domain state, Plugin state, history, and pending work.
+3. Convert each domain and Plugin state value to the new schemas. Decide how
+   to reconcile external work that might already have completed.
+4. Construct and validate a V3 instance. Save it through the V3 persistence API
+   and adapter. Keep V2 backups separate from V3 records.
+5. Restore the saved record in a fresh V3 process. Verify identity, state,
+   pending work IDs, retry counts, and Plugin reconstruction before activation.
+6. Rehearse rollback. V2 cannot read new records automatically; restoring a
+   backup also requires reconciliation of external work performed after cutover.
+
+Do not run old and new writers against the same logical records during this
+conversion. There is no general converter for application-specific Plugin
+state or external effects.
 
 An uncertain write stops the writer before another Action evaluates. A confirmed
-conflict remains a failed commit. New activation loads authoritative state.
-Without an adapter, local RuntimeStore checkpoints support abnormal restart only
-while the instance remains alive. They do not survive loss of the instance or VM.
+conflict remains a failed commit. Reactivation loads authoritative state.
+Without an adapter, RuntimeStore checkpoints survive only local abnormal
+restarts while the instance stays alive. They do not survive instance or VM loss.
 
-The old Storage checkpoint/Thread API and Thread append stores are removed.
-Standalone Thread values remain. Redis TTL remains an adapter option. File
-storage has one BEAM owner per directory. See [storage limits](storage.md).
+File storage requires one BEAM owner per directory. Redis TTL remains an adapter
+option. Standalone `Jido.Thread` values remain; old Thread stores do not.
 
-## Other removed interfaces
+**Check:** restore a real backup, test stale and uncertain writes, and confirm
+that no runtime-only values entered stored state. Definition revision checks,
+durable deletion fencing, and live schema upgrades have unmet research tests;
+do not use them as migration guarantees. See [storage limits](storage.md).
 
-| Removed V2 feature | Supported direction and limit |
+## Replace other removed interfaces
+
+| V2 feature | Required change and limit |
 | --- | --- |
-| Sensor behavior, Sensor structs and built-in Sensor modules | Explicit input Plugins; SensorManager requires a callback port |
-| Native cron directives and Agent schedules | Scheduler and Heartbeat Plugins; explicit occurrence acknowledgement |
-| Discovery service | Explicit module lists and trusted Codec Registry |
-| Identity profile and evolution framework | Application-owned identity policy; security examples do not replace profile APIs |
-| Integrated Memory spaces | Application state, history and compaction; no Memory API adapter |
-| Thread Agent/Plugin integration | Standalone Thread values and application-owned persistence |
-| Old observation event/configuration contracts | V3 lifecycle, Turn, commit, directive and safe error fields |
-| Built-in control/status/lifecycle Actions | Explicit application Actions and supported runtime directives |
+| Sensor behavior, structs, and built-in Sensors | Use explicit input Plugins; SensorManager still needs a callback port |
+| Native cron directives and Agent schedules | Use Scheduler/Heartbeat Plugins and explicit occurrence acknowledgement |
+| Discovery | Supply explicit modules and a trusted Codec Registry |
+| Identity profiles and evolution | Keep policy in the application; there is no profile API adapter |
+| Integrated Memory spaces | Model state/history and compaction in the application |
+| Thread Agent/Plugin integration | Use standalone Thread values and application-owned persistence |
+| Old observation events/configuration | Port handlers to V3 lifecycle, Turn, commit, directive, and safe error fields |
+| Built-in control/status/lifecycle Actions | Use application Actions and supported runtime directives |
 
-The original source remains in Git at
-`a31b74306d4498ee47732c18b993abd4c26542bd`.
+**Check:** search the application for each removed interface. Record its
+replacement or removal. A module rename alone is not proof of equal behavior.
 
-## Downstream packages and checks
+## Validation and known gaps
 
-Existing `jido_ai` consumers use the removed Strategy and Server State contracts.
-Existing `jido_browser` code uses the old Plugin contract. They require a separate
-port. Core does not claim drop-in compatibility and this migration does not edit
-those packages. Deterministic LLM and Factory examples in core use the V3 API.
-They do not validate model quality or a paid provider session.
+Compile and test after each area. For the application port, verify these outcomes:
 
-All 52 fixtures, shared support, supporting core tests, and ten application
-scenarios are required. Run `mix test --include example --include flaky --seed 0`.
-Repeated test runs, recovery and scale checks, the runtime matrix, coverage,
-lint, Dialyzer, docs, and a fresh package consumer must pass before local beta
-QA is complete.
+- Constructors validate state and return the expected result shape.
+- Direct and live commands preserve unrelated fields and protect Plugin state.
+- Invalid input and failed work leave committed state unchanged.
+- Effect retries obey the application's idempotency rules.
+- Restart and restore rebuild owned runtimes without losing pending work.
+- Remote failure and cancellation do not leak workers or resources.
 
-The documents under `docs/design` are pending proposals. Their Ref facade,
-Plugin pipeline, and replacement persistence architecture are not part of this
-migration. Use the current API docs and the implemented contracts above.
+The Core command is:
+
+```sh
+mix test --include example --include flaky --seed 0
+```
+
+At the September 7 alpha checkpoint, full runs on Elixir 1.18 / OTP 27 and
+Elixir 1.20 / OTP 29 had 11 research failures and one approved exclusion.
+Core coverage was 93.9%. These are failed full-suite results, not release approval.
+
+The unmet research assertions concern route selection, Plugin read/input
+isolation, durable namespace identity, definition revisions, durable deletion,
+runtime Init snapshots, Turn revision isolation, live state migration, and live
+Topology updates. Cluster-exclusive ownership remains unsupported. See the
+[acceptance record](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md)
+and [testing guide](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
+
+Before publication, complete the agreed feature scope, repeated test seeds,
+recovery and scale checks, runtime matrix, lint, Dialyzer, docs, and fresh package
+consumer checks. Documents under `docs/design` are proposals. They do not add
+contracts to this beta candidate.

@@ -8,9 +8,10 @@
 Jido is an Agent framework for Elixir. It keeps domain state in immutable
 `%Jido.Agent{}` values and puts OTP runtime state in `Jido.AgentServer`.
 
-This `v3-spike` branch is an alpha for evaluation. It has breaking changes from
-V2. Beta release checks are not complete. See the [migration guide](guides/migration.md)
-for the API changes, known limits, and required checks.
+This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
+changes from V2. The package is not published, and beta release checks are not
+complete. See the [migration guide](guides/migration.md) for the API changes,
+known limits, and required checks.
 
 ## Core model
 
@@ -115,7 +116,7 @@ supervise a persistence adapter process.
 
 ## Installation
 
-This branch is a local V3 candidate. It is not a published 3.0 release.
+This branch is the local `3.0.0-beta.1` candidate. It is not a published release.
 For local development, point your application at this checkout:
 
 ```elixir

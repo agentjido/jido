@@ -1,7 +1,7 @@
 defmodule Jido.MixProject do
   use Mix.Project
 
-  @version "2.3.3"
+  @version "3.0.0-beta.1"
 
   def vsn do
     @version
@@ -86,7 +86,7 @@ defmodule Jido.MixProject do
       extras: [
         {"README.md", title: "Home"},
         {"guides/core-scope.md", title: "Core scope"},
-        {"guides/migration.md", title: "V2 migration"},
+        {"guides/migration.md", title: "Upgrade from V2 to V3"},
         {"guides/agents.md", title: "Agent values"},
         {"guides/core-loop.md", title: "Command and commit"},
         {"guides/runtime.md", title: "Runtime controls"},
