@@ -44,7 +44,8 @@ defmodule Jido.AgentServer.PluginChild do
          child_pid: child_pid,
          child_ref: Process.monitor(child_pid),
          child_id: child_spec.id,
-         plugin_spec: plugin_spec
+         plugin_spec: plugin_spec,
+         readiness: nil
        }}
     else
       nil -> {:stop, :plugin_child_not_started}
@@ -76,19 +77,11 @@ defmodule Jido.AgentServer.PluginChild do
   def handle_info({:await_child_restart, reason, attempts}, state) do
     case supervised_child(state.supervisor, state.child_id) do
       child_pid when is_pid(child_pid) ->
-        case Plugin.await_ready(state.plugin_spec, child_pid) do
-          :ok ->
-            send(
-              state.owner,
-              {:plugin_runtime_ready, self(), state.child_id, child_pid}
-            )
-
-            {:noreply, %{state | child_pid: child_pid, child_ref: Process.monitor(child_pid)}}
-
-          {:error, readiness_reason} ->
-            {:stop, {:plugin_runtime_readiness_failed, state.child_id, reason, readiness_reason},
-             state}
-        end
+        # Readiness can read Agent state. Keep child lookup responsive while
+        # that work runs, or an Agent lookup can block the read it needs.
+        task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
+        readiness = %{task: task, child_pid: child_pid, reason: reason}
+        {:noreply, %{state | readiness: readiness}}
 
       _child when attempts > 0 ->
         Process.send_after(
@@ -104,6 +97,30 @@ defmodule Jido.AgentServer.PluginChild do
     end
   end
 
+  def handle_info({ref, result}, %{readiness: %{task: %Task{ref: ref}} = readiness} = state) do
+    Process.demonitor(ref, [:flush])
+    state = %{state | readiness: nil}
+
+    case result do
+      :ok ->
+        child_pid = readiness.child_pid
+        send(state.owner, {:plugin_runtime_ready, self(), state.child_id, child_pid})
+        {:noreply, %{state | child_pid: child_pid, child_ref: Process.monitor(child_pid)}}
+
+      {:error, reason} ->
+        {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
+         state}
+    end
+  end
+
+  def handle_info(
+        {:DOWN, ref, :process, _pid, reason},
+        %{readiness: %{task: %Task{ref: ref}} = readiness} = state
+      ) do
+    {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
+     %{state | readiness: nil}}
+  end
+
   def handle_info({:EXIT, supervisor, reason}, %{supervisor: supervisor} = state) do
     {:stop, {:plugin_supervisor_exit, reason}, state}
   end
@@ -112,6 +129,7 @@ defmodule Jido.AgentServer.PluginChild do
 
   @impl true
   def terminate(_reason, state) do
+    if state.readiness, do: Task.shutdown(state.readiness.task, :brutal_kill)
     stop_child(state.supervisor, :shutdown)
     :ok
   end

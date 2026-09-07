@@ -287,7 +287,12 @@ defmodule Jido.AgentServerRuntimeTest do
     def dispatch(_runtime, _directive, _context, _opts), do: :ok
 
     @impl Jido.Plugin
-    def await_ready(runtime, _opts), do: GenServer.call(runtime, :await_ready)
+    def await_ready(runtime, _opts) do
+      if :persistent_term.get({__MODULE__, :pause_restart}, false),
+        do: notify({:fresh_readiness_waiting, self(), runtime})
+
+      GenServer.call(runtime, :await_ready)
+    end
 
     def start_link(init), do: GenServer.start_link(__MODULE__, init)
 
@@ -296,6 +301,14 @@ defmodule Jido.AgentServerRuntimeTest do
 
     @impl GenServer
     def handle_continue(:load_state, state) do
+      if :persistent_term.get({__MODULE__, :pause_restart}, false) do
+        notify({:fresh_load_waiting, self()})
+
+        receive do
+          :release_fresh_load -> :ok
+        end
+      end
+
       {:ok, plugin_state} = Jido.Plugin.state(state.init)
       notify({:fresh_runtime_started, self(), plugin_state})
       {:noreply, %{state | plugin_state: plugin_state}}
@@ -496,6 +509,39 @@ defmodule Jido.AgentServerRuntimeTest do
 
     restarted = eventually(fn -> Jido.whereis_agent(jido, id) end)
     assert Process.alive?(restarted)
+  end
+
+  test "Plugin child lookup stays responsive while restart readiness reads Agent state", %{
+    jido: jido
+  } do
+    Process.register(self(), :jido_agent_fresh_runtime_test)
+    on_exit(fn -> :persistent_term.erase({FreshRuntimePlugin, :pause_restart}) end)
+    {:ok, server} = Jido.start_agent(jido, FreshRuntimeAgent, id: unique_id("readiness-state"))
+    assert_receive {:fresh_runtime_started, first, %{value: 0}}, 2_000
+    assert_receive {:fresh_runtime_ready, ^first, %{value: 0}}, 2_000
+    assert {:ok, _} = Server.call(server, signal("runtime.fresh", %{value: 7}))
+    eventually(fn -> Server.status(server).phase == :idle end)
+    {_, state} = :sys.get_state(server)
+    child = Jido.AgentServer.State.child(state, {:plugin, FreshRuntimePlugin})
+    :persistent_term.put({FreshRuntimePlugin, :pause_restart}, true)
+    Process.exit(first, :kill)
+    assert_receive {:fresh_load_waiting, restarted}, 2_000
+    assert_receive {:fresh_readiness_waiting, _waiter, ^restarted}, 2_000
+    lookup = Task.async(fn -> Jido.AgentServer.PluginChild.child_pid(child.lifecycle_pid) end)
+
+    try do
+      assert Task.yield(lookup, 500) == {:ok, :restarting}
+      assert {:ok, %{value: 7}} = Server.plugin_state(server, FreshRuntimePlugin, 500)
+      assert Server.children(server, 500)[{:plugin, FreshRuntimePlugin}].pid == first
+    after
+      send(restarted, :release_fresh_load)
+      Task.shutdown(lookup, :brutal_kill)
+    end
+
+    assert_receive {:fresh_runtime_started, ^restarted, %{value: 7}}, 2_000
+    assert_receive {:fresh_runtime_ready, ^restarted, %{value: 7}}, 2_000
+    eventually(fn -> Server.children(server)[{:plugin, FreshRuntimePlugin}].pid == restarted end)
+    assert Process.alive?(server)
   end
 
   test "refreshes Plugin state and readiness after an internal runtime restart", %{jido: jido} do

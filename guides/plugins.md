@@ -17,6 +17,12 @@ read current committed state through `Jido.Plugin.state/1`. Supplying that
 state and its version directly in replacement Init remains a
 [research contract](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md#fa-06-plugin-runtime-reconstruction-from-committed-state).
 
+After a runtime restart, `await_ready/2` can wait for that state read. Runtime
+lookup stays responsive and reports the runtime unavailable until readiness
+succeeds. Owner shutdown stops the pending readiness task and the runtime.
+Readiness failure stops the owner. See the
+[restart tests](../test/jido/agent/plugin_lifecycle_test.exs).
+
 The Action cannot change protected Plugin keys. A Plugin cannot replace the
 Agent value. Plugin declarations are validated when the Agent value is built.
 Old manifests, mounts, dependency requirements, and V2 callbacks require a port.
