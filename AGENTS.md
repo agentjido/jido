@@ -14,8 +14,8 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 ## Checks
 
 - Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
-- Default release check: `mix test test/jido test/jido_test --include flaky --seed 0`.
-- Example acceptance tests are secondary. Run them separately when needed: `mix examples --seed 0`.
+- Default quality check: `mix quality`. It runs unit tests, not benchmark or example tests.
+- Run secondary suites separately when needed: `mix benchmarks --seed 0` and `mix examples --seed 0`.
 - Compile with `mix compile --warnings-as-errors`.
 - Keep coverage at or above 90%. Aim above 93% to retain a maintenance buffer.
 - Run meaningful lint, Dialyzer, docs and package checks.

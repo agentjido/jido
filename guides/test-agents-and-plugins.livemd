@@ -105,8 +105,8 @@ child specification, startup failure behavior, Directive handling, cleanup, and
 restart behavior. Use messages or public inspection functions instead of sleep
 calls.
 
-In this repository, core tests are the default release check:
-`mix test test/jido test/jido_test --include flaky --seed 0`.
-Example acceptance tests are secondary. Run `mix examples --seed 0` separately
-when needed. The 11 known research failures are temporarily skipped; their
-assertions remain.
+In this repository, `mix quality` runs unit tests and the static checks.
+Benchmark tests and example tests are secondary. Run `mix benchmarks --seed 0`
+or `mix examples --seed 0` separately when needed. Research failures do not
+block the unit quality check. The 11 known research failures are temporarily
+skipped; their assertions remain.

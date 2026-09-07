@@ -445,10 +445,10 @@ Compile and test after each area. For the application port, verify these outcome
 - Restart and restore rebuild owned runtimes without losing pending work.
 - Remote failure and cancellation do not leak workers or resources.
 
-The default Core release check is:
+The default quality check includes unit tests, not benchmark or example tests:
 
 ```sh
-mix test test/jido test/jido_test --include flaky --seed 0
+mix quality
 ```
 
 At the September 7 alpha checkpoint, full runs on Elixir 1.18 / OTP 27 and

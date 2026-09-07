@@ -115,13 +115,14 @@ not prove that core elects one cluster owner.
 development and test dependencies. They are absent from the Hex requirements
 and the production dependency graph.
 
-Run core tests as the default release check:
+Run unit tests and static checks by default:
 
 ```sh
-mix test test/jido test/jido_test --include flaky --seed 0
+mix quality
 ```
 
-Run focused extension examples as a separate, secondary check when needed:
+Benchmark tests (`mix benchmarks --seed 0`) and example tests are separate,
+secondary checks. Run focused extension examples when needed:
 
 ```sh
 mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \

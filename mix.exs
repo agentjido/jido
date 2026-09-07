@@ -141,6 +141,7 @@ defmodule Jido.MixProject do
   def cli do
     [
       preferred_envs: [
+        benchmarks: :test,
         examples: :test,
         coveralls: :test,
         "coveralls.github": :test,
@@ -373,7 +374,8 @@ defmodule Jido.MixProject do
       # Default exclusions are declared once in test/test_helper.exs.
       test: "test --preload-modules",
 
-      # Run the opt-in agent example suite
+      # Run secondary suites only when requested.
+      benchmarks: "test test/jido/bench --only benchmark",
       examples: "test --only example",
 
       # Helper to run docs
@@ -385,8 +387,22 @@ defmodule Jido.MixProject do
         "format --check-formatted",
         "compile --warnings-as-errors",
         "credo --strict --only warning",
-        "dialyzer"
+        "dialyzer",
+        &unit_tests/1
       ]
     ]
+  end
+
+  # Keep quality tools in their normal environment and isolate the test build.
+  defp unit_tests(_args) do
+    {_, status} =
+      System.cmd(
+        "mix",
+        ["test", "test/jido", "test/jido_test", "--include", "flaky", "--seed", "0"],
+        env: [{"MIX_ENV", "test"}],
+        into: IO.stream()
+      )
+
+    if status != 0, do: Mix.raise("Unit tests failed")
   end
 end

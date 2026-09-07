@@ -2,6 +2,7 @@ Code.require_file("../../../bench/support/suite.exs", __DIR__)
 
 defmodule JidoCoreBenchTest do
   use ExUnit.Case, async: false
+  @moduletag :benchmark
   alias JidoCoreBench.{Fixtures, Measure, Report, Suite}
 
   setup do

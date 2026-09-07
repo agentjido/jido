@@ -25,7 +25,7 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 
 3. **Quality Checks**
    ```bash
-   # Run the full quality check suite
+   # Run quality checks and unit tests (not benchmarks or examples)
    mix quality
 
    # Or individual checks
@@ -117,8 +117,12 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 
 3. **Running Tests**
    ```bash
-   # Run full test suite
+   # Run unit tests
    mix test
+
+   # Run secondary suites separately
+   mix benchmarks --seed 0
+   mix examples --seed 0
 
    # Run with coverage
    mix test --cover
