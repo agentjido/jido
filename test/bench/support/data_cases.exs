@@ -2,52 +2,8 @@ defmodule JidoCoreBench.DataCases do
   @moduledoc false
   alias JidoCoreBench.Fixtures, as: F
 
-  def workloads(sizes) do
-    Enum.flat_map(sizes, &thread_cases/1) ++
-      codec_cases() ++ audit_cases() ++ record_cases() ++ other_cases()
-  end
-
-  defp thread_cases(n) do
-    entries = for i <- 1..n, do: %{id: "entry-#{i}", at: 1, kind: :note, payload: %{n: i}}
-
-    for op <- [:append_one, :append_batch, :last, :slice, :normalize] do
-      F.checked(
-        "thread/#{op}/#{n}",
-        fn _ -> Jido.Thread.append(Jido.Thread.new(id: "bench-thread", now: 1), entries) end,
-        fn thread ->
-          case op do
-            :append_one -> Jido.Thread.append(thread, hd(entries))
-            :append_batch -> Jido.Thread.append(thread, entries)
-            :last -> Jido.Thread.last(thread)
-            :slice -> Jido.Thread.slice(thread, div(n, 2), n - 1)
-            :normalize -> Jido.Thread.EntryNormalizer.normalize_many(entries, n, 1)
-          end
-        end,
-        fn result ->
-          case op do
-            :last ->
-              F.equal!({result.seq, result.payload}, {n - 1, %{n: n}})
-
-            :slice ->
-              F.equal!(Enum.map(result, & &1.seq), Enum.to_list(div(n, 2)..(n - 1)))
-
-            :normalize ->
-              F.equal!(
-                Enum.map(result, &{&1.seq, &1.payload}),
-                for(i <- 1..n, do: {n + i - 1, %{n: i}})
-              )
-
-            _ ->
-              count = if op == :append_one, do: n + 1, else: n * 2
-
-              F.equal!(
-                {result.rev, Jido.Thread.entry_count(result), Enum.map(result.entries, & &1.seq)},
-                {count, count, Enum.to_list(0..(count - 1))}
-              )
-          end
-        end
-      )
-    end
+  def workloads do
+    codec_cases() ++ audit_cases() ++ record_cases() ++ other_cases()
   end
 
   defp codec_cases do

@@ -111,8 +111,8 @@ defmodule JidoCoreBench.Suite do
     Fixtures.workloads(s.sizes, s.payloads) ++
       Fixtures.boundary_workloads() ++
       RuntimeCases.workloads(s.payloads) ++
-      DataCases.workloads(s.thread_sizes) ++
-      EdgeCases.workloads(s.thread_sizes, s.sizes) ++
+      DataCases.workloads() ++
+      EdgeCases.workloads(s.sizes) ++
       MergeCases.workloads() ++
       PluginCases.workloads() ++
       PersistenceCases.workloads() ++
@@ -135,7 +135,6 @@ defmodule JidoCoreBench.Suite do
       profile: "smoke",
       sizes: [1, 8],
       payloads: [:small],
-      thread_sizes: [1, 32],
       warmup: 1,
       samples: 2,
       resource_samples: 1
@@ -146,7 +145,6 @@ defmodule JidoCoreBench.Suite do
       profile: "short",
       sizes: [1, 16],
       payloads: [:small, :large_map, :large_binary, :large_list],
-      thread_sizes: [1, 100, 1_000],
       warmup: 5,
       samples: 30,
       resource_samples: 3
@@ -157,7 +155,6 @@ defmodule JidoCoreBench.Suite do
       profile: "scale",
       sizes: [1, 16, 64],
       payloads: [:small, :large_map, :large_binary, :large_list],
-      thread_sizes: [1, 100, 1_000, 10_000],
       warmup: 10,
       samples: 60,
       resource_samples: 5

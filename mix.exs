@@ -73,7 +73,7 @@ defmodule Jido.MixProject do
        {"guides/compare-and-swap-hibernate-and-thaw.md", "Compare And Swap, Hibernate, And Thaw"},
        {"guides/recoverable-effects.md", "Recoverable Effects"},
        {"guides/runtime-coordination-state.md", "Runtime Coordination State"},
-       {"guides/threads-and-audit-records.md", "Threads And Audit Records"}
+       {"guides/audit-records.md", "Audit Records"}
      ]},
     {"Operate And Extend",
      [
@@ -267,10 +267,7 @@ defmodule Jido.MixProject do
           Jido.Persistence.Adapter,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
-          Jido.Persistence.Redis,
-          Jido.Thread,
-          Jido.Thread.Entry,
-          Jido.Thread.EntryNormalizer
+          Jido.Persistence.Redis
         ],
         Observability: [
           Jido.Observe,

@@ -11,9 +11,8 @@ defmodule JidoCoreBench.EdgeCases do
   alias JidoCoreBench.Fixtures, as: F
   alias Jido.Agent.Command.Runner
 
-  def workloads(thread_sizes, route_sizes) do
-    thread_filters(thread_sizes) ++
-      context_cases() ++
+  def workloads(route_sizes) do
+    context_cases() ++
       generated_codec_cases(route_sizes) ++
       budget_cases()
   end
@@ -52,26 +51,6 @@ defmodule JidoCoreBench.EdgeCases do
         Enum.each(results, &F.equal!(&1, {:ok, expected}))
         :ok
       end)
-    end
-  end
-
-  defp thread_filters(sizes) do
-    for n <- sizes,
-        {mode, kinds} <- [single: :message, multiple: [:message, :tool], missing: :absent] do
-      entries =
-        for i <- 1..n do
-          %{id: "entry-#{i}", at: 1, kind: Enum.at([:note, :message, :tool], rem(i, 3))}
-        end
-
-      expected =
-        for entry <- entries, entry.kind in List.wrap(kinds), do: {entry.id, entry.kind}
-
-      F.checked(
-        "thread/filter/#{n}/#{mode}",
-        fn _ -> Jido.Thread.append(Jido.Thread.new(id: "bench-filter", now: 1), entries) end,
-        &Jido.Thread.filter_by_kind(&1, kinds),
-        &F.equal!(Enum.map(&1, fn entry -> {entry.id, entry.kind} end), expected)
-      )
     end
   end
 

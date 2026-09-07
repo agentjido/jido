@@ -419,10 +419,10 @@ V3 adds these modules:
 
 | V2 module | Status and V3 direction |
 | --- | --- |
-| `Jido.Thread` | **Retained.** It is now clearly an optional immutable application value. V3 adds `schema/0`. |
-| `Jido.Thread.Entry` | **Retained.** Revalidate old entries before reuse. |
-| `Jido.Thread.EntryNormalizer` | **Retained.** It now serves Thread append only, not storage adapters. |
-| `Jido.Thread.Agent` | **Removed.** Put the Thread in the declared Agent data schema and return its next value from an Action. |
+| `Jido.Thread` | **Removed.** Define the required history value in the application schema. |
+| `Jido.Thread.Entry` | **Removed.** Define application entry types and validation rules. |
+| `Jido.Thread.EntryNormalizer` | **Removed.** Normalize history at the application boundary. |
+| `Jido.Thread.Agent` | **Removed.** Put history in the declared Agent data schema and return its next value from an Action. |
 | `Jido.Thread.Plugin` | **Removed.** V3 does not capture message history automatically. |
 | `Jido.Thread.Store` | **Removed.** Persist Threads in an application-owned store. |
 | `Jido.Thread.Store.Adapters.InMemory` | **Removed.** Use an application test store. |

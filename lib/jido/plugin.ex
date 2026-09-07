@@ -25,7 +25,7 @@ defmodule Jido.Plugin do
 
   Message history belongs in the application's Agent schema. Actions return
   the complete next history with the rest of the Agent state. History needs no
-  Plugin or Directive. `Jido.Thread` remains an optional application data value.
+  Plugin or Directive.
 
   Define a Plugin with `use Jido.Plugin`:
 

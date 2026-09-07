@@ -103,8 +103,8 @@ The [persistence report](persistence-write-results.md) defines the API and limit
 
 Earlier history changes removed `Jido.Plugin.Thread` and
 `Jido.Plugin.Thread.Set`. Applications that use those modules must follow the
-[Agent history migration guide](agent-history.md). `Jido.Thread` remains an
-optional data value.
+[Agent history migration guide](agent-history.md). The `Jido.Thread` data helpers
+have also been removed.
 
 ## Next work
 

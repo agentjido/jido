@@ -409,7 +409,8 @@ Without an adapter, RuntimeStore checkpoints survive only local abnormal
 restarts while the instance stays alive. They do not survive instance or VM loss.
 
 File storage requires one BEAM owner per directory. Redis TTL remains an adapter
-option. Standalone `Jido.Thread` values remain; old Thread stores do not.
+option. `Jido.Thread` and the old Thread stores do not remain. Convert stored
+Thread values to application-owned history values before restore.
 
 **Check:** restore a real backup, test stale and uncertain writes, and confirm
 that no runtime-only values entered stored state. Definition revision checks,
@@ -427,7 +428,7 @@ do not use them as migration guarantees. See
 | Discovery | Supply explicit modules and a trusted Codec Registry |
 | Identity profiles and evolution | Keep policy in the application; there is no profile API adapter |
 | Integrated Memory spaces | Model state/history and compaction in the application |
-| Thread Agent/Plugin integration | Use standalone Thread values and application-owned persistence |
+| Thread Agent/Plugin integration | Use application-owned history values and persistence |
 | Old observation events/configuration | Port handlers to V3 lifecycle, Turn, commit, directive, and safe error fields |
 | Built-in control/status/lifecycle Actions | Use application Actions and supported runtime directives |
 

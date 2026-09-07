@@ -7,9 +7,8 @@ Jido v3 stores message history as application-owned Agent state. The application
 defines the schema, appends messages, chooses model context, and controls
 retention. History does not require a Plugin or Directive.
 
-The Thread Plugin and its Set Directive have been removed. `Jido.Thread`,
-`Jido.Thread.Entry`, and their normalization helper remain optional data tools.
-Generic Plugin ownership and state validation remain supported.
+The Thread Plugin, its Set Directive, and the `Jido.Thread` data helpers have
+been removed. Generic Plugin ownership and state validation remain supported.
 
 ## Migration
 
@@ -37,28 +36,13 @@ Return an error when the operation fails. The Server validates the candidate
 and commits only a successful Turn. Delivery, scheduling, and child operations
 can still use Directives after that commit.
 
-Applications that want to keep the Thread value can declare the same `thread`
-field explicitly:
-
-```elixir
-schema: Zoi.object(%{thread: Jido.Thread.schema() |> Zoi.nullable() |> Zoi.default(nil)})
-
-# After computing next_thread:
-{:ok, %{next_state | thread: next_thread}, directives}
-```
-
-Keeping the same field and value shape avoids a history-format conversion.
-If an application changes stored Thread values to message lists, it must map
-the existing entries to its chosen fields before restoring that state. Decide
-which IDs, timestamps, references, and payload fields to retain. There is no
-automatic checkpoint conversion.
+Applications that stored Thread values must map the existing entries to their
+chosen application fields before they restore that state. Decide which IDs,
+timestamps, references, and payload fields to retain. There is no automatic
+checkpoint conversion.
 
 Stored Agent definitions or pending Directives that name the removed Plugin
 modules also need migration before reuse.
-
-The optional Thread helper still has convenience operations that read the
-clock and generate missing IDs. Explicit time and identity inputs remain a
-separate follow-up in [issue #14](https://github.com/mikehostetler/jido_v3/issues/14).
 
 ## Integration evidence
 
