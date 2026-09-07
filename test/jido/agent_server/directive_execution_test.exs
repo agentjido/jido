@@ -56,6 +56,21 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     assert Server.status(pid).state_version == 0
   end
 
+  test "rejects a malformed outbound Signal envelope before the Agent commit", %{jido: jido} do
+    {:ok, pid} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("invalid-signal"))
+    malformed = %{Signal.new!("runtime.follow_up", %{}, source: "/test") | source: ""}
+    invalid = Directive.emit(malformed)
+
+    assert {:error, _reason} =
+             Server.call(
+               pid,
+               signal("runtime.directive", %{event: :must_not_commit, directive: invalid})
+             )
+
+    assert Server.agent(pid).state.events == []
+    assert Server.status(pid).state_version == 0
+  end
+
   test "validates a Plugin Directive once in a live turn", %{jido: jido} do
     {:ok, pid} =
       Jido.start_agent(jido, CountedDirectiveAgent, id: unique_id("directive-validation"))

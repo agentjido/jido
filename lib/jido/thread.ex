@@ -27,23 +27,33 @@ defmodule Jido.Thread do
   alias Jido.Thread.Entry
   alias Jido.Thread.EntryNormalizer
 
+  @stats_schema Zoi.object(
+                  %{
+                    entry_count:
+                      Zoi.integer(description: "Number of retained entries") |> Zoi.min(0)
+                  },
+                  unrecognized_keys: :preserve
+                )
+
   @schema Zoi.struct(
             __MODULE__,
             %{
-              id: Zoi.string(description: "Unique thread identifier"),
+              id: Zoi.string(description: "Unique thread identifier") |> Zoi.min(1),
               rev:
-                Zoi.integer(description: "Monotonic revision, increments on append")
+                Zoi.integer(description: "Next monotonic entry sequence")
+                |> Zoi.min(0)
                 |> Zoi.default(0),
               entries:
-                Zoi.list(Zoi.any(), description: "Ordered list of Entry structs")
+                Zoi.list(Entry.schema(), description: "Ordered list of Entry structs")
                 |> Zoi.default([]),
               created_at: Zoi.integer(description: "Creation timestamp (ms)"),
               updated_at: Zoi.integer(description: "Last update timestamp (ms)"),
               metadata: Zoi.map(description: "Arbitrary metadata") |> Zoi.default(%{}),
-              stats: Zoi.map(description: "Cached aggregates") |> Zoi.default(%{entry_count: 0})
+              stats: Zoi.default(@stats_schema, %{entry_count: 0})
             },
             coerce: true
           )
+          |> Zoi.refine({__MODULE__, :validate_invariants, []})
 
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
@@ -76,7 +86,7 @@ defmodule Jido.Thread do
   def append(%__MODULE__{} = thread, entries) do
     entries = List.wrap(entries)
     now = System.system_time(:millisecond)
-    base_seq = length(thread.entries)
+    base_seq = thread.rev
 
     prepared_entries =
       EntryNormalizer.normalize_many(entries, base_seq, now)
@@ -125,6 +135,45 @@ defmodule Jido.Thread do
   @spec slice(t(), non_neg_integer(), non_neg_integer()) :: [Entry.t()]
   def slice(%__MODULE__{entries: entries}, from_seq, to_seq) do
     Enum.filter(entries, fn e -> e.seq >= from_seq and e.seq <= to_seq end)
+  end
+
+  @doc false
+  def validate_invariants(%__MODULE__{} = thread, opts) do
+    count = length(thread.entries)
+    ids = Enum.map(thread.entries, & &1.id)
+    sequences = Enum.map(thread.entries, & &1.seq)
+
+    cond do
+      unrelated_struct?(opts) ->
+        {:error, "Thread schema does not accept unrelated structs"}
+
+      thread.stats.entry_count != count ->
+        {:error, "entry_count must equal the number of retained entries"}
+
+      length(Enum.uniq(ids)) != count ->
+        {:error, "entry IDs must be unique"}
+
+      sequences != retained_sequences(thread.rev, count) ->
+        {:error, "entry sequences must be the ordered suffix before the revision"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp retained_sequences(_rev, 0), do: []
+
+  defp retained_sequences(rev, count) when rev >= count,
+    do: Enum.to_list((rev - count)..(rev - 1))
+
+  defp retained_sequences(_rev, _count), do: :invalid
+
+  defp unrelated_struct?(opts) do
+    case get_in(opts, [:ctx, Access.key(:input)]) do
+      %__MODULE__{} -> false
+      input when is_struct(input) -> true
+      _input -> false
+    end
   end
 
   defp generate_id do

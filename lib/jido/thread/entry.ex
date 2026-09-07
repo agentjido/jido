@@ -30,8 +30,8 @@ defmodule Jido.Thread.Entry do
   @schema Zoi.struct(
             __MODULE__,
             %{
-              id: Zoi.string(description: "Unique entry identifier"),
-              seq: Zoi.integer(description: "Monotonic sequence within thread"),
+              id: Zoi.string(description: "Unique entry identifier") |> Zoi.min(1),
+              seq: Zoi.integer(description: "Monotonic sequence within thread") |> Zoi.min(0),
               at: Zoi.integer(description: "Timestamp (ms)"),
               kind: Zoi.atom(description: "Entry type - open, any atom accepted"),
               payload: Zoi.map(description: "Kind-specific data") |> Zoi.default(%{}),
@@ -40,10 +40,24 @@ defmodule Jido.Thread.Entry do
             },
             coerce: true
           )
+          |> Zoi.refine({__MODULE__, :validate_input_type, []})
 
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
+
+  @doc "Returns the data schema for a Thread Entry."
+  @spec schema() :: Zoi.schema()
+  def schema, do: @schema
+
+  @doc false
+  def validate_input_type(%__MODULE__{}, opts) do
+    case get_in(opts, [:ctx, Access.key(:input)]) do
+      %__MODULE__{} -> :ok
+      input when is_struct(input) -> {:error, "Entry schema does not accept unrelated structs"}
+      _input -> :ok
+    end
+  end
 
   @doc "Create a new entry from attributes"
   @spec new(map() | keyword()) :: t()
@@ -53,7 +67,7 @@ defmodule Jido.Thread.Entry do
     now = System.system_time(:millisecond)
 
     %__MODULE__{
-      id: fetch_attr(attrs, :id),
+      id: entry_id(attrs),
       seq: fetch_attr(attrs, :seq, 0),
       at: fetch_attr(attrs, :at, now),
       kind: fetch_attr(attrs, :kind, :note),
@@ -74,4 +88,13 @@ defmodule Jido.Thread.Entry do
       value -> value
     end
   end
+
+  defp entry_id(attrs) do
+    case fetch_attr(attrs, :id) do
+      nil -> generate_id()
+      id -> id
+    end
+  end
+
+  defp generate_id, do: "entry_" <> Jido.Util.generate_id()
 end

@@ -96,7 +96,7 @@ defmodule Jido.Agent.StateBudgetTest do
     assert StateBudget.limit(%{agent | max_state_size: 64}) == 64
   end
 
-  test "a replacement retains the prior module and smaller limit" do
+  test "a replacement retains the prior module and declared limit" do
     agent = Agent.instantiate!(definition(64))
 
     candidate = %{
@@ -112,6 +112,14 @@ defmodule Jido.Agent.StateBudgetTest do
     assert {:ok, accepted} = StateBudget.transition(agent, %{candidate | state: %{payload: "a"}})
     assert accepted.module == agent.module
     assert accepted.max_state_size == 64
+
+    declared = %{Bounded.new!() | max_state_size: 10_000}
+
+    assert {:ok, transitioned} =
+             StateBudget.transition(declared, %{declared | max_state_size: nil})
+
+    assert transitioned.max_state_size == 10_000
+    assert StateBudget.limit(transitioned) == 128
   end
 
   test "set and transition reject growth and permit smaller valid state" do

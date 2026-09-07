@@ -4,6 +4,19 @@ defmodule JidoTest.ThreadTest do
   alias Jido.Thread
   alias Jido.Thread.Entry
 
+  defmodule ThreadLookalike do
+    @moduledoc false
+    defstruct [:id, :rev, :entries, :created_at, :updated_at, :metadata, :stats]
+  end
+
+  defmodule EmbeddedThreadAgent do
+    @moduledoc false
+
+    use Jido.Agent,
+      name: "embedded_thread_agent",
+      schema: Zoi.object(%{thread: Thread.schema()})
+  end
+
   describe "Thread.new/1" do
     test "exposes its data schema" do
       assert %Zoi.Types.Struct{module: Thread} = Thread.schema()
@@ -147,6 +160,86 @@ defmodule JidoTest.ThreadTest do
     test "one batch uses one timestamp for every entry" do
       thread = Thread.append(Thread.new(), [%{kind: :a}, %{kind: :b}, %{kind: :c}])
       assert thread.entries |> Enum.map(& &1.at) |> Enum.uniq() |> length() == 1
+    end
+
+    test "uses the monotonic revision after application-owned prefix compaction" do
+      original =
+        Thread.new(now: 1_000)
+        |> Thread.append(Enum.map(0..4, &%{id: "entry-#{&1}", kind: :message}))
+
+      compacted = %{
+        original
+        | entries: Enum.drop(original.entries, 2),
+          stats: %{original.stats | entry_count: 3}
+      }
+
+      thread =
+        Thread.append(compacted, [
+          %{id: "entry-5", kind: :message},
+          %{id: "entry-6", kind: :message}
+        ])
+
+      assert thread.rev == 7
+      assert Thread.entry_count(thread) == 5
+      assert Enum.map(thread.entries, & &1.seq) == [2, 3, 4, 5, 6]
+      assert Thread.get_entry(thread, 1) == nil
+      assert Thread.get_entry(thread, 5).id == "entry-5"
+      assert Enum.map(Thread.slice(thread, 3, 5), & &1.seq) == [3, 4, 5]
+    end
+  end
+
+  describe "Thread schema" do
+    test "accepts valid compacted values and Agent state embedding" do
+      full =
+        Thread.new(now: 1_000)
+        |> Thread.append([
+          %{id: "entry-0", kind: :message},
+          %{id: "entry-1", kind: :message},
+          %{id: "entry-2", kind: :message}
+        ])
+
+      compacted = %{full | entries: Enum.drop(full.entries, 1), stats: %{entry_count: 2}}
+
+      assert {:ok, ^compacted} = Zoi.parse(Thread.schema(), compacted)
+
+      restored_map = %{
+        compacted
+        | entries: Enum.map(compacted.entries, &Map.from_struct/1)
+      }
+
+      restored_map = Map.from_struct(restored_map)
+
+      assert {:ok, ^compacted} = Zoi.parse(Thread.schema(), restored_map)
+      assert {:ok, agent} = EmbeddedThreadAgent.new(state: %{thread: compacted})
+      assert agent.state.thread == compacted
+
+      malformed = %{compacted | stats: %{entry_count: 1}}
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               EmbeddedThreadAgent.new(state: %{thread: malformed})
+    end
+
+    test "rejects unrelated structs and malformed restored values" do
+      thread = Thread.new(now: 1_000) |> Thread.append(%{id: "entry-0", kind: :message})
+
+      lookalike =
+        struct(ThreadLookalike, thread |> Map.from_struct() |> Map.to_list())
+
+      malformed = [
+        lookalike,
+        %{thread | rev: -1},
+        %{thread | rev: 0},
+        %{thread | stats: %{entry_count: 0}},
+        %{thread | entries: [%{hd(thread.entries) | seq: 1}]},
+        %{thread | entries: [hd(thread.entries), hd(thread.entries)], stats: %{entry_count: 2}},
+        %{thread | entries: [%URI{host: "example.com"}]},
+        %{thread | metadata: %URI{host: "example.com"}},
+        %{thread | stats: %{}}
+      ]
+
+      for value <- malformed do
+        assert {:error, _errors} = Zoi.parse(Thread.schema(), value)
+      end
     end
   end
 

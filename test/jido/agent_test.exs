@@ -76,6 +76,15 @@ defmodule Jido.AgentTest do
     def handle_signal(_signal, _agent), do: :invalid_callback_result
   end
 
+  defmodule BehaviorOnlyAgent do
+    @moduledoc false
+
+    @behaviour Jido.Agent
+
+    @impl Jido.Agent
+    def handle_signal(signal, agent), do: Jido.Agent.handle_signal(signal, agent)
+  end
+
   defmodule WithStopDirective do
     @moduledoc false
 
@@ -901,6 +910,31 @@ defmodule Jido.AgentTest do
 
       assert {:ok, checkpoint} = Agent.checkpoint(agent)
       assert {:ok, ^agent} = Agent.restore(Agent, checkpoint)
+    end
+
+    test "restores a validated behavior-only Agent module from its checkpoint definition" do
+      definition =
+        Agent.new!(
+          name: "behavior_only_agent",
+          module: BehaviorOnlyAgent,
+          schema: schema()
+        )
+
+      agent = Agent.instantiate!(definition, id: "behavior-only-1", state: %{count: 5})
+
+      assert {:ok, checkpoint} = Agent.checkpoint(agent)
+      assert {:ok, ^agent} = Agent.restore(BehaviorOnlyAgent, checkpoint)
+    end
+
+    test "module-authored restore uses the current module definition" do
+      agent = AuthoredAgent.new!(id: "current-definition-1", state: %{count: 5})
+      assert {:ok, checkpoint} = Agent.checkpoint(agent)
+
+      archived_definition = %{checkpoint.definition | description: "archived definition"}
+      checkpoint = %{checkpoint | definition: archived_definition}
+
+      assert {:ok, restored} = Agent.restore(AuthoredAgent, checkpoint)
+      assert Agent.definition(restored) == AuthoredAgent.agent()
     end
 
     test "passes context through custom checkpoint and restore callbacks" do

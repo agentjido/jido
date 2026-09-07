@@ -3,9 +3,35 @@ defmodule Jido.Thread.EntryTest do
 
   alias Jido.Thread.Entry
 
+  defmodule EntryLookalike do
+    @moduledoc false
+    defstruct [:id, :seq, :at, :kind, :payload, :refs]
+  end
+
+  test "schema accepts Entry values and rejects lookalikes and malformed fields" do
+    entry = Entry.new(id: "entry-1", seq: 1, at: 1_000, kind: :message)
+    assert {:ok, ^entry} = Zoi.parse(Entry.schema(), entry)
+    assert {:ok, ^entry} = Zoi.parse(Entry.schema(), Map.from_struct(entry))
+
+    lookalike = struct(EntryLookalike, entry |> Map.from_struct() |> Map.to_list())
+
+    for malformed <- [
+          lookalike,
+          %{entry | id: ""},
+          %{entry | seq: -1},
+          %{entry | at: "now"},
+          %{entry | kind: "message"},
+          %{entry | payload: %URI{host: "example.com"}},
+          %{entry | refs: %URI{host: "example.com"}}
+        ] do
+      assert {:error, _errors} = Zoi.parse(Entry.schema(), malformed)
+    end
+  end
+
   test "creates an Entry with defaults" do
     entry = Entry.new(%{})
 
+    assert String.starts_with?(entry.id, "entry_")
     assert entry.seq == 0
     assert entry.kind == :note
     assert entry.payload == %{}

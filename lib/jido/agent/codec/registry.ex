@@ -63,7 +63,10 @@ defmodule Jido.Agent.Codec.Registry do
 
   @doc "Finds the canonical identifier for a trusted value."
   def identifier(%__MODULE__{entries: entries}, kind, value) do
-    case Enum.find(entries, fn {_id, entry} -> entry == {kind, value} end) do
+    exact = Enum.find(entries, fn {_id, entry} -> entry === {kind, value} end)
+    compatible = fn -> Enum.find(entries, fn {_id, entry} -> entry == {kind, value} end) end
+
+    case exact || compatible.() do
       {id, _} -> {:ok, id}
       nil -> Authoring.error("Registry has no identifier for value", %{kind: kind})
     end
