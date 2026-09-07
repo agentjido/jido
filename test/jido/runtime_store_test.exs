@@ -34,15 +34,56 @@ defmodule JidoTest.RuntimeStoreTest do
     assert {:shutdown, {GenServer, :call, _}} = Task.await(task)
   end
 
-  test "a write timeout propagates even when the worker later completes it", %{jido: jido} do
+  test "a write timeout returns a structured error even when the worker later completes it", %{
+    jido: jido
+  } do
     assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
     worker = start_call_worker(jido)
-    task = Task.async(fn -> catch_exit(RuntimeStore.put(jido, :hive, :key, :value)) end)
+    task = Task.async(fn -> RuntimeStore.put(jido, :hive, :key, :value) end)
     assert_receive {:request, ^worker, {:put, :hive, :key, :value}}, 1_000
-    assert {:timeout, {GenServer, :call, _}} = Task.await(task, 1_000)
+    assert {:error, :timeout} = Task.await(task, 1_000)
     send(worker, :complete)
     assert_receive {:completed, ^worker}, 1_000
     assert [{{:hive, :key}, :value}] = :ets.lookup(Jido.runtime_store_name(jido), {:hive, :key})
+  end
+
+  test "a delete timeout returns a structured error even when the worker later completes it", %{
+    jido: jido
+  } do
+    table = Jido.runtime_store_name(jido)
+    true = :ets.insert(table, {{:hive, :key}, :value})
+    assert :ok = Supervisor.terminate_child(jido, table)
+    worker = start_call_worker(jido)
+    task = Task.async(fn -> RuntimeStore.delete(jido, :hive, :key) end)
+    assert_receive {:request, ^worker, {:delete, :hive, :key}}, 1_000
+    assert {:error, :timeout} = Task.await(task, 1_000)
+    assert [{{:hive, :key}, :value}] = :ets.lookup(table, {:hive, :key})
+    send(worker, :complete)
+    assert_receive {:completed, ^worker}, 1_000
+    assert [] = :ets.lookup(table, {:hive, :key})
+  end
+
+  test "all operation timeouts use their documented fallback or structured error", %{jido: jido} do
+    assert :ok = Supervisor.terminate_child(jido, Jido.runtime_store_name(jido))
+
+    timeout_calls = [
+      {fn -> RuntimeStore.fetch(jido, :hive, :key) end, :error},
+      {fn -> RuntimeStore.get(jido, :hive, :key, :default) end, :default},
+      {fn -> RuntimeStore.put(jido, :hive, :key, :value) end, {:error, :timeout}},
+      {fn -> RuntimeStore.delete(jido, :hive, :key) end, {:error, :timeout}},
+      {fn -> RuntimeStore.list(jido, :hive) end, []}
+    ]
+
+    for {call, expected} <- timeout_calls do
+      worker = start_call_worker(jido)
+      task = Task.async(call)
+      assert_receive {:request, ^worker, _request}, 1_000
+      assert Task.await(task, 1_000) == expected
+
+      monitor = Process.monitor(worker)
+      Process.exit(worker, :kill)
+      assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 1_000
+    end
   end
 
   defp calls(jido) do
@@ -69,8 +110,7 @@ defmodule JidoTest.RuntimeStoreTest do
                 exit(reason)
 
               :complete ->
-                {:put, hive, key, value} = request
-                :ets.insert(Jido.runtime_store_name(jido), {{hive, key}, value})
+                complete_request(jido, request)
                 GenServer.reply(from, :ok)
                 send(observer, {:completed, self()})
             after
@@ -84,6 +124,14 @@ defmodule JidoTest.RuntimeStoreTest do
     on_exit(fn -> Process.exit(worker, :kill) end)
     Process.register(worker, Jido.runtime_store_name(jido))
     worker
+  end
+
+  defp complete_request(jido, {:put, hive, key, value}) do
+    :ets.insert(Jido.runtime_store_name(jido), {{hive, key}, value})
+  end
+
+  defp complete_request(jido, {:delete, hive, key}) do
+    :ets.delete(Jido.runtime_store_name(jido), {hive, key})
   end
 
   describe "RuntimeStore" do

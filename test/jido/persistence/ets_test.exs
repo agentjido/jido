@@ -86,4 +86,57 @@ defmodule JidoTest.Persistence.ETSTest do
     assert :ets.info(table, :owner) == supervisor
     assert {:ok, "value"} = ETS.get("key", opts)
   end
+
+  test "validates keyword options without creating dynamic atoms" do
+    assert :ok = ETS.validate_options([])
+    assert :ok = ETS.validate_options(table: :valid_table)
+    assert {:error, _reason} = ETS.validate_options(table: "invalid")
+    assert {:error, _reason} = ETS.validate_options([:not_keyword])
+  end
+
+  test "operations reject binary table names without creating derived atoms" do
+    operations = [
+      {:get, fn opts -> ETS.get("key", opts) end},
+      {:put, fn opts -> ETS.put("key", "value", opts) end},
+      {:compare_and_swap, fn opts -> ETS.compare_and_swap("key", :not_found, "value", opts) end},
+      {:delete, fn opts -> ETS.delete("key", opts) end}
+    ]
+
+    for {operation, call} <- operations do
+      table = "test_persistence_invalid_#{operation}_#{System.unique_integer([:positive])}"
+      records = "#{table}_records"
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(records) end
+
+      assert_raise ArgumentError, "Jido.Persistence.ETS :table must be an atom", fn ->
+        call.(table: table)
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom(records) end
+    end
+  end
+
+  test "does not disguise an ETS access error as a missing value" do
+    table = unique_table(:private)
+    records = :"#{table}_records"
+    owner = self()
+
+    pid =
+      spawn(fn ->
+        :ets.new(records, [:named_table, :private, :set])
+        send(owner, {:ready, self()})
+
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    assert_receive {:ready, ^pid}
+
+    assert_raise ArgumentError, fn ->
+      ETS.get("key", table: table)
+    end
+
+    send(pid, :stop)
+  end
 end

@@ -28,8 +28,13 @@ defmodule Jido.Persistence do
   def normalize_adapter(nil), do: nil
   def normalize_adapter(false), do: nil
 
-  def normalize_adapter({adapter, opts}) when is_atom(adapter) and is_list(opts),
-    do: {adapter, opts}
+  def normalize_adapter({adapter, opts}) when is_atom(adapter) and is_list(opts) do
+    if Keyword.keyword?(opts) do
+      {adapter, opts}
+    else
+      raise ArgumentError, "persistence adapter options must be a keyword list"
+    end
+  end
 
   def normalize_adapter(adapter) when is_atom(adapter), do: {adapter, []}
 
@@ -68,9 +73,12 @@ defmodule Jido.Persistence do
   """
   @spec save_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
-  def save_agent(source, %Agent{} = agent, opts \\ []) when is_list(opts) do
+  def save_agent(source, agent, opts \\ [])
+
+  def save_agent(source, %Agent{} = agent, opts) do
     protect(:compare_and_swap, fn ->
-      with {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      with :ok <- validate_operation_options(opts),
+           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
            {:ok, record} <- build_record(agent, instance, opts),
            {:ok, expected_revision} <- expected_revision(opts),
            {:ok, expected_value} <-
@@ -93,7 +101,9 @@ defmodule Jido.Persistence do
   @spec load_agent(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, Agent.t()} | {:error, term()}
   def load_agent(source, agent_module, agent_id, opts \\ [])
-      when is_atom(agent_module) and is_binary(agent_id) and is_list(opts) do
+
+  def load_agent(source, agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
     case load_agent_with_revision(source, agent_module, agent_id, opts) do
       {:ok, agent, _revision} -> {:ok, agent}
       {:error, _reason} = error -> error
@@ -104,9 +114,12 @@ defmodule Jido.Persistence do
   @spec load_agent_with_revision(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
   def load_agent_with_revision(source, agent_module, agent_id, opts \\ [])
-      when is_atom(agent_module) and is_binary(agent_id) and is_list(opts) do
+
+  def load_agent_with_revision(source, agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
     protect(:get, fn ->
-      with {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      with :ok <- validate_operation_options(opts),
+           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
            partition = Keyword.get(opts, :partition),
            key = agent_key(instance, agent_module, agent_id, partition),
            {:ok, value} <- adapter_get(adapter, key, adapter_opts),
@@ -124,9 +137,12 @@ defmodule Jido.Persistence do
   @spec delete_agent(adapter_config() | atom(), module(), String.t(), keyword()) ::
           :ok | {:error, term()}
   def delete_agent(source, agent_module, agent_id, opts \\ [])
-      when is_atom(agent_module) and is_binary(agent_id) and is_list(opts) do
+
+  def delete_agent(source, agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
     protect(:delete, fn ->
-      with {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts) do
+      with :ok <- validate_operation_options(opts),
+           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts) do
         key = agent_key(instance, agent_module, agent_id, Keyword.get(opts, :partition))
         adapter_delete(adapter, key, adapter_opts)
       end
@@ -182,19 +198,43 @@ defmodule Jido.Persistence do
 
   defp validate_adapter_result({:ok, nil}), do: {:ok, nil}
 
-  defp validate_adapter_result({:ok, {adapter, _opts} = config}) do
+  defp validate_adapter_result({:ok, {adapter, opts} = config}) do
     with {:module, ^adapter} <- Code.ensure_loaded(adapter),
          true <- function_exported?(adapter, :get, 2),
          true <- function_exported?(adapter, :put, 3),
          true <- function_exported?(adapter, :compare_and_swap, 4),
-         true <- function_exported?(adapter, :delete, 2) do
+         true <- function_exported?(adapter, :delete, 2),
+         :ok <- validate_adapter_options(adapter, opts) do
       {:ok, config}
     else
+      {:error, _reason} = error -> error
       _value -> {:error, {:invalid_persistence_adapter, adapter}}
     end
   end
 
   defp validate_adapter_result({:error, _reason} = error), do: error
+
+  defp validate_adapter_options(adapter, opts) do
+    if function_exported?(adapter, :validate_options, 1) do
+      case adapter.validate_options(opts) do
+        :ok -> :ok
+        {:error, reason} -> {:error, {:invalid_persistence_options, adapter, reason}}
+        result -> {:error, {:invalid_persistence_options, adapter, {:invalid_result, result}}}
+      end
+    else
+      :ok
+    end
+  rescue
+    error -> {:error, {:invalid_persistence_options, adapter, {:error, error}}}
+  catch
+    kind, reason -> {:error, {:invalid_persistence_options, adapter, {kind, reason}}}
+  end
+
+  defp validate_operation_options(opts) do
+    if Keyword.keyword?(opts), do: :ok, else: invalid_operation_options(opts)
+  end
+
+  defp invalid_operation_options(opts), do: {:error, {:invalid_persistence_options, opts}}
 
   defp expected_revision(opts) do
     case Keyword.fetch(opts, :expected_revision) do
@@ -388,23 +428,25 @@ defmodule Jido.Persistence do
      )}
   end
 
-  defp portable_term?(term)
-       when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),
-       do: false
+  @doc false
+  @spec portable_term?(term()) :: boolean()
+  def portable_term?(term)
+      when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),
+      do: false
 
-  defp portable_term?(term) when is_map(term) do
+  def portable_term?(term) when is_map(term) do
     term
     |> Map.to_list()
     |> Enum.all?(fn {key, value} -> portable_term?(key) and portable_term?(value) end)
   end
 
-  defp portable_term?(term) when is_tuple(term),
+  def portable_term?(term) when is_tuple(term),
     do: term |> Tuple.to_list() |> Enum.all?(&portable_term?/1)
 
-  defp portable_term?([]), do: true
+  def portable_term?([]), do: true
 
-  defp portable_term?([head | tail]),
+  def portable_term?([head | tail]),
     do: portable_term?(head) and portable_term?(tail)
 
-  defp portable_term?(_term), do: true
+  def portable_term?(_term), do: true
 end
