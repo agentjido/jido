@@ -48,13 +48,10 @@ defmodule Jido.Agent.Validation do
   @spec instantiate(Agent.t(), map() | keyword()) ::
           {:ok, Agent.t()} | {:error, Exception.t()}
   def instantiate(%Agent{} = definition, overrides) do
-    with {:ok, definition} <- validate_definition(definition),
-         {:ok, overrides} <- normalize_attrs(overrides, :instance),
-         :ok <- validate_instance_overrides(overrides),
-         {:ok, id} <- instance_id(Map.get(overrides, :id)),
-         {:ok, schema} <- complete_schema(definition),
-         {:ok, state} <- initial_state(schema, Map.get(overrides, :state, %{})) do
-      validate_instance(%{definition | id: id, state: state})
+    with {:ok, definition, _plugin_specs, schema} <-
+           validate_definition_with_plugins(definition),
+         {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
+      {:ok, agent}
     end
   end
 
@@ -81,7 +78,7 @@ defmodule Jido.Agent.Validation do
   @doc false
   @spec validate_definition(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
   def validate_definition(%Agent{id: nil, state: nil} = agent) do
-    with {:ok, agent} <- validate_common(agent) do
+    with {:ok, agent, _plugin_specs, _schema} <- validate_common(agent) do
       {:ok, %{agent | id: nil, state: nil}}
     end
   end
@@ -99,11 +96,8 @@ defmodule Jido.Agent.Validation do
   @doc false
   @spec validate_instance(term()) :: {:ok, Agent.t()} | {:error, Exception.t()}
   def validate_instance(%Agent{} = agent) do
-    with {:ok, agent} <- validate_common(agent),
-         {:ok, id} <- validate_id(agent.id),
-         {:ok, schema} <- complete_schema(agent),
-         {:ok, state} <- State.validate(agent.state, schema) do
-      Jido.Agent.StateBudget.check(%{agent | id: id, state: state})
+    with {:ok, agent, _plugin_specs, schema} <- validate_common(agent) do
+      validate_instance_data(agent, schema)
     end
   end
 
@@ -125,13 +119,24 @@ defmodule Jido.Agent.Validation do
   @spec new_from_module(module(), map() | keyword(), map() | keyword()) ::
           {:ok, Agent.t()} | {:error, Exception.t()}
   def new_from_module(module, definition, overrides) when is_atom(module) do
-    with {:ok, definition} <- definition_from_module(module, definition) do
-      instantiate(definition, overrides)
+    with {:ok, attrs} <- normalize_attrs(definition, :definition),
+         attrs = Map.put(attrs, :module, module),
+         :ok <- known_keys(attrs),
+         :ok <- reject_instance_data(attrs),
+         {:ok, definition, _plugin_specs, schema} <- build_definition_with_plugins(attrs),
+         {:ok, agent} <- instantiate_validated(definition, schema, overrides) do
+      {:ok, agent}
     end
   end
 
   defp build_definition(attrs) do
-    %Agent{
+    with {:ok, agent, _plugin_specs, _schema} <- build_definition_with_plugins(attrs) do
+      {:ok, agent}
+    end
+  end
+
+  defp build_definition_with_plugins(attrs) do
+    agent = %Agent{
       id: nil,
       module: Map.get(attrs, :module, Agent),
       name: Map.get(attrs, :name),
@@ -143,7 +148,8 @@ defmodule Jido.Agent.Validation do
       routes: Map.get(attrs, :routes, []),
       metadata: Map.get(attrs, :metadata, %{})
     }
-    |> validate_common()
+
+    validate_common(agent)
   end
 
   defp validate_common(%Agent{} = agent) do
@@ -151,24 +157,50 @@ defmodule Jido.Agent.Validation do
          {:ok, description} <- field(:description, agent.description),
          :ok <- validate_module(agent.module),
          :ok <- Jido.Agent.StateBudget.validate_limit(agent.max_state_size),
-         {:ok, plugins} <- Plugin.canonical_declarations(agent.plugins),
+         {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
-         {:ok, _complete_schema} <- Plugin.compose_schema(agent.schema, plugins),
+         {:ok, complete_schema} <- Plugin.compose_schema(agent.schema, plugin_specs),
+         {:ok, plugins} <- Plugin.canonical_declarations(plugin_specs),
          {:ok, routes} <- validate_routes(agent.routes),
          {:ok, metadata} <- field(:metadata, agent.metadata) do
-      {:ok,
-       %{
-         agent
-         | name: name,
-           description: description,
-           plugins: plugins,
-           routes: routes,
-           metadata: metadata
-       }}
+      validated = %{
+        agent
+        | name: name,
+          description: description,
+          plugins: plugins,
+          routes: routes,
+          metadata: metadata
+      }
+
+      {:ok, validated, plugin_specs, complete_schema}
     end
   end
 
-  defp complete_schema(%Agent{} = agent), do: Plugin.compose_schema(agent.schema, agent.plugins)
+  defp validate_definition_with_plugins(%Agent{id: nil, state: nil} = definition),
+    do: validate_common(definition)
+
+  defp validate_definition_with_plugins(%Agent{} = definition) do
+    invalid("Agent definition cannot contain instance identity or state", %{
+      id: definition.id,
+      state: definition.state
+    })
+  end
+
+  defp instantiate_validated(definition, schema, overrides) do
+    with {:ok, overrides} <- normalize_attrs(overrides, :instance),
+         :ok <- validate_instance_overrides(overrides),
+         {:ok, id} <- instance_id(Map.get(overrides, :id)),
+         {:ok, state} <- initial_state(schema, Map.get(overrides, :state, %{})) do
+      validate_instance_data(%{definition | id: id, state: state}, schema)
+    end
+  end
+
+  defp validate_instance_data(agent, schema) do
+    with {:ok, id} <- validate_id(agent.id),
+         {:ok, state} <- State.validate(agent.state, schema) do
+      Jido.Agent.StateBudget.check(%{agent | id: id, state: state})
+    end
+  end
 
   defp initial_state(schema, state) when is_map(state) and not is_struct(state) do
     schema

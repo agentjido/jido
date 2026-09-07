@@ -136,7 +136,7 @@ defmodule Jido.Agent.ValidationTest do
     end
   end
 
-  test "calls Plugin schema callbacks twice in order before route and metadata checks" do
+  test "calls Plugin schema callbacks once in order before route and metadata checks" do
     opts = [label: :first]
 
     for extra <- [%{}, %{routes: nil}, %{metadata: nil}] do
@@ -149,7 +149,7 @@ defmodule Jido.Agent.ValidationTest do
         assert {:error, %ValidationError{}} = result
       end
 
-      for callback <- [:state_spec, :directives, :state_spec, :directives] do
+      for callback <- [:state_spec, :directives] do
         assert_received {:callback, actual, ^opts}
         assert actual == callback
       end
