@@ -24,6 +24,10 @@ builder =
 ```
 
 The Builder preserves its first error. Always check `build/1` or `build/2`.
+Like `Jido.Flow.Builder`, it stores each added route after validation and
+checks the complete definition at build time. Appending a route does not
+revalidate earlier route targets. Build checks all current target contracts.
+Plugin declarations keep their ordered callback and ownership checks.
 
 Builder options and DSL options reject duplicate keyword keys. Direct Agent
 constructors, instance overrides, `Agent.set/2`, and caller context keep the last

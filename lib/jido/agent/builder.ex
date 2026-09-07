@@ -4,6 +4,9 @@ defmodule Jido.Agent.Builder do
 
   `build/1` returns a neutral definition. `build/2` also supplies instance
   options and returns a complete Agent. The Builder keeps its first error.
+  Each added route is normalized and checked once, then stored in reverse
+  order as in `Jido.Flow.Builder`. Build restores declaration order and
+  validates the complete definition, including current executable contracts.
 
       builder =
         Jido.Agent.Builder.new(name: "counter")
@@ -18,6 +21,7 @@ defmodule Jido.Agent.Builder do
 
   @schema Zoi.struct(__MODULE__, %{
             config: Zoi.map(),
+            reversed_routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
             error: Zoi.any() |> Zoi.nullable()
           })
   @opaque t :: unquote(Zoi.type_spec(@schema))
@@ -84,7 +88,7 @@ defmodule Jido.Agent.Builder do
   def route(builder, path, target, opts) do
     with {:ok, route} <- Authoring.route(path, target, opts),
          :ok <- Authoring.validate_target(route.target) do
-      append(builder, :routes, route)
+      %{builder | reversed_routes: [route | builder.reversed_routes]}
     else
       {:error, error} -> %{builder | error: error}
     end
@@ -108,7 +112,9 @@ defmodule Jido.Agent.Builder do
   @doc "Builds one neutral Agent definition."
   @spec build(t()) :: {:ok, Agent.t()} | {:error, Exception.t()}
   def build(%__MODULE__{error: error}) when not is_nil(error), do: {:error, error}
-  def build(%__MODULE__{config: config}), do: Agent.new(config)
+
+  def build(%__MODULE__{config: config, reversed_routes: routes}),
+    do: Agent.new(Map.put(config, :routes, Enum.reverse(routes)))
 
   @doc "Builds a complete Agent with the supplied instance options."
   @spec build(t(), map() | keyword()) :: {:ok, Agent.t()} | {:error, Exception.t()}
@@ -123,6 +129,15 @@ defmodule Jido.Agent.Builder do
 
   defp put(%__MODULE__{error: error} = builder, _key, _value) when not is_nil(error), do: builder
 
+  defp put(builder, :routes, value) do
+    with {:ok, routes} <- Authoring.routes(value),
+         {:ok, routes} <- Authoring.traverse(routes, &validate_route/1) do
+      %{builder | reversed_routes: Enum.reverse(routes)}
+    else
+      {:error, error} -> %{builder | error: error}
+    end
+  end
+
   defp put(builder, key, value) do
     case valid_field(key, value) do
       :ok -> %{builder | config: Map.put(builder.config, key, value)}
@@ -132,21 +147,23 @@ defmodule Jido.Agent.Builder do
 
   defp valid_field(key, value) when key in [:name, :description, :metadata] do
     case Agent.Validation.field(key, value) do
-      {:ok, _value} -> :ok
-      {:error, _error} when key == :metadata -> Authoring.error("Agent metadata must be a plain map")
-      {:error, error} when key == :description -> Authoring.error(error.message)
-      error -> error
+      {:ok, _value} ->
+        :ok
+
+      {:error, _error} when key == :metadata ->
+        Authoring.error("Agent metadata must be a plain map")
+
+      {:error, error} when key == :description ->
+        Authoring.error(error.message)
+
+      error ->
+        error
     end
   end
 
   defp valid_field(:max_state_size, value), do: Agent.StateBudget.validate_limit(value)
 
   defp valid_field(:schema, value), do: Agent.State.validate_schema(value)
-  defp valid_field(:routes, value) do
-    with {:ok, routes} <- Authoring.routes(value),
-         {:ok, _} <- Authoring.traverse(routes, &validate_route/1),
-         do: :ok
-  end
 
   defp valid_field(:plugins, value) do
     with {:ok, values} <- Authoring.traverse(value, &{:ok, &1}),
