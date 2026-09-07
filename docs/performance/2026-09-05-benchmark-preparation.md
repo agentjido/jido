@@ -56,7 +56,7 @@ the same idle host with the same tool and settings.
 ## Local evidence
 
 Raw JSON, Markdown reports, and paired command logs remain under the ignored
-`bench/results/` directory. Current schema 2 candidate reports are `final-short`
+`test/bench/results/` directory. Current schema 2 candidate reports are `final-short`
 and `final-scale`. The runtime-floor compatibility report is `final-floor-smoke`.
 Its timings are not used for performance claims.
 
@@ -67,7 +67,7 @@ Its timings are not used for performance claims.
 schema 1. They are historical records and must not be compared with schema 2.
 
 The earlier `baseline-scale` and `control-pairs` runs may overlap. They are marked
-invalid in `bench/results/contaminated.json` and are not used for acceptance.
+invalid in `test/bench/results/contaminated.json` and are not used for acceptance.
 
 See the [50-round plan](../plans/2026-09-05-core-performance.md) and
 [benchmark guide](../../guides/benchmarks.md) for the next steps. A repeated

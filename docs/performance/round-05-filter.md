@@ -33,7 +33,7 @@ in order. All 41 Thread and benchmark tests passed, including nil input,
 invalid input, no matches, and multiple kinds. The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
 The same 11 known example failures remain outside that coverage gate.
 
-Evidence: `bench/results/round-05` and `round-05-control`.
+Evidence: `test/bench/results/round-05` and `round-05-control`.
 
 Baseline commit: `6b999a4e01ca19a2d21edd4299f03ad14862dd59`.
 Runtime SHA-256: `4b544c1ef6236ed9ef826748e6a7bc444b1e5cedca6ae971eb3a3806387e4c01`.

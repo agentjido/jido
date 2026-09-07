@@ -106,6 +106,12 @@ defmodule Jido.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      test_ignore_filters: [
+        fn path ->
+          String.starts_with?(path, "test/bench/") and
+            not String.ends_with?(path, "_test.exs")
+        end
+      ],
 
       # Docs
       name: "Jido",
@@ -141,6 +147,8 @@ defmodule Jido.MixProject do
   def cli do
     [
       preferred_envs: [
+        q: :test,
+        quality: :test,
         benchmarks: :test,
         examples: :test,
         coveralls: :test,
@@ -156,7 +164,9 @@ defmodule Jido.MixProject do
   end
 
   # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "examples", "test/support"]
+  defp elixirc_paths(:test),
+    do: ["lib", "examples", "test/support", "test/jido/support", "test/examples/support"]
+
   defp elixirc_paths(:dev), do: ["lib", "examples"]
   defp elixirc_paths(_), do: ["lib"]
 
@@ -375,8 +385,8 @@ defmodule Jido.MixProject do
       test: "test --preload-modules",
 
       # Run secondary suites only when requested.
-      benchmarks: "test test/jido/bench --only benchmark",
-      examples: "test --only example",
+      benchmarks: "test test/bench --only benchmark",
+      examples: "test test/examples --only example",
 
       # Helper to run docs
       docs: "docs --open",
@@ -388,21 +398,8 @@ defmodule Jido.MixProject do
         "compile --warnings-as-errors",
         "credo --strict --only warning",
         "dialyzer",
-        &unit_tests/1
+        "test test/jido --include flaky --seed 0"
       ]
     ]
-  end
-
-  # Keep quality tools in their normal environment and isolate the test build.
-  defp unit_tests(_args) do
-    {_, status} =
-      System.cmd(
-        "mix",
-        ["test", "test/jido", "test/jido_test", "--include", "flaky", "--seed", "0"],
-        env: [{"MIX_ENV", "test"}],
-        into: IO.stream()
-      )
-
-    if status != 0, do: Mix.raise("Unit tests failed")
   end
 end

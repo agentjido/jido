@@ -33,7 +33,7 @@ complete candidate, and commits it. Jido.Flow and Jido.Exec from jido_action
 own graph scheduling, schemas, collections, loops, and continuation. The tests
 exercise these real components together.
 
-The [shared controls](../../support/workflow_sdk_case.ex) observe Action entry,
+The [shared controls](../support/workflow_sdk_case.ex) observe Action entry,
 hold explicit barriers, and monitor worker exit. Source observation uses an
 optional callback in caller context. Tests use no fixed sleeps, private Server
 messages, or replacement execution engines. Domain operations use Signals.

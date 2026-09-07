@@ -34,7 +34,7 @@ when its value is nil. Each workload checks complete results and cleanup.
 The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
 The same 11 known example failures remain outside that coverage gate.
 
-Evidence: `bench/results/round-18` and `bench/results/round-18-control`.
+Evidence: `test/bench/results/round-18` and `test/bench/results/round-18-control`.
 
 Baseline commit: `def4d6fb46fffaac63199097df8916348aa0e470`.
 Runtime SHA-256: `4b7d9b1cd998aeae8814157157590586523deb38e318aa8d50bae9168dac5eb4`.

@@ -45,7 +45,7 @@ schema, and benchmark tests passed, including concurrent CAS, table isolation,
 table ownership, and full Agent persistence. The complete checks passed with 893 core tests and 83.5% core coverage.
 See [the phase checks](phase-40-checks.md).
 
-Evidence: `bench/results/round-36`, `round-36-control`, and `round-36-puts`.
+Evidence: `test/bench/results/round-36`, `round-36-control`, and `round-36-puts`.
 The resource-only follow-up is `docs/performance/probes/round-36-puts.exs`.
 
 Baseline commit: `9860f5c113f52b6c4990b1eee032826d392e454a`.

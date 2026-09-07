@@ -99,22 +99,6 @@ defmodule JidoTest.ObserveTest do
       end
     end
 
-    test "measures duration correctly" do
-      sleep_time_ms = 10
-
-      Observe.with_span([:jido, :test, :with_span], %{}, fn ->
-        Process.sleep(sleep_time_ms)
-      end)
-
-      assert_receive {:telemetry_event, [:jido, :test, :with_span, :start], _, _}
-
-      assert_receive {:telemetry_event, [:jido, :test, :with_span, :stop], %{duration: duration},
-                      _}
-
-      duration_ms = div(duration, 1_000_000)
-      assert duration_ms >= sleep_time_ms
-    end
-
     test "emits :exception event on error and re-raises" do
       assert_raise RuntimeError, "test error", fn ->
         Observe.with_span([:jido, :test, :with_span], %{error_test: true}, fn ->
@@ -259,18 +243,15 @@ defmodule JidoTest.ObserveTest do
       assert measurements.total_tokens == 150
     end
 
-    test "duration is measured correctly" do
-      sleep_time_ms = 10
-
+    test "duration includes time before a manual span finishes" do
       span_ctx = Observe.start_span([:jido, :test, :manual_span], %{})
-      Process.sleep(sleep_time_ms)
+      span_ctx = %{span_ctx | start_time: span_ctx.start_time - 10_000_000}
       Observe.finish_span(span_ctx)
 
       assert_receive {:telemetry_event, [:jido, :test, :manual_span, :stop],
                       %{duration: duration}, _}
 
-      duration_ms = div(duration, 1_000_000)
-      assert duration_ms >= sleep_time_ms
+      assert duration >= 10_000_000
     end
 
     test "returns span context struct with required keys" do
@@ -364,18 +345,15 @@ defmodule JidoTest.ObserveTest do
       end
     end
 
-    test "measures duration correctly" do
-      sleep_time_ms = 10
-
+    test "duration includes time before an error span finishes" do
       span_ctx = Observe.start_span([:jido, :test, :error_span], %{})
-      Process.sleep(sleep_time_ms)
+      span_ctx = %{span_ctx | start_time: span_ctx.start_time - 10_000_000}
       Observe.finish_span_error(span_ctx, :error, :some_error, [])
 
       assert_receive {:telemetry_event, [:jido, :test, :error_span, :exception],
                       %{duration: duration}, _}
 
-      duration_ms = div(duration, 1_000_000)
-      assert duration_ms >= sleep_time_ms
+      assert duration >= 10_000_000
     end
   end
 

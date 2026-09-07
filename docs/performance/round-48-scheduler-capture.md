@@ -47,8 +47,8 @@ probe on Elixir 1.18.5 / OTP 27 returned 72 copied bytes for each function, with
 no runtime map captured. This floor probe has no completed baseline pair and
 supplies no cross-version timing comparison.
 
-Evidence: `bench/results/round-48`, `round-48-control`, and `round-48-capture`.
-Probe: `bench/capture_scheduler.exs`.
+Evidence: `test/bench/results/round-48`, `round-48-control`, and `round-48-capture`.
+Probe: `test/bench/capture_scheduler.exs`.
 
 Baseline commit: `f71f842c0ad69bb00d398bf4d77c93b6b78edc43`.
 Baseline runtime SHA-256: `d2c12025f34d3c55654fd9d80685eac096ef374bb6cff12343aa3b067d0d3447`.

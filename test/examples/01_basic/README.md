@@ -1,7 +1,7 @@
 # Basic SDK integration tests
 
 Basic tests the smallest combinations of real SDK components. The suite has
-five fixtures and 22 tests. Each fixture owns one integration boundary.
+five fixtures and 16 tests. Each fixture owns one integration boundary.
 
 | Order | Fixture | Tests | SDK obligation |
 | --- | --- | ---: | --- |
@@ -11,11 +11,7 @@ five fixtures and 22 tests. Each fixture owns one integration boundary.
 | 01_04 | [Directive Agent](01_04_directive_agent/directive_agent_test.exs) | 3 | Whole-batch validation and ordered post-commit effects |
 | 01_05 | [Controlled Turn Agent](01_05_controlled_turn_agent/controlled_turn_agent_test.exs) | 3 | Serialization, cancellation, queued work, and caller timeout |
 
-Six tests in `authoring_formats_test.exs` compare Spark, map, keyword, Builder,
-and JSON construction for every fixture, including both Typed Command routes.
-Each form also executes through the real Agent Server.
-
-Run all 22 tests:
+Run all 16 tests:
 
 ```shell
 mix test --include example test/examples/01_basic
@@ -28,7 +24,7 @@ The five implementations live in matching folders under
 [`examples/01_basic`](../../../examples/01_basic). Tests import those Agent
 modules. They do not define replacement Agents, Actions, or Plugins.
 
-[Shared test support](../../support/basic_sdk_case.ex) starts real Agent Servers
+[Shared test support](../support/basic_sdk_case.ex) starts real Agent Servers
 under an isolated Jido instance. The
 [Effects Plugin](../../../examples/01_basic/01_04_directive_agent/effects.ex) starts
 a real supervised runtime and is shared by four fixtures. Directive Agent also

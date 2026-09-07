@@ -4,19 +4,19 @@ Run from the Jido repository root. Use Elixir 1.18 or later and the dependencies
 `mix.lock`. The suite uses the jido_action v3 measurement approach.
 
 ```sh
-ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile smoke --output bench/results/smoke
-ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile short --output bench/results/before
-ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/scale
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile smoke --output test/bench/results/smoke
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile short --output test/bench/results/before
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile scale --output test/bench/results/scale
 ```
 
 | Profile | Cases | Route counts | Thread sizes | Warm-up | Time samples | Resource samples |
 | --- | ---: | --- | --- | ---: | ---: | ---: |
-| smoke | 144 | 1, 8 | 1, 32 | 1 | 2 | 1 |
-| short | 224 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
-| scale | 265 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
+| smoke | 158 | 1, 8 | 1, 32 | 1 | 2 | 1 |
+| short | 238 | 1, 16 | 1, 100, 1000 | 5 | 30 | 3 |
+| scale | 282 | 1, 16, 64 | 1, 100, 1000, 10000 | 10 | 60 | 5 |
 
 Use `--filter SUBSTRING` for selected case IDs. An empty selection is an error.
-Each run writes `report.json` and `report.md`. Raw reports under `bench/results/`
+Each run writes `report.json` and `report.md`. Raw reports under `test/bench/results/`
 are ignored by Git. Keep the same scripts for both sides of a comparison.
 
 ## Cases
@@ -39,8 +39,8 @@ with default and custom table options. They delete their own keys after each
 sample. The named tables remain part of the VM infrastructure; their memory
 is outside the per-case process and copied-term measurements.
 
-For admission task arguments, run `mix run bench/capture_admission.exs --output
-bench/results/admission-capture.json`. This separate diagnostic captures the
+For admission task arguments, run `mix run test/bench/capture_admission.exs --output
+test/bench/results/admission-capture.json`. This separate diagnostic captures the
 actual function passed to `Task.Supervisor.async/2`, checks the completed call,
 and copies that function into a receiver. It reports whether the function holds
 the complete Server state. It supplies no timing evidence, and its copied heap
@@ -51,7 +51,7 @@ a 1 MiB binary. Smoke uses small state for the main matrix; fixed boundary cases
 still use their stated payloads. Actions do no network or provider work.
 Each call must produce its expected result. Server cleanup runs even when a
 result check fails. The benchmark contract tests are in
-`test/jido/bench/core_bench_test.exs`; CI's existing `test/jido` selection runs them.
+`test/bench/core_bench_test.exs`; run them with `mix benchmarks --seed 0`.
 
 ## Measurements
 
@@ -88,25 +88,21 @@ attributed to individual cases; whole-VM totals include them. Retained term prob
 Flat transfers above 64 MiB are rejected. A full Agent result includes its schema
 and routes; a server result does not include all server internal data.
 
-## Compare and repeat
+## Compare
 
 Use two isolated worktrees with separate builds. Compile both before measurement.
 Run one VM at a time on the same idle host and runtime. Keep dependencies and
 scheduler count fixed. Do not compile or run tests during paired measurements.
 
 ```sh
-ERL_FLAGS='+S 2:2' mix run bench/compare.exs \
-  bench/results/before/report.json bench/results/after/report.json \
-  bench/results/comparison.md
-
-python3 bench/repeat.py --baseline /path/to/baseline --candidate /path/to/candidate \
-  --profile short --rounds 5 --output bench/results/pairs
+ERL_FLAGS='+S 2:2' mix run test/bench/compare.exs \
+  test/bench/results/before/report.json test/bench/results/after/report.json \
+  test/bench/results/comparison.md
 ```
 
-The repeat runner uses one absolute script path from both worktrees, starts fresh
-VMs, alternates order, checks report compatibility, and saves all logs and reports.
-Use `--rounds 50` for the final repeated measurement run. It never changes or
-pushes source code. It does not execute 50 different optimization ideas.
+For repeated measurements, run `test/bench/run.exs` from each worktree in a
+fresh VM. Alternate the baseline and candidate order. Use a new output
+directory for each pair. Compare reports from the same pair.
 
 Reports record source revision and hash, source dirtiness, tool hash, lock hash,
 runtime, host, and settings. Comparison rejects different environments, settings,
@@ -125,7 +121,7 @@ The `scheduler/task_capture` cases call the actual scheduler runtime delivery
 handler. An owned reply fixture supplies empty Plugin state. These cases cover
 task start, argument transfer, idle result, timer removal, and process cleanup.
 They do not measure a complete Agent Server Turn or cron activation. Run
-`mix run bench/capture_scheduler.exs --output PATH` for a separate trace of the
+`mix run test/bench/capture_scheduler.exs --output PATH` for a separate trace of the
 actual `Task.async/1` function argument. That trace supplies copy-size evidence,
 not timing evidence.
 

@@ -39,7 +39,7 @@ Both runtime edits were removed. The original two-put path remains. Patches
 are retained in `trials/round-17-map-merge.patch` and `trials/round-17-hoist.patch`.
 Apply them to the stated baseline with `git apply --unidiff-zero` for study.
 
-Evidence: `bench/results/round-17`, `round-17-hoist`, and `round-17-control`.
+Evidence: `test/bench/results/round-17`, `round-17-hoist`, and `round-17-control`.
 
 round-17: baseline `dbf0d71841052da5d6741857e812819f3e0cc607`, candidate `a7dd3f80f772ffd403968b2d7e1c90bf489d6804`.
 Candidate runtime SHA-256: `1fc5a7acf7d77cd25991c3d2d59bb7d1216749fd68e6805e2ee1d2c652eff525`.

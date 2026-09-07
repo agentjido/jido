@@ -43,7 +43,7 @@ All 85 focused authoring, Agent, and benchmark tests passed. Each workload check
 complete decoded definitions or documents and process cleanup. The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
 The same 11 known example failures remain outside that coverage gate.
 
-Evidence: `bench/results/round-31`, `round-31-control`, and `round-31-fixed`.
+Evidence: `test/bench/results/round-31`, `round-31-control`, and `round-31-fixed`.
 The fixed-input diagnostic is `docs/performance/probes/round-31-memory.exs`.
 It supplies resource evidence only. Timing comes from the separate untraced runs.
 The candidate includes Round 18, which changes only command context checks and

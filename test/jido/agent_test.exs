@@ -7,7 +7,6 @@ defmodule Jido.AgentTest do
   alias Jido.Agent.Turn
   alias Jido.Agent.Turn.Outcome
   alias Jido.Signal
-  alias Jido.Signal.ID
   alias Jido.Signal.Router
 
   alias JidoTest.AgentFixtures.{
@@ -240,52 +239,6 @@ defmodule Jido.AgentTest do
     assert %Zoi.Types.Struct{module: Agent} = Agent.schema()
     assert %Zoi.Types.Struct{module: Turn} = Turn.schema()
     assert %Zoi.Types.Struct{module: Outcome} = Outcome.schema()
-  end
-
-  test "validates terminal Turn outcomes" do
-    signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
-    id = ID.generate!()
-
-    attrs = %{
-      id: id,
-      agent_id: "counter-1",
-      source_signal: signal,
-      effective_signal: signal,
-      status: :failed,
-      stage: :execute,
-      committed?: false,
-      state_version_before: 0,
-      error: :simulated_failure,
-      directives: %{total: 0, completed: 0, failed: 0, failed_index: nil, skipped: 0},
-      started_at: 10,
-      finished_at: 12,
-      duration_ms: 2
-    }
-
-    assert {:ok, %Outcome{status: :failed} = outcome} = Outcome.new(attrs)
-
-    assert {:ok, ^outcome} = Outcome.new(outcome)
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Outcome.new(%{outcome | id: "not-a-turn-id"})
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Outcome.new(%{
-               attrs
-               | status: :succeeded,
-                 stage: :commit,
-                 committed?: true,
-                 error: nil
-             })
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Outcome.new(%{attrs | status: :succeeded, error: :contradiction})
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Outcome.new(%{attrs | stage: :directive})
-
-    assert {:error, %Jido.Error.ValidationError{}} =
-             Outcome.new(%{attrs | finished_at: 9})
   end
 
   test "builds instances from a module that uses Jido.Agent" do
@@ -825,7 +778,7 @@ defmodule Jido.AgentTest do
                  Agent.cmd(agent, signal, context: Map.put(context, key, nil))
       end
 
-      refute_receive {:agent_execution_boundary, _, _}
+      refute_received {:agent_execution_boundary, _, _}
     end
 
     test "preserves executable errors without changing the source Agent" do

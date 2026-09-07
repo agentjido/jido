@@ -22,7 +22,7 @@ defmodule JidoTest.Observe.RemoteCausalTraceTest do
                [input: %{node: c.node_b}]
              ])
 
-    eventually(
+    peer_eventually(
       fn ->
         peer_call(c.peer_a, Server, :agent, [parent]).state.results == %{left: 14, right: 14}
       end,
@@ -128,7 +128,7 @@ defmodule JidoTest.Observe.RemoteCausalTraceTest do
     peer_call(c.peer_b, Process, :exit, [first.pid, :kill])
 
     events =
-      eventually(fn ->
+      peer_eventually(fn ->
         events = events(c, probes)
         if length(turns(events, "jido.agent.child.started")) == 2, do: events
       end)
@@ -191,7 +191,7 @@ defmodule JidoTest.Observe.RemoteCausalTraceTest do
     do: Enum.flat_map(probes, fn {peer, probe} -> peer_call(peer, Probe, :events, [probe]) end)
 
   defp await_turns(c, probes, count) do
-    eventually(
+    peer_eventually(
       fn ->
         events = events(c, probes)
 

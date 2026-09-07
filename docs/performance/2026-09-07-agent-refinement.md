@@ -90,12 +90,9 @@ final deduplication pass. Do not use the earlier trial as final evidence.
 Raw paired reports and manifests for this local run are under
 `/tmp/jido-agent-refinement.zu5xg5/final-authoring`. The earlier trial is under
 `/tmp/jido-agent-refinement.zu5xg5/authoring`. These temporary paths are local
-evidence, not published artifacts. Reproduce the comparison with:
-
-```sh
-python3 bench/repeat.py --baseline BASELINE_CHECKOUT --candidate CANDIDATE_CHECKOUT \
-  --output EMPTY_OUTPUT_DIRECTORY --profile scale --filter authoring/ --rounds 5
-```
+evidence, not published artifacts. Reproduce the comparison with the fresh-VM
+procedure in the [benchmark guide](../../guides/benchmarks.md). Use the scale
+profile and the `authoring/` filter.
 
 Runtime SHA-256, baseline:
 `c7653b43b7970073965f8883ce71180ff96766286d77cc938e75cb6effa8011f`.
@@ -106,17 +103,17 @@ Benchmark tool SHA-256:
 
 ## Release test policy
 
-`mix quality` runs unit tests and the existing format, compile, lint, and
+`mix quality` runs core tests and the existing format, compile, lint, and
 Dialyzer checks. Its test step runs in a separate test environment:
 
 ```sh
-mix test test/jido test/jido_test --include flaky --seed 0
+mix test test/jido --include flaky --seed 0
 ```
 
 CI uses this selection. The test helper excludes `:benchmark` and `:example`.
 Benchmark tests (`mix benchmarks`) and example tests (`mix examples`) are
 secondary and run only when selected separately. Research failures do not block
-the unit quality check. The 11 known research failures have individual
+the core quality check. The 11 known research failures have individual
 temporary skip reasons. Their assertions remain unchanged. A metadata-only
 audit confirmed 45 research tests, exactly 11 skips, and a reason for every
 skip. It did not execute research assertions. The existing DIST-03 core skip
@@ -127,7 +124,7 @@ See [the test policy](../../guides/testing.md) and
 
 ## Verification
 
-- `mix quality`: passed, including 980 unit tests. The eight excluded tests
+- `mix quality`: passed, including 980 core tests. The eight excluded tests
   are the seven benchmark tests and the existing DIST-03 skip. Example tests
   are outside the selected paths.
 - Unit-only coverage: 93.6%, with 980 passed and eight excluded. No benchmark
@@ -136,7 +133,7 @@ See [the test policy](../../guides/testing.md) and
 - `mix benchmarks --seed 0`: seven tests passed. The smoke test checks all
   158 benchmark workloads, returned values, term transfers, and cleanup.
 - Unit suite on Elixir 1.18.5 / OTP 27: 980 passed, eight excluded. It uses
-  the same unit selection as quality and a separate build directory.
+  the same core selection as quality and a separate build directory.
 - Quality failure probe: a simulated failing test command makes quality fail.
   Its child process uses `MIX_ENV=test`; the parent keeps its tool environment.
 - `mix docs --no-open -f html --warnings-as-errors`: passed.
@@ -144,7 +141,7 @@ See [the test policy](../../guides/testing.md) and
 - Before the final suite split, the full core selection passed on both
   Elixir 1.20.3 / OTP 29 and Elixir 1.18.5 / OTP 27: 987 passed, one excluded.
   Coverage was 93.7%. That measurement includes benchmark tests and must not
-  be presented as unit-only coverage.
+  be presented as core-only coverage.
 
 The default-runtime tests report existing type warnings in intentional invalid
 input tests. The project compilation and strict warning-level lint checks pass.
@@ -169,7 +166,7 @@ A later review found three pre-existing errors at Agent boundaries:
 The new regression tests produced four failures before these fixes, including
 one at each constructor. After the fixes, 101 focused Agent tests pass on
 Elixir 1.20.3 / OTP 29 and Elixir 1.18.5 / OTP 27. The separate benchmark
-contract suite passes all seven tests. `mix quality` passes with 985 unit tests
+contract suite passes all seven tests. `mix quality` passes with 985 core tests
 and eight exclusions. Docs and package checks also pass. No example acceptance
 tests ran, and research skips are unchanged.
 

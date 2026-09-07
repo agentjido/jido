@@ -36,5 +36,5 @@ paths changed from `phase-34` to `phase-36`. The coverage scope and threshold
 are unchanged. The exact commands and source hashes remain in local reports.
 
 Local logs: `/tmp/jido-phase-36-{coverage,examples,quality,docs,package,floor,scale}.log`.
-Reports: `bench/results/phase-36-scale` and `bench/results/phase-36-floor-smoke`.
+Reports: `test/bench/results/phase-36-scale` and `test/bench/results/phase-36-floor-smoke`.
 The benchmark profiles now contain 97 smoke, 174 short, and 215 scale cases.

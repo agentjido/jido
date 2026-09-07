@@ -71,6 +71,8 @@ defmodule Jido.Thread do
 
   @doc "Append entries to thread (returns new thread)"
   @spec append(t(), Entry.t() | map() | [Entry.t() | map()]) :: t()
+  def append(%__MODULE__{} = thread, entries) when entries in [nil, []], do: thread
+
   def append(%__MODULE__{} = thread, entries) do
     entries = List.wrap(entries)
     now = System.system_time(:millisecond)

@@ -1,4 +1,4 @@
-Code.require_file("../../../bench/support/suite.exs", __DIR__)
+Code.require_file("../../../test/bench/support/suite.exs", __DIR__)
 
 alias JidoCoreBench.{Fixtures, Suite}
 

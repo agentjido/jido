@@ -1,6 +1,6 @@
 # Diagnostic only. Build inputs before the resource observer starts.
 # Use the same script path in both worktrees. No timing claim comes from this run.
-Code.require_file("../../../bench/support/suite.exs", __DIR__)
+Code.require_file("../../../test/bench/support/suite.exs", __DIR__)
 alias JidoCoreBench.{Suite, Measure}
 {:ok, supervisor} = Jido.start_link(name: JidoCoreBench)
 

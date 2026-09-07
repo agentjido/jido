@@ -275,9 +275,9 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
              end)
 
     assert_receive {:scoped_called, [:jido, :scope, :used], %{mode: :scoped}}
-    refute_receive :legacy_start, 10
-    refute_receive :legacy_stop, 10
-    refute_receive :legacy_exception, 10
+    refute_received :legacy_start
+    refute_received :legacy_stop
+    refute_received :legacy_exception
   end
 
   test "with_span/3 falls back to legacy callbacks when scoped callback is missing" do
@@ -492,7 +492,7 @@ defmodule JidoTest.Observe.TracerScopeContractTest do
 
     assert_receive :a_start
     assert_receive {:a_stop, :a_ctx, %{duration: _}}
-    refute_receive {:b_stop, _, _}, 10
+    refute_received {:b_stop, _, _}
   end
 
   test "warn mode isolates throw/exit in finish callbacks" do

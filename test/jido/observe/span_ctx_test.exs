@@ -12,8 +12,7 @@ defmodule JidoTest.Observe.SpanCtxTest do
 
   describe "schema/0" do
     test "returns the Zoi schema" do
-      schema = SpanCtx.schema()
-      assert is_struct(schema)
+      assert %Zoi.Types.Struct{} = SpanCtx.schema()
     end
   end
 
@@ -37,17 +36,17 @@ defmodule JidoTest.Observe.SpanCtxTest do
     end
 
     test "returns error for non-map input" do
-      assert {:error, error} = SpanCtx.new("not a map")
+      assert {:error, error} = apply(SpanCtx, :new, ["not a map"])
       assert error.message == "SpanCtx requires a map"
     end
 
     test "returns error for nil input" do
-      assert {:error, error} = SpanCtx.new(nil)
+      assert {:error, error} = apply(SpanCtx, :new, [nil])
       assert error.message == "SpanCtx requires a map"
     end
 
     test "returns error for list input" do
-      assert {:error, error} = SpanCtx.new([])
+      assert {:error, error} = apply(SpanCtx, :new, [[]])
       assert error.message == "SpanCtx requires a map"
     end
 
@@ -71,7 +70,7 @@ defmodule JidoTest.Observe.SpanCtxTest do
 
     test "raises on non-map input" do
       assert_raise Jido.Error.ValidationError, fn ->
-        SpanCtx.new!("not a map")
+        apply(SpanCtx, :new!, ["not a map"])
       end
     end
   end

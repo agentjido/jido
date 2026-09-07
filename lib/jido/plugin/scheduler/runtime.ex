@@ -6,7 +6,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.{DirectiveContext, Init}
   alias Jido.Plugin.Scheduler
-  alias Jido.Plugin.Scheduler.{Cancel, Cron, Delivery, Durable, Occurrence, Schedule}
+  alias Jido.Plugin.Scheduler.{Cancel, Cron, Delivery, Durable, Occurrence, Schedule, WallClock}
   alias Jido.Signal
   alias Jido.Tracing.Context, as: TraceContext
 
@@ -318,22 +318,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
 
   defp await_cron_slot(time, options) do
     if Keyword.get(options, :time_scale, SchedEx.IdentityTimeScale) == SchedEx.IdentityTimeScale do
-      await_wall_clock(time)
-    end
-  end
-
-  # SchedEx truncates the timer delay to milliseconds. An early callback can
-  # cause its next calculation to select the same slot again. Complete this
-  # callback only after the real clock reaches the intended slot. Custom time
-  # scales retain their own clock and repeat-delivery semantics.
-  defp await_wall_clock(time) do
-    remaining = DateTime.diff(time, DateTime.utc_now(), :microsecond)
-
-    if remaining > 0 do
-      receive do
-      after
-        div(remaining + 999, 1_000) -> await_wall_clock(time)
-      end
+      WallClock.wait_until(time)
     end
   end
 

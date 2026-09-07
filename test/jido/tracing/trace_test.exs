@@ -75,8 +75,8 @@ defmodule JidoTest.Tracing.TraceTest do
     end
 
     test "returns error for non-signal input" do
-      assert {:error, :invalid_args} = Trace.put("not a signal", %{trace_id: "abc"})
-      assert {:error, :invalid_args} = Trace.put(nil, %{trace_id: "abc"})
+      assert {:error, :invalid_args} = apply(Trace, :put, ["not a signal", %{trace_id: "abc"}])
+      assert {:error, :invalid_args} = apply(Trace, :put, [nil, %{trace_id: "abc"}])
     end
   end
 

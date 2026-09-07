@@ -53,8 +53,8 @@ All 72 smoke cases and all four task-capture cases passed on Elixir 1.18.5 /
 OTP 27.3.4.12. None of the floor captures held the complete Server state. This
 was a compatibility run; its timings are not used for performance claims.
 
-Local evidence: `bench/results/round-39`, `round-39-control`, and
-`round-39-captures`. The copy diagnostic is `bench/capture_admission.exs`.
+Local evidence: `test/bench/results/round-39`, `round-39-control`, and
+`round-39-captures`. The copy diagnostic is `test/bench/capture_admission.exs`.
 Its traced calls supply no timing evidence; time samples come from the separate
 untraced benchmark runs.
 

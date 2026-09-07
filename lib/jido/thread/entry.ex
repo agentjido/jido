@@ -63,7 +63,13 @@ defmodule Jido.Thread.Entry do
   end
 
   defp fetch_attr(attrs, key, default \\ nil) do
-    case Map.get(attrs, key) || Map.get(attrs, Atom.to_string(key)) do
+    value =
+      case Map.fetch(attrs, key) do
+        {:ok, value} -> value
+        :error -> Map.get(attrs, Atom.to_string(key))
+      end
+
+    case value do
       nil -> default
       value -> value
     end

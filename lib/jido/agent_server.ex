@@ -56,6 +56,7 @@ defmodule Jido.AgentServer do
 
   alias Jido.AgentServer.{
     ActiveTurn,
+    AdmissionDeadline,
     ChildInfo,
     DirectiveContext,
     DirectiveRuntime,
@@ -210,7 +211,7 @@ defmodule Jido.AgentServer do
   defp call_with_context(server, signal, timeout, context) do
     :gen_statem.call(
       server,
-      {:signal, make_ref(), signal, admission_deadline(timeout), context},
+      {:signal, make_ref(), signal, AdmissionDeadline.new(timeout), context},
       timeout
     )
   end
@@ -238,7 +239,7 @@ defmodule Jido.AgentServer do
   def send_request(server, %Signal{} = signal, timeout \\ 5_000) do
     :gen_statem.send_request(
       server,
-      {:signal, make_ref(), signal, admission_deadline(timeout)}
+      {:signal, make_ref(), signal, AdmissionDeadline.new(timeout)}
     )
   end
 
@@ -729,7 +730,7 @@ defmodule Jido.AgentServer do
       ) do
     data = forget_postponed(data, token)
 
-    if admission_expired?(deadline) do
+    if AdmissionDeadline.expired?(deadline) do
       {:keep_state, data, [{:reply, from, {:error, :admission_timeout}}]}
     else
       start_turn(signal, from, context, data)
@@ -1645,7 +1646,7 @@ defmodule Jido.AgentServer do
 
   defp postpone_call(from, token, _signal, deadline, %State{} = data) do
     cond do
-      admission_expired?(deadline) ->
+      AdmissionDeadline.expired?(deadline) ->
         {:keep_state, forget_postponed(data, token),
          [{:reply, from, {:error, :admission_timeout}}]}
 
@@ -2672,28 +2673,5 @@ defmodule Jido.AgentServer do
   defp normalize_name(name) do
     raise ArgumentError,
           "Agent Server name must be an atom, :global tuple, or :via tuple, got: #{inspect(name)}"
-  end
-
-  defp admission_deadline(:infinity), do: :infinity
-
-  defp admission_deadline(timeout) when is_integer(timeout) and timeout >= 0 do
-    {node(), System.monotonic_time(:millisecond) + timeout}
-  end
-
-  defp admission_expired?(:infinity), do: false
-
-  defp admission_expired?({origin, deadline}) when origin == node() do
-    System.monotonic_time(:millisecond) >= deadline
-  end
-
-  defp admission_expired?({origin, deadline}) do
-    # Compare in the clock domain that created the deadline. Count the full
-    # query duration to avoid granting more time because its reply was delayed.
-    started = System.monotonic_time(:millisecond)
-    now = :erpc.call(origin, System, :monotonic_time, [:millisecond], 1_000)
-    elapsed = System.monotonic_time(:millisecond) - started
-    now + elapsed >= deadline
-  catch
-    _kind, _reason -> true
   end
 end

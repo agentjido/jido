@@ -4,7 +4,14 @@ defmodule JidoTest.Persistence.ETSTest do
   alias Jido.Persistence.ETS
 
   defp unique_table(name) do
-    :"test_persistence_#{name}_#{System.unique_integer([:positive])}"
+    table = :"test_persistence_#{name}_#{System.unique_integer([:positive])}"
+    records = :"#{table}_records"
+
+    on_exit(fn ->
+      if :ets.whereis(records) != :undefined, do: :ets.delete(records)
+    end)
+
+    table
   end
 
   test "conditional writes require the exact bytes or an absent key" do

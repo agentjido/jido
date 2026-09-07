@@ -49,7 +49,7 @@ defmodule JidoTest.Util.DeepMergeTest do
 
     test "requires mergeable top-level inputs" do
       assert_raise FunctionClauseError, fn ->
-        DeepMerge.merge(%{}, :not_mergeable)
+        apply(DeepMerge, :merge, [%{}, :not_mergeable])
       end
     end
   end

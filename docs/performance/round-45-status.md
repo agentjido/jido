@@ -43,18 +43,19 @@ including paths that do not use the changed function. After the full rebuild,
 no Server median peak ratio exceeded 1.018. This result requires investigation
 of build effects. It does not establish the cause of the earlier differences.
 
-`bench/repeat.py` still uses `mix compile --warnings-as-errors` without `--force`.
-The full rebuild was manual. Before further decisions, make full compilation
-part of the comparison procedure and run an unchanged control. Recheck the
-memory evidence used to reject rounds 20, 22, and 28 if build effects apply.
-Their recorded decisions remain unchanged until that work is complete.
+The former Python repeat runner used `mix compile --warnings-as-errors` without
+`--force`. The full rebuild was manual. Before further decisions, make full
+compilation part of the comparison procedure and run an unchanged control.
+Recheck the memory evidence used to reject rounds 20, 22, and 28 if build
+effects apply. Their recorded decisions remain unchanged until that work is
+complete.
 
 The [heap allocation probe](probes/round-45-heap.exs) completed one candidate
 preflight with 11 cases and ten checked invocations per case. Paired allocation
 checks are not complete. This probe measures profiled heap allocation with
 setup and cleanup. It does not measure peak live memory or off-heap allocation.
 
-Local raw reports remain in the benchmark worktree under `bench/results/`:
+Local raw reports remain in the benchmark worktree under `test/bench/results/`:
 
 - `round-45` and `round-45-server`: the earlier broad trial.
 - `round-45-control`: unchanged control.

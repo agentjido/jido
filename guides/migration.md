@@ -445,7 +445,7 @@ Compile and test after each area. For the application port, verify these outcome
 - Restart and restore rebuild owned runtimes without losing pending work.
 - Remote failure and cancellation do not leak workers or resources.
 
-The default quality check includes unit tests, not benchmark or example tests:
+The default quality check includes core tests, not benchmark or example tests:
 
 ```sh
 mix quality

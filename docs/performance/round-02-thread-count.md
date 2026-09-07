@@ -9,7 +9,7 @@ experiment). The trial was removed before shipping the decision.
 Five fresh-VM pairs used the scale profile and `thread/append` filter. The tool
 hash was `1e17fe878a82107a2dbe9f4209e9aa2464de525238297a885491538347c0b306`.
 The runtime and lock matched Round 07. Raw reports, source hashes, logs, and
-pair order are in `bench/results/round-02`.
+pair order are in `test/bench/results/round-02`.
 
 | Batch size | Batch time ratio | Lower-time pairs | Process-byte ratio |
 | ---: | ---: | ---: | ---: |

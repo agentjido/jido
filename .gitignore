@@ -41,5 +41,4 @@ plans/
 /docs/reviews/
 
 # Local benchmark reports
-/bench/results/
-/bench/__pycache__/
+/test/bench/results/

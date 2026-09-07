@@ -8,7 +8,7 @@ used the original append-and-take path.
 
 Baseline: `b4b8c1d3`. Trial: `bedabf2e` (unpublished experiment, removed).
 Five fresh-VM pairs used the short profile and all Audit update cases. Local
-evidence: `bench/results/round-10`. Source and tool hashes are in its reports.
+evidence: `test/bench/results/round-10`. Source and tool hashes are in its reports.
 The tool and host settings match `round-09-final`.
 
 Time ratios for a 1,000-record existing buffer were 1.604 for one new record,

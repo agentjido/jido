@@ -9,7 +9,7 @@ compute how many old records to drop before append.
 
 Baseline: `b4b8c1d3`. Trial commits: `79bc0af2` and `f24d6590` (unpublished
 experiments, removed). Each trial used five fresh-VM pairs with all nine Audit
-update cases in the short profile. Local evidence: `bench/results/round-11`
+update cases in the short profile. Local evidence: `test/bench/results/round-11`
 and `round-11-final`. Their reports contain full source, tool, and lock hashes.
 The tool and host settings match Round 09.
 

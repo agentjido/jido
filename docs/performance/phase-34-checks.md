@@ -54,8 +54,8 @@ ERL_FLAGS='+S 2:2' mix test test/examples --include example --include integratio
 ERL_FLAGS='+S 2:2' mix quality
 ERL_FLAGS='+S 2:2' mix docs --no-open --warnings-as-errors
 ERL_FLAGS='+S 2:2' mix hex.build
-ERL_FLAGS='+S 2:2' mix run bench/run.exs --profile scale --output bench/results/phase-34-scale
+ERL_FLAGS='+S 2:2' mix run test/bench/run.exs --profile scale --output test/bench/results/phase-34-scale
 ```
 
 Local logs: `/tmp/jido-phase-34-{coverage,examples,quality,docs,package,floor,scale}.log`.
-Reports: `bench/results/phase-34-scale` and `bench/results/phase-34-floor-smoke`.
+Reports: `test/bench/results/phase-34-scale` and `test/bench/results/phase-34-floor-smoke`.

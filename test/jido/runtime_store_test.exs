@@ -39,7 +39,7 @@ defmodule JidoTest.RuntimeStoreTest do
     worker = start_call_worker(jido)
     task = Task.async(fn -> catch_exit(RuntimeStore.put(jido, :hive, :key, :value)) end)
     assert_receive {:request, ^worker, {:put, :hive, :key, :value}}, 1_000
-    assert {:timeout, {GenServer, :call, _}} = Task.await(task, 6_000)
+    assert {:timeout, {GenServer, :call, _}} = Task.await(task, 1_000)
     send(worker, :complete)
     assert_receive {:completed, ^worker}, 1_000
     assert [{{:hive, :key}, :value}] = :ets.lookup(Jido.runtime_store_name(jido), {:hive, :key})

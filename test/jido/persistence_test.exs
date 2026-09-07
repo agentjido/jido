@@ -7,6 +7,7 @@ defmodule JidoTest.PersistenceTest do
   alias Jido.Persistence.ETS
   alias Jido.Signal
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
+  alias JidoTest.ScheduledOccurrenceFixtures.{Clock, FastRuntimeAgent}
 
   defmodule ConfiguredInstance do
     def __jido_persistence__, do: {ETS, table: __MODULE__}
@@ -167,18 +168,19 @@ defmodule JidoTest.PersistenceTest do
   end
 
   test "restores portable Plugin state and rebuilds its runtime", %{jido: jido} do
+    start_supervised!(Clock)
     persistence = adapter(:plugin_state)
     tick = Signal.new!("cron.tick", %{}, source: "/test")
     spec = Jido.Plugin.Scheduler.build_cron_spec("* * * * * * *", tick)
 
     agent =
-      RuntimeAgent.new!(
+      FastRuntimeAgent.new!(
         id: unique_id("persisted"),
         state: %{events: [:saved], ticks: 4, scheduler: %{cron: %{heartbeat: spec}}}
       )
 
     assert :ok = Persistence.save_agent(persistence, agent)
-    assert {:ok, restored} = Persistence.load_agent(persistence, RuntimeAgent, agent.id)
+    assert {:ok, restored} = Persistence.load_agent(persistence, FastRuntimeAgent, agent.id)
 
     assert restored == agent
     assert {:ok, pid} = Jido.start_agent(jido, restored)
@@ -324,7 +326,7 @@ defmodule JidoTest.PersistenceTest do
                     }}
 
     assert Server.snapshot(stale) == %{agent: agent, state_version: 0}
-    refute_receive {:signal, ^output}
+    refute_received {:signal, ^output}
     assert {:error, :conflict} = Server.hibernate(stale)
     assert Process.alive?(stale)
 

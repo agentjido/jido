@@ -31,7 +31,7 @@ Measured and checked revision: `616dfbd3`.
 - Format, compile with warnings as errors, strict warning lint, Dialyzer, docs
   with warnings as errors, and Hex package build passed.
 
-The short and scale reports are in `bench/results/cycle-short` and `cycle-scale`.
+The short and scale reports are in `test/bench/results/cycle-short` and `cycle-scale`.
 The runtime-floor report is in `cycle-floor-smoke`. Acceptance evidence remains
 in the individual round reports. Do not compare reports with different tool
 hashes or settings.

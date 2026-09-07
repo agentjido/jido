@@ -29,7 +29,7 @@ Runtime commit: `16531024`. Codec fixture commit: `0ae1e948`.
 
 Core and quality logs use `/tmp/jido-phase-41-{coverage,examples,quality,docs,package}.log`.
 The full benchmark logs use `/tmp/jido-phase-42-{scale,floor}.log`.
-Reports are `bench/results/phase-42-scale` and `bench/results/phase-42-floor`.
+Reports are `test/bench/results/phase-42-scale` and `test/bench/results/phase-42-floor`.
 The floor run uses the isolated archive and build path from prior checks.
 Profiles contain 132 smoke, 212 short, and 253 scale cases.
 

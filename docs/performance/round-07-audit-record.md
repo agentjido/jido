@@ -47,14 +47,12 @@ check was added. They are separate evidence sets, not pooled with the final run.
 - Tool SHA-256: `1e17fe878a82107a2dbe9f4209e9aa2464de525238297a885491538347c0b306`.
 - Lock SHA-256: `1b7d690225a5ee1900d268df23766e92aa6951f541e018f7a65d950c18c66953`.
 - Elixir 1.20.3, OTP 29, ERTS 17.0.5, Apple M1 Max, two schedulers, Mix `dev`.
-- Local evidence: `bench/results/round-07-final/`, including the manifest,
+- Local evidence: `test/bench/results/round-07-final/`, including the manifest,
   per-pair reports, command logs, and summary. Earlier runs are in
   `round-07-control`, `round-07-candidate`, and `round-07-confirmation`.
 
-```sh
-python3 bench/repeat.py --baseline ../jido_core_bench_base --candidate . \
-  --profile short --filter audit/record --rounds 5 --output bench/results/round-07-rerun
-```
+Use the fresh-VM procedure in the [benchmark guide](../../guides/benchmarks.md)
+with the short profile and the `audit/record` filter to reproduce this result.
 
 ## Checks
 

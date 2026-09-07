@@ -11,7 +11,7 @@ Baseline: `99b92e80`. Trial: `443aab71` (unpublished experiment, removed before
 shipping). Five scale-profile pairs selected all Thread cases. Tool SHA-256:
 `1e17fe878a82107a2dbe9f4209e9aa2464de525238297a885491538347c0b306`.
 The runtime and lock matched Round 07. Local evidence, including full source
-hashes and raw samples: `bench/results/round-06`.
+hashes and raw samples: `test/bench/results/round-06`.
 
 | Case | Time ratio | Process-byte ratio | Lower-time pairs |
 | --- | ---: | ---: | ---: |

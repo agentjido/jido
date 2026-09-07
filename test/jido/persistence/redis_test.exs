@@ -4,8 +4,7 @@ defmodule JidoTest.Persistence.RedisTest do
   alias Jido.Persistence.Redis
 
   defp start_store do
-    {:ok, pid} = Elixir.Agent.start_link(fn -> %{data: %{}, commands: []} end)
-    pid
+    start_supervised!({Elixir.Agent, fn -> %{data: %{}, commands: []} end})
   end
 
   defp command_fn(pid, override \\ fn _command -> :next end) do
@@ -101,7 +100,7 @@ defmodule JidoTest.Persistence.RedisTest do
       end
     end
 
-    refute_receive {:unexpected, _}
+    refute_received {:unexpected, _}
   end
 
   test "propagates Redis command errors" do

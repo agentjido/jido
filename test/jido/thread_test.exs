@@ -4,54 +4,11 @@ defmodule JidoTest.ThreadTest do
   alias Jido.Thread
   alias Jido.Thread.Entry
 
-  describe "Entry.new/1" do
-    test "creates entry with defaults" do
-      entry = Entry.new(%{})
-
-      assert entry.seq == 0
-      assert entry.kind == :note
-      assert entry.payload == %{}
-      assert entry.refs == %{}
-      assert is_integer(entry.at)
-    end
-
-    test "creates entry from keyword list" do
-      entry = Entry.new(kind: :message, payload: %{role: "user"})
-
-      assert entry.kind == :message
-      assert entry.payload == %{role: "user"}
-    end
-
-    test "creates entry with all attributes" do
-      now = System.system_time(:millisecond)
-
-      entry =
-        Entry.new(%{
-          id: "entry_123",
-          seq: 5,
-          at: now,
-          kind: :tool_call,
-          payload: %{name: "search"},
-          refs: %{signal_id: "sig_1"}
-        })
-
-      assert entry.id == "entry_123"
-      assert entry.seq == 5
-      assert entry.at == now
-      assert entry.kind == :tool_call
-      assert entry.payload == %{name: "search"}
-      assert entry.refs == %{signal_id: "sig_1"}
-    end
-
-    test "accepts string keys in map" do
-      entry = Entry.new(%{"kind" => :error, "payload" => %{"msg" => "failed"}})
-
-      assert entry.kind == :error
-      assert entry.payload == %{"msg" => "failed"}
-    end
-  end
-
   describe "Thread.new/1" do
+    test "exposes its data schema" do
+      assert %Zoi.Types.Struct{module: Thread} = Thread.schema()
+    end
+
     test "creates empty thread with defaults" do
       thread = Thread.new()
 
@@ -158,7 +115,6 @@ defmodule JidoTest.ThreadTest do
       old_time = 1_700_000_000_000
       thread = Thread.new(now: old_time)
 
-      Process.sleep(1)
       thread = Thread.append(thread, %{kind: :message})
 
       assert thread.updated_at > old_time
@@ -180,6 +136,17 @@ defmodule JidoTest.ThreadTest do
 
       entry = Thread.last(thread)
       assert entry.id == "custom_id"
+    end
+
+    test "empty input is an exact no-op" do
+      thread = Thread.new(now: 1_700_000_000_000)
+      assert Thread.append(thread, []) == thread
+      assert Thread.append(thread, nil) == thread
+    end
+
+    test "one batch uses one timestamp for every entry" do
+      thread = Thread.append(Thread.new(), [%{kind: :a}, %{kind: :b}, %{kind: :c}])
+      assert thread.entries |> Enum.map(& &1.at) |> Enum.uniq() |> length() == 1
     end
   end
 
@@ -299,6 +266,11 @@ defmodule JidoTest.ThreadTest do
       assert length(tools) == 2
       assert Enum.all?(tools, &(&1.kind in [:tool_call, :tool_result]))
     end
+
+    test "an empty kind list matches no entries" do
+      thread = Thread.new() |> Thread.append(%{kind: :message})
+      assert Thread.filter_by_kind(thread, []) == []
+    end
   end
 
   describe "Thread.slice/3" do
@@ -345,6 +317,11 @@ defmodule JidoTest.ThreadTest do
 
       kinds = Enum.map(sliced, & &1.kind)
       assert kinds == [:b, :c]
+    end
+
+    test "reversed bounds return no entries" do
+      thread = Thread.new() |> Thread.append([%{kind: :a}, %{kind: :b}])
+      assert Thread.slice(thread, 1, 0) == []
     end
   end
 

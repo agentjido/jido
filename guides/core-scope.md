@@ -115,7 +115,7 @@ not prove that core elects one cluster owner.
 development and test dependencies. They are absent from the Hex requirements
 and the production dependency graph.
 
-Run unit tests and static checks by default:
+Run core tests and static checks by default:
 
 ```sh
 mix quality

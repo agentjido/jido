@@ -15,7 +15,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     assert_receive {:feature_work, first, %{value: 1}}, 1_000
     assert state(agent).values == []
     assert Server.snapshot(agent).state_version == 0
-    refute_receive {:feature_work, _, %{value: 2}}, 20
+    refute_received {:feature_work, _, %{value: 2}}
     send(first, :release)
     assert_receive {:feature_work, second, %{value: 2}}, 1_000
     assert state(agent).values == [1]

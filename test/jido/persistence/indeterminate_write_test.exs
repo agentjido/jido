@@ -51,7 +51,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     assert_receive {:evaluated, "first"}
     assert_stored_first(c)
-    refute_receive {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:signal, %{type: "persistence.probe.applied"}}
   end
 
   test "an indeterminate write prevents evaluation of the next Action on stale state", c do
@@ -67,8 +67,8 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     # Do not install a stopping error policy: this test requires a core guarantee.
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_receive {:evaluated, "second"}
-    refute_receive {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:evaluated, "second"}
+    refute_received {:signal, %{type: "persistence.probe.applied"}}
     assert_stored_first(c)
   end
 
@@ -89,8 +89,8 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert_stored_first(c)
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_receive {:evaluated, "second"}
-    refute_receive {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:evaluated, "second"}
+    refute_received {:signal, %{type: "persistence.probe.applied"}}
   end
 
   defp start_agent(c, write_result) do

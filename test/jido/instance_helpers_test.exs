@@ -7,6 +7,17 @@ defmodule Jido.InstanceHelpersTest do
     use Jido.Agent, name: "default_instance_agent"
   end
 
+  setup do
+    on_exit(&stop_default_instance/0)
+    :ok
+  end
+
+  defp stop_default_instance do
+    Jido.stop()
+  catch
+    :exit, _reason -> :ok
+  end
+
   test "script startup and shutdown are idempotent", %{jido: jido} do
     name = Module.concat(jido, Script)
     on_exit(fn -> Jido.stop(name) end)
@@ -20,12 +31,14 @@ defmodule Jido.InstanceHelpersTest do
 
   test "default debug helpers set and clear the default instance overrides" do
     instance = Jido.default_instance()
-    previous = :persistent_term.get({:jido_debug, instance}, nil)
+    key = {:jido_debug, instance}
+    absent = make_ref()
+    previous = :persistent_term.get(key, absent)
 
     on_exit(fn ->
-      if previous,
-        do: :persistent_term.put({:jido_debug, instance}, previous),
-        else: Jido.Debug.disable(instance)
+      if previous == absent,
+        do: :persistent_term.erase(key),
+        else: :persistent_term.put(key, previous)
     end)
 
     assert instance == Jido.Default
@@ -84,8 +97,12 @@ defmodule Jido.InstanceHelpersTest do
   test "hibernate and thaw use the default instance when no instance is given" do
     assert {:ok, _jido} = Jido.start()
 
-    persistence =
-      {Jido.Persistence.ETS, table: :"default_lifecycle_#{System.unique_integer([:positive])}"}
+    table = :"default_lifecycle_#{System.unique_integer([:positive])}"
+    persistence = {Jido.Persistence.ETS, table: table}
+
+    on_exit(fn ->
+      if :ets.whereis(table) != :undefined, do: :ets.delete(table)
+    end)
 
     id = unique_id("default-persisted-agent")
     agent = DefaultAgent.new!(id: id)

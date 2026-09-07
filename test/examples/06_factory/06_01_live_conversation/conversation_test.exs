@@ -29,7 +29,7 @@ defmodule JidoTest.Examples.Factory.LiveConversationTest do
     assert_receive {:request, body}
     assert Enum.map(body["messages"], & &1["role"]) == ["user", "assistant", "user"]
     assert {:error, _} = LiveConversation.chat(server, "two", "Repeat", context: context)
-    refute_receive {:request, _}
+    refute_received {:request, _}
     refute inspect(agent.state) =~ "fixture-key"
     assert Server.agent(server) == agent
   end

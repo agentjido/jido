@@ -1,8 +1,15 @@
 defmodule Jido.Topology.ValidationTest do
   use JidoTest.Case, async: true
   alias Jido.Topology
-  alias Jido.Topology.{Reference, Validation}
+  alias Jido.Topology.{Instance, Reference, Validation}
   alias JidoTest.AgentFixtures.CounterAgent
+
+  test "Instance schema validates constructed topology values" do
+    definition = Topology.new!(name: "instance-schema")
+    assert {:ok, instance} = Topology.instantiate(definition, id: "instance-schema")
+    assert %Zoi.Types.Struct{module: Instance} = Instance.schema()
+    assert {:ok, ^instance} = Zoi.parse(Instance.schema(), instance)
+  end
 
   test "group definitions reject conflicting or incomplete sizing options" do
     for {options, message} <- [

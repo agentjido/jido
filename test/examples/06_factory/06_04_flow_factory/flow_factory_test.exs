@@ -16,7 +16,8 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     assert FlowFactory.status(mission).output == %{}
     assert_eventually(Server.status(mission).phase == :idle)
     release(roots, "design")
-    refute_receive {:work, %{role: "api"}, _}
+    assert_eventually(Map.has_key?(FlowFactory.status(mission).artifacts, "#{id}/design/0"))
+    refute_received {:work, %{role: "api"}, _}
     release(roots, "research")
 
     components = take_roles(["api", "ui", "test"], 0)
@@ -28,7 +29,14 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
 
     release(components, "test")
     release(components, "ui")
-    refute_receive {:work, %{role: "integration"}, _}
+
+    assert_eventually(
+      Enum.all?(["test", "ui"], fn role ->
+        Map.has_key?(FlowFactory.status(mission).artifacts, "#{id}/#{role}/0")
+      end)
+    )
+
+    refute_received {:work, %{role: "integration"}, _}
     release(components, "api")
 
     integration = take_roles(["integration"], 0)
@@ -46,7 +54,8 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     end
 
     release(reviews, "security")
-    refute_receive {:work, %{revision: 1}, _}
+    assert_eventually(Map.has_key?(FlowFactory.status(mission).artifacts, "#{id}/security/0"))
+    refute_received {:work, %{revision: 1}, _}
     release(reviews, "quality")
 
     repairs = take_roles(["api", "ui", "test"], 1)
@@ -124,7 +133,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     assert {:error, _} = Server.call(mission, finished(id, %{}))
     assert FlowFactory.status(mission).status == :cancelled
     assert FlowFactory.status(mission).output == %{}
-    refute_receive {:work, %{role: "api"}, _}
+    refute_received {:work, %{role: "api"}, _}
   end
 
   test "owner shutdown stops workers during a nested repair Flow", c do
@@ -147,7 +156,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     state = terminal(mission, :failed)
     assert state.error =~ "timed out"
     assert_workers_stopped(c.jido, id)
-    refute_receive {:work, %{role: "api"}, _}
+    refute_received {:work, %{role: "api"}, _}
   end
 
   test "a worker crash fails the mission and stops the other active worker", c do
@@ -181,7 +190,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     assert_receive {:work, ^input, _}
     assert {:ok, second} = Server.call(worker, request, context: context)
     assert first == second
-    refute_receive {:work, _, _}
+    refute_received {:work, _, _}
 
     assert {:error, _} =
              Server.call(worker, signal("factory.flow.work", %{input | goal: "Changed"}))

@@ -35,5 +35,5 @@ command explicitly sets `MIX_ENV=test` for `mix coveralls.json`. The scope and
 Local logs: `/tmp/jido-phase-40-{coverage,examples,quality,docs,package,scale}.log`,
 `/tmp/jido-phase-40-scheduler-tests.log`, and
 `/tmp/jido-phase-40-floor-scheduler.log`.
-Reports: `bench/results/phase-40-scale` and `bench/results/phase-40-floor-scheduler`.
+Reports: `test/bench/results/phase-40-scale` and `test/bench/results/phase-40-floor-scheduler`.
 Profiles now contain 116 smoke, 196 short, and 237 scale cases.

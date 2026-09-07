@@ -37,7 +37,7 @@ that changed Plugin options and domain schemas take effect on the next
 validation call. The trial patch is `trials/round-22-schema-reuse.patch`.
 Apply it with `git apply --unidiff-zero` to the stated baseline for study.
 
-Evidence: `bench/results/round-22-agent`, `round-22-plugin`,
+Evidence: `test/bench/results/round-22-agent`, `round-22-plugin`,
 `round-22-control-agent`, and `round-22-control-plugin`.
 
 Baseline commit: `9860f5c113f52b6c4990b1eee032826d392e454a`.

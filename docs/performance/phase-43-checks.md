@@ -30,5 +30,5 @@ Runtime commit: `6e2b638e`. Test commit: `5d476e88`.
 
 Logs: `/tmp/jido-phase-43-{coverage,examples,quality,docs,package,scale,floor}.log`
 and `/tmp/jido-phase-43-floor-codec.log`.
-Reports: `bench/results/phase-43-scale` and `bench/results/phase-43-floor`.
+Reports: `test/bench/results/phase-43-scale` and `test/bench/results/phase-43-floor`.
 Profiles contain 132 smoke, 212 short, and 253 scale cases.

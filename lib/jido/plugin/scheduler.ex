@@ -34,8 +34,9 @@ defmodule Jido.Plugin.Scheduler do
   Activation and newly queued work can start an immediate attempt. This option
   changes runtime cadence, not occurrence identity, acknowledgement, or skip policy.
   `:delivery_timeout` sets each state-read and delivery call timeout (default
-  5,000 milliseconds). External work can repeat before acknowledgement, so its
-  receiver must use the occurrence ID to handle duplicates.
+  5,000 milliseconds; positive integer up to 2,147,483,597). External work can
+  repeat before acknowledgement, so its receiver must use the occurrence ID to
+  handle duplicates.
 
   The optional Plugin option `:time_scale` accepts a `SchedEx.TimeScale` module
   for controlled time. It affects recurring schedules only. The default uses
@@ -127,9 +128,14 @@ defmodule Jido.Plugin.Scheduler do
   @impl Jido.Plugin
   def state_spec(opts) do
     interval = Keyword.get(opts, :delivery_interval, 100)
+    timeout = Keyword.get(opts, :delivery_timeout, 5_000)
 
     unless is_integer(interval) and interval in 1..4_294_967_295 do
       raise ArgumentError, "Scheduler delivery_interval must be an integer from 1 to 4294967295"
+    end
+
+    unless is_integer(timeout) and timeout in 1..2_147_483_597 do
+      raise ArgumentError, "Scheduler delivery_timeout must be an integer from 1 to 2147483597"
     end
 
     {@state_key, @state_schema}

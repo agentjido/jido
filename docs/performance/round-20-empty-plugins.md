@@ -33,7 +33,7 @@ candidate for the current suite. No overall speed or memory gain is claimed.
 
 The runtime edit was removed. The patch is
 `trials/round-20-empty-plugins.patch`; use `git apply --unidiff-zero` on the
-stated baseline to reproduce it. Evidence is in `bench/results/round-20` and
+stated baseline to reproduce it. Evidence is in `test/bench/results/round-20` and
 `round-20-control`.
 
 Baseline commit: `3529f146eead9969ac5cbb6c0b10f2ab6aea9671`.

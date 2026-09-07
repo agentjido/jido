@@ -24,6 +24,8 @@ defmodule Jido.RuntimeStore do
 
   use GenServer
 
+  @call_timeout Application.compile_env(:jido, :runtime_store_timeout, 5_000)
+
   @type hive :: term()
   @type key :: term()
   @type value :: term()
@@ -165,7 +167,7 @@ defmodule Jido.RuntimeStore do
     server = Jido.runtime_store_name(instance)
 
     try do
-      GenServer.call(server, request)
+      GenServer.call(server, request, @call_timeout)
     catch
       :exit, {:noproc, _} -> fallback
       :exit, {:normal, _} -> fallback

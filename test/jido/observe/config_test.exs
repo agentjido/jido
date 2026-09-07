@@ -125,13 +125,18 @@ defmodule JidoTest.Observe.ConfigTest do
   defp restore_env(app, key, :error), do: Application.delete_env(app, key)
 
   setup do
-    Debug.reset(@test_instance)
+    telemetry = Application.fetch_env(:jido, :telemetry)
+    observability = Application.fetch_env(:jido, :observability)
 
     on_exit(fn ->
-      Application.delete_env(:jido, :telemetry)
-      Application.delete_env(:jido, :observability)
+      restore_env(:jido, :telemetry, telemetry)
+      restore_env(:jido, :observability, observability)
       Debug.reset(@test_instance)
     end)
+
+    Application.delete_env(:jido, :telemetry)
+    Application.delete_env(:jido, :observability)
+    Debug.reset(@test_instance)
 
     :ok
   end

@@ -4,7 +4,7 @@ These patches preserve rejected or replaced candidates without adding them to
 the shipping runtime history. Apply a patch only in a separate checkout of its base.
 Use `git apply --unidiff-zero PATH` because the patches omit context lines.
 They change runtime source only; use the benchmark method and conditions from
-the related round report. Raw measurements remain in local `bench/results`.
+the related round report. Raw measurements remain in local `test/bench/results`.
 
 | Patch | Base | Trial identifier |
 | --- | --- | --- |

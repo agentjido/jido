@@ -46,7 +46,7 @@ history. Its exact runtime patch is `trials/round-28-exact-route.patch`. The
 new contract tests remain. Runtime source again matches the checked and pushed
 phase-43 version, so its complete checks still apply.
 
-Evidence: `bench/results/round-28` and `round-28-control`.
+Evidence: `test/bench/results/round-28` and `round-28-control`.
 
 Baseline commit: `5d476e88239f783dfab60d07c792b3adf65b786a`.
 Runtime SHA-256: `18f5b64df277906515954cbb7540d4255c607fc994d667e60d4b3eb8da50cdf9`.

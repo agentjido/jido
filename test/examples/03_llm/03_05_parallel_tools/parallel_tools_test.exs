@@ -53,7 +53,7 @@ defmodule JidoTest.Examples.LLM.ParallelToolsTest do
 
     assert_receive {:provider_waiting, :a, a, _, _}, 1_000
     assert length(calls(tools)) == 1
-    refute_receive {:provider_waiting, :b, _, _, _}, 50
+    refute_received {:provider_waiting, :b, _, _, _}
     send(a, {:release, :a})
     assert_receive {:provider_waiting, :b, b, _, _}, 1_000
     send(b, {:release, :b})

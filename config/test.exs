@@ -1,6 +1,7 @@
 import Config
 
 config :git_hooks, auto_install: false
+config :jido, runtime_store_timeout: 100
 
 # Keep Logger enabled but silent by default in tests.
 # This allows ExUnit.CaptureLog to work while keeping test output clean.

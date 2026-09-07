@@ -69,7 +69,7 @@ defmodule JidoTest.Examples.MultiAgent.BoundedWorkersTest do
     eventually(fn -> Server.children(parent) == %{} end)
     assert state(parent).status == :cancelled
     assert state(parent).queue == []
-    refute_receive {:feature_work, _, _}, 20
+    refute_received {:feature_work, _, _}
   end
 
   test "one child crash fails the request and stops the sibling", %{jido: jido} do

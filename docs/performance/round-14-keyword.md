@@ -45,7 +45,7 @@ empty overrides, and non-keyword replacement.
 
 The [complete checks](phase-36-checks.md) passed with 83.5% core coverage.
 The same 11 known example failures remain outside that coverage gate.
-Evidence: `bench/results/round-14` and `round-14-control`.
+Evidence: `test/bench/results/round-14` and `round-14-control`.
 
 Baseline commit: `13d48c40139b5e66b647db354b2e701f637312b1`.
 Runtime SHA-256: `9452e74af75139d30d4a781976b8410f5c491dbbc9a727ddf38b185693dcc82e`.

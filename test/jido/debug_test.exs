@@ -6,14 +6,24 @@ defmodule JidoTest.DebugTest do
   @test_instance :"jido_debug_test_#{System.unique_integer([:positive])}"
 
   setup do
-    Debug.reset(@test_instance)
+    instance_config = Application.fetch_env(:jido_test, @test_instance)
+    telemetry = Application.fetch_env(:jido, :telemetry)
 
     on_exit(fn ->
+      restore_env(:jido_test, @test_instance, instance_config)
+      restore_env(:jido, :telemetry, telemetry)
       Debug.reset(@test_instance)
     end)
 
+    Application.delete_env(:jido_test, @test_instance)
+    Application.delete_env(:jido, :telemetry)
+    Debug.reset(@test_instance)
+
     :ok
   end
+
+  defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)
+  defp restore_env(app, key, :error), do: Application.delete_env(app, key)
 
   describe "enable/3 and level/1" do
     test "default level is :off" do

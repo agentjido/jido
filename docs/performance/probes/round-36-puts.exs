@@ -1,5 +1,5 @@
 # Resource diagnostic only: assert each write without retaining a result list.
-Code.require_file("../../../bench/support/suite.exs", __DIR__)
+Code.require_file("../../../test/bench/support/suite.exs", __DIR__)
 alias JidoCoreBench.{Fixtures, Measure, Suite}
 alias Jido.Persistence.ETS, as: Store
 {:ok, supervisor} = Jido.start_link(name: JidoCoreBench)

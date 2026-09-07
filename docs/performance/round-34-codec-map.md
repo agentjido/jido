@@ -9,7 +9,7 @@ map, and list limits keep their original errors.
 
 The first trial used `Enum.reduce_while/3`. It reduced scan time but increased
 several sampled process peaks. It was replaced by direct iterator recursion.
-Its patch is `trials/round-34-reducer.patch`; its evidence is `bench/results/round-34`.
+Its patch is `trials/round-34-reducer.patch`; its evidence is `test/bench/results/round-34`.
 The unpublished trial commit was `28c47c43`. No part of that trial remains.
 
 ## Paired time and resource results
@@ -93,7 +93,7 @@ The 149 focused codec, topology, Agent, and benchmark tests passed. Complete
 [core, quality, and floor checks](phase-43-checks.md) passed with 898 core tests
 and 83.5% core coverage.
 
-Evidence: `bench/results/round-34-control`, `round-34-iterator`, and `round-34-heap`.
+Evidence: `test/bench/results/round-34-control`, `round-34-iterator`, and `round-34-heap`.
 Allocation probe: `docs/performance/probes/round-34-heap.exs`.
 
 Baseline commit: `0ae1e948fe1e2c28c24abdef50fb8ce3f48149fa`.

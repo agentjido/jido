@@ -3,8 +3,11 @@
 Use an isolated named Jido instance for each live test. Check direct candidate
 results separately from live commits and later directive outcomes. Use barriers
 and process monitors for ordering, failure, replacement, and cleanup.
+Do not use log output, `Process.sleep/1`, or a finite `refute_receive` as a
+completion signal. Use replies, process monitors, or explicit state barriers.
+Capture logs only when log or redaction behavior is the contract under test.
 
-The default quality check runs unit tests, plus format, compile, lint, and
+The default quality check runs core tests, plus format, compile, lint, and
 Dialyzer checks:
 
 ```sh
@@ -15,16 +18,16 @@ There are three test categories:
 
 | Category | Command | Default quality check |
 | --- | --- | --- |
-| Unit | `mix test` | Included |
+| Core | `mix test test/jido --include flaky --seed 0` | Included |
 | Benchmark | `mix benchmarks --seed 0` | Not included |
 | Example, including research | `mix examples --seed 0` | Not included |
 
 CI and the test step in `mix quality` use
-`mix test test/jido test/jido_test --include flaky --seed 0`. They run unit tests
-with a fixed seed, including the tagged flaky unit tests.
+`mix test test/jido --include flaky --seed 0`. They run core tests
+with a fixed seed, including the tagged flaky core tests.
 
 Default `mix test` excludes `:benchmark`, `:example`, `:flaky`, and approved
-`:skip` tests. Benchmark tests in `test/jido/bench/` use the `:benchmark` tag.
+`:skip` tests. Benchmark tests in `test/bench/` use the `:benchmark` tag.
 All example tests, including the former integration scenarios, use `:example`.
 Run examples separately when needed:
 
@@ -46,12 +49,12 @@ in `test/examples/`. Production builds and the Hex package exclude both trees.
 Local development and test builds compile the source examples so demos and
 shared core regression fixtures remain available.
 Deterministic model adapters and local HTTP/SSE tests require no provider key.
-Remote tests start actual BEAM peers. Keep their clock separation and shutdown
+Remote tests start actual BEAM peers. Keep their caller-clock and shutdown
 checks. A local File adapter test does not prove multi-process storage safety.
 
 The core suite also retains the approved skip for the DIST-03 test
 `one logical identity has at most one live cluster owner` in
-`test/jido/agent/distributed_authority_test.exs`. Cluster-exclusive ownership
+`test/jido/agent_server/distributed_authority_test.exs`. Cluster-exclusive ownership
 remains unsupported. Preserve the test assertion and its stated reason.
 
 ## Core coverage
@@ -59,10 +62,10 @@ remains unsupported. Preserve the test assertion and its stated reason.
 The 90% coverage requirement applies to core code in `lib/jido.ex` and `lib/jido/`.
 Keep total core coverage above 93% to allow for new work.
 `coveralls.json` excludes example code, test fixtures, and benchmark helpers.
-Run unit-test coverage of core code with:
+Run core-test coverage with:
 
 ```sh
-mix test --cover test/jido test/jido_test --include flaky --seed 0
+mix test --cover test/jido --include flaky --seed 0
 ```
 
 CI uses the same paths without `--cover`. Benchmark and example tests run separately.

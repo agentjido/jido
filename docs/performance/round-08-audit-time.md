@@ -21,7 +21,7 @@ Tests cover default timestamp bounds, supplied nil and zero, generated IDs,
 and buffer order. All 13 Audit and benchmark contract tests passed. The paired
 result, transfer, and cleanup checks passed. Combined checks passed; see the [cycle checks](cycle-checks.md).
 
-Local evidence: `bench/results/round-08`; control: `audit-expanded-control`.
+Local evidence: `test/bench/results/round-08`; control: `audit-expanded-control`.
 The manifest and raw reports contain the complete environment and source data.
 
 Baseline: `99b92e80ccdae21b63f02896cd81e1042c9d6e3b`.

@@ -58,7 +58,7 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
       HTTP.state(system.factory).jobs["mission"].stages["design"].status == :completed
     )
 
-    refute_receive {:department, "build", _, _}
+    refute_received {:department, "build", _, _}
     send(research, :release)
     assert_receive {:department, "build", build, body}, 3_000
     assert Jason.encode!(body) =~ "research artifact"
@@ -85,7 +85,7 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
                context
              )
 
-    refute_receive {:department, _, _, _}
+    refute_received {:department, _, _, _}
   end
 
   test "pause allows current results but blocks downstream work; cancel rejects late results", %{
@@ -105,7 +105,7 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
     send(design, :release)
     assert_eventually(HTTP.state(system.factory).active == %{})
     assert HTTP.state(system.factory).jobs["mission"].status == :paused
-    refute_receive {:department, "build", _, _}
+    refute_received {:department, "build", _, _}
     assert {:ok, _} = Tools.command(jido, system.factory_id, :resume, "resume", "mission", "")
     assert_receive {:department, "build", build, _}, 3_000
     assert {:ok, _} = Tools.command(jido, system.factory_id, :cancel, "cancel", "mission", "")
@@ -127,7 +127,7 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
 
     assert {:error, _} = Server.call(system.factory, late)
     assert Server.snapshot(system.factory) == before
-    refute_receive {:department, "quality", _, _}
+    refute_received {:department, "quality", _, _}
     assert HTTP.state(system.factory).jobs["mission"].status == :cancelled
   end
 
@@ -147,8 +147,8 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
     )
 
     send(design, :release)
-    refute_receive {:department, "build", _, _}
     assert_eventually(List.last(HTTP.state(system.conversation).events).status == "failed")
+    refute_received {:department, "build", _, _}
     error = HTTP.state(system.factory).jobs["mission"].error
     assert error =~ "HTTP 401"
     assert error =~ "API key is invalid: [REDACTED]"

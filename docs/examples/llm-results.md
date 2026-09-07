@@ -71,7 +71,7 @@ mix compile --warnings-as-errors
 mix format --check-formatted
 mix credo suggest 'examples/03_llm/*.{ex,exs}' \
   'examples/03_llm/**/*.{ex,exs}' 'test/examples/03_llm/**/*.exs' \
-  'test/support/llm_sdk_case.ex' --strict
+  'test/examples/support/llm_sdk_case.ex' --strict
 mix run -e 'Mix.Tasks.Docs.run([])'
 git diff --check
 ```

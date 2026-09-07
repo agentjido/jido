@@ -28,7 +28,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     assert candidate.state.status == :running
     assert Map.from_struct(intent) == %{job_id: "job", value: 3}
     assert Server.snapshot(agent) == before
-    refute_receive {:job_work, _, _}, 20
+    refute_received {:job_work, _, _}
     assert {:ok, _} = ManagedJobs.start_job(agent, "job", 3, context: %{work: barrier()})
     assert_receive {:job_work, worker, 3}, 1_000
     assert state(agent).status == :running

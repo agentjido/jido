@@ -39,7 +39,7 @@ Plugin state, checkpoints, and restoration. Each batch checks all 100 results.
 The [complete checks](phase-34-checks.md) passed with 83.5% core coverage.
 The same 11 known example failures remain outside that coverage gate.
 
-Evidence: `bench/results/round-16` and `round-16-control`.
+Evidence: `test/bench/results/round-16` and `round-16-control`.
 
 Baseline commit: `6f52a85bf46ed2dd9892996018468faa5112f0b0`.
 Runtime SHA-256: `fa35269085c20b740ef757e10c37073cf89e3ba937d65cf300b0a5d326668c6c`.

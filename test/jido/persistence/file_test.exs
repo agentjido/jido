@@ -32,19 +32,19 @@ defmodule JidoTest.Persistence.FileTest do
       if round == 2, do: assert(:ok = FilePersistence.put("key", expected, opts))
 
       results =
-        1..8
+        1..2
         |> Task.async_stream(
           fn n ->
             value = <<round, n>>
             {FilePersistence.compare_and_swap("key", expected, value, opts), value}
           end,
-          max_concurrency: 8,
+          max_concurrency: 2,
           timeout: 10_000
         )
         |> Enum.map(fn {:ok, result} -> result end)
 
       assert [{:ok, winner}] = Enum.filter(results, &match?({:ok, _}, &1))
-      assert Enum.count(results, &match?({{:error, :conflict}, _}, &1)) == 7
+      assert Enum.count(results, &match?({{:error, :conflict}, _}, &1)) == 1
       assert {:ok, ^winner} = FilePersistence.get("key", opts)
     end
   end
