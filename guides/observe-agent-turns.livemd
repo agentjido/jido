@@ -67,7 +67,6 @@ handler_id = "observe-guide-#{System.unique_integer([:positive])}"
 
 {:ok, counter} =
   Jido.start_agent(
-    Jido.default_instance(),
     ObserveGuide.Counter,
     id: "observed-counter"
   )
@@ -106,7 +105,7 @@ caller context, and raw error details.
 
 ```elixir
 :ok = :telemetry.detach(handler_id)
-:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop_agent(counter)
 :ok = Jido.stop()
 ```
 

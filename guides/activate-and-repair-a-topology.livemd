@@ -68,7 +68,7 @@ right = Jido.Topology.Controller.whereis_agent(controller, :right)
 ## Stop One Member
 
 ```elixir
-:ok = Jido.stop_agent(jido, left)
+:ok = Jido.stop_agent(left)
 
 %{
   left_alive?: Jido.AgentServer.alive?(left),

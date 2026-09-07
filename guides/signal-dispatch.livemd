@@ -58,7 +58,6 @@ end
 
 {:ok, sender} =
   Jido.start_agent(
-    Jido.default_instance(),
     DispatchGuide.Sender,
     id: "dispatch-sender"
   )
@@ -85,7 +84,7 @@ outbox.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), sender)
+:ok = Jido.stop_agent(sender)
 :ok = Jido.stop()
 ```
 

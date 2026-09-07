@@ -167,6 +167,12 @@ defmodule Jido do
       @spec agent_count(keyword()) :: non_neg_integer()
       def agent_count(opts \\ []), do: Jido.agent_count(__MODULE__, opts)
 
+      @doc "Fetches one Agent logical-parent binding under this Jido instance."
+      @spec agent_parent_binding(String.t(), keyword()) :: {:ok, map()} | :error
+      def agent_parent_binding(child_id, opts \\ []) do
+        Jido.agent_parent_binding(__MODULE__, child_id, opts)
+      end
+
       @doc "Persists and stops one live Agent Server."
       def hibernate(server, opts \\ []) do
         Jido.hibernate(__MODULE__, server, opts)
@@ -269,7 +275,7 @@ defmodule Jido do
 
       # In a script or Livebook
       {:ok, _} = Jido.start()
-      {:ok, pid} = Jido.start_agent(Jido.default_instance(), MyAgent)
+      {:ok, pid} = Jido.start_agent(MyAgent)
 
       # With custom options
       {:ok, _} = Jido.start(max_tasks: 2000)
@@ -370,15 +376,27 @@ defmodule Jido do
   """
   defdelegate generate_id(), to: Jido.Util
 
-  @doc "Returns the Registry name for a Jido instance."
+  @doc "Returns the Registry name for the default Jido instance."
+  @spec registry_name() :: atom()
+  def registry_name, do: registry_name(@default_instance)
+
+  @doc "Returns the Registry name for the selected Jido instance."
   @spec registry_name(atom()) :: atom()
   def registry_name(name), do: Module.concat(name, Registry)
 
-  @doc "Returns the AgentSupervisor name for a Jido instance."
+  @doc "Returns the AgentSupervisor name for the default Jido instance."
+  @spec agent_supervisor_name() :: atom()
+  def agent_supervisor_name, do: agent_supervisor_name(@default_instance)
+
+  @doc "Returns the AgentSupervisor name for the selected Jido instance."
   @spec agent_supervisor_name(atom()) :: atom()
   def agent_supervisor_name(name), do: Module.concat(name, AgentSupervisor)
 
-  @doc "Returns the TaskSupervisor name for a Jido instance."
+  @doc "Returns the TaskSupervisor name for the default Jido instance."
+  @spec task_supervisor_name() :: atom()
+  def task_supervisor_name, do: task_supervisor_name(@default_instance)
+
+  @doc "Returns the TaskSupervisor name for the selected Jido instance."
   @spec task_supervisor_name(atom() | nil) :: atom()
   def task_supervisor_name(nil), do: Jido.Exec.TaskSupervisor
   def task_supervisor_name(name) when is_atom(name), do: Module.concat(name, TaskSupervisor)
@@ -387,7 +405,11 @@ defmodule Jido do
     raise ArgumentError, "Jido instance must be an atom or nil, got: #{inspect(name)}"
   end
 
-  @doc "Returns the RuntimeStore name for a Jido instance."
+  @doc "Returns the RuntimeStore name for the default Jido instance."
+  @spec runtime_store_name() :: atom()
+  def runtime_store_name, do: runtime_store_name(@default_instance)
+
+  @doc "Returns the RuntimeStore name for the selected Jido instance."
   @spec runtime_store_name(atom()) :: atom()
   def runtime_store_name(name), do: Module.concat(name, RuntimeStore)
 
@@ -406,7 +428,18 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Starts one Agent under the selected Jido instance supervisor.
+  Starts one Agent under the default or selected Jido instance supervisor.
+
+  The one-argument form uses the default instance started by `Jido.start/1`:
+
+      {:ok, _jido} = Jido.start()
+      agent = MyAgent.new!(id: "agent-1")
+      {:ok, server} = Jido.start_agent(agent)
+
+  Pass an instance as the first argument when the application runs more than
+  one Jido supervisor:
+
+      {:ok, server} = Jido.start_agent(MyApp.Jido, agent)
 
   The Agent Server links to its supervisor, not to the calling process. Caller
   exit does not stop the Agent. Use `Jido.AgentServer.start_link/1` when the
@@ -421,9 +454,25 @@ defmodule Jido do
   This is the standard example startup API. Domain command functions can stay
   in the Agent module; they do not need a matching startup wrapper.
   """
+  @spec start_agent(module() | Jido.Agent.t()) :: DynamicSupervisor.on_start_child()
+  def start_agent(agent), do: start_agent(@default_instance, agent, [])
+
+  @doc """
+  Starts an Agent with options in the default instance, or starts an Agent in
+  the selected instance with default options.
+  """
+  @spec start_agent(module() | Jido.Agent.t(), keyword() | module() | Jido.Agent.t()) ::
+          DynamicSupervisor.on_start_child()
+  def start_agent(agent, opts) when is_list(opts),
+    do: start_agent(@default_instance, agent, opts)
+
+  def start_agent(jido_instance, agent) when is_atom(jido_instance),
+    do: start_agent(jido_instance, agent, [])
+
+  @doc "Starts an Agent with options in the selected Jido instance."
   @spec start_agent(atom(), module() | Jido.Agent.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def start_agent(jido_instance, agent, opts \\ []) when is_atom(jido_instance) do
+  def start_agent(jido_instance, agent, opts) when is_atom(jido_instance) do
     if is_list(opts) and Keyword.keyword?(opts) do
       opts
       |> Keyword.merge(agent: agent, jido: jido_instance, register: true)
@@ -434,9 +483,25 @@ defmodule Jido do
     end
   end
 
-  @doc "Stops one v3 Agent by PID or id."
+  @doc "Stops one Agent under the default Jido instance."
+  @spec stop_agent(pid() | String.t()) :: :ok | {:error, :not_found}
+  def stop_agent(pid_or_id), do: stop_agent(@default_instance, pid_or_id, [])
+
+  @doc """
+  Stops an Agent with options in the default instance, or stops an Agent in
+  the selected instance with default options.
+  """
+  @spec stop_agent(atom() | pid() | String.t(), keyword() | pid() | String.t()) ::
+          :ok | {:error, :not_found}
+  def stop_agent(pid_or_id, opts) when is_list(opts),
+    do: stop_agent(@default_instance, pid_or_id, opts)
+
+  def stop_agent(jido_instance, pid_or_id) when is_atom(jido_instance),
+    do: stop_agent(jido_instance, pid_or_id, [])
+
+  @doc "Stops an Agent with options in the selected Jido instance."
   @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid_or_id, opts \\ [])
+  def stop_agent(jido_instance, pid_or_id, opts)
 
   def stop_agent(jido_instance, pid, _opts) when is_atom(jido_instance) and is_pid(pid) do
     Jido.AgentServer.stop(pid)
@@ -454,9 +519,24 @@ defmodule Jido do
     end
   end
 
-  @doc "Looks up one v3 Agent by id."
+  @doc "Looks up one Agent by id under the default Jido instance."
+  @spec whereis_agent(String.t()) :: pid() | nil
+  def whereis_agent(id), do: whereis_agent(@default_instance, id, [])
+
+  @doc """
+  Looks up an Agent with options in the default instance, or looks up an Agent
+  in the selected instance with default options.
+  """
+  @spec whereis_agent(atom() | String.t(), keyword() | String.t()) :: pid() | nil
+  def whereis_agent(id, opts) when is_binary(id) and is_list(opts),
+    do: whereis_agent(@default_instance, id, opts)
+
+  def whereis_agent(jido_instance, id) when is_atom(jido_instance),
+    do: whereis_agent(jido_instance, id, [])
+
+  @doc "Looks up an Agent with options in the selected Jido instance."
   @spec whereis_agent(atom(), String.t(), keyword()) :: pid() | nil
-  def whereis_agent(jido_instance, id, opts \\ [])
+  def whereis_agent(jido_instance, id, opts)
       when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
     Jido.AgentServer.whereis(
       registry_name(jido_instance),
@@ -465,9 +545,18 @@ defmodule Jido do
     )
   end
 
-  @doc "Lists all v3 Agents in one Jido instance."
+  @doc "Lists all Agents in the default Jido instance."
+  @spec list_agents() :: [{String.t(), pid()}]
+  def list_agents, do: list_agents(@default_instance, [])
+
+  @doc "Lists Agents with default-instance options, or lists a selected instance."
+  @spec list_agents(keyword() | atom()) :: [{String.t(), pid()}]
+  def list_agents(opts) when is_list(opts), do: list_agents(@default_instance, opts)
+  def list_agents(jido_instance) when is_atom(jido_instance), do: list_agents(jido_instance, [])
+
+  @doc "Lists Agents with options in the selected Jido instance."
   @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance, opts \\ [])
+  def list_agents(jido_instance, opts)
       when is_atom(jido_instance) and is_list(opts) do
     partition = Keyword.get(opts, :partition)
 
@@ -488,13 +577,39 @@ defmodule Jido do
     |> Enum.filter(fn {_id, pid} -> Process.alive?(pid) end)
   end
 
-  @doc "Returns the count of live v3 Agents in one Jido instance."
-  @spec agent_count(atom(), keyword()) :: non_neg_integer()
-  def agent_count(jido_instance, opts \\ []), do: length(list_agents(jido_instance, opts))
+  @doc "Returns the count of live Agents in the default Jido instance."
+  @spec agent_count() :: non_neg_integer()
+  def agent_count, do: agent_count(@default_instance, [])
 
-  @doc "Fetches one v3 Agent logical-parent binding."
+  @doc "Counts Agents with default-instance options, or counts a selected instance."
+  @spec agent_count(keyword() | atom()) :: non_neg_integer()
+  def agent_count(opts) when is_list(opts), do: agent_count(@default_instance, opts)
+  def agent_count(jido_instance) when is_atom(jido_instance), do: agent_count(jido_instance, [])
+
+  @doc "Counts live Agents with options in the selected Jido instance."
+  @spec agent_count(atom(), keyword()) :: non_neg_integer()
+  def agent_count(jido_instance, opts), do: length(list_agents(jido_instance, opts))
+
+  @doc "Fetches one Agent logical-parent binding from the default instance."
+  @spec agent_parent_binding(String.t()) :: {:ok, map()} | :error
+  def agent_parent_binding(child_id),
+    do: agent_parent_binding(@default_instance, child_id, [])
+
+  @doc """
+  Fetches a parent binding with default-instance options, or fetches it from a
+  selected instance with default options.
+  """
+  @spec agent_parent_binding(atom() | String.t(), keyword() | String.t()) ::
+          {:ok, map()} | :error
+  def agent_parent_binding(child_id, opts) when is_binary(child_id) and is_list(opts),
+    do: agent_parent_binding(@default_instance, child_id, opts)
+
+  def agent_parent_binding(jido_instance, child_id) when is_atom(jido_instance),
+    do: agent_parent_binding(jido_instance, child_id, [])
+
+  @doc "Fetches a parent binding with options from the selected Jido instance."
   @spec agent_parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
-  def agent_parent_binding(jido_instance, child_id, opts \\ []) do
+  def agent_parent_binding(jido_instance, child_id, opts) do
     case RuntimeStore.fetch(
            jido_instance,
            :agent_relationships,
@@ -505,18 +620,53 @@ defmodule Jido do
     end
   end
 
-  @doc "Persists and stops one live Agent Server."
+  @doc "Persists and stops one live Agent Server in the default instance."
+  @spec hibernate(Jido.AgentServer.server()) :: :ok | {:error, term()}
+  def hibernate(server), do: hibernate(@default_instance, server, [])
+
+  @doc """
+  Hibernates an Agent with default-instance options, or hibernates it in a
+  selected instance with default options.
+  """
+  @spec hibernate(Jido.AgentServer.server(), keyword() | Jido.AgentServer.server()) ::
+          :ok | {:error, term()}
+  def hibernate(server, opts) when is_list(opts),
+    do: hibernate(@default_instance, server, opts)
+
+  def hibernate(jido_instance, server) when is_atom(jido_instance),
+    do: hibernate(jido_instance, server, [])
+
+  @doc "Hibernates an Agent with options in the selected Jido instance."
   @spec hibernate(atom(), Jido.AgentServer.server(), keyword()) ::
           :ok | {:error, term()}
-  def hibernate(jido_instance, server, opts \\ [])
+  def hibernate(jido_instance, server, opts)
       when is_atom(jido_instance) and is_list(opts) do
     Jido.AgentServer.hibernate(server, opts)
   end
 
-  @doc "Restores and starts one persisted Agent."
+  @doc "Restores and starts one persisted Agent in the default instance."
+  @spec thaw(module(), String.t()) :: DynamicSupervisor.on_start_child()
+  def thaw(agent_module, agent_id),
+    do: thaw(@default_instance, agent_module, agent_id, [])
+
+  @doc """
+  Thaws an Agent with default-instance options, or thaws it in a selected
+  instance with default options.
+  """
+  @spec thaw(module(), module() | String.t(), keyword() | String.t()) ::
+          DynamicSupervisor.on_start_child()
+  def thaw(agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) and is_list(opts),
+      do: thaw(@default_instance, agent_module, agent_id, opts)
+
+  def thaw(jido_instance, agent_module, agent_id)
+      when is_atom(jido_instance) and is_atom(agent_module) and is_binary(agent_id),
+      do: thaw(jido_instance, agent_module, agent_id, [])
+
+  @doc "Thaws an Agent with options in the selected Jido instance."
   @spec thaw(atom(), module(), String.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def thaw(jido_instance, agent_module, agent_id, opts \\ [])
+  def thaw(jido_instance, agent_module, agent_id, opts)
       when is_atom(jido_instance) and is_atom(agent_module) and is_binary(agent_id) and
              is_list(opts) do
     opts = opts |> Keyword.put(:id, agent_id) |> Keyword.put(:restore, :required)

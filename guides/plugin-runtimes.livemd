@@ -117,7 +117,6 @@ end
 
 {:ok, agent} =
   Jido.start_agent(
-    Jido.default_instance(),
     PluginRuntime.Agent,
     id: "plugin-runtime-1"
   )
@@ -148,7 +147,7 @@ would not undo the committed count.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop_agent(agent)
 :ok = Jido.stop()
 ```
 

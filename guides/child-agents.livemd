@@ -79,7 +79,6 @@ and monitor in runtime state.
 
 {:ok, parent} =
   Jido.start_agent(
-    Jido.default_instance(),
     ChildGuide.Parent,
     id: "child-parent"
   )
@@ -125,7 +124,7 @@ committed.state.desired
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), parent)
+:ok = Jido.stop_agent(parent)
 :ok = Jido.stop()
 ```
 

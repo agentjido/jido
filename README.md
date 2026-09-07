@@ -95,12 +95,16 @@ serialized message handling, persistence, or runtime effects:
 
 ```elixir
 {:ok, _jido} = Jido.start()
-{:ok, counter} = Jido.start_agent(Jido.default_instance(), agent)
+{:ok, counter} = Jido.start_agent(agent)
 
 {:ok, committed_agent} = Jido.AgentServer.call(counter, signal)
 committed_agent.state.count
 #=> 2
 ```
+
+The default instance is also implicit for Agent lookup, listing, counts, stop,
+hibernate, and thaw. Pass an instance as the first argument only when the
+application runs more than one Jido supervisor.
 
 The route `define` declaration creates helpers for the same contract. Use the
 Signal helper with `cmd/2`, or use the command helper with a live actor:

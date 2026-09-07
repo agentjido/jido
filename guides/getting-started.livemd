@@ -92,7 +92,6 @@ at a time and commits each valid candidate.
 
 {:ok, counter} =
   Jido.start_agent(
-    Jido.default_instance(),
     GettingStarted.Counter,
     id: "live-counter"
   )
@@ -108,7 +107,7 @@ The result is `{3, 1}`. The Server owns the committed value and its revision.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop_agent(counter)
 :ok = Jido.stop()
 ```
 

@@ -41,7 +41,6 @@ end
 
 {:ok, counter} =
   Jido.start_agent(
-    Jido.default_instance(),
     DebugGuide.Counter,
     id: "debug-counter",
     debug: true,
@@ -99,7 +98,7 @@ full payload logging off unless the data policy permits it.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop_agent(counter)
 :ok = Jido.stop()
 ```
 

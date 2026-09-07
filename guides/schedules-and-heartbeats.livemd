@@ -65,7 +65,6 @@ end
 
 {:ok, agent} =
   Jido.start_agent(
-    Jido.default_instance(),
     ScheduleGuide.Agent,
     id: "scheduled-agent"
   )
@@ -109,7 +108,7 @@ uses normal admission and Turn rules. A heartbeat is input, not a health proof.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop_agent(agent)
 :ok = Jido.stop()
 ```
 

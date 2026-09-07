@@ -82,7 +82,6 @@ Do not provide the same input key both positionally and through `input:`.
 
 {:ok, order} =
   Jido.start_agent(
-    Jido.default_instance(),
     RouteInterfaces.Order,
     id: "order-7"
   )
@@ -103,7 +102,7 @@ The live helper constructs the same Signal and calls `Jido.AgentServer.call/3`.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), order)
+:ok = Jido.stop_agent(order)
 :ok = Jido.stop()
 ```
 

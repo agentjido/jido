@@ -1,6 +1,12 @@
 defmodule Jido.InstanceHelpersTest do
   use JidoTest.Case, async: false
 
+  alias Jido.AgentServer
+
+  defmodule DefaultAgent do
+    use Jido.Agent, name: "default_instance_agent"
+  end
+
   test "script startup and shutdown are idempotent", %{jido: jido} do
     name = Module.concat(jido, Script)
     on_exit(fn -> Jido.stop(name) end)
@@ -29,6 +35,67 @@ defmodule Jido.InstanceHelpersTest do
     assert Jido.Debug.override(instance, :redact_sensitive) == false
     assert :ok = Jido.debug(:off)
     assert Jido.debug() == :off
+  end
+
+  test "start_agent uses the default instance when no instance is given" do
+    assert {:ok, _jido} = Jido.start()
+
+    agent = DefaultAgent.new!(id: unique_id("default-agent"))
+    agent_id = agent.id
+    assert {:ok, server} = Jido.start_agent(agent)
+    assert %Jido.Agent{id: ^agent_id} = AgentServer.agent(server)
+    assert Jido.whereis_agent(agent_id) == server
+    assert Jido.list_agents() == [{agent_id, server}]
+    assert Jido.agent_count() == 1
+    assert :ok = Jido.stop_agent(agent_id)
+    assert Jido.whereis_agent(agent_id) == nil
+  end
+
+  test "start_agent accepts a module and options for the default instance" do
+    assert {:ok, _jido} = Jido.start()
+
+    id = unique_id("default-agent-options")
+    assert {:ok, server} = Jido.start_agent(DefaultAgent, id: id)
+    assert %Jido.Agent{id: ^id} = AgentServer.agent(server)
+  end
+
+  test "default instance helpers cover runtime names and parent bindings" do
+    assert Jido.registry_name() == Jido.registry_name(Jido.default_instance())
+    assert Jido.agent_supervisor_name() == Jido.agent_supervisor_name(Jido.default_instance())
+    assert Jido.task_supervisor_name() == Jido.task_supervisor_name(Jido.default_instance())
+    assert Jido.runtime_store_name() == Jido.runtime_store_name(Jido.default_instance())
+
+    assert {:ok, _jido} = Jido.start()
+
+    binding = %{parent_id: "parent", tag: :child, meta: %{}}
+
+    assert :ok =
+             Jido.RuntimeStore.put(
+               Jido.default_instance(),
+               :agent_relationships,
+               "child",
+               binding
+             )
+
+    assert {:ok, %{parent_id: "parent", parent_partition: nil, tag: :child, meta: %{}}} =
+             Jido.agent_parent_binding("child")
+  end
+
+  test "hibernate and thaw use the default instance when no instance is given" do
+    assert {:ok, _jido} = Jido.start()
+
+    persistence =
+      {Jido.Persistence.ETS, table: :"default_lifecycle_#{System.unique_integer([:positive])}"}
+
+    id = unique_id("default-persisted-agent")
+    agent = DefaultAgent.new!(id: id)
+
+    assert {:ok, server} = Jido.start_agent(agent, persistence: persistence)
+    assert :ok = Jido.hibernate(server)
+    assert Jido.whereis_agent(id) == nil
+
+    assert {:ok, restored_server} = Jido.thaw(DefaultAgent, id, persistence: persistence)
+    assert %Jido.Agent{id: ^id} = AgentServer.agent(restored_server)
   end
 
   test "invalid parent bindings are rejected and missing metadata is normalized", %{jido: jido} do

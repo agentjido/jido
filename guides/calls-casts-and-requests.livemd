@@ -45,7 +45,6 @@ end
 
 {:ok, counter} =
   Jido.start_agent(
-    Jido.default_instance(),
     RequestGuide.Counter,
     id: "request-counter"
   )
@@ -101,7 +100,7 @@ the request ID in runtime state, not durable Agent state.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop_agent(counter)
 :ok = Jido.stop()
 ```
 

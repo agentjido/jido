@@ -110,7 +110,6 @@ end
 
 {:ok, agent} =
   Jido.start_agent(
-    Jido.default_instance(),
     SensorGuide.Agent,
     id: "sensor-agent"
   )
@@ -142,7 +141,7 @@ owns the PIDs and restarts the sensor while its tag remains desired.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop_agent(agent)
 :ok = Jido.stop()
 Process.unregister(:sensor_guide_observer)
 ```

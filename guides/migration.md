@@ -219,10 +219,10 @@ Use the live API when the application needs a committed result:
 
 ```elixir
 {:ok, _instance} = Jido.start()
-{:ok, server} = Jido.start_agent(Jido.default_instance(), MyApp.Counter, id: "counter-1")
+{:ok, server} = Jido.start_agent(MyApp.Counter, id: "counter-1")
 {:ok, committed} = MyApp.Counter.increment(server, 2)
 # committed.state.count == 2
-:ok = Jido.stop_agent(Jido.default_instance(), server)
+:ok = Jido.stop_agent(server)
 ```
 
 `Jido.AgentServer.call/3` also accepts a Signal. Use `send_request/3` and

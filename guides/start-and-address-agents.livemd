@@ -27,16 +27,15 @@ end
 
 ```elixir
 {:ok, _jido} = Jido.start()
-jido = Jido.default_instance()
 
 {:ok, east} =
-  Jido.start_agent(jido, AddressGuide.Worker,
+  Jido.start_agent(AddressGuide.Worker,
     id: "worker-1",
     partition: :east
   )
 
 {:ok, west} =
-  Jido.start_agent(jido, AddressGuide.Worker,
+  Jido.start_agent(AddressGuide.Worker,
     id: "worker-1",
     partition: :west
   )
@@ -45,20 +44,22 @@ jido = Jido.default_instance()
 ```
 
 An Agent ID is unique inside one Jido instance and partition. A partition is a
-logical namespace. It is not an authorization boundary.
+logical namespace. It is not an authorization boundary. These calls use the
+default instance. Pass an instance as the first argument when the application
+runs more than one Jido supervisor.
 
 ## Look Up And List
 
 ```elixir
-^east = Jido.whereis_agent(jido, "worker-1", partition: :east)
-^west = Jido.whereis_agent(jido, "worker-1", partition: :west)
+^east = Jido.whereis_agent("worker-1", partition: :east)
+^west = Jido.whereis_agent("worker-1", partition: :west)
 
 %{
-  east: Jido.list_agents(jido, partition: :east),
-  west: Jido.list_agents(jido, partition: :west),
+  east: Jido.list_agents(partition: :east),
+  west: Jido.list_agents(partition: :west),
   counts: %{
-    east: Jido.agent_count(jido, partition: :east),
-    west: Jido.agent_count(jido, partition: :west)
+    east: Jido.agent_count(partition: :east),
+    west: Jido.agent_count(partition: :west)
   }
 }
 ```
@@ -69,8 +70,8 @@ persistence keys.
 ## Stop The Agents
 
 ```elixir
-:ok = Jido.stop_agent(jido, east)
-:ok = Jido.stop_agent(jido, west)
+:ok = Jido.stop_agent(east)
+:ok = Jido.stop_agent(west)
 :ok = Jido.stop()
 ```
 

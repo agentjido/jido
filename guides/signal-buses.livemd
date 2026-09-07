@@ -50,7 +50,7 @@ Manager appears before Client so the Bus exists before subscription setup.
 jido = Jido.default_instance()
 
 {:ok, consumer} =
-  Jido.start_agent(jido, BusGuide.Consumer, id: "bus-consumer")
+  Jido.start_agent(BusGuide.Consumer, id: "bus-consumer")
 
 :ok = Jido.AgentServer.await_ready(consumer)
 ```
@@ -91,7 +91,7 @@ must handle duplicate Signals.
 ## Stop The Example
 
 ```elixir
-:ok = Jido.stop_agent(jido, consumer)
+:ok = Jido.stop_agent(consumer)
 :ok = Jido.stop()
 ```
 
