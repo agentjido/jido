@@ -7,7 +7,7 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 ### Development Environment
 
 1. **Elixir Version Requirements**
-   - Jido requires Elixir ~> 1.17
+   - Jido requires Elixir ~> 1.18 and OTP 27 or later
    - We recommend using asdf or similar version manager
 
 2. **Initial Setup**
