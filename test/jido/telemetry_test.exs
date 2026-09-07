@@ -26,6 +26,31 @@ defmodule JidoTest.TelemetryTest do
     assert :ok = Telemetry.setup()
   end
 
+  test "setup/0 does not detach an existing handler" do
+    handler_id = "jido-agent-metrics"
+    event = [:jido, :telemetry, :sentinel]
+    test_pid = self()
+
+    :telemetry.detach(handler_id)
+
+    :ok =
+      :telemetry.attach(
+        handler_id,
+        event,
+        fn event, _measurements, _metadata, pid -> send(pid, {:sentinel, event}) end,
+        test_pid
+      )
+
+    on_exit(fn ->
+      :telemetry.detach(handler_id)
+      Telemetry.setup()
+    end)
+
+    assert :ok = Telemetry.setup()
+    :telemetry.execute(event, %{}, %{})
+    assert_receive {:sentinel, ^event}
+  end
+
   test "metrics expose only Agent Server events" do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)

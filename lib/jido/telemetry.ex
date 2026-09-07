@@ -68,9 +68,10 @@ defmodule Jido.Telemetry do
   """
   @spec setup() :: :ok
   def setup do
-    _ = :telemetry.detach(@handler_id)
-    :telemetry.attach_many(@handler_id, events(), &__MODULE__.handle_event/4, nil)
-    :ok
+    case :telemetry.attach_many(@handler_id, events(), &__MODULE__.handle_event/4, nil) do
+      :ok -> :ok
+      {:error, :already_exists} -> :ok
+    end
   end
 
   @doc """

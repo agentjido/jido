@@ -98,9 +98,41 @@ defmodule JidoTest.Persistence.RedisTest do
           command_fn: fn command -> send(observer, {:unexpected, command}) end
         )
       end
+
+      assert_raise ArgumentError, ~r/:ttl must be a positive integer/, fn ->
+        Redis.put("key", "value",
+          ttl: ttl,
+          command_fn: fn command -> send(observer, {:unexpected, command}) end
+        )
+      end
     end
 
     refute_received {:unexpected, _}
+  end
+
+  test "validates SET and DEL replies" do
+    for reply <- [{:ok, nil}, {:ok, 1}, {:ok, "QUEUED"}, :invalid] do
+      assert {:error, {:invalid_redis_result, ^reply}} =
+               Redis.put("key", "value", command_fn: fn _command -> reply end)
+    end
+
+    for reply <- [{:ok, "1"}, {:ok, -1}, {:ok, nil}, :invalid] do
+      assert {:error, {:invalid_redis_result, ^reply}} =
+               Redis.delete("key", command_fn: fn _command -> reply end)
+    end
+
+    assert :ok = Redis.put("key", "value", command_fn: fn _command -> {:ok, "OK"} end)
+    assert :ok = Redis.delete("key", command_fn: fn _command -> {:ok, 0} end)
+    assert :ok = Redis.delete("key", command_fn: fn _command -> {:ok, 2} end)
+  end
+
+  test "validates adapter options" do
+    command_fn = fn _command -> {:ok, "OK"} end
+
+    assert :ok = Redis.validate_options(command_fn: command_fn, prefix: "custom", ttl: 1)
+    assert {:error, _reason} = Redis.validate_options([])
+    assert {:error, _reason} = Redis.validate_options(command_fn: command_fn, prefix: :invalid)
+    assert {:error, _reason} = Redis.validate_options([:not_keyword])
   end
 
   test "propagates Redis command errors" do

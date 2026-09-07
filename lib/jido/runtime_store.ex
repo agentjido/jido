@@ -101,18 +101,24 @@ defmodule Jido.RuntimeStore do
 
   @doc """
   Stores a value in the given hive.
+
+  A timeout does not cancel queued work. The write can complete after this
+  function returns `{:error, :timeout}`.
   """
   @spec put(atom(), hive(), key(), value()) :: :ok | {:error, term()}
   def put(instance, hive, key, value) when is_atom(instance) do
-    call(instance, {:put, hive, key, value}, {:error, :not_running})
+    call(instance, {:put, hive, key, value}, {:error, :not_running}, {:error, :timeout})
   end
 
   @doc """
   Deletes a value from the given hive.
+
+  A timeout does not cancel queued work. The delete can complete after this
+  function returns `{:error, :timeout}`.
   """
   @spec delete(atom(), hive(), key()) :: :ok | {:error, term()}
   def delete(instance, hive, key) when is_atom(instance) do
-    call(instance, {:delete, hive, key}, {:error, :not_running})
+    call(instance, {:delete, hive, key}, {:error, :not_running}, {:error, :timeout})
   end
 
   @doc """
@@ -163,14 +169,16 @@ defmodule Jido.RuntimeStore do
     {:reply, entries, state}
   end
 
-  defp call(instance, request, fallback) do
+  defp call(instance, request, fallback, timeout_fallback \\ nil) do
     server = Jido.runtime_store_name(instance)
+    timeout_fallback = if is_nil(timeout_fallback), do: fallback, else: timeout_fallback
 
     try do
       GenServer.call(server, request, @call_timeout)
     catch
       :exit, {:noproc, _} -> fallback
       :exit, {:normal, _} -> fallback
+      :exit, {:timeout, {GenServer, :call, _details}} -> timeout_fallback
     end
   end
 end

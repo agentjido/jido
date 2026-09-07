@@ -86,6 +86,7 @@ defmodule Jido.Error do
         opts
         |> Keyword.put(:message, message)
         |> Keyword.put_new(:details, %{})
+        |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
         |> super()
       end
 
@@ -140,6 +141,7 @@ defmodule Jido.Error do
       opts
       |> Keyword.put_new(:message, "Validation failed")
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -174,6 +176,7 @@ defmodule Jido.Error do
       |> Keyword.put_new(:message, "Execution failed")
       |> Keyword.put_new(:phase, :execution)
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -212,6 +215,7 @@ defmodule Jido.Error do
       opts
       |> Keyword.put_new(:message, "Routing failed")
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -243,6 +247,7 @@ defmodule Jido.Error do
       opts
       |> Keyword.put_new(:message, "Operation timed out")
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -279,6 +284,7 @@ defmodule Jido.Error do
       |> Keyword.put_new(:message, "Compensation error")
       |> Keyword.put_new(:compensated, false)
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -306,6 +312,7 @@ defmodule Jido.Error do
       opts
       |> Keyword.put_new(:message, "Internal error")
       |> Keyword.put_new(:details, %{})
+      |> Keyword.update!(:details, &Jido.Error.normalize_details/1)
       |> super()
     end
   end
@@ -313,6 +320,11 @@ defmodule Jido.Error do
   # ============================================================================
   # Error Constructors
   # ============================================================================
+
+  @doc false
+  @spec normalize_details(term()) :: map()
+  def normalize_details(details) when is_map(details), do: details
+  def normalize_details(_details), do: %{}
 
   @doc """
   Creates a validation error.
@@ -450,11 +462,7 @@ defmodule Jido.Error do
   end
 
   defp merge_extra_details(opts, reserved_keys) do
-    explicit_details =
-      case Keyword.get(opts, :details, %{}) do
-        details when is_map(details) -> details
-        _ -> %{}
-      end
+    explicit_details = opts |> Keyword.get(:details, %{}) |> normalize_details()
 
     extra_details =
       opts
@@ -595,8 +603,7 @@ defmodule Jido.Error do
     end
   end
 
-  defp public_message(error) when is_exception(error),
-    do: truncate_string(Exception.message(error))
+  defp public_message(error) when is_exception(error), do: safe_exception_message(error)
 
   defp public_message(%{message: message}), do: transport_string(message)
   defp public_message(%{"message" => message}), do: transport_string(message)
@@ -672,7 +679,7 @@ defmodule Jido.Error do
   defp sanitize_transport(%_{} = value, _depth) when is_exception(value) do
     %{
       type: value.__struct__ |> Module.split() |> Enum.join("."),
-      message: truncate_string(Exception.message(value))
+      message: safe_exception_message(value)
     }
   end
 
@@ -705,7 +712,8 @@ defmodule Jido.Error do
   defp sanitize_transport(value, _depth) when is_reference(value), do: safe_inspect(value)
   defp sanitize_transport(value, _depth), do: safe_inspect(value)
 
-  defp sanitize_key(key) when is_atom(key) or is_binary(key), do: key
+  defp sanitize_key(key) when is_atom(key), do: key
+  defp sanitize_key(key) when is_binary(key), do: sanitize_utf8(key)
   defp sanitize_key(key), do: safe_inspect(key)
 
   defp sanitize_key_value_pairs(entries, depth) do
@@ -748,8 +756,21 @@ defmodule Jido.Error do
   defp compact_key(key), do: String.replace(key, ~r/[^a-z0-9]+/, "")
 
   defp transport_string(value) when is_binary(value), do: truncate_string(value)
+
   defp transport_string(%{message: message}), do: transport_string(message)
   defp transport_string(value), do: value |> sanitize_transport() |> safe_inspect()
+
+  defp safe_exception_message(error) do
+    error
+    |> Exception.message()
+    |> truncate_string()
+  rescue
+    _error -> safe_inspect(error)
+  catch
+    _kind, _reason -> safe_inspect(error)
+  end
+
+  defp sanitize_utf8(value) when is_binary(value), do: String.replace_invalid(value)
 
   defp safe_inspect(value) do
     value
@@ -757,6 +778,8 @@ defmodule Jido.Error do
     |> truncate_string()
   rescue
     _ -> inspect_fallback(value)
+  catch
+    _kind, _reason -> inspect_fallback(value)
   end
 
   defp inspect_fallback(value) do
@@ -770,6 +793,8 @@ defmodule Jido.Error do
   end
 
   defp truncate_string(value, max_chars \\ @transport_max_string) when is_binary(value) do
+    value = sanitize_utf8(value)
+
     if String.length(value) > max_chars do
       String.slice(value, 0, max_chars) <> "...(truncated)"
     else
@@ -856,9 +881,9 @@ defmodule Jido.Error do
   defp unified_type(%Jido.Signal.Error.DispatchError{}), do: :routing_error
   defp unified_type(%Jido.Signal.Error.InternalError{}), do: :internal
 
-  defp unified_type(%{type: type}) when is_atom(type), do: type
+  defp unified_type(%{type: type}) when is_atom(type), do: unified_type_from_atom(type)
   defp unified_type(%{type: type}) when is_binary(type), do: unified_type_from_string(type)
-  defp unified_type(%{"type" => type}) when is_atom(type), do: type
+  defp unified_type(%{"type" => type}) when is_atom(type), do: unified_type_from_atom(type)
   defp unified_type(%{"type" => type}) when is_binary(type), do: unified_type_from_string(type)
 
   defp unified_type(_), do: :internal
@@ -867,9 +892,12 @@ defmodule Jido.Error do
     Map.get(@known_error_type_strings, normalize_type_string(type), :internal)
   end
 
+  defp unified_type_from_atom(type), do: type |> Atom.to_string() |> unified_type_from_string()
+
   defp normalize_type_string(type) do
     type
     |> String.trim()
     |> String.trim_leading(":")
+    |> String.downcase()
   end
 end

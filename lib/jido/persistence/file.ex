@@ -15,7 +15,19 @@ defmodule Jido.Persistence.File do
   @behaviour Jido.Persistence.Adapter
 
   @impl true
+  def validate_options(opts) do
+    cond do
+      not Keyword.keyword?(opts) -> {:error, "options must be a keyword list"}
+      not is_binary(Keyword.get(opts, :path)) -> {:error, ":path must be a non-empty string"}
+      Keyword.get(opts, :path) == "" -> {:error, ":path must be a non-empty string"}
+      true -> :ok
+    end
+  end
+
+  @impl true
   def get(key, opts) when is_binary(key) and is_list(opts) do
+    validate_options!(opts)
+
     case File.read(record_path(Keyword.fetch!(opts, :path), key)) do
       {:ok, value} -> {:ok, value}
       {:error, :enoent} -> {:error, :not_found}
@@ -25,6 +37,7 @@ defmodule Jido.Persistence.File do
 
   @impl true
   def put(key, value, opts) when is_binary(key) and is_binary(value) and is_list(opts) do
+    validate_options!(opts)
     with_lock(key, opts, fn file_path -> write_record(file_path, value) end)
   end
 
@@ -32,6 +45,8 @@ defmodule Jido.Persistence.File do
   def compare_and_swap(key, expected, value, opts)
       when is_binary(key) and (expected == :not_found or is_binary(expected)) and
              is_binary(value) and is_list(opts) do
+    validate_options!(opts)
+
     with_lock(key, opts, fn file_path ->
       case {File.read(file_path), expected} do
         {{:error, :enoent}, :not_found} -> write_record(file_path, value)
@@ -45,6 +60,8 @@ defmodule Jido.Persistence.File do
 
   @impl true
   def delete(key, opts) when is_binary(key) and is_list(opts) do
+    validate_options!(opts)
+
     with_lock(key, opts, fn file_path ->
       case File.rm(file_path) do
         :ok -> :ok
@@ -57,6 +74,13 @@ defmodule Jido.Persistence.File do
   defp with_lock(key, opts, fun) do
     file_path = opts |> Keyword.fetch!(:path) |> record_path(key) |> Path.expand()
     :global.trans({{__MODULE__, file_path}, self()}, fn -> fun.(file_path) end, [node()])
+  end
+
+  defp validate_options!(opts) do
+    case validate_options(opts) do
+      :ok -> :ok
+      {:error, reason} -> raise ArgumentError, "Jido.Persistence.File #{reason}"
+    end
   end
 
   defp write_record(file_path, value) do

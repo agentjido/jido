@@ -51,7 +51,7 @@ defmodule Jido.Debug do
     overrides = build_overrides(level)
 
     overrides =
-      if Keyword.get(opts, :redact) == false do
+      if Keyword.keyword?(opts) and Keyword.get(opts, :redact) == false do
         Map.put(overrides, :redact_sensitive, false)
       else
         overrides
@@ -70,12 +70,7 @@ defmodule Jido.Debug do
   end
 
   @spec level(instance()) :: level()
-  def level(instance) do
-    case :persistent_term.get({:jido_debug, instance}, nil) do
-      nil -> :off
-      %{level: level} -> level
-    end
-  end
+  def level(instance), do: status(instance).level
 
   @spec enabled?(instance()) :: boolean()
   def enabled?(instance) do
@@ -83,18 +78,15 @@ defmodule Jido.Debug do
   end
 
   @spec override(instance(), atom()) :: term() | nil
-  def override(instance, key) do
-    case :persistent_term.get({:jido_debug, instance}, nil) do
-      nil -> nil
-      %{overrides: overrides} -> Map.get(overrides, key)
-    end
-  end
+  def override(instance, key), do: Map.get(status(instance).overrides, key)
 
   @spec maybe_enable_from_config(atom(), instance()) :: :ok
   def maybe_enable_from_config(otp_app, instance) do
     config = Application.get_env(otp_app, instance, [])
 
-    case Keyword.get(config, :debug) do
+    debug = if Keyword.keyword?(config), do: Keyword.get(config, :debug), else: nil
+
+    case debug do
       true -> enable(instance, :on)
       :verbose -> enable(instance, :verbose)
       _ -> disable(instance)
@@ -109,8 +101,12 @@ defmodule Jido.Debug do
   @spec status(instance()) :: map()
   def status(instance) do
     case :persistent_term.get({:jido_debug, instance}, nil) do
-      nil -> %{level: :off, overrides: %{}}
-      state -> state
+      %{level: level, overrides: overrides} = state
+      when level in [:on, :verbose] and is_map(overrides) ->
+        state
+
+      _invalid ->
+        %{level: :off, overrides: %{}}
     end
   end
 

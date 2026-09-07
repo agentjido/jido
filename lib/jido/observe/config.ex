@@ -268,8 +268,8 @@ defmodule Jido.Observe.Config do
     if otp_app do
       otp_app
       |> Application.get_env(instance, [])
-      |> Keyword.get(group, [])
-      |> Keyword.get(key)
+      |> keyword_get(group, [])
+      |> keyword_get(key, nil)
     end
   end
 
@@ -281,7 +281,11 @@ defmodule Jido.Observe.Config do
   end
 
   defp global_config(group, key, default) do
-    :jido |> Application.get_env(group, []) |> Keyword.get(key, default)
+    :jido |> Application.get_env(group, []) |> keyword_get(key, default)
+  end
+
+  defp keyword_get(container, key, default) do
+    if Keyword.keyword?(container), do: Keyword.get(container, key, default), else: default
   end
 
   defp normalize_action_log_level(level, :full), do: logger_level_for_action(level)

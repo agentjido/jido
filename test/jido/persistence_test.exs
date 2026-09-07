@@ -76,6 +76,22 @@ defmodule JidoTest.PersistenceTest do
     end
   end
 
+  test "public operations reject non-keyword options before adapter work" do
+    agent = RuntimeAgent.new!(id: unique_id("invalid-options"))
+    persistence = adapter(:invalid_options)
+
+    for opts <- [[:not_keyword], %{"revision" => 1}] do
+      assert {:error, {:invalid_persistence_options, ^opts}} =
+               Persistence.save_agent(persistence, agent, opts)
+
+      assert {:error, {:invalid_persistence_options, ^opts}} =
+               Persistence.load_agent(persistence, RuntimeAgent, agent.id, opts)
+
+      assert {:error, {:invalid_persistence_options, ^opts}} =
+               Persistence.delete_agent(persistence, RuntimeAgent, agent.id, opts)
+    end
+  end
+
   test "checkpoint callback failures and invalid revisions cannot write a record" do
     persistence = adapter(:callback)
 

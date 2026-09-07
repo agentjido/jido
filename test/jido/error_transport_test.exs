@@ -6,6 +6,13 @@ defmodule JidoTest.ErrorTransportTest do
     defstruct [:token]
   end
 
+  defmodule InvalidMessageError do
+    defexception []
+
+    @impl true
+    def message(_error), do: "invalid" <> <<255>>
+  end
+
   defmodule ValidationAction do
     use Jido.Action,
       name: "error_transport_validation",
@@ -116,11 +123,13 @@ defmodule JidoTest.ErrorTransportTest do
       error = Error.execution_error("Failed", details: %{nested: details})
 
       assert Error.to_map(error).details.nested == %{
-               <<255>> => "visible",
-               (<<255>> <> "TOKEN") => "[REDACTED]",
+               "�" => "visible",
+               "�TOKEN" => "[REDACTED]",
                "{:password, 1}" => "[REDACTED]",
                "123" => "visible"
              }
+
+      assert Jason.encode!(Error.to_map(error))
     end
 
     test "omits stacktrace variants and keeps ordinary keys visible" do
@@ -195,6 +204,66 @@ defmodule JidoTest.ErrorTransportTest do
       metadata = Jido.Observe.exception_metadata(:error, error)
       assert metadata.error == result
       assert Jason.encode!(metadata)
+    end
+
+    test "sanitizes invalid UTF-8 in direct, nested, and exception messages" do
+      for error <- [
+            %{message: "direct" <> <<255>>},
+            %{message: %{message: "nested" <> <<255>>}},
+            %InvalidMessageError{}
+          ] do
+        result = Error.to_map(error)
+
+        assert String.valid?(result.message)
+        assert Jason.encode!(result)
+      end
+
+      result =
+        Error.to_map(
+          Error.execution_error("outer",
+            details: %{
+              <<255>> => "invalid key",
+              message: "nested" <> <<255>>,
+              exception: %InvalidMessageError{}
+            }
+          )
+        )
+
+      assert String.valid?(result.details.message)
+      assert String.valid?(result.details.exception.message)
+
+      assert Enum.all?(Map.keys(result.details), fn key ->
+               not is_binary(key) or String.valid?(key)
+             end)
+
+      assert Jason.encode!(result)
+    end
+
+    test "contains exception message and inspection failures" do
+      for message_failure <- [:raise, :throw, :exit],
+          inspect_failure <- [:raise, :throw, :exit] do
+        error = %JidoTest.ErrorTransport.UnrenderableError{
+          message_failure: message_failure,
+          inspect_failure: inspect_failure
+        }
+
+        result = Error.to_map(error)
+
+        assert is_binary(result.message)
+        assert String.valid?(result.message)
+        assert Map.keys(result) |> Enum.sort() == [:details, :message, :retryable?, :type]
+        assert Jason.encode!(result)
+      end
+    end
+
+    test "canonicalizes known and unknown atom and string error types" do
+      for type <- [:timeout, "timeout", " :timeout "] do
+        assert Error.to_map(%{type: type, message: "late"}).type == :timeout
+      end
+
+      for type <- [:unknown_error, "unknown_error", " UNKNOWN_ERROR "] do
+        assert Error.to_map(%{type: type, message: "unknown"}).type == :internal
+      end
     end
 
     test "bounds long invalid binaries and redacts them under sensitive keys" do

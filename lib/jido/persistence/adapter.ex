@@ -11,6 +11,9 @@ defmodule Jido.Persistence.Adapter do
   @type value :: binary()
   @type options :: keyword()
 
+  @doc "Validates adapter options before an operation starts."
+  @callback validate_options(options()) :: :ok | {:error, term()}
+
   @doc "Gets one value. A missing key returns `{:error, :not_found}`."
   @callback get(key(), options()) :: {:ok, value()} | {:error, term()}
 
@@ -39,4 +42,6 @@ defmodule Jido.Persistence.Adapter do
 
   @doc "Deletes one value. Deleting a missing key returns `:ok`."
   @callback delete(key(), options()) :: :ok | {:error, term()}
+
+  @optional_callbacks validate_options: 1
 end

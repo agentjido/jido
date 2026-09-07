@@ -67,4 +67,11 @@ defmodule JidoTest.Persistence.FileTest do
     assert :ok = FilePersistence.put(key, value, opts)
     assert {:ok, ^value} = FilePersistence.get(key, opts)
   end
+
+  test "validates required keyword options" do
+    assert :ok = FilePersistence.validate_options(path: "/tmp/jido")
+    assert {:error, _reason} = FilePersistence.validate_options([])
+    assert {:error, _reason} = FilePersistence.validate_options(path: "")
+    assert {:error, _reason} = FilePersistence.validate_options([:not_keyword])
+  end
 end

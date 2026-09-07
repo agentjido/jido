@@ -80,16 +80,25 @@ defmodule Jido.Tracing.Context do
   - parent_span_id set to current span_id
   - causation_id set to the provided causation_id (typically input_signal.id)
 
-  Returns `{:ok, traced_signal}` or `{:error, :no_trace_context}`.
+  Returns `{:ok, traced_signal}` on success.
+
+  Returns `{:error, :no_trace_context}` when the process has no trace,
+  `{:error, :invalid_trace_context}` when the stored trace is malformed, or
+  `{:error, :invalid_args}` when the signal or causation ID is invalid.
   """
-  @spec propagate_to(Signal.t(), String.t()) :: {:ok, Signal.t()} | {:error, :no_trace_context}
+  @spec propagate_to(Signal.t(), String.t()) ::
+          {:ok, Signal.t()}
+          | {:error, :no_trace_context | :invalid_trace_context | :invalid_args}
   def propagate_to(%Signal{} = signal, causation_id) when is_binary(causation_id) do
     case get() do
       nil ->
         {:error, :no_trace_context}
 
       trace ->
-        Trace.put(signal, Trace.child_of(trace, causation_id))
+        case Trace.child_of(trace, causation_id) do
+          {:error, :invalid_trace_context} = error -> error
+          child -> Trace.put(signal, child)
+        end
     end
   end
 
@@ -111,7 +120,7 @@ defmodule Jido.Tracing.Context do
 
       trace ->
         trace
-        |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+        |> Trace.telemetry_context()
         |> Enum.map(fn {k, v} -> {:"jido_#{k}", v} end)
         |> Map.new()
     end

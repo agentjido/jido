@@ -26,12 +26,12 @@ defmodule Jido.Telemetry.AgentTest do
     refute_received :error_projected
   end
 
-  test "projection failure retains safe metadata and status" do
+  test "message projection failure retains the structured public type" do
     for failure <- [:throw, :exit] do
       error = %CountingError{failure: failure}
 
       assert AgentTelemetry.result_metadata({:error, error}) ==
-               %{status: :error, error_type: :internal, retryable?: false}
+               %{status: :timed_out, error_type: :timeout, retryable?: true}
 
       assert_received :error_projected
       refute_received :error_projected

@@ -3,11 +3,10 @@ defmodule Jido.ID do
 
   @max_unix_ts_ms 0xFFFFFFFFFFFF
 
-  @doc false
+  @doc "Deprecated compatibility generator. Use `Jido.Signal.ID.generate!/0`."
+  @deprecated "Use Jido.Signal.ID.generate!/0"
   @spec uuid7() :: String.t()
-  def uuid7 do
-    uuid7(System.system_time(:millisecond), :crypto.strong_rand_bytes(10))
-  end
+  defdelegate uuid7(), to: Jido.Signal.ID, as: :generate!
 
   @doc false
   @spec uuid7(non_neg_integer(), <<_::80>>) :: String.t()
