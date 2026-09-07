@@ -4,7 +4,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal.Bus
-  alias Jido.Topology.{BusInputs, Controller, Plan}
+  alias Jido.Topology.{Controller, Plan}
 
   def start_link({jido, instance, repair}),
     do: GenServer.start_link(__MODULE__, {jido, instance, repair})
@@ -62,6 +62,8 @@ defmodule Jido.Topology.Controller.Runtime do
 
   @impl true
   def handle_call(:status, _from, state) do
+    state = refresh_phase(state)
+
     {:reply,
      %{
        status: current_phase(state),
@@ -79,7 +81,9 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_call(:reconcile, _from, state), do: {:reply, :ok, request_pass(state)}
 
   def handle_call({:await_ready, timeout}, from, state) do
-    if current_phase(state) == :ready do
+    state = refresh_phase(state)
+
+    if state.phase == :ready do
       {:reply, :ok, state}
     else
       token = make_ref()
@@ -95,11 +99,18 @@ defmodule Jido.Topology.Controller.Runtime do
 
   def handle_call({:agent, target, member}, _from, state) do
     key = Plan.resolve(state.instance.plan, target, :agent, member)
+    context = ownership_context(state)
 
     pid =
       case Map.get(state.instance.plan.agents, key) do
-        nil -> nil
-        spec -> Jido.whereis_agent(state.jido, spec.id)
+        nil ->
+          nil
+
+        spec ->
+          case Jido.whereis_agent(state.jido, spec.id) do
+            pid when is_pid(pid) -> if owned?(:agent, pid, spec, context), do: pid
+            _ -> nil
+          end
       end
 
     {:reply, pid, state}
@@ -107,6 +118,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   def handle_call({:bus, target}, _from, state) do
     key = Plan.resolve(state.instance.plan, target, :bus)
+    context = ownership_context(state)
 
     pid =
       case Map.get(state.instance.plan.resources, key) do
@@ -115,7 +127,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
         spec ->
           case Bus.whereis(spec.id, jido: state.jido) do
-            {:ok, pid} -> pid
+            {:ok, pid} -> if owned?(:bus, pid, spec, context), do: pid
             _ -> nil
           end
       end
@@ -124,33 +136,36 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   @impl true
-  def terminate(_, state) do
+  def terminate(reason, state) do
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     Enum.each(state.active, fn {_, job} -> Task.shutdown(job.task, :brutal_kill) end)
 
-    state.instance.plan.layers
-    |> Enum.reverse()
-    |> List.flatten()
-    |> Enum.each(fn key ->
-      case Map.get(state.instance.plan.agents, key) do
-        nil ->
-          :ok
+    if intentional_shutdown?(reason) do
+      context = ownership_context(state)
 
-        spec ->
-          safely(fn ->
-            case Jido.whereis_agent(state.jido, spec.id) do
-              nil -> :ok
-              pid -> if owned?(pid, spec, state.instance.id), do: Jido.stop_agent(state.jido, pid)
-            end
-          end)
-      end
-    end)
+      state.instance.plan.layers
+      |> Enum.reverse()
+      |> List.flatten()
+      |> Enum.each(fn key ->
+        case Map.get(state.instance.plan.agents, key) do
+          nil ->
+            :ok
+
+          spec ->
+            safely(fn ->
+              case Jido.whereis_agent(state.jido, spec.id) do
+                pid when is_pid(pid) ->
+                  if owned?(:agent, pid, spec, context), do: Jido.stop_agent(state.jido, pid)
+
+                _ ->
+                  :ok
+              end
+            end)
+        end
+      end)
+    end
 
     :ok
-  end
-
-  defp current_phase(%{phase: :ready} = state) do
-    if Enum.all?(state.ready, fn {_, pid} -> Process.alive?(pid) end), do: :ready, else: :degraded
   end
 
   defp current_phase(state), do: state.phase
@@ -259,17 +274,29 @@ defmodule Jido.Topology.Controller.Runtime do
   defp finish_pass(%{reconcile_requested: true} = state), do: begin_pass(state)
 
   defp finish_pass(state) do
+    state = recheck_ready(state)
     phase = if map_size(state.errors) == 0, do: :ready, else: :degraded
 
     if phase == :ready do
+      reply_waiters(state)
+    else
+      %{state | phase: phase} |> schedule_reconcile()
+    end
+  end
+
+  defp reply_waiters(state) do
+    state = recheck_ready(state)
+
+    if map_size(state.errors) == 0 do
       Enum.each(state.waiters, fn {_, {from, timer}} ->
         if timer, do: Process.cancel_timer(timer)
         GenServer.reply(from, :ok)
       end)
-    end
 
-    %{state | phase: phase, waiters: if(phase == :ready, do: %{}, else: state.waiters)}
-    |> schedule_reconcile()
+      %{state | phase: :ready, waiters: %{}} |> schedule_reconcile()
+    else
+      %{state | phase: :degraded} |> schedule_reconcile()
+    end
   end
 
   defp schedule_reconcile(%{repair: :manual} = state), do: state
@@ -309,7 +336,7 @@ defmodule Jido.Topology.Controller.Runtime do
   defp ensure(spec, %{pool: pool} = context) do
     case Bus.whereis(spec.id, jido: context.jido) do
       {:ok, pid} ->
-        if Enum.any?(DynamicSupervisor.which_children(pool), &(elem(&1, 1) == pid)),
+        if owned?(:bus, pid, spec, context),
           do: {:ok, pid},
           else: {:error, :bus_identity_in_use}
 
@@ -322,7 +349,6 @@ defmodule Jido.Topology.Controller.Runtime do
   defp ensure(spec, context) do
     with {:ok, pid} <- activate(spec, context),
          :ok <- Server.await_ready(pid),
-         :ok <- subscriptions_ready(pid, spec),
          :ok <- bind_parent(pid, spec, context),
          do: {:ok, pid}
   end
@@ -333,7 +359,7 @@ defmodule Jido.Topology.Controller.Runtime do
         start_agent(spec, context)
 
       pid ->
-        if owned?(pid, spec, context.instance_id),
+        if owned?(:agent, pid, spec, context),
           do: {:ok, pid},
           else: {:error, :agent_identity_in_use}
     end
@@ -341,21 +367,12 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp start_agent(spec, context) do
     with {:ok, pid} <- Controller.Activation.start(spec, context) do
-      if owned?(pid, spec, context.instance_id) do
+      if owned?(:agent, pid, spec, context) do
         {:ok, pid}
       else
         Jido.stop_agent(context.jido, pid)
         {:error, :restored_agent_identity_in_use}
       end
-    end
-  end
-
-  defp subscriptions_ready(_pid, %{subscriptions: []}), do: :ok
-
-  defp subscriptions_ready(pid, _spec) do
-    case Map.get(Server.children(pid), {:plugin, BusInputs}) do
-      %{pid: supervisor} when is_pid(supervisor) -> BusInputs.await_ready(supervisor, [])
-      _ -> {:error, :subscriptions_unavailable}
     end
   end
 
@@ -371,11 +388,62 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp marker(spec, instance_id), do: %{id: instance_id, key: spec.key}
 
-  defp owned?(pid, spec, instance_id) do
+  defp ownership_context(state) do
+    %{
+      jido: state.jido,
+      instance_id: state.instance.id,
+      pool: Controller.name(state.jido, state.instance.id, :resources)
+    }
+  end
+
+  defp owned?(kind, pid, spec, context) when is_pid(pid) do
+    Process.alive?(pid) and safely_owned?(fn -> owns?(kind, pid, spec, context) end)
+  end
+
+  defp owned?(_kind, _pid, _spec, _context), do: false
+
+  defp owns?(:agent, pid, spec, context) do
     agent = Server.agent(pid)
 
     agent.module == spec.module and
-      Map.get(agent.metadata, "jido.topology") == marker(spec, instance_id)
+      Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id)
+  end
+
+  defp owns?(:bus, pid, _spec, context) do
+    Enum.any?(DynamicSupervisor.which_children(context.pool), &(elem(&1, 1) == pid))
+  end
+
+  defp refresh_phase(%{phase: :ready} = state) do
+    state = recheck_ready(state)
+    if map_size(state.errors) == 0, do: state, else: %{state | phase: :degraded}
+  end
+
+  defp refresh_phase(state), do: state
+
+  defp recheck_ready(state) do
+    Enum.reduce(state.ready, state, fn {key, pid}, acc ->
+      if is_pid(pid) and Process.alive?(pid) do
+        acc
+      else
+        %{
+          acc
+          | ready: Map.delete(acc.ready, key),
+            errors: Map.put(acc.errors, key, :member_unavailable)
+        }
+      end
+    end)
+  end
+
+  defp intentional_shutdown?(:shutdown), do: true
+  defp intentional_shutdown?({:shutdown, _reason}), do: true
+  defp intentional_shutdown?(_reason), do: false
+
+  defp safely_owned?(fun) do
+    fun.()
+  rescue
+    _error -> false
+  catch
+    :exit, _reason -> false
   end
 
   defp safely(fun) do

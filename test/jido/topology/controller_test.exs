@@ -49,6 +49,30 @@ defmodule Jido.Topology.ControllerTest do
              Jido.agent_parent_binding(jido, Server.agent(worker).id)
   end
 
+  test "normalizes group member lookup and rejects unsupported values", %{jido: jido} do
+    instance =
+      Builder.new(name: "member-lookup")
+      |> Builder.group(:counted, Cell, count: 1)
+      |> Builder.group(:keyed, Cell, members: [%{id: :alpha}], key_by: :id)
+      |> Builder.build!(id: "member-lookup")
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance})
+    assert :ok = Controller.await_ready(controller)
+    assert Controller.whereis_agent(controller, :counted, 1)
+
+    assert Controller.whereis_agent(controller, :counted, 1) ==
+             Controller.whereis_agent(controller, :counted, "1")
+
+    assert Controller.whereis_agent(controller, :keyed, :alpha) ==
+             Controller.whereis_agent(controller, :keyed, "alpha")
+
+    for member <- [0, -1, %{}, self(), true, false, "", String.duplicate("x", 256)] do
+      assert Controller.whereis_agent(controller, :keyed, member) == nil
+    end
+
+    assert Process.alive?(controller)
+  end
+
   test "broadcasts each Signal to every member", %{jido: jido} do
     instance = Swarm.new!(id: "swarm", input: %{worker_count: 4})
     controller = start_supervised!({Controller, jido: jido, topology: instance})
@@ -138,6 +162,26 @@ defmodule Jido.Topology.ControllerTest do
       Controller.status(controller).errors["agent/left"] == :agent_identity_in_use
     end)
 
+    assert Controller.whereis_agent(controller, :left) == nil
+    Supervisor.stop(controller)
+    assert Process.alive?(existing)
+  end
+
+  test "does not return a Bus that activation rejected", %{jido: jido} do
+    existing = start_supervised!({Bus, name: "bus-conflict/bus/work", jido: jido})
+
+    instance =
+      Builder.new(name: "bus-conflict")
+      |> Builder.bus(:work)
+      |> Builder.build!(id: "bus-conflict")
+
+    controller = start_supervised!({Controller, jido: jido, topology: instance})
+
+    eventually(fn ->
+      Controller.status(controller).errors["bus/work"] == :bus_identity_in_use
+    end)
+
+    assert Controller.whereis_bus(controller, :work) == nil
     Supervisor.stop(controller)
     assert Process.alive?(existing)
   end
@@ -255,7 +299,7 @@ defmodule Jido.Topology.ControllerTest do
         &(elem(&1, 0) == Jido.Topology.Controller.Runtime)
       )
 
-    Process.exit(runtime, :kill)
+    :ok = GenServer.stop(runtime, :worker_crash)
 
     eventually(fn ->
       case Enum.find(

@@ -188,7 +188,8 @@ defmodule Jido.Topology.Plan do
           endpoint.key
 
         {:agent, :group, member} when not is_nil(member) ->
-          endpoint.key <> "/" <> Composition.escape(member)
+          with {:ok, member} <- member_key(member),
+               do: endpoint.key <> "/" <> Composition.escape(member)
 
         {:bus, :bus, nil} ->
           endpoint.key
@@ -203,12 +204,19 @@ defmodule Jido.Topology.Plan do
 
   @doc "Returns a local agent key. Group member keys use an explicit second argument."
   def agent_key(key, member \\ nil)
-  def agent_key(key, nil), do: "agent/" <> component(key)
-  def agent_key(key, member), do: "group/" <> component(key) <> "/" <> component(member)
+  def agent_key(key, nil), do: "agent/" <> Composition.escape(key)
+
+  def agent_key(key, member),
+    do: "group/" <> Composition.escape(key) <> "/" <> Composition.escape(member)
 
   @doc "Returns a local Bus key."
-  def bus_key(key), do: "bus/" <> component(key)
-  defp component(value), do: URI.encode(to_string(value), &URI.char_unreserved?/1)
+  def bus_key(key), do: "bus/" <> Composition.escape(key)
+
+  defp member_key(value) when is_integer(value) and value > 0,
+    do: {:ok, Integer.to_string(value)}
+
+  defp member_key(value) when is_atom(value) or is_binary(value), do: Validation.key(value)
+  defp member_key(_value), do: :error
 
   defp count_valid(value) when is_integer(value) and value >= 0, do: :ok
   defp count_valid(_), do: Authoring.error("Resolved group count must be a nonnegative integer")
