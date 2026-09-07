@@ -61,7 +61,8 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
     waiter = {{self(), make_ref()}, nil}
     dead = spawn(fn -> :ok end)
     monitor = Process.monitor(dead)
-    assert_receive {:DOWN, ^monitor, :process, ^dead, :normal}, 1_000
+    assert_receive {:DOWN, ^monitor, :process, ^dead, reason}, 1_000
+    assert reason in [:normal, :noproc]
 
     state = %{state | pending: MapSet.new(), waiters: %{token => waiter}}
     assert {:noreply, finished} = Runtime.handle_info({task.ref, {:ok, dead}}, state)

@@ -46,7 +46,7 @@ defmodule JidoCoreBench.EdgeCases do
         expected =
           if operation == :check,
             do: agent,
-            else: %{agent | max_state_size: if(mode == :module, do: 2_000_000, else: limit)}
+            else: %{agent | max_state_size: limit}
 
         Enum.each(results, &F.equal!(&1, {:ok, expected}))
         :ok
