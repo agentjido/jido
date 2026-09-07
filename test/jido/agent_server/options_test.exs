@@ -16,6 +16,10 @@ defmodule Jido.AgentServer.OptionsTest do
     def new(_opts), do: raise("constructor failed")
   end
 
+  defmodule ThrowingConstructor do
+    def new(_opts), do: throw(:constructor_failed)
+  end
+
   defmodule InvalidConstructor do
     def new(_opts), do: :invalid
   end
@@ -25,8 +29,17 @@ defmodule Jido.AgentServer.OptionsTest do
     assert opts.agent.id == "zero-arity"
     assert {:error, :constructor_failed} = Options.new(agent: FailingConstructor)
 
-    assert {:error, %RuntimeError{message: "constructor failed"}} =
-             Options.new(agent: RaisingConstructor)
+    for {constructor, kind} <- [
+          {RaisingConstructor, :error},
+          {ThrowingConstructor, :throw}
+        ] do
+      assert {:error,
+              %Jido.Error.ValidationError{
+                kind: :config,
+                message: "Agent Server Agent constructor failed",
+                details: %{module: ^constructor, kind: ^kind}
+              }} = Options.new(agent: constructor)
+    end
 
     assert_invalid([agent: InvalidConstructor], "constructor returned an invalid value")
     assert_invalid([agent: String], "must implement new/0 or new/1")
@@ -58,12 +71,17 @@ defmodule Jido.AgentServer.OptionsTest do
           {[error_policy: {:max_errors, 0}], "error_policy is invalid"},
           {[error_policy: {:emit_signal, nil}], "requires an external dispatch target"},
           {[error_policy: {:emit_signal, :invalid}], "emit_signal dispatch is invalid"},
+          {[default_dispatch: :invalid], "default_dispatch is invalid"},
           {[directive_timeout: 0], "directive_timeout must be"},
+          {[readiness_timeout: :infinity], "readiness_timeout must be"},
           {[restore: true], "restore must be"},
           {[state_version: -1], "state_version must be"},
           {[pool: "invalid"], "pool must be an atom"},
           {[idle_timeout: 0], "idle_timeout must be"},
           {[persistence: :invalid], "persistence adapter is invalid"},
+          {[jido: "invalid"], "jido must be an atom"},
+          {[registry: "invalid"], "registry must be an atom"},
+          {[name: {:invalid, :name}], "name is invalid"},
           {[register: true, registry: nil], "requires an Agent Registry"},
           {[register: true, registry: Registry, name: :agent], "cannot be used together"},
           {[directive_handler: fn _ -> :ok end], "does not support custom Directive handlers"},
@@ -98,9 +116,34 @@ defmodule Jido.AgentServer.OptionsTest do
     assert opts.registry == Jido.registry_name(jido)
     assert opts.state_version == 7
     assert opts.directive_timeout == :infinity
+    assert opts.readiness_timeout == 5_000
     assert opts.idle_timeout == 100
     assert opts.restore == false
     assert {:error, _} = Options.new(agent: RemoteCounter, parent: :invalid)
+  end
+
+  test "parent references validate process and request identity fields" do
+    valid = %{pid: self(), id: "parent", tag: :worker}
+    assert {:ok, %ParentRef{}} = ParentRef.new(valid)
+
+    for changes <- [
+          %{pid: :not_a_pid},
+          %{id: ""},
+          %{ref: :not_a_reference},
+          %{spawn_ref: :not_a_request},
+          %{spawn_ref: {0, make_ref()}},
+          %{meta: :not_a_map}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{message: message}} =
+               ParentRef.new(Map.merge(valid, changes))
+
+      assert message == "Agent parent reference is invalid"
+    end
+
+    invalid_struct = %ParentRef{pid: :not_a_pid, id: "parent", tag: :worker}
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Options.new(agent: RemoteCounter, parent: invalid_struct)
   end
 
   defp assert_invalid(opts, fragment) do

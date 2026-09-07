@@ -155,7 +155,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
     restarted =
       eventually(fn ->
         case Server.children(pid)[{:plugin, Scheduler}] do
-          %{pid: new_pid} = current when new_pid != child.pid -> current
+          %{pid: new_pid} = current when is_pid(new_pid) and new_pid != child.pid -> current
           _child -> nil
         end
       end)

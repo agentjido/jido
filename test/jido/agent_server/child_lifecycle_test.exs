@@ -11,6 +11,41 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     RuntimeAgent
   }
 
+  alias JidoTest.AgentServerRuntimeFixtures.OwnedExecutionAgent
+
+  defmodule BlockingDispatchPlugin do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_dispatch(_runtime, signal, _context, _opts) do
+      case signal.data do
+        %{prepare_gate: gate, observer: observer} ->
+          send(observer, {:signal_preparation_blocked, gate, self()})
+
+          receive do
+            {:release_signal_preparation, ^gate} -> {:ok, signal}
+          end
+
+        _data ->
+          {:ok, signal}
+      end
+    end
+  end
+
+  defmodule CompatibleFactory do
+    def new(opts), do: ChildAgent.new(opts)
+  end
+
+  defmodule IgnoringFactory do
+    def new(_opts), do: ChildAgent.new(id: "factory-ignored-request")
+  end
+
+  defmodule ParentCancellationExec do
+    defdelegate run_async(executable, input, context, opts), to: Jido.Exec
+    defdelegate handle_message(handle, message), to: Jido.Exec
+    def cancel(_handle), do: {:error, :parent_cancel_failed}
+  end
+
   defp eventually_agent(server, predicate, timeout \\ 3_000) do
     eventually(
       fn ->
@@ -98,6 +133,98 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert :child_result in parent_agent.state.events
   end
 
+  test "an asynchronously prepared child target uses the restarted child PID", %{jido: jido} do
+    definition = %{RuntimeAgent.agent() | plugins: [BlockingDispatchPlugin]}
+    {:ok, parent} = Jido.start_agent(jido, definition, id: unique_id("target-parent"))
+
+    assert {:ok, _agent} =
+             Server.call(
+               parent,
+               signal("runtime.directive", %{
+                 event: :spawned,
+                 directive: Directive.spawn_agent(ChildAgent, :worker, restart: :transient)
+               })
+             )
+
+    child = eventually(fn -> Server.children(parent)[:worker] end)
+    gate = make_ref()
+
+    outbound =
+      Signal.new!(
+        "child.record",
+        %{event: :after_restart, prepare_gate: gate, observer: self()},
+        source: "/test"
+      )
+
+    assert {:ok, _agent} =
+             Server.call(
+               parent,
+               signal("runtime.directive", %{
+                 event: :prepared,
+                 directive: Directive.emit_to_child(:worker, outbound)
+               })
+             )
+
+    assert_receive {:signal_preparation_blocked, ^gate, worker}, 2_000
+    original_ref = Process.monitor(child.pid)
+    Process.exit(child.pid, :kill)
+    assert_receive {:DOWN, ^original_ref, :process, _pid, :killed}, 2_000
+
+    restarted =
+      eventually(fn ->
+        case Server.children(parent)[:worker] do
+          %{pid: pid} = info when pid != child.pid -> info
+          _info -> nil
+        end
+      end)
+
+    send(worker, {:release_signal_preparation, gate})
+    eventually_agent(restarted.pid, &(:after_restart in &1.state.events))
+  end
+
+  test "an asynchronously prepared parent target observes parent loss", %{jido: jido} do
+    observer = self()
+    definition = %{ChildAgent.agent() | plugins: [BlockingDispatchPlugin]}
+    {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("target-parent"))
+
+    parent_ref =
+      ParentRef.new!(pid: parent, id: Server.agent(parent).id, tag: :owner, meta: %{})
+
+    policy = fn reason, outcome ->
+      send(observer, {:relative_dispatch_failed, reason, outcome})
+      :continue
+    end
+
+    {:ok, child} =
+      Jido.start_agent(jido, definition,
+        id: unique_id("target-child"),
+        parent: parent_ref,
+        on_parent_death: :continue,
+        error_policy: policy
+      )
+
+    gate = make_ref()
+
+    reply =
+      Signal.new!(
+        "runtime.record",
+        %{event: :must_not_arrive, prepare_gate: gate, observer: observer},
+        source: "/test"
+      )
+
+    assert {:ok, _agent} =
+             Server.call(child, signal("child.reply", %{event: :prepared, reply: reply}))
+
+    assert_receive {:signal_preparation_blocked, ^gate, worker}, 2_000
+    assert :ok = Jido.stop_agent(jido, parent)
+    eventually(fn -> Server.status(child).runtime.parent == nil end)
+    send(worker, {:release_signal_preparation, gate})
+
+    assert_receive {:relative_dispatch_failed, :no_parent, outcome}, 2_000
+    assert outcome.committed?
+    assert Server.status(child).phase == :idle
+  end
+
   test "compensates a child start when relationship persistence fails", %{
     jido: jido,
     jido_pid: jido_pid
@@ -126,6 +253,112 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert {:ok, _pid} = Supervisor.restart_child(jido_pid, runtime_store)
   end
 
+  test "child factories must preserve requested identity before tracking", %{jido: jido} do
+    observer = self()
+
+    policy = fn reason, outcome ->
+      send(observer, {:factory_spawn_failed, reason, outcome})
+      :continue
+    end
+
+    {:ok, parent} =
+      Jido.start_agent(jido, RuntimeAgent,
+        id: unique_id("factory-parent"),
+        error_policy: policy
+      )
+
+    requested_id = unique_id("factory-child")
+
+    assert {:ok, _agent} =
+             Server.call(
+               parent,
+               signal("runtime.directive", %{
+                 event: :invalid_factory,
+                 directive:
+                   Directive.spawn_agent(IgnoringFactory, :invalid,
+                     opts: %{id: requested_id, partition: :blue}
+                   )
+               })
+             )
+
+    assert_receive {:factory_spawn_failed,
+                    {:spawn_agent_failed,
+                     %Jido.Error.ValidationError{
+                       message: "Agent Server Agent constructor ignored the requested id"
+                     }}, outcome},
+                   2_000
+
+    assert outcome.committed?
+    refute Map.has_key?(Server.children(parent), :invalid)
+    assert Jido.whereis_agent(jido, requested_id, partition: :blue) == nil
+    assert Jido.whereis_agent(jido, "factory-ignored-request", partition: :blue) == nil
+
+    assert {:ok, _agent} =
+             Server.call(
+               parent,
+               signal("runtime.directive", %{
+                 event: :valid_factory,
+                 directive:
+                   Directive.spawn_agent(CompatibleFactory, :valid,
+                     opts: %{id: requested_id, partition: :blue}
+                   )
+               })
+             )
+
+    child = eventually(fn -> Server.children(parent)[:valid] end)
+    assert child.id == requested_id
+    assert child.partition == :blue
+    assert child.module == ChildAgent
+    assert Jido.whereis_agent(jido, requested_id, partition: :blue) == child.pid
+  end
+
+  test "a deferred child notification must match the original spawn request", %{jido: jido} do
+    parent_id = unique_id("deferred-parent")
+    expected_id = unique_id("deferred-child")
+    wrong_id = unique_id("wrong-child")
+    request = {System.unique_integer([:positive, :monotonic]), make_ref()}
+    {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
+
+    directive =
+      Directive.spawn_agent(ChildAgent, :worker,
+        node: node(),
+        opts: %{id: expected_id, partition: :blue}
+      )
+
+    _state =
+      :sys.replace_state(parent, fn {phase, state} ->
+        pending = %{directive: directive, request_id: request, status: :pending}
+        {phase, %{state | child_spawn_requests: %{worker: pending}}}
+      end)
+
+    {:ok, child} =
+      Jido.start_agent(jido, ChildAgent,
+        id: wrong_id,
+        partition: :green,
+        restart: :temporary
+      )
+
+    parent_ref =
+      ParentRef.new!(
+        pid: parent,
+        id: parent_id,
+        tag: :worker,
+        spawn_ref: request,
+        meta: %{}
+      )
+
+    assert {:ok, _info} = Server.adopt_parent(child, parent_ref)
+    child_ref = Process.monitor(child)
+
+    send(
+      parent,
+      {:agent_child_online, child, wrong_id, ChildAgent, :green, :worker, %{}}
+    )
+
+    refute Map.has_key?(Server.children(parent), :worker)
+    assert_receive {:DOWN, ^child_ref, :process, ^child, _reason}, 2_000
+  end
+
   test "parent death policy uses private runtime state", %{jido: jido} do
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("death-parent"))
 
@@ -145,6 +378,47 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert [%{parent_id: _id, tag: :owner}] = agent.state.events
     refute Map.has_key?(agent.state, :__parent__)
     assert Server.status(child).runtime.parent == nil
+  end
+
+  test "parent death preserves an indeterminate custom cancellation reason", %{jido: jido} do
+    {:ok, parent} =
+      Jido.start_agent(jido, RuntimeAgent,
+        id: unique_id("cancel-parent"),
+        restart: :temporary
+      )
+
+    parent_ref =
+      ParentRef.new!(pid: parent, id: Server.agent(parent).id, tag: :owner, meta: %{})
+
+    {:ok, child} =
+      Jido.start_agent(jido, OwnedExecutionAgent,
+        id: unique_id("cancel-child"),
+        parent: parent_ref,
+        on_parent_death: :stop,
+        exec_module: ParentCancellationExec,
+        restart: :temporary
+      )
+
+    gate = make_ref()
+    observer = self()
+
+    caller =
+      Task.async(fn ->
+        Server.call(
+          child,
+          signal("owned.action", %{test: observer, gate: gate, label: :parent_cancel})
+        )
+      end)
+
+    assert_receive {:owned_execution, :parent_cancel, worker}, 2_000
+    worker_ref = Process.monitor(worker)
+    child_ref = Process.monitor(child)
+    assert :ok = Jido.stop_agent(jido, parent)
+
+    error = {:parent_down, {:cancellation_failed, :parent_cancel_failed}}
+    assert {:error, ^error} = Task.await(caller, 2_000)
+    assert_receive {:DOWN, ^child_ref, :process, ^child, {:shutdown, ^error}}, 2_000
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
   end
 
   test "a transient child does not restart after its parent stops", %{jido: jido} do
@@ -170,6 +444,67 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                    2_000
 
     eventually(fn -> Jido.whereis_agent(jido, child_id) == nil end)
+  end
+
+  for policy <- [:stop, :continue, :emit_orphan], termination <- [:normal, :kill] do
+    test "a permanent child cannot restart after a #{termination} parent death under #{policy}",
+         %{
+           jido: jido
+         } do
+      policy = unquote(policy)
+      termination = unquote(termination)
+      parent_id = unique_id("permanent-parent")
+      child_id = "#{parent_id}/worker"
+      {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id, restart: :temporary)
+      {:ok, unrelated} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("unrelated"))
+      supervisor = Process.whereis(Jido.agent_supervisor_name(jido))
+      supervisor_ref = Process.monitor(supervisor)
+      unrelated_ref = Process.monitor(unrelated)
+
+      assert {:ok, _agent} =
+               Server.call(
+                 parent,
+                 signal("runtime.directive", %{
+                   event: :spawned,
+                   directive:
+                     Directive.spawn_agent(ChildAgent, :worker,
+                       restart: :permanent,
+                       opts: %{on_parent_death: policy}
+                     )
+                 })
+               )
+
+      child = eventually(fn -> Server.children(parent)[:worker] end)
+      child_ref = Process.monitor(child.pid)
+
+      assert :ok = terminate_parent(jido, parent, termination)
+
+      await_child_after_parent_death(policy, child.pid, child_ref)
+
+      eventually(fn -> Jido.whereis_agent(jido, child_id) == nil end, timeout: 2_000)
+      assert Process.alive?(supervisor)
+      assert Process.alive?(unrelated)
+      refute_receive {:DOWN, ^supervisor_ref, :process, ^supervisor, _reason}
+      refute_receive {:DOWN, ^unrelated_ref, :process, ^unrelated, _reason}
+    end
+  end
+
+  defp terminate_parent(jido, parent, :normal), do: Jido.stop_agent(jido, parent)
+
+  defp terminate_parent(_jido, parent, :kill) do
+    Process.exit(parent, :kill)
+    :ok
+  end
+
+  defp await_child_after_parent_death(:stop, _child, child_ref) do
+    assert_receive {:DOWN, ^child_ref, :process, _pid, _reason}, 2_000
+  end
+
+  defp await_child_after_parent_death(policy, child, child_ref)
+       when policy in [:continue, :emit_orphan] do
+    eventually(fn -> Server.status(child).runtime.parent == nil end)
+    Process.exit(child, :kill)
+    assert_receive {:DOWN, ^child_ref, :process, _pid, :killed}, 2_000
   end
 
   test "a parent tracks the new PID after an abnormal child restart", %{jido: jido} do

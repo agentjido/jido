@@ -39,6 +39,34 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
   end
 
+  test "PID and Server references cannot cross instance or partition ownership", %{jido: jido} do
+    other_jido = :"#{jido}_other"
+    start_supervised!({Jido, name: other_jido}, id: other_jido)
+    id = unique_id("owned-agent")
+
+    {:ok, plain} = Jido.start_agent(jido, RuntimeAgent, id: id)
+    {:ok, blue} = Jido.start_agent(jido, RuntimeAgent, id: id, partition: :blue)
+    {:ok, other} = Jido.start_agent(other_jido, RuntimeAgent, id: id)
+
+    plain_ref = Server.via_tuple(id, Jido.registry_name(jido))
+    other_ref = Server.via_tuple(id, Jido.registry_name(other_jido))
+
+    for target <- [other, other_ref] do
+      assert {:error, :not_found} = Jido.stop_agent(jido, target, [])
+      assert {:error, :not_found} = Jido.hibernate(jido, target, [])
+      assert Process.alive?(other)
+    end
+
+    assert {:error, :not_found} = Jido.stop_agent(jido, blue, partition: :red)
+    assert {:error, :not_found} = Jido.hibernate(jido, blue, partition: :red)
+    assert Process.alive?(blue)
+
+    assert {:error, :not_found} = Jido.stop_agent(other_jido, plain_ref, [])
+    assert Process.alive?(plain)
+    assert :ok = Jido.stop_agent(jido, blue)
+    assert :ok = Jido.stop_agent(jido, plain_ref, [])
+  end
+
   test "owns Action and Flow execution under the Agent Jido instance", %{jido: jido} do
     {:ok, agent} =
       Jido.start_agent(jido, OwnedExecutionAgent, id: unique_id("owned-execution"))
@@ -215,7 +243,7 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     try do
       assert Task.yield(lookup, 500) == {:ok, :restarting}
       assert {:ok, %{value: 7}} = Server.plugin_state(server, FreshRuntimePlugin, 500)
-      assert Server.children(server, 500)[{:plugin, FreshRuntimePlugin}].pid == first
+      assert Server.children(server, 500)[{:plugin, FreshRuntimePlugin}].pid == :restarting
     after
       send(restarted, :release_fresh_load)
       Task.shutdown(lookup, :brutal_kill)

@@ -71,6 +71,35 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     assert Server.status(pid).state_version == 0
   end
 
+  test "rejects an invalid Emit dispatch before the Agent commit", %{jido: jido} do
+    {:ok, pid} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("invalid-emit"))
+    before = Server.snapshot(pid)
+    output = Signal.new!("runtime.record", %{event: :must_not_run}, source: "/test")
+
+    assert {:error, %Jido.Error.ValidationError{message: message}} =
+             Server.call(
+               pid,
+               signal("runtime.directive", %{
+                 event: :must_not_commit,
+                 directive: Directive.emit(output, :invalid)
+               })
+             )
+
+    assert message =~ "Emit dispatch is invalid"
+    assert Server.snapshot(pid) == before
+    assert Server.status(pid).phase == :idle
+  end
+
+  test "rejects an invalid default Emit dispatch before startup", %{jido: jido} do
+    assert {:error, %Jido.Error.ValidationError{message: message}} =
+             Jido.start_agent(jido, RuntimeAgent,
+               id: unique_id("invalid-default-emit"),
+               default_dispatch: :invalid
+             )
+
+    assert message =~ "default_dispatch is invalid"
+  end
+
   test "validates a Plugin Directive once in a live turn", %{jido: jido} do
     {:ok, pid} =
       Jido.start_agent(jido, CountedDirectiveAgent, id: unique_id("directive-validation"))

@@ -15,6 +15,9 @@ defmodule Jido.AgentServer.PluginChild do
   def start_link([owner, plugin_spec, child_spec, name]),
     do: start_link(owner, plugin_spec, child_spec, name)
 
+  def start_link([owner, plugin_spec, child_spec, name, readiness_timeout]),
+    do: start_link(owner, plugin_spec, child_spec, name, readiness_timeout)
+
   def start_link(owner, plugin_spec, child_spec) when is_pid(owner) do
     GenServer.start_link(__MODULE__, {owner, plugin_spec, child_spec})
   end
@@ -26,11 +29,24 @@ defmodule Jido.AgentServer.PluginChild do
     GenServer.start_link(__MODULE__, {owner, plugin_spec, child_spec}, name: name)
   end
 
+  def start_link(owner, plugin_spec, child_spec, name, readiness_timeout)
+      when is_pid(owner) and is_integer(readiness_timeout) and readiness_timeout > 0 do
+    GenServer.start_link(
+      __MODULE__,
+      {owner, plugin_spec, child_spec, readiness_timeout},
+      name: name
+    )
+  end
+
   @doc false
   def child_pid(server), do: GenServer.call(server, :child_pid)
 
   @impl true
   def init({owner, plugin_spec, child_spec}) do
+    init({owner, plugin_spec, child_spec, 5_000})
+  end
+
+  def init({owner, plugin_spec, child_spec, readiness_timeout}) do
     Process.flag(:trap_exit, true)
     Process.link(owner)
 
@@ -45,6 +61,7 @@ defmodule Jido.AgentServer.PluginChild do
          child_ref: Process.monitor(child_pid),
          child_id: child_spec.id,
          plugin_spec: plugin_spec,
+         readiness_timeout: readiness_timeout,
          readiness: nil
        }}
     else
@@ -70,6 +87,7 @@ defmodule Jido.AgentServer.PluginChild do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{child_ref: ref} = state) do
+    send(state.owner, {:plugin_runtime_restarting, self(), state.child_id})
     send(self(), {:await_child_restart, reason, @restart_poll_attempts})
     {:noreply, %{state | child_pid: :restarting, child_ref: nil}}
   end
@@ -80,7 +98,15 @@ defmodule Jido.AgentServer.PluginChild do
         # Readiness can read Agent state. Keep child lookup responsive while
         # that work runs, or an Agent lookup can block the read it needs.
         task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
-        readiness = %{task: task, child_pid: child_pid, reason: reason}
+
+        timer =
+          :erlang.start_timer(
+            state.readiness_timeout,
+            self(),
+            {:plugin_readiness_timeout, task.ref}
+          )
+
+        readiness = %{task: task, timer: timer, child_pid: child_pid, reason: reason}
         {:noreply, %{state | readiness: readiness}}
 
       _child when attempts > 0 ->
@@ -99,6 +125,7 @@ defmodule Jido.AgentServer.PluginChild do
 
   def handle_info({ref, result}, %{readiness: %{task: %Task{ref: ref}} = readiness} = state) do
     Process.demonitor(ref, [:flush])
+    _ = :erlang.cancel_timer(readiness.timer)
     state = %{state | readiness: nil}
 
     case result do
@@ -110,13 +137,31 @@ defmodule Jido.AgentServer.PluginChild do
       {:error, reason} ->
         {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
          state}
+
+      other ->
+        {:stop,
+         {:plugin_runtime_readiness_failed, state.child_id, readiness.reason,
+          {:invalid_result, other}}, state}
     end
+  end
+
+  def handle_info(
+        {:timeout, timer, {:plugin_readiness_timeout, ref}},
+        %{readiness: %{task: %Task{ref: ref}, timer: timer} = readiness} = state
+      ) do
+    Task.shutdown(readiness.task, :brutal_kill)
+
+    {:stop,
+     {:plugin_runtime_readiness_timeout, state.child_id, readiness.reason,
+      state.readiness_timeout}, %{state | readiness: nil}}
   end
 
   def handle_info(
         {:DOWN, ref, :process, _pid, reason},
         %{readiness: %{task: %Task{ref: ref}} = readiness} = state
       ) do
+    _ = :erlang.cancel_timer(readiness.timer)
+
     {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
      %{state | readiness: nil}}
   end
@@ -129,7 +174,11 @@ defmodule Jido.AgentServer.PluginChild do
 
   @impl true
   def terminate(_reason, state) do
-    if state.readiness, do: Task.shutdown(state.readiness.task, :brutal_kill)
+    if state.readiness do
+      _ = :erlang.cancel_timer(state.readiness.timer)
+      Task.shutdown(state.readiness.task, :brutal_kill)
+    end
+
     stop_child(state.supervisor, :shutdown)
     :ok
   end

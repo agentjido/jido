@@ -88,6 +88,28 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def signal_directive?(_directive), do: false
 
   @doc false
+  @spec validate_signal_dispatches([term()]) :: {:ok, [term()]} | {:error, term()}
+  def validate_signal_dispatches(directives) do
+    Enum.reduce_while(directives, :ok, fn
+      %Emit{dispatch: nil}, :ok ->
+        {:cont, :ok}
+
+      %Emit{dispatch: dispatch}, :ok ->
+        case validate_dispatch(dispatch) do
+          {:ok, _normalized} -> {:cont, :ok}
+          {:error, reason} -> {:halt, {:error, reason}}
+        end
+
+      _directive, :ok ->
+        {:cont, :ok}
+    end)
+    |> then(fn
+      :ok -> {:ok, directives}
+      {:error, _reason} = error -> error
+    end)
+  end
+
+  @doc false
   @spec prepare_signal(term(), DirectiveContext.t(), State.t()) ::
           {:ok, struct(), term()} | {:error, term()}
   def prepare_signal(%Emit{signal: signal, dispatch: dispatch} = directive, context, state) do
@@ -126,17 +148,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
         Server.cast(agent_server, signal)
 
       target ->
-        target = inherit_bus_scope(target, state.jido)
-
-        case Jido.Signal.Dispatch.dispatch(signal, target) do
-          :ok -> :ok
-          {:error, reason} -> {:error, {:emit_dispatch_failed, reason}}
-        end
+        dispatch_signal(signal, target, state.jido)
     end
-  rescue
-    error -> {:error, {:emit_dispatch_failed, error}}
-  catch
-    kind, reason -> {:error, {:emit_dispatch_failed, {kind, reason}}}
   end
 
   def dispatch_prepared(%EmitToParent{signal: signal}, %State{parent: parent}, _agent_server) do
@@ -174,7 +187,13 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def dispatch_emit(%Emit{signal: signal, dispatch: dispatch}, context, state) do
     signal = propagate(signal, context.signal)
     dispatch = dispatch || state.default_dispatch
-    dispatch = inherit_bus_scope(dispatch, state.jido)
+    dispatch_signal(signal, dispatch, state.jido)
+  end
+
+  @doc false
+  @spec dispatch_signal(Signal.t(), term(), atom() | nil) :: :ok | {:error, term()}
+  def dispatch_signal(signal, dispatch, jido) do
+    dispatch = inherit_bus_scope(dispatch, jido)
 
     case Jido.Signal.Dispatch.dispatch(signal, dispatch) do
       :ok -> :ok
@@ -247,7 +266,14 @@ defmodule Jido.AgentServer.DirectiveRuntime do
       |> Map.put(:register, true)
       |> Map.to_list()
 
-    with {:ok, pid, info} <- start_agent_process_with_info(directive, child_opts, state),
+    with {:ok, pid, info} <-
+           start_verified_agent_process(
+             directive,
+             child_opts,
+             child_id,
+             child_partition,
+             state
+           ),
          :ok <-
            persist_started_agent(
              state,
@@ -262,7 +288,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
         ChildInfo.new!(
           pid: pid,
           ref: Process.monitor(pid),
-          module: agent_module(directive.agent),
+          module: info.agent_module,
           id: child_id,
           activation_id: info.activation_id,
           creation_cause: cause,
@@ -326,8 +352,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   defp start_agent_process(%SpawnAgent{node: target} = directive, opts, state)
        when is_nil(target) or target == node() do
-    spec = Supervisor.child_spec({Server, opts}, restart: directive.restart)
-    DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), spec)
+    ChildPlacement.start_local(state.jido, opts, directive.restart)
   end
 
   defp start_agent_process(directive, opts, state) do
@@ -340,13 +365,88 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     )
   end
 
-  defp start_agent_process_with_info(directive, opts, state) do
-    case start_agent_process(directive, opts, state) do
-      {:ok, pid, info} -> {:ok, pid, info}
-      {:ok, pid} -> with {:ok, info} <- Server.creation_info(pid), do: {:ok, pid, info}
-      other -> other
+  defp start_verified_agent_process(directive, opts, child_id, child_partition, state) do
+    with {:ok, pid, info} <- start_agent_process(directive, opts, state) do
+      case verify_spawned_agent(
+             info,
+             directive,
+             child_id,
+             child_partition,
+             self(),
+             state.agent.id
+           ) do
+        :ok ->
+          {:ok, pid, info}
+
+        {:error, reason} ->
+          _ = ChildPlacement.stop(state.jido, pid, :identity_mismatch, state.directive_timeout)
+          {:error, reason}
+      end
     end
   end
+
+  @doc false
+  def verify_spawned_agent(
+        info,
+        directive,
+        child_id,
+        child_partition,
+        parent_pid,
+        parent_id
+      )
+      when is_map(info) do
+    expected_module = expected_agent_module(directive.agent)
+    parent = Map.get(info, :parent)
+
+    mismatches =
+      %{}
+      |> mismatch(:id, child_id, Map.get(info, :agent_id))
+      |> mismatch(:partition, child_partition, Map.get(info, :partition))
+      |> mismatch(:module, expected_module, Map.get(info, :agent_module))
+      |> mismatch(:parent_pid, parent_pid, parent_value(parent, :pid))
+      |> mismatch(:parent_id, parent_id, parent_value(parent, :id))
+      |> mismatch(:parent_tag, directive.tag, parent_value(parent, :tag))
+
+    if map_size(mismatches) == 0 do
+      :ok
+    else
+      {:error,
+       Jido.Error.validation_error("Spawned Agent identity did not match its request",
+         kind: :config,
+         details: %{tag: directive.tag, mismatches: mismatches}
+       )}
+    end
+  end
+
+  def verify_spawned_agent(
+        info,
+        directive,
+        _child_id,
+        _child_partition,
+        _parent_pid,
+        _parent_id
+      ) do
+    {:error,
+     Jido.Error.validation_error("Spawned Agent returned invalid creation information",
+       kind: :config,
+       details: %{tag: directive.tag, creation_info: info}
+     )}
+  end
+
+  defp expected_agent_module(%Jido.Agent{module: module}), do: module
+
+  defp expected_agent_module(module) when is_atom(module) do
+    if function_exported?(module, :__agent_config__, 0), do: module, else: :factory
+  end
+
+  defp mismatch(acc, :module, :factory, _actual), do: acc
+  defp mismatch(acc, _field, expected, expected), do: acc
+
+  defp mismatch(acc, field, expected, actual),
+    do: Map.put(acc, field, %{expected: expected, actual: actual})
+
+  defp parent_value(parent, field) when is_map(parent), do: Map.get(parent, field)
+  defp parent_value(_parent, _field), do: nil
 
   defp mark_spawn_active(state, tag) do
     case Map.fetch(state.child_spawn_requests, tag) do
@@ -511,8 +611,26 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   defp inherit_bus_scope(target, _jido), do: target
 
-  defp agent_module(%Jido.Agent{module: module}), do: module
-  defp agent_module(module) when is_atom(module), do: module
+  defp validate_dispatch(dispatch) do
+    case Jido.Signal.Dispatch.validate_opts(dispatch) do
+      {:ok, normalized} ->
+        {:ok, normalized}
+
+      {:error, reason} ->
+        {:error,
+         Jido.Error.validation_error("Agent Emit dispatch is invalid", details: %{reason: reason})}
+    end
+  rescue
+    error ->
+      {:error,
+       Jido.Error.validation_error("Agent Emit dispatch is invalid", details: %{reason: error})}
+  catch
+    kind, reason ->
+      {:error,
+       Jido.Error.validation_error("Agent Emit dispatch is invalid",
+         details: %{reason: {kind, reason}}
+       )}
+  end
 
   defp normalize_stop_reason(:normal), do: :normal
   defp normalize_stop_reason(:shutdown), do: :shutdown
