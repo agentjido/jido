@@ -186,6 +186,30 @@ defmodule Jido.Topology.ControllerTest do
     assert Process.alive?(existing)
   end
 
+  test "looks up a ready Bus without scanning the resource supervisor", %{jido: jido} do
+    instance =
+      Builder.new(name: "cached-bus-lookup")
+      |> Builder.bus(:work)
+      |> Builder.build!(id: "cached-bus-lookup")
+
+    controller =
+      start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+
+    assert :ok = Controller.await_ready(controller)
+    bus = Controller.whereis_bus(controller, :work)
+    resources = Controller.name(jido, instance.id, :resources)
+    :ok = :sys.suspend(resources)
+
+    try do
+      lookup = Task.async(fn -> Controller.whereis_bus(controller, :work) end)
+      result = Task.yield(lookup, 500) || Task.shutdown(lookup, :brutal_kill)
+
+      assert result == {:ok, bus}
+    after
+      :ok = :sys.resume(resources)
+    end
+  end
+
   test "readiness can succeed after an earlier caller times out", %{jido: jido} do
     {:ok, existing} = Jido.start_agent(jido, Cell, id: "waiting/agent/left")
 

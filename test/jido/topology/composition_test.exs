@@ -328,6 +328,28 @@ defmodule Jido.Topology.CompositionTest do
     assert Exception.message(error) =~ "depth"
   end
 
+  test "composition accepts 1000 scopes and rejects scope 1001" do
+    leaf = Builder.new(name: "leaf") |> Builder.build!()
+
+    builder =
+      Enum.reduce(1..999, Builder.new(name: "scope-limit"), fn index, builder ->
+        Builder.include(builder, "scope-#{index}", leaf)
+      end)
+
+    assert {:ok, topology} = Builder.build(builder)
+
+    assert Enum.map(topology.includes, & &1.key) ==
+             Enum.map(1..999, &"scope-#{&1}")
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Topology exceeds 1000 component scopes"
+            }} =
+             builder
+             |> Builder.include("scope-1000", leaf)
+             |> Builder.build()
+  end
+
   test "Codec rejects changes to nested topology and export reference records" do
     {:ok, document} = Codec.encode(ComposedSystem.topology(), ComposedFormats.registry())
     [east, west] = document["includes"]

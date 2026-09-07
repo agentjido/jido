@@ -63,6 +63,20 @@ defmodule Jido.Topology.ValidationTest do
     assert error.message == "Expected an Agent module"
   end
 
+  test "unavailable Agent modules return a validation error" do
+    missing_module = JidoTest.UnavailableTopologyAgent
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Expected an Agent module",
+              details: %{module: ^missing_module}
+            }} =
+             Topology.new(
+               name: "unavailable-agent-module",
+               agents: [%{key: :agent, module: missing_module}]
+             )
+  end
+
   test "topology input must be a map and can supply the full initial Agent state" do
     for input <- [[], ~D[2026-01-01], nil] do
       assert {:error, error} = Validation.parse_input(Zoi.any(), input)

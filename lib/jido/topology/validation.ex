@@ -332,14 +332,19 @@ defmodule Jido.Topology.Validation do
 
   @doc false
   def agent_definition(module) when is_atom(module) and not is_nil(module) do
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <- function_exported?(module, :__agent_config__, 0),
-         {:ok, definition} <-
-           Jido.Agent.__definition_from_module__(module, module.__agent_config__()) do
-      {:ok, definition}
-    else
-      {:error, _error} = error -> error
-      _ -> Authoring.error("Expected an Agent module", %{module: module})
+    case Code.ensure_loaded(module) do
+      {:module, ^module} ->
+        with true <- function_exported?(module, :__agent_config__, 0),
+             {:ok, definition} <-
+               Jido.Agent.__definition_from_module__(module, module.__agent_config__()) do
+          {:ok, definition}
+        else
+          {:error, _error} = error -> error
+          _ -> Authoring.error("Expected an Agent module", %{module: module})
+        end
+
+      {:error, _reason} ->
+        Authoring.error("Expected an Agent module", %{module: module})
     end
   rescue
     _error -> Authoring.error("Expected an Agent module", %{module: module})

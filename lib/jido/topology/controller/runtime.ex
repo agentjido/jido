@@ -126,9 +126,20 @@ defmodule Jido.Topology.Controller.Runtime do
           nil
 
         spec ->
-          case Bus.whereis(spec.id, jido: state.jido) do
-            {:ok, pid} -> if owned?(:bus, pid, spec, context), do: pid
-            _ -> nil
+          ready_pid = Map.get(state.ready, key)
+
+          if owned?(:bus, ready_pid, spec, context) do
+            ready_pid
+          else
+            case Bus.whereis(spec.id, jido: state.jido) do
+              {:ok, pid} ->
+                if owned?(:bus, pid, spec, context),
+                  do: pid,
+                  else: nil
+
+              _ ->
+                nil
+            end
           end
       end
 
@@ -392,7 +403,8 @@ defmodule Jido.Topology.Controller.Runtime do
     %{
       jido: state.jido,
       instance_id: state.instance.id,
-      pool: Controller.name(state.jido, state.instance.id, :resources)
+      pool: Controller.name(state.jido, state.instance.id, :resources),
+      ready: state.ready
     }
   end
 
@@ -409,8 +421,9 @@ defmodule Jido.Topology.Controller.Runtime do
       Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id)
   end
 
-  defp owns?(:bus, pid, _spec, context) do
-    Enum.any?(DynamicSupervisor.which_children(context.pool), &(elem(&1, 1) == pid))
+  defp owns?(:bus, pid, spec, context) do
+    Map.get(context, :ready, %{})[spec.key] == pid or
+      Enum.any?(DynamicSupervisor.which_children(context.pool), &(elem(&1, 1) == pid))
   end
 
   defp refresh_phase(%{phase: :ready} = state) do
