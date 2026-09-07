@@ -25,6 +25,23 @@ defmodule Jido.Agent.DSL.Macros do
 
   defp build(path, target, options, caller) do
     validate_options!(options, caller)
+    {extension_target, options} = Keyword.pop(options, :ai)
+
+    target =
+      case {target, extension_target} do
+        {nil, nil} ->
+          nil
+
+        {nil, id} ->
+          Macro.escape({:jido_agent_extension, :ai, id})
+
+        {target, nil} ->
+          target
+
+        {_target, _id} ->
+          error!(caller, "route cannot combine a target module with an ai profile")
+      end
+
     {block, route_options} = Keyword.pop(options, :do)
     {inline, route_block} = extract_inline(block, caller)
 
