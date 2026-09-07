@@ -6,6 +6,10 @@ defmodule Jido.Plugin.Scheduler do
   durable recurring schedule definitions. Its supervised runtime owns timers,
   job references, and other process values.
 
+  A delayed Signal from `schedule/2` is a runtime-only one-shot. It is not in
+  Agent state or in a checkpoint. A Scheduler, Agent, or VM restart can discard
+  it. Use a recurring durable schedule when work must survive a restart.
+
   Pass `generation: integer` (0 through 2,147,483,647) to `cron/4` to add logical occurrence
   metadata. Use a new generation when replacing or recreating a schedule, and
   retain it across restore. `occurrence/1` reads the metadata. Signal data stays
@@ -29,6 +33,11 @@ defmodule Jido.Plugin.Scheduler do
 
   Durable delivery needs Agent persistence for recovery after Agent or VM loss.
   The fixed policy skips slots while a job is pending and slots missed offline.
+  The `jido.scheduler.enqueue` route is a trusted internal control route. It does
+  not authenticate the Signal source. Do not expose this Signal type to
+  untrusted ingress. Valid control Signals for cancelled or replaced generations
+  are safe no-ops. Malformed control Signals still fail validation.
+
   `:delivery_interval` sets the delay between pending-work attempts in milliseconds
   (default 100; positive integer up to 4,294,967,295). One job is tried per attempt.
   Activation and newly queued work can start an immediate attempt. This option
@@ -38,15 +47,24 @@ defmodule Jido.Plugin.Scheduler do
   repeat before acknowledgement, so its receiver must use the occurrence ID to
   handle duplicates.
 
+  `:retry_delay_ms` sets the delay after a recurring job cannot start (default
+  1,000; positive integer up to 4,294,967,295). A valid finite cron expression
+  with no future occurrence is dormant, not failed. It stays in Agent state so
+  it can be cancelled or replaced, and it does not prevent other jobs from
+  starting during restore.
+
   The optional Plugin option `:time_scale` accepts a `SchedEx.TimeScale` module
-  for controlled time. It affects recurring schedules only. The default uses
-  current time. Runtime clock state is not saved in the Agent checkpoint.
+  with `now/1` and `speedup/0` callbacks for controlled time. Its `speedup/0`
+  result must be a positive number, and `now/1` must return a `DateTime`. It
+  affects recurring schedules only. The default uses current time. Runtime clock
+  state is not saved in the Agent checkpoint.
   """
 
   use Jido.Plugin
 
   alias Crontab.CronExpression.Parser
   alias Jido.Plugin.{DirectiveContext, Init}
+  alias Jido.PortableTerm
 
   alias Jido.Plugin.Scheduler.{
     Acknowledge,
@@ -63,6 +81,8 @@ defmodule Jido.Plugin.Scheduler do
 
   @state_key :scheduler
   @default_timezone "Etc/UTC"
+  @timer_max 4_294_967_295
+  @delivery_timeout_max div(@timer_max - 100, 2)
   @cron_spec_schema Zoi.object(%{
                       cron_expression: Zoi.string(),
                       message: Zoi.struct(Jido.Signal),
@@ -127,16 +147,10 @@ defmodule Jido.Plugin.Scheduler do
 
   @impl Jido.Plugin
   def state_spec(opts) do
-    interval = Keyword.get(opts, :delivery_interval, 100)
-    timeout = Keyword.get(opts, :delivery_timeout, 5_000)
-
-    unless is_integer(interval) and interval in 1..4_294_967_295 do
-      raise ArgumentError, "Scheduler delivery_interval must be an integer from 1 to 4294967295"
-    end
-
-    unless is_integer(timeout) and timeout in 1..2_147_483_597 do
-      raise ArgumentError, "Scheduler delivery_timeout must be an integer from 1 to 2147483597"
-    end
+    validate_timer_option!(opts, :delivery_interval, 100, @timer_max)
+    validate_timer_option!(opts, :delivery_timeout, 5_000, @delivery_timeout_max)
+    validate_timer_option!(opts, :retry_delay_ms, 1_000, @timer_max)
+    validate_time_scale_option!(opts)
 
     {@state_key, @state_schema}
   end
@@ -234,7 +248,15 @@ defmodule Jido.Plugin.Scheduler do
   end
 
   @impl Jido.Plugin
-  def dispatch(runtime, %module{}, _context, _opts) when module in [Queue, Acknowledge],
+  def dispatch(runtime, %Queue{} = directive, %DirectiveContext{} = context, _opts) do
+    if Durable.current_queue?(context.plugin_state, directive) do
+      GenServer.cast(runtime, :pending_changed)
+    else
+      :ok
+    end
+  end
+
+  def dispatch(runtime, %Acknowledge{}, _context, _opts),
     do: GenServer.cast(runtime, :pending_changed)
 
   def dispatch(runtime, directive, %DirectiveContext{} = context, opts) do
@@ -286,7 +308,7 @@ defmodule Jido.Plugin.Scheduler do
 
   @doc false
   def validate_occurrence_scope(scope) do
-    if durable_term?(scope), do: :ok, else: {:error, :non_durable_occurrence_scope}
+    if PortableTerm.valid?(scope), do: :ok, else: {:error, :non_durable_occurrence_scope}
   end
 
   defp validate_occurrence(_signal, nil), do: :ok
@@ -338,26 +360,38 @@ defmodule Jido.Plugin.Scheduler do
   defp normalize_timezone_value(timezone) when is_binary(timezone), do: timezone
 
   defp validate_durable_message(message) do
-    if durable_term?(message), do: :ok, else: {:error, {:invalid_message, :non_durable_term}}
+    if PortableTerm.valid?(message),
+      do: :ok,
+      else: {:error, {:invalid_message, :non_durable_term}}
   end
 
   defp validate_durable_id(id) do
-    if durable_term?(id), do: :ok, else: {:error, {:invalid_job_id, :non_durable_term}}
+    if PortableTerm.valid?(id),
+      do: :ok,
+      else: {:error, {:invalid_job_id, :non_durable_term}}
   end
 
-  defp durable_term?(term)
-       when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),
-       do: false
+  defp validate_timer_option!(opts, name, default, maximum) do
+    value = Keyword.get(opts, name, default)
 
-  defp durable_term?(term) when is_map(term) do
-    term
-    |> Map.to_list()
-    |> Enum.all?(fn {key, value} -> durable_term?(key) and durable_term?(value) end)
+    unless is_integer(value) and value in 1..maximum do
+      raise ArgumentError,
+            "Scheduler #{name} must be an integer from 1 to #{maximum}"
+    end
   end
 
-  defp durable_term?(term) when is_tuple(term),
-    do: term |> Tuple.to_list() |> Enum.all?(&durable_term?/1)
+  defp validate_time_scale_option!(opts) do
+    time_scale = Keyword.get(opts, :time_scale, SchedEx.IdentityTimeScale)
 
-  defp durable_term?(term) when is_list(term), do: Enum.all?(term, &durable_term?/1)
-  defp durable_term?(_term), do: true
+    valid? =
+      is_atom(time_scale) and not is_nil(time_scale) and Code.ensure_loaded?(time_scale) and
+        Enum.all?(SchedEx.TimeScale.behaviour_info(:callbacks), fn {callback, arity} ->
+          function_exported?(time_scale, callback, arity)
+        end)
+
+    unless valid? do
+      raise ArgumentError,
+            "Scheduler time_scale must be a loaded module with now/1 and speedup/0 callbacks"
+    end
+  end
 end

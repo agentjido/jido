@@ -41,4 +41,32 @@ defmodule Jido.Plugin.Scheduler.WallClockTest do
                wait
              )
   end
+
+  test "a final wait can be cancelled after the clock moves backward" do
+    slot = ~U[2030-01-01 00:00:01Z]
+
+    times =
+      start_supervised!(
+        {Agent, fn -> [~U[2030-01-01 00:00:00.900000Z], ~U[2030-01-01 00:00:00.100000Z]] end}
+      )
+
+    now = fn -> Agent.get_and_update(times, fn [time | rest] -> {time, rest} end) end
+
+    wait = fn delay ->
+      send(self(), {:wait, delay})
+      if delay == 900, do: :cancelled, else: :ok
+    end
+
+    assert :cancelled = WallClock.wait_until(slot, now, wait)
+    assert_received {:wait, 100}
+    assert_received {:wait, 900}
+  end
+
+  test "the default final wait consumes a runner shutdown" do
+    task =
+      Task.async(fn -> WallClock.wait_until(DateTime.add(DateTime.utc_now(), 60, :second)) end)
+
+    send(task.pid, :shutdown)
+    assert :cancelled = Task.await(task)
+  end
 end

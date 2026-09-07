@@ -174,7 +174,13 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     retry =
       eventually(fn ->
         state = :sys.get_state(scheduler)
-        if state.delivery_task == nil and is_reference(state.pending_timer), do: state
+
+        if state.delivery_task == nil and
+             match?(
+               {timer, token, :retry} when is_reference(timer) and is_reference(token),
+               state.pending_timer
+             ),
+           do: state
       end)
 
     assert retry.options[:delivery_interval] == 25

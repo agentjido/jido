@@ -3,7 +3,10 @@ defmodule Jido.Plugin.Scheduler.Enqueue do
   Records a due occurrence through an ordinary Agent Turn.
 
   Route `jido.scheduler.enqueue` to this Action when using durable recurring
-  delivery. It emits a Queue Directive; business work runs in a later Turn.
+  delivery. This route is trusted internal control input. It does not authenticate
+  the Signal source, so an application must not expose this Signal type to
+  untrusted ingress. It emits a Queue Directive; business work runs in a later
+  Turn.
   """
   use Jido.Action,
     name: "scheduler_enqueue",

@@ -4,6 +4,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
 
   alias Jido.Agent
   alias Jido.Examples.ScheduledOccurrenceRecovery, as: Example
+  alias Jido.Plugin.DirectiveContext
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.Durable
   alias Jido.Signal
@@ -60,7 +61,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert replacement.state.generation == 2
     assert replacement.state.scheduler.cron["job-1"].pending == nil
     assert {:error, :stale_or_invalid_schedule_occurrence} = Example.cmd(replacement, tick)
-    assert {:error, _} = enqueue(replacement, @first)
+    assert {:ok, ^replacement, [_]} = enqueue(replacement, @first)
     assert {:ok, next, [_]} = enqueue(replacement, @first, 2)
     assert {:ok, old} = Scheduler.occurrence(tick)
     assert {:ok, new} = Scheduler.occurrence(next.state.scheduler.cron["job-1"].pending)
@@ -74,14 +75,29 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert {:ok, cancelled, [_]} = Example.cmd(pending, Example.cancel_schedule_signal!("job-1"))
     assert cancelled.state.scheduler.cron == %{}
     assert {:error, :stale_or_invalid_schedule_occurrence} = Example.cmd(cancelled, tick)
-    assert {:error, _} = enqueue(cancelled, @first)
+    assert {:ok, ^cancelled, [_]} = enqueue(cancelled, @first)
 
     assert {:ok, recreated, [_]} =
              Example.cmd(cancelled, Example.arm_schedule_signal!("job-1", "* * * * * *"))
 
     assert recreated.state.generation == 2
-    assert {:error, _} = enqueue(recreated, @first)
+    assert {:ok, ^recreated, [_]} = enqueue(recreated, @first)
     assert {:ok, _, [_]} = enqueue(recreated, @first, 2)
+  end
+
+  test "acknowledgement and cancellation apply in directive order" do
+    {armed, _cron} = armed()
+    assert {:ok, pending, [_]} = enqueue(armed, @first)
+    tick = pending.state.scheduler.cron["job-1"].pending
+    assert {:ok, occurrence} = Scheduler.occurrence(tick)
+    acknowledge = Scheduler.acknowledge(occurrence.id)
+    cancel = Scheduler.cancel("job-1")
+
+    assert {:ok, %{cron: %{}}} =
+             Scheduler.update_state(pending.state.scheduler, [acknowledge, cancel], [])
+
+    assert {:error, :unknown_schedule_occurrence} =
+             Scheduler.update_state(pending.state.scheduler, [cancel, acknowledge], [])
   end
 
   test "repeated definitions preserve progress and changed definitions need a new generation" do
@@ -127,10 +143,71 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
              )
   end
 
-  test "invalid delivery cadence and timeout are rejected before an Agent can start" do
+  test "malformed external control directives remain errors" do
+    signal = Signal.new!("test.tick", %{}, source: "/test")
+
+    assert {:error, {:invalid_job_id, :non_durable_term}} =
+             Scheduler.validate_directive(Scheduler.cancel(make_ref()), [])
+
+    invalid_queue = %Scheduler.Queue{
+      job_id: "job-1",
+      generation: -1,
+      scheduled_at: DateTime.to_iso8601(@first),
+      scope: {TestJido, "agent-1", nil}
+    }
+
+    assert {:error, _reason} = Scheduler.validate_directive(invalid_queue, [])
+
+    assert {:error, _reason} =
+             Scheduler.validate_directive(
+               Scheduler.cron("job-1", "not a cron", signal, generation: 1),
+               []
+             )
+  end
+
+  test "stale queue dispatches do not wake durable delivery" do
+    source = Signal.new!("test.tick", %{}, source: "/test")
+
+    queue = %Scheduler.Queue{
+      job_id: "job-1",
+      generation: 1,
+      scheduled_at: DateTime.to_iso8601(@first),
+      scope: {TestJido, "agent-1", nil}
+    }
+
+    context = %DirectiveContext{
+      turn_id: "turn",
+      agent_id: "agent-1",
+      source_signal: source,
+      effective_signal: source,
+      state_version: 1,
+      plugin_state: %{cron: %{}},
+      turn_context: %{}
+    }
+
+    assert :ok = Scheduler.dispatch(self(), queue, context, [])
+    refute_receive {:"$gen_cast", :pending_changed}
+
+    current = %{cron: %{"job-1" => %{delivery: :durable, generation: 2}}}
+    assert :ok = Scheduler.dispatch(self(), queue, %{context | plugin_state: current}, [])
+    refute_receive {:"$gen_cast", :pending_changed}
+
+    assert :ok =
+             Scheduler.dispatch(
+               self(),
+               %{queue | generation: 2},
+               %{context | plugin_state: current},
+               []
+             )
+
+    assert_receive {:"$gen_cast", :pending_changed}
+  end
+
+  test "invalid timer options are rejected before an Agent can start" do
     for {option, value} <-
           Enum.map([0, -1, 1.5, :manual, 4_294_967_296], &{:delivery_interval, &1}) ++
-            Enum.map([0, -1, 1.5, :manual, 2_147_483_598], &{:delivery_timeout, &1}) do
+            Enum.map([0, -1, 1.5, :manual, 2_147_483_598], &{:delivery_timeout, &1}) ++
+            Enum.map([0, -1, 1.5, :manual, 4_294_967_296], &{:retry_delay_ms, &1}) do
       assert {:error, %Jido.Error.ValidationError{}} =
                Agent.new(
                  name: "invalid-delivery",
@@ -138,7 +215,24 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
                )
     end
 
-    assert {:scheduler, _schema} = Scheduler.state_spec(delivery_timeout: 2_147_483_597)
+    assert {:scheduler, _schema} =
+             Scheduler.state_spec(
+               delivery_interval: 4_294_967_295,
+               delivery_timeout: 2_147_483_597,
+               retry_delay_ms: 4_294_967_295
+             )
+  end
+
+  test "time scale options must name a loaded callback module" do
+    for time_scale <- [nil, String, __MODULE__.MissingTimeScale] do
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Agent.new(
+                 name: "invalid-time-scale",
+                 plugins: [{Scheduler, [time_scale: time_scale]}]
+               )
+    end
+
+    assert {:scheduler, _schema} = Scheduler.state_spec(time_scale: SchedEx.IdentityTimeScale)
   end
 
   defp armed do

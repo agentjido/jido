@@ -13,7 +13,7 @@ defmodule Jido.Agent.Codec.DeriverTest do
         name: "derived",
         schema: schema,
         metadata: %{status: :ready, uri: %URI{host: "example.com"}},
-        plugins: [{Jido.Plugin.Scheduler, time_scale: SchedEx.TimeScale.Default}],
+        plugins: [{Jido.Plugin.Scheduler, time_scale: SchedEx.IdentityTimeScale}],
         routes: [{"counter.add", {Add, %{by: 1}}, match: &String.trim/1}]
       )
 

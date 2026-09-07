@@ -17,6 +17,7 @@ defmodule Jido.Persistence do
 
   alias Jido.Agent
   alias Jido.Error
+  alias Jido.PortableTerm
 
   @format_version 1
   @key_prefix "jido:agent:v1:"
@@ -265,7 +266,7 @@ defmodule Jido.Persistence do
         checkpoint: checkpoint
       }
 
-      if portable_term?(record),
+      if PortableTerm.valid?(record),
         do: {:ok, record},
         else: {:error, {:invalid_checkpoint, :non_portable_term}}
     else
@@ -313,7 +314,7 @@ defmodule Jido.Persistence do
       not is_map(Map.get(record, :checkpoint)) ->
         {:error, {:invalid_persistence_record, :checkpoint}}
 
-      not portable_term?(record) ->
+      not PortableTerm.valid?(record) ->
         {:error, {:invalid_persistence_record, :non_portable_term}}
 
       true ->
@@ -387,24 +388,4 @@ defmodule Jido.Persistence do
        details: %{operation: operation, kind: kind, reason: reason}
      )}
   end
-
-  defp portable_term?(term)
-       when is_pid(term) or is_reference(term) or is_port(term) or is_function(term),
-       do: false
-
-  defp portable_term?(term) when is_map(term) do
-    term
-    |> Map.to_list()
-    |> Enum.all?(fn {key, value} -> portable_term?(key) and portable_term?(value) end)
-  end
-
-  defp portable_term?(term) when is_tuple(term),
-    do: term |> Tuple.to_list() |> Enum.all?(&portable_term?/1)
-
-  defp portable_term?([]), do: true
-
-  defp portable_term?([head | tail]),
-    do: portable_term?(head) and portable_term?(tail)
-
-  defp portable_term?(_term), do: true
 end
