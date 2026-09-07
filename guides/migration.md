@@ -5,6 +5,13 @@ This guide covers the change from published Jido `2.3.3` to the local
 `Jido.AgentServer`. Their contracts have changed. There is no V2 compatibility
 mode, automatic code rewrite, or automatic stored-data conversion.
 
+The comparison fixes V2 at commit
+[`69f3b405`](https://github.com/agentjido/jido/tree/69f3b40506ce3ea1a2c80b255b737d6c3a453cf2)
+and this V3 spike at commit
+[`77966b1a`](https://github.com/agentjido/jido/tree/77966b1a). See the
+[V2 to V3 API map](api-migration-map.md) for the detailed status and change for
+each public module.
+
 The beta version is prepared for evaluation. It is not yet published. A version
 number does not mean that release checks have passed. See
 [validation and known gaps](#validation-and-known-gaps).
@@ -75,6 +82,12 @@ has them. Review the
 [Jido Action migration guide](https://github.com/agentjido/jido_action/blob/release/v3/guides/v2-to-v3-migration.md)
 as part of the same port. An Action that works alone still needs to satisfy the
 complete-state contract when an Agent executes it.
+
+Also review the
+[Jido Signal migration guide](https://github.com/agentjido/jido_signal/blob/release/v3/guides/v2-to-v3.md).
+Core V3 routes canonical V3 Signals. A correct Agent port can still fail when
+the application keeps a V2 Signal constructor, wire map, Router assumption, or
+Dispatch option.
 
 Do not assume that a V2 `jido_ai`, `jido_browser`, or custom integration works
 with Core V3. Check its Plugin, Strategy, and Server API use. Core examples do
@@ -341,8 +354,11 @@ removed.
 
 ### What you need to change
 
-- Replace `Jido.whereis` with `Jido.whereis_agent(instance, id, partition: partition)`.
-  Pass the same instance and partition to startup, lookup, and persistence.
+- Replace `Jido.whereis` with `Jido.whereis_agent(id, partition: partition)`
+  for the default instance. Use
+  `Jido.whereis_agent(instance, id, partition: partition)` only when the
+  application selects another Jido instance. Pass the same instance and
+  partition to startup, lookup, and persistence.
 - Keep `initial_state` for Server startup options. Use `state` for instance
   constructors. Do not rename both options together.
 - Use `attach/2`, `detach/2`, and `touch/1` for lifetime control. The default

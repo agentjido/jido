@@ -88,7 +88,8 @@ defmodule Jido.MixProject do
      ]},
     {"Upgrade",
      [
-       {"guides/migration.md", "Upgrade From Jido v2 To v3"}
+       {"guides/migration.md", "Upgrade From Jido v2 To v3"},
+       {"guides/api-migration-map.md", "V2 To V3 API Map"}
      ]}
   ]
 
