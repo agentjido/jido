@@ -18,6 +18,7 @@ defmodule Jido.AgentServer.State do
               postponed_tokens: Zoi.any(description: "Bounded postponed Signal token set"),
               max_directives_per_turn: Zoi.any(description: "Directive batch limit"),
               directive_timeout: Zoi.any(description: "Plugin and external Directive timeout"),
+              readiness_timeout: Zoi.integer(description: "Plugin runtime readiness timeout"),
               default_dispatch:
                 Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
               error_policy:
@@ -66,7 +67,10 @@ defmodule Jido.AgentServer.State do
               admission_task:
                 Zoi.any(description: "Active Plugin admission task") |> Zoi.optional(),
               directive_task:
-                Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional()
+                Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional(),
+              error_policy_tasks:
+                Zoi.map(description: "Bounded asynchronous error Signal deliveries")
+                |> Zoi.default(%{})
             }
           )
 

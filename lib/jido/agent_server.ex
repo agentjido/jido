@@ -46,6 +46,9 @@ defmodule Jido.AgentServer do
 
   require Logger
 
+  @error_policy_dispatch_fallback_timeout 5_000
+  @max_error_policy_tasks 32
+
   alias Jido.Agent
   alias Jido.Agent.Command.Runner
   alias Jido.Agent.Directive
@@ -60,6 +63,7 @@ defmodule Jido.AgentServer do
     ChildInfo,
     DirectiveContext,
     DirectiveRuntime,
+    ExecutionAdapter,
     Options,
     ParentRef,
     PluginLifecycle,
@@ -345,7 +349,9 @@ defmodule Jido.AgentServer do
   @doc false
   @spec adopt_parent(server(), ParentRef.t()) :: {:ok, map()} | {:error, term()}
   def adopt_parent(server, %ParentRef{} = parent) do
-    :gen_statem.call(server, {:adopt_parent, parent})
+    with {:ok, parent} <- ParentRef.new(parent) do
+      :gen_statem.call(server, {:adopt_parent, parent})
+    end
   end
 
   @doc false
@@ -385,7 +391,14 @@ defmodule Jido.AgentServer do
   @spec hibernate(server(), keyword()) :: :ok | {:error, term()}
   def hibernate(server, opts \\ []) when is_list(opts) do
     {timeout, opts} = Keyword.pop(opts, :timeout, 5_000)
-    pid = GenServer.whereis(server)
+
+    case resolve_server_pid(server) do
+      pid when is_pid(pid) -> hibernate_pid(pid, opts, timeout)
+      nil -> {:error, :not_running}
+    end
+  end
+
+  defp hibernate_pid(pid, opts, timeout) do
     ref = Process.monitor(pid)
 
     try do
@@ -394,15 +407,25 @@ defmodule Jido.AgentServer do
           receive do
             {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
           after
-            timeout -> exit({:timeout, {__MODULE__, :hibernate, [server, opts]}})
+            timeout -> {:error, :timeout}
           end
 
         error ->
           error
       end
+    catch
+      :exit, reason -> {:error, normalize_hibernate_error(reason)}
     after
       Process.demonitor(ref, [:flush])
     end
+  end
+
+  defp resolve_server_pid(server) do
+    GenServer.whereis(server)
+  rescue
+    _error -> nil
+  catch
+    _kind, _reason -> nil
   end
 
   @impl true
@@ -438,6 +461,7 @@ defmodule Jido.AgentServer do
         postponed_tokens: MapSet.new(),
         max_directives_per_turn: max_directives_per_turn,
         directive_timeout: opts.directive_timeout,
+        readiness_timeout: opts.readiness_timeout,
         default_dispatch: opts.default_dispatch,
         error_policy: opts.error_policy,
         error_count: 0,
@@ -461,7 +485,8 @@ defmodule Jido.AgentServer do
         plugin_bootstrap: nil,
         startup_reply: startup_reply,
         admission_task: nil,
-        directive_task: nil
+        directive_task: nil,
+        error_policy_tasks: %{}
       }
 
       span =
@@ -492,9 +517,10 @@ defmodule Jido.AgentServer do
         :info,
         {:plugin_readiness, token, :ok},
         :initializing,
-        %State{plugin_bootstrap: %{token: token, ref: ref}} = data
+        %State{plugin_bootstrap: %{token: token, ref: ref} = readiness} = data
       ) do
     Process.demonitor(ref, [:flush])
+    cancel_task_timer(readiness.timer)
 
     AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
       state_version: data.state_version
@@ -510,18 +536,42 @@ defmodule Jido.AgentServer do
         :info,
         {:plugin_readiness, token, {:error, reason}},
         :initializing,
-        %State{plugin_bootstrap: %{token: token, ref: ref}} = data
+        %State{plugin_bootstrap: %{token: token, ref: ref} = readiness} = data
       ) do
     Process.demonitor(ref, [:flush])
+    cancel_task_timer(readiness.timer)
     {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:plugin_readiness_timeout, token}},
+        :initializing,
+        %State{plugin_bootstrap: readiness} = data
+      ) do
+    if readiness && readiness.token == token && readiness.timer == timer do
+      stop_plugin_readiness(readiness)
+
+      error =
+        Error.timeout_error("Agent Plugin readiness timed out",
+          timeout: data.readiness_timeout
+        )
+
+      {:stop, {:shutdown, {:plugin_readiness_failed, error}}, %{data | plugin_bootstrap: nil}}
+    else
+      :keep_state_and_data
+    end
   end
 
   def handle_event({:call, _from}, :await_ready, :initializing, %State{}) do
     {:keep_state_and_data, [:postpone]}
   end
 
-  def handle_event({:call, from}, :await_ready, _phase, %State{}) do
-    {:keep_state_and_data, [{:reply, from, :ok}]}
+  def handle_event({:call, from}, :await_ready, _phase, %State{} = data) do
+    case PluginLifecycle.readiness_status(data) do
+      :ready -> {:keep_state_and_data, [{:reply, from, :ok}]}
+      {:error, reason} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
   end
 
   @impl true
@@ -814,6 +864,23 @@ defmodule Jido.AgentServer do
 
   def handle_event(
         :info,
+        {:plugin_runtime_restarting, lifecycle_pid, plugin},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    case State.child(data, key) do
+      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
+        {:keep_state, State.add_child(data, key, %{child | pid: :restarting})}
+
+      _child ->
+        :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
         {:plugin_runtime_ready, lifecycle_pid, plugin, runtime_pid},
         _phase,
         %State{} = data
@@ -833,8 +900,9 @@ defmodule Jido.AgentServer do
         :info,
         {:DOWN, ref, :process, _pid, reason},
         :initializing,
-        %State{plugin_bootstrap: %{ref: ref}} = data
+        %State{plugin_bootstrap: %{ref: ref} = readiness} = data
       ) do
+    cancel_task_timer(readiness.timer)
     {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
   end
 
@@ -900,9 +968,20 @@ defmodule Jido.AgentServer do
 
     directive_result =
       case result do
-        :ok -> {:ok, data}
-        {:error, reason} -> {:error, reason, data}
-        other -> {:error, {:invalid_plugin_dispatch_result, other}, data}
+        :ok ->
+          {:ok, data}
+
+        {:dispatch_relative_signal, directive} ->
+          case DirectiveRuntime.dispatch_prepared(directive, data, self()) do
+            :ok -> {:ok, data}
+            {:error, reason} -> {:error, reason, data}
+          end
+
+        {:error, reason} ->
+          {:error, reason, data}
+
+        other ->
+          {:error, {:invalid_plugin_dispatch_result, other}, data}
       end
 
     complete_directive(directive_result, pending.rest, pending.context, pending.span)
@@ -943,6 +1022,174 @@ defmodule Jido.AgentServer do
       )
 
     complete_directive({:error, error, data}, pending.rest, pending.context, pending.span)
+  end
+
+  def handle_event(
+        :info,
+        {ref, result},
+        _phase,
+        %State{} = data
+      )
+      when is_map_key(data.error_policy_tasks, ref) do
+    pending = Map.fetch!(data.error_policy_tasks, ref)
+    release_task_result(pending)
+    data = drop_error_policy_task(data, ref)
+
+    case result do
+      :ok ->
+        {:keep_state, data}
+
+      {:error, reason} ->
+        {:keep_state, record_error_policy_dispatch_failure(data, reason)}
+
+      other ->
+        reason =
+          Error.execution_error("Agent error Signal delivery returned an invalid result",
+            details: %{result: other}
+          )
+
+        {:keep_state, record_error_policy_dispatch_failure(data, reason)}
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        _phase,
+        %State{} = data
+      )
+      when is_map_key(data.error_policy_tasks, ref) do
+    pending = Map.fetch!(data.error_policy_tasks, ref)
+    cancel_task_timer(pending.timer)
+    data = drop_error_policy_task(data, ref)
+
+    error =
+      Error.execution_error("Agent error Signal delivery task exited",
+        details: %{reason: reason}
+      )
+
+    {:keep_state, record_error_policy_dispatch_failure(data, error)}
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:error_policy_dispatch_timeout, task_ref}},
+        _phase,
+        %State{} = data
+      )
+      when is_map_key(data.error_policy_tasks, task_ref) do
+    pending = Map.fetch!(data.error_policy_tasks, task_ref)
+
+    if pending.timer == timer do
+      shutdown_task(pending.task)
+      data = drop_error_policy_task(data, task_ref)
+
+      error =
+        Error.timeout_error("Agent error Signal delivery timed out",
+          timeout: error_policy_dispatch_timeout(data)
+        )
+
+      {:keep_state, record_error_policy_dispatch_failure(data, error)}
+    else
+      :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:jido_exec_adapter_started, ref, exec_pid},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
+          data
+      ) do
+    adapter = ExecutionAdapter.started(adapter, exec_pid)
+    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
+  end
+
+  def handle_event(
+        :info,
+        {:jido_exec_adapter_start_failed, ref, error},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
+      ) do
+    ExecutionAdapter.cancel_timer(adapter)
+    fail_turn(error, :execute, data)
+  end
+
+  def handle_event(
+        :info,
+        {:jido_exec_adapter_callback_started, ref, token, callback},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
+          data
+      ) do
+    adapter = ExecutionAdapter.callback_started(adapter, token, callback)
+    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
+  end
+
+  def handle_event(
+        :info,
+        {:jido_exec_adapter_callback_result, ref, token, result},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
+          data
+      ) do
+    adapter = ExecutionAdapter.callback_finished(adapter, token)
+    data = %{data | active: %{active | exec_handle: adapter}}
+
+    case result do
+      {:done, value} ->
+        ExecutionAdapter.acknowledge(adapter, token)
+        finish_turn(value, data)
+
+      :ignore ->
+        {:keep_state, data}
+
+      {:error, error} ->
+        ExecutionAdapter.acknowledge(adapter, token)
+        fail_turn(error, :execute, data)
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:exec_adapter_timeout, ref, token, callback}},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
+      ) do
+    if ExecutionAdapter.timeout?(adapter, timer, token) do
+      ExecutionAdapter.stop(adapter)
+
+      error =
+        Error.timeout_error("Agent Exec callback timed out",
+          timeout: adapter.timeout,
+          details: %{module: adapter.module, callback: callback}
+        )
+
+      fail_turn(error, :execute, data)
+    else
+      :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, monitor_ref, :process, pid, reason},
+        :running,
+        %State{
+          active: %ActiveTurn{
+            exec_handle: %ExecutionAdapter{pid: pid, monitor_ref: monitor_ref} = adapter
+          }
+        } = data
+      ) do
+    ExecutionAdapter.cancel_timer(adapter)
+
+    error =
+      Error.execution_error("Agent Exec adapter owner exited",
+        details: %{module: adapter.module, reason: reason}
+      )
+
+    fail_turn(error, :execute, data)
   end
 
   def handle_event(:info, {:DOWN, ref, :process, pid, reason}, phase, %State{} = data) do
@@ -1004,7 +1251,8 @@ defmodule Jido.AgentServer do
   defp terminate_agent(reason, data) do
     if match?(%ActiveTurn{exec_handle: handle} when not is_nil(handle), data.active) do
       try do
-        _result = data.exec_module.cancel(data.active.exec_handle)
+        _result = cancel_exec(data.active.exec_handle, data)
+        stop_exec_adapter(data.active.exec_handle)
       catch
         _kind, _reason -> :ok
       end
@@ -1013,6 +1261,7 @@ defmodule Jido.AgentServer do
     stop_plugin_readiness(data.plugin_bootstrap)
     stop_task(data.admission_task)
     stop_task(data.directive_task)
+    Enum.each(data.error_policy_tasks, fn {_ref, pending} -> stop_task(pending) end)
 
     if data.directive_task do
       finish_span_error(data.directive_task.span, {:agent_stopped, reason})
@@ -1077,11 +1326,14 @@ defmodule Jido.AgentServer do
         send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
       end)
 
-    %{data | plugin_bootstrap: %{pid: pid, ref: ref, token: token}}
+    timer = start_task_timer(data.readiness_timeout, :plugin_readiness_timeout, token)
+
+    %{data | plugin_bootstrap: %{pid: pid, ref: ref, token: token, timer: timer}}
   end
 
-  defp stop_plugin_readiness(%{pid: pid, ref: ref}) do
+  defp stop_plugin_readiness(%{pid: pid, ref: ref} = readiness) do
     Process.demonitor(ref, [:flush])
+    if timer = Map.get(readiness, :timer), do: cancel_task_timer(timer)
     if Process.alive?(pid), do: Process.exit(pid, :shutdown)
     :ok
   end
@@ -1167,22 +1419,22 @@ defmodule Jido.AgentServer do
 
     with {:ok, prepared} <-
            Runner.prepare(command.agent, command.signal, command_options, data.plugin_specs),
-         {:ok, handle} <- start_async_exec(prepared, data.exec_module),
+         {:ok, handle} <- start_async_exec(prepared, data),
          :ok <- link_exec(handle) do
       {:ok, handle, prepared}
     end
   end
+
+  defp link_exec(%ExecutionAdapter{}), do: :ok
 
   defp link_exec(%{pid: pid}) when is_pid(pid) do
     Process.link(pid)
     :ok
   end
 
-  defp link_exec(_handle), do: :ok
-
-  defp start_async_exec(prepared, exec_module) do
+  defp start_async_exec(prepared, %State{exec_module: Jido.Exec}) do
     {:ok,
-     exec_module.run_async(
+     Jido.Exec.run_async(
        prepared.turn.executable,
        prepared.turn.input,
        prepared.context,
@@ -1192,6 +1444,21 @@ defmodule Jido.AgentServer do
     error -> {:error, error}
   catch
     kind, reason -> {:error, {kind, reason}}
+  end
+
+  defp start_async_exec(prepared, %State{} = data) do
+    ExecutionAdapter.start(
+      self(),
+      Jido.task_supervisor_name(data.jido),
+      data.exec_module,
+      [
+        prepared.turn.executable,
+        prepared.turn.input,
+        prepared.context,
+        prepared.exec_opts
+      ],
+      data.directive_timeout
+    )
   end
 
   defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
@@ -1323,7 +1590,7 @@ defmodule Jido.AgentServer do
   defp uncertain_write?(_reason), do: false
 
   defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    case data.exec_module.cancel(active.exec_handle) do
+    case cancel_exec(active.exec_handle, data) do
       :ok ->
         finish_span_error(active.span, :cancelled)
         TraceContext.clear()
@@ -1367,7 +1634,8 @@ defmodule Jido.AgentServer do
 
   defp prepare_directives(directives, %State{} = data) do
     with :ok <- ensure_directive_limit(directives, data.max_directives_per_turn),
-         :ok <- ensure_terminal_directive_last(directives) do
+         :ok <- ensure_terminal_directive_last(directives),
+         {:ok, directives} <- DirectiveRuntime.validate_signal_dispatches(directives) do
       {:ok, directives}
     end
   end
@@ -1419,9 +1687,15 @@ defmodule Jido.AgentServer do
                    plugin_context,
                    data.agent.state
                  ) do
-            prepared_directive
-            |> Map.put(:signal, signal)
-            |> DirectiveRuntime.dispatch_prepared(data, agent_server)
+            prepared_directive = Map.put(prepared_directive, :signal, signal)
+
+            case prepared_directive do
+              %Directive.Emit{} ->
+                DirectiveRuntime.dispatch_prepared(prepared_directive, data, agent_server)
+
+              _relative ->
+                {:dispatch_relative_signal, prepared_directive}
+            end
           end
         end,
         rest,
@@ -1699,6 +1973,14 @@ defmodule Jido.AgentServer do
      %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
   end
 
+  defp reentrant_turn_call?(
+         {caller, _tag},
+         %ActiveTurn{exec_handle: %ExecutionAdapter{exec_pid: root}}
+       )
+       when is_pid(caller) and is_pid(root) do
+    related_exec_process?(caller, root, %{}, 0)
+  end
+
   defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})
        when is_pid(caller) and is_pid(root) do
     related_exec_process?(caller, root, %{}, 0)
@@ -1882,7 +2164,16 @@ defmodule Jido.AgentServer do
   end
 
   defp handle_exec_message(message, %State{active: %ActiveTurn{} = active} = data) do
-    case data.exec_module.handle_message(active.exec_handle, message) do
+    handle_exec_message(active.exec_handle, message, data)
+  end
+
+  defp handle_exec_message(%ExecutionAdapter{} = adapter, message, _data) do
+    ExecutionAdapter.forward(adapter, message)
+    :keep_state_and_data
+  end
+
+  defp handle_exec_message(handle, message, %State{} = data) do
+    case data.exec_module.handle_message(handle, message) do
       {:done, result} -> finish_turn(result, data)
       :ignore -> :keep_state_and_data
       {:error, error} -> fail_turn(error, :execute, data)
@@ -1926,8 +2217,15 @@ defmodule Jido.AgentServer do
 
     case data.on_parent_death do
       :stop ->
-        next_data = cancel_active_for_parent(next_data)
-        {:stop, {:shutdown, {:parent_down, reason}}, next_data}
+        {next_data, cancellation} = cancel_active_for_parent(next_data)
+
+        stop_reason =
+          case cancellation do
+            {:indeterminate, error} -> error
+            _result -> {:parent_down, reason}
+          end
+
+        {:stop, {:shutdown, stop_reason}, next_data}
 
       :continue ->
         {:keep_state, next_data}
@@ -1953,7 +2251,7 @@ defmodule Jido.AgentServer do
   defp cancel_active_for_parent(%State{active: %ActiveTurn{exec_handle: handle} = active} = data)
        when not is_nil(handle) do
     {status, error} =
-      case data.exec_module.cancel(handle) do
+      case cancel_exec(handle, data) do
         :ok -> {:cancelled, {:parent_down, :cancelled}}
         {:error, reason} -> {:indeterminate, {:parent_down, {:cancellation_failed, reason}}}
       end
@@ -1961,17 +2259,25 @@ defmodule Jido.AgentServer do
     finish_span_error(active.span, error)
     TraceContext.clear()
     outcome = turn_outcome(data, status, :execute, error)
-    if active.caller, do: :gen_statem.reply(active.caller, {:error, {:parent_down, :cancelled}})
-    complete_outcome(data, outcome)
+    if active.caller, do: :gen_statem.reply(active.caller, {:error, error})
+    {complete_outcome(data, outcome), {status, error}}
   catch
-    _kind, _reason ->
-      finish_span_error(active.span, {:parent_down, :cancelled})
+    kind, reason ->
+      error = {:parent_down, {:cancellation_failed, {kind, reason}}}
+      finish_span_error(active.span, error)
       TraceContext.clear()
-      outcome = turn_outcome(data, :indeterminate, :execute, {:parent_down, :cancelled})
-      complete_outcome(data, outcome)
+      outcome = turn_outcome(data, :indeterminate, :execute, error)
+      if active.caller, do: :gen_statem.reply(active.caller, {:error, error})
+      {complete_outcome(data, outcome), {:indeterminate, error}}
   end
 
-  defp cancel_active_for_parent(data), do: data
+  defp cancel_active_for_parent(data), do: {data, nil}
+
+  defp cancel_exec(%ExecutionAdapter{} = adapter, _data), do: ExecutionAdapter.cancel(adapter)
+  defp cancel_exec(handle, %State{} = data), do: data.exec_module.cancel(handle)
+
+  defp stop_exec_adapter(%ExecutionAdapter{} = adapter), do: ExecutionAdapter.stop(adapter)
+  defp stop_exec_adapter(_handle), do: :ok
 
   defp attach_parent(%State{parent: %ParentRef{}}, _parent), do: {:error, :already_has_parent}
 
@@ -2224,17 +2530,12 @@ defmodule Jido.AgentServer do
           }
         )
 
-      context = directive_context(data)
+      data = start_error_policy_dispatch(signal, dispatch, data)
 
-      _ =
-        DirectiveRuntime.handle(
-          %Directive.Emit{signal: signal, dispatch: dispatch},
-          context,
-          data
-        )
+      {:continue, data}
+    else
+      {:continue, data}
     end
-
-    {:continue, data}
   end
 
   defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: policy} = data)
@@ -2246,6 +2547,52 @@ defmodule Jido.AgentServer do
     end
   rescue
     error -> {:stop, {:error_policy_failed, error}, data}
+  end
+
+  defp start_error_policy_dispatch(signal, dispatch, %State{} = data) do
+    if map_size(data.error_policy_tasks) >= @max_error_policy_tasks do
+      error =
+        Error.execution_error("Agent error Signal delivery limit was reached",
+          details: %{limit: @max_error_policy_tasks}
+        )
+
+      record_error_policy_dispatch_failure(data, error)
+    else
+      supervisor = Jido.task_supervisor_name(data.jido)
+      jido = data.jido
+
+      task =
+        Task.Supervisor.async_nolink(supervisor, fn ->
+          DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
+        end)
+
+      timeout = error_policy_dispatch_timeout(data)
+      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
+      pending = %{task: task, timer: timer}
+      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
+    end
+  rescue
+    error -> record_error_policy_dispatch_failure(data, error)
+  catch
+    kind, reason -> record_error_policy_dispatch_failure(data, {kind, reason})
+  end
+
+  defp error_policy_dispatch_timeout(%State{directive_timeout: :infinity}),
+    do: @error_policy_dispatch_fallback_timeout
+
+  defp error_policy_dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
+
+  defp drop_error_policy_task(%State{} = data, ref) do
+    %{data | error_policy_tasks: Map.delete(data.error_policy_tasks, ref)}
+  end
+
+  defp record_error_policy_dispatch_failure(%State{} = data, reason) do
+    Logger.error("Agent error Signal delivery failed",
+      agent_id: data.agent.id,
+      reason: inspect(reason)
+    )
+
+    record_event(data, :error_signal_delivery_failed, %{reason: reason})
   end
 
   defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
@@ -2663,6 +3010,11 @@ defmodule Jido.AgentServer do
   defp normalize_ready_error({:timeout, {:gen_statem, :call, _details}}), do: :timeout
   defp normalize_ready_error({:noproc, {:gen_statem, :call, _details}}), do: :not_running
   defp normalize_ready_error(reason), do: reason
+
+  defp normalize_hibernate_error({:timeout, {:gen_statem, :call, _details}}), do: :timeout
+  defp normalize_hibernate_error({:noproc, {:gen_statem, :call, _details}}), do: :not_running
+  defp normalize_hibernate_error(:noproc), do: :not_running
+  defp normalize_hibernate_error(reason), do: reason
 
   defp registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
 

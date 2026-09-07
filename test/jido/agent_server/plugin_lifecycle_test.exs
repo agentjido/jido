@@ -86,6 +86,27 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
              Jido.start_agent(jido, definition, restart: :temporary)
   end
 
+  test "initial Plugin readiness has a finite timeout and cleans up", %{jido: jido} do
+    observer = self()
+    gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
+    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+
+    starter =
+      Task.async(fn ->
+        Jido.start_agent(jido, definition, readiness_timeout: 50, restart: :temporary)
+      end)
+
+    assert_receive {:readiness_waiting, waiter, runtime}, 2_000
+    waiter_ref = Process.monitor(waiter)
+    runtime_ref = Process.monitor(runtime)
+
+    assert {:error, {:plugin_readiness_failed, %Jido.Error.TimeoutError{timeout: 50}}} =
+             Task.await(starter, 2_000)
+
+    assert_receive {:DOWN, ^waiter_ref, :process, ^waiter, _reason}, 2_000
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
+  end
+
   test "failed readiness after a runtime restart stops the owner", %{jido: jido} do
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:error, :not_ready}] end})
     definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
@@ -120,11 +141,42 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _}, 2_000
   end
 
-  defp paused_restart(jido) do
+  test "restart Plugin readiness times out and cleans up the runtime tree", %{jido: jido} do
+    {server, wrapper, waiter, runtime} = paused_restart(jido, readiness_timeout: 50)
+    refs = for pid <- [server, wrapper, waiter, runtime], do: {Process.monitor(pid), pid}
+
+    assert_receive {:DOWN, ref, :process, ^server, reason}, 2_000
+    assert {^ref, ^server} = Enum.find(refs, fn {_ref, pid} -> pid == server end)
+    assert inspect(reason) =~ "plugin_runtime_readiness_timeout"
+
+    for {ref, pid} <- refs, pid != server do
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2_000
+    end
+  end
+
+  test "await_ready and children expose a Plugin restart until it is ready", %{jido: jido} do
+    {server, _wrapper, waiter, runtime} = paused_restart(jido)
+
+    eventually(fn -> Server.children(server)[{:plugin, Runtime}].pid == :restarting end)
+
+    assert {:error, {:plugin_runtime_restarting, Runtime}} = Server.await_ready(server)
+    send(waiter, {:release_readiness, :ok})
+
+    eventually(fn -> Server.children(server)[{:plugin, Runtime}].pid == runtime end)
+    assert :ok = Server.await_ready(server)
+  end
+
+  defp paused_restart(jido, opts \\ []) do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:wait, observer}] end})
     definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
-    {:ok, server} = Jido.start_agent(jido, definition, restart: :temporary)
+
+    {:ok, server} =
+      Jido.start_agent(jido, definition,
+        restart: :temporary,
+        readiness_timeout: Keyword.get(opts, :readiness_timeout, 5_000)
+      )
+
     {:idle, state} = :sys.get_state(server)
     child = state.children[{:plugin, Runtime}]
     Process.exit(child.pid, :kill)

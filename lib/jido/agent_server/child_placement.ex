@@ -48,15 +48,21 @@ defmodule Jido.AgentServer.ChildPlacement do
     parent = Keyword.fetch!(opts, :parent)
     jido = Keyword.fetch!(opts, :jido)
 
-    if alive?(parent.pid) or Keyword.get(opts, :on_parent_death, :stop) != :stop do
-      case SpawnRegistry.claim(jido, parent) do
-        :ok -> start_claimed(jido, parent, opts)
-        :closed -> :ignore
-        {:existing, pid} -> {:error, {:already_started, pid}}
-        {:error, _} = error -> error
-      end
+    if alive?(parent.pid) do
+      start_with_claim(jido, parent, opts)
     else
       :ignore
+    end
+  end
+
+  defp start_with_claim(_jido, %{spawn_ref: nil}, opts), do: Server.start_link(opts)
+
+  defp start_with_claim(jido, parent, opts) do
+    case SpawnRegistry.claim(jido, parent) do
+      :ok -> start_claimed(jido, parent, opts)
+      :closed -> :ignore
+      {:existing, pid} -> {:error, {:already_started, pid}}
+      {:error, _} = error -> error
     end
   end
 

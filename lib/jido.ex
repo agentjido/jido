@@ -484,14 +484,17 @@ defmodule Jido do
   end
 
   @doc "Stops one Agent under the default Jido instance."
-  @spec stop_agent(pid() | String.t()) :: :ok | {:error, :not_found}
+  @spec stop_agent(Jido.AgentServer.server() | String.t()) :: :ok | {:error, :not_found}
   def stop_agent(pid_or_id), do: stop_agent(@default_instance, pid_or_id, [])
 
   @doc """
   Stops an Agent with options in the default instance, or stops an Agent in
   the selected instance with default options.
   """
-  @spec stop_agent(atom() | pid() | String.t(), keyword() | pid() | String.t()) ::
+  @spec stop_agent(
+          atom() | Jido.AgentServer.server() | String.t(),
+          keyword() | Jido.AgentServer.server() | String.t()
+        ) ::
           :ok | {:error, :not_found}
   def stop_agent(pid_or_id, opts) when is_list(opts),
     do: stop_agent(@default_instance, pid_or_id, opts)
@@ -500,16 +503,9 @@ defmodule Jido do
     do: stop_agent(jido_instance, pid_or_id, [])
 
   @doc "Stops an Agent with options in the selected Jido instance."
-  @spec stop_agent(atom(), pid() | String.t(), keyword()) :: :ok | {:error, :not_found}
+  @spec stop_agent(atom(), Jido.AgentServer.server() | String.t(), keyword()) ::
+          :ok | {:error, :not_found}
   def stop_agent(jido_instance, pid_or_id, opts)
-
-  def stop_agent(jido_instance, pid, _opts) when is_atom(jido_instance) and is_pid(pid) do
-    Jido.AgentServer.stop(pid)
-  catch
-    :exit, :noproc -> {:error, :not_found}
-    :exit, {:noproc, _details} -> {:error, :not_found}
-    :exit, {:normal, _details} -> :ok
-  end
 
   def stop_agent(jido_instance, id, opts)
       when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
@@ -517,6 +513,17 @@ defmodule Jido do
       nil -> {:error, :not_found}
       pid -> stop_agent(jido_instance, pid, opts)
     end
+  end
+
+  def stop_agent(jido_instance, server, opts)
+      when is_atom(jido_instance) and is_list(opts) do
+    with {:ok, pid} <- owned_agent_server(jido_instance, server, opts) do
+      Jido.AgentServer.stop(pid)
+    end
+  catch
+    :exit, :noproc -> {:error, :not_found}
+    :exit, {:noproc, _details} -> {:error, :not_found}
+    :exit, {:normal, _details} -> :ok
   end
 
   @doc "Looks up one Agent by id under the default Jido instance."
@@ -641,7 +648,9 @@ defmodule Jido do
           :ok | {:error, term()}
   def hibernate(jido_instance, server, opts)
       when is_atom(jido_instance) and is_list(opts) do
-    Jido.AgentServer.hibernate(server, opts)
+    with {:ok, pid} <- owned_agent_server(jido_instance, server, opts) do
+      Jido.AgentServer.hibernate(pid, opts)
+    end
   end
 
   @doc "Restores and starts one persisted Agent in the default instance."
@@ -685,4 +694,47 @@ defmodule Jido do
   end
 
   defp normalize_parent_binding(_binding), do: :error
+
+  defp owned_agent_server(jido_instance, server, opts) do
+    with true <- not is_nil(jido_instance),
+         true <- Keyword.keyword?(opts),
+         pid when is_pid(pid) <- safe_whereis(server),
+         {:ok, %{agent_id: agent_id, partition: partition}} <-
+           Jido.AgentServer.creation_info(pid),
+         true <- partition_matches?(opts, partition),
+         ^pid <- owned_registry_pid(jido_instance, agent_id, partition, pid) do
+      {:ok, pid}
+    else
+      _reason -> {:error, :not_found}
+    end
+  end
+
+  defp safe_whereis(server) do
+    GenServer.whereis(server)
+  rescue
+    _error -> nil
+  catch
+    _kind, _reason -> nil
+  end
+
+  defp partition_matches?(opts, partition) do
+    not Keyword.has_key?(opts, :partition) or Keyword.get(opts, :partition) == partition
+  end
+
+  defp owned_registry_pid(jido_instance, agent_id, partition, pid)
+       when node(pid) == node() do
+    whereis_agent(jido_instance, agent_id, partition: partition)
+  end
+
+  defp owned_registry_pid(jido_instance, agent_id, partition, pid) do
+    :erpc.call(
+      node(pid),
+      __MODULE__,
+      :whereis_agent,
+      [jido_instance, agent_id, [partition: partition]],
+      1_000
+    )
+  catch
+    _kind, _reason -> nil
+  end
 end

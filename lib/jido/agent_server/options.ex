@@ -6,6 +6,7 @@ defmodule Jido.AgentServer.Options do
 
   @default_max_postponed_signals 1_000
   @default_directive_timeout 5_000
+  @default_readiness_timeout 5_000
 
   @schema Zoi.struct(
             __MODULE__,
@@ -28,6 +29,9 @@ defmodule Jido.AgentServer.Options do
               directive_timeout:
                 Zoi.any(description: "Plugin and external Directive timeout")
                 |> Zoi.default(@default_directive_timeout),
+              readiness_timeout:
+                Zoi.integer(description: "Plugin runtime readiness timeout")
+                |> Zoi.default(@default_readiness_timeout),
               default_dispatch:
                 Zoi.any(description: "Default outbound Signal dispatch") |> Zoi.optional(),
               error_policy:
@@ -70,19 +74,26 @@ defmodule Jido.AgentServer.Options do
   end
 
   def new(%{} = attrs) do
-    with :ok <- reject_custom_directive_handler(attrs),
+    with :ok <- validate_identity_options(attrs),
+         :ok <- reject_custom_directive_handler(attrs),
          {:ok, agent} <- build_agent(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
          :ok <- validate_registration(attrs),
          :ok <- validate_parent_policy(Map.get(attrs, :on_parent_death, :stop)),
          :ok <- validate_spawn_fun(Map.get(attrs, :spawn_fun)),
          :ok <- validate_error_policy(Map.get(attrs, :error_policy, :log_only)),
+         {:ok, default_dispatch} <-
+           normalize_default_dispatch(Map.get(attrs, :default_dispatch)),
          {:ok, persistence} <- resolve_persistence(attrs),
          :ok <- validate_restore(Map.get(attrs, :restore, :if_found)),
          :ok <- validate_state_version(Map.get(attrs, :state_version, 0)),
          :ok <-
            validate_directive_timeout(
              Map.get(attrs, :directive_timeout, @default_directive_timeout)
+           ),
+         :ok <-
+           validate_readiness_timeout(
+             Map.get(attrs, :readiness_timeout, @default_readiness_timeout)
            ),
          :ok <- validate_lifecycle(attrs),
          :ok <- reject_native_scheduler(attrs) do
@@ -102,7 +113,8 @@ defmodule Jido.AgentServer.Options do
           Map.get(attrs, :max_postponed_signals, @default_max_postponed_signals),
         max_directives_per_turn: Map.get(attrs, :max_directives_per_turn, :infinity),
         directive_timeout: Map.get(attrs, :directive_timeout, @default_directive_timeout),
-        default_dispatch: Map.get(attrs, :default_dispatch),
+        readiness_timeout: Map.get(attrs, :readiness_timeout, @default_readiness_timeout),
+        default_dispatch: default_dispatch,
         error_policy: Map.get(attrs, :error_policy, :log_only),
         parent: parent,
         on_parent_death: Map.get(attrs, :on_parent_death, :stop),
@@ -173,22 +185,25 @@ defmodule Jido.AgentServer.Options do
     overrides = instance_overrides(id, initial_state)
 
     with {:module, ^module} <- Code.ensure_loaded(module) do
-      cond do
-        function_exported?(module, :new, 1) ->
-          normalize_agent_result(module.new(overrides), module)
+      result =
+        cond do
+          function_exported?(module, :new, 1) -> module.new(overrides)
+          function_exported?(module, :new, 0) -> module.new()
+          true -> invalid("Agent module must implement new/0 or new/1", %{module: module})
+        end
 
-        function_exported?(module, :new, 0) ->
-          normalize_agent_result(module.new(), module)
-
-        true ->
-          invalid("Agent module must implement new/0 or new/1", %{module: module})
+      with {:ok, agent} <- normalize_agent_result(result, module),
+           :ok <- validate_requested_id(agent, id, module) do
+        {:ok, agent}
       end
     else
       {:error, reason} ->
         invalid("Agent module could not be loaded", %{module: module, reason: reason})
     end
   rescue
-    error -> {:error, error}
+    error -> constructor_failed(module, :error, error)
+  catch
+    kind, reason -> constructor_failed(module, kind, reason)
   end
 
   defp instantiate_agent(value, _id, _initial_state),
@@ -211,8 +226,47 @@ defmodule Jido.AgentServer.Options do
   defp maybe_put(opts, key, value), do: Keyword.put(opts, key, value)
 
   defp build_parent(nil), do: {:ok, nil}
-  defp build_parent(%ParentRef{} = parent), do: {:ok, parent}
   defp build_parent(parent), do: ParentRef.new(parent)
+
+  defp validate_requested_id(_agent, nil, _module), do: :ok
+  defp validate_requested_id(%Agent{id: id}, id, _module), do: :ok
+
+  defp validate_requested_id(%Agent{id: actual}, expected, module) do
+    invalid("Agent constructor ignored the requested id", %{
+      module: module,
+      expected_id: expected,
+      actual_id: actual
+    })
+  end
+
+  defp constructor_failed(module, kind, reason) do
+    invalid("Agent constructor failed", %{module: module, kind: kind, reason: reason})
+  end
+
+  defp validate_identity_options(attrs) do
+    with :ok <- validate_optional_atom(Map.get(attrs, :jido), :jido),
+         :ok <- validate_optional_atom(Map.get(attrs, :registry), :registry),
+         :ok <- validate_name(Map.get(attrs, :name)) do
+      :ok
+    end
+  end
+
+  defp validate_optional_atom(nil, _field), do: :ok
+
+  defp validate_optional_atom(value, _field) when is_atom(value) and not is_nil(value), do: :ok
+
+  defp validate_optional_atom(value, field) do
+    invalid("#{field} must be an atom or nil", %{field => value})
+  end
+
+  defp validate_name(nil), do: :ok
+  defp validate_name(name) when is_atom(name) and not is_nil(name), do: :ok
+  defp validate_name({:global, _term}), do: :ok
+
+  defp validate_name({:via, module, _term}) when is_atom(module) and not is_nil(module),
+    do: :ok
+
+  defp validate_name(name), do: invalid("name is invalid", %{name: name})
 
   defp validate_registration(attrs) do
     register = Map.get(attrs, :register, not is_nil(Map.get(attrs, :jido)))
@@ -269,6 +323,19 @@ defmodule Jido.AgentServer.Options do
   defp validate_error_policy(policy),
     do: invalid("error_policy is invalid", %{error_policy: policy})
 
+  defp normalize_default_dispatch(nil), do: {:ok, nil}
+
+  defp normalize_default_dispatch(dispatch) do
+    case Jido.Signal.Dispatch.validate_opts(dispatch) do
+      {:ok, normalized} -> {:ok, normalized}
+      {:error, reason} -> invalid("default_dispatch is invalid", %{reason: reason})
+    end
+  rescue
+    error -> invalid("default_dispatch is invalid", %{reason: error})
+  catch
+    kind, reason -> invalid("default_dispatch is invalid", %{reason: {kind, reason}})
+  end
+
   defp validate_directive_timeout(:infinity), do: :ok
 
   defp validate_directive_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
@@ -277,6 +344,12 @@ defmodule Jido.AgentServer.Options do
     invalid("directive_timeout must be :infinity or a positive integer", %{
       directive_timeout: timeout
     })
+  end
+
+  defp validate_readiness_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
+
+  defp validate_readiness_timeout(timeout) do
+    invalid("readiness_timeout must be a positive integer", %{readiness_timeout: timeout})
   end
 
   defp validate_lifecycle(attrs) do

@@ -39,6 +39,37 @@ defmodule Jido.AgentServer.PluginLifecycle do
   end
 
   @doc false
+  def readiness_status(%State{} = state) do
+    Enum.find_value(state.plugin_specs, :ready, &plugin_readiness(state, &1))
+  end
+
+  defp plugin_readiness(_state, %{runtime?: false}), do: false
+
+  defp plugin_readiness(state, %{runtime?: true, module: plugin}) do
+    case runtime_ref(state, plugin) do
+      {:ok, pid} -> runtime_readiness(pid, plugin)
+      {:error, {:plugin_runtime_unavailable, ^plugin, _state}} -> restarting(plugin)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp runtime_readiness(pid, plugin) when is_pid(pid) and node(pid) == node() do
+    if Process.alive?(pid), do: false, else: restarting(plugin)
+  end
+
+  defp runtime_readiness(pid, plugin) when is_pid(pid) do
+    try do
+      if :erpc.call(node(pid), Process, :alive?, [pid], 1_000),
+        do: false,
+        else: restarting(plugin)
+    catch
+      _kind, _reason -> restarting(plugin)
+    end
+  end
+
+  defp restarting(plugin), do: {:error, {:plugin_runtime_restarting, plugin}}
+
+  @doc false
   def runtime_ref(%State{} = state, plugin) when is_atom(plugin) do
     case State.child(state, {:plugin, plugin}) do
       %ChildInfo{lifecycle_pid: lifecycle_pid} when is_pid(lifecycle_pid) ->
@@ -83,7 +114,8 @@ defmodule Jido.AgentServer.PluginLifecycle do
     if plugin_spec do
       wrapper_spec =
         Supervisor.child_spec(
-          {PluginChild, [self(), plugin_spec, spec, wrapper_name(state, plugin)]},
+          {PluginChild,
+           [self(), plugin_spec, spec, wrapper_name(state, plugin), state.readiness_timeout]},
           id: {:agent_plugin_child, state.agent.id, plugin},
           restart: :temporary
         )
