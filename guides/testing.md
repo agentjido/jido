@@ -10,6 +10,12 @@ The complete suite currently runs with:
 mix test --include example --include flaky --seed 0
 ```
 
+This command also runs the research acceptance tests. Their recorded baseline
+has 11 failing assertions for proposed features that Core does not implement.
+See the [research results](../test/examples/99_research/README.md).
+Keep these assertions enabled. A matching failure count does not make the full
+suite pass or complete beta QA.
+
 Default `mix test` excludes `:example`, `:flaky`, and the approved `:skip` test.
 All example tests, including the former integration scenarios, use `:example`.
 `mix examples --seed 0` selects that complete example suite. Run the complete

@@ -8,6 +8,10 @@
 Jido is an Agent framework for Elixir. It keeps domain state in immutable
 `%Jido.Agent{}` values and puts OTP runtime state in `Jido.AgentServer`.
 
+This `v3-spike` branch is an alpha for evaluation. It has breaking changes from
+V2. Beta release checks are not complete. See the [migration guide](guides/migration.md)
+for the API changes, known limits, and required checks.
+
 ## Core model
 
 1. Define neutral Agent data and its Zoi state schema.
