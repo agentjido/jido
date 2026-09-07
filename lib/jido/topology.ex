@@ -8,9 +8,10 @@ defmodule Jido.Topology do
   `examples/07_topology` for local startup and JSON transport.
 
   Pass static authoring extensions with
-  `use Jido.Topology, extensions: [MyExtension]`. Each extension implements
-  `Jido.Topology.Extension` and lowers its declarations into ordinary Topology
-  configuration before common validation.
+  `use Jido.Topology, extensions: [MyExtension]`. An extension can implement
+  `Jido.Agent.Extension`, `Jido.Topology.Extension`, or both. The combined host
+  sends its declarations to `lower_agent/2`, `lower_topology/2`, or both before
+  common validation.
   """
 
   alias Jido.Agent.Authoring
@@ -43,28 +44,11 @@ defmodule Jido.Topology do
 
   @doc "Declares a topology module."
   defmacro __using__(opts) do
-    {owner_opts, topology_opts} =
-      if is_list(opts) do
-        {
-          Keyword.take(opts, [:name, :description, :max_state_size, :extensions]),
-          Keyword.drop(opts, [:description, :max_state_size])
-        }
-      else
-        {opts, opts}
-      end
-
-    owner_opts =
-      if is_list(owner_opts) do
-        Keyword.put(owner_opts, :__host__, :topology)
-      else
-        owner_opts
-      end
-
     quote location: :keep do
-      use Jido.Agent, unquote(owner_opts)
+      use Jido.Agent, {:__jido_internal_host__, :topology, unquote(opts)}
       import Jido.Topology.Reference, only: [input: 1, member: 1]
       import Jido.Topology.Ref, only: [ref: 2]
-      @topology_options unquote(topology_opts)
+      @topology_options unquote(opts)
       @before_compile Jido.Topology.DSL.Compiler
 
       @doc "Returns the topology owner Agent definition."

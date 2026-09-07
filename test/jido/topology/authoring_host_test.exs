@@ -171,6 +171,58 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     assert {:ok, %Instance{}} = module.new(id: "default-topology")
   end
 
+  test "module attribute options keep the combined authoring host" do
+    module = Module.concat(__MODULE__, "AttributeOptions#{System.unique_integer([:positive])}")
+
+    compile_isolated(
+      quote do
+        defmodule unquote(module) do
+          @options [name: "attribute_options", max_state_size: 1_024]
+          use Jido.Topology, @options
+
+          topology do
+            agents do
+              agent :worker, Jido.Examples.Topology.Cell
+            end
+          end
+        end
+      end
+    )
+
+    assert %Agent{name: "attribute_options", max_state_size: 1_024} = module.agent()
+    assert Enum.map(module.topology().agents, & &1.key) == ["worker"]
+  end
+
+  test "map options keep the combined authoring host" do
+    module = Module.concat(__MODULE__, "MapOptions#{System.unique_integer([:positive])}")
+
+    compile_isolated(
+      quote do
+        defmodule unquote(module) do
+          use Jido.Topology, %{
+            name: "map_options",
+            description: "Topology owner",
+            max_state_size: 2_048
+          }
+
+          topology do
+            resources do
+              bus :events
+            end
+          end
+        end
+      end
+    )
+
+    assert %Agent{
+             name: "map_options",
+             description: "Topology owner",
+             max_state_size: 2_048
+           } = module.agent()
+
+    assert [%{key: "events"}] = module.topology().resources
+  end
+
   test "one topology section cannot be split between legacy and nested locations" do
     module = Module.concat(__MODULE__, "Split#{System.unique_integer([:positive])}")
 

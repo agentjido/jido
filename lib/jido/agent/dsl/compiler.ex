@@ -7,6 +7,7 @@ defmodule Jido.Agent.DSL.Compiler do
   defmacro __before_compile__(env) do
     original = Module.get_attribute(env.module, :jido_agent_options)
     config = unwrap!(Authoring.attrs(original), env)
+    config = host_config(config, env)
     {extensions, config} = Map.pop(config, :extensions, [])
 
     extensions =
@@ -69,6 +70,14 @@ defmodule Jido.Agent.DSL.Compiler do
       if unquote(block?) do
         @after_verify {Jido.Agent.DSL.Compiler, :verify}
       end
+    end
+  end
+
+  defp host_config(config, env) do
+    if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
+      Map.take(config, [:name, :description, :max_state_size, :extensions])
+    else
+      config
     end
   end
 

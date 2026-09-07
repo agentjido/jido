@@ -141,8 +141,7 @@ defmodule Jido.Agent do
 
   @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
-    {host, agent_opts} =
-      if is_list(opts), do: Keyword.pop(opts, :__host__, :agent), else: {:agent, opts}
+    {host, agent_opts} = authoring_host(opts)
 
     {dsl, constructors?, combined_extensions?} =
       case host do
@@ -256,6 +255,11 @@ defmodule Jido.Agent do
       defoverridable handle_signal: 2, checkpoint: 2, restore: 2
     end
   end
+
+  defp authoring_host({:{}, _metadata, [:__jido_internal_host__, :topology, agent_options]}),
+    do: {:topology, agent_options}
+
+  defp authoring_host(agent_options), do: {:agent, agent_options}
 
   @doc "Returns the data schema for the canonical Agent value."
   @spec schema() :: Zoi.schema()

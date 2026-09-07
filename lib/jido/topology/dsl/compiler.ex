@@ -7,6 +7,7 @@ defmodule Jido.Topology.DSL.Compiler do
   defmacro __before_compile__(env) do
     original = Module.get_attribute(env.module, :topology_options)
     config = unwrap!(Authoring.attrs(original), env)
+    config = Map.drop(config, [:description, :max_state_size])
     {extensions, config} = Map.pop(config, :extensions, [])
     validate_extensions!(extensions, env)
     extensions = Enum.filter(extensions, &extension?(&1, :lower_topology))
