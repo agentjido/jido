@@ -33,6 +33,16 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 
+  test "save rejects a nested improper list without raising", c do
+    agent = Probe.new!(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
+
+    assert {:error, {:invalid_checkpoint, :non_portable_term}} =
+             Persistence.save_agent(c.store, agent)
+
+    key = Persistence.agent_key(nil, Probe, c.id)
+    assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
+  end
+
   test "load rejects a nested process handle supplied by storage", c do
     assert :ok = Probe.store_payload(c.store, c.id, %{job: %{worker: self()}})
     assert {:error, _} = Persistence.load_agent(c.store, Probe, c.id)

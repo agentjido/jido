@@ -24,7 +24,7 @@ defmodule JidoCoreBench.SchedulerCapture do
             runtime = SchedulerCases.setup(kind, %{})
 
             try do
-              Fixtures.equal!(SchedulerCases.deliver(runtime), {:previous, :idle})
+              Fixtures.equal!(SchedulerCases.deliver(runtime), {:idle, {:after, :previous}})
             after
               SchedulerCases.cleanup(runtime)
             end

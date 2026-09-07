@@ -180,7 +180,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
 
     scheduler = eventually(fn -> Server.children(pid)[{:plugin, Scheduler}] end)
 
-    {_spec, old_job_pid, _ref} =
+    {_spec, old_job_pid, _ref, _token} =
       eventually(fn ->
         :sys.get_state(scheduler.pid).cron_jobs[:heartbeat]
       end)
@@ -192,7 +192,7 @@ defmodule Jido.Plugin.Scheduler.LiveRuntimeTest do
     new_job_pid =
       eventually(fn ->
         case :sys.get_state(scheduler.pid).cron_jobs[:heartbeat] do
-          {_spec, current_job, _ref}
+          {_spec, current_job, _ref, _token}
           when is_pid(current_job) and current_job != old_job_pid ->
             current_job
 

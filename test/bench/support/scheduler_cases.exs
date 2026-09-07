@@ -26,7 +26,7 @@ defmodule JidoCoreBench.SchedulerCases do
         "scheduler/task_capture/#{kind}",
         &setup(kind, &1),
         &deliver/1,
-        &F.equal!(&1, {:previous, :idle})
+        &F.equal!(&1, {:idle, {:after, :previous}})
       )
       |> Map.put(:cleanup, &cleanup/1)
     end
@@ -51,7 +51,7 @@ defmodule JidoCoreBench.SchedulerCases do
         Scheduler.build_cron_spec("0 0 1 1 *", signal)
         |> Map.merge(%{delivery: :durable, generation: 1})
 
-      %{runtime | desired_cron: %{job: spec}, last_delivered_job: :previous}
+      %{runtime | desired_cron: %{job: spec}, delivery_cursor: {:after, :previous}}
     after
       Process.flag(:trap_exit, previous_trap)
     end

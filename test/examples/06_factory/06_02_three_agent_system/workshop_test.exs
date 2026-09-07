@@ -210,7 +210,9 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
         runtime = :sys.get_state(scheduler)
 
         clocks =
-          Enum.map(runtime.cron_jobs, fn {key, {_, pid, _}} -> {key, :sys.get_state(pid)} end)
+          Enum.map(runtime.cron_jobs, fn {key, {_, pid, _, _}} ->
+            {key, :sys.get_state(pid)}
+          end)
 
         # Preserve process state when the assertion fails.
         # credo:disable-for-next-line Credo.Check.Warning.IoInspect

@@ -11,6 +11,15 @@ defmodule Jido.Plugin.Scheduler.Durable do
   def marked?(signal), do: Signal.get_context(signal, @marker) == true
   def definition(spec), do: Map.drop(spec, @progress)
 
+  def current_queue?(%{cron: cron}, %Queue{} = directive) when is_map(cron) do
+    case Map.get(cron, directive.job_id) do
+      %{delivery: :durable, generation: generation} -> generation == directive.generation
+      _spec -> false
+    end
+  end
+
+  def current_queue?(_state, %Queue{}), do: false
+
   def enqueue_signal(job_id, generation, scheduled_at) do
     Signal.new!(
       "jido.scheduler.enqueue",
@@ -51,7 +60,7 @@ defmodule Jido.Plugin.Scheduler.Durable do
         end
 
       _ ->
-        {:error, :stale_schedule_generation}
+        {:ok, state}
     end
   end
 
