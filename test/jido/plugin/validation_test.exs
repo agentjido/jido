@@ -34,6 +34,56 @@ defmodule Jido.Plugin.ValidationTest do
     def child_spec(_), do: throw(:bad_child_spec)
   end
 
+  defmodule FailingStateSpec do
+    use Jido.Plugin
+
+    def state_spec(opts) do
+      case Keyword.fetch!(opts, :failure) do
+        :raise -> raise ArgumentError, "Invalid Plugin setting"
+        :throw -> throw(:invalid_plugin_setting)
+        :exit -> exit(:invalid_plugin_setting)
+        :returned -> {:error, Jido.Error.validation_error("Invalid Plugin setting")}
+      end
+    end
+  end
+
+  test "state schema callback exceptions return structured errors before composition" do
+    for failure <- [:raise, :throw, :exit] do
+      assert {:error, error} =
+               Jido.Agent.new(%{
+                 name: "bad_plugin_state_schema",
+                 schema: Zoi.object(%{}),
+                 plugins: [{FailingStateSpec, failure: failure}]
+               })
+
+      assert error.message == "Agent Plugin state_spec/1 failed"
+      assert error.details.plugin == FailingStateSpec
+    end
+  end
+
+  test "state schema callback error structs are not treated as schema values" do
+    assert {:error, error} =
+             Jido.Agent.new(%{
+               name: "returned_plugin_state_error",
+               schema: Zoi.object(%{}),
+               plugins: [{FailingStateSpec, failure: :returned}]
+             })
+
+    assert error.message == "Invalid Plugin setting"
+  end
+
+  test "a Plugin can use error as its state key" do
+    assert {:ok, definition} =
+             Jido.Agent.new(%{
+               name: "error_field_plugin",
+               schema: Zoi.object(%{}),
+               plugins: [{Configurable, state: {:error, Zoi.integer() |> Zoi.default(7)}}]
+             })
+
+    assert {:ok, agent} = Jido.Agent.instantiate(definition)
+    assert agent.state.error == 7
+  end
+
   test "invalid Plugin declarations fail with a specific contract error" do
     for {declaration, fragment} <- [
           {Empty, "defines no capability"},

@@ -448,6 +448,8 @@ defmodule Jido.Plugin do
 
   defp validate_state_spec(:none, _module), do: {:ok, {nil, nil}}
 
+  defp validate_state_spec({:error, reason} = error, _module) when is_exception(reason), do: error
+
   defp validate_state_spec({key, %{__struct__: _type} = schema}, module) when is_atom(key) do
     case Jido.Action.validate_static_data(schema) do
       :ok ->
