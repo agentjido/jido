@@ -140,8 +140,6 @@ defmodule Jido.Agent.Codec do
     end
   end
 
-  @doc false
-  def target(target), do: Authoring.split_target(target)
   defp match_id(nil, _registry), do: {:ok, nil}
   defp match_id(match, registry), do: Registry.identifier(registry, :route_match, match)
   defp resolve_match(nil, _registry), do: {:ok, nil}

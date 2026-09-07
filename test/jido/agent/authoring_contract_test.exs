@@ -4,6 +4,7 @@ defmodule Jido.Agent.AuthoringContractTest do
   alias Jido.Agent
   alias Jido.Agent.{Builder, Command, Directive}
   alias JidoTest.AgentFixtures.Add
+  alias Jido.Agent.Codec.{Deriver, Registry}
 
   defmodule Factory do
     def new, do: Agent.new!(name: "factory") |> Agent.instantiate!(id: "factory")
@@ -67,5 +68,35 @@ defmodule Jido.Agent.AuthoringContractTest do
 
     assert {:error, %{message: "Agent module must implement handle_signal/2"}} =
              Agent.new(name: "behavior", module: Factory)
+  end
+
+  test "generated Registry IDs follow first occurrence and keep exact distinct values" do
+    schema = Zoi.object(%{})
+
+    definition =
+      Agent.new!(
+        name: "registry",
+        schema: schema,
+        metadata: %{a: [:repeat, %URI{port: 1}, :repeat, %URI{port: 1.0}], b: {:last, <<255>>}},
+        routes: [{"counter.add", {Add, %{by: 1}}}]
+      )
+
+    assert {:ok, %{entries: entries}} = Deriver.agent(definition)
+
+    assert entries === %{
+             "agent/0" => {:agent, Agent},
+             "schema/1" => {:schema, schema},
+             "atom/2" => {:atom, :a},
+             "atom/3" => {:atom, :repeat},
+             "value/4" => {:value, %URI{port: 1}},
+             "value/5" => {:value, %URI{port: 1.0}},
+             "atom/6" => {:atom, :b},
+             "atom/7" => {:atom, :last},
+             "action/8" => {:action, Add},
+             "atom/9" => {:atom, :by}
+           }
+
+    registry = Registry.new!(%{"integer" => {:value, %URI{port: 1}}})
+    assert {:ok, "integer"} = Registry.identifier(registry, :value, %URI{port: 1.0})
   end
 end
