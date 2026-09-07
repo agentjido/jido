@@ -104,7 +104,7 @@ defmodule Jido.Topology.Validation do
 
   defp normalize(kind, attrs) when kind in [:agent, :group] do
     with {:ok, name} <- key(attrs[:key]),
-         :ok <- agent_module(attrs[:module]),
+         {:ok, _definition} <- agent_definition(attrs[:module]),
          {:ok, state} <- initial_state(Map.get(attrs, :initial_state, %{})),
          {:ok, deps} <- Authoring.traverse(Map.get(attrs, :depends_on, []), &Ref.target/1) do
       agent = %{key: name, module: attrs.module, initial_state: state, depends_on: deps}
@@ -293,18 +293,66 @@ defmodule Jido.Topology.Validation do
 
   defp static(value) do
     case Jido.Action.validate_static_data(value) do
-      :ok -> :ok
+      :ok -> static_references(value)
       _ -> Authoring.error("Topology data must not contain runtime values")
     end
   end
 
-  defp agent_module(module) when is_atom(module) and not is_nil(module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :agent, 0),
-      do: :ok,
-      else: Authoring.error("Expected an Agent module", %{module: module})
+  defp static_references(%Reference{} = reference), do: Reference.validate(reference)
+  defp static_references(%Ref{} = reference), do: Ref.validate(reference)
+
+  defp static_references(value) when is_map(value) and not is_struct(value) do
+    Enum.reduce_while(value, :ok, fn {key, item}, :ok ->
+      case static_references(key) do
+        :ok ->
+          case static_references(item) do
+            :ok -> {:cont, :ok}
+            {:error, _error} = error -> {:halt, error}
+          end
+
+        {:error, _error} = error ->
+          {:halt, error}
+      end
+    end)
   end
 
-  defp agent_module(_), do: Authoring.error("Expected an Agent module")
+  defp static_references(value) when is_list(value) do
+    Enum.reduce_while(value, :ok, fn item, :ok ->
+      case static_references(item) do
+        :ok -> {:cont, :ok}
+        {:error, _error} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp static_references(value) when is_tuple(value),
+    do: value |> Tuple.to_list() |> static_references()
+
+  defp static_references(_value), do: :ok
+
+  @doc false
+  def agent_definition(module) when is_atom(module) and not is_nil(module) do
+    case Code.ensure_loaded(module) do
+      {:module, ^module} ->
+        with true <- function_exported?(module, :__agent_config__, 0),
+             {:ok, definition} <-
+               Jido.Agent.__definition_from_module__(module, module.__agent_config__()) do
+          {:ok, definition}
+        else
+          {:error, _error} = error -> error
+          _ -> Authoring.error("Expected an Agent module", %{module: module})
+        end
+
+      {:error, _reason} ->
+        Authoring.error("Expected an Agent module", %{module: module})
+    end
+  rescue
+    _error -> Authoring.error("Expected an Agent module", %{module: module})
+  catch
+    _kind, _reason -> Authoring.error("Expected an Agent module", %{module: module})
+  end
+
+  def agent_definition(_module), do: Authoring.error("Expected an Agent module")
 
   defp reserved(config, keys) do
     if Enum.any?(keys, &Keyword.has_key?(config, &1)),

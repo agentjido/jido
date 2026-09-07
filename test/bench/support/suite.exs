@@ -11,6 +11,7 @@ Code.require_file("scheduler_cases.exs", __DIR__)
 Code.require_file("codec_cases.exs", __DIR__)
 Code.require_file("observe_cases.exs", __DIR__)
 Code.require_file("authoring_cases.exs", __DIR__)
+Code.require_file("topology_cases.exs", __DIR__)
 
 defmodule JidoCoreBench.Suite do
   @moduledoc false
@@ -27,7 +28,8 @@ defmodule JidoCoreBench.Suite do
     SchedulerCases,
     CodecCases,
     ObserveCases,
-    AuthoringCases
+    AuthoringCases,
+    TopologyCases
   }
 
   def run(profile, filter \\ nil) do
@@ -119,7 +121,8 @@ defmodule JidoCoreBench.Suite do
       SchedulerCases.workloads(s.payloads) ++
       CodecCases.workloads() ++
       ObserveCases.workloads() ++
-      AuthoringCases.workloads(s.sizes)
+      AuthoringCases.workloads(s.sizes) ++
+      TopologyCases.workloads(s.sizes)
   end
 
   def write!(report, directory) do

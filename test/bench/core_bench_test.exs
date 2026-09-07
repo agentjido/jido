@@ -12,8 +12,10 @@ defmodule JidoCoreBenchTest do
 
   test "smoke cases check results, copied values, and process cleanup" do
     workloads = Suite.workloads("smoke")
-    assert length(workloads) == 142
+    assert length(workloads) == 146
     assert length(Enum.uniq_by(workloads, & &1.id)) == length(workloads)
+    assert Enum.any?(workloads, &(&1.id == "topology/builder/agents_128"))
+    assert Enum.any?(workloads, &(&1.id == "topology/definition/agents_128"))
 
     for w <- workloads do
       assert length(Measure.timing(w, 1, 2).wall_ns.samples) == 2

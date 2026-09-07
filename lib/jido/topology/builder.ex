@@ -1,11 +1,20 @@
 defmodule Jido.Topology.Builder do
-  @moduledoc "Builds ordered topology declarations and preserves the first error."
+  @moduledoc """
+  Builds ordered topology declarations and preserves the first error.
+
+  Collections use reversed internal storage so each append has constant cost.
+  Build restores declaration order before common validation.
+  """
   alias Jido.Agent.Authoring
   alias Jido.Topology
   alias Jido.Topology.Validation
 
-  @schema Zoi.struct(__MODULE__, %{config: Zoi.map(), error: Zoi.any() |> Zoi.nullable()})
-  @type t :: unquote(Zoi.type_spec(@schema))
+  @schema Zoi.struct(__MODULE__, %{
+            config: Zoi.map(),
+            reversed_collections: Zoi.map() |> Zoi.default(%{}),
+            error: Zoi.any() |> Zoi.nullable()
+          })
+  @opaque t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
@@ -26,8 +35,9 @@ defmodule Jido.Topology.Builder do
 
   def new(attrs) do
     with {:ok, config} <- Authoring.attrs(attrs), :ok <- Validation.keys(config) do
-      Enum.reduce(config, %__MODULE__{config: %{}, error: nil}, fn {key, value}, builder ->
-        put(builder, key, value)
+      Enum.reduce(config, %__MODULE__{config: %{}, reversed_collections: %{}, error: nil}, fn
+        {key, value}, builder ->
+          put(builder, key, value)
       end)
     else
       {:error, error} -> %__MODULE__{config: %{}, error: error}
@@ -74,7 +84,14 @@ defmodule Jido.Topology.Builder do
 
   @doc "Builds a validated definition."
   def build(%__MODULE__{error: error}) when not is_nil(error), do: {:error, error}
-  def build(%__MODULE__{config: config}), do: Topology.new(config)
+
+  def build(%__MODULE__{config: config, reversed_collections: reversed}) do
+    config =
+      Map.merge(config, Map.new(reversed, fn {key, values} -> {key, Enum.reverse(values)} end))
+
+    Topology.new(config)
+  end
+
   @doc "Builds an instance with explicit options."
   def build(builder, opts) do
     with {:ok, definition} <- build(builder), do: Topology.instantiate(definition, opts)
@@ -90,10 +107,14 @@ defmodule Jido.Topology.Builder do
   defp append(builder, kind, base, opts) do
     with {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, Map.keys(opts) -- Map.keys(base)),
-         {:ok, entry} <- Validation.entry(kind, Map.merge(base, opts)),
-         field = collection(kind),
-         {:ok, existing} <- Authoring.traverse(Map.get(builder.config, field, []), &{:ok, &1}) do
-      put(builder, field, existing ++ [entry])
+         {:ok, entry} <- Validation.entry(kind, Map.merge(base, opts)) do
+      field = collection(kind)
+
+      %{
+        builder
+        | reversed_collections:
+            Map.update(builder.reversed_collections, field, [entry], &[entry | &1])
+      }
     else
       {:error, error} -> %{builder | error: error}
     end
@@ -109,6 +130,22 @@ defmodule Jido.Topology.Builder do
   end
 
   defp put(%{error: error} = builder, _, _) when not is_nil(error), do: builder
+
+  defp put(builder, key, value)
+       when key in [
+              :agents,
+              :groups,
+              :resources,
+              :relationships,
+              :connections,
+              :includes,
+              :imports,
+              :exports
+            ] and is_list(value),
+       do: %{
+         builder
+         | reversed_collections: Map.put(builder.reversed_collections, key, Enum.reverse(value))
+       }
 
   defp put(builder, key, value) do
     case Validation.field(key, value) do

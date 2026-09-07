@@ -24,10 +24,22 @@ defmodule Jido.Topology.Reference do
   @doc "References one field of a keyed group member."
   def member(key), do: new!(:member, key)
 
+  @doc false
+  def new(kind, key) do
+    with :ok <- reference_kind(kind),
+         :ok <- reference_key(key),
+         do: {:ok, %__MODULE__{kind: kind, key: key}}
+  end
+
+  @doc false
+  def validate(%__MODULE__{kind: kind, key: key} = reference) do
+    with {:ok, ^reference} <- new(kind, key), do: :ok
+  end
+
   defp new!(kind, key) do
-    case Zoi.parse(@schema, %{kind: kind, key: key}) do
+    case new(kind, key) do
       {:ok, value} -> value
-      {:error, _} -> raise ArgumentError, "Reference key must be an atom or string"
+      {:error, error} -> raise ArgumentError, Exception.message(error)
     end
   end
 
@@ -35,11 +47,13 @@ defmodule Jido.Topology.Reference do
   def resolve(value, input, member \\ %{})
 
   def resolve(%__MODULE__{kind: kind, key: key}, input, member) do
-    source = if kind == :input, do: input, else: member
+    with {:ok, reference} <- new(kind, key) do
+      source = if reference.kind == :input, do: input, else: member
 
-    case Map.fetch(source, key) do
-      {:ok, value} -> {:ok, value}
-      :error -> Authoring.error("Missing topology reference", %{kind: kind, key: key})
+      case Map.fetch(source, reference.key) do
+        {:ok, value} -> {:ok, value}
+        :error -> Authoring.error("Missing topology reference", %{kind: kind, key: key})
+      end
     end
   end
 
@@ -60,4 +74,16 @@ defmodule Jido.Topology.Reference do
   end
 
   def resolve(value, _input, _member), do: {:ok, value}
+
+  defp reference_kind(kind) when kind in [:input, :member], do: :ok
+  defp reference_kind(_kind), do: Authoring.error("Reference kind must be :input or :member")
+
+  defp reference_key(key) when is_atom(key) and key not in [nil, true, false], do: :ok
+
+  defp reference_key(key) when is_binary(key) and byte_size(key) in 1..255 do
+    if String.valid?(key), do: :ok, else: Authoring.error("Reference key must be UTF-8")
+  end
+
+  defp reference_key(_key),
+    do: Authoring.error("Reference key must be a nonempty atom or string of at most 255 bytes")
 end

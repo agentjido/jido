@@ -1,9 +1,19 @@
+defmodule JidoTest.Topology.InvalidSourceLocatedTopology do
+  def __topology_config__ do
+    config = Jido.Examples.Topology.Swarm.__topology_config__()
+    [agent] = config.agents
+    %{config | agents: [%{agent | module: String}]}
+  end
+
+  def __topology_sources__, do: Jido.Examples.Topology.Swarm.__topology_sources__()
+end
+
 defmodule Jido.Topology.AuthoringTest do
   use ExUnit.Case, async: true
 
   alias Jido.Examples.Topology.{Accounts, Cell, Formats, Swarm}
   alias Jido.Topology
-  alias Jido.Topology.{Builder, Codec, Plan, Reference}
+  alias Jido.Topology.{Builder, Codec, Plan, Ref, Reference}
 
   test "DSL, Builder, and JSON produce equal definitions and plans" do
     definition = Swarm.topology()
@@ -31,6 +41,35 @@ defmodule Jido.Topology.AuthoringTest do
     definition = Accounts.topology()
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+  end
+
+  test "every accepted Reference key survives a definition Codec round trip" do
+    for reference <- [
+          Reference.input(:initial),
+          Reference.input("initial"),
+          Reference.member(:index),
+          Reference.member("index")
+        ] do
+      definition = Topology.new!(name: "reference-round-trip", metadata: %{reference: reference})
+      assert {:ok, document, registry} = Codec.encode(definition)
+      assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    end
+  end
+
+  test "Reference constructors and static validation use the same key contract" do
+    for key <- [nil, true, false, "", String.duplicate("x", 256)] do
+      assert_raise ArgumentError, fn -> Reference.input(key) end
+      assert_raise ArgumentError, fn -> Reference.member(key) end
+    end
+
+    for reference <- [
+          %Reference{kind: :input, key: ""},
+          %Reference{kind: :other, key: :field},
+          %Ref{component: "", key: "worker"}
+        ] do
+      assert {:error, _error} =
+               Topology.new(name: "invalid-reference", metadata: %{reference: reference})
+    end
   end
 
   test "keyed identities do not depend on source ordering" do
@@ -130,6 +169,16 @@ defmodule Jido.Topology.AuthoringTest do
 
     assert {:error, _} =
              Builder.new(name: "bad") |> Builder.agent(:a, Cell, key: :b) |> Builder.build()
+  end
+
+  test "Builder preserves declaration order at scale" do
+    builder =
+      Enum.reduce(1..1_000, Builder.new(name: "ordered"), fn index, builder ->
+        Builder.agent(builder, "agent-#{index}", Cell)
+      end)
+
+    assert {:ok, definition} = Builder.build(builder)
+    assert Enum.map(definition.agents, & &1.key) == Enum.map(1..1_000, &"agent-#{&1}")
   end
 
   test "Builder field errors remain sticky and invalid modules return errors" do
@@ -238,6 +287,22 @@ defmodule Jido.Topology.AuthoringTest do
         ] do
       assert_raise CompileError, fn -> compile_isolated(source) end
     end
+  end
+
+  test "DSL semantic errors retain the declaration source line" do
+    source =
+      Enum.find(Swarm.__topology_sources__(), &(&1.field == :agents and &1.index == 0))
+
+    assert source.line > 1
+    line = source.line
+
+    error =
+      assert_raise CompileError, fn ->
+        Jido.Topology.DSL.Compiler.verify(JidoTest.Topology.InvalidSourceLocatedTopology)
+      end
+
+    assert error.file == Path.expand(__ENV__.file)
+    assert %{description: "Expected an Agent module", line: ^line} = error
   end
 
   defp compile_isolated(source) do

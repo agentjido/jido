@@ -235,6 +235,33 @@ defmodule Jido.Topology.CompositionTest do
              |> Builder.build(id: "child-limit")
   end
 
+  test "Agent limits fail before member and Agent state transformations" do
+    assert {:error, member_error} =
+             Builder.new(name: "member-limit")
+             |> Builder.group(:workers, Cell,
+               members: [%{}, %{id: "valid"}],
+               key_by: :id
+             )
+             |> Builder.startup(max_agents: 1)
+             |> Builder.build(id: "member-limit")
+
+    assert Exception.message(member_error) =~ "max_agents"
+
+    child =
+      Builder.new(name: "invalid-child")
+      |> Builder.agent(:invalid, Cell, initial_state: %{total: "invalid"})
+      |> Builder.agent(:valid, Cell)
+      |> Builder.startup(max_agents: 1)
+      |> Builder.build!()
+
+    assert {:error, child_error} =
+             Builder.new(name: "parent")
+             |> Builder.include(:child, child)
+             |> Builder.build(id: "child-limit-order")
+
+    assert Exception.message(child_error) =~ "max_agents"
+  end
+
   test "child schemas validate mapped input and report the component path" do
     assert {:error, error} =
              ComposedSystem.new(id: "bad", input: %{east_workers: 1, west_workers: 1.5})
@@ -299,6 +326,28 @@ defmodule Jido.Topology.CompositionTest do
 
     assert {:error, error} = Topology.new(source)
     assert Exception.message(error) =~ "depth"
+  end
+
+  test "composition accepts 1000 scopes and rejects scope 1001" do
+    leaf = Builder.new(name: "leaf") |> Builder.build!()
+
+    builder =
+      Enum.reduce(1..999, Builder.new(name: "scope-limit"), fn index, builder ->
+        Builder.include(builder, "scope-#{index}", leaf)
+      end)
+
+    assert {:ok, topology} = Builder.build(builder)
+
+    assert Enum.map(topology.includes, & &1.key) ==
+             Enum.map(1..999, &"scope-#{&1}")
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Topology exceeds 1000 component scopes"
+            }} =
+             builder
+             |> Builder.include("scope-1000", leaf)
+             |> Builder.build()
   end
 
   test "Codec rejects changes to nested topology and export reference records" do

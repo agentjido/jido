@@ -24,4 +24,17 @@ defmodule Jido.Topology.Codec.ValueTest do
       assert error.message == message
     end
   end
+
+  test "encoding rejects Reference values that decoding cannot accept" do
+    registry = Registry.new!(%{})
+
+    for reference <- [
+          %Reference{kind: :input, key: ""},
+          %Reference{kind: :member, key: true},
+          %Reference{kind: :other, key: :field},
+          %Ref{component: "", key: "worker"}
+        ] do
+      assert {:error, _error} = Value.encode(reference, registry)
+    end
+  end
 end

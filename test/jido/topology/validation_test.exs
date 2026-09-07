@@ -2,6 +2,11 @@ defmodule Jido.Topology.ValidationTest do
   use JidoTest.Case, async: true
   alias Jido.Topology
   alias Jido.Topology.{Instance, Reference, Validation}
+
+  defmodule AgentFunctionOnly do
+    def agent, do: :not_a_definition
+  end
+
   alias JidoTest.AgentFixtures.CounterAgent
 
   test "Instance schema validates constructed topology values" do
@@ -46,6 +51,30 @@ defmodule Jido.Topology.ValidationTest do
       assert {:error, error} = Topology.new([name: "invalid-topology"] ++ attrs)
       assert error.message == message
     end
+  end
+
+  test "Agent modules must use the definition contract needed by planning and activation" do
+    assert {:error, error} =
+             Topology.new(
+               name: "invalid-agent-contract",
+               agents: [%{key: :agent, module: AgentFunctionOnly}]
+             )
+
+    assert error.message == "Expected an Agent module"
+  end
+
+  test "unavailable Agent modules return a validation error" do
+    missing_module = JidoTest.UnavailableTopologyAgent
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Expected an Agent module",
+              details: %{module: ^missing_module}
+            }} =
+             Topology.new(
+               name: "unavailable-agent-module",
+               agents: [%{key: :agent, module: missing_module}]
+             )
   end
 
   test "topology input must be a map and can supply the full initial Agent state" do

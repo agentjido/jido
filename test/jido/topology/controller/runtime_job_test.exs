@@ -55,6 +55,22 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
     assert_stale_messages(finished, task)
   end
 
+  test "a dead completion cannot make the Runtime ready or release waiters", %{jido: jido} do
+    {state, task} = active_job(jido)
+    token = make_ref()
+    waiter = {{self(), make_ref()}, nil}
+    dead = spawn(fn -> :ok end)
+    monitor = Process.monitor(dead)
+    assert_receive {:DOWN, ^monitor, :process, ^dead, :normal}, 1_000
+
+    state = %{state | pending: MapSet.new(), waiters: %{token => waiter}}
+    assert {:noreply, finished} = Runtime.handle_info({task.ref, {:ok, dead}}, state)
+    assert finished.phase == :degraded
+    assert finished.ready == %{}
+    assert finished.errors == %{"agent/parent" => :member_unavailable}
+    assert finished.waiters == %{token => waiter}
+  end
+
   test "DOWN without timeout keeps its reason", %{jido: jido} do
     {state, task} = active_job(jido)
 
