@@ -4,16 +4,36 @@ defmodule Jido.Agent.Authoring do
   alias Jido.Error
   alias Jido.Signal.Router
 
-  def attrs(value) when is_map(value) and not is_struct(value), do: {:ok, value}
-
-  def attrs(value) when is_list(value) do
-    if Keyword.keyword?(value) and
-         length(Keyword.keys(value)) == length(Enum.uniq(Keyword.keys(value))),
-       do: {:ok, Map.new(value)},
-       else: error("Expected unique keyword options", %{value: value})
+  def attrs(value) do
+    case to_attrs(value, :reject) do
+      {:ok, attrs} -> {:ok, attrs}
+      :error when is_list(value) -> error("Expected unique keyword options", %{value: value})
+      :error -> error("Expected a map or keyword list", %{value: value})
+    end
   end
 
-  def attrs(value), do: error("Expected a map or keyword list", %{value: value})
+  # Public boundaries keep their own duplicate policy and error context.
+  def to_attrs(value, duplicates \\ :last)
+  def to_attrs(value, _duplicates) when is_map(value) and not is_struct(value), do: {:ok, value}
+
+  def to_attrs(value, duplicates) when is_list(value) do
+    if Keyword.keyword?(value) and
+         (duplicates == :last or Enum.uniq(Keyword.keys(value)) == Keyword.keys(value)),
+       do: {:ok, Map.new(value)},
+       else: :error
+  end
+
+  def to_attrs(_value, _duplicates), do: :error
+
+  # A tuple is a target with defaults only when its second element is a map.
+  # Keep this distinct from the stricter explicit :defaults option below.
+  def split_target({target, defaults}) when is_map(defaults), do: {target, defaults}
+  def split_target(target), do: {target, nil}
+
+  def validate_target(target) do
+    {executable, _defaults} = split_target(target)
+    Jido.Executable.validate(executable)
+  end
 
   def options(value) do
     with {:ok, attrs} <- attrs(value),

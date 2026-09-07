@@ -56,20 +56,11 @@ defmodule Jido.Agent.Command do
   @spec normalize_context(term()) :: {:ok, map()} | {:error, Exception.t()}
   def normalize_context(nil), do: {:ok, %{}}
 
-  def normalize_context(context)
-      when is_map(context) and not is_struct(context),
-      do: {:ok, context}
-
-  def normalize_context(context) when is_list(context) do
-    if Keyword.keyword?(context) do
-      {:ok, Map.new(context)}
-    else
-      invalid("Agent caller context must be a map or keyword list", %{context: context})
-    end
-  end
-
   def normalize_context(context) do
-    invalid("Agent caller context must be a map or keyword list", %{context: context})
+    case Jido.Agent.Authoring.to_attrs(context) do
+      {:ok, context} -> {:ok, context}
+      :error -> invalid("Agent caller context must be a map or keyword list", %{context: context})
+    end
   end
 
   defp agent?(%{__struct__: Jido.Agent}), do: true

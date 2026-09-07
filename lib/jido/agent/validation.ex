@@ -2,6 +2,7 @@ defmodule Jido.Agent.Validation do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Agent.Authoring
   alias Jido.Agent.State
   alias Jido.Error
   alias Jido.Plugin
@@ -146,15 +147,15 @@ defmodule Jido.Agent.Validation do
   end
 
   defp validate_common(%Agent{} = agent) do
-    with {:ok, name} <- validate_name(agent.name),
-         {:ok, description} <- validate_description(agent.description),
+    with {:ok, name} <- field(:name, agent.name),
+         {:ok, description} <- field(:description, agent.description),
          :ok <- validate_module(agent.module),
          :ok <- Jido.Agent.StateBudget.validate_limit(agent.max_state_size),
          {:ok, plugins} <- Plugin.canonical_declarations(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
          {:ok, _complete_schema} <- Plugin.compose_schema(agent.schema, plugins),
          {:ok, routes} <- validate_routes(agent.routes),
-         {:ok, metadata} <- validate_metadata(agent.metadata) do
+         {:ok, metadata} <- field(:metadata, agent.metadata) do
       {:ok,
        %{
          agent
@@ -205,19 +206,21 @@ defmodule Jido.Agent.Validation do
   defp validate_id(id) when is_binary(id) and byte_size(id) > 0, do: {:ok, id}
   defp validate_id(id), do: invalid("Agent id must be a non-empty string", %{id: id})
 
-  defp validate_name(name) do
-    case Jido.Util.validate_name(name) do
-      {:ok, name} -> {:ok, name}
-      {:error, error} -> {:error, error}
-    end
-  end
+  @doc false
+  def field(:name, name), do: Jido.Util.validate_name(name)
 
-  defp validate_description(nil), do: {:ok, nil}
-  defp validate_description(description) when is_binary(description), do: {:ok, description}
+  def field(:description, description) when is_nil(description) or is_binary(description),
+    do: {:ok, description}
 
-  defp validate_description(description) do
+  def field(:description, description) do
     invalid("Agent description must be a string or nil", %{description: description})
   end
+
+  def field(:metadata, metadata) when is_map(metadata) and not is_struct(metadata),
+    do: {:ok, metadata}
+
+  def field(:metadata, metadata),
+    do: invalid("Agent metadata must be a map", %{metadata: metadata})
 
   defp validate_module(module) when is_atom(module) and not is_nil(module) do
     case Code.ensure_loaded(module) do
@@ -250,7 +253,7 @@ defmodule Jido.Agent.Validation do
 
   defp validate_targets(routes) do
     Enum.reduce_while(routes, :ok, fn route, :ok ->
-      target = route_executable(route.target)
+      {target, _defaults} = Authoring.split_target(route.target)
 
       case Jido.Executable.validate(target) do
         :ok ->
@@ -262,28 +265,11 @@ defmodule Jido.Agent.Validation do
     end)
   end
 
-  defp route_executable({target, input}) when is_map(input), do: target
-  defp route_executable(target), do: target
-
-  defp validate_metadata(metadata) when is_map(metadata) and not is_struct(metadata),
-    do: {:ok, metadata}
-
-  defp validate_metadata(metadata),
-    do: invalid("Agent metadata must be a map", %{metadata: metadata})
-
-  defp normalize_attrs(attrs, _source) when is_map(attrs) and not is_struct(attrs),
-    do: {:ok, attrs}
-
-  defp normalize_attrs(attrs, source) when is_list(attrs) do
-    if Keyword.keyword?(attrs) do
-      {:ok, Map.new(attrs)}
-    else
-      invalid("Agent #{source} must be a map or keyword list", %{value: attrs})
-    end
-  end
-
   defp normalize_attrs(attrs, source) do
-    invalid("Agent #{source} must be a map or keyword list", %{value: attrs})
+    case Authoring.to_attrs(attrs) do
+      {:ok, attrs} -> {:ok, attrs}
+      :error -> invalid("Agent #{source} must be a map or keyword list", %{value: attrs})
+    end
   end
 
   defp validate_instance_overrides(overrides) do

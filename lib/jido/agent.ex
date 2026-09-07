@@ -460,19 +460,11 @@ defmodule Jido.Agent do
   def handle_signal(%Signal{} = signal, %__MODULE__{} = agent),
     do: Runner.prepare_default_turn(signal, agent)
 
-  defp normalize_domain_attrs(attrs) when is_map(attrs) and not is_struct(attrs),
-    do: {:ok, attrs}
-
-  defp normalize_domain_attrs(attrs) when is_list(attrs) do
-    if Keyword.keyword?(attrs) do
-      {:ok, Map.new(attrs)}
-    else
-      invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
-    end
-  end
-
   defp normalize_domain_attrs(attrs) do
-    invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
+    case Jido.Agent.Authoring.to_attrs(attrs) do
+      {:ok, attrs} -> {:ok, attrs}
+      :error -> invalid("Agent.set/2 attributes must be a map or keyword list", %{attrs: attrs})
+    end
   end
 
   defp validate_domain_attrs(agent, attrs) do

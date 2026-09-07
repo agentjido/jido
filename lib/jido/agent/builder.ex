@@ -83,7 +83,7 @@ defmodule Jido.Agent.Builder do
 
   def route(builder, path, target, opts) do
     with {:ok, route} <- Authoring.route(path, target, opts),
-         :ok <- validate_target(route.target) do
+         :ok <- Authoring.validate_target(route.target) do
       append(builder, :routes, route)
     else
       {:error, error} -> %{builder | error: error}
@@ -130,9 +130,11 @@ defmodule Jido.Agent.Builder do
     end
   end
 
-  defp valid_field(:name, value) do
-    case Jido.Util.validate_name(value) do
-      {:ok, _} -> :ok
+  defp valid_field(key, value) when key in [:name, :description, :metadata] do
+    case Agent.Validation.field(key, value) do
+      {:ok, _value} -> :ok
+      {:error, _error} when key == :metadata -> Authoring.error("Agent metadata must be a plain map")
+      {:error, error} when key == :description -> Authoring.error(error.message)
       error -> error
     end
   end
@@ -140,14 +142,6 @@ defmodule Jido.Agent.Builder do
   defp valid_field(:max_state_size, value), do: Agent.StateBudget.validate_limit(value)
 
   defp valid_field(:schema, value), do: Agent.State.validate_schema(value)
-  defp valid_field(:description, value) when is_nil(value) or is_binary(value), do: :ok
-
-  defp valid_field(:description, _value),
-    do: Authoring.error("Agent description must be a string or nil")
-
-  defp valid_field(:metadata, value) when is_map(value) and not is_struct(value), do: :ok
-  defp valid_field(:metadata, _value), do: Authoring.error("Agent metadata must be a plain map")
-
   defp valid_field(:routes, value) do
     with {:ok, routes} <- Authoring.routes(value),
          {:ok, _} <- Authoring.traverse(routes, &validate_route/1),
@@ -163,13 +157,8 @@ defmodule Jido.Agent.Builder do
   defp valid_field(_key, _value), do: :ok
 
   defp validate_route(route) do
-    with :ok <- validate_target(route.target), do: {:ok, route}
+    with :ok <- Authoring.validate_target(route.target), do: {:ok, route}
   end
-
-  defp validate_target({target, defaults}) when is_map(defaults),
-    do: Jido.Executable.validate(target)
-
-  defp validate_target(target), do: Jido.Executable.validate(target)
 
   defp append(builder, key, value) do
     case Map.get(builder.config, key, []) do

@@ -146,11 +146,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
         {fields, required} = arguments!(interface.args, env)
 
-        target =
-          case route.target do
-            {target, defaults} when is_map(defaults) -> target
-            target -> target
-          end
+        {target, _defaults} = Authoring.split_target(route.target)
 
         %{
           name: interface.name,

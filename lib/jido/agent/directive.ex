@@ -266,14 +266,9 @@ defmodule Jido.Agent.Directive do
 
   @doc "Validates one built-in Agent Directive."
   @spec validate(t()) :: {:ok, t()} | {:error, term()}
-  def validate(%Emit{signal: %Jido.Signal{}} = directive),
-    do: Zoi.parse(Emit.schema(), Map.from_struct(directive))
-
-  def validate(%EmitToParent{signal: %Jido.Signal{}} = directive),
-    do: Zoi.parse(EmitToParent.schema(), Map.from_struct(directive))
-
-  def validate(%EmitToChild{signal: %Jido.Signal{}} = directive),
-    do: Zoi.parse(EmitToChild.schema(), Map.from_struct(directive))
+  def validate(%{__struct__: module, signal: %Jido.Signal{}} = directive)
+      when module in [Emit, EmitToParent, EmitToChild],
+      do: Zoi.parse(module.schema(), Map.from_struct(directive))
 
   def validate(%{__struct__: module} = directive)
       when module in [Emit, EmitToParent, EmitToChild] do

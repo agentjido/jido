@@ -25,6 +25,22 @@ builder =
 
 The Builder preserves its first error. Always check `build/1` or `build/2`.
 
+Builder options and DSL options reject duplicate keyword keys. Direct Agent
+constructors, instance overrides, `Agent.set/2`, and caller context keep the last
+value for a repeated key. Supply each key once when moving between authoring
+forms. Caller context also accepts `nil` as an empty map.
+
+## Module Roles
+
+An Agent behavior module implements `handle_signal/2`. A module created with
+`use Jido.Agent` also supplies static configuration through `__agent_config__/0`.
+`Agent.new(module, options)` and `Builder.new(module)` require this authoring
+configuration.
+
+Agent Server startup and `SpawnAgent` also accept constructor modules with
+`new/0` or `new/1`. Such a constructor can return an Agent whose behavior module
+is different. It does not need to declare Agent configuration itself.
+
 ## Encode Static Authoring Data
 
 ```elixir
