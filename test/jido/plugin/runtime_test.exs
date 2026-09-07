@@ -83,6 +83,14 @@ defmodule Jido.Plugin.RuntimeTest do
     def child_spec(_init), do: raise("invalid runtime configuration")
   end
 
+  defmodule ConfigurableRuntimePlugin do
+    use Jido.Plugin
+
+    def child_spec(%Plugin.Init{options: opts}) do
+      Keyword.fetch!(opts, :child_spec)
+    end
+  end
+
   defmodule RuntimeAgent do
     use Agent,
       name: "runtime_plugin_agent",
@@ -313,6 +321,32 @@ defmodule Jido.Plugin.RuntimeTest do
   test "rejects an invalid runtime child specification", %{init: init} do
     assert {:error, %Jido.Error.ValidationError{}} =
              Plugin.child_specs(init, [InvalidRuntimePlugin])
+  end
+
+  test "validates all OTP child specification fields before startup", %{init: init} do
+    base = %{id: :runtime, start: {ProcessPlugin, :start_link, [init]}}
+
+    invalid_specs = [
+      %{base | start: {ProcessPlugin, :start_link, :invalid}},
+      Map.put(base, :restart, :sometimes),
+      Map.put(base, :shutdown, :later),
+      Map.put(base, :type, :process),
+      Map.put(base, :modules, :all),
+      Map.put(base, :significant, :yes),
+      %{base | start: {JidoTest.MissingRuntime, :start_link, [init]}},
+      %{base | start: {ProcessPlugin, :missing_start, [init]}}
+    ]
+
+    for child_spec <- invalid_specs do
+      assert {:error, %Jido.Error.ValidationError{} = error} =
+               Plugin.child_specs(init, [
+                 {ConfigurableRuntimePlugin, child_spec: child_spec}
+               ])
+
+      assert error.message == "Agent Plugin child_spec/1 returned an invalid child specification"
+      assert error.details.plugin == ConfigurableRuntimePlugin
+      assert Map.has_key?(error.details, :reason)
+    end
   end
 
   test "contains a failure from child_spec/1", %{init: init} do
