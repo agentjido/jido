@@ -5,8 +5,8 @@ defmodule Jido do
   alias Jido.RuntimeStore
 
   @moduledoc """
-  自動 (Jido) - An actor and agent framework for Elixir, built for workflows and
-  multi-agent systems.
+  自動 (Jido) - A declarative actor and agent framework for Elixir, built for
+  workflows and multi-agent systems.
 
   ## Quick Start
 
@@ -29,11 +29,14 @@ defmodule Jido do
 
   ## Core Concepts
 
-  Jido Agents are immutable data structures. The core operation is `cmd/2`:
+  Declare an Agent definition with its data schema, routes, Plugins, and
+  metadata. Then instantiate it with an identity and initial state. Jido Agents
+  are immutable data structures. The core operation is `cmd/2`:
 
       {:ok, agent, directives} = MyAgent.cmd(agent, signal)
 
-  - **Agents** — Immutable structs updated through Signals
+  - **Agent definitions** — Declarative descriptions with no identity or state
+  - **Agent instances** — Immutable values updated through Signals
   - **Actions** — Functions that transform Agent state and may perform work
   - **Directives** — Runtime-owned external effects (signals, processes, etc.)
 

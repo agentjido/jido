@@ -9,7 +9,7 @@ Mix.install([
 ])
 ```
 
-## Define an Agent
+## Declare An Agent
 
 ```elixir
 defmodule ObserveGuide.Counter do

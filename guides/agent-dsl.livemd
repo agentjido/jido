@@ -1,7 +1,8 @@
 # Agent DSL
 
-This Livebook uses the Jido Agent DSL to define state, routes, route defaults,
-and generated interfaces.
+This Livebook uses the Jido Agent DSL to declare a data schema, routes, route
+defaults, and generated interfaces. The declaration produces a reusable Agent
+definition.
 
 ## Install Jido
 
@@ -58,6 +59,9 @@ end
 Each field has one source. Jido rejects a field that appears in both the
 `use Jido.Agent` options and its DSL block.
 
+The DSL is declarative. It describes the Agent and generates its definition and
+interfaces. It does not start an Agent Server.
+
 ## Inspect Generated Data
 
 ```elixir
@@ -72,7 +76,7 @@ definition = AgentDSL.Profile.agent()
 }
 ```
 
-## Use The Generated Interface
+## Instantiate And Use The Generated Interface
 
 ```elixir
 agent = AgentDSL.Profile.new!(id: "profile-1")

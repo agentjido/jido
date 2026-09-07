@@ -9,7 +9,7 @@ guide and the public module documentation when you build an extension.
 | Area | Supported contract |
 | --- | --- |
 | Agent values | Immutable definitions and instances, validated state, Actions, Flows, and Directives. Direct commands return a candidate; a live Server commits it. |
-| Authoring | Spark DSL, map and keyword construction, Builder, and trusted Codecs share core validation. These forms remain supported. |
+| Authoring | Declarative modules, map and keyword declarations, Builder, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. |
 | Plugins | Declared owned state, preparation, admission, state updates, post-commit dispatch, and optional supervised runtimes. |
 | Persistence | The binary `Jido.Persistence.Adapter` contract, atomic compare-and-swap, and existing checkpoint and restore rules. |

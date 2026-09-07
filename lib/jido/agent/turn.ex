@@ -25,7 +25,7 @@ defmodule Jido.Agent.Turn do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a prepared Agent turn."
+  @doc "Returns the data schema for a prepared Agent Turn."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 

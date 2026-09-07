@@ -5,9 +5,9 @@
 [![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
 
-Jido is an actor and agent framework for Elixir. An Agent is an immutable value
-that holds identity, routes, and validated domain state. An Agent Server is the
-OTP actor that runs one Agent through serial Turns.
+Jido is a declarative actor and agent framework for Elixir. You declare what an
+Agent is, instantiate that declaration as an Agent value, and run the value as
+an OTP actor when you need a live process.
 
 This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
 changes from V2. The package is not published, and beta release checks are not
@@ -16,8 +16,12 @@ known limits, and required checks.
 
 ## Core model
 
-1. Define neutral Agent data and its Zoi state schema.
-2. Instantiate the definition with an identity and state.
+Jido follows the declarative style common in Elixir. The declaration describes
+the Agent. It does not run an imperative process loop.
+
+1. Declare an Agent definition with its data schema, routes, Plugins, and
+   metadata.
+2. Instantiate the definition with an identity and initial state.
 3. Route Signals to one Action or Flow.
 4. Let the executable propose the next domain state and Directives.
 5. Validate and commit the complete Agent value.
@@ -35,7 +39,7 @@ One `%Jido.Agent{}` has two valid forms. A definition has `id: nil` and
 `state: nil`. An instance has a non-empty `id` and validated state. A value
 that has only an id or only state is invalid.
 
-Agent modules also support the Spark `agent` and `routes` blocks, with explicit
+Agent modules provide declarative `agent` and `routes` blocks, with explicit
 nested `define` declarations for command and Signal helpers. Direct map and
 keyword construction, module construction, the runtime Builder, and the
 JSON-compatible Codec use the same Agent validation. See the

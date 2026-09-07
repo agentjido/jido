@@ -11,7 +11,7 @@ Mix.install([
 ])
 ```
 
-## Define The System
+## Declare The System
 
 ```elixir
 defmodule RepairGuide.Cell do

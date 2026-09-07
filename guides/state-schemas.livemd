@@ -1,7 +1,7 @@
 # State Schemas
 
-This Livebook defines complete Agent state with Zoi defaults and a cross-field
-rule.
+This Livebook declares a complete Agent data schema with defaults and a
+cross-field rule.
 
 ## Install Jido
 
@@ -11,7 +11,7 @@ Mix.install([
 ])
 ```
 
-## Define A State Contract
+## Declare A State Contract
 
 ```elixir
 defmodule StateSchemas.CounterState do
@@ -34,10 +34,10 @@ defmodule StateSchemas.CounterState do
 end
 ```
 
-Keep the schema static. The refinement uses a named module function, so the
-authoring contract remains explicit.
+Keep the data schema static. The refinement uses a named module function, so the
+declaration remains explicit.
 
-## Define The Agent
+## Declare The Agent
 
 ```elixir
 defmodule StateSchemas.Counter do
@@ -71,7 +71,7 @@ The result is `%{count: 0, minimum: 0, maximum: 10}`.
 error.__struct__
 ```
 
-The constructor rejects the complete state. The same schema runs for direct
+Instantiation rejects the complete state. The same data schema runs for direct
 commands, live candidates, checkpoints, and restore.
 
 ## Check The Size Budget

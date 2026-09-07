@@ -49,7 +49,7 @@ defmodule SensorGuide.Probe do
 end
 ```
 
-## Define The Agent
+## Declare The Agent
 
 ```elixir
 defmodule SensorGuide.Agent do

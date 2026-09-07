@@ -32,7 +32,7 @@ defmodule Jido.Plugin.SignalContext do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for the outbound Signal context."
+  @doc "Returns the data schema for the outbound Signal context."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 end

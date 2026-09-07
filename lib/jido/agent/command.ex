@@ -21,7 +21,7 @@ defmodule Jido.Agent.Command do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for an Agent command."
+  @doc "Returns the data schema for an Agent command."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 

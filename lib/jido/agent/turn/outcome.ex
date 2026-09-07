@@ -69,7 +69,7 @@ defmodule Jido.Agent.Turn.Outcome do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Returns the Zoi schema for a Turn outcome."
+  @doc "Returns the data schema for a Turn outcome."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 

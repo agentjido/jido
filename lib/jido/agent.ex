@@ -2,9 +2,10 @@ defmodule Jido.Agent do
   @moduledoc """
   The canonical immutable Agent value.
 
-  One Agent value has two valid forms. A definition has no identity or state.
-  An instance has a non-empty identity and complete portable state. Use
-  `new/1` to create a definition and `instantiate/2` to create an instance.
+  Jido separates declaration from instantiation. A definition declares the
+  data schema, routes, Plugins, and metadata, and has no identity or state. An
+  instance has a non-empty identity and complete portable state. Use `new/1`
+  to create a definition and `instantiate/2` to create an instance.
   `cmd/3` applies one Signal to an instance and returns a new Agent plus
   Directives. It does not start or own a process or commit live state.
 
@@ -44,9 +45,9 @@ defmodule Jido.Agent do
   or, when absent, the Signal type. Multiple matches include `details.count` and
   `details.targets`.
 
-  ## Spark authoring
+  ## Declarative authoring
 
-  An Agent module can use keyword configuration or Spark blocks:
+  An Agent module can use keyword configuration or declarative blocks:
 
       defmodule MyApp.Counter do
         use Jido.Agent, name: "counter"
@@ -77,9 +78,9 @@ defmodule Jido.Agent do
   `define` keep normal wildcard and predicate support and generate no helpers.
   A field cannot appear in both keyword and block configuration.
 
-  `Jido.Agent.Builder` and `Jido.Agent.Codec` provide runtime and JSON authoring
-  forms through the same construction validator. Use `new/2` for an Agent
-  module and instance options. These forms preserve the definition and instance
+  `Jido.Agent.Builder` and `Jido.Agent.Codec` provide programmatic and JSON
+  declaration forms through the same validator. Use `new/2` for an Agent module
+  and instance options. These forms preserve the definition and instance
   boundaries above.
   """
 
@@ -110,7 +111,7 @@ defmodule Jido.Agent do
                 |> Zoi.min(0)
                 |> Zoi.nullable()
                 |> Zoi.optional(),
-              schema: Zoi.any(description: "Static Zoi schema for Agent-owned state"),
+              schema: Zoi.any(description: "Static data schema for Agent-owned state"),
               plugins:
                 Zoi.list(Zoi.any(), description: "Canonical ordered Plugin declarations")
                 |> Zoi.default([]),
@@ -138,7 +139,7 @@ defmodule Jido.Agent do
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
-  @doc "Defines one Agent module with a reusable definition and default Signal behavior."
+  @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
     dsl_opts = if is_list(opts), do: Keyword.take(opts, [:extensions]), else: []
 
@@ -171,15 +172,15 @@ defmodule Jido.Agent do
       @spec max_state_size() :: non_neg_integer() | nil
       def max_state_size, do: __agent_config__().max_state_size
 
-      @doc "Returns the authored Agent state schema."
+      @doc "Returns the authored Agent data schema."
       @spec domain_schema() :: Zoi.schema()
       def domain_schema, do: Map.get(__agent_config__(), :schema, Zoi.object(%{}))
 
-      @doc "Returns the authored Agent state schema."
+      @doc "Returns the authored Agent data schema."
       @spec schema() :: Zoi.schema()
       def schema, do: domain_schema()
 
-      @doc "Returns the complete state schema, including Plugin-owned state."
+      @doc "Returns the complete data schema, including Plugin-owned state."
       @spec complete_schema() :: Zoi.schema()
       def complete_schema, do: Jido.Agent.complete_schema!(agent())
 
@@ -235,7 +236,7 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Returns the Zoi schema for the canonical Agent value."
+  @doc "Returns the data schema for the canonical Agent value."
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
@@ -319,13 +320,13 @@ defmodule Jido.Agent do
   @spec definition(t()) :: t()
   def definition(%__MODULE__{} = agent), do: %{agent | id: nil, state: nil}
 
-  @doc "Returns the complete state schema, including Plugin-owned state."
+  @doc "Returns the complete data schema, including Plugin-owned state."
   @spec complete_schema(t()) :: {:ok, Zoi.schema()} | {:error, Exception.t()}
   def complete_schema(%__MODULE__{} = agent) do
     Jido.Plugin.compose_schema(agent.schema, agent.plugins)
   end
 
-  @doc "Returns the complete state schema or raises its validation error."
+  @doc "Returns the complete data schema or raises its validation error."
   @spec complete_schema!(t()) :: Zoi.schema() | no_return()
   def complete_schema!(%__MODULE__{} = agent) do
     case complete_schema(agent) do

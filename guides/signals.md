@@ -1,7 +1,7 @@
 # Signals and routing
 
 Construct input with `Jido.Signal.new/3` or `new!/3`. Use a type, map data, and
-source. Declare routes in the Agent definition or the Spark `routes` block.
+source. Declare routes in the Agent definition or the declarative `routes` block.
 
 A route target can be an Action or Flow. A `{target, defaults}` route merges
 its defaults with Signal data. Signal data takes precedence. The merge is

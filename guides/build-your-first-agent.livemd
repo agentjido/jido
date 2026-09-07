@@ -1,7 +1,8 @@
 # Build Your First Agent
 
-This Livebook builds an Agent with an inline Action, a route default, and a
-generated command interface.
+This Livebook declares an Agent with an inline Action, a route default, and a
+generated command interface. It then instantiates the declaration as an Agent
+value.
 
 ## Install Jido
 
@@ -11,7 +12,7 @@ Mix.install([
 ])
 ```
 
-## Define The Agent
+## Declare The Agent
 
 Use an inline Action when the behavior is local to one Agent route. Extract a
 named Action when other Agents or Flows must reuse it.
@@ -54,8 +55,8 @@ defmodule FirstAgent.Counter do
 end
 ```
 
-The state schema supplies initial values. The Action input schema protects the
-route input. The complete Agent schema validates the returned state.
+The data schema supplies initial values. The Action input schema protects the
+route input. The complete Agent data schema validates the returned state.
 
 ## Inspect The Definition
 
@@ -72,7 +73,7 @@ definition = FirstAgent.Counter.agent()
 
 A definition has no ID and no state. It is reusable authoring data.
 
-## Create An Instance
+## Instantiate The Agent
 
 ```elixir
 agent = FirstAgent.Counter.new!(id: "counter-1")

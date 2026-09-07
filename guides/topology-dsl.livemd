@@ -31,7 +31,7 @@ defmodule TopologyGuide.Cell do
 end
 ```
 
-## Define A Topology
+## Declare A Topology
 
 ```elixir
 defmodule TopologyGuide.System do

@@ -1,15 +1,17 @@
 # Agent Definitions and Instances
 
-`Jido.Agent` is the canonical immutable Agent value. It has two valid forms.
+Jido separates declaration from instantiation. You first declare a reusable
+Agent definition. You then instantiate that definition as an immutable
+`Jido.Agent` value. The value has two valid forms.
 
 | Form | ID | State | Purpose |
 | --- | --- | --- | --- |
-| Definition | `nil` | `nil` | Reusable schema, routes, Plugins, and metadata |
+| Definition | `nil` | `nil` | Reusable data schema, routes, Plugins, and metadata |
 | Instance | Nonempty string | Complete map | One identified Agent with validated state |
 
 A value with only an ID or only state is invalid.
 
-## Build A Definition
+## Declare A Definition
 
 An Agent module provides its neutral definition through `agent/0`:
 
@@ -21,10 +23,10 @@ true = Jido.Agent.definition?(definition)
 You can also use `Jido.Agent.new/1`, `Jido.Agent.Builder`, or
 `Jido.Agent.Codec`. All authoring forms use the same construction validation.
 
-Keep the state schema static. Put changing values in instance state or command
+Keep the data schema static. Put changing values in instance state or command
 input. A runtime closure is not portable authoring data.
 
-## Create An Instance
+## Instantiate An Agent
 
 Use the module helper or instantiate a definition:
 
@@ -38,8 +40,8 @@ Use the module helper or instantiate a definition:
   )
 ```
 
-Constructors apply schema defaults and validate complete state. Do not build an
-Agent struct by hand and assume it is valid.
+Instantiation applies data schema defaults and validates complete state. Do not
+build an Agent struct by hand and assume it is valid.
 
 ## Own Complete State
 

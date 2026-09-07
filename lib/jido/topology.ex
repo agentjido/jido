@@ -1,11 +1,11 @@
 defmodule Jido.Topology do
   @moduledoc """
-  A static definition of Agents, groups, Buses, and logical ownership.
+  A declarative definition of Agents, groups, Buses, and logical ownership.
 
-  Spark modules, `Jido.Topology.Builder`, and `Jido.Topology.Codec` use the
-  same constructor. Construction and planning start no processes. Instance
-  input is validated separately from Agent state. See the topology examples
-  in `examples/07_topology` for local startup and JSON transport.
+  Module declarations, `Jido.Topology.Builder`, and `Jido.Topology.Codec` use
+  the same constructor. Declaration and planning start no processes. Instance
+  input is validated separately from Agent state. See the topology examples in
+  `examples/07_topology` for local startup and JSON transport.
   """
 
   alias Jido.Agent.Authoring
@@ -36,7 +36,7 @@ defmodule Jido.Topology do
   @doc "Returns the schema for a topology definition."
   def schema, do: @schema
 
-  @doc "Defines a topology module with the Spark DSL."
+  @doc "Declares a topology module."
   defmacro __using__(opts) do
     quote location: :keep do
       use Jido.Topology.DSL

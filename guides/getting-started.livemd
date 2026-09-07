@@ -1,7 +1,7 @@
 # Getting Started
 
-This Livebook defines one Agent, applies a direct command, and runs the same
-command in a live Agent Server. Run each cell in order.
+This Livebook declares one Agent definition, instantiates it as an Agent value,
+and runs the value in a live Agent Server. Run each cell in order.
 
 ## Install Jido
 
@@ -38,10 +38,11 @@ Jido uses the Action and Flow contracts from
 [Jido Action](https://hexdocs.pm/jido_action/). An Action can do I/O. Such I/O
 is outside the Agent state commit.
 
-## Define One Agent
+## Declare One Agent
 
-The Agent owns the state schema and the routes from Signals to executable work.
-The nested `define` adds Signal and live-call helpers.
+The declaration describes the Agent data schema and the routes from Signals to
+executable work. It does not start a process. The nested `define` adds Signal
+and live-call helpers.
 
 ```elixir
 defmodule GettingStarted.Counter do
@@ -62,10 +63,14 @@ defmodule GettingStarted.Counter do
 end
 ```
 
+The module declaration produces a reusable neutral Agent definition. It has no
+identity and no live state.
+
 ## Apply A Direct Command
 
-A direct command returns a new Agent value and its Directives. It does not
-start a process or commit live state.
+`new!/1` instantiates the declared Agent with an identity and initial state. A
+direct command returns a new Agent value and its Directives. It does not start a
+process or commit live state.
 
 ```elixir
 agent = GettingStarted.Counter.new!(id: "direct-counter")

@@ -1,11 +1,16 @@
 # Actors, Agents, and Jido
 
-Jido is an actor and agent framework for Elixir. It joins an immutable domain
-model with OTP process ownership.
+Jido is a declarative actor and agent framework for Elixir. It joins an
+immutable domain model with OTP process ownership.
 
-An Agent is data. It contains a definition, an identity, validated state,
-routes, and declared Plugins. `Jido.Agent.cmd/3` applies one Signal and returns
-a candidate Agent value. This operation does not start or own a process.
+Jido follows the declarative style common in Elixir. You declare an Agent by
+describing its data schema, routes, Plugins, and metadata. Jido turns that
+declaration into a neutral Agent definition. The declaration does not start a
+process or run an imperative actor loop.
+
+You then instantiate the definition with an identity and initial state. The
+result is an immutable Agent value. `Jido.Agent.cmd/3` applies one Signal and
+returns a candidate Agent value. This operation does not start or own a process.
 
 An Agent Server is the live actor. It owns one Agent instance in an OTP
 process, accepts serial Turns, commits state, and dispatches effects. The actor
@@ -29,7 +34,7 @@ monitors, timers, and supervision.
 
 ## Why Keep Both Forms
 
-The value form gives you explicit state transitions. You can construct,
+The value form gives you explicit state transitions. You can instantiate,
 validate, serialize, test, and compare Agents without starting processes.
 
 The actor form gives you runtime ownership. It serializes concurrent input,

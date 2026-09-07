@@ -1,7 +1,8 @@
 # Topology Definitions
 
-A `Jido.Topology` is static authoring data for Agents, groups, Signal Buses, and
-logical ownership. Definition, validation, and planning start no processes.
+A `Jido.Topology` is a declarative description of Agents, groups, Signal Buses,
+and logical ownership. You first declare the system and then instantiate it
+with input. Declaration, validation, and planning start no processes.
 
 ## Main Values
 

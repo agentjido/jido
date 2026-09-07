@@ -1,7 +1,8 @@
 # Authoring Extensions
 
-An Agent authoring extension adds static DSL declarations and lowers them into
-ordinary Agent configuration.
+An Agent authoring extension adds static declarations and lowers them into
+ordinary Agent configuration. It extends how an application describes an Agent;
+it does not add an imperative runtime path.
 
 ## Implement The Contract
 
@@ -16,13 +17,13 @@ def lower_agent(config, foreign_entities) do
 end
 ```
 
-Pass Spark extension modules to the Agent:
+Pass authoring extension modules to the Agent:
 
 ```elixir
 use Jido.Agent, extensions: [MyApp.AgentExtension]
 ```
 
-Core first collects its state schema, Plugins, routes, metadata, and state
+Core first collects its data schema, Plugins, routes, metadata, and state
 budget. It then calls extensions in declaration order.
 
 ## Consume Only Owned Entities

@@ -23,7 +23,7 @@ custom runtime behavior can cost more to port than the Agent definitions.
 | Area used in V2 | Work | Main change | Completion check |
 | --- | --- | --- | --- |
 | Agent constructors and result matches | Small | Separate definition from instance; use tagged results | Test every success and failure match |
-| NimbleOptions state schemas | Small to medium | Convert to static Zoi schemas | Test defaults, invalid values, and missing fields |
+| NimbleOptions state schemas | Small to medium | Convert to static data schemas | Test defaults, invalid values, and missing fields |
 | Direct Actions, Instruction lists, state patches | Medium | Route a Signal to one Action or Flow; return complete state | Verify unchanged fields survive each command |
 | Custom Strategy or command hooks | High | Move domain execution to Actions/Flows and policy to Plugins | Test order, rejection, and failure isolation |
 | V2 Plugins and custom directives | High | Rewrite callbacks, state ownership, and runtime setup | Test startup, commit, dispatch, restart, and cleanup |
@@ -101,7 +101,7 @@ agent = MyApp.Counter.new(id: "counter-1")
 
 ### What you need to change
 
-Use a static Zoi schema. Module `new/1` now returns a tagged result. Use
+Use a static data schema. Module `new/1` now returns a tagged result. Use
 `new!/1` only where an exception is the intended error path:
 
 ```elixir
@@ -194,7 +194,7 @@ based on `context.agent_state`. Do not copy V2 StateOps into the new result.
 The Action must preserve protected Plugin state keys. The owning Plugin changes
 those keys through `update_state/3`.
 
-Replace `signal_routes` with definition routes or the Spark `routes` block.
+Replace `signal_routes` with definition routes or the declarative `routes` block.
 Move a sequence of Actions into a Flow when it represents one command. A Flow
 must also produce complete domain state. Do not split it into separate live
 calls if your application requires one commit.

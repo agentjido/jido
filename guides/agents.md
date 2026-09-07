@@ -5,7 +5,7 @@ An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.agent()` or
 `Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.
 Instance options contain only `:id` and `:state`.
 
-Declare a static `Zoi.object` schema. The complete state includes Plugin-owned
+Declare a static data schema. The complete state includes Plugin-owned
 keys. Unknown keys and invalid values fail validation. `Jido.Agent.set/2`
 merges domain attributes and validates the complete result. An Action returns
 a complete candidate state from `context.agent_state`.
@@ -29,7 +29,7 @@ See the [complete example](../README.md#example) and
 
 ## Authoring extensions
 
-Pass Spark extension modules with `use Jido.Agent, extensions: [MyExtension]`.
+Pass authoring extension modules with `use Jido.Agent, extensions: [MyExtension]`.
 An extension can add entities to `agent do` and implement
 `c:Jido.Agent.Extension.lower_agent/2`. Core collects its schema, routes and
 Plugins first. It then calls each extension in declaration order with the

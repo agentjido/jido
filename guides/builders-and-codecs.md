@@ -1,10 +1,11 @@
 # Builders and Codecs
 
-Use `Jido.Agent.Builder` for ordered programmatic construction. Use
-`Jido.Agent.Codec` for versioned JSON-compatible authoring data. Both produce
-the same canonical Agent definition as the module DSL.
+Use `Jido.Agent.Builder` for an ordered programmatic declaration. Use
+`Jido.Agent.Codec` for a versioned JSON-compatible declaration. Both produce
+the same canonical Agent definition as the module DSL. They declare data; they
+do not run an actor.
 
-## Build In Ordered Steps
+## Declare In Ordered Steps
 
 ```elixir
 builder =

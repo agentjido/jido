@@ -6,7 +6,7 @@ defmodule Jido.Topology.Codec do
   documents remain readable. Source modules for included topologies are resolved
   during construction; stored composition is a snapshot of their definitions.
 
-  This Codec uses `Jido.Agent.Codec.Registry` for Agent modules, Zoi schemas,
+  This Codec uses `Jido.Agent.Codec.Registry` for Agent modules, data schemas,
   atoms, and static values. Stored strings cannot create atoms or modules.
   `encode/1` derives a temporary Registry. Supply stable Registry IDs to
   `encode/2` for database storage. Instance input, plans, PIDs, Agent state,
