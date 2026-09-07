@@ -34,14 +34,15 @@ defmodule Jido.Topology.Plan do
   defp expand_plan(definition, id, input, composed) do
     with {:ok, inputs} <- Composition.inputs(definition, input),
          {:ok, expanded} <- expand(composed.nodes, inputs, definition.startup.max_agents),
+         resource_specs = Enum.filter(composed.nodes, &(&1.kind == :bus)),
+         {:ok, components} <- component_limits(composed.scopes, expanded, resource_specs),
          {:ok, agents} <-
            Authoring.traverse(expanded, &agent(&1, id, Map.fetch!(inputs, &1.scope))),
          {:ok, resources} <-
            Authoring.traverse(
-             Enum.filter(composed.nodes, &(&1.kind == :bus)),
+             resource_specs,
              &resource(&1, id, Map.fetch!(inputs, &1.scope))
-           ),
-         {:ok, components} <- component_limits(composed.scopes, agents, resources) do
+           ) do
       groups = Map.new(Enum.filter(composed.nodes, &(&1.kind == :group)), &{&1.key, []})
       members = Map.merge(groups, Enum.group_by(agents, & &1.declaration, & &1.key))
 
@@ -126,8 +127,8 @@ defmodule Jido.Topology.Plan do
 
   defp expand_group(%{members: members, key_by: field} = group, input, remaining) do
     with {:ok, members} <- Reference.resolve(members, input),
+         :ok <- members_limit(members, remaining),
          {:ok, keyed} <- Authoring.traverse(members, &keyed_member(&1, field)),
-         :ok <- size_limit(length(keyed), remaining),
          :ok <- unique_members(keyed) do
       {:ok, keyed |> Enum.sort_by(&elem(&1, 0)) |> Enum.map(&group_agent(group, &1))}
     end
@@ -220,6 +221,11 @@ defmodule Jido.Topology.Plan do
 
   defp count_valid(value) when is_integer(value) and value >= 0, do: :ok
   defp count_valid(_), do: Authoring.error("Resolved group count must be a nonnegative integer")
+  defp members_limit(members, limit) when is_list(members), do: size_limit(length(members), limit)
+
+  defp members_limit(_members, _limit),
+    do: Authoring.error("Resolved group members must be a list")
+
   defp size_limit(count, limit) when count <= limit, do: :ok
   defp size_limit(_, _), do: Authoring.error("Topology exceeds startup.max_agents")
 end

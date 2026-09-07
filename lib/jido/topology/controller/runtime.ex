@@ -397,7 +397,7 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp owned?(kind, pid, spec, context) when is_pid(pid) do
-    Process.alive?(pid) and safely_owned?(fn -> owns?(kind, pid, spec, context) end)
+    Process.alive?(pid) and safely(fn -> owns?(kind, pid, spec, context) end) == true
   end
 
   defp owned?(_kind, _pid, _spec, _context), do: false
@@ -437,14 +437,6 @@ defmodule Jido.Topology.Controller.Runtime do
   defp intentional_shutdown?(:shutdown), do: true
   defp intentional_shutdown?({:shutdown, _reason}), do: true
   defp intentional_shutdown?(_reason), do: false
-
-  defp safely_owned?(fun) do
-    fun.()
-  rescue
-    _error -> false
-  catch
-    :exit, _reason -> false
-  end
 
   defp safely(fun) do
     fun.()

@@ -3,14 +3,8 @@ defmodule Jido.Topology.Composition do
   alias Jido.Agent.Authoring
   alias Jido.Topology.{Ref, Reference, Validation}
 
-  def validate(definition) do
-    with {:ok, _} <- flatten(definition), do: :ok
-  end
-
   def flatten(definition) do
-    scopes = scopes(definition, [], %{})
-
-    with :ok <- scope_limit(scopes),
+    with {:ok, scopes} <- scopes(definition, [], %{}),
          :ok <- validate_bindings(scopes),
          {:ok, collections} <-
            Authoring.traverse(Enum.sort(scopes), fn {path, context} ->
@@ -53,19 +47,44 @@ defmodule Jido.Topology.Composition do
 
   def escape(value), do: URI.encode(to_string(value), &URI.char_unreserved?/1)
 
-  defp scopes(definition, path, acc) do
-    acc = Map.put(acc, path, %{definition: definition, bindings: %{}})
+  defp scopes(_definition, _path, acc) when map_size(acc) >= 1_000,
+    do: Authoring.error("Topology exceeds 1000 component scopes")
 
-    Enum.reduce(definition.includes, acc, fn include, acc ->
+  defp scopes(definition, path, acc) do
+    context = %{
+      definition: definition,
+      bindings: %{},
+      endpoints: endpoint_index(definition),
+      exports: Map.new(definition.exports, &{&1.key, &1})
+    }
+
+    acc = Map.put(acc, path, context)
+
+    Enum.reduce_while(definition.includes, {:ok, acc}, fn include, {:ok, acc} ->
       child_path = path ++ [include.key]
-      acc = scopes(include.topology, child_path, acc)
       bindings = Map.new(include.bindings, &{&1.key, %{path: path, target: &1.to}})
-      Map.update!(acc, child_path, &Map.put(&1, :bindings, bindings))
+
+      case scopes(include.topology, child_path, acc) do
+        {:ok, acc} ->
+          acc = Map.update!(acc, child_path, &Map.put(&1, :bindings, bindings))
+          {:cont, {:ok, acc}}
+
+        {:error, _error} = error ->
+          {:halt, error}
+      end
     end)
   end
 
-  defp scope_limit(scopes) when map_size(scopes) <= 1_000, do: :ok
-  defp scope_limit(_), do: Authoring.error("Topology exceeds 1000 component scopes")
+  defp endpoint_index(definition) do
+    [
+      {:agent, definition.agents},
+      {:group, definition.groups},
+      {:bus, definition.resources},
+      {:import, definition.imports}
+    ]
+    |> Enum.flat_map(fn {kind, entries} -> Enum.map(entries, &{&1.key, kind}) end)
+    |> Map.new()
+  end
 
   defp validate_bindings(scopes) do
     Enum.reduce_while(scopes, :ok, fn
@@ -204,8 +223,7 @@ defmodule Jido.Topology.Composition do
     child_path = path ++ [component]
 
     with {:ok, context} <- fetch_scope(scopes, child_path),
-         {:ok, export} <-
-           find(context.definition.exports, key, "Unknown topology export", child_path),
+         {:ok, export} <- fetch_export(context, key, child_path),
          {:ok, target} <- endpoint(scopes, child_path, export.from, seen),
          :ok <- kind(target, [export.kind]),
          do: {:ok, target}
@@ -213,20 +231,7 @@ defmodule Jido.Topology.Composition do
 
   defp resolve(scopes, path, name, seen) do
     context = Map.fetch!(scopes, path)
-    definition = context.definition
-
-    source =
-      Enum.find_value(
-        [
-          {:agent, definition.agents},
-          {:group, definition.groups},
-          {:bus, definition.resources},
-          {:import, definition.imports}
-        ],
-        fn {kind, values} ->
-          if Enum.any?(values, &(&1.key == name)), do: kind
-        end
-      )
+    source = Map.get(context.endpoints, name)
 
     case source do
       nil -> Authoring.error("Unknown topology endpoint", %{path: path, key: name})
@@ -302,10 +307,10 @@ defmodule Jido.Topology.Composition do
     end
   end
 
-  defp find(values, key, message, path) do
-    case Enum.find(values, &(&1.key == key)) do
-      nil -> Authoring.error(message, %{path: path, key: key})
-      value -> {:ok, value}
+  defp fetch_export(context, key, path) do
+    case Map.fetch(context.exports, key) do
+      {:ok, export} -> {:ok, export}
+      :error -> Authoring.error("Unknown topology export", %{path: path, key: key})
     end
   end
 

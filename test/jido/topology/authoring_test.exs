@@ -1,3 +1,13 @@
+defmodule JidoTest.Topology.InvalidSourceLocatedTopology do
+  def __topology_config__ do
+    config = Jido.Examples.Topology.Swarm.__topology_config__()
+    [agent] = config.agents
+    %{config | agents: [%{agent | module: String}]}
+  end
+
+  def __topology_sources__, do: Jido.Examples.Topology.Swarm.__topology_sources__()
+end
+
 defmodule Jido.Topology.AuthoringTest do
   use ExUnit.Case, async: true
 
@@ -161,6 +171,16 @@ defmodule Jido.Topology.AuthoringTest do
              Builder.new(name: "bad") |> Builder.agent(:a, Cell, key: :b) |> Builder.build()
   end
 
+  test "Builder preserves declaration order at scale" do
+    builder =
+      Enum.reduce(1..1_000, Builder.new(name: "ordered"), fn index, builder ->
+        Builder.agent(builder, "agent-#{index}", Cell)
+      end)
+
+    assert {:ok, definition} = Builder.build(builder)
+    assert Enum.map(definition.agents, & &1.key) == Enum.map(1..1_000, &"agent-#{&1}")
+  end
+
   test "Builder field errors remain sticky and invalid modules return errors" do
     builder = Builder.new(name: "fields") |> Builder.metadata(self())
     assert {:error, error} = Builder.build(builder)
@@ -267,6 +287,22 @@ defmodule Jido.Topology.AuthoringTest do
         ] do
       assert_raise CompileError, fn -> compile_isolated(source) end
     end
+  end
+
+  test "DSL semantic errors retain the declaration source line" do
+    source =
+      Enum.find(Swarm.__topology_sources__(), &(&1.field == :agents and &1.index == 0))
+
+    assert source.line > 1
+    line = source.line
+
+    error =
+      assert_raise CompileError, fn ->
+        Jido.Topology.DSL.Compiler.verify(JidoTest.Topology.InvalidSourceLocatedTopology)
+      end
+
+    assert error.file == Path.expand(__ENV__.file)
+    assert %{description: "Expected an Agent module", line: ^line} = error
   end
 
   defp compile_isolated(source) do

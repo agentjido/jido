@@ -2,6 +2,8 @@ defmodule Jido.Topology.DSL.Compiler do
   @moduledoc false
   alias Jido.Agent.Authoring
   alias Jido.Topology.DSL
+  alias Jido.Topology.Validation
+  alias Spark.Dsl.Entity
   alias Spark.Dsl.Extension
 
   defmacro __before_compile__(env) do
@@ -9,19 +11,22 @@ defmodule Jido.Topology.DSL.Compiler do
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
     agents = Extension.get_entities(dsl, [:agents])
     fields = opts(dsl, :topology, [:schema, :metadata])
-    fields = put_entities(fields, :agents, Enum.filter(agents, &is_struct(&1, DSL.Agent)))
-    fields = put_entities(fields, :groups, Enum.filter(agents, &is_struct(&1, DSL.Group)))
+
+    entity_groups = [
+      {:agents, :agent, Enum.filter(agents, &is_struct(&1, DSL.Agent))},
+      {:groups, :group, Enum.filter(agents, &is_struct(&1, DSL.Group))},
+      {:resources, :bus, Extension.get_entities(dsl, [:resources])},
+      {:relationships, :owns, Extension.get_entities(dsl, [:relationships])},
+      {:connections, :subscribe, Extension.get_entities(dsl, [:connections])},
+      {:includes, :include, Extension.get_entities(dsl, [:topologies])},
+      {:imports, :import, Extension.get_entities(dsl, [:imports])},
+      {:exports, :export, Extension.get_entities(dsl, [:exports])}
+    ]
 
     fields =
-      Enum.reduce(
-        [:resources, :relationships, :connections, :imports, :exports],
-        fields,
-        fn section, fields ->
-          put_entities(fields, section, Extension.get_entities(dsl, [section]))
-        end
-      )
-
-    fields = put_entities(fields, :includes, Extension.get_entities(dsl, [:topologies]))
+      Enum.reduce(entity_groups, fields, fn {field, _kind, entities}, fields ->
+        put_entities(fields, field, entities)
+      end)
 
     startup =
       opts(dsl, :startup, [:concurrency, :ready, :max_agents, :retry_interval, :task_timeout])
@@ -34,18 +39,77 @@ defmodule Jido.Topology.DSL.Compiler do
 
     config = Map.merge(config, fields)
 
+    sources =
+      Enum.flat_map(entity_groups, fn {field, kind, entities} ->
+        sources(entities, field, kind)
+      end)
+
     quote do
       @doc false
       def __topology_config__, do: unquote(Macro.escape(config))
+
+      @doc false
+      def __topology_sources__, do: unquote(Macro.escape(sources))
+
       @after_verify {Jido.Topology.DSL.Compiler, :verify}
     end
   end
 
   def verify(module) do
     env = %{file: to_string(module.module_info(:compile)[:source]), line: 1}
-    unwrap!(Jido.Topology.new(module.__topology_config__()), env)
-    :ok
+    config = module.__topology_config__()
+
+    case Jido.Topology.new(config) do
+      {:ok, _definition} -> :ok
+      {:error, error} -> fail_from_source(config, module.__topology_sources__(), error, env)
+    end
   end
+
+  defp fail_from_source(config, sources, error, env) do
+    located =
+      Enum.find_value(sources, fn source ->
+        entry = config |> Map.fetch!(source.field) |> Enum.fetch!(source.index)
+
+        case Validation.entry(source.kind, entry) do
+          {:ok, _entry} -> nil
+          {:error, source_error} -> {source, source_error}
+        end
+      end)
+
+    case located do
+      {source, source_error} -> fail!(%{env | line: source.line}, Exception.message(source_error))
+      nil -> fail!(env, Exception.message(error))
+    end
+  end
+
+  defp sources(entities, field, kind) do
+    entities
+    |> Enum.with_index()
+    |> Enum.map(fn {entity, index} -> source(field, kind, index, entity) end)
+  end
+
+  defp source(field, kind, index, entity) do
+    %{field: field, kind: kind, index: index, line: source_line(entity)}
+  end
+
+  defp source_line(%_{} = entity) do
+    property_annos =
+      entity
+      |> Map.from_struct()
+      |> Map.keys()
+      |> Enum.map(&Entity.property_anno(entity, &1))
+
+    [Entity.anno(entity) | property_annos]
+    |> Enum.reject(&is_nil/1)
+    |> Enum.map(&:erl_anno.line/1)
+    |> Enum.reject(&(&1 == 1))
+    |> Enum.min(fn -> annotation_line(Entity.anno(entity)) end)
+  end
+
+  defp source_line(_entity), do: 1
+
+  defp annotation_line(nil), do: 1
+  defp annotation_line(annotation), do: :erl_anno.line(annotation)
 
   defp opts(dsl, section, keys) do
     Enum.reduce(keys, %{}, fn key, acc ->
