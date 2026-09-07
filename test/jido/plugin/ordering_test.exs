@@ -158,6 +158,26 @@ defmodule Jido.Plugin.OrderingTest do
     end
   end
 
+  defmodule InvalidOutboundPlugin do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_dispatch(_runtime, signal, _context, opts) do
+      send(opts[:observer], {:outbound, :invalid})
+      {:ok, %{signal | source: "not a URI reference"}}
+    end
+  end
+
+  defmodule MustNotRunOutboundPlugin do
+    use Jido.Plugin
+
+    @impl true
+    def prepare_dispatch(_runtime, signal, _context, opts) do
+      send(opts[:observer], {:outbound, :must_not_run})
+      {:ok, signal}
+    end
+  end
+
   test "normalization rejects duplicate state keys and Directive owners" do
     assert {:error, state_error} =
              Plugin.normalize_all([
@@ -249,6 +269,37 @@ defmodule Jido.Plugin.OrderingTest do
     assert prepared.data.trace == [:second, :first]
     assert_received {:outbound, :second, :second_runtime, :second_state}
     assert_received {:outbound, :first, :first_runtime, :first_state}
+  end
+
+  test "validates each outbound transform before it runs the next Plugin" do
+    observer = self()
+
+    assert {:ok, specs} =
+             Plugin.normalize_all([
+               {MustNotRunOutboundPlugin, observer: observer},
+               {InvalidOutboundPlugin, observer: observer}
+             ])
+
+    source = signal("plugin.order")
+
+    context =
+      struct!(SignalContext,
+        turn_id: "turn-1",
+        agent_id: "agent-1",
+        source_signal: source,
+        effective_signal: source,
+        turn_context: %{},
+        target: self(),
+        state_version: 1,
+        plugin_state: nil,
+        jido: nil,
+        partition: nil
+      )
+
+    assert {:error, error} = Plugin.prepare_dispatch(source, specs, %{}, context, %{})
+    assert error.details.plugin == InvalidOutboundPlugin
+    assert_received {:outbound, :invalid}
+    refute_received {:outbound, :must_not_run}
   end
 
   test "a later reducer failure does not return partially updated Plugin state" do

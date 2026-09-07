@@ -68,20 +68,7 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
     case Enum.find(state.sensors, fn {_tag, sensor} -> sensor.ref == ref end) do
       {tag, _sensor} ->
         state = %{state | sensors: Map.delete(state.sensors, tag)}
-
-        case Map.fetch(state.desired, tag) do
-          {:ok, spec} ->
-            case start_sensor(state, tag, spec) do
-              {:ok, state} ->
-                {:noreply, state}
-
-              {:error, _reason, state} ->
-                {:noreply, schedule_retry(state, state.last_reconciled_version)}
-            end
-
-          :error ->
-            {:noreply, state}
-        end
+        restart_sensor(state, tag)
 
       nil ->
         {:noreply, state}
@@ -102,36 +89,83 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   defp reconcile(state, desired) when is_map(desired) do
     state = state |> stop_changed(desired) |> Map.put(:desired, desired)
 
-    Enum.reduce_while(desired, {:ok, state}, fn {tag, spec}, {:ok, state} ->
-      case Map.get(state.sensors, tag) do
-        %{spec: ^spec, pid: pid} when is_pid(pid) ->
-          {:cont, {:ok, state}}
-
-        nil ->
-          case start_sensor(state, tag, spec) do
-            {:ok, state} ->
-              {:cont, {:ok, state}}
-
-            {:error, reason, state} ->
-              {:halt, {:error, {:sensor_start_failed, tag, reason}, state}}
-          end
-      end
-    end)
+    Enum.reduce_while(desired, {:ok, state}, &reconcile_sensor/2)
   end
 
   defp stop_changed(state, desired) do
     sensors =
       Enum.reduce(state.sensors, %{}, fn {tag, sensor}, kept ->
-        if Map.get(desired, tag) == sensor.spec do
-          Map.put(kept, tag, sensor)
-        else
-          Process.demonitor(sensor.ref, [:flush])
-          _ = DynamicSupervisor.terminate_child(sensor_supervisor(state), sensor.pid)
-          kept
-        end
+        keep_or_stop_sensor(state, desired, tag, sensor, kept)
       end)
 
     %{state | sensors: sensors}
+  end
+
+  defp same_spec?(left, right), do: left === right
+
+  defp restart_sensor(state, tag) do
+    case Map.fetch(state.desired, tag) do
+      {:ok, spec} -> restart_sensor(state, tag, spec)
+      :error -> {:noreply, state}
+    end
+  end
+
+  defp restart_sensor(state, tag, spec) do
+    case start_sensor(state, tag, spec) do
+      {:ok, state} -> {:noreply, state}
+      {:error, _reason, state} -> {:noreply, schedule_retry(state, state.last_reconciled_version)}
+    end
+  end
+
+  defp reconcile_sensor({tag, spec}, {:ok, state}) do
+    case Map.get(state.sensors, tag) do
+      %{spec: current_spec, pid: pid} when is_pid(pid) ->
+        continue_if_same_spec(state, tag, current_spec, spec)
+
+      nil ->
+        start_desired_sensor(state, tag, spec)
+    end
+  end
+
+  defp continue_if_same_spec(state, tag, current_spec, desired_spec) do
+    if same_spec?(current_spec, desired_spec) do
+      {:cont, {:ok, state}}
+    else
+      {:halt, {:error, {:sensor_spec_mismatch, tag}, state}}
+    end
+  end
+
+  defp start_desired_sensor(state, tag, spec) do
+    case start_sensor(state, tag, spec) do
+      {:ok, state} -> {:cont, {:ok, state}}
+      {:error, reason, state} -> {:halt, {:error, {:sensor_start_failed, tag, reason}, state}}
+    end
+  end
+
+  defp keep_or_stop_sensor(state, desired, tag, sensor, kept) do
+    case Map.fetch(desired, tag) do
+      {:ok, spec} -> keep_matching_sensor(state, tag, sensor, spec, kept)
+      :error -> stop_and_discard_sensor(state, sensor, kept)
+    end
+  end
+
+  defp keep_matching_sensor(state, tag, sensor, spec, kept) do
+    if same_spec?(spec, sensor.spec) do
+      Map.put(kept, tag, sensor)
+    else
+      stop_and_discard_sensor(state, sensor, kept)
+    end
+  end
+
+  defp stop_and_discard_sensor(state, sensor, kept) do
+    stop_sensor(state, sensor)
+    kept
+  end
+
+  defp stop_sensor(state, sensor) do
+    Process.demonitor(sensor.ref, [:flush])
+    _ = DynamicSupervisor.terminate_child(sensor_supervisor(state), sensor.pid)
+    :ok
   end
 
   defp start_sensor(state, tag, %{module: module, config: config} = spec) do
@@ -145,15 +179,18 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
       partition: state.init.partition
     }
 
-    with {:ok, child_spec} <- sensor_child_spec(module, init, tag) do
-      case DynamicSupervisor.start_child(sensor_supervisor(state), child_spec) do
-        {:ok, pid} -> track_sensor(state, tag, spec, pid)
-        {:ok, pid, _info} -> track_sensor(state, tag, spec, pid)
-        {:error, reason} -> {:error, reason, state}
-        :ignore -> {:error, :ignored, state}
-      end
-    else
+    case sensor_child_spec(module, init, tag) do
+      {:ok, child_spec} -> start_sensor_child(state, tag, spec, child_spec)
       {:error, reason} -> {:error, reason, state}
+    end
+  end
+
+  defp start_sensor_child(state, tag, spec, child_spec) do
+    case DynamicSupervisor.start_child(sensor_supervisor(state), child_spec) do
+      {:ok, pid} -> track_sensor(state, tag, spec, pid)
+      {:ok, pid, _info} -> track_sensor(state, tag, spec, pid)
+      {:error, reason} -> {:error, reason, state}
+      :ignore -> {:error, :ignored, state}
     end
   end
 

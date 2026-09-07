@@ -166,6 +166,32 @@ defmodule Jido.Plugin.SensorManagerTest do
     eventually(fn -> Server.agent(agent).state.readings == [3, 4] end)
   end
 
+  test "replaces only the sensor whose numeric config type changes", %{jido: jido} do
+    {:ok, agent} = Jido.start_agent(jido, Agent)
+    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    gate = start_supervised!({Elixir.Agent, fn -> [:ok, :ok, :ok] end})
+
+    desired = %{
+      changed: %{module: ControlledSensor, config: %{gate: gate, value: 1}},
+      unchanged: %{module: ControlledSensor, config: %{gate: gate, value: 2}}
+    }
+
+    assert :ok = Runtime.reconcile(runtime, desired, 1, 1_000)
+    first = Runtime.sensors(runtime)
+    changed_ref = Process.monitor(first.changed)
+
+    next_desired = put_in(desired.changed.config.value, 1.0)
+    assert :ok = Runtime.reconcile(runtime, next_desired, 2, 1_000)
+    assert_receive {:DOWN, ^changed_ref, :process, changed_pid, :shutdown}
+    assert changed_pid == first.changed
+
+    next = Runtime.sensors(runtime)
+    assert next.changed != first.changed
+    assert next.unchanged == first.unchanged
+    assert Process.alive?(next.changed)
+    assert Process.alive?(next.unchanged)
+  end
+
   test "retries failed starts and failed restarts without a new command", %{jido: jido} do
     {:ok, agent} = Jido.start_agent(jido, Agent)
     runtime = Server.children(agent)[{:plugin, SensorManager}].pid

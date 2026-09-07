@@ -634,6 +634,22 @@ defmodule Jido.Plugin.ContractTest do
     assert message == "Agent executable changed Plugin-owned state"
   end
 
+  test "uses strict equality for numeric changes in nested Plugin-owned state" do
+    assert {:ok, specs} = Jido.Plugin.normalize_all([OwnedStatePlugin])
+    original = %{owned: %{count: 1, nested: %{value: 2}}}
+
+    for changed <- [
+          %{owned: %{count: 1.0, nested: %{value: 2}}},
+          %{owned: %{count: 1, nested: %{value: 2.0}}}
+        ] do
+      assert {:error, %Jido.Error.ExecutionError{} = error} =
+               Jido.Plugin.protect_state({:ok, changed, []}, original, specs)
+
+      assert error.message == "Agent executable changed Plugin-owned state"
+      assert error.details.keys == [:owned]
+    end
+  end
+
   test "treats a missing Plugin key and a nil Plugin value as different state" do
     agent = NilOwnedStateAgent.new!()
     signal = Signal.new!("owned.delete_nil", %{}, source: "/test")

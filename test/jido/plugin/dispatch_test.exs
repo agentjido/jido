@@ -69,6 +69,14 @@ defmodule Jido.Plugin.DispatchTest do
     assert Server.agent(pid).state.sends == 0
   end
 
+  test "rejects a Send Directive with an invalid complete Signal" do
+    invalid_signal = %{signal("dispatch.output") | source: "not a URI reference"}
+    directive = Dispatch.send(invalid_signal, {:pid, target: self()})
+
+    assert {:error, errors} = Dispatch.validate_directive(directive, [])
+    assert Enum.any?(errors, &(&1.path == [:signal, :source]))
+  end
+
   test "inherits the Agent Jido scope for a Bus target", %{jido: jido} do
     bus = start_supervised!({Bus, name: :dispatch_plugin_bus, jido: jido})
     assert {:ok, _subscription} = Bus.subscribe(bus, "dispatch.bus.output")

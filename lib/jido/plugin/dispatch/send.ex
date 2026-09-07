@@ -4,7 +4,7 @@ defmodule Jido.Plugin.Dispatch.Send do
   @schema Zoi.struct(
             __MODULE__,
             %{
-              signal: Zoi.struct(Jido.Signal, description: "Signal to deliver"),
+              signal: Jido.Signal.schema(),
               target: Zoi.any(description: "Jido Signal Dispatch target or target list")
             },
             coerce: true
