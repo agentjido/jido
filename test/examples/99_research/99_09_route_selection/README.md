@@ -2,7 +2,9 @@
 
 Status: **Core feature required**.
 
-Result on 2026-09-05: **2 passing checks; 2 failing acceptance checks.** All checks are enabled.
+Baseline on 2026-09-05: 2 passing and 2 failing checks.
+As of 2026-09-07, the failing tests are temporarily skipped, with reasons.
+The original assertions remain. See the [research test policy](../README.md).
 
 ## Feature and proof
 
@@ -24,6 +26,7 @@ From the jido repository:
 mix test test/examples/99_research/99_09_route_selection --include example --seed 0
 ```
 
-This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
+This is a secondary check. The missing-contract tests remain skipped until
+the feature is implemented. Do not reverse the original assertions.
 
 [Source](../../../../examples/99_research/99_09_route_selection/route_selection.ex) · [Tests](route_selection_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)

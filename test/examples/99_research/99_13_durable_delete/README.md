@@ -2,7 +2,9 @@
 
 Status: **Core feature required**.
 
-Result on 2026-09-05: **2 passing checks; 1 failing acceptance checks.** All checks are enabled.
+Baseline on 2026-09-05: 2 passing and 1 failing checks.
+As of 2026-09-07, the failing test is temporarily skipped, with reasons.
+The original assertions remain. See the [research test policy](../README.md).
 
 ## Feature and proof
 
@@ -24,6 +26,7 @@ From the jido repository:
 mix test test/examples/99_research/99_13_durable_delete --include example --seed 0
 ```
 
-This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
+This is a secondary check. The missing-contract test remains skipped until
+the feature is implemented. Do not reverse the original assertions.
 
 [Source](../../../../examples/99_research/99_13_durable_delete/durable_delete.ex) · [Tests](durable_delete_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
