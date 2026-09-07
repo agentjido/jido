@@ -212,7 +212,7 @@ defmodule Jido.Examples.Factory.FlowFactory do
 
   def start(jido, goal, opts \\ []) do
     with {:ok, pid} <-
-           Jido.start_agent(jido, Mission, id: Keyword.get(opts, :id, Jido.ID.uuid7())) do
+           Jido.start_agent(jido, Mission, id: Keyword.get(opts, :id, Jido.Signal.ID.generate!())) do
       case Mission.start(pid, goal,
              input: %{security: Keyword.get(opts, :security, true)},
              context: Keyword.get(opts, :context, %{})

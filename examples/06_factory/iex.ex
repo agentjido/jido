@@ -14,7 +14,8 @@ defmodule Jido.Examples.Factory.IEx do
     jido = Keyword.get(opts, :jido, Jido.FactoryDemo)
 
     with :ok <- ensure_instance(jido),
-         {:ok, owner} <- start_owner(jido, mode, Keyword.get(opts, :id, Jido.ID.uuid7())) do
+         {:ok, owner} <-
+           start_owner(jido, mode, Keyword.get(opts, :id, Jido.Signal.ID.generate!())) do
       id = Server.agent(owner).id
 
       session = %{
@@ -43,7 +44,7 @@ defmodule Jido.Examples.Factory.IEx do
   @doc "Sends text. In system modes the answer and factory events print as they arrive."
   def say(session, text) do
     with pid when is_pid(pid) <- Jido.whereis_agent(session.jido, session.conversation_id) do
-      request_id = Jido.ID.uuid7()
+      request_id = Jido.Signal.ID.generate!()
 
       context =
         Map.put(
@@ -148,7 +149,7 @@ defmodule Jido.Examples.Factory.IEx do
       session.jido,
       session.factory_id,
       operation,
-      Jido.ID.uuid7(),
+      Jido.Signal.ID.generate!(),
       job_id,
       "",
       session.context

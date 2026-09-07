@@ -9,11 +9,11 @@ defmodule JidoTest.IDTest do
 
   describe "uuid7/0" do
     test "generates lowercase RFC 9562 UUIDv7 strings" do
-      assert ID.uuid7() =~ @uuid7_regex
+      assert apply(ID, :uuid7, []) =~ @uuid7_regex
     end
 
     test "encodes a Unix millisecond timestamp, version, variant, and random fields" do
-      decoded = ID.uuid7() |> decode_uuid7()
+      decoded = ID |> apply(:uuid7, []) |> decode_uuid7()
 
       assert is_integer(decoded.timestamp)
       assert decoded.version == 7
@@ -23,7 +23,7 @@ defmodule JidoTest.IDTest do
     end
 
     test "generates unique IDs" do
-      ids = for _index <- 1..1000, do: ID.uuid7()
+      ids = for _index <- 1..1000, do: apply(ID, :uuid7, [])
 
       assert length(Enum.uniq(ids)) == 1000
     end
