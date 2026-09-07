@@ -99,6 +99,7 @@ defmodule Jido.Topology.DSL.Compiler do
     end
   end
 
+  @spec fail_from_source(map(), list(), Exception.t(), map()) :: no_return()
   defp fail_from_source(config, sources, error, env) do
     located =
       Enum.find_value(sources, fn source ->
