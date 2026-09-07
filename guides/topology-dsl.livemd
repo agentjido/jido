@@ -1,0 +1,110 @@
+# Topology DSL
+
+This Livebook defines and activates two local Agents with one ownership
+relationship.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Cell Agent
+
+```elixir
+defmodule TopologyGuide.Cell do
+  use Jido.Agent, name: "topology_guide_cell"
+
+  agent do
+    schema Zoi.object(%{label: Zoi.string() |> Zoi.default("cell")})
+  end
+
+  routes do
+    route "jido.agent.child.*" do
+      action _input, name: "topology_guide_child_lifecycle", context: context do
+        {:ok, context.agent_state}
+      end
+    end
+  end
+end
+```
+
+## Define A Topology
+
+```elixir
+defmodule TopologyGuide.System do
+  use Jido.Topology, name: "topology_guide_system"
+
+  agents do
+    agent :leader, TopologyGuide.Cell do
+      initial_state %{label: "leader"}
+    end
+
+    agent :worker, TopologyGuide.Cell do
+      initial_state %{label: "worker"}
+    end
+  end
+
+  relationships do
+    owns :leader, :worker do
+      on_parent_exit :stop
+    end
+  end
+
+  startup do
+    concurrency 2
+    max_agents 10
+    task_timeout 5_000
+  end
+end
+```
+
+## Build The Plan
+
+```elixir
+topology = TopologyGuide.System.new!(id: "guide-system", input: %{})
+
+%{
+  id: topology.id,
+  layer_count: length(topology.plan.layers),
+  member_count: map_size(topology.plan.agents)
+}
+```
+
+Construction and planning start no processes.
+
+## Activate The System
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, controller} =
+  Jido.Topology.Controller.start_link(
+    jido: Jido.default_instance(),
+    topology: topology
+  )
+
+:ok = Jido.Topology.Controller.await_ready(controller)
+
+leader = Jido.Topology.Controller.whereis_agent(controller, :leader)
+worker = Jido.Topology.Controller.whereis_agent(controller, :worker)
+
+%{
+  leader: Jido.AgentServer.agent(leader).state,
+  worker: Jido.AgentServer.agent(worker).state,
+  leader_children: Jido.AgentServer.children(leader)
+}
+```
+
+## Stop The Example
+
+```elixir
+:ok = Supervisor.stop(controller)
+:ok = Jido.stop()
+```
+
+A normal controller shutdown stops its topology Agents.
+
+Continue with [Topology Builders, Codecs, And Composition](topology-builders-codecs-and-composition.md).

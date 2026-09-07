@@ -4,7 +4,7 @@ defmodule Jido.MixProject do
   @version "3.0.0-beta.1"
   @description "An actor and agent framework for Elixir"
 
-  # This is the source of truth for the v3 guide set. ExDoc adds a guide after
+  # This is the source of truth for the guide set. ExDoc adds a guide after
   # its file exists. This lets us review the complete contents before we write
   # the guide text.
   #
@@ -13,80 +13,78 @@ defmodule Jido.MixProject do
   @guide_toc [
     {"Start Here",
      [
-       {"guides/v3/getting-started.livemd", "Getting Started"},
-       {"guides/v3/build-your-first-agent.livemd", "Build Your First Agent"},
-       {"guides/v3/actor-and-agent-framework.md", "Actors, Agents, And Jido"}
+       {"guides/getting-started.livemd", "Getting Started"},
+       {"guides/build-your-first-agent.livemd", "Build Your First Agent"},
+       {"guides/actor-and-agent-framework.md", "Actors, Agents, And Jido"}
      ]},
     {"Core Contracts",
      [
-       {"guides/v3/agent-definitions-and-instances.md", "Agent Definitions And Instances"},
-       {"guides/v3/signals-commands-and-routes.md", "Signals, Commands, And Routes"},
-       {"guides/v3/actions-flows-and-instructions.md", "Actions, Flows, And Instructions"},
-       {"guides/v3/turns-commit-and-effects.md", "Turns, Commit, And Effects"},
-       {"guides/v3/directives-and-outcomes.md", "Directives And Outcomes"},
-       {"guides/v3/errors-and-runtime-guarantees.md", "Errors And Runtime Guarantees"}
+       {"guides/agent-definitions-and-instances.md", "Agent Definitions And Instances"},
+       {"guides/signals-commands-and-routes.md", "Signals, Commands, And Routes"},
+       {"guides/actions-flows-and-instructions.md", "Actions, Flows, And Instructions"},
+       {"guides/turns-commit-and-effects.md", "Turns, Commit, And Effects"},
+       {"guides/directives-and-outcomes.md", "Directives And Outcomes"},
+       {"guides/errors-and-runtime-guarantees.md", "Errors And Runtime Guarantees"}
      ]},
     {"Author Agents",
      [
-       {"guides/v3/agent-dsl.livemd", "Agent DSL"},
-       {"guides/v3/state-schemas.livemd", "State Schemas"},
-       {"guides/v3/route-interfaces.livemd", "Route Interfaces"},
-       {"guides/v3/plugin-state.md", "Plugin-Owned State"},
-       {"guides/v3/builders-and-codecs.md", "Builders And Codecs"},
-       {"guides/v3/authoring-extensions.md", "Authoring Extensions"}
+       {"guides/agent-dsl.livemd", "Agent DSL"},
+       {"guides/state-schemas.livemd", "State Schemas"},
+       {"guides/route-interfaces.livemd", "Route Interfaces"},
+       {"guides/plugin-state.md", "Plugin-Owned State"},
+       {"guides/builders-and-codecs.md", "Builders And Codecs"},
+       {"guides/authoring-extensions.md", "Authoring Extensions"}
      ]},
     {"Run Actors",
      [
-       {"guides/v3/jido-instances.livemd", "Jido Instances"},
-       {"guides/v3/start-and-address-agents.livemd", "Start And Address Agents"},
-       {"guides/v3/agent-server-lifecycle.md", "Agent Server Lifecycle"},
-       {"guides/v3/calls-casts-and-requests.livemd", "Calls, Casts, And Requests"},
-       {"guides/v3/admission-cancellation-and-timeouts.md",
-        "Admission, Cancellation, And Timeouts"},
-       {"guides/v3/runtime-state-and-debugging.livemd", "Runtime State And Debugging"}
+       {"guides/jido-instances.livemd", "Jido Instances"},
+       {"guides/start-and-address-agents.livemd", "Start And Address Agents"},
+       {"guides/agent-server-lifecycle.md", "Agent Server Lifecycle"},
+       {"guides/calls-casts-and-requests.livemd", "Calls, Casts, And Requests"},
+       {"guides/admission-cancellation-and-timeouts.md", "Admission, Cancellation, And Timeouts"},
+       {"guides/runtime-state-and-debugging.livemd", "Runtime State And Debugging"}
      ]},
     {"Add Capabilities",
      [
-       {"guides/v3/plugin-contract-and-lifecycle.md", "Plugin Contract And Lifecycle"},
-       {"guides/v3/plugin-runtimes.livemd", "Plugin Runtimes"},
-       {"guides/v3/jido-signal-messaging.md", "Use Jido Signal"},
-       {"guides/v3/signal-buses.livemd", "Connect A Signal Bus"},
-       {"guides/v3/signal-dispatch.livemd", "Dispatch Signals"},
-       {"guides/v3/schedules-and-heartbeats.livemd", "Schedules And Heartbeats"},
-       {"guides/v3/durable-schedule-occurrences.md", "Durable Schedule Occurrences"},
-       {"guides/v3/managed-sensors.livemd", "Manage Sensors"}
+       {"guides/plugin-contract-and-lifecycle.md", "Plugin Contract And Lifecycle"},
+       {"guides/plugin-runtimes.livemd", "Plugin Runtimes"},
+       {"guides/jido-signal-messaging.md", "Use Jido Signal"},
+       {"guides/signal-buses.livemd", "Connect A Signal Bus"},
+       {"guides/signal-dispatch.livemd", "Dispatch Signals"},
+       {"guides/schedules-and-heartbeats.livemd", "Schedules And Heartbeats"},
+       {"guides/durable-schedule-occurrences.md", "Durable Schedule Occurrences"},
+       {"guides/managed-sensors.livemd", "Manage Sensors"}
      ]},
     {"Compose Systems",
      [
-       {"guides/v3/child-agents.livemd", "Start Child Agents"},
-       {"guides/v3/ownership-orphans-and-remote-children.md",
+       {"guides/child-agents.livemd", "Start Child Agents"},
+       {"guides/ownership-orphans-and-remote-children.md",
         "Ownership, Orphans, And Remote Children"},
-       {"guides/v3/topology-definitions.md", "Topology Definitions"},
-       {"guides/v3/topology-dsl.livemd", "Topology DSL"},
-       {"guides/v3/topology-builders-codecs-and-composition.md",
+       {"guides/topology-definitions.md", "Topology Definitions"},
+       {"guides/topology-dsl.livemd", "Topology DSL"},
+       {"guides/topology-builders-codecs-and-composition.md",
         "Topology Builders, Codecs, And Composition"},
-       {"guides/v3/activate-and-repair-a-topology.livemd", "Activate And Repair A Topology"}
+       {"guides/activate-and-repair-a-topology.livemd", "Activate And Repair A Topology"}
      ]},
     {"Persist And Recover",
      [
-       {"guides/v3/portable-state-and-checkpoints.md", "Portable State And Checkpoints"},
-       {"guides/v3/persistence-adapters.livemd", "Persistence Adapters"},
-       {"guides/v3/compare-and-swap-hibernate-and-thaw.md",
-        "Compare And Swap, Hibernate, And Thaw"},
-       {"guides/v3/recoverable-effects.md", "Recoverable Effects"},
-       {"guides/v3/runtime-coordination-state.md", "Runtime Coordination State"},
-       {"guides/v3/threads-and-audit-records.md", "Threads And Audit Records"}
+       {"guides/portable-state-and-checkpoints.md", "Portable State And Checkpoints"},
+       {"guides/persistence-adapters.livemd", "Persistence Adapters"},
+       {"guides/compare-and-swap-hibernate-and-thaw.md", "Compare And Swap, Hibernate, And Thaw"},
+       {"guides/recoverable-effects.md", "Recoverable Effects"},
+       {"guides/runtime-coordination-state.md", "Runtime Coordination State"},
+       {"guides/threads-and-audit-records.md", "Threads And Audit Records"}
      ]},
     {"Operate And Extend",
      [
-       {"guides/v3/configuration.md", "Configuration"},
-       {"guides/v3/observe-agent-turns.livemd", "Observe Agent Turns"},
-       {"guides/v3/telemetry-tracing-and-logs.md", "Telemetry, Tracing, And Logs"},
-       {"guides/v3/test-agents-and-plugins.livemd", "Test Agents And Plugins"},
-       {"guides/v3/deployment-and-shutdown.md", "Deployment And Shutdown"},
-       {"guides/v3/limits-and-performance.md", "Limits And Performance"},
-       {"guides/v3/extension-boundaries.md", "Extension Boundaries"},
-       {"guides/v3/example-systems.md", "Example Systems"}
+       {"guides/configuration.md", "Configuration"},
+       {"guides/observe-agent-turns.livemd", "Observe Agent Turns"},
+       {"guides/telemetry-tracing-and-logs.md", "Telemetry, Tracing, And Logs"},
+       {"guides/test-agents-and-plugins.livemd", "Test Agents And Plugins"},
+       {"guides/deployment-and-shutdown.md", "Deployment And Shutdown"},
+       {"guides/limits-and-performance.md", "Limits And Performance"},
+       {"guides/extension-boundaries.md", "Extension Boundaries"},
+       {"guides/example-systems.md", "Example Systems"}
      ]},
     {"Upgrade",
      [
@@ -174,11 +172,7 @@ defmodule Jido.MixProject do
       extras: project_extras() ++ guide_extras(),
       extra_section: "Guides",
       formatters: ["html"],
-      # README and the migration guide still link to the old guide set. Remove
-      # these two entries when their v3 rewrites replace those links.
       skip_undefined_reference_warnings_on: [
-        "README.md",
-        "guides/migration.md",
         "CHANGELOG.md",
         "LICENSE"
       ],

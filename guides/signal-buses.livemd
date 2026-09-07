@@ -1,0 +1,99 @@
+# Connect A Signal Bus
+
+This Livebook starts a Bus through an Agent Plugin and routes a published Signal
+to the owning Agent.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define The Consumer
+
+```elixir
+defmodule BusGuide.Consumer do
+  use Jido.Agent, name: "bus_guide_consumer"
+
+  agent do
+    schema Zoi.object(%{values: Zoi.list(Zoi.integer()) |> Zoi.default([])})
+
+    plugin Jido.Plugin.Bus.Manager, config: [name: :guide_bus]
+    plugin Jido.Plugin.Bus.Client, config: [bus: :guide_bus, path: "guide.bus.**"]
+  end
+
+  routes do
+    signal_source "/guides/bus"
+
+    route "guide.bus.record" do
+      action %{value: value, observer: observer},
+        name: "bus_guide_record",
+        schema: Zoi.object(%{value: Zoi.integer(), observer: Zoi.pid()}),
+        context: context do
+        state = context.agent_state
+        send(observer, {:bus_guide_recorded, context.signal.id})
+        {:ok, %{state | values: state.values ++ [value]}}
+      end
+    end
+  end
+end
+```
+
+Manager appears before Client so the Bus exists before subscription setup.
+
+## Start The Consumer
+
+```elixir
+{:ok, _jido} = Jido.start()
+jido = Jido.default_instance()
+
+{:ok, consumer} =
+  Jido.start_agent(jido, BusGuide.Consumer, id: "bus-consumer")
+
+:ok = Jido.AgentServer.await_ready(consumer)
+```
+
+## Publish A Signal
+
+```elixir
+signal =
+  Jido.Signal.new!(
+    "guide.bus.record",
+    %{value: 7, observer: self()},
+    source: "/guides/publisher"
+  )
+
+{:ok, bus} = Jido.Signal.Bus.whereis(:guide_bus, jido: jido)
+{:ok, [_record]} = Jido.Signal.Bus.publish(bus, [signal])
+
+receive do
+  {:bus_guide_recorded, id} -> id
+after
+  5_000 -> raise "Bus delivery did not arrive"
+end
+```
+
+## Read Committed State
+
+```elixir
+Jido.AgentServer.agent(consumer).state.values
+```
+
+The result is `[7]`. A normal Client uses a cast. It does not acknowledge a
+durable cursor.
+
+For durable consumption, set a stable `durable:` ID and a `start_from:` value.
+The Client then calls the Agent and acknowledges only after commit. The Agent
+must handle duplicate Signals.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(jido, consumer)
+:ok = Jido.stop()
+```
+
+See the [Jido Signal Bus guide](https://hexdocs.pm/jido_signal/) for Store,
+replay, cursor, and acknowledgement details.

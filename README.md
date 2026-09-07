@@ -5,8 +5,9 @@
 [![CI](https://github.com/agentjido/jido/actions/workflows/ci.yml/badge.svg)](https://github.com/agentjido/jido/actions/workflows/ci.yml)
 [![License](https://img.shields.io/hexpm/l/jido.svg)](https://github.com/agentjido/jido/blob/main/LICENSE)
 
-Jido is an Agent framework for Elixir. It keeps domain state in immutable
-`%Jido.Agent{}` values and puts OTP runtime state in `Jido.AgentServer`.
+Jido is an actor and agent framework for Elixir. An Agent is an immutable value
+that holds identity, routes, and validated domain state. An Agent Server is the
+OTP actor that runs one Agent through serial Turns.
 
 This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
 changes from V2. The package is not published, and beta release checks are not
@@ -129,17 +130,25 @@ end
 
 ## Guides and validation
 
-See [core scope and extension points](guides/core-scope.md),
-[migration from V2](guides/migration.md), [Agent state](guides/agents.md),
-[runtime controls](guides/runtime.md), [Plugins](guides/plugins.md), and
-[persistence](guides/storage.md). The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md)
-has 52 fixtures plus ten application scenarios. Run their complete acceptance
-before using the candidate.
+Start with the [Getting Started Livebook](guides/getting-started.livemd), then
+[build your first Agent](guides/build-your-first-agent.livemd). Read
+[Actors, Agents, and Jido](guides/actor-and-agent-framework.md) for the framework
+model and [Agent Definitions and Instances](guides/agent-definitions-and-instances.md)
+for the value contract.
+
+The guide set also covers [Agent Turns](guides/turns-commit-and-effects.md),
+[Plugin contracts](guides/plugin-contract-and-lifecycle.md),
+[actor lifecycle](guides/agent-server-lifecycle.md),
+[topologies](guides/topology-definitions.md),
+[persistence and recovery](guides/portable-state-and-checkpoints.md), and
+[operations](guides/configuration.md). Use the
+[example systems catalog](guides/example-systems.md) to find an executable
+contract test. If you have V2 application code, use the
+[migration guide](guides/migration.md).
 
 [Design documents](docs/design/README.md) contain deferred proposals. They do
-not define the API implemented by this branch. The Ref facade, new Plugin
-pipeline, and replacement persistence design are outside this migration.
-Cluster-exclusive ownership is not supported.
+not define the API implemented by this branch. Cluster-exclusive ownership is
+not supported.
 
 ## License
 

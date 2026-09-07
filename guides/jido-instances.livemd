@@ -1,0 +1,75 @@
+# Jido Instances
+
+A Jido instance owns the local Registry, task supervisor, Agent supervisor, and
+runtime coordination store. This Livebook starts a named instance.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define An Application Instance
+
+```elixir
+defmodule InstanceGuide.Jido do
+  use Jido, otp_app: :jido
+end
+```
+
+In an application, add `InstanceGuide.Jido` to the application supervision
+tree before any component that starts Agents.
+
+## Start The Instance
+
+```elixir
+{:ok, instance} = InstanceGuide.Jido.start_link([])
+
+%{
+  registry: InstanceGuide.Jido.registry_name(),
+  agent_supervisor: InstanceGuide.Jido.agent_supervisor_name(),
+  task_supervisor: InstanceGuide.Jido.task_supervisor_name(),
+  runtime_store: InstanceGuide.Jido.runtime_store_name()
+}
+```
+
+Use a fixed application module or another finite atom as the instance name. Do
+not create atoms from external tenant IDs.
+
+## Define And Start An Agent
+
+```elixir
+defmodule InstanceGuide.Agent do
+  use Jido.Agent, name: "instance_guide_agent"
+
+  agent do
+    schema Zoi.object(%{value: Zoi.integer() |> Zoi.default(0)})
+  end
+end
+
+{:ok, agent} =
+  InstanceGuide.Jido.start_agent(
+    InstanceGuide.Agent,
+    id: "agent-1"
+  )
+
+InstanceGuide.Jido.list_agents()
+```
+
+The generated instance functions call the same public top-level Jido API with
+the instance name already supplied.
+
+## Stop The Example
+
+```elixir
+:ok = InstanceGuide.Jido.stop_agent(agent)
+:ok = Supervisor.stop(instance)
+```
+
+The runtime store is local and ephemeral. Use configured persistence when
+Agent state must survive a complete instance or VM loss.
+
+Continue with [Start And Address Agents](start-and-address-agents.livemd) and
+[Configuration](configuration.md).

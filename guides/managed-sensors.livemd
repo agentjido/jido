@@ -1,0 +1,150 @@
+# Manage Sensors
+
+This Livebook starts and stops one supervised input process through
+`Jido.Plugin.SensorManager`.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Register A Local Observer
+
+```elixir
+if Process.whereis(:sensor_guide_observer) do
+  Process.unregister(:sensor_guide_observer)
+end
+
+true = Process.register(self(), :sensor_guide_observer)
+```
+
+The name is only for this local example. Application sensors should get stable
+configuration through their normal application boundary.
+
+## Define A Sensor
+
+```elixir
+defmodule SensorGuide.Probe do
+  use GenServer
+
+  def start_link(%Jido.Plugin.SensorManager.Init{} = init) do
+    GenServer.start_link(__MODULE__, init)
+  end
+
+  @impl GenServer
+  def init(init) do
+    signal =
+      Jido.Signal.new!(
+        "sensor.ready",
+        %{observer: init.config.observer},
+        source: "/guides/sensor"
+      )
+
+    :ok = Jido.AgentServer.cast(init.agent_server, signal)
+    {:ok, init}
+  end
+end
+```
+
+## Define The Agent
+
+```elixir
+defmodule SensorGuide.Agent do
+  use Jido.Agent, name: "sensor_guide_agent"
+
+  agent do
+    schema Zoi.object(%{inputs: Zoi.integer() |> Zoi.default(0)})
+    plugin Jido.Plugin.SensorManager
+  end
+
+  routes do
+    signal_source "/guides/sensor"
+
+    route "sensor.start" do
+      action %{observer: observer},
+        name: "sensor_guide_start",
+        schema: Zoi.object(%{observer: Zoi.atom()}),
+        context: context do
+        directive =
+          Jido.Plugin.SensorManager.start(
+            :probe,
+            SensorGuide.Probe,
+            %{observer: observer}
+          )
+
+        {:ok, context.agent_state, [directive]}
+      end
+
+      define :start_probe, args: [:observer]
+    end
+
+    route "sensor.stop" do
+      action _input, name: "sensor_guide_stop", context: context do
+        {:ok, context.agent_state, [Jido.Plugin.SensorManager.stop(:probe)]}
+      end
+
+      define :stop_probe
+    end
+
+    route "sensor.ready" do
+      action %{observer: observer},
+        name: "sensor_guide_ready",
+        schema: Zoi.object(%{observer: Zoi.atom()}),
+        context: context do
+        count = context.agent_state.inputs + 1
+        send(observer, {:sensor_guide_input, count})
+        {:ok, %{context.agent_state | inputs: count}}
+      end
+    end
+  end
+end
+```
+
+## Start And Stop The Sensor
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, agent} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    SensorGuide.Agent,
+    id: "sensor-agent"
+  )
+
+{:ok, _committed} = SensorGuide.Agent.start_probe(agent, :sensor_guide_observer)
+
+receive do
+  {:sensor_guide_input, count} -> count
+after
+  5_000 -> raise "Sensor input did not arrive"
+end
+
+{:ok, _committed} = SensorGuide.Agent.stop_probe(agent)
+
+:idle =
+  Enum.reduce_while(1..100, :directing, fn _, _phase ->
+    case Jido.AgentServer.status(agent).phase do
+      :idle -> {:halt, :idle}
+      phase ->
+        Process.sleep(10)
+        {:cont, phase}
+    end
+  end)
+```
+
+The desired sensor set is portable Plugin state. The Sensor Manager runtime
+owns the PIDs and restarts the sensor while its tag remains desired.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop()
+Process.unregister(:sensor_guide_observer)
+```
+
+See [Plugin Runtimes](plugin-runtimes.livemd) for restart and readiness rules.

@@ -1,9 +1,111 @@
-# Start with Jido V3
+# Getting Started
 
-The V2 setup cells are retired because their construction and command contracts
-changed. Run the complete local example from [the repository README](../README.md)
-in IEx after `mix deps.get`. The V3 candidate is local until explicitly published.
+This Livebook defines one Agent, applies a direct command, and runs the same
+command in a live Agent Server. Run each cell in order.
 
-For repeatable examples, use the [catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) and
-its tests. See [Agent construction](agents.md), [commands](core-loop.md), and
-[the migration guide](migration.md).
+## Install Jido
+
+From this repository, use the local checkout:
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+An application can use `{:jido, "~> 3.0.0-beta.1"}` after that beta is
+available from Hex.
+
+## Define One Action
+
+An Action gets validated input and Turn context. The current Agent state is in
+`context.agent_state`. Return the complete next state.
+
+```elixir
+defmodule GettingStarted.Add do
+  use Jido.Action,
+    name: "getting_started_add",
+    schema: Zoi.object(%{amount: Zoi.integer()})
+
+  @impl Jido.Action
+  def run(%{amount: amount}, %{agent_state: state}) do
+    {:ok, %{state | count: state.count + amount}}
+  end
+end
+```
+
+Jido uses the Action and Flow contracts from
+[Jido Action](https://hexdocs.pm/jido_action/). An Action can do I/O. Such I/O
+is outside the Agent state commit.
+
+## Define One Agent
+
+The Agent owns the state schema and the routes from Signals to executable work.
+The nested `define` adds Signal and live-call helpers.
+
+```elixir
+defmodule GettingStarted.Counter do
+  use Jido.Agent, name: "getting_started_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/getting-started"
+
+    route "counter.add", GettingStarted.Add do
+      defaults %{amount: 1}
+      define :add, args: [{:optional, :amount}]
+    end
+  end
+end
+```
+
+## Apply A Direct Command
+
+A direct command returns a new Agent value and its Directives. It does not
+start a process or commit live state.
+
+```elixir
+agent = GettingStarted.Counter.new!(id: "direct-counter")
+{:ok, signal} = GettingStarted.Counter.add_signal(3)
+{:ok, candidate, []} = GettingStarted.Counter.cmd(agent, signal)
+
+{agent.state.count, candidate.state.count}
+```
+
+The result is `{0, 3}`. The original Agent is unchanged.
+
+## Run The Live Actor
+
+An Agent Server is the live actor for one Agent instance. It accepts one Turn
+at a time and commits each valid candidate.
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, counter} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    GettingStarted.Counter,
+    id: "live-counter"
+  )
+
+{:ok, committed} = GettingStarted.Counter.add(counter, 3)
+snapshot = Jido.AgentServer.snapshot(counter)
+
+{committed.state.count, snapshot.state_version}
+```
+
+The result is `{3, 1}`. The Server owns the committed value and its revision.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop()
+```
+
+Continue with [Build Your First Agent](build-your-first-agent.livemd) or read
+[Actors, Agents, And Jido](actor-and-agent-framework.md).

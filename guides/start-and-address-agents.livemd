@@ -1,0 +1,79 @@
+# Start and Address Agents
+
+This Livebook starts Agents in partitions and uses the public lookup and list
+APIs.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Small Agent
+
+```elixir
+defmodule AddressGuide.Worker do
+  use Jido.Agent, name: "address_guide_worker"
+
+  agent do
+    schema Zoi.object(%{label: Zoi.string() |> Zoi.default("worker")})
+  end
+end
+```
+
+## Start Two Partitions
+
+```elixir
+{:ok, _jido} = Jido.start()
+jido = Jido.default_instance()
+
+{:ok, east} =
+  Jido.start_agent(jido, AddressGuide.Worker,
+    id: "worker-1",
+    partition: :east
+  )
+
+{:ok, west} =
+  Jido.start_agent(jido, AddressGuide.Worker,
+    id: "worker-1",
+    partition: :west
+  )
+
+{east, west}
+```
+
+An Agent ID is unique inside one Jido instance and partition. A partition is a
+logical namespace. It is not an authorization boundary.
+
+## Look Up And List
+
+```elixir
+^east = Jido.whereis_agent(jido, "worker-1", partition: :east)
+^west = Jido.whereis_agent(jido, "worker-1", partition: :west)
+
+%{
+  east: Jido.list_agents(jido, partition: :east),
+  west: Jido.list_agents(jido, partition: :west),
+  counts: %{
+    east: Jido.agent_count(jido, partition: :east),
+    west: Jido.agent_count(jido, partition: :west)
+  }
+}
+```
+
+Use the same instance and partition for start, lookup, relationships, and
+persistence keys.
+
+## Stop The Agents
+
+```elixir
+:ok = Jido.stop_agent(jido, east)
+:ok = Jido.stop_agent(jido, west)
+:ok = Jido.stop()
+```
+
+Local Registry uniqueness does not establish cluster-exclusive ownership. See
+[Extension Boundaries](extension-boundaries.md) before you activate the same
+business identity on more than one node.

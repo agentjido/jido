@@ -1,0 +1,106 @@
+# Runtime State and Debugging
+
+This Livebook uses only public inspection APIs. It does not read private Agent
+Server state.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define And Start An Agent
+
+```elixir
+defmodule DebugGuide.Counter do
+  use Jido.Agent, name: "debug_guide_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/debug"
+
+    route "counter.add" do
+      action %{amount: amount},
+        name: "debug_guide_add",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
+      define :add, args: [:amount]
+    end
+  end
+end
+
+{:ok, _jido} = Jido.start()
+
+{:ok, counter} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    DebugGuide.Counter,
+    id: "debug-counter",
+    debug: true,
+    debug_max_events: 20
+  )
+```
+
+## Run A Turn
+
+```elixir
+{:ok, committed} = DebugGuide.Counter.add(counter, 2)
+committed.state
+```
+
+## Read Public Views
+
+```elixir
+agent = Jido.AgentServer.agent(counter)
+status = Jido.AgentServer.status(counter)
+snapshot = Jido.AgentServer.snapshot(counter)
+children = Jido.AgentServer.children(counter)
+
+%{
+  agent: agent,
+  status: status,
+  snapshot: snapshot,
+  children: children
+}
+```
+
+The snapshot contains portable Agent data and the commit revision. Status is a
+narrow runtime view. Child information is for live ownership and can contain
+process-local values.
+
+## Read Recent Events
+
+```elixir
+{:ok, events} = Jido.AgentServer.recent_events(counter, limit: 10)
+Enum.map(events, &Map.take(&1, [:event, :stage, :status]))
+```
+
+The event buffer is bounded and newest-first. It is for diagnosis, not durable
+audit history.
+
+## Toggle Debug Mode
+
+```elixir
+:ok = Jido.AgentServer.set_debug(counter, false)
+:ok = Jido.AgentServer.set_debug(counter, true)
+```
+
+Use instance debug controls for shared logging and redaction settings. Keep
+full payload logging off unless the data policy permits it.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop()
+```
+
+Continue with [Observe Agent Turns](observe-agent-turns.livemd).

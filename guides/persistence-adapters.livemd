@@ -1,0 +1,125 @@
+# Persistence Adapters
+
+This Livebook stores an Agent checkpoint, loads it, and removes it. It uses the
+ETS adapter, which is suitable for local development and tests.
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define a portable Agent
+
+```elixir
+defmodule PersistenceGuide.Counter do
+  use Jido.Agent, name: "persistence_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    route "increment" do
+      action %{by: by},
+        name: "persistence_guide_increment",
+        schema: Zoi.object(%{by: Zoi.integer() |> Zoi.default(1)}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + by}}
+      end
+    end
+  end
+end
+```
+
+Create and change the Agent as a value. No actor is necessary for this step.
+
+```elixir
+agent = PersistenceGuide.Counter.new!(id: "guide-counter")
+signal = Jido.Signal.new!("increment", %{by: 4}, source: "/guides/persistence")
+{:ok, agent, []} = PersistenceGuide.Counter.cmd(agent, signal)
+agent.state
+```
+
+## Save through an adapter
+
+An adapter configuration is a module or `{module, options}` pair. The options
+below select a table only for this guide.
+
+```elixir
+store = {Jido.Persistence.ETS, table: :persistence_guide}
+
+:ok =
+  Jido.Persistence.save_agent(
+    store,
+    agent,
+    revision: 1,
+    instance: PersistenceGuide.Jido
+  )
+```
+
+Jido owns the key format, record validation, encoding, and revision check. An
+adapter only stores binary keys and binary values.
+
+## Load and delete
+
+The same instance and partition values identify the record on every operation.
+
+```elixir
+{:ok, restored} =
+  Jido.Persistence.load_agent(
+    store,
+    PersistenceGuide.Counter,
+    "guide-counter",
+    instance: PersistenceGuide.Jido
+  )
+
+restored.state
+```
+
+```elixir
+:ok =
+  Jido.Persistence.delete_agent(
+    store,
+    PersistenceGuide.Counter,
+    "guide-counter",
+    instance: PersistenceGuide.Jido
+  )
+
+{:error, :not_found} =
+  Jido.Persistence.load_agent(
+    store,
+    PersistenceGuide.Counter,
+    "guide-counter",
+    instance: PersistenceGuide.Jido
+  )
+```
+
+## Choose an adapter
+
+Jido includes these adapters:
+
+| Adapter | Use |
+| --- | --- |
+| `Jido.Persistence.ETS` | Tests and local development. Data ends with the BEAM. |
+| `Jido.Persistence.File` | One local BEAM with no shared writers. |
+| `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
+
+Configure persistence on a Jido instance when most actors use the same store.
+An Agent start option can override or disable that configuration.
+
+```elixir
+defmodule PersistenceGuide.AppJido do
+  use Jido,
+    otp_app: :my_app,
+    persistence: {Jido.Persistence.ETS, table: :my_app_agents}
+end
+```
+
+The ETS adapter creates its table when first used. The File adapter is for one
+local writer domain. The Redis adapter lets the host application own its Redis
+client and connection policy.
+
+Next, read
+[Compare-and-Swap, Hibernate, and Thaw](compare-and-swap-hibernate-and-thaw.html)
+for the live actor lifecycle.

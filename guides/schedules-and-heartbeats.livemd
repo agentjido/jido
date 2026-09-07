@@ -1,0 +1,117 @@
+# Schedules and Heartbeats
+
+This Livebook schedules one delayed Signal. It also shows the Heartbeat
+declaration for fixed periodic input.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Scheduled Agent
+
+```elixir
+defmodule ScheduleGuide.Agent do
+  use Jido.Agent, name: "schedule_guide_agent"
+
+  agent do
+    schema Zoi.object(%{ticks: Zoi.integer() |> Zoi.default(0)})
+    plugin Jido.Plugin.Scheduler
+  end
+
+  routes do
+    signal_source "/guides/schedule"
+
+    route "schedule.once" do
+      action %{delay_ms: delay_ms, observer: observer},
+        name: "schedule_guide_once",
+        schema: Zoi.object(%{delay_ms: Zoi.integer() |> Zoi.min(0), observer: Zoi.pid()}),
+        context: context do
+        tick =
+          Jido.Signal.new!(
+            "schedule.tick",
+            %{observer: observer},
+            source: "/guides/schedule/timer"
+          )
+
+        directive = Jido.Plugin.Scheduler.schedule(delay_ms, tick)
+        {:ok, context.agent_state, [directive]}
+      end
+
+      define :schedule_once, args: [:delay_ms, :observer]
+    end
+
+    route "schedule.tick" do
+      action %{observer: observer},
+        name: "schedule_guide_tick",
+        schema: Zoi.object(%{observer: Zoi.pid()}),
+        context: context do
+        count = context.agent_state.ticks + 1
+        send(observer, {:schedule_guide_tick, count})
+        {:ok, %{context.agent_state | ticks: count}}
+      end
+    end
+  end
+end
+```
+
+## Schedule One Signal
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, agent} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    ScheduleGuide.Agent,
+    id: "scheduled-agent"
+  )
+
+{:ok, _committed} = ScheduleGuide.Agent.schedule_once(agent, 25, self())
+
+receive do
+  {:schedule_guide_tick, count} -> count
+after
+  5_000 -> raise "Scheduled Signal did not arrive"
+end
+```
+
+One-shot schedules live in the Plugin runtime. They are not restored after a
+complete runtime loss.
+
+## Add A Heartbeat
+
+For fixed periodic input, declare this Plugin in an Agent:
+
+```elixir
+defmodule ScheduleGuide.HeartbeatAgent do
+  use Jido.Agent, name: "schedule_guide_heartbeat"
+
+  agent do
+    schema Zoi.object(%{})
+
+    plugin Jido.Plugin.Heartbeat,
+      config: [
+        interval: 1_000,
+        signal_type: "system.heartbeat",
+        signal_data: %{}
+      ]
+  end
+end
+```
+
+Add one matching route. Every heartbeat enters the normal Agent mailbox and
+uses normal admission and Turn rules. A heartbeat is input, not a health proof.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop()
+```
+
+See [Durable Schedule Occurrences](durable-schedule-occurrences.md) for
+recurring work that must survive restart.

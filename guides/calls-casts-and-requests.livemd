@@ -1,0 +1,109 @@
+# Calls, Casts, and Requests
+
+This Livebook compares the three public ways to send a Signal to an Agent
+Server.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Counter
+
+```elixir
+defmodule RequestGuide.Counter do
+  use Jido.Agent, name: "request_guide_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/requests"
+
+    route "counter.add" do
+      action %{amount: amount},
+        name: "request_guide_add",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
+      define :add, args: [:amount]
+    end
+  end
+end
+```
+
+## Start The Actor
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, counter} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    RequestGuide.Counter,
+    id: "request-counter"
+  )
+```
+
+## Call And Wait
+
+```elixir
+{:ok, signal} = RequestGuide.Counter.add_signal(2)
+
+{:ok, committed} =
+  Jido.AgentServer.call(
+    counter,
+    signal,
+    context: %{request_id: "req-1"},
+    timeout: 5_000
+  )
+
+committed.state.count
+```
+
+`call/3` waits for the commit or failure. Its timeout also defines the admission
+deadline. If the caller stops waiting after work starts, the Turn can continue.
+
+## Cast Without A Reply
+
+```elixir
+{:ok, cast_signal} = RequestGuide.Counter.add_signal(3)
+:ok = Jido.AgentServer.cast(counter, cast_signal)
+
+# A later call from the same process arrives after the cast.
+{:ok, barrier_signal} = RequestGuide.Counter.add_signal(0)
+{:ok, after_cast} = Jido.AgentServer.call(counter, barrier_signal)
+
+after_cast.state.count
+```
+
+A cast is best effort under overload. It does not confirm admission or commit.
+
+## Send Now And Receive Later
+
+```elixir
+{:ok, request_signal} = RequestGuide.Counter.add_signal(4)
+request_id = Jido.AgentServer.send_request(counter, request_signal)
+
+response = Jido.AgentServer.receive_response(request_id, 5_000)
+response
+```
+
+The request API lets one process send several requests before it waits. Keep
+the request ID in runtime state, not durable Agent state.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop()
+```
+
+See [Admission, Cancellation, And Timeouts](admission-cancellation-and-timeouts.md)
+for failure and wait rules.

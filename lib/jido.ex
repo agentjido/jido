@@ -5,7 +5,7 @@ defmodule Jido do
   alias Jido.RuntimeStore
 
   @moduledoc """
-  自動 (Jido) - An autonomous agent framework for Elixir, built for workflows and
+  自動 (Jido) - An actor and agent framework for Elixir, built for workflows and
   multi-agent systems.
 
   ## Quick Start

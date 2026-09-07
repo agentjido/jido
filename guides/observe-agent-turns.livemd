@@ -1,0 +1,114 @@
+# Observe Agent Turns
+
+This Livebook attaches a telemetry handler to the terminal event for one Agent
+Turn. The handler sends the event to this notebook process.
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define an Agent
+
+```elixir
+defmodule ObserveGuide.Counter do
+  use Jido.Agent, name: "observe_guide_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/observe"
+
+    route "counter.add" do
+      action %{amount: amount},
+        name: "observe_guide_add",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
+      define :add, args: [:amount]
+    end
+  end
+end
+
+defmodule ObserveGuide.Forwarder do
+  def handle(event, measurements, metadata, receiver) do
+    send(receiver, {:agent_turn, event, measurements, metadata})
+  end
+end
+```
+
+## Attach a handler
+
+Telemetry handlers run in the process that emits the event. Keep the handler
+small and send work to another process.
+
+```elixir
+observer = self()
+handler_id = "observe-guide-#{System.unique_integer([:positive])}"
+
+:ok =
+  :telemetry.attach(
+    handler_id,
+    [:jido, :agent, :turn, :settled],
+    &ObserveGuide.Forwarder.handle/4,
+    observer
+  )
+```
+
+## Run one Turn
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, counter} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    ObserveGuide.Counter,
+    id: "observed-counter"
+  )
+
+{:ok, committed} = ObserveGuide.Counter.add(counter, 2)
+committed.state
+```
+
+The settled event reports the final outcome after Directive handling. A Turn
+can commit and then fail during post-commit work, so inspect both `:status` and
+`:committed?`.
+
+```elixir
+event =
+  receive do
+    {:agent_turn, name, measurements, metadata} ->
+      %{name: name, measurements: measurements, metadata: metadata}
+  after
+    5_000 ->
+      raise "no Agent Turn event arrived"
+  end
+
+%{
+  status: event.metadata.status,
+  committed?: event.metadata.committed?,
+  signal_type: event.metadata.signal_type,
+  state_version_after: event.measurements.state_version_after
+}
+```
+
+Metadata is bounded. It includes stable identity, Signal, Turn, trace, status,
+and stage fields. It excludes Agent state, Signal payloads, process handles,
+caller context, and raw error details.
+
+## Detach and stop
+
+```elixir
+:ok = :telemetry.detach(handler_id)
+:ok = Jido.stop_agent(Jido.default_instance(), counter)
+:ok = Jido.stop()
+```
+
+Read [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html) before you
+connect a production exporter.

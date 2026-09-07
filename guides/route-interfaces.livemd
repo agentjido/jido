@@ -1,0 +1,111 @@
+# Route Interfaces
+
+This Livebook defines one exact route and uses the Signal and live-call helpers
+that Jido generates for it.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define The Route
+
+```elixir
+defmodule RouteInterfaces.SetStatus do
+  use Jido.Action,
+    name: "route_interfaces_set_status",
+    schema: Zoi.object(%{status: Zoi.enum([:open, :closed])})
+
+  @impl Jido.Action
+  def run(%{status: status}, %{agent_state: state}) do
+    {:ok, %{state | status: status}}
+  end
+end
+
+defmodule RouteInterfaces.Order do
+  use Jido.Agent, name: "route_interfaces_order"
+
+  agent do
+    schema Zoi.object(%{status: Zoi.enum([:open, :closed]) |> Zoi.default(:open)})
+  end
+
+  routes do
+    signal_source "/guides/route-interfaces"
+
+    route "order.status.set", RouteInterfaces.SetStatus do
+      define :set_status, args: [:status]
+    end
+  end
+end
+```
+
+A generated interface requires an exact route with no match predicate. This
+keeps one helper tied to one executable target.
+
+## Construct A Signal
+
+```elixir
+{:ok, signal} = RouteInterfaces.Order.set_status_signal(:closed)
+
+%{
+  type: signal.type,
+  source: signal.source,
+  data: signal.data
+}
+```
+
+The bang form, `set_status_signal!/1`, returns the Signal or raises a validation
+error.
+
+## Add Envelope And Input Data
+
+```elixir
+{:ok, signal} =
+  RouteInterfaces.Order.set_status_signal(
+    :closed,
+    input: %{request_id: "req-1"},
+    signal: [subject: "order-7"]
+  )
+
+{signal.data.request_id, signal.subject}
+```
+
+Do not provide the same input key both positionally and through `input:`.
+
+## Use The Live Helper
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, order} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    RouteInterfaces.Order,
+    id: "order-7"
+  )
+
+{:ok, committed} =
+  RouteInterfaces.Order.set_status(
+    order,
+    :closed,
+    context: %{actor: "reviewer"},
+    timeout: 5_000
+  )
+
+committed.state.status
+```
+
+The live helper constructs the same Signal and calls `Jido.AgentServer.call/3`.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), order)
+:ok = Jido.stop()
+```
+
+See [Signals, Commands, And Routes](signals-commands-and-routes.md) for route
+selection rules.

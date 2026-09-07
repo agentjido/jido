@@ -1,0 +1,132 @@
+# Start Child Agents
+
+This Livebook starts and stops one owned child Agent through Directives.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define The Child
+
+```elixir
+defmodule ChildGuide.Worker do
+  use Jido.Agent, name: "child_guide_worker"
+
+  agent do
+    schema Zoi.object(%{jobs: Zoi.integer() |> Zoi.default(0)})
+  end
+end
+```
+
+## Define The Parent
+
+```elixir
+defmodule ChildGuide.Parent do
+  use Jido.Agent, name: "child_guide_parent"
+
+  agent do
+    schema Zoi.object(%{desired: Zoi.boolean() |> Zoi.default(false)})
+  end
+
+  routes do
+    signal_source "/guides/children"
+
+    route "child.start" do
+      action _input, name: "child_guide_start", context: context do
+        directive =
+          Jido.Agent.Directive.spawn_agent(
+            ChildGuide.Worker,
+            :worker,
+            opts: %{id: "child-worker"},
+            restart: :transient
+          )
+
+        {:ok, %{context.agent_state | desired: true}, [directive]}
+      end
+
+      define :start_worker
+    end
+
+    route "child.stop" do
+      action _input, name: "child_guide_stop", context: context do
+        {:ok, %{context.agent_state | desired: false},
+         [Jido.Agent.Directive.stop_child(:worker)]}
+      end
+
+      define :stop_worker
+    end
+
+    route "jido.agent.child.*" do
+      action _input, name: "child_guide_lifecycle", context: context do
+        {:ok, context.agent_state}
+      end
+    end
+  end
+end
+```
+
+The parent stores desired business state. The Agent Server stores the child PID
+and monitor in runtime state.
+
+## Start The Parent And Child
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, parent} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    ChildGuide.Parent,
+    id: "child-parent"
+  )
+
+{:ok, committed} = ChildGuide.Parent.start_worker(parent)
+
+child =
+  Enum.reduce_while(1..100, nil, fn _, _ ->
+    case Jido.AgentServer.children(parent)[:worker] do
+      nil ->
+        Process.sleep(10)
+        {:cont, nil}
+
+      value ->
+        {:halt, value}
+    end
+  end)
+
+{committed.state.desired, child.pid, child.id}
+```
+
+The parent commit can finish before child startup. The bounded loop waits for
+post-commit Directive dispatch.
+
+## Stop The Child
+
+```elixir
+{:ok, committed} = ChildGuide.Parent.stop_worker(parent)
+
+true =
+  Enum.reduce_while(1..100, false, fn _, _ ->
+    if Jido.AgentServer.children(parent)[:worker] do
+      Process.sleep(10)
+      {:cont, false}
+    else
+      {:halt, true}
+    end
+  end)
+
+committed.state.desired
+```
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), parent)
+:ok = Jido.stop()
+```
+
+Continue with [Ownership, Orphans, And Remote Children](ownership-orphans-and-remote-children.md).

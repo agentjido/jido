@@ -1,0 +1,109 @@
+# Test Agents and Plugins
+
+This Livebook tests the same Agent as a value and as a live actor. Direct tests
+give fast contract feedback. Actor tests verify commit and process behavior.
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define the subject
+
+```elixir
+defmodule TestGuide.Counter do
+  use Jido.Agent, name: "test_guide_counter"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+  end
+
+  routes do
+    signal_source "/guides/test"
+
+    route "counter.add" do
+      action %{amount: amount},
+        name: "test_guide_add",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
+      define :add, args: [:amount]
+    end
+  end
+end
+```
+
+## Test the direct contract
+
+The direct path does not start processes. Verify the candidate state,
+Directives, and unchanged input value.
+
+```elixir
+agent = TestGuide.Counter.new!(id: "direct-test")
+{:ok, signal} = TestGuide.Counter.add_signal(3)
+
+{:ok, candidate, []} = TestGuide.Counter.cmd(agent, signal)
+0 = agent.state.count
+3 = candidate.state.count
+```
+
+Invalid input must fail before it can produce a candidate.
+
+```elixir
+{:ok, invalid_signal} = TestGuide.Counter.add_signal("three")
+{:error, %Jido.Action.Error.InvalidInputError{}} =
+  TestGuide.Counter.cmd(agent, invalid_signal)
+```
+
+## Test the actor boundary
+
+Start a unique Jido instance for each asynchronous test. This prevents registry
+and runtime state from crossing test cases.
+
+```elixir
+jido = :"test_guide_#{System.unique_integer([:positive])}"
+{:ok, jido_pid} = Jido.start_link(name: jido)
+{:ok, server} = Jido.start_agent(jido, TestGuide.Counter, id: "live-test")
+
+before = Jido.AgentServer.snapshot(server)
+{:ok, committed} = TestGuide.Counter.add(server, 4)
+after_commit = Jido.AgentServer.snapshot(server)
+
+0 = before.state_version
+1 = after_commit.state_version
+4 = committed.state.count
+^committed = after_commit.agent
+```
+
+Test process ownership and cleanup explicitly when they are part of the
+contract.
+
+```elixir
+monitor = Process.monitor(server)
+:ok = Jido.stop_agent(jido, server)
+
+receive do
+  {:DOWN, ^monitor, :process, ^server, _reason} -> :ok
+after
+  5_000 -> raise "Agent Server did not stop"
+end
+
+:ok = Supervisor.stop(jido_pid)
+```
+
+## Test Plugins at both boundaries
+
+For a state-only Plugin, test option normalization, state initialization,
+Directive validation, and `update_state/3` as ordinary functions. Then run one
+Agent Turn to verify that Plugin state commits with domain state.
+
+For a Plugin runtime, start the Agent under a unique Jido instance. Verify its
+child specification, startup failure behavior, Directive handling, cleanup, and
+restart behavior. Use messages or public inspection functions instead of sleep
+calls.
+
+In this repository, `mix examples` runs the executable example suite. Use
+`mix test` for the full contract suite.

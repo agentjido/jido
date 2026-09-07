@@ -1,0 +1,93 @@
+# Dispatch Signals
+
+This Livebook sends one Signal to a PID after an Agent commit.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Sending Agent
+
+```elixir
+defmodule DispatchGuide.Sender do
+  use Jido.Agent, name: "dispatch_guide_sender"
+
+  agent do
+    schema Zoi.object(%{sent: Zoi.integer() |> Zoi.default(0)})
+    plugin Jido.Plugin.Dispatch
+  end
+
+  routes do
+    signal_source "/guides/dispatch"
+
+    route "dispatch.send" do
+      action %{recipient: recipient, text: text},
+        name: "dispatch_guide_send",
+        schema: Zoi.object(%{recipient: Zoi.pid(), text: Zoi.string()}),
+        context: context do
+        outbound =
+          Jido.Signal.new!(
+            "dispatch.delivered",
+            %{text: text},
+            source: "/guides/dispatch/sender"
+          )
+
+        directive =
+          Jido.Plugin.Dispatch.send(
+            outbound,
+            {:pid, target: recipient}
+          )
+
+        {:ok, %{context.agent_state | sent: context.agent_state.sent + 1}, [directive]}
+      end
+
+      define :send_text, args: [:recipient, :text]
+    end
+  end
+end
+```
+
+## Send After Commit
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, sender} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    DispatchGuide.Sender,
+    id: "dispatch-sender"
+  )
+
+{:ok, committed} = DispatchGuide.Sender.send_text(sender, self(), "ready")
+
+received =
+  receive do
+    {:signal, signal} -> signal
+  after
+    5_000 -> raise "Dispatched Signal did not arrive"
+  end
+
+{committed.state.sent, received.type, received.data}
+```
+
+The Agent state commits before the Plugin calls the Jido Signal PID adapter.
+The Plugin also propagates trace causation from the input Signal.
+
+A dispatch timeout is indeterminate. The adapter can finish after the timeout.
+Use receiver idempotency when retry is possible. This Plugin is not a durable
+outbox.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), sender)
+:ok = Jido.stop()
+```
+
+See [Recoverable Effects](recoverable-effects.md) when delivery must survive a
+crash.

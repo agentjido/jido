@@ -1,0 +1,115 @@
+# Build Your First Agent
+
+This Livebook builds an Agent with an inline Action, a route default, and a
+generated command interface.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define The Agent
+
+Use an inline Action when the behavior is local to one Agent route. Extract a
+named Action when other Agents or Flows must reuse it.
+
+```elixir
+defmodule FirstAgent.Counter do
+  use Jido.Agent,
+    name: "first_agent_counter",
+    description: "Counts typed increment Signals"
+
+  agent do
+    schema Zoi.object(%{
+             count: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0),
+             last_amount: Zoi.integer() |> Zoi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/guides/first-agent"
+
+    route "counter.increment" do
+      action %{amount: amount},
+        name: "first_agent_increment",
+        schema: Zoi.object(%{amount: Zoi.integer() |> Zoi.min(0)}),
+        context: context do
+        state = context.agent_state
+
+        {:ok,
+         %{
+           state
+           | count: state.count + amount,
+             last_amount: amount
+         }}
+      end
+
+      defaults %{amount: 1}
+      define :increment, args: [{:optional, :amount}]
+    end
+  end
+end
+```
+
+The state schema supplies initial values. The Action input schema protects the
+route input. The complete Agent schema validates the returned state.
+
+## Inspect The Definition
+
+```elixir
+definition = FirstAgent.Counter.agent()
+
+%{
+  definition?: Jido.Agent.definition?(definition),
+  id: definition.id,
+  state: definition.state,
+  route_count: length(definition.routes)
+}
+```
+
+A definition has no ID and no state. It is reusable authoring data.
+
+## Create An Instance
+
+```elixir
+agent = FirstAgent.Counter.new!(id: "counter-1")
+
+%{
+  instance?: Jido.Agent.instance?(agent),
+  id: agent.id,
+  state: agent.state
+}
+```
+
+## Use The Generated Signal Helper
+
+Omit the optional argument to use the route default.
+
+```elixir
+{:ok, default_signal} = FirstAgent.Counter.increment_signal()
+{:ok, after_default, []} = FirstAgent.Counter.cmd(agent, default_signal)
+
+{:ok, explicit_signal} = FirstAgent.Counter.increment_signal(4)
+{:ok, after_explicit, []} = FirstAgent.Counter.cmd(after_default, explicit_signal)
+
+after_explicit.state
+```
+
+The final state is `%{count: 5, last_amount: 4}`.
+
+## Reject Invalid Input
+
+```elixir
+{:ok, invalid_signal} = FirstAgent.Counter.increment_signal(-1)
+{:error, error} = FirstAgent.Counter.cmd(after_explicit, invalid_signal)
+
+{error.__struct__, after_explicit.state.count}
+```
+
+The Action does not run, and the source Agent value stays at count five.
+
+Continue with [Agent DSL](agent-dsl.livemd) and
+[Route Interfaces](route-interfaces.livemd).

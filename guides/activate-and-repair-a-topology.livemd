@@ -1,0 +1,108 @@
+# Activate and Repair A Topology
+
+This Livebook starts a topology with manual repair, stops one member, and asks
+the controller to restore the existing target.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define The System
+
+```elixir
+defmodule RepairGuide.Cell do
+  use Jido.Agent, name: "repair_guide_cell"
+
+  agent do
+    schema Zoi.object(%{label: Zoi.string() |> Zoi.default("cell")})
+  end
+end
+
+defmodule RepairGuide.System do
+  use Jido.Topology, name: "repair_guide_system"
+
+  agents do
+    agent :left, RepairGuide.Cell do
+      initial_state %{label: "left"}
+    end
+
+    agent :right, RepairGuide.Cell do
+      initial_state %{label: "right"}
+    end
+  end
+
+  startup do
+    concurrency 2
+    retry_interval 1_000
+    task_timeout 5_000
+  end
+end
+```
+
+## Start With Manual Repair
+
+```elixir
+{:ok, _jido} = Jido.start()
+jido = Jido.default_instance()
+topology = RepairGuide.System.new!(id: "repair-system", input: %{})
+
+{:ok, controller} =
+  Jido.Topology.Controller.start_link(
+    jido: jido,
+    topology: topology,
+    repair: :manual
+  )
+
+:ok = Jido.Topology.Controller.await_ready(controller)
+
+left = Jido.Topology.Controller.whereis_agent(controller, :left)
+right = Jido.Topology.Controller.whereis_agent(controller, :right)
+
+{left, right}
+```
+
+## Stop One Member
+
+```elixir
+:ok = Jido.stop_agent(jido, left)
+
+%{
+  left_alive?: Jido.AgentServer.alive?(left),
+  right_same?: Jido.Topology.Controller.whereis_agent(controller, :right) == right
+}
+```
+
+Manual mode retains normal child supervision but does not run a periodic repair
+pass.
+
+## Request Repair
+
+```elixir
+:ok = Jido.Topology.Controller.reconcile(controller)
+:ok = Jido.Topology.Controller.await_ready(controller)
+
+new_left = Jido.Topology.Controller.whereis_agent(controller, :left)
+
+%{
+  restarted?: is_pid(new_left) and new_left != left,
+  right_same?: Jido.Topology.Controller.whereis_agent(controller, :right) == right,
+  status: Jido.Topology.Controller.status(controller)
+}
+```
+
+Healthy members retain their PIDs and state. Repair uses the same topology
+target. It does not apply a new definition.
+
+## Stop The Example
+
+```elixir
+:ok = Supervisor.stop(controller)
+:ok = Jido.stop()
+```
+
+See [Deployment And Shutdown](deployment-and-shutdown.md) for supervision-tree
+placement.

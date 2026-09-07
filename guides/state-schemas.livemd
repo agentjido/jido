@@ -1,0 +1,92 @@
+# State Schemas
+
+This Livebook defines complete Agent state with Zoi defaults and a cross-field
+rule.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A State Contract
+
+```elixir
+defmodule StateSchemas.CounterState do
+  def schema do
+    Zoi.object(%{
+      count: Zoi.integer() |> Zoi.default(0),
+      minimum: Zoi.integer() |> Zoi.default(0),
+      maximum: Zoi.integer() |> Zoi.default(10)
+    })
+    |> Zoi.refine({__MODULE__, :within_bounds, []})
+  end
+
+  def within_bounds(%{count: count, minimum: minimum, maximum: maximum}, _opts) do
+    if minimum <= count and count <= maximum do
+      :ok
+    else
+      {:error, "count must be within the ordered bounds"}
+    end
+  end
+end
+```
+
+Keep the schema static. The refinement uses a named module function, so the
+authoring contract remains explicit.
+
+## Define The Agent
+
+```elixir
+defmodule StateSchemas.Counter do
+  use Jido.Agent, name: "state_schema_counter"
+
+  agent do
+    schema StateSchemas.CounterState.schema()
+    max_state_size 32_768
+  end
+end
+```
+
+## Apply Defaults
+
+```elixir
+agent = StateSchemas.Counter.new!(id: "bounded-counter")
+agent.state
+```
+
+The result is `%{count: 0, minimum: 0, maximum: 10}`.
+
+## Reject An Invalid Instance
+
+```elixir
+{:error, error} =
+  StateSchemas.Counter.new(
+    id: "invalid-counter",
+    state: %{count: 11, minimum: 0, maximum: 10}
+  )
+
+error.__struct__
+```
+
+The constructor rejects the complete state. The same schema runs for direct
+commands, live candidates, checkpoints, and restore.
+
+## Check The Size Budget
+
+```elixir
+size = :erlang.external_size(agent.state)
+{:ok, _agent} = Jido.Agent.validate_instance(agent)
+
+size
+```
+
+The size is the external term size. It is not the process heap size.
+
+Do not store PIDs, ports, references, functions, or task handles in durable
+Agent state. Put them in Plugin runtimes.
+
+Continue with [Plugin-Owned State](plugin-state.md) and
+[Portable State And Checkpoints](portable-state-and-checkpoints.md).

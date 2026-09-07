@@ -1,0 +1,155 @@
+# Plugin Runtimes
+
+This Livebook creates a Plugin-owned GenServer and sends it one typed Directive
+after an Agent commit.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Directive
+
+```elixir
+defmodule PluginRuntime.Record do
+  @schema Zoi.struct(__MODULE__, %{label: Zoi.string() |> Zoi.min(1)}, coerce: true)
+  @enforce_keys Zoi.Struct.enforce_keys(@schema)
+  defstruct Zoi.Struct.struct_fields(@schema)
+
+  def schema, do: @schema
+end
+```
+
+## Define The Runtime
+
+```elixir
+defmodule PluginRuntime.Store do
+  use GenServer
+
+  def start_link(%Jido.Plugin.Init{} = init) do
+    GenServer.start_link(__MODULE__, init)
+  end
+
+  @impl GenServer
+  def init(init) do
+    {:ok, %{agent_server: init.agent_server, records: []}}
+  end
+
+  @impl GenServer
+  def handle_call({:record, label, state_version}, _from, state) do
+    record = %{label: label, state_version: state_version}
+    {:reply, :ok, %{state | records: state.records ++ [record]}}
+  end
+
+  def handle_call(:records, _from, state) do
+    {:reply, state.records, state}
+  end
+end
+```
+
+The runtime owns process-local data. It stops and restarts with its Agent.
+
+## Define The Plugin
+
+```elixir
+defmodule PluginRuntime.Effects do
+  use Jido.Plugin
+
+  @impl Jido.Plugin
+  def directives(_opts), do: [PluginRuntime.Record]
+
+  @impl Jido.Plugin
+  def validate_directive(%PluginRuntime.Record{} = directive, _opts) do
+    case Zoi.parse(PluginRuntime.Record.schema(), Map.from_struct(directive)) do
+      {:ok, value} -> {:ok, value}
+      {:error, issues} ->
+        {:error, Jido.Error.validation_error("Invalid record", details: %{issues: issues})}
+    end
+  end
+
+  @impl Jido.Plugin
+  def dispatch(runtime, directive, context, _opts) do
+    GenServer.call(runtime, {:record, directive.label, context.state_version})
+  end
+
+  def child_spec(%Jido.Plugin.Init{} = init) do
+    Supervisor.child_spec({PluginRuntime.Store, init}, id: __MODULE__)
+  end
+end
+```
+
+## Use The Plugin
+
+```elixir
+defmodule PluginRuntime.Agent do
+  use Jido.Agent, name: "plugin_runtime_agent"
+
+  agent do
+    schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    plugin PluginRuntime.Effects
+  end
+
+  routes do
+    signal_source "/guides/plugin-runtime"
+
+    route "runtime.record" do
+      action %{label: label},
+        name: "plugin_runtime_record",
+        schema: Zoi.object(%{label: Zoi.string()}),
+        context: context do
+        directive = %PluginRuntime.Record{label: label}
+        {:ok, %{context.agent_state | count: context.agent_state.count + 1}, [directive]}
+      end
+
+      define :record, args: [:label]
+    end
+  end
+end
+```
+
+## Run The Effect
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+{:ok, agent} =
+  Jido.start_agent(
+    Jido.default_instance(),
+    PluginRuntime.Agent,
+    id: "plugin-runtime-1"
+  )
+
+:ok = Jido.AgentServer.await_ready(agent)
+{:ok, committed} = PluginRuntime.Agent.record(agent, "first")
+
+%{pid: runtime} = Jido.AgentServer.children(agent)[{:plugin, PluginRuntime.Effects}]
+
+records =
+  Enum.reduce_while(1..100, [], fn _, _records ->
+    case GenServer.call(runtime, :records) do
+      [] ->
+        Process.sleep(10)
+        {:cont, []}
+
+      records ->
+        {:halt, records}
+    end
+  end)
+
+{committed.state.count, records}
+```
+
+The state commits before `dispatch/4` records the effect. A dispatch failure
+would not undo the committed count.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(Jido.default_instance(), agent)
+:ok = Jido.stop()
+```
+
+See [Plugin Contract And Lifecycle](plugin-contract-and-lifecycle.md).

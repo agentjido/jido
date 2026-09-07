@@ -1,0 +1,101 @@
+# Agent DSL
+
+This Livebook uses the Jido Agent DSL to define state, routes, route defaults,
+and generated interfaces.
+
+## Install Jido
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("..", __DIR__)}
+])
+```
+
+## Define A Named Action
+
+```elixir
+defmodule AgentDSL.Rename do
+  use Jido.Action,
+    name: "agent_dsl_rename",
+    schema: Zoi.object(%{name: Zoi.string()})
+
+  @impl Jido.Action
+  def run(%{name: name}, %{agent_state: state}) do
+    {:ok, %{state | name: String.trim(name)}}
+  end
+end
+```
+
+## Declare The Agent
+
+```elixir
+defmodule AgentDSL.Profile do
+  use Jido.Agent,
+    name: "agent_dsl_profile",
+    description: "Owns one display profile"
+
+  agent do
+    schema Zoi.object(%{
+             name: Zoi.string() |> Zoi.default("Anonymous"),
+             revision: Zoi.integer() |> Zoi.min(0) |> Zoi.default(0)
+           })
+
+    metadata %{domain: "profiles"}
+    max_state_size 16_384
+  end
+
+  routes do
+    signal_source "/guides/agent-dsl"
+
+    route "profile.rename", AgentDSL.Rename do
+      defaults %{name: "Anonymous"}
+      define :rename, args: [{:optional, :name}]
+    end
+  end
+end
+```
+
+Each field has one source. Jido rejects a field that appears in both the
+`use Jido.Agent` options and its DSL block.
+
+## Inspect Generated Data
+
+```elixir
+definition = AgentDSL.Profile.agent()
+
+%{
+  name: AgentDSL.Profile.name(),
+  description: AgentDSL.Profile.description(),
+  metadata: AgentDSL.Profile.metadata(),
+  routes: AgentDSL.Profile.routes(),
+  definition?: Jido.Agent.definition?(definition)
+}
+```
+
+## Use The Generated Interface
+
+```elixir
+agent = AgentDSL.Profile.new!(id: "profile-1")
+{:ok, signal} = AgentDSL.Profile.rename_signal(" Ada ")
+{:ok, candidate, []} = AgentDSL.Profile.cmd(agent, signal)
+
+candidate.state.name
+```
+
+The result is `"Ada"`.
+
+## Use A Route Default
+
+```elixir
+{:ok, signal} = AgentDSL.Profile.rename_signal()
+{:ok, candidate, []} = AgentDSL.Profile.cmd(agent, signal)
+
+candidate.state.name
+```
+
+The result is `"Anonymous"`. Signal values replace route defaults when both
+provide the same key.
+
+Continue with [State Schemas](state-schemas.livemd),
+[Route Interfaces](route-interfaces.livemd), and
+[Authoring Extensions](authoring-extensions.md).

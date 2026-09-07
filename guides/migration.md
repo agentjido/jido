@@ -1,4 +1,4 @@
-# Upgrade from Jido V2 to V3
+# Upgrade from Jido v2 to v3
 
 This guide covers the change from published Jido `2.3.3` to the local
 `3.0.0-beta.1` candidate. The public names remain `Jido.Agent` and
@@ -302,7 +302,7 @@ end
 ```
 
 Add `plugin MyApp.CounterPlugin` inside the Agent's `agent` block. Use
-`plugin MyPlugin, option: value` for per-Agent options. This example counts
+`plugin MyPlugin, config: [option: value]` for per-Agent options. This example counts
 successful candidate reductions; only a successful live commit stores the count.
 Set a default on the owned object itself when the key can be absent. A default
 on a nested field alone does not create the outer Plugin state object.
@@ -330,7 +330,8 @@ inspect the Agent in `Jido.Agent.Command`. Later Plugins can change prepared
 input. Do not treat the proposed isolation contract as implemented behavior.
 
 **Check:** test owned state protection, callback order, readiness, owner shutdown,
-restart reconstruction, and dispatch errors. See [Plugins](plugins.md).
+restart reconstruction, and dispatch errors. See
+[Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md).
 
 ## Port lifecycle and composition
 
@@ -355,8 +356,9 @@ A remote disconnect does not prove that a child is dead. Local duplicate
 registration checks do not establish exclusive ownership across a cluster.
 
 **Check:** test shutdown, detached owners, idle expiry, worker limits, remote
-failure, and cleanup. See [runtime controls](runtime.md) and the
-[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/05_03_bounded_workers).
+failure, and cleanup. See
+[Agent Server Lifecycle](agent-server-lifecycle.md) and the
+[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/test/examples/05_multi_agent/05_03_bounded_workers).
 
 ## Convert stored data explicitly
 
@@ -396,7 +398,9 @@ option. Standalone `Jido.Thread` values remain; old Thread stores do not.
 **Check:** restore a real backup, test stale and uncertain writes, and confirm
 that no runtime-only values entered stored state. Definition revision checks,
 durable deletion fencing, and live schema upgrades have unmet research tests;
-do not use them as migration guarantees. See [storage limits](storage.md).
+do not use them as migration guarantees. See
+[Portable State and Checkpoints](portable-state-and-checkpoints.md) and
+[Limits and Performance](limits-and-performance.md).
 
 ## Replace other removed interfaces
 
@@ -440,7 +444,7 @@ isolation, durable namespace identity, definition revisions, durable deletion,
 runtime Init snapshots, Turn revision isolation, live state migration, and live
 Topology updates. Cluster-exclusive ownership remains unsupported. See the
 [acceptance record](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md)
-and [testing guide](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
+and [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
 Before publication, complete the agreed feature scope, repeated test seeds,
 recovery and scale checks, runtime matrix, lint, Dialyzer, docs, and fresh package
