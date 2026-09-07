@@ -8,6 +8,14 @@ defmodule Jido.Agent.DSL.Compiler do
     original = Module.get_attribute(env.module, :jido_agent_options)
     config = unwrap!(Authoring.attrs(original), env)
     {extensions, config} = Map.pop(config, :extensions, [])
+
+    extensions =
+      if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
+        Enum.filter(extensions, &extension?(&1, :lower_agent))
+      else
+        extensions
+      end
+
     # Module access can read an older loaded version during recompilation.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
     routes = Extension.get_entities(dsl, [:routes])
@@ -277,6 +285,11 @@ defmodule Jido.Agent.DSL.Compiler do
     do: %{env | line: :erl_anno.line(anno)}
 
   defp location(env, _entity), do: env
+
+  defp extension?(module, callback) when is_atom(module) and not is_nil(module),
+    do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)
+
+  defp extension?(_module, _callback), do: false
 
   defp unwrap!({:ok, value}, _env), do: value
   defp unwrap!({:error, error}, env), do: fail!(env, Exception.message(error))

@@ -240,7 +240,7 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
 
   test "invalid extension declarations fail at compilation" do
     for {extensions, message} <- [
-          {[NoLower], ~r/must implement lower_topology\/2/},
+          {[NoLower], ~r/must implement lower_agent\/2 or lower_topology\/2/},
           {[BadConfig, BadConfig], ~r/Duplicate Topology extension/}
         ] do
       module = Module.concat(__MODULE__, "Contract#{System.unique_integer([:positive])}")

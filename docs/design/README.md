@@ -113,6 +113,8 @@ Read the design in this order:
 
 Supporting documents:
 
+- [Topology as one Agent authoring host](topology-authoring-host.md) defines the
+  proposed combined DSL, owner Agent, constructor, and reconciliation boundary.
 - [Agent authoring](authoring.md) records the versioned-module proposal and
   links to the authoring formats implemented on the current SDK.
 - [Agent Spark DSL and route interfaces](agent-dsl-interfaces.md) describes block
@@ -145,6 +147,7 @@ can move a document from `Pending approval` to `Approved`.
 | [Observability](observability.md) | Pending approval |
 | [Errors](errors.md) | Pending approval |
 | [Runtime extension boundaries](runtime-extension-boundaries.md) | Pending approval |
+| [Topology as one Agent authoring host](topology-authoring-host.md) | Pending approval |
 | [Agent authoring](authoring.md) | Pending approval |
 | [Agent Spark DSL and route interfaces](agent-dsl-interfaces.md) | Pending approval |
 | [v3 design changes](v3-design-changes.md) | Pending approval |

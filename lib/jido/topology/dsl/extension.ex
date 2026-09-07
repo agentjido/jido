@@ -134,35 +134,75 @@ defmodule Jido.Topology.DSL.Extension do
              }
            end)
 
-  use Spark.Dsl.Extension,
-    sections: [
-      %Spark.Dsl.Section{
-        name: :topology,
-        patchable?: true,
-        schema: [schema: [type: :any], metadata: [type: :map]]
-      },
-      %Spark.Dsl.Section{name: :agents, patchable?: true, entities: [@agent, @group]},
-      %Spark.Dsl.Section{name: :resources, patchable?: true, entities: [@bus]},
-      %Spark.Dsl.Section{name: :relationships, patchable?: true, entities: [@owns]},
-      %Spark.Dsl.Section{name: :connections, patchable?: true, entities: [@subscribe]},
-      %Spark.Dsl.Section{name: :topologies, patchable?: true, entities: [@include]},
-      %Spark.Dsl.Section{name: :imports, patchable?: true, entities: [@import_bus]},
-      %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports},
-      %Spark.Dsl.Section{
-        name: :startup,
-        patchable?: true,
-        schema: [
-          concurrency: [type: :pos_integer],
-          ready: [type: {:in, [:all]}],
-          max_agents: [type: :pos_integer],
-          retry_interval: [type: :pos_integer],
-          task_timeout: [type: :pos_integer]
-        ]
-      }
+  @agents_section %Spark.Dsl.Section{
+    name: :agents,
+    patchable?: true,
+    entities: [@agent, @group]
+  }
+  @resources_section %Spark.Dsl.Section{name: :resources, patchable?: true, entities: [@bus]}
+  @relationships_section %Spark.Dsl.Section{
+    name: :relationships,
+    patchable?: true,
+    entities: [@owns]
+  }
+  @connections_section %Spark.Dsl.Section{
+    name: :connections,
+    patchable?: true,
+    entities: [@subscribe]
+  }
+  @topologies_section %Spark.Dsl.Section{
+    name: :topologies,
+    patchable?: true,
+    entities: [@include]
+  }
+  @imports_section %Spark.Dsl.Section{
+    name: :imports,
+    patchable?: true,
+    entities: [@import_bus]
+  }
+  @exports_section %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports}
+  @startup_section %Spark.Dsl.Section{
+    name: :startup,
+    patchable?: true,
+    schema: [
+      concurrency: [type: :pos_integer],
+      ready: [type: {:in, [:all]}],
+      max_agents: [type: :pos_integer],
+      retry_interval: [type: :pos_integer],
+      task_timeout: [type: :pos_integer]
     ]
+  }
+
+  @topology_sections [
+    @agents_section,
+    @resources_section,
+    @relationships_section,
+    @connections_section,
+    @topologies_section,
+    @imports_section,
+    @exports_section,
+    @startup_section
+  ]
+
+  # Keep the current top-level blocks readable during the beta migration.
+  # The compiler rejects declarations split across both locations.
+  use Spark.Dsl.Extension,
+    sections:
+      [
+        %Spark.Dsl.Section{
+          name: :topology,
+          patchable?: true,
+          schema: [schema: [type: :any], metadata: [type: :map]],
+          sections: @topology_sections
+        }
+      ] ++ @topology_sections
 end
 
 defmodule Jido.Topology.DSL do
   @moduledoc false
-  use Spark.Dsl, default_extensions: [extensions: [Jido.Topology.DSL.Extension]]
+
+  use Spark.Dsl,
+    default_extensions: [
+      extensions: [Jido.Agent.DSL.Extension, Jido.Topology.DSL.Extension]
+    ]
 end

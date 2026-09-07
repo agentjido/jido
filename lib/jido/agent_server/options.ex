@@ -174,6 +174,9 @@ defmodule Jido.AgentServer.Options do
 
     with {:module, ^module} <- Code.ensure_loaded(module) do
       cond do
+        function_exported?(module, :__agent_config__, 0) ->
+          Agent.new(module, overrides)
+
         function_exported?(module, :new, 1) ->
           normalize_agent_result(module.new(overrides), module)
 

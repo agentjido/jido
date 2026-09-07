@@ -141,15 +141,49 @@ defmodule Jido.Agent do
 
   @doc "Declares one Agent module with a reusable definition and default Signal behavior."
   defmacro __using__(opts) do
-    dsl_opts = if is_list(opts), do: Keyword.take(opts, [:extensions]), else: []
+    {host, agent_opts} =
+      if is_list(opts), do: Keyword.pop(opts, :__host__, :agent), else: {:agent, opts}
+
+    {dsl, constructors?, combined_extensions?} =
+      case host do
+        :topology -> {Jido.Topology.DSL, false, true}
+        :agent -> {Jido.Agent.DSL, true, false}
+      end
+
+    dsl_opts =
+      if is_list(agent_opts) do
+        extensions = Keyword.get(agent_opts, :extensions)
+
+        if is_nil(extensions), do: [], else: [extensions: extensions]
+      else
+        []
+      end
+
+    constructors =
+      if constructors? do
+        quote location: :keep do
+          @doc "Creates one Agent instance from this module definition."
+          @spec new(map() | keyword()) :: {:ok, Jido.Agent.t()} | {:error, Exception.t()}
+          def new(overrides \\ []) do
+            Jido.Agent.new(__MODULE__, overrides)
+          end
+
+          @doc "Creates one Agent instance or raises its validation error."
+          @spec new!(map() | keyword()) :: Jido.Agent.t() | no_return()
+          def new!(overrides \\ []) do
+            Jido.Agent.new!(__MODULE__, overrides)
+          end
+        end
+      end
 
     quote location: :keep do
-      use Jido.Agent.DSL, unquote(dsl_opts)
+      use unquote(dsl), unquote(dsl_opts)
       use Jido.Action.Inline
       @before_compile Jido.Agent.DSL.Compiler
       @behaviour Jido.Agent
 
-      @jido_agent_options unquote(opts)
+      @jido_agent_options unquote(agent_opts)
+      @jido_agent_combined_extensions unquote(combined_extensions?)
 
       @doc "Returns the neutral canonical Agent definition."
       @spec agent() :: Jido.Agent.t()
@@ -202,20 +236,7 @@ defmodule Jido.Agent do
       @spec metadata() :: map()
       def metadata, do: agent().metadata
 
-      @doc "Creates one Agent instance from this module definition."
-      @spec new(map() | keyword()) :: {:ok, Jido.Agent.t()} | {:error, Exception.t()}
-      def new(overrides \\ []) do
-        Jido.Agent.__new_from_module__(__MODULE__, __agent_config__(), overrides)
-      end
-
-      @doc "Creates one Agent instance or raises its validation error."
-      @spec new!(map() | keyword()) :: Jido.Agent.t() | no_return()
-      def new!(overrides \\ []) do
-        case new(overrides) do
-          {:ok, agent} -> agent
-          {:error, error} -> raise error
-        end
-      end
+      unquote(constructors)
 
       @doc "Applies one Signal to an Agent value without starting a Server."
       @spec cmd(Jido.Agent.t(), Jido.Signal.t(), keyword()) ::

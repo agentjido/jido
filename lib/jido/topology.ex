@@ -43,14 +43,46 @@ defmodule Jido.Topology do
 
   @doc "Declares a topology module."
   defmacro __using__(opts) do
-    dsl_opts = if is_list(opts), do: Keyword.take(opts, [:extensions]), else: []
+    {owner_opts, topology_opts} =
+      if is_list(opts) do
+        {
+          Keyword.take(opts, [:name, :description, :max_state_size, :extensions]),
+          Keyword.drop(opts, [:description, :max_state_size])
+        }
+      else
+        {opts, opts}
+      end
+
+    owner_opts =
+      if is_list(owner_opts) do
+        Keyword.put(owner_opts, :__host__, :topology)
+      else
+        owner_opts
+      end
 
     quote location: :keep do
-      use Jido.Topology.DSL, unquote(dsl_opts)
+      use Jido.Agent, unquote(owner_opts)
       import Jido.Topology.Reference, only: [input: 1, member: 1]
       import Jido.Topology.Ref, only: [ref: 2]
-      @topology_options unquote(opts)
+      @topology_options unquote(topology_opts)
       @before_compile Jido.Topology.DSL.Compiler
+
+      @doc "Returns the topology owner Agent definition."
+      @spec owner() :: Jido.Agent.t()
+      def owner, do: agent()
+
+      @doc "Constructs the topology owner Agent."
+      @spec new_agent(map() | keyword()) ::
+              {:ok, Jido.Agent.t()} | {:error, Exception.t()}
+      def new_agent(opts \\ []) do
+        Jido.Agent.new(__MODULE__, opts)
+      end
+
+      @doc "Constructs the topology owner Agent or raises its validation error."
+      @spec new_agent!(map() | keyword()) :: Jido.Agent.t() | no_return()
+      def new_agent!(opts \\ []) do
+        Jido.Agent.new!(__MODULE__, opts)
+      end
 
       @doc "Returns the topology definition."
       def topology, do: Jido.Topology.new!(__topology_config__())
