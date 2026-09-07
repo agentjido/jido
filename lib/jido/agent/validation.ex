@@ -182,9 +182,9 @@ defmodule Jido.Agent.Validation do
   end
 
   defp known_keys(attrs) do
-    case Enum.find(Map.keys(attrs), &(&1 not in @definition_keys)) do
-      nil -> :ok
-      key -> invalid("Unknown Agent definition key", %{key: key})
+    case Map.keys(attrs) -- @definition_keys do
+      [] -> :ok
+      [key | _] -> invalid("Unknown Agent definition key", %{key: key})
     end
   end
 
@@ -273,9 +273,9 @@ defmodule Jido.Agent.Validation do
   end
 
   defp validate_instance_overrides(overrides) do
-    case Enum.find(Map.keys(overrides), &(&1 not in @instance_keys)) do
-      nil -> :ok
-      key -> invalid("Agent instances can set only :id and :state", %{key: key})
+    case Map.keys(overrides) -- @instance_keys do
+      [] -> :ok
+      [key | _] -> invalid("Agent instances can set only :id and :state", %{key: key})
     end
   end
 

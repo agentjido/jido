@@ -87,6 +87,31 @@ defmodule Jido.Agent.ValidationTest do
     refute_received {:callback, _, _}
   end
 
+  test "rejects unknown nil keys in definition maps and keyword lists" do
+    attrs = %{nil => :unexpected, name: "nil_key", plugins: [CallbackPlugin]}
+
+    for input <- [attrs, Enum.to_list(attrs)] do
+      assert {:error,
+              %ValidationError{message: "Unknown Agent definition key", details: %{key: nil}}} =
+               Agent.new(input)
+
+      refute_received {:callback, _, _}
+    end
+  end
+
+  test "rejects unknown nil keys in instance maps and keyword lists" do
+    definition = Agent.new!(name: "nil_key")
+    overrides = %{nil => :unexpected, id: "nil-key-instance"}
+
+    for input <- [overrides, Enum.to_list(overrides)] do
+      assert {:error,
+              %ValidationError{
+                message: "Agent instances can set only :id and :state",
+                details: %{key: nil}
+              }} = Agent.instantiate(definition, input)
+    end
+  end
+
   test "reports the first common field error when later fields also fail" do
     failures = [
       {:name, nil},

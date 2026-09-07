@@ -149,3 +149,29 @@ See [the test policy](../../guides/testing.md) and
 The default-runtime tests report existing type warnings in intentional invalid
 input tests. The project compilation and strict warning-level lint checks pass.
 No example acceptance assertions were run for the final verification.
+
+## Follow-up contract fixes
+
+A later review found three pre-existing errors at Agent boundaries:
+
+- Constructors accepted an unknown `nil` key because `Enum.find/2` also uses
+  `nil` when no key is found. Definition and instance checks now inspect the
+  list of unknown keys. Tests cover maps, keyword lists, and callback order.
+- Codec accepted and encoded struct-valued tuple defaults, then rejected them
+  during decode. Decode now restores the tuple form. The explicit authoring
+  `:defaults` option remains restricted to plain maps, and invalid non-map
+  document defaults retain their error.
+- A descriptor failure during Registry derivation raised `MatchError`.
+  Route collection now returns the resolver error and stops at the first
+  failed route. Tests cover invalid descriptors and raised callback errors at
+  the first, middle, and last route. Registry ID order remains unchanged.
+
+The new regression tests produced four failures before these fixes, including
+one at each constructor. After the fixes, 101 focused Agent tests pass on
+Elixir 1.20.3 / OTP 29 and Elixir 1.18.5 / OTP 27. The separate benchmark
+contract suite passes all seven tests. `mix quality` passes with 985 unit tests
+and eight exclusions. Docs and package checks also pass. No example acceptance
+tests ran, and research skips are unchanged.
+
+No paired performance or full coverage run was repeated for these fixes; the
+measurements above describe the initial refinement pass.

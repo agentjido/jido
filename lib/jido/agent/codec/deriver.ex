@@ -4,13 +4,14 @@ defmodule Jido.Agent.Codec.Deriver do
   alias Jido.Agent.Codec.Registry
 
   def agent(agent) do
-    []
-    |> add(:agent, agent.module)
-    |> add(:schema, agent.schema)
-    |> data(agent.metadata)
-    |> collect(agent.plugins, &plugin_entries/2)
-    |> collect(agent.routes, &route_entries/2)
-    |> build()
+    entries =
+      []
+      |> add(:agent, agent.module)
+      |> add(:schema, agent.schema)
+      |> data(agent.metadata)
+      |> collect(agent.plugins, &plugin_entries/2)
+
+    with {:ok, entries} <- collect_routes(entries, agent.routes), do: build(entries)
   end
 
   def plugin(plugin), do: [] |> plugin_entries(plugin) |> build()
@@ -18,11 +19,16 @@ defmodule Jido.Agent.Codec.Deriver do
   defp plugin_entries(entries, {module, options}),
     do: entries |> add(:plugin, module) |> data(options)
 
-  defp route_entries(entries, route) do
+  defp collect_routes(entries, []), do: {:ok, entries}
+
+  defp collect_routes(entries, [route | routes]) do
     {target, defaults} = Authoring.split_target(route.target)
-    {:ok, executable} = Jido.Executable.resolve(target)
-    entries = entries |> add(executable.kind, target) |> data(defaults)
-    if is_nil(route.match), do: entries, else: add(entries, :route_match, route.match)
+
+    with {:ok, executable} <- Jido.Executable.resolve(target) do
+      entries = entries |> add(executable.kind, target) |> data(defaults)
+      entries = if is_nil(route.match), do: entries, else: add(entries, :route_match, route.match)
+      collect_routes(entries, routes)
+    end
   end
 
   defp collect(entries, values, fun), do: Enum.reduce(values, entries, &fun.(&2, &1))
