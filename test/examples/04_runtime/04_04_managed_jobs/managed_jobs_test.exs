@@ -75,7 +75,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     runtime =
       eventually(fn ->
         case Server.children(agent)[{:plugin, Jobs}] do
-          %{pid: pid} when pid != old -> pid
+          %{pid: pid} when is_pid(pid) and pid != old -> pid
           _ -> nil
         end
       end)
