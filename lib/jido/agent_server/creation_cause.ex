@@ -42,16 +42,23 @@ defmodule Jido.AgentServer.CreationCause do
   def metadata(nil), do: %{}
 
   def metadata(%__MODULE__{} = cause) do
-    cause
-    |> Trace.child_of(cause.signal_id)
-    |> Map.put(:cause_turn_id, cause.turn_id)
+    case Trace.child_of(cause, cause.signal_id) do
+      {:error, :invalid_trace_context} -> %{}
+      child -> Map.put(child, :cause_turn_id, cause.turn_id)
+    end
   end
 
   def put(signal, nil), do: signal
 
   def put(signal, %__MODULE__{} = cause) do
-    {:ok, signal} = Trace.put(signal, Trace.child_of(cause, cause.signal_id))
-    {:ok, signal} = Signal.put_context(signal, "jidocauseturnid", cause.turn_id)
-    signal
+    case Trace.child_of(cause, cause.signal_id) do
+      {:error, :invalid_trace_context} ->
+        signal
+
+      child ->
+        {:ok, signal} = Trace.put(signal, child)
+        {:ok, signal} = Signal.put_context(signal, "jidocauseturnid", cause.turn_id)
+        signal
+    end
   end
 end
