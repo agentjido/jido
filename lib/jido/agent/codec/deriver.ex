@@ -4,7 +4,7 @@ defmodule Jido.Agent.Codec.Deriver do
   alias Jido.Agent.Codec.Registry
 
   def agent(agent) do
-    {[], MapSet.new()}
+    []
     |> add(:agent, agent.module)
     |> add(:schema, agent.schema)
     |> data(agent.metadata)
@@ -13,7 +13,7 @@ defmodule Jido.Agent.Codec.Deriver do
     |> build()
   end
 
-  def plugin(plugin), do: {[], MapSet.new()} |> plugin_entries(plugin) |> build()
+  def plugin(plugin), do: [] |> plugin_entries(plugin) |> build()
 
   defp plugin_entries(entries, {module, options}),
     do: entries |> add(:plugin, module) |> data(options)
@@ -46,14 +46,12 @@ defmodule Jido.Agent.Codec.Deriver do
 
   # As in Flow's Deriver, collect into an accumulator. Keep Agent's existing
   # first-occurrence IDs and exact deduplication; lookup still uses ==.
-  defp add({entries, seen} = acc, kind, value) do
-    entry = {kind, value}
-    if MapSet.member?(seen, entry), do: acc, else: {[entry | entries], MapSet.put(seen, entry)}
-  end
+  defp add(entries, kind, value), do: [{kind, value} | entries]
 
-  defp build({entries, _seen}) do
+  defp build(entries) do
     entries
     |> Enum.reverse()
+    |> Enum.uniq()
     |> Enum.with_index()
     |> Map.new(fn {{kind, _} = entry, index} ->
       {"#{kind}/#{index}", entry}
