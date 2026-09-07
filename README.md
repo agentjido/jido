@@ -48,17 +48,6 @@ JSON-compatible Codec use the same Agent validation. See the
 ## Example
 
 ```elixir
-defmodule MyApp.Increment do
-  use Jido.Action,
-    name: "increment",
-    schema: Zoi.object(%{amount: Zoi.integer()})
-
-  @impl Jido.Action
-  def run(%{amount: amount}, context) do
-    {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
-  end
-end
-
 defmodule MyApp.Counter do
   use Jido.Agent, name: "counter"
 
@@ -69,27 +58,60 @@ defmodule MyApp.Counter do
   routes do
     signal_source "/example"
 
-    route "counter.increment", MyApp.Increment do
+    route "counter.increment" do
+      action %{amount: amount},
+        name: "increment",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
       defaults %{amount: 1}
       define :increment, args: [{:optional, :amount}]
     end
   end
 end
 
-definition = MyApp.Counter.agent()
-#=> %Jido.Agent{id: nil, state: nil, ...}
+agent = MyApp.Counter.new!(id: "counter-1")
 
-instance = MyApp.Counter.new!(id: "counter-1")
-#=> %Jido.Agent{id: "counter-1", state: %{count: 0}, ...}
+signal =
+  Jido.Signal.new!(
+    "counter.increment",
+    %{amount: 2},
+    source: "/example"
+  )
 
-{:ok, _jido} = Jido.start()
-{:ok, counter} = Jido.start_agent(Jido.default_instance(), MyApp.Counter, id: "counter-1")
-
-{:ok, signal} = MyApp.Counter.increment_signal(2)
-{:ok, _candidate, []} = MyApp.Counter.cmd(instance, signal)
-{:ok, agent} = MyApp.Counter.increment(counter, 2)
-agent.state.count
+{:ok, candidate, []} = MyApp.Counter.cmd(agent, signal)
+candidate.state.count
 #=> 2
+```
+
+`cmd/2` is the main entry point for an Agent value. It routes one Signal and
+returns a candidate Agent plus the Directives that a runtime can dispatch. The
+original Agent value stays unchanged.
+
+Run the same Agent value as a live actor when it needs process identity,
+serialized message handling, persistence, or runtime effects:
+
+```elixir
+{:ok, _jido} = Jido.start()
+{:ok, counter} = Jido.start_agent(Jido.default_instance(), agent)
+
+{:ok, committed_agent} = Jido.AgentServer.call(counter, signal)
+committed_agent.state.count
+#=> 2
+```
+
+The route `define` declaration creates helpers for the same contract. Use the
+Signal helper with `cmd/2`, or use the command helper with a live actor:
+
+```elixir
+{:ok, increment_signal} = MyApp.Counter.increment_signal(3)
+{:ok, candidate, []} = MyApp.Counter.cmd(agent, increment_signal)
+
+{:ok, committed_agent} = MyApp.Counter.increment(counter, 3)
+committed_agent.state.count
+#=> 5
 ```
 
 ## Agent Plugins
