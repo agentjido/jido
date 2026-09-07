@@ -367,7 +367,14 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   defp start_verified_agent_process(directive, opts, child_id, child_partition, state) do
     with {:ok, pid, info} <- start_agent_process(directive, opts, state) do
-      case verify_started_agent(info, directive, child_id, child_partition, state) do
+      case verify_spawned_agent(
+             info,
+             directive,
+             child_id,
+             child_partition,
+             self(),
+             state.agent.id
+           ) do
         :ok ->
           {:ok, pid, info}
 
@@ -378,8 +385,16 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     end
   end
 
-  defp verify_started_agent(info, directive, child_id, child_partition, state)
-       when is_map(info) do
+  @doc false
+  def verify_spawned_agent(
+        info,
+        directive,
+        child_id,
+        child_partition,
+        parent_pid,
+        parent_id
+      )
+      when is_map(info) do
     expected_module = expected_agent_module(directive.agent)
     parent = Map.get(info, :parent)
 
@@ -388,8 +403,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
       |> mismatch(:id, child_id, Map.get(info, :agent_id))
       |> mismatch(:partition, child_partition, Map.get(info, :partition))
       |> mismatch(:module, expected_module, Map.get(info, :agent_module))
-      |> mismatch(:parent_pid, self(), parent_value(parent, :pid))
-      |> mismatch(:parent_id, state.agent.id, parent_value(parent, :id))
+      |> mismatch(:parent_pid, parent_pid, parent_value(parent, :pid))
+      |> mismatch(:parent_id, parent_id, parent_value(parent, :id))
       |> mismatch(:parent_tag, directive.tag, parent_value(parent, :tag))
 
     if map_size(mismatches) == 0 do
@@ -403,7 +418,14 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     end
   end
 
-  defp verify_started_agent(info, directive, _child_id, _child_partition, _state) do
+  def verify_spawned_agent(
+        info,
+        directive,
+        _child_id,
+        _child_partition,
+        _parent_pid,
+        _parent_id
+      ) do
     {:error,
      Jido.Error.validation_error("Spawned Agent returned invalid creation information",
        kind: :config,

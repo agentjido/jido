@@ -61,6 +61,7 @@ defmodule Jido.AgentServer do
     ActiveTurn,
     AdmissionDeadline,
     ChildInfo,
+    ChildPlacement,
     DirectiveContext,
     DirectiveRuntime,
     ExecutionAdapter,
@@ -856,6 +857,10 @@ defmodule Jido.AgentServer do
     case verify_child_online(pid, child_id, tag, data) do
       {:ok, info} ->
         {:keep_state, track_online_child(data, pid, info)}
+
+      {:error, _reason, :stop} ->
+        _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
+        :keep_state_and_data
 
       {:error, _reason} ->
         :keep_state_and_data
@@ -2355,25 +2360,40 @@ defmodule Jido.AgentServer do
        %{agent_id: ^child_id, parent: %ParentRef{pid: owner, id: parent_id, tag: ^tag} = parent} =
            info}
       when owner == self() and parent_id == data.agent.id ->
-        with :ok <- verify_child_placement(pid, tag, parent, data), do: {:ok, info}
+        with :ok <- verify_child_placement(pid, tag, parent, info, data), do: {:ok, info}
 
       _other ->
         {:error, :parent_mismatch}
     end
   end
 
-  defp verify_child_placement(pid, tag, parent, data) do
+  defp verify_child_placement(pid, tag, parent, info, data) do
     case Map.get(data.child_spawn_requests, tag) do
-      %{request_id: request, directive: %{node: target}} ->
-        if node(pid) == target and parent.spawn_ref == request,
-          do: :ok,
-          else: {:error, :spawn_request_mismatch}
+      %{request_id: request, directive: %{node: target} = directive} ->
+        child_id = Map.get(directive.opts, :id, "#{data.agent.id}/#{tag}")
+        child_partition = Map.get(directive.opts, :partition, data.partition)
+
+        with true <- node(pid) == target and parent.spawn_ref == request,
+             :ok <-
+               DirectiveRuntime.verify_spawned_agent(
+                 info,
+                 directive,
+                 child_id,
+                 child_partition,
+                 self(),
+                 data.agent.id
+               ) do
+          :ok
+        else
+          false -> {:error, :spawn_request_mismatch, :stop}
+          {:error, reason} -> {:error, reason, :stop}
+        end
 
       nil when node(pid) == node() ->
         :ok
 
       nil ->
-        {:error, :unknown_remote_child}
+        {:error, :unknown_remote_child, :stop}
     end
   end
 

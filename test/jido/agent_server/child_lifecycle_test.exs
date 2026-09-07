@@ -312,6 +312,53 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert Jido.whereis_agent(jido, requested_id, partition: :blue) == child.pid
   end
 
+  test "a deferred child notification must match the original spawn request", %{jido: jido} do
+    parent_id = unique_id("deferred-parent")
+    expected_id = unique_id("deferred-child")
+    wrong_id = unique_id("wrong-child")
+    request = {System.unique_integer([:positive, :monotonic]), make_ref()}
+    {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
+
+    directive =
+      Directive.spawn_agent(ChildAgent, :worker,
+        node: node(),
+        opts: %{id: expected_id, partition: :blue}
+      )
+
+    _state =
+      :sys.replace_state(parent, fn {phase, state} ->
+        pending = %{directive: directive, request_id: request, status: :pending}
+        {phase, %{state | child_spawn_requests: %{worker: pending}}}
+      end)
+
+    {:ok, child} =
+      Jido.start_agent(jido, ChildAgent,
+        id: wrong_id,
+        partition: :green,
+        restart: :temporary
+      )
+
+    parent_ref =
+      ParentRef.new!(
+        pid: parent,
+        id: parent_id,
+        tag: :worker,
+        spawn_ref: request,
+        meta: %{}
+      )
+
+    assert {:ok, _info} = Server.adopt_parent(child, parent_ref)
+    child_ref = Process.monitor(child)
+
+    send(
+      parent,
+      {:agent_child_online, child, wrong_id, ChildAgent, :green, :worker, %{}}
+    )
+
+    refute Map.has_key?(Server.children(parent), :worker)
+    assert_receive {:DOWN, ^child_ref, :process, ^child, _reason}, 2_000
+  end
+
   test "parent death policy uses private runtime state", %{jido: jido} do
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("death-parent"))
 
