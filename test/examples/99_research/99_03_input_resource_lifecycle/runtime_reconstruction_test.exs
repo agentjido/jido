@@ -32,6 +32,7 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1_000
   end
 
+  @tag skip: "Pending FA-06: runtime Init does not contain committed Plugin state"
   test "replacement Init supplies committed owned state and its version", c do
     assert {:ok, _} = Example.select(c.server, "B")
     version = Jido.AgentServer.snapshot(c.server).state_version

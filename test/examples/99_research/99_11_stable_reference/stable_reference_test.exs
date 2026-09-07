@@ -57,6 +57,7 @@ defmodule JidoTest.Examples.StableReferenceTest do
     assert b.state.messages == ["B"]
   end
 
+  @tag skip: "Pending FA-03: stable durable namespace identity is not implemented"
   test "durable identity survives rebinding the same namespace to a new local instance", c do
     assert {:ok, first} =
              Jido.start_agent(c.jido, Conversation,

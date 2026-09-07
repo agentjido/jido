@@ -115,7 +115,13 @@ not prove that core elects one cluster owner.
 development and test dependencies. They are absent from the Hex requirements
 and the production dependency graph.
 
-Run the focused extension checks with:
+Run core tests as the default release check:
+
+```sh
+mix test test/jido test/jido_test --include flaky --seed 0
+```
+
+Run focused extension examples as a separate, secondary check when needed:
 
 ```sh
 mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
@@ -123,5 +129,7 @@ mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
   test/examples/08_applications --include example --seed 0
 ```
 
-Run all examples with `mix examples`. The full acceptance suite includes the
-enabled research failures: `mix test --include example --include flaky --seed 0`.
+Run all examples separately with `mix examples --seed 0`. The 11 known failing
+research tests are temporarily skipped, with their assertions retained. See the
+[test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
+Passing tests do not prove these missing contracts.

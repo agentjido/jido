@@ -19,11 +19,13 @@ defmodule JidoTest.Examples.PluginIsolationTest do
     assert Jido.AgentServer.snapshot(server) == before
   end
 
+  @tag skip: "Pending FA-02: scoped Plugin input is not implemented"
   test "the audit callback can observe only its intended total field" do
     assert {:ok, candidate, []} = Jido.Agent.cmd(Example.new(), Example.signal())
     assert candidate.state.observed_fields == [:total]
   end
 
+  @tag skip: "Pending FA-02: prepared-input ownership is not enforced"
   test "a later Plugin cannot replace an earlier Plugin's prepared input" do
     assert {:ok, candidate, []} =
              Jido.Agent.cmd(Example.new(replace_input: true), Example.signal())

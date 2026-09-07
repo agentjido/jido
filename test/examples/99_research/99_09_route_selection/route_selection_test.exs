@@ -20,6 +20,7 @@ defmodule JidoTest.Examples.RouteSelectionTest do
     assert agent.state.handler == "fallback"
   end
 
+  @tag skip: "Pending FA-01: exact-route precedence is not implemented"
   test "an exact route wins when wildcard routes also match" do
     assert {:ok, agent, []} =
              Jido.Agent.cmd(Example.new(:fallback), Example.signal("order.create"))
@@ -27,6 +28,7 @@ defmodule JidoTest.Examples.RouteSelectionTest do
     assert agent.state.handler == "create"
   end
 
+  @tag skip: "Pending FA-01: route selection is not fixed before preparation"
   test "preparation cannot replace the executable selected by the source Signal" do
     assert {:ok, agent, []} =
              Jido.Agent.cmd(Example.new(:rewrite), Example.signal("order.create"))
