@@ -42,7 +42,10 @@ Review each seam against the same five questions:
 4. Which decisions must we make before implementation?
 5. What evidence will show that the seam is aligned?
 
-Cross-system decisions belong in [the architecture overview](00_overview/architecture.md) or [the invariants](00_overview/invariants.md). Detailed rules belong in the folder that owns the concept.
+Cross-system decisions belong in the [overview design](00_overview/design.md).
+Current cross-system evidence and gaps belong in the
+[overview alignment](00_overview/alignment.md). Detailed rules belong in the
+folder that owns the concept.
 
 ## Seam document pattern
 
@@ -101,71 +104,57 @@ This table is the source of truth for design approval. A moved or changed docume
 | Design index | Pending approval |
 | [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
 | [Jido V3 library vision](VISION.md) | Pending approval |
-| [Overview index](00_overview/README.md) | Pending approval |
-| [Overview gap analysis](00_overview/gap-analysis.md) | Pending approval |
-| [Architecture and data boundaries](00_overview/architecture.md) | Pending approval |
-| [Cross-system invariants](00_overview/invariants.md) | Pending approval |
-| [Glossary](00_overview/glossary.md) | Pending approval |
+| [Overview briefing](00_overview/README.md) | Pending approval |
+| [Overview design](00_overview/design.md) | Pending approval |
 | [Overview alignment](00_overview/alignment.md) | Pending approval |
-| [Overview review briefing](00_overview/briefing.md) | Pending approval |
-| [Agent index](01_agent/README.md) | Pending approval |
-| [Agent gap analysis](01_agent/gap-analysis.md) | Pending approval |
-| [Agent design](01_agent/agent.md) | Pending approval |
+| [Agent briefing](01_agent/README.md) | Pending approval |
+| [Agent design](01_agent/design.md) | Pending approval |
 | [Agent alignment](01_agent/alignment.md) | Pending approval |
-| [Agent authoring index](02_agent-authoring/README.md) | Pending approval |
-| [Agent authoring gap analysis](02_agent-authoring/gap-analysis.md) | Pending approval |
-| [Agent authoring](02_agent-authoring/authoring.md) | Pending approval |
-| [Agent DSL and interfaces](02_agent-authoring/dsl-and-interfaces.md) | Pending approval |
-| [Stable Agent identity](03_agent-identity/README.md) | Pending approval |
-| [Agent identity gap analysis](03_agent-identity/gap-analysis.md) | Pending approval |
-| [Turn evaluation index](04_turn-evaluation/README.md) | Pending approval |
-| [Turn evaluation gap analysis](04_turn-evaluation/gap-analysis.md) | Pending approval |
-| [Turn evaluation](04_turn-evaluation/turn-evaluation.md) | Pending approval |
-| [Plugin index](05_plugins/README.md) | Pending approval |
-| [Plugin gap analysis](05_plugins/gap-analysis.md) | Pending approval |
-| [Plugin design](05_plugins/plugins.md) | Pending approval |
-| [Plugin facets and extension ownership](05_plugins/plugin-facets.md) | Pending approval |
-| [Scheduled occurrences](05_plugins/scheduled-occurrences.md) | Pending approval |
-| [Commit and effects index](06_commit-and-effects/README.md) | Pending approval |
-| [Commit and effects gap analysis](06_commit-and-effects/gap-analysis.md) | Pending approval |
-| [Commit and effects](06_commit-and-effects/commit-and-effects.md) | Pending approval |
-| [Durability guarantee](06_commit-and-effects/durability-guarantee.md) | Pending approval |
-| [Persistence index](07_persistence/README.md) | Pending approval |
-| [Persistence gap analysis](07_persistence/gap-analysis.md) | Pending approval |
-| [Instance persistence](07_persistence/instance-persistence.md) | Pending approval |
-| [Persistence adapters and durable lifecycle](07_persistence/persistence-adapters.md) | Pending approval |
-| [Agent Server index](08_agent-server/README.md) | Pending approval |
-| [Agent Server gap analysis](08_agent-server/gap-analysis.md) | Pending approval |
-| [Agent Server](08_agent-server/agent-server.md) | Pending approval |
-| [Jido instance index](09_jido-instance/README.md) | Pending approval |
-| [Jido instance gap analysis](09_jido-instance/gap-analysis.md) | Pending approval |
-| [Jido instance](09_jido-instance/jido-instance.md) | Pending approval |
-| [Jido instance callbacks](09_jido-instance/instance-callbacks.md) | Pending approval |
-| [Runtime topology index](10_runtime-topology/README.md) | Pending approval |
-| [Runtime topology gap analysis](10_runtime-topology/gap-analysis.md) | Pending approval |
-| [Runtime topology](10_runtime-topology/runtime-topology.md) | Pending approval |
-| [Remote owned children](10_runtime-topology/remote-owned-children.md) | Pending approval |
-| [Topology control plane index](11_topology-control-plane/README.md) | Pending approval |
-| [Topology control-plane gap analysis](11_topology-control-plane/gap-analysis.md) | Pending approval |
-| [Topology authoring host](11_topology-control-plane/topology-authoring-host.md) | Pending approval |
-| [Errors and contracts index](12_errors-and-contracts/README.md) | Pending approval |
-| [Errors and contracts gap analysis](12_errors-and-contracts/gap-analysis.md) | Pending approval |
-| [Error design](12_errors-and-contracts/errors.md) | Pending approval |
-| [Observability index](13_observability/README.md) | Pending approval |
-| [Observability gap analysis](13_observability/gap-analysis.md) | Pending approval |
-| [Observability](13_observability/observability.md) | Pending approval |
-| [Core OpenTelemetry bridge](13_observability/opentelemetry-bridge.md) | Pending approval |
-| [Package boundaries index](90_package-boundaries/README.md) | Pending approval |
-| [Package boundaries gap analysis](90_package-boundaries/gap-analysis.md) | Pending approval |
-| [Runtime extension boundaries](90_package-boundaries/runtime-extension-boundaries.md) | Pending approval |
-| [Delivery and history index](99_delivery/README.md) | Pending approval |
-| [Delivery gap analysis](99_delivery/gap-analysis.md) | Pending approval |
-| [Delivery plan](99_delivery/delivery-plan.md) | Pending approval |
-| [V3 design changes](99_delivery/v3-design-changes.md) | Pending approval |
-| [V3 planning baseline](99_delivery/planning-baseline.md) | Pending approval |
+| [Agent authoring briefing](02_agent-authoring/README.md) | Pending approval |
+| [Agent authoring design](02_agent-authoring/design.md) | Pending approval |
+| [Agent authoring alignment](02_agent-authoring/alignment.md) | Pending approval |
+| [Agent identity briefing](03_agent-identity/README.md) | Pending approval |
+| [Agent identity design](03_agent-identity/design.md) | Pending approval |
+| [Agent identity alignment](03_agent-identity/alignment.md) | Pending approval |
+| [Turn evaluation briefing](04_turn-evaluation/README.md) | Pending approval |
+| [Turn evaluation design](04_turn-evaluation/design.md) | Pending approval |
+| [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Pending approval |
+| [Plugin briefing](05_plugins/README.md) | Pending approval |
+| [Plugin design](05_plugins/design.md) | Pending approval |
+| [Plugin alignment](05_plugins/alignment.md) | Pending approval |
+| [Commit and effects briefing](06_commit-and-effects/README.md) | Pending approval |
+| [Commit and effects design](06_commit-and-effects/design.md) | Pending approval |
+| [Commit and effects alignment](06_commit-and-effects/alignment.md) | Pending approval |
+| [Persistence briefing](07_persistence/README.md) | Pending approval |
+| [Persistence design](07_persistence/design.md) | Pending approval |
+| [Persistence alignment](07_persistence/alignment.md) | Pending approval |
+| [Agent Server briefing](08_agent-server/README.md) | Pending approval |
+| [Agent Server design](08_agent-server/design.md) | Pending approval |
+| [Agent Server alignment](08_agent-server/alignment.md) | Pending approval |
+| [Jido instance briefing](09_jido-instance/README.md) | Pending approval |
+| [Jido instance design](09_jido-instance/design.md) | Pending approval |
+| [Jido instance alignment](09_jido-instance/alignment.md) | Pending approval |
+| [Runtime topology briefing](10_runtime-topology/README.md) | Pending approval |
+| [Runtime topology design](10_runtime-topology/design.md) | Pending approval |
+| [Runtime topology alignment](10_runtime-topology/alignment.md) | Pending approval |
+| [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
+| [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
+| [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
+| [Errors and contracts briefing](12_errors-and-contracts/README.md) | Pending approval |
+| [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
+| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Pending approval |
+| [Observability briefing](13_observability/README.md) | Pending approval |
+| [Observability design](13_observability/design.md) | Pending approval |
+| [Observability alignment](13_observability/alignment.md) | Pending approval |
+| [Package boundaries briefing](90_package-boundaries/README.md) | Pending approval |
+| [Package boundaries design](90_package-boundaries/design.md) | Pending approval |
+| [Package boundaries alignment](90_package-boundaries/alignment.md) | Pending approval |
+| [Delivery briefing](99_delivery/README.md) | Pending approval |
+| [Delivery design](99_delivery/design.md) | Pending approval |
+| [Delivery alignment](99_delivery/alignment.md) | Pending approval |
 
-## Research evidence
+## Delivery evidence
 
-- [Feature acceptance results](../examples/feature-acceptance-results.md)
-- [Live upgrade results](../examples/live-upgrade-results.md)
-- [Core refinement results](../examples/core-refinement-results.md)
+The [delivery alignment](99_delivery/alignment.md) records current quality,
+test, research, documentation, package, compatibility, and release evidence.
+Executable tests and repository automation remain the canonical evidence.
