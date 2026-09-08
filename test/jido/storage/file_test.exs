@@ -1,11 +1,31 @@
 defmodule JidoTest.Storage.FileTest do
   use ExUnit.Case, async: false
 
+  use JidoTest.StorageCheckpointConformance,
+    adapter: Jido.Storage.File,
+    setup: quote(do: conformance_opts(:checkpoint))
+
+  use JidoTest.StorageThreadConformance,
+    adapter: Jido.Storage.File,
+    setup: quote(do: conformance_opts(:thread))
+
   alias Jido.Storage.File, as: FileStorage
   alias Jido.Thread
   alias Jido.Thread.Entry
 
   @moduletag :storage
+
+  defp conformance_opts(scope) do
+    path =
+      Path.join(
+        System.tmp_dir!(),
+        "jido_file_conformance_#{scope}_#{System.unique_integer([:positive])}"
+      )
+
+    File.mkdir_p!(path)
+    on_exit(fn -> File.rm_rf!(path) end)
+    [path: path]
+  end
 
   setup do
     base_dir =

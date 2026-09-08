@@ -92,7 +92,9 @@ defmodule Jido.Storage do
 
   Returns `{:ok, updated_thread}` on success.
   """
-  @callback append_thread(thread_id :: String.t(), entries :: [Entry.t()], opts :: keyword()) ::
+  @type entry_input :: Entry.t() | map()
+
+  @callback append_thread(thread_id :: String.t(), entries :: [entry_input()], opts :: keyword()) ::
               {:ok, Thread.t()} | {:error, term()}
 
   @doc """
