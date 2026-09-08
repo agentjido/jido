@@ -1,169 +1,173 @@
-# Overview seam alignment plan
+> Seam alignment plan. This document is pending approval.
 
-> Planning document. This document is pending approval. Code in `lib`, public
-> module documentation, and executable tests define current behavior.
+# Core model, shared terms, and invariants alignment
 
-## 1. Purpose, scope, and owner
+## Status
 
-This document gives the shared architecture plan for Jido V3. It defines the
-model, vocabulary, ownership boundaries, and cross-system invariants that later
-seams use. Approval of this document sets planning gates. It does not change a
-runtime contract by itself.
+- Design reviewed: 2026-09-08. The design review index contains no approved
+  Overview entry.
+- Code reviewed: `4e63640efd499ee2df3c717016e8d3542376f1b2`.
+- Prerequisite alignments: None. This is the first alignment gate.
+- Alignment state: `Draft`.
+- Approved decisions: None. The review-status table in
+  `docs/design/README.md` is the source of truth.
 
-The `00_overview` seam owns:
+The alignment state is execution status. It is not document approval. This
+document records current evidence and recommended dispositions. It does not
+change runtime behavior.
 
-- the shared Agent, Turn, commit, effect, durability, and runtime model;
-- the names and meanings of cross-system concepts;
-- the boundary between Jido, OTP, `jido_action`, and `jido_signal`;
-- the categories of extension points;
-- cross-system invariants and their detailed seam owners;
-- the order in which later seams can finalize their contracts.
+## Inputs and evidence
 
-This seam does not own detailed structs, callback signatures, error codes,
-storage operations, supervision strategies, or topology update protocols.
-Those contracts stay with their numbered seams.
+### Design
 
-There is no prerequisite alignment document. This is the first planning gate
-in the dependency graph in `docs/design/AGENTS.md`.
+- `docs/design/AGENTS.md`: review, EARS, dependency-order, and document-pattern
+  rules.
+- `docs/design/SEAM_TEMPLATE.md`: required three-file seam structure.
+- `docs/design/VISION.md`: the pending Jido V3 Bright Line and library vision.
+- `docs/design/README.md`: design order and canonical approval status.
+- `docs/design/00_overview/design.md`: recommended shared target.
 
-## 2. Inputs reviewed
+### Canonical code
 
-### Design and public documentation
+| Evidence path | Canonical current behavior |
+| --- | --- |
+| `lib/jido/agent.ex:2-21` | An Agent is immutable data. A direct command returns a candidate Agent and Directives and does not commit live state. Plugin preparation occurs before routing. |
+| `lib/jido/agent.ex:370-423` | Agent modules can own complete checkpoint and restore callbacks. Default checkpoints are maps with no definition revision. |
+| `lib/jido/agent.ex:458-477` | `cmd/3` delegates to the Runner. Default routing requires exactly one executable Turn. |
+| `lib/jido/agent/command/runner.ex:29-132` | Direct and live execution share the Runner. Plugin preparation occurs before route selection, state protection, Plugin reduction, and candidate validation. |
+| `lib/jido/agent/command/runner.ex:178-227` | Jido rejects multiple Router targets and normalizes routing failures. |
+| `lib/jido/agent/command.ex:1-22` | The current public Plugin preparation input contains the complete Agent, Signal, and caller context. |
+| `lib/jido/plugin.ex:2-24` | One Plugin behavior combines admission, pure preparation, owned state, Directives, dispatch, and runtime work. |
+| `lib/jido/plugin.ex:67-102` | Current callback contracts use `Jido.Agent.Command`, Plugin Init, and Directive and Signal contexts. |
+| `lib/jido/plugin.ex:190-205` | Live Plugin admission is serial in declaration order. |
+| `lib/jido/plugin.ex:238-265` | Executable writes to Plugin state are rejected. Plugin runtime children use `Jido.Plugin.Init`. |
+| `lib/jido/plugin.ex:797-875` | A Plugin cannot replace the Agent. Plugin state reduction is ordered and receives only owned Directives. |
+| `lib/jido/plugin/init.ex:1-19` | Runtime Init has a Server PID and Agent ID, but no committed Plugin state or state version. |
+| `lib/jido/plugin/scheduler.ex:30-48` | Scheduler documents durable pending work, acknowledgement, and the bounded `delivery_interval` option. |
+| `lib/jido/plugin/scheduler/runtime.ex:415-436` | Scheduler applies `delivery_interval` between pending-work attempts. |
+| `lib/jido/agent_server.ex:2-42` | The Agent Server owns serialized live Turns, one commit, ordered Directives, and state-version rules. Executable I/O can occur before commit. |
+| `lib/jido/agent_server.ex:257-309` | Status is a map. Lookup uses Agent ID and partition and returns a PID. |
+| `lib/jido/agent_server.ex:381-389` | Snapshot is a map with the Agent and state version. |
+| `lib/jido/agent_server.ex:506-544` | Plugin runtimes become ready before startup reports success. No initial durable write occurs at this boundary. |
+| `lib/jido/agent_server.ex:1285-1309` | Live admission runs before shared Runner preparation and can change the command Signal. |
+| `lib/jido/agent_server.ex:1419-1545` | The Server uses Runner preparation and completion, persists first, installs the candidate, replies, and then starts Directives. |
+| `lib/jido/agent_server.ex:1548-1594` | An uncertain persistence write always stops the Server. Other write failures can use a continuing error policy. |
+| `lib/jido/agent_server.ex:1639-1756` | Directives are validated before commit and handled after commit. A Directive failure has its own terminal result. |
+| `lib/jido/agent_server.ex:1878-1923` | Public status and active-Turn views are maps. |
+| `lib/jido/agent_server.ex:2882-2929` | Nonpersistent startup uses Runtime Store state. Persistent startup loads a durable record. Commits use the current state version as the expected revision. |
+| `lib/jido/agent_server/runtime_checkpoint.ex:8-50` | A named instance restores the last nondurable Agent and version after abnormal Server restart and deletes the checkpoint on a clean stop. |
+| `lib/jido/agent_server/plugin_lifecycle.ex:9-39` | Plugin runtime startup and readiness are owned by the Agent Server lifecycle. |
+| `lib/jido/agent_server/plugin_lifecycle.ex:110-198` | Plugin wrappers use the Jido Agent Dynamic Supervisor and remain outside Agent state. |
+| `lib/jido/agent_server/options.ex:11-64` | Agent Server options include an optional per-Agent persistence source and current map-based runtime options. |
+| `lib/jido/persistence.ex:1-16` | Persistence owns record keys, encoding, validation, and adapter fault containment. |
+| `lib/jido/persistence.ex:59-159` | Persistence uses atomic revision checks, instance/module/partition/ID keys, and physical delete. |
+| `lib/jido/persistence.ex:285-315` | Current checkpoints and records are maps. Persistence rejects nonportable records. |
+| `lib/jido/persistence/adapter.ex:1-46` | Adapters store bytes and provide atomic compare-and-swap. They do not own lifecycle policy. |
+| `lib/jido.ex:8-48` | Jido exposes immutable Agent and direct-command concepts and public PID-based instance examples. |
+| `lib/jido.ex:129-169` | Instance configuration and public Agent operations use keyword lists, Agent IDs, and PIDs. |
+| `lib/jido.ex:346-370` | A Jido instance starts one Task Supervisor, Registry, Runtime Store, Spawn Registry, and Agent Dynamic Supervisor. |
+| `lib/jido/topology.ex:1-15` | Topology supports static definitions, shared constructors, and a combined Agent and Topology authoring host. |
+| `lib/jido/topology/controller.ex:1-24` | The Controller owns static local activation and automatic or manual repair, not live target updates or cluster policy. |
+| `lib/jido/topology/controller.ex:73-90` | Status, readiness, and manual reconcile use the existing target. |
+| `lib/jido/error.ex:1-17` | Jido defines six consolidated Splode error types. |
+| `lib/jido/telemetry.ex:8-30` | Semantic events separate lifecycle, Turn, commit, Directive, and settlement. Legacy Agent Server events remain. |
+| `lib/jido/telemetry/agent.ex:8-44` | Semantic identity metadata is bounded and uses selected fields. |
+| `lib/jido/telemetry/agent.ex:96-147` | The Turn span ends at commit. One later event reports terminal settlement. |
+| `../jido_action/lib/jido_exec.ex:1-18` | `jido_action` owns the public Action, Instruction, and Flow execution boundary. |
+| `../jido_signal/lib/jido_signal/router.ex:1-16` | `jido_signal` owns route precedence. |
+| `../jido_signal/lib/jido_signal/router.ex:297-318` | The Router returns all matching targets in precedence order. |
+| `../jido_signal/lib/jido_signal/router/index.ex:95-103` | Route lookup applies predicates, sorts by precedence, and returns ordered targets. |
+| `mix.exs:351-360` | This checkout uses a sibling path for `jido_action` and a Hex V3 requirement for `jido_signal`. |
 
-The review used these design rules and baseline documents:
+### Tests and examples
 
-- `docs/design/AGENTS.md`
-- `docs/design/README.md`
-- `docs/design/99_delivery/planning-baseline.md`
-- `guides/core-scope.md`
-- `guides/extension-boundaries.md`
+| Evidence path | Behavior proved or specified |
+| --- | --- |
+| `test/jido/agent_test.exs:157-389` | Definitions, instances, direct Turns, complete state validation, and checkpoint round trips work without a Server. |
+| `test/jido/agent_test.exs:581-858` | Current routing, errors, context, Directives, direct determinism, and Flow execution are covered. |
+| `test/jido/agent_test.exs:904-989` | Direct definitions and custom checkpoint and restore callbacks remain supported. |
+| `test/jido/agent/builder_test.exs:19-65` | Builder route validation, order, reuse, and error retention are supported. |
+| `test/jido/agent/codec_test.exs:29-67` | Codec route round trips and errors are supported. |
+| `test/jido/plugin/contract_test.exs:490-670` | Plugin order, owned Directive filtering, state validation, and state-write protection are proved. |
+| `test/jido/agent_server/public_api_test.exs:87-181` | One complete state commit, neutral definition startup, input separation, and live execution are proved. |
+| `test/jido/agent_server/public_api_test.exs:230-305` | Action continuation, Flow execution, responsiveness, and state-version behavior are proved. |
+| `test/jido/agent_server/public_api_test.exs:333-459` | Caller timeout, pre-commit failure, and cancellation behavior are proved. |
+| `test/jido/agent_server/directive_execution_test.exs:27-184` | Directive validation, post-commit order, failure, timeout, and commit retention are proved. |
+| `test/jido/agent_server/runtime_lifecycle_test.exs:152-180` | Plugin runtime handles stay outside Agent state and stop with the Agent. |
+| `test/jido/agent_server/runtime_lifecycle_test.exs:225-289` | Plugin runtime replacement can pull current committed state and remain responsive. |
+| `test/jido/agent_server/runtime_lifecycle_test.exs:293-326` | Abnormal nonpersistent restart restores the last commit and state version. |
+| `test/jido/persistence_test.exs:259-347` | Each successful live commit is saved. A stale Server cannot commit or dispatch, but it can remain running after a confirmed conflict. |
+| `test/jido/persistence_test.exs:395-503` | Current physical delete and compare-and-swap conflict behavior are proved. |
+| `test/jido/persistence/indeterminate_write_test.exs:35-93` | An uncertain write stops stale evaluation and blocks Directive handling. |
+| `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Portable values round trip and nonportable checkpoints are rejected. |
+| `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Saved work intent, retry, acknowledgement, and restart recovery are proved for Scheduler. |
+| `test/jido/plugin/scheduler/occurrence_recovery_test.exs:175-195` | A focused recovery test proves that `delivery_interval` controls retry cadence without changing pending work. |
+| `test/jido/topology/controller_test.exs:20-330` | Static activation, local repair, readiness, ownership, state retention, and cleanup are proved. |
+| `test/jido/topology/authoring_host_test.exs:79-272` | The combined Agent and Topology authoring host is implemented and validated. |
+| `test/jido/observe/agent_lifecycle_test.exs:10-45` | Direct evaluation emits no runtime events. Handler failure does not change the result. |
+| `test/jido/observe/agent_lifecycle_test.exs:48-302` | Terminal Outcomes, commit boundaries, lifecycle events, and bounded metadata are proved. |
+| `test/jido/error/normalization_test.exs:8-321` | Error constructors and public normalization are covered. |
+| `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity is proved for one route. The target first-match and source-Signal cases are skipped. |
+| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Current Plugin state ownership is proved. Declared-view and prepared-input isolation cases are skipped. |
+| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80` | An application-level stable reference works locally. Core durable namespace rebinding is skipped. |
+| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Same-definition restore works. Revision-mismatch rejection is skipped. |
+| `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:13-31` | Current compare-and-swap and delete work. Tombstone fencing is skipped. |
+| `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-43` | State-pull reconstruction works. State-and-version Init is skipped. |
 
-The review used every document in this seam:
+### Prior validation record
 
-- `docs/design/00_overview/README.md`
-- `docs/design/00_overview/architecture.md`
-- `docs/design/00_overview/invariants.md`
-- `docs/design/00_overview/glossary.md`
-- `docs/design/00_overview/gap-analysis.md`
+The superseded Overview evidence recorded these results on 2026-09-08:
 
-The review also checked these later-seam proposals where they affect an
-overview decision:
+- Focused Agent, Plugin, persistence-authority, and observation tests: 94
+  tests, zero failures.
+- Selected research examples: 10 passing implemented controls, eight skipped
+  target-contract cases, and zero failures.
 
-- `docs/design/03_agent-identity/README.md`
-- `docs/design/03_agent-identity/gap-analysis.md`
-- `docs/design/04_turn-evaluation/gap-analysis.md`
-- `docs/design/05_plugins/plugin-facets.md`
-- `docs/design/08_agent-server/agent-server.md`
-- `docs/design/08_agent-server/gap-analysis.md`
-- `docs/design/09_jido-instance/gap-analysis.md`
-- `docs/design/10_runtime-topology/gap-analysis.md`
-- `docs/design/10_runtime-topology/remote-owned-children.md`
-- `docs/design/11_topology-control-plane/topology-authoring-host.md`
-- `docs/design/12_errors-and-contracts/gap-analysis.md`
-- `docs/design/13_observability/gap-analysis.md`
-- `docs/design/90_package-boundaries/runtime-extension-boundaries.md`
-- `docs/design/90_package-boundaries/gap-analysis.md`
+The commands were:
 
-### Canonical code and public module documentation
+```sh
+mix test test/jido/agent_test.exs test/jido/plugin/contract_test.exs \
+  test/jido/persistence/indeterminate_write_test.exs \
+  test/jido/observe/agent_lifecycle_test.exs --seed 0
 
-The review used these primary modules:
+mix test test/examples/99_research/99_03_input_resource_lifecycle \
+  test/examples/99_research/99_09_route_selection \
+  test/examples/99_research/99_10_plugin_isolation \
+  test/examples/99_research/99_11_stable_reference \
+  test/examples/99_research/99_12_definition_revision \
+  test/examples/99_research/99_13_durable_delete --include example --seed 0
+```
 
-- `lib/jido.ex`
-- `lib/jido/agent.ex`
-- `lib/jido/agent/builder.ex`
-- `lib/jido/agent/codec.ex`
-- `lib/jido/agent/command.ex`
-- `lib/jido/agent/command/runner.ex`
-- `lib/jido/agent/turn.ex`
-- `lib/jido/agent/turn/outcome.ex`
-- `lib/jido/agent_server.ex`
-- `lib/jido/agent_server/state.ex`
-- `lib/jido/agent_server/runtime_checkpoint.ex`
-- `lib/jido/agent_server/plugin_lifecycle.ex`
-- `lib/jido/plugin.ex`
-- `lib/jido/plugin/spec.ex`
-- `lib/jido/plugin/init.ex`
-- `lib/jido/persistence.ex`
-- `lib/jido/persistence/adapter.ex`
-- `lib/jido/topology.ex`
-- `lib/jido/topology/plan.ex`
-- `lib/jido/topology/controller.ex`
-- `lib/jido/topology/controller/activation.ex`
-- `lib/jido/error.ex`
-- `lib/jido/telemetry.ex`
-- `lib/jido/telemetry/agent.ex`
-- `lib/jido/observe.ex`
-- `lib/jido/observe/tracer.ex`
-- `lib/jido/debug.ex`
-- `mix.exs`
+This consolidation did not rerun tests because it changes design documents
+only. A skipped test is a target specification, not passing evidence.
 
-The review also checked the direct lower-layer boundaries:
+## Retained baseline
 
-- `../jido_action/lib/jido_exec.ex`
-- `../jido_signal/lib/jido_signal/router.ex`
-- `../jido_signal/lib/jido_signal/router/index.ex`
+This section contains canonical current facts only. It does not state the
+recommended target.
 
-### Executable test evidence
+### Agent values and authoring
 
-The review used these representative tests:
+- `%Jido.Agent{}` is the immutable Agent definition or instance value. A
+  definition has schema, routes, Plugins, and metadata. An instance adds a
+  nonempty ID and complete state.
+- Spark DSL, direct declarations, inline Actions, Builder, and Codec use the
+  Agent validation boundary.
+- `Jido.Agent.cmd/3` returns a candidate Agent and Directives. It starts no
+  process, commits no live state, handles no Directive, and emits no Agent
+  runtime telemetry.
+- `%Jido.Agent.Command{}` and `%Jido.Agent.Turn{}` are current command and
+  selection values. `%Jido.Agent.Turn.Outcome{}` is the current public terminal
+  live-Turn value.
+- Complete Agent `checkpoint/2` and `restore/2` callbacks are supported.
 
-- `test/jido/agent_test.exs`
-- `test/jido/agent/builder_test.exs`
-- `test/jido/agent/codec_test.exs`
-- `test/jido/plugin/contract_test.exs`
-- `test/jido/agent_server/public_api_test.exs`
-- `test/jido/agent_server/directive_execution_test.exs`
-- `test/jido/agent_server/runtime_boundary_test.exs`
-- `test/jido/agent_server/runtime_lifecycle_test.exs`
-- `test/jido/persistence_test.exs`
-- `test/jido/persistence/indeterminate_write_test.exs`
-- `test/jido/persistence/checkpoint_portability_test.exs`
-- `test/jido/instance_test.exs`
-- `test/jido/supervisor_test.exs`
-- `test/jido/topology/controller_test.exs`
-- `test/jido/topology/composition_test.exs`
-- `test/jido/topology/authoring_host_test.exs`
-- `test/jido/error_test.exs`
-- `test/jido/error/normalization_test.exs`
-- `test/jido/error_transport_test.exs`
-- `test/jido/telemetry/agent_test.exs`
-- `test/jido/observe/agent_lifecycle_test.exs`
-- `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs`
-- `test/examples/99_research/99_09_route_selection/route_selection_test.exs`
-- `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs`
-- `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs`
-- `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs`
-- `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs`
+### Current Turn and Plugin path
 
-The review did not run tests. This task changes planning documents only. The
-verified test results in `docs/design/99_delivery/planning-baseline.md` and
-`docs/design/00_overview/gap-analysis.md` remain the current execution record.
-
-## 3. Current architecture baseline
-
-This section states implemented behavior only.
-
-### 3.1 Values and direct evaluation
-
-- `%Jido.Agent{}` is the immutable Agent value. It represents a neutral
-  definition or an instance with an ID and complete state.
-- Spark DSL, direct declarations, inline Actions, Builder, and Codec all use
-  the Agent validation boundary.
-- `Jido.Agent.cmd/3` evaluates one Signal and returns a candidate Agent and a
-  Directive list. It does not make the candidate live and does not dispatch the
-  Directives.
-- `%Jido.Agent.Command{}` and `%Jido.Agent.Turn{}` are the current command and
-  executable-selection values. `%Jido.Agent.Turn.Outcome{}` is the current
-  public terminal live-Turn value.
-- `Jido.Agent.Command.Runner` is private. It is the shared direct and live
-  evaluation mechanism.
-
-### 3.2 Current Turn path
-
-The current direct path is:
+The current path is:
 
 ```text
 source Signal
+  -> live Plugin admission, for live calls
   -> sequential Plugin prepare chain
   -> route the prepared Signal
   -> require exactly one matching target
@@ -171,508 +175,332 @@ source Signal
   -> protect Plugin-owned state
   -> validate Directives
   -> reduce Plugin-owned state in declaration order
-  -> validate and return one candidate Agent and Directive list
+  -> validate one candidate Agent
 ```
 
-The live path adds asynchronous admission before this direct path. Admission
-can also change the Signal. The Agent Server then persists the next state when
-configured, installs the candidate, increments `state_version`, replies to the
-caller, and handles Directives in order.
+- Admission and preparation can change the Signal. Route selection uses the
+  changed Signal.
+- The Signal Router returns all targets in precedence order. Jido rejects zero
+  or multiple targets.
+- A preparation callback receives the complete Agent, Signal, and caller
+  context. All Plugins pass one command value through a serial chain.
+- An Action or Flow returns the complete proposed state and can do synchronous
+  external I/O. It cannot change a Plugin-owned state key.
+- Each stateful Plugin owns at most one state key. Its reducer receives only
+  Directives owned by that Plugin.
+- Direct and live execution share the private Runner evaluation mechanism.
 
-The Signal Router returns all matches in precedence order. Jido currently
-rejects zero or multiple targets. It does not select the first target.
+### Current commit and recoverable work
 
-### 3.3 State, commit, effects, and recovery
+- One Agent Server serializes admission, evaluation, commit, and Directive
+  handling for one activation.
+- A successful Turn persists or checkpoints first, installs the complete
+  candidate, increases `state_version` once, replies to the caller, and handles
+  Directives in list order.
+- A pre-commit failure preserves the committed Agent and version. A
+  post-commit Directive failure preserves the commit and version.
+- Jido does not undo external I/O that an Action or Flow completed before a
+  failed commit.
+- Ordinary Directive handling has no general crash-recovery guarantee.
+- Scheduler is a proved capability-specific pattern. It stores portable work
+  intent and stable occurrence IDs, retries saved work, and acknowledges
+  completion through a later Signal and commit. Its `delivery_interval` option
+  changes retry cadence without changing occurrence identity or pending work.
 
-- The Action or Flow returns the complete proposed state. It cannot change a
-  Plugin-owned state key. Each stateful Plugin owns at most one state key and
-  can replace only that complete value.
-- One successful live Turn has one commit point and increments
-  `state_version` once. A pre-commit error preserves state and version. A
-  post-commit Directive error preserves both.
-- Actions and Flows can perform synchronous I/O before commit. That I/O is not
-  rolled back when evaluation fails.
-- Directive work starts after commit. Ordinary Directive dispatch has no
-  general crash-recovery promise.
-- Saved Plugin state can contain durable work intent. Built-in Scheduler tests
-  show stable occurrence IDs, retry, and acknowledgement through a later
-  Signal and commit.
+### Current runtime and instance boundary
 
-### 3.4 Process and instance boundaries
+- A PID, registered name, global name, or `:via` value addresses the current
+  Agent Server. Instance helpers start, find, stop, hibernate, and thaw Agents
+  by current IDs and return PIDs.
+- A Jido instance starts a Task Supervisor, Registry, Runtime Store, Spawn
+  Registry, and one Dynamic Supervisor for Agent Servers and Plugin wrappers.
+- Plugin runtime handles stay in private Server state. They do not enter Agent
+  state or checkpoints.
+- `%Jido.Plugin.Init{}` has a Server PID, Agent ID, module, instance,
+  partition, and options. It does not have committed Plugin state or a matching
+  Agent state version.
+- A nonpersistent named-instance Server stores its last commit in Runtime
+  Store. An abnormal Server restart restores it. A clean full instance stop
+  removes the nondurable state.
 
-- One Agent Server is the serialized OTP owner of one live Agent.
-- A Jido instance starts one Task Supervisor, one Registry, one Runtime Store,
-  one Spawn Registry, and one Dynamic Supervisor for Agent Servers and Plugin
-  runtime wrappers. The instance supervisor uses `:one_for_one`.
-- Plugin runtime handles stay in private Agent Server state. They do not enter
-  the Agent or its checkpoint.
-- Public Agent Server operations accept a PID, registered name, global name,
-  or `:via` value. Jido instance helpers start, find, stop, hibernate, and thaw
-  Agents. Startup and lookup return PIDs.
-- A nonpersistent named-instance Server saves each successful commit to the
-  instance Runtime Store. An abnormal Server restart restores the latest saved
-  Agent and state version. A full instance stop removes this nondurable state.
-- A persistent Server loads the latest durable record. Plugin runtimes start
-  and become ready before startup returns. Startup does not write an initial
-  durable record.
+### Current persistence boundary
 
-### 3.5 Durability boundary
+- Persistence uses private map records and portable map checkpoints. The
+  record key includes Jido instance, Agent module, partition, and Agent ID.
+- The Server uses the current state version as the expected revision for an
+  atomic compare-and-swap write.
+- An uncertain write always stops the Server. A confirmed conflict or adapter
+  error can use the configured error policy and can leave the Server running.
+- Persistent startup loads a record when one exists. It starts Plugin runtimes
+  and waits for readiness. It does not write an initial active record.
+- Delete removes the adapter value and its revision history. It writes no
+  tombstone.
+- A live Agent can inherit the instance persistence source or select an
+  explicit per-Agent source.
 
-- `Jido.Persistence` owns Agent keys, private record maps, record validation,
-  checkpoint encoding, and adapter fault containment.
-- `Jido.Persistence.Adapter` owns binary `get`, `put`, atomic
-  `compare_and_swap`, and `delete` operations. It does not own Agent lifecycle
-  policy.
-- A live commit uses the current Agent `state_version` as the expected
-  revision. An uncertain write stops the Server. A confirmed conflict or
-  adapter error can pass to the configured error policy and can leave the
-  Server running.
-- Delete removes the adapter record. It does not keep a tombstone or revision
-  history.
-- The current checkpoint and record are plain maps. They contain no stable
-  definition revision or canonical Agent Ref.
+### Current Topology, errors, observation, and package direction
 
-### 3.6 Topology, errors, and observation
+- Static Topology definitions and plans are immutable. DSL, Builder, and Codec
+  use common validation and planning.
+- The local Controller supports startup, readiness, automatic repair, and
+  `repair: :manual` with `reconcile/2`. Reconcile uses the existing target. It
+  does not update desired state or transfer ownership.
+- A Topology module has an authoring owner Agent, but that Agent does not own
+  the live Controller target.
+- `Jido.Error` defines six Splode errors. Some public protocols still return
+  atoms, tuples, and maps.
+- Semantic telemetry separates lifecycle, Turn, commit, Directive, and
+  settlement boundaries. It excludes private state and payload data. Legacy
+  Agent Server telemetry, `Jido.Observe`, tracing, and debug paths remain.
+- `jido_action` owns executable work. `jido_signal` owns Signals and ordered
+  route matching. `jido` owns Agent meaning, Plugin composition, live commit,
+  local runtime, persistence policy, errors, and observation.
 
-- Topology definitions and plans are immutable values. DSL, Builder, and Codec
-  use the same validation and planning path.
-- The static local Topology Controller activates the existing plan, reports
-  readiness, and performs automatic or manual repair. It has no live target
-  update, owner-Agent runtime, cluster placement, or ownership transfer.
-- `Jido.Error` defines six Splode error structs. Some public protocol results
-  still use atoms, tuples, and maps.
-- Semantic Agent telemetry separates lifecycle, Turn, commit, Directive, and
-  terminal settlement events. Bounded metadata excludes state, payloads,
-  process handles, caller context, and raw error data.
-- Older `:agent_server` telemetry, the `Jido.Observe` tracer path, and local
-  debug buffers remain public or supported compatibility paths.
+## Gap register
 
-### 3.7 Current package direction
+All dispositions in this table are recommendations. None are approved.
 
-- `jido_action` owns Actions, Instructions, Flows, and `Jido.Exec`.
-- `jido_signal` owns the Signal envelope, ordered route matching, dispatch, and
-  local Signal bus.
-- `jido` uses those lower layers. It owns Agents, Plugins, Agent Server,
-  instances, local topology, core persistence, errors, and observation.
-- The current `jido` checkout uses a sibling path for `jido_action` and a Hex
-  V3 requirement for `jido_signal`. Cross-package tests must use compatible V3
-  versions.
+| Gap | Requirement | Current evidence | Difference | Recommended disposition |
+| --- | --- | --- | --- | --- |
+| `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/command/runner.ex:64-90,178-193`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:23-37` | Preparation occurs before routing, and Jido rejects multiple matches. | `Change`: select the first source-Signal match before preparation. |
+| `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/command.ex:1-22`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:22-34` | A Plugin sees the complete Agent and shares one mutable prepared command. | `Change`: add declared views and isolated owned input. Preserve order and write protection. |
+| `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159` | Core has no stable Agent Ref. Registry and persistence identity shapes differ. | `Change, staged`: add Ref-first contracts beside current ID and PID APIs. |
+| `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | `lib/jido/agent.ex:403-420,563-574`; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Checkpoints have no enforced definition revision. Restore can use the loaded module definition. | `Change, staged`: add revision and old-checkpoint rules. Keep all authoring forms. |
+| `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex:506-533,2887-2905` | Persistent startup reports readiness without an initial active durable record. | `Change`: define provisional readiness, record write, publication, and cleanup in owner seams. |
+| `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1548-1594`; `test/jido/persistence_test.exs:305-347` | Only uncertain writes always remove the activation. Confirmed failures can continue. | `Change`: remove write authority after every write failure. |
+| `OVR-GAP-007` | `OVR-REQ-042` | `lib/jido/persistence.ex:137-150`; `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:21-31` | Physical delete removes revision history, so a delayed initial writer can recreate data. | `Change`: use a compare-and-swap tombstone after retention and reactivation rules are set. |
+| `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex:1-19`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35-43` | Plugin runtime Init does not contain committed owned state or state version. | `Change`: add a coherent replacement input and keep state-pull compatibility. |
+| `OVR-GAP-009` | `OVR-REQ-052`, `OVR-REQ-053`, and `OVR-REQ-065` | `lib/jido/agent_server.ex:257-263,381-389,1878-1923`; `lib/jido/error.ex:1-17` | Current public contracts use structs, maps, tuples, atoms, and partially normalized errors. | `Defer exact shapes`: seam 12 and value owners define the exception and migration inventory. |
+| `OVR-GAP-010` | `OVR-REQ-005` | `lib/jido/plugin.ex:2-24,67-102` | One Plugin behavior mixes Agent, Agent Server, persistence-related state, and runtime concerns. | `Defer details`: approve owner categories first; seam 05 owns callbacks and migration. |
+| `OVR-GAP-011` | `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Portability is checked at persistence encoding, not at every proposed value boundary. | `Defer boundary timing`: seams 01, 07, and 12 define where rejection occurs. |
+| `OVR-GAP-012` | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,81-90`; `test/jido/topology/authoring_host_test.exs:79-272` | Static authoring and repair exist. Owner-Agent live control and target updates do not. | `Retain and defer`: keep static local Topology; do not make live control a V3 gate. |
+| `OVR-GAP-013` | `OVR-REQ-014`, `OVR-REQ-021`, `OVR-REQ-009`, `OVR-REQ-011`, `OVR-REQ-042`, `OVR-REQ-048` | Six research example files in the evidence table | Eight target-contract tests are skipped. | `Change evidence state`: owner seams supply passing acceptance proof after approval. |
+| `OVR-GAP-014` | `OVR-REQ-001` through `OVR-REQ-066` | Separate tests in the evidence table | No single executable conformance set maps all shared requirements to owner-seam evidence. | `Change evidence state`: seam 99 closes one traceable cross-seam acceptance set. |
+| `OVR-GAP-015` | `OVR-REQ-001` through `OVR-REQ-066` | `docs/design/01_agent/README.md` through `docs/design/13_observability/README.md` | Dependent seam indexes do not yet link to the Overview requirements and invariants that they own. | `Change documentation state`: each owner seam adds exact trace links after approval. |
 
-## 4. Target shared architecture for V3
+## Conflict dispositions
 
-This section is the recommended overview target. Approval confirms the shared
-model. Later seams still own their detailed contracts.
+These dispositions replace conflicting or over-specific text from the
+superseded Overview documents. They are recommendations until approval.
 
-### 4.1 Major values and owners
-
-| Value or concept | Overview owner and rule | Detailed owner |
+| Conflict or pressure point | Recommended disposition | Requirement or owner |
 | --- | --- | --- |
-| Signal | The immutable input envelope. Keep the received value as the source Signal. | `jido_signal` owns the value. Seams 04 and 05 own Jido use. |
-| Agent definition | Static schema, routes, Plugin declarations, metadata, and an optional or required definition revision. It has no live runtime state. | 01 and 02 |
-| Agent instance | Immutable domain and Plugin-owned portable state for one Agent ID. It has no live process handles. | 01 |
-| Agent Ref | The proposed stable identity for lookup, storage, and delivery. It must be separate from a PID and runtime location. | 03, then 09 and 07 |
-| Turn | One fixed executable selection and its input for one source Signal. | 04 |
-| Candidate Agent | The complete validated Agent returned by direct evaluation and offered to the live owner for commit. | 01 and 04 |
-| State version | The live commit revision. One successful Turn increments it once. | 06 and 08 |
-| Live result | The current tagged success or error reply at the commit boundary. It is not a new `Result` struct. | 08 and 12 |
-| Turn Outcome | The terminal observation after post-commit Directive work settles. It does not replace the live result. | 08 and 13 |
-| Directive | A typed request for runtime-owned work after commit. | 06, 08, and the owning Plugin |
-| Checkpoint | Portable Agent reconstruction data. It contains no runtime handles. | 01 and 07 |
-| Persistence record | The durable lifecycle and compare-and-swap envelope around saved Agent state. Its exact public shape is not set here. | 07 |
-| Topology definition and plan | Static desired composition and one expanded local plan. | 11 |
+| Plugin preparation occurs before route selection. | Change to source-Signal selection before preparation. | `OVR-REQ-013` through `OVR-REQ-015`; seams 04 and 05 |
+| Current routing rejects multiple matches. | Select the first Router target by existing precedence. | `OVR-REQ-014`; seam 04 |
+| Plugins see the complete Agent and share prepared input. | Add declared Agent views and isolated Plugin-owned inputs. | `OVR-REQ-021`; seams 01, 04, and 05 |
+| Earlier text says nonpersistent restart resets to the initial Agent. | Remove that target. Keep last-commit runtime-checkpoint restore. | `OVR-REQ-044` and `OVR-REQ-045`; seams 08 through 10 |
+| Earlier text says all runtime effects start after commit. | Limit the rule to runtime-owned Directive work. External executable I/O can occur before commit. | `OVR-REQ-027` through `OVR-REQ-030`; seam 06 |
+| Earlier text names `%Jido.Plugin{}` as a configuration struct. | Remove the type claim. `Jido.Plugin` is a behavior. | `OVR-REQ-052`; seam 05 |
+| Core has no stable Agent Ref. | Add Ref through a staged migration. | `OVR-REQ-011` and `OVR-REQ-012`; seams 03, 07, 09, and 10 |
+| Core has no positive definition revision. | Add revision through a staged migration. Do not claim that a label pins loaded code. | `OVR-REQ-009` and `OVR-REQ-010`; seams 01, 02, 04, and 07 |
+| Earlier proposals name Checkpoint, Commit, Record, Status, Turn Status, Plugin Context, Transition, Contribution, Runtime values, and Instance Config structs. | Keep the roles. Defer exact types, fields, serialization, and errors to their owners. | `OVR-REQ-052`; seam 12 and value owners |
+| Earlier text can imply a new Result value. | Keep the tagged live result and the separate Turn Outcome. | Public/shared contract; seams 08, 12, and 13 |
+| Plugin runtime Init lacks current state and version. | Add a coherent replacement input and keep the state-pull API during migration. | `OVR-REQ-048`; seams 05, 08, and 10 |
+| Confirmed persistence errors can leave a writable Server active. | Remove write authority after every persistence write failure. | `OVR-REQ-039`; seams 07 and 08 |
+| Persistent startup has no initial active record. | Add the record after provisional Plugin readiness and before Agent readiness. | `OVR-REQ-040`; seams 07, 08, and 10 |
+| Durable delete removes revision history. | Use a compare-and-swap tombstone with explicit retention, purge, and reactivation rules. | `OVR-REQ-042`; seam 07 |
+| Old proposals remove Builder and Codec. | Remove the removal proposal. Keep both APIs. | `OVR-REQ-008` and `OVR-REQ-063`; seams 01 and 02 |
+| Old proposals remove public PID APIs immediately. | Keep PID APIs during a Ref-first migration. | `OVR-REQ-012` and `OVR-REQ-063`; seams 03, 08, 09, and 12 |
+| The four Plugin facets do not exist. | Approve only the owner categories in this seam. Defer callbacks and checkpoint composition. | `OVR-REQ-005`; seam 05 with 01 and 07 |
+| A Topology authoring owner exists but does not own the live target. | Keep authoring. Defer live authority and updates. | `OVR-REQ-060` and `OVR-REQ-061`; seam 11 |
+| Plugin wrappers share the Agent Dynamic Supervisor. | Require separate logical roles only. Defer physical pool changes. | `OVR-REQ-047`; seams 09 and 10 |
+| Legacy telemetry, tracing, and debug coexist with semantic events. | Keep all supported paths until semantic replacement coverage exists. | `OVR-REQ-054` through `OVR-REQ-059`, `OVR-REQ-063`; seam 13 |
+| Per-Agent persistence override and instance persistence both exist. | Preserve both until seams 90, 07, and 09 decide compatibility. | `OVR-REQ-063`; seams 90, 07, and 09 |
+| Future durable, cluster, and transport package names do not have complete APIs. | Keep only the package-boundary direction. Defer APIs until integration proof exists. | `OVR-REQ-062`; seams 90 and 99 |
 
-Do not add the proposed public structs from `architecture.md` only because they
-appear in that document. Each owning seam must first define purpose,
-compatibility, serialization, and error behavior.
+## High-level work sequence
 
-### 4.2 Recommended data flow
+This sequence defines outcomes and gates. It is not an implementation plan.
+After the Overview intent and requirements are approved, `ce-plan` will create
+the implementation tasks.
 
-Subject to approval item A-01, use this shared order:
+### Phase 0 — Approve the shared baseline
 
-```text
-source Signal
-  -> live admission, which can accept, reject, or add bounded context
-  -> select the first route target from the source Signal by Router precedence
-  -> fix the executable for the Turn
-  -> prepare isolated Plugin-owned input in declaration order
-  -> run one Action or Flow through Jido.Exec
-  -> assemble Plugin contributions in declaration order
-  -> validate one candidate Agent and Directive batch
-  -> persist when durability is configured
-  -> install the candidate and increment the state version once
-  -> return the live result
-  -> handle Directives in order
-  -> publish one terminal Turn Outcome
-```
+- Requirements: all `OVR-REQ` identifiers.
+- Required outcome: one approved model, vocabulary, invariant set, and conflict
+  disposition.
+- Compatibility: no runtime change.
+- Verification: document review against canonical evidence.
+- Exit criteria: the user approves or changes each `OVR-DEC` item.
 
-Admission must not change executable selection. A later seam must define which
-Signal fields admission can change and how those changes become the effective
-Signal. The route predicate sees the source Signal. The executable and Plugins
-can receive an effective Signal or prepared input as defined by seams 04 and
-05. Those details are not final here.
+### Phase 1 — Lock package and public-contract policy
 
-### 4.3 State and effect boundaries
+- Requirements: `OVR-REQ-001` through `OVR-REQ-005`, `OVR-REQ-052`,
+  `OVR-REQ-053`, `OVR-REQ-062`, `OVR-REQ-063`, `OVR-REQ-065`, and
+  `OVR-REQ-066`.
+- Required outcome: approved package direction, extension categories, error
+  ownership, value ownership, and compatibility rules.
+- Owner gates: seam 90, then seam 12.
+- Compatibility: current authoring, PID, persistence, and observation APIs stay
+  available.
+- Verification: public API inventory and compatible V3 package checks.
+- Exit criteria: seams 90 and 12 can state one owner for every later public
+  contract.
 
-- Agent domain state and Plugin-owned state are separate ownership classes.
-  Seams 01 and 05 decide their physical field layout and migration.
-- The selected Action or Flow is the only writer of domain state during a
-  Turn. A Plugin can write only its declared complete state slice.
-- Jido alone assembles and validates the candidate Agent.
-- Actions and Flows can do synchronous I/O before commit. Applications own
-  idempotency and recovery for that work.
-- Directive handling is runtime-owned post-commit work. It has a separate
-  failure and observation boundary.
-- A capability that promises recovery must store portable work intent and a
-  stable operation ID in Agent or Plugin state. Core does not make every
-  Directive durable.
+### Phase 2 — Align Agent, authoring, identity, and Turn
 
-### 4.4 Process boundaries
+- Requirements: `OVR-REQ-006` through `OVR-REQ-023`.
+- Required outcome: immutable Agent roles, normalized authoring, stable
+  identity direction, definition revision, source-Signal routing, direct/live
+  parity, and Plugin isolation boundaries.
+- Owner gates: seams 01, 02, 03, and 04, in graph order.
+- Compatibility: Builder, Codec, neutral definitions, custom routing, custom
+  checkpoints, ID APIs, and PID handles remain.
+- Verification: Agent, authoring, route, stable-reference, revision, and Turn
+  acceptance tests.
+- Exit criteria: the four owner alignments are approved, and target evidence is
+  passing or explicitly deferred.
 
-- An Agent Server is the only serialized live owner of one Agent activation.
-- A PID is a runtime handle. It is not durable identity.
-- The Jido instance owns local lookup, supervision, task execution, local
-  runtime checkpoints, and persistence selection for its live Agents.
-- Plugin runtime processes are capability resources, not Agent peers. Their
-  exact pool placement and restart coupling belong to seams 09 and 10.
-- OTP owns mailboxes, process scheduling, monitoring, supervision, timers,
-  exits, and shutdown. Jido owns domain meaning, commit policy, and recovery
-  rules built on those OTP services.
-- Current PID APIs stay supported during any Ref-first migration. No overview
-  approval removes them.
+### Phase 3 — Align Plugin ownership
 
-### 4.5 Durability boundary
+- Requirements: `OVR-REQ-005`, `OVR-REQ-019` through `OVR-REQ-023`,
+  `OVR-REQ-031` through `OVR-REQ-034`, `OVR-REQ-047` through `OVR-REQ-049`.
+- Required outcome: one ordered Plugin declaration with explicit owner
+  categories, data authority, state ownership, and runtime replacement input.
+- Owner gate: seam 05.
+- Compatibility: compatibility delegates preserve supported callbacks and
+  custom Agent checkpoint meaning.
+- Verification: Plugin contract, isolation, Scheduler recovery, and runtime
+  replacement tests.
+- Exit criteria: seam 05 is approved and checkpoint interaction is explicit.
 
-- A durable live commit becomes visible only after a confirmed successful
-  compare-and-swap write.
-- No Directive starts when the durable write is not confirmed.
-- The recommended target removes write authority after every persistence write
-  error. Seams 07 and 08 must define confirmed conflict, confirmed failure,
-  uncertain result, reload, and restart behavior.
-- The recommended persistent-create target is: start provisional Plugin
-  runtimes, wait for readiness, write the initial active record at state
-  version zero, and only then report the Agent as ready. Seams 07, 08, and 10
-  own failure cleanup and publication details.
-- The recommended normal-delete target writes a compare-and-swap tombstone.
-  Seam 07 owns retention, purge, reactivation, and next-writer rules.
-- The existing binary adapter remains the storage I/O boundary. A Plugin or
-  persistence facet cannot change a compare-and-swap result.
+### Phase 4 — Align commit, effects, and durability
 
-### 4.6 Extension categories
+- Requirements: `OVR-REQ-024` through `OVR-REQ-043` and `OVR-REQ-064`.
+- Required outcome: one commit boundary, honest external-I/O scope, recoverable
+  capability pattern, safe write authority, initial record, restore, and
+  tombstone lifecycle.
+- Owner gates: seam 06, then seam 07.
+- Compatibility: binary adapters and compare-and-swap stay. Record and delete
+  changes need a versioned migration.
+- Verification: commit, Directive, persistence-failure, portability, create,
+  delete, purge, restart, and reactivation tests.
+- Exit criteria: seams 06 and 07 are approved and each lifecycle state has an
+  owner and passing evidence.
 
-Use one term and one owner for each extension type:
+### Phase 5 — Align live ownership and runtime topology
 
-| Extension category | Purpose | Boundary rule |
-| --- | --- | --- |
-| Plugin package | A reusable Agent capability declared by the user. | Keep the ordered declaration experience during migration. |
-| Plugin facet | A proposed owner-specific Plugin behavior for Agent, Agent Server, Persistence, or Topology. | The four-facet model needs approval. Exact callbacks belong to seam 05. |
-| Adapter | A replaceable external service boundary, such as persistence or Signal dispatch. | It does not own Agent lifecycle or Plugin state policy. |
-| Authoring extension | Static DSL syntax that lowers to canonical Agent or Topology values. | It does not run Turn, persistence, or lifecycle work. |
-| Directive handler | Runtime work for one typed Directive after commit. | It cannot change the committed result. |
-| Tracer or telemetry handler | Observation and export. | It cannot change results or runtime outcomes. |
+- Requirements: `OVR-REQ-011`, `OVR-REQ-012`, `OVR-REQ-040`,
+  `OVR-REQ-041`, `OVR-REQ-044` through `OVR-REQ-051`.
+- Required outcome: approved Agent Server, Jido instance, Plugin runtime, and
+  process-ownership contracts.
+- Owner gates: seams 08, 09, and 10.
+- Compatibility: Ref-first APIs are additive. PID APIs and runtime-checkpoint
+  restore remain. Any pool change preserves restart behavior.
+- Verification: public API, instance, supervisor, runtime lifecycle, owned
+  child, readiness, and distributed-boundary tests.
+- Exit criteria: restart sources, readiness, local resolution, and logical
+  runtime roles are proved.
 
-Do not turn `Jido.Plugin` into a universal extension behavior. `Jido.Exec`,
-Signal dispatch adapters, persistence adapters, authoring extensions, and
-tracers keep separate contracts.
+### Phase 6 — Align Topology control and observation
 
-### 4.7 Topology and package direction
+- Requirements: `OVR-REQ-054` through `OVR-REQ-061` and `OVR-REQ-063`.
+- Required outcome: static local Topology remains supported, future live
+  control stays bounded, semantic events become primary, and legacy migration
+  has proof.
+- Owner gates: seam 11, then seam 13.
+- Compatibility: no current Topology or observation API is removed without a
+  separate staged plan.
+- Verification: Controller, authoring-host, telemetry, and observation tests.
+- Exit criteria: live Topology work is approved or deferred, and any legacy
+  removal has complete replacement evidence.
 
-- Keep the current static Topology definition, plan, local Controller,
-  readiness, and repair as the implemented baseline.
-- Treat the combined Topology authoring host and its owner Agent value as
-  implemented authoring. Do not claim that the owner Agent controls the live
-  topology until seam 11 defines and proves that runtime.
-- Live target updates, rolling changes, and resumable topology upgrades remain
-  open in seam 11 and delivery planning.
-- Keep Jido core as a complete local Agent runtime. Put general recovery scans,
-  leases, fencing, and storage maintenance in a durable package. Put membership,
-  placement, rebalance, and failover in a cluster package. Put gateways,
-  authentication, and durable inboxes in a transport package.
-- Add a core extension API only when an integration otherwise needs private
-  Server state, private messages, or generated runtime names.
+### Phase 7 — Close delivery
 
-## 5. Invariant reconciliation
+- Requirements: all approved Overview and dependent-seam requirements.
+- Required outcome: one V3 release scope and migration order.
+- Owner gate: seam 99.
+- Compatibility: release notes list each additive, changed, deprecated, and
+  deferred contract.
+- Verification: full core quality checks, compatible V3 package tests, examples,
+  and migration probes.
+- Exit criteria: the delivery alignment is approved and required acceptance
+  gates pass.
 
-The classification means:
+## Acceptance matrix
 
-- **Retained:** current behavior and the recommended target agree.
-- **Changed:** the recommended wording or behavior differs from current code
-  or from the current overview text.
-- **Deferred:** the rule can be a later target, but its detailed owner must
-  decide it before it becomes a V3 requirement.
-- **Rejected:** remove the proposed rule and retain the evidenced current rule.
-
-### 5.1 Turn and Plugin boundaries
-
-| ID | Class | Code evidence | Recommended wording | Migration effect | Detailed owner |
-| --- | --- | --- | --- | --- | --- |
-| INV-T01 | Retained | `lib/jido/agent/command/runner.ex`; `test/jido/agent_server/public_api_test.exs` | The Agent path works with no Plugins. | None. | 01 and 04 |
-| INV-T02 | Changed | Router order: `../jido_signal/lib/jido_signal/router/index.ex`; exact-one policy: `lib/jido/agent/command/runner.ex`; skipped proof: `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Jido selects the first matching route target in Signal Router precedence order. | Ambiguous routes change from an error to a deterministic selection. Add a staged compatibility note. | 04, with 01 |
-| INV-T03 | Changed | `lib/jido/agent.ex` and `lib/jido/agent/command/runner.ex` prepare before routing today. | Route selection uses the source Signal and completes before pure Plugin preparation. | A Plugin that changes Signal type can no longer redirect the Turn. | 04 and 05 |
-| INV-T04 | Changed | `lib/jido/plugin.ex`; route test above | After selection, Plugin work cannot replace the executable or cause another route lookup. | Add validation and migration evidence for current route-changing Plugins. | 04 and 05 |
-| INV-T05 | Retained | `lib/jido/agent/command/runner.ex`; `lib/jido/agent_server.ex` | Direct `Agent.cmd/3` and live Server execution use the same candidate-evaluation boundary. | Preserve direct and live parity tests. | 04 and 08 |
-| INV-T06 | Retained | `lib/jido/plugin.ex`; `test/jido/plugin/contract_test.exs` | During a Turn, the Action or Flow is the only writer of domain state. | Preserve behavior. | 01, 04, and 05 |
-| INV-T07 | Retained | `lib/jido/agent/command/runner.ex`; `lib/jido/plugin.ex` | Plugin state reducers do not receive or change the complete executable output. | Preserve the narrow reducer input. | 05 |
-| INV-T08 | Retained | `lib/jido/plugin/spec.ex`; `test/jido/plugin/contract_test.exs` | Each stateful Plugin owns at most one complete Plugin state entry. | Preserve during facet migration. | 05 |
-| INV-T09 | Retained | `lib/jido/plugin.ex`; `test/jido/plugin/contract_test.exs` | A Plugin can replace only its complete owned state entry. | Preserve strict ownership checks. | 01 and 05 |
-| INV-T10 | Changed | `%Jido.Agent.Command{}` contains the full Agent; isolation tests are skipped in `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs`. | Each Plugin receives only its declared Agent view, its owned prepared input, and the Directives that it owns. | Add observed-field declarations and isolated prepared inputs. Exact values and merge rules stay open. | 05, with 01 and 04 |
-| INV-T11 | Retained | `lib/jido/plugin.ex`; `test/jido/plugin/contract_test.exs` | Plugin preparation and state contribution run serially in declaration order. | Preserve order while changing input ownership. | 05 |
-| INV-T12 | Retained | `lib/jido/agent/command/runner.ex` | Only Jido assembles and validates the candidate Agent. | Preserve behavior. | 01 and 04 |
-
-### 5.2 Commit, persistence, and recovery
-
-| ID | Class | Code evidence | Recommended wording | Migration effect | Detailed owner |
-| --- | --- | --- | --- | --- | --- |
-| INV-C01 | Retained | `lib/jido/agent_server.ex`; `test/jido/agent_server/public_api_test.exs` | Live Agent state has one commit point. | None. | 06 and 08 |
-| INV-C02 | Retained | `lib/jido/agent_server.ex`; `lib/jido/agent/turn/outcome.ex` | Each successful Agent state commit increments the state version by one, including an equal-state result. | Preserve tests for success and pre-commit failure. | 06 and 08 |
-| INV-C03 | Changed | `lib/jido/agent.ex`; `lib/jido/agent_server.ex` | Runtime-owned Directive work starts after commit. An Action or Flow can perform synchronous I/O before commit. | Correct the broad effect claim. No runtime change is required. | 06 |
-| INV-C04 | Retained | `lib/jido/plugin/scheduler.ex`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs` | A capability that promises durable work stores portable intent and stable IDs with the business change in one checkpoint. | Keep this capability-specific. Do not create a universal outbox. | 05, 06, and 07 |
-| INV-C05 | Retained | Scheduler runtime and recovery tests | A supervised capability worker resumes its saved pending work after startup. | Preserve the proven pattern. | 05 and 10 |
-| INV-C06 | Retained | Scheduler acknowledgement path and tests | Durable-work completion enters through a new Signal and normal Agent commit. | Preserve the normal Turn boundary. | 05 and 06 |
-| INV-C07 | Retained | Scheduler state and `guides/core-scope.md` | Later Turns preserve pending work. Core has no universal durable outbox gate. | None. | 05 and 06 |
-| INV-C08 | Retained | `lib/jido/agent_server.ex`; Directive failure tests | Ordinary Directive handling does not promise crash recovery. | Document this on each Directive API. | 06 and 08 |
-| INV-C09 | Retained | `lib/jido/persistence.ex`; `lib/jido/persistence/adapter.ex` | Persistence updates use atomic compare-and-swap. | Preserve the binary adapter contract. | 07 |
-| INV-C10 | Changed | `lib/jido/agent_server.ex`; `test/jido/persistence_test.exs` | Only a confirmed successful persistence write lets the activation keep write authority. | Confirmed conflicts and confirmed write errors must no longer continue as writable activations. | 07 and 08 |
-| INV-C11 | Changed | Only uncertain writes always stop in `lib/jido/agent_server.ex`. | Every persistence write error removes write authority. The Server must stop or enter a non-writing terminal state defined by its owner. | This changes configurable error-policy behavior. Add a compatibility note and restart proof. | 07 and 08 |
-| INV-C12 | Changed | `Jido.Persistence.delete_agent/4` calls adapter delete; the tombstone test is skipped. | Normal durable deletion writes a compare-and-swap tombstone. | Replace blind deletion only after retention, purge, and reactivation rules exist. | 07 |
-
-### 5.3 Definition, identity, and lifecycle
-
-| ID | Class | Code evidence | Recommended wording | Migration effect | Detailed owner |
-| --- | --- | --- | --- | --- | --- |
-| INV-D01 | Changed | `%Jido.Agent{}` has no definition revision; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` is partly skipped. | Module-authored Agent definitions have a positive module-owned definition revision. Other authoring forms must preserve the same normalized field. | Add a compatible default and Codec migration. Do not remove Builder or Codec. | 01 and 02 |
-| INV-D02 | Changed | `Jido.Agent.restore/3` can use the current module definition without a saved revision check. | Restore checks the saved Agent module and definition revision before state becomes live. | Old checkpoints need a stated legacy rule. Complete code pinning remains a separate problem. | 01, 04, and 07 |
-| INV-D03 | Changed | Registry and persistence use different identity shapes; no core Ref exists. | Registry, persistence, Agent delivery, and placement use one stable Agent Ref after a staged migration. | Add a Ref-first facade while current ID and PID APIs remain supported. | 03, then 07, 09, and 10 |
-| INV-D04 | Retained | Agent values exclude PIDs; public lookup returns a replaceable PID. | A PID is a runtime handle, not durable Agent identity. | Keep PID APIs as compatibility handles. | 03 and 09 |
-| INV-D05 | Retained | `lib/jido/agent_server.ex`; `test/jido/persistence_test.exs` | Persistent Server restart loads the latest valid durable record. | Preserve behavior while record shape changes. | 07 and 08 |
-| INV-D06 | Rejected | `lib/jido/agent_server/runtime_checkpoint.ex`; `test/jido/agent_server/runtime_lifecycle_test.exs` | A nonpersistent Server in a named Jido instance restores its latest in-instance runtime checkpoint after an abnormal Server restart. A full instance stop removes that checkpoint. | Remove the reset-to-initial proposal. Keep the implemented restart guarantee. | 08, 09, and 10 |
-| INV-D07 | Changed | Live persistence uses instance context, but per-Agent overrides and direct Persistence calls exist. | Live Server persistence runs through the owning Jido instance context. Direct Persistence APIs remain explicit protocol entry points during migration. | Seam 09 and seam 90 must decide whether per-Agent adapter selection stays. | 07, 09, and 90 |
-| INV-D08 | Changed | Plugin readiness exists, but initial durable write does not. | Persistent creation makes provisional Plugin runtimes ready, writes the initial active record at state version zero, and then reports readiness. | Add cleanup and retry rules before implementation. | 07, 08, and 10 |
-
-### 5.4 Runtime boundaries
-
-| ID | Class | Code evidence | Recommended wording | Migration effect | Detailed owner |
-| --- | --- | --- | --- | --- | --- |
-| INV-R01 | Retained | `lib/jido.ex`; `test/jido/supervisor_test.exs` | Every Agent Server is a peer in the Jido Agent activation pool. | Preserve this logical peer model. | 09 and 10 |
-| INV-R02 | Changed | Plugin wrappers currently use the same Dynamic Supervisor in `lib/jido/agent_server/plugin_lifecycle.ex`. | Plugin runtime hosts are capability resources, not Agent peers. Physical pool separation is a later runtime-topology decision. | Do not claim current physical separation. A later pool split needs restart-cascade tests. | 09 and 10 |
-| INV-R03 | Changed | `%Jido.Plugin.Init{}` lacks committed Plugin state and state version; the FA-06 proof is skipped. | Every Plugin runtime replacement starts from one current committed Plugin state value and the matching Agent state version. | Add a fresh Init path. Keep the public state-pull path during migration. | 05, 08, and 10 |
-| INV-R04 | Retained | Agent checkpoints are portable; runtime handles stay in private Server state. | Runtime handles and executable workflow state never enter Agent state or checkpoints. | Preserve and broaden portability tests. | 01, 05, 07, and 10 |
-| INV-R05 | Retained | Agent Server cancel paths act before commit. | Only admission and executable evaluation before commit are cancellable. | Keep caller timeout separate from cancellation. | 04 and 08 |
-| INV-R06 | Retained | Commit and Directive paths have no active-turn cancellation operation. | Commit and Directive handling are not cancellable through the Turn cancel API. | Preserve behavior and document it. | 06 and 08 |
-| INV-R07 | Deferred | Caller timeout does not cancel work. `Jido.Exec` has execution timeout, but the Server has no independent `turn_timeout`. | A live Turn execution limit, if added, is distinct from caller wait timeout and Directive timeout. | No release promise until seams 04 and 08 define start, stop, and Outcome rules. | 04 and 08 |
-| INV-R08 | Retained | Plugin runtimes use public Agent Server calls and Signals to change Agent state. | Plugin runtimes request state changes through Signals and the Agent mailbox. | Preserve this boundary. | 05 and 08 |
-
-### 5.5 Public values, errors, and observation
-
-| ID | Class | Code evidence | Recommended wording | Migration effect | Detailed owner |
-| --- | --- | --- | --- | --- | --- |
-| INV-P01 | Changed | `Jido.Persistence` validates `Jido.PortableTerm`; Agent transition does not enforce it. | Every value that crosses into a checkpoint or persistence record contains no PID, port, reference, function, improper list, or non-byte-aligned bitstring. Seam 01 and seam 12 decide if all live Agent state must meet this rule earlier. | Keep current persistence rejection. Add earlier validation only with error and compatibility rules. | 01, 07, and 12 |
-| INV-P02 | Retained | Public structs have schemas; some protocol results are documented maps. | Each shaped public success value has one owner and one purpose. Do not add a struct before its owner and migration are clear. | Audit proposed types before implementation. | 12 and each value owner |
-| INV-P03 | Changed | `Jido.Error` has Splode types, but public boundaries also return atoms and tuples. | Public construction, command, and lifecycle failures use owner-defined Splode errors, except for protocol results that seam 12 lists explicitly. | Add codes and normalization without breaking all tuple controls at once. | 12 |
-| INV-P04 | Deferred | Current status, snapshot, telemetry, and OTP controls use maps or tuples. | Raw maps and OTP control values are allowed only as explicit documented protocol exceptions. | Seam 12 must inventory the exceptions and migration path. | 12 |
-| INV-P05 | Retained | `test/jido/observe/agent_lifecycle_test.exs` | Direct `Agent.cmd/3` emits no Agent runtime telemetry. | None. | 04 and 13 |
-| INV-P06 | Retained | `lib/jido/telemetry/agent.ex`; observation tests | The live Turn result span stops at the commit and live-result boundary. | Preserve event order. | 08 and 13 |
-| INV-P07 | Retained | Semantic Directive spans and tests | Directive work uses separate post-commit spans and one later terminal settlement event. | Preserve behavior. | 06, 08, and 13 |
-| INV-P08 | Retained | Telemetry handlers are contained; observation tests prove unchanged results. | Observation cannot change an Agent result or runtime outcome. | Preserve handler isolation. | 13 |
-| INV-P09 | Retained | `lib/jido/telemetry/agent.ex`; bounded metadata tests | Semantic telemetry metadata contains no Agent state, Plugin state, payload, caller context, process handle, or raw error detail. | Keep bounded metadata in all new events. | 13 |
-
-## 6. Vocabulary reconciliation
-
-Use these preferred terms in later design documents.
-
-| Preferred term | Meaning | Do not use as an alias |
-| --- | --- | --- |
-| Agent definition | An immutable static Agent value with schema, routes, Plugin declarations, and metadata, but no instance ID or state. | Agent class, Agent template |
-| Agent instance | An immutable Agent value with an ID and complete validated state. | live Agent, actor process |
-| Agent ID | The current nonempty string inside one Agent instance. | Ref, PID |
-| Agent Ref | The proposed stable identity across lookup, storage, and delivery. It is separate from location. | PID, server name, persistence key |
-| Runtime handle | A PID or OTP name that addresses the current activation. | Agent identity |
-| Source Signal | The Signal received for the Turn. It never changes. | original event, raw command |
-| Effective Signal | The bounded Signal view after allowed admission or preparation changes. It does not select another executable. | rewritten source Signal |
-| Turn | One fixed Action or Flow selection and its input for one source Signal. | transaction, job |
-| Executable | The selected Action or Flow. | handler, route result |
-| Candidate Agent | The complete validated immutable Agent proposed by evaluation. | next live state, commit |
-| Evaluation return | The direct `Agent.cmd/3` result. It proves no live or durable commit. | Result, Outcome |
-| Live result | The tagged reply from live command execution at the commit boundary. | Result struct, Turn Outcome |
-| State version | The integer that advances once for each successful live Turn commit. | storage lease, definition revision |
-| Commit | The operation that makes one candidate Agent live after required persistence succeeds. | candidate, persistence write |
-| Turn Outcome | The terminal observation after Directive work settles or the Turn otherwise stops. | live result, commit result |
-| Directive | A typed request for runtime-owned post-commit work. | guaranteed durable effect |
-| Durable work intent | Portable pending work with a stable operation ID in Agent or Plugin state. | Directive queue, universal outbox |
-| Runtime checkpoint | The nondurable in-instance snapshot used for abnormal nonpersistent Server restart. | durable record, initial Agent |
-| Agent checkpoint | Portable reconstruction data produced by the Agent persistence boundary. | runtime checkpoint, Codec document |
-| Persistence record | The durable lifecycle and compare-and-swap envelope. The current form is a private map. | Agent identity, checkpoint |
-| Write authority | Permission for the current activation to perform another durable commit. | PID ownership, Registry presence |
-| Definition revision | A module-owned revision of normalized Agent definition meaning. It does not by itself pin loaded BEAM code. | state version, package version |
-| Plugin | The user-declared reusable capability. Current code also uses this name for one mixed behavior. | adapter, authoring extension |
-| Plugin facet | A proposed owner-specific Plugin behavior. | arbitrary hook, adapter |
-| Plugin runtime | Supervised resources for one Plugin on one Agent activation. | Plugin state |
-| Jido instance | One named local supervision and service boundary. | namespace, cluster |
-| Runtime topology | The OTP process and ownership layout below a Jido instance. | Topology definition |
-| Topology control plane | Static desired definitions, plans, repair, and any future live target management. | Agent pool |
-| Adapter | A replaceable external service boundary. | Plugin facet |
-| Authoring extension | Static syntax lowering to canonical values. | runtime Plugin |
-
-Do not use `%Jido.Plugin{}` as a public configuration struct. It does not
-exist. Do not use `Result` as the name of an unapproved new value. Do not say
-that all Agent evaluation is pure, because Actions and Flows can perform I/O.
-Do not say that a nonpersistent restart uses the initial Agent. Do not describe
-Builder, Codec, owned children, PID APIs, or local debug as removed.
-
-## 7. Design and code conflict decisions
-
-These dispositions cover the material conflicts and missing-contract pressure
-points in `gap-analysis.md`. They are recommendations until the user approves
-them.
-
-| Conflict or pressure point | Disposition | Reason | Execution owner |
+| Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| Plugin preparation currently occurs before route selection. | Change | Fix selection from the source Signal before preparation. This gives one stable Turn executable. | 04 and 05 |
-| Current routing rejects multiple matches. | Change | Use the Router's existing precedence and select the first target. | 04, with `jido_signal` compatibility evidence |
-| Plugins see the complete Agent and share one prepared command. | Change | Add declared observation and isolated prepared input. Keep declaration order. | 01, 04, and 05 |
-| The overview says that nonpersistent restart resets to the initial Agent. | Remove | Current runtime checkpoints preserve the last commit and a focused test requires it. | 08, 09, and 10 update their documents |
-| The overview says that all runtime effects start after commit. | Change | Only Directive work has that rule. Action and Flow I/O can occur before commit. | 06 |
-| `architecture.md` lists `%Jido.Plugin{}` as a public configuration struct. | Remove | `Jido.Plugin` is a behavior. The current normalized Spec is private. | 05 decides a manifest and facet model |
-| Core has no stable Agent Ref. | Change, staged | Stable identity is useful across Registry, persistence, and delivery, but it must not remove PID APIs immediately. | 03, 07, 09, and 10 |
-| Core has no positive definition revision. | Change, staged | Restore and upgrade need explicit definition identity. A label does not by itself pin executable code. | 01, 02, 04, and 07 |
-| Proposed Checkpoint, Commit, Record, Status, Turn Status, Plugin Context, Plugin Transition, Plugin Contribution, and Instance Config structs do not exist. | Defer exact shapes | Overview defines roles only. Each owner must show a need, migration, serialization, and error contract. | 01, 05, 07, 08, 09, and 12 |
-| The current live result is a tagged tuple, but `architecture.md` can imply a new Result value. | Remove the implied struct | Keep the tagged live result. Keep Turn Outcome as terminal observation. | 08 and 12 |
-| Plugin runtime Init lacks committed Plugin state and state version. | Change | Replacement must start from one coherent committed snapshot. Keep the state-pull API during migration. | 05, 08, and 10 |
-| Confirmed persistence errors can leave a writable Server alive. | Change | A failed write means the activation does not have proof that it can continue safely. | 07 and 08 |
-| Persistent startup does not write an initial active record. | Change | Durable creation needs one clear readiness and publication boundary. | 07, 08, and 10 |
-| Durable delete removes revision history. | Change | A compare-and-swap tombstone prevents a delayed initial writer from recreating a deleted Agent. | 07 |
-| Old proposals remove Builder and Codec. | Remove the removal proposal | Both APIs are documented, tested, and use shared validation. | 01 and 02 preserve them |
-| Old proposals remove public PID APIs immediately. | Defer any removal | PID APIs are documented and tested. Add Ref-first APIs beside them before any deprecation decision. | 03, 08, 09, and 12 |
-| The four Plugin facets are proposed but not implemented. | Defer detailed contract; recommend the ownership model | The current behavior mixes pure Agent work and live Server work. Exact callbacks and checkpoint interaction belong to seam 05. | 05, with 01 and 07 |
-| The combined Topology authoring host exists, but its owner Agent does not own the live target. | Retain authoring; defer runtime ownership | Current Controller behavior is useful and tested. A control-plane owner and live updates need a separate contract. | 11 |
-| Plugin wrappers share the Agent Dynamic Supervisor. | Defer physical pool change | Overview requires separate logical roles, not an unproved supervision layout. | 09 and 10 |
-| Legacy `:agent_server` telemetry, Observe tracer, and debug paths coexist with semantic events. | Retain during migration | These are supported compatibility paths. Seam 13 can define deprecation only after replacement coverage exists. | 13 |
-| Per-Agent persistence override exists, while one instance-only provider is proposed. | Defer | Both are public planning inputs. Package boundaries and instance policy must decide compatibility first. | 90, 07, and 09 |
-| Durable, cluster, and fabric package names appear as future owners. | Retain as boundary direction; defer APIs | Core is local. No external package contract is complete without an integration proof. | 90 and 99 |
+| `OVR-REQ-001` through `OVR-REQ-005` | `lib/jido.ex:8-48`; `../jido_action/lib/jido_exec.ex:1-18`; `../jido_signal/lib/jido_signal/router.ex:1-16`; `mix.exs:351-360` | Seam-90 boundary inventory and compatible V3 compile and test result. | `Partial` |
+| `OVR-REQ-006` through `OVR-REQ-008` | `lib/jido/agent.ex:2-10`; `test/jido/agent_test.exs:157-389`; `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67` | Preserve every supported authoring form through the normalized target. | `Proven` for current behavior; target remains pending |
+| `OVR-REQ-009` and `OVR-REQ-010` | `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` has one passing and one skipped case. | Revision field, all-authoring-form round trip, mismatch rejection, and old-checkpoint migration. | `Missing` |
+| `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159`; `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80` | Core Ref construction, serialization, Registry, persistence, delivery, node-move, and stale-location tests. | `Partial` |
+| `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex:95-103`; `lib/jido/agent/command/runner.ex:64-90,178-193`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:23-37` | Direct and live first-match tests for exact, `*`, `**`, predicate, priority, declaration order, and route-changing Plugins. | `Conflict` |
+| `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/command/runner.ex:29-132`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-14` | Preserve parity after the route and Plugin-input changes. | `Proven` for current behavior |
+| `OVR-REQ-019` through `OVR-REQ-023` | `lib/jido/plugin.ex:238-255,797-875`; `test/jido/plugin/contract_test.exs:490-670`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:22-34` | Declared observation, isolated input, deterministic merge, and direct/live parity. | `Partial` |
+| `OVR-REQ-024` through `OVR-REQ-030` | `lib/jido/agent_server.ex:1493-1545,1639-1756`; `test/jido/agent_server/public_api_test.exs:87-181`; `test/jido/agent_server/directive_execution_test.exs:27-184` | Keep equal-state and paired pre-commit failure proof. Keep explicit executable-I/O limits. | `Proven` for current target wording |
+| `OVR-REQ-031` through `OVR-REQ-034` | `lib/jido/plugin/scheduler.ex:30-48`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve stable ID, retry, acknowledgement, unrelated-Turn, and restart proof. | `Proven` for Scheduler |
+| `OVR-REQ-035` and `OVR-REQ-036` | `lib/jido/persistence/adapter.ex:1-46`; `test/jido/persistence_test.exs:422-503` | Run the adapter contract for every supported adapter and compatible V3 package set. | `Proven` for current adapter contract |
+| `OVR-REQ-037` and `OVR-REQ-038` | `lib/jido/agent_server.ex:1493-1545`; `test/jido/persistence/indeterminate_write_test.exs:35-93` | Preserve for all write-result classes. | `Proven` |
+| `OVR-REQ-039` | `test/jido/persistence/indeterminate_write_test.exs:35-93`; `test/jido/persistence_test.exs:305-347` | Conflict, confirmed error, exception, timeout, and indeterminate matrix with no later Turn before reload. | `Conflict` |
+| `OVR-REQ-040` | `lib/jido/agent_server.ex:506-544,2887-2905` | Revision-zero active record, publication, and cleanup for readiness and write failures. | `Missing` |
+| `OVR-REQ-041` | `lib/jido/agent_server.ex:2887-2905`; `test/jido/persistence_test.exs:359-394`; `test/jido/topology/controller_test.exs:251-285` | Preserve latest-record restore with the new record lifecycle. | `Proven` for current record |
+| `OVR-REQ-042` | `lib/jido/persistence.ex:137-150`; `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:13-31` | Tombstone retention, purge, reactivation, stale-writer, and rollback tests. | `Missing` |
+| `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Cross-boundary negative matrix for each approved durable value. | `Partial` |
+| `OVR-REQ-044` and `OVR-REQ-045` | `lib/jido/agent_server/runtime_checkpoint.ex:8-50`; `test/jido/agent_server/runtime_lifecycle_test.exs:293-326` | Add explicit full-instance-stop proof that the nondurable checkpoint is gone. | `Partial` |
+| `OVR-REQ-046` and `OVR-REQ-047` | `lib/jido/agent_server.ex:2-10`; `lib/jido.ex:346-370`; `lib/jido/agent_server/plugin_lifecycle.ex:110-198`; `test/jido/supervisor_test.exs:15-54` | If pools change, prove peer Agent behavior, Plugin isolation, and restart coupling. | `Proven` for logical roles |
+| `OVR-REQ-048` | `test/jido/agent_server/runtime_lifecycle_test.exs:225-289`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35-43` | State/version coherence for every replacement cause. | `Missing` |
+| `OVR-REQ-049` | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-32`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
+| `OVR-REQ-050` and `OVR-REQ-051` | `test/jido/agent_server/public_api_test.exs:333-459`; `lib/jido/agent_server.ex:1596-1637` | Preserve pre-commit cancellation and prove commit and Directive rejection. | `Partial` |
+| `OVR-REQ-052` and `OVR-REQ-053` | `lib/jido/agent_server.ex:257-263,381-389,1878-1923`; `lib/jido/error.ex:1-17`; `test/jido/error/normalization_test.exs:8-321` | Seam-12 inventory for every public entry and protocol exception. | `Partial` |
+| `OVR-REQ-054` through `OVR-REQ-059` | `lib/jido/telemetry.ex:8-30`; `test/jido/observe/agent_lifecycle_test.exs:10-302` | Add persistence, admission, Topology, and Agent Ref metadata cases. Keep legacy tests until retirement. | `Partial` |
+| `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,73-90`; `test/jido/topology/controller_test.exs:20-330`; `test/jido/topology/authoring_host_test.exs:79-272` | Add owner desired-state and live-target tests only if seam 11 approves those contracts. | `Proven` for static scope |
+| `OVR-REQ-062` | `lib/jido.ex:8-48,346-370`; `mix.exs:351-360` | Seam-90 package contract and integration proof before any external package becomes required. | `Partial` |
+| `OVR-REQ-063` | `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67`; `test/jido/agent_server/public_api_test.exs:87-590`; `test/jido/persistence_test.exs:35-514`; `test/jido/observe/agent_lifecycle_test.exs:10-395` | Compatibility inventory, stated support period, and replacement proof before any deprecation. | `Partial` |
+| `OVR-REQ-064` | `lib/jido/agent_server.ex:2887-2929`; `lib/jido/persistence.ex:119-135,285-315` | Preserve instance context in initial records, live commits, restore, tombstones, and reactivation. | `Partial` |
+| `OVR-REQ-065` and `OVR-REQ-066` | `lib/jido/agent_server.ex:257-263,381-389`; `lib/jido/persistence.ex:59-99`; `test/jido/persistence_test.exs:79-94` | Complete seam-12 protocol-exception and option-validation inventory. | `Partial` |
 
-## 8. Ordered documentation and implementation alignment phases
+## Migration and compatibility effects
 
-The phases follow the dependency graph in `docs/design/AGENTS.md`. Each phase
-first aligns documents. Runtime work starts only after the needed contracts are
-approved.
+No deprecation or removal is approved in this seam.
 
-| Phase | Shared contract change | Affected later seams | Compatibility effect | Evidence | Exit criteria |
-| --- | --- | --- | --- | --- | --- |
-| 1. Approve the overview baseline | Replace mixed current and deferred claims with the model, vocabulary, and invariant dispositions in this plan. | All | No runtime change. | This alignment, the gap analysis, and the canonical paths in section 2. | User approves the requested decisions. Overview source documents are updated to match. |
-| 2. Lock package and public-boundary policy | Confirm lower-layer direction, extension categories, core-local scope, supported API retention, and protocol exceptions. | 90, then 12 | Builder, Codec, PID APIs, owned children, adapters, and debug remain available during migration. | `mix.exs`, `guides/core-scope.md`, `guides/extension-boundaries.md`, public API tests. | Seam 90 alignment is approved. Seam 12 has a fixed owner and compatibility inventory. |
-| 3. Align errors and value ownership | Define stable public error classes, codes, normalization, and rules for new structs versus documented maps and tuples. | 12, then 01 and all API seams | New errors and values are additive until callers have migration evidence. | Error, transport, status, snapshot, and Outcome tests. | Seam 12 alignment is approved. Every later seam can name its result and error owner. |
-| 4. Align Agent, authoring, identity, and Turn | Keep the immutable Agent and all authoring forms. Add the approved definition revision and stable Ref direction. Fix source-Signal route selection and direct/live parity. | 01, then 02, 03, and 04 | Route ambiguity and route-changing Plugins need migration notes. Builder, Codec, neutral definitions, custom routing, and PID handles remain supported. | Agent, Builder, Codec, route, stable-reference, definition-revision, and Turn tests. | Seams 01 through 04 have approved alignments. FA-01, FA-03, and FA-04 have passing or explicitly deferred acceptance proof. |
-| 5. Align Plugin ownership | Decide the facet model, declared observation, prepared-input isolation, owned state, and coherent runtime replacement input. | 05 | Keep the ordered Plugin declaration form. Use adapters and compatibility delegates for callback migration. | Plugin contract tests, FA-02, and FA-06. | Seam 05 alignment is approved. Plugin checkpoint interaction is explicit. Isolation and replacement proofs pass or are explicitly deferred. |
-| 6. Align commit, effects, and durability | Keep one commit point and post-commit Directive work. Define write-authority loss, initial durable creation, record lifecycle, and tombstones. | 06, then 07 | Persistence record and delete behavior change. Existing adapter compare-and-swap stays. | Commit and Directive tests, persistence conflict and indeterminate tests, portability tests, FA-05. | Seams 06 and 07 are approved. Create, commit, restore, conflict, uncertain write, delete, purge, and reactivation each have an owned contract. |
-| 7. Align live ownership and runtime topology | Apply approved identity, durability, Plugin, and error rules to Agent Server, Jido instance, and process ownership. Keep nonpersistent runtime-checkpoint restore. | 08, then 09 and 10 | Ref-first APIs are additive. PID APIs remain for a stated period. Any pool change must preserve restart behavior. | Public API, instance, supervisor, runtime lifecycle, child ownership, and distributed tests. | Seams 08 through 10 are approved. Restart sources, readiness, pool roles, and local resolution are proven. |
-| 8. Align Topology control and observation | Keep static local repair. Decide owner-Agent runtime and live target scope. Make semantic events primary and plan legacy-path migration. | 11, then 13 | No current Topology or observation API is removed without a staged plan. | Topology controller, composition, authoring-host, telemetry, and observation tests. | Seams 11 and 13 are approved. Any live topology or legacy removal item has explicit acceptance proof or is deferred. |
-| 9. Close delivery | Combine approved seams into release scope and migration order. | 99 | Release notes state every additive, changed, deprecated, and deferred contract. | Full core quality, examples, cross-package V3 tests, and migration probes. | Delivery plan is approved and all required acceptance gates pass. |
+| Area | Compatibility effect and migration gate |
+| --- | --- |
+| Route order | First-match selection changes current multiple-match errors. Route-changing Plugin behavior needs a stated transition and direct/live acceptance proof. |
+| Plugin input | Declared views and isolated prepared input change callback authority. Keep declaration order and supply compatibility delegates until Plugin migrations are proved. |
+| Agent Ref | Add Ref-first APIs beside current ID and PID APIs. Do not remove current handles in V3 without a separate deprecation decision. |
+| Definition revision | Preserve revision through DSL, direct data, Builder, Codec, checkpoints, and restore. Define behavior for old checkpoints before enforcement. |
+| Custom checkpoints | Keep complete Agent `checkpoint/2` and `restore/2`. A Persistence facet cannot silently override their meaning. |
+| Durable records | Version any new active and tombstone record shape. Define mixed-version read, write, purge, reactivation, and rollback rules before the first new-format write. |
+| Write errors | Removing write authority after confirmed failures changes current error-policy behavior. Define stop or terminal non-writing behavior and automatic-restart reload rules. |
+| Persistence adapters | Keep the binary adapter and atomic compare-and-swap contract. New lifecycle meaning stays above the adapter. |
+| Plugin runtime Init | Add coherent state and version input. Keep the current public state-pull recovery path during migration. |
+| Public values and errors | Add values and normalized errors only after owner, purpose, serialization, protocol exceptions, and caller migration are clear. |
+| Topology | Keep static local activation and repair. Do not require live updates for V3. |
+| Observation | Keep semantic events, legacy `:agent_server` telemetry, `Jido.Observe`, tracing, and debug until seam 13 proves replacement coverage. |
+| Package versions | Test a declared compatible V3 pair. Do not use uncommitted sibling `jido_signal` behavior as proof for the Hex dependency. |
 
-## 9. Downstream planning gates
+Release rollback must not cause an older runtime to ignore a tombstone or
+misread a new identity or definition revision. The owner seams must define the
+mixed-version gate before data-format changes. Supported APIs remain available
+when a safe rollback requires them.
 
-After this plan is approved, later seams can rely on the decisions below. They
-must not treat the listed open details as approved.
+## Assumptions and blockers
 
-| Seam | Decisions it can rely on | Detailed decisions that remain open |
-| --- | --- | --- |
-| 90 Package boundaries | Jido is the local coordination layer above `jido_action` and `jido_signal`. Adapters, Plugin facets, authoring extensions, Directives, and tracers are different categories. Supported APIs need staged migration. | Exact future package APIs, per-Agent persistence override, and public extension functions. |
-| 12 Errors and contracts | Each public value and error has one owner. Live result and Turn Outcome are different. Maps and OTP values can be documented protocol exceptions. | Exact structs, codes, fields, normalization matrix, and exception inventory. |
-| 01 Agent | Agent definitions and instances are immutable. Direct `cmd/3` returns a candidate and Directives. Domain and Plugin state have separate write owners. Agent values contain no runtime handles. Builder and Codec stay. | Physical state layout, public state operations, checkpoint shape, definition-revision field rules, and compatibility details. |
-| 02 Agent authoring | DSL, direct definitions, Builder, Codec, and inline Actions remain valid authoring categories and must reach one normalized definition contract. | Revision syntax, Codec version migration, DSL details, and extension APIs. |
-| 03 Agent identity | A PID is only a runtime handle. Stable identity, location, and write authority are different questions. A Ref-first migration must keep current APIs during transition. | Ref fields, partition type, namespace binding, storage-key migration, and transport behavior. |
-| 04 Turn evaluation | One Turn fixes one executable. Direct and live paths share candidate evaluation. Recommended routing uses first Router match from the source Signal before preparation. | Effective-Signal fields, custom callback migration, prepared-input shape, timeout, and code-revision pinning. |
-| 05 Plugins | A Plugin is a declared capability. Owned state, pure Agent work, live Server work, persistence conversion, and topology planning have different owners. Declaration order stays stable. | Approval and exact shape of four facets, callback signatures, observation declarations, merge rules, and custom checkpoint interaction. |
-| 06 Commit and effects | One live commit follows validation and required persistence. Directive work is post-commit. Action and Flow I/O can occur pre-commit. Core has no universal durable outbox. | Commit value shape, Directive batch policy, cancellation boundary details, and durability guarantee levels. |
-| 07 Persistence | Keep binary adapters and atomic compare-and-swap. Recommended target adds initial active records, lost write authority on every write error, and tombstones. | Record struct, revisions versus storage tokens, timeout, retention, purge, reactivation, and per-Agent provider policy. |
-| 08 Agent Server | The Server is the serialized live owner. One commit increments the state version once. Nonpersistent abnormal restart restores the latest in-instance runtime checkpoint. PID APIs remain during migration. | Ref-first methods, status structs, timeout rules, write-error stop form, and startup publication protocol. |
-| 09 Jido instance | The instance owns local services, lookup, supervision, Runtime Store, and live persistence context. | Namespace configuration, facade surface, supervisor strategy, pool split, and provider override policy. |
-| 10 Runtime topology | Agent Servers are peers. Plugin runtimes are capability resources. Replacement uses current committed Plugin state and version. | Physical pools, restart coupling, readiness task ownership, remote Ref resolution, and placement policy boundaries. |
-| 11 Topology control plane | Current static definition, plan, local Controller, readiness, and repair stay supported. Authoring-owner values do not prove runtime ownership. | Owner runtime, desired-state storage, `start_topology`, live target update, rolling upgrade, and resumability. |
-| 13 Observability | Semantic lifecycle, Turn, commit, Directive, and settlement boundaries are the target. Metadata stays bounded and observation cannot change outcomes. | Event inventory, metrics, persistence events, OpenTelemetry bridge, and retirement schedule for legacy telemetry, tracer, and debug paths. |
-| 99 Delivery | Work follows the dependency order in section 8. A supported API is not removed without a decision, migration period, and evidence. | Release cut, required versus deferred upgrades, version matrix, and final rollout schedule. |
+| ID | Type | Owner | Statement | Resolution needed |
+| --- | --- | --- | --- | --- |
+| `OVR-BLK-001` | `Blocker` | 00 Overview | No `OVR-DEC` item is approved. Dependent seams cannot use target requirements as approved contracts. | User approval or changed decisions. |
+| `OVR-BLK-002` | `Assumption` | 90 Package boundaries | Jido remains the local coordination layer above public `jido_action` and `jido_signal` contracts. | Confirm in seam 90. |
+| `OVR-BLK-003` | `Blocker` | 04 Turn evaluation and `jido_action` | A definition revision does not by itself pin Action or Flow BEAM code for a complete Turn. | Decide executable code-revision scope and prove it at the execution boundary. |
+| `OVR-BLK-004` | `Assumption` | 90 and Delivery | The declared Hex `jido_signal` V3 version has the Router precedence used by Jido. | Compile and test the declared compatible package set. |
+| `OVR-BLK-005` | `Blocker` | 05 Plugins, 01 Agent, 07 Persistence | The proposed Persistence facet has no approved composition with complete custom Agent checkpoint callbacks. | Define explicit composition or defer the facet. |
+| `OVR-BLK-006` | `Blocker` | 07 Persistence and 08 Agent Server | Initial records, write-authority loss, and tombstones lack final failure, retention, purge, reactivation, and restart rules. | Approve the durability scope, then define these rules in owner seams. |
+| `OVR-BLK-007` | `Assumption` | 12 Errors and contracts | Maps, tuples, atoms, and OTP values can remain documented protocol exceptions. | Complete the seam-12 inventory and migration rules. |
+| `OVR-BLK-008` | `Assumption` | 09 Jido instance and 10 Runtime topology | Plugin runtimes and Agent Servers need separate logical roles, but not necessarily separate Dynamic Supervisors. | Decide physical placement only after restart and readiness proof. |
+| `OVR-BLK-009` | `Assumption` | 11 Topology control plane | Static local Topology is sufficient for the V3 release boundary. | Approve or change `OVR-DEC-009`. |
 
-## 10. Cross-seam acceptance matrix
+## Completion criteria
 
-This matrix maps every reconciled invariant group to current proof or required
-future proof. A skipped test is a specification, not passing proof.
-
-| Target IDs or boundary | Current proof | Required future proof |
-| --- | --- | --- |
-| INV-T01 and INV-T05 | `test/jido/agent_server/public_api_test.exs`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` single-route case | Keep direct/live parity in the final Turn suite. |
-| INV-T02 through INV-T04 | Router precedence is implemented in `../jido_signal`; Jido exact-one behavior is tested in `test/jido/agent_test.exs`. | Enable both FA-01 tests. Add exact, `*`, `**`, predicate, priority, and declaration-order cases for direct and live paths. |
-| INV-T06 through INV-T09, INV-T11, and INV-T12 | `test/jido/plugin/contract_test.exs` proves state ownership, Directive filtering, order, and candidate validation. | Repeat these proofs through any facet compatibility layer. |
-| INV-T10 | Current tests prove the gap only. | Enable both FA-02 tests. Prove declared observation, isolated input, deterministic merge, and direct/live parity. |
-| INV-C01 through INV-C03 | `test/jido/agent_server/public_api_test.exs`, `test/jido/agent_server/directive_execution_test.exs`, and `test/jido/persistence_test.exs` | Add equal-state success and paired pre-commit failure revision proof if not already explicit. Keep Action-I/O documentation tests or examples. |
-| INV-C04 through INV-C08 | `test/jido/plugin/scheduler/occurrence_recovery_test.exs` and Scheduler durable tests | Keep stable ID, retry, acknowledgement, restart, and unrelated-Turn preservation proof. |
-| INV-C09 | Persistence adapter and stale-writer tests | Run the same adapter contract for each supported adapter and compatible V3 package set. |
-| INV-C10 and INV-C11 | `test/jido/persistence/indeterminate_write_test.exs` proves uncertain-write stop. `test/jido/persistence_test.exs` proves current confirmed-conflict continuation. | Add a matrix for conflict, confirmed adapter error, exception, timeout, and indeterminate result. Prove no later evaluation before reload. |
-| INV-C12 | `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` proves the current gap. | Enable FA-05. Add retention, purge, reactivation, stale writer, and rollback cases. |
-| INV-D01 and INV-D02 | Definition revision example proves same-definition restore; mismatch proof is skipped. | Enable FA-04. Add Builder, Codec, neutral definition, custom checkpoint, and old-record migration cases. |
-| INV-D03 and INV-D04 | Instance and startup tests prove ID and PID replacement behavior. Stable-reference tests use an application substitute. | Add core Ref construction, serialization, Registry, persistence, Directive, node-move, and stale-location proofs. Enable FA-03. |
-| INV-D05 | Persistence restore, thaw, and Controller restore tests | Preserve latest-record restore with the new Record lifecycle. |
-| INV-D06 | `test/jido/agent_server/runtime_lifecycle_test.exs` proves last-commit restore after abnormal restart. | Add full-instance-stop proof that the nondurable checkpoint is gone. |
-| INV-D07 and INV-D08 | Instance persistence selection and Plugin readiness are tested. Initial record is absent. | Prove provisional readiness, revision-zero write, publication, cleanup on readiness/write failure, and configured provider authority. |
-| INV-R01 and INV-R02 | `test/jido/supervisor_test.exs`; Plugin lifecycle tests | If pools change, prove peer Agent behavior, Plugin isolation, and required restart cascade. |
-| INV-R03 | Runtime lifecycle tests prove fresh state through the public pull API. FA-06 is skipped. | Enable FA-06 and prove state/version coherence for every replacement cause. |
-| INV-R04 | Checkpoint portability and runtime lifecycle tests | Add one cross-boundary negative matrix for all proposed durable and runtime values. |
-| INV-R05 through INV-R07 | Agent Server cancellation and runtime-boundary tests; caller timeout is documented. | Add a Turn-timeout matrix only if the feature is approved. Prove commit and Directive non-cancellation. |
-| INV-R08 | Plugin runtime and Scheduler tests | Preserve Signal reentry and mailbox serialization through facet migration. |
-| INV-P01 | `test/jido/persistence/checkpoint_portability_test.exs` | Decide and test whether rejection occurs only at checkpoint creation or also at Agent transition. |
-| INV-P02 through INV-P04 | Current struct schemas, error tests, status maps, snapshots, and public API tests | Add the seam-12 value and error inventory. Test every public entry and documented protocol exception. |
-| INV-P05 through INV-P09 | `test/jido/observe/agent_lifecycle_test.exs`; `test/jido/telemetry/agent_test.exs` | Add persistence, admission, topology, and any new Ref metadata cases. Keep legacy compatibility tests until retirement. |
-| Package direction | `mix.exs`, public lower-layer documentation, and `guides/extension-boundaries.md` | Compile and test a declared compatible V3 matrix. Do not use an uncommitted sibling as proof for a Hex dependency. |
-| Topology ownership boundary | Topology composition, authoring-host, Controller readiness, repair, and state-retention tests | Add owner desired-state and live-target tests only after seam 11 approves those contracts. |
-
-## 11. Open decisions that need user approval
-
-Each item is small enough for a direct decision.
-
-1. **A-01, route contract.** Recommended: select the first Router match from
-   the source Signal before Plugin preparation. Admission and preparation must
-   not change that executable. Effect: deterministic fallback routes replace
-   the current multiple-match error, and route-changing Plugins need migration.
-2. **A-02, nonpersistent restart.** Recommended: retain the current
-   in-instance runtime checkpoint. An abnormal Server restart restores the last
-   committed Agent and state version. Effect: remove the reset-to-initial text
-   from the overview and later seams.
-3. **A-03, stable identity scope.** Recommended: make a stable Agent Ref a V3
-   core target, separate from PID and location, and add it beside current ID and
-   PID APIs. Effect: seams 03, 07, 09, and 10 must plan a staged migration. Exact
-   fields remain with seam 03.
-4. **A-04, definition revision.** Recommended: require a positive module-owned
-   revision for module-authored definitions, preserve it through Builder and
-   Codec, and define a legacy rule for old checkpoints. Effect: restore can
-   reject definition mismatch, but full executable code pinning stays open.
-5. **A-05, Plugin ownership model.** Recommended: approve the four owner
-   categories in principle: Agent, Agent Server, Persistence, and Topology
-   facets under one declared Plugin package. Effect: seam 05 can design a staged
-   split of the current mixed behavior without changing the user declaration
-   order.
-6. **A-06, custom checkpoint compatibility.** Recommended: retain complete
-   Agent `checkpoint/2` and `restore/2` callbacks during V3. A Persistence facet
-   must not silently override them. Effect: seams 01, 05, and 07 must define one
-   explicit composition or defer Persistence facets.
-7. **A-07, durability release scope.** Recommended: require initial active
-   records, loss of write authority after every write error, and tombstone
-   deletion for V3. Effect: seams 07 and 08 have required behavior changes and
-   migration tests.
-8. **A-08, compatibility APIs.** Recommended: retain Builder, Codec, neutral
-   definitions, owned children, public PID Agent Server APIs, and local debug
-   paths for the V3 release. Effect: new Ref, value, Plugin, and semantic
-   telemetry APIs are additive. Later removal needs a separate deprecation
-   decision.
-9. **A-09, Topology release scope.** Recommended: keep static local Topology
-   activation and repair in V3. Defer owner-Agent control of live desired state
-   and live target updates until seam 11 proves them. Effect: the current
-   Controller stays the supported runtime and live upgrade does not block V3.
-10. **A-10, package boundary.** Recommended: keep core local. Treat durable,
-    cluster, and fabric packages as future owners for recovery services,
-    cluster policy, and transport. Effect: no unproved package API becomes a V3
-    dependency.
-11. **A-11, public value rollout.** Recommended: approve value roles in this
-    overview, but defer exact new struct sets to seam 90, seam 12, and each value
-    owner. Effect: current maps, tuples, and structs stay canonical until a
-    staged replacement is approved.
-12. **A-12, legacy observation.** Recommended: make semantic Agent events the
-    target and retain `:agent_server` telemetry, `Jido.Observe`, and debug paths
-    during migration. Effect: seam 13 must supply replacement coverage and a
-    separate deprecation plan before removal.
+- [ ] The user has approved or changed each `OVR-DEC` item.
+- [ ] Every approved `OVR-REQ` item has `Proven` evidence.
+- [ ] No unresolved `Conflict` remains in the acceptance matrix.
+- [ ] Compatibility and mixed-version rules are complete for each changed
+  public or durable contract.
+- [ ] Owner seams contain the detailed contracts assigned to them and link to
+  the applicable `OVR-INV` and `OVR-REQ` identifiers.
+- [ ] Compatible V3 `jido`, `jido_action`, and `jido_signal` versions compile
+  and pass their required cross-package tests.
+- [ ] Seam 99 records all additive, changed, deprecated, and deferred release
+  items.
+- [ ] After approval, `ce-plan` creates formal implementation tasks. This
+  alignment document remains a high-level sequence only.
