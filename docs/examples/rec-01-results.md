@@ -66,8 +66,8 @@ record and removes its temporary storage directory.
 
 ## Design change
 
-[Commit and effects](../design/commit-and-effects.md) and
-[Durability guarantee](../design/durability-guarantee.md) now separate ordinary
+[Commit and effects](../design/06_commit-and-effects/commit-and-effects.md) and
+[Durability guarantee](../design/06_commit-and-effects/durability-guarantee.md) now separate ordinary
 Directive dispatch from explicit recoverable work. Related design documents
 remove the universal outbox, cursor, and admission gate. Unrelated proposed
 instance APIs and write-authority rules remain proposals. Modified design

@@ -91,7 +91,7 @@ The tests use real SchedEx callbacks, Agent Turns, and file persistence. The
 controlled clock only supplies time. UTC identity normalization is covered;
 full daylight-saving scheduling policy and fresh-VM recovery of this Scheduler
 capability are not claimed by these tests. Distributed writer authority remains
-under DIST-03. See the [design and API note](../design/scheduled-occurrences.md).
+under DIST-03. See the [design and API note](../design/05_plugins/scheduled-occurrences.md).
 
 ## Combined validation
 

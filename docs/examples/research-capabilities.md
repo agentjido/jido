@@ -98,7 +98,7 @@ mix run examples/05_multi_agent/05_05_remote_child/demo.exs
 
 This proves Erlang distribution between two local Agent nodes. It does not
 prove multi-host deployment, cluster ownership authority, or automatic
-failover. The [remote-child contract](../design/remote-owned-children.md)
+failover. The [remote-child contract](../design/10_runtime-topology/remote-owned-children.md)
 defines the implemented boundary.
 
 ## Historical examples

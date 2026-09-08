@@ -114,7 +114,7 @@ workspace changes. No new Dialyzer finding was added.
 | Unreachable `false` pattern | `lib/jido/plugin.ex:1` |
 | Unreachable `nil` pattern | `lib/jido/plugin/scheduler/runtime.ex:233` |
 
-See the [implemented authoring contract](../design/agent-dsl-interfaces.md).
+See the [implemented authoring contract](../design/02_agent-authoring/dsl-and-interfaces.md).
 The verification entries below record earlier SDK runs.
 
 ## Earlier verification

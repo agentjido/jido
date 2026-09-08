@@ -85,7 +85,7 @@ The failing hibernate/thaw test also fails in an isolated checkout of unchanged
 HEAD: thaw sees the old PID still registered. This is recorded as QA-HIBERNATE
 in the [gap register](runtime-multi-agent-gaps.md), separate from node placement.
 
-The [core contract](../design/remote-owned-children.md) defines supported behavior
+The [core contract](../design/10_runtime-topology/remote-owned-children.md) defines supported behavior
 and boundaries. Automatic failover, sharding, durable identity, leases, and
 recovery authority remain later work. Adoption and generic cross-node Agent
 lookup are not newly supported by this change. DIST-02 still needs its complete
