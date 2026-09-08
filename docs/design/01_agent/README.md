@@ -4,6 +4,8 @@
 
 Current comparison: [gap analysis](gap-analysis.md).
 
+Alignment plan: [alignment document](alignment.md).
+
 `Jido.Agent` owns immutable Agent definitions and instances, domain state,
 Plugin-owned state composition, schemas, routes, metadata, checkpoints, and
 direct command evaluation.

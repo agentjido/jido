@@ -4,6 +4,11 @@
 
 Current comparison: [gap analysis](gap-analysis.md).
 
+Alignment package:
+
+- [Detailed alignment plan](alignment.md)
+- [Review briefing](briefing.md)
+
 The code in `lib` is the source of truth for implemented behavior. The design
 set contains current contracts, deferred proposals, and historical decisions.
 

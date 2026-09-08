@@ -3,6 +3,10 @@
 
 # Jido V3 design
 
+Start with the [Jido V3 library vision](VISION.md). It defines the Bright Line,
+the core semantic contract, developer ownership, and the library boundary used
+by every architectural seam.
+
 The numbered folders define the proposed review order for the main architectural seams. Each folder owns one subsystem or one cross-system concern. Its `README.md` states the boundary, current direction, and open questions.
 
 The design documents are planning material. When a document and the implementation differ, treat the implementation as canonical until the design change is approved and implemented.
@@ -40,6 +44,54 @@ Review each seam against the same five questions:
 
 Cross-system decisions belong in [the architecture overview](00_overview/architecture.md) or [the invariants](00_overview/invariants.md). Detailed rules belong in the folder that owns the concept.
 
+## Seam document pattern
+
+Use [the architectural seam template](SEAM_TEMPLATE.md). Each seam has three
+documents by default:
+
+- `README.md` is the briefing and decision entry point.
+- `design.md` is the planned end state and contains EARS requirements.
+- `alignment.md` contains current evidence, gaps, migration phases, and the
+  acceptance matrix.
+
+Each seam README includes a short `Major gaps and work remaining` section.
+Formal implementation tasks do not belong in these documents. After a seam is
+approved, use `ce-plan` to create its implementation plan.
+
+Do not keep separate briefing, gap-analysis, or evidence documents after their
+unique content is integrated. This rule prevents the same fact from appearing
+in several reports with different wording or status.
+
+## Requirement format
+
+Use EARS, the Easy Approach to Requirements Syntax, for all proposed and
+approved requirements. EARS makes each requirement conditional, observable,
+and testable.
+
+Use these patterns:
+
+| Pattern | Form |
+| --- | --- |
+| Ubiquitous | `The <owner> shall <required response>.` |
+| Event-driven | `When <trigger>, the <owner> shall <required response>.` |
+| State-driven | `While <state>, the <owner> shall <required response>.` |
+| Unwanted behavior | `If <unwanted condition>, then the <owner> shall <required response>.` |
+| Optional feature | `Where <feature is enabled>, the <owner> shall <required response>.` |
+| Combined | `Where <feature>, while <state>, when <trigger>, the <owner> shall <required response>.` |
+
+Give each requirement a stable identifier in the form
+`<SEAM>-REQ-<number>`, such as `AGT-REQ-001`. Use one observable behavior per
+requirement. Name the component that owns the response. Define each trigger,
+state, input, result, and error with terms from the design glossary or the
+owning seam.
+
+Do not use words such as `should`, `normally`, `appropriate`, `fast`, or
+`graceful` in a requirement. Replace each vague word with a measurable result.
+Map every requirement to current evidence or to a required acceptance test.
+
+An EARS statement does not mean that the requirement is approved. The review
+status table remains the source of truth for approval.
+
 ## Document review status
 
 This table is the source of truth for design approval. A moved or changed document remains pending until it receives a new review.
@@ -47,14 +99,19 @@ This table is the source of truth for design approval. A moved or changed docume
 | Document | Status |
 | --- | --- |
 | Design index | Pending approval |
+| [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
+| [Jido V3 library vision](VISION.md) | Pending approval |
 | [Overview index](00_overview/README.md) | Pending approval |
 | [Overview gap analysis](00_overview/gap-analysis.md) | Pending approval |
 | [Architecture and data boundaries](00_overview/architecture.md) | Pending approval |
 | [Cross-system invariants](00_overview/invariants.md) | Pending approval |
 | [Glossary](00_overview/glossary.md) | Pending approval |
+| [Overview alignment](00_overview/alignment.md) | Pending approval |
+| [Overview review briefing](00_overview/briefing.md) | Pending approval |
 | [Agent index](01_agent/README.md) | Pending approval |
 | [Agent gap analysis](01_agent/gap-analysis.md) | Pending approval |
 | [Agent design](01_agent/agent.md) | Pending approval |
+| [Agent alignment](01_agent/alignment.md) | Pending approval |
 | [Agent authoring index](02_agent-authoring/README.md) | Pending approval |
 | [Agent authoring gap analysis](02_agent-authoring/gap-analysis.md) | Pending approval |
 | [Agent authoring](02_agent-authoring/authoring.md) | Pending approval |
