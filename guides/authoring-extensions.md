@@ -28,8 +28,8 @@ Pass authoring extension modules to the Agent:
 use Jido.Agent, extensions: [MyApp.AgentExtension]
 ```
 
-Core first collects its data schema, Plugins, routes, metadata, and state
-budget. It then calls extensions in declaration order.
+Core first collects its data schema, Plugins, routes, and metadata. It then
+calls extensions in declaration order.
 
 ## Consume Only Owned Entities
 

@@ -12,7 +12,6 @@ defmodule Jido.Agent.Validation do
     :module,
     :name,
     :description,
-    :max_state_size,
     :schema,
     :plugins,
     :state,
@@ -141,7 +140,6 @@ defmodule Jido.Agent.Validation do
       module: Map.get(attrs, :module, Agent),
       name: Map.get(attrs, :name),
       description: Map.get(attrs, :description),
-      max_state_size: Map.get(attrs, :max_state_size),
       schema: Map.get(attrs, :schema, Zoi.object(%{})),
       plugins: Map.get(attrs, :plugins, []),
       state: nil,
@@ -156,7 +154,6 @@ defmodule Jido.Agent.Validation do
     with {:ok, name} <- field(:name, agent.name),
          {:ok, description} <- field(:description, agent.description),
          :ok <- validate_module(agent.module),
-         :ok <- Jido.Agent.StateBudget.validate_limit(agent.max_state_size),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
          {:ok, complete_schema} <- Plugin.compose_schema(agent.schema, plugin_specs),
@@ -197,9 +194,8 @@ defmodule Jido.Agent.Validation do
 
   defp validate_instance_data(agent, schema) do
     with {:ok, id} <- validate_id(agent.id),
-         {:ok, state} <- State.validate(agent.state, schema) do
-      Jido.Agent.StateBudget.check(%{agent | id: id, state: state})
-    end
+         {:ok, state} <- State.validate(agent.state, schema),
+         do: {:ok, %{agent | id: id, state: state}}
   end
 
   defp initial_state(schema, state) when is_map(state) and not is_struct(state) do

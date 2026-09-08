@@ -9,7 +9,7 @@ it cannot evaluate another Action. Reactivation loads authoritative state.
 Use `Jido.hibernate(instance, pid)` to save and stop an idle Server. A successful
 return includes completed termination. Use `Jido.thaw(instance, module, id)` to
 restore it. Normal module restore uses the current definition and validates
-complete state, identity, portability, and any state-size limit.
+complete state, identity, and portability.
 
 Without a persistence adapter, the instance RuntimeStore retains checkpoints
 for local abnormal restarts. This is RAM in the same instance, not durable

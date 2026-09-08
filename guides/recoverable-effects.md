@@ -41,8 +41,8 @@ Ordinary Directive structs are transient Turn outputs. Do not use a Directive
 list as a durable outbox. Store the business intent in validated Agent or Plugin
 state. Then, derive the next Directive from that state.
 
-Use a bounded structure and define retention. Unbounded pending work can exceed
-the Agent state size limit and make every checkpoint more expensive.
+Use a bounded structure and define retention. Unbounded pending work can make
+every checkpoint more expensive.
 
 ## Use schedules for time-based work
 

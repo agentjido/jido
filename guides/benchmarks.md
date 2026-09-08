@@ -25,12 +25,10 @@ Agent cases cover construction, validation, command preparation, routing, direct
 Action and two-step Flow commands, state transition, and checkpoint/restore.
 Live server cases cover calls, Plugin admission, Flow calls, 20 casts with a completion call,
 snapshots, failure, and start/stop. Data cases cover Thread append, normalization,
-last entry and slice, Audit buffers and 100-record ID batches, state budgets, deep merge, Codec, and spans.
+last entry and slice, Audit buffers and 100-record ID batches, deep merge, Codec, and spans.
 A no-op Plugin case measures the command preparation callback path.
 Additional cases cover mixed Thread kinds, large caller contexts, reserved-key
-errors, and Codec encoding with a generated Registry. Budget batch cases perform
-100 checks or replacements with unlimited, module-limited, and stricter instance
-limits. Their time is for the full batch, and every returned Agent is checked.
+errors, and Codec encoding with a generated Registry.
 Keyword merge cases cover 25-operation batches with 8, 128, or 1,024 keys,
 plus duplicate keys, empty overrides, and non-keyword replacement lists.
 Plugin schema cases cover validation and preparation with up to 10,000 owned

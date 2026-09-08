@@ -178,8 +178,6 @@ defmodule Jido.AgentTest do
     assert Agent.definition?(definition)
     refute Agent.instance?(definition)
 
-    assert is_nil(definition.max_state_size)
-
     assert definition
            |> Map.from_struct()
            |> Map.keys()
@@ -193,8 +191,7 @@ defmodule Jido.AgentTest do
                :plugins,
                :state,
                :routes,
-               :metadata,
-               :max_state_size
+               :metadata
              ])
   end
 

@@ -177,7 +177,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     compile_isolated(
       quote do
         defmodule unquote(module) do
-          @options [name: "attribute_options", max_state_size: 1_024]
+          @options [name: "attribute_options"]
           use Jido.Topology, @options
 
           topology do
@@ -189,7 +189,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
       end
     )
 
-    assert %Agent{name: "attribute_options", max_state_size: 1_024} = module.agent()
+    assert %Agent{name: "attribute_options"} = module.agent()
     assert Enum.map(module.topology().agents, & &1.key) == ["worker"]
   end
 
@@ -201,8 +201,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
         defmodule unquote(module) do
           use Jido.Topology, %{
             name: "map_options",
-            description: "Topology owner",
-            max_state_size: 2_048
+            description: "Topology owner"
           }
 
           topology do
@@ -216,8 +215,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
 
     assert %Agent{
              name: "map_options",
-             description: "Topology owner",
-             max_state_size: 2_048
+             description: "Topology owner"
            } = module.agent()
 
     assert [%{key: "events"}] = module.topology().resources

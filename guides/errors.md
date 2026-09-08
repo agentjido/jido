@@ -1,7 +1,7 @@
 # Errors
 
 Public failures use tagged tuples and structured exceptions. A validation error
-can identify an input, action, configuration, or complete-state size limit.
+can identify an input, action, or configuration.
 A routing error means that the Signal did not select one valid executable.
 A caller timeout does not imply that active work was cancelled.
 
@@ -14,5 +14,4 @@ retains the new commit. Review `Jido.Agent.Turn.Outcome` and runtime error polic
 to choose the application response. An uncertain persistence write stops the
 writer even when ordinary error policy would continue.
 
-See [transport regressions](../test/jido/error_transport_test.exs) and
-[state-size checks](../test/jido/agent/state_budget_test.exs).
+See [transport regressions](../test/jido/error_transport_test.exs).

@@ -45,7 +45,6 @@ defmodule StateSchemas.Counter do
 
   agent do
     schema StateSchemas.CounterState.schema()
-    max_state_size 32_768
   end
 end
 ```
@@ -73,17 +72,6 @@ error.__struct__
 
 Instantiation rejects the complete state. The same data schema runs for direct
 commands, live candidates, checkpoints, and restore.
-
-## Check The Size Budget
-
-```elixir
-size = :erlang.external_size(agent.state)
-{:ok, _agent} = Jido.Agent.validate_instance(agent)
-
-size
-```
-
-The size is the external term size. It is not the process heap size.
 
 Do not store PIDs, ports, references, functions, or task handles in durable
 Agent state. Put them in Plugin runtimes.

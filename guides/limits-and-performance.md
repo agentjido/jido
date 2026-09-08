@@ -5,23 +5,6 @@ but it also makes long Turns and unbounded queues visible design risks. Set
 limits at the boundaries that your application owns, and measure before you
 change them.
 
-## Limit Agent state
-
-Set `max_state_size` in the Agent definition:
-
-```elixir
-use Jido.Agent,
-  name: "bounded_agent",
-  max_state_size: 1_000_000
-```
-
-The value is the external term size in bytes for complete state, including
-Plugin state. Jido checks the candidate before commit. A `nil` limit avoids the
-size calculation.
-
-Keep threads, audit records, pending jobs, deduplication keys, and schedule
-occurrences bounded. Large state also increases validation and checkpoint cost.
-
 ## Limit actor work
 
 `max_postponed_signals` limits work that reaches an actor while a Turn is active.

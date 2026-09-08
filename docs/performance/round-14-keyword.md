@@ -39,7 +39,7 @@ The unchanged plain-map paths stayed within the control range.
 
 All sampled process-peak and copied-result ratios were 1.000. There were no
 owned helper starts or remaining helpers. No memory reduction is claimed.
-All 81 focused merge, Agent, budget, and benchmark tests passed. Each keyword
+All 81 focused merge, Agent, and benchmark tests passed. Each keyword
 batch checks all 25 complete results, including nested maps, duplicate keys,
 empty overrides, and non-keyword replacement.
 

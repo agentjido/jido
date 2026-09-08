@@ -9,7 +9,6 @@ The new accepted fixes in this batch are:
 | Round | Target | Measured result |
 | ---: | --- | --- |
 | 05 | Single-kind Thread filtering | 39% to 49% less median time at 100 to 10,000 entries; sampled memory unchanged |
-| 16 | State budget checks | Small-state 100-check batches use 21% to 24% less median time; sampled memory unchanged |
 | 18 | Reserved command context keys | Prepare uses 36% less median time at 1,000 keys and 88% less at 10,000 keys; sampled memory unchanged |
 | 31 | Generated Codec encoding | Neutral definitions use 29% to 43% less median time; larger generated cases have lower sampled process peaks |
 

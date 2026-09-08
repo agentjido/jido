@@ -49,7 +49,6 @@ defmodule Jido.Agent.Builder do
              :module,
              :name,
              :description,
-             :max_state_size,
              :schema,
              :metadata,
              :routes,
@@ -69,8 +68,6 @@ defmodule Jido.Agent.Builder do
   def name(builder, value), do: put(builder, :name, value)
   @doc "Sets the description."
   def description(builder, value), do: put(builder, :description, value)
-  @doc "Sets the complete state size limit in external term bytes."
-  def max_state_size(builder, value), do: put(builder, :max_state_size, value)
   @doc "Sets the domain schema."
   def schema(builder, value), do: put(builder, :schema, value)
   @doc "Sets the metadata map."
@@ -161,8 +158,6 @@ defmodule Jido.Agent.Builder do
         error
     end
   end
-
-  defp valid_field(:max_state_size, value), do: Agent.StateBudget.validate_limit(value)
 
   defp valid_field(:schema, value), do: Agent.State.validate_schema(value)
 

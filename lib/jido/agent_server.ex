@@ -1483,8 +1483,7 @@ defmodule Jido.AgentServer do
   end
 
   defp finish_success(%Agent{} = agent, directives, %State{} = data) do
-    with {:ok, agent} <- Jido.Agent.StateBudget.transition(data.agent, agent),
-         {:ok, directives} <- prepare_directives(directives, data) do
+    with {:ok, directives} <- prepare_directives(directives, data) do
       commit_turn(agent, directives, data)
     else
       {:error, reason} -> fail_turn(reason, :finalize, data)

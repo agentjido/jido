@@ -9,10 +9,6 @@ Round 14 removed a second keyword-list scan. Five fresh-VM pairs showed about
 with a non-keyword list. Sampled process memory and copied result sizes stayed
 the same. [The round report](round-14-keyword.md) gives all cases and controls.
 
-Round 17 tested two ways to update replacement budget fields. Both were
-removed. One slowed transitions; the other had no qualifying time or copied
-memory gain. [The report](round-17-replacement.md) retains both trial patches.
-
 ## Complete checks
 
 Runtime commit: `598626a4`.

@@ -191,7 +191,6 @@ defmodule Jido.MixProject do
       groups_for_modules: [
         "Agent Contracts": [
           Jido.Agent,
-          Jido.Agent.StateBudget,
           Jido.Agent.Command,
           Jido.Agent.Turn,
           Jido.Agent.Turn.Outcome

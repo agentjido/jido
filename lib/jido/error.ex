@@ -119,7 +119,7 @@ defmodule Jido.Error do
     ## Fields
 
     - `message` - Human-readable error message
-    - `kind` - Category: `:input`, `:action`, `:config`, `:state_size`
+    - `kind` - Category: `:input`, `:action`, `:config`
     - `subject` - The invalid value (field name, action module, etc.)
     - `details` - Additional context
     """
@@ -129,7 +129,7 @@ defmodule Jido.Error do
 
     @type t :: %__MODULE__{
             message: String.t(),
-            kind: :input | :action | :config | :state_size | nil,
+            kind: :input | :action | :config | nil,
             subject: any(),
             details: map()
           }
@@ -331,7 +331,7 @@ defmodule Jido.Error do
 
   ## Options
 
-  - `:kind` - Category: `:input`, `:action`, `:config`, `:state_size`
+  - `:kind` - Category: `:input`, `:action`, `:config`
   - `:subject` - The invalid value
   - `:field` - Alias for `:subject` (for input validation)
   - `:action` - Alias for `:subject` with `kind: :action`

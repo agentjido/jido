@@ -159,7 +159,6 @@ JidoTest.Examples.DefinitionRevisionTest [test/examples/99_research/99_12_defini
                name: "research_versioned_cart",
                state: %{total: 20},
                description: nil,
-               max_state_size: nil,
                schema: #Zoi.map<
                  coerce: false,
                  unrecognized_keys: :strip,

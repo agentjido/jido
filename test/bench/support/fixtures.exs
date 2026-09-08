@@ -219,16 +219,6 @@ defmodule JidoCoreBench.Fixtures do
         fn _, {a, error} -> %{original: a, error: error} end
       )
 
-    budgets =
-      for limit <- [nil, 2_000_000] do
-        checked(
-          "state/budget/#{inspect(limit)}",
-          fn _ -> %{agent(1, payload(:large_list)) | max_state_size: limit} end,
-          &Jido.Agent.StateBudget.check/1,
-          fn {:ok, a} -> equal!(a.state, %{count: 0, payload: payload(:large_list)}) end
-        )
-      end
-
-    [plugin, failure | budgets]
+    [plugin, failure]
   end
 end

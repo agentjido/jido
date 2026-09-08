@@ -106,11 +106,6 @@ defmodule Jido.Agent do
                 Zoi.string(description: "Agent description")
                 |> Zoi.nullable()
                 |> Zoi.optional(),
-              max_state_size:
-                Zoi.integer(description: "Maximum external term size of complete state")
-                |> Zoi.min(0)
-                |> Zoi.nullable()
-                |> Zoi.optional(),
               schema: Zoi.any(description: "Static data schema for Agent-owned state"),
               plugins:
                 Zoi.list(Zoi.any(), description: "Canonical ordered Plugin declarations")
@@ -200,10 +195,6 @@ defmodule Jido.Agent do
       @doc "Returns the Agent description."
       @spec description() :: String.t() | nil
       def description, do: Map.get(__agent_config__(), :description)
-
-      @doc "Returns the module state size limit in external term bytes."
-      @spec max_state_size() :: non_neg_integer() | nil
-      def max_state_size, do: __agent_config__().max_state_size
 
       @doc "Returns the authored Agent data schema."
       @spec domain_schema() :: Zoi.schema()
@@ -372,8 +363,7 @@ defmodule Jido.Agent do
       plugins: agent.plugins,
       state: agent.state,
       routes: Enum.map(agent.routes, &route_to_map/1),
-      metadata: agent.metadata,
-      max_state_size: agent.max_state_size
+      metadata: agent.metadata
     }
   end
 
@@ -452,7 +442,7 @@ defmodule Jido.Agent do
     with {:ok, agent} <- validate_instance(agent),
          {:ok, schema} <- complete_schema(agent),
          {:ok, state} <- State.validate(next_state, schema) do
-      Jido.Agent.StateBudget.transition(agent, %{agent | state: state})
+      {:ok, %{agent | state: state}}
     end
   end
 
@@ -598,8 +588,7 @@ defmodule Jido.Agent do
           :schema,
           :plugins,
           :routes,
-          :metadata,
-          :max_state_size
+          :metadata
         ])
         |> new()
 

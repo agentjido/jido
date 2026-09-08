@@ -49,9 +49,6 @@ Do not put these values in persistent Agent or Plugin state:
 Use stable identifiers and portable configuration. Rebuild runtime resources
 in a Plugin runtime or in application supervision after restore.
 
-The Agent state size limit applies to complete state before commit. It can stop
-unexpected growth before the same state becomes an expensive checkpoint.
-
 ## Custom checkpoint formats
 
 Override `checkpoint/2` and `restore/2` when you need a durable format that is

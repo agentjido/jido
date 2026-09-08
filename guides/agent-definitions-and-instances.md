@@ -53,12 +53,6 @@ A Plugin can own one declared state key. Agent executables can read that key,
 but they cannot replace it. The Plugin update stage owns changes to that key.
 See [Plugin-Owned State](plugin-state.md).
 
-## Set A State Budget
-
-`max_state_size` limits the external encoded size of the complete state,
-including Plugin-owned state. It uses `:erlang.external_size/1`. It is not a
-process heap limit.
-
 Jido also checks portability when it creates a checkpoint. State for durable
 use must not contain PIDs, ports, references, functions, or other local runtime
 values.

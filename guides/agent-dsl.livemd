@@ -42,7 +42,6 @@ defmodule AgentDSL.Profile do
            })
 
     metadata %{domain: "profiles"}
-    max_state_size 16_384
   end
 
   routes do

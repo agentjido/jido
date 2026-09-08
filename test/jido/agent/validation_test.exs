@@ -47,7 +47,6 @@ defmodule Jido.Agent.ValidationTest do
       module: Agent,
       name: "defaults",
       description: nil,
-      max_state_size: nil,
       schema: Zoi.object(%{}),
       plugins: [],
       state: nil,
@@ -62,8 +61,7 @@ defmodule Jido.Agent.ValidationTest do
                name: "defaults",
                id: nil,
                state: nil,
-               description: nil,
-               max_state_size: nil
+               description: nil
              })
 
     for field <- [:name, :module, :schema, :plugins, :routes, :metadata] do
@@ -117,7 +115,6 @@ defmodule Jido.Agent.ValidationTest do
       {:name, nil},
       {:description, 123},
       {:module, nil},
-      {:max_state_size, -1},
       {:plugins, nil},
       {:schema, nil},
       {:routes, nil},

@@ -12,7 +12,6 @@ Declare Plugins explicitly and preserve their owned state keys and callback orde
 
 Keep runtime PIDs and handles out of checkpoints. Use typed schemas, safe error
 maps, instance and partition scope, owned children, and explicit resource cleanup.
-An optional `max_state_size` bounds complete state in external term bytes.
 
 Test direct values and live behavior. Use controlled barriers for concurrency and
 failure tests. Run the full catalog and integration acceptance, not just default

@@ -143,9 +143,7 @@ Do not pass live process state into a definition. Keep PIDs, references,
 connections, and timers in owned runtimes. Review any dynamic schema builders:
 V3 requires static schemas and does not provide a schema adapter.
 
-**Check:** test schema defaults and invalid state through the constructor. If you
-set `max_state_size`, test the complete state, including Plugin state. The limit
-uses external term bytes; it does not establish portability.
+**Check:** test schema defaults and invalid state through the constructor.
 
 ## Send Signals and return complete state
 
