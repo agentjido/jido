@@ -1,7 +1,6 @@
 defmodule JidoTest.Observe.ConfigTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Config.Defaults
   alias Jido.Debug
   alias Jido.Observe.Config
 
@@ -143,7 +142,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
   describe "telemetry_log_level/1" do
     test "returns default when no config set" do
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+      assert Config.telemetry_log_level(nil) == :info
     end
 
     test "reads from global config" do
@@ -153,17 +152,17 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default when global value is invalid" do
       Application.put_env(:jido, :telemetry, log_level: :invalid)
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+      assert Config.telemetry_log_level(nil) == :info
     end
 
     test "nil instance skips debug override" do
-      assert Config.telemetry_log_level(nil) == Defaults.telemetry_log_level()
+      assert Config.telemetry_log_level(nil) == :info
     end
   end
 
   describe "telemetry_log_args/1" do
     test "returns default when no config set" do
-      assert Config.telemetry_log_args(nil) == Defaults.telemetry_log_args()
+      assert Config.telemetry_log_args(nil) == :keys_only
     end
 
     test "reads from global config" do
@@ -173,13 +172,13 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default when value is invalid" do
       Application.put_env(:jido, :telemetry, log_args: :verbose)
-      assert Config.telemetry_log_args(nil) == Defaults.telemetry_log_args()
+      assert Config.telemetry_log_args(nil) == :keys_only
     end
   end
 
   describe "slow_signal_threshold_ms/1" do
     test "returns default" do
-      assert Config.slow_signal_threshold_ms(nil) == Defaults.slow_signal_threshold_ms()
+      assert Config.slow_signal_threshold_ms(nil) == 10
     end
 
     test "reads from global config" do
@@ -189,18 +188,18 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default when value is invalid" do
       Application.put_env(:jido, :telemetry, slow_signal_threshold_ms: -5)
-      assert Config.slow_signal_threshold_ms(nil) == Defaults.slow_signal_threshold_ms()
+      assert Config.slow_signal_threshold_ms(nil) == 10
     end
   end
 
   describe "slow_directive_threshold_ms/1" do
     test "returns default" do
-      assert Config.slow_directive_threshold_ms(nil) == Defaults.slow_directive_threshold_ms()
+      assert Config.slow_directive_threshold_ms(nil) == 5
     end
 
     test "falls back to default when value is invalid" do
       Application.put_env(:jido, :telemetry, slow_directive_threshold_ms: "slow")
-      assert Config.slow_directive_threshold_ms(nil) == Defaults.slow_directive_threshold_ms()
+      assert Config.slow_directive_threshold_ms(nil) == 5
     end
   end
 
@@ -211,7 +210,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to defaults when list contains non-strings" do
       Application.put_env(:jido, :telemetry, interesting_signal_types: ["ok", 123])
-      assert Config.interesting_signal_types(nil) == Defaults.interesting_signal_types()
+      assert Config.interesting_signal_types(nil) == []
     end
   end
 
@@ -355,7 +354,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
   describe "observe_log_level/1" do
     test "returns default" do
-      assert Config.observe_log_level(nil) == Defaults.observe_log_level()
+      assert Config.observe_log_level(nil) == :info
     end
 
     test "reads from global observability config" do
@@ -365,13 +364,13 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default for invalid logger level" do
       Application.put_env(:jido, :observability, log_level: :invalid)
-      assert Config.observe_log_level(nil) == Defaults.observe_log_level()
+      assert Config.observe_log_level(nil) == :info
     end
   end
 
   describe "debug_events/1" do
     test "returns :off by default" do
-      assert Config.debug_events(nil) == Defaults.observe_debug_events()
+      assert Config.debug_events(nil) == :off
     end
 
     test "reads from global observability config" do
@@ -381,7 +380,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default when value is invalid" do
       Application.put_env(:jido, :observability, debug_events: :everything)
-      assert Config.debug_events(nil) == Defaults.observe_debug_events()
+      assert Config.debug_events(nil) == :off
     end
   end
 
@@ -424,7 +423,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default tracer when configured module is invalid" do
       Application.put_env(:jido, :observability, tracer: Date)
-      assert Config.tracer(nil) == Defaults.tracer()
+      assert Config.tracer(nil) == Jido.Observe.NoopTracer
     end
   end
 
@@ -446,7 +445,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
   describe "debug_max_events/1" do
     test "returns default by default" do
-      assert Config.debug_max_events(nil) == Defaults.debug_max_events()
+      assert Config.debug_max_events(nil) == 500
     end
 
     test "reads from global telemetry config" do
@@ -456,7 +455,7 @@ defmodule JidoTest.Observe.ConfigTest do
 
     test "falls back to default when value is invalid" do
       Application.put_env(:jido, :telemetry, debug_max_events: -1)
-      assert Config.debug_max_events(nil) == Defaults.debug_max_events()
+      assert Config.debug_max_events(nil) == 500
     end
   end
 

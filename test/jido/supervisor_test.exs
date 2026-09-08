@@ -17,6 +17,7 @@ defmodule JidoTest.SupervisorTest do
       spec = Jido.child_spec(name: name)
       assert spec.id == name
       assert spec.type == :supervisor
+      assert spec.shutdown == 10_000
     end
 
     test "starts TaskSupervisor as child", %{jido: jido} do

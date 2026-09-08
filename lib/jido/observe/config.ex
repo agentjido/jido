@@ -12,9 +12,19 @@ defmodule Jido.Observe.Config do
   When `instance` is `nil`, steps 1-2 are skipped.
   """
 
-  alias Jido.Config.Defaults
-
   @type instance :: atom() | nil
+
+  @default_telemetry_log_level :info
+  @default_telemetry_log_args :keys_only
+  @default_slow_signal_threshold_ms 10
+  @default_slow_directive_threshold_ms 5
+  @default_interesting_signal_types []
+  @default_observe_log_level :info
+  @default_debug_events :off
+  @default_redact_sensitive false
+  @default_tracer Jido.Observe.NoopTracer
+  @default_tracer_failure_mode :warn
+  @default_debug_max_events 500
 
   @log_level_priority %{
     trace: 0,
@@ -40,7 +50,7 @@ defmodule Jido.Observe.Config do
       :telemetry,
       :log_level,
       :telemetry_log_level,
-      Defaults.telemetry_log_level()
+      @default_telemetry_log_level
     )
     |> normalize_telemetry_log_level()
   end
@@ -48,7 +58,7 @@ defmodule Jido.Observe.Config do
   @doc "Returns the argument logging mode for the given instance."
   @spec telemetry_log_args(instance()) :: :keys_only | :full | :none
   def telemetry_log_args(instance \\ nil) do
-    resolve(instance, :telemetry, :log_args, :telemetry_log_args, Defaults.telemetry_log_args())
+    resolve(instance, :telemetry, :log_args, :telemetry_log_args, @default_telemetry_log_args)
     |> normalize_telemetry_log_args()
   end
 
@@ -60,9 +70,9 @@ defmodule Jido.Observe.Config do
       :telemetry,
       :slow_signal_threshold_ms,
       :slow_signal_threshold_ms,
-      Defaults.slow_signal_threshold_ms()
+      @default_slow_signal_threshold_ms
     )
-    |> normalize_non_neg_integer(Defaults.slow_signal_threshold_ms())
+    |> normalize_non_neg_integer(@default_slow_signal_threshold_ms)
   end
 
   @doc "Returns the slow directive threshold in milliseconds."
@@ -73,9 +83,9 @@ defmodule Jido.Observe.Config do
       :telemetry,
       :slow_directive_threshold_ms,
       :slow_directive_threshold_ms,
-      Defaults.slow_directive_threshold_ms()
+      @default_slow_directive_threshold_ms
     )
-    |> normalize_non_neg_integer(Defaults.slow_directive_threshold_ms())
+    |> normalize_non_neg_integer(@default_slow_directive_threshold_ms)
   end
 
   @doc "Returns the list of signal types considered interesting."
@@ -86,7 +96,7 @@ defmodule Jido.Observe.Config do
       :telemetry,
       :interesting_signal_types,
       :interesting_signal_types,
-      Defaults.interesting_signal_types()
+      @default_interesting_signal_types
     )
     |> normalize_interesting_signal_types()
   end
@@ -177,7 +187,7 @@ defmodule Jido.Observe.Config do
       :observability,
       :log_level,
       :observe_log_level,
-      Defaults.observe_log_level()
+      @default_observe_log_level
     )
     |> normalize_observe_log_level()
   end
@@ -190,7 +200,7 @@ defmodule Jido.Observe.Config do
       :observability,
       :debug_events,
       :observe_debug_events,
-      Defaults.observe_debug_events()
+      @default_debug_events
     )
     |> normalize_debug_events()
   end
@@ -209,7 +219,7 @@ defmodule Jido.Observe.Config do
       :observability,
       :redact_sensitive,
       :redact_sensitive,
-      Defaults.redact_sensitive()
+      @default_redact_sensitive
     )
     |> normalize_boolean()
   end
@@ -217,7 +227,7 @@ defmodule Jido.Observe.Config do
   @doc "Returns the tracer module for the given instance."
   @spec tracer(instance()) :: module()
   def tracer(instance \\ nil) do
-    resolve(instance, :observability, :tracer, :tracer, Defaults.tracer())
+    resolve(instance, :observability, :tracer, :tracer, @default_tracer)
     |> normalize_tracer()
   end
 
@@ -229,7 +239,7 @@ defmodule Jido.Observe.Config do
       :observability,
       :tracer_failure_mode,
       :tracer_failure_mode,
-      Defaults.tracer_failure_mode()
+      @default_tracer_failure_mode
     )
     |> normalize_tracer_failure_mode()
   end
@@ -244,9 +254,9 @@ defmodule Jido.Observe.Config do
       :telemetry,
       :debug_max_events,
       :debug_max_events,
-      Defaults.debug_max_events()
+      @default_debug_max_events
     )
-    |> normalize_non_neg_integer(Defaults.debug_max_events())
+    |> normalize_non_neg_integer(@default_debug_max_events)
   end
 
   # --- Private helpers ---
@@ -309,22 +319,22 @@ defmodule Jido.Observe.Config do
   end
 
   defp normalize_telemetry_log_level(level) when level in @telemetry_log_levels, do: level
-  defp normalize_telemetry_log_level(_), do: Defaults.telemetry_log_level()
+  defp normalize_telemetry_log_level(_), do: @default_telemetry_log_level
 
   defp normalize_telemetry_log_args(mode) when mode in @telemetry_log_args_modes, do: mode
-  defp normalize_telemetry_log_args(_), do: Defaults.telemetry_log_args()
+  defp normalize_telemetry_log_args(_), do: @default_telemetry_log_args
 
   defp normalize_observe_log_level(level) when level in @observe_log_levels, do: level
-  defp normalize_observe_log_level(_), do: Defaults.observe_log_level()
+  defp normalize_observe_log_level(_), do: @default_observe_log_level
 
   defp normalize_debug_events(mode) when mode in @debug_events_modes, do: mode
-  defp normalize_debug_events(_), do: Defaults.observe_debug_events()
+  defp normalize_debug_events(_), do: @default_debug_events
 
   defp normalize_interesting_signal_types(types) when is_list(types) do
-    if Enum.all?(types, &is_binary/1), do: types, else: Defaults.interesting_signal_types()
+    if Enum.all?(types, &is_binary/1), do: types, else: @default_interesting_signal_types
   end
 
-  defp normalize_interesting_signal_types(_), do: Defaults.interesting_signal_types()
+  defp normalize_interesting_signal_types(_), do: @default_interesting_signal_types
 
   defp normalize_non_neg_integer(value, _default) when is_integer(value) and value >= 0, do: value
   defp normalize_non_neg_integer(_, default), do: default
@@ -333,7 +343,7 @@ defmodule Jido.Observe.Config do
   defp normalize_boolean(_), do: false
 
   defp normalize_tracer_failure_mode(mode) when mode in @tracer_failure_modes, do: mode
-  defp normalize_tracer_failure_mode(_), do: Defaults.tracer_failure_mode()
+  defp normalize_tracer_failure_mode(_), do: @default_tracer_failure_mode
 
   defp normalize_tracer(module) when is_atom(module) do
     case Code.ensure_loaded(module) do
@@ -343,13 +353,13 @@ defmodule Jido.Observe.Config do
              function_exported?(module, :span_exception, 4) do
           module
         else
-          Defaults.tracer()
+          @default_tracer
         end
 
       _ ->
-        Defaults.tracer()
+        @default_tracer
     end
   end
 
-  defp normalize_tracer(_), do: Defaults.tracer()
+  defp normalize_tracer(_), do: @default_tracer
 end

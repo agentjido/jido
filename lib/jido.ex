@@ -1,8 +1,9 @@
 defmodule Jido do
   use Supervisor
 
-  alias Jido.Config.Defaults
   alias Jido.RuntimeStore
+
+  @shutdown_timeout_ms 10_000
 
   @moduledoc """
   自動 (Jido) - A declarative actor and agent framework for Elixir, built for
@@ -338,7 +339,7 @@ defmodule Jido do
       start: {__MODULE__, :start_link, [opts]},
       type: :supervisor,
       restart: :permanent,
-      shutdown: Defaults.jido_shutdown_timeout_ms()
+      shutdown: @shutdown_timeout_ms
     }
   end
 

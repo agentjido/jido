@@ -221,7 +221,6 @@ defmodule Jido.MixProject do
           Jido.AgentServer.ChildInfo,
           Jido.AgentServer.DirectiveContext,
           Jido.AgentServer.ParentRef,
-          Jido.Config.Defaults,
           Jido.RuntimeStore
         ],
         "Plugin Contracts": [

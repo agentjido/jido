@@ -473,7 +473,7 @@ V3 adds these modules:
 | `Jido.Error.RoutingError` | **Retained type with a stronger V3 role.** Missing, invalid, and multiple Agent route matches return it. |
 | `Jido.Error.TimeoutError` | **Retained type.** Separate caller timeout from active Turn cancellation. |
 | `Jido.Error.ValidationError` | **Retained type.** Zoi now supplies schema issues. |
-| `Jido.Config.Defaults` | **Same name, smaller contract.** Await, Server timeout, InstanceManager, and WorkerPool default functions are removed. |
+| `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Observe.Config` owns observability defaults and configuration resolution. |
 | `Jido.RuntimeStore` | **Retained call surface.** It is instance-local coordination state, not durable application storage. Do not migrate stored values by copying its internal keys. |
 | `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Agent.Codec.Registry`. |
 | `Jido.Util` | **Retained call surface for internal support.** Prefer the domain modules that own validation, IDs, lookup, and executable resolution. |
