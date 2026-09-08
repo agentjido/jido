@@ -1,5 +1,5 @@
 defmodule JidoTest.Examples.Factory.BatchTest do
-  use JidoTest.Case, async: true
+  use JidoTest.Case, async: false
   @moduletag :example
 
   alias Jido.Examples.Factory.{Conversation, Tools, Workshop}

@@ -71,8 +71,20 @@ defmodule Jido.Agent.DSL.Macros do
     end
   end
 
+  defp parse_inline!([options], caller) when is_list(options) do
+    if Keyword.keyword?(options) do
+      Inline.parse_callback!(nil, options, caller)
+    else
+      error!(caller, "inline route Action has an invalid declaration")
+    end
+  end
+
   defp parse_inline!([pattern, options], caller) when is_list(options) do
-    Inline.parse_callback!(pattern, options, caller)
+    if clause_options?(pattern, options) do
+      Inline.parse_callback!(nil, pattern ++ options, caller)
+    else
+      Inline.parse_callback!(pattern, options, caller)
+    end
   end
 
   defp parse_inline!([pattern, options, body], caller)
@@ -82,6 +94,11 @@ defmodule Jido.Agent.DSL.Macros do
 
   defp parse_inline!(_args, caller) do
     error!(caller, "inline route Action has an invalid declaration")
+  end
+
+  defp clause_options?(pattern, options) do
+    Keyword.keyword?(pattern) and Keyword.keyword?(options) and
+      not Keyword.has_key?(pattern, :do) and Keyword.has_key?(options, :do)
   end
 
   defp extract_inline(nil, _caller), do: {nil, nil}
@@ -147,8 +164,13 @@ defmodule Jido.Agent.DSL.Macros do
     end
   end
 
-  defp extension_target(_target, [_ | _], caller),
-    do: error!(caller, "route requires exactly one target module or extension target option")
+  defp extension_target(_target, [{option, _value} | _], caller) do
+    error!(
+      caller,
+      "route requires exactly one target module or extension target option; " <>
+        "got target module with #{inspect(option)}"
+    )
+  end
 
   defp error!(caller, description) do
     raise CompileError, file: caller.file, line: caller.line, description: description

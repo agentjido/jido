@@ -46,7 +46,7 @@ defmodule Jido.Plugin do
 
   @type result :: {:ok, proposed_state :: map(), directives :: [struct()]} | {:error, term()}
   @type declaration :: module() | {module(), keyword()}
-  @type declarations_or_specs :: [declaration()] | [Spec.t()]
+  @typep declarations_or_specs :: [declaration()] | [Spec.t()]
   @type state_spec :: :none | {atom(), Zoi.schema()}
 
   @doc "Defines one v3 Agent Plugin."

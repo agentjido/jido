@@ -351,7 +351,7 @@ defmodule Jido.MixProject do
   defp deps do
     [
       # Jido Ecosystem
-      {:jido_action, "~> 3.0.0-beta.7"},
+      {:jido_action, path: "../jido_action"},
       {:jido_signal, "~> 3.0.0-beta.4"},
 
       # Jido Deps

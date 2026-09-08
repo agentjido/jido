@@ -1,5 +1,5 @@
 defmodule JidoTest.Examples.Factory.FlowFactoryTest do
-  use JidoTest.Case, async: true
+  use JidoTest.Case, async: false
   @moduletag :example
 
   @moduletag timeout: 120_000

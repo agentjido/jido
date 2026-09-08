@@ -283,6 +283,40 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert hd(decoded.routes).target == {target, %{multiplier: 1}}
   end
 
+  test "inline routes accept guarded callback clauses" do
+    compiled =
+      compile_agent(
+        """
+        route "test.classify" do
+          action schema: Zoi.object(%{amount: Zoi.integer()}), context: context do
+            %{amount: amount} when amount > 0 ->
+              {:ok, %{context.agent_state | result: :positive}}
+
+            _ ->
+              {:ok, %{context.agent_state | result: :other}}
+          end
+        end
+        """,
+        "",
+        """
+        agent do
+          schema Zoi.object(%{result: Zoi.atom() |> Zoi.default(:unset)})
+        end
+        """
+      )
+
+    {module, _bytecode} =
+      Enum.find(compiled, fn {compiled_module, _bytecode} ->
+        function_exported?(compiled_module, :new!, 0)
+      end)
+
+    positive = Jido.Signal.new!("test.classify", %{amount: 1}, source: "/test")
+    other = Jido.Signal.new!("test.classify", %{amount: 0}, source: "/test")
+
+    assert {:ok, %{state: %{result: :positive}}, []} = module.cmd(module.new!(), positive)
+    assert {:ok, %{state: %{result: :other}}, []} = module.cmd(module.new!(), other)
+  end
+
   test "generated constructors preserve omission, explicit values and new Signal IDs" do
     assert {:ok, %{data: %{}} = first} = Counter.add_signal()
     assert {:ok, %{data: %{amount: 0}} = second} = Counter.add_signal(0)
@@ -695,7 +729,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "removed route params and Plugin labels fail compilation" do
-    assert_raise Spark.Error.DslError, ~r/params/, fn ->
+    assert_raise CompileError, ~r/params/, fn ->
       compile_agent("route \"test.add\", Add, params: %{amount: 1}")
     end
 

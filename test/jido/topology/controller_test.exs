@@ -1,5 +1,5 @@
 defmodule Jido.Topology.ControllerTest do
-  use JidoTest.Case, async: true
+  use JidoTest.Case, async: false
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.{Cell, Hierarchy, Independent, Swarm}
