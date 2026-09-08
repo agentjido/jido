@@ -4,6 +4,7 @@ defmodule Jido.Agent.DSL.Macros do
   alias Jido.Action.Inline
 
   @entity Jido.Agent.DSL.Extension.Routes.Route
+  @route_options [:defaults, :priority, :match, :do]
   defmacro route(path, target_or_options) do
     if Keyword.keyword?(target_or_options) do
       build(path, nil, target_or_options, __CALLER__)
@@ -25,22 +26,8 @@ defmodule Jido.Agent.DSL.Macros do
 
   defp build(path, target, options, caller) do
     validate_options!(options, caller)
-    {extension_target, options} = Keyword.pop(options, :ai)
-
-    target =
-      case {target, extension_target} do
-        {nil, nil} ->
-          nil
-
-        {nil, id} ->
-          Macro.escape({:jido_agent_extension, :ai, id})
-
-        {target, nil} ->
-          target
-
-        {_target, _id} ->
-          error!(caller, "route cannot combine a target module with an ai profile")
-      end
+    {options, extension_options} = Keyword.split(options, @route_options)
+    target = extension_target(target, extension_options, caller)
 
     {block, route_options} = Keyword.pop(options, :do)
     {inline, route_block} = extract_inline(block, caller)
@@ -148,6 +135,20 @@ defmodule Jido.Agent.DSL.Macros do
     keys = Keyword.keys(options)
     if length(keys) != length(Enum.uniq(keys)), do: error!(caller, "duplicate route option")
   end
+
+  defp extension_target(target, [], _caller), do: target
+
+  defp extension_target(nil, [{option, value}], _caller) do
+    quote generated: true do
+      %Jido.Agent.Extension.RouteTarget{
+        option: unquote(option),
+        value: unquote(value)
+      }
+    end
+  end
+
+  defp extension_target(_target, [_ | _], caller),
+    do: error!(caller, "route requires exactly one target module or extension target option")
 
   defp error!(caller, description) do
     raise CompileError, file: caller.file, line: caller.line, description: description

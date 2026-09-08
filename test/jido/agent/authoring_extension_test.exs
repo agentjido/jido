@@ -19,14 +19,38 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     use Spark.Dsl.Extension,
       dsl_patches: [%Spark.Dsl.Patch.AddEntity{section_path: [:agent], entity: @label}]
 
+    def route_target_options, do: [:ref]
+
     def lower_agent(config, entities) do
       {labels, rest} = Enum.split_with(entities, &match?(%Label{}, &1))
       metadata = Enum.reduce(labels, config.metadata, &Map.put(&2, &1.key, &1.value))
 
       routes =
         Enum.map(config.routes, fn
-          %{target: %Ref{target: target}} = route -> %{route | target: target}
-          route -> route
+          %{target: %Ref{target: target}} = route ->
+            %{route | target: target}
+
+          %{
+            target:
+              {%Jido.Agent.Extension.RouteTarget{
+                 extension: __MODULE__,
+                 option: :ref,
+                 value: target
+               }, defaults}
+          } = route ->
+            %{route | target: {target, defaults}}
+
+          %{
+            target: %Jido.Agent.Extension.RouteTarget{
+              extension: __MODULE__,
+              option: :ref,
+              value: target
+            }
+          } = route ->
+            %{route | target: target}
+
+          route ->
+            route
         end)
 
       {:ok, %{config | metadata: metadata, routes: routes}, rest}
@@ -36,6 +60,14 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
   defmodule Unclaimed do
     use Spark.Dsl.Extension, dsl_patches: Labels.dsl_patches()
     def lower_agent(config, entities), do: {:ok, config, entities}
+  end
+
+  defmodule ConflictingRouteTarget do
+    def route_target_options, do: [:ref]
+  end
+
+  defmodule InvalidRouteTargetOptions do
+    def route_target_options, do: [:ref, :ref]
   end
 
   defmodule BadConfig do
@@ -98,6 +130,8 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
             end
 
             route "ordinary", Add
+            route "extension_target", ref: Add
+            route "extension_target_defaults", ref: Add, defaults: %{amount: 1}
           end
         end
       end
@@ -106,11 +140,75 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     definition = module.agent()
     assert definition.metadata == %{owner: "consumer"}
     assert [{Turns, []}] = definition.plugins
-    assert Enum.all?(definition.routes, &(&1.target == Add))
+    assert Enum.count(definition.routes, &(&1.target == Add)) == 3
+    assert Enum.any?(definition.routes, &(&1.target == {Add, %{amount: 1}}))
     {:ok, server} = Jido.start_agent(jido, module)
     assert {:ok, %{state: %{count: 3, turns: 1}}} = module.add(server, 3)
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
     assert {:ok, ^definition} = Jido.Agent.Codec.decode(document, registry)
+  end
+
+  test "extension route target options must be declared and unambiguous" do
+    assert_raise CompileError, ~r/Unknown Agent extension route target option :unknown/, fn ->
+      compile_isolated(
+        quote do
+          defmodule unquote(
+                      Module.concat(
+                        __MODULE__,
+                        "UnknownRouteTarget#{System.unique_integer([:positive])}"
+                      )
+                    ) do
+            use Jido.Agent, name: "unknown_route_target", extensions: [Labels]
+
+            routes do
+              route "unknown", unknown: Add
+            end
+          end
+        end
+      )
+    end
+
+    assert {:error, error} =
+             Jido.Agent.Extension.route_target_extension([Labels, ConflictingRouteTarget], :ref)
+
+    assert Exception.message(error) == "Conflicting Agent extension route target option :ref"
+
+    assert {:error, error} =
+             Jido.Agent.Extension.route_target_extension([InvalidRouteTargetOptions], :ref)
+
+    assert Exception.message(error) ==
+             "Agent extension route_target_options/0 must return unique atom names"
+
+    assert {:error, error} = Jido.Agent.Extension.route_target_extension(:invalid, :ref)
+    assert Exception.message(error) == "Invalid Agent extension route target option"
+  end
+
+  test "a route has only one module or extension target" do
+    for routes <- [
+          quote(do: route("mixed", Add, ref: Add)),
+          quote(do: route("multiple", ref: Add, other: Add))
+        ] do
+      assert_raise CompileError,
+                   ~r/route requires exactly one target module or extension target option/,
+                   fn ->
+                     compile_isolated(
+                       quote do
+                         defmodule unquote(
+                                     Module.concat(
+                                       __MODULE__,
+                                       "InvalidRouteTarget#{System.unique_integer([:positive])}"
+                                     )
+                                   ) do
+                           use Jido.Agent, name: "invalid_route_target", extensions: [Labels]
+
+                           routes do
+                             unquote(routes)
+                           end
+                         end
+                       end
+                     )
+                   end
+    end
   end
 
   test "unclaimed declarations fail at compilation" do
