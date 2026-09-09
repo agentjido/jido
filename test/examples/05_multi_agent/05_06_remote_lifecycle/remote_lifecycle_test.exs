@@ -18,19 +18,22 @@ defmodule JidoTest.Examples.MultiAgent.RemoteLifecycleTest do
     assert {:ok, _} =
              peer_call(c.peer_a, RemoteLifecycle, :create_worker, [parent, c.node_b])
 
-    child =
-      peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)
+    child = peer_call(c.peer_a, Server, :children, [parent], 5_000)[:worker]
 
     assert node(child.pid) == c.node_b
     assert :ok = :peer.stop(c.peer_b)
 
     [observation] =
-      peer_eventually(fn ->
-        case peer_call(c.peer_a, Server, :agent, [parent]).state.observations do
-          [] -> nil
-          observations -> observations
-        end
-      end)
+      peer_eventually(
+        fn ->
+          case safe_peer_call(c.peer_a, Server, :agent, [parent]) do
+            %{state: %{observations: []}} -> nil
+            %{state: %{observations: observations}} -> observations
+            _not_ready -> nil
+          end
+        end,
+        timeout: 3_000
+      )
 
     assert observation == %{
              child_id: child.id,
@@ -40,5 +43,11 @@ defmodule JidoTest.Examples.MultiAgent.RemoteLifecycleTest do
 
     assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
     assert peer_call(c.peer_a, Process, :alive?, [parent])
+  end
+
+  defp safe_peer_call(peer, module, function, args) do
+    peer_call(peer, module, function, args, 1_000)
+  catch
+    :exit, _reason -> nil
   end
 end
