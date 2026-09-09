@@ -1,18 +1,11 @@
 defmodule Jido.Examples.TypedCommandAgent do
   @moduledoc """
-  A typed command Agent that tests SDK validation boundaries.
+  An Agent with typed commands and complete candidate-state validation.
 
   The schema owns the count bounds. Actions do not repeat that check.
-  The duplicate route and invalid count input exercise rejection paths.
-  Caller context supplies the observer. Messages expose Action entry; they do not change Agent state.
   The profile route supplies a default patch. A Signal patch replaces that
   entire nested map before the Action validates its input.
-  An unknown route returns `Jido.Error.RoutingError` before Action execution.
-  A duplicate route selects its first declared target. The integration test
-  checks direct and live execution.
   """
-
-  alias Jido.Examples.DirectiveAgent.{Effects, Record}
 
   defmodule Contract do
     def schema do
@@ -34,67 +27,46 @@ defmodule Jido.Examples.TypedCommandAgent do
     end
   end
 
-  defmodule OwnedState do
-    use Jido.Plugin
-
-    @impl true
-    def state_spec(_opts), do: {:owned, Zoi.integer() |> Zoi.default(0)}
-  end
-
-  defmodule Patch do
-    use Jido.Action,
-      name: "basic_sdk_patch",
-      schema:
-        Zoi.object(%{
-          patch:
-            Zoi.object(
-              %{name: Zoi.string() |> Zoi.optional(), push: Zoi.boolean() |> Zoi.optional()},
-              unrecognized_keys: :error
-            )
-        })
-
-    @impl true
-    def run(input, %{agent_state: state, observer: observer}) do
-      send(observer, {:sdk_action, :patch})
-      profile = Map.merge(state.profile, input.patch)
-      {:ok, %{state | profile: %{profile | name: String.trim(profile.name)}}}
-    end
-  end
-
-  defmodule SetCount do
-    use Jido.Action,
-      name: "basic_sdk_set_count",
-      schema: Zoi.object(%{count: Zoi.integer()})
-
-    @impl true
-    def run(input, %{agent_state: state, observer: observer}) do
-      send(observer, {:sdk_action, :set_count})
-      # Deliberately omit the domain bound check. Final SDK validation must
-      # reject a correctly typed candidate that violates the root refinement.
-      {:ok, %{state | count: input.count}, [%Record{label: "count accepted"}]}
-    end
-  end
-
   use Jido.Agent, name: "basic_sdk_typed_commands"
 
   agent do
     schema Contract.schema()
-    plugin Effects
   end
 
   routes do
     signal_source "/examples/basic/typed_command_agent"
 
-    route "basic.profile.patch", Patch do
+    route "basic.typed_command.patch_profile" do
+      action %{patch: patch},
+        name: "basic_sdk_patch",
+        schema:
+          Zoi.object(%{
+            patch:
+              Zoi.object(
+                %{name: Zoi.string() |> Zoi.optional(), push: Zoi.boolean() |> Zoi.optional()},
+                unrecognized_keys: :error
+              )
+          }),
+        context: context do
+        profile = Map.merge(context.agent_state.profile, patch)
+        profile = %{profile | name: String.trim(profile.name)}
+        {:ok, %{context.agent_state | profile: profile}}
+      end
+
       defaults %{patch: %{name: "Route default", push: true}}
       define :patch_profile, args: [{:optional, :patch}]
     end
 
-    route "basic.count.set", SetCount do
+    route "basic.typed_command.set_count" do
+      action %{count: count},
+        name: "basic_sdk_set_count",
+        schema: Zoi.object(%{count: Zoi.integer()}),
+        context: context do
+        # Complete Agent validation owns this bound check.
+        {:ok, %{context.agent_state | count: count}}
+      end
+
       define :set_count, args: [:count]
     end
-
-    route "basic.ambiguous", Patch
-    route "basic.ambiguous", SetCount
   end
 end

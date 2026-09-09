@@ -48,33 +48,6 @@ defmodule Jido.Examples.DirectiveAgent.Effects do
   end
 end
 
-defmodule Jido.Examples.DirectiveAgent.StatelessEffects do
-  @moduledoc "A typed recording capability without a Plugin process."
-
-  use Jido.Plugin
-
-  alias Jido.AgentServer, as: Server
-  alias Jido.Examples.DirectiveAgent.{Effects, Record}
-
-  @impl true
-  def directives(_opts), do: [Record]
-
-  @impl true
-  defdelegate validate_directive(directive, opts), to: Effects
-
-  @impl true
-  def dispatch(nil, directive, context, _opts) do
-    server = Jido.whereis_agent(context.jido, context.agent_id, partition: context.partition)
-    record = %{label: directive.label, snapshot: Server.snapshot(server), context: context}
-    # This is local test observation. Domain results use Signals.
-    send(context.turn_context.observer, {:sdk_record, server, record})
-
-    if directive.fail?,
-      do: {:error, Jido.Error.execution_error("record dispatch failed")},
-      else: :ok
-  end
-end
-
 defmodule Jido.Examples.DirectiveAgent.EffectRuntime do
   @moduledoc false
 

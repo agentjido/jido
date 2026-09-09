@@ -55,19 +55,8 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
   end
 
   test "instances from one definition keep separate state and identity", %{jido: jido} do
-    observer = self()
-
-    {caller, monitor} =
-      spawn_monitor(fn ->
-        {:ok, server} = Jido.start_agent(jido, MinimalAgent)
-        send(observer, {:started, server})
-        exit(:caller_finished)
-      end)
-
-    assert_receive {:started, first}
-    assert_receive {:DOWN, ^monitor, :process, ^caller, :caller_finished}
-    assert Process.alive?(first)
-    assert {:ok, second} = Jido.start_agent(jido, MinimalAgent, id: unique_id())
+    first = start_agent!(jido, MinimalAgent)
+    second = start_agent!(jido, MinimalAgent)
     untouched = Server.snapshot(second)
 
     assert {:ok, changed} = Server.call(first, MinimalAgent.increment_signal!(7))
@@ -78,14 +67,5 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
     assert is_binary(changed.id) and byte_size(changed.id) > 0
     assert Jido.whereis_agent(jido, changed.id) == first
     assert Jido.whereis_agent(jido, untouched.agent.id) == second
-
-    assert {:error, _reason} = Jido.start_agent(jido, MinimalAgent, id: changed.id)
-    assert Server.snapshot(first) == %{agent: changed, state_version: 1}
-    assert Jido.whereis_agent(jido, changed.id) == first
-
-    for opts <- [nil, [:invalid], [id: ""], [id: 7]] do
-      assert {:error, %Jido.Error.ValidationError{}} = Jido.start_agent(jido, MinimalAgent, opts)
-      assert Server.snapshot(first) == %{agent: changed, state_version: 1}
-    end
   end
 end

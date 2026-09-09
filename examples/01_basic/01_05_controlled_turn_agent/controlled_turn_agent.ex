@@ -2,40 +2,11 @@ defmodule Jido.Examples.ControlledTurnAgent do
   @moduledoc """
   An Agent with observable, controlled Action execution.
 
-  Caller context carries an observer PID. Input selects an execution barrier. Release a
-  blocked Action with `{:sdk_release, label}` sent to its reported worker PID.
+  Caller context carries an observer PID and selects an execution barrier. Release
+  a blocked Action with `{:sdk_release, label}` sent to its reported worker PID.
   These messages control local observations and timing. Domain commands use
-  Signals. Observer PIDs do not enter committed state or Directives.
+  Signals. Observer PIDs do not enter Signals, committed state, or Directives.
   """
-
-  alias Jido.Examples.DirectiveAgent.{Effects, Record}
-
-  defmodule Change do
-    use Jido.Action,
-      name: "basic_sdk_controlled_turn",
-      schema:
-        Zoi.object(%{
-          amount: Zoi.integer(),
-          label: Zoi.string(),
-          blocked?: Zoi.boolean() |> Zoi.default(false)
-        })
-
-    @impl true
-    def run(input, %{agent_state: state, observer: observer} = context) do
-      # These messages are test observation and a timing barrier. Domain
-      # commands still use Signals; Jido.Exec and the Server remain real.
-      send(observer, {:sdk_started, input.label, self(), state, Map.get(context, :request)})
-
-      if input.blocked? do
-        receive do
-          {:sdk_release, label} when label == input.label -> :ok
-        end
-      end
-
-      {:ok, %{state | count: state.count + input.amount, history: state.history ++ [input.label]},
-       [%Record{label: input.label}]}
-    end
-  end
 
   use Jido.Agent, name: "basic_sdk_controlled_turn"
 
@@ -44,14 +15,30 @@ defmodule Jido.Examples.ControlledTurnAgent do
              count: Zoi.integer() |> Zoi.default(0),
              history: Zoi.list(Zoi.string()) |> Zoi.default([])
            })
-
-    plugin Effects
   end
 
   routes do
     signal_source "/examples/basic/controlled_turn_agent"
 
-    route "basic.controlled.change", Change do
+    route "basic.controlled_turn.increment" do
+      action %{amount: amount, label: label},
+        name: "basic_sdk_controlled_turn",
+        schema: Zoi.object(%{amount: Zoi.integer(), label: Zoi.string()}),
+        context: context do
+        state = context.agent_state
+
+        # Observer messages and the barrier are transient execution controls.
+        send(context.observer, {:sdk_started, label, self(), state, Map.get(context, :request)})
+
+        if Map.get(context, :blocked?, false) do
+          receive do
+            {:sdk_release, ^label} -> :ok
+          end
+        end
+
+        {:ok, %{state | count: state.count + amount, history: state.history ++ [label]}}
+      end
+
       define :increment, args: [:amount, :label]
     end
   end

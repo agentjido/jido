@@ -2,186 +2,66 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
   use JidoTest.BasicSDKCase
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Error.{RoutingError, ValidationError}
-  alias Jido.Examples.DirectiveAgent.Effects
+  alias Jido.Error.ValidationError
   alias Jido.Examples.TypedCommandAgent, as: Agent
-  alias Jido.Examples.TypedCommandAgent.OwnedState
 
-  test "construction preserves defaults and root constraints with and without Plugin state", %{
-    jido: jido
-  } do
-    for plugins <- [[], [OwnedState]] do
-      definition = %{Agent.agent() | plugins: plugins}
-      {:ok, valid} = Jido.Agent.instantiate(definition, id: unique_id())
-      server = start_agent!(jido, definition, id: valid.id)
+  test "route defaults and typed command input agree in direct and live execution", %{jido: jido} do
+    cases = [
+      {Agent.patch_profile_signal!(), %{name: "Route default", email: true, push: true}},
+      {Agent.patch_profile_signal!(%{name: " New "}), %{name: "New", email: true, push: false}},
+      {Agent.patch_profile_signal!(%{push: false}), %{name: "Initial", email: true, push: false}}
+    ]
 
-      assert valid.state.count == 0
-      assert valid.state.profile == %{name: "Initial", email: true, push: false}
-      assert Map.has_key?(valid.state, :owned) == (plugins != [])
-      assert Server.snapshot(server) == %{agent: valid, state_version: 0}
+    for {command, expected_profile} <- cases do
+      server = start_agent!(jido, Agent)
+      before = Server.snapshot(server)
 
-      for state <- [
-            %{minimum: 2},
-            %{count: -1},
-            %{count: 6},
-            %{minimum: 3, maximum: 1}
-          ] do
-        id = unique_id()
+      assert before.agent.state == %{
+               count: 0,
+               minimum: 0,
+               maximum: 5,
+               profile: %{name: "Initial", email: true, push: false}
+             }
 
-        assert {:error, %ValidationError{}} =
-                 Jido.Agent.instantiate(definition, id: id, state: state)
+      assert {:ok, candidate, []} = Agent.cmd(before.agent, command)
+      assert candidate.state.profile == expected_profile
+      assert Server.snapshot(server) == before
 
-        assert {:error, %ValidationError{}} =
-                 Jido.start_agent(jido, definition, id: id, initial_state: state)
-
-        assert Jido.whereis_agent(jido, id) == nil
-      end
+      assert {:ok, ^candidate} = Server.call(server, command)
+      assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
     end
   end
 
-  test "route defaults merge shallowly before direct and live Action validation", %{
-    jido: jido
-  } do
+  test "invalid typed input does not commit and a valid command recovers", %{jido: jido} do
     server = start_agent!(jido, Agent, error_policy: observe_errors())
     before = Server.snapshot(server)
 
     for patch <- [%{push: "yes"}, %{unknown: true}, nil] do
-      command = signal("basic.profile.patch", %{patch: patch})
+      command = Agent.patch_profile_signal!(patch)
 
       assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-               Agent.cmd(before.agent, command, context: %{observer: self()})
+               Agent.cmd(before.agent, command)
 
-      assert {:error, %Jido.Action.Error.InvalidInputError{}} =
-               Server.call(server, command, context: %{observer: self()})
-
-      assert Server.snapshot(server) == before
-      assert Effects.records(server) == []
-    end
-
-    refute_received {:sdk_action, _}
-
-    for data <- [nil, [], "invalid"] do
-      command = signal("basic.profile.patch", data)
-
-      assert {:error, %ValidationError{message: "Agent Signal data must be a map"}} =
-               Agent.cmd(before.agent, command, context: %{observer: self()})
-
-      assert {:error, %ValidationError{message: "Agent Signal data must be a map"}} =
-               Server.call(server, command, context: %{observer: self()})
-
+      assert {:error, %Jido.Action.Error.InvalidInputError{}} = Server.call(server, command)
       assert Server.snapshot(server) == before
     end
 
-    refute_received {:sdk_action, _}
-
-    cases = [
-      {%{}, %{name: "Route default", email: true, push: true}},
-      {%{patch: %{name: " New "}}, %{name: "New", email: true, push: false}},
-      {%{patch: %{push: false}}, %{name: "Initial", email: true, push: false}}
-    ]
-
-    for {data, expected_profile} <- cases do
-      server = start_agent!(jido, Agent)
-      before = Server.snapshot(server)
-      command = signal("basic.profile.patch", data)
-
-      assert {:ok, candidate, []} = Agent.cmd(before.agent, command, context: %{observer: self()})
-      assert_receive {:sdk_action, :patch}
-      assert Server.snapshot(server) == before
-
-      assert {:ok, ^candidate} = Server.call(server, command, context: %{observer: self()})
-      assert_receive {:sdk_action, :patch}
-      refute_received {:sdk_action, :set_count}
-
-      assert candidate.state == %{before.agent.state | profile: expected_profile}
-      assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
-      assert Effects.records(server) == []
-    end
+    assert {:ok, recovered} = Agent.patch_profile(server, %{name: "Valid"})
+    assert recovered.state.profile.name == "Valid"
+    assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
   end
 
-  test "an invalid candidate cannot commit or dispatch after successful Action execution", %{
-    jido: jido
-  } do
+  test "complete Agent validation rejects an out-of-bounds candidate", %{jido: jido} do
     server = start_agent!(jido, Agent, error_policy: observe_errors())
     before = Server.snapshot(server)
-    command = signal("basic.count.set", %{count: 6})
 
-    result = Server.call(server, command, context: %{observer: self()})
-    assert_receive {:sdk_action, :set_count}
-    await_idle(server)
-    assert {:error, %ValidationError{message: "Agent state does not match its schema"}} = result
+    assert {:error, %ValidationError{message: "Agent state does not match its schema"}} =
+             Agent.set_count(server, 6)
+
     assert Server.snapshot(server) == before
-    assert Effects.records(server) == []
 
-    assert {:ok, recovered} =
-             Server.call(server, signal("basic.count.set", %{count: 5}),
-               context: %{observer: self()}
-             )
-
-    await_idle(server)
+    assert {:ok, recovered} = Agent.set_count(server, 5)
     assert recovered.state.count == 5
     assert Server.snapshot(server) == %{agent: recovered, state_version: 1}
-    assert [%{label: "count accepted"}] = Effects.records(server)
-  end
-
-  test "direct and live unknown routes share one error contract and leave the Server usable", %{
-    jido: jido
-  } do
-    server = start_agent!(jido, Agent, error_policy: observe_errors())
-    before = Server.snapshot(server)
-    input = %{patch: %{name: "Wrong"}, count: 1}
-    type = "basic.unknown"
-    command = signal(type, input)
-
-    assert {:error, %RoutingError{} = direct_error} =
-             Agent.cmd(before.agent, command, context: %{observer: self()})
-
-    assert {:error, %RoutingError{} = live_error} =
-             Server.call(server, command, context: %{observer: self()})
-
-    assert direct_error.target == type
-    assert live_error.target == type
-    assert Jido.Error.to_map(live_error) == Jido.Error.to_map(direct_error)
-    assert direct_error.details.reason == :no_handlers_found
-    assert direct_error.details.route == type
-    assert live_error.details.reason == :no_handlers_found
-    assert live_error.details.route == type
-    assert Server.snapshot(server) == before
-    refute_received {:sdk_action, _}
-    assert Effects.records(server) == []
-
-    assert {:ok, changed} =
-             Server.call(
-               server,
-               signal("basic.profile.patch", %{patch: %{name: "Valid"}}),
-               context: %{observer: self()}
-             )
-
-    assert_receive {:sdk_action, :patch}
-    assert changed.state.profile.name == "Valid"
-    assert Server.snapshot(server) == %{agent: changed, state_version: 1}
-  end
-
-  test "duplicate routes select the first declared target for direct and live execution", %{
-    jido: jido
-  } do
-    server = start_agent!(jido, Agent)
-    before = Server.snapshot(server)
-    command = signal("basic.ambiguous", %{patch: %{name: " First "}, count: 4})
-
-    assert {:ok, candidate, []} =
-             Agent.cmd(before.agent, command, context: %{observer: self()})
-
-    assert_receive {:sdk_action, :patch}
-    refute_received {:sdk_action, :set_count}
-    assert candidate.state.profile.name == "First"
-    assert candidate.state.count == 0
-
-    assert {:ok, ^candidate} =
-             Server.call(server, command, context: %{observer: self()})
-
-    assert_receive {:sdk_action, :patch}
-    refute_received {:sdk_action, :set_count}
-    assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
   end
 end

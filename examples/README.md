@@ -1,6 +1,3 @@
-> Current example run, 2026-09-09: 306 checks pass and no example check is
-> skipped. The research subset has 48 passing checks.
-
 # Jido V3 examples
 
 The main catalog has 62 fixtures in eight groups. All use the implemented
