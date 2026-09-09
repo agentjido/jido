@@ -25,7 +25,7 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 
 3. **Quality Checks**
    ```bash
-   # Run quality checks and core tests (not benchmarks or examples)
+   # Run quality checks and fast core tests
    mix quality
 
    # Or individual checks
@@ -117,8 +117,11 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
 
 3. **Running Tests**
    ```bash
-   # Run core tests
+   # Run fast core tests
    mix test
+
+   # Run core tests that start external BEAM nodes
+   mix peer --seed 0
 
    # Run secondary suites separately
    mix benchmarks --seed 0

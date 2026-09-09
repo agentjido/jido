@@ -149,6 +149,7 @@ defmodule Jido.MixProject do
       preferred_envs: [
         q: :test,
         quality: :test,
+        peer: :test,
         benchmarks: :test,
         examples: :test,
         coveralls: :test,
@@ -398,7 +399,8 @@ defmodule Jido.MixProject do
       # Default exclusions are declared once in test/test_helper.exs.
       test: "test --preload-modules",
 
-      # Run secondary suites only when requested.
+      # Run filtered suites only when requested.
+      peer: "test test/jido --only peer --seed 0",
       benchmarks: "test test/bench --only benchmark",
       examples: "test test/examples --only example",
 

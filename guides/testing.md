@@ -14,26 +14,30 @@ Dialyzer checks:
 mix quality
 ```
 
-There are three test categories:
+There are four test execution categories:
 
 | Category | Command | Default quality check |
 | --- | --- | --- |
 | Core | `mix test test/jido --include flaky --seed 0` | Included |
+| Peer core | `mix peer --seed 0` | Not included |
 | Benchmark | `mix benchmarks --seed 0` | Not included |
 | Example, including research | `mix examples --seed 0` | Not included |
 
 CI and the test step in `mix quality` use
-`mix test test/jido --include flaky --seed 0`. They run core tests
-with a fixed seed, including the tagged flaky core tests.
+`mix test test/jido --include flaky --seed 0`. They run fast core tests with a
+fixed seed, including the tagged flaky tests but excluding peer tests.
 
-Default `mix test` excludes `:benchmark`, `:example`, `:flaky`, and approved
-`:skip` tests. Benchmark tests in `test/bench/` use the `:benchmark` tag.
-All example tests, including the former integration scenarios, use `:example`.
-Run examples separately when needed:
+Default `mix test` excludes `:benchmark`, `:example`, `:flaky`, `:peer`, and
+approved `:skip` tests. Tests that use `JidoTest.PeerCase` get the `:peer` tag
+and start actual BEAM nodes. Run peer and example tests separately when needed:
 
 ```sh
+mix peer --seed 0
 mix examples --seed 0
 ```
+
+Benchmark tests in `test/bench/` use the `:benchmark` tag. All example tests,
+including the former integration scenarios, use `:example`.
 
 All research example tests pass without skips. They include the explicit
 quiescent upgrade boundary, validated definition migration, and additive local
@@ -69,13 +73,14 @@ CI uses the same paths without `--cover`. Benchmark and example tests run separa
 Example source lines do not count toward the core coverage goal; all selected
 tests can contribute coverage of the core modules they call.
 
-As an optional secondary check, run all three categories with core coverage:
+As an optional secondary check, run all four categories with core coverage:
 
 ```sh
-mix test --include benchmark --include example --include flaky --seed 0 --cover
+mix test --include benchmark --include example --include flaky --include peer --seed 0 --cover
 ```
 
 The Mix summary threshold and ExCoveralls minimum are both 90%. Keep the
 coverage scope intact when adding tests. Do not add skips to meet the threshold.
-Coverage runs also collect counters from the isolated BEAM test nodes before
-they stop. The report includes the same measured modules on each node.
+Coverage runs that include `:peer` also collect counters from the isolated BEAM
+test nodes before they stop. The report includes the same measured modules on
+each node.

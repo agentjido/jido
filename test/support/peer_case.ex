@@ -11,6 +11,8 @@ defmodule JidoTest.PeerCase do
 
   using do
     quote do
+      @moduletag :peer
+
       import JidoTest.Eventually
 
       import JidoTest.PeerCase,
