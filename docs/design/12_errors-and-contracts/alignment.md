@@ -1,15 +1,15 @@
-> Completed seam alignment. This document is pending user approval.
+> Approved seam alignment. Dependent owner-seam follow-up remains open.
 
 # Errors and public contracts alignment
 
 ## Status
 
-- Design reviewed: 2026-09-09. User approval remains pending.
+- Design reviewed and approved: 2026-09-09.
 - Code base: error-contract alignment commit `3e504be6` on branch `v3-spike`.
 - Approved prerequisite: [00 Overview](../00_overview/alignment.md).
 - Narrow pending prerequisite: [90 Package boundaries](../90_package-boundaries/alignment.md)
   for package ownership only.
-- Alignment state: `Foundational implementation complete; pending user approval`.
+- Alignment state: `Approved; foundational implementation complete`.
 
 The review-status table in `docs/design/README.md` is the source of truth for
 document approval.

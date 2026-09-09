@@ -1,8 +1,8 @@
-> Aligned target seam design. This document is pending user approval.
+> Approved target seam design. Dependent owner-seam details remain open.
 
 # Errors and public contracts design
 
-The requirements and decisions in this document are ready for user review. The
+The requirements and decisions in this document are approved. The
 [design review index](../README.md#document-review-status) is the source of
 truth for approval.
 

@@ -1,5 +1,4 @@
-> Seam review entry point. The aligned implementation is complete. This
-> document is pending user approval.
+> Approved seam review entry point. Dependent owner-seam work remains open.
 
 # 12 — Errors and public contracts
 
@@ -9,7 +8,7 @@ This seam defines how Jido carries a failure across a public boundary. It also
 records the public success shapes, raw protocol controls, error projection, and
 portable-value rule that other seams use.
 
-The contract and its implementation evidence are ready for user review.
+The contract and its implementation evidence are approved.
 
 The audit rejected two proposed error classes. Jido does not need a
 `:persistence` class or a `:runtime` class now. Persistence and runtime are

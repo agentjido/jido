@@ -1,8 +1,8 @@
-> Aligned target seam design. This document is pending user approval.
+> Approved target seam design. Dependent owner-seam details remain open.
 
 # Agent authoring design
 
-The requirements and decisions in this document are ready for user review.
+The requirements and decisions in this document are approved.
 The [design review index](../README.md#document-review-status) is the source of
 truth for approval. Pending package-boundary and shared-error details are
 explicit assumptions for this contract. A later conflict requires a reviewed

@@ -1,5 +1,4 @@
-> Seam review entry point. The aligned implementation is complete. This
-> document is pending user approval.
+> Approved seam review entry point. Dependent owner-seam work remains open.
 
 # 02 — Agent authoring
 
@@ -15,7 +14,7 @@ now preserves the Agent `vsn`, starts Builder module input from
 `agent/0`, encodes instances from their neutral definitions, and publishes the
 pure data extension lowerer. One requirement-mapped suite proves the common
 definition and instance boundary for keyword-only and Spark-block modules. The
-contract and its implementation evidence are ready for user review.
+contract and its implementation evidence are approved.
 
 The Overview and Agent prerequisite seams are approved. Package-boundary and
 shared-error work remain explicit assumptions and still require their own
