@@ -107,6 +107,5 @@ calls.
 
 In this repository, `mix quality` runs core tests and the static checks.
 Benchmark tests and example tests are secondary. Run `mix benchmarks --seed 0`
-or `mix examples --seed 0` separately when needed. Three deferred live-upgrade
-assertions remain skipped. They do not block the selected core candidate, and
-their assertions remain.
+or `mix examples --seed 0` separately when needed. All example assertions,
+including the bounded live-upgrade contracts, pass without skips.

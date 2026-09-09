@@ -35,15 +35,14 @@ Run examples separately when needed:
 mix examples --seed 0
 ```
 
-Three research tests are skipped. They describe active-Turn revision pinning,
-live definition migration, and live Topology replacement. Each skip names the
-missing feature, and the original assertion remains. See the
-[research results](../test/examples/99_research/README.md). These deferred live
-upgrade contracts do not block the selected core candidate.
+All research example tests pass without skips. They include the explicit
+quiescent upgrade boundary, validated definition migration, and additive local
+Topology update. See the
+[research results](../test/examples/99_research/README.md).
 
-The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) has 52 fixtures and ten
-additional application scenarios. Source files live in `examples/`; tests live
-in `test/examples/`. Production builds and the Hex package exclude both trees.
+The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) has 62 main fixtures and
+16 research probes. Source files live in `examples/`; tests live in
+`test/examples/`. Production builds and the Hex package exclude both trees.
 Local development and test builds compile the source examples so demos and
 shared core regression fixtures remain available.
 Deterministic model adapters and local HTTP/SSE tests require no provider key.

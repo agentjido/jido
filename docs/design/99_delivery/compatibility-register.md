@@ -19,7 +19,9 @@ or removed V3 API.
 | Turn routing | Changed from an earlier beta | The first target in Router order wins. Selection uses the unchanged source Signal before Plugin preparation. |
 | Durable records | Added and versioned | Compatible unnamed keys use outer format 2. Namespaced Ref keys use outer format 3. Supported V3 outer format-1 active records remain readable. |
 | Agent Server activation | Strengthened | Initial durable creation completes before public readiness. A required write error removes write authority and stops the activation. |
+| Agent Server upgrade | Added | `upgrade/2` and `upgrade/3` serialize a zero-arity operation at idle. Definition replacement validates complete migrated state, preserves identity and Plugin declarations, and advances one checkpoint revision. |
 | Topology Plugin planning | Added | Contributions are pure plan input. They cannot start processes, persist state, or grant authority. |
+| Topology target update | Added | `Jido.Topology.Controller.update/3` accepts additive local Agent entries. Existing Agent specifications and resources must remain identical. |
 | Semantic observation | Added | Version-1 events and bounded metadata exist beside legacy observation paths. |
 | Existing V3 public APIs | Retained | No removal or deprecation is approved. |
 
@@ -36,9 +38,15 @@ or removed V3 API.
 - A failed state commit keeps the prior committed Agent state. Jido cannot undo
   external I/O that an Action or Flow completed before that failure.
 
-## Unsupported transitions
+## Bounded and unsupported transitions
 
-This candidate does not claim active-Turn code revision pinning, live Agent
-definition migration, live Topology target replacement, cluster-exclusive
-ownership, automatic failover, or a built-in OpenTelemetry bridge. The
-[scope ledger](scope-ledger.md) gives each item an owner and review point.
+The quiescent operation does not pin arbitrary BEAM loads. Agent definition
+migration does not change Plugin declarations or migrate private Server or
+Plugin runtime state. A cross-module durable migration needs a stable namespace
+key. Topology updates add local Agents only; removal, changed Agent definitions,
+resource changes, placement, and ownership transfer require controller
+replacement or another control plane.
+
+This candidate does not claim cluster-exclusive ownership, automatic failover,
+or a built-in OpenTelemetry bridge. The [scope ledger](scope-ledger.md) gives
+each excluded or deferred item an owner and review point.

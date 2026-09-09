@@ -10,10 +10,13 @@ consumer, and four delivery records. The package uses published Hex sources for
 Agents, Agent Servers, persistence, and Topology together with Signal, Agent Ref,
 durable storage, and instance operations.
 
-The candidate does not claim Jido AI, Jido Browser, a distributed control plane,
-an OpenTelemetry bridge, or live code and Topology upgrades. These items have
-explicit dispositions in the scope ledger. Publication still needs a human
-release decision and an exact-commit CI result.
+The candidate includes an explicit quiescent Agent Server upgrade boundary,
+validated Agent definition migration, and additive local Topology target
+updates. It does not claim arbitrary BEAM code pinning, Plugin runtime or
+private Server-state migration, destructive Topology updates, Jido AI, Jido
+Browser, a distributed control plane, or an OpenTelemetry bridge. These limits
+have explicit dispositions in the scope ledger. Publication still needs a
+human release decision and an exact-commit CI result.
 
 ## Boundary
 
@@ -32,9 +35,16 @@ release decision and an exact-commit CI result.
 | Plugin seam | The public package consumer uses the four owner facets without private Jido APIs. |
 | Runtime floor | Elixir 1.18.5 and OTP 27.3.4.12 core tests pass. |
 | Current runtime | Elixir 1.20.3 and OTP 29.0.5 are used for the final local gates. |
-| Research | 42 checks pass. Three live-upgrade checks remain skipped. |
+| Research | 48 checks pass. No research check is skipped. |
 | Core exclusion | `DIST-03` remains excluded because core does not claim cluster-exclusive ownership. |
 | Publication | Not performed. Exact-commit CI and human approval remain external gates. |
+
+## Example contract classification
+
+| Class | Examples | Ownership |
+| --- | --- | --- |
+| Core capability | Agent observation, causal trace, durable scheduling, remote child placement, remote lifecycle, checkpoint identity, checkpoint portability, indeterminate writes, and bounded live upgrades | Jido provides and tests the behavior. |
+| Application extension pattern | Recoverable delivery and pending-job recovery | Jido provides commit, persistence, Plugin runtime, and restart primitives. The application owns effect IDs, idempotency, approval, retry, and cancellation policy. |
 
 ## Records
 

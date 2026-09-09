@@ -7,7 +7,7 @@
 - Alignment date: 2026-09-09.
 - Candidate branch: `v3-spike`.
 - Candidate identity: the commit that contains this record, with parent
-  `66c4d054`.
+  `84dc2dc9`.
 - Alignment state: `Implemented locally; external release approval pending`.
 - Package scope: Jido, `jido_action`, and `jido_signal` only.
 
@@ -24,8 +24,8 @@ text and code differ.
 | Agent identity | Public Agent Ref construction, serialization, local resolution, persistence identity, and facade operations pass. | `Proven` |
 | Turn and commit | Source-Signal selection is fixed, write authority fails closed, and execution-only context does not enter post-commit Directive work. | `Proven` |
 | Persistence | Versioned records, initial writes, compare-and-swap, tombstones, collision checks, Plugin conversion, and restore pass. | `Proven` |
-| Agent Server | Admission, execution, commit, Plugin runtime reconstruction, readiness, failure, and settlement pass. | `Proven` |
-| Topology | Static local planning, Plugin contribution, activation, readiness, and repair pass. | `Proven` |
+| Agent Server | Admission, execution, commit, Plugin runtime reconstruction, readiness, failure, settlement, quiescent upgrade, and validated definition migration pass. | `Proven` |
+| Topology | Static local planning, Plugin contribution, activation, readiness, repair, and additive target update pass. | `Proven` |
 | Errors and observation | The code registry is closed. Semantic lifecycle, Turn, persistence, and Topology events have bounded metadata and default consumers. | `Proven` |
 | Package source | Production dependencies use published Hex packages. The unpacked Jido candidate passes a separate public consumer. | `Proven` |
 | Compatibility | No API is deprecated or removed. Stored-data, downgrade, rollback, and live-upgrade limits are explicit. | `Proven` |
@@ -38,9 +38,9 @@ text and code differ.
 | `DEL-REQ-010` to `DEL-REQ-017` | `Proven locally` | Quality, coverage, docs, package, benchmark, example, and two-runtime results. |
 | `DEL-REQ-018` | `External gate` | Exact-commit CI needs a published remote commit. No local result claims this gate. |
 | `DEL-REQ-019` and `DEL-REQ-020` | `Proven` | Evidence is bound to the containing commit and its recorded parent. |
-| `DEL-REQ-021` to `DEL-REQ-024` | `Proven` | Three research skips are deferred. `DIST-03` is excluded. Each test keeps its ID and reason. |
+| `DEL-REQ-021` to `DEL-REQ-024` | `Proven` | UP-01, UP-02, and UP-07 pass. `DIST-03` is the only excluded assertion and keeps its ID and reason. |
 | `DEL-REQ-025` to `DEL-REQ-033` | `Proven` | Public guides, package metadata, examples, and the compatibility register agree. |
-| `DEL-REQ-034` to `DEL-REQ-038` | `Bounded` | V2 import and downgrade are not claimed. Live upgrade is deferred. The guide states each boundary. |
+| `DEL-REQ-034` to `DEL-REQ-038` | `Bounded` | V2 import and downgrade are not claimed. Quiescent Agent upgrade, validated definition migration, and additive local Topology update have executable proof. The guide states the limits. |
 | `DEL-REQ-039` | `Proven` | Public docs state that Jido cannot undo external work completed before a failed commit. |
 | `DEL-REQ-040` | `Proven` | This seam contains gates and records, not a task backlog. |
 | `DEL-REQ-041` and `DEL-REQ-042` | `Satisfied by execution` | The user directed implementation. Repository instructions did not permit use of a planning skill. Commits and records provide traceability. |

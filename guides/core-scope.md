@@ -10,11 +10,11 @@ guide and the public module documentation when you build an extension.
 | --- | --- |
 | Agent values | Immutable definitions and instances, validated state, Actions, Flows, and Directives. Direct commands return a candidate; a live Server commits it. |
 | Authoring | Declarative modules, map and keyword declarations, Builder, and trusted Codecs share core validation. These forms remain supported. |
-| Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. |
+| Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. An explicit upgrade operation waits for idle; validated definition migration preserves identity and Plugin declarations. |
 | Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
 | Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
-| Topology | Pure definitions and plans, ordered static Plugin contribution, bounded local activation, readiness, same-target repair, and cleanup. |
+| Topology | Pure definitions and plans, ordered static Plugin contribution, bounded local activation, readiness, same-target repair, additive local Agent updates, and cleanup. |
 
 An extension uses these public APIs and the selection rules in the
 [extension-boundaries guide](extension-boundaries.md).
@@ -88,13 +88,20 @@ to wait for completion and `status/2` to inspect errors. Requests during an
 active pass produce one follow-up pass. They share the controller's startup
 concurrency limit. Healthy Agents retain their PIDs and committed state.
 
+Use `Jido.Topology.Controller.update/3` to add local Agent entries to a ready
+controller. The Topology ID, resources, and all existing Agent specifications
+must stay identical. The new target becomes the source for later repair passes.
+Removal, changed definitions, resource changes, placement, and ownership
+transfer require controller replacement or another control plane.
+
 The independent topology example stops one Agent. In manual mode, it remains
 stopped until the application requests repair. The other Agent keeps its PID
 and state. See the
 [example test](https://github.com/agentjido/jido/blob/v3-spike/test/examples/07_topology/07_01_independent/independent_test.exs).
 
-This operation repairs the existing target. Live definition changes, topology
-resizing, placement, and ownership transfer require separate contracts.
+This operation repairs the existing target. Use `update/3` for additive local
+growth. Destructive changes, placement, and ownership transfer require separate
+contracts.
 
 ## Deferred scope
 
@@ -106,12 +113,12 @@ Future package names describe possible ownership, not implemented packages:
 | Membership, placement, rebalance, and failover | A cluster extension such as `jido_cluster`. Durable authority must come from storage or an explicit authority service. |
 | Transport gateways, authentication, and durable inboxes | A transport extension such as `jido_fabric`. |
 | Catch-up queues, backoff, and scheduling policy | An application or Scheduler extension, with a failing integration example before another core control is added. |
-| Agent migration and live topology updates | A separate design and acceptance pass. A repair request does not implement an upgrade. |
+| Private Server or Plugin runtime migration and destructive Topology updates | A separate design and acceptance pass. Core upgrade keeps Plugin declarations fixed, and Topology update adds local Agents only. |
 
-The research suite still records missing proposed contracts for replacement
-Init, stable namespace identity, durable deletion, Turn revision isolation,
-and live upgrades. Source-Signal route selection and Plugin input isolation now
-pass. See the current
+The research suite records executable contracts for replacement Init, stable
+namespace identity, durable deletion, the explicit quiescent upgrade boundary,
+validated Agent definition migration, and additive Topology updates. It also
+proves source-Signal route selection and Plugin input isolation. See the current
 [research test matrix](../test/examples/99_research/README.md).
 The distributed authority example uses an explicit external authority; it does
 not prove that core elects one cluster owner.
@@ -138,7 +145,6 @@ mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
   test/examples/08_applications --include example --seed 0
 ```
 
-Run all examples separately with `mix examples --seed 0`. Three deferred
-live-upgrade tests remain skipped, with their assertions retained. See the
+Run all examples separately with `mix examples --seed 0`. All example tests
+pass without skips. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
-Passing core tests do not prove these deferred contracts.

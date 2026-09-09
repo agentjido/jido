@@ -180,7 +180,7 @@ mix test test/examples/99_research/99_03_input_resource_lifecycle/runtime_recons
 
 mix test test/examples/99_research --include example --seed 0
 
-42 passed, 3 skipped
+48 passed
 
 mix quality
 
@@ -188,9 +188,8 @@ mix quality
 ```
 
 The distributed skip is the explicit non-guarantee for one exclusive cluster
-owner. The three research skips are the deferred live Turn, state, and
-Topology upgrade contracts. The documentation warning gate and diff check
-also passed.
+owner. The live Turn, state, and additive Topology upgrade research contracts
+pass without skips. The documentation warning gate and diff check also passed.
 
 ## Completion criteria
 

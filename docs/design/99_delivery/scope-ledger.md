@@ -28,10 +28,10 @@ not a gate exception.
 | 05 Plugins | `PLG-REQ-001` to `PLG-REQ-076` | None | None |
 | 06 Commit and effects | `COMMIT-REQ-001` to `COMMIT-REQ-044` | None | None |
 | 07 Persistence | `PERS-REQ-001` to `PERS-REQ-051` | None | None |
-| 08 Agent Server | `SRV-REQ-001` to `SRV-REQ-065` | None | None |
+| 08 Agent Server | `SRV-REQ-001` to `SRV-REQ-076` | None | None |
 | 09 Jido instance | `INST-REQ-001` to `INST-REQ-056` | None | None |
 | 10 Runtime topology | `RT-REQ-001` to `RT-REQ-051` | None | None |
-| 11 Topology control plane | `TOP-REQ-001` to `TOP-REQ-005`; `TOP-REQ-059`, `TOP-REQ-060`; `TOP-REQ-062` to `TOP-REQ-068` | `TOP-REQ-006` to `TOP-REQ-058`; `TOP-REQ-061` | None |
+| 11 Topology control plane | `TOP-REQ-001`; `TOP-REQ-003` to `TOP-REQ-005`; `TOP-REQ-059`, `TOP-REQ-060`; `TOP-REQ-062` to `TOP-REQ-076` | `TOP-REQ-006` to `TOP-REQ-058`; `TOP-REQ-061` | `TOP-REQ-002` is retired by its owner design. |
 | 12 Errors and contracts | `ERR-REQ-001` to `ERR-REQ-018`; `ERR-REQ-020` to `ERR-REQ-024` | None | `ERR-REQ-019` is retired by its owner design. |
 | 13 Observability | `OBS-REQ-001` to `OBS-REQ-020`; `OBS-REQ-022` to `OBS-REQ-043`; `OBS-REQ-046`; `OBS-REQ-048` to `OBS-REQ-054`; `OBS-REQ-056`, `OBS-REQ-057` | `OBS-REQ-021`; `OBS-REQ-044`, `OBS-REQ-045`, `OBS-REQ-047`, `OBS-REQ-055` | None |
 | 90 Package boundaries | `PKG-REQ-001` to `PKG-REQ-005`; `PKG-REQ-007` to `PKG-REQ-030`; `PKG-REQ-034` to `PKG-REQ-038` | `PKG-REQ-031`, `PKG-REQ-032`, `PKG-REQ-039` | `PKG-REQ-006`, `PKG-REQ-033` for this core-only claim |
@@ -51,7 +51,15 @@ not a gate exception.
 
 | Assertion | Status | Owner | Reason and user effect | Review point |
 | --- | --- | --- | --- | --- |
-| `UP-01` | Deferred | Turn and runtime owners | An active Turn does not pin a BEAM code revision. Stop work before a code change when this guarantee is required. | Review with an executable active-Turn transition and failure recovery. |
-| `UP-02` | Deferred | Agent Server owner | A live Agent definition has no automatic state migration. Stop and restore through an application conversion. | Review with versioned state conversion and rollback proof. |
-| `UP-07` | Deferred | Topology owner | A Controller repairs one fixed target. It does not apply a live target update. | Review with a versioned update, recovery, and rollback contract. |
 | `DIST-03` | Excluded | Future distributed authority owner | Core does not guarantee one live owner across a cluster. Applications that need this must supply fenced external authority. | Review with enforceable epochs at every protected commit. |
+
+UP-01, UP-02, and UP-07 are implemented and are release-required evidence.
+Their assertions pass without skip tags.
+
+## Example contract classification
+
+| Contract | Status | Owner and limit |
+| --- | --- | --- |
+| OBS-01, OBS-02, REC-03, DIST-01, DIST-02, PERSIST-01, PERSIST-02, PERSIST-03, UP-01, UP-02, and UP-07 | Core capability | Jido owns the bounded behavior proved by core and example tests. |
+| REC-01 recoverable delivery | Application extension pattern | Core commits and restores Plugin intent. The application owns stable effect IDs, sink idempotency, retry interval, and retention. |
+| REC-02 pending-job recovery | Application extension pattern | Core restores approved state and owned runtimes. The application owns approval, attempt identity, retry, and cancellation policy. |

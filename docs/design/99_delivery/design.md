@@ -244,6 +244,6 @@ evidence record names.
 | `DEL-DEC-003` | Who can accept a gate exception? | Name one gate-exception owner who is not the command result itself. | Exceptions have explicit human authority and expiry. |
 | `DEL-DEC-004` | Which skips can remain? | Permit only requirements that the approved scope ledger defers or excludes. | No release-required behavior is hidden by a skip. |
 | `DEL-DEC-005` | What is the default compatibility policy? | Keep supported V3 APIs until an owner approves a version-bounded deprecation and its removal gate. | Additive migration remains the default. |
-| `DEL-DEC-006` | Are live upgrade features a V3 release gate? | Defer live Agent and Topology upgrade unless the release scope adds them. | Current skipped upgrade probes do not block the core candidate. |
+| `DEL-DEC-006` | Which live upgrade features are a V3 release gate? | Require the explicit quiescent Agent Server boundary, validated same-Plugin Agent definition migration, and additive local Topology updates. | UP-01, UP-02, and UP-07 must pass. Arbitrary code pinning, private runtime migration, and destructive Topology updates remain outside the claim. |
 | `DEL-DEC-007` | What rollback claim applies to stored data? | Require rollback proof for each supported path; otherwise state the irreversible boundary. | Documentation cannot imply an unproved downgrade. |
 | `DEL-DEC-008` | How fresh must evidence be? | Run final gates on the exact candidate commit and package revisions with a clean or fully recorded worktree. | Old reports remain historical context only. |

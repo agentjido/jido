@@ -106,7 +106,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Jido V3 library vision](VISION.md) | Pending approval |
 | [Overview briefing](00_overview/README.md) | Approved |
 | [Overview design](00_overview/design.md) | Approved |
-| [Overview alignment](00_overview/alignment.md) | Approved |
+| [Overview alignment](00_overview/alignment.md) | Pending approval |
 | [Agent briefing](01_agent/README.md) | Approved |
 | [Agent design](01_agent/design.md) | Approved |
 | [Agent alignment](01_agent/alignment.md) | Approved |
@@ -136,7 +136,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |
 | [Runtime topology briefing](10_runtime-topology/README.md) | Selected and implemented |
 | [Runtime topology design](10_runtime-topology/design.md) | Selected and implemented |
-| [Runtime topology alignment](10_runtime-topology/alignment.md) | Implemented |
+| [Runtime topology alignment](10_runtime-topology/alignment.md) | Pending approval |
 | [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
 | [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
 | [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
@@ -149,9 +149,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Package boundaries briefing](90_package-boundaries/README.md) | Approved |
 | [Package boundaries design](90_package-boundaries/design.md) | Approved |
 | [Package boundaries alignment](90_package-boundaries/alignment.md) | Approved |
-| [Delivery briefing](99_delivery/README.md) | Implemented locally |
-| [Delivery design](99_delivery/design.md) | Selected and implemented |
-| [Delivery alignment](99_delivery/alignment.md) | Implemented locally; release approval pending |
+| [Delivery briefing](99_delivery/README.md) | Pending approval |
+| [Delivery design](99_delivery/design.md) | Pending approval |
+| [Delivery alignment](99_delivery/alignment.md) | Pending approval |
 
 ## Delivery evidence
 

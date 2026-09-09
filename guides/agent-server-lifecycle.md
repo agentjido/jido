@@ -68,6 +68,22 @@ An idle Server with persistence can save and stop through `hibernate/2`. A later
 available during active Turn work. An active record does not mean that a Server
 is live. Normal durable delete uses a tombstone, not a hibernated record kind.
 
+## Explicit Upgrade Boundary
+
+Use `Jido.AgentServer.upgrade/2` to run a zero-arity installation operation
+after the Server becomes idle. An upgrade request waits behind active Turn and
+Directive work. Signals that arrive after the request remain behind it in the
+Server event order. This operation coordinates installation; it does not pin
+arbitrary BEAM module loads.
+
+Use `Jido.AgentServer.upgrade/3` to migrate the committed Agent to a target
+module. The migration receives the current Agent and returns one complete state
+map. The target must keep the same Agent identity and Plugin declarations. Jido
+validates and checkpoints the target before it becomes visible, then advances
+the state version once. Cross-module durable migration requires a stable Jido
+namespace key. This operation does not migrate private Server state or Plugin
+runtime structure.
+
 See [Calls, Casts, And Requests](calls-casts-and-requests.livemd),
 [Runtime State And Debugging](runtime-state-and-debugging.livemd), and
 [Compare And Swap, Hibernate, And Thaw](compare-and-swap-hibernate-and-thaw.md).

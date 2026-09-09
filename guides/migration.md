@@ -432,8 +432,9 @@ values to application-owned history values before restore.
 
 **Check:** restore a real backup, test stale and uncertain writes, and confirm
 that no runtime-only values entered stored state. Definition revision checks,
-durable deletion fencing, and live schema upgrades have unmet research tests;
-do not use them as migration guarantees. See
+durable deletion fencing, and the bounded live definition migration contract
+have executable tests. Do not infer private runtime migration or arbitrary
+code-revision pinning from those tests. See
 [Portable State and Checkpoints](portable-state-and-checkpoints.md) and
 [Limits and Performance](limits-and-performance.md).
 
@@ -476,11 +477,12 @@ is above the 90% release threshold. Example acceptance tests are secondary;
 run `mix examples --seed 0` separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
-The remaining three skipped research assertions concern active-Turn revision
-pinning, live definition migration, and live Topology updates. Stable Agent
-identity, durable deletion, Plugin runtime reconstruction, source-Signal route
-selection, and Plugin input isolation pass. Cluster-exclusive ownership remains
-unsupported. See [Test Agents and Plugins](test-agents-and-plugins.livemd).
+All research example assertions pass. They include the quiescent upgrade
+boundary, validated live definition migration, and additive local Topology
+updates. Stable Agent identity, durable deletion, Plugin runtime reconstruction,
+source-Signal route selection, and Plugin input isolation also pass.
+Cluster-exclusive ownership remains unsupported. See
+[Test Agents and Plugins](test-agents-and-plugins.livemd).
 
 The delivery record contains the local runtime, lint, Dialyzer, docs, package,
 example, benchmark, and public-consumer checks. Publication still needs an
