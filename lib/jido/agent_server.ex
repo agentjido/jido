@@ -555,7 +555,8 @@ defmodule Jido.AgentServer do
 
       error =
         Error.timeout_error("Agent Plugin readiness timed out",
-          timeout: data.readiness_timeout
+          timeout: data.readiness_timeout,
+          details: %{code: :plugin_callback_timeout, callback: :await_ready}
         )
 
       {:stop, {:shutdown, {:plugin_readiness_failed, error}}, %{data | plugin_bootstrap: nil}}
@@ -938,7 +939,7 @@ defmodule Jido.AgentServer do
 
     error =
       Error.execution_error("Agent Plugin admission task exited",
-        details: %{reason: reason}
+        details: %{code: :plugin_callback_task_failed, callback: :admit, reason: reason}
       )
 
     fail_turn(error, :prepare, data)
@@ -956,7 +957,11 @@ defmodule Jido.AgentServer do
     error =
       Error.timeout_error("Agent Plugin admission timed out",
         timeout: data.directive_timeout,
-        details: %{turn_id: data.active.turn_id}
+        details: %{
+          code: :plugin_callback_timeout,
+          callback: :admit,
+          turn_id: data.active.turn_id
+        }
       )
 
     fail_turn(error, :prepare, data)
@@ -1003,7 +1008,7 @@ defmodule Jido.AgentServer do
 
     error =
       Error.execution_error("Agent Plugin Directive task exited",
-        details: %{reason: reason}
+        details: %{code: :plugin_callback_task_failed, callback: :dispatch, reason: reason}
       )
 
     complete_directive({:error, error, data}, pending.rest, pending.context, pending.span, :exit)
@@ -1023,7 +1028,11 @@ defmodule Jido.AgentServer do
     error =
       Error.timeout_error("Agent Directive timed out",
         timeout: data.directive_timeout,
-        details: %{turn_id: data.active.turn_id}
+        details: %{
+          code: :plugin_callback_timeout,
+          callback: :dispatch,
+          turn_id: data.active.turn_id
+        }
       )
 
     complete_directive({:error, error, data}, pending.rest, pending.context, pending.span)
@@ -1168,7 +1177,11 @@ defmodule Jido.AgentServer do
       error =
         Error.timeout_error("Agent Exec callback timed out",
           timeout: adapter.timeout,
-          details: %{module: adapter.module, callback: callback}
+          details: %{
+            code: :agent_exec_callback_timeout,
+            module: adapter.module,
+            callback: callback
+          }
         )
 
       fail_turn(error, :execute, data)
@@ -1191,7 +1204,11 @@ defmodule Jido.AgentServer do
 
     error =
       Error.execution_error("Agent Exec adapter owner exited",
-        details: %{module: adapter.module, reason: reason}
+        details: %{
+          code: :agent_exec_callback_task_failed,
+          module: adapter.module,
+          reason: reason
+        }
       )
 
     fail_turn(error, :execute, data)

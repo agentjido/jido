@@ -100,8 +100,10 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     waiter_ref = Process.monitor(waiter)
     runtime_ref = Process.monitor(runtime)
 
-    assert {:error, {:plugin_readiness_failed, %Jido.Error.TimeoutError{timeout: 50}}} =
+    assert {:error, {:plugin_readiness_failed, %Jido.Error.TimeoutError{timeout: 50} = error}} =
              Task.await(starter, 2_000)
+
+    assert Jido.Error.code(error) == :plugin_callback_timeout
 
     assert_receive {:DOWN, ^waiter_ref, :process, ^waiter, _reason}, 2_000
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000

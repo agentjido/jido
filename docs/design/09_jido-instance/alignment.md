@@ -334,7 +334,7 @@ No removal or deprecation is approved in this seam.
 | --- | --- | --- | --- | --- |
 | `INST-BLK-001` | `Blocker` | 00 Overview | Local runtime, stable Ref, compatibility, and topology limits are pending approval. | Approve them or replace them with explicit instance assumptions. |
 | `INST-BLK-002` | `Blocker` | 90 Package boundaries | Core, cluster, durable, transport, and extension ownership are pending approval. | Approve or change the package boundary. |
-| `INST-BLK-003` | `Blocker` | 12 Errors and contracts | Instance error codes and the protocol-value registry are pending. | Approve them before Ref facade result types close. |
+| `INST-BLK-003` | `Owner dependency` | 12 Errors and contracts and 09 Jido instance | The current instance protocol values are registered and shared conversion rules are pending seam-12 approval. Exact future Ref-facade results stay with seam 09. | Approve seam 12, then define the Ref-facade result migration in seam 09. |
 | `INST-BLK-004` | `Blocker` | 03 Agent identity | Core Ref, binary partition conversion, equality, and portable encoding do not exist. | Approve the Ref and migration rules. |
 | `INST-BLK-005` | `Blocker` | 07 Persistence | Ref keys, legacy reads, collision checks, tombstones, and persistence-operation limits are not approved. | Approve record migration and lifecycle before durable Ref operations. |
 | `INST-BLK-006` | `Blocker` | 08 Agent Server | Initial durable create, all-write-error authority loss, and final public error meanings are not implemented. | Align Server readiness and failure behavior with seam 07. |

@@ -372,7 +372,7 @@ No deprecation or removal is approved in this seam.
 | `PKG-BLK-007` | `Assumption` | Future package owners | Durable, cluster, and transport names are working names only. | Add package designs and evidence before an availability claim. |
 | `PKG-BLK-008` | `Blocker` | `jido_browser`, 99 Delivery | The current browser manifest selects V2 Jido packages. | Supply a tested V3 dependency set. |
 | `PKG-BLK-009` | `Blocker` | 99 Delivery | No public-only external fixture or complete V3 matrix exists. | Define and pass both release gates. |
-| `PKG-BLK-010` | `Assumption` | 12 Errors and contracts | Existing public maps, tuples, atoms, PIDs, and names can remain documented protocol values during migration. | Complete the seam-12 public contract inventory. |
+| `PKG-BLK-010` | `Resolved evidence; pending approval` | 12 Errors and contracts | Seam 12 inventories existing public maps, tuples, atoms, PIDs, names, failure positions, and compatibility dispositions. | Confirm the inventory when seam 12 is approved. |
 
 ## Completion criteria
 

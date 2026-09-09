@@ -534,14 +534,39 @@ defmodule Jido.Agent do
 
   defp invoke_persistence_callback(callback, fun) do
     case fun.() do
-      {:ok, value} -> {:ok, value}
-      {:error, reason} -> {:error, reason}
-      value -> {:error, {callback, :invalid_return, value}}
+      {:ok, value} ->
+        {:ok, value}
+
+      {:error, reason} ->
+        {:error, reason}
+
+      value ->
+        {:error,
+         Error.validation_error("Agent #{callback}/2 returned an invalid result",
+           kind: :config,
+           details: %{
+             code: :agent_invalid_callback_result,
+             callback: callback,
+             result: value
+           }
+         )}
     end
   rescue
-    error -> {:error, {callback, :raised, error}}
+    error -> persistence_callback_error(callback, :error, error)
   catch
-    kind, reason -> {:error, {callback, kind, reason}}
+    kind, reason -> persistence_callback_error(callback, kind, reason)
+  end
+
+  defp persistence_callback_error(callback, kind, reason) do
+    {:error,
+     Error.execution_error("Agent #{callback}/2 failed",
+       details: %{
+         code: :agent_callback_failed,
+         callback: callback,
+         kind: kind,
+         reason: reason
+       }
+     )}
   end
 
   defp validate_checkpoint(checkpoint, module) do

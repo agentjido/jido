@@ -25,7 +25,7 @@ prerequisite seam below.
 | --- | --- |
 | [00 Core model](../00_overview/alignment.md) | Direct evaluation has no Agent runtime event. The live result, settlement, privacy, observer-failure, and compatibility invariants stay separate. |
 | [90 Package boundaries](../90_package-boundaries/alignment.md) | Jido owns semantic Agent observation. Lower packages own their execution and Signal contracts. Hosts own vendor infrastructure. |
-| [12 Errors and contracts](../12_errors-and-contracts/alignment.md) | Current error map version 1 stays supported. Target error version 2 is pending. Telemetry can use a smaller safe projection. |
+| [12 Errors and contracts](../12_errors-and-contracts/alignment.md) | The exact error map version 1 stays supported. Stable Jido codes use `Jido.Error.code/1`. No version 2 is planned without a named consumer. Telemetry can keep its smaller safe projection. |
 | [01 Agent](../01_agent/alignment.md) | An Agent is a pure value. Direct `cmd/3` does not make a live commit. |
 | [03 Agent identity](../03_agent-identity/alignment.md) | Target correlation identity is the complete Agent Ref namespace, partition, and ID. The Ref is not implemented. |
 | [04 Turn evaluation](../04_turn-evaluation/alignment.md) | Public observation must not make private evaluation stages or Plugin callbacks stable. |
@@ -124,7 +124,7 @@ prerequisite seam below.
 | `OBS-GAP-006` | `OBS-REQ-027`, `OBS-REQ-028` | Current identity is instance, partition, and ID. | Agent Ref and namespace are not implemented; target field names are not approved. | `Blocked` on seam 03 and `OBS-DEC-002` |
 | `OBS-GAP-007` | `OBS-REQ-030` to `OBS-REQ-032` | Signal carrier and causal metadata work across tested local and known-node paths. | Jido-owned Tasks do not have one explicit OpenTelemetry context-transfer contract. | `Partial`; add owner-bound transfer tests |
 | `OBS-GAP-008` | `OBS-REQ-033` to `OBS-REQ-036` | Agent semantic events have a strict allowlist. | New event families and older `Jido.Observe` paths do not share this projection. | `Partial`; apply contract only to semantic families |
-| `OBS-GAP-009` | `OBS-REQ-035` | Current semantic projection has error type and retryability. | Target error class and code depend on pending error map version 2. | `Blocked` on seam 12 migration |
+| `OBS-GAP-009` | `OBS-REQ-035` | Current semantic projection has error type and retryability. Stable Jido codes are available through `Jido.Error.code/1`. | No public error-class projection exists, and no version-2 consumer was found. | `Owner decision`; add a semantic code only where an event consumer requires it |
 | `OBS-GAP-010` | `OBS-REQ-037`, `OBS-REQ-038` | Three old Agent Server metrics exist. | No default metric uses the semantic catalog. Current metrics tag `jido_instance`. | `Replace after parity`; do not remove first |
 | `OBS-GAP-011` | `OBS-REQ-039`, `OBS-REQ-040` | The old log consumer and configuration work. | No semantic logger or four-mode semantic policy exists. | `Replace after parity` |
 | `OBS-GAP-012` | `OBS-REQ-041` to `OBS-REQ-043` | Agent semantic emission and Agent Server wrappers contain observer faults. | Public `Jido.Observe` strict mode can still make a tracer failure visible to its caller. | `Compatibility exception`; do not use strict mode for semantic runtime emission |
@@ -285,7 +285,7 @@ This sequence defines outcomes and gates. It is not an implementation plan.
 | `OBS-BLK-002` | `Blocker` | 03 Agent identity | `%Jido.Agent.Ref{}` and target namespace are not implemented. | Approve seam 03 and field names in `OBS-DEC-002`. |
 | `OBS-BLK-003` | `Decision` | 07, 08, 13 | Hibernate and thaw are distinct lifecycle operations; create/delete are persistence facts. | Approve or change `OBS-DEC-003`. |
 | `OBS-BLK-004` | `Decision` | 04, 06, 08, 13 | The bounded status and stage tables are the public observation vocabulary. | Approve or change `OBS-DEC-004`. |
-| `OBS-BLK-005` | `Blocker` | 12 Errors | Error class and code depend on error map version 2. | Approve the error migration before these fields become required. |
+| `OBS-BLK-005` | `Owner dependency` | 12 Errors and 13 Observability | Seam 12 keeps exact projection v1 and provides `Jido.Error.code/1`; it rejects an unused version 2. | Decide in seam 13 whether a named semantic event needs a code. Do not require an error class or a new projection without consumer proof. |
 | `OBS-BLK-006` | `Decision` | This seam | Semantic log modes replace current consumer configuration only after parity. | Approve or change `OBS-DEC-005`. |
 | `OBS-BLK-007` | `Decision` | 13 and host | An optional bridge belongs in Jido; the host owns OpenTelemetry infrastructure. | Approve or change `OBS-DEC-006`. |
 | `OBS-BLK-008` | `Decision` | 06, 08, 13 | The OpenTelemetry Turn span end is unresolved. | Select live result or settlement in `OBS-DEC-007`. |

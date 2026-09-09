@@ -149,7 +149,7 @@ defmodule Jido.Agent.Command.Runner do
   defp normalize_exec_result(result) do
     {:error,
      Error.execution_error("Agent executable returned an invalid result",
-       details: %{result: result}
+       details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
      )}
   end
 
@@ -219,7 +219,7 @@ defmodule Jido.Agent.Command.Runner do
   end
 
   defp prepare_run_turn(agent, signal) do
-    case agent.module.handle_signal(signal, agent) do
+    case invoke_agent_callback(agent.module, :handle_signal, [signal, agent]) do
       {:ok, %Turn{} = turn} -> Turn.validate(turn)
       {:error, reason} -> {:error, reason}
       result -> {:error, invalid_callback_result(result, agent.module)}
@@ -238,7 +238,11 @@ defmodule Jido.Agent.Command.Runner do
         {:halt,
          {:error,
           Error.validation_error("Agent executable returned an invalid Directive",
-            details: %{directive: directive}
+            details: %{
+              code: :agent_invalid_callback_result,
+              callback: :execute,
+              directive: directive
+            }
           )}}
     end)
     |> case do
@@ -271,7 +275,7 @@ defmodule Jido.Agent.Command.Runner do
   defp invalid_state_output(output) do
     {:error,
      Error.execution_error("Agent executable output must be a plain state map",
-       details: %{output: output}
+       details: %{code: :agent_invalid_callback_result, callback: :execute, output: output}
      )}
   end
 
@@ -284,8 +288,34 @@ defmodule Jido.Agent.Command.Runner do
 
   defp invalid_callback_result(result, module) do
     Error.execution_error("Agent handle_signal/2 returned an invalid result",
-      details: %{module: module, result: result}
+      details: %{
+        code: :agent_invalid_callback_result,
+        module: module,
+        callback: :handle_signal,
+        result: result
+      }
     )
+  end
+
+  defp invoke_agent_callback(module, callback, args) do
+    apply(module, callback, args)
+  rescue
+    error -> agent_callback_error(module, callback, :error, error)
+  catch
+    kind, reason -> agent_callback_error(module, callback, kind, reason)
+  end
+
+  defp agent_callback_error(module, callback, kind, reason) do
+    {:error,
+     Error.execution_error("Agent callback failed",
+       details: %{
+         code: :agent_callback_failed,
+         module: module,
+         callback: callback,
+         kind: kind,
+         reason: reason
+       }
+     )}
   end
 
   defp invalid(message, details) do

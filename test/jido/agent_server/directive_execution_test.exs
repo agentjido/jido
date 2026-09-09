@@ -157,13 +157,15 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     Process.exit(worker, :kill)
     assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}
 
-    assert_receive {:dispatch_failed, %Jido.Error.ExecutionError{},
+    assert_receive {:dispatch_failed, %Jido.Error.ExecutionError{} = error,
                     %Outcome{
                       status: :failed,
                       stage: :directive,
                       committed?: true,
                       directives: %{failed: 1, failed_index: 0}
                     }}
+
+    assert Jido.Error.code(error) == :plugin_callback_task_failed
 
     eventually(fn -> Server.status(pid).phase == :idle end)
     assert Server.snapshot(pid) == %{agent: committed, state_version: 1}
@@ -204,7 +206,7 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     assert_receive {:plugin_directive_blocked, ^gate, worker}
     worker_ref = Process.monitor(worker)
 
-    assert_receive {:directive_timeout, %Jido.Error.TimeoutError{},
+    assert_receive {:directive_timeout, %Jido.Error.TimeoutError{} = error,
                     %Outcome{
                       status: :timed_out,
                       stage: :directive,
@@ -217,6 +219,8 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
                       }
                     }},
                    2_000
+
+    assert Jido.Error.code(error) == :plugin_callback_timeout
 
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
     eventually(fn -> Server.status(pid).phase == :idle end)

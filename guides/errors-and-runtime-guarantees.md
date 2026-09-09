@@ -7,10 +7,31 @@ stage where the error occurred and on whether state committed.
 
 `Jido.Error` defines validation, routing, execution, timeout, compensation, and
 internal error types. Use `Jido.Error.to_map/1` when an application needs a
-bounded transport value.
+bounded transport value. The map always has the top-level keys `type`,
+`message`, `details`, and `retryable?`.
+
+Some Jido-owned conversions have a stable code in `error.details.code`. Use
+`Jido.Error.code/1` to read it. Do not match a human-readable message.
 
 Do not expose raw error details to an untrusted caller without review. Details
 can contain application data.
+
+## Callback Failures
+
+Jido preserves the reason from a declared callback result of
+`{:error, reason}`. This result belongs to the application callback contract.
+Jido converts these other cases at the boundary that owns the callback:
+
+| Callback result | Jido result |
+| --- | --- |
+| Invalid success or result shape | Owner error with an invalid-callback-result code |
+| Raise, throw, or exit | `Jido.Error.ExecutionError` with a callback-failed code |
+| Owned task exits before a result | `Jido.Error.ExecutionError` with a task-failed code |
+| Owned operation reaches its limit | `Jido.Error.TimeoutError` with a timeout code |
+
+This rule does not replace OTP caller timeouts or public lifecycle controls.
+Persistence adapter controls, Agent Server cancellation values, PID lookup,
+Registry names, and OTP start and stop values keep their documented forms.
 
 ## Classify The Failure
 

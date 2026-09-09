@@ -38,9 +38,10 @@ file defines outcomes and gates. It is not the later implementation plan.
 - [Package-boundary design](../90_package-boundaries/design.md): keeps Agent
   Server in local Jido core, preserves current PID and debug APIs during
   migration, and forbids private access by ecosystem packages.
-- [Errors design](../12_errors-and-contracts/design.md): supplies pending
-  overload, timeout, reentry, cancellation, runtime, and persistence error
-  meanings. It keeps defined OTP controls in a protocol registry.
+- [Errors design](../12_errors-and-contracts/design.md): supplies stable Plugin
+  and Exec conversion codes and registers current overload, reentry,
+  cancellation, persistence, and OTP controls. Seam 08 owns any later
+  lifecycle conversion.
 - [Agent design](../01_agent/design.md) and
   [Agent authoring design](../02_agent-authoring/design.md): own canonical
   construction, instance protection, definition revision, and generated live
@@ -377,10 +378,10 @@ authoritative writer against a record format that it cannot interpret.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `SRV-BLK-001` | `Blocker` | 00 Overview | One-owner, stable identity, durability, cancellation, and compatibility targets are pending approval. | Approve them or replace them with explicit Server assumptions. |
+| `SRV-BLK-001` | `Resolved design input` | 00 Overview | The Overview direction is approved. Exact Server durability and cancellation behavior remains with seams 07 and 08. | Close the owner decisions before changing runtime behavior. |
 | `SRV-BLK-002` | `Blocker` | 90 Package boundaries | Local-core ownership, API retention, and public-only extension rules are pending. | Approve or change the package boundary. |
-| `SRV-BLK-003` | `Blocker` | 12 Errors and contracts | Stable timeout, overload, reentry, cancellation, runtime, and persistence errors are pending. | Approve the result registry before public conversion. |
-| `SRV-BLK-004` | `Implementation gap` | 01 Agent and 02 Agent authoring | Agent `vsn` and canonical versioned construction are approved but not implemented. | Implement and prove module defaults, preservation, and legacy restore. |
+| `SRV-BLK-003` | `Owner dependency` | 12 Errors and contracts and 08 Agent Server | Plugin and Exec conversion codes are implemented and pending seam-12 approval. Current overload, reentry, cancellation, and persistence controls are registered for compatibility. | Approve seam 12. Change a lifecycle control only with a seam-08 owner decision and migration test. |
+| `SRV-BLK-004` | `Owner dependency` | 01 Agent and 02 Agent authoring | Agent version and default checkpoint behavior are implemented and approved at `fa17a6d6`. Canonical authoring work remains with seam 02. | Complete only the seam-02 authoring dependency. |
 | `SRV-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Ref, namespace binding, partition conversion, and Ref-first facade do not exist. | Approve identity and instance resolution without removing current handles. |
 | `SRV-BLK-006` | `Blocker` | 04 Turn evaluation and 05 Plugins | Current Plugin admission and preparation can affect the Signal before route selection. | Approve and migrate fixed source-Signal selection with facet compatibility. |
 | `SRV-BLK-007` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | Current confirmed write errors can continue, contrary to the pending all-error target. | Select one authority rule and align stop, caller, and restore behavior. |

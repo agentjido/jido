@@ -140,8 +140,9 @@ or returns a failure outside the confirmed conflict and rejection set, then the
 Persistence boundary shall classify the write as indeterminate.
 
 `PERS-REQ-021`: When an adapter control reaches a public Jido persistence
-operation, the Persistence boundary shall convert it to the approved seam-12
-`PersistenceError` code.
+operation after the current compatibility period, the Persistence boundary
+shall convert it to an approved existing error class with a persistence-owned
+code. Seam 07 shall define that migration and code set before release.
 
 `PERS-REQ-022`: If a required persistence write returns any error, then the
 Agent Server shall remove that activation's write authority before it admits

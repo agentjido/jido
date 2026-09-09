@@ -42,6 +42,12 @@ defmodule Jido.Error do
   - `:routing` - Routing/dispatch failures
   - `:timeout` - Timeouts
   - `:internal` - Unexpected failures
+
+  ## Stable Program Codes
+
+  Jido-owned conversions store a stable atom in `error.details.code`. Use
+  `code/1` to read the code. Do not use a human-readable message as a program
+  key. `stable_codes/0` returns the closed registry for this release.
   """
 
   # Splode error classes (internal - do not use directly)
@@ -105,6 +111,44 @@ defmodule Jido.Error do
       internal: Internal
     ],
     unknown_error: Internal.UnknownError
+
+  @typedoc """
+  A stable Jido-owned program code.
+
+  The code is stored in `error.details.code`. Call `code/1` instead of matching
+  a human-readable message. Codes from adjacent packages remain owned by those
+  packages.
+  """
+  @type code ::
+          :non_portable_term
+          | :agent_invalid_callback_result
+          | :agent_callback_failed
+          | :plugin_invalid_callback_result
+          | :plugin_callback_failed
+          | :plugin_callback_timeout
+          | :plugin_callback_task_failed
+          | :persistence_invalid_callback_result
+          | :persistence_callback_failed
+          | :agent_exec_invalid_callback_result
+          | :agent_exec_callback_failed
+          | :agent_exec_callback_timeout
+          | :agent_exec_callback_task_failed
+
+  @stable_codes [
+    :non_portable_term,
+    :agent_invalid_callback_result,
+    :agent_callback_failed,
+    :plugin_invalid_callback_result,
+    :plugin_callback_failed,
+    :plugin_callback_timeout,
+    :plugin_callback_task_failed,
+    :persistence_invalid_callback_result,
+    :persistence_callback_failed,
+    :agent_exec_invalid_callback_result,
+    :agent_exec_callback_failed,
+    :agent_exec_callback_timeout,
+    :agent_exec_callback_task_failed
+  ]
 
   # ============================================================================
   # Error Structs
@@ -475,6 +519,17 @@ defmodule Jido.Error do
   # ============================================================================
   # Utilities
   # ============================================================================
+
+  @doc "Returns the registered Jido program code carried by an error."
+  @spec code(term()) :: code() | nil
+  def code({:error, reason}), do: code(reason)
+  def code(%{details: %{code: code}}) when code in @stable_codes, do: code
+  def code(%{code: code}) when code in @stable_codes, do: code
+  def code(_error), do: nil
+
+  @doc "Returns the closed set of Jido-owned program codes."
+  @spec stable_codes() :: [code()]
+  def stable_codes, do: @stable_codes
 
   @transport_max_depth 4
   @transport_max_items 20

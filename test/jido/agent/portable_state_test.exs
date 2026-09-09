@@ -56,6 +56,36 @@ defmodule Jido.Agent.PortableStateTest do
     assert length(deep_path) == 20
   end
 
+  test "bounds every diagnostic path segment" do
+    definition = Agent.new!(name: "portable_path", schema: Zoi.object(%{payload: Zoi.any()}))
+    long_binary = String.duplicate("b", 100)
+    long_integer = String.to_integer(String.duplicate("9", 100))
+    long_atom = :aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+    for key <- [long_binary, long_atom] do
+      assert {:error,
+              %Jido.Error.ValidationError{
+                details: %{code: :non_portable_term, path: [:agent_state, :payload, segment]}
+              }} = Agent.instantiate(definition, state: %{payload: %{key => self()}})
+
+      assert is_binary(segment)
+      assert byte_size(segment) == 64
+    end
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :non_portable_term,
+                path: [:agent_state, :payload, {:map_value, 0}]
+              }
+            }} = Agent.instantiate(definition, state: %{payload: %{long_integer => self()}})
+
+    assert {:error, [root_segment]} =
+             Jido.PortableTerm.validate(self(), [String.duplicate("r", 100)])
+
+    assert root_segment == String.duplicate("r", 64)
+  end
+
   test "transition and command candidates use the same portable-state boundary" do
     definition =
       Agent.new!(

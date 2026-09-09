@@ -210,15 +210,24 @@ defmodule Jido.AgentServer.PublicAPITest do
     end
   end
 
-  test "stops on an unexpected handle_signal fault" do
+  test "contains an unexpected handle_signal fault" do
     server =
       start_supervised!({Server, agent: FaultAgent.new!(), restart: :temporary})
 
-    monitor = Process.monitor(server)
-    :ok = Server.cast(server, signal("fault.raise"))
+    original = Server.snapshot(server)
 
-    assert_receive {:DOWN, ^monitor, :process, ^server, {%RuntimeError{}, _stacktrace}},
-                   @receive_timeout
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              details: %{
+                code: :agent_callback_failed,
+                callback: :handle_signal,
+                kind: :error,
+                reason: %RuntimeError{message: "unexpected callback fault"}
+              }
+            }} = Server.call(server, signal("fault.raise"))
+
+    assert Server.snapshot(server) == original
+    assert Process.alive?(server)
   end
 
   test "defines Agent Server runtime records with Zoi structs" do

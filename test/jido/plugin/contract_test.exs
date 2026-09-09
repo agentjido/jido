@@ -527,7 +527,12 @@ defmodule Jido.Plugin.ContractTest do
              Jido.Plugin.admit(command, invalid_specs, %{})
 
     assert invalid.message == "Agent Plugin admit/3 returned an invalid result"
-    assert invalid.details == %{plugin: AdmissionPlugin, result: {:ok, :not_a_command}}
+
+    assert invalid.details == %{
+             code: :plugin_invalid_callback_result,
+             plugin: AdmissionPlugin,
+             result: {:ok, :not_a_command}
+           }
 
     assert {:ok, replace_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :replace}])
 
@@ -535,7 +540,12 @@ defmodule Jido.Plugin.ContractTest do
              Jido.Plugin.admit(command, replace_specs, %{})
 
     assert replacement.message == "Agent Plugin cannot replace the Agent"
-    assert replacement.details == %{plugin: AdmissionPlugin, callback: :admit}
+
+    assert replacement.details == %{
+             code: :plugin_invalid_callback_result,
+             plugin: AdmissionPlugin,
+             callback: :admit
+           }
 
     assert {:ok, reject_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :reject}])
     assert {:error, :denied} = Jido.Plugin.admit(command, reject_specs, %{})

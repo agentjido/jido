@@ -140,6 +140,53 @@ defmodule JidoTest.ErrorTest do
     end
   end
 
+  describe "stable program codes" do
+    test "publishes one closed Jido-owned code registry" do
+      expected = [
+        :non_portable_term,
+        :agent_invalid_callback_result,
+        :agent_callback_failed,
+        :plugin_invalid_callback_result,
+        :plugin_callback_failed,
+        :plugin_callback_timeout,
+        :plugin_callback_task_failed,
+        :persistence_invalid_callback_result,
+        :persistence_callback_failed,
+        :agent_exec_invalid_callback_result,
+        :agent_exec_callback_failed,
+        :agent_exec_callback_timeout,
+        :agent_exec_callback_task_failed
+      ]
+
+      assert Error.stable_codes() == expected
+      assert Enum.uniq(expected) == expected
+      assert Enum.all?(expected, &is_atom/1)
+    end
+
+    test "extracts registered codes without making messages part of the contract" do
+      error =
+        Error.execution_error("This text can change", details: %{code: :agent_callback_failed})
+
+      assert Error.code(error) == :agent_callback_failed
+      assert Error.code({:error, error}) == :agent_callback_failed
+      assert Error.code(%{code: :plugin_callback_failed}) == :plugin_callback_failed
+      assert Error.code(%{details: %{code: :unknown}}) == nil
+      assert Error.code(:agent_callback_failed) == nil
+    end
+
+    test "keeps the exact version 1 projection shape and nests its program code" do
+      error =
+        Error.execution_error("Failed", details: %{code: :agent_callback_failed, callback: :run})
+
+      projection = Error.to_map(error)
+
+      assert Map.keys(projection) |> Enum.sort() == [:details, :message, :retryable?, :type]
+      assert projection.details.code == :agent_callback_failed
+      refute Map.has_key?(projection, :code)
+      refute Map.has_key?(projection, :class)
+    end
+  end
+
   describe "to_map/1" do
     @to_map_cases [
       # {description, error_expr, expected_type}

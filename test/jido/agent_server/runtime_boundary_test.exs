@@ -4,6 +4,7 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.ParentRef
+  alias Jido.Error
   alias JidoTest.AgentFixtures
 
   @moduletag capture_log: true
@@ -195,9 +196,10 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
               %Jido.Error.ExecutionError{
                 message: "Agent Exec callback failed",
                 details: %{callback: :run_async, kind: kind}
-              }} = Server.call(server, signal("boundary.emit", %{count: 1}))
+              } = error} = Server.call(server, signal("boundary.emit", %{count: 1}))
 
       assert kind == expected_kind
+      assert Error.code(error) == :agent_exec_callback_failed
       assert Server.snapshot(server) == original
       assert Server.status(server).phase == :idle
     end
@@ -219,8 +221,16 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
       if mode == :run_hang do
         assert_received {:exec_callback_blocked, :run_async, _owner}
         assert %Jido.Error.TimeoutError{timeout: 50} = error
+        assert Error.code(error) == :agent_exec_callback_timeout
       else
         assert %Jido.Error.ExecutionError{} = error
+
+        expected_code =
+          if mode == :run_invalid,
+            do: :agent_exec_invalid_callback_result,
+            else: :agent_exec_callback_failed
+
+        assert Error.code(error) == expected_code
       end
 
       assert Server.snapshot(server) == original
@@ -280,8 +290,16 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
 
       if mode == :handle_hang do
         assert %Jido.Error.TimeoutError{timeout: 50} = error
+        assert Error.code(error) == :agent_exec_callback_timeout
       else
         assert %Jido.Error.ExecutionError{} = error
+
+        expected_code =
+          if mode == :handle_invalid,
+            do: :agent_exec_invalid_callback_result,
+            else: :agent_exec_callback_failed
+
+        assert Error.code(error) == expected_code
       end
 
       assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
@@ -317,9 +335,23 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
       assert_receive {:exec_callback_started, :cancel, ^mode, _owner}, 2_000
 
       case expectation do
-        :exact -> assert error == :cancel_failed
-        :structured -> assert %Jido.Error.ExecutionError{} = error
-        :timeout -> assert %Jido.Error.TimeoutError{timeout: 50} = error
+        :exact ->
+          assert error == :cancel_failed
+          assert Error.code(error) == nil
+
+        :structured ->
+          assert %Jido.Error.ExecutionError{} = error
+
+          expected_code =
+            if mode == :cancel_invalid,
+              do: :agent_exec_invalid_callback_result,
+              else: :agent_exec_callback_failed
+
+          assert Error.code(error) == expected_code
+
+        :timeout ->
+          assert %Jido.Error.TimeoutError{timeout: 50} = error
+          assert Error.code(error) == :agent_exec_callback_timeout
       end
 
       assert {:error, ^error} = Task.await(caller, 2_000)

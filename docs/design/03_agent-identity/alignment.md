@@ -251,7 +251,7 @@ No removal or deprecation is approved in this seam.
 | --- | --- | --- | --- | --- |
 | `ID-BLK-001` | `Blocker` | 00 Overview | Stable Ref, identity separation, and V3 compatibility requirements are pending approval. | Approve them or replace them with explicit identity assumptions. |
 | `ID-BLK-002` | `Blocker` | 90 Package boundaries | Core identity ownership and the local-core boundary are pending approval. | Approve or change the package boundary. |
-| `ID-BLK-003` | `Blocker` | 12 Errors and contracts | Public value, validation error, portable map, and `agent_ref` projection rules are pending approval. | Approve the value and error rules before public Ref release. |
+| `ID-BLK-003` | `Owner dependency` | 12 Errors and contracts and 03 Agent identity | Shared value, validation-error, and portability rules are implemented and pending seam-12 approval. Exact Ref fields and any `agent_ref` projection stay with seam 03. | Approve seam 12, then define and prove the Ref-owned fields without changing error projection v1. |
 | `ID-BLK-004` | `Blocker` | 01 Agent | Agent ID and definition-revision contracts are pending approval. | Confirm that Ref uses `agent.id` and excludes definition revision. |
 | `ID-BLK-005` | `Blocker` | 09 Jido instance | Namespace assignment, local binding, duplicate handling, and module-rename configuration are not defined. | Approve the instance binding contract. |
 | `ID-BLK-006` | `Blocker` | 03 Agent identity | Current partitions accept any term, but the target Ref field is binary or `nil`. | Approve conversion, collision, and transition rules. |

@@ -327,8 +327,8 @@ No removal or deprecation is approved in this seam.
 | --- | --- | --- | --- | --- |
 | `PLG-BLK-001` | `Blocker` | 00 Overview | Four facet owners, Plugin isolation, and runtime replacement input are pending approval. | Approve or replace the related Overview decisions. |
 | `PLG-BLK-002` | `Blocker` | 90 Package boundaries | Plugin, adapter, authoring, Directive, and Telemetry separation is pending approval. | Approve or change the extension boundary. |
-| `PLG-BLK-003` | `Blocker` | 12 Errors and contracts | Callback codes, fault normalization, and portable paths are pending approval. | Approve before final public callback types and early checks. |
-| `PLG-BLK-004` | `Blocker` | 01 Agent | Combined state, custom checkpoints, and portable-state timing are pending approval. | Approve or change the Agent contract. |
+| `PLG-BLK-003` | `Owner dependency` | 12 Errors and contracts and 05 Plugins | Shared callback codes, fault normalization, and portable paths are implemented and pending seam-12 approval. Exact future Plugin callback values stay with seam 05. | Approve seam 12, then prove the seam-05 value model with the shared rules. |
+| `PLG-BLK-004` | `Resolved` | 01 Agent | Combined state, custom checkpoints, and portable-state timing are implemented and approved at `fa17a6d6`. | No action. |
 | `PLG-BLK-005` | `Blocker` | 04 Turn evaluation | Source-Signal first-match routing and bounded contribution inputs are pending approval. | Approve route order and parity boundary. |
 | `PLG-BLK-006` | `Assumption` | 02 Agent authoring | All authoring forms preserve ordered package declarations and static options. | Keep `AUTH-REQ-004`, `AUTH-REQ-036`, and `AUTH-REQ-049` aligned. |
 | `PLG-BLK-007` | `Blocker` | 03 Agent identity, 08 Agent Server, 09 Jido instance | Exact live runtime identity fields are not approved. | Define whether target Init carries Agent Ref beside compatibility fields. |

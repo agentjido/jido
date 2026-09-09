@@ -1,6 +1,5 @@
 defmodule JidoTest.Persistence.CheckpointPortabilityTest do
   use JidoTest.Case, async: true
-  @moduletag :research
   @moduletag capability: "PERSIST-02"
 
   alias Jido.Examples.CheckpointPortabilityProbe, as: Probe
@@ -59,5 +58,35 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
                 path: [:record, :checkpoint, :state, :payload, :job, :worker]
               }
             }} = Persistence.load_agent(c.store, Probe, c.id)
+  end
+
+  test "load rejects every prohibited term class supplied by storage", c do
+    port = Port.open({:spawn_executable, System.find_executable("true")}, [])
+    on_exit(fn -> if Port.info(port), do: Port.close(port) end)
+
+    values = [
+      self(),
+      port,
+      make_ref(),
+      fn -> :runtime end,
+      [1 | :improper],
+      <<1::size(1)>>
+    ]
+
+    for {value, index} <- Enum.with_index(values) do
+      id = "#{c.id}-#{index}"
+      assert :ok = Probe.store_payload(c.store, id, %{job: %{runtime: value}})
+
+      assert {:error,
+              %Jido.Error.ValidationError{
+                details: %{
+                  code: :non_portable_term,
+                  path: path
+                }
+              }} = Persistence.load_agent(c.store, Probe, id)
+
+      assert Enum.take(path, 6) == [:record, :checkpoint, :state, :payload, :job, :runtime]
+      assert length(path) <= 20
+    end
   end
 end

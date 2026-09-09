@@ -36,8 +36,9 @@ plan.
   durable runtime handles.
 - [Package-boundary design](../90_package-boundaries/design.md): keeps record
   meaning in Jido and the binary adapter as a distinct host-owned integration.
-- [Errors design](../12_errors-and-contracts/design.md): keeps raw adapter
-  controls inside the protocol and requires public `PersistenceError` values.
+- [Errors design](../12_errors-and-contracts/design.md): keeps raw adapter and
+  current Persistence controls during compatibility. It uses existing error
+  classes for invalid replies and adapter faults.
 - [Agent design](../01_agent/design.md): keeps plain-map default and custom
   checkpoints and separates checkpoint, definition, state, and storage versions.
 - [Identity design](../03_agent-identity/design.md): proposes Ref as durable
@@ -113,9 +114,9 @@ plan.
 | Gap | Requirements | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
 | `PERS-GAP-001` | `PERS-REQ-001` to `PERS-REQ-005` | Persistence and adapter modules | Owner split works, but four callbacks remain required. | `Change, compatible` |
-| `PERS-GAP-002` | `PERS-REQ-006` to `PERS-REQ-010` | Record and Agent checkpoint code | Checkpoint layering works. Target Ref, definition revision, tombstone, and complete portable-term set do not. | `Partial`; `Blocked` on seams 01, 03, and 12 |
+| `PERS-GAP-002` | `PERS-REQ-006` to `PERS-REQ-010` | Record and Agent checkpoint code | Checkpoint layering, definition version, and the portable-term set work. Target Ref and tombstone do not. | `Partial`; `Blocked` on seam 03 and record lifecycle work |
 | `PERS-GAP-003` | `PERS-REQ-011` to `PERS-REQ-016` | Save code and revision tests | Exact-byte CAS and direct revision rules work. Server next-revision ownership is spread across modules. | `Retain`; strengthen contract evidence |
-| `PERS-GAP-004` | `PERS-REQ-017` to `PERS-REQ-021` | Adapter containment and error tests | There is no closed rejection set or public `PersistenceError`. Plain returned errors can look confirmed. | `Change`; `Blocked` on seam 12 |
+| `PERS-GAP-004` | `PERS-REQ-017` to `PERS-REQ-021` | Adapter containment and error tests | Invalid replies and callback faults have shared codes. Returned adapter reasons remain compatible, and the closed confirmed-rejection set is not final. | `Partial`; seam 07 owns future public codes and migration |
 | `PERS-GAP-005` | `PERS-REQ-022` | Server failure branch and stale-Server test | Only uncertain writes always remove authority. | `Conflict`; `Blocked` on seams 06 and 08 |
 | `PERS-GAP-006` | `PERS-REQ-023` to `PERS-REQ-028` | Startup and restore code | A new persistent Agent reports ready without revision-zero storage. | `Missing`; `Blocked` on Agent Server lifecycle |
 | `PERS-GAP-007` | `PERS-REQ-029` to `PERS-REQ-031` | Load validation and restore tests | Current validation works. Definition revision does not exist. | `Partial`; `Blocked` on seam 01 |
@@ -258,13 +259,13 @@ plan. Create that plan only after the user approves this seam.
 | `PERS-REQ-003` to `PERS-REQ-005` | Four callbacks are required; host ownership is documented | Two-required-callback conformance plus maintenance compatibility tests. | `Partial` |
 | `PERS-REQ-006`, `PERS-REQ-007` | `lib/jido/persistence.ex:79-98,284-315` | Default and custom checkpoint ordering on each retained adapter. | `Proven` |
 | `PERS-REQ-008`, `PERS-REQ-009` | Current active envelope has copied identity and revision; no tombstone | Ref, definition-revision, active, and tombstone fixtures. | `Missing` |
-| `PERS-REQ-010` | PID and improper-list tests; current validator allows non-byte-aligned bitstrings | Complete prohibited-term matrix with bounded paths. | `Partial` |
+| `PERS-REQ-010` | Agent and Persistence tests cover all prohibited terms with bounded paths | Keep the matrix through record migration. | `Proven` for current record |
 | `PERS-REQ-011` to `PERS-REQ-016` | Revision and concurrent-writer tests | Map Server revision proof directly to the closed adapter suite. | `Proven` for current active records |
 | `PERS-REQ-017` | Adapter option tests | Approved seam-12 invalid-options code. | `Partial` |
 | `PERS-REQ-018` | ETS, File, Redis, and live conflict tests | Shared conflict/no-write cases for every adapter. | `Proven` for current adapters |
 | `PERS-REQ-019` | No adapter uses a typed preflight rejection | Rejection before backend work and no-write proof. | `Missing` |
 | `PERS-REQ-020` | Redis and lost-reply tests cover several cases | Returned plain error, raise, throw, exit, invalid result, and timeout matrix. | `Partial` |
-| `PERS-REQ-021` | Public Persistence returns raw terms and `ExecutionError` | Public `PersistenceError` code tests. | `Conflict` |
+| `PERS-REQ-021` | Public Persistence keeps raw adapter reasons and uses coded `ExecutionError` for invalid replies and faults | Define and test persistence-owned codes before any public control migration. | `Owner-deferred` |
 | `PERS-REQ-022` | Indeterminate stop passes; conflict continuation passes | Every required write failure removes authority before next evaluation. | `Conflict` |
 | `PERS-REQ-023` to `PERS-REQ-028` | Startup returns before any initial write | Revision-zero storage, all restore policies, failure publication, and Plugin cleanup. | `Missing` |
 | `PERS-REQ-029`, `PERS-REQ-030` | Invalid record and identity tests | Preserve with new active record and Ref. | `Proven` for current record |
@@ -313,10 +314,10 @@ plan. Create that plan only after the user approves this seam.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `PERS-BLK-001` | `Blocker` | 00 Overview | Initial records, all-error authority loss, and tombstones are pending. | Approve or change the Overview durability decision. |
+| `PERS-BLK-001` | `Resolved design input` | 00 Overview | The Overview durability direction is approved. Exact record and authority behavior remains seam-07 and seam-08 owner work. | Implement only after those owner decisions close. |
 | `PERS-BLK-002` | `Blocker` | 90 Package boundaries | Production provider placement and public compatibility are pending. | Approve provider ownership and migration gates. |
-| `PERS-BLK-003` | `Blocker` | 12 Errors and contracts | `PersistenceError`, codes, controls, and portable paths are pending. | Approve the public result contract. |
-| `PERS-BLK-004` | `Implementation gap` | 01 Agent and 02 Agent authoring | Agent `vsn` and default checkpoint evolution are approved but not implemented. | Implement and prove the `vsn: 1` legacy rule and version-2 checkpoint. |
+| `PERS-BLK-003` | `Owner dependency` | 12 Errors and contracts and 07 Persistence | Seam 12 keeps adapter controls raw, rejects a new `PersistenceError`, and implements codes for invalid replies, callback faults, and portable paths. Public persistence control migration stays with seam 07. | Approve seam 12, then close the seam-07 public result and write-policy matrix. |
+| `PERS-BLK-004` | `Resolved` | 01 Agent | Agent `vsn`, the `vsn: 1` legacy rule, and version-2 default checkpoints are implemented and approved at `fa17a6d6`. | No action. |
 | `PERS-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Ref exists only as a target, and namespace binding is undefined. | Approve Ref, namespace, and partition conversion. |
 | `PERS-BLK-006` | `Blocker` | 06 Commit and effects and 08 Agent Server | Current conflict continuation disagrees with all-error authority loss. | Select one rule and define stop, reload, and caller behavior. |
 | `PERS-BLK-007` | `Blocker` | 07 Persistence | Tombstone retention, purge authorization, same-identity reactivation, TTL, and rollback are not approved. | Approve the lifecycle maintenance rules. |

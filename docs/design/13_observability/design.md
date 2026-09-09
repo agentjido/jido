@@ -93,7 +93,7 @@ apply or when its source value does not pass validation.
 | Turn and Signal | `turn_id`, `source_signal_id`, `signal_id`, `signal_type` | Bounded UTF-8 strings |
 | Causal trace | `trace_id`, `span_id`, `parent_span_id`, `causation_id`, `cause_turn_id`, `child_activation_id`, `sampled?` | Bounded IDs and Boolean sampling hint |
 | Result | `operation`, `status`, `stage`, `kind`, `committed?` | Registered atoms and Boolean |
-| Safe error | `error_class`, `error_type`, `error_code`, `retryable?` | Bounded public projection from seam 12; current code only supplies type and retryability |
+| Safe error | `error_type`, `error_code`, `retryable?` | Bounded semantic projection; use `Jido.Error.code/1` for a registered Jido code and omit it when absent |
 | Directive | `directive_module` | Module atom |
 | Admission | `admission_reason` | Registered atom |
 | Persistence | `adapter_module`, `persistence_reason` | Module atom and registered atom |

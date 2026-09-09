@@ -962,14 +962,37 @@ defmodule Jido.Plugin do
   defp safe_apply(module, function, args, message) do
     apply(module, function, args)
   rescue
-    error -> {:error, plugin_error(message, module, %{error: error})}
+    error -> {:error, plugin_callback_error(message, module, function, :error, error)}
   catch
     kind, reason ->
-      {:error, plugin_error(message, module, %{kind: kind, reason: reason})}
+      {:error, plugin_callback_error(message, module, function, kind, reason)}
   end
 
   defp plugin_invalid(message, module, details),
-    do: {:error, plugin_error(message, module, details)}
+    do:
+      {:error,
+       plugin_error(
+         message,
+         module,
+         Map.put_new(details, :code, :plugin_invalid_callback_result)
+       )}
+
+  defp plugin_callback_error(message, module, callback, :error, error) do
+    plugin_error(message, module, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      error: error
+    })
+  end
+
+  defp plugin_callback_error(message, module, callback, kind, reason) do
+    plugin_error(message, module, %{
+      code: :plugin_callback_failed,
+      callback: callback,
+      kind: kind,
+      reason: reason
+    })
+  end
 
   defp plugin_error(message, module, details),
     do: Error.execution_error(message, details: Map.put(details, :plugin, module))

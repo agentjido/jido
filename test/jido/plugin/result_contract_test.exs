@@ -54,8 +54,12 @@ defmodule Jido.Plugin.ResultContractTest do
 
       expected =
         if unquote(callback) == :admit,
-          do: %{plugin: CallbackPlugin, callback: :admit},
-          else: %{plugin: CallbackPlugin}
+          do: %{
+            code: :plugin_invalid_callback_result,
+            plugin: CallbackPlugin,
+            callback: :admit
+          },
+          else: %{code: :plugin_invalid_callback_result, plugin: CallbackPlugin}
 
       assert error.details == expected
     end
@@ -72,20 +76,36 @@ defmodule Jido.Plugin.ResultContractTest do
 
       assert {:error, error} = run_status(unquote(callback), fn _ -> {:ok, :unexpected} end)
       assert error.message == "Agent Plugin #{unquote(label)} returned an invalid result"
-      assert error.details == %{plugin: CallbackPlugin, result: {:ok, :unexpected}}
+
+      assert error.details == %{
+               code: :plugin_invalid_callback_result,
+               plugin: CallbackPlugin,
+               result: {:ok, :unexpected}
+             }
     end
 
     test "#{callback} contains raised errors, throws, and exits" do
       assert {:error, error} = run_status(unquote(callback), fn _ -> raise "callback fault" end)
       assert error.message == unquote(failure)
 
-      assert %{plugin: CallbackPlugin, error: %RuntimeError{message: "callback fault"}} =
-               error.details
+      assert %{
+               code: :plugin_callback_failed,
+               callback: unquote(callback),
+               plugin: CallbackPlugin,
+               error: %RuntimeError{message: "callback fault"}
+             } = error.details
 
       for {kind, fun} <- [throw: fn _ -> throw(:fault) end, exit: fn _ -> exit(:fault) end] do
         assert {:error, error} = run_status(unquote(callback), fun)
         assert error.message == unquote(failure)
-        assert error.details == %{plugin: CallbackPlugin, kind: kind, reason: :fault}
+
+        assert error.details == %{
+                 code: :plugin_callback_failed,
+                 callback: unquote(callback),
+                 plugin: CallbackPlugin,
+                 kind: kind,
+                 reason: :fault
+               }
       end
     end
   end

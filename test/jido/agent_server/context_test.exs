@@ -102,6 +102,11 @@ defmodule Jido.AgentServer.ContextTest do
       end
 
       assert {:error, error} = Task.await(caller)
+
+      expected_code =
+        if @failure == :exit, do: :plugin_callback_task_failed, else: :plugin_callback_timeout
+
+      assert Jido.Error.code(error) == expected_code
       assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 2_000
       assert_receive {:admission_failed, ^error, outcome}, 2_000
       assert outcome.stage == :prepare

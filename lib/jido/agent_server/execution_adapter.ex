@@ -42,7 +42,11 @@ defmodule Jido.AgentServer.ExecutionAdapter do
       {:error, reason} ->
         {:error,
          Error.execution_error("Agent Exec adapter owner could not start",
-           details: %{module: module, reason: reason}
+           details: %{
+             code: :agent_exec_callback_task_failed,
+             module: module,
+             reason: reason
+           }
          )}
     end
   rescue
@@ -71,7 +75,12 @@ defmodule Jido.AgentServer.ExecutionAdapter do
       {:DOWN, ^monitor_ref, :process, _pid, reason} ->
         {:error,
          Error.execution_error("Agent Exec adapter owner exited during cancellation",
-           details: %{module: adapter.module, reason: reason}
+           details: %{
+             code: :agent_exec_callback_task_failed,
+             module: adapter.module,
+             callback: :cancel,
+             reason: reason
+           }
          )}
     after
       adapter.timeout ->
@@ -81,7 +90,11 @@ defmodule Jido.AgentServer.ExecutionAdapter do
         {:error,
          Error.timeout_error("Agent Exec cancellation timed out",
            timeout: adapter.timeout,
-           details: %{module: adapter.module}
+           details: %{
+             code: :agent_exec_callback_timeout,
+             module: adapter.module,
+             callback: :cancel
+           }
          )}
     end
   end
@@ -226,13 +239,22 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   defp validate_handle(handle, module) do
     {:error,
      Error.execution_error("Agent Exec run_async returned an invalid handle",
-       details: %{module: module, handle: inspect(handle)}
+       details: %{
+         code: :agent_exec_invalid_callback_result,
+         module: module,
+         callback: :run_async,
+         handle: inspect(handle)
+       }
      )}
   end
 
   defp invalid_handle_error(pid) do
     Error.execution_error("Agent Exec run_async returned a dead process handle",
-      details: %{pid: inspect(pid)}
+      details: %{
+        code: :agent_exec_invalid_callback_result,
+        callback: :run_async,
+        pid: inspect(pid)
+      }
     )
   end
 
@@ -245,7 +267,12 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   defp normalize_handle_message({:ok, result}, module) do
     {:error,
      Error.execution_error("Agent Exec handle_message returned an invalid result",
-       details: %{module: module, result: inspect(result)}
+       details: %{
+         code: :agent_exec_invalid_callback_result,
+         module: module,
+         callback: :handle_message,
+         result: inspect(result)
+       }
      )}
   end
 
@@ -256,7 +283,12 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   defp normalize_cancel({:ok, result}, module) do
     {:error,
      Error.execution_error("Agent Exec cancel returned an invalid result",
-       details: %{module: module, result: inspect(result)}
+       details: %{
+         code: :agent_exec_invalid_callback_result,
+         module: module,
+         callback: :cancel,
+         result: inspect(result)
+       }
      )}
   end
 
@@ -270,7 +302,13 @@ defmodule Jido.AgentServer.ExecutionAdapter do
 
   defp callback_error(module, callback, kind, reason) do
     Error.execution_error("Agent Exec callback failed",
-      details: %{module: module, callback: callback, kind: kind, reason: reason}
+      details: %{
+        code: :agent_exec_callback_failed,
+        module: module,
+        callback: callback,
+        kind: kind,
+        reason: reason
+      }
     )
   end
 

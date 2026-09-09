@@ -427,14 +427,23 @@ defmodule Jido.Persistence do
   defp invalid_adapter_result(operation, result) do
     {:error,
      Error.execution_error("Persistence adapter returned an invalid result",
-       details: %{operation: operation, result: result}
+       details: %{
+         code: :persistence_invalid_callback_result,
+         operation: operation,
+         result: result
+       }
      )}
   end
 
   defp persistence_failure(operation, kind, reason) do
     {:error,
      Error.execution_error("Persistence adapter operation failed",
-       details: %{operation: operation, kind: kind, reason: reason}
+       details: %{
+         code: :persistence_callback_failed,
+         operation: operation,
+         kind: kind,
+         reason: reason
+       }
      )}
   end
 
