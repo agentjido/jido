@@ -115,6 +115,7 @@ Jido includes these adapters:
 | `Jido.Persistence.ETS` | Tests and local development. Data ends with the BEAM. |
 | `Jido.Persistence.File` | One local BEAM with no shared writers. |
 | `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
+| `Jido.Persistence.Bedrock` | Shared durable storage through Bedrock KV 0.7 transactions. |
 | `Jido.Persistence.Ecto` | PostgreSQL or SQLite through an application Ecto repository. |
 
 Configure persistence on a Jido instance when most actors use the same store.
@@ -200,6 +201,86 @@ fields, and `key` must be its single primary key.
 The Ecto adapter supports the PostgreSQL and SQLite Ecto adapters. It rejects
 other database adapters during configuration validation because their upsert
 and affected-row rules do not prove this CAS contract.
+
+## Configure Bedrock KV
+
+Bedrock support is optional. Add the supported `0.7.x` client to the host
+application:
+
+```elixir
+def deps do
+  [
+    {:jido, "~> 3.0"},
+    {:bedrock, "~> 0.7.0"},
+    {:bedrock_raft, ">= 0.9.7 and < 0.10.0", override: true}
+  ]
+end
+```
+
+The explicit Bedrock Raft dependency is required. Bedrock `0.7.x` has a broad
+Raft requirement, but it uses the `0.9.x` client API. The host constraint keeps
+resolution from selecting incompatible `0.10.x` releases.
+
+Define the Bedrock cluster and repo. The repo must use `Bedrock.Repo`:
+
+```elixir
+defmodule MyApp.BedrockCluster do
+  use Bedrock.Cluster, otp_app: :my_app, name: "my_app"
+end
+
+defmodule MyApp.BedrockRepo do
+  use Bedrock.Repo, cluster: MyApp.BedrockCluster
+end
+```
+
+Configure the Bedrock cluster for the deployment. Bedrock uses strict
+durability mode by default. Keep strict mode for production. It validates log
+replication and persistent coordinator, log, and materializer paths when the
+cluster starts. Follow the Bedrock durability guide for local file or
+S3-compatible object storage settings.
+
+Add the cluster before the Jido instance in the application supervision tree:
+
+```elixir
+children = [MyApp.BedrockCluster, MyApp.Jido]
+```
+
+Select the repo in the Jido instance:
+
+```elixir
+defmodule MyApp.Jido do
+  use Jido,
+    otp_app: :my_app,
+    persistence:
+      {Jido.Persistence.Bedrock,
+       repo: MyApp.BedrockRepo,
+       prefix: "my-app:jido:",
+       timeout_in_ms: 5_000}
+end
+```
+
+The prefix defaults to `"jido:persistence:"`. It must be a non-empty binary
+in the Bedrock user keyspace. The timeout must be a positive integer in
+milliseconds or `:infinity`. The adapter rejects a stored key larger than
+16 KiB and a value larger than 128 KiB before it starts a transaction.
+
+The adapter uses one Bedrock transaction for each CAS. `Repo.get/1` adds the
+read conflict, and `Repo.put/2` writes the new exact bytes. Bedrock normally
+retries transaction failures. The adapter sets `retry_limit: 0` for writes
+because a lost commit reply can have an unknown result. It reports a resolver
+abort as a confirmed conflict. It reports every other write failure as
+indeterminate. Jido then stops the affected activation and requires restore
+before another write.
+
+Each adapter operation runs in a fresh process. It cannot join an application
+Bedrock transaction and report success before that outer transaction commits.
+The adapter stores the Jido bytes without an envelope, so `get/2` returns the
+exact bytes used by CAS.
+
+A successful Bedrock transaction is strictly serializable. Bedrock 0.7 reports
+success after every required log has appended and synced its write-ahead log.
+The cluster durability profile still controls deployment durability. The
+adapter does not make Bedrock relaxed mode durable.
 
 Next, read
 [Compare-and-Swap, Hibernate, and Thaw](compare-and-swap-hibernate-and-thaw.html)
