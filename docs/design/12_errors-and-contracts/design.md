@@ -1,8 +1,8 @@
-> Target seam design. This document is pending approval.
+> Approved target seam design. Dependent owner-seam details remain open.
 
 # Errors and public contracts design
 
-All requirements and decisions in this document are pending approval. The
+The requirements and decisions in this document were approved on 2026-09-09. The
 [design review index](../README.md#document-review-status) is the source of
 truth for approval.
 

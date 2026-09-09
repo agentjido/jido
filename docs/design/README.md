@@ -140,9 +140,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
 | [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
 | [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
-| [Errors and contracts briefing](12_errors-and-contracts/README.md) | Pending approval |
-| [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
-| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Pending approval |
+| [Errors and contracts briefing](12_errors-and-contracts/README.md) | Approved |
+| [Errors and contracts design](12_errors-and-contracts/design.md) | Approved |
+| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Approved |
 | [Observability briefing](13_observability/README.md) | Pending approval |
 | [Observability design](13_observability/design.md) | Pending approval |
 | [Observability alignment](13_observability/alignment.md) | Pending approval |

@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Approved seam review entry point. Dependent owner-seam work remains open.
 
 # 12 — Errors and public contracts
 
@@ -7,6 +7,8 @@
 This seam defines how Jido carries a failure across a public boundary. It also
 records the public success shapes, raw protocol controls, error projection, and
 portable-value rule that other seams use.
+
+The contract and its implementation evidence were approved on 2026-09-09.
 
 The audit rejected two proposed error classes. Jido does not need a
 `:persistence` class or a `:runtime` class now. Persistence and runtime are
@@ -66,7 +68,7 @@ that needs it. `Jido.Error.to_map/1` keeps its exact four top-level keys:
 These items do not block the foundational contract. They block only a later
 change to the listed operation.
 
-## Decisions requested
+## Approved decisions
 
 1. Approve the five-class taxonomy and keep `CompensationError`.
 2. Approve `details.code` and the closed code registry.

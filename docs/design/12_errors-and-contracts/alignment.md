@@ -1,18 +1,18 @@
-> Seam alignment evidence. This document is pending approval.
+> Approved seam alignment. Dependent owner-seam follow-up remains open.
 
 # Errors and public contracts alignment
 
 ## Status
 
-- Design reviewed: 2026-09-09.
-- Code base: approved Agent alignment commit `fa17a6d6`, concurrent Agent
-  authoring commit `ae559f4f`, and the changes in this alignment.
+- Design reviewed: 2026-09-09. Approved: 2026-09-09.
+- Code base: error-contract alignment commit `3e504be6` on branch `v3-spike`.
 - Approved prerequisite: [00 Overview](../00_overview/alignment.md).
 - Narrow pending prerequisite: [90 Package boundaries](../90_package-boundaries/alignment.md)
   for package ownership only.
-- Alignment state: `Complete; pending design approval`.
+- Alignment state: `Approved; foundational implementation complete`.
 
-The alignment state reports work status. It is not document approval.
+The review-status table in `docs/design/README.md` is the source of truth for
+document approval.
 
 ## Audit result
 
@@ -214,8 +214,7 @@ a future change to the owner's operation contract.
 - Seam 08 and seam 09 now record current lifecycle controls as compatible
   owner-managed migrations.
 - Seam 13 no longer depends on a speculative projection v2.
-- Seam 90 can use the completed public inventory as evidence, subject to seam
-  12 approval.
+- Seam 90 can use the approved public inventory as evidence.
 
 ## Verification record
 
@@ -238,4 +237,4 @@ a future change to the owner's operation contract.
 - [x] Exact v1 projection behavior is retained and tested.
 - [x] Agent and persistence portability boundaries have focused evidence.
 - [x] Dependent blockers have a specific resolution or owner deferral.
-- [ ] The user has approved or changed the `ERR-DEC` items.
+- [x] The user has approved or changed the `ERR-DEC` items.
