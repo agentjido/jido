@@ -23,14 +23,23 @@ defmodule Jido.Persistence do
   A Plugin Persistence facet can convert only its paired owned-state value in
   the default checkpoint path. Complete custom Agent checkpoints bypass this
   conversion and keep their opaque callback contract.
+
+  Compatible operations without a namespace use the instance, Agent module,
+  partition, and ID key with record format 2. Namespaced operations use the
+  exact Agent Ref key with record format 3. If only a compatible key exists,
+  the namespaced operation continues to use it. If both keys exist, the
+  operation returns an identity collision. Jido does not rewrite data across
+  the two keys automatically.
   """
 
   alias Jido.Agent
+  alias Jido.Agent.Ref
   alias Jido.Error
   alias Jido.Persistence.{Checkpoint, Record}
   alias Jido.PortableTerm
 
   @key_prefix "jido:agent:v1:"
+  @ref_key_prefix "jido:agent:v2:"
 
   @type adapter_config :: {module(), keyword()} | module() | nil | false
 
@@ -90,15 +99,26 @@ defmodule Jido.Persistence do
     protect(:compare_and_swap, fn ->
       with :ok <- validate_operation_options(opts),
            {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           {:ok, record} <- build_record(agent, instance, opts),
+           partition = Keyword.get(opts, :partition),
+           {:ok, identity} <-
+             storage_identity(
+               adapter,
+               adapter_opts,
+               instance,
+               agent.module,
+               agent.id,
+               partition,
+               Keyword.get(opts, :namespace)
+             ),
+           {:ok, record} <- build_record(agent, instance, opts, identity),
            {:ok, expected_revision} <- expected_revision(opts),
            {:ok, expected_value} <-
-             current_value(adapter, adapter_opts, record, expected_revision),
+             current_value(adapter, adapter_opts, record, identity, expected_revision),
            {:ok, value} <- Record.encode(record),
            :ok <-
              adapter_compare_and_swap(
                adapter,
-               agent_key(record),
+               identity.key,
                expected_value,
                value,
                adapter_opts
@@ -116,12 +136,24 @@ defmodule Jido.Persistence do
       with :ok <- validate_operation_options(opts),
            {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
            :ok <- validate_initial_revision(opts),
-           {:ok, record} <- build_record(agent, instance, Keyword.put(opts, :revision, 0)),
+           partition = Keyword.get(opts, :partition),
+           {:ok, identity} <-
+             storage_identity(
+               adapter,
+               adapter_opts,
+               instance,
+               agent.module,
+               agent.id,
+               partition,
+               Keyword.get(opts, :namespace)
+             ),
+           {:ok, record} <-
+             build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
            {:ok, value} <- Record.encode(record),
            :ok <-
              adapter_compare_and_swap(
                adapter,
-               agent_key(record),
+               identity.key,
                :not_found,
                value,
                adapter_opts
@@ -155,14 +187,24 @@ defmodule Jido.Persistence do
       with :ok <- validate_operation_options(opts),
            {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
            partition = Keyword.get(opts, :partition),
-           key = agent_key(instance, agent_module, agent_id, partition),
-           {:ok, value} <- adapter_get(adapter, key, adapter_opts),
+           {:ok, identity} <-
+             storage_identity(
+               adapter,
+               adapter_opts,
+               instance,
+               agent_module,
+               agent_id,
+               partition,
+               Keyword.get(opts, :namespace)
+             ),
+           {:ok, value} <- adapter_get(adapter, identity.key, adapter_opts),
            {:ok, record} <- Record.decode(value),
-           :ok <- Record.validate(record, instance, agent_module, agent_id, partition),
+           :ok <- validate_record(record, identity, instance, agent_module, agent_id, partition),
            :ok <- require_active(record),
            :ok <- validate_definition_revision(record, agent_module),
            {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
-           {:ok, agent} <- Agent.restore(agent_module, checkpoint, restore_context(record)),
+           {:ok, agent} <-
+             Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
            :ok <- validate_restored_identity(agent, agent_module, agent_id) do
         {:ok, agent, Record.revision(record)}
       end
@@ -180,11 +222,20 @@ defmodule Jido.Persistence do
       with :ok <- validate_operation_options(opts),
            {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
            partition = Keyword.get(opts, :partition),
-           key = agent_key(instance, agent_module, agent_id, partition) do
+           {:ok, identity} <-
+             storage_identity(
+               adapter,
+               adapter_opts,
+               instance,
+               agent_module,
+               agent_id,
+               partition,
+               Keyword.get(opts, :namespace)
+             ) do
         delete_current(
           adapter,
           adapter_opts,
-          key,
+          identity,
           instance,
           agent_module,
           agent_id,
@@ -203,14 +254,25 @@ defmodule Jido.Persistence do
     @key_prefix <> Base.url_encode64(identity, padding: false)
   end
 
+  @doc false
+  @spec agent_key(Ref.t()) :: binary()
+  def agent_key(%Ref{} = ref) do
+    ref = Ref.new!(ref)
+    identity = :erlang.term_to_binary({ref.namespace, ref.partition, ref.id})
+    @ref_key_prefix <> Base.url_encode64(identity, padding: false)
+  end
+
   defp resolve_instance_config(jido) when is_atom(jido) and not is_nil(jido) do
-    if function_exported?(jido, :__jido_persistence__, 0) do
-      jido.__jido_persistence__()
-      |> normalize_adapter_result()
-      |> validate_adapter_result()
-    else
-      {:ok, nil}
-    end
+    config =
+      cond do
+        live_instance?(jido) -> Jido.instance_persistence(jido)
+        function_exported?(jido, :__jido_persistence__, 0) -> jido.__jido_persistence__()
+        true -> nil
+      end
+
+    config
+    |> normalize_adapter_result()
+    |> validate_adapter_result()
   rescue
     error -> {:error, {:invalid_persistence_config, error}}
   end
@@ -219,11 +281,16 @@ defmodule Jido.Persistence do
 
   defp resolve_source(source, opts) do
     {config_result, default_instance} =
-      if is_atom(source) and not is_nil(source) and
-           function_exported?(source, :__jido_persistence__, 0) do
-        {resolve_instance_config(source), source}
-      else
-        {resolve_config(source, nil), nil}
+      cond do
+        is_atom(source) and not is_nil(source) and
+            function_exported?(source, :__jido_persistence__, 0) ->
+          {resolve_instance_config(source), source}
+
+        live_instance?(source) ->
+          {resolve_instance_config(source), source}
+
+        true ->
+          {resolve_config(source, nil), nil}
       end
 
     with {:ok, config} <- config_result,
@@ -231,6 +298,13 @@ defmodule Jido.Persistence do
       {:ok, config, Keyword.get(opts, :instance, default_instance)}
     end
   end
+
+  defp live_instance?(source) when is_atom(source) and not is_nil(source) do
+    is_pid(Process.whereis(source)) and
+      is_pid(Process.whereis(Jido.runtime_store_name(source)))
+  end
+
+  defp live_instance?(_source), do: false
 
   defp require_adapter(nil), do: {:error, :persistence_not_configured}
   defp require_adapter(config), do: {:ok, config}
@@ -294,8 +368,8 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp current_value(adapter, opts, record, expected_revision) do
-    case adapter_get(adapter, agent_key(record), opts) do
+  defp current_value(adapter, opts, record, identity, expected_revision) do
+    case adapter_get(adapter, identity.key, opts) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
 
@@ -304,14 +378,7 @@ defmodule Jido.Persistence do
 
       {:ok, value} ->
         with {:ok, current} <- Record.decode(value),
-             :ok <-
-               Record.validate(
-                 current,
-                 record.instance,
-                 record.agent_module,
-                 record.agent_id,
-                 record.partition
-               ),
+             :ok <- validate_record_against_record(current, record, identity),
              :ok <- require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, value}
@@ -338,10 +405,11 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp build_record(agent, instance, opts) do
+  defp build_record(agent, instance, opts, identity) do
     partition = Keyword.get(opts, :partition)
     revision = Keyword.get(opts, :revision, 0)
     reason = Keyword.get(opts, :reason, :manual)
+    record_format = record_format(identity)
 
     context = %{
       instance: instance,
@@ -351,8 +419,9 @@ defmodule Jido.Persistence do
     }
 
     with true <- is_integer(revision) and revision >= 0,
-         {:ok, checkpoint} <- Checkpoint.dump(agent, context, Record.format_version(), reason),
-         {:ok, record} <- Record.build_active(agent, instance, partition, revision, checkpoint) do
+         {:ok, checkpoint} <- Checkpoint.dump(agent, context, record_format, reason),
+         {:ok, record} <-
+           build_active_record(agent, instance, partition, revision, checkpoint, identity) do
       {:ok, record}
     else
       false -> {:error, {:invalid_checkpoint, :shape}}
@@ -360,35 +429,198 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp delete_current(adapter, adapter_opts, key, instance, agent_module, agent_id, partition) do
-    case adapter_get(adapter, key, adapter_opts) do
+  defp storage_identity(
+         _adapter,
+         _adapter_opts,
+         instance,
+         agent_module,
+         agent_id,
+         partition,
+         nil
+       ) do
+    {:ok,
+     %{
+       mode: :legacy,
+       key: agent_key(instance, agent_module, agent_id, partition)
+     }}
+  end
+
+  defp storage_identity(
+         adapter,
+         adapter_opts,
+         instance,
+         agent_module,
+         agent_id,
+         partition,
+         namespace
+       ) do
+    with {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id) do
+      ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace}
+
+      legacy_identity = %{
+        mode: :legacy,
+        key: agent_key(instance, agent_module, agent_id, partition)
+      }
+
+      select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity)
+    end
+  end
+
+  defp select_storage_identity(adapter, opts, ref_identity, legacy_identity) do
+    case {
+      stored_key_state(adapter, ref_identity.key, opts),
+      stored_key_state(adapter, legacy_identity.key, opts)
+    } do
+      {:missing, :missing} ->
+        {:ok, ref_identity}
+
+      {:present, :missing} ->
+        {:ok, ref_identity}
+
+      {:missing, :present} ->
+        {:ok, legacy_identity}
+
+      {:present, :present} ->
+        {:error,
+         {:persistence_identity_collision,
+          %{ref_key: ref_identity.key, legacy_key: legacy_identity.key}}}
+
+      {{:error, reason}, _legacy} ->
+        {:error, reason}
+
+      {_ref, {:error, reason}} ->
+        {:error, reason}
+    end
+  end
+
+  defp stored_key_state(adapter, key, opts) do
+    case adapter_get(adapter, key, opts) do
+      {:ok, _value} -> :present
+      {:error, :not_found} -> :missing
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp record_format(%{mode: :legacy}), do: Record.format_version()
+  defp record_format(%{mode: :ref}), do: Record.ref_format_version()
+
+  defp build_active_record(agent, instance, partition, revision, checkpoint, %{mode: :legacy}) do
+    Record.build_active(agent, instance, partition, revision, checkpoint)
+  end
+
+  defp build_active_record(agent, _instance, partition, revision, checkpoint, %{
+         mode: :ref,
+         namespace: namespace
+       }) do
+    Record.build_ref_active(agent, namespace, partition, revision, checkpoint)
+  end
+
+  defp build_tombstone_record(
+         instance,
+         agent_module,
+         agent_id,
+         partition,
+         revision,
+         %{mode: :legacy}
+       ) do
+    Record.build_tombstone(instance, agent_module, agent_id, partition, revision)
+  end
+
+  defp build_tombstone_record(
+         _instance,
+         agent_module,
+         agent_id,
+         partition,
+         revision,
+         %{mode: :ref, namespace: namespace}
+       ) do
+    Record.build_ref_tombstone(namespace, agent_module, agent_id, partition, revision)
+  end
+
+  defp validate_record(record, %{mode: :legacy}, instance, agent_module, agent_id, partition) do
+    Record.validate(record, instance, agent_module, agent_id, partition)
+  end
+
+  defp validate_record(
+         record,
+         %{mode: :ref, namespace: namespace},
+         _instance,
+         agent_module,
+         agent_id,
+         partition
+       ) do
+    Record.validate_ref(record, namespace, agent_module, agent_id, partition)
+  end
+
+  defp validate_record_against_record(current, record, %{mode: :legacy}) do
+    Record.validate(
+      current,
+      record.instance,
+      record.agent_module,
+      record.agent_id,
+      record.partition
+    )
+  end
+
+  defp validate_record_against_record(current, record, %{
+         mode: :ref,
+         namespace: namespace
+       }) do
+    Record.validate_ref(
+      current,
+      namespace,
+      record.agent_module,
+      record.agent_id,
+      record.partition
+    )
+  end
+
+  defp delete_current(
+         adapter,
+         adapter_opts,
+         identity,
+         instance,
+         agent_module,
+         agent_id,
+         partition
+       ) do
+    case adapter_get(adapter, identity.key, adapter_opts) do
       {:error, :not_found} ->
         with {:ok, tombstone} <-
-               Record.build_tombstone(instance, agent_module, agent_id, partition, 0),
+               build_tombstone_record(
+                 instance,
+                 agent_module,
+                 agent_id,
+                 partition,
+                 0,
+                 identity
+               ),
              {:ok, value} <- Record.encode(tombstone) do
-          adapter_compare_and_swap(adapter, key, :not_found, value, adapter_opts)
+          adapter_compare_and_swap(adapter, identity.key, :not_found, value, adapter_opts)
         end
 
       {:ok, expected_value} ->
         with {:ok, current} <- Record.decode(expected_value),
-             :ok <- Record.validate(current, instance, agent_module, agent_id, partition) do
+             :ok <-
+               validate_record(current, identity, instance, agent_module, agent_id, partition) do
           case Record.kind(current) do
             :tombstone ->
               :ok
 
             :active ->
               with {:ok, tombstone} <-
-                     Record.build_tombstone(
+                     build_tombstone_record(
                        instance,
                        agent_module,
                        agent_id,
                        partition,
-                       Record.revision(current)
+                       Record.revision(current),
+                       identity
                      ),
                    {:ok, value} <- Record.encode(tombstone) do
                 adapter_compare_and_swap(
                   adapter,
-                  key,
+                  identity.key,
                   expected_value,
                   value,
                   adapter_opts
@@ -421,7 +653,7 @@ defmodule Jido.Persistence do
   defp restore_checkpoint(record, agent_module) do
     checkpoint = Record.checkpoint(record)
 
-    if Record.format(record) == Record.format_version() do
+    if Record.format(record) in [Record.format_version(), Record.ref_format_version()] do
       Checkpoint.load(agent_module, checkpoint, Record.format(record), :restore)
     else
       {:ok, checkpoint}
@@ -464,17 +696,13 @@ defmodule Jido.Persistence do
   defp validate_restored_identity(_agent, _module, _id),
     do: {:error, {:invalid_persistence_record, :checkpoint_identity}}
 
-  defp restore_context(record) do
+  defp restore_context(record, instance) do
     %{
-      instance: Map.fetch!(record, :instance),
+      instance: instance,
       partition: Map.fetch!(record, :partition),
       revision: Record.revision(record),
       reason: :restore
     }
-  end
-
-  defp agent_key(record) do
-    agent_key(record.instance, record.agent_module, record.agent_id, record.partition)
   end
 
   defp adapter_get(adapter, key, opts) do

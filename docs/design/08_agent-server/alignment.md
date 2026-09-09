@@ -1,5 +1,5 @@
 > Seam alignment evidence. The implementation direction was selected on
-> 2026-09-10. Ref-first instance controls remain with seam 09.
+> 2026-09-10. Seam 09 now supplies the Ref-first instance controls.
 
 # Agent Server alignment
 
@@ -10,7 +10,7 @@
   source-Signal evaluation, owner-specific Plugin facets, commit authority,
   durable record lifecycle, Agent definition versions, and current public
   error contracts are present.
-- Alignment state: `Implemented with Ref-first facade work deferred`.
+- Alignment state: `Implemented; Ref-first instance integration is also complete`.
 
 The Agent Server now has one active pre-commit timeout, strict ready
 publication, and coherent Plugin runtime bootstrap values. Existing
@@ -147,10 +147,10 @@ This register records the state after implementation.
 | --- | --- | --- | --- | --- |
 | `SRV-GAP-001` | `SRV-REQ-001` to `SRV-REQ-004` | Server State, OTP startup, checkpoint, and child tests | Private handles remain only in Server-owned values. | `Resolved` |
 | `SRV-GAP-002` | `SRV-REQ-005`, `SRV-REQ-006` | Options, construction, and definition-version tests | Canonical construction and instance protection are implemented. | `Resolved` |
-| `SRV-GAP-003` | `SRV-REQ-007` | Stable Ref value and public PID/name API | Ref exists, but Ref-first runtime resolution is instance-owned. | `Deferred to seam 09` |
-| `SRV-GAP-004` | `SRV-REQ-008` | Durable lifecycle and definition checks | Active, tombstone, legacy, and revision checks are implemented. Ref-key binding remains. | `Deferred to seam 09` |
+| `SRV-GAP-003` | `SRV-REQ-007` | Stable Ref value, seam-09 local resolution, and public PID/name API | The instance facade resolves the replaceable PID before it calls this Server. | `Resolved across seams 08 and 09` |
+| `SRV-GAP-004` | `SRV-REQ-008` | Durable lifecycle, definition checks, stable Ref keys, and namespace rebind proof | The instance supplies namespace while the Server retains activation meaning. | `Resolved across seams 07 to 09` |
 | `SRV-GAP-005` | `SRV-REQ-009` to `SRV-REQ-011` | Initial-write cleanup and publication test | Registry identity is reserved as `:starting`; public lookup accepts only `:ready` after confirmed creation. | `Resolved` |
-| `SRV-GAP-006` | `SRV-REQ-012` to `SRV-REQ-017` | Public API and caller-timeout tests | Current PID/name and OTP controls remain supported. Ref delegates are additive instance work. | `Resolved for Server`; seam 09 follow-up |
+| `SRV-GAP-006` | `SRV-REQ-012` to `SRV-REQ-017` | Public API, caller-timeout, and Ref-facade tests | Current PID/name and OTP controls remain supported beside additive Ref delegates. | `Resolved` |
 | `SRV-GAP-007` | `SRV-REQ-018` to `SRV-REQ-022` | Postponement and overload tests | OTP order, bounded reached-event tokens, call rejection, and bounded cast observation remain supported. | `Resolved` |
 | `SRV-GAP-008` | `SRV-REQ-023` | Reentry tests | Admission, executable, and Directive process trees are rejected through owner-defined controls. | `Resolved` |
 | `SRV-GAP-009` | `SRV-REQ-024` to `SRV-REQ-027` | Seam-04 Runner and seam-05 owner facets | Admission cannot change source selection; the selected executable reaches Exec. | `Resolved` |
@@ -185,7 +185,7 @@ Server proposal and gap report. Git history retains their exact text.
 | Only `start_link` and child specification can remain public. | `Remove`. | Current command, control, inspection, debug, child, and lifecycle operations are documented and tested. |
 | A Server owns one committed Agent, version, mailbox, active Turn, persistence coordination, Plugin links, attachments, and effect control. | `Retain`. | These are current seam-owned roles. |
 | The private state must contain `initial_agent` and reset nonpersistent restart to it. | `Remove`. | Current and prerequisite targets retain the last committed in-instance runtime checkpoint. |
-| A persistent child specification keeps only Ref and instance as restart source. | `Defer`. | Core Ref and namespace binding do not exist. Seam 09 owns restart source configuration. |
+| A persistent child specification keeps only Ref and instance as restart source. | `Defer`. | Ref and namespace now exist, but current child restart contracts still require their compatible options. Seam 10 owns any topology-level source change. |
 | Runtime handles never enter Agent or checkpoint data. | `Retain`. | Current state, checkpoint, and child tests support this invariant. |
 | The runtime has exactly four phases and no `admitting` phase. | `Replace`. | Current public status exposes five total phases. Keep them for compatibility. |
 | Plugin preparation must be hidden inside `running`. | `Remove as a phase rule`. | `admitting` is current public data. Seam 04 owns evaluator stages, not Server phases. |
@@ -198,7 +198,7 @@ Server proposal and gap report. Git history retains their exact text.
 | Persistence timeout is an indeterminate write and stops authority. | `Retain conditionally`. | Seam 07 deferred the option. If configured by owning seams, the result meaning is indeterminate. |
 | Directive timeout is post-commit failure and creates no replay duty. | `Retain`. | Current commit retention works. Effect completion can remain uncertain. |
 | Cancellation and completion races are decided by the first processed event. | `Implemented`. | `:gen_statem` serialization and both race-order tests prove the rule. |
-| The facade must expose a fixed list of Ref-first command and lifecycle functions. | `Defer exact facade`. | Seam 09 owns names, namespace binding, resolution, and public lifecycle policy. |
+| The facade must expose a fixed list of Ref-first command and lifecycle functions. | `Implemented by seam 09`. | The instance owns names, namespace checks, resolution, and public lifecycle policy. |
 | `start_agent` and `activate_agent` must define complete startup semantics here. | `Split ownership`. | This seam owns Server readiness. Seam 09 owns facade and publication. Seam 07 owns record meaning. |
 | Public runtime options include partition, Turn, readiness, Directive, dispatch, error, idle, and postponed limits. | `Implemented for Server-owned limits`. | `turn_timeout` is separate from caller, readiness, persistence, Directive, and idle limits. Instance-owned fields stay outside this seam. |
 | Error policy must become only closed `continue` or `stop` data. | `Replace with staged compatibility`. | Current Signal, maximum-count, and function policies are supported. They cannot override safety invariants. |
@@ -317,10 +317,10 @@ Create the formal plan only after the user approves this seam.
 | --- | --- | --- | --- |
 | `SRV-REQ-001` to `SRV-REQ-004` | Server State, OTP startup, and ownership tests | Complete private-handle exclusion and one-owner audit | `Proven` |
 | `SRV-REQ-005`, `SRV-REQ-006` | Options, public construction, and definition-version tests | Keep through later authoring changes | `Proven` |
-| `SRV-REQ-007` | PID/name lookup and stable Ref value | Ref-to-handle resolution belongs to seam 09 | `Proven for Server ownership` |
-| `SRV-REQ-008` | Seam-07 record lifecycle tests | Ref-key migration belongs to seam 09 | `Proven for current key` |
+| `SRV-REQ-007` | PID/name lookup plus seam-09 Ref-to-handle resolution | None | `Proven across owner seams` |
+| `SRV-REQ-008` | Seam-07 lifecycle plus seam-09 stable Ref record and rebind tests | None | `Proven across owner seams` |
 | `SRV-REQ-009` to `SRV-REQ-011` | Revision-zero create, cleanup, and strict publication tests | None in this seam | `Proven` |
-| `SRV-REQ-012` to `SRV-REQ-017` | Public API, async request, caller-timeout, and compatibility tests | Additive Ref facade belongs to seam 09 | `Proven for Server controls` |
+| `SRV-REQ-012` to `SRV-REQ-017` | Public API, async request, caller-timeout, compatibility, and additive Ref-facade tests | None | `Proven across owner seams` |
 | `SRV-REQ-018` to `SRV-REQ-022` | Postponement, overload, and bounded cast observation | None | `Proven` |
 | `SRV-REQ-023` | Reentry tests for all three owned process trees | None | `Proven` |
 | `SRV-REQ-024` to `SRV-REQ-027` | Source-first selection, ordered admission, and exact Exec target tests | None | `Proven` |
@@ -351,9 +351,9 @@ No removal or deprecation is approved in this seam.
 
 | Area | Compatibility rule and gate |
 | --- | --- |
-| PID and name API | Keep all documented current operations. Add Ref-first instance calls before any later restriction. |
+| PID and name API | Keep all documented current operations beside the implemented Ref-first instance calls. |
 | Startup | Keep module, neutral definition, and Agent instance inputs. Add revision and initial-write checks without changing canonical construction ownership. |
-| Identity | Keep IDs and term-valued partitions. Do not require Ref until seams 03 and 09 define namespace and conversion. |
+| Identity | Keep IDs and term-valued partitions. Ref-first operations require the implemented namespace and binary-or-`nil` Ref partition. |
 | Status | Keep the current map and five phase atoms. Add fields only through an owner-documented compatible form. |
 | Snapshot and Outcome | Keep the snapshot map and current validated Outcome. Seam 13 must inventory consumers before changing fields, Signals, or stages. |
 | Debug | Keep bounded `set_debug` and `recent_events`. A later removal needs observation replacement proof and security review. |
@@ -381,7 +381,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-002` | `Resolved` | 90 Package boundaries | Agent Server remains in Core and public API compatibility is retained. | Keep cross-package proof in seam 99. |
 | `SRV-BLK-003` | `Resolved` | 12 Errors and contracts and 08 Agent Server | Current controls stay compatible. `agent_turn_timeout` is one registered owner code. | Preserve the stable-code registry. |
 | `SRV-BLK-004` | `Resolved` | 01 Agent and 02 Agent authoring | Agent version, default checkpoint behavior, and canonical authoring are implemented and approved at `fa17a6d6` and `ae559f4f`. | No action. |
-| `SRV-BLK-005` | `Deferred owner work` | 09 Jido instance | Core Ref exists. Namespace binding and the Ref-first facade remain instance-owned. | Implement them in seam 09 without removing current handles. |
+| `SRV-BLK-005` | `Resolved` | 09 Jido instance | Namespace binding, stable persistence identity, and the Ref-first facade are implemented without removing current handles. | Preserve the local-only boundary. |
 | `SRV-BLK-006` | `Resolved` | 04 Turn evaluation and 05 Plugins | Source-Signal selection and owner-specific facets are implemented. | Preserve their order. |
 | `SRV-BLK-007` | `Resolved design input` | 06 Commit, 07 Persistence, 08 Agent Server | Every required write error now stops the activation, returns the failure, and requires restore-first reactivation. | Preserve the rule during seam-08 lifecycle work. |
 | `SRV-BLK-008` | `Resolved` | 07 Persistence and 08 Agent Server | Revision-zero create and strict ready publication are implemented. | Preserve their order. |

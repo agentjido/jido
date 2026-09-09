@@ -7,9 +7,7 @@ defmodule JidoTest.SupervisorTest do
     end
 
     test "requires :name option" do
-      assert_raise KeyError, ~r/:name/, fn ->
-        Jido.start_link([])
-      end
+      assert {:error, %Jido.Error.ValidationError{}} = Jido.start_link([])
     end
 
     test "can be used as a child spec" do

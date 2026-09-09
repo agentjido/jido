@@ -26,10 +26,12 @@ an application-supplied command function and supports a millisecond TTL. That
 TTL also applies to tombstones and limits the delayed-writer fence. Its unit
 tests use a controlled command function; they do not prove Redis failover.
 
-Storage keys start with `jido:agent:v1:`. New outer records use format 2. The
-reader also accepts Jido V3 outer format-1 active records. Old V2 and Actor
-records require an explicit offline application conversion. There is no
-automatic conversion.
+Compatible unnamed storage keys start with `jido:agent:v1:` and use outer
+format 2. Namespaced Ref keys start with `jido:agent:v2:` and use outer format
+3. The reader also accepts Jido V3 outer format-1 active records. A namespaced
+operation reads a lone compatible key but rejects a compatible and Ref-key
+collision. It does not rewrite across keys. Old V2 and Actor records require
+an explicit offline application conversion.
 Standalone Thread values remain, but old Thread stores and append APIs do not.
 Ordinary directives are not a durable outbox. See the
 [delivery and job examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md).

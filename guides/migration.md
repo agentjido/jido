@@ -389,10 +389,11 @@ V2 Storage checkpoints, Plugin pointers, and Thread append stores do not have
 an automatic V3 reader. Renaming an envelope is not a conversion.
 
 V3 uses `Jido.Persistence` and a binary adapter with atomic compare-and-swap.
-Keys start with `jido:agent:v1:` and include instance, module, partition, and ID.
-New outer records use format 2 with active or tombstone kind. The reader also
-accepts Jido V3 outer format-1 active records. Restore validates identity,
-definition revision, complete state, and recursive portability.
+Compatible unnamed keys start with `jido:agent:v1:` and include instance,
+module, partition, and ID. They use outer format 2. Namespaced keys start with
+`jido:agent:v2:`, use `{namespace, partition, id}`, and use outer format 3. The
+reader also accepts Jido V3 outer format-1 active records. Restore validates
+identity, definition revision, complete state, and recursive portability.
 
 ### What you need to change
 
@@ -401,16 +402,21 @@ definition revision, complete state, and recursive portability.
    domain state, Plugin state, history, and pending work.
 3. Convert each domain and Plugin state value to the new schemas. Decide how
    to reconcile external work that might already have completed.
-4. Construct and validate a V3 instance. Save it through the V3 persistence API
-   and adapter. Keep V2 backups separate from V3 records.
+4. Construct and validate a V3 instance. If you add a namespace, confirm that
+   no compatible and stable keys exist for the same Ref. Save through the V3
+   persistence API and adapter. Keep V2 backups separate from V3 records.
 5. Restore the saved record in a fresh V3 process. Verify identity, state,
    pending work IDs, retry counts, and Plugin reconstruction before activation.
-6. Rehearse rollback. V2 cannot read new records automatically; restoring a
-   backup also requires reconciliation of external work performed after cutover.
+6. Rehearse rollback before the first namespaced write. Older code cannot read
+   format 3. Downgrade after that write is unsupported. Restoring a backup also
+   requires reconciliation of external work performed after cutover.
 
 Do not run old and new writers against the same logical records during this
-conversion. There is no general converter for application-specific Plugin
-state or external effects.
+conversion. The adapter cannot atomically move one record across two keys.
+There is no general converter for application-specific Plugin state or
+external effects. Core adapters also have no key-list contract. Inventory
+legacy module keys that would collapse to the same `{namespace, partition,
+id}` before cutover.
 
 Every required persistence write error stops that activation before another
 Action evaluates. A confirmed conflict remains a failed commit by that writer.

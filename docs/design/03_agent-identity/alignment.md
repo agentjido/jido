@@ -1,10 +1,12 @@
-> Seam alignment plan. This document is pending approval.
+> Seam alignment evidence. The Ref value and local instance consumers are
+> implemented. Runtime delivery and placement remain with seam 10.
 
 # Stable Agent identity alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. This seam is pending approval.
+- Design reviewed: 2026-09-08. Ref selected on 2026-09-09. Local instance and
+  persistence consumers implemented on 2026-09-10.
 - Code and Ref implementation reviewed: 2026-09-09 on branch `v3-spike`,
   after package-boundary commit `82956491`.
 - Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
@@ -12,9 +14,9 @@
   [01 Agent](../01_agent/alignment.md), which are approved. The approved
   seam-12 error contract remains the validation boundary; its package-boundary
   inventory revalidation is pending approval.
-- Alignment state: `Ref value implemented; dependent boundary use remains
-  with owner seams`.
-- Approved decisions: None.
+- Alignment state: `Implemented for value, local instance, and persistence;
+  delivery and placement remain with seam 10`.
+- Selected decisions: `ID-DEC-001` through `ID-DEC-007`.
 
 The alignment state is execution status. It is not document approval. This
 file defines outcomes and gates. It is not an implementation plan.
@@ -46,14 +48,16 @@ file defines outcomes and gates. It is not an implementation plan.
   optional partition, and ID tuple and provides a strict version-1 map codec.
 - `lib/jido/agent.ex:96-135,327-337`: an Agent instance has one nonempty
   string ID and no namespace or partition field.
-- `lib/jido.ex:70-107,144-185`: `use Jido` has no namespace option. Generated
-  lifecycle functions accept Agent values, modules, IDs, partitions, and PIDs.
+- `lib/jido.ex`: `use Jido` accepts an optional stable namespace. Generated
+  modules expose compatible lifecycle functions and an additive Ref-first
+  family.
 - `lib/jido.ex:233-234,347-370,417-425`: Jido instances are atom-named local
   supervisors. Each owns a Registry. A partition can be any term.
 - `lib/jido/agent_server.ex:295-310,2983-2986,3039`: registered Server names
   use Agent ID and optional partition in one selected Registry.
-- `lib/jido/persistence.ex:59-160,248-307,330-383`: persistence keys and records
-  use instance, Agent module, partition, and Agent ID. Load validates all four.
+- `lib/jido/persistence.ex` and `lib/jido/persistence/record.ex`: unnamed
+  operations keep compatible keys. Namespaced operations use the complete Ref
+  key and format-3 records, with dual-read and collision rules.
 - `lib/jido/agent.ex:370-423,521-543`: the default checkpoint carries Agent
   module and ID. Restore rejects a module or ID mismatch.
 - `lib/jido/agent_server/runtime_checkpoint.ex:8-50` and
@@ -87,8 +91,8 @@ file defines outcomes and gates. It is not an implementation plan.
   skipped.
 - `examples/99_research/99_11_stable_reference/stable_reference.ex:25-46` and
   `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80`:
-  an application Ref can resolve local lookup on each call. Core namespace
-  rebinding is not implemented.
+  the Core Ref facade resolves the current local PID and restores durable state
+  after the namespace is rebound to another local instance name.
 
 ## Retained baseline
 
@@ -115,14 +119,14 @@ file defines outcomes and gates. It is not an implementation plan.
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
 | `ID-GAP-001` | `ID-REQ-001` to `ID-REQ-013` | `Jido.Agent.Ref`, focused contract tests, and the stable-reference example | Core provides the constructor, validator, exact equality, exclusions, and strict version-1 map codec. | `Aligned` |
-| `ID-GAP-002` | `ID-REQ-006`, `ID-REQ-015`, `ID-REQ-017` | Jido instance atom and module scope Registry and storage | No stable namespace can survive module replacement or bind one identity domain across instance lifetimes. | `Change`; seam 09 owns binding |
+| `ID-GAP-002` | `ID-REQ-006`, `ID-REQ-015`, `ID-REQ-017` | Exact namespace binding and durable rebind tests | Stable namespace stays independent of module, Supervisor name, and PID. | `Aligned by seam 09` |
 | `ID-GAP-003` | `ID-REQ-003`, `ID-REQ-016`, `ID-REQ-026` | Partition is `term()` and tests use `:blue` | The target Ref uses `nil` or a nonempty binary string. | `Change, staged` |
-| `ID-GAP-004` | `ID-REQ-014`, `ID-REQ-018` | Agent, Registry, and RuntimeStore use separate ID and partition inputs | They do not start from one validated Ref. | `Change` |
-| `ID-GAP-005` | `ID-REQ-019`, `ID-REQ-020`, `ID-REQ-027`, `ID-REQ-028` | Persistence key is `{instance, agent_module, partition, agent_id}` | Module and runtime instance are part of durable identity. No dual-read, collision, or rollback rule exists. | `Change, staged`; seam 07 owns record work |
+| `ID-GAP-004` | `ID-REQ-014`, `ID-REQ-018` | Ref facade startup and lookup tests | The facade validates the complete Ref and maps it to the compatible local Registry key only after the namespace check. | `Aligned by seam 09` |
+| `ID-GAP-005` | `ID-REQ-019`, `ID-REQ-020`, `ID-REQ-027`, `ID-REQ-028` | Stable Ref key, format-3 records, module validation, legacy read, and dual-key collision tests | Automatic cross-key rewrite is unsafe with the adapter contract and is not done. Downgrade after a new format-3 write is unsupported. | `Aligned with explicit migration limits` |
 | `ID-GAP-006` | `ID-REQ-021`, `ID-REQ-023`, `ID-REQ-024` | Parent and child delivery uses saved IDs and PIDs | Delivery does not carry one Ref and a changed PID can make a saved handle stale. | `Change`; seams 08 and 10 own resolution |
 | `ID-GAP-007` | `ID-REQ-022` | Remote spawn carries node, Jido atom, ID, partition, parent PID, and request reference | Stable identity and requested location have no separate public values. | `Change`; do not change placement policy here |
 | `ID-GAP-008` | `ID-REQ-025`, `ID-REQ-026` | Public ID, PID, generated-name, and term-partition APIs are active and tested | A direct replacement would break supported behavior. | `Retain` during additive migration |
-| `ID-GAP-009` | All requirements | Focused Ref tests prove the owned value contract; current runtime tests cover separate consumers | Dependent seams must prove exact Ref preservation at their boundaries. | `Owner-deferred evidence` |
+| `ID-GAP-009` | All requirements | Focused Ref, instance, persistence, and FA03 tests prove the implemented consumers. | Seam 10 must prove delivery and placement consumers. | `Partially owner-deferred` |
 
 ## Dispositions of earlier analysis
 
@@ -222,15 +226,15 @@ Create the implementation plan later, after the design is approved.
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
 | `ID-REQ-001` to `ID-REQ-013` | `lib/jido/agent/ref.ex`; `test/jido/agent/ref_test.exs`; stable-reference example and tests | Core value, field validation, exact equality, errors, exclusions, and version-1 map round trips | `Proven` |
-| `ID-REQ-014` | Agent ID and checkpoint identity checks | Ref-to-Agent mismatch test at every binding boundary | `Partial` |
-| `ID-REQ-015` and `ID-REQ-017` | Separate Jido instance Registries and storage keys | Stable namespace tests across instance restart and module rename | `Partial` |
-| `ID-REQ-016` | Partitioned Registry and persistence tests | Ref equality and isolation for `nil` and binary partitions | `Partial` |
-| `ID-REQ-018` | Registry lookup by ID and partition | Complete-Ref registration, lookup, replacement PID, and dead PID tests | `Partial` |
-| `ID-REQ-019` and `ID-REQ-020` | Module-based persistence keys and validated record fields | Ref-key records with separate module and definition-revision fields | `Conflict` |
+| `ID-REQ-014` | Ref startup rejects an ID or partition conflict | None | `Proven` |
+| `ID-REQ-015` to `ID-REQ-017` | Ref value tests plus namespace, partition, and instance rebind tests | None | `Proven` |
+| `ID-REQ-018` | Ref facade lookup, replacement PID, missing PID, and wrong namespace tests | None | `Proven for local lookup` |
+| `ID-REQ-019` and `ID-REQ-020` | Stable Ref keys and format-3 records keep Agent module and revision outside key identity | None | `Proven` |
 | `ID-REQ-021` | Parent and child structures copy ID and partition | Exact Ref delivery after PID replacement | `Missing` |
-| `ID-REQ-022` to `ID-REQ-024` | Explicit remote node placement keeps ID and partition | Ref-preserving node move, stale location, and disconnect tests | `Partial` |
+| `ID-REQ-022` | Explicit remote node placement keeps ID and partition | Ref-preserving placement tests | `Deferred to seam 10` |
+| `ID-REQ-023` and `ID-REQ-024` | Ref facade resolves a replaceable local PID and never changes the Ref | None | `Proven locally` |
 | `ID-REQ-025` and `ID-REQ-026` | Current APIs and atom-partition tests | Compatibility inventory and release gates beside Ref-first APIs | `Proven` |
-| `ID-REQ-027` and `ID-REQ-028` | No migration path | Collision, legacy read, mixed-version, rewrite, rollback, and removal-gate tests | `Missing` |
+| `ID-REQ-027` and `ID-REQ-028` | Dual-read and dual-key collision tests plus explicit no-rewrite and unsupported-downgrade rules | None | `Proven` |
 
 ## Migration and compatibility
 
@@ -243,7 +247,7 @@ No removal or deprecation is approved in this seam.
 | PID and generated names | Keep them as documented runtime controls. Do not use them as durable identity. |
 | Partitions | Keep current term-valued options. Require explicit conversion and collision checks before a value enters the binary-string Ref field. |
 | Jido instances | Keep current atom and module names. Add namespace binding without making current names durable identity. |
-| Persistence | Keep old records readable. Seam 07 must define dual-read order, collision failure, rewrite timing, rollback, and the final removal gate. |
+| Persistence | Keep a lone legacy record readable. Use the stable Ref key for a new namespaced record. Reject dual-key collisions. Do not rewrite across keys automatically. Downgrade after a stable write is unsupported. |
 | Checkpoints | Keep Agent module and definition data as restore data. Add the exact Ref only through the approved Agent and persistence format migration. |
 | Relationships and delivery | Keep owned-child and direct PID behavior while Ref targets and handle refresh get proof. |
 | Remote placement | Keep explicit node requests. Node stays separate from Ref. |
@@ -257,10 +261,10 @@ No removal or deprecation is approved in this seam.
 | `ID-BLK-002` | `Blocker` | 90 Package boundaries | Core identity ownership and the local-core boundary are pending approval. | Approve or change the package boundary. |
 | `ID-BLK-003` | `Owner dependency` | 12 Errors and contracts and 03 Agent identity | Shared value, validation-error, and portability rules are implemented and pending seam-12 approval. Exact Ref fields and any `agent_ref` projection stay with seam 03. | Approve seam 12, then define and prove the Ref-owned fields without changing error projection v1. |
 | `ID-BLK-004` | `Blocker` | 01 Agent | Agent ID and definition-revision contracts are pending approval. | Confirm that Ref uses `agent.id` and excludes definition revision. |
-| `ID-BLK-005` | `Blocker` | 09 Jido instance | Namespace assignment, local binding, duplicate handling, and module-rename configuration are not defined. | Approve the instance binding contract. |
+| `ID-BLK-005` | `Resolved` | 09 Jido instance | Namespace assignment, local binding, duplicate handling, and instance-name replacement are implemented. | Preserve the exact local scope. |
 | `ID-BLK-006` | `Blocker` | 03 Agent identity | Current partitions accept any term, but the target Ref field is binary or `nil`. | Approve conversion, collision, and transition rules. |
-| `ID-BLK-007` | `Blocker` | 07 Persistence | Legacy key reads, collision behavior, rewrite, rollback, and removal gates are not defined. | Approve the persistence migration before key changes. |
-| `ID-BLK-008` | `Assumption` | 08 Agent Server, 09 Jido instance, 10 Runtime topology | Ref-first paths can be additive while current PID and ID controls stay supported. | Confirm exact APIs and results in the owner seams. |
+| `ID-BLK-007` | `Resolved with limit` | 07 Persistence and 09 Jido instance | Legacy read and collision behavior are implemented. The adapter cannot atomically rewrite two keys. | Keep rewrite offline or provider-owned. |
+| `ID-BLK-008` | `Resolved locally` | 08 Agent Server and 09 Jido instance | Ref-first paths are additive while current PID and ID controls stay supported. | Seam 10 must preserve this rule. |
 | `ID-BLK-009` | `Assumption` | 10 Runtime topology and later authority owner | Location discovery and exclusive write authority remain separate from Ref. | Define those contracts without changing the identity tuple. |
 
 ## Completion criteria
@@ -268,18 +272,18 @@ No removal or deprecation is approved in this seam.
 - [ ] The user has approved or changed each `ID-DEC` item.
 - [ ] Prerequisite drafts are approved or replaced by explicit assumptions.
 - [ ] Every approved `ID-REQ` item has `Proven` evidence.
-- [ ] No unresolved `Conflict` remains in the acceptance matrix.
+- [x] No unresolved persistence `Conflict` remains in the acceptance matrix.
 - [x] Ref construction, validation, equality, and portable encoding have public
       contract tests.
 - [ ] Namespace and partition isolation work across process, instance, module,
       and node changes.
-- [ ] Persistence migration keeps old records reachable and has collision and
-      rollback proof.
+- [x] Persistence keeps a lone old record reachable, detects a collision, and
+      documents the no-automatic-rewrite and unsupported-downgrade rules.
 - [ ] Delivery and placement preserve the exact Ref while location and handles
       stay separate.
-- [ ] Current ID, PID, generated-name, partition, owned-child, and persistence
+- [x] Current ID, PID, generated-name, partition, owned-child, and persistence
       APIs remain supported until approved owner-seam gates complete.
-- [ ] No cluster directory, transport policy, placement policy, lease, or
+- [x] No cluster directory, transport policy, placement policy, lease, or
       fencing contract is decided in this seam.
 - [ ] Dependent seam documents use the approved identity contract.
 - [ ] After approval, the formal implementation plan is created separately.

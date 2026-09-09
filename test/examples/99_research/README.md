@@ -20,7 +20,7 @@ example starts two local Erlang nodes. Each row has its own focused command.
 | --- | --- | ---: | ---: | --- |
 | FA-01 | [Route precedence and fixed selection](99_09_route_selection/README.md) | 4 | 0 | Core feature available |
 | FA-02 | [Plugin read and prepared-input isolation](99_10_plugin_isolation/README.md) | 4 | 0 | Core feature available |
-| FA-03 | [Stable Agent references and durable namespace identity](99_11_stable_reference/README.md) | 2 | 1 | Core feature required; application reference works |
+| FA-03 | [Stable Agent references and durable namespace identity](99_11_stable_reference/README.md) | 3 | 0 | Implemented and executable |
 | FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 2 | 0 | Core feature available |
 | FA-05 | [Durable deletion](99_13_durable_delete/README.md) | 2 | 1 | Core feature required |
 | FA-06 | [Plugin runtime reconstruction from committed state](99_03_input_resource_lifecycle/README.md) | 1 | 1 | Core feature required; public pull recovery works |

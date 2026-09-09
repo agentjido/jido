@@ -1,12 +1,11 @@
 > Selected seam design. The implementation direction was selected on
-> 2026-09-09. Stable Ref key migration remains with seam 09.
+> 2026-09-09. Stable Ref persistence was completed on 2026-09-10.
 
 # Persistence design
 
-The record lifecycle, adapter surface, Plugin composition, and write-result
-rules in this document are implemented. Requirements for stable Ref keys remain
-deferred until seam 09 binds namespace and partition values. The full target
-design is still pending approval.
+The record lifecycle, adapter surface, Plugin composition, write-result rules,
+and stable namespaced identity in this document are implemented. The alignment
+record states the compatibility and migration limits.
 
 ## Scope and owner
 
@@ -58,8 +57,9 @@ Four revisions remain separate:
 - state revision is the Agent Server commit revision used by persistence.
 
 The implementation keeps exact-byte CAS. It does not add an opaque storage-
-version token or record-valued instance callback. Stable Ref keys replace
-legacy module-based keys only through a mixed-version migration in seam 09.
+version token or record-valued instance callback. Namespaced writes use stable
+Ref keys. A lone legacy key stays readable, a dual-key collision fails closed,
+and no automatic cross-key rewrite occurs.
 
 ## Requirements
 
@@ -261,9 +261,9 @@ behavior as part of the core byte-storage contract.
 
 The implementation keeps `Jido.Persistence.save_agent/3`, `load_agent/4`,
 `load_agent_with_revision/4`, and `delete_agent/4` as the current direct
-boundary during migration. Ref-first forms are additive after seam 03 and seam
-09 approve the Ref and namespace binding. Existing instance defaults and
-per-Agent override or disablement remain supported.
+boundary during migration. Ref-first instance forms are now additive through
+seam 09. Existing instance defaults and per-Agent override or disablement
+remain supported.
 
 The required adapter callback set is:
 
@@ -331,7 +331,7 @@ These guarantees apply only after the related requirements are approved.
 | `PERS-DEC-003` | Use active records and compact tombstones only. | `Implemented` | Hibernate remains a process operation. |
 | `PERS-DEC-004` | Every required write error, including conflict, removes write authority. | `Implemented` | The failed activation cannot admit another Turn. |
 | `PERS-DEC-005` | Confirm revision-zero creation after Plugin readiness and before the start call succeeds. | `Implemented`; stricter Registry publication stays with seam 08 | Initial state survives later activation loss subject to adapter guarantees. |
-| `PERS-DEC-006` | Keep the compatible key until seam 09 can add a collision-safe Ref migration. | `Deferred to seam 09` | Module-based storage identity remains during this seam. |
-| `PERS-DEC-007` | Write version-2 active or tombstone records and read legacy format 1. | `Implemented` | New lifecycle meaning is explicit and old active records remain readable. |
+| `PERS-DEC-006` | Keep compatible unnamed keys and add collision-safe stable Ref keys for namespaced operations. | `Implemented by seam 09` | A lone legacy key stays readable. Both keys fail closed. There is no automatic rewrite. |
+| `PERS-DEC-007` | Write version-2 records for compatible unnamed keys and version-3 records for stable Ref keys. Read legacy format 1. | `Implemented` | New lifecycle meaning is explicit and old active records remain readable. |
 | `PERS-DEC-008` | Keep complete custom callbacks and bypass Plugin slice conversion for them. | `Implemented` | Current custom callbacks remain valid. |
 | `PERS-DEC-009` | Defer Ecto and Bedrock placement. | `Deferred` | No unproved backend is claimed as shipped. |

@@ -1,5 +1,5 @@
 > Seam review entry point. The implementation direction was selected on
-> 2026-09-10. Ref-first instance controls remain with seam 09.
+> 2026-09-10. Seam 09 now supplies the Ref-first instance controls.
 
 # 08 — Agent Server
 
@@ -34,8 +34,8 @@ Code and executable tests are canonical for current behavior.
 | Area | Implemented contract | Retained limit |
 | --- | --- | --- |
 | Live owner | One `:gen_statem` owns one Agent, one version, and at most one active Turn. | Keep one serialized commit owner per activation. |
-| Startup | Construct or restore, validate, reserve identity, start Plugin children, await readiness, confirm revision-zero creation, and publish `:ready`. | Keep this order. Ref namespace binding remains with seam 09. |
-| Identity | Public operations use PID, name, ID, instance, and partition values. | Add Ref-based resolution in the instance seam. Keep supported PID/name operations during migration. |
+| Startup | Construct or restore, validate, reserve identity, start Plugin children, await readiness, confirm revision-zero creation, and publish `:ready`. | Keep this order. The seam-09 Ref facade preserves it. |
+| Identity | Public Server operations use PID and name. Compatible instance APIs use ID and partition. | Seam 09 adds local Ref resolution. Keep supported PID/name operations during migration. |
 | Admission | OTP postpones busy Signals. A token set limits callbacks already seen by the state machine. | Keep OTP ordering and state the mailbox limit accurately. Add stable overload and admission errors. |
 | Turn control | Admission and execution are cancellable. One `turn_timeout` covers active work until commit starts. | Keep caller wait, persistence, readiness, and Directive limits separate. |
 | Commit | Runtime or durable checkpoint succeeds before complete state replacement, reply, and Directives. | Keep the order. Remove write authority after every required persistence write error. |
@@ -87,8 +87,8 @@ Code and executable tests are canonical for current behavior.
   canonical construction and generated live-helper delegation.
 - Dependents: 09 Jido instance, 10 Runtime topology, 11 Topology control plane,
   13 Observability, and 99 Delivery.
-- Deferred inputs: Ref namespace binding and the additive instance facade in
-  seam 09, any later observation projection in seam 13, and cross-package proof
+- Completed input: Ref namespace binding and the additive instance facade in
+  seam 09. Deferred inputs are any later observation projection in seam 13 and cross-package proof
   in seam 99. Hot private-state migration is not a V3 claim.
 
 ## Documents

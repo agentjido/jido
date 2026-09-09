@@ -40,7 +40,8 @@ defmodule Jido.Topology.Controller.Activation do
 
   defp saved_state(spec, context, persistence) do
     case Jido.Persistence.load_agent_with_revision(persistence, spec.module, spec.id,
-           instance: context.jido
+           instance: context.jido,
+           namespace: Jido.namespace(context.jido)
          ) do
       {:ok, agent, version} when agent.id == spec.id and agent.module == spec.module ->
         {:ok, agent.state, version, :required}

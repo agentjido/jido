@@ -96,6 +96,30 @@ Use the same partition option that identified the original actor. Thaw is a
 normal actor start after the restore step. Thus, Plugin runtimes and other
 process resources start again from their specifications.
 
+## Keep durable identity stable
+
+A namespaced Jido instance stores a new Agent under a key derived from the
+complete `{namespace, partition, id}` Ref. It uses persistence record format 3.
+The local instance atom and Agent module are not part of that key. The record
+still stores and validates the Agent module.
+
+Use `activate_agent/3` to restore by Ref. After the live Server hibernates or
+stops, use `delete_agent/3` to write a logical tombstone. `delete_agent/3`
+refuses to delete while the local Server is live.
+
+When a namespaced operation finds only a legacy instance-keyed record, Jido
+continues to use that key. When it finds both the legacy key and the stable Ref
+key, it returns a persistence identity collision. It does not select one or
+rewrite either key.
+
+Adding a namespace is an application migration gate. Stop old writers and
+check for collisions before you enable the new runtime. The adapter contract
+cannot atomically move data between two keys. An older release cannot read
+format 3, so downgrade after the first stable Ref write is not supported.
+Legacy keys also contain the Agent module. Inventory the old keyspace for two
+module keys that would collapse to one Ref because Core adapters do not provide
+a key-list operation.
+
 ## Recovery scope
 
 A Jido instance also keeps an ephemeral runtime checkpoint for abnormal

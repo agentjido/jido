@@ -35,8 +35,9 @@ mismatch before it accepts saved state.
 
 Application code usually uses `Jido.Persistence` instead of these callbacks.
 Persistence adds the active-or-tombstone record format, storage identity,
-Agent `vsn`, revision, and adapter boundary. New active records use outer
-format 2. Persistence can still read legacy outer format-1 active records.
+Agent `vsn`, revision, and adapter boundary. Compatible unnamed records use
+outer format 2. Stable namespaced Ref records use outer format 3. Persistence
+can still read legacy outer format-1 active records.
 
 ## Persistence Plugin conversion
 

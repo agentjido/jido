@@ -1,5 +1,5 @@
 > Seam alignment evidence. The implementation direction was selected on
-> 2026-09-09. Stable Ref key migration remains with seam 09.
+> 2026-09-09. Stable Ref persistence was completed by seam 09 on 2026-09-10.
 
 # Persistence alignment
 
@@ -9,7 +9,7 @@
 - Prerequisites: package boundaries, portable errors, Agent checkpoints and
   versions, Agent Ref, Turn selection, owner-specific Plugin facets, and the
   commit authority rule are present.
-- Alignment state: `Implemented with stable-key migration deferred`.
+- Alignment state: `Implemented, including stable namespaced identity`.
 
 Persistence now owns a version-2 active-or-tombstone record, a closed binary
 CAS boundary, revision-zero creation, definition checks, and default-checkpoint
@@ -17,9 +17,10 @@ Plugin conversion. The Agent Server confirms initial creation after Plugin
 readiness and before its start call succeeds. Every required write error still
 removes the activation's write authority.
 
-The storage key remains the compatible instance-module, Agent-module,
-partition, and ID key. Seam 09 must bind stable Ref namespace and partition
-values before Persistence can add a collision-safe Ref key migration.
+Unnamed operations retain the compatible instance-module, Agent-module,
+partition, and ID key. Namespaced operations use a stable Ref key and record
+format 3. They read a lone legacy key and reject a legacy-plus-Ref collision.
+They do not rewrite data across keys automatically.
 
 This execution state is not approval of every requirement in the target
 design.
@@ -158,7 +159,7 @@ active records remain readable through their earlier restore path.
 | `PERS-REQ-023` to `PERS-REQ-028` | `Proven with seam 08 publication` | Initial CAS and Plugin cleanup pass. Public Registry lookup stays hidden until the entry is `:ready`. |
 | `PERS-REQ-029` to `PERS-REQ-038` | `Proven` | Outer validation, restored identity, definition revision, tombstones, races, and safe decoding pass. |
 | `PERS-REQ-039` | `Proven` | Legacy outer format-1 active records load. |
-| `PERS-REQ-040`, `PERS-REQ-041` | `Deferred to seam 09` | Stable Ref exists, but namespace and partition binding are not yet selected. Current keys remain compatible. |
+| `PERS-REQ-040`, `PERS-REQ-041` | `Proven by seam 09` | Namespaced operations use the Ref key, dual-read a lone legacy key, and reject a dual-key collision before a write. |
 | `PERS-REQ-042` to `PERS-REQ-044` | `Proven` | Custom callback payloads stay opaque. Default Plugin owned-slice conversion is bounded. |
 | `PERS-REQ-045` to `PERS-REQ-049` | `Proven` | Restore, commit order, failure stop, hibernate, and runtime reconstruction have focused evidence. |
 | `PERS-REQ-050` | `Single-Agent contract proven; Topology integration remains with seams 10 and 11` | Persistence exposes no multi-record transaction claim. |
@@ -169,12 +170,15 @@ active records remain readable through their earlier restore path.
 - Public module-and-ID Persistence functions remain available.
 - Existing instance defaults, per-Agent overrides, partitions, hibernate, and
   thaw remain available.
-- Outer format-1 active records remain readable. All new writes use format 2.
+- Outer format-1 active records remain readable. Compatible unnamed writes use
+  format 2. New namespaced writes use format 3.
 - Older code cannot load format-2 records, but its fail-closed record check also
   prevents it from overwriting a format-2 tombstone through normal save.
-- The storage key stays unchanged in this seam. Seam 09 must add collision
-  detection, dual read, rewrite, rollback, and removal gates before Ref-key
-  writes start.
+- A namespaced operation probes the stable and compatible keys. A lone legacy
+  key remains on that key. Both keys cause a collision error. The adapter
+  cannot atomically rewrite two keys, so Jido does not rewrite automatically.
+  An older release cannot read format 3. Downgrade after the first namespaced
+  write is unsupported.
 - `put/3` and `delete/2` remain optional maintenance callbacks. Normal durable
   lifecycle code uses only get and CAS.
 - Tombstone purge and same-identity reactivation are not normal Core
@@ -185,7 +189,7 @@ active records remain readable through their earlier restore path.
 | Seam | Required follow-up |
 | --- | --- |
 | 08 Agent Server | Preserve `:starting` identity reservation and publish `:ready` only after revision-zero creation is confirmed. |
-| 09 Jido instance | Bind Ref namespace and partition values, then own the mixed-key migration and any instance delete facade. |
+| 09 Jido instance | Complete. It binds namespace, supplies the Ref facade, applies the mixed-key rule, and exposes tombstone delete for an inactive Ref. |
 | 10 Runtime topology | Consume revision-zero activation without adding discovery or lease meaning to persistence. |
 | 11 Topology control plane | Keep desired Topology and multi-Agent reconciliation outside per-Agent records. |
 | 13 Observability | Add bounded operation and result-class evidence without checkpoint payloads or adapter secrets. |
@@ -204,6 +208,6 @@ active records remain readable through their earlier restore path.
 - [x] Default Plugin state conversion stays within the paired owner slice.
 - [x] Complete custom checkpoints bypass Plugin conversion.
 - [x] ETS, File, and Redis pass one shared get-and-CAS conformance suite.
-- [ ] Stable Ref key migration is complete in seam 09.
-- [ ] Provisional Registry visibility is decided in seam 08.
+- [x] Stable Ref key migration rules are implemented in seam 09.
+- [x] Provisional Registry visibility is decided in seam 08.
 - [ ] The full target design has user approval.

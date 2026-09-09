@@ -73,9 +73,18 @@ ref =
   )
 ```
 
-The Ref does not contain the Agent module, PID, node, or a revision. Current
-runtime functions still accept IDs, PIDs, and existing partition values while
-Ref-first runtime support is added.
+The Ref does not contain the Agent module, PID, node, or a revision. A Jido
+instance with a stable namespace can build and use it directly:
+
+```elixir
+{:ok, ref} = MyApp.Jido.agent_ref(agent.id, partition: "north")
+{:ok, server} = MyApp.Jido.start_agent_ref(ref, MyApp.Counter)
+{:ok, ^server} = MyApp.Jido.resolve_agent(ref)
+```
+
+Ref-first operations validate the full Ref and resolve the current local PID
+for each operation. They do not route to another node. Current runtime
+functions still accept IDs, PIDs, and existing partition values.
 
 A state version identifies one committed revision. An activation ID identifies
 one Agent Server lifetime. Do not use these values as substitutes for one

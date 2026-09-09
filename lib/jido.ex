@@ -1,9 +1,12 @@
 defmodule Jido do
   use Supervisor
 
+  alias Jido.Agent.Ref
+  alias Jido.Instance.{NamespaceRegistry, Options, RefFacade}
   alias Jido.RuntimeStore
 
   @shutdown_timeout_ms 10_000
+  @instance_config_hive :jido_instance_config
 
   @moduledoc """
   自動 (Jido) - A declarative actor and agent framework for Elixir, built for
@@ -14,7 +17,9 @@ defmodule Jido do
   Create a Jido supervisor in your application:
 
       defmodule MyApp.Jido do
-        use Jido, otp_app: :my_app
+        use Jido,
+          otp_app: :my_app,
+          namespace: "my-app/primary"
       end
 
   Add to your supervision tree:
@@ -73,13 +78,15 @@ defmodule Jido do
   ## Options
 
     - `:otp_app` - Required. Your application name (e.g., `:my_app`).
+    - `:namespace` - Optional nonempty binary for stable Agent Ref operations.
+      One exact namespace can be bound to one live local instance per node.
     - `:persistence` - Optional `Jido.Persistence.Adapter` module or
       `{module, options}` tuple. The default is no durable persistence.
 
   ## Example
 
       defmodule MyApp.Jido do
-        use Jido, otp_app: :my_app
+        use Jido, otp_app: :my_app, namespace: "my-app/primary"
       end
 
   Then add to your supervision tree in `lib/my_app/application.ex`:
@@ -94,6 +101,7 @@ defmodule Jido do
   defmacro __using__(opts) do
     otp_app = Keyword.fetch!(opts, :otp_app)
     persistence = Keyword.get(opts, :persistence)
+    namespace = Keyword.get(opts, :namespace)
 
     quote location: :keep do
       @otp_app unquote(otp_app)
@@ -106,24 +114,18 @@ defmodule Jido do
       @spec __jido_persistence__() :: {module(), keyword()} | nil
       def __jido_persistence__, do: Jido.Persistence.normalize_adapter(unquote(persistence))
 
+      @doc "Returns the configured stable namespace for this Jido instance."
+      @spec __jido_namespace__() :: String.t() | nil
+      def __jido_namespace__, do: unquote(namespace)
+
       @doc false
       def child_spec(init_arg \\ []) do
-        opts =
-          config(init_arg)
-          |> Keyword.put_new(:name, __MODULE__)
-          |> Keyword.put_new(:otp_app, @otp_app)
-
-        Jido.child_spec(opts)
+        Jido.child_spec(__jido_instance_options__(init_arg))
       end
 
       @doc false
       def start_link(init_arg \\ []) do
-        opts =
-          config(init_arg)
-          |> Keyword.put_new(:name, __MODULE__)
-          |> Keyword.put_new(:otp_app, @otp_app)
-
-        Jido.start_link(opts)
+        Jido.start_link(__jido_instance_options__(init_arg))
       end
 
       @doc """
@@ -132,14 +134,25 @@ defmodule Jido do
       Configuration is loaded from `config :#{@otp_app}, #{inspect(__MODULE__)}` and
       overridden by any runtime options passed in.
       """
-      @spec config(keyword()) :: keyword()
+      @spec config(term()) :: term()
       def config(overrides \\ []) do
-        @otp_app
-        |> Application.get_env(__MODULE__, [])
-        |> Keyword.merge(overrides)
+        Jido.merge_instance_config(
+          Application.get_env(@otp_app, __MODULE__, []),
+          overrides
+        )
       end
 
       defoverridable config: 1
+
+      defp __jido_instance_options__(init_arg) do
+        Jido.instance_options(
+          config(init_arg),
+          __MODULE__,
+          @otp_app,
+          __jido_namespace__(),
+          __jido_persistence__()
+        )
+      end
 
       @doc "Starts an Agent under this Jido instance."
       @spec start_agent(module() | Jido.Agent.t(), keyword()) ::
@@ -168,6 +181,118 @@ defmodule Jido do
       @spec agent_count(keyword()) :: non_neg_integer()
       def agent_count(opts \\ []), do: Jido.agent_count(__MODULE__, opts)
 
+      @doc "Builds one stable Agent Ref in this instance namespace."
+      def agent_ref(id, opts \\ []), do: Jido.agent_ref(__MODULE__, id, opts)
+
+      @doc "Resolves the current local PID for one stable Agent Ref."
+      def resolve_agent(%Jido.Agent.Ref{} = ref), do: Jido.resolve_agent(__MODULE__, ref)
+
+      @doc "Starts one Agent with an explicit stable Agent Ref."
+      def start_agent_ref(%Jido.Agent.Ref{} = ref, agent, opts \\ []) do
+        Jido.start_agent_ref(__MODULE__, ref, agent, opts)
+      end
+
+      @doc "Activates one durable Agent with an explicit stable Agent Ref."
+      def activate_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
+        Jido.activate_agent(__MODULE__, ref, agent_module, opts)
+      end
+
+      @doc "Sends one synchronous Signal through a stable Agent Ref."
+      def call(%Jido.Agent.Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
+        Jido.call(__MODULE__, ref, signal, timeout_or_opts)
+      end
+
+      @doc "Sends one asynchronous Signal through a stable Agent Ref."
+      def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
+
+      @doc "Starts one asynchronous Signal request through a stable Agent Ref."
+      def send_request(%Jido.Agent.Ref{} = ref, signal, timeout \\ 5_000) do
+        Jido.send_request(__MODULE__, ref, signal, timeout)
+      end
+
+      @doc "Receives an Agent request response with the standard OTP envelope."
+      def receive_response(request_id, timeout \\ 5_000) do
+        Jido.receive_response(request_id, timeout)
+      end
+
+      @doc "Stops the local Agent resolved by a stable Agent Ref."
+      def stop_agent_ref(%Jido.Agent.Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000) do
+        Jido.stop_agent_ref(__MODULE__, ref, reason, timeout)
+      end
+
+      @doc "Persists and stops the local Agent resolved by a stable Agent Ref."
+      def hibernate_ref(%Jido.Agent.Ref{} = ref, opts \\ []) do
+        Jido.hibernate_ref(__MODULE__, ref, opts)
+      end
+
+      @doc "Writes a durable tombstone for one inactive stable Agent Ref."
+      def delete_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
+        Jido.delete_agent(__MODULE__, ref, agent_module, opts)
+      end
+
+      @doc "Cancels current pre-commit work for one stable Agent Ref."
+      def cancel(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.cancel(__MODULE__, ref, timeout)
+      end
+
+      @doc "Cancels one matching Turn for a stable Agent Ref."
+      def cancel_turn(%Jido.Agent.Ref{} = ref, turn_id, timeout \\ 5_000) do
+        Jido.cancel_turn(__MODULE__, ref, turn_id, timeout)
+      end
+
+      @doc "Attaches an owner process through a stable Agent Ref."
+      def attach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
+        Jido.attach(__MODULE__, ref, owner_pid, timeout)
+      end
+
+      @doc "Detaches an owner process through a stable Agent Ref."
+      def detach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
+        Jido.detach(__MODULE__, ref, owner_pid, timeout)
+      end
+
+      @doc "Resets the idle timer through a stable Agent Ref."
+      def touch_ref(%Jido.Agent.Ref{} = ref), do: Jido.touch(__MODULE__, ref)
+
+      @doc "Returns the committed Agent for one stable Agent Ref."
+      def agent(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.agent(__MODULE__, ref, timeout)
+      end
+
+      @doc "Returns one Plugin-owned state value through a stable Agent Ref."
+      def plugin_state(%Jido.Agent.Ref{} = ref, plugin, timeout \\ 5_000) do
+        Jido.plugin_state(__MODULE__, ref, plugin, timeout)
+      end
+
+      @doc "Returns Turn status through a stable Agent Ref."
+      def status(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.status(__MODULE__, ref, timeout)
+      end
+
+      @doc "Returns a committed snapshot through a stable Agent Ref."
+      def snapshot(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.snapshot(__MODULE__, ref, timeout)
+      end
+
+      @doc "Returns child runtime status through a stable Agent Ref."
+      def children(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.children(__MODULE__, ref, timeout)
+      end
+
+      @doc "Waits for runtime readiness through a stable Agent Ref."
+      def await_ready(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
+        Jido.await_ready(__MODULE__, ref, timeout)
+      end
+
+      @doc "Controls the bounded debug buffer through a stable Agent Ref."
+      def set_agent_debug(%Jido.Agent.Ref{} = ref, enabled, timeout \\ 5_000) do
+        Jido.set_agent_debug(__MODULE__, ref, enabled, timeout)
+      end
+
+      @doc "Returns bounded recent events through a stable Agent Ref."
+      def recent_events(%Jido.Agent.Ref{} = ref, opts \\ [], timeout \\ 5_000) do
+        Jido.recent_events(__MODULE__, ref, opts, timeout)
+      end
+
       @doc "Fetches one Agent logical-parent binding under this Jido instance."
       @spec agent_parent_binding(String.t(), keyword()) :: {:ok, map()} | :error
       def agent_parent_binding(child_id, opts \\ []) do
@@ -187,6 +312,10 @@ defmodule Jido do
       @doc "Returns the Registry name for this Jido instance."
       @spec registry_name() :: atom()
       def registry_name, do: Jido.registry_name(__MODULE__)
+
+      @doc "Returns the stable namespace bound to this live Jido instance."
+      @spec namespace() :: String.t() | nil
+      def namespace, do: Jido.namespace(__MODULE__)
 
       @doc "Returns the AgentSupervisor name for this Jido instance."
       @spec agent_supervisor_name() :: atom()
@@ -235,6 +364,32 @@ defmodule Jido do
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
+
+  @doc false
+  def merge_instance_config(config, overrides) do
+    cond do
+      not (is_list(config) and Keyword.keyword?(config)) -> config
+      not (is_list(overrides) and Keyword.keyword?(overrides)) -> overrides
+      true -> Keyword.merge(config, overrides)
+    end
+  end
+
+  @doc false
+  def instance_options(config, name, otp_app, namespace, persistence)
+
+  def instance_options(config, name, otp_app, namespace, persistence) when is_list(config) do
+    if Keyword.keyword?(config) do
+      config
+      |> Keyword.put_new(:name, name)
+      |> Keyword.put_new(:otp_app, otp_app)
+      |> Keyword.put_new(:namespace, namespace)
+      |> Keyword.put_new(:persistence, persistence)
+    else
+      config
+    end
+  end
+
+  def instance_options(config, _name, _otp_app, _namespace, _persistence), do: config
 
   @doc """
   Returns the default Jido instance name.
@@ -285,9 +440,12 @@ defmodule Jido do
 
   Same as `start_link/1`, but `:name` defaults to `Jido.Default`.
   """
-  @spec start(keyword()) :: {:ok, pid()} | {:error, term()}
+  @spec start(term()) :: {:ok, pid()} | {:error, term()}
   def start(opts \\ []) do
-    opts = Keyword.put_new(opts, :name, @default_instance)
+    opts =
+      if is_list(opts) and Keyword.keyword?(opts),
+        do: Keyword.put_new(opts, :name, @default_instance),
+        else: opts
 
     case start_link(opts) do
       {:ok, pid} -> {:ok, pid}
@@ -320,18 +478,33 @@ defmodule Jido do
 
   ## Options
     - `:name` - Required. The name of this Jido instance (e.g., `MyApp.Jido`)
+    - `:namespace` - Optional nonempty stable namespace for Ref-first functions
+    - `:max_tasks` - Task Supervisor child limit; defaults to `1_000`
+    - `:persistence` - Optional default persistence adapter
 
   ## Example
 
       {:ok, pid} = Jido.start_link(name: MyApp.Jido)
   """
   def start_link(opts) do
-    name = Keyword.fetch!(opts, :name)
-    Supervisor.start_link(__MODULE__, opts, name: name)
+    with {:ok, opts} <- Options.validate(opts),
+         {:ok, claim} <-
+           NamespaceRegistry.claim(Keyword.get(opts, :namespace), Keyword.fetch!(opts, :name)) do
+      result =
+        Supervisor.start_link(
+          __MODULE__,
+          {opts, claim},
+          name: Keyword.fetch!(opts, :name)
+        )
+
+      if not match?({:ok, _pid}, result), do: NamespaceRegistry.release(claim)
+      result
+    end
   end
 
   @doc false
   def child_spec(opts) do
+    opts = Options.validate!(opts)
     name = Keyword.fetch!(opts, :name)
 
     %{
@@ -344,30 +517,41 @@ defmodule Jido do
   end
 
   @impl true
-  def init(opts) do
+  def init({opts, claim}) do
     name = Keyword.fetch!(opts, :name)
     runtime_store = runtime_store_name(name)
 
-    if otp_app = opts[:otp_app] do
-      Jido.Debug.maybe_enable_from_config(otp_app, name)
+    with :ok <-
+           NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()) do
+      if otp_app = opts[:otp_app] do
+        Jido.Debug.maybe_enable_from_config(otp_app, name)
+      end
+
+      :ok = Jido.RuntimeStore.ensure_table(runtime_store)
+
+      true =
+        :ets.insert(
+          runtime_store,
+          {{@instance_config_hive, :persistence}, Keyword.get(opts, :persistence)}
+        )
+
+      base_children = [
+        {Task.Supervisor,
+         name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
+        {Registry, keys: :unique, name: registry_name(name)},
+        {Jido.RuntimeStore, name: runtime_store},
+        {Jido.AgentServer.SpawnRegistry, jido: name},
+        {DynamicSupervisor,
+         name: agent_supervisor_name(name),
+         strategy: :one_for_one,
+         max_restarts: 1000,
+         max_seconds: 5}
+      ]
+
+      Supervisor.init(base_children, strategy: :one_for_one)
+    else
+      {:error, reason} -> exit(reason)
     end
-
-    :ok = Jido.RuntimeStore.ensure_table(runtime_store)
-
-    base_children = [
-      {Task.Supervisor,
-       name: task_supervisor_name(name), max_children: Keyword.get(opts, :max_tasks, 1000)},
-      {Registry, keys: :unique, name: registry_name(name)},
-      {Jido.RuntimeStore, name: runtime_store},
-      {Jido.AgentServer.SpawnRegistry, jido: name},
-      {DynamicSupervisor,
-       name: agent_supervisor_name(name),
-       strategy: :one_for_one,
-       max_restarts: 1000,
-       max_seconds: 5}
-    ]
-
-    Supervisor.init(base_children, strategy: :one_for_one)
   end
 
   @doc """
@@ -384,6 +568,24 @@ defmodule Jido do
   @doc "Returns the Registry name for the selected Jido instance."
   @spec registry_name(atom()) :: atom()
   def registry_name(name), do: Module.concat(name, Registry)
+
+  @doc "Returns the stable namespace bound to one live Jido instance."
+  @spec namespace(atom() | nil) :: String.t() | nil
+  def namespace(nil), do: nil
+  def namespace(name), do: NamespaceRegistry.namespace(name)
+
+  @doc false
+  @spec instance_persistence(atom()) :: term()
+  def instance_persistence(name) when is_atom(name) do
+    table = runtime_store_name(name)
+
+    case :ets.lookup(table, {@instance_config_hive, :persistence}) do
+      [{{@instance_config_hive, :persistence}, persistence}] -> persistence
+      [] -> nil
+    end
+  rescue
+    ArgumentError -> nil
+  end
 
   @doc "Returns the AgentSupervisor name for the default Jido instance."
   @spec agent_supervisor_name() :: atom()
@@ -423,6 +625,109 @@ defmodule Jido do
   @spec unwrap_partition_key(term()) :: {partition() | nil, term()}
   def unwrap_partition_key({:partition, partition, value}), do: {partition, value}
   def unwrap_partition_key(value), do: {nil, value}
+
+  # ---------------------------------------------------------------------------
+  # Stable Agent Ref facade
+  # ---------------------------------------------------------------------------
+
+  @doc "Builds one stable Agent Ref in the selected instance namespace."
+  @spec agent_ref(atom(), String.t(), keyword()) ::
+          {:ok, Ref.t()} | {:error, Jido.Error.ValidationError.t()}
+  def agent_ref(jido_instance, id, opts \\ []),
+    do: RefFacade.build_ref(jido_instance, id, opts)
+
+  @doc "Resolves the current local PID for one stable Agent Ref."
+  @spec resolve_agent(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
+  def resolve_agent(jido_instance, %Ref{} = ref), do: RefFacade.resolve(jido_instance, ref)
+
+  @doc "Starts one Agent with an explicit stable Agent Ref."
+  @spec start_agent_ref(atom(), Ref.t(), module() | Jido.Agent.t(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def start_agent_ref(jido_instance, %Ref{} = ref, agent, opts \\ []),
+    do: RefFacade.start_agent(jido_instance, ref, agent, opts)
+
+  @doc "Activates one durable Agent with an explicit stable Agent Ref."
+  @spec activate_agent(atom(), Ref.t(), module(), keyword()) ::
+          DynamicSupervisor.on_start_child()
+  def activate_agent(jido_instance, %Ref{} = ref, agent_module, opts \\ []),
+    do: RefFacade.activate_agent(jido_instance, ref, agent_module, opts)
+
+  @doc "Sends one synchronous Signal through a stable Agent Ref."
+  def call(jido_instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000),
+    do: RefFacade.call(jido_instance, ref, signal, timeout_or_opts)
+
+  @doc "Sends one best-effort asynchronous Signal through a stable Agent Ref."
+  def cast(jido_instance, %Ref{} = ref, signal), do: RefFacade.cast(jido_instance, ref, signal)
+
+  @doc "Starts one asynchronous Signal request through a stable Agent Ref."
+  def send_request(jido_instance, %Ref{} = ref, signal, timeout \\ 5_000),
+    do: RefFacade.send_request(jido_instance, ref, signal, timeout)
+
+  @doc "Receives an Agent request response with the standard OTP envelope."
+  defdelegate receive_response(request_id, timeout \\ 5_000), to: Jido.AgentServer
+
+  @doc "Stops the local Agent resolved by a stable Agent Ref."
+  def stop_agent_ref(jido_instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000),
+    do: RefFacade.stop(jido_instance, ref, reason, timeout)
+
+  @doc "Persists and stops the local Agent resolved by a stable Agent Ref."
+  def hibernate_ref(jido_instance, %Ref{} = ref, opts \\ []),
+    do: RefFacade.hibernate(jido_instance, ref, opts)
+
+  @doc "Writes a durable tombstone for one inactive stable Agent Ref."
+  def delete_agent(jido_instance, %Ref{} = ref, agent_module, opts \\ []),
+    do: RefFacade.delete(jido_instance, ref, agent_module, opts)
+
+  @doc "Cancels current pre-commit work for one stable Agent Ref."
+  def cancel(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.cancel(jido_instance, ref, timeout)
+
+  @doc "Cancels one matching Turn for a stable Agent Ref."
+  def cancel_turn(jido_instance, %Ref{} = ref, turn_id, timeout \\ 5_000),
+    do: RefFacade.cancel_turn(jido_instance, ref, turn_id, timeout)
+
+  @doc "Attaches an owner process through a stable Agent Ref."
+  def attach(jido_instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
+    do: RefFacade.attach(jido_instance, ref, owner_pid, timeout)
+
+  @doc "Detaches an owner process through a stable Agent Ref."
+  def detach(jido_instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
+    do: RefFacade.detach(jido_instance, ref, owner_pid, timeout)
+
+  @doc "Resets the idle timer through a stable Agent Ref."
+  def touch(jido_instance, %Ref{} = ref), do: RefFacade.touch(jido_instance, ref)
+
+  @doc "Returns the committed Agent through a stable Agent Ref."
+  def agent(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.agent(jido_instance, ref, timeout)
+
+  @doc "Returns one Plugin-owned state value through a stable Agent Ref."
+  def plugin_state(jido_instance, %Ref{} = ref, plugin, timeout \\ 5_000),
+    do: RefFacade.plugin_state(jido_instance, ref, plugin, timeout)
+
+  @doc "Returns Turn status through a stable Agent Ref."
+  def status(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.status(jido_instance, ref, timeout)
+
+  @doc "Returns a committed snapshot through a stable Agent Ref."
+  def snapshot(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.snapshot(jido_instance, ref, timeout)
+
+  @doc "Returns child runtime status through a stable Agent Ref."
+  def children(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.children(jido_instance, ref, timeout)
+
+  @doc "Waits for runtime readiness through a stable Agent Ref."
+  def await_ready(jido_instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.await_ready(jido_instance, ref, timeout)
+
+  @doc "Controls the bounded debug buffer through a stable Agent Ref."
+  def set_agent_debug(jido_instance, %Ref{} = ref, enabled, timeout \\ 5_000),
+    do: RefFacade.set_debug(jido_instance, ref, enabled, timeout)
+
+  @doc "Returns bounded recent events through a stable Agent Ref."
+  def recent_events(jido_instance, %Ref{} = ref, opts \\ [], timeout \\ 5_000),
+    do: RefFacade.recent_events(jido_instance, ref, opts, timeout)
 
   # ---------------------------------------------------------------------------
   # Agent Lifecycle

@@ -78,11 +78,12 @@ truth for approval. All requirements and decisions in this seam are pending.
   [06 Commit and effects](../06_commit-and-effects/alignment.md),
   [07 Persistence](../07_persistence/alignment.md),
   [08 Agent Server](../08_agent-server/alignment.md), and
-  [09 Jido instance](../09_jido-instance/alignment.md). All are pending drafts.
+  [09 Jido instance](../09_jido-instance/alignment.md). Ref identity, local
+  namespace resolution, and stable persistence identity are implemented inputs.
 - Dependents: 11 Topology control plane, 13 Observability, and 99 Delivery.
-- Blockers: prerequisite approval, Ref and namespace implementation, Plugin
-  replacement input, revision-zero durable creation, and the final cluster
-  authority owner.
+- Blockers: this seam's remaining decisions, runtime placement proof, and the
+  final cluster authority owner. Ref and namespace, Plugin replacement input,
+  and revision-zero durable creation are implemented inputs.
 
 ## Documents
 

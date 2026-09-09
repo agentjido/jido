@@ -3032,7 +3032,11 @@ defmodule Jido.AgentServer do
   end
 
   defp restore_initial_agent(%Options{} = opts) do
-    load_opts = [instance: opts.jido, partition: opts.partition]
+    load_opts = [
+      instance: opts.jido,
+      namespace: Jido.namespace(opts.jido),
+      partition: opts.partition
+    ]
 
     case Jido.Persistence.load_agent_with_revision(
            opts.persistence,
@@ -3054,6 +3058,7 @@ defmodule Jido.AgentServer do
   defp persist_initial_agent(%State{initial_persistence: :create, state_version: 0} = data) do
     opts = [
       instance: data.jido,
+      namespace: Jido.namespace(data.jido),
       partition: data.partition,
       revision: 0,
       reason: :activate
@@ -3113,6 +3118,7 @@ defmodule Jido.AgentServer do
     opts =
       extra_opts
       |> Keyword.put(:instance, data.jido)
+      |> Keyword.put(:namespace, Jido.namespace(data.jido))
       |> Keyword.put(:partition, data.partition)
       |> Keyword.put(:revision, version)
       |> Keyword.put(:expected_revision, data.state_version)

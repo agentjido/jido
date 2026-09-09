@@ -134,6 +134,10 @@ defmodule Jido.Error do
           | :agent_exec_callback_timeout
           | :agent_exec_callback_task_failed
           | :agent_turn_timeout
+          | :jido_instance_invalid_config
+          | :jido_namespace_already_bound
+          | :jido_namespace_required
+          | :jido_namespace_mismatch
 
   @stable_codes [
     :non_portable_term,
@@ -149,7 +153,11 @@ defmodule Jido.Error do
     :agent_exec_callback_failed,
     :agent_exec_callback_timeout,
     :agent_exec_callback_task_failed,
-    :agent_turn_timeout
+    :agent_turn_timeout,
+    :jido_instance_invalid_config,
+    :jido_namespace_already_bound,
+    :jido_namespace_required,
+    :jido_namespace_mismatch
   ]
 
   # ============================================================================

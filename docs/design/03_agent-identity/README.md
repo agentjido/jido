@@ -26,20 +26,20 @@ later seams.
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Agent identity | `%Jido.Agent{}` has one nonempty `id`; `Jido.Agent.Ref` provides the exact portable identity value | One Ref combines namespace, optional partition, and ID |
-| Local runtime | Instance Registry keys use partition and ID; callers use ID or PID | Local identity use starts from the Ref; PID stays a replaceable handle |
-| Persistence | Keys use instance module, Agent module, partition, and ID | Durable identity is the Ref; modules and revisions are record data |
+| Agent identity | `%Jido.Agent{}` has one nonempty `id`; `Jido.Agent.Ref` provides the exact portable `{namespace, partition, id}` identity value | Implemented |
+| Local runtime | A namespaced instance validates the Ref and resolves the current local PID. Compatible ID and PID functions remain. | Implemented for the local instance boundary |
+| Persistence | New namespaced records use a stable Ref key. Agent module and revision remain record data. Compatible legacy keys remain readable under explicit collision rules. | Implemented with no automatic cross-key rewrite |
 | Nodes | Remote placement keeps copied IDs, partitions, and PIDs | A node change does not change the Ref |
-| Public API | ID-first and PID-first functions are supported | Add Ref-first functions and keep supported APIs during migration |
+| Public API | ID-first, PID-first, and Ref-first functions are supported | Keep all supported paths until a separate migration gate |
 
 ## Major gaps and work remaining
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Downstream Ref use | The public Ref and its version-1 map round trip are implemented | Use the same Ref at lookup, storage, delivery, and placement boundaries | 07, 08, 09, and 10 |
-| No stable namespace | Module rename can change storage identity | Stable namespace binding independent of module name | 09 Jido instance |
-| Different identity shapes | Lookup, storage, and relationships can disagree | Exact Ref preservation at each boundary | 03, then 07, 08, 09, and 10 |
-| Module-based storage key | Code identity and Agent identity are coupled | Staged, collision-safe key migration | 07 Persistence |
+| Downstream Ref use | Value, local lookup, instance lifecycle, and stable storage use are implemented. | Preserve the same Ref in later delivery and placement forms. | 10 Runtime topology |
+| Stable namespace | Exact local binding is independent of module and Supervisor names. | Keep namespace separate from location and authority. | 09 complete; 10 and 11 consume it |
+| Different identity shapes | Compatible paths still accept term-valued partitions and local handles. | Add new Ref target forms without silently converting legacy partitions. | 10 Runtime topology |
+| Storage-key migration | Dual-read and collision detection are implemented. Cross-key rewrite is not atomic in the adapter contract. | Use an offline or provider-owned tool if an application must rewrite legacy keys. | Application or provider owner |
 | Runtime handles in relationships | A restart can make a saved PID stale | Ref-based public targets with replaceable handles | 08 Agent Server and 10 Runtime topology |
 | No location or authority contract | A Ref alone cannot prevent two live writers | Separate location and authority contracts | 10 Runtime topology and later owner seam |
 
@@ -66,8 +66,8 @@ later seams.
   unchanged; its package-boundary inventory revalidation is pending approval.
 - Dependents: 07 Persistence, 08 Agent Server, 09 Jido instance,
   10 Runtime topology, and 13 Observability.
-- Blockers for dependent work: namespace binding rules, partition migration,
-  and persistence-key migration.
+- Namespace binding and stable persistence identity are implemented in seam 09.
+  Runtime delivery and placement remain with seam 10.
 
 ## Documents
 

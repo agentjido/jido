@@ -16,8 +16,9 @@
   [06 Commit and effects](../06_commit-and-effects/alignment.md),
   [07 Persistence](../07_persistence/alignment.md),
   [08 Agent Server](../08_agent-server/alignment.md), and
-  [09 Jido instance](../09_jido-instance/alignment.md). All were used as pending
-  draft prerequisites.
+  [09 Jido instance](../09_jido-instance/alignment.md). The Ref value, local
+  namespace, facade, persistence identity, Plugin bootstrap pair, and durable
+  activation inputs are implemented prerequisites.
 - Alignment state: `Blocked` on prerequisite approval and the decisions in this
   seam.
 - Approved decisions: None.
@@ -133,7 +134,7 @@ All dispositions are recommendations and are pending approval.
 | `RT-GAP-005` | `RT-REQ-024` | Plugin Init and owner-built replacement child specification | Each generation receives one newly built committed state-version input. | `Resolved by seams 05 and 08`; preserve during topology work |
 | `RT-GAP-006` | `RT-REQ-028` to `RT-REQ-032` | State, DirectiveRuntime, and child tests | Current logical relationship behavior is implemented. Public Ref identity is absent. | `Retain`; migrate handles later |
 | `RT-GAP-007` | `RT-REQ-033` to `RT-REQ-044` | ChildPlacement, SpawnRegistry, and distributed tests | Known-node behavior is strong. Receipt storage is nondurable and gives no ownership transfer. | `Retain` bounded contract; `Defer` authority |
-| `RT-GAP-008` | `RT-REQ-045` to `RT-REQ-047` | No core Agent Ref or namespace | Current child and facade paths use IDs and PIDs. | `Missing`; blocked on seams 03 and 09 |
+| `RT-GAP-008` | `RT-REQ-045` to `RT-REQ-047` | Core Agent Ref, exact local namespace, and public Ref facade | Current child relationships still use compatible IDs and tracked PIDs. | `Input resolved`; seam 10 owns topology use |
 | `RT-GAP-009` | `RT-REQ-048` | Core scope and distributed authority research test | The limit is documented. One skipped test shows exclusive ownership is absent. | `Retain` explicit non-guarantee |
 | `RT-GAP-010` | `RT-REQ-049` to `RT-REQ-051` | Controller docs, code, and tests | The split exists, but old seam text mixed runtime and control-plane duties. | `Retain`; clarify owner boundary |
 | `RT-GAP-011` | `RT-REQ-015`, `RT-REQ-025` | Persistence and Agent Server code | Revision-zero create, Plugin cleanup, and ready-only public publication are implemented. | `Resolved input`; preserve during topology work |
@@ -154,7 +155,7 @@ remote-child, and gap-analysis files. Git history keeps their exact text.
 | Nonpersistent abnormal restart resets to the initial Agent at version zero. | `Remove`. | Current code and prerequisite seams keep the latest same-instance checkpoint. |
 | Persistent restart uses the latest durable record. | `Retain dependency`. | Seam 07 owns the record and seam 08 owns activation. |
 | Instance restart discovers persistent Agents automatically. | `Reject`. | Activation requires an explicit child spec or control-plane decision. |
-| Agent-to-Agent delivery is Ref-first now. | `Replace with additive target`. | Current child delivery uses tracked PIDs. Seams 03 and 09 must first add local Ref resolution. |
+| Agent-to-Agent delivery is Ref-first now. | `Replace with additive target`. | Current child delivery uses tracked PIDs. Seams 03 and 09 now provide local Ref resolution; this seam must define any topology target change. |
 | A Plugin runtime always needs a process. | `Reject`. | Process-free owned Directive handling remains valid when no runtime is declared. |
 | A separate `Jido.Plugin.Runtime` behavior with `dispatch/3` is the target. | `Remove`. | Seam 05 owns the facet migration and keeps current `Jido.Plugin` compatibility. |
 | Plugin roots are normalized to `restart: :temporary`. | `Remove`. | Current and seam-05 contracts require a permanent root under a temporary wrapper. |
@@ -275,7 +276,7 @@ Create the formal plan only after the user approves this seam.
 | `RT-REQ-028` to `RT-REQ-032` | Child lifecycle and restarted-child tests | Repeat with Ref migration and all parent policies across node loss | `Proven` locally; remote matrix is `Partial` |
 | `RT-REQ-033` to `RT-REQ-042` | Distributed child and Spawn Registry tests | Controlled instance-loss and duplicate-after-loss tests | `Proven` for live instances; loss limit is `Partial` |
 | `RT-REQ-043` and `RT-REQ-044` | Remote lifecycle tests | Reconnect and each parent-death policy matrix | `Partial` |
-| `RT-REQ-045` to `RT-REQ-047` | Application research example only | Core Ref, namespace, replacement, absent, and no-fallback tests | `Missing` |
+| `RT-REQ-045` to `RT-REQ-047` | Core Ref, namespace, replacement PID, absent Agent, and no-fallback tests | Topology target integration | `Prerequisite proven; seam work remains` |
 | `RT-REQ-048` | Core scope and skipped authority test | Architecture check and public non-guarantee review | `Partial` |
 | `RT-REQ-049` to `RT-REQ-051` | Controller docs, code, examples, and tests | Application restart-coupling and public-only integration fixture | `Partial` |
 
@@ -290,9 +291,9 @@ No removal or deprecation is approved in this seam.
 | Runtime checkpoints | Keep same-instance last-commit recovery and clean-stop deletion. Do not convert it into a durability claim. |
 | Persistence | Consume revision-zero creation, tombstones, and all-write-error authority without adding discovery or lease meaning. |
 | Plugin runtime | Keep the temporary wrapper role and permanent root contract. The wrapper rebuilds the root specification with a fresh state-version pair for each generation. Keep state-pull compatibility. |
-| Relationships | Keep built-in child Directives, private handles, parent policies, and parent-binding lookup. Add Ref use only after local resolution exists. |
+| Relationships | Keep built-in child Directives, private handles, parent policies, and parent-binding lookup. Local Ref resolution now exists; add Ref topology use only through this seam's selected target contract. |
 | Remote placement | Keep top-level `node:` and no fallback. Preserve current uncertain-result and generation behavior. |
-| Identity | Add Ref-first local paths. Keep ID, PID, name, partition, and direct Agent Server APIs. |
+| Identity | Consume the implemented Ref-first local paths. Keep ID, PID, name, partition, and direct Agent Server APIs. |
 | Controller | Keep it outside the Jido instance. A later seam-11 change must preserve public runtime component contracts. |
 | Cluster features | No migration exists because discovery, election, failover, leases, fencing, and exclusive ownership are not core features. |
 
@@ -307,7 +308,7 @@ unit.
 | --- | --- | --- | --- | --- |
 | `RT-BLK-001` | `Blocker` | 00 Overview and 90 Package boundaries | Local-core scope, static Topology, explicit known-node placement, and compatibility are pending approval. | Approve or change the Bright Line and package scope. |
 | `RT-BLK-002` | `Blocker` | 12 Errors and contracts | Final runtime, timeout, not-found, and indeterminate error forms are pending. | Approve the error registry without changing runtime result meaning. |
-| `RT-BLK-003` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Agent Ref, namespace binding, partition conversion, and local Ref facade do not exist. | Approve and implement the additive local identity path. |
+| `RT-BLK-003` | `Resolved input` | 03 Agent identity and 09 Jido instance | Core Agent Ref, namespace binding, strict Ref partition validation, and the local Ref facade are implemented. | Preserve the additive and local-only contract. |
 | `RT-BLK-004` | `Resolved input` | 05 Plugins and 08 Agent Server | Every Plugin generation receives matching committed Plugin state and state version. | Preserve the immutable pair and compatible state-pull path. |
 | `RT-BLK-005` | `Resolved input` | 07 Persistence and 08 Agent Server | Revision-zero durable creation, all-write-error authority loss, and ready-only publication are implemented. | Preserve startup, failure, cleanup, and reactivation order. |
 | `RT-BLK-006` | `Assumption` | 09 Jido instance and 10 Runtime topology | The current five-child `:one_for_one` tree is the first-stage V3 target. | Approve or change `RT-DEC-001`. |

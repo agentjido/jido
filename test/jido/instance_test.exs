@@ -117,6 +117,14 @@ defmodule JidoTest.InstanceTest do
     assert opts[:max_tasks] == 2_000
   end
 
+  test "invalid application instance configuration reaches the final validator" do
+    Application.put_env(:jido_test_instance, TestInstance, :invalid)
+
+    assert {:error, %Jido.Error.ValidationError{} = error} = TestInstance.start_link()
+    assert Jido.Error.code(error) == :jido_instance_invalid_config
+    assert Process.whereis(TestInstance) == nil
+  end
+
   test "an inline instance keeps its Redis persistence function" do
     module = compile_inline_redis_instance("inline-persistence")
     on_exit(fn -> unload_module(module) end)
@@ -125,6 +133,39 @@ defmodule JidoTest.InstanceTest do
     assert is_function(opts[:command_fn], 1)
     assert {:ok, {:echo, ["PING"]}} = opts[:command_fn].(["PING"])
     assert opts[:prefix] == "inline-persistence"
+  end
+
+  test "application and start options replace the declared persistence default" do
+    application_persistence =
+      {Jido.Persistence.ETS,
+       table: String.to_atom("jido_app_persistence_#{System.unique_integer([:positive])}")}
+
+    runtime_persistence =
+      {Jido.Persistence.ETS,
+       table: String.to_atom("jido_runtime_persistence_#{System.unique_integer([:positive])}")}
+
+    Application.put_env(
+      :jido_test_instance,
+      TestInstance,
+      max_tasks: 500,
+      persistence: application_persistence
+    )
+
+    {:ok, _pid} = TestInstance.start_link(persistence: runtime_persistence)
+    assert Jido.instance_persistence(TestInstance) == runtime_persistence
+
+    agent = RedisTestAgent.new!(id: "configured-persistence")
+    assert {:ok, server} = TestInstance.start_agent(agent, restore: false)
+    assert :ok = TestInstance.hibernate(server)
+
+    assert {:ok, ^agent} =
+             Jido.Persistence.load_agent(runtime_persistence, RedisTestAgent, agent.id,
+               instance: TestInstance
+             )
+
+    stop_test_instance()
+    {:ok, _pid} = TestInstance.start_link()
+    assert Jido.instance_persistence(TestInstance) == application_persistence
   end
 
   test "hibernate and thaw work through an instance module" do
@@ -222,5 +263,45 @@ defmodule JidoTest.InstanceTest do
     assert Process.whereis(TestInstance)
 
     Supervisor.stop(supervisor, :normal, 5_000)
+  end
+
+  test "namespace bindings survive a namespace registry worker restart" do
+    namespace = "jido/test/registry-restart/#{System.unique_integer([:positive])}"
+    instance = String.to_atom("jido_registry_restart_#{System.unique_integer([:positive])}")
+    other = String.to_atom("jido_registry_duplicate_#{System.unique_integer([:positive])}")
+
+    instance_pid = start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    assert Jido.namespace(instance) == namespace
+
+    assert :ok =
+             Supervisor.terminate_child(Jido.Supervisor, Jido.Instance.NamespaceRegistry)
+
+    assert {:ok, _registry_pid} =
+             Supervisor.restart_child(Jido.Supervisor, Jido.Instance.NamespaceRegistry)
+
+    assert Jido.namespace(instance) == namespace
+    assert Jido.Instance.NamespaceRegistry.lookup(namespace) == {instance, instance_pid}
+
+    assert {:error, %Jido.Error.ValidationError{} = error} =
+             Jido.start_link(name: other, namespace: namespace)
+
+    assert Jido.Error.code(error) == :jido_namespace_already_bound
+  end
+
+  test "a plain instance persistence default survives a runtime store worker restart" do
+    instance = String.to_atom("jido_persistence_default_#{System.unique_integer([:positive])}")
+    table = String.to_atom("jido_persistence_table_#{System.unique_integer([:positive])}")
+    persistence = {Jido.Persistence.ETS, table: table}
+
+    instance_pid =
+      start_supervised!({Jido, name: instance, persistence: persistence}, id: instance)
+
+    runtime_store = Jido.runtime_store_name(instance)
+
+    assert Jido.instance_persistence(instance) == persistence
+    assert :ok = Supervisor.terminate_child(instance_pid, runtime_store)
+    assert Jido.instance_persistence(instance) == persistence
+    assert {:ok, _runtime_store_pid} = Supervisor.restart_child(instance_pid, runtime_store)
+    assert Jido.instance_persistence(instance) == persistence
   end
 end

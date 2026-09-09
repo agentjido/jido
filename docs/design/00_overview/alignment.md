@@ -60,7 +60,7 @@ change runtime behavior.
 | `lib/jido/agent_server/plugin_lifecycle.ex:110-198` | Plugin wrappers use the Jido Agent Dynamic Supervisor and remain outside Agent state. |
 | `lib/jido/agent_server/options.ex:11-64` | Agent Server options include an optional per-Agent persistence source and current map-based runtime options. |
 | `lib/jido/persistence.ex:1-16` | Persistence owns record keys, encoding, validation, and adapter fault containment. |
-| `lib/jido/persistence.ex` | Persistence uses atomic revision checks, compatible instance/module/partition/ID keys, version-2 active records, and CAS tombstones. |
+| `lib/jido/persistence.ex` | Persistence uses atomic revision checks, compatible version-2 keys and records, stable namespaced Ref keys and version-3 records, dual-key collision checks, and CAS tombstones. |
 | `lib/jido/persistence/record.ex` | Records are exact maps. Safe decoding, outer identity, shape, revision, and portability checks fail closed. |
 | `lib/jido/persistence/adapter.ex:1-46` | Adapters store bytes and provide atomic compare-and-swap. They do not own lifecycle policy. |
 | `lib/jido.ex:8-48` | Jido exposes immutable Agent and direct-command concepts and public PID-based instance examples. |
@@ -109,7 +109,7 @@ change runtime behavior.
 | `test/jido/error/normalization_test.exs:8-321` | Error constructors and public normalization are covered. |
 | `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity, first-match precedence, and fixed source-Signal selection all pass. |
 | `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state ownership, declared-view isolation, and separate prepared inputs all pass. |
-| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80` | An application-level stable reference works locally. Core durable namespace rebinding is skipped. |
+| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
 | `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Same-definition restore works. Revision-mismatch rejection is skipped. |
 | `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
 | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-43` | State-pull reconstruction works. State-and-version Init is skipped. |
@@ -223,18 +223,18 @@ source Signal
   Store. An abnormal Server restart restores it. A clean full instance stop
   removes the nondurable state.
 
-### Current persistence boundary
+### Implemented persistence boundary
 
-- Persistence uses private map records and portable map checkpoints. The
-  record key includes Jido instance, Agent module, partition, and Agent ID.
+- Persistence uses exact map records and portable map checkpoints. Compatible
+  unnamed keys include Jido instance, Agent module, partition, and Agent ID.
+  Stable namespaced keys use the complete Agent Ref.
 - The Server uses the current state version as the expected revision for an
   atomic compare-and-swap write.
-- An uncertain write always stops the Server. A confirmed conflict or adapter
-  error can use the configured error policy and can leave the Server running.
-- Persistent startup loads a record when one exists. It starts Plugin runtimes
-  and waits for readiness. It does not write an initial active record.
-- Delete removes the adapter value and its revision history. It writes no
-  tombstone.
+- Every required write error stops the Server activation before later work.
+- Persistent startup loads or creates a record. It starts Plugin runtimes,
+  waits for readiness, confirms revision zero, and only then publishes
+  `:ready` and returns startup success.
+- Normal delete writes a CAS tombstone and retains the revision fence.
 - A live Agent can inherit the instance persistence source or select an
   explicit per-Agent source.
 
@@ -265,7 +265,7 @@ still define open details and prove each target behavior.
 | --- | --- | --- | --- | --- |
 | `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
 | `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | `Resolved`: Agent facets receive declared projections and package-owned prepared input. | Preserve the four-owner Plugin contract. |
-| `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159` | Core has no stable Agent Ref. Registry and persistence identity shapes differ. | `Change, staged`: add Ref-first contracts beside current ID and PID APIs. |
+| `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | Agent Ref, namespace registry, Ref facade, persistence formats, and FA03 | Ref identity, local resolution, and stable storage are implemented beside current ID and PID APIs. Topology delivery still uses compatible handles. | `Resolved for value, instance, and persistence`; seam 10 owns topology use. |
 | `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | `lib/jido/agent.ex:403-420,563-574`; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Checkpoints have no enforced definition revision. Restore can use the loaded module definition. | `Change, staged`: add revision and old-checkpoint rules. Keep all authoring forms. |
 | `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/jido/persistence/record_lifecycle_test.exs` | `Resolved`: revision zero is confirmed after Plugin readiness. Registry identity stays `:starting` until public `:ready` publication. | Preserve the write, cleanup, and publication order. |
 | `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1582-1617`; `test/jido/persistence_test.exs:318-356` | Every required persistence write failure now removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seams 07 and 08. |
@@ -293,7 +293,7 @@ table delegates them.
 | Earlier text says nonpersistent restart resets to the initial Agent. | Remove that target. Keep last-commit runtime-checkpoint restore. | `OVR-REQ-044` and `OVR-REQ-045`; seams 08 through 10 |
 | Earlier text says all runtime effects start after commit. | Limit the rule to runtime-owned Directive work. External executable I/O can occur before commit. | `OVR-REQ-027` through `OVR-REQ-030`; seam 06 |
 | Earlier text names `%Jido.Plugin{}` as a configuration struct. | Remove the type claim. `Jido.Plugin` is a behavior. | `OVR-REQ-052`; seam 05 |
-| Core has no stable Agent Ref. | Add Ref through a staged migration. | `OVR-REQ-011` and `OVR-REQ-012`; seams 03, 07, 09, and 10 |
+| Core has no stable Agent Ref. | `Implemented` for the value, local instance facade, and durable identity. Seam 10 owns later topology use. | `OVR-REQ-011` and `OVR-REQ-012`; seams 03, 07, 09, and 10 |
 | Core has no positive definition revision. | Add revision through a staged migration. Do not claim that a label pins loaded code. | `OVR-REQ-009` and `OVR-REQ-010`; seams 01, 02, 04, and 07 |
 | Earlier proposals name Checkpoint, Commit, Record, Status, Turn Status, Plugin Context, Transition, Contribution, Runtime values, and Instance Config structs. | Keep the roles. Defer exact types, fields, serialization, and errors to their owners. | `OVR-REQ-052`; seam 12 and value owners |
 | Earlier text can imply a new Result value. | Keep the tagged live result and the separate Turn Outcome. | Public/shared contract; seams 08, 12, and 13 |
@@ -426,7 +426,7 @@ the implementation tasks.
 | `OVR-REQ-001` through `OVR-REQ-005` | `lib/jido.ex:8-48`; `../jido_action/lib/jido_exec.ex:1-18`; `../jido_signal/lib/jido_signal/router.ex:1-16`; `mix.exs:351-360` | Seam-90 boundary inventory and compatible V3 compile and test result. | `Partial` |
 | `OVR-REQ-006` through `OVR-REQ-008` | `lib/jido/agent.ex:2-10`; `test/jido/agent_test.exs:157-389`; `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67` | Preserve every supported authoring form through the normalized target. | `Proven` for current behavior; target remains pending |
 | `OVR-REQ-009` and `OVR-REQ-010` | `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` has one passing and one skipped case. | Revision field, all-authoring-form round trip, mismatch rejection, and old-checkpoint migration. | `Missing` |
-| `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159`; `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-80` | Core Ref construction, serialization, Registry, persistence, delivery, node-move, and stale-location tests. | `Partial` |
+| `OVR-REQ-011` and `OVR-REQ-012` | Ref contract tests, instance Ref tests, stable-key persistence tests, and three passing FA03 cases | Topology delivery, node-move, and stale-location tests remain with seam 10. | `Proven for value, local instance, and persistence` |
 | `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex:95-103`; `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct and live first-match and fixed-selection tests pass. | `Proven` |
 | `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/command/runner.ex:29-132`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-14` | Preserve parity after the route and Plugin-input changes. | `Proven` for current behavior |
 | `OVR-REQ-019` through `OVR-REQ-023` | `lib/jido/agent/plugin.ex`; `test/jido/plugin/facets_test.exs`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | Declared observation, isolated input, deterministic ownership, and direct/live compatibility tests pass. | `Proven` |
@@ -460,10 +460,10 @@ No deprecation or removal is approved in this seam.
 | --- | --- |
 | Route order | First-match selection changes current multiple-match errors. Route-changing Plugin behavior needs a stated transition and direct/live acceptance proof. |
 | Plugin input | Declared views and isolated prepared input change callback authority. Keep declaration order and supply compatibility delegates until Plugin migrations are proved. |
-| Agent Ref | Add Ref-first APIs beside current ID and PID APIs. Do not remove current handles in V3 without a separate deprecation decision. |
+| Agent Ref | Ref-first APIs now exist beside current ID and PID APIs. Do not remove current handles in V3 without a separate deprecation decision. |
 | Definition revision | Preserve revision through DSL, direct data, Builder, Codec, checkpoints, and restore. Define behavior for old checkpoints before enforcement. |
 | Custom checkpoints | Keep complete Agent `checkpoint/2` and `restore/2`. A Persistence facet cannot silently override their meaning. |
-| Durable records | Version any new active and tombstone record shape. Define mixed-version read, write, purge, reactivation, and rollback rules before the first new-format write. |
+| Durable records | Compatible keys use format 2. Stable Ref keys use format 3. A lone legacy key remains readable, dual keys fail closed, automatic cross-key rewrite is not supported, and downgrade after a stable write is unsupported. |
 | Write errors | Removing write authority after confirmed failures changes current error-policy behavior. Define stop or terminal non-writing behavior and automatic-restart reload rules. |
 | Persistence adapters | Keep the binary adapter and atomic compare-and-swap contract. New lifecycle meaning stays above the adapter. |
 | Plugin runtime Init | Keep the implemented coherent state and version input. Keep the current public state-pull recovery path during migration. |

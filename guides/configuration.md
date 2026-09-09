@@ -13,6 +13,7 @@ supervision tree.
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
+    namespace: "my-app/primary",
     persistence: {Jido.Persistence.ETS, table: :my_app_agents}
 end
 ```
@@ -23,8 +24,10 @@ Supervisor.start_link(children, strategy: :one_for_one)
 ```
 
 The `:otp_app` value tells the generated module where to read its runtime
-configuration. The optional `:persistence` value defines the default adapter
-for actors in this instance.
+configuration. The optional `:namespace` value enables stable Agent Ref
+operations. It must be a nonempty binary and must be unique among live local
+instances on one Erlang node. The optional `:persistence` value defines the
+default adapter for actors in this instance.
 
 Set instance options in application configuration:
 
@@ -44,7 +47,13 @@ config :my_app, MyApp.Jido,
 ```
 
 Options passed to `MyApp.Jido.start_link/1` override application configuration.
-The default `:max_tasks` value is `1_000`.
+The default `:max_tasks` value is `1_000`. Jido validates `:name`, `:otp_app`,
+`:namespace`, `:max_tasks`, and `:persistence` before it starts any instance
+child. The established `:debug`, `:telemetry`, and `:observability` groups pass
+to their observation owner. Other unknown instance keys fail validation.
+
+`max_tasks` limits only children of the instance Task Supervisor. It does not
+limit Agent Server mailboxes, postponed Signals, or Plugin runtime processes.
 
 ## Configure one actor
 

@@ -1,11 +1,10 @@
-> Target seam design. This document is pending approval.
+> Selected seam design. This contract is implemented.
 
 # Jido instance design
 
-All requirements and decisions in this document are recommended targets. The
-[design review index](../README.md#document-review-status) is the source of
-truth for approval. Code defines current behavior until an approved target is
-implemented.
+The requirements and decisions in this document define the implemented seam.
+The [alignment record](alignment.md) gives the code, test, migration, and
+compatibility evidence.
 
 ## Scope and owner
 
@@ -38,10 +37,10 @@ Application Supervisor
     └── Agent Dynamic Supervisor      Agent Servers and current Plugin wrappers
 ```
 
-The recommended first alignment stage keeps this implemented tree and its
-`:one_for_one` strategy. A later change to failure coupling or Plugin placement
-needs an owner-seam decision and failure-injection proof. This seam does not
-redefine Agent Server ownership of Plugin runtimes.
+The implemented alignment keeps this tree and its `:one_for_one` strategy. A
+later change to failure coupling or Plugin placement needs an owner-seam
+decision and failure-injection proof. This seam does not redefine Agent Server
+ownership of Plugin runtimes.
 
 The instance has two separate identities:
 
@@ -72,7 +71,8 @@ their existing semantic ownership.
 
 ## Requirements
 
-Each identifier is stable. EARS syntax does not grant approval.
+Each identifier is stable. The alignment record maps these requirements to
+executable evidence.
 
 ### Public role and application composition
 
@@ -306,19 +306,18 @@ Current direct `Jido.AgentServer` command, control, lifecycle, and inspection
 functions also remain public. A Ref facade is additive and does not make them
 private by declaration.
 
-### Recommended Ref-first facade roles
+### Ref-first facade
 
-Exact function names and arities remain an open API naming decision. The
-approved surface must cover these roles without private Server access:
+The implemented surface covers each role without private Server access:
 
-| Role | Required capability |
+| Role | Entries |
 | --- | --- |
-| Identity | Build and validate a Ref in the instance namespace. |
-| Publication | Start supplied Agent data or activate known durable identity. |
-| Command | Synchronous call, best-effort cast, and OTP asynchronous request. |
-| Control | Cancel eligible work and target one Turn ID. |
-| Lifecycle | Stop, hibernate, activate, attach, detach, touch, and approved durable delete. |
-| Inspection | Local lookup, Agent, Plugin state, status, snapshot, children, readiness, list, count, and debug data. |
+| Identity | `agent_ref`, `resolve_agent` |
+| Publication | `start_agent_ref`, `activate_agent` |
+| Command | `call`, `cast`, `send_request`, `receive_response` |
+| Control | Root `cancel`, `cancel_turn`, `attach`, `detach`, and `touch`; generated modules use `attach_ref`, `detach_ref`, and `touch_ref` for the ownership controls. |
+| Lifecycle | `stop_agent_ref`, `hibernate_ref`, `delete_agent` |
+| Inspection | `agent`, `plugin_state`, `status`, `snapshot`, `children`, `await_ready`, `set_agent_debug`, `recent_events` |
 
 `whereis_agent` keeps its current PID-or-`nil` compatibility meaning. A future
 Ref overload or separate local resolver must still identify its PID as a
@@ -326,7 +325,7 @@ replaceable local handle.
 
 ### Configuration precedence
 
-The recommended resolution order is:
+The implemented resolution order is:
 
 1. compile-time instance declaration for `otp_app` and the persistence default;
 2. `config otp_app, InstanceModule` runtime values;
@@ -362,7 +361,7 @@ extension behavior. Directives own post-commit work.
 
 ## Downstream guarantees
 
-These guarantees apply only after the related requirements are approved.
+These guarantees are part of the implemented seam.
 
 | Consumer seam | Guaranteed contract |
 | --- | --- |
@@ -371,14 +370,14 @@ These guarantees apply only after the related requirements are approved.
 | 13 Observability | Instance and Agent Server debug and status compatibility paths remain available during migration. |
 | 99 Delivery | Ref-first migration cannot remove supported ID, PID, partition, or direct Server paths without a separate gate. |
 
-## Open design decisions
+## Selected design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Question | Selected option | Effect |
 | --- | --- | --- | --- |
 | `INST-DEC-001` | What is the instance role? | Keep an application-owned local Supervisor and facade. | Jido stays a composable library. |
 | `INST-DEC-002` | Which first-stage supervision tree applies? | Keep the implemented five children and `:one_for_one`. | Alignment can begin without an unproved restart redesign. |
 | `INST-DEC-003` | How is namespace bound? | Make it optional for compatibility, exact, and unique among live local bindings on one node. | Ref work can start without breaking plain instances. |
-| `INST-DEC-004` | What is the Ref API shape? | Add one complete Ref-first family after a focused naming review. | Callers get one local resolution policy without removing direct Server calls. |
+| `INST-DEC-004` | What is the Ref API shape? | Add the identity, publication, command, control, lifecycle, and inspection family listed above. | Callers get one local resolution policy without removing direct Server calls. |
 | `INST-DEC-005` | Which persistence precedence applies? | Keep explicit per-Agent selection or disablement above the instance default. | Current use cases and seam-07 compatibility stay valid. |
 | `INST-DEC-006` | Which instance callbacks exist? | Keep only overridable `config/1` now. | New callback authority waits for a proved use case. |
 | `INST-DEC-007` | Does the instance resolve remote Agents? | No. Keep this facade local. | Topology and transport owners can add explicit higher-level APIs. |

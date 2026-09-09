@@ -46,7 +46,7 @@ current behavior.
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| No stable Ref or namespace | Placement cannot name one Agent across nodes. | Approved Ref, namespace binding, and local resolution. | 03 Agent identity, 09 Jido instance |
+| Stable Ref input | Ref, namespace binding, local resolution, and stable persistence identity are implemented. | Preserve the complete Ref separately from later location and authority values. | 03 Agent identity, 09 Jido instance |
 | No authority or fence input | Two nodes can run the same logical Agent. | Authority grants with monotonically increasing epochs that every write owner enforces. | 06 Commit, 07 Persistence, 08 Agent Server, external authority owner |
 | No membership or placement contract | A known node is not discovery or scheduling. | Validated provider inputs and deterministic, explainable placement output. | 11 control plane, external cluster owner |
 | No handoff or recovery protocol | Restart and failover can overlap or lose intent. | Idempotent state machines with durable operation records and explicit rollback. | 11 control plane, external durable owner |
@@ -87,9 +87,10 @@ current behavior.
   [runtime topology](../10_runtime-topology/alignment.md). Authority and
   recovery also use [commit and effects](../06_commit-and-effects/alignment.md).
 - Dependents: 13 Observability and 99 Delivery.
-- Blockers: All prerequisite documents are pending approval. Stable Ref,
-  namespace, write-authority loss, revision-zero persistence, fencing input,
-  authority-provider semantics, and package ownership are not implemented.
+- Blockers: Fencing input, authority-provider semantics, membership and
+  placement contracts, recovery operations, and package ownership are not
+  implemented. Stable Ref, namespace, write-authority loss, and revision-zero
+  persistence are implemented inputs.
 
 ## Documents
 

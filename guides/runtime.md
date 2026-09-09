@@ -29,6 +29,28 @@ The last removal starts the configured idle timer. `touch/1` resets that timer.
 `idle_timeout` defaults to `:infinity`. Idle shutdown removes the registration.
 These controls remain; the old InstanceManager facade and worker-pool API do not.
 
+## Use a stable Agent Ref
+
+Add a namespace to a generated Jido instance when a logical Agent identity
+must stay stable across local Supervisor names and PIDs:
+
+```elixir
+defmodule MyApp.Jido do
+  use Jido, otp_app: :my_app, namespace: "my-app/primary"
+end
+
+{:ok, ref} = MyApp.Jido.agent_ref("agent-42", partition: "north")
+{:ok, _server} = MyApp.Jido.start_agent_ref(ref, MyAgent)
+{:ok, agent} = MyApp.Jido.call(ref, signal)
+```
+
+The Ref facade also provides cast and OTP request functions, cancellation,
+attach and detach controls, stop and hibernate functions, durable activation
+and delete, and Server inspection. Each operation validates the Ref namespace
+and resolves its current local PID. A missing Agent returns
+`{:error, :not_found}`. A namespace is local identity input. It does not prove
+remote location or write authority.
+
 Use `Jido.stop_agent/1` to stop an Agent. Use `hibernate/1` and `thaw/2` when
 persistence is configured. Each function also accepts an explicit instance.
 See [storage](storage.md) and `Jido.AgentServer` for owned children.

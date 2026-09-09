@@ -18,8 +18,9 @@
   [09 Jido instance](../09_jido-instance/alignment.md), and
   [10 Runtime topology](../10_runtime-topology/alignment.md). Authority and
   recovery also use [06 Commit and effects](../06_commit-and-effects/alignment.md).
-- Alignment state: `Blocked` on pending prerequisites, package ownership,
-  stable Ref, namespace, authority epochs, and commit-time fencing.
+- Alignment state: `Blocked` on package ownership, authority epochs,
+  membership and placement contracts, recovery operations, and commit-time
+  fencing. Stable Ref and namespace inputs are implemented.
 - Approved decisions: None.
 
 The alignment state is execution status. It is not document approval. This
@@ -93,8 +94,7 @@ file defines outcomes and gates. It is not the formal implementation plan.
 | `test/jido/topology/controller_test.exs:251-340` | Child state restore, Bus repair, and Controller worker recovery work for the same supplied target. |
 | `test/jido/agent_server/distributed_authority_test.exs:10-30` | Shared CAS detects a stale writer after another node commits. |
 | `test/jido/agent_server/distributed_authority_test.exs:32-39` | Exclusive cluster ownership is skipped and not proved. |
-| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:21-58` | An application-level Ref can resolve local replacement and separate bindings. Core Ref and durable namespace are missing. |
-| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs:60-80` | Durable namespace rebinding is skipped and not proved. |
+| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves a local replacement, separates namespaces, and restores durable state after namespace rebinding. All three cases pass. |
 | `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:13-42` | Example code can compare Agent plan entries and validate a new target without live effects. |
 | `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:55-78` | Full Controller replacement can restore Agent state but replaces all PIDs. |
 | `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:80-97` | Live target growth is skipped and not implemented. |
@@ -137,7 +137,7 @@ local static contract. It does not prove a distributed target.
 | `TOP-GAP-003` | `TOP-REQ-012` to `TOP-REQ-018` | CAS conflict test; exclusive-owner test skipped | CAS detects one stale revision. There is no grant, epoch, expiry, or commit fence. | `Conflict` with any exclusive-owner claim; `Blocked` |
 | `TOP-GAP-004` | `TOP-REQ-019` to `TOP-REQ-024` | Explicit known-node child only | No automatic placement, capacity, constraints, deterministic policy, or explanation exists. | `Missing`; keep library choice deferred |
 | `TOP-GAP-005` | `TOP-REQ-025` to `TOP-REQ-033` | Persistent local restore and full Controller replacement | No durable operation state, fenced handoff, rollback, or automatic recovery exists. | `Missing`; `Blocked` on authority and persistence targets |
-| `TOP-GAP-006` | `TOP-REQ-034` to `TOP-REQ-038` | Application Ref example only | Core Ref, namespace binding, distributed location record, and re-resolution contract do not exist. | `Missing`; `Blocked` on seams 03 and 09 |
+| `TOP-GAP-006` | `TOP-REQ-034` to `TOP-REQ-038` | Core Ref, namespace binding, stable persistence identity, and local re-resolution | Distributed location and re-resolution contracts do not exist. | `Partial`; identity input is resolved, control-plane work remains |
 | `TOP-GAP-007` | `TOP-REQ-039` to `TOP-REQ-044` | Deployment guidance only | No network-partition or stale-epoch runtime enforcement exists. | `Missing`; `Blocked` on authority mechanism |
 | `TOP-GAP-008` | `TOP-REQ-045` to `TOP-REQ-048` | Local Controller status map | Local pass status exists. Distributed semantic events and state separation do not. | `Partial`; event schema deferred to seam 13 |
 | `TOP-GAP-009` | `TOP-REQ-049` to `TOP-REQ-058` | Manual local `reconcile/2` only | No authenticated audit, preview, cordon, drain, move, rebalance, suspend, or resume contract exists. | `Missing`; product UI remains out of scope |
@@ -266,7 +266,7 @@ Create the implementation plan later, after the design is approved.
 | `TOP-REQ-012` to `TOP-REQ-018` | CAS conflict only; exclusive-owner test skipped | Grant, epoch, expiry, stale-commit, and claim tests | `Conflict` |
 | `TOP-REQ-019` to `TOP-REQ-024` | Explicit known-node child placement only | Constraint, capacity, deterministic choice, and unscheduled tests | `Missing` |
 | `TOP-REQ-025` to `TOP-REQ-033` | Local restore and full replacement examples | Durable operation, fencing, readiness, retry, and rollback tests | `Missing` |
-| `TOP-REQ-034` to `TOP-REQ-038` | Application-level Ref example | Core Ref, namespace, location, and re-resolution tests | `Missing` |
+| `TOP-REQ-034` to `TOP-REQ-038` | Core Ref, namespace, local re-resolution, and durable namespace rebind tests | Distributed location and re-resolution tests | `Partial` |
 | `TOP-REQ-039` to `TOP-REQ-044` | Deployment guidance only | Network-partition and stale-epoch enforcement tests | `Missing` |
 | `TOP-REQ-045` to `TOP-REQ-048` | Local Controller status only | Distributed event, status, redaction, and handler-failure tests | `Partial` |
 | `TOP-REQ-049` to `TOP-REQ-058` | Manual local repair only | Authenticated audit and every operator-role test | `Missing` |
@@ -298,9 +298,9 @@ No removal or deprecation is approved in this seam.
 | `TOP-BLK-001` | `Blocker` | 00 Overview | Static Topology retention and distributed scope are pending approval. | Approve or change the Overview topology decision. |
 | `TOP-BLK-002` | `Blocker` | 90 Package boundaries | The external control-plane owner and public integration boundary are pending. | Approve package placement before API design. |
 | `TOP-BLK-003` | `Blocker` | 12 Errors and contracts | Provider controls, operation errors, and safe projections are not approved. | Approve result and error ownership. |
-| `TOP-BLK-004` | `Blocker` | 03 Agent identity, 09 Jido instance | Core Ref and stable namespace are target designs only. | Implement and prove exact Ref binding and local resolution. |
+| `TOP-BLK-004` | `Resolved input` | 03 Agent identity, 09 Jido instance | Core Ref, stable namespace binding, stable persistence identity, and local resolution are implemented. | Preserve the Ref when later location and authority values are added. |
 | `TOP-BLK-005` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | No activation or commit boundary accepts and enforces an authority epoch. | Approve the narrow fencing contract and failure rule. |
-| `TOP-BLK-006` | `Partial input` | 07 Persistence and 09 Jido instance | Revision-zero records, tombstones, and all-write-error authority loss are implemented. Ref-key migration remains. | Complete stable namespace and mixed-key work before durable Ref control. |
+| `TOP-BLK-006` | `Resolved input` | 07 Persistence and 09 Jido instance | Revision-zero records, tombstones, all-write-error authority loss, stable Ref keys, and explicit legacy collision rules are implemented. | Do not infer a lease or fencing grant from these inputs. |
 | `TOP-BLK-007` | `Blocker` | External authority owner | Grant source, epoch durability, optional lease clock model, renewal margin, and provider fault set are not selected. | Define and prove one provider contract before exclusive claims. |
 | `TOP-BLK-008` | `Blocker` | External cluster owner | Membership source, node identity, generation, capacity units, and stale-view policy are not selected. | Define provider data and conformance tests. |
 | `TOP-BLK-009` | `Blocker` | 11 Control plane | Partial handoff, retry, rollback, and operation-record retention policies are not approved. | Approve operation state and recovery semantics. |

@@ -5,6 +5,11 @@ defmodule Jido.Application do
   @doc false
   def start(_type, _args) do
     Jido.Telemetry.setup()
-    Supervisor.start_link([], strategy: :one_for_one, name: Jido.Supervisor)
+
+    Supervisor.start_link(
+      [Jido.Instance.NamespaceRegistry],
+      strategy: :one_for_one,
+      name: Jido.Supervisor
+    )
   end
 end

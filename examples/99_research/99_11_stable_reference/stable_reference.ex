@@ -24,22 +24,21 @@ end
 
 defmodule Jido.Examples.StableReference do
   @moduledoc """
-  Resolves a stable Agent Ref through public lookup on each call.
+  Resolves a stable Agent Ref through the public Jido instance facade.
 
-  Application bindings map the Ref namespace to a current Jido instance.
-  Runtime lookup still uses the current ID and partition API.
+  The selected local Jido instance must bind the exact Ref namespace. Each
+  operation resolves the current Agent Server PID and does not save that PID.
   """
 
   alias Jido.Agent.Ref
+  alias Jido.Signal
 
-  @spec append(Ref.t(), %{required(String.t()) => atom()}, String.t()) ::
+  @spec append(Ref.t(), atom(), String.t()) ::
           {:ok, Jido.Agent.t()} | {:error, term()}
-  def append(%Ref{} = ref, bindings, text) do
-    instance = Map.fetch!(bindings, ref.namespace)
+  def append(%Ref{} = ref, instance, text) when is_atom(instance) do
+    signal =
+      Signal.new!("conversation.append", %{text: text}, source: "/examples/stable-reference")
 
-    case Jido.whereis_agent(instance, ref.id, partition: ref.partition) do
-      nil -> {:error, :not_found}
-      pid -> __MODULE__.Conversation.append(pid, text)
-    end
+    Jido.call(instance, ref, signal)
   end
 end

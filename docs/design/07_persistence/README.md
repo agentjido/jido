@@ -1,5 +1,5 @@
-> Seam review entry point. The implementation direction was selected on
-> 2026-09-09. The full target design is still pending approval.
+> Implemented seam review entry point. Stable Ref persistence was completed by
+> seam 09 on 2026-09-10.
 
 # 07 — Persistence
 
@@ -11,7 +11,8 @@ revisions, logical deletion, checkpoint integration, and storage-result
 classification. Adapters own binary `get/2` and exact-byte
 `compare_and_swap/4` operations.
 
-New writes use exact version-2 active or tombstone records. A persistent Agent
+Compatible unnamed writes use exact version-2 active or tombstone records. New
+namespaced writes use exact version-3 active or tombstone records. A persistent Agent
 Server confirms a create-only revision-zero write after Plugin readiness and
 before its start call succeeds. Normal delete writes a compact CAS tombstone,
 so a delayed writer cannot recreate the deleted record lifetime. Every required
@@ -22,9 +23,10 @@ its paired owned-state value. Complete custom Agent checkpoints bypass that
 conversion and keep their opaque callback contract. Legacy outer format-1
 active records remain readable.
 
-The storage key still uses instance module, Agent module, partition, and ID.
-Stable Ref key migration waits for the namespace and partition decisions in
-seam 09.
+Unnamed operations keep the compatible instance-and-module key. Namespaced
+operations use the complete `{namespace, partition, id}` Ref key. A lone legacy
+key remains readable. A legacy and stable key collision fails closed. Jido does
+not rewrite across the two keys automatically.
 
 ## Owner boundary
 
@@ -42,14 +44,14 @@ seam 09.
 | Area | Current contract |
 | --- | --- |
 | Adapter | Binary get and exact-byte CAS are required. Put and delete are optional maintenance callbacks. |
-| Record | Version-2 active records contain identity, Agent `vsn`, revision, and checkpoint. Tombstones contain identity and revision only. |
+| Record | Version-2 compatible and version-3 Ref records contain identity, Agent `vsn`, revision, and checkpoint. Tombstones contain identity and revision only. |
 | Create | New persistent activation confirms revision zero before the start call succeeds. |
 | Commit | Confirmed CAS precedes live replacement and Directives. Every write error removes authority. |
 | Delete | Normal delete uses CAS tombstones. Missing delete creates a revision-zero tombstone. |
 | Restore | Active records restore. Tombstones return `:deleted`. Corrupt, future, mismatched, and changed-definition records fail closed. |
 | Checkpoints | Agent owns default or complete custom maps. Custom maps bypass Plugin slice conversion. |
 | Plugins | A Persistence facet converts only the state value owned by its paired Agent facet. |
-| Compatibility | Legacy format-1 active records load. Current module-based keys remain until seam 09. |
+| Compatibility | Legacy format-1 active records load. Compatible unnamed keys remain. Namespaced operations dual-read and reject a dual-key collision. |
 | Backends | ETS, File, and Redis pass one shared get-and-CAS conformance test. |
 
 ## Important limits
@@ -63,8 +65,8 @@ seam 09.
   directory sync durability.
 - Registry identity reservation uses `:starting`. Public lookup and listing
   expose only `:ready` entries after initial persistence succeeds.
-- Ref-key collision checks, dual reads, rewrite, rollback, and removal gates
-  remain with seam 09.
+- Cross-key rewrite is not automatic because the adapter cannot atomically
+  compare and swap two keys. Downgrade after a version-3 write is unsupported.
 
 ## Dependencies
 
