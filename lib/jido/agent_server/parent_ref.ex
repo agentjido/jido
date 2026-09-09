@@ -1,5 +1,5 @@
 defmodule Jido.AgentServer.ParentRef do
-  @moduledoc "A private logical parent relationship for one live Agent Server."
+  @moduledoc false
 
   @schema Zoi.struct(
             __MODULE__,
@@ -34,7 +34,7 @@ defmodule Jido.AgentServer.ParentRef do
   @doc false
   def schema, do: @schema
 
-  @doc "Creates one validated parent relationship."
+  @doc false
   def new(attrs) when is_list(attrs) do
     if Keyword.keyword?(attrs), do: attrs |> Map.new() |> new(), else: invalid(attrs)
   end
@@ -56,7 +56,7 @@ defmodule Jido.AgentServer.ParentRef do
     {:error, Jido.Error.validation_error("Agent parent reference is invalid", details: details)}
   end
 
-  @doc "Creates one validated parent relationship or raises."
+  @doc false
   def new!(attrs) do
     case new(attrs) do
       {:ok, parent} -> parent

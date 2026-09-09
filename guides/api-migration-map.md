@@ -188,8 +188,8 @@ the complete candidate state, then performs Directives in list order.
 
 | V2 module | Status and V3 direction |
 | --- | --- |
-| `Jido.AgentServer.ChildInfo` | **Same name, private data.** V3 adds activation, creation, lifecycle, and child-kind fields. Use `children/2`; do not convert stored structs. |
-| `Jido.AgentServer.ParentRef` | **Same name, private data.** V3 adds a monitor, creation cause, and remote spawn reference. Use attach, detach, adopt, and parent-binding APIs. |
+| <code>Jido.AgentServer.ChildInfo</code> | **Same name, private data.** V3 adds activation, creation, lifecycle, and child-kind fields. Use `children/2`; do not convert stored structs. |
+| <code>Jido.AgentServer.ParentRef</code> | **Same name, private data.** V3 adds a monitor, creation cause, and remote spawn reference. Use attach, detach, adopt, and parent-binding APIs. |
 | **Jido.AgentServer.Options** | **Private in V3.** Use documented startup options. `storage` becomes `persistence`; restore and Turn limits are new; native schedules and custom directive handlers are rejected. |
 | **Jido.AgentServer.State** | **Private in V3.** Use the public query functions. The V2 struct is not a migration format. |
 | `Jido.AgentServer.Status` | **Removed.** `status/2` and `Jido.Agent.Turn.Outcome` cover separate live and terminal views. |
@@ -473,7 +473,7 @@ V3 adds these modules:
 | `Jido.Error.TimeoutError` | **Retained type.** Separate caller timeout from active Turn cancellation. |
 | `Jido.Error.ValidationError` | **Retained type.** Zoi now supplies schema issues. |
 | `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Observe.Config` owns observability defaults and configuration resolution. |
-| `Jido.RuntimeStore` | **Retained call surface.** It is instance-local coordination state, not durable application storage. Do not migrate stored values by copying its internal keys. |
+| <code>Jido.RuntimeStore</code> | **Private in V3.** It is instance-local coordination state, not durable application storage. Use public instance and relationship functions. Do not copy its internal keys. |
 | `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Agent.Codec.Registry`. |
 | `Jido.Util` | **Retained call surface for internal support.** Prefer the domain modules that own validation, IDs, lookup, and executable resolution. |
 

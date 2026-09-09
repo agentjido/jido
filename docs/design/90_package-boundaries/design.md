@@ -1,10 +1,12 @@
-> Target seam design. This document is pending approval.
+> Approved target seam design. Package-specific compatibility evidence can
+> evolve with the ecosystem.
 
 # Package and extension boundaries design
 
-All requirements and decisions in this document are recommended targets. The
-Overview is a draft prerequisite with `Pending approval` status. This document
-does not make the Overview approved.
+The requirements and nine decisions in this document were approved on
+2026-09-09. The approved Overview supplies the Bright Line and dependency
+direction. Owner seams still define exact APIs, migrations, and implementation
+evidence.
 
 ## Scope and owner
 
@@ -125,6 +127,13 @@ child specifications, and application supervision. A public contract has
 module documentation, input validation, stable result meaning, and executable
 tests. An integration package does not use `@doc false` modules or functions.
 
+`Jido.Plugin.Spec`, `Jido.AgentServer.ChildInfo`,
+`Jido.AgentServer.ParentRef`, and `Jido.RuntimeStore` are internal support
+types. Public Plugin declarations, callback contexts, AgentServer inspection
+maps, relationship functions, and Jido instance helpers are their supported
+boundaries. Public instance name helpers do not make an internal process or
+store API public.
+
 Current supported APIs stay available unless an owner seam approves a staged
 migration. This rule covers direct and DSL Agent authoring, Builder, Codec,
 Agent and Topology authoring extensions, custom routing, complete checkpoint
@@ -151,8 +160,8 @@ Migration ownership stays separate:
 
 ## Requirements
 
-These EARS requirements define the recommended target. Approval status remains
-separate from requirement syntax.
+These EARS requirements define the approved target. Approval does not mean
+that all package-specific implementation and release evidence is complete.
 
 ### Package ownership and dependency direction
 
@@ -285,9 +294,11 @@ persistence selection.
 separate owners to record format, Agent state, Plugin state, and backend
 storage migration.
 
-`PKG-REQ-037`: Before an ecosystem package claims Jido V3 compatibility, its
-release owner shall prove one explicit compatible V3 package set through
-public contracts.
+`PKG-REQ-037`: Before Jido claims core V3 compatibility, its release owner
+shall prove one explicit `jido`, `jido_action`, and `jido_signal` package set
+through public contracts. Before an integration package claims Jido V3
+compatibility, its release owner shall prove its added package against one
+such core set.
 
 `PKG-REQ-038`: Before Jido is published, the Jido release owner shall replace
 development path dependencies with intended release sources or document an
@@ -318,7 +329,8 @@ proposal and not as available behavior.
 
 ## Downstream guarantees
 
-These guarantees apply only after the related requirements are approved.
+These guarantees follow from the approved requirements. Detailed owner-seam
+contracts and implementation evidence can remain open.
 
 | Consumer seam or package | Guaranteed boundary |
 | --- | --- |
@@ -329,23 +341,23 @@ These guarantees apply only after the related requirements are approved.
 | 06 Commit and effects | Actions can perform I/O before commit; runtime-owned Directives run after commit. |
 | 07 Persistence and 09 Jido instance | Jido owns record meaning; adapters own byte storage; external clients stay application-owned. |
 | 10 Runtime topology | Static local Topology and explicit known-node children stay in core; cluster policy stays outside. |
-| 12 Errors and contracts | Every exported extension entry has one owner, documented results, and a compatibility rule. |
+| 12 Errors and contracts | Every public extension entry has one owner, documented results, and a compatibility rule. Revalidate the early approved public-value inventory after a related change. |
 | 13 Observability | Telemetry observes behavior and cannot change it. |
 | `jido_ai` and `jido_browser` | Integration uses public V3 package contracts without private Jido access. |
 | 99 Delivery | Compatibility claims require one tested package set and publishable dependency sources. |
 
-## Open design decisions
+## Approved decisions
 
-All recommendations are pending approval.
+The user approved `PKG-DEC-001` through `PKG-DEC-009` on 2026-09-09.
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
 | `PKG-DEC-001` | Is Jido a local library or a general platform? | Keep it a complete local Agent library. | Durable, cluster, transport, AI, browser, and product policy stay outside. |
 | `PKG-DEC-002` | What is the default extension method? | Use ordinary Elixir composition. | Plugins and adapters keep narrow authority. |
-| `PKG-DEC-003` | Where do production storage adapters live? | Keep the adapter contract and record meaning in Jido; decide each provider implementation from dependency and release needs. | Existing ETS, File, and Redis APIs stay supported until a staged move is approved. |
+| `PKG-DEC-003` | Where do production storage adapters live? | Keep the adapter contract, record meaning, and current ETS, File, and Redis providers in Jido V3. Decide future providers from dependency and release needs. | A later package move needs an approved migration with compatibility evidence. |
 | `PKG-DEC-004` | Can one Agent override instance persistence? | Preserve the current option for V3 unless seams 07 and 09 approve a migration. | Existing callers do not lose storage selection without replacement proof. |
 | `PKG-DEC-005` | Do PID commands and generated-name helpers become private? | No immediate change. Add Ref-first and instance facades first, then review deprecation. | Current application and integration code has a staged path. |
 | `PKG-DEC-006` | Is static Topology permanent core scope? | Yes, for local definition, activation, readiness, and repair. | Cluster placement and failover remain separate. |
 | `PKG-DEC-007` | Are future package names and APIs fixed? | No. Keep capability groups, but require package-specific design and proof. | Documents do not claim unavailable APIs. |
 | `PKG-DEC-008` | Who owns stored-data migration? | Use separate core-record, Agent-state, Plugin-state, and backend-storage owners. | A version change cannot hide application or operator work. |
-| `PKG-DEC-009` | What proves an ecosystem boundary? | A public-only fixture plus one explicit compatible V3 package matrix. | Internal core tests cannot be the only release evidence. |
+| `PKG-DEC-009` | What proves an ecosystem boundary? | Prove the three-package core set through public contracts. Each integration package adds its own public-only compatibility proof. | An integration does not block the core release, and internal core tests are not its only evidence. |

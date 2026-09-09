@@ -26,14 +26,14 @@ the portable configuration necessary to rebuild it in Agent or Plugin state.
 
 ## Instance coordination state
 
-`Jido.RuntimeStore` is an internal control-plane store for data that several
-runtime components in one Jido instance must share. It uses named hives to keep
-concerns separate. Jido uses it for facts such as parent-child bindings and
-ephemeral restart checkpoints.
+The internal runtime store holds data that several runtime components in one
+Jido instance must share. It uses named hives to keep concerns separate. Jido
+uses it for facts such as parent-child bindings and ephemeral restart
+checkpoints.
 
-The ETS table is owned by the Jido instance supervisor. It can survive a
-`Jido.RuntimeStore` process restart, but it ends when the owning Jido instance
-ends. It is not a database and is not a public durable-state extension point.
+The ETS table is owned by the Jido instance supervisor. It can survive a store
+process restart, but it ends when the owning Jido instance ends. It is not a
+database and is not a public durable-state extension point.
 
 ## Persistence state
 
@@ -42,8 +42,8 @@ instance, or BEAM node. The adapter stores binary records and applies the
 durability policy of the host application.
 
 Persistence saves Agent checkpoints. It does not save mailboxes, running tasks,
-Plugin runtime processes, Signal bus subscribers, or all data in
-`Jido.RuntimeStore`.
+Plugin runtime processes, Signal bus subscribers, or all data in the internal
+coordination store.
 
 ## A selection rule
 

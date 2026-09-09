@@ -1,65 +1,105 @@
-# Extension Boundaries
+# Extension boundaries
 
-Jido core defines the Agent value, actor runtime, Plugin boundary, composition
-model, and persistence contract. Extensions connect these contracts to a
-specific application or service.
+Jido is a local Agent library. It coordinates public contracts from Jido
+Action and Jido Signal. It does not own application architecture, durable
+workflow recovery, cluster policy, transport gateways, AI policy, or browser
+sessions.
 
-## Public extension points
+Use ordinary Elixir and OTP composition first. Use a Jido extension contract
+only when the extension needs the authority that the contract supplies.
 
-Use these public boundaries:
+## Select an extension type
 
-- `Jido.Action` and `Jido.Exec` for executable work
-- `Jido.Plugin` for reusable Agent state, Directives, and runtime children
-- `Jido.Persistence.Adapter` for checkpoint storage
-- `Jido.Observe.Tracer` for trace export
-- Jido Signal dispatch adapters and buses for message transport
-- `Jido.Agent.Extension` and `Jido.Topology.Extension` for static DSL lowering
-- Agent and Topology builders and codecs for trusted authoring systems
-- `spawn_fun` for an application-owned remote child start
+| Need | Use | Owner and limit |
+| --- | --- | --- |
+| Add an application facade, policy, supervision tree, or coordination service | Ordinary Elixir and OTP | The host application owns it. It calls documented public APIs. |
+| Define executable work | `Jido.Action` or a Flow through `Jido.Exec` | Jido Action owns execution. Jido owns Agent evaluation and commit. |
+| Define, route, or deliver an event | Jido Signal values, routes, dispatch, or buses | Jido Signal owns the event and delivery contracts. |
+| Add reusable Agent state or lifecycle behavior | `Jido.Plugin` | A Plugin uses only its declared state, callbacks, Directives, and optional runtime child. |
+| Replace one external infrastructure operation | The narrow adapter for that package | The package that defines the operation owns the adapter. There is no universal Jido adapter. |
+| Add static Agent or Topology syntax | `Jido.Agent.Extension` or `Jido.Topology.Extension` | The extension lowers syntax to a canonical value before runtime activation. |
+| Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
+| Observe Agent behavior | `Jido.Observe.Tracer` or a Telemetry handler | Observation has no authority to change evaluation, commit, or runtime results. |
 
-An extension must validate its options and return documented error shapes. It
-must not depend on private `AgentServer` state or ETS table layouts.
+Builders and codecs are public authoring tools. Use them for trusted systems
+that create Agent or Topology definitions. The `spawn_fun` option is a public
+application boundary for starting an owned child on a known Erlang node. It is
+not a cluster placement service.
 
-## Package boundaries
+## Package ownership
 
-Jido uses [Jido Action](https://hexdocs.pm/jido_action/) for Action, Flow,
-Instruction, and execution contracts. Put reusable executable work in that
-package or in an application Action module.
+Jido uses [Jido Action](https://hexdocs.pm/jido_action/) for Actions,
+Instructions, Flows, and in-memory execution. Put reusable executable work in
+an Action package or in an application Action module.
 
 Jido uses [Jido Signal](https://hexdocs.pm/jido_signal/) for Signal values,
-routing, buses, and dispatch. A transport integration belongs at that boundary.
+serialization, routing, dispatch, and the local Signal bus. Put transport
+integration at that boundary.
 
-Jido core coordinates these packages around an Agent Turn. It does not duplicate
-their schema, execution, or transport systems.
+Jido owns Agent values, Turn use of the lower packages, Plugin composition,
+candidate assembly, live commit, Directives, the local Agent runtime,
+persistence record meaning, static local Topology, public errors, and semantic
+Agent observation.
 
-## Application-owned systems
+Focused integration packages can own AI behavior, browser automation, storage
+providers, recovery services, cluster placement, or transport. They must use
+the public contract of the package that owns each operation. They must not
+change Jido semantics through private state or messages.
 
-The core does not supply these policies:
+The host application owns external clients, supervision, authorization,
+business transactions, deployment, and product policy. When an adapter uses a
+database, Redis, or another client process, the host application supervises
+that client.
 
-- a distributed Agent registry
-- cluster membership or leader election
-- a database transaction that includes an external service
-- a general durable message broker
-- model provider clients, prompt policy, or tool catalogs
-- business-specific authorization and tenancy
-- unlimited conversation or audit storage
+## Public and internal contracts
 
-Build these in the host application or in a focused integration package. Keep a
-small stable reference in Agent state when Jido must coordinate with the system.
+An extension can use a module or function when it has public documentation and
+documented result behavior. It must not use a module or function that has
+`@moduledoc false` or `@doc false`.
 
-## Keep runtime resources out of checkpoints
+These types are internal implementation details:
 
-A Plugin runtime can own a process, connection, watcher, or worker pool. Its
-portable Plugin state should contain only the configuration and facts necessary
-to rebuild that resource. A persistence adapter stores Agent checkpoints, not
-runtime processes.
+- <code>Jido.Plugin.Spec</code>
+- <code>Jido.AgentServer.ChildInfo</code>
+- <code>Jido.AgentServer.ParentRef</code>
+- <code>Jido.RuntimeStore</code>
 
-## Prefer explicit protocols
+Use the public Plugin declaration, Plugin callback contexts, AgentServer
+inspection maps, relationship functions, and Jido instance helpers instead.
+Instance name helpers are public for application composition and observation.
+They do not make an internal process or store API public.
 
-Use Signals for messages, Directives for runtime-owned effects, Plugin callbacks
-for Plugin-owned behavior, and adapters for external boundaries. Do not mutate
-an Agent behind the Turn boundary or send private messages to an actor process.
+An ecosystem package must not:
 
-When an extension needs a new core capability, first define the ownership,
-failure, timeout, retry, and restore rules. A public function without those
-rules is not a complete extension contract.
+- read or change private AgentServer state;
+- send private AgentServer messages;
+- require a generated supervisor or Registry name;
+- change Agent or Plugin state outside Turn evaluation;
+- dispatch runtime-owned work before commit;
+- treat a PID or OTP name as durable Agent identity;
+- depend on an ETS table layout.
+
+## Persistence boundary
+
+`Jido.Persistence.Adapter` is a byte-store contract. Jido owns checkpoint
+validation, record meaning, revision policy, and the effect of a storage result
+on Agent commit. An adapter owns only its storage operations.
+
+The ETS, File, and Redis adapters remain supported in Jido V3. Instance
+persistence defaults and per-Agent selection also remain supported. A future
+move or restriction needs an approved migration with compatibility evidence.
+
+Plugin runtime resources do not belong in checkpoints. Keep processes,
+connections, watchers, and worker pools in the supervised runtime. Keep only
+portable configuration and rebuild data in Plugin state.
+
+## Extension growth
+
+These boundaries can grow as the ecosystem grows. A new extension contract
+must have one owner, one authority, documented input and output, error rules,
+and executable acceptance evidence. It must protect a shared semantic rule
+that ordinary composition cannot protect.
+
+Do not add a generic hook or expose a private implementation to support one
+integration. Start with a small integration example. Add the smallest public
+contract that the example proves is necessary.

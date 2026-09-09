@@ -1,25 +1,26 @@
-> Seam alignment plan. This document is pending approval.
+> Approved seam alignment. Package-specific evidence and owner-seam work
+> remain open.
 
 # Package and extension boundaries alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. All package-boundary documents are pending
-  approval.
-- Code reviewed: `1496421f63978c416c0c0a4fc8792935150aecf8`.
-- Prerequisite alignment: [00 Overview](../00_overview/alignment.md), used as a
-  draft prerequisite only.
-- Alignment state: `Draft`.
-- Approved decisions: None.
+- Design reviewed: 2026-09-08. Package-boundary direction approved:
+  2026-09-09.
+- Code reviewed: `ed9e8d5f6424e0f4247b9e3c4c9b9d97b6b90aca`.
+- Approved prerequisite: [00 Overview](../00_overview/alignment.md).
+- Early approved dependent: [12 Errors and contracts](../12_errors-and-contracts/alignment.md).
+  Its public ownership inventory needs revalidation after a related change.
+- Alignment state: `Approved direction; current boundaries retained`.
+- Approved decisions: `PKG-DEC-001` through `PKG-DEC-009`.
 
-The Overview review status is `Pending approval`. This alignment uses its
-Bright Line and package direction as assumptions. It does not call the
-Overview approved. The alignment state is execution status, not document
-approval.
+The review-status table in `docs/design/README.md` is the source of truth for
+document approval. Approval records the boundary direction. It does not claim
+that all future integration packages or release evidence are complete.
 
 This document gives outcomes and gates. It is not a formal implementation
-plan. After the seam intent and requirements are approved, `ce-plan` follows
-approval and creates the implementation plan.
+plan. Owner seams can add detailed implementation plans when their contracts
+are ready.
 
 ## Inputs and evidence
 
@@ -27,9 +28,10 @@ approval and creates the implementation plan.
 
 - `docs/design/AGENTS.md`: review, EARS, dependency order, and document rules.
 - `docs/design/SEAM_TEMPLATE.md`: required three-file seam structure.
-- `docs/design/VISION.md`: pending Bright Line and library direction.
-- `docs/design/00_overview/design.md`: draft package and extension assumptions.
-- `docs/design/90_package-boundaries/design.md`: recommended target for this
+- `docs/design/VISION.md`: library direction.
+- `docs/design/00_overview/design.md`: approved package and extension
+  direction.
+- `docs/design/90_package-boundaries/design.md`: approved target for this
   seam.
 
 ### Canonical code and package evidence
@@ -57,6 +59,7 @@ approval and creates the implementation plan.
 | `lib/jido/agent/extension.ex:1-23` | An Agent authoring extension lowers static syntax to canonical configuration and cannot add another runtime. |
 | `lib/jido/topology/extension.ex:1-27` | A Topology authoring extension is static lowering and cannot bypass normal activation or validation. |
 | `lib/jido/plugin.ex:1-24,67-102` | One Plugin can own Agent state, pure callbacks, Directives, dispatch, and one runtime root. Runtime dispatch occurs after commit and gets no complete private Server state. |
+| `lib/jido/plugin/spec.ex`; `lib/jido/agent_server/{child_info,parent_ref}.ex`; `lib/jido/runtime_store.ex` | Plugin normalization, child tracking, parent tracking, and the instance Runtime Store are internal support modules. Public declarations, contexts, maps, relationship functions, and instance helpers remain the extension boundary. |
 | `lib/jido/agent/directive.ex:1-15` | A Directive requests runtime work after commit. It does not change Agent domain state or undo Action I/O. |
 | `lib/jido/agent_server.ex:160-330` | Agent Server command, request, cancellation, state, readiness, and inspection operations are public and accept PIDs or registered names. |
 | `lib/jido/agent_server.ex:1493-1594` | The Server persists before live commit and Directive work. Only uncertain write results always stop the Server; confirmed failures can use the error policy. |
@@ -182,13 +185,14 @@ did not rerun runtime tests.
 
 ## Gap register
 
-All dispositions are recommendations and are pending approval.
+The package-boundary dispositions are approved. Open work remains with the
+named owner seams and release owners.
 
 | Gap | Requirements | Current evidence | Difference | Recommended disposition |
 | --- | --- | --- | --- | --- |
-| `PKG-GAP-001` | `PKG-REQ-007` through `PKG-REQ-016`, `PKG-REQ-034` | Public modules and tests in the evidence tables | No one inventory classifies every extension entry as retained, staged, or proposed. | `Change documentation`: keep the inventory in this seam and close release status in seam 99. |
-| `PKG-GAP-002` | `PKG-REQ-017` through `PKG-REQ-024` | Core tests compile inside the Jido project | There is no small external Mix package that proves public-only Plugin, persistence, Signal, and known-node use. | `Change evidence`: add a public-only acceptance fixture after approval. |
-| `PKG-GAP-003` | `PKG-REQ-003` through `PKG-REQ-006`, `PKG-REQ-037`, `PKG-REQ-038` | `mix.exs:351-375`; sibling `mix.exs` files | No one result proves a publishable compatible V3 set. Jido AI uses paths, and Jido Browser declares V2 ranges. | `Change evidence`: define and test one release matrix. |
+| `PKG-GAP-001` | `PKG-REQ-007` through `PKG-REQ-016`, `PKG-REQ-034` | Public modules, tests, and `guides/extension-boundaries.md` | Current extension categories have an owner, authority, public boundary, and growth rule. | `Resolved for current categories`: extend the guide when a package adds a public extension type. Seam 99 owns release status. |
+| `PKG-GAP-002` | `PKG-REQ-017` through `PKG-REQ-024` | Core tests compile inside the Jido project | There is no small external Mix package that proves public-only Plugin, persistence, Signal, and known-node use. | `Integration evidence`: add a small public-only fixture when an integration package makes a V3 compatibility claim. |
+| `PKG-GAP-003` | `PKG-REQ-003` through `PKG-REQ-006`, `PKG-REQ-037`, `PKG-REQ-038` | `mix.exs:351-375`; sibling `mix.exs` files | No one result proves a publishable `jido`, `jido_action`, and `jido_signal` set. Integration packages have separate release evidence. | `Change evidence`: define and test the three-package core set. Each integration owner adds its package to a proved core set. |
 | `PKG-GAP-004` | `PKG-REQ-023`, `PKG-REQ-034` | `lib/jido.ex:144-201`; `lib/jido/persistence.ex:153-160` | Core has no stable Agent Ref. PID, Registry, and storage identities differ. | `Change, staged`: add the owner-seam identity contract before API restriction or key migration. |
 | `PKG-GAP-005` | `PKG-REQ-020`, `PKG-REQ-034` | `lib/jido.ex:187-201,380-415`; `test/jido/instance_helpers_test.exs:67-79` | Generated-name helpers are public, but an external package must not need private runtime names. | `Retain and classify`: preserve the helpers for application use; do not make them a required ecosystem dependency. |
 | `PKG-GAP-006` | `PKG-REQ-025` through `PKG-REQ-027`, `PKG-REQ-035` | `lib/jido.ex:70-107`; `lib/jido/agent_server/options.ex:377-395` | Instance defaults and per-Agent persistence selection coexist. One-instance authority is only a proposal. | `Retain`: defer any authority change to seams 07 and 09 with a staged migration. |
@@ -197,14 +201,14 @@ All dispositions are recommendations and are pending approval.
 | `PKG-GAP-009` | `PKG-REQ-026`, `PKG-REQ-034` | `lib/jido/agent_server.ex:2874-2929`; `lib/jido/persistence.ex:137-151` | Initial active records, tombstones, definition revision, and strict write-authority loss are not implemented. | `Defer details`: seams 03, 07, 08, and 09 own the contracts and migration. |
 | `PKG-GAP-010` | `PKG-REQ-028` through `PKG-REQ-032` | Topology and child-placement evidence in the test table | Local static control and known-node placement exist. General cluster and transport services do not. | `Retain and bound`: keep current core features; keep general policies outside core. |
 | `PKG-GAP-011` | `PKG-REQ-002`, `PKG-REQ-030` through `PKG-REQ-033`, `PKG-REQ-039` | No released durable, cluster, or fabric contract is present in this repository | Earlier package lists describe desired capabilities but do not prove APIs. | `Defer`: treat package names and APIs as proposals until their owners supply design and evidence. |
-| `PKG-GAP-012` | `PKG-REQ-033`, `PKG-REQ-037` | `../jido_ai/mix.exs:60-71`; `../jido_browser/mix.exs:61-70` | AI uses the V3 workspace, but browser still selects V2 peers. | `Change evidence`: prove each V3 integration separately. |
+| `PKG-GAP-012` | `PKG-REQ-033`, `PKG-REQ-037` | `../jido_ai/mix.exs:60-71`; `../jido_browser/mix.exs:61-70` | AI uses the V3 workspace, but browser still selects V2 peers. This does not block the core package set. | `Owner evidence`: prove each V3 integration separately before that integration claims compatibility. |
 | `PKG-GAP-013` | `PKG-REQ-005`, `PKG-REQ-038` | Sibling dependency lists | There is no automated dependency-direction or production-tree guard. | `Change evidence`: make the release gate detect reverse and example-only dependencies. |
 | `PKG-GAP-014` | `PKG-REQ-024`, `PKG-REQ-039` | Future provider failure behavior has no package test kit | Core adapter tests do not prove scans, leases, lost replies, cleanup, or backend limits for a future durable package. | `Defer`: each package owns a conformance kit before it claims support. |
 
 ## Conflict dispositions
 
-These dispositions preserve the unique earlier proposals without treating them
-as approved or implemented.
+These approved dispositions preserve useful earlier proposals without
+treating deferred owner-seam work as implemented.
 
 | Earlier proposal or conflict | Recommended disposition | Owner |
 | --- | --- | --- |
@@ -240,16 +244,17 @@ as approved or implemented.
 ## High-level work sequence
 
 This sequence defines outcomes and gates. It is not an implementation plan.
-After approval, `ce-plan` creates the formal implementation plan.
+Owner seams can create detailed plans when their contracts are ready.
 
-### Phase 0 — Resolve prerequisite and seam decisions
+### Phase 0 — Record prerequisite and seam decisions
 
 - Requirements: all `PKG-REQ` identifiers.
-- Required outcome: approved Bright Line assumptions, ownership matrix,
-  extension categories, and conflict dispositions.
+- Required outcome: the approved Bright Line, ownership matrix, extension
+  categories, and conflict dispositions are recorded.
 - Compatibility: no runtime change.
 - Verification: review against the evidence tables and all `PKG-DEC` items.
-- Exit criteria: the user approves or changes each package-boundary decision.
+- Exit criteria: complete. The user approved each package-boundary decision on
+  2026-09-09.
 
 ### Phase 1 — Lock the public extension inventory
 
@@ -295,8 +300,9 @@ After approval, `ce-plan` creates the formal implementation plan.
 
 - Requirements: `PKG-REQ-003` through `PKG-REQ-006`, `PKG-REQ-024`,
   `PKG-REQ-037`, and `PKG-REQ-038`.
-- Required outcome: one public-only extension result and one explicit,
-  publishable V3 package set.
+- Required outcome: one explicit, publishable `jido`, `jido_action`, and
+  `jido_signal` set. Each integration owner supplies public-only evidence for
+  its added package.
 - Compatibility: release sources replace development paths unless an approved
   exception states otherwise.
 - Verification: compile, test, dependency-direction, production dependency
@@ -308,7 +314,7 @@ After approval, `ce-plan` creates the formal implementation plan.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `PKG-REQ-001` and `PKG-REQ-002` | `lib/jido.ex:8-48,346-370`; `mix.exs:351-375` | Approved scope inventory that finds no general platform dependency in core. | `Partial` |
+| `PKG-REQ-001` and `PKG-REQ-002` | `lib/jido.ex:8-48,346-370`; `mix.exs:351-375` | Approved scope inventory finds no general platform dependency in core. | `Proven` for current scope |
 | `PKG-REQ-003` | `mix.exs:354`; `lib/jido/agent/command/runner.ex:29-42`; `../jido_action/lib/jido_exec.ex:1-48` | Public-only Action and Flow integration against the release source. | `Partial` |
 | `PKG-REQ-004` | `mix.exs:355`; `lib/jido/agent.ex:69-74`; `../jido_signal/lib/jido_signal/router.ex:1-61` | Public-only Signal route, dispatch, and Bus integration against the release source. | `Partial` |
 | `PKG-REQ-005` | `../jido_action/mix.exs:263-283`; `../jido_signal/mix.exs:189-209` | Automated reverse-dependency guard. | `Proven` for current manifests |
@@ -330,12 +336,12 @@ After approval, `ce-plan` creates the formal implementation plan.
 | `PKG-REQ-028` | `lib/jido/topology/controller.ex:1-24,73-107`; controller tests | Keep static local acceptance through V3 release. | `Proven` |
 | `PKG-REQ-029` and `PKG-REQ-030` | Child-placement and distributed-child tests in the evidence table | Public integration proof that location policy does not grant write authority. | `Partial` |
 | `PKG-REQ-031` and `PKG-REQ-032` | Public Signal and Agent boundaries; no transport package contract | Transport fixture that delivers through public Signal input and cannot inspect durable values. | `Missing` |
-| `PKG-REQ-033` | Jido AI uses V3 sibling paths; Jido Browser uses V2 ranges | Separate V3 AI and browser compatibility results. | `Conflict` |
+| `PKG-REQ-033` | Jido AI uses V3 sibling paths; Jido Browser uses V2 ranges | Separate V3 AI and browser compatibility results before each package makes its claim. | `Owner-deferred`; not a core conflict |
 | `PKG-REQ-034` | Supported API evidence throughout this document | Release inventory with replacement, deprecation, and support gates. | `Partial` |
 | `PKG-REQ-035` | `lib/jido.ex:70-107`; `lib/jido/agent_server/options.ex:377-395`; persistence tests | Owner decision and compatibility proof before any restriction. | `Proven` for current behavior |
 | `PKG-REQ-036` | Current format-version rejection and custom checkpoint callbacks | Versioned fixtures for record, Agent, Plugin, and backend migration boundaries. | `Missing` |
-| `PKG-REQ-037` | No complete V3 package result | One explicit Jido, Jido Action, Jido Signal, Jido AI, and Jido Browser set. | `Missing` |
-| `PKG-REQ-038` | Jido and Jido AI use development paths | Published-source dependency tree or approved exception. | `Conflict` for publication |
+| `PKG-REQ-037` | No complete published core result | One explicit Jido, Jido Action, and Jido Signal set. Each integration owner proves its added package separately. | `Partial`; release evidence remains |
+| `PKG-REQ-038` | Jido uses a development path for Jido Action | Published-source dependency tree or approved exception. | `Open release gate`; not a design blocker |
 | `PKG-REQ-039` | No future durable, cluster, or fabric API is proved here | Documentation review plus public API and acceptance evidence from each future package. | `Partial` |
 
 ## Compatibility effects
@@ -363,25 +369,41 @@ No deprecation or removal is approved in this seam.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `PKG-BLK-001` | `Blocker` | 00 Overview | The draft Overview package direction and Bright Line are not approved. | Approve or change the related Overview decisions. |
-| `PKG-BLK-002` | `Assumption` | 90 Package boundaries | Jido remains the local coordination layer above `jido_action` and `jido_signal`. | Approve or change `PKG-DEC-001`. |
-| `PKG-BLK-003` | `Assumption` | 03 Agent identity, 09 Jido instance | A stable Agent identity is additive before current PID and name APIs change. | Approve the direction and define the identity contract. |
-| `PKG-BLK-004` | `Blocker` | 07 Persistence, 09 Jido instance | One-instance storage authority conflicts with supported per-Agent selection. | Approve retention or a staged replacement. |
-| `PKG-BLK-005` | `Blocker` | 07 Persistence, 90 Package boundaries | Production adapter placement is not final. | Decide provider ownership from dependency and migration evidence. |
-| `PKG-BLK-006` | `Assumption` | 10 Runtime topology | Static local Topology and explicit known-node child placement remain core V3 contracts. | Approve or change `PKG-DEC-006`. |
-| `PKG-BLK-007` | `Assumption` | Future package owners | Durable, cluster, and transport names are working names only. | Add package designs and evidence before an availability claim. |
-| `PKG-BLK-008` | `Blocker` | `jido_browser`, 99 Delivery | The current browser manifest selects V2 Jido packages. | Supply a tested V3 dependency set. |
-| `PKG-BLK-009` | `Blocker` | 99 Delivery | No public-only external fixture or complete V3 matrix exists. | Define and pass both release gates. |
-| `PKG-BLK-010` | `Resolved evidence; pending approval` | 12 Errors and contracts | Seam 12 inventories existing public maps, tuples, atoms, PIDs, names, failure positions, and compatibility dispositions. | Confirm the inventory when seam 12 is approved. |
+| `PKG-BLK-001` | `Resolved` | 00 Overview | The Overview Bright Line and package direction are approved. | No further Overview approval is needed. |
+| `PKG-BLK-002` | `Resolved` | 90 Package boundaries | Jido remains the local coordination layer above `jido_action` and `jido_signal`. | Recorded in `PKG-DEC-001`. |
+| `PKG-BLK-003` | `Owner dependency` | 03 Agent identity, 09 Jido instance | A stable Agent identity is additive before current PID and name APIs change. | Define the identity contract before a compatibility change. |
+| `PKG-BLK-004` | `Resolved for seam 90` | 07 Persistence, 09 Jido instance | Per-Agent persistence selection remains supported. | A future restriction needs an approved staged replacement. |
+| `PKG-BLK-005` | `Resolved for V3` | 07 Persistence, 90 Package boundaries | ETS, File, and Redis provider modules remain supported in Jido V3. | A future package move needs dependency and migration evidence. |
+| `PKG-BLK-006` | `Resolved` | 10 Runtime topology | Static local Topology and explicit known-node child placement remain core V3 contracts. | Recorded in `PKG-DEC-006`. |
+| `PKG-BLK-007` | `Approved boundary` | Future package owners | Durable, cluster, and transport names are working names only. | Add package designs and evidence before an availability claim. |
+| `PKG-BLK-008` | `Integration owner dependency` | `jido_browser`, 99 Delivery | The current browser manifest selects V2 Jido packages. | Supply a tested V3 dependency set before Jido Browser claims compatibility. This does not block the core set. |
+| `PKG-BLK-009` | `Release evidence` | 99 Delivery and integration owners | No published core package result or integration-specific public fixture exists. | Prove the core set before its release claim. Prove each integration when it makes its claim. |
+| `PKG-BLK-010` | `Approved early; revalidation needed` | 12 Errors and contracts | Seam 12 was approved before its formal seam-90 prerequisite. Its error contracts remain approved. | Revalidate its public ownership inventory after a related seam-12 change. Do not change its error taxonomy or mark it approved automatically. |
+
+## Early seam-12 revalidation
+
+This alignment does not change the approved seam-12 documents. The next
+related seam-12 edit must revalidate these statements against the approved
+package boundary:
+
+- `Jido.Plugin.Spec` is internal. The public Plugin declaration and callback
+  contexts remain public shaped values.
+- `Jido.AgentServer.ChildInfo`, `Jido.AgentServer.ParentRef`, and
+  `Jido.RuntimeStore` are internal support types.
+- The public-value inventory must include the extension categories in this
+  seam without publishing their private normalization or storage types.
+
+The error taxonomy, stable codes, callback-error preservation, raw controls,
+exact V1 projection, and portability rules do not need revalidation from this
+cleanup.
 
 ## Completion criteria
 
-- [ ] The user has approved or changed each `PKG-DEC` item.
-- [ ] The Overview dependencies used here are approved or replaced by explicit
-      package-seam assumptions.
+- [x] The user approved `PKG-DEC-001` through `PKG-DEC-009` on 2026-09-09.
+- [x] The Overview dependency is approved.
 - [ ] Every approved `PKG-REQ` item has `Proven` evidence.
-- [ ] No unresolved `Conflict` remains in the acceptance matrix.
-- [ ] Every public extension entry has one owner, one authority, one support
+- [x] No unresolved core design `Conflict` remains in the acceptance matrix.
+- [x] Every current public extension category has one owner, one authority, one support
       status, and one migration rule.
 - [ ] No ecosystem package needs private Agent Server state, messages, or
       generated runtime names.
@@ -390,6 +412,7 @@ No deprecation or removal is approved in this seam.
 - [ ] A public-only external package fixture passes.
 - [ ] One explicit, publishable V3 package set passes its compile, test,
       dependency-direction, and integration gates.
-- [ ] Future durable, cluster, and transport behavior is either proved by its
+- [x] Future durable, cluster, and transport behavior is either proved by its
       package owner or marked as proposed.
-- [ ] After approval, `ce-plan` creates the formal implementation plan.
+- [ ] Owner seams create detailed implementation plans when their contracts are
+      ready.

@@ -1,4 +1,5 @@
-> Approved target seam design. Dependent owner-seam details remain open.
+> Target seam design. This document is pending approval after package-boundary
+> revalidation. The approved error contract is unchanged.
 
 # Errors and public contracts design
 
@@ -241,7 +242,7 @@ refine its owned value, but it shall keep the compatibility disposition.
 | Agent `new`, `instantiate`, `validate`, schema composition, `set`, and `transition` | `Jido.Agent` or schema | Defined validation or adjacent error | Seam 01; retain. Bang forms raise the tagged error. |
 | Agent `cmd` and `handle_signal` | Agent, `Turn`, and Directive list | Returned callback reason, routing error, or Jido conversion code | Seams 01 and 04; use the normalization matrix. |
 | Agent `checkpoint` and `restore` | Versioned checkpoint map or Agent | Returned callback reason, portability error, or Jido conversion code | Seams 01 and 07; retain checkpoint contract. |
-| Plugin declaration, schema, and state helpers | `Plugin.Spec`, schema, command, state, or child specs | Defined validation, callback reason, or Plugin conversion code | Seam 05; use the normalization matrix. |
+| Plugin declaration, schema, and state helpers | Public Plugin declarations, schemas, commands, state helpers, and child specs; `Plugin.Spec` is internal normalization data | Defined validation, callback reason, or Plugin conversion code | Seam 05; use the normalization matrix. |
 | Plugin readiness, admission, dispatch, and Directive validation | `:ok`, command, Signal, or Directive | Returned callback reason or Plugin conversion code | Seam 05; use the normalization matrix. |
 | Persistence configuration and operations | Adapter pair, Agent, revision, or `:ok` | Current adapter reason or persistence conversion code | Seam 07; keep raw controls until owner migration. Invalid direct adapter configuration can raise `ArgumentError`. |
 | Agent Server start and Signal work | OTP start value or Agent | Startup controls, returned application reason, or owned conversion code | Seam 08; keep lifecycle controls, add codes only to owned conversions. |
@@ -257,7 +258,7 @@ refine its owned value, but it shall keep the compatibility disposition.
 | Agent public map | Complete Agent inspection form; `Agent.to_map/1` | Retain the map and its current keys. It is not the error projection. |
 | Agent checkpoint map | Portable restore envelope; `Agent.checkpoint/2` and `restore/3` | Retain versioned checkpoint semantics. |
 | `Jido.Agent.Turn` and `Outcome` | Prepared work and completed runtime outcome; their constructors and validators | Retain; seams 04 and 08 own fields. |
-| `Jido.Plugin.Spec`, `Init`, and callback contexts | Normalized Plugin declaration and runtime callback data; Plugin normalization and Zoi validators | Retain; seam 05 owns fields. |
+| `Jido.Plugin.Init` and Plugin callback contexts | Public runtime callback data; public Zoi validators | Retain; seam 05 owns fields. `Jido.Plugin.Spec` remains internal normalization data. |
 | Agent Directive structs | Typed effect requests; Directive constructors and validators | Retain; seam 06 owns fields. |
 | Agent Server status, snapshot, child, relationship, and event maps | Narrow inspection and protocol views; built by Agent Server | Retain maps; seam 08 owns fields and versioning. |
 | Registry PID, via tuple, OTP name, and `{id, pid}` list | Direct OTP and Registry interoperation | Retain protocol shapes. |

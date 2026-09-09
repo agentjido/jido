@@ -1,5 +1,5 @@
 defmodule Jido.AgentServer.ChildInfo do
-  @moduledoc "Private process and identity data for one tracked Agent or Plugin child."
+  @moduledoc false
 
   @schema Zoi.struct(
             __MODULE__,
@@ -30,7 +30,7 @@ defmodule Jido.AgentServer.ChildInfo do
   @doc false
   def schema, do: @schema
 
-  @doc "Creates one validated child record."
+  @doc false
   def new(attrs) when is_list(attrs), do: attrs |> Map.new() |> new()
   def new(attrs) when is_map(attrs), do: Zoi.parse(@schema, attrs)
 
@@ -41,7 +41,7 @@ defmodule Jido.AgentServer.ChildInfo do
      )}
   end
 
-  @doc "Creates one validated child record or raises."
+  @doc false
   def new!(attrs) do
     case new(attrs) do
       {:ok, child} -> child

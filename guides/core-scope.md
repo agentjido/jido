@@ -16,8 +16,16 @@ guide and the public module documentation when you build an extension.
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
 | Topology | Pure definitions and plans, bounded local activation, readiness, repair, and cleanup. |
 
-An extension uses these public APIs. If it needs private Server state, private
-messages, or generated supervisor names, first add an integration example that
+An extension uses these public APIs and the selection rules in the
+[extension-boundaries guide](extension-boundaries.md).
+<code>Jido.Plugin.Spec</code>, <code>Jido.AgentServer.ChildInfo</code>,
+<code>Jido.AgentServer.ParentRef</code>, and <code>Jido.RuntimeStore</code> are
+internal implementation details. Use public Plugin
+declarations, callback contexts, inspection maps, relationship functions, and
+instance helpers instead.
+
+If an extension needs private Server state, private messages, generated
+supervisor names, or an ETS table layout, first add an integration example that
 shows the missing core operation. Keep the core change as small as that proof
 permits.
 

@@ -141,14 +141,14 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
 | [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
 | [Errors and contracts briefing](12_errors-and-contracts/README.md) | Approved |
-| [Errors and contracts design](12_errors-and-contracts/design.md) | Approved |
-| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Approved |
+| [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
+| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Pending approval |
 | [Observability briefing](13_observability/README.md) | Pending approval |
 | [Observability design](13_observability/design.md) | Pending approval |
 | [Observability alignment](13_observability/alignment.md) | Pending approval |
-| [Package boundaries briefing](90_package-boundaries/README.md) | Pending approval |
-| [Package boundaries design](90_package-boundaries/design.md) | Pending approval |
-| [Package boundaries alignment](90_package-boundaries/alignment.md) | Pending approval |
+| [Package boundaries briefing](90_package-boundaries/README.md) | Approved |
+| [Package boundaries design](90_package-boundaries/design.md) | Approved |
+| [Package boundaries alignment](90_package-boundaries/alignment.md) | Approved |
 | [Delivery briefing](99_delivery/README.md) | Pending approval |
 | [Delivery design](99_delivery/design.md) | Pending approval |
 | [Delivery alignment](99_delivery/alignment.md) | Pending approval |

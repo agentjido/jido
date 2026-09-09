@@ -217,10 +217,7 @@ defmodule Jido.MixProject do
         "Actor Runtime": [
           Jido,
           Jido.AgentServer,
-          Jido.AgentServer.ChildInfo,
-          Jido.AgentServer.DirectiveContext,
-          Jido.AgentServer.ParentRef,
-          Jido.RuntimeStore
+          Jido.AgentServer.DirectiveContext
         ],
         "Plugin Contracts": [
           Jido.Plugin,

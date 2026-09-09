@@ -1,26 +1,5 @@
 defmodule Jido.RuntimeStore do
-  @moduledoc """
-  Instance-scoped runtime key/value store for mutable Jido coordination state.
-
-  `RuntimeStore` is an internal control-plane store owned by each Jido instance.
-  It backs ephemeral runtime data that needs a stable home outside individual
-  Agent processes, such as logical parent-child relationship bindings.
-
-  The ETS table itself is owned by the Jido instance supervisor, while the
-  `RuntimeStore` process provides the logical API. That lets the table survive
-  `RuntimeStore` process restarts without making it durable beyond the life of
-  the owning Jido instance.
-
-  Values are organized into named hives so unrelated runtime concerns can share
-  the same store without colliding:
-
-      :ok = Jido.RuntimeStore.put(MyApp.Jido, :relationships, "child-1", %{parent_id: "p-1"})
-      {:ok, binding} = Jido.RuntimeStore.fetch(MyApp.Jido, :relationships, "child-1")
-      :ok = Jido.RuntimeStore.delete(MyApp.Jido, :relationships, "child-1")
-
-  The store is intentionally ephemeral. It is reset when the owning Jido
-  instance stops or restarts.
-  """
+  @moduledoc false
 
   use GenServer
 
@@ -45,9 +24,7 @@ defmodule Jido.RuntimeStore do
     }
   end
 
-  @doc """
-  Starts a RuntimeStore process.
-  """
+  @doc false
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -77,9 +54,7 @@ defmodule Jido.RuntimeStore do
     ArgumentError -> :ok
   end
 
-  @doc """
-  Returns a value from the given hive, or `default` when no value exists.
-  """
+  @doc false
   @spec get(atom(), hive(), key(), value()) :: value()
   def get(instance, hive, key, default \\ nil) when is_atom(instance) do
     case fetch(instance, hive, key) do
@@ -88,42 +63,25 @@ defmodule Jido.RuntimeStore do
     end
   end
 
-  @doc """
-  Fetches a value from the given hive.
-
-  Returns `{:ok, value}` when present, or `:error` when the key or store is
-  unavailable.
-  """
+  @doc false
   @spec fetch(atom(), hive(), key()) :: {:ok, value()} | :error
   def fetch(instance, hive, key) when is_atom(instance) do
     call(instance, {:fetch, hive, key}, :error)
   end
 
-  @doc """
-  Stores a value in the given hive.
-
-  A timeout does not cancel queued work. The write can complete after this
-  function returns `{:error, :timeout}`.
-  """
+  @doc false
   @spec put(atom(), hive(), key(), value()) :: :ok | {:error, term()}
   def put(instance, hive, key, value) when is_atom(instance) do
     call(instance, {:put, hive, key, value}, {:error, :not_running}, {:error, :timeout})
   end
 
-  @doc """
-  Deletes a value from the given hive.
-
-  A timeout does not cancel queued work. The delete can complete after this
-  function returns `{:error, :timeout}`.
-  """
+  @doc false
   @spec delete(atom(), hive(), key()) :: :ok | {:error, term()}
   def delete(instance, hive, key) when is_atom(instance) do
     call(instance, {:delete, hive, key}, {:error, :not_running}, {:error, :timeout})
   end
 
-  @doc """
-  Lists all `{key, value}` entries in the given hive.
-  """
+  @doc false
   @spec list(atom(), hive()) :: [{key(), value()}]
   def list(instance, hive) when is_atom(instance) do
     call(instance, {:list, hive}, [])
