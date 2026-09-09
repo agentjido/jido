@@ -270,6 +270,8 @@ defmodule Jido.MixProject do
         "Persistence And History": [
           Jido.Persistence,
           Jido.Persistence.Adapter,
+          Jido.Persistence.Ecto,
+          Jido.Persistence.Ecto.Record,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
           Jido.Persistence.Plugin,
@@ -370,7 +372,11 @@ defmodule Jido.MixProject do
       {:telemetry_metrics, "~> 1.2"},
       {:sched_ex, "~> 1.2.1"},
 
+      # Optional Persistence Adapters
+      {:ecto_sql, "~> 3.14", optional: true},
+
       # Development & Test Dependencies
+      {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:req_llm, "~> 1.21", only: [:dev, :test]},
       {:dotenvy, "~> 1.1", only: [:dev, :test]},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
