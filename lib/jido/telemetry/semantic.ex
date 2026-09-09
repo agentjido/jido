@@ -2,6 +2,7 @@ defmodule Jido.Telemetry.Semantic do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.Telemetry.OpenTelemetry
 
   @schema_version 1
 
@@ -19,26 +20,36 @@ defmodule Jido.Telemetry.Semantic do
   @signed_measurements [:system_time, :monotonic_time]
   @count_measurements ~w(duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after component_count ready_count failed_count epoch)a
 
-  @type span :: %{prefix: [atom()], metadata: map(), at: integer()}
+  @type span :: %{
+          required(:prefix) => [atom()],
+          required(:metadata) => map(),
+          required(:at) => integer(),
+          optional(:otel) => OpenTelemetry.Span.t() | nil
+        }
 
   @doc false
   def schema_version, do: @schema_version
 
   @doc false
-  def start(prefix, metadata, measurements \\ %{})
-      when is_list(prefix) and is_map(metadata) and is_map(measurements) do
+  def start(prefix, metadata, measurements \\ %{}, opts \\ [])
+      when is_list(prefix) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+    at = System.monotonic_time()
+    metadata = normalize_metadata(metadata)
+    measurements = normalize_measurements(measurements)
+
     span = %{
       prefix: prefix,
-      metadata: normalize_metadata(metadata),
-      at: System.monotonic_time()
+      metadata: metadata,
+      at: at,
+      otel:
+        OpenTelemetry.start(prefix, metadata, measurements, Keyword.put(opts, :start_time, at))
     }
 
     emit(
       prefix ++ [:start],
       measurements
-      |> normalize_measurements()
-      |> Map.merge(%{monotonic_time: span.at, system_time: System.system_time()}),
-      span.metadata
+      |> Map.merge(%{monotonic_time: at, system_time: System.system_time()}),
+      metadata
     )
 
     span
@@ -48,26 +59,37 @@ defmodule Jido.Telemetry.Semantic do
   def finish(span, metadata \\ %{}, measurements \\ %{}, ending \\ :stop)
   def finish(nil, _metadata, _measurements, _ending), do: :ok
 
-  def finish(%{prefix: prefix, metadata: base, at: started}, metadata, measurements, ending)
+  def finish(
+        %{prefix: prefix, metadata: base, at: started} = span,
+        metadata,
+        measurements,
+        ending
+      )
       when ending in [:stop, :exception] do
-    emit(
-      prefix ++ [ending],
-      measurements
-      |> normalize_measurements()
-      |> Map.put(:duration, max(System.monotonic_time() - started, 0)),
-      base |> Map.merge(normalize_metadata(metadata)) |> normalize_metadata()
-    )
+    duration = max(System.monotonic_time() - started, 0)
+    measurements = measurements |> normalize_measurements() |> Map.put(:duration, duration)
+    metadata = base |> Map.merge(normalize_metadata(metadata)) |> normalize_metadata()
+    ended_at = started + duration
+
+    OpenTelemetry.finish(Map.get(span, :otel), ending, metadata, measurements, ended_at)
+    emit(prefix ++ [ending], measurements, metadata)
   end
 
   @doc false
-  def point(event, metadata, measurements \\ %{})
-      when is_list(event) and is_map(metadata) and is_map(measurements) do
+  def point(event, metadata, measurements \\ %{}, opts \\ [])
+      when is_list(event) and is_map(metadata) and is_map(measurements) and is_list(opts) do
+    at = System.monotonic_time()
+
     measurements =
       measurements
       |> normalize_measurements()
+      |> Map.put_new(:monotonic_time, at)
       |> Map.put_new(:system_time, System.system_time())
 
-    emit(event, measurements, normalize_metadata(metadata))
+    metadata = normalize_metadata(metadata)
+
+    OpenTelemetry.point(event, metadata, measurements, Keyword.put(opts, :at, at))
+    emit(event, measurements, metadata)
   end
 
   @doc false

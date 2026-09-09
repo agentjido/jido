@@ -99,7 +99,6 @@ defmodule JidoTest.ErrorTransportTest do
         result = Error.to_map(error)
 
         assert result.details.nested == %{key => "[REDACTED]"}
-        assert Jido.Observe.exception_metadata(:error, error).error == result
         refute Jason.encode!(result) =~ "hidden"
       end
     end
@@ -177,7 +176,6 @@ defmodule JidoTest.ErrorTransportTest do
         assert [%{path: ^path}] = error.details.errors
         result = Error.to_map(error)
         assert result.details.errors == Jido.Action.Error.to_map(error).details.errors
-        assert Jido.Observe.exception_metadata(:error, error).error == result
 
         encoded_path =
           Enum.map(path, fn part -> if is_atom(part), do: to_string(part), else: part end)
@@ -200,10 +198,6 @@ defmodule JidoTest.ErrorTransportTest do
 
       assert result.details.a.b.c == ["<<255>>"]
       assert Jason.encode!(result)
-
-      metadata = Jido.Observe.exception_metadata(:error, error)
-      assert metadata.error == result
-      assert Jason.encode!(metadata)
     end
 
     test "sanitizes invalid UTF-8 in direct, nested, and exception messages" do
@@ -280,10 +274,6 @@ defmodule JidoTest.ErrorTransportTest do
         assert String.valid?(result.details.a.b.c.value)
         assert String.length(result.details.a.b.c.value) <= 512 + String.length("...(truncated)")
         assert Jason.encode!(result)
-
-        metadata = Jido.Observe.exception_metadata(:error, error)
-        assert metadata.error == result
-        assert Jason.encode!(metadata)
       end
     end
 

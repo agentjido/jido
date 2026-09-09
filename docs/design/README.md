@@ -143,9 +143,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Errors and contracts briefing](12_errors-and-contracts/README.md) | Selected and implemented |
 | [Errors and contracts design](12_errors-and-contracts/design.md) | Selected and implemented |
 | [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Implemented |
-| [Observability briefing](13_observability/README.md) | Implemented |
+| [Observability briefing](13_observability/README.md) | Selected and implemented |
 | [Observability design](13_observability/design.md) | Selected and implemented |
-| [Observability alignment](13_observability/alignment.md) | Implemented |
+| [Observability alignment](13_observability/alignment.md) | Selected and implemented |
 | [Package boundaries briefing](90_package-boundaries/README.md) | Approved |
 | [Package boundaries design](90_package-boundaries/design.md) | Approved |
 | [Package boundaries alignment](90_package-boundaries/alignment.md) | Approved |

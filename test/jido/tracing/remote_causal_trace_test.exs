@@ -1,4 +1,4 @@
-defmodule JidoTest.Observe.RemoteCausalTraceTest do
+defmodule JidoTest.Tracing.RemoteCausalTraceTest do
   use JidoTest.PeerCase, async: false
   @moduletag capability: "OBS-02"
 

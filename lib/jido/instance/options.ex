@@ -8,10 +8,8 @@ defmodule Jido.Instance.Options do
     :max_tasks,
     :name,
     :namespace,
-    :observability,
     :otp_app,
-    :persistence,
-    :telemetry
+    :persistence
   ]
   @default_max_tasks 1_000
 

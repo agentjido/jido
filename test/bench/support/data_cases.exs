@@ -120,9 +120,11 @@ defmodule JidoCoreBench.DataCases do
 
     spans =
       F.checked(
-        "observe/span",
+        "telemetry/span",
         fn _ -> nil end,
-        fn _ -> Jido.Observe.with_span([:jido, :bench], %{}, fn -> :ok end) end,
+        fn _ ->
+          Jido.Telemetry.Semantic.with_span([:jido, :bench], %{}, %{}, fn -> :ok end)
+        end,
         &F.equal!(&1, :ok)
       )
 

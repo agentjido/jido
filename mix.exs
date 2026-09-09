@@ -277,15 +277,10 @@ defmodule Jido.MixProject do
           Jido.Persistence.Redis
         ],
         Observability: [
-          Jido.Observe,
-          Jido.Observe.Config,
-          Jido.Observe.Log,
-          Jido.Observe.Tracer,
-          Jido.Observe.NoopTracer,
-          Jido.Observe.SpanCtx,
           Jido.Debug,
           Jido.Telemetry,
           Jido.Telemetry.Formatter,
+          Jido.Telemetry.OpenTelemetry,
           Jido.Tracing.Context,
           Jido.Tracing.Trace
         ],
@@ -368,6 +363,7 @@ defmodule Jido.MixProject do
       {:splode, "~> 0.3.0"},
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
+      {:opentelemetry_api, "~> 1.0", optional: true},
       {:sched_ex, "~> 1.2.1"},
 
       # Development & Test Dependencies

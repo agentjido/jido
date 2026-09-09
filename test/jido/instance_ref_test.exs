@@ -123,20 +123,15 @@ defmodule JidoTest.InstanceRefTest do
     assert Error.code(error) == :jido_namespace_required
   end
 
-  test "instance options preserve observation configuration for its owner seam" do
+  test "instance options reject removed observation groups" do
     name = unique_instance("observation-config")
 
-    pid =
-      start_supervised!(
-        {Jido,
-         name: name,
-         debug: true,
-         telemetry: [log_level: :debug],
-         observability: [redact_sensitive: true]},
-        id: name
-      )
+    for option <- [telemetry: [], observability: []] do
+      assert {:error, %Error.ValidationError{} = error} =
+               Jido.Instance.Options.validate([name: name] ++ option)
 
-    assert Process.whereis(name) == pid
+      assert Error.code(error) == :jido_instance_invalid_config
+    end
   end
 
   test "a generated instance exposes the same Ref-first facade" do

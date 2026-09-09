@@ -1,4 +1,4 @@
-defmodule JidoTest.Observe.CausalTraceTest do
+defmodule JidoTest.Tracing.CausalTraceTest do
   use JidoTest.Case, async: false
   @moduletag capability: "OBS-02"
 

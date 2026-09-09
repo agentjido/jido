@@ -478,7 +478,7 @@ reverse the decision. It identifies work that the owner seam must complete.
 | `OVR-DEC-009` | Keep static local activation and repair. Defer owner-Agent live control and target updates. | Approved | Live Topology control does not block V3. |
 | `OVR-DEC-010` | Keep core local. Keep general durable, cluster, and transport services in focused packages. | Approved | No unproved external package API becomes a V3 dependency. |
 | `OVR-DEC-011` | Approve public value roles only. Let seam 12, seam 90, and value owners decide exact types. | Approved | Supported maps, tuples, and structs remain until a staged replacement is approved. |
-| `OVR-DEC-012` | Make semantic Agent events the target and keep legacy telemetry, `Jido.Observe`, and debug paths during migration. | Approved | Seam 13 must prove replacement coverage before removal. |
+| `OVR-DEC-012` | Make semantic Agent events the single V3 observation source, remove legacy Agent Server telemetry and `Jido.Observe`, and keep the OpenTelemetry API mapping optional. | Approved | The host owns the SDK and export path. W3C tracing and bounded debug history remain. |
 
 ### V2 `vsn` research note
 

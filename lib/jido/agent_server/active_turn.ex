@@ -38,9 +38,7 @@ defmodule Jido.AgentServer.ActiveTurn do
                 Zoi.integer(description: "Monotonic pre-commit deadline") |> Zoi.optional(),
               timeout_timer:
                 Zoi.any(description: "Pre-commit timeout timer reference") |> Zoi.optional(),
-              span: Zoi.any(description: "Signal telemetry span") |> Zoi.optional(),
-              telemetry_span:
-                Zoi.any(description: "Semantic Turn telemetry span") |> Zoi.optional()
+              span: Zoi.any(description: "Semantic Turn telemetry span") |> Zoi.optional()
             }
           )
 
@@ -52,8 +50,8 @@ defmodule Jido.AgentServer.ActiveTurn do
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
-  @spec new(Signal.t(), term(), non_neg_integer(), term(), timeout()) :: t()
-  def new(source_signal, caller, start_version, span, timeout \\ :infinity) do
+  @spec new(Signal.t(), term(), non_neg_integer(), timeout()) :: t()
+  def new(source_signal, caller, start_version, timeout \\ :infinity) do
     turn_id = ID.generate!()
     started_monotonic = System.monotonic_time(:millisecond)
 
@@ -76,8 +74,7 @@ defmodule Jido.AgentServer.ActiveTurn do
       started_monotonic: started_monotonic,
       timeout: timeout,
       timeout_deadline: timeout_deadline,
-      timeout_timer: timeout_timer,
-      span: span
+      timeout_timer: timeout_timer
     }
   end
 

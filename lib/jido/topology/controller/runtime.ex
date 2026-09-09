@@ -303,7 +303,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
     member = spec(key, state)
     context = task_context(key, member, state)
-    trace = TraceContext.get()
+    trace = TraceContext.capture()
 
     task =
       Task.Supervisor.async_nolink(supervisor, fn ->

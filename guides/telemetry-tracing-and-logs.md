@@ -25,8 +25,8 @@ uses `:stop`. An error, throw, or exit that escapes the boundary uses
 
 A successful Turn span ends when its commit becomes live. Directive work can
 finish later. `turn.settled` reports the terminal public Outcome after all
-owned Directive attempts finish. A committed Turn can therefore have an OK
-Turn result and a failed settlement.
+owned Directive attempts finish. A committed Turn can have an OK Turn result
+and a failed settlement.
 
 Lifecycle operations are `activate`, `stop`, `hibernate`, and `thaw`.
 Persistence operations are `load`, `compare_and_swap`, and `delete`. Local
@@ -41,7 +41,6 @@ contain the Agent Ref projection:
 - `agent_partition`
 - `agent_id`
 
-The current `jido_instance` and `partition` fields remain during migration.
 Activation, Turn, source Signal, effective Signal, trace parent, and Signal
 causation IDs have separate fields.
 
@@ -56,17 +55,12 @@ The semantic boundary omits state, payloads, caller context, checkpoints,
 records, encoded keys, raw errors, stacktraces, process handles, credentials,
 arbitrary application metadata, and OpenTelemetry `tracestate`.
 
-## Use default metrics
+## Use metrics and logs
 
 `Jido.Telemetry.metrics/0` returns count and duration metrics from semantic
 events. It uses only fixed operation, status, stage, reason, and component tags.
 
-`Jido.Telemetry.legacy_metrics/0` keeps the three old Agent Server metric
-definitions during migration.
-
-## Configure semantic logs
-
-Set the semantic log mode in the Jido telemetry configuration:
+Set the semantic log mode in the Jido configuration:
 
 ```elixir
 config :jido, :telemetry,
@@ -81,37 +75,61 @@ The modes are:
 - `:interesting` also logs operations at or over the slow threshold.
 - `:all` logs every terminal semantic fact.
 
-When no semantic mode is set, the old `log_level: :trace` maps to `:all`, and
-`:debug` maps to `:interesting`. The old Signal and Directive logger remains
-available.
-
-## Keep handlers fast
+`MyApp.Jido.debug(:on)` sets `:interesting` for that Jido instance.
+`MyApp.Jido.debug(:verbose)` sets `:all`. The instance setting has priority
+over the global semantic log mode.
 
 Telemetry calls handlers in the emitting process. A handler must not call the
 observed Agent or do direct network or storage I/O. Copy the bounded event to a
-consumer process and return. A failing handler must not change the runtime
-result.
+consumer process and return.
+
+## Enable OpenTelemetry
+
+Jido declares `opentelemetry_api` as an optional dependency. A host that wants
+OpenTelemetry must add the API and SDK to its own dependencies:
+
+```elixir
+{:opentelemetry_api, "~> 1.0"},
+{:opentelemetry, "~> 1.0"}
+```
+
+The host must start and configure the SDK. The host also owns sampling,
+exporters, collectors, credentials, resources, and vendor configuration. Jido
+does not add or start the SDK, and it does not do export work in a Telemetry
+handler.
+
+When an SDK tracer is available, Jido maps the semantic catalog directly to
+OpenTelemetry:
+
+- Agent Turn becomes `jido.agent.turn`.
+- Agent Directive becomes `jido.agent.directive`.
+- Agent lifecycle includes the bounded operation, such as
+  `jido.agent.lifecycle.activate`.
+- Persistence and Topology replace `operation` with the bounded operation,
+  such as `jido.persistence.load`.
+- `turn.settled` becomes a zero-duration span with a link to its completed Turn
+  span.
+
+Jido sends only the bounded semantic fields as `jido.*` attributes. A failed
+operation gets OpenTelemetry error status. An escaping fault adds a safe
+`exception` event with type and kind only. Jido does not add the raw reason,
+message, or stacktrace.
+
+Disable this mapping without disabling semantic Telemetry:
+
+```elixir
+config :jido, :opentelemetry, enabled: false
+```
+
+If the optional API or an SDK tracer is absent, the OpenTelemetry path is a
+no-op. Semantic Telemetry, metrics, and logs continue to work.
 
 ## Transfer trace context
 
 Signals keep the complete portable W3C carrier across process, node, queue,
-and durable boundaries. Jido-owned Tasks explicitly attach the captured local
-context and restore the earlier context after they finish. Lower packages own
-context transfer for Tasks that they start.
+and durable boundaries. Jido extracts this carrier before it starts semantic
+spans and injects the active OpenTelemetry span into outgoing Signals.
 
-## Connect OpenTelemetry
-
-Jido Core has no OpenTelemetry dependency and starts no SDK or exporter. A host
-bridge can translate the semantic event catalog. It must end a Turn span at the
-live result and report settlement as a later correlated fact.
-
-The host owns the OpenTelemetry API and SDK, sampling, exporters, collectors,
-credentials, and vendor configuration. Do not use old Agent Server events,
-`Jido.Observe` callbacks, or debug history as a second span source.
-
-## Keep compatibility paths separate
-
-`Jido.Observe`, old Agent Server events, tracing helpers, old logging, and the
-bounded debug buffer remain available. No removal is part of this seam. The
-strict tracer mode of `Jido.Observe` is also not part of semantic runtime
-emission.
+Jido-owned Tasks capture and attach the full process-local OpenTelemetry
+context. They restore the earlier context after they finish. Lower packages
+own context transfer for Tasks that they start.

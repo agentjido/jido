@@ -140,8 +140,9 @@ Agent and Topology authoring extensions, custom routing, complete checkpoint
 callbacks, Plugins, Directives, `spawn_fun`, owned children, explicit known-node
 child placement, public PID-based Agent Server operations, Jido instance
 lifecycle and name helpers, per-Agent persistence selection, persistence
-adapters, static local Topology, legacy and semantic telemetry, `Jido.Observe`,
-tracing, and debug paths.
+adapters, static local Topology, semantic telemetry, optional OpenTelemetry API
+mapping, W3C tracing, and debug paths. The V3 observation decision explicitly
+removes the old Agent Server event family and `Jido.Observe`.
 
 A Ref-first identity or instance command facade is additive before any
 restriction of ID, PID, or generated-name APIs. The identity owner defines
