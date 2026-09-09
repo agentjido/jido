@@ -6,7 +6,8 @@ Direct execution returns the batch to the caller without dispatch.
 
 Use the built-in `Jido.Agent.Directive` types for supported runtime operations.
 Use `SpawnAgent` and `StopChild` for owned Agents. Declare other types through a
-Plugin and implement its validation and dispatch callbacks. The V2
+Plugin Agent facet. Put validation in that facet. Put optional post-commit
+dispatch in the Plugin Agent Server facet. The V2
 `DirectiveExec` protocol and custom `directive_handler` option are removed.
 
 If one directive fails, the committed state remains. Later directives in that

@@ -356,23 +356,26 @@ as the duplicate-handling key.
 
 ### Manifest and facets
 
-`Jido.Plugin` remains the package declaration entry. In the target model its
-generated metadata contains static facet module identities, common option
-validation, facet option mapping, and explicit package or facet revisions. It
-contains no Turn, process, persistence, or Topology callback.
+`Jido.Plugin` is the package declaration entry. The package module is
+callback-free. Its `Jido.Plugin.Manifest` contains the package module, one
+positive package version, no more than one module for each closed owner facet,
+and an optional `option_keys` mapping. Declaration options must be static data.
+If `option_keys` is present, each declared option must have one or more selected
+facet owners. If it is absent, each selected facet gets the common options.
 
-The recommended facet behaviors are `Jido.Agent.Plugin`,
-`Jido.AgentServer.Plugin`, `Jido.Persistence.Plugin`, and
-`Jido.Topology.Plugin`. Exact callback value module names remain an open naming
-decision. Each value must be a validated public struct because it crosses a
-package callback boundary. The required roles are:
+The four facet behaviors are `Jido.Agent.Plugin`, `Jido.AgentServer.Plugin`,
+`Jido.Persistence.Plugin`, and `Jido.Topology.Plugin`. The callback values are
+public owner-namespaced structs. Each value has a validator because it crosses
+a package callback boundary:
 
 | Value role | Required content | Excluded content |
 | --- | --- | --- |
-| Preparation input | Source Signal, effective Signal, package identity, owned prepared input | Complete Agent, other Plugin input, route handle |
-| Agent facet context | Package module, static options, Agent ID, Agent module, owned state, declared Agent projection | PID, complete state, runtime and persistence data |
-| Transition view | Source and effective Signal identity, declared before and after fields, owned Directives | Complete executable output, other contributions |
-| Contribution | Complete owned state or unchanged marker, added owned Directives | Domain state and foreign Directives |
+| `Jido.Agent.Plugin.Preparation` | Source Signal, effective Signal, package identity, Agent identity, declared Agent projection, owned state, owned prepared input, bounded caller context | Complete Agent, other Plugin input, route handle, runtime data |
+| `Jido.Agent.Plugin.Transition` | Source and effective Signal, Agent identity, declared before and after projections, current owned state, owned prepared input, owned Directives | Complete executable output, other Plugin contributions, runtime data |
+| `Jido.Agent.Plugin.Contribution` | `:unchanged` or one complete replacement owned state value, plus added owned Directives | Domain state and foreign Directives |
+| `Jido.Persistence.Plugin.Context` | Package and format versions, direction, and operation reason | Adapter, key, expected revision, complete Agent, commit result |
+| `Jido.Topology.Plugin.Context` | Package version and canonical Agent identity | Process, persistence, controller, activation state |
+| `Jido.Topology.Plugin.Contribution` | Current canonical Bus resources, ownership relationships, and Bus subscriptions | Agent definitions, new resource kinds, activation operations |
 | Runtime init | Live Agent identity, package module, options, committed owned state, matching state version | Complete Agent, persistence adapter, prior runtime handle |
 | Directive context | Turn identity, source and effective Signal, committed owned state and version, bounded transient context | Complete private Agent Server state |
 | Outbound context | Turn identity, source and effective Signal, target, committed owned state and version | Complete private Agent Server state |
@@ -384,20 +387,29 @@ version remain separate.
 
 ### Callback authority
 
-The Agent facet has pure preparation and contribution callbacks. Preparation
-can reject input, return a valid effective Signal, and set one owned prepared
-value. Contribution can replace one complete owned state value and add owned
-Directives. It cannot select a route, do commit work, or use a runtime handle.
+The Agent facet has `state_spec/1`, `observes/1`, `prepare/2`, `contribute/2`,
+`directives/1`, and `validate_directive/2`. All callbacks are optional, but the
+facet must declare at least one capability. Preparation can reject input,
+return a valid effective Signal, change bounded caller context, and set one
+owned prepared value. Contribution can replace one complete owned state value
+and add owned Directives. It cannot select a route, do commit work, or use a
+runtime handle.
 
-The Agent Server facet can admit live input, prepare outbound Signals, declare
-one optional child, report readiness, and handle paired Directives after commit.
-The Agent Server owns callback tasks, limits, start order, restart, errors, and
-settlement.
+The Agent Server facet has `admit/3`, `prepare_dispatch/4`, `dispatch/4`, and
+`await_ready/2`. It can also implement the standard OTP `child_spec/1`
+callback for one permanent runtime root. The Agent Server owns callback tasks,
+limits, start order, restart, errors, and settlement.
 
-The Persistence facet has pure dump and load callbacks for one owned value.
-The Persistence owner decides checkpoint and record order. The adapter remains
-a separate byte-storage contract. The Topology facet has one pure contribution
-callback. The Topology owner validates the complete definition and plan.
+The Persistence facet requires `dump/3` and `load/3` for one owned value. The
+Persistence owner decides checkpoint and record order. The adapter remains a
+separate byte-storage contract. The Topology facet requires `contribute/2`.
+The Topology owner validates each returned canonical entry and the complete
+definition and plan.
+
+`use Jido.Plugin` with no options is the supported mixed-callback compatibility
+form. It keeps `prepare/2`, `prepare_turn/2`, `update_state/3`, live callbacks,
+and current runtime behavior while built-in Plugins migrate. New package
+modules use facet options and cannot define facet callbacks themselves.
 
 ### Scheduled occurrence contract
 
@@ -454,11 +466,11 @@ These guarantees apply only after the related requirements are approved.
 | 12 Errors and contracts | Callback faults, invalid results, and nonportable values use owner-defined errors. |
 | 99 Delivery | Mixed behavior removal waits for built-in and public-only compatibility proof. |
 
-## Open design decisions
+## Decision register
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
-| `PLG-DEC-001` | What is the Plugin architecture? | Use one callback-free manifest and four owner-specific facets. | Mixed ownership has a staged replacement. |
+| `PLG-DEC-001` | What is the Plugin architecture? | **Selected on 2026-09-09:** use one callback-free manifest and four owner-specific facets. | Mixed ownership has a staged replacement. |
 | `PLG-DEC-002` | Where is Plugin state stored? | Keep one Plugin-owned top-level key in the combined Agent state map. | Agent and checkpoint shapes remain compatible. |
 | `PLG-DEC-003` | What can pure callbacks observe? | Use declared top-level Agent fields, owned state, owned input, and owned Directives only. | Cross-Plugin reads and writes are denied. |
 | `PLG-DEC-004` | Can contribution add Directives? | Yes. Accept only owned types and append them in declaration order. | Plugins can request bounded post-commit work without domain-state authority. |
@@ -466,7 +478,7 @@ These guarantees apply only after the related requirements are approved.
 | `PLG-DEC-006` | Does state-only reduction handle a live Directive? | Yes, when no live handler is declared. | Existing state-only Plugins do not gain a required runtime callback. |
 | `PLG-DEC-007` | How does runtime bootstrap work? | Put committed owned state and matching state version in one immutable Init value. | First start and replacement use a coherent view. |
 | `PLG-DEC-008` | How do complete custom checkpoints interact with a Persistence facet? | Bypass the facet during the first compatibility stage. | Existing callback meaning stays intact while a later API can separate domain conversion. |
-| `PLG-DEC-009` | Which callback and value names are public? | Use owner namespaces and choose exact names during API review before implementation. | The semantic contract can be approved without locking weak names. |
+| `PLG-DEC-009` | Which callback and value names are public? | **Selected on 2026-09-09:** use the exact owner behaviors, callbacks, and public values in this contract. | Owner APIs are stable enough for the seam implementation. |
 | `PLG-DEC-010` | Does Scheduler occurrence identity change to Agent Ref now? | No. Keep version 1 and require a separate versioned migration. | Existing occurrence IDs remain stable. |
 | `PLG-DEC-011` | Can Plugins be installed dynamically into a live Agent? | No for the first facet contract. | Static definition, state schema, and ownership stay coherent. |
 | `PLG-DEC-012` | Can one package declare several facets for one owner? | No for the first facet contract. Compose them behind one module. | Order and ownership remain unambiguous. |

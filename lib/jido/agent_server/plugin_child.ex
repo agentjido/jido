@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.PluginChild do
 
   use GenServer
 
-  alias Jido.Plugin
+  alias Jido.AgentServer.Plugin
 
   @restart_poll_ms 10
   @restart_poll_attempts 500

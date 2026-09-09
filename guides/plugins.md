@@ -1,32 +1,43 @@
 # Plugins
 
-Declare Plugins explicitly in the Agent definition. `use Jido.Plugin` supplies
-the V3 behavior. A Plugin can implement these separate operations:
+Declare Plugin packages in the Agent definition. A new package uses
+`Jido.Plugin` only as a manifest:
 
-- `prepare(command, opts)` changes permitted Signal or caller context input.
-- `admit(runtime, command, opts)` controls live admission.
-- `state_spec(opts)` declares one owned state key and schema.
-- `update_state(owned_state, directives, opts)` returns the next owned value.
-- `directives(opts)` and `validate_directive/2` declare and validate owned directives.
-- `dispatch(runtime, directive, context, opts)` performs directive work after commit.
+```elixir
+defmodule MyApp.Capability do
+  use Jido.Plugin,
+    agent: MyApp.Capability.Agent,
+    agent_server: MyApp.Capability.Server,
+    persistence: MyApp.Capability.Persistence,
+    topology: MyApp.Capability.Topology,
+    vsn: 1
+end
+```
 
-Optional `child_spec/1` starts an owned runtime. Without a runtime the dispatch
-callback receives `nil`. Both forms use a supervised dispatch task and the same
-validation, ordering, timeout, and failure rules. A replacement runtime can
-read current committed state through `Jido.Plugin.state/1`. Supplying that
-state and its version directly in replacement Init remains a
-research contract.
+Select only the facets that the package needs. Each facet has one owner and one
+bounded authority:
 
-After a runtime restart, `await_ready/2` can wait for that state read. Runtime
-lookup stays responsive and reports the runtime unavailable until readiness
-succeeds. Owner shutdown stops the pending readiness task and the runtime.
-Readiness failure stops the owner. See the
-[restart tests](../test/jido/agent_server/plugin_lifecycle_test.exs).
+- `Jido.Agent.Plugin` prepares Turn input and contributes owned state and
+  Directives.
+- `Jido.AgentServer.Plugin` handles live admission, one optional permanent
+  runtime root, readiness, outbound Signal preparation, and post-commit work.
+- `Jido.Persistence.Plugin` converts one paired owned-state value without
+  storage or commit authority.
+- `Jido.Topology.Plugin` contributes static canonical Topology entries without
+  live-control authority.
 
-The Action cannot change protected Plugin keys. A Plugin cannot replace the
-Agent value. Plugin declarations are validated when the Agent value is built.
-Old manifests, mounts, dependency requirements, and V2 callbacks require a port.
+The Action cannot change protected Plugin keys. Each Agent facet receives only
+its declared domain projection and its owned state and input. The selected
+executable reads package inputs from `context.plugin_inputs`.
 
-See the [Plugin example](https://github.com/agentjido/jido/tree/v3-spike/examples/01_basic/README.md),
-[contract tests](../test/jido/plugin/contract_test.exs), and
-[runtime tests](../test/jido/plugin/runtime_test.exs).
+The Agent Server owns all runtime processes and tasks. It runs Directive work
+after commit. A failed dispatch does not undo the commit. Supplying committed
+state and its matching version directly in replacement Init belongs to the
+Agent Server alignment work.
+
+`use Jido.Plugin` with no options keeps the mixed compatibility behavior for
+current built-ins. New packages should use owner facets.
+
+See [Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md),
+[Plugin-Owned State](plugin-state.md), and
+[Plugin Runtimes](plugin-runtimes.livemd).

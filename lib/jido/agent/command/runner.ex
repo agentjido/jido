@@ -3,13 +3,13 @@ defmodule Jido.Agent.Command.Runner do
 
   alias Jido.Agent
   alias Jido.Agent.{Command, Turn}
+  alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Error
-  alias Jido.Plugin
   alias Jido.Signal
   alias Jido.Signal.Router
 
-  @reserved_context_keys [:agent_id, :agent_state, :signal]
-  @type stage :: :route | :prepare | :input | :execute | :compose | :validate
+  @reserved_context_keys [:agent_id, :agent_state, :signal, :plugin_inputs]
+  @type stage :: :route | :prepare | :input | :compose | :validate
 
   defmodule Prepared do
     @moduledoc false
@@ -20,6 +20,7 @@ defmodule Jido.Agent.Command.Runner do
       :signal,
       :turn,
       :context,
+      :plugin_inputs,
       :exec_opts,
       :plugin_specs
     ]
@@ -31,6 +32,7 @@ defmodule Jido.Agent.Command.Runner do
             signal: Jido.Signal.t(),
             turn: Jido.Agent.Turn.t(),
             context: map(),
+            plugin_inputs: %{optional(module()) => term()},
             exec_opts: keyword(),
             plugin_specs: [Jido.Plugin.Spec.t()]
           }
@@ -126,8 +128,11 @@ defmodule Jido.Agent.Command.Runner do
              )
            ),
          {:ok, command} <- at(:input, Command.new(agent, effective_signal, caller_context)),
-         {:ok, command, plugin_specs} <-
-           at(:prepare, prepare_plugins(command, agent.plugins, plugin_source)),
+         {:ok, command, plugin_specs, plugin_inputs} <-
+           at(
+             :prepare,
+             prepare_plugins(command, source_signal, agent.plugins, plugin_source)
+           ),
          :ok <- at(:prepare, ensure_original_agent(command.agent, agent)),
          :ok <- at(:prepare, reject_reserved_context(command.context, :command)),
          {:ok, turn} <- at(:input, materialize_turn(selection, command.signal)) do
@@ -135,7 +140,8 @@ defmodule Jido.Agent.Command.Runner do
         Map.merge(command.context, %{
           agent_id: agent.id,
           agent_state: agent.state,
-          signal: command.signal
+          signal: command.signal,
+          plugin_inputs: plugin_inputs
         })
 
       {:ok,
@@ -145,6 +151,7 @@ defmodule Jido.Agent.Command.Runner do
          signal: command.signal,
          turn: turn,
          context: context,
+         plugin_inputs: plugin_inputs,
          exec_opts: exec_opts,
          plugin_specs: plugin_specs
        }}
@@ -180,7 +187,7 @@ defmodule Jido.Agent.Command.Runner do
          {:ok, output, directives} <-
            at(
              :compose,
-             Plugin.protect_state(
+             AgentPlugin.protect_state(
                {:ok, output, directives},
                prepared.agent.state,
                prepared.plugin_specs
@@ -191,7 +198,14 @@ defmodule Jido.Agent.Command.Runner do
          {:ok, output, directives} <-
            at(
              :compose,
-             Plugin.update_state({:ok, output, directives}, prepared.plugin_specs)
+             AgentPlugin.contribute(
+               {:ok, output, directives},
+               prepared.agent,
+               prepared.source_signal,
+               prepared.signal,
+               prepared.plugin_inputs,
+               prepared.plugin_specs
+             )
            ),
          {:ok, agent} <- at(:validate, Agent.transition(prepared.agent, output)) do
       {:ok, agent, directives}
@@ -363,20 +377,20 @@ defmodule Jido.Agent.Command.Runner do
       Jido.Agent.Directive.built_in?(directive) ->
         Jido.Agent.Directive.validate(directive)
 
-      plugin = Plugin.directive_owner(plugins, directive) ->
-        Plugin.validate_directive(plugin, directive)
+      plugin = AgentPlugin.directive_owner(plugins, directive) ->
+        AgentPlugin.validate_directive(plugin, directive)
 
       true ->
         invalid("Agent Directive has no owner", %{directive: directive})
     end
   end
 
-  defp prepare_plugins(command, declarations, :normalize) do
-    Plugin.prepare(command, declarations)
+  defp prepare_plugins(command, source_signal, declarations, :normalize) do
+    AgentPlugin.prepare_evaluation(command, source_signal, declarations)
   end
 
-  defp prepare_plugins(command, _declarations, {:prepared, plugin_specs}) do
-    Plugin.prepare_specs(command, plugin_specs)
+  defp prepare_plugins(command, source_signal, _declarations, {:prepared, plugin_specs}) do
+    AgentPlugin.prepare_evaluation(command, source_signal, plugin_specs)
   end
 
   defp invalid_state_output(output) do
@@ -424,6 +438,7 @@ defmodule Jido.Agent.Command.Runner do
 
   defp at(_stage, {:ok, _value} = result), do: result
   defp at(_stage, {:ok, _first, _second} = result), do: result
+  defp at(_stage, {:ok, _first, _second, _third} = result), do: result
   defp at(_stage, :ok), do: :ok
   defp at(stage, {:error, reason}), do: {:error, stage, reason}
 

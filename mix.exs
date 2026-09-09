@@ -191,7 +191,11 @@ defmodule Jido.MixProject do
       groups_for_modules: [
         "Agent Contracts": [
           Jido.Agent,
+          Jido.Agent.Plugin,
+          Jido.Agent.Plugin.Contribution,
+          Jido.Agent.Plugin.Preparation,
           Jido.Agent.Ref,
+          Jido.Agent.Plugin.Transition,
           Jido.Agent.Command,
           Jido.Agent.Turn,
           Jido.Agent.Turn.Outcome
@@ -200,8 +204,7 @@ defmodule Jido.MixProject do
           Jido.Agent.Builder,
           Jido.Agent.Codec,
           Jido.Agent.Codec.Registry,
-          Jido.Agent.Extension,
-          Jido.Plugin.Codec
+          Jido.Agent.Extension
         ],
         "Agent Directives": [
           Jido.Agent.Directive,
@@ -218,13 +221,16 @@ defmodule Jido.MixProject do
         "Actor Runtime": [
           Jido,
           Jido.AgentServer,
-          Jido.AgentServer.DirectiveContext
-        ],
-        "Plugin Contracts": [
-          Jido.Plugin,
+          Jido.AgentServer.DirectiveContext,
+          Jido.AgentServer.Plugin,
           Jido.Plugin.DirectiveContext,
           Jido.Plugin.Init,
           Jido.Plugin.SignalContext
+        ],
+        "Plugin Contracts": [
+          Jido.Plugin,
+          Jido.Plugin.Codec,
+          Jido.Plugin.Manifest
         ],
         "Built-In Plugins": [
           Jido.Plugin.Audit,
@@ -255,6 +261,9 @@ defmodule Jido.MixProject do
           Jido.Topology.Extension,
           Jido.Topology.Instance,
           Jido.Topology.Plan,
+          Jido.Topology.Plugin,
+          Jido.Topology.Plugin.Context,
+          Jido.Topology.Plugin.Contribution,
           Jido.Topology.Ref,
           Jido.Topology.Reference
         ],
@@ -263,6 +272,8 @@ defmodule Jido.MixProject do
           Jido.Persistence.Adapter,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
+          Jido.Persistence.Plugin,
+          Jido.Persistence.Plugin.Context,
           Jido.Persistence.Redis
         ],
         Observability: [

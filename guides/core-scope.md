@@ -11,18 +11,18 @@ guide and the public module documentation when you build an extension.
 | Agent values | Immutable definitions and instances, validated state, Actions, Flows, and Directives. Direct commands return a candidate; a live Server commits it. |
 | Authoring | Declarative modules, map and keyword declarations, Builder, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. |
-| Plugins | Declared owned state, preparation, admission, state updates, post-commit dispatch, and optional supervised runtimes. |
+| Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
 | Persistence | The binary `Jido.Persistence.Adapter` contract, atomic compare-and-swap, and existing checkpoint and restore rules. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
 | Topology | Pure definitions and plans, bounded local activation, readiness, repair, and cleanup. |
 
 An extension uses these public APIs and the selection rules in the
 [extension-boundaries guide](extension-boundaries.md).
-<code>Jido.Plugin.Spec</code>, <code>Jido.AgentServer.ChildInfo</code>,
-<code>Jido.AgentServer.ParentRef</code>, and <code>Jido.RuntimeStore</code> are
-internal implementation details. Use public Plugin
-declarations, callback contexts, inspection maps, relationship functions, and
-instance helpers instead.
+<code>Jido.Plugin.Spec</code>, all four owner-facet Specs,
+<code>Jido.AgentServer.ChildInfo</code>, <code>Jido.AgentServer.ParentRef</code>,
+and <code>Jido.RuntimeStore</code> are internal implementation details. Use the
+public Plugin manifest, owner behaviors and callback values, inspection maps,
+relationship functions, and instance helpers instead.
 
 If an extension needs private Server state, private messages, generated
 supervisor names, or an ETS table layout, first add an integration example that
@@ -108,10 +108,11 @@ Future package names describe possible ownership, not implemented packages:
 | Catch-up queues, backoff, and scheduling policy | An application or Scheduler extension, with a failing integration example before another core control is added. |
 | Agent migration and live topology updates | A separate design and acceptance pass. A repair request does not implement an upgrade. |
 
-The research suite still records missing proposed contracts for route
-selection, Plugin input isolation and replacement Init, stable namespace
-identity, definition revisions, durable deletion, and live upgrades. See the
-current [research test matrix](../test/examples/99_research/README.md).
+The research suite still records missing proposed contracts for replacement
+Init, stable namespace identity, durable deletion, Turn revision isolation,
+and live upgrades. Source-Signal route selection and Plugin input isolation now
+pass. See the current
+[research test matrix](../test/examples/99_research/README.md).
 The distributed authority example uses an explicit external authority; it does
 not prove that core elects one cluster owner.
 

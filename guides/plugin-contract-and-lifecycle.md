@@ -1,65 +1,92 @@
 # Plugin Contract and Lifecycle
 
-A Plugin adds one declared capability to an Agent. It can prepare command
-input, control live admission, own one state key, own Directive types, transform
-outbound Signals, and start one supervised runtime root.
+A Plugin package adds one declared capability to an Agent. The package module
+is callback-free. It selects no more than one facet for each Jido owner:
 
-Declare only the callbacks that the capability needs.
+| Facet | Purpose |
+| --- | --- |
+| `Jido.Agent.Plugin` | Pure Turn preparation, owned state, and owned Directives |
+| `Jido.AgentServer.Plugin` | Live admission, runtime, readiness, outbound preparation, and post-commit dispatch |
+| `Jido.Persistence.Plugin` | Pure dump and load of one paired owned-state value |
+| `Jido.Topology.Plugin` | Pure static Topology contribution |
 
-## Callback Order
+## Declare a Package
+
+```elixir
+defmodule MyApp.RateLimit do
+  use Jido.Plugin,
+    agent: MyApp.RateLimit.Agent,
+    agent_server: MyApp.RateLimit.Server,
+    vsn: 1,
+    option_keys: [agent: [:limit], agent_server: [:endpoint]]
+end
+```
+
+Put common options in the Agent declaration:
+
+```elixir
+agent do
+  plugin MyApp.RateLimit, config: [limit: 100, endpoint: "local"]
+end
+```
+
+If `option_keys` is absent, each selected facet gets all common options. If it
+is present, it must assign every declared option to a selected facet. A package
+module can appear only once in one Agent definition.
+
+## Agent Facet
+
+The Agent facet can implement these callbacks:
 
 | Callback | Boundary |
 | --- | --- |
 | `state_spec/1` | Define one owned state key and static schema |
-| `child_spec/1` | Start the optional runtime root |
-| `await_ready/2` | Confirm that runtime setup is complete |
-| `admit/3` | Accept or reject a live command |
-| `prepare/2` | Prepare the Signal or caller context |
-| `update_state/3` | Update owned state before final validation |
+| `observes/1` | Select top-level domain fields for the callback projection |
+| `prepare/2` | Change the effective Signal, bounded caller context, or this package's prepared input |
+| `contribute/2` | Keep or replace owned state and append owned Directives |
 | `directives/1` | Declare owned Directive modules |
-| `validate_directive/2` | Validate one owned Directive before commit |
-| `dispatch/4` | Run owned Directive work after commit |
-| `prepare_dispatch/4` | Transform an outbound Signal |
+| `validate_directive/2` | Validate one owned Directive before candidate return |
 
-`use Jido.Plugin` takes no options. Put options in the Agent declaration:
+`Jido.Agent.Plugin.Preparation` does not contain the complete Agent or another
+package's input. Route selection uses the unchanged source Signal before
+preparation. The selected Action or Flow reads prepared values from
+`context.plugin_inputs[PackageModule]`.
 
-```elixir
-agent do
-  plugin MyApp.RateLimit, config: [limit: 100]
-end
-```
+`Jido.Agent.Plugin.Contribution` can replace only one complete owned-state
+value. Its Directives must belong to the same Agent facet. Jido appends them
+after executable Directives in package declaration order.
 
-A Plugin module can appear only once in one Agent definition.
+## Agent Server Facet
 
-## Keep State Ownership Narrow
+The Agent Server facet can implement `admit/3`, `prepare_dispatch/4`,
+`dispatch/4`, and `await_ready/2`. It can also implement the standard OTP
+`child_spec/1` callback for one permanent runtime root.
 
-A stateful Plugin owns one state key. Its update callback changes only that
-value. An Agent executable must preserve the key. Jido rejects a candidate that
-changes or removes Plugin-owned state before the Plugin update stage.
+Admission runs in declaration order before Turn evaluation. Outbound Signal
+preparation runs in reverse declaration order. Directive dispatch starts only
+after commit. A dispatch failure does not roll back committed state.
 
-This is a write-ownership rule. It is not a read-security boundary.
+The Agent Server owns tasks, timeouts, runtime handles, start order, restart,
+readiness, and settlement. Runtime handles never enter Agent state or a
+checkpoint.
 
-## Keep Preparation Pure
+## Persistence and Topology Facets
 
-`prepare/2` can change the effective Signal or caller context after route
-selection. It cannot replace the executable selected from the source Signal
-and must not start runtime work. A later Plugin can observe and change the
-prepared command, so declaration order is not an authorization boundary.
+The Persistence facet implements `dump/3` and `load/3` for one paired Plugin
+state value. It cannot receive the adapter, record key, expected revision,
+complete Agent, or commit result. Dump output must be portable. Load output
+must also match the Agent facet's state schema.
 
-Use `admit/3` when a decision needs the live Plugin runtime.
+The Topology facet implements `contribute/2`. It can return current canonical
+Bus resources, ownership relationships, and Bus subscriptions. It cannot start
+a process, persist data, or control live activation.
 
-## Validate Before Commit
+## Compatibility Form
 
-Jido validates every Plugin-owned Directive and computes Plugin-owned state
-before it validates and commits the complete candidate. Dispatch starts only
-after commit. A dispatch failure does not roll back state.
-
-## Own Runtime Resources
-
-Use `child_spec/1` for connections, timers, subscriptions, and other process
-state. The runtime gets `Jido.Plugin.Init`, not a private Agent Server state
-value. Use `Jido.Plugin.state/1` when a restarted runtime must reconstruct from
-current committed Plugin state.
+`use Jido.Plugin` with no options is the supported mixed-callback compatibility
+form. Current built-in Plugins use it while they move to owner facets. This
+form can receive a complete `Jido.Agent.Command` in `prepare/2`; it is not an
+isolation boundary.
 
 See [Plugin Runtimes](plugin-runtimes.livemd) and
 [Plugin-Owned State](plugin-state.md).

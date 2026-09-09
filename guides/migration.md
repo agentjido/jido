@@ -202,17 +202,18 @@ end
 
 Replace patch returns such as `{:ok, %{count: next_count}}` with complete state
 based on `context.agent_state`. Do not copy V2 StateOps into the new result.
-The Action must preserve protected Plugin state keys. The owning Plugin changes
-those keys through `update_state/3`.
+The Action must preserve protected Plugin state keys. The owning Agent Plugin
+facet changes those keys through `contribute/2`.
 
 Replace `signal_routes` with definition routes or the declarative `routes` block.
 Move a sequence of Actions into a Flow when it represents one command. A Flow
 must also produce complete domain state. Do not split it into separate live
 calls if your application requires one commit.
 
-Do not assume that an exact route overrides wildcard matches. Multiple matches
-are an error. Plugin preparation currently occurs before route selection, so a
-Plugin that changes Signal type can change the selected executable.
+Jido uses the first matching target in Router order. Router priority and
+specificity put an exact route before a matching wildcard route. Selection uses
+the unchanged source Signal before Plugin preparation. A prepared effective
+Signal cannot select a different executable.
 
 **Check:** assert that unrelated fields survive success. Test no-match and
 multiple-match Signals. Test every pattern match that used the old two-element
@@ -261,10 +262,10 @@ The Server no longer exposes the old GenServer State structure.
 | --- | --- |
 | Domain calculation or branching | Action or Flow |
 | State machine domain state | Fields in the Agent schema and explicit transitions |
-| Pure input preparation | Plugin `prepare/2` |
-| Admission that needs live state or a resource | Plugin `admit/3` |
-| Plugin-owned state update | Plugin `update_state/3` |
-| Runtime work after commit | Typed Plugin directive and `dispatch/4` |
+| Pure input preparation | `c:Jido.Agent.Plugin.prepare/2` |
+| Admission that needs live state or a resource | `c:Jido.AgentServer.Plugin.admit/3` |
+| Plugin-owned state update | `c:Jido.Agent.Plugin.contribute/2` |
+| Runtime work after commit | Typed Plugin Directive and `c:Jido.AgentServer.Plugin.dispatch/4` |
 | Observation | Public snapshots/status and V3 telemetry |
 
 There is no callback-for-callback Strategy adapter. Rebuild behavior around
@@ -293,22 +294,28 @@ end
 
 ### What you need to change
 
-V3 `use Jido.Plugin` takes no options. Declare options on the Agent. Define one
-owned state key and its schema with `state_spec/1`:
+In V3, the package module is a callback-free manifest. Put Agent state behavior
+in an Agent facet:
 
 ```elixir
-defmodule MyApp.CounterPlugin do
-  use Jido.Plugin
+defmodule MyApp.CounterPlugin.Agent do
+  use Jido.Agent.Plugin
+  alias Jido.Agent.Plugin.Contribution
 
-  @impl Jido.Plugin
+  @impl Jido.Agent.Plugin
   def state_spec(_opts) do
     {:counter_plugin, Zoi.object(%{turns: Zoi.integer()}) |> Zoi.default(%{turns: 0})}
   end
 
-  @impl Jido.Plugin
-  def update_state(state, _directives, _opts) do
-    {:ok, %{state | turns: state.turns + 1}}
+  @impl Jido.Agent.Plugin
+  def contribute(transition, _opts) do
+    next = %{transition.plugin_state | turns: transition.plugin_state.turns + 1}
+    {:ok, %Contribution{plugin: transition.plugin, state: {:replace, next}}}
   end
+end
+
+defmodule MyApp.CounterPlugin do
+  use Jido.Plugin, agent: MyApp.CounterPlugin.Agent
 end
 ```
 
@@ -324,21 +331,23 @@ Port each capability explicitly:
 | --- | --- |
 | Manifest, requirements, automatic routes | Declare Plugins and routes on the Agent explicitly |
 | `mount/2` | Put portable defaults in the state schema; put runtime setup in an owned child |
-| Signal/action preparation hooks | Rewrite against `prepare/2` or `admit/3` and `Jido.Agent.Command` |
-| Emit preparation | Use `prepare_dispatch/4` with its Signal context |
-| `transform_result/3` | Put domain transformations in the Action/Flow; reduce only owned Plugin state |
-| `DirectiveExec` or `directive_handler` | Declare directive types, validate them, and implement `dispatch/4` |
-| `child_spec(config)` | Accept `Jido.Plugin.Init`; read configured options from `init.options` |
-| Plugin checkpoint/restore hooks | Convert portable owned state through the application persistence contract |
+| Signal or Action preparation hooks | Use `c:Jido.Agent.Plugin.prepare/2` with a bounded Preparation value |
+| Live admission | Use `c:Jido.AgentServer.Plugin.admit/3` |
+| Emit preparation | Use `c:Jido.AgentServer.Plugin.prepare_dispatch/4` with its Signal context |
+| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.contribute/2` only for owned Plugin state and Directives |
+| `DirectiveExec` or `directive_handler` | Declare and validate Directive types in the Agent facet; implement `dispatch/4` in the Agent Server facet |
+| `child_spec(config)` | Put `child_spec/1` in the Agent Server facet; accept `Jido.Plugin.Init` and read `init.options` |
+| Plugin checkpoint or restore hooks | Use `c:Jido.Persistence.Plugin.dump/3` and `c:Jido.Persistence.Plugin.load/3` for one paired owned value |
+| Static topology metadata | Use `c:Jido.Topology.Plugin.contribute/2` for bounded canonical entries |
 
 A runtime root must be permanent and owned. Use `Jido.Plugin.state/1` to read
 committed owned state after a restart. `Init` does not contain a state snapshot
 or state version. `await_ready/2` can wait for reconstruction; readiness failure
 stops the owner. A Plugin without a child receives `nil` in `dispatch/4`.
 
-State ownership is not a read-security boundary. A preparation callback can
-inspect the Agent in `Jido.Agent.Command`. Later Plugins can change prepared
-input. Do not treat the proposed isolation contract as implemented behavior.
+Each Agent facet receives only the top-level domain fields from `observes/1`,
+its owned state, and its own prepared input. This is a callback API boundary.
+It is not a sandbox for untrusted BEAM code.
 
 **Check:** test owned state protection, callback order, readiness, owner shutdown,
 restart reconstruction, and dispatch errors. See
@@ -458,10 +467,10 @@ skipped, with their assertions retained. Example acceptance tests are secondary;
 run `mix examples --seed 0` separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
-The unmet research assertions concern route selection, Plugin read/input
-isolation, durable namespace identity, definition revisions, durable deletion,
-runtime Init snapshots, Turn revision isolation, live state migration, and live
-Topology updates. Cluster-exclusive ownership remains unsupported. See
+The remaining skipped research assertions concern durable namespace identity,
+durable deletion, runtime Init snapshots, Turn revision isolation, live state
+migration, and live Topology updates. Source-Signal route selection and Plugin
+input isolation now pass. Cluster-exclusive ownership remains unsupported. See
 [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
 Before publication, complete the agreed feature scope, repeated test seeds,

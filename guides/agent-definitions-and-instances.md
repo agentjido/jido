@@ -50,7 +50,8 @@ complete next state map. Use `context.agent_state` as the base for updates so
 you retain other domain fields.
 
 A Plugin can own one declared state key. Agent executables can read that key,
-but they cannot replace it. The Plugin update stage owns changes to that key.
+but they cannot replace it. The owning Agent Plugin contribution changes that
+key.
 See [Plugin-Owned State](plugin-state.md).
 
 Jido also checks portability when it creates a checkpoint. State for durable

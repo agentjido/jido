@@ -33,8 +33,12 @@ The live Server adds these reserved context keys for execution:
 - `:agent_id`
 - `:agent_state`
 - `:signal`
+- `:plugin_inputs`
 - `:jido`
 - `:partition`
+
+`plugin_inputs` is keyed by Plugin package module. Each value belongs to that
+package. It is read-only execution context.
 
 Caller context is not stored or copied into emitted Signals. Application code
 must select any value that must enter state or a new Signal.

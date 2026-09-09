@@ -15,9 +15,11 @@ only when the extension needs the authority that the contract supplies.
 | Add an application facade, policy, supervision tree, or coordination service | Ordinary Elixir and OTP | The host application owns it. It calls documented public APIs. |
 | Define executable work | `Jido.Action` or a Flow through `Jido.Exec` | Jido Action owns execution. Jido owns Agent evaluation and commit. |
 | Define, route, or deliver an event | Jido Signal values, routes, dispatch, or buses | Jido Signal owns the event and delivery contracts. |
-| Add reusable Agent state or lifecycle behavior | `Jido.Plugin` | A Plugin uses only its declared state, callbacks, Directives, and optional runtime child. |
+| Add reusable Agent behavior | A `Jido.Plugin` package with `Jido.Agent.Plugin` and, when needed, `Jido.AgentServer.Plugin` | The Agent facet is pure and bounded. The Agent Server facet owns live work and one optional runtime root. |
 | Replace one external infrastructure operation | The narrow adapter for that package | The package that defines the operation owns the adapter. There is no universal Jido adapter. |
 | Add static Agent or Topology syntax | `Jido.Agent.Extension` or `Jido.Topology.Extension` | The extension lowers syntax to a canonical value before runtime activation. |
+| Convert one Plugin-owned state value | `Jido.Persistence.Plugin` | The facet has no adapter, key, revision, complete-Agent, or commit authority. |
+| Add bounded static Plugin topology | `Jido.Topology.Plugin` | The facet returns canonical static entries. It has no process or live-control authority. |
 | Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
 | Observe Agent behavior | `Jido.Observe.Tracer` or a Telemetry handler | Observation has no authority to change evaluation, commit, or runtime results. |
 
@@ -60,6 +62,10 @@ documented result behavior. It must not use a module or function that has
 These types are internal implementation details:
 
 - <code>Jido.Plugin.Spec</code>
+- <code>Jido.Agent.Plugin.Spec</code>
+- <code>Jido.AgentServer.Plugin.Spec</code>
+- <code>Jido.Persistence.Plugin.Spec</code>
+- <code>Jido.Topology.Plugin.Spec</code>
 - <code>Jido.AgentServer.ChildInfo</code>
 - <code>Jido.AgentServer.ParentRef</code>
 - <code>Jido.RuntimeStore</code>
@@ -92,6 +98,9 @@ move or restriction needs an approved migration with compatibility evidence.
 Plugin runtime resources do not belong in checkpoints. Keep processes,
 connections, watchers, and worker pools in the supervised runtime. Keep only
 portable configuration and rebuild data in Plugin state.
+
+A Persistence Plugin facet can convert only its paired owned-state value. It
+does not replace the byte adapter or change checkpoint and commit rules.
 
 ## Extension growth
 

@@ -378,7 +378,7 @@ defmodule Jido.Agent do
   @doc "Returns the complete data schema, including Plugin-owned state."
   @spec complete_schema(t()) :: {:ok, Zoi.schema()} | {:error, Exception.t()}
   def complete_schema(%__MODULE__{} = agent) do
-    Jido.Plugin.compose_schema(agent.schema, agent.plugins)
+    Jido.Agent.Plugin.compose_schema(agent.schema, agent.plugins)
   end
 
   @doc "Returns the complete data schema or raises its validation error."

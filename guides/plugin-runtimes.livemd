@@ -52,16 +52,16 @@ end
 
 The runtime owns process-local data. It stops and restarts with its Agent.
 
-## Define The Plugin
+## Define the Agent Facet
 
 ```elixir
-defmodule PluginRuntime.Effects do
-  use Jido.Plugin
+defmodule PluginRuntime.Effects.Agent do
+  use Jido.Agent.Plugin
 
-  @impl Jido.Plugin
+  @impl Jido.Agent.Plugin
   def directives(_opts), do: [PluginRuntime.Record]
 
-  @impl Jido.Plugin
+  @impl Jido.Agent.Plugin
   def validate_directive(%PluginRuntime.Record{} = directive, _opts) do
     case Zoi.parse(PluginRuntime.Record.schema(), Map.from_struct(directive)) do
       {:ok, value} -> {:ok, value}
@@ -70,7 +70,19 @@ defmodule PluginRuntime.Effects do
     end
   end
 
-  @impl Jido.Plugin
+end
+```
+
+The Agent facet owns the Directive type and validation. It has no runtime
+handle.
+
+## Define the Agent Server Facet
+
+```elixir
+defmodule PluginRuntime.Effects.Server do
+  use Jido.AgentServer.Plugin
+
+  @impl Jido.AgentServer.Plugin
   def dispatch(runtime, directive, context, _opts) do
     GenServer.call(runtime, {:record, directive.label, context.state_version})
   end
@@ -78,6 +90,18 @@ defmodule PluginRuntime.Effects do
   def child_spec(%Jido.Plugin.Init{} = init) do
     Supervisor.child_spec({PluginRuntime.Store, init}, id: __MODULE__)
   end
+end
+```
+
+The Agent Server facet owns the live callback and runtime root.
+
+## Define the Package
+
+```elixir
+defmodule PluginRuntime.Effects do
+  use Jido.Plugin,
+    agent: PluginRuntime.Effects.Agent,
+    agent_server: PluginRuntime.Effects.Server
 end
 ```
 

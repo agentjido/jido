@@ -1,13 +1,21 @@
 # Write a Plugin
 
-Start with `use Jido.Plugin`. Implement only the capability's required callbacks.
-For owned state, declare a key and schema through `state_spec/1`, then return
-`{:ok, next_owned_state}` from `update_state/3`. Keep the Agent's domain keys
+Start with a callback-free package that uses `Jido.Plugin`. Add only the owner
+facets that the capability needs.
+
+Use `Jido.Agent.Plugin` for pure preparation, owned state, and owned
+Directives. Use `Jido.AgentServer.Plugin` only for live admission or runtime
+work. Add `Jido.Persistence.Plugin` only when one owned state value needs a
+format conversion. Add `Jido.Topology.Plugin` only for static canonical
+Topology entries.
+
+For owned state, declare a key and schema through `state_spec/1`. Return a
+`Jido.Agent.Plugin.Contribution` from `contribute/2`. Keep Agent domain keys
 under the Action's control.
 
-For a typed effect, declare its directive, validate it, and implement
-`dispatch/4`. Add a child specification only when the capability needs a runtime.
-Test direct preparation, live dispatch, failure policy, replacement, and cleanup.
+For a typed effect, declare and validate the Directive in the Agent facet. Put
+post-commit handling in the Agent Server facet. Add `child_spec/1` only when the
+capability needs one permanent runtime root.
 
 See [the callback guide](plugins.md) and
-[stateless dispatch tests](../test/jido/agent/stateless_directive_test.exs).
+[the four-facet tests](../test/jido/plugin/facets_test.exs).

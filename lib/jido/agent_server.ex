@@ -54,6 +54,8 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Directive
   alias Jido.Agent.Turn.Outcome
   alias Jido.Plugin
+  alias Jido.Agent.Plugin, as: AgentPlugin
+  alias Jido.AgentServer.Plugin, as: ServerPlugin
   alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
   alias Jido.Plugin.SignalContext, as: PluginSignalContext
 
@@ -1316,7 +1318,7 @@ defmodule Jido.AgentServer do
 
     try do
       with {:ok, command} <- initial_command(signal, context, data) do
-        if Plugin.admits?(data.plugin_specs) do
+        if ServerPlugin.admits?(data.plugin_specs) do
           start_admission_task(command, data)
         else
           begin_turn_execution(command, data)
@@ -1388,12 +1390,12 @@ defmodule Jido.AgentServer do
     plugin_specs = data.plugin_specs
 
     with {:ok, runtime_refs} <-
-           plugin_runtime_refs(data, Plugin.admission_modules(plugin_specs)) do
+           plugin_runtime_refs(data, ServerPlugin.admission_modules(plugin_specs)) do
       supervisor = Jido.task_supervisor_name(data.jido)
 
       task =
         Task.Supervisor.async(supervisor, fn ->
-          Plugin.admit(command, plugin_specs, runtime_refs)
+          ServerPlugin.admit(command, plugin_specs, runtime_refs)
         end)
 
       timer = start_task_timer(data.directive_timeout, :admission_timeout, task.ref)
@@ -1512,7 +1514,6 @@ defmodule Jido.AgentServer do
   end
 
   defp evaluator_outcome_stage(stage) when stage in [:route, :prepare, :input], do: :prepare
-  defp evaluator_outcome_stage(:execute), do: :execute
   defp evaluator_outcome_stage(stage) when stage in [:compose, :validate], do: :finalize
 
   defp finish_success(%Agent{} = agent, directives, %State{} = data) do
@@ -1694,7 +1695,7 @@ defmodule Jido.AgentServer do
          span,
          %State{active: %ActiveTurn{} = active} = data
        ) do
-    modules = Plugin.dispatch_modules(data.plugin_specs)
+    modules = ServerPlugin.dispatch_modules(data.plugin_specs)
 
     with {:ok, prepared_directive, target} <-
            DirectiveRuntime.prepare_signal(directive, context, data),
@@ -1717,7 +1718,7 @@ defmodule Jido.AgentServer do
       start_directive_task(
         fn ->
           with {:ok, signal} <-
-                 Plugin.prepare_dispatch(
+                 ServerPlugin.prepare_dispatch(
                    prepared_directive.signal,
                    data.plugin_specs,
                    runtime_refs,
@@ -1798,7 +1799,7 @@ defmodule Jido.AgentServer do
   end
 
   defp start_plugin_directive(directive, rest, context, span, %State{} = data) do
-    case Plugin.directive_owner(data.plugin_specs, directive) do
+    case AgentPlugin.directive_owner(data.plugin_specs, directive) do
       %Jido.Plugin.Spec{dispatch?: false} ->
         complete_directive({:ok, data}, rest, context, span)
 
@@ -1840,7 +1841,7 @@ defmodule Jido.AgentServer do
     start_directive_task(
       fn ->
         with {:ok, runtime_ref} <- plugin_runtime_ref(data, plugin) do
-          Plugin.dispatch(plugin, runtime_ref, directive, plugin_context)
+          ServerPlugin.dispatch(plugin, runtime_ref, directive, plugin_context)
         end
       end,
       rest,

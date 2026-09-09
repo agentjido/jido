@@ -1,30 +1,55 @@
+defmodule Jido.Examples.PluginIsolation.First.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+
+  def observes(_opts), do: []
+
+  def prepare(preparation, _opts),
+    do: {:ok, %{preparation | input: "original"}}
+end
+
 defmodule Jido.Examples.PluginIsolation.First do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent: Jido.Examples.PluginIsolation.First.Agent
+end
 
-  def prepare(command, _opts),
-    do: {:ok, %{command | context: Map.put(command.context, :first_input, "original")}}
+defmodule Jido.Examples.PluginIsolation.Audit.Agent do
+  @moduledoc "Records the data made available to a Plugin callback. No external work occurs."
+  use Jido.Agent.Plugin
+
+  def observes(_opts), do: [:total]
+
+  def prepare(preparation, opts) do
+    input = %{
+      observed_fields: Map.keys(preparation.agent_state),
+      attempted_first_input: if(opts[:replace_input], do: "replaced", else: nil)
+    }
+
+    {:ok, %{preparation | input: input}}
+  end
 end
 
 defmodule Jido.Examples.PluginIsolation.Audit do
-  @moduledoc "Records the data made available to a Plugin callback. No external work occurs."
-  use Jido.Plugin
+  @moduledoc false
+  use Jido.Plugin, agent: Jido.Examples.PluginIsolation.Audit.Agent
+end
 
-  def prepare(command, opts) do
-    context = Map.put(command.context, :observed_fields, Map.keys(command.agent.state))
+defmodule Jido.Examples.PluginIsolation.Owned.Agent do
+  @moduledoc false
+  use Jido.Agent.Plugin
+  alias Jido.Agent.Plugin.Contribution
 
-    context =
-      if opts[:replace_input], do: Map.put(context, :first_input, "replaced"), else: context
+  def state_spec(_), do: {:audit, Zoi.integer() |> Zoi.default(0)}
 
-    {:ok, %{command | context: context}}
+  def contribute(transition, _opts) do
+    {:ok,
+     %Contribution{plugin: transition.plugin, state: {:replace, transition.plugin_state + 1}}}
   end
 end
 
 defmodule Jido.Examples.PluginIsolation.Owned do
   @moduledoc false
-  use Jido.Plugin
-  def state_spec(_), do: {:audit, Zoi.integer() |> Zoi.default(0)}
-  def update_state(value, _, _), do: {:ok, value + 1}
+  use Jido.Plugin, agent: Jido.Examples.PluginIsolation.Owned.Agent
 end
 
 defmodule Jido.Examples.PluginIsolation.Record do
@@ -32,10 +57,13 @@ defmodule Jido.Examples.PluginIsolation.Record do
   use Jido.Action, name: "research_plugin_record"
 
   def run(input, context) do
+    inputs = context.plugin_inputs
+    audit_input = Map.fetch!(inputs, Jido.Examples.PluginIsolation.Audit)
+
     state = %{
       context.agent_state
-      | observed_fields: context.observed_fields,
-        first_input: context.first_input
+      | observed_fields: audit_input.observed_fields,
+        first_input: Map.fetch!(inputs, Jido.Examples.PluginIsolation.First)
     }
 
     state = if input[:overwrite_owned], do: %{state | audit: 99}, else: state
@@ -68,7 +96,7 @@ defmodule Jido.Examples.PluginIsolation.ReadAudit do
 end
 
 defmodule Jido.Examples.PluginIsolation.ReplaceInput do
-  @moduledoc "Configures a later Plugin to replace an earlier Plugin's input."
+  @moduledoc "Configures a later Plugin to attempt a foreign input replacement."
   use Jido.Agent, name: "research_plugin_replace_input"
   alias Jido.Examples.PluginIsolation.{Audit, First, Owned, Record}
 
@@ -92,7 +120,7 @@ defmodule Jido.Examples.PluginIsolation.ReplaceInput do
 end
 
 defmodule Jido.Examples.PluginIsolation do
-  @moduledoc "Tests Plugin data access, prepared input ownership, and existing write protection."
+  @moduledoc "Proves Plugin projections, owned input, and existing write protection."
   alias __MODULE__.{ReadAudit, ReplaceInput}
 
   def new(opts \\ []) do

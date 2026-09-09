@@ -25,13 +25,14 @@ to_child = Jido.Agent.Directive.emit_to_child(:worker, signal)
 spawn = Jido.Agent.Directive.spawn_agent(MyApp.Worker, :worker)
 ```
 
-A Plugin can define more Directive types. It owns their validation, optional
-state update, and dispatch.
+A Plugin Agent facet can define more Directive types. It owns their validation
+and optional pre-commit state contribution. Its paired Agent Server facet owns
+optional post-commit dispatch.
 
 ## Validate Before Commit
 
 Jido validates all built-in and Plugin Directives before commit. Plugin-owned
-state updates also run before commit. Runtime dispatch starts only after the
+state contributions also run before commit. Runtime dispatch starts only after the
 complete candidate is valid and durable storage has accepted it.
 
 A direct `Jido.Agent.cmd/3` call returns the list but does not dispatch it.

@@ -1,7 +1,7 @@
 defmodule Jido.AgentServer.PluginLifecycle do
   @moduledoc false
 
-  alias Jido.Plugin
+  alias Jido.AgentServer.Plugin
   alias Jido.Plugin.Init
   alias Jido.AgentServer.{ChildInfo, PluginChild, State}
 

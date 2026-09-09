@@ -82,7 +82,7 @@ package inventory documents also remain pending approval.
 | `test/jido/agent/turn/outcome_test.exs:24-103` | Current Outcome stage, status, revision, Directive count, and time rules are covered. |
 | `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct/live parity, fallback, exact-first precedence, and fixed source-Signal selection all pass. |
 | `test/jido/agent/turn_evaluation_test.exs` | Custom routing runs before preparation, Turn source identity is exact, direct/live candidates match, and private stage tags are bounded. |
-| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state write protection passes. Bounded reads and separate prepared inputs are skipped. |
+| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state write protection, bounded reads, and separate prepared inputs all pass. |
 
 ## Retained baseline
 
@@ -282,7 +282,7 @@ depends on changing route choice without a clear compatibility adapter.
 | `TURN-BLK-003` | `Resolved contract` | 12 Errors and contracts | Callback normalization, invariant exits, and stable codes are approved. | The package inventory document revalidation does not change this contract. |
 | `TURN-BLK-004` | `Resolved` | 01 Agent | Direct `cmd/3`, custom routing, combined state, and transition requirements are approved. | Preserve the Agent contract. |
 | `TURN-BLK-005` | `Approved authoring input` | 02 Agent authoring and `jido_signal` | Authoring preserves Router order and current route-default precedence. | Confirm against the release-compatible `jido_signal` package. |
-| `TURN-BLK-006` | `Blocker` | 05 Plugins | Bounded Agent views, owned prepared inputs, Transition data, and contribution authority have no approved callback contract. | Approve seam-05 value roles and migration before evaluator isolation work. |
+| `TURN-BLK-006` | `Resolved implementation input` | 05 Plugins | Bounded Agent views, owned prepared inputs, Transition data, and contribution authority use the four-owner Plugin contract. | Preserve seam-05 owner boundaries. |
 | `TURN-BLK-007` | `Blocker` | 08 Agent Server and 13 Observability | Private evaluator stages have no approved mapping to live control and Outcome stages. | Approve one explicit mapping without making the vocabularies identical. |
 | `TURN-BLK-008` | `Assumption` | 08 Agent Server | Live admission remains outside candidate evaluation and cannot change source-Signal selection. | Approve or change `TURN-DEC-007`. |
 | `TURN-BLK-009` | `Resolved design` | 04 Turn evaluation and `jido_action` | Agent `vsn` does not pin loaded executable code. | V3 uses the code loaded when `Jido.Exec` invokes the selected executable. |

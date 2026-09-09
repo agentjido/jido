@@ -5,7 +5,8 @@ defmodule Jido.Agent.Validation do
   alias Jido.Agent.Authoring
   alias Jido.Agent.State
   alias Jido.Error
-  alias Jido.Plugin
+  alias Jido.Agent.Plugin, as: AgentPlugin
+  alias Jido.Plugin.Normalizer, as: PluginNormalizer
 
   @definition_keys [
     :id,
@@ -158,10 +159,10 @@ defmodule Jido.Agent.Validation do
          {:ok, description} <- field(:description, agent.description),
          :ok <- validate_module(agent.module),
          {:ok, vsn} <- field(:vsn, agent.vsn),
-         {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
+         {:ok, plugin_specs} <- PluginNormalizer.normalize_all(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
-         {:ok, complete_schema} <- Plugin.compose_schema(agent.schema, plugin_specs),
-         {:ok, plugins} <- Plugin.canonical_declarations(plugin_specs),
+         {:ok, complete_schema} <- AgentPlugin.compose_schema(agent.schema, plugin_specs),
+         {:ok, plugins} <- PluginNormalizer.canonical_declarations(plugin_specs),
          {:ok, routes} <- validate_routes(agent.routes),
          {:ok, metadata} <- field(:metadata, agent.metadata) do
       validated = %{

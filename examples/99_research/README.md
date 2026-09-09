@@ -1,7 +1,7 @@
 # Jido feature acceptance examples
 
-The 2026-09-05 passes add 13 executable feature probes against unchanged core.
-All 45 checks are enabled: **34 pass and 11 fail across nine proposed core features**.
+The research set has 13 executable feature probes. The current result has
+**39 passing checks and 6 skipped checks across six proposed core features**.
 The first ten probes cover general core features. Three more cover live Agent
 and topology upgrades. A failed check records required behavior; do not skip
 it or reverse its assertion.
@@ -12,16 +12,16 @@ it or reverse its assertion.
 mix test test/examples/99_research --include example --seed 0
 ```
 
-This selection returns a failing exit status while the 11 missing-contract
-assertions remain unmet. It uses no vendor API or model request. The distributed
+This is an optional secondary check. It excludes the 6 skipped missing-contract
+assertions. It uses no vendor API or model request. The distributed
 example starts two local Erlang nodes. Each row has its own focused command.
 
-| ID | Feature | Pass | Fail | Result |
+| ID | Feature | Pass | Skipped | Result |
 | --- | --- | ---: | ---: | --- |
-| FA-01 | [Route precedence and fixed selection](99_09_route_selection/README.md) | 2 | 2 | Core feature required |
-| FA-02 | [Plugin read and prepared-input isolation](99_10_plugin_isolation/README.md) | 2 | 2 | Core feature required |
+| FA-01 | [Route precedence and fixed selection](99_09_route_selection/README.md) | 4 | 0 | Core feature available |
+| FA-02 | [Plugin read and prepared-input isolation](99_10_plugin_isolation/README.md) | 4 | 0 | Core feature available |
 | FA-03 | [Stable Agent references and durable namespace identity](99_11_stable_reference/README.md) | 2 | 1 | Core feature required; application reference works |
-| FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 1 | 1 | Core feature required |
+| FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 2 | 0 | Core feature available |
 | FA-05 | [Durable deletion](99_13_durable_delete/README.md) | 2 | 1 | Core feature required |
 | FA-06 | [Plugin runtime reconstruction from committed state](99_03_input_resource_lifecycle/README.md) | 1 | 1 | Core feature required; public pull recovery works |
 | FA-07 | [Progress observation with recovery](99_01_progress_observation/README.md) | 5 | 0 | Works as an application extension |
@@ -48,6 +48,6 @@ The original DIST-03 source probe and its core tests remain available. The
 core-only exclusive-owner test retains its previously approved skip. The four
 new fencing checks have no skips and use an explicit external authority.
 
-These tests stay in test/examples because this pass adds examples and records
-core requirements. It does not implement or change core contracts. Existing
-CI excludes test/examples; the full command with --include example runs them.
+These tests stay in test/examples because they record core requirements.
+Existing CI excludes test/examples; the full command with `--include example`
+runs them.
