@@ -1,39 +1,40 @@
 defmodule Jido.Telemetry do
   @moduledoc """
-  Logging and metrics for Jido Agent Server events.
+  Semantic logging and metrics for the Jido runtime.
 
-  Agent Servers emit bounded telemetry metadata for Signal execution and
-  Directive dispatch. Logging uses the shared observability configuration.
+  Jido emits version-1 semantic events for Agent lifecycle, Turn result,
+  commit, Directive work, Turn settlement, admission rejection, persistence,
+  and static local Topology operations. Spans use `:start`, `:stop`, and
+  `:exception`. Returned errors use `:stop`; faults that escape the observed
+  boundary use `:exception`.
 
-  ## Semantic Agent events
+  A successful Turn span ends when its commit becomes live.
+  `[:jido, :agent, :turn, :settled]` is a separate later fact after Directive
+  work. Agent lifecycle operations are `:activate`, `:stop`, `:hibernate`, and
+  `:thaw`. Persistence operations are `:load`, `:compare_and_swap`, and
+  `:delete`. Local Topology operations are `:activate`, `:repair`, and
+  `:cleanup`.
 
-  Live Servers also emit `[:jido, :agent, boundary, event]`, where `boundary`
-  is `:lifecycle`, `:turn`, `:commit`, or `:directive`, and `event` is `:start`,
-  `:stop`, or `:exception`. Durations and timestamps use native time units.
-  Returned errors use `:stop` with status metadata. Escaping faults use
-  `:exception`. Action packages can report their own execution exceptions.
+  Semantic metadata is a strict scalar allowlist. It includes schema version,
+  bounded identity and correlation, public status, and registered error codes.
+  Revisions, durations, and counts are measurements. Events exclude state,
+  payloads, records, raw errors, process handles, and caller context.
 
-  `[:jido, :agent, :turn, :settled]` reports one terminal Outcome after
-  Directive completion or failure. A successful Turn span ends at commit;
-  settlement can fail after that commit. Metadata contains bounded Agent,
-  activation, Signal, Turn, and trace IDs, status, stage, and `committed?`.
-  Revisions and Directive counts are measurements. State, payloads, raw error
-  details, process handles, and caller context are excluded from these events.
+  `metrics/0` returns low-cardinality semantic metrics. `legacy_metrics/0`
+  keeps the old Agent Server metric definitions. The old events, log handler,
+  `Jido.Observe`, tracing, and debug history also remain for compatibility.
 
-  Lifecycle operations are `:activate` and `:stop`. Each activation, including
-  an OTP restart, gets a fresh `activation_id`. Startup spans end when Plugins
-  are ready. Stop spans cover cleanup. Abrupt process or VM loss can prevent
-  final events; this stream is not a durable event journal.
-
-  The existing `:agent_server` spans remain available for compatibility.
-  Handlers run in the emitting process and must return quickly. Exporters
-  should copy these bounded events to their own process.
+  Handlers run in the emitting process and must return quickly. A host exporter
+  or OpenTelemetry bridge must copy bounded events to its own process. Jido
+  does not start an SDK or exporter. Abrupt process or VM loss can prevent
+  final events, so this stream is not a durable journal.
   """
 
   require Logger
 
   alias Jido.Observe.Config, as: ObserveConfig
   alias Jido.Telemetry.Formatter
+  alias Jido.Telemetry.Semantic
 
   @typedoc """
   Supported telemetry event names.
@@ -61,6 +62,7 @@ defmodule Jido.Telemetry do
         }
 
   @handler_id "jido-agent-metrics"
+  @semantic_handler_id "jido-semantic-logger"
 
   @doc """
   Attaches telemetry handlers. Idempotent — safe to call multiple times.
@@ -68,14 +70,13 @@ defmodule Jido.Telemetry do
   """
   @spec setup() :: :ok
   def setup do
-    case :telemetry.attach_many(@handler_id, events(), &__MODULE__.handle_event/4, nil) do
-      :ok -> :ok
-      {:error, :already_exists} -> :ok
-    end
+    attach(@handler_id, legacy_events(), &__MODULE__.handle_event/4)
+    attach(@semantic_handler_id, semantic_terminal_events(), &__MODULE__.handle_semantic_event/4)
+    :ok
   end
 
   @doc """
-  Returns telemetry metric definitions with automatic per-instance scoping.
+  Returns low-cardinality metric definitions for the semantic event catalog.
 
   Wire these into your reporter in your application:
 
@@ -83,38 +84,106 @@ defmodule Jido.Telemetry do
   """
   @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
-    tag_values = &instance_tag_values/1
+    [
+      Telemetry.Metrics.counter("jido.agent.lifecycle.stop.count",
+        event_name: [:jido, :agent, :lifecycle, :stop],
+        tags: [:operation, :status]
+      ),
+      Telemetry.Metrics.summary("jido.agent.lifecycle.stop.duration",
+        event_name: [:jido, :agent, :lifecycle, :stop],
+        tags: [:operation, :status],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.agent.turn.stop.count",
+        event_name: [:jido, :agent, :turn, :stop],
+        tags: [:status, :stage]
+      ),
+      Telemetry.Metrics.summary("jido.agent.turn.stop.duration",
+        event_name: [:jido, :agent, :turn, :stop],
+        tags: [:status, :stage],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.agent.turn.settled.count",
+        event_name: [:jido, :agent, :turn, :settled],
+        tags: [:status, :stage]
+      ),
+      Telemetry.Metrics.summary("jido.agent.turn.settled.duration",
+        event_name: [:jido, :agent, :turn, :settled],
+        tags: [:status, :stage],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.agent.commit.stop.count",
+        event_name: [:jido, :agent, :commit, :stop],
+        tags: [:status]
+      ),
+      Telemetry.Metrics.summary("jido.agent.commit.stop.duration",
+        event_name: [:jido, :agent, :commit, :stop],
+        tags: [:status],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.agent.directive.stop.count",
+        event_name: [:jido, :agent, :directive, :stop],
+        tags: [:status]
+      ),
+      Telemetry.Metrics.summary("jido.agent.directive.stop.duration",
+        event_name: [:jido, :agent, :directive, :stop],
+        tags: [:status],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.agent.admission.rejected.count",
+        event_name: [:jido, :agent, :admission, :rejected],
+        tags: [:admission_reason]
+      ),
+      Telemetry.Metrics.counter("jido.persistence.operation.stop.count",
+        event_name: [:jido, :persistence, :operation, :stop],
+        tags: [:operation, :status, :persistence_reason]
+      ),
+      Telemetry.Metrics.summary("jido.persistence.operation.stop.duration",
+        event_name: [:jido, :persistence, :operation, :stop],
+        tags: [:operation, :status, :persistence_reason],
+        unit: {:native, :millisecond}
+      ),
+      Telemetry.Metrics.counter("jido.topology.operation.stop.count",
+        event_name: [:jido, :topology, :operation, :stop],
+        tags: [:topology_operation, :status]
+      ),
+      Telemetry.Metrics.summary("jido.topology.operation.stop.duration",
+        event_name: [:jido, :topology, :operation, :stop],
+        tags: [:topology_operation, :status],
+        unit: {:native, :millisecond}
+      )
+    ]
+  end
 
+  @doc "Returns the retained Agent Server metric definitions."
+  @spec legacy_metrics() :: [Telemetry.Metrics.t()]
+  def legacy_metrics do
     [
       Telemetry.Metrics.counter("jido.agent_server.signal.stop.count",
         event_name: [:jido, :agent_server, :signal, :stop],
         tags: [:jido_instance, :signal_type],
-        tag_values: tag_values,
+        tag_values: &instance_tag_values/1,
         description: "Total Agent Signals processed"
       ),
       Telemetry.Metrics.summary("jido.agent_server.signal.stop.duration",
         event_name: [:jido, :agent_server, :signal, :stop],
         tags: [:jido_instance, :signal_type],
-        tag_values: tag_values,
+        tag_values: &instance_tag_values/1,
         unit: {:native, :millisecond},
         description: "Agent Signal duration summary"
       ),
       Telemetry.Metrics.counter("jido.agent_server.directive.stop.count",
         event_name: [:jido, :agent_server, :directive, :stop],
         tags: [:jido_instance, :directive_type],
-        tag_values: tag_values,
+        tag_values: &instance_tag_values/1,
         description: "Total Agent Directives executed"
       )
     ]
   end
 
-  defp instance_tag_values(meta) do
-    meta
-    |> Map.new()
-    |> Map.put_new(:jido_instance, :global)
-  end
+  defp instance_tag_values(meta), do: meta |> Map.new() |> Map.put_new(:jido_instance, :global)
 
-  defp events do
+  defp legacy_events do
     [
       [:jido, :agent_server, :signal, :start],
       [:jido, :agent_server, :signal, :stop],
@@ -124,6 +193,101 @@ defmodule Jido.Telemetry do
       [:jido, :agent_server, :directive, :exception]
     ]
   end
+
+  defp semantic_terminal_events do
+    spans =
+      for prefix <- [
+            [:jido, :agent, :lifecycle],
+            [:jido, :agent, :turn],
+            [:jido, :agent, :commit],
+            [:jido, :agent, :directive],
+            [:jido, :persistence, :operation],
+            [:jido, :topology, :operation]
+          ],
+          ending <- [:stop, :exception],
+          do: prefix ++ [ending]
+
+    spans ++
+      [
+        [:jido, :agent, :turn, :settled],
+        [:jido, :agent, :admission, :rejected]
+      ]
+  end
+
+  defp attach(id, events, handler) do
+    case :telemetry.attach_many(id, events, handler, nil) do
+      :ok -> :ok
+      {:error, :already_exists} -> :ok
+    end
+  end
+
+  @doc false
+  def handle_semantic_event(event, measurements, metadata, _config) do
+    mode = semantic_log_mode()
+    metadata = Semantic.normalize_metadata(metadata)
+    measurements = Semantic.normalize_measurements(measurements)
+
+    if log_semantic?(mode, event, measurements, metadata) do
+      message =
+        "[jido.semantic] event=#{event |> Enum.drop(1) |> Enum.join(".")} " <>
+          Formatter.format_metadata(Map.merge(metadata, measurements), max_value_length: 128)
+
+      if semantic_error?(event, metadata),
+        do: Logger.warning(message),
+        else: Logger.debug(message)
+    end
+
+    :ok
+  rescue
+    _error -> :ok
+  catch
+    _kind, _reason -> :ok
+  end
+
+  defp semantic_log_mode do
+    config = Application.get_env(:jido, :telemetry, [])
+    explicit = config_value(config, :semantic_log_mode)
+
+    cond do
+      explicit in [:off, :errors, :interesting, :all] -> explicit
+      config_value(config, :log_level) == :trace -> :all
+      config_value(config, :log_level) == :debug -> :interesting
+      true -> :off
+    end
+  end
+
+  defp log_semantic?(:off, _event, _measurements, _metadata), do: false
+  defp log_semantic?(:all, _event, _measurements, _metadata), do: true
+
+  defp log_semantic?(:errors, event, _measurements, metadata),
+    do: semantic_error?(event, metadata)
+
+  defp log_semantic?(:interesting, event, measurements, metadata) do
+    semantic_error?(event, metadata) or slow_semantic?(measurements)
+  end
+
+  defp semantic_error?(event, metadata) do
+    List.last(event) == :exception or Map.get(metadata, :status) not in [nil, :ok]
+  end
+
+  defp slow_semantic?(measurements) do
+    duration = Map.get(measurements, :duration, 0)
+    threshold = semantic_slow_threshold_ms()
+    Formatter.to_ms(duration) >= threshold
+  end
+
+  defp semantic_slow_threshold_ms do
+    config = Application.get_env(:jido, :telemetry, [])
+
+    case config_value(config, :semantic_slow_threshold_ms) do
+      value when is_integer(value) and value >= 0 -> value
+      _value -> 1_000
+    end
+  end
+
+  defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
+  defp config_value(config, key) when is_map(config), do: Map.get(config, key)
+  defp config_value(_config, _key), do: nil
 
   @doc """
   Handles Agent Server telemetry events.

@@ -1,10 +1,9 @@
 # Jido V3 observability design
 
-Status: Pending approval.
+Status: Selected and implemented.
 
-All requirements in this file are target requirements. A requirement is not a
-claim that the current code implements it. Current proof and gaps are in
-[alignment.md](alignment.md).
+The requirements in this file define the selected contract. Current owner,
+code, test, and compatibility proof is in [alignment.md](alignment.md).
 
 ## Scope and owner
 
@@ -43,7 +42,7 @@ failure does not undo that commit.
 
 ### Event catalog
 
-The first five rows exist now. The last three rows are target additions.
+All eight rows are implemented.
 
 | Family | Event name | Shape | Meaning |
 | --- | --- | --- | --- |
@@ -63,8 +62,7 @@ boundary uses `:exception`. A point event has no matching start event.
 Lifecycle operations are `:activate`, `:stop`, `:hibernate`, and `:thaw`.
 Record creation and deletion are persistence operations. Persistence operations
 are `:load`, `:compare_and_swap`, and `:delete`. Local Topology operations are
-`:activate`, `:repair`, and `:cleanup`. These are target vocabularies. The
-current lifecycle emitter only reports `:activate` and `:stop`.
+`:activate`, `:repair`, and `:cleanup`.
 
 ### Status and stage vocabularies
 
@@ -86,8 +84,8 @@ apply or when its source value does not pass validation.
 
 | Group | Fields | Value rule |
 | --- | --- | --- |
-| Schema | `schema_version` | Positive integer; target version starts at `1` |
-| Agent Ref | `agent_namespace`, `agent_partition`, `agent_id` | Bounded UTF-8 strings projected from `%Jido.Agent.Ref{}` after that value exists |
+| Schema | `schema_version` | Positive integer; current version is `1` |
+| Agent Ref | `agent_namespace`, `agent_partition`, `agent_id` | Bounded UTF-8 strings projected from `%Jido.Agent.Ref{}` |
 | Current identity overlap | `jido_instance`, `partition` | Current atom/string/integer fields retained only for compatibility |
 | Agent runtime | `agent_module`, `activation_id` | Module atom and bounded ID |
 | Turn and Signal | `turn_id`, `source_signal_id`, `signal_id`, `signal_type` | Bounded UTF-8 strings |
@@ -99,7 +97,7 @@ apply or when its source value does not pass validation.
 | Persistence | `adapter_module`, `persistence_reason` | Module atom and registered atom |
 | Topology | `topology_id`, `topology_operation`, `component_kind`, `node_id` | Bounded strings or registered atoms |
 
-The target maximum is 256 bytes for an ID or type and 128 bytes for a
+The maximum is 256 bytes for an ID or type and 128 bytes for a
 partition. Invalid UTF-8, larger strings, nested values, and values outside the
 allowlist are omitted. New code must not convert untrusted strings to atoms.
 
@@ -146,7 +144,7 @@ the live-result duration from the Turn span.
 
 ### Default consumer contract
 
-The target default metric set has count and duration metrics for lifecycle,
+The default metric set has count and duration metrics for lifecycle,
 Turn result, settlement, commit, Directive, persistence, and local Topology.
 It also has an admission rejection counter. Default metric tags can use only
 the fixed vocabularies `operation`, `status`, `stage`, `admission_reason`,
@@ -158,7 +156,7 @@ activation IDs, Turn IDs, Signal IDs, trace IDs, topology IDs, node IDs, error
 messages, or error codes. Hosts can build explicit high-cardinality views
 outside Jido.
 
-The target semantic logger has modes `:off`, `:errors`, `:interesting`, and
+The semantic logger has modes `:off`, `:errors`, `:interesting`, and
 `:all`. `:errors` logs non-OK terminal facts. `:interesting` also logs configured
 slow operations, admission rejection, non-OK persistence, degraded Topology
 operations, and committed Turns with failed Directives. `:all` logs every
@@ -166,21 +164,19 @@ semantic terminal event. It does not log span starts by default.
 
 ### OpenTelemetry boundary
 
-If approved, `Jido.OpenTelemetry` is an optional translation layer over the
-semantic Telemetry contract. It maps only the events in this catalog. It does
-not use old Agent Server events, `Jido.Observe` callbacks, or debug history as
-its source.
+Jido Core does not include an OpenTelemetry bridge or dependency in V3. The
+semantic Telemetry catalog is the host integration boundary. A host bridge
+must map only this catalog. It must not use old Agent Server events,
+`Jido.Observe` callbacks, or debug history as its source.
 
-The bridge can depend on an optional OpenTelemetry API. It must not start an
-SDK or exporter. It must not perform network I/O in a Telemetry handler. A host
-can attach the bridge, configure sampling, and select an exporter.
+The host owns the OpenTelemetry API and SDK, sampling policy, exporters,
+collectors, credentials, and vendor configuration. A synchronous Telemetry
+handler must not perform network or storage I/O.
 
-The bridge must preserve the difference between the live Turn result and Turn
-settlement. The exact Turn span end is an open decision. One valid mapping ends
-the span at the live result and emits settlement as a correlated point. Another
-valid mapping keeps one logical Turn span open until settlement and records the
-live result as an earlier event. Neither mapping can label result duration as
-settlement duration.
+A host bridge must preserve the difference between the live Turn result and
+Turn settlement. The semantic Turn span ends at the live result. Settlement is
+a later correlated point. A bridge must not label result duration as settlement
+duration.
 
 Jido-owned Task boundaries must transfer trace context explicitly. Lower-level
 packages transfer context for tasks that they own. A Signal remains the
@@ -346,20 +342,20 @@ that consumer shall not fail the emitting runtime operation.
 
 ### OpenTelemetry
 
-`OBS-REQ-044`: Where the optional OpenTelemetry bridge is enabled, the bridge
-shall translate only the semantic event catalog.
+`OBS-REQ-044`: Where a host enables an OpenTelemetry bridge, the bridge shall
+translate only the semantic event catalog.
 
-`OBS-REQ-045`: Where the optional OpenTelemetry bridge is present, the host
-application shall own SDK start, sampling policy, exporters, collectors,
-credentials, and vendor configuration.
+`OBS-REQ-045`: The host application shall own the OpenTelemetry API and SDK,
+SDK start, sampling policy, exporters, collectors, credentials, and vendor
+configuration.
 
-`OBS-REQ-046`: Where the OpenTelemetry API dependency is absent or the bridge
-is disabled, Jido shall compile and run without OpenTelemetry startup.
+`OBS-REQ-046`: Jido Core shall compile and run without an OpenTelemetry
+dependency or startup.
 
-`OBS-REQ-047`: When the OpenTelemetry bridge maps a Turn, the bridge shall
-preserve separate live-result and terminal-settlement facts.
+`OBS-REQ-047`: When a host bridge maps a Turn, the bridge shall end the span at
+the live result and preserve terminal settlement as a separate correlated fact.
 
-`OBS-REQ-048`: When an OpenTelemetry context crosses a Jido-owned Task
+`OBS-REQ-048`: When process-local trace context crosses a Jido-owned Task
 boundary, the task owner shall attach and restore that context without leaking
 it into later work.
 
@@ -384,9 +380,9 @@ allowlist, size limits, private-value exclusion, and metric-tag limits.
 `OBS-REQ-054`: When correlation behavior changes, focused tests shall prove
 local, retry, child-activation, Task, known-node, and concurrent continuity.
 
-`OBS-REQ-055`: Where the OpenTelemetry bridge is implemented, tests shall
-prove builds without the API, with API-only no-op behavior, with the bridge
-disabled, and with an in-memory SDK.
+`OBS-REQ-055`: Where a host OpenTelemetry bridge is implemented, its owner
+shall prove disabled and in-memory SDK modes without adding exporter work to a
+Jido Telemetry handler.
 
 `OBS-REQ-056`: When a host disables all built-in consumers, the semantic event
 boundaries shall continue to emit the event catalog.
@@ -405,17 +401,17 @@ semantic event boundary shall not broaden its metadata allowlist.
 - Telemetry is best-effort and is not an audit journal.
 - Export and vendor policy stay outside Jido core.
 
-## Open design decisions
+## Selected design decisions
 
 | ID | Decision | Recommended answer | Effect if changed |
 | --- | --- | --- | --- |
-| `OBS-DEC-001` | Event catalog | Approve the eight families in this file. | Names, tests, metrics, logs, and bridge mapping must change together. |
-| `OBS-DEC-002` | Agent Ref projection | Use `agent_namespace`, `agent_partition`, and `agent_id`. | Identity migration and attribute names change. |
-| `OBS-DEC-003` | Lifecycle operations | Add `hibernate` and `thaw`; keep create/delete under persistence. | Lifecycle and persistence ownership changes. |
-| `OBS-DEC-004` | Public statuses and stages | Approve the bounded tables and keep private stages hidden. | Dashboards and compatibility tests change. |
-| `OBS-DEC-005` | Default logs | Use four semantic modes and safe fields only. | Configuration migration and coverage gates change. |
-| `OBS-DEC-006` | OpenTelemetry owner | Put an optional semantic bridge in Jido core; keep infrastructure in the host. | A separate package needs a public attachment and version contract. |
-| `OBS-DEC-007` | OpenTelemetry Turn span end | Select live result or settlement before bridge work starts. | Span duration and settlement mapping change. |
+| `OBS-DEC-001` | Event catalog | Use the eight families in this file. | Names, tests, metrics, logs, and host mapping change together. |
+| `OBS-DEC-002` | Agent Ref projection | Use `agent_namespace`, `agent_partition`, and `agent_id`. | Identity fields have one stable meaning. |
+| `OBS-DEC-003` | Lifecycle operations | Use `hibernate` and `thaw`; keep create and delete under persistence. | Lifecycle and persistence facts stay separate. |
+| `OBS-DEC-004` | Public statuses and stages | Use the bounded tables and keep private stages hidden. | Dashboards do not depend on evaluator details. |
+| `OBS-DEC-005` | Default logs | Use four semantic modes and safe fields only. | Current log settings have a compatibility map. |
+| `OBS-DEC-006` | OpenTelemetry owner | Keep the bridge and all infrastructure in the host for V3. | Core has no speculative dependency or startup behavior. |
+| `OBS-DEC-007` | OpenTelemetry Turn span end | End at the live result and report settlement as a later point. | Result and settlement durations stay distinct. |
 | `OBS-DEC-008` | Legacy overlap | Remove nothing until inventory, parity tests, notice, and review are complete. | Earlier removal is a breaking change. |
 
 ## Downstream guarantees
@@ -425,7 +421,7 @@ semantic event boundary shall not broaden its metadata allowlist.
   degradation without reading private state.
 - A reporter can join Agent work by Ref, activation, Turn, Signal, trace, and
   causation without using a PID as identity.
-- Hosts can use Telemetry only, attach the optional OpenTelemetry bridge, or
-  export copied events through another process.
+- Hosts can use Telemetry only, attach their OpenTelemetry bridge, or export
+  copied events through another process.
 - A distributed control plane can use the same safety rules without moving its
   authority model into Jido core.

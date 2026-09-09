@@ -94,8 +94,22 @@ defmodule Jido.Telemetry.AgentTest do
              agent_module: __MODULE__,
              status: :ok,
              committed?: true,
-             partition: "partition-1"
+             partition: "partition-1",
+             schema_version: 1
            }
+  end
+
+  test "error metadata includes only a registered program code" do
+    error =
+      Jido.Error.timeout_error("expired", details: %{code: :agent_turn_timeout, private: self()})
+
+    assert AgentTelemetry.error_metadata(error) == %{
+             error_type: :timeout,
+             error_code: :agent_turn_timeout,
+             retryable?: true
+           }
+
+    refute Map.has_key?(AgentTelemetry.error_metadata(:plain_reason), :error_code)
   end
 
   test "finish accepts a missing span" do

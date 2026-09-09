@@ -72,7 +72,7 @@ are ready.
 | `lib/jido/persistence/file.ex:1-66` | Core includes a file adapter with one-BEAM ownership limits. |
 | `lib/jido/persistence/redis.ex:1-56` | Core includes a Redis adapter that receives an application-owned command function. |
 | `lib/jido/topology/controller.ex:1-24,73-107` | Core owns static local Topology startup, readiness, automatic or manual repair, and current-target reconcile. It has no live target update or cluster policy. |
-| `lib/jido/telemetry.ex:1-30` | Jido emits semantic and legacy Agent Server Telemetry. Metadata is bounded and handlers are observers. |
+| `Jido.Telemetry` and its semantic owner modules | Jido emits bounded Agent, admission, persistence, and local Topology events. Legacy Agent Server Telemetry remains. Handlers are observers. |
 | `../jido_ai/mix.exs:60-71` | The AI V3 checkout uses sibling paths for Jido, Jido Action, and Jido Signal. |
 | `../jido_browser/mix.exs:61-70` | The browser checkout still declares Jido and Jido Action V2 ranges. It is not current V3 compatibility proof. |
 
@@ -94,7 +94,7 @@ are ready.
 | `test/jido/topology/controller_test.exs:20-330` | Static activation, readiness, local repair, state retention, and cleanup are proved. |
 | `test/jido/agent_server/child_placement_test.exs:8-72` | An explicit node is valid owned-child intent and pure evaluation starts no process. |
 | `test/jido/agent_server/distributed_child_test.exs:41-109,155-234` | Known-node child start, remote restart, and no local fallback are proved. |
-| `test/jido/observe/agent_lifecycle_test.exs:10-44,72-115,235-300` | Direct evaluation emits no runtime events. Handler failure preserves results. Semantic metadata is bounded and commit and settlement stay separate. |
+| Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Direct evaluation emits no runtime events. Handler failure preserves results. Semantic data is bounded, and live result and settlement stay separate. |
 
 ### Retained validation record
 
@@ -326,7 +326,7 @@ Owner seams can create detailed plans when their contracts are ready.
 | `PKG-REQ-011` | `lib/jido/persistence/adapter.ex:1-47`; Signal and browser adapters have separate owners | Inventory of every adapter and the package that owns it. | `Partial` |
 | `PKG-REQ-012` | Agent and Topology extension modules and tests in the evidence tables | Public-only authoring extension fixture. | `Proven` in core |
 | `PKG-REQ-013` and `PKG-REQ-014` | `lib/jido/agent/directive.ex:1-15`; Directive and Scheduler tests | Keep post-commit proof and add a public recoverable-capability fixture. | `Partial` |
-| `PKG-REQ-015` | `lib/jido/telemetry.ex:1-30`; `test/jido/observe/agent_lifecycle_test.exs:10-44` | External-handler failure case in the public fixture. | `Proven` in core |
+| `PKG-REQ-015` | Semantic owner modules and handler-failure tests | Preserve failure isolation for every event family. | `Proven` in core |
 | `PKG-REQ-016` and `PKG-REQ-017` | Distinct public modules in the evidence table | Review checklist for every proposed new extension type. | `Partial` |
 | `PKG-REQ-018` through `PKG-REQ-023` | Public module docs state some limits; no external fixture checks all limits | Compile and runtime fixture with no private state, message, name, commit, or PID-identity dependency. | `Missing` |
 | `PKG-REQ-024` | Current public modules have documentation and core tests | Package-level acceptance rule and required evidence index. | `Partial` |

@@ -2,15 +2,15 @@ defmodule Jido.Telemetry.Agent do
   @moduledoc false
 
   alias Jido.AgentServer.{ActiveTurn, CreationCause}
-  alias Jido.Error
+  alias Jido.Telemetry.Semantic
   alias Jido.Tracing.Trace
 
-  @identity_keys ~w(agent_id activation_id turn_id source_signal_id signal_id signal_type trace_id span_id parent_span_id causation_id cause_turn_id child_activation_id)a
-  @atom_keys ~w(agent_module directive_module jido_instance operation stage status kind error_type)a
-  @boolean_keys [:committed?, :retryable?, :sampled?]
-
   def identity(data) do
+    namespace = safe_namespace(data.jido)
+
     %{
+      agent_namespace: namespace,
+      agent_partition: if(is_binary(data.partition), do: data.partition),
       agent_id: data.agent.id,
       agent_module: data.agent.module,
       activation_id: data.activation_id,
@@ -43,34 +43,40 @@ defmodule Jido.Telemetry.Agent do
     })
   end
 
-  def start(boundary, metadata, measurements \\ %{}) do
-    span = %{
-      prefix: [:jido, :agent, boundary],
-      metadata: normalize(metadata),
-      at: System.monotonic_time()
+  def admission_rejected(data, signal, reason) when reason in [:deadline_expired, :overloaded] do
+    trace = Trace.get(signal) || %{}
+
+    metadata =
+      data
+      |> identity()
+      |> Map.merge(
+        Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id, :sampled?])
+      )
+      |> Map.merge(%{
+        source_signal_id: signal.id,
+        signal_id: signal.id,
+        signal_type: signal.type,
+        status: :rejected,
+        admission_reason: reason
+      })
+
+    measurements = %{
+      queue_depth: MapSet.size(data.postponed_tokens),
+      queue_limit: data.max_postponed_signals
     }
 
-    emit(
-      span.prefix ++ [:start],
-      Map.merge(measurements, %{
-        monotonic_time: span.at,
-        system_time: System.system_time()
-      }),
-      span.metadata
-    )
+    Semantic.point([:jido, :agent, :admission, :rejected], metadata, measurements)
+  end
 
-    span
+  def start(boundary, metadata, measurements \\ %{}) do
+    Semantic.start([:jido, :agent, boundary], metadata, measurements)
   end
 
   def finish(span, metadata \\ %{}, measurements \\ %{}, ending \\ :stop)
   def finish(nil, _metadata, _measurements, _ending), do: :ok
 
   def finish(span, metadata, measurements, ending) do
-    emit(
-      span.prefix ++ [ending],
-      Map.put(measurements, :duration, max(System.monotonic_time() - span.at, 0)),
-      Map.merge(span.metadata, normalize(metadata))
-    )
+    Semantic.finish(span, metadata, measurements, ending)
   end
 
   def with_span(boundary, metadata, fun) do
@@ -140,10 +146,10 @@ defmodule Jido.Telemetry.Agent do
 
     duration = max(System.monotonic_time() - data.active.telemetry_span.at, 0)
 
-    emit(
+    Semantic.emit(
       [:jido, :agent, :turn, :settled],
       Map.put(measurements, :duration, duration),
-      normalize(metadata)
+      metadata
     )
   end
 
@@ -179,10 +185,7 @@ defmodule Jido.Telemetry.Agent do
   defp metadata_error_status(_metadata), do: :error
 
   def error_metadata(reason) do
-    public = Error.to_map(reason)
-    %{error_type: public.type, retryable?: public.retryable?}
-  catch
-    _, _ -> %{error_type: :internal, retryable?: false}
+    Semantic.error_metadata(reason)
   end
 
   defp status(:succeeded), do: :ok
@@ -191,34 +194,13 @@ defmodule Jido.Telemetry.Agent do
   defp stage(stage) when stage in [:prepare, :execute, :finalize], do: :evaluate
   defp stage(stage), do: stage
 
-  defp normalize(metadata) do
-    Enum.reduce(metadata, %{}, fn
-      {key, value}, acc when key in @identity_keys and is_binary(value) ->
-        if byte_size(value) <= 256 and String.valid?(value),
-          do: Map.put(acc, key, value),
-          else: acc
-
-      {key, value}, acc when key in @atom_keys and is_atom(value) and not is_nil(value) ->
-        Map.put(acc, key, value)
-
-      {key, value}, acc when key in @boolean_keys and is_boolean(value) ->
-        Map.put(acc, key, value)
-
-      {:partition, value}, acc when is_binary(value) and byte_size(value) <= 128 ->
-        Map.put(acc, :partition, value)
-
-      {:partition, value}, acc when is_atom(value) or is_integer(value) ->
-        Map.put(acc, :partition, value)
-
-      _, acc ->
-        acc
-    end)
-  end
-
-  defp emit(event, measurements, metadata) do
-    :telemetry.execute(event, measurements, metadata)
-    :ok
+  defp safe_namespace(jido) when is_atom(jido) do
+    Jido.namespace(jido)
+  rescue
+    _error -> nil
   catch
-    _, _ -> :ok
+    _kind, _reason -> nil
   end
+
+  defp safe_namespace(_jido), do: nil
 end

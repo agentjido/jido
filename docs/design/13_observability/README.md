@@ -1,108 +1,88 @@
-# 13 — Observability
+> Implemented seam review entry point.
 
-Status: Pending approval.
+# 13 - Observability
 
 ## Briefing
 
-This seam defines the public observation contract for the Jido V3 runtime. It
-keeps semantic Telemetry events as the source contract. It defines bounded
-event data, correlation, logs, metrics, failure isolation, and an optional
-OpenTelemetry translation boundary. It does not give an observer execution
-authority, make telemetry durable, or put an exporter in the SDK.
+Jido now uses one semantic event catalog for Agent lifecycle, Turn result,
+commit, Directive work, Turn settlement, admission rejection, persistence, and
+the static local Topology Controller.
 
-The current runtime emits semantic events for Agent activation and stop, Turn
-evaluation and live result, commit, Directive work, and terminal Turn
-settlement. It also emits older Agent Server events and supports
-`Jido.Observe`, process-local tracing, configurable logging, and debug history.
-These older paths stay available during a staged migration.
+Every semantic event has `schema_version: 1`. The event boundary keeps only
+approved scalar metadata. It omits state, payloads, raw errors, records,
+credentials, process handles, and arbitrary application metadata. Counts,
+durations, and revisions stay in measurements.
 
-## Why this seam exists
+Observation has no execution or persistence authority. A handler failure does
+not change the command result, durable result, or public Turn Outcome.
 
-- Owns: Jido semantic event names and meanings, measurements, safe metadata,
-  runtime correlation, default metrics, semantic log policy, observer failure
-  rules, compatibility, and the optional Jido-to-OpenTelemetry mapping.
-- Coordinates: Agent Ref identity, Signal trace carriers, Turn and commit
-  boundaries, persistence results, Agent Server Outcomes, local Topology, and
-  optional control-plane events.
-- Does not own: Agent behavior, persistence policy, cluster authority,
-  exporter processes, collectors, storage backends, dashboards, alert rules,
-  vendor credentials, or AI-provider observation.
+## Event catalog
 
-The contract must let an operator answer four separate questions: what became
-live, what settled later, what failed, and how related work is correlated. A
-handler must not be able to change any of those results.
-
-## Current and target state
-
-| Area | Current state | Target state |
+| Family | Event | Meaning |
 | --- | --- | --- |
-| Semantic Agent events | Lifecycle `activate` and `stop`, Turn, commit, Directive, and `turn.settled` events exist. | Keep these meanings and add approved lifecycle operations only at real boundaries. |
-| Missing runtime visibility | Admission rejection, persistence operations, and local Topology operations have no semantic event families. | Add bounded events at the owner boundaries. Do not infer events from logs or debug history. |
-| Identity and correlation | Events use Agent ID, module, activation ID, Jido instance, partition, Turn and Signal IDs, and legacy/W3C-derived trace IDs. | Project the approved Agent Ref namespace, partition, and ID. Keep activation, Turn, Signal, trace, parent, and causation as separate fields. |
-| Outcome timing | A successful Turn span stops when the commit becomes live. `turn.settled` occurs after Directive work. | Preserve this split in Telemetry, logs, metrics, and OpenTelemetry. |
-| Safety | Semantic metadata uses an allowlist and semantic emission catches handler faults. Older observation paths can accept broader data. | Apply one bounded projection to all new semantic families. Keep payloads, state, raw errors, records, and handles out. |
-| Metrics and logs | Default metrics and the built-in log consumer use older Agent Server events. | Add semantic metrics and logs before any old path is deprecated. Keep identity out of default metric tags. |
-| OpenTelemetry | Jido has no OpenTelemetry dependency or bridge. | Add an optional translation layer only if approved. The host owns the SDK, sampling, exporters, collector, and credentials. |
+| Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Activation, stop, hibernate, or thaw |
+| Agent Turn result | `[:jido, :agent, :turn, event]` | Admission to live result or pre-commit failure |
+| Agent commit | `[:jido, :agent, :commit, event]` | One commit attempt, including required persistence |
+| Agent Directive | `[:jido, :agent, :directive, event]` | One post-commit Directive attempt |
+| Turn settlement | `[:jido, :agent, :turn, :settled]` | One terminal public Outcome |
+| Admission rejection | `[:jido, :agent, :admission, :rejected]` | Deadline or overload rejection before a Turn |
+| Persistence | `[:jido, :persistence, :operation, event]` | Load, compare-and-swap, or delete |
+| Local Topology | `[:jido, :topology, :operation, event]` | Activation, repair, or cleanup |
 
-All target changes in this seam are pending approval. The current code is the
-canonical implementation record.
+For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
+uses `:stop`. A fault that escapes the observed boundary uses `:exception`.
 
-## Major gaps and work remaining
+The successful Turn span ends when the commit becomes live. Directive work can
+settle later. The separate `turn.settled` fact keeps this difference visible.
 
-| Gap | Required outcome |
-| --- | --- |
-| Incomplete catalog | Add admission-rejection, persistence-operation, and local Topology-operation evidence with exact schemas and tests. |
-| Transitional identity | Add the Agent Ref projection after seam 03 is approved. Keep current fields for a documented overlap period. |
-| Split consumers | Move default metrics and logs to semantic events and prove equal or better operational coverage. |
-| Incomplete propagation | Define explicit trace transfer across each Jido-owned Task boundary and keep Signal W3C propagation under `jido_signal` ownership. |
-| No OpenTelemetry bridge | Decide package ownership, span timing, optional dependency policy, and compile matrix before implementation. |
-| Compatibility debt | Inventory users of legacy Agent Server events, `Jido.Observe`, tracing, logs, and debug history before any deprecation. |
+## Identity and correlation
 
-## Decisions requested
+When an instance has a stable namespace, Agent events project the exact Agent
+Ref fields as `agent_namespace`, `agent_partition`, and `agent_id`. The current
+`jido_instance` and `partition` fields stay during the compatibility interval.
 
-1. Approve the event catalog in [design.md](design.md), including target
-   admission, persistence, and local Topology families.
-2. Approve `agent_namespace`, `agent_partition`, and `agent_id` as the semantic
-   projection of the Agent Ref. Keep `jido_instance` and `partition` during the
-   compatibility interval.
-3. Approve lifecycle operations `activate`, `stop`, `hibernate`, and `thaw`.
-   Represent record creation and deletion as persistence operations.
-4. Approve the status and stage vocabularies. Do not expose private evaluator
-   or Plugin callback stages.
-5. Approve semantic log modes `off`, `errors`, `interesting`, and `all`, with
-   safe fields only.
-6. Approve an optional `Jido.OpenTelemetry` bridge in core. Keep the SDK,
-   exporter, collector, sampling policy, and credentials in the host.
-7. Decide whether the OpenTelemetry Turn span ends at the live result or at
-   settlement. In both cases, it must report result and settlement as separate
-   facts.
-8. Approve additive schema evolution and a measured overlap period before any
-   legacy observation API is removed.
+Activation, Turn, source Signal, effective Signal, trace parent, and Signal
+causation IDs stay separate. Signals keep the complete portable W3C carrier.
+Jido-owned Tasks explicitly attach and restore their process-local trace
+context.
 
-## Dependencies
+## Consumers
 
-- [Core model](../00_overview/alignment.md) defines the result, settlement,
-  privacy, and compatibility invariants.
-- [Package boundaries](../90_package-boundaries/alignment.md) assign semantic
-  Agent observation to Jido and exporter infrastructure to the host.
-- [Errors and contracts](../12_errors-and-contracts/alignment.md) owns safe
-  public error projections.
-- [Agent](../01_agent/alignment.md), [Turn](../04_turn-evaluation/alignment.md),
-  [Plugins](../05_plugins/alignment.md), and
-  [commit and effects](../06_commit-and-effects/alignment.md) define the
-  evaluation and live-result boundaries.
-- [Agent identity](../03_agent-identity/alignment.md) owns Agent Ref fields.
-- [Persistence](../07_persistence/alignment.md),
-  [Agent Server](../08_agent-server/alignment.md),
-  [Jido instance](../09_jido-instance/alignment.md), and
-  [runtime topology](../10_runtime-topology/alignment.md) own the runtime facts
-  that observation reports.
-- [Topology control plane](../11_topology-control-plane/alignment.md) owns
-  optional distributed events and authority meaning.
+`Jido.Telemetry.metrics/0` returns low-cardinality metrics from semantic events.
+It does not use Agent, Signal, trace, topology, or error IDs as default tags.
+`legacy_metrics/0` keeps the old Agent Server definitions for migration.
+
+The semantic logger supports `:off`, `:errors`, `:interesting`, and `:all` with
+`semantic_log_mode`. It filters metadata and measurements again before it
+writes a log entry.
+
+Jido does not include an OpenTelemetry dependency or exporter. A host can map
+the semantic catalog to OpenTelemetry without using old Agent Server events.
+The host owns the SDK, sampling, exporters, collector, credentials, and vendor
+configuration.
+
+## Compatibility
+
+- Keep semantic version-1 names and field meanings for additive changes.
+- Use a new versioned contract for a breaking schema change.
+- Keep old Agent Server events, `Jido.Observe`, tracing, logging, and debug
+  history until a separate inventory, parity, notice, and removal review is
+  complete.
+- Keep telemetry best-effort. Do not use it as a durable audit record.
+
+## Evidence
+
+- Agent lifecycle tests prove Ref projection, hibernate, thaw, live result,
+  settlement, rejection, privacy, and failure isolation.
+- Persistence tests prove load, compare-and-swap, conflict, delete, status,
+  revision, and privacy facts.
+- Topology tests prove activation, repair, cleanup, status, counts, and privacy.
+- Telemetry tests prove schema normalization, stable error codes, semantic
+  metrics, four log modes, and retained legacy metrics.
+- Trace tests prove portable Signal context and explicit Task restoration.
+- The semantic boundary demonstration runs all main families together.
 
 ## Documents
 
-- [Design](design.md) — target event, data, consumer, bridge, compatibility,
-  and evidence requirements.
-- [Alignment](alignment.md) — current evidence, gaps, old-claim dispositions,
-  acceptance gates, migration notes, assumptions, and blockers.
+- [Selected design](design.md)
+- [Implemented alignment and evidence](alignment.md)

@@ -306,7 +306,7 @@ table delegates them.
 | The four Plugin facets do not exist. | Approve only the owner categories in this seam. Defer callbacks and checkpoint composition. | `OVR-REQ-005`; seam 05 with 01 and 07 |
 | A Topology authoring owner exists but does not own the live target. | Keep authoring. Defer live authority and updates. | `OVR-REQ-060` and `OVR-REQ-061`; seam 11 |
 | Plugin wrappers share the Agent Dynamic Supervisor. | Require separate logical roles only. Defer physical pool changes. | `OVR-REQ-047`; seams 09 and 10 |
-| Legacy telemetry, tracing, and debug coexist with semantic events. | Keep all supported paths until semantic replacement coverage exists. | `OVR-REQ-054` through `OVR-REQ-059`, `OVR-REQ-063`; seam 13 |
+| Legacy telemetry, tracing, and debug coexist with semantic events. | Semantic Agent, admission, persistence, and local Topology events and default consumers are implemented. Keep all supported old paths until a separate removal review. | `OVR-REQ-054` through `OVR-REQ-059`, `OVR-REQ-063`; seam 13 |
 | Per-Agent persistence override and instance persistence both exist. | Preserve both until seams 90, 07, and 09 decide compatibility. | `OVR-REQ-063`; seams 90, 07, and 09 |
 | Future durable, cluster, and transport package names do not have complete APIs. | Keep only the package-boundary direction. Defer APIs until integration proof exists. | `OVR-REQ-062`; seams 90 and 99 |
 
@@ -445,7 +445,7 @@ the implementation tasks.
 | `OVR-REQ-049` | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-32`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
 | `OVR-REQ-050` and `OVR-REQ-051` | `test/jido/agent_server/public_api_test.exs:333-459`; `lib/jido/agent_server.ex:1596-1637` | Preserve pre-commit cancellation and prove commit and Directive rejection. | `Partial` |
 | `OVR-REQ-052` and `OVR-REQ-053` | `Jido.Error`; seam-12 public value and raw control inventories; error normalization tests | Preserve the inventory through delivery and add no unowned release result. | `Proven` |
-| `OVR-REQ-054` through `OVR-REQ-059` | `lib/jido/telemetry.ex:8-30`; `test/jido/observe/agent_lifecycle_test.exs:10-302` | Add persistence, admission, Topology, and Agent Ref metadata cases. Keep legacy tests until retirement. | `Partial` |
+| `OVR-REQ-054` through `OVR-REQ-059` | Semantic owner modules; Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Preserve the version-1 catalog and legacy overlap through delivery. | `Proven` |
 | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,73-90`; `test/jido/topology/controller_test.exs:20-330`; `test/jido/topology/authoring_host_test.exs:79-272` | Add owner desired-state and live-target tests only if seam 11 approves those contracts. | `Proven` for static scope |
 | `OVR-REQ-062` | `lib/jido.ex:8-48,346-370`; `mix.exs:351-360` | Seam-90 package contract and integration proof before any external package becomes required. | `Partial` |
 | `OVR-REQ-063` | `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67`; `test/jido/agent_server/public_api_test.exs:87-590`; `test/jido/persistence_test.exs:35-514`; `test/jido/observe/agent_lifecycle_test.exs:10-395` | Compatibility inventory, stated support period, and replacement proof before any deprecation. | `Partial` |
@@ -469,7 +469,7 @@ No deprecation or removal is approved in this seam.
 | Plugin runtime Init | Keep the implemented coherent state and version input. Keep the current public state-pull recovery path during migration. |
 | Public values and errors | Add values and normalized errors only after owner, purpose, serialization, protocol exceptions, and caller migration are clear. |
 | Topology | Keep static local activation and repair. Do not require live updates for V3. |
-| Observation | Keep semantic events, legacy `:agent_server` telemetry, `Jido.Observe`, tracing, and debug until seam 13 proves replacement coverage. |
+| Observation | Use version-1 semantic events and low-cardinality default consumers. Keep legacy `:agent_server` telemetry, `Jido.Observe`, tracing, logging, and debug until a separate removal review. |
 | Package versions | Test a declared compatible V3 pair. Do not use uncommitted sibling `jido_signal` behavior as proof for the Hex dependency. |
 
 Release rollback must not cause an older runtime to ignore a tombstone or

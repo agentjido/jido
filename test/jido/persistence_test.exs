@@ -199,6 +199,102 @@ defmodule JidoTest.PersistenceTest do
     {ETS, table: :"agent_persistence_#{name}_#{System.unique_integer([:positive])}"}
   end
 
+  test "public persistence operations emit bounded semantic spans" do
+    persistence = adapter(:semantic_events)
+    agent = RuntimeAgent.new!(id: unique_id("semantic-persistence"))
+    namespace = "test/persistence"
+
+    events = [
+      [:jido, :persistence, :operation, :start],
+      [:jido, :persistence, :operation, :stop],
+      [:jido, :persistence, :operation, :exception]
+    ]
+
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        events,
+        fn event, measurements, metadata, owner ->
+          send(owner, {:persistence_event, event, measurements, metadata})
+        end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    opts = [namespace: namespace, partition: "west"]
+    assert :ok = Persistence.save_agent(persistence, agent, opts)
+
+    assert {:ok, ^agent, 0} =
+             Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id, opts)
+
+    assert :ok =
+             Persistence.save_agent(
+               persistence,
+               %{agent | state: %{agent.state | events: [:saved]}},
+               opts ++ [revision: 1, expected_revision: 0]
+             )
+
+    assert {:error, :conflict} =
+             Persistence.save_agent(
+               persistence,
+               agent,
+               opts ++ [revision: 2, expected_revision: 0]
+             )
+
+    assert :ok = Persistence.delete_agent(persistence, RuntimeAgent, agent.id, opts)
+
+    assert {:error, :deleted} =
+             Persistence.load_agent(persistence, RuntimeAgent, agent.id, opts)
+
+    observed = collect_persistence_events([])
+    starts = Enum.filter(observed, &(elem(&1, 0) == :start))
+    stops = Enum.filter(observed, &(elem(&1, 0) == :stop))
+    assert length(starts) == 6
+    assert length(stops) == 6
+
+    assert Enum.map(stops, fn {_ending, metadata, _measurements} ->
+             {metadata.operation, metadata.status}
+           end) == [
+             {:compare_and_swap, :ok},
+             {:load, :ok},
+             {:compare_and_swap, :ok},
+             {:compare_and_swap, :conflict},
+             {:delete, :ok},
+             {:load, :not_found}
+           ]
+
+    for {_ending, metadata, measurements} <- observed do
+      assert metadata.schema_version == 1
+      assert metadata.agent_namespace == namespace
+      assert metadata.agent_partition == "west"
+      assert metadata.agent_id == agent.id
+      assert metadata.adapter_module == ETS
+      assert metadata.persistence_reason == :manual
+      refute Map.has_key?(metadata, :record)
+      refute Map.has_key?(metadata, :key)
+      assert Enum.all?(Map.values(measurements), &is_integer/1)
+    end
+
+    assert Enum.any?(stops, fn {_ending, metadata, measurements} ->
+             metadata.operation == :compare_and_swap and metadata.status == :ok and
+               measurements[:revision_after] == 1
+           end)
+  end
+
+  defp collect_persistence_events(acc) do
+    receive do
+      {:persistence_event, event, measurements, metadata} ->
+        collect_persistence_events([
+          {List.last(event), metadata, measurements} | acc
+        ])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
   test "restores portable Plugin state and rebuilds its runtime", %{jido: jido} do
     start_supervised!(Clock)
     persistence = adapter(:plugin_state)

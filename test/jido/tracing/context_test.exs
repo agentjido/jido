@@ -131,6 +131,36 @@ defmodule Jido.Tracing.ContextTest do
     assert Context.get() == nil
   end
 
+  test "an owned task can attach and restore an explicit context" do
+    parent = Trace.new_root()
+    previous = Trace.new_root()
+
+    assert Context.with_context(previous, fn ->
+             assert Context.get() == previous
+
+             task =
+               Task.async(fn ->
+                 Context.with_context(parent, fn ->
+                   assert Context.get() == parent
+                   :observed
+                 end)
+               end)
+
+             assert Task.await(task) == :observed
+             assert Context.get() == previous
+             :observed
+           end) == :observed
+
+    assert Context.get() == nil
+  end
+
+  test "explicit task context is restored after a fault" do
+    trace = Trace.new_root()
+
+    assert catch_throw(Context.with_context(trace, fn -> throw(:failed) end)) == :failed
+    assert Context.get() == nil
+  end
+
   test "telemetry metadata prefixes keys and omits missing values" do
     trace = %{
       trace_id: "trace-1",

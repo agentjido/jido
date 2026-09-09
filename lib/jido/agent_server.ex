@@ -507,7 +507,11 @@ defmodule Jido.AgentServer do
       span =
         AgentTelemetry.start(
           :lifecycle,
-          Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, :activate)
+          Map.put(
+            AgentTelemetry.lifecycle_metadata(data),
+            :operation,
+            if(initial_persistence == :restored, do: :thaw, else: :activate)
+          )
         )
 
       {:ok, :initializing, %{data | activation_span: span},
@@ -810,6 +814,7 @@ defmodule Jido.AgentServer do
     data = forget_postponed(data, token)
 
     if AdmissionDeadline.expired?(deadline) do
+      AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
       {:keep_state, data, [{:reply, from, {:error, :admission_timeout}}]}
     else
       start_turn(signal, from, context, data)
@@ -1305,7 +1310,8 @@ defmodule Jido.AgentServer do
   @impl true
   def terminate(reason, _phase, %State{} = data) do
     AgentTelemetry.finish(data.activation_span, AgentTelemetry.result_metadata({:error, reason}))
-    metadata = Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, :stop)
+    operation = if reason == {:shutdown, :hibernate}, do: :hibernate, else: :stop
+    metadata = Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, operation)
 
     result =
       AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
@@ -1437,10 +1443,13 @@ defmodule Jido.AgentServer do
     with {:ok, runtime_refs} <-
            plugin_runtime_refs(data, ServerPlugin.admission_modules(plugin_specs)) do
       supervisor = Jido.task_supervisor_name(data.jido)
+      trace = TraceContext.get()
 
       task =
         Task.Supervisor.async(supervisor, fn ->
-          ServerPlugin.admit(command, plugin_specs, runtime_refs)
+          TraceContext.with_context(trace, fn ->
+            ServerPlugin.admit(command, plugin_specs, runtime_refs)
+          end)
         end)
 
       {:next_state, :admitting, %{data | admission_task: %{task: task, timer: nil}}}
@@ -1965,7 +1974,8 @@ defmodule Jido.AgentServer do
 
   defp start_directive_task(fun, rest, context, span, data) do
     supervisor = Jido.task_supervisor_name(data.jido)
-    task = Task.Supervisor.async(supervisor, fun)
+    trace = TraceContext.get()
+    task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
     timer = start_directive_timer(data.directive_timeout, task.ref)
     pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
     {:keep_state, %{data | directive_task: pending}}
@@ -2069,9 +2079,11 @@ defmodule Jido.AgentServer do
     }
   end
 
-  defp postpone_call(from, token, _signal, deadline, %State{} = data) do
+  defp postpone_call(from, token, signal, deadline, %State{} = data) do
     cond do
       AdmissionDeadline.expired?(deadline) ->
+        AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
+
         {:keep_state, forget_postponed(data, token),
          [{:reply, from, {:error, :admission_timeout}}]}
 
@@ -2079,6 +2091,7 @@ defmodule Jido.AgentServer do
         {:keep_state_and_data, [:postpone]}
 
       admission_full?(data) ->
+        AgentTelemetry.admission_rejected(data, signal, :overloaded)
         {:keep_state_and_data, [{:reply, from, {:error, overload_error(data)}}]}
 
       true ->
@@ -2092,6 +2105,8 @@ defmodule Jido.AgentServer do
         {:keep_state_and_data, [:postpone]}
 
       admission_full?(data) ->
+        AgentTelemetry.admission_rejected(data, signal, :overloaded)
+
         Logger.warning("Agent Signal cast dropped because the Server is overloaded",
           agent_id: data.agent.id,
           signal_id: signal.id,
@@ -2726,10 +2741,13 @@ defmodule Jido.AgentServer do
     else
       supervisor = Jido.task_supervisor_name(data.jido)
       jido = data.jido
+      trace = TraceContext.get()
 
       task =
         Task.Supervisor.async(supervisor, fn ->
-          DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
+          TraceContext.with_context(trace, fn ->
+            DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
+          end)
         end)
 
       timeout = error_policy_dispatch_timeout(data)

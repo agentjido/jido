@@ -4,7 +4,9 @@ defmodule Jido.Topology.Controller.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Signal.Bus
+  alias Jido.Telemetry.Topology, as: TopologyTelemetry
   alias Jido.Topology.{Controller, Plan}
+  alias Jido.Tracing.Context, as: TraceContext
 
   def start_link({jido, instance, repair}),
     do: GenServer.start_link(__MODULE__, {jido, instance, repair})
@@ -25,7 +27,9 @@ defmodule Jido.Topology.Controller.Runtime do
       waiters: %{},
       phase: :starting,
       pending: MapSet.new(),
-      active: %{}
+      active: %{},
+      pass_count: 0,
+      operation_span: nil
     }
 
     {:ok, state, {:continue, :reconcile}}
@@ -148,6 +152,8 @@ defmodule Jido.Topology.Controller.Runtime do
 
   @impl true
   def terminate(reason, state) do
+    TopologyTelemetry.finish(Map.get(state, :operation_span), :error, state)
+    span = TopologyTelemetry.start(:cleanup, state)
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     Enum.each(state.active, fn {_, job} -> Task.shutdown(job.task, :brutal_kill) end)
 
@@ -176,6 +182,8 @@ defmodule Jido.Topology.Controller.Runtime do
       end)
     end
 
+    cleanup_status = if intentional_shutdown?(reason), do: :ok, else: :error
+    TopologyTelemetry.finish(span, cleanup_status, %{state | ready: %{}})
     :ok
   end
 
@@ -192,15 +200,18 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp begin_pass(state) do
     keys = Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources)
+    operation = if Map.get(state, :pass_count, 0) == 0, do: :activate, else: :repair
+    span = TopologyTelemetry.start(operation, state)
 
-    %{
-      state
-      | ready: %{},
-        errors: %{},
-        pending: MapSet.new(keys),
-        phase: :starting,
-        reconcile_requested: false
-    }
+    state
+    |> Map.merge(%{
+      ready: %{},
+      errors: %{},
+      pending: MapSet.new(keys),
+      phase: :starting,
+      reconcile_requested: false,
+      operation_span: span
+    })
     |> drive()
   end
 
@@ -244,9 +255,12 @@ defmodule Jido.Topology.Controller.Runtime do
 
     member = spec(key, state)
     context = task_context(key, member, state)
+    trace = TraceContext.get()
 
     task =
-      Task.Supervisor.async_nolink(supervisor, fn -> safely(fn -> ensure(member, context) end) end)
+      Task.Supervisor.async_nolink(supervisor, fn ->
+        TraceContext.with_context(trace, fn -> safely(fn -> ensure(member, context) end) end)
+      end)
 
     timer =
       Process.send_after(
@@ -282,17 +296,36 @@ defmodule Jido.Topology.Controller.Runtime do
   defp record(state, key, {:error, reason}),
     do: %{state | errors: Map.put(state.errors, key, reason)}
 
-  defp finish_pass(%{reconcile_requested: true} = state), do: begin_pass(state)
+  defp finish_pass(%{reconcile_requested: true} = state) do
+    state = complete_pass(state)
+    begin_pass(%{state | reconcile_requested: false})
+  end
 
   defp finish_pass(state) do
+    state = complete_pass(state)
+
+    if state.phase == :ready do
+      reply_waiters(state)
+    else
+      schedule_reconcile(state)
+    end
+  end
+
+  defp complete_pass(state) do
     state = recheck_ready(state)
     phase = if map_size(state.errors) == 0, do: :ready, else: :degraded
 
-    if phase == :ready do
-      reply_waiters(state)
-    else
-      %{state | phase: phase} |> schedule_reconcile()
-    end
+    TopologyTelemetry.finish(
+      Map.get(state, :operation_span),
+      if(phase == :ready, do: :ok, else: :error),
+      state
+    )
+
+    Map.merge(state, %{
+      phase: phase,
+      operation_span: nil,
+      pass_count: Map.get(state, :pass_count, 0) + 1
+    })
   end
 
   defp reply_waiters(state) do

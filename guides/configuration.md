@@ -119,6 +119,18 @@ status = MyApp.Jido.debug_status()
 
 Do not depend on a debug override as permanent production configuration.
 
+Configure bounded semantic logs separately from the retained old log path:
+
+```elixir
+config :jido, :telemetry,
+  semantic_log_mode: :interesting,
+  semantic_slow_threshold_ms: 250
+```
+
+The semantic modes are `:off`, `:errors`, `:interesting`, and `:all`.
+`Jido.Telemetry.metrics/0` returns the low-cardinality semantic metric set.
+Use `legacy_metrics/0` only while an old Agent Server reporter migrates.
+
 ## Keep ownership clear
 
 Jido validates its own actor and observability options. A Plugin validates its

@@ -36,6 +36,7 @@ defmodule Jido.Persistence do
   alias Jido.Agent.Ref
   alias Jido.Error
   alias Jido.Persistence.{Checkpoint, Record}
+  alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.PortableTerm
 
   @key_prefix "jido:agent:v1:"
@@ -96,35 +97,37 @@ defmodule Jido.Persistence do
   def save_agent(source, agent, opts \\ [])
 
   def save_agent(source, %Agent{} = agent, opts) do
-    protect(:compare_and_swap, fn ->
-      with :ok <- validate_operation_options(opts),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           partition = Keyword.get(opts, :partition),
-           {:ok, identity} <-
-             storage_identity(
-               adapter,
-               adapter_opts,
-               instance,
-               agent.module,
-               agent.id,
-               partition,
-               Keyword.get(opts, :namespace)
-             ),
-           {:ok, record} <- build_record(agent, instance, opts, identity),
-           {:ok, expected_revision} <- expected_revision(opts),
-           {:ok, expected_value} <-
-             current_value(adapter, adapter_opts, record, identity, expected_revision),
-           {:ok, value} <- Record.encode(record),
-           :ok <-
-             adapter_compare_and_swap(
-               adapter,
-               identity.key,
-               expected_value,
-               value,
-               adapter_opts
-             ) do
-        :ok
-      end
+    PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
+      protect(:compare_and_swap, fn ->
+        with :ok <- validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             partition = Keyword.get(opts, :partition),
+             {:ok, identity} <-
+               storage_identity(
+                 adapter,
+                 adapter_opts,
+                 instance,
+                 agent.module,
+                 agent.id,
+                 partition,
+                 Keyword.get(opts, :namespace)
+               ),
+             {:ok, record} <- build_record(agent, instance, opts, identity),
+             {:ok, expected_revision} <- expected_revision(opts),
+             {:ok, expected_value} <-
+               current_value(adapter, adapter_opts, record, identity, expected_revision),
+             {:ok, value} <- Record.encode(record),
+             :ok <-
+               adapter_compare_and_swap(
+                 adapter,
+                 identity.key,
+                 expected_value,
+                 value,
+                 adapter_opts
+               ) do
+          :ok
+        end
+      end)
     end)
   end
 
@@ -132,34 +135,36 @@ defmodule Jido.Persistence do
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []) do
-    protect(:compare_and_swap, fn ->
-      with :ok <- validate_operation_options(opts),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           :ok <- validate_initial_revision(opts),
-           partition = Keyword.get(opts, :partition),
-           {:ok, identity} <-
-             storage_identity(
-               adapter,
-               adapter_opts,
-               instance,
-               agent.module,
-               agent.id,
-               partition,
-               Keyword.get(opts, :namespace)
-             ),
-           {:ok, record} <-
-             build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
-           {:ok, value} <- Record.encode(record),
-           :ok <-
-             adapter_compare_and_swap(
-               adapter,
-               identity.key,
-               :not_found,
-               value,
-               adapter_opts
-             ) do
-        :ok
-      end
+    PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
+      protect(:compare_and_swap, fn ->
+        with :ok <- validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             :ok <- validate_initial_revision(opts),
+             partition = Keyword.get(opts, :partition),
+             {:ok, identity} <-
+               storage_identity(
+                 adapter,
+                 adapter_opts,
+                 instance,
+                 agent.module,
+                 agent.id,
+                 partition,
+                 Keyword.get(opts, :namespace)
+               ),
+             {:ok, record} <-
+               build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
+             {:ok, value} <- Record.encode(record),
+             :ok <-
+               adapter_compare_and_swap(
+                 adapter,
+                 identity.key,
+                 :not_found,
+                 value,
+                 adapter_opts
+               ) do
+          :ok
+        end
+      end)
     end)
   end
 
@@ -183,31 +188,34 @@ defmodule Jido.Persistence do
 
   def load_agent_with_revision(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
-    protect(:get, fn ->
-      with :ok <- validate_operation_options(opts),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           partition = Keyword.get(opts, :partition),
-           {:ok, identity} <-
-             storage_identity(
-               adapter,
-               adapter_opts,
-               instance,
-               agent_module,
-               agent_id,
-               partition,
-               Keyword.get(opts, :namespace)
-             ),
-           {:ok, value} <- adapter_get(adapter, identity.key, adapter_opts),
-           {:ok, record} <- Record.decode(value),
-           :ok <- validate_record(record, identity, instance, agent_module, agent_id, partition),
-           :ok <- require_active(record),
-           :ok <- validate_definition_revision(record, agent_module),
-           {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
-           {:ok, agent} <-
-             Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
-           :ok <- validate_restored_identity(agent, agent_module, agent_id) do
-        {:ok, agent, Record.revision(record)}
-      end
+    PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
+      protect(:get, fn ->
+        with :ok <- validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             partition = Keyword.get(opts, :partition),
+             {:ok, identity} <-
+               storage_identity(
+                 adapter,
+                 adapter_opts,
+                 instance,
+                 agent_module,
+                 agent_id,
+                 partition,
+                 Keyword.get(opts, :namespace)
+               ),
+             {:ok, value} <- adapter_get(adapter, identity.key, adapter_opts),
+             {:ok, record} <- Record.decode(value),
+             :ok <-
+               validate_record(record, identity, instance, agent_module, agent_id, partition),
+             :ok <- require_active(record),
+             :ok <- validate_definition_revision(record, agent_module),
+             {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
+             {:ok, agent} <-
+               Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
+             :ok <- validate_restored_identity(agent, agent_module, agent_id) do
+          {:ok, agent, Record.revision(record)}
+        end
+      end)
     end)
   end
 
@@ -218,30 +226,32 @@ defmodule Jido.Persistence do
 
   def delete_agent(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
-    protect(:delete, fn ->
-      with :ok <- validate_operation_options(opts),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           partition = Keyword.get(opts, :partition),
-           {:ok, identity} <-
-             storage_identity(
-               adapter,
-               adapter_opts,
-               instance,
-               agent_module,
-               agent_id,
-               partition,
-               Keyword.get(opts, :namespace)
-             ) do
-        delete_current(
-          adapter,
-          adapter_opts,
-          identity,
-          instance,
-          agent_module,
-          agent_id,
-          partition
-        )
-      end
+    PersistenceTelemetry.observe(:delete, source, agent_module, agent_id, opts, fn ->
+      protect(:delete, fn ->
+        with :ok <- validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+             partition = Keyword.get(opts, :partition),
+             {:ok, identity} <-
+               storage_identity(
+                 adapter,
+                 adapter_opts,
+                 instance,
+                 agent_module,
+                 agent_id,
+                 partition,
+                 Keyword.get(opts, :namespace)
+               ) do
+          delete_current(
+            adapter,
+            adapter_opts,
+            identity,
+            instance,
+            agent_module,
+            agent_id,
+            partition
+          )
+        end
+      end)
     end)
   end
 

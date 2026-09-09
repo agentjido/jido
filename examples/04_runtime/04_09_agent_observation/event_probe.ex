@@ -8,15 +8,17 @@ defmodule Jido.Examples.TurnObservation.EventProbe do
   an OBS-03 consumer with a queue/backpressure contract.
   """
 
-  # Existing event names plus proposed semantic names. Attaching does not
-  # create any of these events.
+  # Retained Agent Server names plus the version-1 semantic catalog. Attaching
+  # does not create any of these events.
   @prefixes [
     [:jido, :agent_server, :signal],
     [:jido, :agent_server, :directive],
     [:jido, :agent, :lifecycle],
     [:jido, :agent, :turn],
     [:jido, :agent, :commit],
-    [:jido, :agent, :directive]
+    [:jido, :agent, :directive],
+    [:jido, :persistence, :operation],
+    [:jido, :topology, :operation]
   ]
   @events for(prefix <- @prefixes, ending <- [:start, :stop, :exception], do: prefix ++ [ending]) ++
             [[:jido, :agent, :turn, :settled], [:jido, :agent, :admission, :rejected]]
@@ -29,6 +31,14 @@ defmodule Jido.Examples.TurnObservation.EventProbe do
     %{table: table, handler: handler}
   end
 
+  @doc "Attaches one finite probe to all semantic events."
+  def attach_all do
+    table = :ets.new(__MODULE__, [:ordered_set, :public])
+    handler = {__MODULE__, make_ref()}
+    :ok = :telemetry.attach_many(handler, @events, &__MODULE__.capture/4, {table, :all})
+    %{table: table, handler: handler}
+  end
+
   def events(probe), do: Enum.map(:ets.tab2list(probe.table), &elem(&1, 1))
 
   def detach(probe) do
@@ -38,16 +48,26 @@ defmodule Jido.Examples.TurnObservation.EventProbe do
   end
 
   @doc false
+  def capture(event, measurements, metadata, {table, :all}) do
+    insert(table, event, measurements, metadata)
+  end
+
   def capture(event, measurements, %{agent_id: agent_id} = metadata, {table, ids}) do
     if MapSet.member?(ids, agent_id) do
-      :ets.insert(table, {
-        System.unique_integer([:positive, :monotonic]),
-        %{event: event, measurements: measurements, metadata: metadata}
-      })
+      insert(table, event, measurements, metadata)
     end
 
     :ok
   end
 
   def capture(_event, _measurements, _metadata, _config), do: :ok
+
+  defp insert(table, event, measurements, metadata) do
+    :ets.insert(table, {
+      System.unique_integer([:positive, :monotonic]),
+      %{event: event, measurements: measurements, metadata: metadata}
+    })
+
+    :ok
+  end
 end

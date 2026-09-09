@@ -345,6 +345,149 @@ defmodule JidoTest.Observe.AgentLifecycleTest do
     end
   end
 
+  test "rejected calls and casts report bounded admission facts", %{jido: jido} do
+    id = unique_id("admission")
+    probe = EventProbe.attach(id)
+    owner = self()
+
+    barrier = fn ->
+      send(owner, {:held_execution, self()})
+
+      receive do
+        :release -> :ok
+      end
+    end
+
+    try do
+      {:ok, server} =
+        Jido.start_agent(jido, Agent, id: id, max_postponed_signals: 0)
+
+      held = Task.async(fn -> Agent.hold(server, 1, context: %{barrier: barrier}) end)
+      assert_receive {:held_execution, worker}, 1_000
+
+      assert {:error, {:overloaded, %{limit: 0, postponed: 0}}} =
+               Server.call(server, Agent.record_signal!(2))
+
+      assert :ok = Server.cast(server, Agent.record_signal!(3))
+
+      eventually(fn ->
+        probe
+        |> EventProbe.events()
+        |> Enum.count(&(&1.event == [:jido, :agent, :admission, :rejected])) == 2
+      end)
+
+      events =
+        Enum.filter(
+          EventProbe.events(probe),
+          &(&1.event == [:jido, :agent, :admission, :rejected])
+        )
+
+      for event <- events do
+        assert event.metadata.schema_version == 1
+        assert event.metadata.status == :rejected
+        assert event.metadata.admission_reason == :overloaded
+        assert event.measurements.queue_depth == 0
+        assert event.measurements.queue_limit == 0
+        assert is_integer(event.measurements.system_time)
+        refute Map.has_key?(event.metadata, :turn_id)
+      end
+
+      send(worker, :release)
+      assert {:ok, _agent} = Task.await(held)
+    after
+      EventProbe.detach(probe)
+    end
+  end
+
+  test "an expired postponed call reports deadline rejection", %{jido: jido} do
+    id = unique_id("deadline")
+    probe = EventProbe.attach(id)
+    owner = self()
+
+    barrier = fn ->
+      send(owner, {:held_execution, self()})
+
+      receive do
+        :release -> :ok
+      end
+    end
+
+    try do
+      {:ok, server} = Jido.start_agent(jido, Agent, id: id)
+      held = Task.async(fn -> Agent.hold(server, 1, context: %{barrier: barrier}) end)
+      assert_receive {:held_execution, worker}, 1_000
+
+      caller =
+        Task.async(fn ->
+          try do
+            Server.call(server, Agent.record_signal!(2), 20)
+          catch
+            :exit, _reason -> :caller_timed_out
+          end
+        end)
+
+      assert Task.await(caller) == :caller_timed_out
+      send(worker, :release)
+      assert {:ok, _agent} = Task.await(held)
+
+      eventually(fn ->
+        Enum.any?(EventProbe.events(probe), fn
+          %{event: [:jido, :agent, :admission, :rejected], metadata: metadata} ->
+            metadata.admission_reason == :deadline_expired
+
+          _event ->
+            false
+        end)
+      end)
+    after
+      EventProbe.detach(probe)
+    end
+  end
+
+  test "namespaced lifecycle events project the Agent Ref and hibernate and thaw", %{jido: _jido} do
+    id = unique_id("ref-observation")
+    instance = :"observe_ref_#{System.unique_integer([:positive])}"
+    namespace = "test/observe/#{id}"
+    table = :"observe_ref_store_#{System.unique_integer([:positive])}"
+    persistence = {Jido.Persistence.ETS, table: table}
+
+    start_supervised!(
+      {Jido, name: instance, namespace: namespace, persistence: persistence},
+      id: instance
+    )
+
+    probe = EventProbe.attach(id)
+
+    try do
+      {:ok, server} = Jido.start_agent(instance, Agent, id: id, partition: "west")
+      assert :ok = Jido.hibernate(instance, server, partition: "west")
+      assert {:ok, thawed} = Jido.thaw(instance, Agent, id, partition: "west")
+      assert :ok = Server.await_ready(thawed)
+
+      lifecycle =
+        Enum.filter(EventProbe.events(probe), fn event ->
+          Enum.take(event.event, 3) == [:jido, :agent, :lifecycle]
+        end)
+
+      completed =
+        for %{event: [:jido, :agent, :lifecycle, :stop], metadata: metadata} <- lifecycle,
+            do: metadata.operation
+
+      assert completed == [:activate, :hibernate, :thaw]
+
+      for event <- lifecycle do
+        assert event.metadata.schema_version == 1
+        assert event.metadata.agent_namespace == namespace
+        assert event.metadata.agent_partition == "west"
+        assert event.metadata.agent_id == id
+        assert event.metadata.partition == "west"
+        assert event.metadata.jido_instance == instance
+      end
+    after
+      EventProbe.detach(probe)
+    end
+  end
+
   defp semantic_events(probe) do
     Enum.filter(EventProbe.events(probe), &(Enum.take(&1.event, 2) == [:jido, :agent]))
   end

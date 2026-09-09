@@ -1,96 +1,117 @@
-# Telemetry, Tracing, and Logs
+# Telemetry, tracing, and logs
 
-Jido reports actor work through semantic telemetry events. It also supplies a
-tracer boundary, selective logs, and a bounded local debug buffer. These tools
-describe runtime work. They are not a durable audit journal.
+Jido reports runtime work through version-1 semantic Telemetry events. These
+events describe work. They do not authorize work, change a result, or provide a
+durable audit record.
 
-## Semantic actor events
+## Use semantic events
 
-Live actors emit events with this shape:
+Jido emits these event families:
 
 ```elixir
-[:jido, :agent, boundary, event]
+[:jido, :agent, :lifecycle, event]
+[:jido, :agent, :turn, event]
+[:jido, :agent, :commit, event]
+[:jido, :agent, :directive, event]
+[:jido, :agent, :turn, :settled]
+[:jido, :agent, :admission, :rejected]
+[:jido, :persistence, :operation, event]
+[:jido, :topology, :operation, event]
 ```
 
-The boundary is `:lifecycle`, `:turn`, `:commit`, or `:directive`. The event is
-`:start`, `:stop`, or `:exception`.
+For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
+uses `:stop`. An error, throw, or exit that escapes the boundary uses
+`:exception`.
 
-`[:jido, :agent, :turn, :settled]` reports one terminal Turn outcome after all
-Directive work ends or fails. A successful Turn span ends at commit. The
-settlement event can report a later failure with `committed?: true`.
+A successful Turn span ends when its commit becomes live. Directive work can
+finish later. `turn.settled` reports the terminal public Outcome after all
+owned Directive attempts finish. A committed Turn can therefore have an OK
+Turn result and a failed settlement.
 
-Important metadata includes:
+Lifecycle operations are `activate`, `stop`, `hibernate`, and `thaw`.
+Persistence operations are `load`, `compare_and_swap`, and `delete`. Local
+Topology operations are `activate`, `repair`, and `cleanup`.
 
-- Agent module, ID, instance, partition, and activation ID
-- source Signal ID, effective Signal ID, and Signal type
-- Turn, trace, span, causation, and parent span IDs
-- status, stage, error type, and retryability
-- the `:committed?` flag
+## Use safe fields
 
-Measurements include duration, state revisions, and Directive counts. Jido does
-not include state, payloads, raw error details, PIDs, or caller context in these
-semantic events.
+Every semantic event contains `schema_version: 1`. Applicable Agent events
+contain the Agent Ref projection:
 
-An abrupt process or VM loss can prevent final events. Export telemetry to your
-monitoring system if you need data outside the current node.
+- `agent_namespace`
+- `agent_partition`
+- `agent_id`
+
+The current `jido_instance` and `partition` fields remain during migration.
+Activation, Turn, source Signal, effective Signal, trace parent, and Signal
+causation IDs have separate fields.
+
+Errors use bounded `error_type`, `error_code`, and `retryable?` fields. A code
+appears only when `Jido.Error.code/1` recognizes it. Events do not include an
+error message or error details.
+
+Durations, counts, capacity, and revisions are integer measurements. Do not use
+Agent, Signal, trace, topology, node, or error IDs as default metric tags.
+
+The semantic boundary omits state, payloads, caller context, checkpoints,
+records, encoded keys, raw errors, stacktraces, process handles, credentials,
+arbitrary application metadata, and OpenTelemetry `tracestate`.
+
+## Use default metrics
+
+`Jido.Telemetry.metrics/0` returns count and duration metrics from semantic
+events. It uses only fixed operation, status, stage, reason, and component tags.
+
+`Jido.Telemetry.legacy_metrics/0` keeps the three old Agent Server metric
+definitions during migration.
+
+## Configure semantic logs
+
+Set the semantic log mode in the Jido telemetry configuration:
+
+```elixir
+config :jido, :telemetry,
+  semantic_log_mode: :interesting,
+  semantic_slow_threshold_ms: 250
+```
+
+The modes are:
+
+- `:off` logs no semantic event.
+- `:errors` logs non-OK terminal facts.
+- `:interesting` also logs operations at or over the slow threshold.
+- `:all` logs every terminal semantic fact.
+
+When no semantic mode is set, the old `log_level: :trace` maps to `:all`, and
+`:debug` maps to `:interesting`. The old Signal and Directive logger remains
+available.
 
 ## Keep handlers fast
 
-Telemetry calls handlers in the emitting actor process. A slow handler adds
-latency to the actor. Copy the bounded event to an exporter process and return
-quickly. Do not make a network call in the handler.
+Telemetry calls handlers in the emitting process. A handler must not call the
+observed Agent or do direct network or storage I/O. Copy the bounded event to a
+consumer process and return. A failing handler must not change the runtime
+result.
 
-Use stable fields such as `jido_instance`, `agent_module`, `signal_type`,
-`status`, and `stage` as metric tags. Do not use IDs as low-cardinality metric
-tags.
+## Transfer trace context
 
-## Connect a tracer
+Signals keep the complete portable W3C carrier across process, node, queue,
+and durable boundaries. Jido-owned Tasks explicitly attach the captured local
+context and restore the earlier context after they finish. Lower packages own
+context transfer for Tasks that they start.
 
-Implement `Jido.Observe.Tracer` to connect OpenTelemetry or another tracing
-system. The behavior has callbacks to start, stop, and fail spans. The default
-`Jido.Observe.NoopTracer` does no external work.
+## Connect OpenTelemetry
 
-```elixir
-config :my_app, MyApp.Jido,
-  observability: [
-    tracer: MyApp.JidoTracer,
-    tracer_failure_mode: :warn,
-    redact_sensitive: true
-  ]
-```
+Jido Core has no OpenTelemetry dependency and starts no SDK or exporter. A host
+bridge can translate the semantic event catalog. It must end a Turn span at the
+live result and report settlement as a later correlated fact.
 
-Use `:warn` when a tracer failure must not stop Agent work. Use `:strict` only
-when observability failure must fail the operation.
+The host owns the OpenTelemetry API and SDK, sampling, exporters, collectors,
+credentials, and vendor configuration. Do not use old Agent Server events,
+`Jido.Observe` callbacks, or debug history as a second span source.
 
-## Configure logs
+## Keep compatibility paths separate
 
-Jido can log slow or selected Signal and Directive events. Configure thresholds
-for each instance:
-
-```elixir
-config :my_app, MyApp.Jido,
-  telemetry: [
-    log_level: :debug,
-    log_args: :keys_only,
-    slow_signal_threshold_ms: 25,
-    slow_directive_threshold_ms: 10,
-    interesting_signal_types: ["order.failed"]
-  ]
-```
-
-Use `:keys_only` or `:none` in production unless full arguments are safe. Set
-`redact_sensitive: true` when your metadata can contain secrets or personal
-data.
-
-## Use the debug buffer for investigation
-
-Enable instance debug mode for short investigations:
-
-```elixir
-:ok = MyApp.Jido.debug(:on)
-{:ok, events} = MyApp.Jido.recent(server, 50)
-:ok = MyApp.Jido.debug(:off)
-```
-
-The actor keeps a bounded ring buffer. It is local, ephemeral, and not a
-replacement for metrics, traces, logs, or domain audit records.
+`Jido.Observe`, old Agent Server events, tracing helpers, old logging, and the
+bounded debug buffer remain available. No removal is part of this seam. The
+strict tracer mode of `Jido.Observe` is also not part of semantic runtime
+emission.

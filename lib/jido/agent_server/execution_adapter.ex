@@ -2,6 +2,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.Tracing.Context, as: TraceContext
 
   @fallback_timeout 5_000
 
@@ -22,8 +23,11 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   def start(owner, supervisor, module, args, timeout) do
     ref = make_ref()
     timeout = finite_timeout(timeout)
+    trace = TraceContext.get()
 
-    case Task.Supervisor.start_child(supervisor, fn -> run(owner, ref, module, args) end) do
+    case Task.Supervisor.start_child(supervisor, fn ->
+           TraceContext.with_context(trace, fn -> run(owner, ref, module, args) end)
+         end) do
       {:ok, pid} ->
         monitor_ref = Process.monitor(pid)
         timer = start_timer(timeout, ref, :startup, :run_async)

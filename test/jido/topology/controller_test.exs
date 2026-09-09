@@ -36,6 +36,69 @@ defmodule Jido.Topology.ControllerTest do
     eventually(fn -> not Process.alive?(left) and not Process.alive?(right) end)
   end
 
+  test "activation, repair, and cleanup emit bounded local topology spans", %{jido: jido} do
+    instance = Independent.new!(id: "observed-topology")
+    handler = {__MODULE__, make_ref()}
+
+    events =
+      for ending <- [:start, :stop, :exception],
+          do: [:jido, :topology, :operation, ending]
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        events,
+        fn event, measurements, metadata, owner ->
+          send(owner, {:topology_event, event, measurements, metadata})
+        end,
+        self()
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    controller =
+      start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+
+    assert :ok = Controller.await_ready(controller)
+    assert :ok = Controller.reconcile(controller)
+    assert :ok = Controller.await_ready(controller)
+    assert :ok = Supervisor.stop(controller)
+
+    observed = collect_topology_events([])
+    starts = Enum.filter(observed, &(elem(&1, 0) == :start))
+    stops = Enum.filter(observed, &(elem(&1, 0) == :stop))
+
+    assert Enum.map(starts, fn {_ending, metadata, _measurements} ->
+             metadata.topology_operation
+           end) == [:activate, :repair, :cleanup]
+
+    assert Enum.map(stops, fn {_ending, metadata, _measurements} ->
+             {metadata.topology_operation, metadata.status}
+           end) == [{:activate, :ok}, {:repair, :ok}, {:cleanup, :ok}]
+
+    for {_ending, metadata, measurements} <- observed do
+      assert metadata.schema_version == 1
+      assert metadata.topology_id == instance.id
+      assert metadata.jido_instance == jido
+      refute Map.has_key?(metadata, :components)
+      refute Map.has_key?(metadata, :errors)
+      assert measurements.component_count == 2
+      assert is_integer(measurements.ready_count)
+      assert is_integer(measurements.failed_count)
+    end
+
+    assert List.last(stops) |> elem(2) |> Map.fetch!(:ready_count) == 0
+  end
+
+  defp collect_topology_events(acc) do
+    receive do
+      {:topology_event, event, measurements, metadata} ->
+        collect_topology_events([{List.last(event), metadata, measurements} | acc])
+    after
+      0 -> Enum.reverse(acc)
+    end
+  end
+
   test "establishes logical ownership for nested groups", %{jido: jido} do
     controller = start_supervised!({Controller, jido: jido, topology: Hierarchy.new!(id: "tree")})
     assert :ok = Controller.await_ready(controller)

@@ -71,6 +71,23 @@ defmodule Jido.Tracing.Context do
     Process.get(@context_key)
   end
 
+  @doc false
+  @spec with_context(map() | nil, (-> result)) :: result when result: term()
+  def with_context(context, fun)
+      when (is_map(context) or is_nil(context)) and is_function(fun, 0) do
+    previous = get()
+
+    if context, do: Process.put(@context_key, context), else: Process.delete(@context_key)
+
+    try do
+      fun.()
+    after
+      if previous,
+        do: Process.put(@context_key, previous),
+        else: Process.delete(@context_key)
+    end
+  end
+
   @doc """
   Propagates trace context to a new signal.
 
