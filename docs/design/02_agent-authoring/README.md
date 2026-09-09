@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Approved seam review entry point. Dependent owner-seam work remains open.
 
 # 02 — Agent authoring
 
@@ -6,18 +6,19 @@
 
 Jido supports Agent modules, Spark blocks, direct map and keyword data,
 Builder, and Codec documents. These forms use one Agent constructor, but some
-source features exist only for modules. The recommended target keeps all
+source features exist only for modules. The approved target keeps all
 supported forms. It defines parity as equality of the canonical Agent
 definition, makes `agent/0` the module authority, keeps generated interfaces as
 module API, and gives Codec a clear portable subset. The current implementation
 now preserves the approved Agent `vsn`, starts Builder module input from
 `agent/0`, encodes instances from their neutral definitions, and publishes the
 pure data extension lowerer. One requirement-mapped suite proves the common
-definition and instance boundary for keyword-only and Spark-block modules.
+definition and instance boundary for keyword-only and Spark-block modules. The
+contract and its implementation evidence were approved on 2026-09-09.
 
-All seam-02 requirements and decisions are pending approval. The Overview and
-Agent prerequisite seams are approved. Package-boundary and shared-error work
-remain pending.
+The Overview and Agent prerequisite seams are approved. Package-boundary and
+shared-error work remain explicit assumptions and still require their own
+review.
 
 ## Why this seam exists
 
@@ -44,11 +45,10 @@ remain pending.
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Seam approval | The implemented direction is not an approved seam-02 contract. | Review and approve or change the pending decisions and requirements. | 02 Agent authoring |
 | Shared authoring errors | Authoring uses structured errors, but final shared codes and callback rules remain pending. | Apply the approved seam-12 contract without changing authoring meaning. | 12 Errors and contracts |
 | Release compatibility | Local tests prove the current package set, but publication gates remain broader. | Keep one compatible V3 package matrix and public-only extension proof. | 90 Package boundaries, 99 Delivery |
 
-## Decisions requested
+## Approved decisions
 
 1. **Supported forms:** Keep module, Spark, direct data, Builder, Codec, and
    neutral definitions.
@@ -70,8 +70,9 @@ remain pending.
   Package boundaries and errors remain explicit pending assumptions.
 - Dependents: 04 Turn evaluation, 05 Plugins, 07 Persistence, 08 Agent Server,
   11 Topology control plane, and 99 Delivery.
-- Blockers: seam-02 approval, package-boundary approval, and the final shared
-  authoring error contract. The Agent `vsn` dependency is resolved.
+- The pending package and error seams are explicit downstream assumptions.
+  They do not block the approved authoring contract. A later conflict requires
+  a reviewed migration.
 
 ## Documents
 

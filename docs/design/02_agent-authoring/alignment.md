@@ -1,22 +1,21 @@
-> Seam alignment plan. This document is pending approval.
+> Approved seam alignment. Dependent owner-seam follow-up remains open.
 
 # Agent authoring alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. Refreshed: 2026-09-09. This seam is pending
-  approval.
-- Code reviewed: working tree from `fa17a6d6f994a3b139ce18e1f116a373b51975cc`
-  on branch `v3-spike`.
+- Design reviewed: 2026-09-08. Approved: 2026-09-09.
+- Code reviewed: `ae559f4f41318d0021f8044589f99da810f4f82e` on branch
+  `v3-spike`.
 - Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
   [90 Package boundaries](../90_package-boundaries/alignment.md),
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md), and
   [01 Agent](../01_agent/alignment.md). Overview and Agent are approved.
   Package boundaries and errors remain explicit pending assumptions.
-- Alignment state: `Implemented locally; pending seam approval`.
+- Alignment state: `Approved; scoped implementation complete`.
 
-The alignment state is execution status. It is not document approval. This
-document gives outcomes and gates. It is not a formal implementation plan.
+The review-status table in `docs/design/README.md` is the source of truth for
+document approval.
 
 ## Inputs and evidence
 
@@ -32,7 +31,7 @@ document gives outcomes and gates. It is not a formal implementation plan.
   pending authoring failure and bang-function rules.
 - [Agent design](../01_agent/design.md): owns the two Agent forms and the
   approved compatible Agent `vsn` contract.
-- [Target design](design.md): defines the recommended authoring target.
+- [Target design](design.md): defines the approved authoring target.
 
 ### Canonical code
 
@@ -131,7 +130,7 @@ A skipped test is not passing evidence.
 
 ## Gap register
 
-All dispositions are recommendations and are pending approval.
+The dispositions below are approved for this seam.
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
@@ -150,7 +149,7 @@ All dispositions are recommendations and are pending approval.
 
 | Earlier material or conflict | Disposition | Reason and owner |
 | --- | --- | --- |
-| Use only versioned Agent modules and remove Builder, Codec, Registry, direct data, and neutral definitions. | `Remove` as a target. | The APIs are public and tested. Pending `OVR-REQ-063`, `PKG-REQ-034`, and `AGT-REQ-022` to `AGT-REQ-024` preserve them. |
+| Use only versioned Agent modules and remove Builder, Codec, Registry, direct data, and neutral definitions. | `Remove` as a target. | The APIs are public and tested. Approved `OVR-REQ-063`, `AGT-REQ-022` to `AGT-REQ-024`, and this seam preserve them. Package release proof remains with `PKG-REQ-034`. |
 | Make every Agent definition module-owned and versioned. | `Change in stages`. | Approved seam 01 requires revisions for generated modules and permits unversioned direct and behavior-only definitions. |
 | Require static-definition equality at persistent creation and exact module and revision checks at restore. | `Defer` to seams 01 and 07. | This seam preserves revision through authoring but does not define checkpoint or persistence policy. |
 | Make `__agent_config__/0` the normalized public authority. | `Remove`. | `agent/0` performs canonical construction. The double-underscore functions remain private compiler metadata. |
@@ -170,9 +169,8 @@ All dispositions are recommendations and are pending approval.
 
 ## High-level work sequence
 
-This sequence defines outcomes and gates. It is not an implementation plan.
-The user requested direct implementation, so this work did not create or run a
-separate formal plan.
+This sequence records the approved outcomes and completed implementation gates.
+It is not a separate implementation plan.
 
 ### Phase 0 — Resolve prerequisites and authoring decisions
 
@@ -303,19 +301,19 @@ No removal or deprecation is approved in this seam.
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
 | `AUTH-BLK-001` | `Resolved` | 00 Overview | Shared form retention, revision, and compatibility requirements are approved. | No further Overview action is required for seam 02. |
-| `AUTH-BLK-002` | `Blocker` | 90 Package boundaries | Extension categories and cross-package release gates are pending approval. | Approve or change the package boundary. |
-| `AUTH-BLK-003` | `Blocker` | 12 Errors and contracts | Stable authoring errors, codes, and bang rules are pending approval. | Approve them before final error alignment. |
+| `AUTH-BLK-002` | `Explicit assumption` | 90 Package boundaries | The current package ownership and extension categories support this approved authoring contract. | Review the package release gate in seam 90. A conflict requires a migration. |
+| `AUTH-BLK-003` | `Explicit assumption` | 12 Errors and contracts | Current structured authoring errors support this approved contract. Final shared codes remain deferred to seam 12. | Review the shared error matrix. A conflict requires a migration. |
 | `AUTH-BLK-004` | `Resolved` | 01 Agent | The definition-revision field, generated default, direct compatibility, and old-document rule are approved and implemented. | Keep seam-02 evidence aligned with seam 01. |
-| `AUTH-BLK-005` | `Assumption` | 02 Agent authoring | Parity applies to canonical definitions, not module functions or source syntax. | Approve or change `AUTH-DEC-002`. |
-| `AUTH-BLK-006` | `Implemented assumption` | 02 Agent authoring | Codec keeps instance input and uses definition-first static encoding. | Approve or change `AUTH-DEC-004`. |
-| `AUTH-BLK-007` | `Assumption` | 02 Agent authoring and `jido_signal` | Direct Router predicates can exceed the Codec portable subset. | Approve or require one stricter common predicate rule. |
-| `AUTH-BLK-008` | `Implemented assumption` | 02 Agent authoring | Data extensions lower before Builder or Codec and do not enter documents. | Approve or change `AUTH-DEC-006`. |
+| `AUTH-BLK-005` | `Approved implementation` | 02 Agent authoring | Parity applies to canonical definitions, not module functions or source syntax. | No action. |
+| `AUTH-BLK-006` | `Approved implementation` | 02 Agent authoring | Codec keeps instance input and uses definition-first static encoding. | No action. |
+| `AUTH-BLK-007` | `Approved authoring contract` | 02 Agent authoring and `jido_signal` | Direct Router predicates can exceed the Codec portable subset. | Confirm the release-compatible `jido_signal` package retains the required predicate behavior. |
+| `AUTH-BLK-008` | `Approved implementation` | 02 Agent authoring | Data extensions lower before Builder or Codec and do not enter documents. | No action. |
 | `AUTH-BLK-009` | `Resolved for authoring` | 04 Turn evaluation and `jido_action` | The approved Overview says Agent `vsn` does not pin loaded Action or Flow code. | Seam 04 retains the V3 non-guarantee. |
 
 ## Completion criteria
 
-- [ ] The user has approved or changed each `AUTH-DEC` item.
-- [ ] Package-boundary and shared-error prerequisites are approved or retained
+- [x] The user has approved or changed each `AUTH-DEC` item.
+- [x] Package-boundary and shared-error prerequisites are approved or retained
       as explicit assumptions.
 - [x] No unresolved seam-02 implementation conflict remains in the acceptance
       matrix. Shared error codes remain a deferred owner condition.
@@ -328,7 +326,7 @@ No removal or deprecation is approved in this seam.
 - [x] Codec instance input, portable subset, Registry safety, and document
       limits have passing evidence.
 - [x] Public Builder, Codec, Registry, generated-interface, and extension docs
-      and types match the pending seam contract.
+      and types match the approved seam contract.
 - [x] No checkpoint, restore, route-selection, Plugin-runtime, commit, Agent
       Server, or identity contract is decided in this seam.
 - [ ] Dependent seams use the approved definition and parity contract.

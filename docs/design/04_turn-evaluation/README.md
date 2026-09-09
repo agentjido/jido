@@ -69,9 +69,10 @@ decisions are pending approval.
   [90 Package boundaries](../90_package-boundaries/alignment.md),
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
   [01 Agent](../01_agent/alignment.md), and
-  [02 Agent authoring](../02_agent-authoring/alignment.md). All are pending
-  draft prerequisites. [03 Agent identity](../03_agent-identity/alignment.md)
-  was also reviewed; it does not own candidate evaluation.
+  [02 Agent authoring](../02_agent-authoring/alignment.md). Overview, Agent,
+  and Agent authoring are approved. Package boundaries and errors remain
+  pending. [03 Agent identity](../03_agent-identity/alignment.md) was also
+  reviewed; it does not own candidate evaluation.
 - Dependents: 05 Plugins, 06 Commit and effects, 08 Agent Server, 13
   Observability, and 99 Delivery.
 - Blockers: prerequisite approval; seam-05 bounded callback values; the final

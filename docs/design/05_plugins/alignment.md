@@ -10,10 +10,11 @@
   [90 Package boundaries](../90_package-boundaries/alignment.md),
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
   [01 Agent](../01_agent/alignment.md), and
-  [04 Turn evaluation](../04_turn-evaluation/alignment.md). All are pending
-  draft prerequisites.
+  [04 Turn evaluation](../04_turn-evaluation/alignment.md). Overview and Agent
+  are approved. Package boundaries, errors, and Turn evaluation remain pending.
 - Related contracts: [02 Agent authoring](../02_agent-authoring/design.md) and
-  [03 Agent identity](../03_agent-identity/design.md).
+  [03 Agent identity](../03_agent-identity/design.md). Agent authoring is
+  approved. Agent identity remains pending.
 - Alignment state: `Blocked`.
 
 The alignment state is execution status. It is not document approval. This
@@ -330,7 +331,7 @@ No removal or deprecation is approved in this seam.
 | `PLG-BLK-003` | `Owner dependency` | 12 Errors and contracts and 05 Plugins | Shared callback codes, fault normalization, and portable paths are implemented and pending seam-12 approval. Exact future Plugin callback values stay with seam 05. | Approve seam 12, then prove the seam-05 value model with the shared rules. |
 | `PLG-BLK-004` | `Resolved` | 01 Agent | Combined state, custom checkpoints, and portable-state timing are implemented and approved at `fa17a6d6`. | No action. |
 | `PLG-BLK-005` | `Blocker` | 04 Turn evaluation | Source-Signal first-match routing and bounded contribution inputs are pending approval. | Approve route order and parity boundary. |
-| `PLG-BLK-006` | `Assumption` | 02 Agent authoring | All authoring forms preserve ordered package declarations and static options. | Keep `AUTH-REQ-004`, `AUTH-REQ-036`, and `AUTH-REQ-049` aligned. |
+| `PLG-BLK-006` | `Approved input` | 02 Agent authoring | All authoring forms preserve ordered package declarations and static options. | Preserve `AUTH-REQ-004`, `AUTH-REQ-036`, and `AUTH-REQ-049`. |
 | `PLG-BLK-007` | `Blocker` | 03 Agent identity, 08 Agent Server, 09 Jido instance | Exact live runtime identity fields are not approved. | Define whether target Init carries Agent Ref beside compatibility fields. |
 | `PLG-BLK-008` | `Blocker` | 05 Plugins, 07 Persistence | Complete custom checkpoints and owned-slice conversion have no approved long-term composition. | Approve compatibility bypass and decide the later domain-only callback path. |
 | `PLG-BLK-009` | `Blocker` | 08 Agent Server, 10 Runtime topology | No current API supplies committed Plugin state and matching version in one value. | Approve bootstrap value, commit-race behavior, and replacement ownership. |

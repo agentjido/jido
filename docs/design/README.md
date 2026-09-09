@@ -110,9 +110,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Agent briefing](01_agent/README.md) | Approved |
 | [Agent design](01_agent/design.md) | Approved |
 | [Agent alignment](01_agent/alignment.md) | Approved |
-| [Agent authoring briefing](02_agent-authoring/README.md) | Pending approval |
-| [Agent authoring design](02_agent-authoring/design.md) | Pending approval |
-| [Agent authoring alignment](02_agent-authoring/alignment.md) | Pending approval |
+| [Agent authoring briefing](02_agent-authoring/README.md) | Approved |
+| [Agent authoring design](02_agent-authoring/design.md) | Approved |
+| [Agent authoring alignment](02_agent-authoring/alignment.md) | Approved |
 | [Agent identity briefing](03_agent-identity/README.md) | Pending approval |
 | [Agent identity design](03_agent-identity/design.md) | Pending approval |
 | [Agent identity alignment](03_agent-identity/alignment.md) | Pending approval |

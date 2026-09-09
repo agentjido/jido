@@ -16,8 +16,9 @@
   as related context.
 - Alignment state: `Blocked`.
 
-The alignment state is execution status. It is not document approval. All
-prerequisites and this seam are pending approval.
+The alignment state is execution status. It is not document approval.
+Overview, Agent, and Agent authoring are approved. Package boundaries, errors,
+and this seam remain pending approval.
 
 ## Inputs and evidence
 
@@ -274,7 +275,7 @@ depends on changing route choice without a clear compatibility adapter.
 | `TURN-BLK-002` | `Blocker` | 90 Package boundaries | The division between Jido candidate assembly and lower-package execution and routing is pending approval. | Approve or change the package boundary. |
 | `TURN-BLK-003` | `Blocker` | 12 Errors and contracts | Callback error normalization, invariant exits, and stable codes are pending approval. | Approve the seam-12 contract before final error alignment. |
 | `TURN-BLK-004` | `Blocker` | 01 Agent | Direct `cmd/3`, custom routing, combined state, and transition requirements are pending approval. | Approve or change the Agent contract. |
-| `TURN-BLK-005` | `Assumption` | 02 Agent authoring and `jido_signal` | Authoring preserves Router order and current route-default precedence. | Confirm against the release-compatible `jido_signal` package. |
+| `TURN-BLK-005` | `Approved authoring input` | 02 Agent authoring and `jido_signal` | Authoring preserves Router order and current route-default precedence. | Confirm against the release-compatible `jido_signal` package. |
 | `TURN-BLK-006` | `Blocker` | 05 Plugins | Bounded Agent views, owned prepared inputs, Transition data, and contribution authority have no approved callback contract. | Approve seam-05 value roles and migration before evaluator isolation work. |
 | `TURN-BLK-007` | `Blocker` | 08 Agent Server and 13 Observability | Private evaluator stages have no approved mapping to live control and Outcome stages. | Approve one explicit mapping without making the vocabularies identical. |
 | `TURN-BLK-008` | `Assumption` | 08 Agent Server | Live admission remains outside candidate evaluation and cannot change source-Signal selection. | Approve or change `TURN-DEC-007`. |

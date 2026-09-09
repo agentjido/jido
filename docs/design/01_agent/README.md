@@ -39,7 +39,6 @@ boundaries. The contract and its implementation evidence were approved on
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Dependent authoring adoption | Seam 02 must use the approved `vsn` contract in its own final design. | Review and approve the dependent authoring seam. | 02 Agent authoring |
 | Persistence integration | Seam 07 owns storage records beyond the Agent checkpoint map. | Review the approved Agent checkpoint contract during persistence approval. | 07 Persistence |
 | Error normalization | Callback fault normalization remains outside the implemented Agent scope. | Finish the shared error matrix without changing the approved Agent value or checkpoint contract. | 12 Errors |
 | Package compatibility | Package release gates remain owned by the package seam. | Prove the compatible V3 package release set. | 90 Package boundaries |

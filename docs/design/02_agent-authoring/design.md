@@ -1,11 +1,12 @@
-> Target seam design. This document is pending approval.
+> Approved target seam design. Dependent owner-seam details remain open.
 
 # Agent authoring design
 
-All requirements and decisions in this document are recommended targets. The
-[design review index](../README.md#document-review-status) is the source of
-truth for approval. The Overview and Agent prerequisites are approved. Package
-boundaries and shared errors remain pending assumptions.
+The requirements and decisions in this document were approved on 2026-09-09.
+The [design review index](../README.md#document-review-status) is the source of
+truth for approval. Pending package-boundary and shared-error details are
+explicit assumptions for this contract. A later conflict requires a reviewed
+migration.
 
 ## Scope and owner
 
@@ -57,7 +58,7 @@ configuration for direct, Builder, or Codec authoring.
 
 ## Requirements
 
-EARS syntax does not grant approval. Each requirement is a recommended target.
+The EARS requirements below are approved.
 
 ### Supported forms and canonical normalization
 
@@ -413,7 +414,7 @@ bypass common Agent validation.
 
 ## Downstream guarantees
 
-These guarantees apply only after the related requirements are approved.
+These approved guarantees apply to dependent seams.
 
 | Consumer seam | Guaranteed contract |
 | --- | --- |
@@ -427,11 +428,9 @@ These guarantees apply only after the related requirements are approved.
 | 90 Package boundaries | Inline Actions, Signals, Plugins, authoring extensions, and ordinary wrappers keep separate package owners. |
 | 99 Delivery | Supported forms remain until a separate staged migration has replacement proof. |
 
-## Open design decisions
+## Approved design decisions
 
-All recommendations are pending approval.
-
-| ID | Question | Recommended option | Effect |
+| ID | Question | Approved option | Effect |
 | --- | --- | --- | --- |
 | `AUTH-DEC-001` | Which authoring forms remain? | Keep module, Spark, direct map and keyword, Builder, Codec, and neutral definitions. | The historical module-only proposal is retired. |
 | `AUTH-DEC-002` | What does authoring parity include? | Compare canonical neutral Agent definitions only. | Module helpers and syntax can differ without creating another Agent contract. |
