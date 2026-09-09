@@ -11,8 +11,9 @@ before commit keeps the current revision. A failure during post-commit work does
 not undo it.
 
 The server supplies its current revision as `:expected_revision` when it saves.
-The write succeeds only when storage still has that revision. A missing record
-is valid for the first revision-zero expectation.
+The write succeeds only when storage still has that revision. Before a new
+persistent start succeeds, the server writes the supplied Agent as a create-
+only revision-zero record.
 
 Direct persistence calls can use the same rule:
 
@@ -29,9 +30,10 @@ For a live Turn, any persistence write error also stops that Server activation
 before it can evaluate more work. A revision cannot decrease. A save of the
 exact same record at the same revision is idempotent.
 
-Compare-and-swap prevents a confirmed stale write. It is not a writer lease. A
-delete or expiry removes the old revision history, and a new record can start
-again.
+Compare-and-swap prevents a confirmed stale write. It is not a writer lease.
+Normal delete preserves revision history in a tombstone. Normal create and save
+cannot replace that tombstone. Physical purge or storage expiry removes the
+fence. Same-identity reactivation is not a normal Core operation.
 
 ## Write failures
 
@@ -39,10 +41,12 @@ Every required persistence write error stops the Server activation before it
 accepts more work. Error policy cannot keep the stale writer active. Start a
 new activation and restore the authoritative record before a retry.
 
-A confirmed conflict means that this write did not replace the record. An
-adapter exception, timeout, or invalid result can make the outcome uncertain.
-For an indeterminate result, storage can contain either the previous record or
-the candidate record.
+A confirmed conflict means that the exact expected bytes did not match. A
+confirmed `{:rejected, reason}` result means that a documented preflight limit
+stopped the write before it started. Every other CAS error is indeterminate.
+This includes an exception, throw, exit, timeout, invalid result, or an
+unclassified adapter error. Storage can then contain either the previous
+record or the candidate record.
 
 Application recovery must then read the durable record and decide if the Turn
 committed. Give external operations stable identifiers so a retry does not
@@ -54,12 +58,17 @@ An Agent start accepts one of three restore policies:
 
 | Policy | Result |
 | --- | --- |
-| `false` | Start from the supplied Agent value. Do not read persistence. |
-| `:if_found` | Restore a record when it exists. Otherwise, use the supplied value. |
+| `false` | Do not read persistence. Create the supplied Agent at revision zero. Fail if an active record or tombstone exists. |
+| `:if_found` | Restore an active record. If it is missing, create the supplied Agent at revision zero. |
 | `:required` | Restore a record. Fail the start when no valid record exists. |
 
-The default is `:if_found`. `:required` is useful when a start is specifically a
-recovery operation.
+The default is `:if_found`. A tombstone returns `:deleted` and fails all three
+normal creation or restore paths. `:required` is useful when a start is
+specifically a recovery operation.
+
+Plugin runtimes can start provisionally before the initial storage write. Jido
+stops that runtime tree if the write fails. The start call does not return
+success until the write is confirmed.
 
 ## Hibernate a live actor
 

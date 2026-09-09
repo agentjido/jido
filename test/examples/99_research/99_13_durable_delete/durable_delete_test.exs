@@ -20,13 +20,12 @@ defmodule JidoTest.Examples.DurableDeleteTest do
 
   test "deletion makes the order unavailable", c do
     assert :ok = Jido.Persistence.delete_agent(c.store, DurableDelete, c.order.id)
-    assert {:error, :not_found} = Jido.Persistence.load_agent(c.store, DurableDelete, c.order.id)
+    assert {:error, :deleted} = Jido.Persistence.load_agent(c.store, DurableDelete, c.order.id)
   end
 
-  @tag skip: "Pending FA-05: durable deletion fencing is not implemented"
   test "a delayed initial writer cannot restore a deleted order", c do
     assert :ok = Jido.Persistence.delete_agent(c.store, DurableDelete, c.order.id)
-    assert {:error, _deleted_or_conflict} = DurableDelete.delayed_write(c.store, c.order)
-    assert {:error, _} = Jido.Persistence.load_agent(c.store, DurableDelete, c.order.id)
+    assert {:error, :conflict} = DurableDelete.delayed_write(c.store, c.order)
+    assert {:error, :deleted} = Jido.Persistence.load_agent(c.store, DurableDelete, c.order.id)
   end
 end

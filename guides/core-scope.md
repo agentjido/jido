@@ -12,7 +12,7 @@ guide and the public module documentation when you build an extension.
 | Authoring | Declarative modules, map and keyword declarations, Builder, and trusted Codecs share core validation. These forms remain supported. |
 | Live execution | Public PID-based `Jido.AgentServer` operations. `Jido` instance helpers start, find, stop, hibernate, and thaw Agents. |
 | Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
-| Persistence | The binary `Jido.Persistence.Adapter` contract, atomic compare-and-swap, and existing checkpoint and restore rules. |
+| Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
 | Topology | Pure definitions and plans, bounded local activation, readiness, repair, and cleanup. |
 

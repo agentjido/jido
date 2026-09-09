@@ -16,7 +16,12 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
 
     def compare_and_swap(key, expected, value, opts) do
       :ok = Store.compare_and_swap(key, expected, value, Keyword.put(opts, :write_result, :ok))
-      raise "stored write reply lost"
+
+      if :erlang.binary_to_term(value, [:safe]).revision == 0 do
+        :ok
+      else
+        raise "stored write reply lost"
+      end
     end
   end
 
@@ -82,7 +87,7 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
                restore: false
              )
 
-    assert {:error, {:persistence_failed, %Jido.Error.ExecutionError{}}} =
+    assert {:error, {:persistence_failed, {:indeterminate, %Jido.Error.ExecutionError{}}}} =
              Probe.increment(pid, "first", 1, context: c.turn_context)
 
     assert_receive {:evaluated, "first"}

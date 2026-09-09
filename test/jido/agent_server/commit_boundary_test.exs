@@ -151,8 +151,10 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
     assert_receive :external_write_completed
     assert Server.snapshot(server).state_version == 0
 
-    assert {:error, :not_found} =
-             Jido.Persistence.load_agent(persistence, Agent, id, instance: jido)
+    assert {:ok, initial, 0} =
+             Jido.Persistence.load_agent_with_revision(persistence, Agent, id, instance: jido)
+
+    assert initial.state == %{count: 0}
   end
 
   test "an ordinary Directive batch is not replayed after Server loss", %{jido: jido} do

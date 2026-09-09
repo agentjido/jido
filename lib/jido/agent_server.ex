@@ -440,7 +440,8 @@ defmodule Jido.AgentServer do
   def init({%Options{} = opts, startup_reply}) do
     Process.flag(:trap_exit, true)
 
-    with {:ok, restored_agent, restored_version} <- restore_initial_agent(opts),
+    with {:ok, restored_agent, restored_version, initial_persistence} <-
+           restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          {:ok, exec_module} <- validate_exec_module(opts.exec_module),
@@ -476,6 +477,7 @@ defmodule Jido.AgentServer do
         pool_key: opts.pool_key,
         idle_timeout: opts.idle_timeout,
         persistence: opts.persistence,
+        initial_persistence: initial_persistence,
         attachments: %{},
         idle_timer: nil,
         spawn_fun: opts.spawn_fun,
@@ -524,15 +526,22 @@ defmodule Jido.AgentServer do
       ) do
     Process.demonitor(ref, [:flush])
     cancel_task_timer(readiness.timer)
+    data = %{data | plugin_bootstrap: nil}
 
-    AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
-      state_version: data.state_version
-    })
+    case persist_initial_agent(data) do
+      {:ok, data} ->
+        AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
+          state_version: data.state_version
+        })
 
-    notify_startup(data, :ok)
-    data = %{data | plugin_bootstrap: nil, activation_span: nil, startup_reply: nil}
-    notify_parent_online(data)
-    {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
+        notify_startup(data, :ok)
+        data = %{data | activation_span: nil, startup_reply: nil}
+        notify_parent_online(data)
+        {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
+
+      {:error, reason} ->
+        {:stop, {:shutdown, {:persistence_failed, reason}}, data}
+    end
   end
 
   def handle_event(
@@ -2895,8 +2904,12 @@ defmodule Jido.AgentServer do
     %{data | idle_timer: nil}
   end
 
+  defp restore_initial_agent(%Options{restore: false, persistence: nil} = opts) do
+    {:ok, opts.agent, opts.state_version, :none}
+  end
+
   defp restore_initial_agent(%Options{restore: false} = opts) do
-    {:ok, opts.agent, opts.state_version}
+    {:ok, opts.agent, opts.state_version, :create}
   end
 
   defp restore_initial_agent(%Options{persistence: nil, restore: :required}) do
@@ -2905,7 +2918,7 @@ defmodule Jido.AgentServer do
 
   defp restore_initial_agent(%Options{persistence: nil} = opts) do
     {agent, version} = RuntimeCheckpoint.restore(opts)
-    {:ok, agent, version}
+    {:ok, agent, version, :none}
   end
 
   defp restore_initial_agent(%Options{} = opts) do
@@ -2918,15 +2931,35 @@ defmodule Jido.AgentServer do
            load_opts
          ) do
       {:ok, agent, version} ->
-        {:ok, agent, version}
+        {:ok, agent, version, :restored}
 
       {:error, :not_found} when opts.restore == :if_found ->
-        {:ok, opts.agent, opts.state_version}
+        {:ok, opts.agent, opts.state_version, :create}
 
       {:error, _reason} = error ->
         error
     end
   end
+
+  defp persist_initial_agent(%State{initial_persistence: :create, state_version: 0} = data) do
+    opts = [
+      instance: data.jido,
+      partition: data.partition,
+      revision: 0,
+      reason: :activate
+    ]
+
+    case Jido.Persistence.create_agent(data.persistence, data.agent, opts) do
+      :ok -> {:ok, %{data | initial_persistence: :ready}}
+      {:error, _reason} = error -> error
+    end
+  end
+
+  defp persist_initial_agent(%State{initial_persistence: :create, state_version: version}),
+    do: {:error, {:invalid_initial_revision, version}}
+
+  defp persist_initial_agent(%State{} = data),
+    do: {:ok, %{data | initial_persistence: :ready}}
 
   defp persist_commit(%State{persistence: nil} = data, agent, version) do
     RuntimeCheckpoint.put(data, agent, version)

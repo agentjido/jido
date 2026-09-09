@@ -43,7 +43,7 @@ defmodule Jido.Topology.Controller.Activation do
            instance: context.jido
          ) do
       {:ok, agent, version} when agent.id == spec.id and agent.module == spec.module ->
-        {:ok, agent.state, version, false}
+        {:ok, agent.state, version, :required}
 
       {:ok, _, _} ->
         {:error, :restored_agent_identity_mismatch}

@@ -1,10 +1,12 @@
-> Target seam design. This document is pending approval.
+> Selected seam design. The implementation direction was selected on
+> 2026-09-09. Stable Ref key migration remains with seam 09.
 
 # Persistence design
 
-All requirements and decisions in this document are recommended targets. EARS
-syntax does not mean that the user approved a requirement. Code defines current
-behavior until an approved target is implemented.
+The record lifecycle, adapter surface, Plugin composition, and write-result
+rules in this document are implemented. Requirements for stable Ref keys remain
+deferred until seam 09 binds namespace and partition values. The full target
+design is still pending approval.
 
 ## Scope and owner
 
@@ -38,7 +40,7 @@ adds identity, Agent module, Agent `vsn` when available, record kind, state
 revision, and outer format. The adapter sees only a binary key, expected binary
 or `:not_found`, and new binary.
 
-The target record algebra has two values:
+The record algebra has two values:
 
 | Kind | Required meaning | Excluded data |
 | --- | --- | --- |
@@ -55,9 +57,9 @@ Four revisions remain separate:
 - Agent `vsn` identifies module-owned Agent meaning;
 - state revision is the Agent Server commit revision used by persistence.
 
-The target keeps exact-byte CAS. It does not add an opaque storage-version token
-or record-valued instance callback. Stable Ref keys replace legacy module-based
-keys only through an approved mixed-version migration.
+The implementation keeps exact-byte CAS. It does not add an opaque storage-
+version token or record-valued instance callback. Stable Ref keys replace
+legacy module-based keys only through a mixed-version migration in seam 09.
 
 ## Requirements
 
@@ -257,7 +259,7 @@ behavior as part of the core byte-storage contract.
 
 ## Public contract
 
-The target keeps `Jido.Persistence.save_agent/3`, `load_agent/4`,
+The implementation keeps `Jido.Persistence.save_agent/3`, `load_agent/4`,
 `load_agent_with_revision/4`, and `delete_agent/4` as the current direct
 boundary during migration. Ref-first forms are additive after seam 03 and seam
 09 approve the Ref and namespace binding. Existing instance defaults and
@@ -289,6 +291,9 @@ Core does not expose it as normal Agent deletion. Reactivation of the same Ref
 requires an approved purge and proof that old writers cannot run. A new Ref is
 the safe default.
 
+The Redis adapter applies its configured TTL to tombstones. Therefore, a TTL
+also limits the duration of the stale-writer fence.
+
 ## Invariants
 
 - `PERS-INV-001`: Agent checkpoint meaning and durable record meaning have
@@ -317,16 +322,16 @@ These guarantees apply only after the related requirements are approved.
 | 13 Observability | Events can report operation, result class, identity, and revision without record or checkpoint payloads. |
 | Plugin capabilities | Pure owned-state conversion cannot inspect storage or change commit policy. |
 
-## Open design decisions
+## Selected design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Selected option | State | Effect |
 | --- | --- | --- | --- |
-| `PERS-DEC-001` | Which public storage boundary applies? | Keep the binary adapter below `Jido.Persistence`; add no record-valued instance callbacks. | Current adapters and per-Agent selection remain composable. |
-| `PERS-DEC-002` | Which adapter operations are required? | Require `get/2` and CAS. Keep `put/3` and `delete/2` as temporary maintenance compatibility APIs. | Runtime writes cannot bypass record policy. |
-| `PERS-DEC-003` | Which durable lifecycle values exist? | Use active records and compact tombstones only. | Hibernate remains a process operation. |
-| `PERS-DEC-004` | What removes write authority? | Every required write error, including conflict. | Seam 06 implements activation stop. Seams 07 and 08 must preserve it. |
-| `PERS-DEC-005` | When is a new persistent Agent durable? | Before readiness, after provisional Plugin readiness. | Initial state survives a later VM failure subject to adapter guarantees. |
-| `PERS-DEC-006` | How does identity change? | Use stable Ref only after collision-safe mixed-version migration is approved. | Module rename can stop changing identity without losing old records. |
-| `PERS-DEC-007` | How does the outer format evolve? | Read legacy format 1 and write a new versioned active-or-tombstone format only after rollback gates exist. | Older releases cannot silently ignore tombstones. |
-| `PERS-DEC-008` | How do custom checkpoints compose with Plugins? | Keep complete callbacks and bypass Plugin slice conversion first. | Current callbacks remain valid; the long-term composition stays open. |
-| `PERS-DEC-009` | Where do Ecto and Bedrock adapters live? | Defer placement until conformance, optional-dependency, and package-boundary decisions are approved. | No unproved backend is claimed as shipped. |
+| `PERS-DEC-001` | Keep the binary adapter below `Jido.Persistence`. Add no record-valued instance callbacks. | `Implemented` | Current adapters and per-Agent selection remain composable. |
+| `PERS-DEC-002` | Require `get/2` and CAS. Keep `put/3` and `delete/2` as optional maintenance APIs. | `Implemented` | Runtime writes cannot bypass record policy. |
+| `PERS-DEC-003` | Use active records and compact tombstones only. | `Implemented` | Hibernate remains a process operation. |
+| `PERS-DEC-004` | Every required write error, including conflict, removes write authority. | `Implemented` | The failed activation cannot admit another Turn. |
+| `PERS-DEC-005` | Confirm revision-zero creation after Plugin readiness and before the start call succeeds. | `Implemented`; stricter Registry publication stays with seam 08 | Initial state survives later activation loss subject to adapter guarantees. |
+| `PERS-DEC-006` | Keep the compatible key until seam 09 can add a collision-safe Ref migration. | `Deferred to seam 09` | Module-based storage identity remains during this seam. |
+| `PERS-DEC-007` | Write version-2 active or tombstone records and read legacy format 1. | `Implemented` | New lifecycle meaning is explicit and old active records remain readable. |
+| `PERS-DEC-008` | Keep complete custom callbacks and bypass Plugin slice conversion for them. | `Implemented` | Current custom callbacks remain valid. |
+| `PERS-DEC-009` | Defer Ecto and Bedrock placement. | `Deferred` | No unproved backend is claimed as shipped. |

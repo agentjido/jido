@@ -56,7 +56,7 @@ file defines outcomes and gates. It is not the later implementation plan.
 - [Commit design](../06_commit-and-effects/design.md): owns checkpoint,
   replacement, reply, Directive, settlement, and non-replay order.
 - [Persistence design](../07_persistence/design.md): owns initial active records,
-  CAS results, tombstones, restore meaning, and the pending all-write-error
+  CAS results, tombstones, restore meaning, and the implemented all-write-error
   authority rule.
 - [Target design](design.md): defines this seam's recommended runtime contract.
 
@@ -149,8 +149,8 @@ All dispositions are recommendations and are pending approval.
 | `SRV-GAP-001` | `SRV-REQ-001` to `SRV-REQ-004` | Server module, State, and child-spec code | One-owner and OTP behavior work. Private-state exclusion needs one complete audit. | `Retain`; strengthen evidence |
 | `SRV-GAP-002` | `SRV-REQ-005`, `SRV-REQ-006` | Options and public API tests | Canonical construction and instance override rejection work. Definition revision is absent. | `Retain`; recheck after revision migration |
 | `SRV-GAP-003` | `SRV-REQ-007` | Public PID/name API and identity design | Handles are replaceable in practice, but no core Ref exists. | `Partial`; additive identity work belongs to seams 03 and 09 |
-| `SRV-GAP-004` | `SRV-REQ-008` | Durable restore code and tests | Known active records restore before admission. Ref, tombstone, and revision checks are missing. | `Partial`; consume seam 07 results |
-| `SRV-GAP-005` | `SRV-REQ-009` to `SRV-REQ-011` | Startup publishes after Plugin readiness | No revision-zero create occurs. Plugin cleanup exists for current bootstrap failures but lacks initial-write cases. | `Change`; blocked on seam 07 |
+| `SRV-GAP-004` | `SRV-REQ-008` | Durable restore code and tests | Active, tombstone, definition-revision, and legacy records have seam-07 behavior. Ref-key migration remains. | `Partial`; complete Ref binding in seam 09 |
+| `SRV-GAP-005` | `SRV-REQ-009` to `SRV-REQ-011` | Startup and initial-write cleanup tests | Revision-zero create occurs after Plugin readiness and before the start call succeeds. Registry can still expose the provisional PID. | `Partial`; decide strict publication in this seam |
 | `SRV-GAP-006` | `SRV-REQ-012` to `SRV-REQ-017` | Public API and tests | Sync, cast, request, caller-timeout, and compatibility behavior work. Stable errors and a Ref facade are missing. | `Retain`; staged error and facade additions |
 | `SRV-GAP-007` | `SRV-REQ-018` to `SRV-REQ-022` | Postponement code and overload tests | Serialization works. Call overload is a tuple and cast observation is log-only. | `Retain`; normalize observation and errors |
 | `SRV-GAP-008` | `SRV-REQ-023` | Reentry code and tests | Reentry is detected, but three different raw controls exist. | `Retain`; align with seam 12 |
@@ -190,7 +190,7 @@ Server proposal and gap report. Git history retains their exact text.
 | Runtime handles never enter Agent or checkpoint data. | `Retain`. | Current state, checkpoint, and child tests support this invariant. |
 | The runtime has exactly four phases and no `admitting` phase. | `Replace`. | Current public status exposes five total phases. Keep them for compatibility. |
 | Plugin preparation must be hidden inside `running`. | `Remove as a phase rule`. | `admitting` is current public data. Seam 04 owns evaluator stages, not Server phases. |
-| Persistent creation starts provisional runtimes, waits, writes revision zero, and then publishes. | `Retain target`. | Plugin readiness exists; initial create is missing and belongs jointly to seams 07 and 08. |
+| Persistent creation starts provisional runtimes, waits, writes revision zero, and then publishes. | `Implemented for start-call success; narrow remaining gap`. | Initial create and cleanup pass. This seam must decide whether Registry lookup can expose the provisional PID. |
 | Recovery workers can resume pending work while later Turns continue. | `Retain as capability behavior`. | Explicit capability state can do this. Ordinary Directives receive no replay guarantee. |
 | One public control model must expose only `evaluate`, `commit`, and `directive`. | `Replace`. | Current Outcomes use five supported stages. Keep them until seam 13 approves migration. |
 | `turn_timeout` covers route, preparation, execution, contribution, and validation. | `Retain target with correction`. | Live admission also belongs in the cancellable Server-wide limit. Exact option and task shape remain open. |
@@ -319,8 +319,8 @@ Create the formal plan only after the user approves this seam.
 | `SRV-REQ-001` to `SRV-REQ-004` | Server State, OTP startup, and ownership tests | Complete private-handle exclusion and one-owner audit | `Proven` |
 | `SRV-REQ-005`, `SRV-REQ-006` | Options and public API construction tests | Repeat with definition revision and all supported authoring forms | `Proven` for current forms; target is `Partial` |
 | `SRV-REQ-007` | PID/name lookup and replacement behavior | Ref-to-handle replacement test through seam 09 | `Partial` |
-| `SRV-REQ-008` | Current active-record restore tests | Ref, tombstone, definition revision, and old-record matrix | `Partial` |
-| `SRV-REQ-009` to `SRV-REQ-011` | Plugin readiness precedes publication | Revision-zero create, duplicate, fault, timeout, and cleanup tests | `Missing` |
+| `SRV-REQ-008` | Seam-07 record lifecycle tests | Ref-key migration only | `Partial` |
+| `SRV-REQ-009` to `SRV-REQ-011` | Revision-zero create and Plugin cleanup tests | Strict provisional Registry visibility | `Partial` |
 | `SRV-REQ-012` to `SRV-REQ-017` | Public API, async request, and caller-timeout tests | Stable seam-12 errors and additive Ref-facade integration | `Proven` for current controls; target migration is `Partial` |
 | `SRV-REQ-018` to `SRV-REQ-022` | Postponement and overload tests | Stable call error and bounded cast observation | `Partial` |
 | `SRV-REQ-023` | Reentry tests for executable and Directive; admission code | Stable error matrix for all three process trees | `Partial` |
@@ -337,7 +337,7 @@ Create the formal plan only after the user approves this seam.
 | `SRV-REQ-047` to `SRV-REQ-049` | Directive order, failure, timeout, and commit tests | Keep through facet and error migration | `Proven` |
 | `SRV-REQ-050` to `SRV-REQ-052` | Child lifecycle and distributed child tests | Keep exact uncertainty without adding topology authority | `Proven` |
 | `SRV-REQ-053` | Checkpoint shapes contain no batch | Crash during each Directive position and prove no replay | `Missing` |
-| `SRV-REQ-054`, `SRV-REQ-055` | Hibernate and idle-lifecycle tests | Repeat with active/tombstone target records | `Proven` for current record; target is `Partial` |
+| `SRV-REQ-054`, `SRV-REQ-055` | Hibernate, active-record, and tombstone lifecycle tests | Provider retention policy | `Proven` for Core lifecycle |
 | `SRV-REQ-056`, `SRV-REQ-057` | Termination and runtime-boundary tests | Full owned-work cleanup and invariant/application-fault classification | `Partial` |
 | `SRV-REQ-058` | Outcome schema and runtime tests | Keep after final error and observation projection | `Proven` |
 | `SRV-REQ-059` | No reconstructed settlement code | Crash-before-publication and restart observation test | `Missing` |
@@ -385,7 +385,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Ref, namespace binding, partition conversion, and Ref-first facade do not exist. | Approve identity and instance resolution without removing current handles. |
 | `SRV-BLK-006` | `Blocker` | 04 Turn evaluation and 05 Plugins | Current Plugin admission and preparation can affect the Signal before route selection. | Approve and migrate fixed source-Signal selection with facet compatibility. |
 | `SRV-BLK-007` | `Resolved design input` | 06 Commit, 07 Persistence, 08 Agent Server | Every required write error now stops the activation, returns the failure, and requires restore-first reactivation. | Preserve the rule during seam-08 lifecycle work. |
-| `SRV-BLK-008` | `Blocker` | 07 Persistence | No revision-zero create, tombstone-aware restore, or complete CAS result set exists. | Approve record lifecycle and mixed-version rules. |
+| `SRV-BLK-008` | `Resolved input` | 07 Persistence | Revision-zero create, tombstone-aware restore, legacy reads, and closed CAS results are implemented. | Preserve the contract while deciding strict publication. |
 | `SRV-BLK-009` | `Blocker` | 05 Plugins | No approved runtime bootstrap value contains matching owned state and state version. | Approve its fields, identity, and restart-race behavior. |
 | `SRV-BLK-010` | `Assumption` | 08 Agent Server | A Server-wide Turn limit starts with active pre-commit work, not mailbox wait, and ends when commit begins. | Approve or change `SRV-DEC-003`. |
 | `SRV-BLK-011` | `Assumption` | 08 Agent Server and 13 Observability | Current status, Outcome, and debug contracts remain during migration. | Inventory consumers before a versioned replacement. |

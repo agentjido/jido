@@ -35,6 +35,12 @@ after commit. A failed dispatch does not undo the commit. Supplying committed
 state and its matching version directly in replacement Init belongs to the
 Agent Server alignment work.
 
+Persistence runs a selected Persistence facet only for the default Agent
+checkpoint. It gives the facet one paired owned-state value, bounded format
+context, and mapped static options. A complete custom Agent checkpoint bypasses
+this conversion. Topology contribution is a separate pure facet and does not
+give the Plugin live-control authority.
+
 `use Jido.Plugin` with no options keeps the mixed compatibility behavior for
 current built-ins. New packages should use owner facets.
 

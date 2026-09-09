@@ -1,7 +1,7 @@
 # Persistence Adapters
 
-This Livebook stores an Agent checkpoint, loads it, and removes it. It uses the
-ETS adapter, which is suitable for local development and tests.
+This Livebook stores an Agent checkpoint, loads it, and logically deletes it.
+It uses the ETS adapter, which is suitable for local development and tests.
 
 ```elixir
 Mix.install([
@@ -58,10 +58,13 @@ store = {Jido.Persistence.ETS, table: :persistence_guide}
   )
 ```
 
-Jido owns the key format, record validation, encoding, and revision check. An
-adapter only stores binary keys and binary values.
+Jido owns the key format, active and tombstone record meaning, validation,
+encoding, and revision check. An adapter only stores binary keys and binary
+values. Runtime adapters must implement binary `get/2` and exact-byte
+`compare_and_swap/4`. Their `put/3` and `delete/2` functions are optional
+maintenance operations.
 
-## Load and delete
+## Load and logically delete
 
 The same instance and partition values identify the record on every operation.
 
@@ -86,7 +89,7 @@ restored.state
     instance: PersistenceGuide.Jido
   )
 
-{:error, :not_found} =
+{:error, :deleted} =
   Jido.Persistence.load_agent(
     store,
     PersistenceGuide.Counter,
@@ -94,6 +97,14 @@ restored.state
     instance: PersistenceGuide.Jido
   )
 ```
+
+Normal delete replaces the exact active record with a compact tombstone. The
+tombstone contains identity and revision, but no checkpoint or Agent state. It
+prevents a delayed normal writer from recreating that record lifetime. Delete
+of a missing identity creates a revision-zero tombstone.
+
+Physical tombstone purge is a storage maintenance task. Core does not use it
+for normal Agent deletion.
 
 ## Choose an adapter
 
@@ -118,7 +129,8 @@ end
 
 The ETS adapter creates its table when first used. The File adapter is for one
 local writer domain. The Redis adapter lets the host application own its Redis
-client and connection policy.
+client and connection policy. A Redis TTL applies to tombstones too. Thus, it
+also limits the duration of the delayed-writer fence.
 
 Next, read
 [Compare-and-Swap, Hibernate, and Thaw](compare-and-swap-hibernate-and-thaw.html)

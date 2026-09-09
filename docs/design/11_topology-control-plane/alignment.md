@@ -300,7 +300,7 @@ No removal or deprecation is approved in this seam.
 | `TOP-BLK-003` | `Blocker` | 12 Errors and contracts | Provider controls, operation errors, and safe projections are not approved. | Approve result and error ownership. |
 | `TOP-BLK-004` | `Blocker` | 03 Agent identity, 09 Jido instance | Core Ref and stable namespace are target designs only. | Implement and prove exact Ref binding and local resolution. |
 | `TOP-BLK-005` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | No activation or commit boundary accepts and enforces an authority epoch. | Approve the narrow fencing contract and failure rule. |
-| `TOP-BLK-006` | `Blocker` | 07 Persistence | Revision-zero records, tombstones, Ref keys, and all-write-error authority loss are not implemented. | Complete the approved durable lifecycle prerequisites. |
+| `TOP-BLK-006` | `Partial input` | 07 Persistence and 09 Jido instance | Revision-zero records, tombstones, and all-write-error authority loss are implemented. Ref-key migration remains. | Complete stable namespace and mixed-key work before durable Ref control. |
 | `TOP-BLK-007` | `Blocker` | External authority owner | Grant source, epoch durability, optional lease clock model, renewal margin, and provider fault set are not selected. | Define and prove one provider contract before exclusive claims. |
 | `TOP-BLK-008` | `Blocker` | External cluster owner | Membership source, node identity, generation, capacity units, and stale-view policy are not selected. | Define provider data and conformance tests. |
 | `TOP-BLK-009` | `Blocker` | 11 Control plane | Partial handoff, retry, rollback, and operation-record retention policies are not approved. | Approve operation state and recovery semantics. |

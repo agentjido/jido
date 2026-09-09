@@ -140,9 +140,11 @@ defmodule MyApp.Jido do
 end
 ```
 
-All Agents in the instance inherit this adapter. A successful Agent commit is
-stored before the Server reports success. `hibernate/2` saves and stops
-one Server. `thaw/3` restores and starts it. Jido does not start or
+Agents inherit this adapter unless their start options override or disable it.
+A new persistent activation writes revision zero before its start call
+succeeds. A successful Agent commit is stored before the Server reports
+success. Normal durable delete writes a tombstone. `hibernate/2` saves and
+stops one Server. `thaw/3` restores and starts it. Jido does not start or
 supervise a persistence adapter process.
 
 ## Installation

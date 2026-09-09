@@ -51,7 +51,7 @@ defmodule JidoTest.PersistenceTest do
 
       assert :ok = Persistence.delete_agent(ConfiguredInstance, RuntimeAgent, agent.id, opts)
 
-      assert {:error, :not_found} =
+      assert {:error, :deleted} =
                Persistence.load_agent(direct, RuntimeAgent, agent.id, instance: namespace)
     end
   end
@@ -156,6 +156,22 @@ defmodule JidoTest.PersistenceTest do
     def delete(_key, opts), do: Keyword.fetch!(opts, :reply)
   end
 
+  defmodule CASFaultAdapter do
+    @behaviour Jido.Persistence.Adapter
+
+    @impl true
+    def get(_key, _opts), do: {:error, :not_found}
+
+    @impl true
+    def compare_and_swap(_key, _expected, _value, opts) do
+      case Keyword.fetch!(opts, :mode) do
+        :raise -> raise "CAS raised"
+        :throw -> throw(:cas_threw)
+        :exit -> exit(:cas_exited)
+      end
+    end
+  end
+
   defmodule BarrierAdapter do
     @behaviour Jido.Persistence.Adapter
 
@@ -205,7 +221,7 @@ defmodule JidoTest.PersistenceTest do
     eventually(fn -> Server.agent(pid).state.ticks > 4 end, timeout: 5_000)
   end
 
-  test "contains adapter faults and keeps a live Server running", %{jido: jido} do
+  test "contains adapter faults and reports indeterminate writes", %{jido: jido} do
     agent = RuntimeAgent.new!(id: unique_id("persistence-fault"))
 
     assert {:error, %Jido.Error.ExecutionError{} = error} =
@@ -213,7 +229,9 @@ defmodule JidoTest.PersistenceTest do
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
-    assert {:error, %Jido.Error.ExecutionError{details: %{operation: :compare_and_swap}} = error} =
+    assert {:error,
+            {:indeterminate,
+             %Jido.Error.ExecutionError{details: %{operation: :compare_and_swap}} = error}} =
              Persistence.save_agent({RaisingAdapter, allow_read: true}, agent)
 
     assert Jido.Error.code(error) == :persistence_callback_failed
@@ -228,15 +246,13 @@ defmodule JidoTest.PersistenceTest do
 
     assert Jido.Error.code(error) == :persistence_callback_failed
 
-    {:ok, pid} =
-      Jido.start_agent(jido, agent,
-        persistence: {RaisingAdapter, allow_read: true},
-        restore: false
-      )
+    assert {:error, {:persistence_failed, {:indeterminate, %Jido.Error.ExecutionError{}}}} =
+             Jido.start_agent(jido, agent,
+               persistence: {RaisingAdapter, allow_read: true},
+               restore: false
+             )
 
-    assert {:error, %Jido.Error.ExecutionError{}} = Server.hibernate(pid)
-    assert Process.alive?(pid)
-    assert Server.agent(pid) == agent
+    eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
   end
 
   test "validates adapter replies before fault containment returns a result" do
@@ -252,20 +268,63 @@ defmodule JidoTest.PersistenceTest do
       opts = if operation == :compare_and_swap, do: [get_reply: {:error, :not_found}], else: []
 
       for reply <- [:invalid, {:ok, %{invalid: :record}}] do
-        assert {:error, %Jido.Error.ExecutionError{} = error} =
-                 call.({ReplyAdapter, Keyword.put(opts, :reply, reply)})
+        result = call.({ReplyAdapter, Keyword.put(opts, :reply, reply)})
+
+        error =
+          case operation do
+            :compare_and_swap ->
+              assert {:error, {:indeterminate, %Jido.Error.ExecutionError{} = error}} = result
+              error
+
+            _operation ->
+              assert {:error, %Jido.Error.ExecutionError{} = error} = result
+              error
+          end
 
         assert error.message == "Persistence adapter returned an invalid result"
 
+        callback_operation = if operation == :delete, do: :get, else: operation
+
         assert error.details == %{
                  code: :persistence_invalid_callback_result,
-                 operation: operation,
+                 operation: callback_operation,
                  result: reply
                }
       end
 
-      assert {:error, :unavailable} =
-               call.({ReplyAdapter, Keyword.put(opts, :reply, {:error, :unavailable})})
+      result = call.({ReplyAdapter, Keyword.put(opts, :reply, {:error, :unavailable})})
+
+      if operation == :compare_and_swap do
+        assert {:error, {:indeterminate, :unavailable}} = result
+      else
+        assert {:error, :unavailable} = result
+      end
+    end
+  end
+
+  test "classifies the closed CAS result set" do
+    agent = RuntimeAgent.new!(id: unique_id("cas-results"))
+
+    for {reply, expected} <- [
+          {{:error, :conflict}, :conflict},
+          {{:error, {:rejected, :too_large}}, {:rejected, :too_large}},
+          {{:error, :indeterminate}, :indeterminate},
+          {{:error, {:indeterminate, :timeout}}, {:indeterminate, :timeout}},
+          {{:error, :unavailable}, {:indeterminate, :unavailable}}
+        ] do
+      assert {:error, ^expected} =
+               Persistence.save_agent(
+                 {ReplyAdapter, get_reply: {:error, :not_found}, reply: reply},
+                 agent
+               )
+    end
+
+    for {mode, kind} <- [raise: :error, throw: :throw, exit: :exit] do
+      assert {:error,
+              {:indeterminate,
+               %Jido.Error.ExecutionError{
+                 details: %{code: :persistence_callback_failed, kind: ^kind}
+               }}} = Persistence.save_agent({CASFaultAdapter, mode: mode}, agent)
     end
   end
 
@@ -398,7 +457,7 @@ defmodule JidoTest.PersistenceTest do
     assert :ok = Persistence.save_agent(persistence, agent, instance: jido)
     assert :ok = Persistence.delete_agent(persistence, RuntimeAgent, agent.id, instance: jido)
 
-    assert {:error, :not_found} =
+    assert {:error, :deleted} =
              Persistence.load_agent(persistence, RuntimeAgent, agent.id, instance: jido)
   end
 

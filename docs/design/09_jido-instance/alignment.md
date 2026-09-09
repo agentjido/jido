@@ -146,7 +146,7 @@ All dispositions are recommendations and are pending approval.
 | `INST-GAP-009` | `INST-REQ-031` to `INST-REQ-036` | Public Agent Server API and current guides | Direct calls and result meanings work. No Ref delegate exists. Old seam text incorrectly made Agent Server internal. | `Retain` direct API; add facade |
 | `INST-GAP-010` | `INST-REQ-037` to `INST-REQ-040` | Generated `config/1`; no other callback | `config/1` is not checked as one final value. Proposed callbacks have no concrete contract or tests. | `Retain` config; `Defer` new callbacks |
 | `INST-GAP-011` | `INST-REQ-041` to `INST-REQ-044` | Options and Persistence code | Precedence and delegation work. Invalid defaults can fail only when an Agent consumes them. | `Retain` precedence; validate earlier |
-| `INST-GAP-012` | `INST-REQ-045` | Current physical delete in Persistence | No tombstone lifecycle exists. | `Blocked` on seam 07 |
+| `INST-GAP-012` | `INST-REQ-045` | Seam-07 CAS tombstone lifecycle | Logical delete exists at `Jido.Persistence`; an instance Ref facade and mixed-key migration do not. | `Partial`; add only after namespace binding |
 | `INST-GAP-013` | `INST-REQ-046` to `INST-REQ-049` | Instance and Agent Server inspection tests | Current local and debug paths work. Ref-first inspection is absent. | `Retain`; add Ref delegates |
 | `INST-GAP-014` | `INST-REQ-050` and `INST-REQ-051` | Structured startup errors plus raw not-found controls | Public result forms are mixed. Ownership rejection works. | `Retain` protocol meaning; migrate through seam 12 |
 | `INST-GAP-015` | `INST-REQ-052` | Caller, Directive, readiness, idle, and postponed limits | Limit roles exist across owners. There is no persistence-operation limit. | `Clarify`; defer exact new limit |
@@ -176,8 +176,8 @@ files. Git history keeps their exact text.
 | Add a public instance `commit` operation. | `Remove`. | Commit occurs inside Agent Server command processing. Seam 06 owns its meaning. |
 | Add a separate `plugin_runtimes` operation. | `Remove as required`. | Current `children` inspection can expose bounded runtime status. Seam 08 owns that contract. |
 | `whereis_local` must replace `whereis_agent`. | `Defer exact name`. | Current lookup is supported. The new API only needs to identify local PID meaning. |
-| Persistent create waits for Plugin readiness and writes revision zero before publication. | `Retain target dependency`. | Seams 07 and 08 own this missing lifecycle. The instance facade must preserve their result. |
-| Durable delete is an instance operation over physical adapter delete. | `Replace`. | Expose deletion only after seam 07 provides its approved tombstone contract. |
+| Persistent create waits for Plugin readiness and writes revision zero before start success. | `Implemented input`. | The instance facade must preserve the seam-07 result and the seam-08 publication decision. |
+| Durable delete is an instance operation over physical adapter delete. | `Replace`. | Any future instance facade must use the implemented seam-07 CAS tombstone contract. |
 | All Agents in one instance must use the same persistence provider. | `Remove`. | Current and seam-07 contracts retain explicit per-Agent override or disablement. |
 | Add record-valued instance persistence callbacks. | `Remove`. | Seam 07 keeps `Jido.Persistence` above a binary adapter and rejects this layer. |
 | `children/1` is the first required callback. | `Defer`. | No current implementation or concrete use case fixes placement, purity, readiness, or failure behavior. |
@@ -336,8 +336,8 @@ No removal or deprecation is approved in this seam.
 | `INST-BLK-002` | `Blocker` | 90 Package boundaries | Core, cluster, durable, transport, and extension ownership are pending approval. | Approve or change the package boundary. |
 | `INST-BLK-003` | `Owner dependency` | 12 Errors and contracts and 09 Jido instance | The current instance protocol values are registered and shared conversion rules are pending seam-12 approval. Exact future Ref-facade results stay with seam 09. | Approve seam 12, then define the Ref-facade result migration in seam 09. |
 | `INST-BLK-004` | `Blocker` | 03 Agent identity | Core Ref, binary partition conversion, equality, and portable encoding do not exist. | Approve the Ref and migration rules. |
-| `INST-BLK-005` | `Blocker` | 07 Persistence | Ref keys, legacy reads, collision checks, tombstones, and persistence-operation limits are not approved. | Approve record migration and lifecycle before durable Ref operations. |
-| `INST-BLK-006` | `Blocker` | 08 Agent Server | Initial durable create, all-write-error authority loss, and final public error meanings are not implemented. | Align Server readiness and failure behavior with seam 07. |
+| `INST-BLK-005` | `Owner work` | 07 Persistence and 09 Jido instance | Legacy record reads and tombstones exist. Ref keys, collision checks, dual reads, and rewrite gates need namespace binding. | Define and implement the mixed-key migration in this seam. |
+| `INST-BLK-006` | `Partial input` | 08 Agent Server | Initial durable create and all-write-error authority loss are implemented. Strict provisional Registry publication remains open. | Preserve the start result and consume the seam-08 publication decision. |
 | `INST-BLK-007` | `Assumption` | 09 Jido instance | One live exact namespace binding per node is sufficient for the local facade. | Approve or change `INST-DEC-003`. |
 | `INST-BLK-008` | `Blocker` | 09 Jido instance | Exact Ref-first function names, arities, tagged results, and bang variants are open. | Complete a focused API naming review after identity approval. |
 | `INST-BLK-009` | `Assumption` | 09 Jido instance, 07 Persistence | Per-Agent persistence override and disablement remain supported. | Approve or change `INST-DEC-005`. |

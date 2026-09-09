@@ -45,7 +45,8 @@ abnormal Agent Server restart can recover that value while the owning Jido
 instance stays alive. A normal stop removes the runtime checkpoint.
 
 Configured persistence is separate. It can restore state after the complete
-instance or VM restarts.
+instance or VM restarts. A new persistent Server confirms a revision-zero
+record after Plugin readiness and before its start call succeeds.
 
 Use `Jido.stop_agent/3` when the instance owns the Server. Use
 `Jido.AgentServer.stop/3` for a direct Server reference. A `Stop` Directive
@@ -55,7 +56,8 @@ stops the Server after its current state commit.
 
 An idle Server with persistence can save and stop through `hibernate/2`. A later
 `Jido.thaw/4` loads the checkpoint and starts the Agent again. Hibernation is not
-available during active Turn work.
+available during active Turn work. An active record does not mean that a Server
+is live. Normal durable delete uses a tombstone, not a hibernated record kind.
 
 See [Calls, Casts, And Requests](calls-casts-and-requests.livemd),
 [Runtime State And Debugging](runtime-state-and-debugging.livemd), and

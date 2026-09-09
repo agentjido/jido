@@ -42,7 +42,7 @@ Registry names, and OTP start and stop values keep their documented forms.
 | Action or Flow | No commit | Decide whether external work is safe to repeat |
 | Candidate validation | No commit | Correct the returned complete state |
 | Confirmed storage conflict | No commit by this writer; activation stops | Restore the winning record in a new activation |
-| Other confirmed storage error | No commit; activation stops | Correct storage and restore in a new activation |
+| Confirmed storage rejection | No commit; activation stops | Correct the documented preflight limit and restore in a new activation |
 | Indeterminate storage write | Unknown durable result; activation stops | Reload authoritative state in a new activation |
 | Directive dispatch | Commit remains | Reconcile post-commit work |
 
@@ -62,6 +62,10 @@ consensus, or automatic compensation.
 Every required persistence write error removes the current activation's write
 authority. This rule applies even when its normal error policy would continue.
 The stopped activation does not reload or retry the Turn.
+
+Persistence load returns `:not_found` for an absent record and `:deleted` for a
+tombstone. A tombstone is an intentional durable fence. Do not treat it as a
+missing record or create the same identity again through the normal lifecycle.
 
 ## Process Guarantees
 

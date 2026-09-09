@@ -17,7 +17,7 @@ defmodule Jido.Persistence.Adapter do
   @doc "Gets one value. A missing key returns `{:error, :not_found}`."
   @callback get(key(), options()) :: {:ok, value()} | {:error, term()}
 
-  @doc "Stores one value and replaces any value for the same key."
+  @doc "Stores one value for explicit maintenance and replaces any prior value."
   @callback put(key(), value(), options()) :: :ok | {:error, term()}
 
   @doc """
@@ -28,11 +28,12 @@ defmodule Jido.Persistence.Adapter do
   The comparison and write must be one atomic operation relative to other
   writes and deletes. A separate `get/2` followed by `put/3` is not sufficient.
 
-  Return `{:error, :indeterminate}` or `{:error, {:indeterminate, reason}}`
-  when the write result is unknown. Other returned errors confirm that this
-  operation did not store the proposed value. Exceptions and invalid callback
-  replies are also treated as uncertain. The Server stops an uncertain writer
-  before another Action can run. Restore from storage before retrying.
+  Return `{:error, {:rejected, reason}}` only for a documented check that
+  finishes before a storage write starts. Return `{:error, :indeterminate}` or
+  `{:error, {:indeterminate, reason}}` when the write result is unknown. Jido
+  also classifies every other returned error, exception, throw, exit, or invalid
+  callback result as indeterminate. Every required write error stops the Server
+  activation before another Action can run. Restore from storage before retrying.
 
   Agent checkpoint saves require this callback. `put/3` remains an
   unconditional byte operation for explicit storage maintenance.
@@ -40,8 +41,8 @@ defmodule Jido.Persistence.Adapter do
   @callback compare_and_swap(key(), :not_found | value(), value(), options()) ::
               :ok | {:error, term()}
 
-  @doc "Deletes one value. Deleting a missing key returns `:ok`."
+  @doc "Physically deletes one value for explicit maintenance."
   @callback delete(key(), options()) :: :ok | {:error, term()}
 
-  @optional_callbacks validate_options: 1
+  @optional_callbacks validate_options: 1, put: 3, delete: 2
 end

@@ -1,345 +1,208 @@
-> Seam alignment plan. This document is pending approval.
+> Seam alignment evidence. The implementation direction was selected on
+> 2026-09-09. Stable Ref key migration remains with seam 09.
 
 # Persistence alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. All documents in this seam are pending approval.
-- Code reviewed: `40ba9ff9c6e9dac6806f5c0adb146b58e14741a7` on branch
-  `v3-spike`.
-- Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
-  [90 Package boundaries](../90_package-boundaries/alignment.md),
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
-  [01 Agent](../01_agent/alignment.md),
-  [03 Agent identity](../03_agent-identity/alignment.md),
-  [04 Turn evaluation](../04_turn-evaluation/alignment.md),
-  [05 Plugins](../05_plugins/alignment.md), and
-  [06 Commit and effects](../06_commit-and-effects/alignment.md). All were used
-  as pending draft prerequisites.
-- Related serialization input: [02 Agent authoring](../02_agent-authoring/design.md).
-- Alignment state: `Blocked`.
+- Implementation reviewed: 2026-09-09 on branch `v3-spike`.
+- Prerequisites: package boundaries, portable errors, Agent checkpoints and
+  versions, Agent Ref, Turn selection, owner-specific Plugin facets, and the
+  commit authority rule are present.
+- Alignment state: `Implemented with stable-key migration deferred`.
 
-The state is blocked because prerequisite decisions are pending and the target
-write-authority, identity, record, tombstone, and Plugin composition rules are
-not approved. This file is alignment input. It is not a formal implementation
-plan.
+Persistence now owns a version-2 active-or-tombstone record, a closed binary
+CAS boundary, revision-zero creation, definition checks, and default-checkpoint
+Plugin conversion. The Agent Server confirms initial creation after Plugin
+readiness and before its start call succeeds. Every required write error still
+removes the activation's write authority.
 
-## Inputs and evidence
+The storage key remains the compatible instance-module, Agent-module,
+partition, and ID key. Seam 09 must bind stable Ref namespace and partition
+values before Persistence can add a collision-safe Ref key migration.
 
-### Design inputs
+This execution state is not approval of every requirement in the target
+design.
 
-- [Jido V3 vision](../VISION.md): Jido owns portable persistence contracts and
-  record revision rules. The adapter owns atomic byte storage. The application
-  owns the storage service.
-- [Overview design](../00_overview/design.md): proposes initial active records,
-  authority loss after any write error, tombstones, portable records, and no
-  durable runtime handles.
-- [Package-boundary design](../90_package-boundaries/design.md): keeps record
-  meaning in Jido and the binary adapter as a distinct host-owned integration.
-- [Errors design](../12_errors-and-contracts/design.md): keeps raw adapter and
-  current Persistence controls during compatibility. It uses existing error
-  classes for invalid replies and adapter faults.
-- [Agent design](../01_agent/design.md): keeps plain-map default and custom
-  checkpoints and separates checkpoint, definition, state, and storage versions.
-- [Identity design](../03_agent-identity/design.md): proposes Ref as durable
-  identity and assigns legacy key migration to this seam.
-- [Turn design](../04_turn-evaluation/design.md): ends before persistence and
-  gives the commit boundary one validated candidate.
-- [Plugin design](../05_plugins/design.md): permits pure owned-slice conversion
-  but requires a custom-checkpoint compatibility rule.
-- [Commit design](../06_commit-and-effects/design.md): requires confirmed
-  persistence before visibility or Directives and proposes authority loss after
-  every write error.
-- [Target design](design.md): consolidates the recommended persistence target.
+## Selected architecture
 
-### Canonical code
+Persistence has two data boundaries:
 
-| Evidence | Current behavior |
+```text
+Agent-owned checkpoint map
+  -> Persistence-owned active or tombstone record
+  -> safe external-term binary
+  -> adapter-owned exact-byte CAS
+```
+
+`Jido.Persistence.Adapter` requires only `get/2` and
+`compare_and_swap/4`. The compatible `put/3` and `delete/2` callbacks are
+optional maintenance operations. Normal Agent save and delete paths do not use
+them.
+
+Version-2 active records have these exact fields:
+
+```text
+format, kind, instance, agent_module, agent_vsn, agent_id,
+partition, revision, checkpoint
+```
+
+Version-2 tombstones have these exact fields:
+
+```text
+format, kind, instance, agent_module, agent_id, partition, revision
+```
+
+A tombstone contains no checkpoint or Agent state. It keeps the last active
+revision, or revision zero when deletion targets an absent key. Normal create
+and save operations cannot replace it. Loading it returns
+`{:error, :deleted}`. Physical purge is an adapter or provider maintenance
+operation. Core does not use purge for normal Agent deletion.
+
+## Lifecycle results
+
+### Create and restore
+
+- `restore: false` does not read a record. It performs a create-only
+  revision-zero CAS after provisional Plugin readiness.
+- `restore: :if_found` restores an active record. A missing record uses the
+  supplied Agent and then performs the same create-only CAS.
+- `restore: :required` restores an active record. A missing or deleted record
+  fails startup and does not create a record.
+- An existing active record or tombstone makes a new create conflict.
+- A failed initial write makes the start call fail and stops the provisional
+  Plugin runtime tree.
+
+The current Registry registration happens as part of process start. Seam 08
+owns any stricter rule for hiding the provisional PID before the initial write.
+
+### Commit and write results
+
+The Agent Server supplies its current revision as `:expected_revision`. The
+adapter compares the complete stored bytes and writes the complete proposed
+bytes as one operation.
+
+Only `:ok` confirms a write. `{:error, :conflict}` confirms an exact-value
+mismatch. `{:error, {:rejected, reason}}` confirms a documented preflight
+rejection. An explicit indeterminate result, another error, a raise, a throw,
+an exit, or an invalid callback result is indeterminate. The Agent Server stops
+after every one of these required write errors.
+
+### Delete
+
+Delete reads and validates the current record, then replaces its exact bytes
+with a compact tombstone by CAS. A concurrent newer commit makes the delete
+conflict and preserves that active record. Repeated delete of a tombstone is
+idempotent.
+
+The Redis adapter applies its configured TTL to active records and tombstones.
+Therefore, its stale-writer barrier lasts only as long as that TTL. Use no TTL,
+or use an application maintenance policy that preserves the required fence.
+
+### Checkpoint and Plugin composition
+
+The Agent owns checkpoint meaning. Persistence owns the outer record. The
+Agent `vsn` is copied outside the checkpoint and checked before Agent restore.
+
+For a default checkpoint, each `Jido.Persistence.Plugin` facet receives only
+its paired Agent-facet state value, a bounded format context, and its mapped
+static options. Dump runs before record validation. Load runs after outer
+record validation and before Agent restore. The facet cannot see an adapter,
+record key, complete Agent state, process, or commit result.
+
+A complete custom Agent checkpoint bypasses Plugin slice conversion. Its
+wrapped plain-map payload stays opaque to Persistence. Legacy outer format-1
+active records remain readable through their earlier restore path.
+
+## Canonical source
+
+| Source | Implemented contract |
 | --- | --- |
-| `lib/jido/persistence.ex:1-16,59-160` | Persistence owns key, record, checkpoint call, restore call, revision, and adapter containment. Public functions use module, ID, instance, and partition. |
-| `lib/jido/persistence.ex:200-282` | Adapter validation requires `get`, `put`, CAS, and `delete`. Save reads, validates revision, and uses exact expected bytes. |
-| `lib/jido/persistence.ex:284-371` | Format-1 active maps are encoded with Erlang external terms, checked for portability, decoded with `[:safe]`, and checked for identity and shape. |
-| `lib/jido/persistence.ex:386-430` | Adapter errors pass through. Exceptions and invalid results become `ExecutionError`; there is no `PersistenceError`. |
-| `lib/jido/persistence/adapter.ex:1-46` | The public byte behavior includes four operations. Its docs treat only explicit indeterminate results, exceptions, and invalid replies as uncertain. |
-| `lib/jido/persistence/ets.ex:22-67` | ETS provides atomic create and replacement plus unconditional put and delete. Data ends with the BEAM. |
-| `lib/jido/persistence/file.ex:27-103` | File CAS uses a one-BEAM global lock and atomic rename. It does not call file or directory sync. |
-| `lib/jido/persistence/redis.ex:52-112` | Redis CAS uses one `EVAL`; command errors and invalid CAS replies are indeterminate. TTL applies to stored values. |
-| `lib/jido/agent.ex:370-423,509-598` | Agent owns default and complete custom checkpoint maps. Default version 1 includes complete combined state. Restore validates module and state. |
-| `lib/jido/plugin.ex:67-102` | No Plugin checkpoint or restore callback exists. |
-| `lib/jido.ex:70-107,473-528,631-684` | An instance supplies an adapter default. Per-Agent selection remains. Hibernate and thaw use the existing Server path. There is no logical instance delete facade. |
-| `lib/jido/agent_server/options.ex:47-53,377-401` | Persistence can inherit, override, or disable. Restore is `false`, `:if_found`, or `:required`. There is no persistence operation limit. |
-| `lib/jido/agent_server.ex:438-533,2874-2905` | Restore and Plugin readiness complete before startup success. A new Agent gets no revision-zero durable write. |
-| `lib/jido/agent_server.ex:623-630,1493-1594` | Hibernate and Turn commit save before state change. Conflict can follow error policy and keep the Server active. Uncertain writes stop it. |
-| `lib/jido/agent_server.ex:2915-2950` | Server saves with its current expected revision. Hibernate and clean stop keep an active checkpoint shape. |
-| `lib/jido/topology/controller/activation.ex:9-52` | Topology restores known member Agents independently through the instance adapter. |
+| `lib/jido/persistence.ex` | Source resolution, key ownership, create, load, save, logical delete, revision rules, result classification, and adapter fault containment. |
+| `lib/jido/persistence/record.ex` | Exact version-2 active and tombstone shapes, legacy format-1 validation, safe decoding, identity checks, and portability. |
+| `lib/jido/persistence/checkpoint.ex` | Agent checkpoint order, bounded Plugin owned-slice dump and load, and custom-checkpoint bypass. |
+| `lib/jido/persistence/adapter.ex` | Required binary get and CAS contract plus optional compatible maintenance callbacks. |
+| `lib/jido/agent_server.ex` | Restore selection, revision-zero create after Plugin readiness, durable commit, and authority loss after write failure. |
+| `lib/jido/agent_server/state.ex` | Explicit initial-persistence phase for new, restored, and nonpersistent activations. |
+| `lib/jido/topology/controller/activation.ex` | Existing durable members use required restore; missing members use create-only revision zero. |
+| `lib/jido/persistence/ets.ex` | Process-local exact-byte CAS. |
+| `lib/jido/persistence/file.ex` | One-BEAM file CAS with atomic rename and no file-system sync claim. |
+| `lib/jido/persistence/redis.ex` | One-command Redis CAS with application-owned client and TTL policy. |
 
-### Tests and examples
+## Executable evidence
 
-| Evidence | Behavior proved or specified |
+| Evidence | Result |
 | --- | --- |
-| `test/jido/persistence_test.exs:259-279,422-505` | Live commit persists revision 1; stale and same-revision changed writes conflict; two writers have one winner. |
-| `test/jido/persistence_test.exs:318-356` | A confirmed conflict returns before live replacement or dispatch and stops the stale Server activation. |
-| `test/jido/persistence_test.exs:359-404` | Thaw and automatic restore work. Current delete returns later `:not_found`. |
-| `test/jido/persistence_test.exs:406-420` | Corrupt bytes fail load and are not overwritten by save. |
-| `test/jido/persistence/adapter_test.exs:59-110` | Adapter declarations and option validator faults are checked. All four callbacks are required. |
-| `test/jido/persistence/indeterminate_write_test.exs:35-115` | Confirmed CAS permits commit. Indeterminate or lost-reply writes prevent Directives and later stale evaluation. |
-| `test/jido/persistence/checkpoint_identity_test.exs:14-32` | Outer and restored Agent ID mismatches fail. |
-| `test/jido/persistence/checkpoint_portability_test.exs:15-49` | Portable nested data round trips. Nested PID and improper-list data fail before store or after load. |
-| `test/jido/persistence/ets_test.exs:17-52` | ETS exact-byte create, replacement, conflict, and concurrent winner behavior pass. |
-| `test/jido/persistence/file_test.exs:18-49` | File exact-byte CAS and one-BEAM concurrency behavior pass. |
-| `test/jido/persistence/redis_test.exs:63-89,138-147` | Controlled tests prove one EVAL command and result mapping, not a real Redis recovery claim. |
-| `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:13-30` | Existing revisions reject stale writers. The tombstone fencing target remains skipped. |
-| `test/examples/99_research/99_15_state_migration/state_migration_test.exs:8-59` | A predeclared compatible state migration persists. It does not prove definition or Plugin restore migration. |
-| `test/jido/topology/controller_test.exs:247-284` and `test/jido/topology/controller/composition_runtime_test.exs:222-245` | ETS-backed member state restores and runtime Bus resources rebuild when the application supplies the Topology again. |
+| `test/jido/persistence/record_lifecycle_test.exs` | Exact version-2 shapes, revision-zero startup, restore policies, active and missing delete, delayed-writer fencing, delete-versus-commit race, legacy reads, definition checks, and fail-closed future records. |
+| `test/jido/persistence/plugin_integration_test.exs` | Default checkpoints convert only the paired owned state. Complete custom checkpoints bypass conversion. |
+| `test/jido/persistence/adapter_conformance_test.exs` | ETS, File, and Redis pass one required binary get and exact-byte CAS suite, including concurrent winners. |
+| `test/jido/persistence/adapter_test.exs` | An adapter with only get and CAS is valid. Option validation failures remain contained. |
+| `test/jido/persistence_test.exs` | Direct lifecycle, revision rules, closed CAS results, write faults, live commit, hibernate, thaw, and stale activation behavior pass. |
+| `test/jido/persistence/indeterminate_write_test.exs` | Stored lost-reply and explicit indeterminate writes stop authority and do not start Directives. |
+| `test/jido/agent_server/plugin_lifecycle_test.exs` | A rejected initial write stops its provisional Plugin runtime. |
+| `test/jido/agent_server/effect_recovery_test.exs` | Failed intent and acknowledgement writes stop the activation while confirmed records remain recoverable. |
+| `test/jido/plugin/scheduler/occurrence_recovery_test.exs` | Scheduler intent and result failures preserve the last confirmed record for restore. |
+| `test/jido/topology/controller_test.exs` and `test/jido/topology/controller/composition_runtime_test.exs` | Persistent members and Bus subscriptions restore after controller restart under the create-only rule. |
+| `test/examples/99_research/99_13_durable_delete` | The durable-delete acceptance example now passes without a skip. |
 
-## Retained baseline
+## Requirement disposition
 
-- Persistence owns record meaning. Adapters own binary operations only.
-- Exact-byte atomic CAS protects live commits from stale storage revisions.
-- A confirmed write precedes live Agent replacement and Directive handling.
-- An indeterminate or lost-reply write stops the current writer.
-- Active records validate outer identity, restored Agent identity, revision,
-  shape, and portable content.
-- Default checkpoints include complete Agent and Plugin state. Complete custom
-  Agent checkpoint and restore callbacks remain supported.
-- Instance defaults can be replaced or disabled for one Agent.
-- ETS, File, and Redis keep their documented current limits.
-- Persistent restore rebuilds Plugin and Topology runtime resources instead of
-  storing their process handles.
-- Current direct, ID, PID, partition, hibernate, thaw, and adapter APIs remain
-  supported until an approved migration replaces one.
-
-## Gap register
-
-| Gap | Requirements | Current evidence | Difference | Disposition |
-| --- | --- | --- | --- | --- |
-| `PERS-GAP-001` | `PERS-REQ-001` to `PERS-REQ-005` | Persistence and adapter modules | Owner split works, but four callbacks remain required. | `Change, compatible` |
-| `PERS-GAP-002` | `PERS-REQ-006` to `PERS-REQ-010` | Record and Agent checkpoint code | Checkpoint layering, definition version, and the portable-term set work. Target Ref and tombstone do not. | `Partial`; `Blocked` on seam 03 and record lifecycle work |
-| `PERS-GAP-003` | `PERS-REQ-011` to `PERS-REQ-016` | Save code and revision tests | Exact-byte CAS and direct revision rules work. Server next-revision ownership is spread across modules. | `Retain`; strengthen contract evidence |
-| `PERS-GAP-004` | `PERS-REQ-017` to `PERS-REQ-021` | Adapter containment and error tests | Invalid replies and callback faults have shared codes. Returned adapter reasons remain compatible, and the closed confirmed-rejection set is not final. | `Partial`; seam 07 owns future public codes and migration |
-| `PERS-GAP-005` | `PERS-REQ-022` | Server failure branch, stale-Server test, and indeterminate-write tests | Every required write failure removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seam 07 and 08 work |
-| `PERS-GAP-006` | `PERS-REQ-023` to `PERS-REQ-028` | Startup and restore code | A new persistent Agent reports ready without revision-zero storage. | `Missing`; `Blocked` on Agent Server lifecycle |
-| `PERS-GAP-007` | `PERS-REQ-029` to `PERS-REQ-031` | Load validation and restore tests | Current validation works. Definition revision does not exist. | `Partial`; `Blocked` on seam 01 |
-| `PERS-GAP-008` | `PERS-REQ-032` to `PERS-REQ-036` | Blind delete and skipped FA-05 test | No tombstone or durable deletion fence exists. | `Missing` |
-| `PERS-GAP-009` | `PERS-REQ-037`, `PERS-REQ-038` | Safe decode and corrupt-record tests | Most current corruption checks work. Bitstring and future-kind cases need the approved error contract. | `Partial` |
-| `PERS-GAP-010` | `PERS-REQ-039` to `PERS-REQ-041` | Format-1 key and identity code | No Ref key, dual read, collision check, rewrite, rollback, or removal gate exists. | `Blocked` on seams 03 and 09 |
-| `PERS-GAP-011` | `PERS-REQ-042`, `PERS-REQ-043` | Custom Agent callback tests | Complete custom callbacks work. Plugin bypass is not needed until a facet exists. | `Proven` for current callback; target composition is `Deferred` |
-| `PERS-GAP-012` | `PERS-REQ-044` | No Plugin Persistence facet | Owned-slice conversion does not exist. | `Deferred`; `Blocked` on seam 05 |
-| `PERS-GAP-013` | `PERS-REQ-045` to `PERS-REQ-048` | Server restore, commit, and write-failure tests | Restore, commit order, and all-error authority work. Initial durable creation does not. | `Partial` |
-| `PERS-GAP-014` | `PERS-REQ-049`, `PERS-REQ-050` | Plugin and Topology recovery tests | Runtime reconstruction and per-Agent restore work only for current covered paths and ETS Topology tests. | `Partial` |
-| `PERS-GAP-015` | `PERS-REQ-051` | Adapter API and package boundaries | Core has no discovery or lease API. The exclusion needs a public boundary check. | `Proven` in current API; release evidence is `Partial` |
-
-## Disposition of superseded claims
-
-This table covers the distinct claims in the removed persistence index, gap
-analysis, instance proposal, and adapter proposal. Git history keeps the old
-text.
-
-| Superseded claim | Disposition | Reason and owner |
+| Requirement set | State | Evidence or owner |
 | --- | --- | --- |
-| Replace the byte adapter with record-valued instance callbacks. | `Remove`. | The package seam keeps the binary adapter. A second provider layer adds unproved token and fault boundaries. |
-| Make one persistence provider mandatory for every Agent in an instance. | `Remove`. | Instance defaults and per-Agent override or disablement are supported. |
-| Add a public `Jido.Persistence.Record` now. | `Defer`. | A private versioned record is sufficient until public value need and migration are proved. |
-| Add opaque `storage_version` and write `operation_id` fields. | `Remove from core target`. | Exact expected bytes and state revision are the implemented CAS contract. Reconciliation services can own retry identity. |
-| Store `:active`, `:hibernated`, and `:deleted` in one lifecycle record. | `Replace`. | Use active and compact tombstone records. Hibernate is process state. |
-| Keep only active records and blind delete. | `Replace`. | Tombstones preserve the stale-writer barrier. |
-| Keep `get`, `put`, CAS, and `delete` as required runtime callbacks forever. | `Change in stages`. | Require get and CAS; retain put and delete as maintenance compatibility APIs first. |
-| Treat every returned CAS error except explicit indeterminate as confirmed no-write. | `Replace`. | Only conflict and documented preflight rejection confirm no write. |
-| Let conflict follow Agent error policy and continue. | `Removed`. | Seam 06 now stops the activation after every required persistence write failure. |
-| Stop after every persistence write error. | `Implemented by seam 06`. | Preserve caller failure, activation stop, and restore-first recovery through seams 07 and 08. |
-| Add a persistence callback timeout now. | `Defer`. | No option or implementation exists. Seam 08 must define task and stop behavior first. |
-| Write revision zero only after the first Turn. | `Replace`. | Target creation confirms revision zero before readiness. |
-| Start Plugin runtimes only after initial persistence. | `Replace`. | Target starts them provisionally, waits for readiness, writes, then publishes. Failed write must clean them up. |
-| Allow `restore: false` to ignore an existing record. | `Replace`. | It uses supplied state but must still create only when storage is absent. |
-| Let delete of a missing identity return only `:ok`. | `Replace`. | Target creates a revision-zero tombstone to fence delayed creators. |
-| Physically purge tombstones through the normal adapter contract. | `Remove`. | Retention and purge are provider maintenance policy. |
-| Permit normal reactivation after tombstone. | `Remove`. | Reactivation requires purge and proof that old writers cannot run; a new Ref is safer. |
-| Make module and instance names permanent durable identity. | `Change in stages`. | Target Ref excludes code and runtime names, but legacy keys need safe migration. |
-| Change to Ref keys without mixed-version rules. | `Reject`. | Collision, dual-read, rewrite, rollback, and old-reader behavior are release gates. |
-| Require positive definition revision before all persistence work. | `Defer to staged Agent contract`. | Direct and behavior-only Agents can remain unversioned during compatibility. |
-| Reject every old outer record format. | `Replace`. | Legacy format 1 stays readable during a versioned migration. |
-| Add an outer record migration callback. | `Defer`. | Offline or dual-read conversion is enough until an online hook has a proved need and safety model. |
-| Replace plain-map Agent checkpoints with a fixed public checkpoint struct. | `Remove`. | Seam 01 keeps plain maps and complete custom callbacks. |
-| Apply Plugin slice conversion inside complete custom checkpoints. | `Reject for first stage`. | Custom callbacks own the complete format and bypass Plugin conversion. |
-| Add pure Plugin-owned slice dump and load. | `Retain as deferred target`. | It stays bounded and cannot see adapter, key, revision, or write result. |
-| Add Plugin hooks around load, write, delete, or commit. | `Reject`. | Such hooks could change commit order or hide uncertain writes. |
-| Add a general record codec for encryption or compression. | `Defer`. | Format ID, key rotation, limits, and CAS evidence need a separate design. |
-| Add Ecto and Bedrock directly to core now. | `Defer placement`. | Package ownership and optional-dependency release gates are not approved. |
-| Reuse V2 Ecto, Bedrock, or Redis records. | `Reject`. | V2 data needs explicit offline application conversion. |
-| Keep Redis client-neutral and require EVAL for CAS. | `Retain`. | This matches current code and tests. |
-| Claim Redis failover from controlled command tests. | `Reject`. | No real Redis recovery test exists. |
-| Claim File power-loss durability from atomic rename. | `Reject`. | Current code has no file or directory sync proof. |
-| Claim shared multi-BEAM File ownership. | `Reject`. | Current lock is one-BEAM only. |
-| Add Agent discovery scans to the byte adapter. | `Reject`. | Persistence restores known identities. Catalogs and recovery control are external capabilities. |
-| Add Topology callbacks or a multi-key transaction to the adapter. | `Reject`. | Current recovery composes independent Agent records and rebuilds runtime resources. |
-| Claim complete durable Topology desired state. | `Reject for current scope`. | Tests restore supplied known members only. Topology desired-state ownership is separate. |
-| Persist Buses, subscriptions, PIDs, timers, and ownership bindings. | `Reject`. | Runtime topology reconstructs these values after restore. |
-| Treat persistence as a Directive outbox or Thread journal. | `Reject`. | Ordinary Directives are transient. Durable capability work stores explicit intent in owned Agent state. |
-| Add Ecto with one new v3 table and atomic SQL CAS. | `Preserve as deferred provider input`. | SQLite and PostgreSQL tests, optional dependency, migration helper, and host Repo ownership remain required if approved. |
-| Add Bedrock with transactional CAS and size preflight. | `Preserve as deferred provider input`. | A future adapter must keep host Repo ownership and prove 16 KiB key and 128 KiB value limits against the selected version. |
+| `PERS-REQ-001` to `PERS-REQ-010` | `Proven` | Persistence owns the record above binary adapters. Version-2 shapes and portable data are checked. |
+| `PERS-REQ-011` to `PERS-REQ-016` | `Proven` | Live and direct revision rules use exact-byte CAS. |
+| `PERS-REQ-017` to `PERS-REQ-020` | `Proven` | Option validation and the closed CAS classification have focused tests. |
+| `PERS-REQ-021` | `Compatible control retained` | Public calls keep current raw controls and existing structured callback errors. A new error family is not added. |
+| `PERS-REQ-022` | `Proven` | Seam 06 and current recovery tests show authority loss after every required write error. |
+| `PERS-REQ-023` to `PERS-REQ-028` | `Proven for the start-call boundary; Registry publication deferred` | Initial CAS and Plugin cleanup pass. Seam 08 owns stricter provisional PID visibility. |
+| `PERS-REQ-029` to `PERS-REQ-038` | `Proven` | Outer validation, restored identity, definition revision, tombstones, races, and safe decoding pass. |
+| `PERS-REQ-039` | `Proven` | Legacy outer format-1 active records load. |
+| `PERS-REQ-040`, `PERS-REQ-041` | `Deferred to seam 09` | Stable Ref exists, but namespace and partition binding are not yet selected. Current keys remain compatible. |
+| `PERS-REQ-042` to `PERS-REQ-044` | `Proven` | Custom callback payloads stay opaque. Default Plugin owned-slice conversion is bounded. |
+| `PERS-REQ-045` to `PERS-REQ-049` | `Proven` | Restore, commit order, failure stop, hibernate, and runtime reconstruction have focused evidence. |
+| `PERS-REQ-050` | `Single-Agent contract proven; Topology integration remains with seams 10 and 11` | Persistence exposes no multi-record transaction claim. |
+| `PERS-REQ-051` | `Proven` | The adapter has no discovery, placement, lease, replay, or mailbox API. |
 
-## High-level work sequence
+## Compatibility and migration
 
-This sequence defines outcomes and gates. It is not a formal implementation
-plan. Create that plan only after the user approves this seam.
+- Public module-and-ID Persistence functions remain available.
+- Existing instance defaults, per-Agent overrides, partitions, hibernate, and
+  thaw remain available.
+- Outer format-1 active records remain readable. All new writes use format 2.
+- Older code cannot load format-2 records, but its fail-closed record check also
+  prevents it from overwriting a format-2 tombstone through normal save.
+- The storage key stays unchanged in this seam. Seam 09 must add collision
+  detection, dual read, rewrite, rollback, and removal gates before Ref-key
+  writes start.
+- `put/3` and `delete/2` remain optional maintenance callbacks. Normal durable
+  lifecycle code uses only get and CAS.
+- Tombstone purge and same-identity reactivation are not normal Core
+  operations. A new Ref is the safe default after durable deletion.
 
-### Phase 0 — Resolve decisions and prerequisite blockers
+## Remaining owner work
 
-- Requirements: all `PERS-REQ` identifiers.
-- Required outcome: approved boundary, lifecycle, authority, identity,
-  serialization, custom-checkpoint, and provider decisions.
-- Compatibility: no runtime or stored-data change.
-- Verification: review all `PERS-DEC` items and blocker resolutions.
-- Exit criteria: one non-conflicting target exists across seams 01, 03, 05, 06,
-  08, 09, and 12.
+| Seam | Required follow-up |
+| --- | --- |
+| 08 Agent Server | Decide whether a provisional startup PID must be hidden from Registry lookup until the revision-zero write is confirmed. |
+| 09 Jido instance | Bind Ref namespace and partition values, then own the mixed-key migration and any instance delete facade. |
+| 10 Runtime topology | Consume revision-zero activation without adding discovery or lease meaning to persistence. |
+| 11 Topology control plane | Keep desired Topology and multi-Agent reconciliation outside per-Agent records. |
+| 13 Observability | Add bounded operation and result-class evidence without checkpoint payloads or adapter secrets. |
+| Provider owners | Define tombstone retention, purge tools, size limits, and backend recovery claims. |
 
-### Phase 1 — Freeze byte and error contracts
+## Completion gate for this seam
 
-- Requirements: `PERS-REQ-001` to `PERS-REQ-022`.
-- Required outcome: minimum runtime adapter, closed CAS results, normalized
-  errors, and one write-authority rule.
-- Compatibility: retain current built-in modules and maintenance operations.
-- Verification: shared adapter conformance and live write-result matrix.
-- Exit criteria: every invoked CAS result has one storage, public error,
-  authority, and retry meaning.
-
-### Phase 2 — Establish safe record lifecycle
-
-- Requirements: `PERS-REQ-023` to `PERS-REQ-036`, `PERS-REQ-045` to
-  `PERS-REQ-048`.
-- Required outcome: revision-zero creation, active restore, confirmed commit,
-  compact tombstone deletion, and provisional runtime cleanup.
-- Compatibility: keep current hibernate and thaw entries; add no durable
-  hibernated status.
-- Verification: create, restore-policy, conflict, indeterminate, cleanup,
-  delete-race, delayed-writer, hibernate, and stop tests.
-- Exit criteria: every lifecycle path has one durable value and readiness rule.
-
-### Phase 3 — Align serialization and migration
-
-- Requirements: `PERS-REQ-037` to `PERS-REQ-044`.
-- Required outcome: versioned outer records, safe legacy reads, Ref-key
-  collision controls, custom-checkpoint compatibility, and bounded Plugin
-  conversion if approved.
-- Compatibility: no format-1 record becomes unreachable. Older code must not
-  silently ignore a new tombstone during rollback.
-- Verification: fixed binary fixtures, corrupt data, definition mismatch,
-  legacy/new key collisions, rollback, custom callback, and Plugin slice tests.
-- Exit criteria: every supported record and checkpoint version has an explicit
-  read, write, rejection, and rollback rule.
-
-### Phase 4 — Prove recovery boundaries
-
-- Requirements: `PERS-REQ-049` to `PERS-REQ-051`.
-- Required outcome: known-Agent restore rebuilds runtime resources without
-  adding discovery, cluster ownership, or multi-record claims.
-- Compatibility: static supplied Topology behavior remains supported.
-- Verification: Agent and Topology restart cases on each claimed durable
-  adapter, including isolated member conflict and tombstone behavior.
-- Exit criteria: documentation claims no more durability than executable
-  backend and lifecycle evidence proves.
-
-### Phase 5 — Decide and qualify production providers
-
-- Requirements: applicable `PERS-REQ-002` to `PERS-REQ-005`,
-  `PERS-REQ-012` to `PERS-REQ-020`, and `PERS-REQ-045` to `PERS-REQ-051`.
-- Required outcome: each retained or new provider has an owner, optional
-  dependency rule, conformance result, recovery claim, and documented limit.
-- Compatibility: V2 data uses explicit offline conversion. Current v3 Redis
-  key and value behavior remains readable during any core format migration.
-- Verification: package-without-optionals fixture plus real backend jobs for
-  every durability claim.
-- Exit criteria: no adapter is listed as supported beyond its passing evidence.
-
-## Acceptance matrix
-
-| Requirement | Evidence now | Required evidence | Evidence state |
-| --- | --- | --- | --- |
-| `PERS-REQ-001`, `PERS-REQ-002` | Persistence and adapter module docs and code | Preserve owner split through record migration. | `Proven` |
-| `PERS-REQ-003` to `PERS-REQ-005` | Four callbacks are required; host ownership is documented | Two-required-callback conformance plus maintenance compatibility tests. | `Partial` |
-| `PERS-REQ-006`, `PERS-REQ-007` | `lib/jido/persistence.ex:79-98,284-315` | Default and custom checkpoint ordering on each retained adapter. | `Proven` |
-| `PERS-REQ-008`, `PERS-REQ-009` | Current active envelope has copied identity and revision; no tombstone | Ref, definition-revision, active, and tombstone fixtures. | `Missing` |
-| `PERS-REQ-010` | Agent and Persistence tests cover all prohibited terms with bounded paths | Keep the matrix through record migration. | `Proven` for current record |
-| `PERS-REQ-011` to `PERS-REQ-016` | Revision and concurrent-writer tests | Map Server revision proof directly to the closed adapter suite. | `Proven` for current active records |
-| `PERS-REQ-017` | Adapter option tests | Approved seam-12 invalid-options code. | `Partial` |
-| `PERS-REQ-018` | ETS, File, Redis, and live conflict tests | Shared conflict/no-write cases for every adapter. | `Proven` for current adapters |
-| `PERS-REQ-019` | No adapter uses a typed preflight rejection | Rejection before backend work and no-write proof. | `Missing` |
-| `PERS-REQ-020` | Redis and lost-reply tests cover several cases | Returned plain error, raise, throw, exit, invalid result, and timeout matrix. | `Partial` |
-| `PERS-REQ-021` | Public Persistence keeps raw adapter reasons and uses coded `ExecutionError` for invalid replies and faults | Define and test persistence-owned codes before any public control migration. | `Owner-deferred` |
-| `PERS-REQ-022` | Confirmed-conflict, known-error, and indeterminate-write stop cases | Every required write failure removes authority before next evaluation. | `Proven by seam 06`; preserve during record work |
-| `PERS-REQ-023` to `PERS-REQ-028` | Startup returns before any initial write | Revision-zero storage, all restore policies, failure publication, and Plugin cleanup. | `Missing` |
-| `PERS-REQ-029`, `PERS-REQ-030` | Invalid record and identity tests | Preserve with new active record and Ref. | `Proven` for current record |
-| `PERS-REQ-031` | Definition-revision target test is skipped | Stored revision match, mismatch, missing-old-record, and rollback cases. | `Blocked` |
-| `PERS-REQ-032` to `PERS-REQ-036` | Blind delete and skipped delayed-writer case | Tombstone load, missing delete, race, stale writer, purge, and reactivation tests. | `Missing` |
-| `PERS-REQ-037`, `PERS-REQ-038` | Safe decode and corrupt-record tests | All invalid fields, unknown kinds and versions, and no-write assertions. | `Partial` |
-| `PERS-REQ-039` | Current format-1 load tests | Fixed legacy binary fixture under the new reader. | `Proven` for current reader; migration is `Partial` |
-| `PERS-REQ-040`, `PERS-REQ-041` | No core Ref or migration path | Collision, dual-read, rewrite, rollback, and removal-gate tests. | `Blocked` |
-| `PERS-REQ-042` | Custom callback tests in `test/jido/agent_test.exs:937-1010` | Run one complete custom pair through each retained adapter and new record format. | `Partial` |
-| `PERS-REQ-043`, `PERS-REQ-044` | No Plugin Persistence facet | Bypass, slice isolation, portability, schema, and no-runtime tests. | `Deferred` |
-| `PERS-REQ-045` | Automatic restore and thaw tests | Preserve for Ref and active/tombstone records. | `Proven` for current active record |
-| `PERS-REQ-046`, `PERS-REQ-047` | Commit and indeterminate-write tests | Full closed write-result matrix. | `Proven` for covered current results |
-| `PERS-REQ-048` | Hibernate and clean-stop code keep active maps | Explicit no-liveness-field fixture. | `Proven` for current record |
-| `PERS-REQ-049` | Plugin and Topology restart tests | All runtime handle exclusions and rebuild causes. | `Partial` |
-| `PERS-REQ-050` | ETS Topology member recovery tests | Each claimed durable adapter, member tombstone, and isolated conflict. | `Partial` |
-| `PERS-REQ-051` | No such adapter APIs exist | Public boundary inventory and external capability fixture. | `Proven` for current API |
-
-## Migration and compatibility
-
-- Keep current `Jido.Persistence` direct functions, instance defaults,
-  per-Agent override or disablement, IDs, PIDs, term partitions, hibernate,
-  thaw, ETS, File, Redis, and complete custom Agent callbacks.
-- Introduce the minimum adapter behavior without removing built-in maintenance
-  functions in the same step. A later deprecation needs public usage evidence.
-- Keep fixed legacy format-1 and checkpoint-version-1 fixtures. Add a new outer
-  format only with an older-reader rejection and rollback rule.
-- Do not move to Ref keys before stable namespace binding and term-partition
-  conversion exist. Detect legacy/new collisions before the first new write.
-- Do not overwrite legacy records in place during a rolling deployment unless
-  all writers and rollback readers understand the new tombstone and key rules.
-- Keep V2 Ecto, Bedrock, and Redis data offline. Stop V2 writers, export with V2
-  code, convert application and Plugin state, and save through the V3 API.
-- Keep the current v3 Redis client-neutral option model. Document that TTL also
-  limits any future tombstone barrier.
-- State File guarantees narrowly: atomic rename and one-BEAM serialization are
-  proved; power-loss sync is not.
-- If Ecto is approved, keep its dependency and database driver optional, use a
-  new V3 table, and prove atomic SQL CAS for each named database.
-- If Bedrock is approved, keep the host Repo external, reject key and value
-  limits before a transaction, and prove restart behavior with the selected
-  Bedrock version.
-- Rollback must restore adapter result handling, Server authority behavior, and
-  caller errors as one compatible unit.
-
-## Assumptions and blockers
-
-| ID | Type | Owner | Statement | Resolution needed |
-| --- | --- | --- | --- | --- |
-| `PERS-BLK-001` | `Resolved design input` | 00 Overview | The Overview durability direction is approved. Exact record and authority behavior remains seam-07 and seam-08 owner work. | Implement only after those owner decisions close. |
-| `PERS-BLK-002` | `Blocker` | 90 Package boundaries | Production provider placement and public compatibility are pending. | Approve provider ownership and migration gates. |
-| `PERS-BLK-003` | `Owner dependency` | 12 Errors and contracts and 07 Persistence | Seam 12 keeps adapter controls raw, rejects a new `PersistenceError`, and implements codes for invalid replies, callback faults, and portable paths. Public persistence control migration stays with seam 07. | Approve seam 12, then close the seam-07 public result and write-policy matrix. |
-| `PERS-BLK-004` | `Resolved` | 01 Agent | Agent `vsn`, the `vsn: 1` legacy rule, and version-2 default checkpoints are implemented and approved at `fa17a6d6`. | No action. |
-| `PERS-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Ref exists only as a target, and namespace binding is undefined. | Approve Ref, namespace, and partition conversion. |
-| `PERS-BLK-006` | `Resolved design input` | 06 Commit and effects and 08 Agent Server | Every required write error stops the activation. The caller receives the failure. A later activation restores authoritative state. | Preserve this rule through seam-07 record and adapter work. |
-| `PERS-BLK-007` | `Blocker` | 07 Persistence | Tombstone retention, purge authorization, same-identity reactivation, TTL, and rollback are not approved. | Approve the lifecycle maintenance rules. |
-| `PERS-BLK-008` | `Blocker` | 05 Plugins and 01 Agent | Complete custom checkpoints and Plugin slice conversion have no long-term composition. | Approve first-stage bypass and later composition or permanent deferral. |
-| `PERS-BLK-009` | `Assumption` | 08 Agent Server | Plugin runtimes can start provisionally and be cleaned up before publication. | Prove all startup failure paths. |
-| `PERS-BLK-010` | `Assumption` | 10 Runtime topology | Persistence restores known identity only and does not own discovery or placement. | Keep later topology contracts separate. |
-| `PERS-BLK-011` | `Blocker` | Adapter owners and 99 Delivery | There is no shared conformance suite or real backend recovery matrix. | Pass the suite before a provider claim. |
-| `PERS-BLK-012` | `Resolved` | Design index owner | The design index now lists the persistence briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
-
-## Completion criteria
-
-- [ ] The user has approved or changed every `PERS-DEC` item.
-- [ ] Prerequisite drafts are approved or replaced by explicit assumptions.
-- [ ] Every approved `PERS-REQ` item has `Proven` evidence.
-- [ ] No unresolved `Conflict` remains.
-- [ ] Initial creation, active restore, commit, hibernate, tombstone, purge, and
-      reactivation have one documented record and authority result.
-- [ ] Every adapter passes the shared CAS conformance set.
-- [ ] Legacy and new record and key formats have collision, rollback, and
-      old-reader evidence.
-- [ ] Complete custom checkpoints and any Plugin slice conversion have an
-      approved composition and tests.
-- [ ] Backend documentation states only proved durability and size limits.
-- [ ] Dependent seams use the approved contract.
-- [ ] A separate formal implementation plan is created only after approval.
+- [x] Binary get and exact-byte CAS are the required runtime adapter boundary.
+- [x] New writes use exact version-2 active or tombstone records.
+- [x] Revision-zero creation completes before the start call succeeds.
+- [x] Active restore, live commit, hibernate, and thaw preserve state revision.
+- [x] Every required write error removes activation authority.
+- [x] Logical deletion fences delayed writers and concurrent newer commits.
+- [x] Legacy format-1 active records remain readable.
+- [x] Agent definition revision is checked before restore.
+- [x] Default Plugin state conversion stays within the paired owner slice.
+- [x] Complete custom checkpoints bypass Plugin conversion.
+- [x] ETS, File, and Redis pass one shared get-and-CAS conformance suite.
+- [ ] Stable Ref key migration is complete in seam 09.
+- [ ] Provisional Registry visibility is decided in seam 08.
+- [ ] The full target design has user approval.

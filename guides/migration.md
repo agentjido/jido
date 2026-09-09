@@ -390,7 +390,9 @@ an automatic V3 reader. Renaming an envelope is not a conversion.
 
 V3 uses `Jido.Persistence` and a binary adapter with atomic compare-and-swap.
 Keys start with `jido:agent:v1:` and include instance, module, partition, and ID.
-Restore validates identity, complete state, and recursive portability.
+New outer records use format 2 with active or tombstone kind. The reader also
+accepts Jido V3 outer format-1 active records. Restore validates identity,
+definition revision, complete state, and recursive portability.
 
 ### What you need to change
 
@@ -418,8 +420,9 @@ Without an adapter, RuntimeStore checkpoints survive only local abnormal
 restarts while the instance stays alive. They do not survive instance or VM loss.
 
 File storage requires one BEAM owner per directory. Redis TTL remains an adapter
-option. `Jido.Thread` and the old Thread stores do not remain. Convert stored
-Thread values to application-owned history values before restore.
+option. It also limits tombstone retention and the stale-writer fence.
+`Jido.Thread` and the old Thread stores do not remain. Convert stored Thread
+values to application-owned history values before restore.
 
 **Check:** restore a real backup, test stale and uncertain writes, and confirm
 that no runtime-only values entered stored state. Definition revision checks,

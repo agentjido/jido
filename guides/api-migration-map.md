@@ -411,16 +411,17 @@ definition while it runs.
 | `Jido.Agent.InstanceManager` | `Jido.start_agent/1..3`, registry lookup, persistence, hibernate, and thaw. There is no public manager process API. |
 
 The V2 `Jido.Storage` callbacks mix checkpoint and Thread operations. The V3
-`Jido.Persistence.Adapter` stores binary keys and values through `get/2`,
-`put/3`, `compare_and_swap/4`, and `delete/2`. A get followed by a put is not a
-valid compare-and-swap implementation. Decode V2 data with V2 code, transform
-it, and save a new V3 record. Do not point both versions at the same keys.
+`Jido.Persistence.Adapter` requires binary `get/2` and
+`compare_and_swap/4`. Its `put/3` and `delete/2` callbacks are optional
+maintenance operations. A get followed by a put is not a valid compare-and-
+swap implementation. Decode V2 data with V2 code, transform it, and save a new
+V3 record. Do not point both versions at the same keys.
 
 V3 adds these modules:
 
 | V3 module | Purpose |
 | --- | --- |
-| `Jido.Persistence` | Owns Agent record keys, encoding, revision checks, restore, and adapter fault containment. |
+| `Jido.Persistence` | Owns Agent record keys, active and tombstone records, encoding, revision checks, restore, logical delete, and adapter fault containment. |
 | `Jido.Persistence.Adapter` | Defines the minimal byte-store contract. |
 | `Jido.Persistence.ETS` | Supplies local in-memory Agent persistence. |
 | `Jido.Persistence.File` | Supplies file-backed Agent persistence with one owner per directory. |

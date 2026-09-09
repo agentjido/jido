@@ -34,8 +34,23 @@ mismatch before it accepts saved state.
 ```
 
 Application code usually uses `Jido.Persistence` instead of these callbacks.
-Persistence adds the record format, storage identity, revision, and adapter
-boundary.
+Persistence adds the active-or-tombstone record format, storage identity,
+Agent `vsn`, revision, and adapter boundary. New active records use outer
+format 2. Persistence can still read legacy outer format-1 active records.
+
+## Persistence Plugin conversion
+
+A Plugin package can select a `Jido.Persistence.Plugin` facet when its owned
+state needs a durable representation that differs from its live Agent value.
+For the default Agent checkpoint, Persistence calls this facet with only:
+
+- the state value owned by the paired `Jido.Agent.Plugin` facet;
+- a context with package version, record format, direction, and reason;
+- the static options mapped to the Persistence facet.
+
+The facet cannot read the adapter, record key, complete Agent state, process,
+or commit result. Dump output must be portable. Load output must also match the
+paired Agent-facet state schema.
 
 Direct and behavior-only definitions keep the version-1 checkpoint format with
 an embedded definition. This includes an explicitly unversioned direct
@@ -82,6 +97,9 @@ core-owned version-2 envelope. The envelope contains `agent_module`, `vsn`, and
 the opaque `payload`. `Jido.Agent.restore/3` checks the module and `vsn`, then
 passes only the payload to the callback. It still passes a legacy raw custom
 map directly to the callback.
+
+Persistence does not apply Plugin owned-state conversion to a complete custom
+checkpoint. The custom callback owns the complete payload and its migration.
 
 Restore must return an Agent with the module and ID that the persistence record
 names. Jido rejects a checkpoint that changes this identity.

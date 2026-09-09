@@ -10,10 +10,10 @@
   authoring order, Agent identity, and source-Signal Turn selection are present.
 - Alignment state: `Implemented with deferred owner integrations`.
 
-The Plugin package and its four owner facets are implemented. Agent and Agent
-Server use their facets now. Persistence and Topology have bounded conversion
-APIs. Their record and plan call sites stay with seams 07 and 11. The coherent
-runtime bootstrap value stays with seam 08.
+The Plugin package and its four owner facets are implemented. Agent, Agent
+Server, and Persistence use their facets now. Topology has a bounded
+contribution API; its plan call site stays with seam 11. The coherent runtime
+bootstrap value stays with seam 08.
 
 This execution state is not approval of all requirements in the target design.
 
@@ -113,8 +113,9 @@ The Persistence facet can receive only one owned state value, a validated
 must be portable. Load output must be portable and valid for the paired Agent
 facet state schema. A Persistence facet requires a stateful Agent facet.
 
-This seam does not call the facet from checkpoint record assembly. Seam 07 owns
-that order and the compatibility rule for complete custom checkpoints.
+Persistence calls the facet from default-checkpoint record assembly. Dump and
+load receive only the paired owned-state value. Complete custom Agent
+checkpoints bypass the conversion and keep their opaque callback contract.
 
 ### Topology
 
@@ -131,6 +132,7 @@ Seam 11 owns lowering order, duplicate checks, limits, and activation.
 | Evidence | Result |
 | --- | --- |
 | `test/jido/plugin/facets_test.exs` | A callback-free package normalizes to four separate owner Specs. Agent preparation and contribution work. Live dispatch, Persistence conversion, and Topology contribution use owner values. Invalid owners, option mappings, Persistence results, contexts, loaded state, and Topology entries fail. |
+| `test/jido/persistence/plugin_integration_test.exs` | The default checkpoint calls only the paired Persistence facet. Complete custom checkpoints bypass owned-slice conversion. |
 | `test/jido/plugin/preparation_test.exs` | Preparation receives only declared domain state and owned Plugin state. Read-only fields cannot change. Prepared input must be portable. |
 | `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | All four research assertions run. Projection and prepared-input isolation checks are no longer skipped. |
 | Existing Plugin contract, validation, result, order, and runtime tests | The mixed callback compatibility contract remains stable. |

@@ -66,6 +66,18 @@ replacement with the facet schema and the portable-value rule.
 A failed Turn does not commit the contribution. A direct command returns the
 candidate but does not commit it.
 
+## Convert One Owned Value for Persistence
+
+A package can select `Jido.Persistence.Plugin` when its live owned value needs
+a different durable representation. The facet receives only that owned value,
+record-format context, and its mapped static options. Persistence applies the
+conversion to the default Agent checkpoint before it writes the outer record.
+On load, it validates the converted value with the paired Agent-facet schema
+before Agent restore.
+
+A complete custom Agent checkpoint owns its whole payload. Persistence does not
+apply Plugin slice conversion to that custom payload.
+
 ## Use Outer Defaults
 
 If the owned value is an object that can be absent, put a default on the outer

@@ -15,7 +15,9 @@ defmodule Jido.Agent.SerializationContractTest do
     assert "jido:agent:v1:" <> _identity = key
     assert {:ok, bytes} = Store.get(key, opts)
     record = :erlang.binary_to_term(bytes, [:safe])
-    assert record.kind == :agent
+    assert record.format == 2
+    assert record.kind == :active
+    assert record.agent_vsn == Probe.vsn()
     assert record.agent_id == agent.id
 
     # These old identifiers are intentional rejection fixtures.

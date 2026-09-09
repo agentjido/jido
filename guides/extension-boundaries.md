@@ -88,8 +88,9 @@ An ecosystem package must not:
 ## Persistence boundary
 
 `Jido.Persistence.Adapter` is a byte-store contract. Jido owns checkpoint
-validation, record meaning, revision policy, and the effect of a storage result
-on Agent commit. An adapter owns only its storage operations.
+validation, active and tombstone record meaning, revision policy, and the
+effect of a storage result on Agent commit. An adapter owns binary get and
+exact-byte CAS. Put and delete are optional maintenance operations.
 
 The ETS, File, and Redis adapters remain supported in Jido V3. Instance
 persistence defaults and per-Agent selection also remain supported. A future
@@ -99,8 +100,10 @@ Plugin runtime resources do not belong in checkpoints. Keep processes,
 connections, watchers, and worker pools in the supervised runtime. Keep only
 portable configuration and rebuild data in Plugin state.
 
-A Persistence Plugin facet can convert only its paired owned-state value. It
-does not replace the byte adapter or change checkpoint and commit rules.
+A Persistence Plugin facet can convert only its paired owned-state value in the
+default checkpoint path. A complete custom Agent checkpoint bypasses this
+conversion. The facet does not replace the byte adapter or change checkpoint
+and commit rules.
 
 ## Extension growth
 

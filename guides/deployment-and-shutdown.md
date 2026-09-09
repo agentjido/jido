@@ -58,6 +58,11 @@ A normal stop removes the instance runtime checkpoint. It does not delete a
 durable persistence record. Delete that record explicitly when the domain
 operation is a durable delete.
 
+Normal durable delete writes a tombstone. It preserves the stale-writer fence
+and does not physically remove the storage key. Physical purge and retention
+are provider maintenance policy. A Redis TTL applies to tombstones and limits
+the duration of that fence.
+
 Use hibernate when you want to save the current Agent and stop its actor:
 
 ```elixir

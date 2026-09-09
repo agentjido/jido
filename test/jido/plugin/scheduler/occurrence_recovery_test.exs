@@ -64,7 +64,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
 
       if reject? do
         send(Keyword.fetch!(opts, :observer), {:occurrence_write_rejected, stage})
-        {:error, :test_storage_unavailable}
+        {:error, {:rejected, :test_storage_unavailable}}
       else
         Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
       end
@@ -152,7 +152,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
       assert_receive {:occurrence_write_rejected, @stage}, 1_000
 
       assert_receive {:DOWN, ^monitor, :process, ^server,
-                      {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                      {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
                      1_000
 
       saved = load_agent(c)
@@ -179,7 +179,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     assert_receive {:occurrence_write_rejected, :result}, 1_000
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
-                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                    {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
                    1_000
 
     pending = load_agent(c).state.scheduler.cron["job-1"].pending
@@ -204,7 +204,7 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     assert_receive {:occurrence_write_rejected, :result}, 1_000
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
-                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                    {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
                    1_000
 
     saved = load_agent(c)

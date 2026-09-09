@@ -41,6 +41,11 @@ defmodule Jido.AgentServer.State do
                 Zoi.any(description: "Idle timeout in milliseconds") |> Zoi.default(:infinity),
               persistence:
                 Zoi.any(description: "Optional Agent persistence adapter") |> Zoi.optional(),
+              initial_persistence:
+                Zoi.enum([:none, :create, :restored, :ready],
+                  description: "Initial durable-record state"
+                )
+                |> Zoi.default(:none),
               attachments:
                 Zoi.map(description: "Attached owner PIDs and monitor references")
                 |> Zoi.default(%{}),

@@ -48,7 +48,7 @@ source of truth for current behavior.
 | Incomplete configuration validation | Invalid values can fail only when a child or Agent consumes them. | Validate all instance-owned values before the instance starts children. | 09 Jido instance, 12 Errors |
 | No Ref facade | Callers must combine lookup and PID-based operations. | One local lookup and error policy for Ref-first lifecycle, command, control, and inspection. | 09 Jido instance, 08 Agent Server |
 | Supervision failure proof is incomplete | Current tests prove child presence, not restart coupling. | Failure-injection evidence for each instance-owned service. | 09 Jido instance |
-| Durable lifecycle is incomplete | Initial records, tombstones, and write-authority loss are pending. | Consume one approved persistence and Server lifecycle contract. | 07 Persistence, 08 Agent Server |
+| Durable Ref lifecycle is incomplete | Initial records, tombstones, and write-authority loss are implemented on the compatible key. Namespace and partition binding are still pending. | Bind Ref identity and add a collision-safe mixed-key migration. | 07 Persistence, 08 Agent Server, 09 Jido instance |
 | Public errors remain mixed | Instance functions return PIDs, `nil`, atoms, tuples, and errors. | Preserve approved protocol values and normalize failures through seam 12. | 09 Jido instance, 12 Errors |
 
 ## Decisions requested

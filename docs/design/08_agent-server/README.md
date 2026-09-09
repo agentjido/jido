@@ -34,7 +34,7 @@ remain canonical for current behavior.
 | Area | Current | Recommended target |
 | --- | --- | --- |
 | Live owner | One `:gen_statem` owns one Agent, one version, and at most one active Turn. | Keep one serialized commit owner per activation. |
-| Startup | Construct or restore, validate, start Plugin children, await readiness, then publish. New persistent state has no revision-zero write. | Keep canonical construction. For persistence, publish only after Plugin readiness and a create-only revision-zero write. |
+| Startup | Construct or restore, validate, start Plugin children, await readiness, and confirm revision-zero creation before the start call succeeds. Registry can still expose a provisional PID. | Decide strict provisional publication and keep the implemented persistence order. |
 | Identity | Public operations use PID, name, ID, instance, and partition values. | Add Ref-based resolution in the instance seam. Keep supported PID/name operations during migration. |
 | Admission | OTP postpones busy Signals. A token set limits callbacks already seen by the state machine. | Keep OTP ordering and state the mailbox limit accurately. Add stable overload and admission errors. |
 | Turn control | Admission and execution are cancellable. Admission reuses `directive_timeout`; native execution has no Server-wide Turn limit. | Use one pre-commit Turn limit and keep caller wait, persistence, readiness, and Directive limits separate. |

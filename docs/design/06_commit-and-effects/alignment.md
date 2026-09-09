@@ -79,9 +79,8 @@ cancellation, retention, and duplicate policy. Completion returns through a
 new Signal and a normal new Turn.
 
 The default Agent checkpoint includes combined Agent and Plugin state. A
-custom complete checkpoint can change that content. Seam 07 must preserve the
-complete custom callback contract and must prove any stronger recoverable-work
-claim.
+Persistence facet can convert its paired owned-state value. A custom complete
+checkpoint bypasses that conversion and keeps its complete callback contract.
 
 ## Canonical source
 
@@ -119,7 +118,7 @@ claim.
 | `COMMIT-REQ-031`, `COMMIT-REQ-032` | `Runtime behavior proven; public observation deferred to seam 13` | Restore does not replay an ordinary batch or infer settlement. Seam 13 owns any public interrupted-settlement signal. |
 | `COMMIT-REQ-033` to `COMMIT-REQ-036` | `Proven` | Active Turn, Plugin Directive context, outbound Signal trace, and checkpoint exclusions preserve the boundary. |
 | `COMMIT-REQ-037`, `COMMIT-REQ-038`, `COMMIT-REQ-040` to `COMMIT-REQ-044` | `Pattern proven; capability-owned` | Recoverable delivery and Scheduler prove saved intent, stable IDs, later acknowledgement Turns, retry, cancellation, and duplicate rules. Core does not generalize the policy. |
-| `COMMIT-REQ-039` | `Deferred to seam 07` | The default checkpoint preserves Plugin state. Custom complete-checkpoint composition needs owner-level integration and proof. |
+| `COMMIT-REQ-039` | `Proven in seam 07` | Default Plugin owned-slice conversion and complete custom-checkpoint bypass have focused integration tests. |
 
 ## Compatibility and migration
 
@@ -139,7 +138,7 @@ claim.
 
 | Seam | Required follow-up |
 | --- | --- |
-| 07 Persistence | Compose Persistence facets in the default checkpoint path, preserve complete custom checkpoints, and create the target active record before broad revision-zero durability claims. |
+| 07 Persistence | Complete. Default Persistence facets, custom checkpoint bypass, and revision-zero active records are implemented. |
 | 08 Agent Server | Integrate the initial durable-record boundary and the complete startup lifecycle. Keep the all-write-error stop rule. |
 | 13 Observability | Define public evidence for a Turn interrupted after commit and before terminal settlement. |
 | Capability owners | Define acknowledgement, retry, ordering, cancellation, retention, and duplicate policy for each recoverable operation. |
@@ -159,7 +158,7 @@ claim.
 - [x] Ordinary Directive work is not replayed after Server loss.
 - [x] Recoverable work remains an explicit capability pattern, not a core
       outbox.
-- [ ] Custom checkpoint preservation is complete in seam 07.
-- [ ] Revision-zero durable activation is complete in seams 07 and 08.
+- [x] Custom checkpoint preservation is complete in seam 07.
+- [x] Revision-zero durable activation is complete for the start-call boundary.
 - [ ] Interrupted-settlement observation is complete in seam 13.
 - [ ] The full target design has user approval.

@@ -59,7 +59,8 @@ defines outcomes and gates. It is not the later formal implementation plan.
 | `lib/jido.ex:431-629` | Managed Agent lifecycle uses the Agent Dynamic Supervisor, local Registry, and public Runtime Store parent bindings. |
 | `lib/jido/runtime_store.ex:1-23,57-78` | The instance owns a nondurable ETS table that survives Runtime Store worker restart. |
 | `lib/jido/agent_server.ex:85-145` | Direct startup links to the caller. Managed startup uses the Agent Dynamic Supervisor. Managed children default to `:transient`; direct children default to `:temporary`. |
-| `lib/jido/agent_server.ex:450-544` | Startup restores state, starts Plugin children, waits for readiness, and publishes ready only after readiness. It does not create revision zero. |
+| `lib/jido/agent_server.ex` | Startup restores state, starts Plugin children, waits for readiness, and confirms revision zero before the start call succeeds. Registry can expose a provisional PID. |
+| `lib/jido/topology/controller/activation.ex` | The Controller preflights durable state. Existing members start with required restore; missing members use create-only revision zero. |
 | `lib/jido/agent_server.ex:1244-1282` | Controlled termination stops execution, readiness, admission, Directive, error-policy, and Plugin runtime work. |
 | `lib/jido/agent_server.ex:1325-1346` | Initial Plugin readiness uses `spawn_monitor/1`, not the instance Task Supervisor or an owner link. |
 | `lib/jido/agent_server.ex:1370-1383` | Plugin admission runs as a task under the selected instance Task Supervisor. |
@@ -160,7 +161,7 @@ remote-child, and gap-analysis files. Git history keeps their exact text.
 | A Plugin root gets no Agent Server PID and signals only through a Ref facade. | `Defer migration`. | Current Init has the Server PID. Exact future identity fields remain blocked in seam 05. |
 | Plugin replacement must receive fresh complete state and version in Init. | `Retain target, narrow ownership`. | Seam 05 owns the bootstrap value; seams 08 and 10 own lifecycle and placement. |
 | Add separate Plugin Runtime Init, Context, Status, and `plugin_runtimes` APIs. | `Remove as required`. | No such API exists. Current Plugin context and `children` inspection stay compatible. |
-| Persistent first creation writes revision zero after Plugin readiness. | `Retain pending target`. | Seams 07 and 08 own this missing contract. |
+| Persistent first creation writes revision zero after Plugin readiness. | `Implemented for start-call success`. | Seam 08 owns stricter provisional Registry publication. |
 | Add Plugin terminate and every-state-change callbacks. | `Reject`. | OTP shutdown and later Signals remain the selected boundaries. |
 | Explicit remote `node:` selects an Erlang node and never falls back locally. | `Retain`. | This is implemented and tested. |
 | A remote target owns the child process while the parent owns the logical link. | `Retain`. | This is the current ownership model. |
@@ -287,7 +288,7 @@ No removal or deprecation is approved in this seam.
 | Instance tree | Keep five children and `:one_for_one`. Any strategy, order, or pool change needs a separate fault matrix and rollback rule. |
 | Agent placement | Keep direct peer children and current restart options. Topology-controlled Agents remain temporary. |
 | Runtime checkpoints | Keep same-instance last-commit recovery and clean-stop deletion. Do not convert it into a durability claim. |
-| Persistence | Add revision-zero creation and all-write-error authority rules as one seams-07-and-08 rollout. |
+| Persistence | Consume revision-zero creation, tombstones, and all-write-error authority without adding discovery or lease meaning. |
 | Plugin runtime | Keep the temporary wrapper and permanent root. Add state-version bootstrap without removing state-pull compatibility until parity passes. |
 | Relationships | Keep built-in child Directives, private handles, parent policies, and parent-binding lookup. Add Ref use only after local resolution exists. |
 | Remote placement | Keep top-level `node:` and no fallback. Preserve current uncertain-result and generation behavior. |

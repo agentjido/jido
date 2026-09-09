@@ -17,6 +17,16 @@ defmodule JidoTest.Persistence.AdapterTest do
     def delete(_key, _opts), do: :ok
   end
 
+  defmodule MinimalAdapter do
+    @behaviour Jido.Persistence.Adapter
+
+    @impl true
+    def get(_key, _opts), do: {:error, :not_found}
+
+    @impl true
+    def compare_and_swap(_key, _expected, _value, _opts), do: :ok
+  end
+
   defmodule RejectingAdapter do
     @behaviour Jido.Persistence.Adapter
 
@@ -78,6 +88,7 @@ defmodule JidoTest.Persistence.AdapterTest do
 
   test "requires keyword options and supports optional adapter validation" do
     assert {:ok, {CompatibleAdapter, []}} = Persistence.resolve_config(CompatibleAdapter, nil)
+    assert {:ok, {MinimalAdapter, []}} = Persistence.resolve_config(MinimalAdapter, nil)
 
     assert {:error, {:invalid_persistence_config, _}} =
              Persistence.resolve_config({ETS, [:not_keyword]}, nil)

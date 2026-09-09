@@ -19,7 +19,7 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
     @impl true
     def compare_and_swap(key, expected, value, opts) do
       if Elixir.Agent.get(Keyword.fetch!(opts, :fault), & &1) do
-        {:error, :test_storage_unavailable}
+        {:error, {:rejected, :test_storage_unavailable}}
       else
         Jido.Persistence.File.compare_and_swap(key, expected, value, opts)
       end
@@ -180,16 +180,17 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
     :ok = Elixir.Agent.update(fault, fn _ -> true end)
     before_write = Server.snapshot(server)
 
-    assert {:error, {:persistence_failed, :test_storage_unavailable}} =
+    assert {:error, {:persistence_failed, {:rejected, :test_storage_unavailable}}} =
              Agent.record_and_deliver(server, "effect-1", 7)
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
-                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                    {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
                    1_000
 
     refute_received {:effect_attempt, "effect-1", _task}
     assert Sink.records(context.jido) == %{}
-    assert {:error, :not_found} = load(context, before_write.agent.id)
+    initial = before_write.agent
+    assert {:ok, ^initial, 0} = load(context, initial.id)
   end
 
   test "a failed completion write retains intent for a restored activation", context do
@@ -205,7 +206,7 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
     send(task, :release)
 
     assert_receive {:DOWN, ^monitor, :process, ^server,
-                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                    {:shutdown, {:persistence_failed, {:rejected, :test_storage_unavailable}}}},
                    1_000
 
     assert {:ok, ^committed, 1} = load(context, committed.id)

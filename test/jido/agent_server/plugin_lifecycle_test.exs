@@ -49,6 +49,32 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     end
   end
 
+  defmodule ObservedRuntime do
+    use GenServer
+    use Jido.Plugin
+
+    def child_spec(init), do: %{id: __MODULE__, start: {__MODULE__, :start_link, [init]}}
+    def start_link(init), do: GenServer.start_link(__MODULE__, init)
+
+    def init(init) do
+      send(Keyword.fetch!(init.options, :observer), {:observed_runtime_started, self()})
+      {:ok, init}
+    end
+  end
+
+  defmodule RejectingCreateAdapter do
+    @behaviour Jido.Persistence.Adapter
+
+    @impl true
+    def get(_key, _opts), do: {:error, :not_found}
+
+    @impl true
+    def compare_and_swap(_key, :not_found, _value, opts) do
+      send(Keyword.fetch!(opts, :observer), :initial_write_rejected)
+      {:error, {:rejected, :storage_unavailable}}
+    end
+  end
+
   test "standalone Servers own a runtime tree and stop it on shutdown" do
     server = start_supervised!({Server, agent: Agent})
     assert :ok = Server.await_ready(server)
@@ -107,6 +133,40 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
 
     assert_receive {:DOWN, ^waiter_ref, :process, ^waiter, _reason}, 2_000
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
+  end
+
+  test "a rejected initial persistence write cleans up the provisional Plugin runtime", %{
+    jido: jido
+  } do
+    observer = __MODULE__.InitialWriteObserver
+    Process.register(self(), observer)
+    id = unique_id("initial-write-rejected")
+
+    definition =
+      Jido.Agent.new!(
+        name: "initial_write_rejected",
+        plugins: [{ObservedRuntime, observer: observer}]
+      )
+
+    starter =
+      Task.async(fn ->
+        Jido.start_agent(jido, definition,
+          id: id,
+          persistence: {RejectingCreateAdapter, observer: observer},
+          restore: false,
+          restart: :temporary
+        )
+      end)
+
+    assert_receive {:observed_runtime_started, runtime}, 1_000
+    runtime_ref = Process.monitor(runtime)
+    assert_receive :initial_write_rejected, 1_000
+
+    assert {:error, {:persistence_failed, {:rejected, :storage_unavailable}}} =
+             Task.await(starter, 2_000)
+
+    assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
+    eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
   end
 
   test "failed readiness after a runtime restart stops the owner", %{jido: jido} do
