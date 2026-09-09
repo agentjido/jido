@@ -380,7 +380,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-001` | `Blocker` | 00 Overview | One-owner, stable identity, durability, cancellation, and compatibility targets are pending approval. | Approve them or replace them with explicit Server assumptions. |
 | `SRV-BLK-002` | `Blocker` | 90 Package boundaries | Local-core ownership, API retention, and public-only extension rules are pending. | Approve or change the package boundary. |
 | `SRV-BLK-003` | `Blocker` | 12 Errors and contracts | Stable timeout, overload, reentry, cancellation, runtime, and persistence errors are pending. | Approve the result registry before public conversion. |
-| `SRV-BLK-004` | `Blocker` | 01 Agent and 02 Agent authoring | Definition revision and canonical versioned construction are not implemented. | Approve revision defaults and old-definition rules. |
+| `SRV-BLK-004` | `Implementation gap` | 01 Agent and 02 Agent authoring | Agent `vsn` and canonical versioned construction are approved but not implemented. | Implement and prove module defaults, preservation, and legacy restore. |
 | `SRV-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Ref, namespace binding, partition conversion, and Ref-first facade do not exist. | Approve identity and instance resolution without removing current handles. |
 | `SRV-BLK-006` | `Blocker` | 04 Turn evaluation and 05 Plugins | Current Plugin admission and preparation can affect the Signal before route selection. | Approve and migrate fixed source-Signal selection with facet compatibility. |
 | `SRV-BLK-007` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | Current confirmed write errors can continue, contrary to the pending all-error target. | Select one authority rule and align stop, caller, and restore behavior. |
@@ -389,7 +389,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-010` | `Assumption` | 08 Agent Server | A Server-wide Turn limit starts with active pre-commit work, not mailbox wait, and ends when commit begins. | Approve or change `SRV-DEC-003`. |
 | `SRV-BLK-011` | `Assumption` | 08 Agent Server and 13 Observability | Current status, Outcome, and debug contracts remain during migration. | Inventory consumers before a versioned replacement. |
 | `SRV-BLK-012` | `Assumption` | 10 Runtime topology | Explicit known-node child operations remain supported but grant no cluster authority. | Keep placement and authority outside this seam. |
-| `SRV-BLK-013` | `Blocker` | 04 Turn evaluation and `jido_action` | Definition revision does not pin loaded Action or Flow code. | Approve the V3 non-guarantee or create a lower-owner code-revision contract. |
+| `SRV-BLK-013` | `Resolved design` | 04 Turn evaluation and `jido_action` | Agent `vsn` does not pin loaded Action or Flow code. | V3 uses the code loaded when `Jido.Exec` invokes the selected executable. |
 | `SRV-BLK-014` | `Blocker` | 08 Agent Server | No public need, state migration, in-flight-Turn, rollback, or test contract exists for `code_change/4`. | Defer hot private-state upgrade or approve a separate design. |
 | `SRV-BLK-015` | `Resolved` | Design index and dependent seam owners | The main review table and dependent seams now use the Agent Server briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 

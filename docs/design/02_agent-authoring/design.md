@@ -99,9 +99,8 @@ function shall return the canonical validated neutral definition.
 command functions, the generated functions shall delegate to the canonical
 Agent boundaries.
 
-`AUTH-REQ-014`: Where seam 01 assigns a definition revision to a generated
-module, the Agent DSL compiler shall preserve that revision in the canonical
-definition.
+`AUTH-REQ-014`: Where seam 01 assigns `vsn` to a generated module, the Agent
+DSL compiler shall preserve `vsn` in the canonical definition.
 
 `AUTH-REQ-015`: Where seam 01 permits an unversioned direct or behavior-only
 definition, the Agent authoring boundary shall preserve that compatibility
@@ -187,8 +186,8 @@ route target without executing it.
 `AUTH-REQ-038`: When the Agent Builder builds a definition or instance, it
 shall use the canonical Agent definition and instantiation boundaries.
 
-`AUTH-REQ-039`: Where seam 01 adds definition revision, the Agent Builder shall
-accept and preserve that revision without removing old Builder input.
+`AUTH-REQ-039`: Where seam 01 adds Agent `vsn`, the Agent Builder shall accept
+and preserve it without removing old Builder input.
 
 ### Codec and trusted Registry
 
@@ -219,9 +218,9 @@ shall resolve it directly to one canonical entry.
 Agent Codec shall return an authoring error without changing direct Agent
 validity.
 
-`AUTH-REQ-048`: Where seam 01 adds definition revision, the Agent Codec shall
-preserve it in a versioned authoring document and shall keep an approved rule
-for existing version-1 documents.
+`AUTH-REQ-048`: Where seam 01 adds Agent `vsn`, the Agent Codec shall preserve
+it in a versioned authoring document and shall keep an approved rule for
+existing version-1 documents.
 
 `AUTH-REQ-049`: The Plugin Codec shall encode one canonical Plugin declaration
 as module and options and shall exclude Plugin state and runtime data.
@@ -381,7 +380,7 @@ bypass common Agent validation.
   executable code.
 - `AUTH-INV-008`: A valid direct definition can be outside the Codec portable
   subset without becoming invalid.
-- `AUTH-INV-009`: Definition revision, Codec document version, checkpoint
+- `AUTH-INV-009`: Agent `vsn`, Codec document version, checkpoint
   version, Agent state version, and storage revision are separate concepts.
 
 ## Downstream guarantees
@@ -412,5 +411,5 @@ All recommendations are pending approval.
 | `AUTH-DEC-004` | Can Codec encode an Agent instance? | Yes. Derive and validate its neutral definition, then encode only static data. | Current instance calls stay supported without repeated state parsing. |
 | `AUTH-DEC-005` | Must every valid definition be encodable? | No. Codec supports the Registry-resolvable static subset. | Runtime closures stay valid for direct use and fail clearly at Codec. |
 | `AUTH-DEC-006` | How do data users apply extensions? | Publish the pure lowerer; Builder and Codec consume lowered core data only. | Extension syntax does not enter the document format or runtime. |
-| `AUTH-DEC-007` | How does definition revision enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | This seam does not redefine checkpoint or restore policy. |
+| `AUTH-DEC-007` | How does Agent `vsn` enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | This seam does not redefine checkpoint or restore policy. |
 | `AUTH-DEC-008` | Does explicit route `defaults:` accept structs? | No. Keep the plain-map rule and retain the legacy tuple exception until a staged migration is approved. | Existing tuple input remains compatible. |

@@ -306,9 +306,7 @@ defmodule Jido.Persistence do
         checkpoint: checkpoint
       }
 
-      if PortableTerm.valid?(record),
-        do: {:ok, record},
-        else: {:error, {:invalid_checkpoint, :non_portable_term}}
+      with :ok <- validate_portable_record(record), do: {:ok, record}
     else
       false -> {:error, {:invalid_checkpoint, :shape}}
       {:error, _reason} = error -> error
@@ -354,11 +352,8 @@ defmodule Jido.Persistence do
       not is_map(Map.get(record, :checkpoint)) ->
         {:error, {:invalid_persistence_record, :checkpoint}}
 
-      not PortableTerm.valid?(record) ->
-        {:error, {:invalid_persistence_record, :non_portable_term}}
-
       true ->
-        :ok
+        validate_portable_record(record)
     end
   end
 
@@ -369,6 +364,20 @@ defmodule Jido.Persistence do
 
   defp validate_restored_identity(_agent, _module, _id),
     do: {:error, {:invalid_persistence_record, :checkpoint_identity}}
+
+  defp validate_portable_record(record) do
+    case PortableTerm.validate(record, :record) do
+      :ok ->
+        :ok
+
+      {:error, path} ->
+        {:error,
+         Error.validation_error("Persistence record contains a non-portable term",
+           kind: :config,
+           details: %{code: :non_portable_term, path: path}
+         )}
+    end
+  end
 
   defp restore_context(record) do
     %{

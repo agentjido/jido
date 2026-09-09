@@ -34,7 +34,7 @@ are also pending drafts.
 | Interfaces | `define` generates Signal and live-call helpers only on modules. | Keep module-only helpers outside definition parity. |
 | Codec | Static data uses a trusted Registry and a closed JSON format. Instance encoding validates live state. | Encode the static definition of a definition or instance. Keep nonportable source forms valid but not encodable. |
 | Extensions | Spark calls the pure lowerer. Builder and Codec accept lowered data only. | Publish one pure data-lowering boundary and keep runtime ownership out. |
-| Revision | No definition revision exists in authoring data. | Preserve the pending Agent-seam revision through every applicable form. |
+| Agent `vsn` | No enforced module-owned `vsn` exists in authoring data. | Preserve the Agent-seam `vsn` through every applicable form. |
 
 ## Major gaps and work remaining
 

@@ -64,7 +64,9 @@ defmodule Jido.Topology.Controller.Activation do
           key: spec.key
         })
 
-      definition = %{definition | metadata: metadata}
+      # Topology owns this derived static definition. It is not the exact
+      # generated module definition, so it uses the compatible unversioned form.
+      definition = %{definition | metadata: metadata, vsn: nil}
 
       definition =
         if spec.subscriptions == [] do

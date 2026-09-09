@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Approved seam review entry point. Dependent owner-seam work remains open.
 
 # 01 — Agent
 
@@ -9,9 +9,10 @@ forms: a neutral definition and an instance. An instance has one combined state
 map. That map contains domain state and Plugin-owned state. Direct `cmd/3`
 evaluation returns a candidate Agent and Directives without a process or commit.
 This seam keeps those contracts. It also keeps Builder, Codec, custom routing,
-and custom checkpoint callbacks. The recommended target adds a compatible
-definition revision and rejects nonportable state at Agent acceptance
-boundaries. Both changes need staged migration and approval.
+and custom checkpoint callbacks. The working-tree implementation adds a
+compatible module-owned `vsn` and rejects nonportable state at Agent acceptance
+boundaries. The contract and its implementation evidence were approved on
+2026-09-09.
 
 ## Why this seam exists
 
@@ -31,43 +32,55 @@ boundaries. Both changes need staged migration and approval.
 | State | One complete map includes domain and Plugin-owned fields. | Keep one map and keep separate write owners. |
 | Direct execution | `cmd/3` returns a candidate Agent and Directives. | Keep this process-free evaluation contract. |
 | Authoring | Module DSL, direct data, Builder, and Codec use shared validation. | Keep all forms and one normalized definition contract. |
-| Checkpoints | Version-1 maps and complete custom callbacks are supported. | Keep them readable and add a versioned revision check without a forced public struct. |
-| Portable state | Persistence rejects nonportable records. | Reject nonportable state when the Agent accepts it and again at persistence. |
+| Checkpoints | Version-1 maps and complete custom callbacks are supported. | Keep them readable, write version 2 for generated modules, and wrap new custom payloads in a core-owned revision envelope. |
+| Portable state | Persistence rejects nonportable records. | Reject nonportable state when the Agent accepts it and again at persistence. Keep static direct definitions unrestricted in memory. |
 
 ## Major gaps and work remaining
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| No definition revision | Restore cannot detect changed module meaning. | Add an authoring-compatible revision and an old-checkpoint rule. | 01 Agent, 02 Agent authoring, 07 Persistence |
-| Late portability check | Direct or nonpersistent Agents can accept runtime handles. | Add path-aware checks at Agent state acceptance. | 01 Agent, 05 Plugins, 12 Errors |
-| Checkpoint text and behavior are not aligned | The default map stores the complete combined state, not domain-only state. | State the current format correctly and define a compatible next format. | 01 Agent, 07 Persistence |
-| Prerequisite drafts are pending | Error and package rules can still change. | Approve or replace the assumptions before implementation. | 00 Overview, 90 Package boundaries, 12 Errors |
+| Dependent authoring adoption | Seam 02 must use the approved `vsn` contract in its own final design. | Review and approve the dependent authoring seam. | 02 Agent authoring |
+| Persistence integration | Seam 07 owns storage records beyond the Agent checkpoint map. | Review the approved Agent checkpoint contract during persistence approval. | 07 Persistence |
+| Error normalization | Callback fault normalization remains outside the implemented Agent scope. | Finish the shared error matrix without changing the approved Agent value or checkpoint contract. | 12 Errors |
+| Package compatibility | Package release gates remain owned by the package seam. | Prove the compatible V3 package release set. | 90 Package boundaries |
 
-## Decisions requested
+## Approved decisions
 
-1. **Retained Agent model:** Approve two Agent forms, one combined state map,
+1. **Retained Agent model:** Keep two Agent forms, one combined state map,
    direct execution, Builder, Codec, custom routing, and checkpoint callbacks.
    Effect: no current supported Agent path is removed in this seam.
-2. **Definition revision:** Approve revision `1` as the default for existing
-   `use Jido.Agent` modules and allow unversioned direct definitions.
+2. **Agent `vsn`:** Use `vsn` as the canonical field. Use `1` as the
+   default for existing `use Jido.Agent` modules and allow unversioned direct
+   definitions.
    Effect: module authors get a compatible restore gate.
-3. **Checkpoint evolution:** Approve a version-2 default map for versioned
+3. **Checkpoint evolution:** Use a version-2 default map for versioned
    module definitions while version 1 and custom callbacks stay supported.
    Effect: restore can check module meaning without a forced checkpoint struct.
-4. **Portable state:** Approve early state checks after a compatibility audit
+4. **Portable state:** Add early state checks after a compatibility audit
    and use the error contract from seam 12.
    Effect: direct, live, and persistent paths accept the same portable state.
+
+## Additional approved decisions
+
+1. **Custom checkpoint envelope:** Jido wraps a new opaque custom callback
+   payload in a versioned core-owned `agent_module` and `vsn` envelope. Restore
+   also keeps the legacy raw-map read path.
+2. **Direct durable definitions:** Direct definitions stay unrestricted in
+   memory. The default checkpoint supports only the portable embedded subset.
+   Other definitions get a typed portability error and need a generated module
+   or a custom durable form.
 
 ## Dependencies
 
 - Prerequisites: [00 Overview](../00_overview/alignment.md),
   [90 Package boundaries](../90_package-boundaries/alignment.md), and
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md). All are
-  pending draft prerequisites.
+  [12 Errors and contracts](../12_errors-and-contracts/alignment.md). Overview
+  is approved. Package and error contracts remain pending.
 - Dependents: 02 Agent authoring, 03 Agent identity, 04 Turn evaluation,
   05 Plugins, 07 Persistence, and 08 Agent Server.
-- Blockers: prerequisite approval, the final portable-error path, and the
-  version-2 checkpoint migration rule.
+- The pending package and error seams are explicit downstream assumptions.
+  They do not block the approved Agent contract. A later conflicting contract
+  requires a reviewed migration.
 
 ## Documents
 

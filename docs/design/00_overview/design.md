@@ -1,10 +1,13 @@
-> Target seam design. This document is pending approval.
+> Approved target seam design. Detailed owner-seam contracts and
+> implementation evidence remain open.
 
 # Core model, shared terms, and invariants design
 
-All requirements and decisions in this document are recommended targets. The
+The shared requirements and 12 decisions in this document were approved as the
+V3 direction on 2026-09-09. The
 [design review index](../README.md#document-review-status) is the source of
-truth for approval. It does not approve any item in this document.
+truth for approval. Owner seams must still define the open details and supply
+implementation evidence.
 
 ## Scope and owner
 
@@ -333,7 +336,7 @@ is clearer than a struct.
 | Value or contract | Shared role | Detailed owner |
 | --- | --- | --- |
 | Signal | Immutable input envelope. The received value is the source Signal. | `jido_signal`; seams 04 and 05 own Jido use. |
-| Agent definition | Static schema, routes, Plugin declarations, metadata, and definition revision. | 01 Agent and 02 Agent authoring |
+| Agent definition | Static schema, routes, Plugin declarations, metadata, and module-owned `vsn`. | 01 Agent and 02 Agent authoring |
 | Agent instance | Immutable identity and complete portable domain and Plugin state. | 01 Agent |
 | Agent Ref | Stable identity, separate from runtime location. | 03 Agent identity, then 07, 09, and 10 |
 | Turn | One fixed executable and input for one source Signal. | 04 Turn evaluation |
@@ -401,7 +404,7 @@ contain the required behavior.
 
 | Preferred term | Meaning | Do not use as an alias |
 | --- | --- | --- |
-| Agent definition | Immutable static Agent value with schema, routes, Plugin declarations, metadata, and definition revision. | Agent class, Agent template |
+| Agent definition | Immutable static Agent value with schema, routes, Plugin declarations, metadata, and module-owned `vsn`. | Agent class, Agent template |
 | Agent instance | Immutable Agent value with identity and complete validated state. | live Agent, actor process |
 | Agent ID | Supported nonempty string in one Agent instance. | Agent Ref, PID |
 | Agent Ref | Stable identity across lookup, storage, delivery, and placement. | PID, server name, persistence key |
@@ -414,7 +417,7 @@ contain the required behavior.
 | Candidate Agent | Complete validated immutable Agent proposed by evaluation. | next live state, commit |
 | Evaluation return | Direct `Jido.Agent.cmd/3` result. It proves no live or durable commit. | live result, Turn Outcome |
 | Live result | Tagged live reply at the commit boundary. | Result struct, Turn Outcome |
-| State version | Integer that advances once for each successful live Turn commit. | storage lease, definition revision |
+| State version | Integer that advances once for each successful live Turn commit. | storage lease, Agent `vsn` |
 | Commit | Operation that makes one candidate Agent live after required persistence succeeds. | candidate, persistence write |
 | Turn Outcome | Terminal observation after Directive work settles or the Turn stops. | live result, commit result |
 | Directive | Typed request for runtime-owned post-commit work. | guaranteed durable effect |
@@ -423,7 +426,7 @@ contain the required behavior.
 | Agent checkpoint | Portable Agent reconstruction data. | runtime checkpoint, Codec document |
 | Persistence record | Durable lifecycle and compare-and-swap envelope. | Agent identity, checkpoint |
 | Write authority | Permission for the current activation to do another durable commit. | PID ownership, Registry presence |
-| Definition revision | Module-owned revision of normalized Agent-definition meaning. It does not pin loaded BEAM code by itself. | state version, package version |
+| Agent `vsn` | Positive module-owned revision of normalized Agent-definition meaning. It does not pin loaded BEAM code by itself. | checkpoint format version, state version, package version |
 | Plugin | User-declared reusable capability. | adapter, authoring extension |
 | Plugin facet | Proposed owner-specific Plugin behavior. | arbitrary hook, adapter |
 | Plugin runtime | Supervised resources for one Plugin on one Agent activation. | Plugin state |
@@ -457,21 +460,33 @@ approved. Detailed owner contracts remain open.
 | 13 Observability | Semantic Turn, commit, Directive, lifecycle, and settlement boundaries are the target. Observation is bounded and has no execution authority. |
 | 99 Delivery | A supported API remains until an approved migration and acceptance evidence permit a change. |
 
-## Open design decisions
+## Approved design decisions
 
-All options in this table are recommendations and are pending approval.
+The user approved the shared direction on 2026-09-09. An `Open detail` does not
+reverse the decision. It identifies work that the owner seam must complete.
 
-| ID | Question | Recommended option | Effect |
+| ID | Approved direction | Status | Effect or open detail |
 | --- | --- | --- | --- |
-| `OVR-DEC-001` | Which route selects the executable? | Select the first Router match from the source Signal before Plugin preparation. | Ambiguous routes become deterministic. Route-changing Plugins need migration. |
-| `OVR-DEC-002` | What does abnormal nonpersistent restart restore? | Restore the latest in-instance runtime checkpoint and state version. | Abnormal same-instance restart preserves the latest committed state. |
-| `OVR-DEC-003` | Is stable Agent Ref in V3 scope? | Yes. Add it beside supported ID and PID APIs. | Seams 03, 07, 09, and 10 need a staged identity migration. |
-| `OVR-DEC-004` | How does definition revision work? | Use a positive module-owned revision, preserve it through all authoring forms, and define an old-checkpoint rule. | Restore can reject a definition mismatch. Executable code pinning stays open. |
-| `OVR-DEC-005` | How is Plugin behavior divided? | Use Agent, Agent Server, Persistence, and Topology as proposed facet owners under one ordered Plugin declaration. | Seam 05 can separate mixed ownership without changing declaration order. |
-| `OVR-DEC-006` | Do complete custom checkpoint callbacks remain? | Keep `checkpoint/2` and `restore/2` until Persistence-facet composition is explicit. | No Plugin facet can silently replace custom checkpoint meaning. |
-| `OVR-DEC-007` | Which durability changes are in V3 scope? | Require initial active records, loss of write authority after every write error, and tombstones. | Seams 07 and 08 need behavior changes and migration evidence. |
-| `OVR-DEC-008` | Which supported APIs remain for V3? | Keep Builder, Codec, neutral definitions, owned children, public PID APIs, persistence adapters, and local debug paths. | New APIs are additive until a separate deprecation decision. |
-| `OVR-DEC-009` | How much live Topology control is in V3? | Keep static local activation and repair. Defer owner-Agent live control and target updates. | Live upgrade does not block V3. |
-| `OVR-DEC-010` | Which services belong in Jido core? | Keep core local. Keep general durable, cluster, and transport services in focused packages. | No unproved external package API becomes a V3 dependency. |
-| `OVR-DEC-011` | Does this seam approve exact new public structs? | No. Approve roles only and let seam 12, seam 90, and value owners decide types. | Supported maps, tuples, and structs remain until a staged replacement is approved. |
-| `OVR-DEC-012` | Which observation APIs remain during migration? | Make semantic Agent events the target and keep legacy telemetry, `Jido.Observe`, and debug paths. | Seam 13 must prove replacement coverage before removal. |
+| `OVR-DEC-001` | Select the first Router match from the source Signal before Plugin preparation and make the fixed selection available to the observation boundary. | Approved | Ambiguous routes become deterministic and route selection can be logged without using Plugin-mutated input. Route-changing Plugins need migration. |
+| `OVR-DEC-002` | Restore the latest in-instance runtime checkpoint and state version after an abnormal nonpersistent restart. | Approved | Abnormal same-instance restart preserves the latest committed state. |
+| `OVR-DEC-003` | Add stable Agent Ref in V3 beside supported ID and PID APIs. | Approved | Seams 03, 07, 09, and 10 need a staged identity migration. |
+| `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | Default checkpoints and durable records store a snapshot for restore validation. A missing revision in a valid version-1 default checkpoint means `vsn: 1`. It does not belong to Agent Ref and does not pin loaded BEAM code. |
+| `OVR-DEC-005` | Separate Plugin responsibilities by their Agent, Agent Server, Persistence, and Topology owners. | Approved direction; detailed model deferred | Seam 05 must later define the smallest coherent declaration, callback, and composition model. The exact four-facet model is not approved. |
+| `OVR-DEC-006` | Keep complete Agent `checkpoint/2` and `restore/2` callbacks until Persistence composition is explicit. | Approved | No Plugin contract can silently replace custom checkpoint meaning. |
+| `OVR-DEC-007` | Require initial active records, loss of write authority after every write error, and tombstones. | Approved | Seams 07 and 08 must define failure, retention, purge, reactivation, and restart rules. |
+| `OVR-DEC-008` | Keep Builder, Codec, neutral definitions, owned children, public PID APIs, persistence adapters, and local debug paths. | Approved | New APIs are additive until a separate deprecation decision. |
+| `OVR-DEC-009` | Keep static local activation and repair. Defer owner-Agent live control and target updates. | Approved | Live Topology control does not block V3. |
+| `OVR-DEC-010` | Keep core local. Keep general durable, cluster, and transport services in focused packages. | Approved | No unproved external package API becomes a V3 dependency. |
+| `OVR-DEC-011` | Approve public value roles only. Let seam 12, seam 90, and value owners decide exact types. | Approved | Supported maps, tuples, and structs remain until a staged replacement is approved. |
+| `OVR-DEC-012` | Make semantic Agent events the target and keep legacy telemetry, `Jido.Observe`, and debug paths during migration. | Approved | Seam 13 must prove replacement coverage before removal. |
+
+### V2 `vsn` research note
+
+In tag `v2.3.3`, `vsn` was an optional compile-time Agent authoring option. It
+was a string, was copied into `%Jido.Agent{}`, and was returned by `vsn/0` and
+`__agent_metadata__/0`. The default version-1 checkpoint contained checkpoint
+format version, Agent module, Agent ID, and state. It did not contain `vsn`,
+and default restore did not compare `vsn`. V3 keeps the canonical name but
+tightens its type and gives it an enforced restore contract. Agent `vsn`,
+checkpoint-format version, state version, package version, and OTP code-change
+version are separate values.

@@ -185,6 +185,7 @@ defmodule Jido.AgentTest do
              Enum.sort([
                :id,
                :module,
+               :vsn,
                :name,
                :description,
                :schema,
@@ -377,14 +378,15 @@ defmodule Jido.AgentTest do
     assert %Agent{id: nil, state: nil} = Agent.definition(first)
   end
 
-  test "checkpoints and restores only Agent domain data" do
+  test "checkpoints and restores complete Agent state" do
     agent = CounterAgent.new!(id: "saved", state: %{count: 7, history: ["saved"]})
 
     assert {:ok, checkpoint} = Agent.checkpoint(agent)
+    assert checkpoint.version == 2
     assert checkpoint.kind == :agent
     assert checkpoint.agent_module == CounterAgent
-    assert checkpoint.definition == CounterAgent.agent()
-    assert %Agent{id: nil, state: nil} = checkpoint.definition
+    assert checkpoint.vsn == CounterAgent.vsn()
+    refute Map.has_key?(checkpoint, :definition)
     assert checkpoint.state == agent.state
 
     assert {:ok, restored} = Agent.restore(CounterAgent, checkpoint)
@@ -925,10 +927,15 @@ defmodule Jido.AgentTest do
 
     test "module-authored restore uses the current module definition" do
       agent = AuthoredAgent.new!(id: "current-definition-1", state: %{count: 5})
-      assert {:ok, checkpoint} = Agent.checkpoint(agent)
 
-      archived_definition = %{checkpoint.definition | description: "archived definition"}
-      checkpoint = %{checkpoint | definition: archived_definition}
+      checkpoint = %{
+        version: 1,
+        kind: :agent,
+        agent_module: AuthoredAgent,
+        id: agent.id,
+        definition: %{Agent.definition(agent) | description: "archived definition"},
+        state: agent.state
+      }
 
       assert {:ok, restored} = Agent.restore(AuthoredAgent, checkpoint)
       assert Agent.definition(restored) == AuthoredAgent.agent()
@@ -942,7 +949,18 @@ defmodule Jido.AgentTest do
         )
 
       assert {:ok, checkpoint} = Agent.checkpoint(agent, %{saved_by: "checkpoint"})
-      assert checkpoint.saved_by == "checkpoint"
+
+      assert checkpoint == %{
+               version: 2,
+               kind: :agent_custom,
+               agent_module: CallbackPersistenceAgent,
+               vsn: 1,
+               payload: %{
+                 id: "callback-1",
+                 state: %{count: 7, history: ["before"]},
+                 saved_by: "checkpoint"
+               }
+             }
 
       assert {:ok, restored} =
                Agent.restore(CallbackPersistenceAgent, checkpoint, %{restored_by: "restore"})
@@ -957,9 +975,11 @@ defmodule Jido.AgentTest do
 
       malformed = [
         Map.delete(checkpoint, :version),
-        %{checkpoint | version: 2},
+        %{checkpoint | version: 3},
         %{checkpoint | kind: :other},
         %{checkpoint | agent_module: Agent},
+        %{checkpoint | vsn: nil},
+        %{checkpoint | vsn: 0},
         %{checkpoint | id: ""},
         %{checkpoint | state: []}
       ]

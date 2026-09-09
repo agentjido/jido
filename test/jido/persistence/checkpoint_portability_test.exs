@@ -23,21 +23,27 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
     assert {:ok, ^agent, 3} = Persistence.load_agent_with_revision(c.store, Probe, c.id)
   end
 
-  test "save rejects a process handle before it reaches the adapter", c do
-    agent = Probe.new!(id: c.id, state: %{payload: %{job: %{worker: self()}}})
-
-    assert {:error, {:invalid_checkpoint, :non_portable_term}} =
-             Persistence.save_agent(c.store, agent)
+  test "Agent acceptance rejects a process handle before persistence", c do
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :non_portable_term,
+                path: [:agent_state, :payload, :job, :worker]
+              }
+            }} = Probe.new(id: c.id, state: %{payload: %{job: %{worker: self()}}})
 
     key = Persistence.agent_key(nil, Probe, c.id)
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
   end
 
-  test "save rejects a nested improper list without raising", c do
-    agent = Probe.new!(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
-
-    assert {:error, {:invalid_checkpoint, :non_portable_term}} =
-             Persistence.save_agent(c.store, agent)
+  test "Agent acceptance rejects a nested improper list without raising", c do
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :non_portable_term,
+                path: [:agent_state, :payload, :job, :values, 1]
+              }
+            }} = Probe.new(id: c.id, state: %{payload: %{job: %{values: [1 | self()]}}})
 
     key = Persistence.agent_key(nil, Probe, c.id)
     assert {:error, :not_found} = Store.get(key, elem(c.store, 1))
@@ -45,6 +51,13 @@ defmodule JidoTest.Persistence.CheckpointPortabilityTest do
 
   test "load rejects a nested process handle supplied by storage", c do
     assert :ok = Probe.store_payload(c.store, c.id, %{job: %{worker: self()}})
-    assert {:error, _} = Persistence.load_agent(c.store, Probe, c.id)
+
+    assert {:error,
+            %Jido.Error.ValidationError{
+              details: %{
+                code: :non_portable_term,
+                path: [:record, :checkpoint, :state, :payload, :job, :worker]
+              }
+            }} = Persistence.load_agent(c.store, Probe, c.id)
   end
 end

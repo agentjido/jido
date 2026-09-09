@@ -1,4 +1,5 @@
-> Seam review entry point. This document is pending approval.
+> Approved seam review entry point. Detailed owner-seam contracts and
+> implementation evidence remain open.
 
 # 00 — Core model, shared terms, and invariants
 
@@ -14,8 +15,10 @@ Plugin runtime replacement. This seam defines only the shared model and
 invariants. Each owner seam defines its detailed API.
 
 The [design review index](../README.md#document-review-status) is the source of
-truth for approval. It has no `Approved` Overview entry. Thus, no
-recommendation or target requirement in this folder is an approved decision.
+truth for document approval. The Overview documents and 12 decisions were
+approved on 2026-09-09. The exact Plugin ownership model remains deferred
+owner-seam design work. Approval does not mean that target behavior is present
+in the code.
 
 ## Why this seam exists
 
@@ -50,20 +53,27 @@ recommendation or target requirement in this folder is an approved decision.
 | Public values and errors | Several proposed structs do not exist, and current public protocols use structs, maps, tuples, and atoms. | One owner and migration rule for each public value and error. | 12 Errors and contracts, 90 Package boundaries, value owners |
 | Acceptance coverage | Skipped research tests specify several target contracts but do not prove them. | Passing owner-seam evidence for each approved Overview requirement. | All dependent seams, closed by 99 Delivery |
 
-## Decisions requested
+## Approved direction
 
-These are recommended decisions. They are not approved.
+The user approved these shared decisions on 2026-09-09. Items 4 and 5 approve
+the direction but leave the listed owner-seam details open.
 
 1. **Route contract:** Select the first Router match from the source Signal
    before Plugin preparation. Admission and preparation cannot replace it.
+   Make that fixed selection available to the observation boundary for safe
+   logging.
 2. **Nonpersistent restart:** Keep the current last-commit runtime checkpoint
    rule for abnormal restart in the same Jido instance.
 3. **Stable identity:** Make Agent Ref a V3 target and keep current ID and PID
    APIs during migration.
-4. **Definition revision:** Use a positive module-owned revision, preserve it
-   in all authoring forms, and define a rule for old checkpoints.
-5. **Plugin ownership:** Use Agent, Agent Server, Persistence, and Topology as
-   the four proposed facet owners under one ordered Plugin declaration.
+4. **Definition revision:** Keep `vsn` as the canonical field name. Store it
+   on the immutable Agent definition and copy it to each instance. A generated
+   module owns it at compile time and defaults it to `1`. A checkpoint and
+   durable record store a snapshot for restore validation. Agent Ref and
+   runtime `state_version` do not contain it.
+5. **Plugin ownership:** Separate Agent, Agent Server, Persistence, and
+   Topology responsibilities as the target direction. Defer the exact facet,
+   callback, and composition model until seam 05 receives more design work.
 6. **Custom checkpoints:** Keep complete Agent `checkpoint/2` and `restore/2`
    callbacks until their composition with Persistence facets is explicit.
 7. **Durability scope:** Require initial active records, loss of write authority
@@ -85,8 +95,8 @@ These are recommended decisions. They are not approved.
 - Prerequisites: None. This is the first alignment gate.
 - Dependents: 90, 12, 01 through 11, 13, and 99, in the order in
   `docs/design/AGENTS.md`.
-- Blockers: The 12 decisions above are pending approval. Detailed dependent
-  seams cannot treat them as approved contracts.
+- Blockers: The shared direction is approved. Plugin ownership composition is
+  deferred. Detailed owner-seam contracts and acceptance evidence remain.
 - Lower layers: `jido_action` owns executable work. `jido_signal` owns the
   Signal envelope and ordered route matching. Jido owns how these contracts
   become one Agent Turn.

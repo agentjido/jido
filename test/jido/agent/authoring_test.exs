@@ -196,6 +196,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   defp builder do
     Builder.new(module: Counter, name: "authoring_counter")
+    |> Builder.vsn(1)
     |> Builder.description("All authoring forms")
     |> Builder.schema(Counter.schema())
     |> Builder.metadata(%{owner: :test, nested: {:tag, <<255>>}})

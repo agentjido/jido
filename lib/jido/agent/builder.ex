@@ -36,7 +36,7 @@ defmodule Jido.Agent.Builder do
   def new(module) when is_atom(module) do
     with {:module, ^module} <- Code.ensure_loaded(module),
          true <- function_exported?(module, :__agent_config__, 0) do
-      new(Map.put(module.__agent_config__(), :module, module))
+      new(module.__agent_config__() |> Map.put_new(:vsn, 1) |> Map.put(:module, module))
     else
       _ -> failed("Expected an Agent module")
     end
@@ -47,6 +47,7 @@ defmodule Jido.Agent.Builder do
          :ok <-
            Authoring.keys(attrs, [
              :module,
+             :vsn,
              :name,
              :description,
              :schema,
@@ -66,6 +67,8 @@ defmodule Jido.Agent.Builder do
 
   @doc "Sets the name."
   def name(builder, value), do: put(builder, :name, value)
+  @doc "Sets the Agent definition version."
+  def vsn(builder, value), do: put(builder, :vsn, value)
   @doc "Sets the description."
   def description(builder, value), do: put(builder, :description, value)
   @doc "Sets the domain schema."
@@ -161,6 +164,8 @@ defmodule Jido.Agent.Builder do
 
   defp valid_field(:schema, value), do: Agent.State.validate_schema(value)
 
+  defp valid_field(:vsn, value), do: Agent.Validation.field(:vsn, value) |> status()
+
   defp valid_field(:plugins, value) do
     with {:ok, values} <- Authoring.traverse(value, &{:ok, &1}),
          {:ok, _} <- Jido.Plugin.canonical_declarations(values),
@@ -168,6 +173,9 @@ defmodule Jido.Agent.Builder do
   end
 
   defp valid_field(_key, _value), do: :ok
+
+  defp status({:ok, _value}), do: :ok
+  defp status({:error, _error} = error), do: error
 
   defp validate_route(route) do
     with :ok <- Authoring.validate_target(route.target), do: {:ok, route}

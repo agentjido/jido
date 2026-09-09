@@ -47,6 +47,18 @@ defmodule JidoTest.AgentRuntimeFixtures.ReplyToParent do
   end
 end
 
+defmodule JidoTest.AgentRuntimeFixtures.RecordOrphan do
+  @moduledoc false
+  use Jido.Action, name: "agent_record_orphan"
+
+  @impl Jido.Action
+  def run(params, context) do
+    event = Map.drop(params, [:parent_pid])
+    state = context.agent_state
+    {:ok, %{state | events: state.events ++ [event]}}
+  end
+end
+
 defmodule JidoTest.AgentRuntimeFixtures.BootPluginWorker do
   @moduledoc false
 
@@ -118,7 +130,7 @@ end
 defmodule JidoTest.AgentRuntimeFixtures.ChildAgent do
   @moduledoc false
 
-  alias JidoTest.AgentRuntimeFixtures.{Record, ReplyToParent}
+  alias JidoTest.AgentRuntimeFixtures.{Record, RecordOrphan, ReplyToParent}
 
   use Jido.Agent,
     name: "runtime_child_agent",
@@ -126,7 +138,7 @@ defmodule JidoTest.AgentRuntimeFixtures.ChildAgent do
     routes: [
       {"child.record", Record},
       {"child.reply", ReplyToParent},
-      {"jido.agent.orphaned", Record}
+      {"jido.agent.orphaned", RecordOrphan}
     ]
 end
 

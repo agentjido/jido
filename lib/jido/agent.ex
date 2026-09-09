@@ -82,16 +82,33 @@ defmodule Jido.Agent do
   declaration forms through the same validator. Use `new/2` for an Agent module
   and instance options. These forms preserve the definition and instance
   boundaries above.
+
+  A generated Agent module owns a positive definition `vsn` and defaults to
+  `1`. Direct and behavior-only definitions can use `nil` for compatibility.
+  The default generated-module checkpoint stores the module, `vsn`, identity,
+  and complete combined state in format version 2. Restore rejects a module or
+  `vsn` mismatch before it constructs an Agent. Custom callbacks keep an opaque
+  map payload inside a core-owned revision envelope. Legacy version-1 default
+  checkpoints and raw custom callback maps remain readable.
+
+  Agent state must contain portable terms. PIDs, ports, references, functions,
+  improper lists, and non-byte-aligned bitstrings are rejected with a bounded
+  path. This state rule does not restrict static direct-definition data while
+  it stays in memory. A default embedded-definition checkpoint must still be
+  fully portable.
   """
 
   alias Jido.Agent.{State, Turn}
   alias Jido.Agent.Command.Runner
   alias Jido.Agent.Validation
   alias Jido.Error
+  alias Jido.PortableTerm
   alias Jido.Signal
   alias Jido.Signal.Router
 
-  @checkpoint_version 1
+  @legacy_checkpoint_version 1
+  @checkpoint_version 2
+  @custom_checkpoint_kind :agent_custom
 
   @schema Zoi.struct(
             __MODULE__,
@@ -101,6 +118,11 @@ defmodule Jido.Agent do
                 |> Zoi.nullable()
                 |> Zoi.optional(),
               module: Zoi.atom(description: "Agent behavior module"),
+              vsn:
+                Zoi.integer(description: "Agent definition version")
+                |> Zoi.min(1)
+                |> Zoi.nullable()
+                |> Zoi.optional(),
               name: Zoi.string(description: "Agent name"),
               description:
                 Zoi.string(description: "Agent description")
@@ -117,7 +139,7 @@ defmodule Jido.Agent do
               routes:
                 Zoi.list(Zoi.any(), description: "Canonical Signal Router routes")
                 |> Zoi.default([]),
-              metadata: Zoi.map(description: "Portable Agent metadata") |> Zoi.default(%{})
+              metadata: Zoi.map(description: "Agent definition metadata") |> Zoi.default(%{})
             },
             coerce: true
           )
@@ -196,6 +218,10 @@ defmodule Jido.Agent do
       @spec description() :: String.t() | nil
       def description, do: Map.get(__agent_config__(), :description)
 
+      @doc "Returns the positive Agent definition version owned by this module."
+      @spec vsn() :: pos_integer()
+      def vsn, do: Map.fetch!(__agent_config__(), :vsn)
+
       @doc "Returns the authored Agent data schema."
       @spec domain_schema() :: Zoi.schema()
       def domain_schema, do: Map.get(__agent_config__(), :schema, Zoi.object(%{}))
@@ -222,7 +248,7 @@ defmodule Jido.Agent do
       @spec plugins() :: list()
       def plugins, do: agent().plugins
 
-      @doc "Returns portable Agent metadata."
+      @doc "Returns the Agent definition metadata."
       @spec metadata() :: map()
       def metadata, do: agent().metadata
 
@@ -351,12 +377,13 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Returns the complete portable Agent value as a map."
+  @doc "Returns the complete Agent value as a map."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = agent) do
     %{
       id: agent.id,
       module: agent.module,
+      vsn: agent.vsn,
       name: agent.name,
       description: agent.description,
       schema: agent.schema,
@@ -367,7 +394,7 @@ defmodule Jido.Agent do
     }
   end
 
-  @doc "Builds a domain-only checkpoint through the Agent module callback."
+  @doc "Builds a complete-state checkpoint through the Agent module callback."
   @spec checkpoint(t(), map()) :: {:ok, map()} | {:error, term()}
   def checkpoint(%__MODULE__{} = agent, context \\ %{}) when is_map(context) do
     with {:ok, agent} <- validate_instance(agent),
@@ -377,7 +404,7 @@ defmodule Jido.Agent do
                do: agent.module.checkpoint(agent, context),
                else: default_checkpoint(agent, context)
            end),
-         :ok <- validate_checkpoint_output(checkpoint) do
+         {:ok, checkpoint} <- prepare_checkpoint_output(agent, checkpoint) do
       {:ok, checkpoint}
     end
   end
@@ -386,36 +413,35 @@ defmodule Jido.Agent do
   @spec restore(module(), map(), map()) :: {:ok, t()} | {:error, term()}
   def restore(module, checkpoint, context \\ %{})
       when is_atom(module) and is_map(checkpoint) and is_map(context) do
-    with {:ok, agent} <-
+    with {:ok, callback_checkpoint, saved_vsn} <- prepare_restore_input(module, checkpoint),
+         {:ok, agent} <-
            invoke_persistence_callback(:restore, fn ->
              if module != __MODULE__ and Code.ensure_loaded?(module) and
                   function_exported?(module, :restore, 2),
-                do: module.restore(checkpoint, context),
-                else: default_restore(module, checkpoint, context)
+                do: module.restore(callback_checkpoint, context),
+                else: default_restore(module, callback_checkpoint, context)
            end),
          {:ok, agent} <- validate_instance(agent),
-         :ok <- validate_restored_module(agent, module) do
+         :ok <- validate_restored_module(agent, module),
+         :ok <- validate_restored_vsn(agent, saved_vsn) do
       {:ok, agent}
     end
   end
 
   @doc false
   def default_checkpoint(%__MODULE__{} = agent, _context) do
-    {:ok,
-     %{
-       version: @checkpoint_version,
-       kind: :agent,
-       agent_module: agent.module,
-       id: agent.id,
-       definition: definition(agent),
-       state: agent.state
-     }}
+    with {:ok, agent} <- validate_instance(agent),
+         {:ok, checkpoint} <- build_default_checkpoint(agent),
+         :ok <- validate_portable(checkpoint, :checkpoint) do
+      {:ok, checkpoint}
+    end
   end
 
   @doc false
   def default_restore(module, checkpoint, _context) when is_atom(module) and is_map(checkpoint) do
-    with :ok <- validate_checkpoint(checkpoint, module),
-         {:ok, definition} <- restore_definition(module, checkpoint),
+    with :ok <- validate_portable(checkpoint, :checkpoint),
+         {:ok, version} <- validate_checkpoint(checkpoint, module),
+         {:ok, definition} <- restore_definition(module, checkpoint, version),
          {:ok, agent} <-
            instantiate(definition, id: checkpoint.id, state: Map.fetch!(checkpoint, :state)) do
       {:ok, agent}
@@ -519,9 +545,11 @@ defmodule Jido.Agent do
   end
 
   defp validate_checkpoint(checkpoint, module) do
+    version = Map.get(checkpoint, :version)
+
     cond do
-      Map.get(checkpoint, :version) != @checkpoint_version ->
-        invalid("Agent checkpoint version is invalid", %{version: Map.get(checkpoint, :version)})
+      version not in [@legacy_checkpoint_version, @checkpoint_version] ->
+        invalid("Agent checkpoint version is invalid", %{version: version})
 
       Map.get(checkpoint, :kind) != :agent ->
         invalid("Agent checkpoint kind is invalid", %{kind: Map.get(checkpoint, :kind)})
@@ -538,8 +566,141 @@ defmodule Jido.Agent do
       not is_map(Map.get(checkpoint, :state)) ->
         invalid("Agent checkpoint state must be a map", %{state: Map.get(checkpoint, :state)})
 
+      version == @checkpoint_version and
+          (not is_integer(Map.get(checkpoint, :vsn)) or Map.get(checkpoint, :vsn) <= 0) ->
+        invalid("Agent checkpoint vsn is invalid", %{vsn: Map.get(checkpoint, :vsn)})
+
       true ->
-        :ok
+        {:ok, version}
+    end
+  end
+
+  defp build_default_checkpoint(%__MODULE__{} = agent) do
+    if is_nil(agent.vsn),
+      do: build_legacy_checkpoint(agent),
+      else: build_versioned_checkpoint(agent)
+  end
+
+  defp build_versioned_checkpoint(%__MODULE__{} = agent) do
+    case current_generated_definition(agent.module) do
+      {:ok, current_definition} ->
+        if definition(agent) === current_definition do
+          {:ok,
+           %{
+             version: @checkpoint_version,
+             kind: :agent,
+             agent_module: agent.module,
+             vsn: agent.vsn,
+             id: agent.id,
+             state: agent.state
+           }}
+        else
+          definition_mismatch("Agent instance definition does not match its generated module", %{
+            module: agent.module,
+            instance_vsn: agent.vsn,
+            module_vsn: current_definition.vsn
+          })
+        end
+
+      :not_generated ->
+        build_legacy_checkpoint(agent)
+
+      {:error, _error} = error ->
+        error
+    end
+  end
+
+  defp build_legacy_checkpoint(%__MODULE__{} = agent) do
+    {:ok,
+     %{
+       version: @legacy_checkpoint_version,
+       kind: :agent,
+       agent_module: agent.module,
+       id: agent.id,
+       definition: definition(agent),
+       state: agent.state
+     }}
+  end
+
+  defp prepare_checkpoint_output(agent, checkpoint) do
+    with :ok <- validate_checkpoint_output(checkpoint) do
+      if default_checkpoint_output?(agent, checkpoint) do
+        with :ok <- validate_portable(checkpoint, :checkpoint), do: {:ok, checkpoint}
+      else
+        with :ok <- validate_current_module_vsn(agent.module, agent.vsn) do
+          envelope = %{
+            version: @checkpoint_version,
+            kind: @custom_checkpoint_kind,
+            agent_module: agent.module,
+            vsn: agent.vsn,
+            payload: checkpoint
+          }
+
+          with :ok <- validate_portable(envelope, :checkpoint), do: {:ok, envelope}
+        end
+      end
+    end
+  end
+
+  defp default_checkpoint_output?(agent, checkpoint) do
+    case build_default_checkpoint(agent) do
+      {:ok, expected} -> checkpoint === expected
+      {:error, _error} -> false
+    end
+  end
+
+  defp exact_keys?(map, keys), do: Enum.sort(Map.keys(map)) == Enum.sort(keys)
+
+  defp prepare_restore_input(module, checkpoint) do
+    with :ok <- validate_portable(checkpoint, :checkpoint) do
+      if Map.get(checkpoint, :kind) == @custom_checkpoint_kind do
+        prepare_custom_restore_input(module, checkpoint)
+      else
+        {:ok, checkpoint, :legacy_or_default}
+      end
+    end
+  end
+
+  defp prepare_custom_restore_input(module, checkpoint) do
+    cond do
+      not exact_keys?(checkpoint, [
+        :version,
+        :kind,
+        :agent_module,
+        :vsn,
+        :payload
+      ]) ->
+        invalid("Custom Agent checkpoint envelope is invalid", %{
+          code: :invalid_checkpoint
+        })
+
+      Map.get(checkpoint, :version) != @checkpoint_version ->
+        invalid("Custom Agent checkpoint version is invalid", %{
+          code: :invalid_checkpoint,
+          version: Map.get(checkpoint, :version)
+        })
+
+      Map.get(checkpoint, :agent_module) != module ->
+        definition_mismatch("Custom Agent checkpoint module does not match", %{
+          expected: module,
+          actual: Map.get(checkpoint, :agent_module)
+        })
+
+      not is_map(Map.get(checkpoint, :payload)) or is_struct(Map.get(checkpoint, :payload)) ->
+        invalid("Custom Agent checkpoint payload must be a plain map", %{
+          code: :invalid_checkpoint
+        })
+
+      not valid_vsn?(Map.get(checkpoint, :vsn)) ->
+        invalid("Custom Agent checkpoint vsn is invalid", %{
+          code: :invalid_checkpoint,
+          vsn: Map.get(checkpoint, :vsn)
+        })
+
+      true ->
+        with :ok <- validate_current_module_vsn(module, Map.get(checkpoint, :vsn)) do
+          {:ok, Map.fetch!(checkpoint, :payload), {:custom, Map.get(checkpoint, :vsn)}}
+        end
     end
   end
 
@@ -560,29 +721,66 @@ defmodule Jido.Agent do
     })
   end
 
-  defp restore_definition(__MODULE__, checkpoint), do: restore_checkpoint_definition(checkpoint)
+  defp validate_restored_vsn(_agent, :legacy_or_default), do: :ok
+  defp validate_restored_vsn(%__MODULE__{vsn: vsn}, {:custom, vsn}), do: :ok
 
-  defp restore_definition(module, checkpoint) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :__agent_config__, 0) and
-         function_exported?(module, :agent, 0) do
-      case module.agent() do
-        %__MODULE__{} = definition -> validate_definition(definition)
-        value -> invalid("Agent definition callback returned an invalid value", %{value: value})
-      end
-    else
+  defp validate_restored_vsn(%__MODULE__{} = agent, {:custom, saved_vsn}) do
+    definition_mismatch("Restored Agent vsn does not match", %{
+      saved_vsn: saved_vsn,
+      restored_vsn: agent.vsn
+    })
+  end
+
+  defp restore_definition(__MODULE__, checkpoint, @legacy_checkpoint_version),
+    do: restore_checkpoint_definition(checkpoint)
+
+  defp restore_definition(__MODULE__, _checkpoint, @checkpoint_version) do
+    invalid("Version-2 Agent checkpoints require a generated Agent module", %{
+      code: :invalid_checkpoint
+    })
+  end
+
+  defp restore_definition(module, checkpoint, @checkpoint_version) do
+    with {:ok, definition} <- require_generated_definition(module),
+         :ok <- compare_vsn(definition.vsn, Map.fetch!(checkpoint, :vsn)) do
+      {:ok, definition}
+    end
+  end
+
+  defp restore_definition(module, checkpoint, @legacy_checkpoint_version) do
+    if explicit_unversioned_definition?(checkpoint) do
       restore_checkpoint_definition(checkpoint)
+    else
+      case current_generated_definition(module) do
+        {:ok, definition} ->
+          saved_vsn = Map.get(checkpoint, :vsn, 1)
+
+          with :ok <- compare_vsn(definition.vsn, saved_vsn), do: {:ok, definition}
+
+        :not_generated ->
+          restore_checkpoint_definition(checkpoint)
+
+        {:error, _error} = error ->
+          error
+      end
+    end
+  end
+
+  defp explicit_unversioned_definition?(checkpoint) do
+    case Map.get(checkpoint, :definition) do
+      %{} = definition -> Map.has_key?(definition, :vsn) and is_nil(Map.get(definition, :vsn))
+      _other -> false
     end
   end
 
   defp restore_checkpoint_definition(checkpoint) do
     case Map.get(checkpoint, :definition) do
-      %__MODULE__{} = definition ->
-        validate_definition(definition)
-
       %{} = definition ->
         definition
+        |> Map.delete(:__struct__)
         |> Map.take([
           :module,
+          :vsn,
           :name,
           :description,
           :schema,
@@ -595,6 +793,72 @@ defmodule Jido.Agent do
       value ->
         invalid("Agent checkpoint definition is invalid", %{definition: value})
     end
+  end
+
+  defp current_generated_definition(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :__agent_config__, 0) and
+         function_exported?(module, :agent, 0) do
+      case module.agent() do
+        %__MODULE__{} = definition -> validate_definition(definition)
+        value -> invalid("Agent definition callback returned an invalid value", %{value: value})
+      end
+    else
+      :not_generated
+    end
+  end
+
+  defp require_generated_definition(module) do
+    case current_generated_definition(module) do
+      {:ok, definition} ->
+        {:ok, definition}
+
+      :not_generated ->
+        invalid("Version-2 Agent checkpoints require a generated Agent module", %{
+          code: :invalid_checkpoint,
+          module: module
+        })
+
+      {:error, _error} = error ->
+        error
+    end
+  end
+
+  defp validate_current_module_vsn(module, saved_vsn) do
+    case current_generated_definition(module) do
+      {:ok, definition} -> compare_vsn(definition.vsn, saved_vsn)
+      :not_generated -> :ok
+      {:error, _error} = error -> error
+    end
+  end
+
+  defp compare_vsn(vsn, vsn), do: :ok
+
+  defp compare_vsn(current_vsn, saved_vsn) do
+    definition_mismatch("Agent checkpoint vsn does not match", %{
+      current_vsn: current_vsn,
+      saved_vsn: saved_vsn
+    })
+  end
+
+  defp valid_vsn?(nil), do: true
+  defp valid_vsn?(vsn), do: is_integer(vsn) and vsn > 0
+
+  defp validate_portable(value, root) do
+    case PortableTerm.validate(value, root) do
+      :ok ->
+        :ok
+
+      {:error, path} ->
+        {:error,
+         Error.validation_error("Agent checkpoint contains a non-portable term",
+           kind: :config,
+           details: %{code: :non_portable_term, path: path}
+         )}
+    end
+  end
+
+  defp definition_mismatch(message, details) do
+    invalid(message, Map.put(details, :code, :definition_mismatch))
   end
 
   defp invalid(message, details) do

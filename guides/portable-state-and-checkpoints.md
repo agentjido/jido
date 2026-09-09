@@ -13,7 +13,9 @@ monitors, tasks, and Plugin runtime processes do not enter the record.
 Agents created with `use Jido.Agent` have default `checkpoint/2` and
 `restore/2` callbacks. The default checkpoint contains the Agent identity and
 its complete validated state. Complete state includes the domain state and each
-Plugin state slice.
+Plugin state slice. A generated Agent module also owns a positive `vsn`. Jido
+stores it in the default version-2 checkpoint and rejects a module or `vsn`
+mismatch before it accepts saved state.
 
 ```elixir
 {:ok, checkpoint} = MyAgent.checkpoint(agent, %{
@@ -35,6 +37,14 @@ Application code usually uses `Jido.Persistence` instead of these callbacks.
 Persistence adds the record format, storage identity, revision, and adapter
 boundary.
 
+Direct and behavior-only definitions keep the version-1 checkpoint format with
+an embedded definition. This includes an explicitly unversioned direct
+definition that uses a generated module as its behavior but owns changed static
+data. Direct definitions can contain runtime authoring data in memory. The
+default checkpoint can store them only when the complete map is portable. Use
+an exact generated Agent definition or a custom durable format for other
+definitions.
+
 ## Portable terms only
 
 Checkpoint data must remain valid outside the current process and BEAM node.
@@ -44,6 +54,8 @@ Do not put these values in persistent Agent or Plugin state:
 - ports
 - references
 - functions
+- improper lists
+- bitstrings that are not byte-aligned
 - runtime handles that are valid only on one node
 
 Use stable identifiers and portable configuration. Rebuild runtime resources
@@ -51,9 +63,9 @@ in a Plugin runtime or in application supervision after restore.
 
 ## Custom checkpoint formats
 
-Override `checkpoint/2` and `restore/2` when you need a durable format that is
-different from the default Agent representation. Keep the format explicit and
-versioned.
+Override `checkpoint/2` and `restore/2` when you need a durable payload that is
+different from the default Agent representation. The callbacks own an opaque
+plain-map payload.
 
 ```elixir
 def checkpoint(agent, _context) do
@@ -64,6 +76,12 @@ def restore(%{version: 1, id: id, state: state}, _context) do
   new(id: id, state: state)
 end
 ```
+
+The public `Jido.Agent.checkpoint/2` function wraps a new custom payload in a
+core-owned version-2 envelope. The envelope contains `agent_module`, `vsn`, and
+the opaque `payload`. `Jido.Agent.restore/3` checks the module and `vsn`, then
+passes only the payload to the callback. It still passes a legacy raw custom
+map directly to the callback.
 
 Restore must return an Agent with the module and ID that the persistence record
 names. Jido rejects a checkpoint that changes this identity.

@@ -316,7 +316,7 @@ plan. Create that plan only after the user approves this seam.
 | `PERS-BLK-001` | `Blocker` | 00 Overview | Initial records, all-error authority loss, and tombstones are pending. | Approve or change the Overview durability decision. |
 | `PERS-BLK-002` | `Blocker` | 90 Package boundaries | Production provider placement and public compatibility are pending. | Approve provider ownership and migration gates. |
 | `PERS-BLK-003` | `Blocker` | 12 Errors and contracts | `PersistenceError`, codes, controls, and portable paths are pending. | Approve the public result contract. |
-| `PERS-BLK-004` | `Blocker` | 01 Agent and 02 Agent authoring | Definition revision and default checkpoint evolution are pending. | Approve version and old-checkpoint rules. |
+| `PERS-BLK-004` | `Implementation gap` | 01 Agent and 02 Agent authoring | Agent `vsn` and default checkpoint evolution are approved but not implemented. | Implement and prove the `vsn: 1` legacy rule and version-2 checkpoint. |
 | `PERS-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Ref exists only as a target, and namespace binding is undefined. | Approve Ref, namespace, and partition conversion. |
 | `PERS-BLK-006` | `Blocker` | 06 Commit and effects and 08 Agent Server | Current conflict continuation disagrees with all-error authority loss. | Select one rule and define stop, reload, and caller behavior. |
 | `PERS-BLK-007` | `Blocker` | 07 Persistence | Tombstone retention, purge authorization, same-identity reactivation, TTL, and rollback are not approved. | Approve the lifecycle maintenance rules. |

@@ -104,12 +104,12 @@ This table is the source of truth for design approval. A moved or changed docume
 | Design index | Pending approval |
 | [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
 | [Jido V3 library vision](VISION.md) | Pending approval |
-| [Overview briefing](00_overview/README.md) | Pending approval |
-| [Overview design](00_overview/design.md) | Pending approval |
-| [Overview alignment](00_overview/alignment.md) | Pending approval |
-| [Agent briefing](01_agent/README.md) | Pending approval |
-| [Agent design](01_agent/design.md) | Pending approval |
-| [Agent alignment](01_agent/alignment.md) | Pending approval |
+| [Overview briefing](00_overview/README.md) | Approved |
+| [Overview design](00_overview/design.md) | Approved |
+| [Overview alignment](00_overview/alignment.md) | Approved |
+| [Agent briefing](01_agent/README.md) | Approved |
+| [Agent design](01_agent/design.md) | Approved |
+| [Agent alignment](01_agent/alignment.md) | Approved |
 | [Agent authoring briefing](02_agent-authoring/README.md) | Pending approval |
 | [Agent authoring design](02_agent-authoring/design.md) | Pending approval |
 | [Agent authoring alignment](02_agent-authoring/alignment.md) | Pending approval |

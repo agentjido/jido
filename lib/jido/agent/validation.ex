@@ -10,6 +10,7 @@ defmodule Jido.Agent.Validation do
   @definition_keys [
     :id,
     :module,
+    :vsn,
     :name,
     :description,
     :schema,
@@ -110,6 +111,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, definition} <- normalize_attrs(definition, :definition) do
       definition
       |> Map.put(:module, module)
+      |> Map.put_new(:vsn, 1)
       |> new()
     end
   end
@@ -119,7 +121,7 @@ defmodule Jido.Agent.Validation do
           {:ok, Agent.t()} | {:error, Exception.t()}
   def new_from_module(module, definition, overrides) when is_atom(module) do
     with {:ok, attrs} <- normalize_attrs(definition, :definition),
-         attrs = Map.put(attrs, :module, module),
+         attrs = attrs |> Map.put(:module, module) |> Map.put_new(:vsn, 1),
          :ok <- known_keys(attrs),
          :ok <- reject_instance_data(attrs),
          {:ok, definition, _plugin_specs, schema} <- build_definition_with_plugins(attrs),
@@ -138,6 +140,7 @@ defmodule Jido.Agent.Validation do
     agent = %Agent{
       id: nil,
       module: Map.get(attrs, :module, Agent),
+      vsn: Map.get(attrs, :vsn),
       name: Map.get(attrs, :name),
       description: Map.get(attrs, :description),
       schema: Map.get(attrs, :schema, Zoi.object(%{})),
@@ -154,6 +157,7 @@ defmodule Jido.Agent.Validation do
     with {:ok, name} <- field(:name, agent.name),
          {:ok, description} <- field(:description, agent.description),
          :ok <- validate_module(agent.module),
+         {:ok, vsn} <- field(:vsn, agent.vsn),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          :ok <- State.validate_schema(agent.schema),
          {:ok, complete_schema} <- Plugin.compose_schema(agent.schema, plugin_specs),
@@ -164,6 +168,7 @@ defmodule Jido.Agent.Validation do
         agent
         | name: name,
           description: description,
+          vsn: vsn,
           plugins: plugins,
           routes: routes,
           metadata: metadata
@@ -249,6 +254,12 @@ defmodule Jido.Agent.Validation do
 
   def field(:metadata, metadata),
     do: invalid("Agent metadata must be a map", %{metadata: metadata})
+
+  def field(:vsn, nil), do: {:ok, nil}
+  def field(:vsn, vsn) when is_integer(vsn) and vsn > 0, do: {:ok, vsn}
+
+  def field(:vsn, vsn),
+    do: invalid("Agent vsn must be a positive integer or nil", %{vsn: vsn})
 
   defp validate_module(module) when is_atom(module) and not is_nil(module) do
     case Code.ensure_loaded(module) do

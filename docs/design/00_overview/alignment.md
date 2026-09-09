@@ -1,15 +1,15 @@
-> Seam alignment plan. This document is pending approval.
+> Approved seam alignment plan. Implementation evidence remains open.
 
 # Core model, shared terms, and invariants alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. The design review index contains no approved
-  Overview entry.
+- Design reviewed: 2026-09-08. Shared direction approved: 2026-09-09.
 - Code reviewed: `4e63640efd499ee2df3c717016e8d3542376f1b2`.
 - Prerequisite alignments: None. This is the first alignment gate.
-- Alignment state: `Draft`.
-- Approved decisions: None. The review-status table in
+- Alignment state: `Approved direction; not implemented`.
+- Approved decisions: `OVR-DEC-001` through `OVR-DEC-012`. The detailed Plugin
+  model in decision 005 is deferred. The review-status table in
   `docs/design/README.md` is the source of truth.
 
 The alignment state is execution status. It is not document approval. This
@@ -258,7 +258,8 @@ source Signal
 
 ## Gap register
 
-All dispositions in this table are recommendations. None are approved.
+The gap dispositions follow the approved Overview direction. Owner seams must
+still define open details and prove each target behavior.
 
 | Gap | Requirement | Current evidence | Difference | Recommended disposition |
 | --- | --- | --- | --- | --- |
@@ -280,8 +281,9 @@ All dispositions in this table are recommendations. None are approved.
 
 ## Conflict dispositions
 
-These dispositions replace conflicting or over-specific text from the
-superseded Overview documents. They are recommendations until approval.
+These approved dispositions replace conflicting or over-specific text from
+the superseded Overview documents. Owner-seam details remain open where the
+table delegates them.
 
 | Conflict or pressure point | Recommended disposition | Requirement or owner |
 | --- | --- | --- |
@@ -479,19 +481,19 @@ when a safe rollback requires them.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `OVR-BLK-001` | `Blocker` | 00 Overview | No `OVR-DEC` item is approved. Dependent seams cannot use target requirements as approved contracts. | User approval or changed decisions. |
+| `OVR-BLK-001` | `Resolved` | 00 Overview | The user approved `OVR-DEC-001` through `OVR-DEC-012` on 2026-09-09. Decision 005 defers the exact Plugin model. | No further Overview approval is needed before dependent-seam review. |
 | `OVR-BLK-002` | `Assumption` | 90 Package boundaries | Jido remains the local coordination layer above public `jido_action` and `jido_signal` contracts. | Confirm in seam 90. |
-| `OVR-BLK-003` | `Blocker` | 04 Turn evaluation and `jido_action` | A definition revision does not by itself pin Action or Flow BEAM code for a complete Turn. | Decide executable code-revision scope and prove it at the execution boundary. |
+| `OVR-BLK-003` | `Resolved for Overview` | 04 Turn evaluation and `jido_action` | A definition revision is a compile-time Agent meaning revision. It does not pin Action or Flow BEAM code for a complete Turn. | Seam 04 must record and test this non-guarantee. Any future code pinning needs a separate owned contract. |
 | `OVR-BLK-004` | `Assumption` | 90 and Delivery | The declared Hex `jido_signal` V3 version has the Router precedence used by Jido. | Compile and test the declared compatible package set. |
-| `OVR-BLK-005` | `Blocker` | 05 Plugins, 01 Agent, 07 Persistence | The proposed Persistence facet has no approved composition with complete custom Agent checkpoint callbacks. | Define explicit composition or defer the facet. |
-| `OVR-BLK-006` | `Blocker` | 07 Persistence and 08 Agent Server | Initial records, write-authority loss, and tombstones lack final failure, retention, purge, reactivation, and restart rules. | Approve the durability scope, then define these rules in owner seams. |
+| `OVR-BLK-005` | `Deferred design` | 05 Plugins, 01 Agent, 07 Persistence | Responsibility separation is approved, but an exact Persistence facet and its composition with complete custom Agent checkpoint callbacks are deferred. | Seam 05 must receive a separate design cycle before Plugin implementation planning. |
+| `OVR-BLK-006` | `Owner-seam blocker` | 07 Persistence and 08 Agent Server | Initial records, write-authority loss, and tombstones are approved, but final failure, retention, purge, reactivation, and restart rules are not defined. | Define and approve these rules in seams 07 and 08. |
 | `OVR-BLK-007` | `Assumption` | 12 Errors and contracts | Maps, tuples, atoms, and OTP values can remain documented protocol exceptions. | Complete the seam-12 inventory and migration rules. |
 | `OVR-BLK-008` | `Assumption` | 09 Jido instance and 10 Runtime topology | Plugin runtimes and Agent Servers need separate logical roles, but not necessarily separate Dynamic Supervisors. | Decide physical placement only after restart and readiness proof. |
-| `OVR-BLK-009` | `Assumption` | 11 Topology control plane | Static local Topology is sufficient for the V3 release boundary. | Approve or change `OVR-DEC-009`. |
+| `OVR-BLK-009` | `Resolved` | 11 Topology control plane | Static local Topology is sufficient for the V3 release boundary. | Live owner-Agent control and target updates are deferred. |
 
 ## Completion criteria
 
-- [ ] The user has approved or changed each `OVR-DEC` item.
+- [x] The user has approved or changed each `OVR-DEC` item.
 - [ ] Every approved `OVR-REQ` item has `Proven` evidence.
 - [ ] No unresolved `Conflict` remains in the acceptance matrix.
 - [ ] Compatibility and mixed-version rules are complete for each changed

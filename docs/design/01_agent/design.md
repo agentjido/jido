@@ -1,10 +1,11 @@
-> Target seam design. This document is pending approval.
+> Approved target seam design. Dependent owner-seam details remain open.
 
 # Agent design
 
-All requirements and decisions in this document are recommended targets. The
-[design review index](../README.md#document-review-status) is the source of
-truth for approval. The prerequisite seam documents are also pending approval.
+The requirements and decisions in this document were approved on 2026-09-09.
+The [design review index](../README.md#document-review-status) is the source of
+truth for approval. Pending prerequisite seam details are explicit assumptions
+for this Agent contract. A later conflict requires a reviewed migration.
 
 ## Scope and owner
 
@@ -35,9 +36,8 @@ Agent instance
 ```
 
 The static fields are `module`, `name`, `description`, `schema`, ordered
-`plugins`, ordered normalized `routes`, and `metadata`. A compatible target
-also adds `definition_revision`. Only `id` and `state` differ between a
-definition and its instances.
+`plugins`, ordered normalized `routes`, `metadata`, and `vsn`. Only `id` and
+`state` differ between a definition and its instances.
 
 The instance has one combined state map. The domain schema and stateful Plugin
 schemas compose into one complete schema. Plugin state stays under each
@@ -147,20 +147,21 @@ validator.
 `AGT-REQ-025`: The Agent boundary shall keep Codec authoring documents separate
 from Agent checkpoint data.
 
-### Definition revision and checkpoints
+### Agent `vsn` and checkpoints
 
 `AGT-REQ-026`: Where an Agent definition is owned by a generated Agent module,
-the normalized definition shall contain one positive module-owned definition
-revision.
+the normalized definition shall contain one positive module-owned `vsn`.
 
-`AGT-REQ-027`: Where an existing generated Agent module does not declare a
-definition revision, the Agent authoring boundary shall use revision `1`.
+`AGT-REQ-027`: Where an existing generated Agent module does not declare
+`vsn`, the Agent authoring boundary shall use `vsn: 1`.
 
-`AGT-REQ-028`: Where direct data or a behavior-only module owns no generated
-definition, the Agent boundary shall permit an unversioned neutral definition.
+`AGT-REQ-028`: Where direct data owns the normalized definition, including a
+definition derived from a generated module, or a behavior-only module owns no
+generated definition, the Agent boundary shall permit an unversioned neutral
+definition.
 
-`AGT-REQ-029`: When Builder, Codec, or `to_map/1` processes a definition
-revision, the Agent authoring boundary shall preserve that revision.
+`AGT-REQ-029`: When Builder, Codec, or `to_map/1` processes Agent `vsn`, the
+Agent authoring boundary shall preserve that value.
 
 `AGT-REQ-030`: When the default checkpoint boundary writes a versioned
 module-owned Agent, it shall first verify that the validated neutral Agent
@@ -169,21 +170,34 @@ definition is strictly equal to the current generated module definition.
 `AGT-REQ-031`: When `checkpoint/2` uses the default version-1 format, the Agent
 boundary shall keep the current map shape and combined state meaning.
 
-`AGT-REQ-032`: When `restore/3` receives a valid default version-1 checkpoint,
-the Agent boundary shall keep the current module-definition and embedded-
-definition restore paths without a revision guarantee.
+`AGT-REQ-032`: When `restore/3` receives a valid default version-1 checkpoint
+for a generated Agent module without saved `vsn`, the Agent boundary shall
+treat its saved value as `vsn: 1` before it compares the current module.
 
 `AGT-REQ-033`: When the default checkpoint boundary writes a versioned
 module-owned Agent, it shall write a version-2 plain map with `version`, `kind`,
-`agent_module`, `definition_revision`, `id`, and combined `state` fields.
+`agent_module`, `vsn`, `id`, and combined `state` fields.
 
 `AGT-REQ-034`: When restore reads a default version-2 checkpoint, the Agent
-boundary shall reject an Agent module or definition revision mismatch before
-it accepts saved state.
+boundary shall reject an Agent module or `vsn` mismatch before it accepts
+saved state.
 
 `AGT-REQ-035`: While complete custom checkpoint and restore callbacks remain
-supported, the Agent boundary shall accept their documented plain-map
-contract.
+supported, their callback boundary shall keep the documented opaque plain-map
+payload contract.
+
+`AGT-REQ-040`: When a custom checkpoint callback returns a new payload, the
+public Agent boundary shall wrap it in a version-2 core-owned plain-map
+envelope with `version`, `kind`, `agent_module`, `vsn`, and `payload` fields.
+Restore shall compare the saved module and revision before it passes the opaque
+payload to the callback. It shall also keep legacy raw-map callback reads.
+
+`AGT-REQ-041`: While direct and behavior-only Agent definitions remain valid
+in memory, the Agent boundary shall not apply state portability rules to their
+static definition data. Their default embedded-definition checkpoint shall be
+durable only when the complete checkpoint is portable. If it is not portable,
+the boundary shall return the seam-12 `ValidationError` with code
+`:non_portable_term` and a bounded checkpoint path.
 
 ### Portable state and errors
 
@@ -215,7 +229,7 @@ Elixir protocol control.
 | `plugins` | Ordered static list | Same | Canonical Plugin declarations. |
 | `routes` | Ordered static list | Same | Canonical Router routes; route choice belongs to seam 04. |
 | `metadata` | Static map | Same | Agent definition metadata. |
-| `definition_revision` | Positive integer or `nil` | Same | Module-owned meaning revision; `nil` is for unversioned compatibility forms. |
+| `vsn` | Positive integer or `nil` | Same | Module-owned meaning revision; `nil` is for unversioned compatibility forms. |
 | `id` | `nil` | Nonempty binary | Current Agent ID only; Agent Ref belongs to seam 03. |
 | `state` | `nil` | Plain map | Complete combined domain and Plugin-owned state. |
 
@@ -234,7 +248,7 @@ Elixir protocol control.
 | `cmd/3` | Evaluate directly and return a candidate Agent and Directives. |
 | `checkpoint/2`, `restore/3` | Use the Agent checkpoint and restore boundary with an optional context map. |
 | `handle_signal/2` | Return a prepared Turn or an error. Seam 04 owns route policy. |
-| `checkpoint/2`, `restore/2` callbacks | Let an Agent module keep its complete custom checkpoint behavior. |
+| `checkpoint/2`, `restore/2` callbacks | Let an Agent module encode and decode an opaque custom payload. The public Agent boundary owns the revision envelope. |
 
 The current default checkpoint remains a plain map:
 
@@ -249,14 +263,14 @@ The current default checkpoint remains a plain map:
 }
 ```
 
-The recommended compatible extension is this version-2 plain map:
+The approved compatible format is this version-2 plain map:
 
 ```elixir
 %{
   version: 2,
   kind: :agent,
   agent_module: MyApp.Agent,
-  definition_revision: 3,
+  vsn: 3,
   id: "agent-1",
   state: complete_combined_state
 }
@@ -264,13 +278,32 @@ The recommended compatible extension is this version-2 plain map:
 
 It does not copy the static definition into the checkpoint and does not add a
 public Checkpoint struct. Version 1 remains readable. A generated module
-definition uses version 2 after the revision contract is available. Direct and
-behavior-only definitions can keep the embedded version-1 path until their
-owner seam approves another compatible format.
+definition uses version 2. Direct and behavior-only definitions keep the
+embedded version-1 path when the full checkpoint is portable. An explicitly
+unversioned direct definition can use a generated module as its behavior while
+the direct value owns its changed static definition.
+
+A custom callback returns an opaque map. The public Agent boundary writes this
+core-owned envelope:
+
+```elixir
+%{
+  version: 2,
+  kind: :agent_custom,
+  agent_module: MyApp.Agent,
+  vsn: 3,
+  payload: custom_callback_map
+}
+```
+
+Restore checks the module and `vsn` before it gives `payload` to the custom
+callback. It also gives a legacy raw custom map directly to the callback.
 
 The portable-state rule applies to instance state and checkpoint state. It does
-not apply to the static definition as one recursive term. Static Zoi schemas
-and Router match declarations can contain valid static function data.
+not apply to the static definition while the definition stays in memory.
+Static Zoi schemas and Router match declarations can contain valid static
+function data. An embedded direct definition must be portable before the
+default checkpoint can cross a durable boundary.
 
 ## Invariants
 
@@ -286,12 +319,12 @@ and Router match declarations can contain valid static function data.
   live commit or Directive handling.
 - `AGT-INV-007`: Codec data and checkpoint data have separate purposes and
   formats.
-- `AGT-INV-008`: Definition revision, checkpoint format version, Agent Server
+- `AGT-INV-008`: Agent `vsn`, checkpoint format version, Agent Server
   state version, and persistence storage revision are separate concepts.
 
 ## Downstream guarantees
 
-These guarantees apply only after the related requirements are approved.
+These approved guarantees apply to dependent seams.
 
 | Consumer seam | Guaranteed contract |
 | --- | --- |
@@ -299,17 +332,19 @@ These guarantees apply only after the related requirements are approved.
 | 03 Agent identity | An instance keeps its current nonempty ID; this seam does not define Agent Ref, namespace, or location. |
 | 04 Turn evaluation | Direct evaluation accepts one prepared Turn and returns one candidate Agent and Directive list; route order remains owned by seam 04. |
 | 05 Plugins | Plugin-owned fields stay in the combined state map with unique keys and separate write authority; facet details remain owned by seam 05. |
-| 07 Persistence | Version-1 checkpoints remain readable; a compatible versioned-module format adds definition revision; record fields remain owned by seam 07. |
+| 07 Persistence | Version-1 checkpoints remain readable; a compatible versioned-module format adds Agent `vsn`; record fields remain owned by seam 07. |
 | 08 Agent Server | Live evaluation uses the same candidate assembly; commit and state version remain outside the Agent value. |
 | 12 Errors and contracts | Agent operations adopt approved errors and early portable-state checks without inventing interim error shapes. |
 
-## Open design decisions
+## Approved design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Question | Approved option | Effect |
 | --- | --- | --- | --- |
 | `AGT-DEC-001` | Which current Agent contracts remain? | Keep both forms, combined state, direct `cmd/3`, Builder, Codec, custom routing, and checkpoint callbacks. | No current supported path is removed. |
-| `AGT-DEC-002` | How does definition revision start? | Default generated modules to revision `1`; allow `nil` only for direct and behavior-only compatibility forms. | Existing module source stays valid. |
+| `AGT-DEC-002` | How does Agent `vsn` start? | Default generated modules to `vsn: 1`; allow `nil` only for direct and behavior-only compatibility forms. | Existing module source stays valid. |
 | `AGT-DEC-003` | How does checkpoint creation prove module ownership? | Compare the validated neutral instance definition with the current generated module definition by strict term equality before a version-2 write. | Mutated static data cannot claim the module revision. |
-| `AGT-DEC-004` | How does the default checkpoint evolve? | Add a version-2 plain map for versioned generated modules; keep version-1 reads and custom callback maps. | Restore gets a revision gate without a forced public struct. |
+| `AGT-DEC-004` | How does the default checkpoint evolve? | Add a version-2 plain map with `vsn` for generated modules; read missing `vsn` in a valid version-1 generated-module checkpoint as `1`; keep custom callback payload maps. | Restore gets a revision gate without a forced public struct. |
 | `AGT-DEC-005` | Where does state portability run? | Run it at every Agent state acceptance point and keep persistence validation. | Direct and persistent Agents use one state rule. |
 | `AGT-DEC-006` | Does this seam add state accessor APIs? | No. Keep struct access, `set/2`, and the private complete transition boundary. | The seam does not add an unproved public abstraction. |
+| `AGT-DEC-007` | How does a custom checkpoint carry module revision? | Wrap each new opaque callback map in a core-owned version-2 module and `vsn` envelope; keep raw-map reads for legacy data. | Custom callbacks retain payload ownership and restore gets an early revision gate. |
+| `AGT-DEC-008` | Which direct definitions use the default durable format? | Keep every valid direct definition in memory, but permit the embedded default checkpoint only when its full map is portable. | Runtime authoring stays flexible and durable writes fail with a typed path instead of hidden serialization risk. |

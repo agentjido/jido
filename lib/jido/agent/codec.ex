@@ -24,7 +24,8 @@ defmodule Jido.Agent.Codec do
   alias Jido.Agent.Authoring
   alias Jido.Agent.Codec.{Data, Registry}
 
-  @fields ~w(type version module name description schema metadata plugins routes)
+  @fields_v1 ~w(type version module name description schema metadata plugins routes)
+  @fields_v2 ~w(type version module vsn name description schema metadata plugins routes)
 
   @doc "Encodes authoring data with a generated temporary Registry."
   def encode(agent) do
@@ -55,8 +56,9 @@ defmodule Jido.Agent.Codec do
          {:ok, routes} <- Authoring.traverse(agent.routes, &encode_route(&1, registry)) do
       document = %{
         "type" => "jido.agent",
-        "version" => 1,
+        "version" => 2,
         "module" => module,
+        "vsn" => agent.vsn,
         "name" => agent.name,
         "description" => agent.description,
         "schema" => schema,
@@ -72,10 +74,10 @@ defmodule Jido.Agent.Codec do
   @doc "Decodes one neutral Agent definition."
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- definition_object(document),
-         :ok <- version(document, "jido.agent"),
+         {:ok, version} <- definition_object(document),
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :agent),
+         vsn = document_vsn(document, version, module),
          {:ok, schema} <- Registry.resolve(registry, document["schema"], :schema),
          {:ok, metadata} <- Data.decode(document["metadata"], registry),
          {:ok, plugins} <-
@@ -83,6 +85,7 @@ defmodule Jido.Agent.Codec do
          {:ok, routes} <- collection(document["routes"], &decode_route(&1, registry)) do
       Agent.new(%{
         module: module,
+        vsn: vsn,
         name: document["name"],
         description: document["description"],
         schema: schema,
@@ -98,7 +101,25 @@ defmodule Jido.Agent.Codec do
     with {:ok, definition} <- decode(document, registry), do: Agent.instantiate(definition, opts)
   end
 
-  defp definition_object(document), do: object(document, @fields)
+  defp definition_object(%{"type" => "jido.agent", "version" => 1} = document) do
+    with :ok <- object(document, @fields_v1), do: {:ok, 1}
+  end
+
+  defp definition_object(%{"type" => "jido.agent", "version" => 2} = document) do
+    with :ok <- object(document, @fields_v2), do: {:ok, 2}
+  end
+
+  defp definition_object(_document),
+    do: Authoring.error("Unknown authoring document type or version")
+
+  defp document_vsn(_document, 1, module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :__agent_config__, 0) and
+         function_exported?(module, :agent, 0),
+       do: 1,
+       else: nil
+  end
+
+  defp document_vsn(document, 2, _module), do: document["vsn"]
 
   defp encode_route(route, registry) do
     {target, defaults} = Authoring.split_target(route.target)

@@ -2,6 +2,7 @@ defmodule Jido.Agent.State do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.PortableTerm
   alias Jido.Util.DeepMerge
 
   @doc false
@@ -42,7 +43,7 @@ defmodule Jido.Agent.State do
 
     case Zoi.parse(schema, state) do
       {:ok, validated} ->
-        {:ok, validated}
+        with :ok <- validate_portable(validated), do: {:ok, validated}
 
       {:error, errors} ->
         {:error,
@@ -59,6 +60,20 @@ defmodule Jido.Agent.State do
        field: :state,
        details: %{state: state}
      )}
+  end
+
+  defp validate_portable(state) do
+    case PortableTerm.validate(state, :agent_state) do
+      :ok ->
+        :ok
+
+      {:error, path} ->
+        {:error,
+         Error.validation_error("Agent state contains a non-portable term",
+           field: :state,
+           details: %{code: :non_portable_term, path: path}
+         )}
+    end
   end
 
   defp static_schema(schema) do

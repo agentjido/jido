@@ -45,6 +45,11 @@ defmodule Jido.Agent.DSL.Compiler do
       )
 
     config = unwrap!(Jido.Agent.Extension.lower(extensions, config, entities), env)
+    config = Map.put_new(config, :vsn, 1)
+
+    unless is_integer(config.vsn) and config.vsn > 0 do
+      fail!(env, "Agent vsn must be a positive integer")
+    end
 
     routes =
       if extensions == [],
@@ -74,7 +79,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
   defp host_config(config, env) do
     if Module.get_attribute(env.module, :jido_agent_combined_extensions) do
-      Map.take(config, [:name, :description, :extensions])
+      Map.take(config, [:name, :description, :extensions, :vsn])
     else
       config
     end

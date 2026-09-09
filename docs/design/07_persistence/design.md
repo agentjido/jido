@@ -34,15 +34,15 @@ Agent-owned checkpoint map
 
 An Agent checkpoint represents one Agent value. It can use the default format
 or complete custom `checkpoint/2` and `restore/2` callbacks. A durable record
-adds identity, Agent module, definition revision when available, record kind,
-state revision, and outer format. The adapter sees only a binary key, expected
-binary or `:not_found`, and new binary.
+adds identity, Agent module, Agent `vsn` when available, record kind, state
+revision, and outer format. The adapter sees only a binary key, expected binary
+or `:not_found`, and new binary.
 
 The target record algebra has two values:
 
 | Kind | Required meaning | Excluded data |
 | --- | --- | --- |
-| Active record | Exact Agent Ref, Agent module, optional definition revision, nonnegative state revision, and checkpoint | PID, runtime location, task, Directive batch, adapter client |
+| Active record | Exact Agent Ref, Agent module, optional Agent `vsn`, nonnegative state revision, and checkpoint | PID, runtime location, task, Directive batch, adapter client |
 | Tombstone | Exact Agent Ref and last known nonnegative state revision | Checkpoint, Agent state, process status |
 
 Hibernate is an Agent Server process transition. It does not add a durable
@@ -52,7 +52,7 @@ Four revisions remain separate:
 
 - record format version controls the outer durable map;
 - checkpoint format version belongs to the Agent callback;
-- definition revision identifies module-owned Agent meaning;
+- Agent `vsn` identifies module-owned Agent meaning;
 - state revision is the Agent Server commit revision used by persistence.
 
 The target keeps exact-byte CAS. It does not add an opaque storage-version token
@@ -89,8 +89,8 @@ produce the checkpoint before Persistence builds the durable record.
 Agent checkpoint as an opaque plain map inside the record.
 
 `PERS-REQ-008`: When Persistence builds an active record, it shall store Agent
-identity, Agent module, definition revision when available, and state revision
-outside the checkpoint.
+identity, Agent module, Agent `vsn` when available, and state revision outside
+the checkpoint.
 
 `PERS-REQ-009`: When Persistence builds a tombstone, it shall exclude the Agent
 checkpoint and Agent state.
@@ -176,9 +176,8 @@ complete outer record before it calls Agent restore.
 `PERS-REQ-030`: When Agent restore returns an Agent, the Persistence boundary
 shall verify the restored Agent identity and module before startup can continue.
 
-`PERS-REQ-031`: Where a saved definition revision is present, when Persistence
-loads an active record, it shall reject a mismatch before the Agent becomes
-live.
+`PERS-REQ-031`: Where a saved Agent `vsn` is present, when Persistence loads an
+active record, it shall reject a mismatch before the Agent becomes live.
 
 `PERS-REQ-032`: When normal durable deletion targets an active record, the
 Persistence boundary shall replace the exact active bytes with a tombstone by
@@ -296,7 +295,7 @@ the safe default.
 - `PERS-INV-002`: One confirmed CAS changes one complete binary value.
 - `PERS-INV-003`: A non-confirmed required write cannot produce visible live
   Agent state or post-commit Directive work.
-- `PERS-INV-004`: Durable identity, Agent module, definition revision, state
+- `PERS-INV-004`: Durable identity, Agent module, Agent `vsn`, state
   revision, and runtime location are separate values.
 - `PERS-INV-005`: A tombstone preserves the conflict barrier after logical
   deletion.

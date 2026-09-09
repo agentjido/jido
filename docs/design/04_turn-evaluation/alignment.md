@@ -278,7 +278,7 @@ depends on changing route choice without a clear compatibility adapter.
 | `TURN-BLK-006` | `Blocker` | 05 Plugins | Bounded Agent views, owned prepared inputs, Transition data, and contribution authority have no approved callback contract. | Approve seam-05 value roles and migration before evaluator isolation work. |
 | `TURN-BLK-007` | `Blocker` | 08 Agent Server and 13 Observability | Private evaluator stages have no approved mapping to live control and Outcome stages. | Approve one explicit mapping without making the vocabularies identical. |
 | `TURN-BLK-008` | `Assumption` | 08 Agent Server | Live admission remains outside candidate evaluation and cannot change source-Signal selection. | Approve or change `TURN-DEC-007`. |
-| `TURN-BLK-009` | `Blocker` | 04 Turn evaluation and `jido_action` | Definition revision does not pin loaded executable code. | Approve the V3 non-guarantee or define an owned code-revision contract. |
+| `TURN-BLK-009` | `Resolved design` | 04 Turn evaluation and `jido_action` | Agent `vsn` does not pin loaded executable code. | V3 uses the code loaded when `Jido.Exec` invokes the selected executable. |
 | `TURN-BLK-010` | `Assumption` | 06 Commit and effects and 08 Agent Server | State revision is not evaluator input. The Server checks and advances it at commit. | Confirm in the owner seams. |
 | `TURN-BLK-011` | `Assumption` | 03 Agent identity | Stable Agent Ref does not change candidate evaluation semantics. | Keep Ref and runtime handles out of evaluator authority. |
 
