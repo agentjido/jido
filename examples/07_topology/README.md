@@ -11,6 +11,7 @@ Construction and group expansion start no processes.
 | `07_03_bus_swarm` | [DSL](07_03_bus_swarm/swarm.ex), [Builder and Codec](07_03_bus_swarm/formats.ex), [JSON](07_03_bus_swarm/swarm.json) | A coordinator and 1000 workers receive work through a Bus |
 | `07_04_keyed_accounts` | [DSL](07_04_keyed_accounts/accounts.ex) | Agent identities come from account keys |
 | `07_05_composed_system` | [Guide and all forms](07_05_composed_system/README.md) | Two teams share one Bus through imports, bindings, and public exports |
+| `07_06_plugin_contribution` | [Guide and DSL](07_06_plugin_contribution/README.md) | An Agent Plugin contributes its static Bus and subscription |
 
 ## Start at application boot
 
@@ -129,6 +130,22 @@ The JSON document contains the definition only. It excludes instance input,
 expanded plans, PIDs, runtime status, and committed Agent state. The same
 document can be instantiated more than once with different IDs and input.
 Codec version 2 embeds composed definitions. Version 1 documents remain readable.
+
+## Plugin contributions
+
+An Agent declaration can contain a Plugin package with a
+`Jido.Topology.Plugin` facet. During instance planning, the facet can contribute
+current Bus resources, ownership relationships, and Bus subscriptions. Jido
+applies contributions in Agent declaration order, then group declaration
+order, and then Plugin declaration order. Included Topologies receive the same
+expansion in their own scope.
+
+The source definition remains unchanged. Direct plan construction and normal
+instantiation produce the same expanded plan. All contributed entries pass
+through the common Topology validator and graph checks before activation.
+Contribution is pure and static. It starts no process and grants no runtime,
+persistence, placement, or write authority. See
+[`07_06_plugin_contribution`](07_06_plugin_contribution/README.md).
 
 ## DSL blocks
 

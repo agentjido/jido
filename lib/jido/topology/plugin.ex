@@ -5,8 +5,17 @@ defmodule Jido.Topology.Plugin do
   A callback can return current canonical Bus resources, ownership
   relationships, and Bus subscriptions. It cannot start a process, activate a
   plan, persist data, or add a new resource kind through this contract.
+
+  `Jido.Topology.instantiate/2` invokes these facets during pure plan
+  construction. It processes Agent declarations, then group declarations, in
+  their source order. Each declaration keeps its Plugin order. Included
+  Topologies receive contributions in their own scope. Common Topology
+  validation checks the combined entries before a Controller can activate the
+  plan.
   """
 
+  alias Jido.Agent.Authoring
+  alias Jido.Plugin, as: PluginPackage
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.{Context, Contribution, Spec}
   alias Jido.Topology.Validation
@@ -65,6 +74,51 @@ defmodule Jido.Topology.Plugin do
     }
   end
 
+  @doc false
+  @spec expand_definition(Jido.Topology.t()) ::
+          {:ok, Jido.Topology.t()} | {:error, term()}
+  def expand_definition(%Jido.Topology{} = definition) do
+    with {:ok, includes} <-
+           Authoring.traverse(definition.includes, &expand_include/1),
+         definition = %{definition | includes: includes},
+         {:ok, nested} <-
+           Authoring.traverse(
+             definition.agents ++ definition.groups,
+             &declaration_contributions/1
+           ),
+         expanded <- append_contributions(definition, List.flatten(nested)),
+         {:ok, attrs} <- Validation.definition(expanded) do
+      {:ok, struct(Jido.Topology, attrs)}
+    end
+  end
+
+  defp expand_include(include) do
+    with {:ok, topology} <- expand_definition(include.topology),
+         do: {:ok, %{include | topology: topology}}
+  end
+
+  defp declaration_contributions(declaration) do
+    with {:ok, agent} <- Validation.agent_definition(declaration.module),
+         {:ok, specs} <- PluginPackage.normalize_all(agent.plugins) do
+      specs
+      |> Enum.reject(&is_nil(&1.topology))
+      |> Authoring.traverse(fn spec ->
+        contribute(spec, context(spec, declaration.key, declaration.module))
+      end)
+    end
+  end
+
+  defp append_contributions(definition, contributions) do
+    Enum.reduce(contributions, definition, fn contribution, current ->
+      %{
+        current
+        | resources: current.resources ++ contribution.resources,
+          relationships: current.relationships ++ contribution.relationships,
+          connections: current.connections ++ contribution.connections
+      }
+    end)
+  end
+
   defp callback_contribution({:ok, %Contribution{} = contribution}, spec) do
     case Contribution.validate(contribution) do
       {:ok, contribution} ->
@@ -103,7 +157,7 @@ defmodule Jido.Topology.Plugin do
   end
 
   defp validate_entries(kind, entries) do
-    Jido.Agent.Authoring.traverse(entries, &Validation.entry(kind, &1))
+    Authoring.traverse(entries, &Validation.entry(kind, &1))
   end
 
   defp validate_context(

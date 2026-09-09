@@ -1,19 +1,23 @@
-> Target seam design. This document is pending approval.
+> Selected seam design. The Jido core contract is implemented. Distributed
+> requirements are a deferred external reference contract.
 
 # Topology control-plane design
 
-All requirements and decisions are recommended targets. Code defines current
-behavior until the target is approved and implemented.
+The local requirements and decisions in this document define the implemented
+Jido core seam. Requirements for a distributed control plane define a later
+application or integration package. They are not Jido core V3 release gates.
 
 ## Scope and owner
 
 - Owner: `Jido.Topology` and `Jido.Topology.Controller` own static local
   topology. An optional host application or ecosystem integration owns the
   distributed control plane.
-- In scope: the boundary between desired placement and local activation,
-  provider inputs for membership and authority, placement output, ownership
-  epochs, handoff, recovery, stable Ref resolution, network-partition safety,
-  operator controls, and control-plane observation.
+- In scope for Jido core: static definition validation, pure Plugin
+  contribution, local planning, one fixed Controller target, readiness, repair,
+  lookup, and cleanup.
+- External reference scope: provider inputs for membership and authority,
+  placement output, authority epochs, handoff, recovery, network-partition
+  safety, operator controls, and distributed observation.
 - Out of scope: the local OTP process tree, Agent and Turn semantics,
   persistence record format, membership or consensus implementation,
   transport, deployment, business workflow, and vendor selection.
@@ -39,6 +43,12 @@ public Jido activation, stop, status, and persistence boundaries
        one local Agent activation
 ```
 
+Before activation, pure instance planning asks declared
+`Jido.Topology.Plugin` facets for canonical static entries. It appends Agent
+contributions, then group contributions, in source and Plugin declaration
+order. Included Topologies expand in their own scopes. The common validator
+checks the complete result. The source definition stays unchanged.
+
 The local Topology Controller has one immutable `%Jido.Topology.Instance{}`
 target. It repairs members of that target on one Jido instance. It does not
 discover nodes, move Agents, replace its target, issue authority, or resolve a
@@ -61,7 +71,7 @@ limits holder eligibility. It does not replace epoch checks. A system cannot
 claim exclusive ownership unless every protected commit rejects a stale epoch.
 Capability-specific external effects need the same rule if they claim fencing.
 
-## Requirements
+## Jido core requirements
 
 ### Purpose and boundary
 
@@ -80,6 +90,13 @@ inspection boundaries.
 
 `TOP-REQ-005`: The control-plane owner shall keep desired placement, runtime
 location, and write authority as separate values.
+
+## External distributed reference requirements
+
+Requirements `TOP-REQ-006` through `TOP-REQ-058` and `TOP-REQ-061` apply only
+if an application or integration package implements a distributed control
+plane. Jido core does not implement them. Their deferred state does not block
+the local core contract.
 
 ### Membership and discovery inputs
 
@@ -288,7 +305,9 @@ boundary shall still enforce Ref validation, authority epochs, and fencing.
 shall return the proposed placement operations without changing authority,
 location, or runtime state.
 
-### Compatibility and errors
+## Compatibility and Plugin planning requirements
+
+### Core compatibility
 
 `TOP-REQ-059`: While no approved migration replaces static local Topology, the
 Jido core package shall keep its definition, Builder, Codec, instance, plan,
@@ -298,12 +317,41 @@ Controller, readiness, repair, and lookup contracts supported.
 Topology Controller shall not describe `reconcile/2` as resize, upgrade,
 rebalance, handoff, or recovery.
 
+### External error ownership
+
 `TOP-REQ-061`: When a distributed control-plane operation fails outside a
 documented provider protocol, the control-plane owner shall return an
 owner-defined error through the approved seam-12 contract.
 
+### Core authority boundary
+
 `TOP-REQ-062`: The control-plane boundary shall not start an authoring owner
 Agent or Plugin runtime as implicit distributed authority.
+
+### Topology Plugin planning
+
+`TOP-REQ-063`: When Jido builds a Topology instance or a direct Plan, it shall
+ask every declared Topology Plugin facet for its static contribution before it
+builds the complete graph.
+
+`TOP-REQ-064`: When Jido orders Topology contributions, it shall process Agent
+declarations, then group declarations, in source order and shall preserve the
+Plugin order inside each declaration.
+
+`TOP-REQ-065`: When an included Topology contains a contributing Plugin, Jido
+shall apply that contribution in the included Topology scope.
+
+`TOP-REQ-066`: Before a Controller can activate a contributed plan, Jido shall
+apply common definition and graph validation to all explicit and contributed
+entries.
+
+`TOP-REQ-067`: When planning adds Plugin entries, the Topology instance shall
+retain the validated source definition and shall put expanded entries only in
+the Plan.
+
+`TOP-REQ-068`: The Topology Plugin contract shall provide no runtime handle or
+operation that starts a process, persists Agent state, replaces a Controller
+target, or grants live or distributed authority.
 
 ## Public contract
 
@@ -312,13 +360,13 @@ The implemented core surface remains the local component contract:
 | Role | Current public entry | Meaning |
 | --- | --- | --- |
 | Static authoring | `Jido.Topology`, DSL, Builder, Codec | Validated local definition; no processes |
-| Pure plan | `Jido.Topology.instantiate/2` | Validated input and stable local plan |
+| Pure plan | `Jido.Topology.instantiate/2`, `Jido.Topology.Plan.build/3` | Validated input, ordered static Plugin contribution, and stable local plan |
 | Local activation | `Jido.Topology.Controller.start_link/1` | One fixed target on one Jido instance |
 | Local readiness | `await_ready/2`, `status/2` | Current local pass and component state |
 | Local repair | `reconcile/2` | Repair the same target; not an update |
 | Local lookup | `whereis_agent/3`, `whereis_bus/2` | Replaceable local handles |
 
-The target does not add a required control plane to Jido core. An ecosystem
+This design does not add a required control plane to Jido core. An ecosystem
 contract can define provider behaviours for membership, authority, desired
 placement storage, and location publication. Those providers must have closed
 validated result sets, operation limits, and fault classification. This seam
@@ -341,28 +389,31 @@ state that it provides no exclusive-owner guarantee.
 - `TOP-INV-006`: Network availability cannot override fencing.
 - `TOP-INV-007`: Operator actions cannot bypass authority checks.
 - `TOP-INV-008`: Control-plane observation has no execution authority.
+- `TOP-INV-009`: Topology Plugin contribution changes a Plan, not its source
+  definition or runtime authority.
 
 ## Downstream guarantees
 
-| Consumer seam | Guaranteed contract after approval |
+| Consumer seam | Selected guarantee |
 | --- | --- |
 | 13 Observability | Control-plane transitions have bounded semantic facts and no Agent state or private handles. |
 | 99 Delivery | Each distributed claim has provider, failure, partition, compatibility, and acceptance evidence. |
 | Ecosystem control plane | Public Jido local activation and persistence components stay distinct from membership and authority policy. |
 | Host application | A control plane is optional and can be selected without changing core Agent semantics. |
 
-## Open design decisions
+## Selected design decisions
 
-| ID | Question | Recommended option | Effect |
-| --- | --- | --- | --- |
-| `TOP-DEC-001` | Where does distributed control-plane code live? | In an optional application or focused ecosystem package, not Jido core. | The Bright Line stays local. |
-| `TOP-DEC-002` | What happens to static local Topology? | Keep its current core API and fixed-target repair meaning. | Existing users keep a supported component. |
-| `TOP-DEC-003` | What proves exclusive ownership? | A provider-issued increasing epoch enforced at every protected commit. | Lease and Registry presence are not enough. |
-| `TOP-DEC-004` | Are time-limited leases required? | No. Permit them as one authority-provider mechanism, but always require fencing for an exclusive claim. | The design stays provider-neutral. |
-| `TOP-DEC-005` | What is membership authority? | Advisory placement input only. | Membership failure cannot grant ownership. |
-| `TOP-DEC-006` | How are placement ties resolved? | Require deterministic provider policy and an explanation, but do not select an algorithm here. | Tests can repeat a decision without fixing product policy. |
-| `TOP-DEC-007` | How does handoff recover state? | Restore through the normal durable Agent record. Do not copy checkpoints in the control plane. | Persistence meaning stays in seam 07. |
-| `TOP-DEC-008` | What is the network-partition rule? | Reject new mutations when current authority cannot be confirmed. | Safety takes priority over write availability. |
-| `TOP-DEC-009` | Which operator roles are in the contract? | Preview, cordon, uncordon, drain, move, rebalance, suspend, resume, and status. | Product UI remains outside this seam. |
-| `TOP-DEC-010` | Does an owner Agent become the control plane? | No. Keep authoring helpers, but do not grant implicit live or distributed authority. | Plugin and Agent state do not become cluster coordination. |
-| `TOP-DEC-011` | Is live local target replacement part of this approval? | No. Keep it as a separate later design and acceptance pass. | Distributed placement does not hide an unimplemented local upgrade API. |
+| ID | Selected option | Effect |
+| --- | --- | --- |
+| `TOP-DEC-001` | Distributed control-plane code lives in an application or focused ecosystem package, not Jido core. | The core boundary stays local. |
+| `TOP-DEC-002` | Keep static local Topology and fixed-target repair. | Existing users keep a supported component. |
+| `TOP-DEC-003` | An exclusive-owner claim requires an increasing epoch enforced at every protected commit. | Lease and Registry presence are not enough. |
+| `TOP-DEC-004` | Time-limited leases are optional, but fencing is required for an exclusive claim. | The external design stays provider-neutral. |
+| `TOP-DEC-005` | Membership is advisory placement input only. | Membership failure cannot grant ownership. |
+| `TOP-DEC-006` | An external placement policy must be deterministic and explain its result. | The contract does not select one policy. |
+| `TOP-DEC-007` | Handoff restores through the normal durable Agent record. | The control plane does not copy checkpoint content. |
+| `TOP-DEC-008` | A holder rejects new mutations when it cannot confirm current authority. | Safety takes priority over write availability. |
+| `TOP-DEC-009` | Preview, cordon, uncordon, drain, move, rebalance, suspend, resume, and status belong to the external contract. | Product UI stays outside this seam. |
+| `TOP-DEC-010` | An owner Agent is not the control plane. | Authoring and Plugin state do not become cluster authority. |
+| `TOP-DEC-011` | Live local target replacement stays deferred. | Distributed placement does not hide a missing local update API. |
+| `TOP-DEC-012` | Topology Plugin facets contribute during pure Plan construction. | Static extension is complete without live Plugin authority. |

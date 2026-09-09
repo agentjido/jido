@@ -42,8 +42,7 @@ The former 1,181-line mixed implementation is split across these owner files.
 - The package manifest and four facet behaviors are implemented.
 - Agent and Agent Server call their owner modules.
 - Persistence and Topology facet conversion functions are implemented and
-  bounded. Persistence record use is complete. Topology plan use belongs to
-  seam 11.
+  bounded. Persistence record use and Topology plan use are complete.
 - Each Plugin runtime generation receives matching committed Plugin state and
   state version in its immutable Init value.
 - The Plugin-isolation research example passes all four assertions.
@@ -52,8 +51,8 @@ The former 1,181-line mixed implementation is split across these owner files.
 ## Dependencies
 
 - Prerequisites: seams 90, 12, 01, 02, 03, and 04.
-- Completed owner integrations: seam 07 records and seam 08 runtime bootstrap.
-- Remaining owner integration: seam 11 static Topology contribution.
+- Completed owner integrations: seam 07 records, seam 08 runtime bootstrap,
+  and seam 11 static Topology planning.
 - Other dependents: seams 06, 10, 13, and 99.
 
 ## Documents

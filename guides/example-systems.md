@@ -28,7 +28,7 @@ The numbered groups add one type of complexity at a time.
 | `04_runtime` | Scheduling, buses, jobs, observation, recovery, deduplication, and outboxes |
 | `05_multi_agent` | Child lifecycle, requests, worker groups, hierarchies, and remote children |
 | `06_factory` | Runtime-built conversations, systems, departments, and flows |
-| `07_topology` | Independent, hierarchical, bus-connected, keyed, and composed systems |
+| `07_topology` | Independent, hierarchical, bus-connected, keyed, composed, and Plugin-contributed systems |
 | `08_applications` | Audit, subscriptions, inboxes, identity, security, coordination, and groups |
 
 Start with `01_basic/01_01_minimal_agent`. It compares the direct Agent command

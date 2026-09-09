@@ -12,10 +12,17 @@ defmodule Jido.Topology do
   `Jido.Agent.Extension`, `Jido.Topology.Extension`, or both. The combined host
   sends its declarations to `lower_agent/2`, `lower_topology/2`, or both before
   common validation.
+
+  During instance planning, each Agent or group declaration can add pure
+  static entries through a declared `Jido.Topology.Plugin` facet. Jido adds
+  Agent contributions, then group contributions, in Plugin declaration order.
+  Included Topologies receive the same expansion in their own scope. The
+  source definition stays unchanged, and common validation checks the complete
+  plan before activation.
   """
 
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Composition, Instance, Plan, Validation}
+  alias Jido.Topology.{Composition, Instance, Plan, Plugin, Validation}
 
   @schema Zoi.struct(
             __MODULE__,
@@ -95,15 +102,17 @@ defmodule Jido.Topology do
   @doc "Validates a definition or raises its error."
   def new!(attrs), do: unwrap!(new(attrs))
 
-  @doc "Validates instance input and builds a stable local execution plan."
+  @doc "Validates input, applies static Plugin contributions, and builds a local plan."
   @spec instantiate(t(), map() | keyword()) :: {:ok, Instance.t()} | {:error, Exception.t()}
   def instantiate(definition, opts) do
-    with {:ok, definition, composed} <- new_with_composition(definition),
+    with {:ok, definition, _static_composed} <- new_with_composition(definition),
+         {:ok, planning_definition} <- Plugin.expand_definition(definition),
+         {:ok, composed} <- Composition.flatten(planning_definition),
          {:ok, opts} <- Authoring.attrs(opts),
          :ok <- Authoring.keys(opts, [:id, :input]),
          {:ok, id} <- Validation.key(Map.get(opts, :id)),
          {:ok, input} <- Validation.parse_input(definition.schema, Map.get(opts, :input, %{})),
-         {:ok, plan} <- Plan.build_composed(definition, id, input, composed) do
+         {:ok, plan} <- Plan.build_composed(planning_definition, id, input, composed) do
       {:ok, %Instance{id: id, definition: definition, input: input, plan: plan}}
     end
   end

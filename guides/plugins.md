@@ -39,11 +39,15 @@ Persistence runs a selected Persistence facet only for the default Agent
 checkpoint. It gives the facet one paired owned-state value, bounded format
 context, and mapped static options. A complete custom Agent checkpoint bypasses
 this conversion. Topology contribution is a separate pure facet and does not
-give the Plugin live-control authority.
+give the Plugin live-control authority. Instance planning applies Topology
+contributions in stable Agent, group, and Plugin declaration order. It validates
+the combined graph before activation and keeps generated entries out of the
+source definition.
 
 `use Jido.Plugin` with no options keeps the mixed compatibility behavior for
 current built-ins. New packages should use owner facets.
 
 See [Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md),
 [Plugin-Owned State](plugin-state.md), and
-[Plugin Runtimes](plugin-runtimes.livemd).
+[Plugin Runtimes](plugin-runtimes.livemd). See
+[Topology Definitions](topology-definitions.md) for static contribution use.

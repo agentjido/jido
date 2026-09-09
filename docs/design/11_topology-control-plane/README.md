@@ -1,98 +1,87 @@
-> Seam review entry point. This document is pending approval.
+> Implemented seam review entry point.
 
-# 11 — Topology control plane
+# 11 - Topology control plane
 
 ## Briefing
 
-Jido core has a static local Topology system. It validates definitions and
-plans, starts Agents and Buses on one Jido instance, waits for readiness, and
-repairs the same fixed target. It has no distributed control plane. The
-recommended target keeps this local contract in core and defines an optional
-control-plane contract for an application or integration package. That control
-plane can consume membership and authority services, place stable Agent Refs,
-coordinate handoff and recovery, and expose operator controls. It must use
-public Jido boundaries. It must not claim exclusive ownership unless stale
-owners are fenced at the commit boundary.
+Jido core owns static local Topology planning and fixed-target repair. It does
+not own a distributed control plane.
 
-All target requirements are pending approval. Code and executable tests define
-current behavior.
+During pure instance planning, the Topology owner now asks each declared
+`Jido.Topology.Plugin` facet for static entries. The four-module Plugin seam is
+complete:
 
-## Why this seam exists
+| Owner module | Topology role |
+| --- | --- |
+| `Jido.Agent.Plugin` | Defines pure Agent preparation and owned state. |
+| `Jido.AgentServer.Plugin` | Defines live callbacks and an optional runtime root. |
+| `Jido.Persistence.Plugin` | Converts one owned state value for a record. |
+| `Jido.Topology.Plugin` | Contributes static Bus, ownership, and subscription entries to planning. |
 
-- Owner: `Jido.Topology` and `Jido.Topology.Controller` own static local
-  topology. An optional application or ecosystem integration owns distributed
-  control-plane policy.
-- Owns: the boundary between desired placement and local activation, inputs
-  from membership and authority services, placement decisions, handoff and
-  recovery coordination, and operator control semantics.
-- Does not own: the local OTP process tree, Agent state, Turn evaluation,
-  persistence record meaning, cluster membership implementation, consensus,
-  transport, deployment, or application policy.
+Jido applies Agent contributions first, then group contributions. Each
+declaration keeps Plugin declaration order. Included Topologies receive the
+same expansion in their own scope. The common validator checks the complete
+graph before activation. The source definition stays unchanged.
 
-## Current and target state
+One application-supervised `Jido.Topology.Controller` starts and repairs one
+fixed `%Jido.Topology.Instance{}` on one Jido instance. `reconcile/2` repairs
+that target. It does not resize, update, move, rebalance, hand off, or recover
+an Agent on another node.
 
-| Area | Current | Recommended target |
-| --- | --- | --- |
-| Local Topology | Static definitions and plans; one local Controller repairs one fixed target. | Keep this core contract and its public APIs. |
-| Control plane | No distributed control-plane module or service exists. | Add only an optional external contract that uses public Jido operations. |
-| Membership and discovery | Core local Registry and explicit known-node child placement only. | Consume a provider-owned, generation-tagged membership view as input. Do not treat membership as authority. |
-| Ownership | Local names and persistence CAS detect some conflicts. | Require an external authority grant and stale-epoch fencing before any exclusive-owner or automatic-failover claim. |
-| Placement | A caller can request one known Erlang node for an owned child. | Select eligible nodes from declared constraints, capacity, membership, and authority state. |
-| Handoff and recovery | No Agent handoff, rebalance, or automatic recovery contract exists. | Use idempotent operations, stable Refs, durable restore, new authority epochs, and explicit partial-failure results. |
-| Partitions | Core defines no network-partition policy. | Stop new mutations when authority cannot be confirmed; reconcile to the highest valid epoch after recovery. |
-| Operations | Local Controller status and manual repair exist. | Add bounded status plus authenticated cordon, drain, move, rebalance, suspend, resume, and preview operations. |
+## Owned contract
 
-## Major gaps and work remaining
+- Topology definition and instance construction start no Jido process.
+- Topology Plugin contribution is pure static planning work.
+- A contribution can add current Bus resources, ownership relationships, and
+  Bus subscriptions. It cannot add Agents or a new resource kind.
+- Duplicate keys, unknown endpoints, duplicate subscriptions, and graph cycles
+  fail before Controller activation.
+- A group receives one contribution for its declaration. All expanded members
+  receive the resulting group connection.
+- The Controller owns local dependency order, readiness, repair, and cleanup.
+- A Controller target is fixed for its lifetime.
+- Authoring owner helpers and Plugin facets have no implicit runtime or
+  distributed authority.
 
-| Gap | Why it matters | Required outcome | Owner seam |
-| --- | --- | --- | --- |
-| Stable Ref input | Ref, namespace binding, local resolution, and stable persistence identity are implemented. | Preserve the complete Ref separately from later location and authority values. | 03 Agent identity, 09 Jido instance |
-| No authority or fence input | Two nodes can run the same logical Agent. | Authority grants with monotonically increasing epochs that every write owner enforces. | 06 Commit, 07 Persistence, 08 Agent Server, external authority owner |
-| No membership or placement contract | A known node is not discovery or scheduling. | Validated provider inputs and deterministic, explainable placement output. | 11 control plane, external cluster owner |
-| No handoff or recovery protocol | Restart and failover can overlap or lose intent. | Idempotent state machines with durable operation records and explicit rollback. | 11 control plane, external durable owner |
-| Fixed local target | Repair cannot resize or replace a plan. | Keep repair meaning clear; approve live target change separately. | 11 control plane |
-| Incomplete observation and controls | Operators cannot prove why placement or authority changed. | Bounded events, status, audit identity, and safe operator actions. | 11 control plane, 13 Observability |
+## Distributed boundary
 
-## Decisions requested
+Membership, discovery, automatic placement, rebalance, handoff, automatic
+failover, leases, fencing, network-partition policy, and operator controls stay
+outside Jido core. An application or focused integration can build those
+functions with public Jido activation, Ref, persistence, and inspection
+contracts.
 
-1. **Package boundary:** Keep distributed control-plane behavior outside Jido
-   core. Effect: core remains a local Agent library.
-2. **Local contract:** Keep the current static local Controller and do not call
-   `reconcile/2` a target update. Effect: existing applications remain valid.
-3. **Authority:** Require a provider-issued monotonically increasing epoch and
-   commit-time fencing for exclusive ownership. Effect: a lease or Registry
-   entry alone cannot prove safety.
-4. **Membership:** Treat membership and health as placement input, not durable
-   identity or write authority. Effect: discovery cannot create ownership.
-5. **Placement:** Use provider-neutral constraints and capacity data. Effect:
-   the design does not select a distributed library.
-6. **Handoff and recovery:** Use durable, idempotent operations and restore from
-   the approved persistence contract. Effect: retries do not create a second
-   logical operation.
-7. **Partition policy:** Stop mutation when authority cannot be confirmed.
-   Effect: availability does not override fencing.
-8. **Operator boundary:** Approve the listed safe control roles and require
-   authentication, audit identity, and preview. Effect: force operations cannot
-   bypass authority checks.
+A known Erlang node is a caller-selected location. It is not discovery or
+write authority. A Registry entry and persistence compare-and-swap are also not
+authority grants. A system must enforce a newer authority epoch at every
+protected commit before it can claim exclusive ownership or safe automatic
+failover.
 
-## Dependencies
+The detailed provider, placement, recovery, and operator requirements in the
+design are an external reference contract. They are not Jido core V3 release
+requirements.
 
-- Prerequisites: [Overview](../00_overview/alignment.md),
-  [package boundaries](../90_package-boundaries/alignment.md),
-  [errors and contracts](../12_errors-and-contracts/alignment.md),
-  [Agent](../01_agent/alignment.md), [Agent identity](../03_agent-identity/alignment.md),
-  [Plugins](../05_plugins/alignment.md), [persistence](../07_persistence/alignment.md),
-  [Agent Server](../08_agent-server/alignment.md),
-  [Jido instance](../09_jido-instance/alignment.md), and
-  [runtime topology](../10_runtime-topology/alignment.md). Authority and
-  recovery also use [commit and effects](../06_commit-and-effects/alignment.md).
-- Dependents: 13 Observability and 99 Delivery.
-- Blockers: Fencing input, authority-provider semantics, membership and
-  placement contracts, recovery operations, and package ownership are not
-  implemented. Stable Ref, namespace, write-authority loss, and revision-zero
-  persistence are implemented inputs.
+## Evidence
+
+- `test/jido/topology/plugin_integration_test.exs` proves ordered Agent and
+  group contribution, source-definition preservation, direct-plan parity,
+  included-scope expansion, and conflict rejection.
+- `test/examples/07_topology/07_06_plugin_contribution` proves that a
+  contributed Bus and subscription work through the local Controller.
+- The existing Topology suites prove authoring, composition, stable local
+  plans, readiness, repair, restore, conflict handling, and cleanup.
+- The runtime-topology and distributed-child suites prove that explicit
+  known-node activation is the lowest remote primitive and has no fallback or
+  exclusive-owner guarantee.
+
+## Follow-on seams
+
+- 12 Errors and contracts owns the final public error inventory.
+- 13 Observability owns public semantic events and bounded status projections.
+- 99 Delivery owns the full cross-package and release gate.
+- An external package owns any later distributed control plane.
 
 ## Documents
 
-- [Target design](design.md)
-- [Alignment plan](alignment.md)
+- [Selected design](design.md)
+- [Implemented alignment and evidence](alignment.md)

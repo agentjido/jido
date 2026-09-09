@@ -92,7 +92,12 @@ must also match the Agent facet's state schema.
 
 The Topology facet implements `contribute/2`. It can return current canonical
 Bus resources, ownership relationships, and Bus subscriptions. It cannot start
-a process, persist data, or control live activation.
+a process, persist data, or control live activation. Jido calls the facet while
+it builds an instance Plan. It processes Agent declarations, then group
+declarations, in source order and keeps Plugin declaration order. Included
+Topologies receive the same expansion in their own scope. Common Topology
+validation checks the complete graph before Controller activation. The source
+definition stays unchanged.
 
 ## Compatibility Form
 

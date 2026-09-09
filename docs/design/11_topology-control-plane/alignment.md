@@ -1,329 +1,208 @@
-> Seam alignment plan. This document is pending approval.
+> Implemented seam alignment. This document records the selected contract and
+> its evidence.
 
 # Topology control-plane alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. This seam is pending approval.
-- Code reviewed: `a58cc285d6f906b69448b5e2a72dc21091b07b49` on branch
-  `v3-spike`.
-- Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
-  [90 Package boundaries](../90_package-boundaries/alignment.md),
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
-  [01 Agent](../01_agent/alignment.md),
-  [03 Agent identity](../03_agent-identity/alignment.md),
-  [05 Plugins](../05_plugins/alignment.md),
-  [07 Persistence](../07_persistence/alignment.md),
-  [08 Agent Server](../08_agent-server/alignment.md),
-  [09 Jido instance](../09_jido-instance/alignment.md), and
-  [10 Runtime topology](../10_runtime-topology/alignment.md). Authority and
-  recovery also use [06 Commit and effects](../06_commit-and-effects/alignment.md).
-- Alignment state: `Blocked` on package ownership, authority epochs,
-  membership and placement contracts, recovery operations, and commit-time
-  fencing. Stable Ref and namespace inputs are implemented.
-- Approved decisions: None.
+- Design selected and implemented: 2026-09-09.
+- Alignment state: `Implemented` for the Jido core seam.
+- Compatibility state: additive. Existing Topology, Builder, Codec, Plan,
+  Controller, repair, readiness, and lookup behavior stays supported.
+- External state: distributed control-plane functions are deferred to an
+  application or focused integration package. They do not block Jido V3 core.
+- Follow-on work: seam 12 owns the final error inventory, seam 13 owns public
+  observation, and seam 99 owns the full delivery gate.
 
-The alignment state is execution status. It is not document approval. This
-file defines outcomes and gates. It is not the formal implementation plan.
+## Selected contract
 
-## Inputs and evidence
+Jido core is one local Topology component. Static authoring validates a source
+definition. Pure instance planning validates input, asks declared Topology
+Plugin facets for static entries, and builds one stable local plan. These steps
+start no Jido process.
 
-### Design
+Contribution uses this fixed order:
 
-- [Jido V3 vision](../VISION.md): Jido is a local Agent library. The developer
-  owns network topology, cluster strategy, deployment, and operational policy.
-- [Overview design](../00_overview/design.md): keeps static local Topology and
-  separates identity, location, and write authority.
-- [Package-boundary design](../90_package-boundaries/design.md): keeps static
-  local Topology in core and assigns membership, placement, rebalance, recovery
-  services, claims, leases, and fencing to focused integrations.
-- [Errors design](../12_errors-and-contracts/design.md): requires validated
-  public values, defined errors, and closed provider controls.
-- [Agent design](../01_agent/design.md): keeps runtime handles outside Agent
-  state and separates definition revision from state version.
-- [Agent identity design](../03_agent-identity/design.md): proposes exact
-  `{namespace, partition, id}` Ref identity and excludes node, lease, epoch,
-  PID, and storage revision.
-- [Plugin design](../05_plugins/design.md): limits a Topology facet to pure
-  static contribution and grants it no live authority.
-- [Commit design](../06_commit-and-effects/design.md): gives Agent Server the
-  one live commit point and does not make ordinary Directives durable.
-- [Persistence design](../07_persistence/design.md): keeps per-Agent records,
-  gives no discovery or lease service, and does not provide multi-Agent atomic
-  commit.
-- [Agent Server design](../08_agent-server/design.md): owns one activation but
-  does not bind namespace, resolve Ref, select placement, or grant cluster
-  authority.
-- [Jido instance design](../09_jido-instance/design.md): provides local Ref
-  resolution only and no implicit remote forwarding.
-- [Runtime-topology design](../10_runtime-topology/design.md): keeps local
-  process ownership and explicit known-node children separate from desired
-  state, discovery, placement, and authority.
-- [Target design](design.md): defines the recommended optional control-plane
-  contract.
+1. Root and included Topologies expand in their own scopes.
+2. Each scope processes Agent declarations in source order.
+3. Each scope then processes group declarations in source order.
+4. Each declaration processes Plugin packages in declaration order.
+5. Jido appends all entries after explicit source entries.
+6. Common definition and graph validation checks the complete result.
 
-### Canonical code
+A Topology facet can contribute current Bus resources, ownership relationships,
+and Bus subscriptions. It cannot add an Agent, add a new resource kind, start a
+runtime, persist state, or grant authority. Each group declaration gets one
+contribution. Its expanded members use the resulting group relationships and
+subscriptions.
 
-| Evidence | Canonical current behavior |
-| --- | --- |
-| `lib/jido/topology.ex:1-14,20-40` | Topology is static authoring data for Agents, groups, Buses, relationships, composition, and startup policy. It has no membership, placement, authority, or epoch field. |
-| `lib/jido/topology.ex:45-78` | One module is a combined Agent and Topology authoring host. It exposes authoring owner helpers, but those helpers have no runtime authority. |
-| `lib/jido/topology.ex:82-108` | Construction and instantiation validate data and build a plan without starting a process. |
-| `lib/jido/topology/instance.ex:1-15` | An instance contains only ID, definition, input, and local plan. |
-| `lib/jido/topology/plan.ex:1-16,34-70` | A plan contains local Agents, resources, dependency layers, lookup data, and component counts. |
-| `lib/jido/topology/plan.ex:155-180` | Plan member IDs derive from one topology instance ID. Resource and Agent locations are not selected. |
-| `lib/jido/topology/codec.ex:1-17,40-85` | Codec version 2 stores static definitions. It excludes input, plans, state, PIDs, and runtime status. |
-| `lib/jido/topology/controller.ex:1-24` | The Controller supports one static local target and explicitly excludes live updates, cluster placement, ownership transfer, and cluster policy. |
-| `lib/jido/topology/controller.ex:43-70` | A Controller is an application-supervised local tree with task, resource, and runtime children. Startup returns before readiness. |
-| `lib/jido/topology/controller.ex:73-107` | Public status, readiness, repair, and local handle lookup operate on one Controller. |
-| `lib/jido/topology/controller/runtime.ex:13-31,184-205` | Runtime state stores one fixed instance. Repair requests repeat a pass against that instance. |
-| `lib/jido/topology/controller/runtime.ex:207-325` | A pass uses dependency layers, bounded concurrency, readiness, degraded status, and automatic or manual retry. |
-| `lib/jido/topology/controller/runtime.ex:347-427` | Activation uses local Jido lookup and metadata markers. These checks do not provide cross-node authority. |
-| `lib/jido/topology/controller/activation.ex:8-35` | Member activation uses the public Agent Server path and waits for local readiness. |
-| `lib/jido/topology/controller/activation.ex:39-56` | Persistent child restore uses the normal single-Agent persistence contract. |
-| `lib/jido.ex:346-370,430-599` | A Jido instance supplies local services and local Agent lifecycle functions. It has no cluster directory or control-plane service. |
-| `lib/jido/persistence.ex:59-160` | Persistence uses per-Agent records and CAS. It does not issue ownership grants or discover Agents. |
+The `%Jido.Topology.Instance{}` keeps the validated source definition. The
+expanded entries live in its Plan. `Jido.Topology.Plan.build/3` and
+`Jido.Topology.instantiate/2` produce the same expanded plan for the same
+definition, ID, and input.
 
-### Tests and examples
+One `Jido.Topology.Controller` activates one fixed instance on one local Jido
+instance. The application supervises it beside the Jido instance. It owns
+dependency order, bounded startup, readiness, local repair, and cleanup.
+`reconcile/2` repairs the same target. It does not replace that target.
 
-| Evidence | Behavior proved or specified |
-| --- | --- |
-| `test/jido/topology/controller_test.exs:9-37` | Invalid local repair policy has no activation effect. Fixed-target startup, duplicate local Controller identity, state retention, and cleanup work. |
-| `test/jido/topology/controller_test.exs:115-168` | Local Agent repair and unrelated-Agent conflict protection work. |
-| `test/jido/topology/controller_test.exs:213-245` | Readiness retry and local instance scoping work. |
-| `test/jido/topology/controller_test.exs:251-340` | Child state restore, Bus repair, and Controller worker recovery work for the same supplied target. |
-| `test/jido/agent_server/distributed_authority_test.exs:10-30` | Shared CAS detects a stale writer after another node commits. |
-| `test/jido/agent_server/distributed_authority_test.exs:32-39` | Exclusive cluster ownership is skipped and not proved. |
-| `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves a local replacement, separates namespaces, and restores durable state after namespace rebinding. All three cases pass. |
-| `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:13-42` | Example code can compare Agent plan entries and validate a new target without live effects. |
-| `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:55-78` | Full Controller replacement can restore Agent state but replaces all PIDs. |
-| `test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs:80-97` | Live target growth is skipped and not implemented. |
-| `guides/core-scope.md:53-101` | Public guidance limits repair to one existing target and marks leases, fencing, membership, placement, failover, and live updates as deferred. |
-| `guides/deployment-and-shutdown.md:69-78` | Multi-node guidance assigns ownership, routing, fencing, and reconciliation to the application or an integration package. |
+## Four-module Plugin seam
 
-The removed gap report recorded 99 passing focused Topology tests and one
-skipped live-update test on 2026-09-08. This historical result proves only the
-local static contract. It does not prove a distributed target.
-
-## Retained baseline
-
-- `TOP-RB-001`: Module DSL, direct data, Builder, and Codec produce validated
-  static Topology definitions.
-- `TOP-RB-002`: Instantiation validates one input and builds one stable local
-  plan without starting a process.
-- `TOP-RB-003`: The combined authoring host exposes Agent and Topology helpers.
-  An authoring helper is not live authority.
-- `TOP-RB-004`: One application-supervised Controller owns one fixed local
-  target and its repair timing.
-- `TOP-RB-005`: Local activation uses bounded tasks, dependency order,
-  readiness checks, and public Jido lifecycle functions.
-- `TOP-RB-006`: Healthy owned local members keep their PIDs and state during a
-  repair pass.
-- `TOP-RB-007`: Normal Controller shutdown stops owned Agents in reverse
-  dependency order. It does not stop unrelated conflicting Agents.
-- `TOP-RB-008`: Persistent member restore uses independent single-Agent
-  records. Topology has no durable desired-state or multi-record transaction.
-- `TOP-RB-009`: Current explicit remote child placement requires a known node
-  and has no discovery, fallback, failover, or exclusive-owner guarantee.
-- `TOP-RB-010`: Core has no membership provider, distributed directory,
-  placement policy, lease, epoch, fencing, handoff, or operator control plane.
-
-## Gap register
-
-| Gap | Requirement | Current evidence | Difference | Disposition |
-| --- | --- | --- | --- | --- |
-| `TOP-GAP-001` | `TOP-REQ-001` to `TOP-REQ-005` | Topology and Controller code | Static local roles work. Distributed boundary documentation was mixed with an owner-Agent proposal. | `Retain` local roles; `Change` boundary text |
-| `TOP-GAP-002` | `TOP-REQ-006` to `TOP-REQ-011` | No provider contract | Membership and discovery inputs do not exist. | `Missing`; external owner required |
-| `TOP-GAP-003` | `TOP-REQ-012` to `TOP-REQ-018` | CAS conflict test; exclusive-owner test skipped | CAS detects one stale revision. There is no grant, epoch, expiry, or commit fence. | `Conflict` with any exclusive-owner claim; `Blocked` |
-| `TOP-GAP-004` | `TOP-REQ-019` to `TOP-REQ-024` | Explicit known-node child only | No automatic placement, capacity, constraints, deterministic policy, or explanation exists. | `Missing`; keep library choice deferred |
-| `TOP-GAP-005` | `TOP-REQ-025` to `TOP-REQ-033` | Persistent local restore and full Controller replacement | No durable operation state, fenced handoff, rollback, or automatic recovery exists. | `Missing`; `Blocked` on authority and persistence targets |
-| `TOP-GAP-006` | `TOP-REQ-034` to `TOP-REQ-038` | Core Ref, namespace binding, stable persistence identity, and local re-resolution | Distributed location and re-resolution contracts do not exist. | `Partial`; identity input is resolved, control-plane work remains |
-| `TOP-GAP-007` | `TOP-REQ-039` to `TOP-REQ-044` | Deployment guidance only | No network-partition or stale-epoch runtime enforcement exists. | `Missing`; `Blocked` on authority mechanism |
-| `TOP-GAP-008` | `TOP-REQ-045` to `TOP-REQ-048` | Local Controller status map | Local pass status exists. Distributed semantic events and state separation do not. | `Partial`; event schema deferred to seam 13 |
-| `TOP-GAP-009` | `TOP-REQ-049` to `TOP-REQ-058` | Manual local `reconcile/2` only | No authenticated audit, preview, cordon, drain, move, rebalance, suspend, or resume contract exists. | `Missing`; product UI remains out of scope |
-| `TOP-GAP-010` | `TOP-REQ-059` to `TOP-REQ-062` | Current public local APIs and old proposal | Compatibility is implemented. Error normalization is partial. Old owner-Agent runtime claims conflict with prerequisite boundaries. | `Retain` APIs; `Remove` implicit authority; `Defer` live update |
-
-## Dispositions of superseded claims
-
-| Superseded claim | Disposition | Reason and owner |
-| --- | --- | --- |
-| One module can be a combined Agent and Topology authoring host. | `Retain`. | Current code and authoring tests prove it. It remains static authoring. |
-| `owner/0`, `new_agent/1`, and Topology `new/1` compatibility are implemented. | `Retain`. | These are public authoring helpers. They do not grant control-plane authority. |
-| Add owner fields to Topology, Instance, and Plan. | `Defer`. | Distributed identity uses Agent Ref. No current control-plane need proves these core fields. |
-| Encode an owner Agent in a new Topology Codec version. | `Defer`. | Current Codec stores static Topology data. A format change needs an approved data need and migration. |
-| An included Topology must not start a second owner Agent. | `Replace`. | Current composition contributes one flattened static graph and starts no authoring owner Agent. |
-| Store desired Topology input in a reserved owner Plugin state key. | `Remove from this target`. | Distributed desired placement belongs to the control-plane owner. Plugin state is not cluster consensus. |
-| Add typed Topology Directives that commit desired state through an owner Turn. | `Remove from this target`. | Control-plane operations need durable multi-step operation semantics, not an ordinary transient Directive batch. |
-| Put the local Controller under a Topology Plugin runtime. | `Remove`. | Seam 05 gives a Topology facet static authority only. Seam 10 keeps the Controller application-supervised. |
-| Add `Jido.start_topology` and return an owner Agent PID. | `Defer`. | No approved startup contract requires it. The current Controller PID and readiness APIs remain supported. |
-| Treat the owner Agent as the only live desired-state authority. | `Remove from distributed target`. | An Agent activation cannot provide membership consensus, placement policy, or stale-owner fencing. |
-| Commit bootstrap desired state before the first child starts. | `Replace`. | Local static startup remains current behavior. Distributed startup must first have desired placement and a fenced authority grant. |
-| Make the local Controller accept replaceable targets and state versions. | `Defer to a separate live-update design`. | Current repair is fixed-target. Distributed placement must not hide this missing local API. |
-| Keep unchanged PIDs during live target growth or definition change. | `Retain as later acceptance intent`. | The skipped upgrade test specifies this outcome but does not prove it. |
-| Define repair, resize, upgrade, rolling update, and rollback as distinct operations. | `Retain with changed ownership`. | Repair stays local. Move, rebalance, handoff, recovery, and rollback belong to the optional control plane. Live definition update remains separate. |
-| Resolve definition revision to exact deployed code in this seam. | `Defer`. | Seams 01 and 08 own definition checks and loaded-code limits. Deployment owns artifact rollout. |
-| Use local metadata markers as exclusive ownership. | `Reject`. | Markers protect one local Controller from unrelated local processes. They do not fence another node. |
-| Treat persistence CAS as exclusive cluster ownership. | `Reject`. | Current CAS detects conflicting revisions after writes. It does not issue or renew authority. |
-| Choose a specific distributed library. | `Reject`. | Membership, authority, storage, and transport providers remain separate and provider-neutral. |
-
-## High-level work sequence
-
-This sequence defines outcomes and gates. It is not an implementation plan.
-Create the implementation plan later, after the design is approved.
-
-### Phase 0 — Resolve scope and prerequisite decisions
-
-- Requirements: all `TOP-REQ` identifiers.
-- Required outcome: approved package owner, local compatibility boundary,
-  authority model, partition rule, and operator roles.
-- Constraints: do not select a vendor or distributed library.
-- Compatibility: no runtime change.
-- Verification: review each `TOP-DEC` item and every blocker below.
-- Exit criteria: prerequisite drafts are approved or replaced by explicit
-  assumptions, and the user approves or changes each topology decision.
-
-### Phase 1 — Lock the local component contract
-
-- Requirements: `TOP-REQ-001` to `TOP-REQ-005`, `TOP-REQ-059`, and
-  `TOP-REQ-060`.
-- Required outcome: static authoring, planning, fixed-target local repair, and
-  the external control-plane boundary have one clear contract.
-- Constraints: keep current Controller APIs and application supervision.
-- Compatibility: no removal or changed repair meaning.
-- Verification: authoring, Codec, composition, Controller, readiness, repair,
-  conflict, restore, and cleanup tests.
-- Exit criteria: public docs contain no distributed claim for local behavior.
-
-### Phase 2 — Establish identity and provider inputs
-
-- Requirements: `TOP-REQ-006` to `TOP-REQ-011` and `TOP-REQ-034` to
-  `TOP-REQ-038`.
-- Required outcome: stable Ref, namespace, membership snapshots, desired
-  placement, and location records have validated owner-specific boundaries.
-- Constraints: membership cannot grant authority. Ref cannot contain location.
-- Compatibility: add provider and Ref paths beside current ID, PID, and
-  known-node APIs.
-- Verification: generation, duplicate-node, stale-view, namespace, location
-  replacement, and re-resolution tests.
-- Exit criteria: each placement input has one owner and one accepted revision.
-
-### Phase 3 — Establish enforceable authority
-
-- Requirements: `TOP-REQ-012` to `TOP-REQ-018` and `TOP-REQ-039` to
-  `TOP-REQ-044`.
-- Required outcome: increasing epochs, commit-time stale-epoch rejection,
-  optional lease expiry, and network-partition behavior have executable proof.
-- Constraints: Registry presence, membership, and CAS conflict are not grants.
-- Compatibility: deployments without fencing stay best-effort and make no
-  exclusive claim.
-- Verification: overlapping holder, lost renewal, delayed message, stale
-  writer, partition, heal, and external-effect fence tests.
-- Exit criteria: every lower epoch is rejected after a higher epoch exists.
-
-### Phase 4 — Add placement, handoff, and recovery outcomes
-
-- Requirements: `TOP-REQ-019` to `TOP-REQ-033`.
-- Required outcome: deterministic placement and durable idempotent operations
-  use public Jido activation and restore boundaries.
-- Constraints: do not inspect or copy checkpoint contents. Do not call a local
-  repair pass a handoff or update.
-- Compatibility: current static Controller remains available.
-- Verification: no-capacity, changed input, retry, partial activation,
-  readiness failure, stale location, handoff, recovery, and rollback tests.
-- Exit criteria: each operation has one final or resumable recorded result.
-
-### Phase 5 — Add operation and observation contracts
-
-- Requirements: `TOP-REQ-045` to `TOP-REQ-058` and `TOP-REQ-061`.
-- Required outcome: bounded status, semantic events, authenticated audit, safe
-  controls, preview, and defined errors.
-- Constraints: observation and force actions have no authority bypass.
-- Compatibility: keep local status and manual repair.
-- Verification: event field, redaction, handler-failure, authorization, audit,
-  preview, cordon, drain, move, suspend, and resume tests.
-- Exit criteria: an operator can explain each decision without private state.
-
-### Phase 6 — Close release evidence
-
-- Requirements: all approved `TOP-REQ` identifiers.
-- Required outcome: public docs, package boundary, failure matrix, provider
-  conformance, and deployment claims agree.
-- Compatibility: no supported core API is removed without a separate gate.
-- Verification: format, compile, focused tests, full package tests,
-  public-only integration fixture, network fault tests, and mixed-version
-  rollback tests.
-- Exit criteria: no approved requirement is `Missing`, `Conflict`, or
-  `Blocked` in the acceptance matrix.
-
-## Acceptance matrix
-
-| Requirement | Evidence now | Required evidence | Evidence state |
+| Module | Input owned by this seam | Output used by this seam | Live authority |
 | --- | --- | --- | --- |
-| `TOP-REQ-001` | `lib/jido/topology.ex:82-108`; authoring and validation tests | Public contract inventory | `Proven` |
-| `TOP-REQ-002` | `lib/jido/topology/controller.ex:81-90`; runtime fixed instance | Fixed-target regression test | `Proven` |
-| `TOP-REQ-003` to `TOP-REQ-005` | Core scope and package design | Public-only external integration fixture | `Partial` |
-| `TOP-REQ-006` to `TOP-REQ-011` | None | Membership provider contract and stale-view tests | `Missing` |
-| `TOP-REQ-012` to `TOP-REQ-018` | CAS conflict only; exclusive-owner test skipped | Grant, epoch, expiry, stale-commit, and claim tests | `Conflict` |
-| `TOP-REQ-019` to `TOP-REQ-024` | Explicit known-node child placement only | Constraint, capacity, deterministic choice, and unscheduled tests | `Missing` |
-| `TOP-REQ-025` to `TOP-REQ-033` | Local restore and full replacement examples | Durable operation, fencing, readiness, retry, and rollback tests | `Missing` |
-| `TOP-REQ-034` to `TOP-REQ-038` | Core Ref, namespace, local re-resolution, and durable namespace rebind tests | Distributed location and re-resolution tests | `Partial` |
-| `TOP-REQ-039` to `TOP-REQ-044` | Deployment guidance only | Network-partition and stale-epoch enforcement tests | `Missing` |
-| `TOP-REQ-045` to `TOP-REQ-048` | Local Controller status only | Distributed event, status, redaction, and handler-failure tests | `Partial` |
-| `TOP-REQ-049` to `TOP-REQ-058` | Manual local repair only | Authenticated audit and every operator-role test | `Missing` |
-| `TOP-REQ-059` and `TOP-REQ-060` | Current Topology APIs and docs | Compatibility inventory and terminology guard | `Proven` |
-| `TOP-REQ-061` | Current failures include atoms, tuples, and errors | Approved seam-12 mapping for each control-plane boundary | `Partial` |
-| `TOP-REQ-062` | No owner Agent controls the current Controller | Public boundary and no-implicit-authority test | `Proven` |
+| `Jido.Agent.Plugin` | Agent declaration and state schema | None during Topology planning | None |
+| `Jido.AgentServer.Plugin` | Live activation context | None during Topology planning | Only its bounded live facet callbacks |
+| `Jido.Persistence.Plugin` | One paired owned state value | None during Topology planning | None |
+| `Jido.Topology.Plugin` | Package, version, Agent key and module, static options | Canonical Bus, ownership, and subscription entries | None |
 
-## Migration and compatibility
+The package manifest selects the facets. The contribution dispatcher invokes
+only the Topology facet. Normal Agent definition validation still validates the
+complete package declaration. A contribution does not start a Server runtime
+or run a Persistence conversion.
 
-No removal or deprecation is approved in this seam.
+## Distributed boundary
 
-| Area | Compatibility rule and gate |
+Jido core does not implement cluster membership, discovery, automatic
+placement, rebalance, handoff, automatic failover, leases, authority epochs,
+network-partition policy, or operator control actions.
+
+An external control plane can use these public inputs:
+
+- a complete Agent Ref for stable identity;
+- explicit Jido activation and lifecycle calls;
+- local Ref resolution and current status calls;
+- the durable per-Agent record contract;
+- explicit caller-selected known-node child placement.
+
+The external owner must keep desired placement, current location, and write
+authority as separate values. Membership is placement input only. A Registry
+entry, a PID, a known node, and persistence compare-and-swap are not authority
+grants. Any exclusive-owner or safe automatic-failover claim requires a newer
+authority epoch that every protected commit can enforce.
+
+Requirements `TOP-REQ-006` through `TOP-REQ-058`, and `TOP-REQ-061`, are the
+reference contract for such an external package. They are not implemented by
+Jido core and are not core release blockers.
+
+## Canonical implementation
+
+| Contract | Source |
 | --- | --- |
-| Static authoring | Keep DSL, direct values, Builder, Codec versions 1 and 2, composition, and authoring extensions. |
-| Owner helpers | Keep `owner/0` and `new_agent/1` as current authoring compatibility. Do not give them implicit control-plane meaning. |
-| Local Controller | Keep application supervision, fixed target, status, readiness, repair modes, and lookup functions. |
-| Repair | Keep `reconcile/2` as same-target repair. Any update API needs separate approval and live-diff proof. |
-| Agent lifecycle | Keep current ID, PID, partition, and explicit known-node functions while Ref-first paths are additive. |
-| Persistence | Keep per-Agent records and current adapters. Add no control-plane record data to Agent checkpoints. |
-| Best-effort placement | Permit deployment without fencing only when status and docs exclude exclusive ownership and safe failover claims. |
-| Provider rollout | Version membership, authority, desired-placement, location, and operation records separately. Prove old-reader and rollback behavior. |
-| Mixed versions | Do not enable automatic recovery until every active writer can enforce epochs. |
-| Rollback | Disable new automatic operations first. Preserve authority records and fence values. Roll back provider and runtime support as one compatible unit. |
+| Static definition and instance boundary | `Jido.Topology` |
+| Recursive contribution order and common validation | `Jido.Topology.Plugin.expand_definition/1` |
+| Owner-bounded facet call and context | `Jido.Topology.Plugin` |
+| Canonical contribution value | `Jido.Topology.Plugin.Contribution` |
+| Direct plan parity | `Jido.Topology.Plan.build/3` |
+| Included-scope addresses and graph validation | `Jido.Topology.Composition` |
+| Fixed-target local activation and repair | `Jido.Topology.Controller` and `Jido.Topology.Controller.Runtime` |
+| Public local Agent lifecycle and Ref operations | `Jido` and `Jido.Instance.RefFacade` |
+| Durable per-Agent restore | `Jido.Persistence` and `Jido.Topology.Controller.Activation` |
 
-## Assumptions and blockers
+## Evidence matrix
 
-| ID | Type | Owner | Statement | Resolution needed |
-| --- | --- | --- | --- | --- |
-| `TOP-BLK-001` | `Blocker` | 00 Overview | Static Topology retention and distributed scope are pending approval. | Approve or change the Overview topology decision. |
-| `TOP-BLK-002` | `Blocker` | 90 Package boundaries | The external control-plane owner and public integration boundary are pending. | Approve package placement before API design. |
-| `TOP-BLK-003` | `Blocker` | 12 Errors and contracts | Provider controls, operation errors, and safe projections are not approved. | Approve result and error ownership. |
-| `TOP-BLK-004` | `Resolved input` | 03 Agent identity, 09 Jido instance | Core Ref, stable namespace binding, stable persistence identity, and local resolution are implemented. | Preserve the Ref when later location and authority values are added. |
-| `TOP-BLK-005` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | No activation or commit boundary accepts and enforces an authority epoch. | Approve the narrow fencing contract and failure rule. |
-| `TOP-BLK-006` | `Resolved input` | 07 Persistence and 09 Jido instance | Revision-zero records, tombstones, all-write-error authority loss, stable Ref keys, and explicit legacy collision rules are implemented. | Do not infer a lease or fencing grant from these inputs. |
-| `TOP-BLK-007` | `Blocker` | External authority owner | Grant source, epoch durability, optional lease clock model, renewal margin, and provider fault set are not selected. | Define and prove one provider contract before exclusive claims. |
-| `TOP-BLK-008` | `Blocker` | External cluster owner | Membership source, node identity, generation, capacity units, and stale-view policy are not selected. | Define provider data and conformance tests. |
-| `TOP-BLK-009` | `Blocker` | 11 Control plane | Partial handoff, retry, rollback, and operation-record retention policies are not approved. | Approve operation state and recovery semantics. |
-| `TOP-BLK-010` | `Assumption` | 10 Runtime topology | Explicit known-node activation remains the lowest remote placement primitive. | Confirm or add one narrow public activation boundary. |
-| `TOP-BLK-011` | `Assumption` | 13 Observability | Seam 13 will define exact event names and bounded field encodings. | Map the approved transition facts without adding authority. |
-| `TOP-BLK-012` | `Blocker` | 11 Control plane | Live local target replacement is not implemented and is not part of this target. | Keep it deferred or approve a separate design pass. |
-| `TOP-BLK-013` | `Resolved` | Design index owner | The main review table now lists the control-plane briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
+| Requirement group | Evidence | State |
+| --- | --- | --- |
+| `TOP-REQ-001` to `TOP-REQ-005` | Topology validation, composition, Controller, core-scope, and package-boundary evidence | `Proven` for the selected local and external-owner boundary |
+| `TOP-REQ-006` to `TOP-REQ-058` | No Jido core implementation is selected | `Deferred external reference contract` |
+| `TOP-REQ-059`, `TOP-REQ-060` | Existing Topology and Controller suites plus fixed-target API text | `Proven` |
+| `TOP-REQ-061` | No external control-plane protocol is selected | `Deferred with its external owner` |
+| `TOP-REQ-062` | Authoring-host, Plugin, Controller, and runtime-topology evidence | `Proven` |
+| `TOP-REQ-063` to `TOP-REQ-068` | Plugin integration unit and executable example tests | `Proven` |
+
+## Executable evidence
+
+| Evidence | Behavior proved |
+| --- | --- |
+| `test/jido/topology/plugin_integration_test.exs` | Explicit entries stay first. Agent, group, and Plugin order is stable. Bus, subscription, and ownership entries enter the common graph. Source definitions stay unchanged. Direct planning matches instantiation. Included contributions stay in their component scope. A duplicate contribution fails before activation. |
+| `test/examples/07_topology/07_06_plugin_contribution` | A Topology-only Plugin package contributes a Bus and subscription. The Controller starts them, and a published Signal reaches the Agent. |
+| `test/jido/topology` | Authoring, validation, composition, input, group, Controller, readiness, repair, restore, conflict, and cleanup behavior stays valid. |
+| `test/examples/07_topology` | All documented local systems run through the same Controller contract. |
+| Distributed child and authority tests | Known-node placement works as a bounded primitive. The exclusive-owner case remains an explicit non-guarantee. |
+
+## Compatibility decisions
+
+| Area | Decision |
+| --- | --- |
+| Static authoring | Keep module DSL, direct values, Builder, Codec versions 1 and 2, composition, and authoring extensions. |
+| Source definition | Keep it free of generated contribution entries. Store expansion only in the Plan. |
+| Plugin declarations | Keep module and `{module, options}` forms and their order. |
+| Plan | Add Topology facet expansion to normal instance and direct Plan construction. |
+| Owner helpers | Keep `owner/0` and `new_agent/1` as authoring helpers only. |
+| Controller | Keep application supervision, fixed target, readiness, repair modes, status, and lookup. |
+| Repair | Keep `reconcile/2` as same-target repair. A live update needs a separate contract. |
+| Persistence | Keep independent per-Agent records. Add no desired-placement or authority data to Agent checkpoints. |
+| Remote placement | Keep explicit caller-selected known-node placement and no local fallback. |
+| Cluster features | Add no core membership, discovery, automatic placement, failover, lease, fence, or exclusive-owner claim. |
+
+## Limits
+
+- Topology Plugin code is application code. The contract requires it to be
+  pure, but Elixir cannot prevent arbitrary side effects inside a callback.
+- Contribution runs each time Jido builds or verifies an instance plan. It must
+  be deterministic for fixed definition data.
+- Explicit source graph references must be valid before contribution. A facet
+  must contribute any connection that depends on its contributed resource.
+- Two contributions cannot declare the same key or duplicate the same
+  subscription. The common validator rejects the complete plan.
+- The Controller does not resize groups or replace a definition.
+- A Controller marker prevents unrelated local takeover only. It does not
+  fence another Erlang node.
+- Persistent restore does not provide distributed desired-state storage or an
+  authority grant.
+
+## Verification record
+
+Verification passed on 2026-09-09:
+
+```text
+mix test test/jido/topology test/jido/plugin/facets_test.exs --seed 0
+
+106 passed
+
+mix test test/examples/07_topology --only example --seed 0
+
+7 passed
+
+mix test test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs \
+  --include example --seed 0
+
+4 passed, 1 skipped
+
+mix test test/jido/agent_server/distributed_child_test.exs \
+  test/jido/agent_server/remote_lifecycle_test.exs \
+  test/jido/agent_server/distributed_authority_test.exs \
+  --include research --seed 0
+
+19 passed, 1 skipped
+
+mix quality
+
+1181 passed, 1 excluded
+
+mix docs --warnings-as-errors
+
+documentation generated with no warnings
+```
+
+The Topology-upgrade skip is the deferred live-target update contract. The
+distributed-authority skip is the explicit non-guarantee for exclusive cluster
+ownership. The quality exclusion is the same approved external-provider case.
+The diff check also passed.
 
 ## Completion criteria
 
-- [ ] The user has approved or changed every `TOP-DEC` item.
-- [ ] Prerequisite drafts are approved or replaced by explicit assumptions.
-- [ ] Every approved `TOP-REQ` item has `Proven` evidence.
-- [ ] No approved requirement has a `Missing`, `Conflict`, or `Blocked` state.
-- [ ] Current static Topology and fixed-target local repair remain supported.
-- [ ] Membership, location, identity, and authority have separate values and
-      provider contracts.
-- [ ] A stale authority epoch cannot commit Agent state or a fenced external
-      effect.
-- [ ] Handoff, recovery, retry, rollback, and network partition tests pass.
-- [ ] Operator actions are authenticated, audited, previewable, and fenced.
-- [ ] Distributed claims use only public Jido contracts and one tested package
-      set.
-- [ ] Dependent seam documents and the main design index use the approved
-      three-file contract.
-- [ ] A separate formal implementation plan is created only after approval.
+- [x] Static definitions and plans remain process-free Jido values.
+- [x] Topology Plugin facets are called by the Topology owner during planning.
+- [x] Contribution order is deterministic and documented.
+- [x] Included Topologies receive contributions in their own scopes.
+- [x] Common validation checks the complete contributed graph before
+      activation.
+- [x] The source definition stays unchanged and direct Plan construction has
+      parity with instantiation.
+- [x] The executable example proves a contributed Bus and subscription.
+- [x] The four Plugin owner modules keep separate authority.
+- [x] The local Controller keeps one fixed target and same-target repair.
+- [x] Authoring owner helpers have no implicit runtime authority.
+- [x] Distributed control-plane policy stays outside Jido core.
+- [x] External distributed requirements are explicit non-core reference
+      requirements, not unresolved core blockers.

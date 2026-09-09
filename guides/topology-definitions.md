@@ -34,6 +34,27 @@ not check external service readiness.
 Use a finite `max_agents` and startup concurrency. The controller starts only
 the expanded local plan.
 
+## Add Static Plugin Entries
+
+An Agent can declare a Plugin package with a `Jido.Topology.Plugin` facet. When
+Jido builds an instance plan, that facet can contribute Bus resources,
+ownership relationships, and Bus subscriptions for the Agent declaration.
+
+Jido applies Agent contributions first and then group contributions. It keeps
+source declaration order and Plugin declaration order. Included Topologies
+receive contributions in their own scope. A group gets one contribution for
+the declaration, and all its members use the resulting group wiring.
+
+The validated source definition stays unchanged. Jido validates the complete
+expanded graph before activation. A duplicate key, unknown endpoint, duplicate
+subscription, or graph cycle returns an error before the Controller starts.
+
+This facet is for pure static planning. It cannot add Agents or new resource
+kinds. It does not start a Jido process, persist state, replace the Controller
+target, or grant live authority. See the
+[`07_06_plugin_contribution`](../examples/07_topology/07_06_plugin_contribution/README.md)
+example.
+
 ## Separate Static And Dynamic Systems
 
 Use a Topology for an application system whose desired members are known from

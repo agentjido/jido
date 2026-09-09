@@ -2,7 +2,7 @@ defmodule Jido.Topology.Plan do
   @moduledoc "An expanded local topology with stable IDs and dependency layers."
 
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Composition, Ref, Reference, Validation}
+  alias Jido.Topology.{Composition, Plugin, Ref, Reference, Validation}
 
   @schema Zoi.struct(__MODULE__, %{
             agents: Zoi.map(),
@@ -20,7 +20,8 @@ defmodule Jido.Topology.Plan do
 
   @doc false
   def build(definition, id, input) do
-    with :ok <- root_imports(definition),
+    with {:ok, definition} <- Plugin.expand_definition(definition),
+         :ok <- root_imports(definition),
          {:ok, composed} <- Composition.flatten(definition),
          do: expand_plan(definition, id, input, composed)
   end

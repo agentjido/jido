@@ -49,7 +49,7 @@ in the code.
 | Route and Plugin input contract | Current preparation can change selection and expose the complete Agent. | One fixed executable from the source Signal and isolated Plugin-owned inputs. | 01 Agent, 04 Turn evaluation, 05 Plugins |
 | Stable identity and definition revision | Ref value, instance namespace, Ref facade, stable key, and restore checks are implemented. Runtime Topology still uses compatible local handles. | Preserve exact Ref identity when topology work adds new target forms. | 10 |
 | Durable lifecycle | Current creation, write-error, and delete rules do not give one safe record lifecycle. | Initial active records, loss of write authority, and tombstone semantics. | 06 Commit and effects, 07 Persistence, 08 Agent Server, 10 Runtime topology |
-| Plugin ownership and replacement | Four closed owner facets and coherent runtime replacement are implemented. | Complete the remaining Topology integration and keep compatibility proof. | 05, 08, 09, 10, 11 |
+| Plugin ownership and replacement | Four closed owner facets, coherent runtime replacement, Persistence conversion, and Topology planning integration are implemented. | Keep compatibility proof through delivery. | 05, 08, 09, 10, 11 |
 | Public values and errors | Several proposed structs do not exist, and current public protocols use structs, maps, tuples, and atoms. | One owner and migration rule for each public value and error. | 12 Errors and contracts, 90 Package boundaries, value owners |
 | Acceptance coverage | Skipped research tests specify several target contracts but do not prove them. | Passing owner-seam evidence for each approved Overview requirement. | All dependent seams, closed by 99 Delivery |
 

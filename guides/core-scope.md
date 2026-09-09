@@ -14,7 +14,7 @@ guide and the public module documentation when you build an extension.
 | Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
 | Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
-| Topology | Pure definitions and plans, bounded local activation, readiness, repair, and cleanup. |
+| Topology | Pure definitions and plans, ordered static Plugin contribution, bounded local activation, readiness, same-target repair, and cleanup. |
 
 An extension uses these public APIs and the selection rules in the
 [extension-boundaries guide](extension-boundaries.md).
