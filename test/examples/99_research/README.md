@@ -1,10 +1,9 @@
 # Jido feature acceptance examples
 
-The research set has 13 executable feature probes. The current result has 42
-passing checks and 3 skipped live-upgrade checks.
-The first ten probes cover general core features. Three more cover live Agent
-and topology upgrades. Each skip names a missing feature. Keep the original
-assertion and remove the skip when that feature is implemented.
+The research set has 16 executable feature probes. The current result has 48
+passing checks and no skipped checks. Ten probes cover general core features,
+three retained probes cover persistence boundaries, and three cover bounded
+live Agent and Topology upgrades.
 
 ## Run
 
@@ -12,9 +11,9 @@ assertion and remove the skip when that feature is implemented.
 mix test test/examples/99_research --include example --seed 0
 ```
 
-This is an optional secondary check, not the default release check. It excludes
-the 3 skipped tests. It uses no vendor API or model request. The distributed
-example starts two local Erlang nodes. Each row has its own focused command.
+This is an optional secondary check, not the default release check. It uses no
+vendor API or model request. The distributed example starts two local Erlang
+nodes. Each row has its own focused command.
 
 | ID | Feature | Baseline pass | Skipped | Result |
 | --- | --- | ---: | ---: | --- |
@@ -28,26 +27,29 @@ example starts two local Erlang nodes. Each row has its own focused command.
 | FA-08 | [Acknowledged handoff and worker reconciliation](99_04_handoff_reconciliation/README.md) | 3 | 0 | Works as an application protocol |
 | FA-09 | [Shared work budgets](99_05_capacity_deadlines_cleanup/README.md) | 3 | 0 | Works as a local runtime extension |
 | FA-10 | [Fenced distributed ownership](99_02_distributed_authority/README.md) | 4 | 0 | Works with an explicit external authority |
-| UP-01 | [Turn upgrade](99_14_turn_upgrade/README.md) | 2 | 1 | Core feature required |
-| UP-02 | [State migration](99_15_state_migration/README.md) | 3 | 1 | Compatible state migration works; definition upgrade required |
-| UP-07 | [Topology upgrade](99_16_topology_upgrade/README.md) | 4 | 1 | Plan comparison and full replacement work; live update required |
+| PERSIST-01 | [Checkpoint identity](99_06_checkpoint_identity/README.md) | 1 | 0 | Core loader rejects mismatched identity |
+| PERSIST-02 | [Checkpoint portability](99_07_checkpoint_portability/README.md) | 1 | 0 | Core loader rejects runtime-only values |
+| PERSIST-03 | [Indeterminate write](99_08_indeterminate_write/README.md) | 1 | 0 | Core blocks stale work after an uncertain write |
+| UP-01 | [Turn upgrade](99_14_turn_upgrade/README.md) | 3 | 0 | Core provides an explicit quiescent upgrade boundary |
+| UP-02 | [State migration](99_15_state_migration/README.md) | 4 | 0 | Core validates and checkpoints live definition migration |
+| UP-07 | [Topology upgrade](99_16_topology_upgrade/README.md) | 5 | 0 | Core supports additive local target updates |
 
-The tables and focused README files record the missing contracts, proof limits,
+The tables and focused README files record the contracts, proof limits,
 validation commands, and live-upgrade results. Executable tests and their tags
-define the current skip policy.
+define the current result.
 
 ## Retained research
 
 The original IDs remain stable. The ten probes use existing folders 99_01
-through 99_05 and new folders 99_09 through 99_13. Three older completed
-persistence probes remain under 99_06 through 99_08. Their core regression
-tests remain under test/jido/persistence.
+through 99_05 and new folders 99_09 through 99_13. Three completed persistence
+probes remain under 99_06 through 99_08. Each has a small example test and a
+deeper core regression suite.
 The live-upgrade examples use new folders 99_14 through 99_16.
 
 The original DIST-03 source probe and its core tests remain available. The
 core-only exclusive-owner test retains its previously approved skip. The four
 new fencing checks have no skips and use an explicit external authority.
 
-These tests stay in test/examples because this pass adds examples and records
-core requirements. It does not implement or change core contracts. Existing
-CI excludes test/examples; `mix examples --seed 0` selects them separately.
+These tests stay in test/examples because they record executable example
+contracts. Existing CI excludes test/examples; `mix examples --seed 0` selects
+them separately.

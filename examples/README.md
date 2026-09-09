@@ -1,6 +1,5 @@
-> Current research run, 2026-09-08: 34 checks pass and 11 checks are skipped
-> across the proposed core features. The skipped assertions remain in the test
-> suite.
+> Current example run, 2026-09-09: 306 checks pass and no example check is
+> skipped. The research subset has 48 passing checks.
 
 # Jido V3 examples
 
@@ -35,11 +34,10 @@ mix test test/examples/01_basic --include example --seed 0
 mix test --include example --include flaky --seed 0  # Complete acceptance suite
 ```
 
-Core regression tests can reuse example modules. Keep each assertion in one
-suite. The runtime, observation, remote, and persistence guides link to core
-tests where the behavior is already covered. Do not copy those tests into the
-example suite. The exact DIST-03 exclusion is the only approved skip in the
-complete suite; cluster-exclusive ownership remains unsupported.
+Every numbered example folder has at least one small executable behavior test.
+Deeper core regression suites can reuse the same example modules. The exact
+DIST-03 exclusion is the only approved skip in the complete suite;
+cluster-exclusive ownership remains unsupported.
 
 LLM and Factory tests use deterministic adapters and local HTTP/SSE servers.
 Live provider demos require separate credentials and budget. The recursive

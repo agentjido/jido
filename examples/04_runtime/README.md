@@ -1,8 +1,8 @@
 # Runtime feature examples
 
-This sequence has 13 source fixtures. The first eight use opt-in example
-tests. The five promoted capability examples use the default core acceptance
-suite. Each profile gives its focused test command.
+This sequence has 13 source fixtures and 34 opt-in example tests. The five
+promoted capability examples also have deeper core acceptance suites. Each
+profile gives its focused test command.
 
 | Order | Added feature | Tests |
 | --- | --- | ---: |
@@ -14,11 +14,11 @@ suite. Each profile gives its focused test command.
 | [04_06_state_recovery](04_06_state_recovery/persistent_counter_recovery.ex) | Restore retains state, duplicate ledger, and revision. | 5 example |
 | [04_07_input_deduplication](04_07_input_deduplication/deduplicating_inbox.ex) | A stable input ID rejects duplicate work before commit. | 2 example |
 | [04_08_commit_outbox](04_08_commit_outbox/audit_outbox.ex) | Business state and audit intent restore together. | 3 example |
-| [04_09_agent_observation](04_09_agent_observation/turn_observation.ex) | SDK events expose Agent, admission, persistence, and local Topology facts. | 12 core |
-| [04_10_causal_trace](04_10_causal_trace/causal_trace.ex) | Local and remote child work retains explicit creation causes. | 12 core |
-| [04_11_recoverable_delivery](04_11_recoverable_delivery/recoverable_delivery.ex) | A Plugin resumes committed output intent after loss. | 11 core |
-| [04_12_pending_job_recovery](04_12_pending_job_recovery/pending_job_recovery.ex) | Approval, attempt identity, retry, and cancellation survive restart. | 7 core |
-| [04_13_durable_scheduling](04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Saved schedule occurrences retry at a configured interval until the result commit acknowledges them. | 31 core |
+| [04_09_agent_observation](04_09_agent_observation/turn_observation.ex) | SDK events expose Agent, admission, persistence, and local Topology facts. | 1 example plus core suite |
+| [04_10_causal_trace](04_10_causal_trace/causal_trace.ex) | Local and remote child work retains explicit creation causes. | 1 example plus core suite |
+| [04_11_recoverable_delivery](04_11_recoverable_delivery/recoverable_delivery.ex) | An application Plugin resumes committed output intent after loss. | 1 example plus core suite |
+| [04_12_pending_job_recovery](04_12_pending_job_recovery/pending_job_recovery.ex) | An application protocol preserves approval and requires explicit retry after restart. | 1 example plus core suite |
+| [04_13_durable_scheduling](04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Saved schedule occurrences retry at a configured interval until the result commit acknowledges them. | 1 example plus core suite |
 
 Run the opt-in example tests:
 

@@ -1,6 +1,13 @@
-# Agent Observation test location
+# Agent Observation tests
 
-The core acceptance tests remain at
+The folder test proves that semantic Turn events distinguish a successful
+commit from a committed Directive failure:
+
+```shell
+mix test test/examples/04_runtime/04_09_agent_observation --include example --seed 0
+```
+
+The deeper core acceptance tests remain at
 [`test/jido/observe/agent_lifecycle_test.exs`](../../../jido/observe/agent_lifecycle_test.exs).
 
 Persistence and local Topology observation tests are in

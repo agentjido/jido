@@ -1,12 +1,12 @@
 # PERSIST-02 acceptance notes
 
 ```sh
-mix test test/jido/persistence/checkpoint_portability_test.exs --seed 0
+mix test test/examples/99_research/99_07_checkpoint_portability --include example --seed 0
 ```
 
-All three tests pass. The loader rejects the nested PID. The original rejection
-assertion remains enabled. The fixture changes stored bytes after a valid
-save so the test reaches the load validator.
+The folder test proves that the loader rejects a nested PID. The fixture
+changes stored bytes after a valid save so the test reaches the load validator.
+The deeper core suite covers all prohibited term classes.
 
-[Tests](../../../jido/persistence/checkpoint_portability_test.exs) ·
+[Core tests](../../../jido/persistence/checkpoint_portability_test.exs) ·
 [Example](../../../../examples/99_research/99_07_checkpoint_portability/README.md)
