@@ -136,7 +136,7 @@ Persistence is optional. Configure one binary adapter on the Jido instance:
 defmodule MyApp.Jido do
   use Jido,
     otp_app: :my_app,
-    persistence: {MyApp.Persistence, repo: MyApp.Repo}
+    persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
 end
 ```
 
@@ -145,7 +145,9 @@ A new persistent activation writes revision zero before its start call
 succeeds. A successful Agent commit is stored before the Server reports
 success. Normal durable delete writes a tombstone. `hibernate/2` saves and
 stops one Server. `thaw/3` restores and starts it. Jido does not start or
-supervise a persistence adapter process.
+supervise the application storage process. See the
+[persistence adapter guide](guides/persistence-adapters.livemd) for the Ecto
+dependency and migration.
 
 ## Installation
 
