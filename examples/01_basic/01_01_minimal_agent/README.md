@@ -1,16 +1,20 @@
 # Minimal Agent
 
-This example solves a small state problem: keep a counter and change it with a
-Signal. It teaches the Agent DSL, an inline Action, route defaults, generated
-command helpers, direct execution, and live Agent Server execution.
+A small Agent keeps a counter and changes it through one typed Signal route.
 
-## Read the files
+## What you will learn
 
-1. Read [the Agent](minimal_agent.ex).
-2. Read [the behavior tests](../../../test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs).
-3. Read [the shared test case](../../../test/examples/support/basic_sdk_case.ex) if you want to see how the isolated Jido instance starts.
+- How to declare Agent state and an inline Action.
+- How route defaults and generated command helpers work.
+- How direct and live execution use the same Agent contract.
 
-## Run the example
+## Read the code
+
+Read [the Agent](minimal_agent.ex) first. Then read
+[the behavior tests](../../../test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs)
+and [the shared test setup](../../../test/examples/support/basic_sdk_case.ex).
+
+## Run it
 
 Run this command from the `jido` repository root:
 
@@ -18,13 +22,24 @@ Run this command from the `jido` repository root:
 mix test test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs --include example --seed 0
 ```
 
-The tests show that direct and live commands use the same defaults and Signal
-overrides. They also show that two Agent instances keep separate state.
+Expected result: the tests complete without failures. They show default and
+explicit increments, unchanged state after invalid input, and separate state
+for two Agent instances.
 
-Invalid Action input does not change committed state. A later valid command can
-still commit. The isolated Jido instance stops all Agent Servers after each test.
+## Important behavior
+
+An invalid amount does not change committed state. A later valid command can
+still commit. Direct execution does not change the live Agent Server.
+
+## Limits
 
 This example does not teach Plugins, Directives, persistence, or concurrent
 Turns.
 
-[Back to Basic](../README.md) · [Next: Typed Command Agent](../01_02_typed_command_agent/README.md)
+## Files
+
+- [Agent source](minimal_agent.ex)
+- [Behavior tests](../../../test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs)
+- [Shared test setup](../../../test/examples/support/basic_sdk_case.ex)
+
+Previous: [Basic overview](../README.md) | Next: [Typed Command Agent](../01_02_typed_command_agent/README.md)

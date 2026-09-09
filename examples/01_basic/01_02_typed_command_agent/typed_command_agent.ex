@@ -38,7 +38,6 @@ defmodule Jido.Examples.TypedCommandAgent do
 
     route "basic.typed_command.patch_profile" do
       action %{patch: patch},
-        name: "basic_sdk_patch",
         schema:
           Zoi.object(%{
             patch:
@@ -59,7 +58,6 @@ defmodule Jido.Examples.TypedCommandAgent do
 
     route "basic.typed_command.set_count" do
       action %{count: count},
-        name: "basic_sdk_set_count",
         schema: Zoi.object(%{count: Zoi.integer()}),
         context: context do
         # Complete Agent validation owns this bound check.

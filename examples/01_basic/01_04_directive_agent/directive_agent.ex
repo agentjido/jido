@@ -20,7 +20,6 @@ defmodule Jido.Examples.DirectiveAgent do
 
     route "basic.directive.set_count" do
       action %{count: count, batch: batch},
-        name: "basic_sdk_directive_batch",
         schema:
           Zoi.object(%{
             count: Zoi.integer(),

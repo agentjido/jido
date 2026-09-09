@@ -18,7 +18,6 @@ defmodule Jido.Examples.MinimalAgent do
 
     route "basic.minimal.increment" do
       action %{amount: amount},
-        name: "examples_minimal_agent_increment",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}

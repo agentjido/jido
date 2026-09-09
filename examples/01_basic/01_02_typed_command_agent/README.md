@@ -1,16 +1,20 @@
 # Typed Command Agent
 
-This example accepts a typed profile patch and a typed count command. It teaches
-Action input schemas, route defaults, shallow Signal-data merging, and complete
-candidate-state validation.
+A typed Agent accepts profile and count commands without duplicating its state
+rules inside each Action.
 
-## Read the files
+## What you will learn
 
-1. Read [the Agent and its state contract](typed_command_agent.ex).
-2. Read [the behavior tests](../../../test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs).
-3. Read [the shared test case](../../../test/examples/support/basic_sdk_case.ex) for the isolated runtime setup.
+- How Action input schemas validate Signal data.
+- How route defaults use a shallow merge.
+- How the Agent schema validates the complete candidate state.
 
-## Run the example
+## Read the code
+
+Read [the Agent and its state contract](typed_command_agent.ex) first. Then read
+[the behavior tests](../../../test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs).
+
+## Run it
 
 Run this command from the `jido` repository root:
 
@@ -18,14 +22,23 @@ Run this command from the `jido` repository root:
 mix test test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs --include example --seed 0
 ```
 
-The tests show that direct and live execution produce the same profile. They
-also show that the Agent schema rejects a correctly typed count when the final
-candidate is outside the allowed bounds.
+Expected result: the tests complete without failures. Direct and live execution
+produce the same profile, and an out-of-range candidate does not commit.
 
-Invalid Action input and invalid candidate state do not commit. A later valid
-command can still commit.
+## Important behavior
+
+Invalid Action input and invalid candidate state leave committed state
+unchanged. A later valid command can still commit.
+
+## Limits
 
 This example does not define routing-error policy, Plugin state, or Directive
-effects. The profile default merge is shallow. It is not a recursive merge.
+effects. The profile merge is shallow, not recursive.
 
-[Previous: Minimal Agent](../01_01_minimal_agent/README.md) · [Back to Basic](../README.md) · [Next: Plugin State Agent](../01_03_plugin_state_agent/README.md)
+## Files
+
+- [Agent and state contract](typed_command_agent.ex)
+- [Behavior tests](../../../test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs)
+- [Shared test setup](../../../test/examples/support/basic_sdk_case.ex)
+
+Previous: [Minimal Agent](../01_01_minimal_agent/README.md) | Next: [Plugin State Agent](../01_03_plugin_state_agent/README.md)

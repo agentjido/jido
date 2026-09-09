@@ -1,5 +1,5 @@
 defmodule JidoTest.BasicSDKCase do
-  @moduledoc "Test support for the five Basic SDK integration fixtures."
+  @moduledoc "Test support for the four Basic SDK integration fixtures."
 
   use ExUnit.CaseTemplate
 

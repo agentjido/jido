@@ -1,15 +1,19 @@
 # Plugin State Agent
 
-This example adds state that a Plugin owns. It teaches Plugin state declaration,
-Plugin updates, atomic domain and Plugin commits, and state-ownership protection.
+An Agent and a Plugin update their separate state fields in one atomic commit.
 
-## Read the files
+## What you will learn
 
-1. Read [the Agent and CountTurns Plugin](plugin_state_agent.ex).
-2. Read [the behavior tests](../../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs).
-3. Read [the shared test case](../../../test/examples/support/basic_sdk_case.ex) for the isolated runtime setup.
+- How a Plugin declares and updates the state that it owns.
+- How domain state and Plugin state commit together.
+- How Jido prevents an Action from changing Plugin-owned state.
 
-## Run the example
+## Read the code
+
+Read [the Agent and its `CountTurns` Plugin](plugin_state_agent.ex) first. Then
+read [the behavior tests](../../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs).
+
+## Run it
 
 Run this command from the `jido` repository root:
 
@@ -17,15 +21,24 @@ Run this command from the `jido` repository root:
 mix test test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs --include example --seed 0
 ```
 
-The first command commits the domain count and the Plugin turn count together.
-The public snapshot and Plugin-state APIs show the same commit.
+Expected result: the tests complete without failures. A valid Turn commits both
+state owners, and invalid ownership or Plugin output does not commit.
 
-An Action cannot overwrite Plugin-owned state. Invalid Plugin output also
-rejects the complete candidate. Both failures keep the last committed state,
-and a valid command can recover after an ownership failure.
+## Important behavior
 
-The Plugin allows only one committed Turn so that the failure is deterministic.
-This artificial limit is not a recommended application policy. This example
-does not teach Plugin processes or Directive dispatch.
+An Action cannot overwrite Plugin-owned state. Invalid Plugin output rejects
+the complete candidate. A valid command can recover after an ownership failure.
 
-[Previous: Typed Command Agent](../01_02_typed_command_agent/README.md) · [Back to Basic](../README.md) · [Next: Directive Agent](../01_04_directive_agent/README.md)
+## Limits
+
+The Plugin permits only one committed Turn to make its failure deterministic.
+This artificial limit is not an application policy. The example does not teach
+Plugin processes or Directive dispatch.
+
+## Files
+
+- [Agent and Plugin source](plugin_state_agent.ex)
+- [Behavior tests](../../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs)
+- [Shared test setup](../../../test/examples/support/basic_sdk_case.ex)
+
+Previous: [Typed Command Agent](../01_02_typed_command_agent/README.md) | Next: [Directive Agent](../01_04_directive_agent/README.md)

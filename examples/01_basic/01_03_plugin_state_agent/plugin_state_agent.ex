@@ -30,7 +30,6 @@ defmodule Jido.Examples.PluginStateAgent do
 
     route "basic.plugin_state.increment" do
       action %{amount: amount},
-        name: "basic_sdk_owned_state_change",
         schema: Zoi.object(%{amount: Zoi.integer()}),
         context: context do
         {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
@@ -41,7 +40,6 @@ defmodule Jido.Examples.PluginStateAgent do
 
     route "basic.plugin_state.overwrite" do
       action _input,
-        name: "basic_sdk_owned_state_overwrite",
         schema: Zoi.object(%{}),
         context: context do
         {:ok, %{context.agent_state | turns: context.agent_state.turns + 1}}
