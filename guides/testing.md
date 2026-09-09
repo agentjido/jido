@@ -35,13 +35,11 @@ Run examples separately when needed:
 mix examples --seed 0
 ```
 
-The 11 known failing research tests are temporarily skipped. They describe
-proposed features that Core does not implement. Each skip names the missing
-feature; the original assertion remains. Remove the skip when the feature is
-implemented. See the [research results](../test/examples/99_research/README.md).
-A passing core suite does not prove these proposed contracts.
-Research failures are allowed in explicit example runs; they do not block
-`mix quality`. Keep the temporary skips until the missing features are ready.
+Three research tests are skipped. They describe active-Turn revision pinning,
+live definition migration, and live Topology replacement. Each skip names the
+missing feature, and the original assertion remains. See the
+[research results](../test/examples/99_research/README.md). These deferred live
+upgrade contracts do not block the selected core candidate.
 
 The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) has 52 fixtures and ten
 additional application scenarios. Source files live in `examples/`; tests live
@@ -60,7 +58,7 @@ remains unsupported. Preserve the test assertion and its stated reason.
 ## Core coverage
 
 The 90% coverage requirement applies to core code in `lib/jido.ex` and `lib/jido/`.
-Keep total core coverage above 93% to allow for new work.
+Use 93% as a preferred development buffer, not as the release threshold.
 `coveralls.json` excludes example code, test fixtures, and benchmark helpers.
 Run core-test coverage with:
 

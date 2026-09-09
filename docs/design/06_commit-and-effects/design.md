@@ -1,5 +1,4 @@
-> Target seam design. The implementation options in the decision table were
-> selected on 2026-09-09. The complete design is still pending approval.
+> Selected commit-and-effects design. The core contract is implemented.
 
 # Commit and effects design
 
@@ -70,7 +69,7 @@ implied by Turn settlement.
 
 ## Requirements
 
-These stable EARS requirements are pending approval.
+The delivery scope selects these stable EARS requirements.
 
 ### Boundary and ownership
 

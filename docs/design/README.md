@@ -1,4 +1,4 @@
-> Design navigation and review index. This document is pending approval.
+> Design navigation and implementation status index.
 > Code in `lib`, public module documentation, and executable tests define current behavior.
 
 # Jido V3 design
@@ -101,7 +101,7 @@ This table is the source of truth for design approval. A moved or changed docume
 
 | Document | Status |
 | --- | --- |
-| Design index | Pending approval |
+| Design index | Current |
 | [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
 | [Jido V3 library vision](VISION.md) | Pending approval |
 | [Overview briefing](00_overview/README.md) | Approved |
@@ -113,45 +113,45 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Agent authoring briefing](02_agent-authoring/README.md) | Approved |
 | [Agent authoring design](02_agent-authoring/design.md) | Approved |
 | [Agent authoring alignment](02_agent-authoring/alignment.md) | Approved |
-| [Agent identity briefing](03_agent-identity/README.md) | Pending approval |
-| [Agent identity design](03_agent-identity/design.md) | Pending approval |
-| [Agent identity alignment](03_agent-identity/alignment.md) | Pending approval |
-| [Turn evaluation briefing](04_turn-evaluation/README.md) | Pending approval |
-| [Turn evaluation design](04_turn-evaluation/design.md) | Pending approval |
-| [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Pending approval |
-| [Plugin briefing](05_plugins/README.md) | Pending approval |
-| [Plugin design](05_plugins/design.md) | Pending approval |
-| [Plugin alignment](05_plugins/alignment.md) | Pending approval |
-| [Commit and effects briefing](06_commit-and-effects/README.md) | Pending approval |
-| [Commit and effects design](06_commit-and-effects/design.md) | Pending approval |
-| [Commit and effects alignment](06_commit-and-effects/alignment.md) | Pending approval |
-| [Persistence briefing](07_persistence/README.md) | Pending approval |
-| [Persistence design](07_persistence/design.md) | Pending approval |
-| [Persistence alignment](07_persistence/alignment.md) | Pending approval |
-| [Agent Server briefing](08_agent-server/README.md) | Pending approval |
-| [Agent Server design](08_agent-server/design.md) | Pending approval |
-| [Agent Server alignment](08_agent-server/alignment.md) | Pending approval |
-| [Jido instance briefing](09_jido-instance/README.md) | Pending approval |
-| [Jido instance design](09_jido-instance/design.md) | Pending approval |
-| [Jido instance alignment](09_jido-instance/alignment.md) | Pending approval |
-| [Runtime topology briefing](10_runtime-topology/README.md) | Pending approval |
-| [Runtime topology design](10_runtime-topology/design.md) | Pending approval |
-| [Runtime topology alignment](10_runtime-topology/alignment.md) | Pending approval |
-| [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
-| [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
-| [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
-| [Errors and contracts briefing](12_errors-and-contracts/README.md) | Approved |
-| [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
-| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Pending approval |
+| [Agent identity briefing](03_agent-identity/README.md) | Selected and implemented |
+| [Agent identity design](03_agent-identity/design.md) | Selected and implemented |
+| [Agent identity alignment](03_agent-identity/alignment.md) | Implemented; external delivery deferred |
+| [Turn evaluation briefing](04_turn-evaluation/README.md) | Selected and implemented |
+| [Turn evaluation design](04_turn-evaluation/design.md) | Selected and implemented |
+| [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Implemented |
+| [Plugin briefing](05_plugins/README.md) | Selected and implemented |
+| [Plugin design](05_plugins/design.md) | Selected and implemented |
+| [Plugin alignment](05_plugins/alignment.md) | Implemented |
+| [Commit and effects briefing](06_commit-and-effects/README.md) | Selected and implemented |
+| [Commit and effects design](06_commit-and-effects/design.md) | Selected and implemented |
+| [Commit and effects alignment](06_commit-and-effects/alignment.md) | Implemented |
+| [Persistence briefing](07_persistence/README.md) | Selected and implemented |
+| [Persistence design](07_persistence/design.md) | Selected and implemented |
+| [Persistence alignment](07_persistence/alignment.md) | Implemented |
+| [Agent Server briefing](08_agent-server/README.md) | Selected and implemented |
+| [Agent Server design](08_agent-server/design.md) | Selected and implemented |
+| [Agent Server alignment](08_agent-server/alignment.md) | Implemented |
+| [Jido instance briefing](09_jido-instance/README.md) | Selected and implemented |
+| [Jido instance design](09_jido-instance/design.md) | Selected and implemented |
+| [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |
+| [Runtime topology briefing](10_runtime-topology/README.md) | Selected and implemented |
+| [Runtime topology design](10_runtime-topology/design.md) | Selected and implemented |
+| [Runtime topology alignment](10_runtime-topology/alignment.md) | Implemented |
+| [Topology control-plane briefing](11_topology-control-plane/README.md) | Selected and implemented for core |
+| [Topology control-plane design](11_topology-control-plane/design.md) | Selected and implemented for core |
+| [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Implemented for core; distributed contract deferred |
+| [Errors and contracts briefing](12_errors-and-contracts/README.md) | Selected and implemented |
+| [Errors and contracts design](12_errors-and-contracts/design.md) | Selected and implemented |
+| [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Implemented |
 | [Observability briefing](13_observability/README.md) | Implemented |
 | [Observability design](13_observability/design.md) | Selected and implemented |
 | [Observability alignment](13_observability/alignment.md) | Implemented |
 | [Package boundaries briefing](90_package-boundaries/README.md) | Approved |
 | [Package boundaries design](90_package-boundaries/design.md) | Approved |
 | [Package boundaries alignment](90_package-boundaries/alignment.md) | Approved |
-| [Delivery briefing](99_delivery/README.md) | Pending approval |
-| [Delivery design](99_delivery/design.md) | Pending approval |
-| [Delivery alignment](99_delivery/alignment.md) | Pending approval |
+| [Delivery briefing](99_delivery/README.md) | Implemented locally |
+| [Delivery design](99_delivery/design.md) | Selected and implemented |
+| [Delivery alignment](99_delivery/alignment.md) | Implemented locally; release approval pending |
 
 ## Delivery evidence
 

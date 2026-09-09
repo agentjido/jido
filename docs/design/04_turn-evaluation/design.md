@@ -1,4 +1,4 @@
-> Target seam design. This document is pending approval.
+> Selected Turn evaluation design. The core contract is implemented.
 
 # Turn evaluation design
 
@@ -60,7 +60,7 @@ runtime state. Seam 08 owns the live task shape and all stale-result checks.
 
 ## Requirements
 
-All requirements are recommended target behavior. They are pending approval.
+The delivery scope selects these requirements as core behavior.
 
 ### Evaluation input and order
 

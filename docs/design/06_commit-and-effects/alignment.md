@@ -1,5 +1,4 @@
-> Seam alignment evidence. The implementation direction was selected on
-> 2026-09-09. The full target design is still pending approval.
+> Implemented commit-and-effects alignment.
 
 # Commit and effects alignment
 

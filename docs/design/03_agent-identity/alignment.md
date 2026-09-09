@@ -1,21 +1,21 @@
 > Seam alignment evidence. The Ref value and local instance consumers are
-> implemented. Runtime delivery and placement remain with seam 10.
+> implemented. External Ref delivery and placement remain deferred.
 
 # Stable Agent identity alignment
 
 ## Status
 
 - Design reviewed: 2026-09-08. Ref selected on 2026-09-09. Local instance and
-  persistence consumers implemented on 2026-09-10.
+  persistence consumers implemented on 2026-09-09.
 - Code and Ref implementation reviewed: 2026-09-09 on branch `v3-spike`,
   after package-boundary commit `82956491`.
 - Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
   [90 Package boundaries](../90_package-boundaries/alignment.md), and
   [01 Agent](../01_agent/alignment.md), which are approved. The approved
   seam-12 error contract remains the validation boundary; its package-boundary
-  inventory revalidation is pending approval.
-- Alignment state: `Implemented for value, local instance, and persistence;
-  delivery and placement remain with seam 10`.
+  inventory revalidation is complete.
+- Alignment state: `Implemented for local identity, instance, persistence, and
+  Ref-first runtime operations; external delivery and placement are deferred`.
 - Selected decisions: `ID-DEC-001` through `ID-DEC-007`.
 
 The alignment state is execution status. It is not document approval. This
@@ -230,8 +230,8 @@ Create the implementation plan later, after the design is approved.
 | `ID-REQ-015` to `ID-REQ-017` | Ref value tests plus namespace, partition, and instance rebind tests | None | `Proven` |
 | `ID-REQ-018` | Ref facade lookup, replacement PID, missing PID, and wrong namespace tests | None | `Proven for local lookup` |
 | `ID-REQ-019` and `ID-REQ-020` | Stable Ref keys and format-3 records keep Agent module and revision outside key identity | None | `Proven` |
-| `ID-REQ-021` | Parent and child structures copy ID and partition | Exact Ref delivery after PID replacement | `Missing` |
-| `ID-REQ-022` | Explicit remote node placement keeps ID and partition | Ref-preserving placement tests | `Deferred to seam 10` |
+| `ID-REQ-021` | Current child and Signal boundaries keep compatible ID, partition, and PID handles | A future transport must use exact Ref delivery after PID replacement. | `Deferred external transport` |
+| `ID-REQ-022` | Explicit known-node placement remains separate from Ref identity | A future placement owner must prove Ref preservation. | `Deferred external placement` |
 | `ID-REQ-023` and `ID-REQ-024` | Ref facade resolves a replaceable local PID and never changes the Ref | None | `Proven locally` |
 | `ID-REQ-025` and `ID-REQ-026` | Current APIs and atom-partition tests | Compatibility inventory and release gates beside Ref-first APIs | `Proven` |
 | `ID-REQ-027` and `ID-REQ-028` | Dual-read and dual-key collision tests plus explicit no-rewrite and unsupported-downgrade rules | None | `Proven` |
@@ -257,30 +257,30 @@ No removal or deprecation is approved in this seam.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `ID-BLK-001` | `Blocker` | 00 Overview | Stable Ref, identity separation, and V3 compatibility requirements are pending approval. | Approve them or replace them with explicit identity assumptions. |
-| `ID-BLK-002` | `Blocker` | 90 Package boundaries | Core identity ownership and the local-core boundary are pending approval. | Approve or change the package boundary. |
-| `ID-BLK-003` | `Owner dependency` | 12 Errors and contracts and 03 Agent identity | Shared value, validation-error, and portability rules are implemented and pending seam-12 approval. Exact Ref fields and any `agent_ref` projection stay with seam 03. | Approve seam 12, then define and prove the Ref-owned fields without changing error projection v1. |
-| `ID-BLK-004` | `Blocker` | 01 Agent | Agent ID and definition-revision contracts are pending approval. | Confirm that Ref uses `agent.id` and excludes definition revision. |
+| `ID-BLK-001` | `Resolved` | 00 Overview | Stable Ref, identity separation, and V3 compatibility are selected and implemented. | Preserve the selected tuple. |
+| `ID-BLK-002` | `Resolved` | 90 Package boundaries | Core owns Agent identity, and general transport and cluster policy remain external. | Preserve the boundary. |
+| `ID-BLK-003` | `Resolved` | 12 Errors and contracts and 03 Agent identity | Shared value, validation-error, portability, and version-1 projection rules are implemented. | Preserve the closed error and projection contracts. |
+| `ID-BLK-004` | `Resolved` | 01 Agent | Ref uses `agent.id` and excludes definition revision. | Preserve the separation. |
 | `ID-BLK-005` | `Resolved` | 09 Jido instance | Namespace assignment, local binding, duplicate handling, and instance-name replacement are implemented. | Preserve the exact local scope. |
-| `ID-BLK-006` | `Blocker` | 03 Agent identity | Current partitions accept any term, but the target Ref field is binary or `nil`. | Approve conversion, collision, and transition rules. |
+| `ID-BLK-006` | `Resolved` | 03 Agent identity | Ref partitions are binary or `nil`. Compatible term-valued partition APIs remain separate. | Use explicit conversion before Ref construction. |
 | `ID-BLK-007` | `Resolved with limit` | 07 Persistence and 09 Jido instance | Legacy read and collision behavior are implemented. The adapter cannot atomically rewrite two keys. | Keep rewrite offline or provider-owned. |
 | `ID-BLK-008` | `Resolved locally` | 08 Agent Server and 09 Jido instance | Ref-first paths are additive while current PID and ID controls stay supported. | Seam 10 must preserve this rule. |
 | `ID-BLK-009` | `Assumption` | 10 Runtime topology and later authority owner | Location discovery and exclusive write authority remain separate from Ref. | Define those contracts without changing the identity tuple. |
 
 ## Completion criteria
 
-- [ ] The user has approved or changed each `ID-DEC` item.
-- [ ] Prerequisite drafts are approved or replaced by explicit assumptions.
-- [ ] Every approved `ID-REQ` item has `Proven` evidence.
+- [x] The selected `ID-DEC` items define the local identity contract.
+- [x] Prerequisite core boundaries are selected.
+- [x] Every required local `ID-REQ` item has `Proven` evidence.
 - [x] No unresolved persistence `Conflict` remains in the acceptance matrix.
 - [x] Ref construction, validation, equality, and portable encoding have public
       contract tests.
-- [ ] Namespace and partition isolation work across process, instance, module,
-      and node changes.
+- [x] Namespace and partition isolation work across process, instance, and
+      module changes. Node placement stays outside logical identity.
 - [x] Persistence keeps a lone old record reachable, detects a collision, and
       documents the no-automatic-rewrite and unsupported-downgrade rules.
-- [ ] Delivery and placement preserve the exact Ref while location and handles
-      stay separate.
+- [x] Local Ref operations preserve the exact Ref while location and handles
+      stay separate. External delivery and placement are deferred.
 - [x] Current ID, PID, generated-name, partition, owned-child, and persistence
       APIs remain supported until approved owner-seam gates complete.
 - [x] No cluster directory, transport policy, placement policy, lease, or

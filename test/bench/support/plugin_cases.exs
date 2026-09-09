@@ -44,7 +44,12 @@ defmodule JidoCoreBench.PluginCases do
               result.context,
               Map.merge(
                 context,
-                %{agent_id: agent.id, agent_state: agent.state, signal: signal}
+                %{
+                  agent_id: agent.id,
+                  agent_state: agent.state,
+                  signal: signal,
+                  plugin_inputs: %{}
+                }
               )
             )
 

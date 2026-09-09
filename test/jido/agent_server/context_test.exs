@@ -307,6 +307,10 @@ defmodule Jido.AgentServer.ContextTest do
 
     assert_receive {:context_dispatch, output, dispatch}
     assert dispatch.turn_context.private_request == private_request
+    refute Map.has_key?(dispatch.turn_context, :agent_id)
+    refute Map.has_key?(dispatch.turn_context, :agent_state)
+    refute Map.has_key?(dispatch.turn_context, :signal)
+    refute Map.has_key?(dispatch.turn_context, :plugin_inputs)
     assert dispatch.source_signal == command
     assert dispatch.effective_signal.data == command.data
     assert dispatch.plugin_state == 1

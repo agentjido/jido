@@ -1,5 +1,4 @@
-> Seam review entry point. The implementation direction was selected on
-> 2026-09-09. The full target design is still pending approval.
+> Selected and implemented commit-and-effects seam.
 
 # 06 — Commit and effects
 

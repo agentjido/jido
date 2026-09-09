@@ -15,8 +15,8 @@ rule for each extension category and one public-contract test for ecosystem
 packages.
 
 The Overview and the nine package-boundary decisions were approved on
-2026-09-09. The exact APIs and migration work remain with their owner seams.
-Approval does not mean that every future integration package exists or has V3
+2026-09-09. The selected core APIs and migration limits are implemented. This
+does not mean that every future integration package exists or has V3
 compatibility evidence.
 
 Seam 12 was approved before this formal prerequisite. Its error contracts
@@ -50,7 +50,7 @@ revalidation against this seam when they next change.
 | Public extension inventory | Seam 12 now records public values, raw controls, and internal support types. | Preserve the classified inventory through delivery. | 90 Package boundaries, 12 Errors and contracts, 99 Delivery |
 | Stable identity boundary | Agent Ref and the local Ref-first facade are implemented beside IDs, PIDs, and generated names. | Preserve all compatible identity forms through V3. | 03 Agent identity, 09 Jido instance, 12 Errors and contracts |
 | Persistence ownership | Instance defaults and per-Agent overrides coexist. Backend and migration owners are not final. | One approved authority model that keeps the byte adapter and has a staged migration. | 07 Persistence, 09 Jido instance, 90 Package boundaries |
-| Ecosystem contract proof | Core tests do not prove that a released package uses only public contracts. | A public-only fixture and one compatible V3 package matrix. | 90 Package boundaries, 99 Delivery |
+| Ecosystem contract proof | The unpacked core package passes a public-only consumer against one exact V3 matrix. | Each added integration package supplies its own matrix and fixture. | Integration package owner |
 | Future service scope | Durable, cluster, and transport capability lists have no released package contracts. | Capability ownership without claims of available package APIs. | Future package owners, 99 Delivery |
 | Integration ownership | AI and browser ownership is clear at a high level, but V3 compatibility is not complete. | Public Action, Signal, Plugin, Directive, and instance integration with no private Jido access. | `jido_ai`, `jido_browser`, 90 Package boundaries |
 
@@ -87,8 +87,8 @@ The user approved these decisions on 2026-09-09.
   inventory was revalidated after the owner-seam changes.
 - Other dependents: all owner seams that expose public values, integration
   packages, and 99 Delivery.
-- Blockers: None for this package-boundary direction. Future package APIs and
-  release evidence remain owner work.
+- Blockers: None for the selected core package set. Future package APIs and
+  integration evidence remain owner work.
 
 ## Documents
 

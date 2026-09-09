@@ -60,7 +60,7 @@ rg -n 'mount|prepare_signal|prepare_action|transform_result|on_checkpoint|on_res
 ## Update dependencies and installation
 
 The candidate requires Elixir 1.18 or later. The declared OTP minimum is 27.
-Core now requires `jido_action ~> 3.0.0-beta.7` and
+Core now requires `jido_action ~> 3.0.0-beta.9` and
 `jido_signal ~> 3.0.0-beta.4`.
 
 ### What you need to change
@@ -470,21 +470,19 @@ The default quality check includes core tests, not benchmark or example tests:
 mix quality
 ```
 
-At the September 7 alpha checkpoint, full runs on Elixir 1.18 / OTP 27 and
-Elixir 1.20 / OTP 29 had 11 research failures and one approved exclusion.
-Core coverage was 93.9%. These are historical failed full-suite results, not
-release approval. The 11 known failing research tests are now temporarily
-skipped, with their assertions retained. Example acceptance tests are secondary;
+The current local candidate passes the core suite on Elixir 1.18.5 / OTP
+27.3.4.12 and the full local gates on Elixir 1.20.3 / OTP 29.0.5. Core coverage
+is above the 90% release threshold. Example acceptance tests are secondary;
 run `mix examples --seed 0` separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
-The remaining skipped research assertions concern durable namespace identity,
-durable deletion, runtime Init snapshots, Turn revision isolation, live state
-migration, and live Topology updates. Source-Signal route selection and Plugin
-input isolation now pass. Cluster-exclusive ownership remains unsupported. See
-[Test Agents and Plugins](test-agents-and-plugins.livemd).
+The remaining three skipped research assertions concern active-Turn revision
+pinning, live definition migration, and live Topology updates. Stable Agent
+identity, durable deletion, Plugin runtime reconstruction, source-Signal route
+selection, and Plugin input isolation pass. Cluster-exclusive ownership remains
+unsupported. See [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
-Before publication, complete the agreed feature scope, repeated test seeds,
-recovery and scale checks, runtime matrix, lint, Dialyzer, docs, and fresh package
-consumer checks. Documents under `docs/design` are proposals. They do not add
-contracts to this beta candidate.
+The delivery record contains the local runtime, lint, Dialyzer, docs, package,
+example, benchmark, and public-consumer checks. Publication still needs an
+exact-commit CI result and human release approval. Deferred requirements do not
+add contracts to this beta candidate.

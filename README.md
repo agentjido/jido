@@ -10,9 +10,9 @@ Agent is, instantiate that declaration as an Agent value, and run the value as
 an OTP actor when you need a live process.
 
 This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
-changes from V2. The package is not published, and beta release checks are not
-complete. See the [migration guide](guides/migration.md) for the API changes,
-known limits, and required checks.
+changes from V2. The package is not published. Local delivery checks are
+complete, but exact-commit CI and human release approval remain. See the
+[migration guide](guides/migration.md) for the API changes and known limits.
 
 ## Core model
 
@@ -120,13 +120,13 @@ committed_agent.state.count
 
 ## Agent Plugins
 
-A `Jido.Plugin` is one explicit Agent capability. A Plugin can admit live
-Signals, prepare pure command input, transform outbound Signals, own one
-portable Agent state key, reduce owned Directives, and optionally start an OTP
-runtime. A Plugin that only dispatches typed Directives can omit `child_spec/1`.
-The Server calls `dispatch/4` with a `nil` runtime in its supervised task.
-Validation, ordering, timeout, and failure rules apply to both forms. Results
-enter through the normal Agent Signal mailbox. See the `Jido.Plugin` API docs.
+A `Jido.Plugin` is one package manifest for an explicit Agent capability. It
+can compose four independent owner facets: `Jido.Agent.Plugin` for pure Turn
+work, `Jido.AgentServer.Plugin` for admission and runtime work,
+`Jido.Persistence.Plugin` for one paired durable value, and
+`Jido.Topology.Plugin` for static plan contributions. A package declares only
+the facets that it needs. Results enter through the normal Agent Signal
+mailbox. See the `Jido.Plugin` API docs.
 
 ## Persistence
 

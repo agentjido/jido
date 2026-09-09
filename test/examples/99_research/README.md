@@ -13,7 +13,7 @@ mix test test/examples/99_research --include example --seed 0
 ```
 
 This is an optional secondary check, not the default release check. It excludes
-the 6 skipped tests. It uses no vendor API or model request. The distributed
+the 3 skipped tests. It uses no vendor API or model request. The distributed
 example starts two local Erlang nodes. Each row has its own focused command.
 
 | ID | Feature | Baseline pass | Skipped | Result |

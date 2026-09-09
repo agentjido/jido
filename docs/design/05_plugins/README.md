@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Selected and implemented four-owner Plugin seam.
 
 # 05 — Plugins
 
@@ -46,7 +46,7 @@ The former 1,181-line mixed implementation is split across these owner files.
 - Each Plugin runtime generation receives matching committed Plugin state and
   state version in its immutable Init value.
 - The Plugin-isolation research example passes all four assertions.
-- The documents remain pending approval.
+- The selected four-owner contract and all owner integrations are implemented.
 
 ## Dependencies
 

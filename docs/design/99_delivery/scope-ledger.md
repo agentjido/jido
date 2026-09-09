@@ -1,0 +1,57 @@
+# Delivery scope ledger
+
+This ledger applies to the local Jido `3.0.0-beta.1` core candidate. It uses
+closed requirement ranges. Thus, it gives every prerequisite requirement ID a
+disposition without copying each ID to a separate row.
+
+## Authority
+
+| Role | Owner |
+| --- | --- |
+| Delivery and compatibility owner | Jido maintainers |
+| Evidence owner | The candidate commit and its author |
+| Gate-exception owner | Human release approver |
+| Publication approval owner | Human release approver |
+
+No gate exception is active. A deferred or excluded feature is a scope limit,
+not a gate exception.
+
+## Requirement ranges
+
+| Seam | Required | Deferred | Excluded |
+| --- | --- | --- | --- |
+| 00 Overview | `OVR-REQ-001` to `OVR-REQ-066` | None | None |
+| 01 Agent | `AGT-REQ-001` to `AGT-REQ-041` | None | None |
+| 02 Agent authoring | `AUTH-REQ-001` to `AUTH-REQ-062` | None | None |
+| 03 Agent identity | `ID-REQ-001` to `ID-REQ-020`; `ID-REQ-023` to `ID-REQ-028` | `ID-REQ-021`, `ID-REQ-022` | None |
+| 04 Turn evaluation | `TURN-REQ-001` to `TURN-REQ-044` | None | None |
+| 05 Plugins | `PLG-REQ-001` to `PLG-REQ-076` | None | None |
+| 06 Commit and effects | `COMMIT-REQ-001` to `COMMIT-REQ-044` | None | None |
+| 07 Persistence | `PERS-REQ-001` to `PERS-REQ-051` | None | None |
+| 08 Agent Server | `SRV-REQ-001` to `SRV-REQ-065` | None | None |
+| 09 Jido instance | `INST-REQ-001` to `INST-REQ-056` | None | None |
+| 10 Runtime topology | `RT-REQ-001` to `RT-REQ-051` | None | None |
+| 11 Topology control plane | `TOP-REQ-001` to `TOP-REQ-005`; `TOP-REQ-059`, `TOP-REQ-060`; `TOP-REQ-062` to `TOP-REQ-068` | `TOP-REQ-006` to `TOP-REQ-058`; `TOP-REQ-061` | None |
+| 12 Errors and contracts | `ERR-REQ-001` to `ERR-REQ-018`; `ERR-REQ-020` to `ERR-REQ-024` | None | `ERR-REQ-019` is retired by its owner design. |
+| 13 Observability | `OBS-REQ-001` to `OBS-REQ-020`; `OBS-REQ-022` to `OBS-REQ-043`; `OBS-REQ-046`; `OBS-REQ-048` to `OBS-REQ-054`; `OBS-REQ-056`, `OBS-REQ-057` | `OBS-REQ-021`; `OBS-REQ-044`, `OBS-REQ-045`, `OBS-REQ-047`, `OBS-REQ-055` | None |
+| 90 Package boundaries | `PKG-REQ-001` to `PKG-REQ-005`; `PKG-REQ-007` to `PKG-REQ-030`; `PKG-REQ-034` to `PKG-REQ-038` | `PKG-REQ-031`, `PKG-REQ-032`, `PKG-REQ-039` | `PKG-REQ-006`, `PKG-REQ-033` for this core-only claim |
+
+## Deferred and excluded effects
+
+| Scope ID | Status | Owner | Reason and user effect | Review point |
+| --- | --- | --- | --- | --- |
+| `SCOPE-DIST` | Deferred | Future distributed control-plane owner | Core has no membership, automatic placement, lease, fencing, failover, or operator control plane. Static local Topology stays available. | Review with a public external package and its conformance suite. |
+| `SCOPE-OTEL` | Deferred | Host integration owner | Core emits semantic Telemetry but does not include an OpenTelemetry SDK or bridge. | Review when a host bridge has disabled and in-memory SDK proof. |
+| `SCOPE-TRANSPORT` | Deferred | Future transport owner | Core does not claim a general transport package or durable fabric API. Public Signal input remains available. | Review with a named package and public-only fixture. |
+| `SCOPE-REF-DELIVERY` | Deferred | Future transport and placement owners | Local Ref resolution is implemented. Core does not claim Ref-addressed transport or automatic placement across nodes. | Review with replaceable-handle delivery and Ref-preserving placement tests. |
+| `SCOPE-AI-BROWSER` | Excluded | Jido AI and Jido Browser owners | This package result does not claim V3 compatibility for AI or Browser. Core remains usable without either package. | Each package adds its exact matrix and public-only proof. |
+| `SCOPE-ERR-019` | Excluded | Errors seam | The proposed error projection version 2 was retired. Version 1 remains the contract. | Review only with a new versioned error design. |
+
+## Skip classification
+
+| Assertion | Status | Owner | Reason and user effect | Review point |
+| --- | --- | --- | --- | --- |
+| `UP-01` | Deferred | Turn and runtime owners | An active Turn does not pin a BEAM code revision. Stop work before a code change when this guarantee is required. | Review with an executable active-Turn transition and failure recovery. |
+| `UP-02` | Deferred | Agent Server owner | A live Agent definition has no automatic state migration. Stop and restore through an application conversion. | Review with versioned state conversion and rollback proof. |
+| `UP-07` | Deferred | Topology owner | A Controller repairs one fixed target. It does not apply a live target update. | Review with a versioned update, recovery, and rollback contract. |
+| `DIST-03` | Excluded | Future distributed authority owner | Core does not guarantee one live owner across a cluster. Applications that need this must supply fenced external authority. | Review with enforceable epochs at every protected commit. |

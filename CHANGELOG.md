@@ -2,6 +2,21 @@
 
 <!-- changelog -->
 
+## Unreleased — V3 beta candidate
+
+### Features
+
+* split Plugin packages into Agent, Agent Server, Persistence, and Topology owner facets
+* add stable Agent references and Ref-first instance operations
+* add versioned durable records, tombstones, write-authority fencing, and runtime reconstruction
+* add static Topology Plugin planning and semantic runtime observation
+
+### Compatibility
+
+* select Hex `jido_action 3.0.0-beta.9` and `jido_signal 3.0.0-beta.4`
+* retain current V3 public APIs through the `3.0.x` line
+* defer live code migration, live Topology replacement, and distributed control-plane claims
+
 ## [v2.3.3](https://github.com/agentjido/jido/compare/v2.3.2...v2.3.3) (2026-08-10)
 
 

@@ -124,38 +124,31 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
     assert [%{label: "count accepted"}] = Effects.records(server)
   end
 
-  test "direct and live routing failures share one error contract and leave the Server usable", %{
+  test "direct and live unknown routes share one error contract and leave the Server usable", %{
     jido: jido
   } do
     server = start_agent!(jido, Agent, error_policy: observe_errors())
     before = Server.snapshot(server)
     input = %{patch: %{name: "Wrong"}, count: 1}
+    type = "basic.unknown"
+    command = signal(type, input)
 
-    for {type, expected_details} <- [
-          {"basic.unknown", %{reason: :no_handlers_found, route: "basic.unknown"}},
-          {"basic.ambiguous", %{count: 2, targets: [Agent.Patch, Agent.SetCount]}}
-        ] do
-      command = signal(type, input)
+    assert {:error, %RoutingError{} = direct_error} =
+             Agent.cmd(before.agent, command, context: %{observer: self()})
 
-      assert {:error, %RoutingError{} = direct_error} =
-               Agent.cmd(before.agent, command, context: %{observer: self()})
+    assert {:error, %RoutingError{} = live_error} =
+             Server.call(server, command, context: %{observer: self()})
 
-      assert {:error, %RoutingError{} = live_error} =
-               Server.call(server, command, context: %{observer: self()})
-
-      assert direct_error.target == type
-      assert live_error.target == type
-      assert Jido.Error.to_map(live_error) == Jido.Error.to_map(direct_error)
-
-      for {key, value} <- expected_details do
-        assert direct_error.details[key] == value
-        assert live_error.details[key] == value
-      end
-
-      assert Server.snapshot(server) == before
-      refute_received {:sdk_action, _}
-      assert Effects.records(server) == []
-    end
+    assert direct_error.target == type
+    assert live_error.target == type
+    assert Jido.Error.to_map(live_error) == Jido.Error.to_map(direct_error)
+    assert direct_error.details.reason == :no_handlers_found
+    assert direct_error.details.route == type
+    assert live_error.details.reason == :no_handlers_found
+    assert live_error.details.route == type
+    assert Server.snapshot(server) == before
+    refute_received {:sdk_action, _}
+    assert Effects.records(server) == []
 
     assert {:ok, changed} =
              Server.call(
@@ -167,5 +160,28 @@ defmodule JidoTest.Examples.Basic.TypedCommandAgentTest do
     assert_receive {:sdk_action, :patch}
     assert changed.state.profile.name == "Valid"
     assert Server.snapshot(server) == %{agent: changed, state_version: 1}
+  end
+
+  test "duplicate routes select the first declared target for direct and live execution", %{
+    jido: jido
+  } do
+    server = start_agent!(jido, Agent)
+    before = Server.snapshot(server)
+    command = signal("basic.ambiguous", %{patch: %{name: " First "}, count: 4})
+
+    assert {:ok, candidate, []} =
+             Agent.cmd(before.agent, command, context: %{observer: self()})
+
+    assert_receive {:sdk_action, :patch}
+    refute_received {:sdk_action, :set_count}
+    assert candidate.state.profile.name == "First"
+    assert candidate.state.count == 0
+
+    assert {:ok, ^candidate} =
+             Server.call(server, command, context: %{observer: self()})
+
+    assert_receive {:sdk_action, :patch}
+    refute_received {:sdk_action, :set_count}
+    assert Server.snapshot(server) == %{agent: candidate, state_version: 1}
   end
 end

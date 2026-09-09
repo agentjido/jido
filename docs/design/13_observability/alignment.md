@@ -138,7 +138,8 @@ and does no Agent call, storage call, or network call.
 | `OBS-REQ-033` to `OBS-REQ-036` | Shared allowlist, error code, size, UTF-8, and private-data tests | `Proven` |
 | `OBS-REQ-037` to `OBS-REQ-040` | Semantic metric-tag and four-mode logger tests | `Proven` |
 | `OBS-REQ-041` to `OBS-REQ-043` | Emission and consumer-failure containment tests and no-authority review | `Proven` |
-| `OBS-REQ-044` to `OBS-REQ-048`, `OBS-REQ-055` | Host bridge decision, no OpenTelemetry dependency, and explicit Core Task context | `Owner-deferred`; Core compile mode proven |
+| `OBS-REQ-044`, `OBS-REQ-045`, `OBS-REQ-047`, `OBS-REQ-055` | No host OpenTelemetry bridge is selected. | `Owner-deferred` |
+| `OBS-REQ-046`, `OBS-REQ-048` | Core has no OpenTelemetry dependency and transfers Task context explicitly. | `Proven` |
 | `OBS-REQ-049` to `OBS-REQ-051` | Schema version 1 and retained legacy paths | `Proven`; removal blocked |
 | `OBS-REQ-052` to `OBS-REQ-054`, `OBS-REQ-056`, `OBS-REQ-057` | Focused catalog, privacy, correlation, disabled-consumer, and legacy-option tests | `Proven` |
 

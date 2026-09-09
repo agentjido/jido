@@ -7,8 +7,9 @@ defmodule Jido.Examples.TypedCommandAgent do
   Caller context supplies the observer. Messages expose Action entry; they do not change Agent state.
   The profile route supplies a default patch. A Signal patch replaces that
   entire nested map before the Action validates its input.
-  Unknown and duplicate routes both return Jido.Error.RoutingError before
-  Action execution. The integration test checks direct and live execution.
+  An unknown route returns `Jido.Error.RoutingError` before Action execution.
+  A duplicate route selects its first declared target. The integration test
+  checks direct and live execution.
   """
 
   alias Jido.Examples.DirectiveAgent.{Effects, Record}

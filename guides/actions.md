@@ -13,6 +13,6 @@ Actions and Flows can perform I/O before commit. A later validation or storage
 failure does not undo that I/O. Use stable operation IDs and application
 idempotency where repetition can change an external result.
 
-The Hex release `jido_action` beta.7 provides Flow composition and inline Actions.
+The Hex release `jido_action` beta.9 provides Flow composition and inline Actions.
 Jido passes its instance Task Supervisor through the `task_supervisor` execution option.
 See the [Workflow catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/02_workflow/README.md).

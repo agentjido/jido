@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Selected and implemented Turn evaluation seam.
 
 # 04 — Turn evaluation
 
@@ -8,8 +8,7 @@ Jido has one command path for direct and live candidate evaluation. The private
 Runner now selects the first Router target from the unchanged source Signal,
 binds that Signal to the Turn, prepares Plugins, calls `Jido.Exec`, applies
 Plugin state updates, and validates a candidate Agent. Bounded, owned Plugin
-input remains seam-05 work. All target requirements and decisions remain
-pending approval.
+input is implemented by the seam-05 owner facets.
 
 ## Why this seam exists
 

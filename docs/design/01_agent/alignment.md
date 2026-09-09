@@ -263,7 +263,7 @@ It is not a separate implementation plan.
 | `AGT-REQ-033` and `AGT-REQ-034` | `test/jido/agent/versioning_test.exs` | Version-2 write, module mismatch, revision mismatch, and static-definition mismatch tests. | `Proven` |
 | `AGT-REQ-035` and `AGT-REQ-040` | `test/jido/agent_test.exs`; `test/jido/agent/versioning_test.exs` | Custom envelope and legacy raw-map compatibility. | `Proven` |
 | `AGT-REQ-036` to `AGT-REQ-038`, `AGT-REQ-041` | `test/jido/agent/portable_state_test.exs`; `test/jido/persistence/checkpoint_portability_test.exs` | Early Agent checks, every rejected term class, bounded paths, direct definitions, and load defense in depth. | `Proven` |
-| `AGT-REQ-039` | Current validation and routing errors are typed; callback faults vary. | Apply the shared normalization matrix after seam 12 is approved. | `Deferred owner condition` |
+| `AGT-REQ-039` | Shared seam-12 error normalization and callback-fault tests | None | `Proven` |
 
 ## Migration and compatibility
 

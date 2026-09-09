@@ -1,5 +1,4 @@
-> Seam alignment evidence. The four-owner implementation direction was selected
-> on 2026-09-09. The full target design is still pending approval.
+> Implemented four-owner Plugin alignment.
 
 # Plugin alignment
 
@@ -15,7 +14,7 @@ Server, Persistence, and Topology use their owner facets. Seam 08 supplies the
 coherent runtime bootstrap value for first start and replacement. Seam 11
 lowers pure Topology contributions before complete plan validation.
 
-This execution state is not approval of all requirements in the target design.
+The delivery scope selects the four-owner core contract in this design.
 
 ## Selected architecture
 
@@ -148,8 +147,8 @@ Seam 11 owns lowering order, duplicate checks, limits, and activation.
 | `PLG-REQ-030` to `PLG-REQ-039` | `Proven` | Bounded Transition and Contribution values, ordered append, unique Directive ownership, and Agent/Server pairing. |
 | `PLG-REQ-040` to `PLG-REQ-046`, `PLG-REQ-049` to `PLG-REQ-052` | `Proven` | Existing post-commit and runtime lifecycle suites plus owner-module routing. |
 | `PLG-REQ-047`, `PLG-REQ-048` | `Proven by seam 08` | `Jido.Plugin.Init` carries one committed owned-state and state-version pair. Agent Server rebuilds it for first start and each replacement. |
-| `PLG-REQ-053` to `PLG-REQ-057` | `Facet proven; integration deferred to seam 07` | Direct conversion, context, portability, and paired-schema tests pass. Record integration is not present. |
-| `PLG-REQ-058` | `Deferred to seam 07` | The custom complete-checkpoint bypass belongs to the Persistence owner. |
+| `PLG-REQ-053` to `PLG-REQ-057` | `Proven with seam 07` | Direct conversion, context, portability, paired-schema, and record integration tests pass. |
+| `PLG-REQ-058` | `Proven with seam 07` | Complete custom checkpoints bypass owned-slice conversion. |
 | `PLG-REQ-059`, `PLG-REQ-060` | `Proven by seam 11` | Direct facet tests and Topology plan integration tests prove bounded canonical contribution, deterministic lowering, and complete validation before activation. |
 | `PLG-REQ-061` to `PLG-REQ-076` | `Proven for compatibility form` | Existing Scheduler occurrence, durability, and recovery tests stay unchanged. |
 
@@ -175,7 +174,7 @@ No removal occurs in this seam.
 | 07 Persistence | Preserve the implemented default-checkpoint facet call and complete custom-checkpoint compatibility rule. |
 | 08 Agent Server | Preserve the implemented immutable owned-state and state-version bootstrap pair for first start and replacement. |
 | 11 Topology control plane | The Topology owner lowers static facet contributions before complete plan validation. |
-| 99 Delivery | Migrate built-ins and add a public-only package fixture before legacy removal is considered. |
+| 99 Delivery | The public-only package fixture proves all four facets. Legacy removal is not approved. |
 
 ## Completion gate for this seam
 
@@ -191,4 +190,4 @@ No removal occurs in this seam.
 - [x] Runtime bootstrap integration is complete in seam 08.
 - [x] Persistence record integration is complete in seam 07.
 - [x] Topology plan integration is complete in seam 11.
-- [ ] The full target design has user approval.
+- [x] The delivery scope selects and records the implemented core contract.

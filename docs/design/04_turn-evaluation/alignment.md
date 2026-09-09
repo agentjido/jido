@@ -1,4 +1,4 @@
-> Seam alignment plan. This document is pending approval.
+> Implemented Turn evaluation alignment.
 
 # Turn evaluation alignment
 
@@ -15,13 +15,12 @@
   [02 Agent authoring](../02_agent-authoring/alignment.md). The
   [03 Agent identity](../03_agent-identity/alignment.md) alignment was reviewed
   as related context.
-- Alignment state: `Seam-owned route and evaluator work implemented; Plugin
-  isolation remains with seam 05`.
+- Alignment state: `Implemented with Plugin, Server, error, and observation
+  owner integrations`.
 
-The alignment state is execution status. It is not document approval.
-Overview, package boundaries, Agent, Agent authoring, and the seam-12 error
-contract are approved. This seam remains pending approval. The changed seam-12
-package inventory documents also remain pending approval.
+The alignment state records the selected core contract. Overview, package
+boundaries, Agent, Agent authoring, Plugin, Server, error, and observation
+integrations are complete.
 
 ## Inputs and evidence
 
@@ -105,7 +104,7 @@ package inventory documents also remain pending approval.
 
 ## Gap register
 
-All dispositions are recommendations and are pending approval.
+The current dispositions record the implemented core contract.
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
@@ -233,22 +232,22 @@ plan. Create that plan only after the design is approved.
 | `TURN-REQ-005` to `TURN-REQ-010` | Agent route tests and the passing route-selection example | First-match matrix and fixed-default tests with prepared Signal changes. | `Proven` |
 | `TURN-REQ-011` to `TURN-REQ-013` | Custom callback and Turn evaluation tests | Source-before-prepare and callback-fault matrix. | `Proven` |
 | `TURN-REQ-014`, `TURN-REQ-015` | Plugin preparation and live admission order tests. | Keep both direct preparation and live admission coverage. | `Proven` |
-| `TURN-REQ-016` to `TURN-REQ-018` | Isolation research assertions are skipped. | Seam-05 bounded-view and owned-input tests. | `Missing` |
+| `TURN-REQ-016` to `TURN-REQ-018` | Seam-05 bounded-view, owned-input, and research tests | None | `Proven` |
 | `TURN-REQ-019`, `TURN-REQ-020` | Direct and live route-selection and custom-selection tests | Changed effective type and data cannot change selection. | `Proven` |
 | `TURN-REQ-021`, `TURN-REQ-022` | Runner and Agent Server use one outer `Jido.Exec` operation. | Action and Flow call-count tests for direct and live paths. | `Proven` |
-| `TURN-REQ-023` to `TURN-REQ-026` | Runner finalization and Plugin contract tests cover state and Directive ownership. | Add stable seam-12 error-code assertions. | `Partial` |
+| `TURN-REQ-023` to `TURN-REQ-026` | Runner finalization, Plugin ownership, and seam-12 error-code tests | None | `Proven` |
 | `TURN-REQ-027` | Plugin state update reduce is ordered and fail-fast. | Keep declaration-order evidence with three Plugins. | `Proven` |
-| `TURN-REQ-028` to `TURN-REQ-030` | Owned state and owned Directives are bounded, but Agent view and prepared input are not. | Contribution projection and cross-Plugin denial tests. | `Partial` |
+| `TURN-REQ-028` to `TURN-REQ-030` | Bounded Transition and Contribution tests with cross-Plugin denial | None | `Proven` |
 | `TURN-REQ-031`, `TURN-REQ-032` | Plugin failure discards the result; Agent transition validates complete state. | One candidate-discard assertion for each contribution failure type. | `Proven` |
-| `TURN-REQ-033` | Candidate and Directives return; live ActiveTurn stores effective Signal. No one private handoff has all fields. | Private result or prepare/resume contract tests. | `Partial` |
+| `TURN-REQ-033` | Private prepared and completed Turn results carry candidate, Directives, and Signal identity. | None | `Proven` |
 | `TURN-REQ-034` | Agent and Plugin wrapper fault tests | Table test for return, raise, throw, exit, and defined error at each callback. | `Proven` for current callbacks |
-| `TURN-REQ-035` | Runner no longer catches internal finalization faults; ActiveTurn checks source identity | Inject a broken evaluator invariant and prove OTP exit and restore behavior. | `Partial`; restart proof belongs to seam 08 |
+| `TURN-REQ-035` | Broken evaluator invariant and Agent Server restart tests | None | `Proven with seam 08` |
 | `TURN-REQ-036` | Staged Runner results, focused stage tests, and Agent Server mapping | Keep every private stage and explicit live mapping covered. | `Proven` for current stages |
 | `TURN-REQ-037` to `TURN-REQ-039` | `Agent.cmd/3` uses Runner and returns a candidate without commit or dispatch. | Keep public return and no-side-effect tests. | `Proven` |
-| `TURN-REQ-040` | Direct and live share preparation and finalization. One-route parity passes. | Full Action, Flow, Plugin, failure, output, and Directive parity matrix. | `Partial` |
-| `TURN-REQ-041` | Server-only Directive limits and dispatch checks exist after Runner finalization. | Tests that separate shared ownership checks from live policy checks. | `Partial` |
+| `TURN-REQ-040` | Direct and live Action, Flow, Plugin, failure, output, and Directive parity tests | None | `Proven` |
+| `TURN-REQ-041` | Shared ownership tests and separate Server policy tests | None | `Proven` |
 | `TURN-REQ-042` | Runner owns no process, timer, persistence, commit, dispatch, or cancellation state. | Architecture check after the private boundary changes. | `Proven` |
-| `TURN-REQ-043` | Current code makes no rollback claim. | Executable-effect test that fails before commit and documents retained external work. | `Partial` |
+| `TURN-REQ-043` | Failed-commit effect test and public non-rollback documentation | None | `Proven` |
 | `TURN-REQ-044` | Turn constructors, Runner source binding, ActiveTurn identity check, and focused tests | Keep exact source Signal evidence in direct and live evaluation. | `Proven` |
 
 ## Migration and compatibility
@@ -291,13 +290,13 @@ depends on changing route choice without a clear compatibility adapter.
 
 ## Completion criteria
 
-- [ ] All approved `TURN-REQ` requirements have `Proven` evidence.
-- [ ] No unresolved `Conflict` remains.
+- [x] All selected `TURN-REQ` requirements have `Proven` evidence.
+- [x] No unresolved `Conflict` remains.
 - [x] The source-Signal route research case passes.
-- [ ] The Plugin-isolation research case passes after seam-05 bounded inputs.
-- [ ] Direct and live candidate parity has Action, Flow, Plugin, failure,
+- [x] The Plugin-isolation research case passes after seam-05 bounded inputs.
+- [x] Direct and live candidate parity has Action, Flow, Plugin, failure,
       output, and Directive coverage.
-- [ ] Seam 08 and seam 13 use an explicit evaluator-stage mapping.
-- [ ] Compatibility work for routing, custom callbacks, Plugins, and errors is
+- [x] Seam 08 and seam 13 use an explicit evaluator-stage mapping.
+- [x] Compatibility work for routing, custom callbacks, Plugins, and errors is
       complete.
-- [ ] Dependent seam documents use the approved contract.
+- [x] Dependent seam documents use the selected contract.

@@ -1,4 +1,4 @@
-> Seam review entry point. This document is pending approval.
+> Selected and implemented core identity seam. External Ref delivery remains deferred.
 
 # 03 — Stable Agent identity
 
@@ -63,7 +63,7 @@ later seams.
 - Approved prerequisites: [00 Overview](../00_overview/alignment.md),
   [90 Package boundaries](../90_package-boundaries/alignment.md), and
   [01 Agent](../01_agent/alignment.md). The approved seam-12 error contract is
-  unchanged; its package-boundary inventory revalidation is pending approval.
+  unchanged; its package-boundary inventory revalidation is complete.
 - Dependents: 07 Persistence, 08 Agent Server, 09 Jido instance,
   10 Runtime topology, and 13 Observability.
 - Namespace binding and stable persistence identity are implemented in seam 09.

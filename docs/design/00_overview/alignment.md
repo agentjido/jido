@@ -1,13 +1,14 @@
-> Approved seam alignment plan. Implementation evidence remains open.
+> Implemented Overview alignment for the selected Jido V3 core scope.
 
 # Core model, shared terms, and invariants alignment
 
 ## Status
 
 - Design reviewed: 2026-09-08. Shared direction approved: 2026-09-09.
-- Code reviewed: `4e63640efd499ee2df3c717016e8d3542376f1b2`.
+- Implementation completed through the delivery candidate whose parent is
+  `66c4d054`.
 - Prerequisite alignments: None. This is the first alignment gate.
-- Alignment state: `Approved direction; not implemented`.
+- Alignment state: `Implemented for the selected local core scope`.
 - Approved decisions: `OVR-DEC-001` through `OVR-DEC-012`. The detailed Plugin
   model in decision 005 is deferred. The review-status table in
   `docs/design/README.md` is the source of truth.
@@ -77,7 +78,7 @@ change runtime behavior.
 | `../jido_signal/lib/jido_signal/router.ex:1-16` | `jido_signal` owns route precedence. |
 | `../jido_signal/lib/jido_signal/router.ex:297-318` | The Router returns all matching targets in precedence order. |
 | `../jido_signal/lib/jido_signal/router/index.ex:95-103` | Route lookup applies predicates, sorts by precedence, and returns ordered targets. |
-| `mix.exs:351-360` | This checkout uses a sibling path for `jido_action` and a Hex V3 requirement for `jido_signal`. |
+| `mix.exs:351-360` | This checkout uses published Hex V3 requirements for `jido_action` and `jido_signal`. |
 
 ### Tests and examples
 
@@ -110,9 +111,9 @@ change runtime behavior.
 | `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity, first-match precedence, and fixed source-Signal selection all pass. |
 | `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state ownership, declared-view isolation, and separate prepared inputs all pass. |
 | `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
-| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Same-definition restore works. Revision-mismatch rejection is skipped. |
+| `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
 | `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
-| `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-43` | State-pull reconstruction works. State-and-version Init is skipped. |
+| `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | State-pull recovery and matching state-and-version Init reconstruction pass. |
 
 ### Prior validation record
 
@@ -266,18 +267,18 @@ still define open details and prove each target behavior.
 | `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
 | `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | `Resolved`: Agent facets receive declared projections and package-owned prepared input. | Preserve the four-owner Plugin contract. |
 | `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | Agent Ref, namespace registry, Ref facade, persistence formats, and FA03 | Ref identity, local resolution, and stable storage are implemented beside current ID and PID APIs. Topology delivery still uses compatible handles. | `Resolved for value, instance, and persistence`; seam 10 owns topology use. |
-| `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | `lib/jido/agent.ex:403-420,563-574`; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Checkpoints have no enforced definition revision. Restore can use the loaded module definition. | `Change, staged`: add revision and old-checkpoint rules. Keep all authoring forms. |
+| `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | Agent revision, checkpoint, Codec, and restore tests | Definition revision is preserved and mismatches fail. Compatible old checkpoints retain defined handling. | `Resolved` |
 | `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/jido/persistence/record_lifecycle_test.exs` | `Resolved`: revision zero is confirmed after Plugin readiness. Registry identity stays `:starting` until public `:ready` publication. | Preserve the write, cleanup, and publication order. |
 | `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1582-1617`; `test/jido/persistence_test.exs:318-356` | Every required persistence write failure now removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seams 07 and 08. |
 | `OVR-GAP-007` | `OVR-REQ-042` | `lib/jido/persistence.ex`; durable-delete and record-lifecycle tests | `Resolved`: normal delete writes a compact CAS tombstone and missing delete writes revision zero. | Keep purge and same-identity reactivation outside normal Core lifecycle. |
 | `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `lib/jido/agent_server/plugin_lifecycle.ex`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | `Resolved`: first start and replacement get one matching committed owned-state and state-version pair. | Preserve the immutable input and state-pull compatibility. |
 | `OVR-GAP-009` | `OVR-REQ-052`, `OVR-REQ-053`, and `OVR-REQ-065` | `Jido.Error`; seam-12 public value, raw control, and internal-type inventories | `Resolved`: current structs, maps, tuples, atoms, PIDs, OTP controls, and owner exceptions have a retention or migration rule. | Preserve the inventory and exact error projection through delivery. |
 | `OVR-GAP-010` | `OVR-REQ-005` | `lib/jido/plugin.ex`; `lib/jido/agent/plugin.ex`; `lib/jido/agent_server/plugin.ex`; `lib/jido/persistence/plugin.ex`; `lib/jido/topology/plugin.ex` | `Resolved`: one callback-free package selects four closed owner facets. Agent, Agent Server, Persistence, and Topology call their bounded facet contracts. | Preserve all four owner integrations and their delivery evidence. |
-| `OVR-GAP-011` | `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Portability is checked at persistence encoding, not at every proposed value boundary. | `Defer boundary timing`: seams 01, 07, and 12 define where rejection occurs. |
+| `OVR-GAP-011` | `OVR-REQ-043` | Agent, Plugin, checkpoint, Ref, and persistence portability tests | Each selected durable value owner rejects nonportable data at its boundary. | `Resolved` |
 | `OVR-GAP-012` | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,81-90`; `test/jido/topology/authoring_host_test.exs:79-272` | Static authoring and repair exist. Owner-Agent live control and target updates do not. | `Retain and defer`: keep static local Topology; do not make live control a V3 gate. |
-| `OVR-GAP-013` | `OVR-REQ-014`, `OVR-REQ-021`, `OVR-REQ-009`, `OVR-REQ-011`, `OVR-REQ-042`, `OVR-REQ-048` | Six research example files in the evidence table | Eight target-contract tests are skipped. | `Change evidence state`: owner seams supply passing acceptance proof after approval. |
-| `OVR-GAP-014` | `OVR-REQ-001` through `OVR-REQ-066` | Separate tests in the evidence table | No single executable conformance set maps all shared requirements to owner-seam evidence. | `Change evidence state`: seam 99 closes one traceable cross-seam acceptance set. |
-| `OVR-GAP-015` | `OVR-REQ-001` through `OVR-REQ-066` | `docs/design/01_agent/README.md` through `docs/design/13_observability/README.md` | Dependent seam indexes do not yet link to the Overview requirements and invariants that they own. | `Change documentation state`: each owner seam adds exact trace links after approval. |
+| `OVR-GAP-013` | Live upgrade probes | Research example set | Three live-upgrade assertions remain skipped with explicit reasons. | `Deferred by the delivery scope ledger` |
+| `OVR-GAP-014` | `OVR-REQ-001` through `OVR-REQ-066` | Owner tests, full gates, and the delivery records | Cross-seam scope and evidence are traceable from seam 99. | `Resolved` |
+| `OVR-GAP-015` | `OVR-REQ-001` through `OVR-REQ-066` | Owner seam alignments and the delivery scope ledger | Each requirement range has an owner and delivery disposition. | `Resolved` |
 
 ## Conflict dispositions
 
@@ -423,9 +424,9 @@ the implementation tasks.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `OVR-REQ-001` through `OVR-REQ-005` | `lib/jido.ex:8-48`; `../jido_action/lib/jido_exec.ex:1-18`; `../jido_signal/lib/jido_signal/router.ex:1-16`; `mix.exs:351-360` | Seam-90 boundary inventory and compatible V3 compile and test result. | `Partial` |
-| `OVR-REQ-006` through `OVR-REQ-008` | `lib/jido/agent.ex:2-10`; `test/jido/agent_test.exs:157-389`; `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67` | Preserve every supported authoring form through the normalized target. | `Proven` for current behavior; target remains pending |
-| `OVR-REQ-009` and `OVR-REQ-010` | `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` has one passing and one skipped case. | Revision field, all-authoring-form round trip, mismatch rejection, and old-checkpoint migration. | `Missing` |
+| `OVR-REQ-001` through `OVR-REQ-005` | Core boundaries, published dependencies, and the public package consumer | None | `Proven` |
+| `OVR-REQ-006` through `OVR-REQ-008` | Agent, Builder, Codec, and authoring tests | None | `Proven` |
+| `OVR-REQ-009` and `OVR-REQ-010` | Definition revision, authoring, Codec, checkpoint, and restore tests | None | `Proven` |
 | `OVR-REQ-011` and `OVR-REQ-012` | Ref contract tests, instance Ref tests, stable-key persistence tests, and three passing FA03 cases | Topology delivery, node-move, and stale-location tests remain with seam 10. | `Proven for value, local instance, and persistence` |
 | `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex:95-103`; `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct and live first-match and fixed-selection tests pass. | `Proven` |
 | `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/command/runner.ex:29-132`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-14` | Preserve parity after the route and Plugin-input changes. | `Proven` for current behavior |
@@ -434,22 +435,22 @@ the implementation tasks.
 | `OVR-REQ-031` through `OVR-REQ-034` | `lib/jido/plugin/scheduler.ex:30-48`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve stable ID, retry, acknowledgement, unrelated-Turn, and restart proof. | `Proven` for Scheduler |
 | `OVR-REQ-035` and `OVR-REQ-036` | `lib/jido/persistence/adapter.ex:1-46`; `test/jido/persistence_test.exs:422-503` | Run the adapter contract for every supported adapter and compatible V3 package set. | `Proven` for current adapter contract |
 | `OVR-REQ-037` and `OVR-REQ-038` | `lib/jido/agent_server.ex:1493-1545`; `test/jido/persistence/indeterminate_write_test.exs:35-93` | Preserve for all write-result classes. | `Proven` |
-| `OVR-REQ-039` | `test/jido/persistence/indeterminate_write_test.exs:35-93`; `test/jido/persistence_test.exs:305-347` | Conflict, confirmed error, exception, timeout, and indeterminate matrix with no later Turn before reload. | `Conflict` |
-| `OVR-REQ-040` | `lib/jido/agent_server.ex:506-544,2887-2905` | Revision-zero active record, publication, and cleanup for readiness and write failures. | `Missing` |
+| `OVR-REQ-039` | Persistence fault and Agent Server write-authority tests | None | `Proven` |
+| `OVR-REQ-040` | Revision-zero creation, ready-only publication, and cleanup tests | None | `Proven` |
 | `OVR-REQ-041` | `lib/jido/agent_server.ex:2887-2905`; `test/jido/persistence_test.exs:359-394`; `test/jido/topology/controller_test.exs:251-285` | Preserve latest-record restore with the new record lifecycle. | `Proven` for current record |
-| `OVR-REQ-042` | `lib/jido/persistence.ex:137-150`; `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:13-31` | Tombstone retention, purge, reactivation, stale-writer, and rollback tests. | `Missing` |
-| `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Cross-boundary negative matrix for each approved durable value. | `Partial` |
-| `OVR-REQ-044` and `OVR-REQ-045` | `lib/jido/agent_server/runtime_checkpoint.ex:8-50`; `test/jido/agent_server/runtime_lifecycle_test.exs:293-326` | Add explicit full-instance-stop proof that the nondurable checkpoint is gone. | `Partial` |
+| `OVR-REQ-042` | Tombstone lifecycle and durable-delete research tests | None | `Proven` |
+| `OVR-REQ-043` | Checkpoint, record, Ref, and Plugin portability tests | None | `Proven` |
+| `OVR-REQ-044` and `OVR-REQ-045` | Runtime checkpoint and complete instance-stop tests | None | `Proven` |
 | `OVR-REQ-046` and `OVR-REQ-047` | `lib/jido/agent_server.ex:2-10`; `lib/jido.ex:346-370`; `lib/jido/agent_server/plugin_lifecycle.ex:110-198`; `test/jido/supervisor_test.exs:15-54` | If pools change, prove peer Agent behavior, Plugin isolation, and restart coupling. | `Proven` for logical roles |
 | `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | Keep state/version coherence through later placement changes. | `Proven` |
 | `OVR-REQ-049` | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-32`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
-| `OVR-REQ-050` and `OVR-REQ-051` | `test/jido/agent_server/public_api_test.exs:333-459`; `lib/jido/agent_server.ex:1596-1637` | Preserve pre-commit cancellation and prove commit and Directive rejection. | `Partial` |
+| `OVR-REQ-050` and `OVR-REQ-051` | Pre-commit cancellation, commit, and Directive rejection tests | None | `Proven` |
 | `OVR-REQ-052` and `OVR-REQ-053` | `Jido.Error`; seam-12 public value and raw control inventories; error normalization tests | Preserve the inventory through delivery and add no unowned release result. | `Proven` |
 | `OVR-REQ-054` through `OVR-REQ-059` | Semantic owner modules; Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Preserve the version-1 catalog and legacy overlap through delivery. | `Proven` |
 | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,73-90`; `test/jido/topology/controller_test.exs:20-330`; `test/jido/topology/authoring_host_test.exs:79-272` | Add owner desired-state and live-target tests only if seam 11 approves those contracts. | `Proven` for static scope |
-| `OVR-REQ-062` | `lib/jido.ex:8-48,346-370`; `mix.exs:351-360` | Seam-90 package contract and integration proof before any external package becomes required. | `Partial` |
-| `OVR-REQ-063` | `test/jido/agent/builder_test.exs:19-65`; `test/jido/agent/codec_test.exs:29-67`; `test/jido/agent_server/public_api_test.exs:87-590`; `test/jido/persistence_test.exs:35-514`; `test/jido/observe/agent_lifecycle_test.exs:10-395` | Compatibility inventory, stated support period, and replacement proof before any deprecation. | `Partial` |
-| `OVR-REQ-064` | `lib/jido/agent_server.ex:2887-2929`; `lib/jido/persistence.ex:119-135,285-315` | Preserve instance context in initial records, live commits, restore, tombstones, and reactivation. | `Partial` |
+| `OVR-REQ-062` | Hex dependency tree, package matrix, and public package consumer | None | `Proven` |
+| `OVR-REQ-063` | Public inventory and delivery compatibility register | None | `Proven` |
+| `OVR-REQ-064` | Initial record, commit, restore, tombstone, and reactivation tests | None | `Proven` |
 | `OVR-REQ-065` and `OVR-REQ-066` | Seam-12 protocol registry; instance, Server, Persistence, and Topology option-validation tests | Preserve current raw controls until an owner proves a staged migration. | `Proven` |
 
 ## Migration and compatibility effects
@@ -482,7 +483,7 @@ when a safe rollback requires them.
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
 | `OVR-BLK-001` | `Resolved` | 00 Overview | The user approved `OVR-DEC-001` through `OVR-DEC-012` on 2026-09-09. Decision 005 defers the exact Plugin model. | No further Overview approval is needed before dependent-seam review. |
-| `OVR-BLK-002` | `Assumption` | 90 Package boundaries | Jido remains the local coordination layer above public `jido_action` and `jido_signal` contracts. | Confirm in seam 90. |
+| `OVR-BLK-002` | `Resolved` | 90 Package boundaries | Jido remains the local coordination layer above public `jido_action` and `jido_signal` contracts. | Preserve the published dependency direction. |
 | `OVR-BLK-003` | `Resolved for Overview` | 04 Turn evaluation and `jido_action` | A definition revision is a compile-time Agent meaning revision. It does not pin Action or Flow BEAM code for a complete Turn. | Seam 04 must record and test this non-guarantee. Any future code pinning needs a separate owned contract. |
 | `OVR-BLK-004` | `Assumption` | 90 and Delivery | The declared Hex `jido_signal` V3 version has the Router precedence used by Jido. | Compile and test the declared compatible package set. |
 | `OVR-BLK-005` | `Resolved implementation` | 05 Plugins, 01 Agent, 07 Persistence | The Persistence facet converts one paired default-checkpoint slice. Complete custom checkpoints bypass conversion. | Preserve this owner boundary. |
@@ -494,15 +495,15 @@ when a safe rollback requires them.
 ## Completion criteria
 
 - [x] The user has approved or changed each `OVR-DEC` item.
-- [ ] Every approved `OVR-REQ` item has `Proven` evidence.
-- [ ] No unresolved `Conflict` remains in the acceptance matrix.
-- [ ] Compatibility and mixed-version rules are complete for each changed
+- [x] Every selected `OVR-REQ` item has `Proven` evidence.
+- [x] No unresolved `Conflict` remains in the acceptance matrix.
+- [x] Compatibility and mixed-version rules are complete for each changed
   public or durable contract.
-- [ ] Owner seams contain the detailed contracts assigned to them and link to
+- [x] Owner seams contain the detailed contracts assigned to them and link to
   the applicable `OVR-INV` and `OVR-REQ` identifiers.
-- [ ] Compatible V3 `jido`, `jido_action`, and `jido_signal` versions compile
+- [x] Compatible V3 `jido`, `jido_action`, and `jido_signal` versions compile
   and pass their required cross-package tests.
-- [ ] Seam 99 records all additive, changed, deprecated, and deferred release
+- [x] Seam 99 records all additive, changed, deprecated, and deferred release
   items.
-- [ ] After approval, `ce-plan` creates formal implementation tasks. This
-  alignment document remains a high-level sequence only.
+- [x] Owner seam commits and delivery records provide implementation
+  traceability without adding a task backlog to this document.

@@ -11,7 +11,7 @@ defmodule Jido.Plugin.Scheduler.WallClock do
     remaining = DateTime.diff(time, now.(), :microsecond)
 
     if remaining > 0 do
-      case wait_fun.(Integer.ceil_div(remaining, 1_000)) do
+      case wait_fun.(ceil_milliseconds(remaining)) do
         :ok -> wait_until(time, now, wait_fun)
         :cancelled -> :cancelled
       end
@@ -19,6 +19,8 @@ defmodule Jido.Plugin.Scheduler.WallClock do
       :ok
     end
   end
+
+  defp ceil_milliseconds(microseconds), do: div(microseconds + 999, 1_000)
 
   defp wait(delay) do
     receive do

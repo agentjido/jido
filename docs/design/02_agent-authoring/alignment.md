@@ -274,7 +274,7 @@ It is not a separate implementation plan.
 | `AUTH-REQ-050` to `AUTH-REQ-052` | Extension host, Spark fixture, and public data-entry tests | Keep order, claims, invalid-result, and common-validation cases. | `Proven` |
 | `AUTH-REQ-053` and `AUTH-REQ-054` | Public `lower/3` docs and spec plus direct, Builder, and Codec parity | Keep source entities out of Codec data. | `Proven` |
 | `AUTH-REQ-055` | After-verify compiler path and later-module test | Preserve in compatible package set | `Proven` |
-| `AUTH-REQ-056` | Current authoring errors are structured; tagged and bang paths are covered | Apply final seam-12 codes after that seam is approved. | `Deferred owner condition` |
+| `AUTH-REQ-056` | Structured authoring, tagged and bang paths, and seam-12 stable codes | None | `Proven` |
 | `AUTH-REQ-057` to `AUTH-REQ-060` | Generated constructor, packaging, docs, and direct/live tests | Preserve in the public interface acceptance set | `Proven` |
 
 ## Migration and compatibility

@@ -1,4 +1,4 @@
-> Target seam design. This document is pending approval.
+> Selected four-owner Plugin design. The core contract is implemented.
 
 # Plugin design
 

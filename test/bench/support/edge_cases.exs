@@ -39,7 +39,12 @@ defmodule JidoCoreBench.EdgeCases do
 
             F.equal!(
               prepared.context,
-              Map.merge(context, %{agent_id: agent.id, agent_state: agent.state, signal: signal})
+              Map.merge(context, %{
+                agent_id: agent.id,
+                agent_state: agent.state,
+                signal: signal,
+                plugin_inputs: %{}
+              })
             )
 
           {:error, error} ->

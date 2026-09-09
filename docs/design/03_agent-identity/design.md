@@ -1,10 +1,11 @@
-> Target seam design. This document is pending approval.
+> Selected core identity design. The local identity contract is implemented.
 
 # Stable Agent identity design
 
 All requirements and decisions in this document are recommended targets. The
 [design review index](../README.md#document-review-status) is the source of
-truth for approval. The prerequisite documents are also pending approval.
+truth for status. The delivery scope ledger records the deferred external
+delivery and placement requirements.
 
 ## Scope and owner
 

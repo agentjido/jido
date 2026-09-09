@@ -138,7 +138,7 @@ mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
   test/examples/08_applications --include example --seed 0
 ```
 
-Run all examples separately with `mix examples --seed 0`. The 11 known failing
-research tests are temporarily skipped, with their assertions retained. See the
+Run all examples separately with `mix examples --seed 0`. Three deferred
+live-upgrade tests remain skipped, with their assertions retained. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
-Passing tests do not prove these missing contracts.
+Passing core tests do not prove these deferred contracts.

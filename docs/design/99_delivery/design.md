@@ -1,4 +1,4 @@
-> Target seam design. This document is pending approval.
+> Selected delivery design for the local Jido V3 core candidate.
 
 # Delivery design
 
@@ -11,9 +11,9 @@
 - Out of scope: subsystem behavior, package implementation details, product
   policy, and detailed implementation tasks.
 
-This design specifies the release decision process. It does not approve a
-target contract in another seam and does not assert that a current check
-passes.
+This design specifies the release decision process. The records in this folder
+apply it to the selected core candidate. They do not approve an external
+package or claim publication.
 
 ## Model
 
@@ -195,13 +195,13 @@ external work.
 
 ### Alignment and later implementation plans
 
-`DEL-REQ-040`: While this seam is pending approval, the delivery alignment
-shall contain only current evidence, gaps, dispositions, high-level sequence,
-and acceptance gates.
+`DEL-REQ-040`: When the delivery seam is implemented, the delivery alignment
+shall contain current evidence, dispositions, acceptance gates, and links to
+the four delivery records.
 
-`DEL-REQ-041`: When the user approves the delivery intent and requirements, the
-delivery owner shall use `ce-plan` to create each detailed implementation plan
-outside this seam.
+`DEL-REQ-041`: When the user directs delivery implementation, the delivery
+owner shall map each implementation commit to its owner seam and verification
+evidence.
 
 `DEL-REQ-042`: When a later implementation plan is created, that plan shall map
 each task to approved requirement IDs, owned files, verification, and a release
@@ -235,11 +235,11 @@ evidence record names.
 | Ecosystem packages | A compatibility claim applies only to the named tested versions and sources. |
 | Later `ce-plan` work | Approved requirement IDs and gates are stable planning inputs. |
 
-## Open design decisions
+## Selected design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Question | Selected option | Effect |
 | --- | --- | --- | --- |
-| `DEL-DEC-001` | How is release scope selected? | Use a requirement-level `required`, `deferred`, or `excluded` ledger. | Pending seam designs do not become release scope by inference. |
+| `DEL-DEC-001` | How is release scope selected? | Use a requirement-level `required`, `deferred`, or `excluded` ledger. | Unselected seam designs do not become release scope by inference. |
 | `DEL-DEC-002` | Which package set must pass? | Require Jido, `jido_action`, and `jido_signal`; add AI or Browser only when the release claim names them. | Core can release without an unsupported ecosystem claim. |
 | `DEL-DEC-003` | Who can accept a gate exception? | Name one gate-exception owner who is not the command result itself. | Exceptions have explicit human authority and expiry. |
 | `DEL-DEC-004` | Which skips can remain? | Permit only requirements that the approved scope ledger defers or excludes. | No release-required behavior is hidden by a skip. |
