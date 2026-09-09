@@ -1,4 +1,5 @@
-> Approved seam review entry point. Dependent owner-seam work remains open.
+> Seam review entry point. The aligned implementation is complete. This
+> document is pending user approval.
 
 # 02 — Agent authoring
 
@@ -6,15 +7,15 @@
 
 Jido supports Agent modules, Spark blocks, direct map and keyword data,
 Builder, and Codec documents. These forms use one Agent constructor, but some
-source features exist only for modules. The approved target keeps all
+source features exist only for modules. The aligned target keeps all
 supported forms. It defines parity as equality of the canonical Agent
 definition, makes `agent/0` the module authority, keeps generated interfaces as
 module API, and gives Codec a clear portable subset. The current implementation
-now preserves the approved Agent `vsn`, starts Builder module input from
+now preserves the Agent `vsn`, starts Builder module input from
 `agent/0`, encodes instances from their neutral definitions, and publishes the
 pure data extension lowerer. One requirement-mapped suite proves the common
 definition and instance boundary for keyword-only and Spark-block modules. The
-contract and its implementation evidence were approved on 2026-09-09.
+contract and its implementation evidence are ready for user review.
 
 The Overview and Agent prerequisite seams are approved. Package-boundary and
 shared-error work remain explicit assumptions and still require their own

@@ -1,10 +1,10 @@
-> Approved seam alignment. Dependent owner-seam follow-up remains open.
+> Completed seam alignment. This document is pending user approval.
 
 # Agent authoring alignment
 
 ## Status
 
-- Design reviewed: 2026-09-08. Approved: 2026-09-09.
+- Design reviewed: 2026-09-09. User approval remains pending.
 - Code reviewed: `ae559f4f41318d0021f8044589f99da810f4f82e` on branch
   `v3-spike`.
 - Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
@@ -12,7 +12,7 @@
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md), and
   [01 Agent](../01_agent/alignment.md). Overview and Agent are approved.
   Package boundaries and errors remain explicit pending assumptions.
-- Alignment state: `Approved; scoped implementation complete`.
+- Alignment state: `Scoped implementation complete; pending user approval`.
 
 The review-status table in `docs/design/README.md` is the source of truth for
 document approval.
