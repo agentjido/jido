@@ -426,6 +426,7 @@ V3 adds these modules:
 | `Jido.Persistence.ETS` | Supplies local in-memory Agent persistence. |
 | `Jido.Persistence.File` | Supplies file-backed Agent persistence with one owner per directory. |
 | `Jido.Persistence.Redis` | Supplies Redis-backed Agent persistence. |
+| `Jido.Persistence.Bedrock` | Supplies Bedrock KV 0.7 persistence with strictly serializable exact-byte CAS. |
 
 ### Threads
 

@@ -270,6 +270,7 @@ defmodule Jido.MixProject do
         "Persistence And History": [
           Jido.Persistence,
           Jido.Persistence.Adapter,
+          Jido.Persistence.Bedrock,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
           Jido.Persistence.Plugin,
@@ -369,6 +370,10 @@ defmodule Jido.MixProject do
       {:telemetry, "~> 1.3"},
       {:telemetry_metrics, "~> 1.2"},
       {:sched_ex, "~> 1.2.1"},
+
+      # Optional Persistence Adapters
+      {:bedrock, "~> 0.7.0", optional: true},
+      {:bedrock_raft, ">= 0.9.7 and < 0.10.0", optional: true},
 
       # Development & Test Dependencies
       {:req_llm, "~> 1.21", only: [:dev, :test]},

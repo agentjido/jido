@@ -29,6 +29,22 @@ operations. It must be a nonempty binary and must be unique among live local
 instances on one Erlang node. The optional `:persistence` value defines the
 default adapter for actors in this instance.
 
+For shared Bedrock persistence, use a host repo created with `Bedrock.Repo`:
+
+```elixir
+persistence:
+  {Jido.Persistence.Bedrock,
+   repo: MyApp.BedrockRepo,
+   prefix: "my-app:jido:",
+   timeout_in_ms: 5_000}
+```
+
+The host application must add Bedrock `0.7.x` and constrain Bedrock Raft to
+`>= 0.9.7 and < 0.10.0`. It must configure the durability profile and supervise
+the Bedrock cluster before the Jido instance. See
+[Persistence Adapters](persistence-adapters.html) for the transaction and
+failure rules.
+
 Set instance options in application configuration:
 
 ```elixir
