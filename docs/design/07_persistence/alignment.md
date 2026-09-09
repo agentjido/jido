@@ -78,7 +78,7 @@ plan.
 | Evidence | Behavior proved or specified |
 | --- | --- |
 | `test/jido/persistence_test.exs:259-279,422-505` | Live commit persists revision 1; stale and same-revision changed writes conflict; two writers have one winner. |
-| `test/jido/persistence_test.exs:305-357` | A confirmed conflict can leave a stale Server active under its error policy. |
+| `test/jido/persistence_test.exs:318-356` | A confirmed conflict returns before live replacement or dispatch and stops the stale Server activation. |
 | `test/jido/persistence_test.exs:359-404` | Thaw and automatic restore work. Current delete returns later `:not_found`. |
 | `test/jido/persistence_test.exs:406-420` | Corrupt bytes fail load and are not overwritten by save. |
 | `test/jido/persistence/adapter_test.exs:59-110` | Adapter declarations and option validator faults are checked. All four callbacks are required. |
@@ -117,7 +117,7 @@ plan.
 | `PERS-GAP-002` | `PERS-REQ-006` to `PERS-REQ-010` | Record and Agent checkpoint code | Checkpoint layering, definition version, and the portable-term set work. Target Ref and tombstone do not. | `Partial`; `Blocked` on seam 03 and record lifecycle work |
 | `PERS-GAP-003` | `PERS-REQ-011` to `PERS-REQ-016` | Save code and revision tests | Exact-byte CAS and direct revision rules work. Server next-revision ownership is spread across modules. | `Retain`; strengthen contract evidence |
 | `PERS-GAP-004` | `PERS-REQ-017` to `PERS-REQ-021` | Adapter containment and error tests | Invalid replies and callback faults have shared codes. Returned adapter reasons remain compatible, and the closed confirmed-rejection set is not final. | `Partial`; seam 07 owns future public codes and migration |
-| `PERS-GAP-005` | `PERS-REQ-022` | Server failure branch and stale-Server test | Only uncertain writes always remove authority. | `Conflict`; `Blocked` on seams 06 and 08 |
+| `PERS-GAP-005` | `PERS-REQ-022` | Server failure branch, stale-Server test, and indeterminate-write tests | Every required write failure removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seam 07 and 08 work |
 | `PERS-GAP-006` | `PERS-REQ-023` to `PERS-REQ-028` | Startup and restore code | A new persistent Agent reports ready without revision-zero storage. | `Missing`; `Blocked` on Agent Server lifecycle |
 | `PERS-GAP-007` | `PERS-REQ-029` to `PERS-REQ-031` | Load validation and restore tests | Current validation works. Definition revision does not exist. | `Partial`; `Blocked` on seam 01 |
 | `PERS-GAP-008` | `PERS-REQ-032` to `PERS-REQ-036` | Blind delete and skipped FA-05 test | No tombstone or durable deletion fence exists. | `Missing` |
@@ -125,7 +125,7 @@ plan.
 | `PERS-GAP-010` | `PERS-REQ-039` to `PERS-REQ-041` | Format-1 key and identity code | No Ref key, dual read, collision check, rewrite, rollback, or removal gate exists. | `Blocked` on seams 03 and 09 |
 | `PERS-GAP-011` | `PERS-REQ-042`, `PERS-REQ-043` | Custom Agent callback tests | Complete custom callbacks work. Plugin bypass is not needed until a facet exists. | `Proven` for current callback; target composition is `Deferred` |
 | `PERS-GAP-012` | `PERS-REQ-044` | No Plugin Persistence facet | Owned-slice conversion does not exist. | `Deferred`; `Blocked` on seam 05 |
-| `PERS-GAP-013` | `PERS-REQ-045` to `PERS-REQ-048` | Server restore and commit tests | Restore and commit order work. Creation and all-error authority do not. | `Partial` |
+| `PERS-GAP-013` | `PERS-REQ-045` to `PERS-REQ-048` | Server restore, commit, and write-failure tests | Restore, commit order, and all-error authority work. Initial durable creation does not. | `Partial` |
 | `PERS-GAP-014` | `PERS-REQ-049`, `PERS-REQ-050` | Plugin and Topology recovery tests | Runtime reconstruction and per-Agent restore work only for current covered paths and ETS Topology tests. | `Partial` |
 | `PERS-GAP-015` | `PERS-REQ-051` | Adapter API and package boundaries | Core has no discovery or lease API. The exclusion needs a public boundary check. | `Proven` in current API; release evidence is `Partial` |
 
@@ -145,8 +145,8 @@ text.
 | Keep only active records and blind delete. | `Replace`. | Tombstones preserve the stale-writer barrier. |
 | Keep `get`, `put`, CAS, and `delete` as required runtime callbacks forever. | `Change in stages`. | Require get and CAS; retain put and delete as maintenance compatibility APIs first. |
 | Treat every returned CAS error except explicit indeterminate as confirmed no-write. | `Replace`. | Only conflict and documented preflight rejection confirm no write. |
-| Let conflict follow Agent error policy and continue. | `Conflict`. | The pending Overview and commit target remove write authority after every required write failure. |
-| Stop after every persistence write error. | `Retain target, blocked`. | Seams 06, 08, and 12 must align current caller and restart behavior. |
+| Let conflict follow Agent error policy and continue. | `Removed`. | Seam 06 now stops the activation after every required persistence write failure. |
+| Stop after every persistence write error. | `Implemented by seam 06`. | Preserve caller failure, activation stop, and restore-first recovery through seams 07 and 08. |
 | Add a persistence callback timeout now. | `Defer`. | No option or implementation exists. Seam 08 must define task and stop behavior first. |
 | Write revision zero only after the first Turn. | `Replace`. | Target creation confirms revision zero before readiness. |
 | Start Plugin runtimes only after initial persistence. | `Replace`. | Target starts them provisionally, waits for readiness, writes, then publishes. Failed write must clean them up. |
@@ -266,7 +266,7 @@ plan. Create that plan only after the user approves this seam.
 | `PERS-REQ-019` | No adapter uses a typed preflight rejection | Rejection before backend work and no-write proof. | `Missing` |
 | `PERS-REQ-020` | Redis and lost-reply tests cover several cases | Returned plain error, raise, throw, exit, invalid result, and timeout matrix. | `Partial` |
 | `PERS-REQ-021` | Public Persistence keeps raw adapter reasons and uses coded `ExecutionError` for invalid replies and faults | Define and test persistence-owned codes before any public control migration. | `Owner-deferred` |
-| `PERS-REQ-022` | Indeterminate stop passes; conflict continuation passes | Every required write failure removes authority before next evaluation. | `Conflict` |
+| `PERS-REQ-022` | Confirmed-conflict, known-error, and indeterminate-write stop cases | Every required write failure removes authority before next evaluation. | `Proven by seam 06`; preserve during record work |
 | `PERS-REQ-023` to `PERS-REQ-028` | Startup returns before any initial write | Revision-zero storage, all restore policies, failure publication, and Plugin cleanup. | `Missing` |
 | `PERS-REQ-029`, `PERS-REQ-030` | Invalid record and identity tests | Preserve with new active record and Ref. | `Proven` for current record |
 | `PERS-REQ-031` | Definition-revision target test is skipped | Stored revision match, mismatch, missing-old-record, and rollback cases. | `Blocked` |
@@ -319,7 +319,7 @@ plan. Create that plan only after the user approves this seam.
 | `PERS-BLK-003` | `Owner dependency` | 12 Errors and contracts and 07 Persistence | Seam 12 keeps adapter controls raw, rejects a new `PersistenceError`, and implements codes for invalid replies, callback faults, and portable paths. Public persistence control migration stays with seam 07. | Approve seam 12, then close the seam-07 public result and write-policy matrix. |
 | `PERS-BLK-004` | `Resolved` | 01 Agent | Agent `vsn`, the `vsn: 1` legacy rule, and version-2 default checkpoints are implemented and approved at `fa17a6d6`. | No action. |
 | `PERS-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Ref exists only as a target, and namespace binding is undefined. | Approve Ref, namespace, and partition conversion. |
-| `PERS-BLK-006` | `Blocker` | 06 Commit and effects and 08 Agent Server | Current conflict continuation disagrees with all-error authority loss. | Select one rule and define stop, reload, and caller behavior. |
+| `PERS-BLK-006` | `Resolved design input` | 06 Commit and effects and 08 Agent Server | Every required write error stops the activation. The caller receives the failure. A later activation restores authoritative state. | Preserve this rule through seam-07 record and adapter work. |
 | `PERS-BLK-007` | `Blocker` | 07 Persistence | Tombstone retention, purge authorization, same-identity reactivation, TTL, and rollback are not approved. | Approve the lifecycle maintenance rules. |
 | `PERS-BLK-008` | `Blocker` | 05 Plugins and 01 Agent | Complete custom checkpoints and Plugin slice conversion have no long-term composition. | Approve first-stage bypass and later composition or permanent deferral. |
 | `PERS-BLK-009` | `Assumption` | 08 Agent Server | Plugin runtimes can start provisionally and be cleaned up before publication. | Prove all startup failure paths. |

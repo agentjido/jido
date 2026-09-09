@@ -32,8 +32,8 @@ optional post-commit dispatch.
 ## Validate Before Commit
 
 Jido validates all built-in and Plugin Directives before commit. Plugin-owned
-state contributions also run before commit. Runtime dispatch starts only after the
-complete candidate is valid and durable storage has accepted it.
+state contributions also run before commit. Runtime dispatch starts only after
+the complete candidate is valid and the required checkpoint has succeeded.
 
 A direct `Jido.Agent.cmd/3` call returns the list but does not dispatch it.
 
@@ -55,8 +55,13 @@ Statuses are `:succeeded`, `:failed`, `:cancelled`, `:timed_out`, and
 ## Do Not Use Directives As A Queue
 
 An ordinary Directive list is not a durable queue. A process or VM can stop
-after commit and before dispatch completes. For durable delivery, save explicit
-pending work or use a durable Signal Bus subscription when that contract fits.
+after commit and before dispatch completes. Restore does not replay that batch
+or infer a terminal Outcome from the committed revision. A Directive timeout
+also does not prove that an external effect did not occur before the task
+stopped.
+
+For durable delivery, save explicit pending work or use a durable Signal Bus
+subscription when that contract fits.
 
 See [Plugin Contract And Lifecycle](plugin-contract-and-lifecycle.md),
 [Start Child Agents](child-agents.livemd), and

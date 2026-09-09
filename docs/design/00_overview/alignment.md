@@ -51,7 +51,7 @@ change runtime behavior.
 | `lib/jido/agent_server.ex:506-544` | Plugin runtimes become ready before startup reports success. No initial durable write occurs at this boundary. |
 | `lib/jido/agent_server.ex:1285-1309` | Live admission runs before shared Runner preparation and can change the command Signal. |
 | `lib/jido/agent_server.ex:1419-1545` | The Server uses Runner preparation and completion, persists first, installs the candidate, replies, and then starts Directives. |
-| `lib/jido/agent_server.ex:1548-1594` | An uncertain persistence write always stops the Server. Other write failures can use a continuing error policy. |
+| `lib/jido/agent_server.ex:1582-1617` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
 | `lib/jido/agent_server.ex:1639-1756` | Directives are validated before commit and handled after commit. A Directive failure has its own terminal result. |
 | `lib/jido/agent_server.ex:1878-1923` | Public status and active-Turn views are maps. |
 | `lib/jido/agent_server.ex:2882-2929` | Nonpersistent startup uses Runtime Store state. Persistent startup loads a durable record. Commits use the current state version as the expected revision. |
@@ -96,7 +96,7 @@ change runtime behavior.
 | `test/jido/agent_server/runtime_lifecycle_test.exs:152-180` | Plugin runtime handles stay outside Agent state and stop with the Agent. |
 | `test/jido/agent_server/runtime_lifecycle_test.exs:225-289` | Plugin runtime replacement can pull current committed state and remain responsive. |
 | `test/jido/agent_server/runtime_lifecycle_test.exs:293-326` | Abnormal nonpersistent restart restores the last commit and state version. |
-| `test/jido/persistence_test.exs:259-347` | Each successful live commit is saved. A stale Server cannot commit or dispatch, but it can remain running after a confirmed conflict. |
+| `test/jido/persistence_test.exs:259-356` | Each successful live commit is saved. A confirmed conflict cannot commit or dispatch and stops the stale Server activation. |
 | `test/jido/persistence_test.exs:395-503` | Current physical delete and compare-and-swap conflict behavior are proved. |
 | `test/jido/persistence/indeterminate_write_test.exs:35-93` | An uncertain write stops stale evaluation and blocks Directive handling. |
 | `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Portable values round trip and nonportable checkpoints are rejected. |
@@ -268,7 +268,7 @@ still define open details and prove each target behavior.
 | `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159` | Core has no stable Agent Ref. Registry and persistence identity shapes differ. | `Change, staged`: add Ref-first contracts beside current ID and PID APIs. |
 | `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | `lib/jido/agent.ex:403-420,563-574`; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Checkpoints have no enforced definition revision. Restore can use the loaded module definition. | `Change, staged`: add revision and old-checkpoint rules. Keep all authoring forms. |
 | `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex:506-533,2887-2905` | Persistent startup reports readiness without an initial active durable record. | `Change`: define provisional readiness, record write, publication, and cleanup in owner seams. |
-| `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1548-1594`; `test/jido/persistence_test.exs:305-347` | Only uncertain writes always remove the activation. Confirmed failures can continue. | `Change`: remove write authority after every write failure. |
+| `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1582-1617`; `test/jido/persistence_test.exs:318-356` | Every required persistence write failure now removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seams 07 and 08. |
 | `OVR-GAP-007` | `OVR-REQ-042` | `lib/jido/persistence.ex:137-150`; `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs:21-31` | Physical delete removes revision history, so a delayed initial writer can recreate data. | `Change`: use a compare-and-swap tombstone after retention and reactivation rules are set. |
 | `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex:1-19`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35-43` | Plugin runtime Init does not contain committed owned state or state version. | `Change`: add a coherent replacement input and keep state-pull compatibility. |
 | `OVR-GAP-009` | `OVR-REQ-052`, `OVR-REQ-053`, and `OVR-REQ-065` | `lib/jido/agent_server.ex:257-263,381-389,1878-1923`; `lib/jido/error.ex:1-17` | Current public contracts use structs, maps, tuples, atoms, and partially normalized errors. | `Defer exact shapes`: seam 12 and value owners define the exception and migration inventory. |

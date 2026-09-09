@@ -73,7 +73,7 @@ file defines outcomes and gates. It is not the later implementation plan.
 | `lib/jido/agent_server.ex:709-756,1596-1637` | Admission and executable work can be cancelled. Current controls are atoms such as `:idle`, `:directing`, `:stale_turn`, and `:cancelled`. |
 | `lib/jido/agent_server.ex:1285-1467` | One ActiveTurn starts before live admission. Admission runs in a supervised task and uses `directive_timeout`. Runner prepares the Turn and `Jido.Exec` runs the selected executable asynchronously. |
 | `lib/jido/agent_server.ex:1469-1545` | Runner finalization and live Directive validation precede checkpoint work. A successful commit writes first, replaces the complete Agent, increments one version, replies, and then starts Directives. |
-| `lib/jido/agent_server.ex:1548-1594` | Indeterminate persistence failures stop. Confirmed conflicts and other known failures can continue through current error policy. |
+| `lib/jido/agent_server.ex:1582-1617` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
 | `lib/jido/agent_server.ex:1639-1862` | Directives run in list order after commit. One failure stops the batch. Process-backed work has one Directive timeout and does not roll back state. |
 | `lib/jido/agent_server.ex:1981-2008` | Synchronous reentry from admission, executable, and Directive process trees is detected and rejected. |
 | `lib/jido/agent_server.ex:2148-2218` | Plugin lifecycle-owner loss stops the Server. Other child exits remove private tracking and create a later child-exit Signal. |
@@ -158,7 +158,7 @@ All dispositions are recommendations and are pending approval.
 | `SRV-GAP-010` | `SRV-REQ-028`, `SRV-REQ-029` | Admission reuses Directive timeout; native Exec has no Server timer | No whole-Turn limit or complete late-result proof exists. | `Missing`; approve exact task and timer boundary |
 | `SRV-GAP-011` | `SRV-REQ-030`, `SRV-REQ-031` | Cancellation code and tests | Pre-commit cancellation works. Results differ from seam-12 codes, and commit has no explicit externally visible stage. | `Partial`; normalize and add race proof |
 | `SRV-GAP-012` | `SRV-REQ-032` to `SRV-REQ-038` | Finalization, validation, commit, and Directive tests | Candidate, batch, checkpoint, replacement, version, reply, and no-Directive rules substantially work. | `Retain`; add complete order matrix |
-| `SRV-GAP-013` | `SRV-REQ-039` | Persistence failure branch | Only uncertain writes always stop. Confirmed conflicts can continue. | `Conflict`; approve all-write-error authority loss |
+| `SRV-GAP-013` | `SRV-REQ-039` | Persistence failure branch and seam-06 tests | Confirmed conflicts, known errors, and indeterminate results stop the activation. | `Resolved by seam 06`; preserve through startup work |
 | `SRV-GAP-014` | `SRV-REQ-040` | RuntimeCheckpoint and lifecycle tests | Same-instance abnormal restart restores the last commit and version. | `Proven` |
 | `SRV-GAP-015` | `SRV-REQ-041` | Plugin lifecycle and readiness tests | Ownership and readiness work for the mixed Plugin behavior. | `Proven` for current behavior; facet migration is `Partial` |
 | `SRV-GAP-016` | `SRV-REQ-042` | Plugin Init and replacement tests | Replacement reads fresh state, but state and version are not one immutable input. | `Missing`; blocked on seam 05 value contract |
@@ -210,7 +210,7 @@ Server proposal and gap report. Git history retains their exact text.
 | Caller timeout after start does not cancel the Turn. | `Retain`. | Current test evidence proves it. |
 | Stable cancellation results must be `turn_cancelled`, `no_active_turn`, `turn_mismatch`, and `too_late`. | `Retain target; migrate`. | Current atoms differ. Seam 12 owns error shape and codes. |
 | Same-Agent synchronous reentry must fail. | `Retain`. | Current code covers admission, executable, and Directive process trees. |
-| Every persistence write error must stop with lost write authority. | `Retain target, blocked`. | Current confirmed failures can continue. Seams 06, 07, 08, and 12 must change together. |
+| Every persistence write error must stop with lost write authority. | `Implemented by seam 06`. | Preserve caller failure, activation stop, and restore-first recovery during seam-08 work. |
 | Framework invariant failure must crash and use the configured restart source. | `Retain`. | Fault classification and recovery proof must be complete. |
 | Plugin replacement must receive matching state and state version. | `Retain target`. | Current restart reads fresh state but lacks one coherent input. |
 | Directive failure has fixed stop behavior. | `Remove`. | Current error policy can continue or stop. Only commit retention and batch stop are fixed. |
@@ -328,7 +328,7 @@ Create the formal plan only after the user approves this seam.
 | `SRV-REQ-028`, `SRV-REQ-029` | No complete Server Turn limit | Whole-unit timer, task termination, `DOWN`, late-result, state, and Outcome test | `Missing` |
 | `SRV-REQ-030`, `SRV-REQ-031` | Admission and execution cancellation tests | Stable errors and deterministic cancel/result race in both orders | `Partial` |
 | `SRV-REQ-032` to `SRV-REQ-038` | Candidate, Directive, persistence, equal-state, reply, and order tests | One requirement-mapped commit-order matrix | `Proven` |
-| `SRV-REQ-039` | Indeterminate stop; confirmed-conflict continuation | Every CAS failure stops before new evaluation | `Conflict` |
+| `SRV-REQ-039` | Confirmed-conflict, known-error, and indeterminate-write stop cases | Every CAS failure stops before new evaluation | `Proven by seam 06` |
 | `SRV-REQ-040` | Runtime lifecycle restart test | Keep after identity and checkpoint migration | `Proven` |
 | `SRV-REQ-041` | Plugin start, ownership, and readiness tests | Agent Server facet parity test | `Proven` for current mixed behavior; target is `Partial` |
 | `SRV-REQ-042` | Fresh-state replacement tests | Atomic state-version input and commit-race cases | `Missing` |
@@ -384,7 +384,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-004` | `Resolved` | 01 Agent and 02 Agent authoring | Agent version, default checkpoint behavior, and canonical authoring are implemented and approved at `fa17a6d6` and `ae559f4f`. | No action. |
 | `SRV-BLK-005` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Ref, namespace binding, partition conversion, and Ref-first facade do not exist. | Approve identity and instance resolution without removing current handles. |
 | `SRV-BLK-006` | `Blocker` | 04 Turn evaluation and 05 Plugins | Current Plugin admission and preparation can affect the Signal before route selection. | Approve and migrate fixed source-Signal selection with facet compatibility. |
-| `SRV-BLK-007` | `Blocker` | 06 Commit, 07 Persistence, 08 Agent Server | Current confirmed write errors can continue, contrary to the pending all-error target. | Select one authority rule and align stop, caller, and restore behavior. |
+| `SRV-BLK-007` | `Resolved design input` | 06 Commit, 07 Persistence, 08 Agent Server | Every required write error now stops the activation, returns the failure, and requires restore-first reactivation. | Preserve the rule during seam-08 lifecycle work. |
 | `SRV-BLK-008` | `Blocker` | 07 Persistence | No revision-zero create, tombstone-aware restore, or complete CAS result set exists. | Approve record lifecycle and mixed-version rules. |
 | `SRV-BLK-009` | `Blocker` | 05 Plugins | No approved runtime bootstrap value contains matching owned state and state version. | Approve its fields, identity, and restart-race behavior. |
 | `SRV-BLK-010` | `Assumption` | 08 Agent Server | A Server-wide Turn limit starts with active pre-commit work, not mailbox wait, and ends when commit begins. | Approve or change `SRV-DEC-003`. |

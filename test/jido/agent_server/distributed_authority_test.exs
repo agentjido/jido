@@ -20,10 +20,10 @@ defmodule Jido.AgentServer.DistributedAuthorityTest do
     assert {:ok, %{state: %{value: 2}}} =
              peer_call(c.peer_b, Agent, :record, [replacement, 2])
 
-    assert {:error, _conflict} = peer_call(c.peer_a, Agent, :record, [old, 3])
+    assert {:error, {:persistence_failed, :conflict}} =
+             peer_call(c.peer_a, Agent, :record, [old, 3])
 
-    assert %{state_version: 1, agent: %{state: %{value: 1}}} =
-             peer_call(c.peer_a, Server, :snapshot, [old])
+    peer_eventually(fn -> not peer_call(c.peer_a, Process, :alive?, [old]) end)
 
     assert %{state_version: 2, agent: %{state: %{value: 2}}} =
              peer_call(c.peer_b, Server, :snapshot, [replacement])

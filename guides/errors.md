@@ -11,7 +11,8 @@ projection also handles hostile binaries and redacts sensitive fields.
 
 A pre-commit failure retains the previous Agent and revision. A directive failure
 retains the new commit. Review `Jido.Agent.Turn.Outcome` and runtime error policy
-to choose the application response. An uncertain persistence write stops the
-writer even when ordinary error policy would continue.
+to choose the application response. Every required persistence write error stops
+that activation even when ordinary error policy would continue. A new activation
+must restore authoritative state.
 
 See [transport regressions](../test/jido/error_transport_test.exs).

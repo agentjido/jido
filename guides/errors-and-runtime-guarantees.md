@@ -41,8 +41,9 @@ Registry names, and OTP start and stop values keep their documented forms.
 | Routing | No commit | Correct routes or Signal type |
 | Action or Flow | No commit | Decide whether external work is safe to repeat |
 | Candidate validation | No commit | Correct the returned complete state |
-| Confirmed storage conflict | No commit | Resolve the competing writer |
-| Indeterminate storage write | Unknown durable result | Reload authoritative state |
+| Confirmed storage conflict | No commit by this writer; activation stops | Restore the winning record in a new activation |
+| Other confirmed storage error | No commit; activation stops | Correct storage and restore in a new activation |
+| Indeterminate storage write | Unknown durable result; activation stops | Reload authoritative state in a new activation |
 | Directive dispatch | Commit remains | Reconcile post-commit work |
 
 Retry information is guidance. It does not prove that an external operation is
@@ -57,6 +58,10 @@ version.
 Jido does not provide a transaction across Agent state and external services.
 It also does not provide cluster-exclusive Agent ownership, distributed
 consensus, or automatic compensation.
+
+Every required persistence write error removes the current activation's write
+authority. This rule applies even when its normal error policy would continue.
+The stopped activation does not reload or retry the Turn.
 
 ## Process Guarantees
 

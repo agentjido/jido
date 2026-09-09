@@ -410,8 +410,10 @@ Do not run old and new writers against the same logical records during this
 conversion. There is no general converter for application-specific Plugin
 state or external effects.
 
-An uncertain write stops the writer before another Action evaluates. A confirmed
-conflict remains a failed commit. Reactivation loads authoritative state.
+Every required persistence write error stops that activation before another
+Action evaluates. A confirmed conflict remains a failed commit by that writer.
+An indeterminate result can follow a completed write. In both cases,
+reactivation loads authoritative state before a retry.
 Without an adapter, RuntimeStore checkpoints survive only local abnormal
 restarts while the instance stays alive. They do not survive instance or VM loss.
 

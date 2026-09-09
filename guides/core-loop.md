@@ -7,7 +7,8 @@ commit a live state or dispatch the returned directives.
 For live execution, start an Agent under a Jido instance. Send the Signal through
 `Jido.AgentServer.call/3`, `cast/2`, or `send_request/3`. A call returns
 `{:ok, committed_agent}` after commit. A pre-commit failure returns
-`{:error, reason}`. A successful cast confirms sending only.
+`{:error, reason}`. Success confirms commit, not Directive settlement or
+external business completion. A successful cast confirms sending only.
 
 The Server serializes admission, execution, commit, and directive work. Jido
 selects the first executable from the unchanged source Signal. Plugins can then
@@ -16,5 +17,9 @@ protects Plugin-owned state, validates Directives, applies Agent Plugin
 contributions, and validates the complete candidate.
 The Server commits before dispatch. A failed directive preserves that commit
 and stops later directives in its batch. Error policy then applies.
+
+Any required persistence write error stops that Server activation before it
+can evaluate another Turn. Recovery starts a new activation from authoritative
+stored state.
 
 See `Jido.Action`, [Plugins](plugins.md), and [runtime controls](runtime.md).

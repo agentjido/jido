@@ -62,7 +62,7 @@ are ready.
 | `lib/jido/plugin/spec.ex`; `lib/jido/agent_server/{child_info,parent_ref}.ex`; `lib/jido/runtime_store.ex` | Plugin normalization, child tracking, parent tracking, and the instance Runtime Store are internal support modules. Public declarations, contexts, maps, relationship functions, and instance helpers remain the extension boundary. |
 | `lib/jido/agent/directive.ex:1-15` | A Directive requests runtime work after commit. It does not change Agent domain state or undo Action I/O. |
 | `lib/jido/agent_server.ex:160-330` | Agent Server command, request, cancellation, state, readiness, and inspection operations are public and accept PIDs or registered names. |
-| `lib/jido/agent_server.ex:1493-1594` | The Server persists before live commit and Directive work. Only uncertain write results always stop the Server; confirmed failures can use the error policy. |
+| `lib/jido/agent_server.ex:1527-1617` | The Server persists before live commit and Directive work. Every required persistence write failure stops that activation. |
 | `lib/jido/agent_server.ex:2874-2929` | Persistent startup restores a record if present, but it does not write an initial record. Live commits use the current state version as the expected revision. |
 | `lib/jido/agent_server/options.ex:35-50,377-395` | Public Server options include `spawn_fun` and per-Agent persistence selection or disablement. |
 | `lib/jido/persistence.ex:1-16,59-160` | Jido owns persistence keys, record encoding, identity checks, revision checks, checkpoint calls, and physical delete. |
@@ -175,7 +175,7 @@ did not rerun runtime tests.
   ID, or definition revision.
 - A new persistent Agent can become ready before its first record write.
 - Normal delete removes the stored value and revision history.
-- Only uncertain persistence writes always remove the current activation.
+- Every required persistence write failure removes the current activation.
 - Static Topology has no live target replacement, cluster placement, or
   ownership transfer.
 - Core does not implement automatic recovery scans, leases, leader election,

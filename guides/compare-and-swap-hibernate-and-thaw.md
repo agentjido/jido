@@ -25,18 +25,24 @@ Direct persistence calls can use the same rule:
 ```
 
 A conflict returns `{:error, :conflict}` and does not replace the stored record.
-A revision cannot decrease. A save of the exact same record at the same revision
-is idempotent.
+For a live Turn, any persistence write error also stops that Server activation
+before it can evaluate more work. A revision cannot decrease. A save of the
+exact same record at the same revision is idempotent.
 
 Compare-and-swap prevents a confirmed stale write. It is not a writer lease. A
 delete or expiry removes the old revision history, and a new record can start
 again.
 
-## Indeterminate writes
+## Write failures
 
-An adapter exception, timeout, or invalid result can make a write outcome
-uncertain. The server stops the writer before it accepts more work. This keeps
-one process from work on an unconfirmed storage history.
+Every required persistence write error stops the Server activation before it
+accepts more work. Error policy cannot keep the stale writer active. Start a
+new activation and restore the authoritative record before a retry.
+
+A confirmed conflict means that this write did not replace the record. An
+adapter exception, timeout, or invalid result can make the outcome uncertain.
+For an indeterminate result, storage can contain either the previous record or
+the candidate record.
 
 Application recovery must then read the durable record and decide if the Turn
 committed. Give external operations stable identifiers so a retry does not

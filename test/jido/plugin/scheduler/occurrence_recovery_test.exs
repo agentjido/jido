@@ -142,55 +142,54 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
 
   for stage <- [:intent, :result] do
     @stage stage
-    test "a failed #{@stage} write preserves the last committed state and permits retry", c do
+    test "a failed #{@stage} write preserves state for a restored activation", c do
       {_adapter, opts} = c.persistence
       c = %{c | persistence: {FaultFile, opts}}
       Elixir.Agent.update(c.barrier, fn _ -> @stage end)
       server = start_agent(c)
+      monitor = Process.monitor(server)
       assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
       assert_receive {:occurrence_write_rejected, @stage}, 1_000
-      assert Server.agent(server).state.ticks == []
-      assert load_agent(c).state.ticks == []
-      pending = load_agent(c).state.scheduler.cron["job-1"].pending
+
+      assert_receive {:DOWN, ^monitor, :process, ^server,
+                      {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                     1_000
+
+      saved = load_agent(c)
+      assert saved.state.ticks == []
+      pending = saved.state.scheduler.cron["job-1"].pending
       assert pending != nil == (@stage == :result)
       Elixir.Agent.update(c.barrier, fn _ -> false end)
-      await_tick_count(server, 1)
-      assert [_tick] = Server.agent(server).state.ticks
-      assert Server.agent(server).state.scheduler.cron["job-1"].pending == nil
+      eventually(fn -> Jido.whereis_agent(c.jido, c.id) == nil end)
+      restored = start_agent(c, restore: :required)
+      await_tick_count(restored, 1)
+      assert [_tick] = Server.agent(restored).state.ticks
+      assert Server.agent(restored).state.scheduler.cron["job-1"].pending == nil
     end
   end
 
-  test "failed delivery schedules a retry and preserves saved work before acknowledgement", c do
+  test "failed delivery preserves saved work for reactivation", c do
     {_adapter, opts} = c.persistence
     c = %{c | persistence: {FaultFile, opts}}
     Elixir.Agent.update(c.barrier, fn _ -> :result end)
     server = start_agent(c)
+    monitor = Process.monitor(server)
     assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
 
     assert_receive {:occurrence_write_rejected, :result}, 1_000
+
+    assert_receive {:DOWN, ^monitor, :process, ^server,
+                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                   1_000
+
     pending = load_agent(c).state.scheduler.cron["job-1"].pending
-    scheduler = Server.children(server)[{:plugin, Scheduler}].pid
-
-    retry =
-      eventually(fn ->
-        state = :sys.get_state(scheduler)
-
-        if state.delivery_task == nil and
-             match?(
-               {timer, token, :retry} when is_reference(timer) and is_reference(token),
-               state.pending_timer
-             ),
-           do: state
-      end)
-
-    assert retry.options[:delivery_interval] == 25
     assert load_agent(c).state.scheduler.cron["job-1"].pending == pending
-    assert Server.agent(server).state.ticks == []
 
     Elixir.Agent.update(c.barrier, fn _ -> false end)
-    send(scheduler, :deliver_pending)
+    eventually(fn -> Jido.whereis_agent(c.jido, c.id) == nil end)
+    restored = start_agent(c, restore: :required)
     {:ok, occurrence} = Scheduler.occurrence(pending)
-    ticks = await_occurrence(server, occurrence.id)
+    ticks = await_occurrence(restored, occurrence.id)
     assert [%{occurrence: ^occurrence}] = ticks
     assert load_agent(c).state.scheduler.cron["job-1"].pending == nil
   end
@@ -200,14 +199,31 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRecoveryTest do
     c = %{c | persistence: {FaultFile, opts}}
     Elixir.Agent.update(c.barrier, fn _ -> :result end)
     server = start_agent(c)
+    monitor = Process.monitor(server)
     assert {:ok, _} = Example.arm_schedule(server, "job-1", "* * * * * *")
     assert_receive {:occurrence_write_rejected, :result}, 1_000
-    tick = Server.agent(server).state.scheduler.cron["job-1"].pending
-    assert {:ok, cancelled} = Example.cancel_schedule(server, "job-1")
+
+    assert_receive {:DOWN, ^monitor, :process, ^server,
+                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                   1_000
+
+    saved = load_agent(c)
+    tick = saved.state.scheduler.cron["job-1"].pending
+
+    assert {:ok, cancelled, [_directive]} =
+             Jido.Agent.cmd(saved, Example.cancel_schedule_signal!("job-1"))
+
     assert cancelled.state.scheduler.cron == %{}
-    assert {:error, _} = Server.call(server, tick)
-    kill(server)
+
+    assert :ok =
+             Jido.Persistence.save_agent(c.persistence, cancelled,
+               instance: c.jido,
+               revision: 3,
+               expected_revision: 2
+             )
+
     Elixir.Agent.update(c.barrier, fn _ -> false end)
+    eventually(fn -> Jido.whereis_agent(c.jido, c.id) == nil end)
     restored = start_agent(c, restore: :required)
     assert Server.agent(restored) == cancelled
     assert {:error, _} = Server.call(restored, tick)

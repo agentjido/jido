@@ -7,6 +7,9 @@ part of the same transaction.
 Use a recoverable effect protocol when work must survive process or node
 failure.
 
+This is a capability pattern. Jido core does not provide a universal outbox or
+an exactly-once external-effect guarantee.
+
 ## Store intent before execution
 
 A common protocol has four steps:
@@ -74,5 +77,6 @@ Telemetry and audit records can show that a Turn committed and that a Directive
 later failed. They help diagnosis, but they are not the recovery protocol. The
 pending operation in state is the source of truth.
 
-For a complete example, see `test/examples/04_runtime/04_08_commit_outbox` in
-the repository.
+For a complete example, see
+`examples/04_runtime/04_11_recoverable_delivery` and its tests in the
+repository.

@@ -176,37 +176,45 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   test "a failed intent write exposes no work to the live Plugin", context do
     {context, fault} = faulty_storage(context)
     server = start_agent(context)
+    monitor = Process.monitor(server)
     :ok = Elixir.Agent.update(fault, fn _ -> true end)
     before_write = Server.snapshot(server)
 
     assert {:error, {:persistence_failed, :test_storage_unavailable}} =
              Agent.record_and_deliver(server, "effect-1", 7)
 
-    assert Server.snapshot(server) == before_write
+    assert_receive {:DOWN, ^monitor, :process, ^server,
+                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                   1_000
+
     refute_received {:effect_attempt, "effect-1", _task}
     assert Sink.records(context.jido) == %{}
     assert {:error, :not_found} = load(context, before_write.agent.id)
   end
 
-  test "a failed completion write retains intent and retries the same effect ID", context do
+  test "a failed completion write retains intent for a restored activation", context do
     {context, fault} = faulty_storage(context)
     :ok = Sink.hold(context.jido, :after_write)
     server = start_agent(context)
     assert {:ok, committed} = Agent.record_and_deliver(server, "effect-1", 7)
     assert_receive {:effect_attempt, "effect-1", task}, 1_000
     eventually(fn -> Sink.records(context.jido) == %{"effect-1" => 7} end)
+    monitor = Process.monitor(server)
     :ok = Elixir.Agent.update(fault, fn _ -> true end)
     :ok = Sink.hold(context.jido, :none)
     send(task, :release)
 
-    assert_receive {:effect_attempt, "effect-1", retry_task}, 1_000
-    assert retry_task != task
-    assert Server.snapshot(server) == %{agent: committed, state_version: 1}
+    assert_receive {:DOWN, ^monitor, :process, ^server,
+                    {:shutdown, {:persistence_failed, :test_storage_unavailable}}},
+                   1_000
+
     assert {:ok, ^committed, 1} = load(context, committed.id)
     :ok = Elixir.Agent.update(fault, fn _ -> false end)
-    await_completed(server, %{"effect-1" => 7})
+    eventually(fn -> Jido.whereis_agent(context.jido, committed.id) == nil end)
+    restored = start_agent(context, id: committed.id, restore: :required)
+    await_completed(restored, %{"effect-1" => 7})
     assert Sink.records(context.jido) == %{"effect-1" => 7}
-    assert Server.snapshot(server).state_version == 2
+    assert Server.snapshot(restored).state_version == 2
   end
 
   defp faulty_storage(%{persistence: {_adapter, opts}} = context) do

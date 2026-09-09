@@ -1,4 +1,5 @@
-> Target seam design. This document is pending approval.
+> Target seam design. The implementation options in the decision table were
+> selected on 2026-09-09. The complete design is still pending approval.
 
 # Commit and effects design
 
@@ -294,14 +295,14 @@ These guarantees apply only after the related requirements are approved.
 | 99 Delivery | Every commit, failure, causation, and recovery claim has a stable acceptance identifier. |
 | Capability packages | Core permits portable intent in Agent or Plugin state but does not supply a universal outbox or exactly-once guarantee. |
 
-## Open design decisions
+## Design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Question | Selected option | Effect |
 | --- | --- | --- | --- |
-| `COMMIT-DEC-001` | What is a live state commit? | Replace one complete immutable Agent snapshot and increment the state version once. | Partial mutation and no-op commit categories stay outside the contract. |
-| `COMMIT-DEC-002` | What does synchronous success mean? | Confirm commit only; add no settlement wait API here. | Callers use capability state for external completion and observation for settlement. |
-| `COMMIT-DEC-003` | What happens after any persistence write error? | Remove write authority before another Turn, matching the Overview target. | Current continuation after known errors must change with seams 07 and 08. |
-| `COMMIT-DEC-004` | What happens to an ordinary batch after Server loss? | Do not replay it and do not reconstruct settlement from a checkpoint. | Ordinary work remains explicitly transient. |
-| `COMMIT-DEC-005` | Does a Directive timeout prove absence of an effect? | No. Report runtime timeout and require application duplicate policy for retries. | Settlement status is not an external transaction result. |
-| `COMMIT-DEC-006` | How does custom checkpointing affect recoverable work? | Require preservation of every owned field used by the declared guarantee. | Custom callbacks remain supported but cannot silently weaken durability claims. |
-| `COMMIT-DEC-007` | Does core provide a general durable delivery facility? | No. Keep it capability-owned and evaluate any reusable implementation as a separate public Plugin contract. | Core keeps no universal outbox, cursor, or global admission gate. |
+| `COMMIT-DEC-001` | What is a live state commit? | **Selected on 2026-09-09:** replace one complete immutable Agent snapshot and increment the state version once. | Partial mutation and no-op commit categories stay outside the contract. |
+| `COMMIT-DEC-002` | What does synchronous success mean? | **Selected on 2026-09-09:** confirm commit only; add no settlement wait API here. | Callers use capability state for external completion and observation for settlement. |
+| `COMMIT-DEC-003` | What happens after any persistence write error? | **Selected on 2026-09-09:** remove write authority before another Turn. | The activation stops. A later activation restores authoritative state. |
+| `COMMIT-DEC-004` | What happens to an ordinary batch after Server loss? | **Selected on 2026-09-09:** do not replay it and do not reconstruct settlement from a checkpoint. | Ordinary work remains explicitly transient. |
+| `COMMIT-DEC-005` | Does a Directive timeout prove absence of an effect? | **Selected on 2026-09-09:** no. Report runtime timeout and require application duplicate policy for retries. | Settlement status is not an external transaction result. |
+| `COMMIT-DEC-006` | How does custom checkpointing affect recoverable work? | **Selected on 2026-09-09:** require preservation of every owned field used by the declared guarantee. | Custom callbacks remain supported. Seam 07 owns composition and proof. |
+| `COMMIT-DEC-007` | Does core provide a general durable delivery facility? | **Selected on 2026-09-09:** no. Keep it capability-owned and evaluate reusable implementations as separate public Plugin contracts. | Core keeps no universal outbox, cursor, or global admission gate. |

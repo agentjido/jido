@@ -315,18 +315,12 @@ defmodule JidoTest.PersistenceTest do
     assert restored.state.events == [:saved]
   end
 
-  test "a stale Server cannot commit, dispatch, hibernate, or overwrite on stop", %{jido: jido} do
+  test "a persistence conflict removes the stale Server's write authority", %{jido: jido} do
     persistence = adapter(:stale_server)
     agent = RuntimeAgent.new!(id: unique_id("stale-server"))
-    observer = self()
-
-    policy = fn reason, outcome ->
-      send(observer, {:failed_commit, reason, outcome})
-      :continue
-    end
-
-    opts = [persistence: persistence, restore: false, error_policy: policy]
+    opts = [persistence: persistence, restore: false, error_policy: :log_only]
     assert {:ok, stale} = Jido.start_agent(jido, agent, opts)
+    monitor = Process.monitor(stale)
     committed = %{agent | state: %{agent.state | events: [:winner]}}
 
     assert :ok =
@@ -347,21 +341,13 @@ defmodule JidoTest.PersistenceTest do
 
     assert {:error, {:persistence_failed, :conflict}} = Server.call(stale, command)
 
-    assert_receive {:failed_commit, {:persistence_failed, :conflict},
-                    %Jido.Agent.Turn.Outcome{
-                      stage: :commit,
-                      committed?: false,
-                      state_version_before: 0
-                    }}
+    assert_receive {:DOWN, ^monitor, :process, ^stale,
+                    {:shutdown, {:persistence_failed, :conflict}}},
+                   1_000
 
-    assert Server.snapshot(stale) == %{agent: agent, state_version: 0}
     refute_received {:signal, ^output}
-    assert {:error, :conflict} = Server.hibernate(stale)
-    assert Process.alive?(stale)
-
-    monitor = Process.monitor(stale)
-    assert :ok = Server.stop(stale)
-    assert_receive {:DOWN, ^monitor, :process, ^stale, _reason}
+    refute Process.alive?(stale)
+    eventually(fn -> Jido.whereis_agent(jido, agent.id) == nil end)
 
     assert {:ok, ^committed, 1} =
              Persistence.load_agent_with_revision(persistence, RuntimeAgent, agent.id,

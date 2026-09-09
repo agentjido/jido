@@ -172,12 +172,12 @@ defmodule Jido.AgentServer do
   Application code must select any values it wants to store or emit.
 
   A durable revision conflict returns `{:error, {:persistence_failed, :conflict}}`
-  before live state changes or Directives run. The configured error policy
-  decides whether the Server continues or stops. It does not reload or retry
-  the command automatically; external Action work may already have completed.
-  Uncertain persistence commit errors stop the Server before more work can run.
-  The write can have completed even if its reply was lost. A new activation
-  must restore the stored state before it can continue.
+  before live state changes or Directives run. Every required persistence write
+  error stops this activation before it can accept more work. The Server does
+  not reload or retry the command automatically; external Action work may
+  already have completed. For an indeterminate result, the write can have
+  completed even if its reply was lost. A new activation must restore the
+  authoritative stored state before it can continue.
 
   `:agent_id`, `:agent_state`, and `:signal` are reserved execution keys. The
   Server supplies its own `:jido` and `:partition` values. Caller timeout stops
@@ -1594,9 +1594,7 @@ defmodule Jido.AgentServer do
     decision =
       case reason do
         {:persistence_failed, failure} ->
-          if uncertain_write?(failure),
-            do: {:stop, {:shutdown, {:persistence_failed, failure}}, next_data},
-            else: error_policy_decision(outcome, next_data)
+          {:stop, {:shutdown, {:persistence_failed, failure}}, next_data}
 
         _reason ->
           error_policy_decision(outcome, next_data)
@@ -1618,14 +1616,6 @@ defmodule Jido.AgentServer do
         end
     end
   end
-
-  defp uncertain_write?(:indeterminate), do: true
-  defp uncertain_write?({:indeterminate, _reason}), do: true
-
-  defp uncertain_write?(%Error.ExecutionError{details: %{operation: :compare_and_swap}}),
-    do: true
-
-  defp uncertain_write?(_reason), do: false
 
   defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
     case cancel_exec(active.exec_handle, data) do

@@ -324,7 +324,7 @@ These guarantees apply only after the related requirements are approved.
 | `PERS-DEC-001` | Which public storage boundary applies? | Keep the binary adapter below `Jido.Persistence`; add no record-valued instance callbacks. | Current adapters and per-Agent selection remain composable. |
 | `PERS-DEC-002` | Which adapter operations are required? | Require `get/2` and CAS. Keep `put/3` and `delete/2` as temporary maintenance compatibility APIs. | Runtime writes cannot bypass record policy. |
 | `PERS-DEC-003` | Which durable lifecycle values exist? | Use active records and compact tombstones only. | Hibernate remains a process operation. |
-| `PERS-DEC-004` | What removes write authority? | Every required write error, including conflict. | Current conflict continuation must change with seams 06 and 08. |
+| `PERS-DEC-004` | What removes write authority? | Every required write error, including conflict. | Seam 06 implements activation stop. Seams 07 and 08 must preserve it. |
 | `PERS-DEC-005` | When is a new persistent Agent durable? | Before readiness, after provisional Plugin readiness. | Initial state survives a later VM failure subject to adapter guarantees. |
 | `PERS-DEC-006` | How does identity change? | Use stable Ref only after collision-safe mixed-version migration is approved. | Module rename can stop changing identity without losing old records. |
 | `PERS-DEC-007` | How does the outer format evolve? | Read legacy format 1 and write a new versioned active-or-tombstone format only after rollback gates exist. | Older releases cannot silently ignore tombstones. |

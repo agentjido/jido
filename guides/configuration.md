@@ -85,6 +85,9 @@ thaw operations.
 
 The supported error policies are `:log_only`, `:stop_on_error`,
 `{:max_errors, count}`, `{:emit_signal, dispatch}`, or a function with arity two.
+They apply to ordinary Turn and Directive failures. A required persistence
+write error always stops that activation, even when its configured policy would
+continue.
 
 ## Configure observability
 
