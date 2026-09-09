@@ -29,7 +29,6 @@ defmodule JidoTest.Examples.TurnUpgradeTest do
     assert Jido.whereis_agent(c.jido, before.id) == c.server
   end
 
-  @tag skip: "Pending UP-01: an active Turn does not retain its code revision"
   test "an active Turn finishes on its old revision before the next Turn uses new code", c do
     gate = make_ref()
     observer = self()
@@ -37,9 +36,10 @@ defmodule JidoTest.Examples.TurnUpgradeTest do
     assert_receive {:between_upgrade_steps, ^gate, worker}, 2_000
     assert Server.snapshot(c.server).state_version == 0
 
-    :ok = Example.install_step(2)
+    upgrade = Task.async(fn -> Server.upgrade(c.server, fn -> Example.install_step(2) end) end)
     send(worker, {:release, gate})
     assert {:ok, active} = Task.await(caller)
+    assert :ok = Task.await(upgrade)
     assert {:ok, next} = Example.run(c.server)
 
     assert next.state == %{total: 20, revisions: [2, 2]}

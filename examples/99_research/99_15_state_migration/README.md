@@ -1,12 +1,14 @@
 # UP-02: State migration
 
-Three tests pass. One enabled test fails.
+All four tests pass.
 
 A wallet and its owned audit state migrate in one live commit when the static schema accepts both formats. Invalid target data preserves the whole old snapshot. The migration survives saved-state recovery and an upgrade ID prevents a repeated transformation.
 
-## Required core feature
+## Implemented core feature
 
-A strict old schema rejects the new state format. Core needs an explicit operation that installs a target definition with validated, migrated state. Do not relax ordinary Turn validation.
+A strict old schema rejects the new state format. The explicit Agent Server
+upgrade operation installs a target definition only after the target validates
+the complete migrated state. Ordinary Turn validation stays unchanged.
 
 ## Run
 
@@ -14,12 +16,13 @@ A strict old schema rejects the new state format. Core needs an explicit operati
 mix test test/examples/99_research/99_15_state_migration --include example --seed 0 --trace
 ```
 
-The failed assertion is enabled and states desired upgrade behavior. When the
-explicit upgrade API exists, connect this example to it. Current startup and
-ordinary Turn APIs retain their existing contracts.
+All assertions are enabled. Current startup and ordinary Turn APIs retain their
+existing contracts.
 
 ## Scope
 
-The passing path is application state migration with a predeclared schema. It does not replace the definition or a Plugin runtime. Crashes during migration and concurrent upgrade requests remain untested.
+The compatible path remains an application migration with a predeclared
+schema. The strict path replaces the Agent definition but keeps the same Agent
+identity and Plugin declarations. It does not replace Plugin runtime structure.
 
 [Source](state_migration.ex) · [Tests](../../../test/examples/99_research/99_15_state_migration/state_migration_test.exs)

@@ -128,9 +128,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Persistence briefing](07_persistence/README.md) | Selected and implemented |
 | [Persistence design](07_persistence/design.md) | Selected and implemented |
 | [Persistence alignment](07_persistence/alignment.md) | Implemented |
-| [Agent Server briefing](08_agent-server/README.md) | Selected and implemented |
-| [Agent Server design](08_agent-server/design.md) | Selected and implemented |
-| [Agent Server alignment](08_agent-server/alignment.md) | Implemented |
+| [Agent Server briefing](08_agent-server/README.md) | Pending approval |
+| [Agent Server design](08_agent-server/design.md) | Pending approval |
+| [Agent Server alignment](08_agent-server/alignment.md) | Pending approval |
 | [Jido instance briefing](09_jido-instance/README.md) | Selected and implemented |
 | [Jido instance design](09_jido-instance/design.md) | Selected and implemented |
 | [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |

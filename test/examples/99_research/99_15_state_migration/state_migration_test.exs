@@ -49,12 +49,12 @@ defmodule JidoTest.Examples.StateMigrationTest do
     assert repeated.state == migrated_state()
   end
 
-  @tag skip: "Pending UP-02: live definition migration is not implemented"
   test "a running old definition can migrate to a state format outside its old schema", c do
     {:ok, server} = Jido.start_agent(c.jido, StrictWallet, id: unique_id("strict-wallet"))
 
-    assert {:ok, upgraded} = StateMigration.migrate(server)
+    assert {:ok, upgraded} = StateMigration.upgrade(server)
     assert upgraded.state == migrated_state()
+    assert upgraded.module == StateMigration.MigratedWallet
     assert Jido.whereis_agent(c.jido, upgraded.id) == server
     assert Server.snapshot(server).state_version == 1
   end

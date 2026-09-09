@@ -1,14 +1,15 @@
 # UP-01: Turn upgrade
 
-The baseline has two passing tests and one failure. As of 2026-09-07,
-the failing test is temporarily skipped, with its assertion retained.
-See the [research test policy](../README.md).
+All three tests pass with no skip.
 
-Two Flow steps call one Action module. A barrier permits a controlled code load between the steps. Idle replacement changes executed behavior on the same Agent PID. The active Turn mixes revisions and returns 11 instead of 2.
+Two Flow steps call one Action module. A barrier pauses one active Turn between
+the steps. The explicit Agent Server upgrade operation waits for idle, loads
+the new code, and lets the next Turn use it on the same Agent PID.
 
-## Required core feature
+## Implemented core feature
 
-Core needs an explicit revision boundary for the complete Turn. A revision label alone cannot isolate arbitrary module loads.
+The upgrade boundary serializes an operator-selected code installation with
+Turns. It does not pin arbitrary module loads.
 
 ## Run
 
@@ -16,10 +17,8 @@ Core needs an explicit revision boundary for the complete Turn. A revision label
 mix test test/examples/99_research/99_14_turn_upgrade --include example --seed 0 --trace
 ```
 
-This is a secondary check. The skipped assertion states desired upgrade
-behavior. When the explicit upgrade API exists, connect this example to it
-and remove the skip. Current startup and ordinary Turn APIs retain their
-existing contracts.
+This is a secondary check. All assertions are enabled. Current startup and
+ordinary Turn APIs retain their existing contracts.
 
 ## Scope
 

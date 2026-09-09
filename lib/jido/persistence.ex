@@ -132,6 +132,66 @@ defmodule Jido.Persistence do
   end
 
   @doc false
+  @spec replace_agent(adapter_config() | atom(), Agent.t(), Agent.t(), keyword()) ::
+          :ok | {:error, term()}
+  def replace_agent(source, %Agent{} = current_agent, %Agent{} = target_agent, opts \\ []) do
+    PersistenceTelemetry.observe(
+      :compare_and_swap,
+      source,
+      target_agent.module,
+      target_agent.id,
+      opts,
+      fn ->
+        protect(:compare_and_swap, fn ->
+          with :ok <- validate_operation_options(opts),
+               :ok <- validate_replacement_agents(current_agent, target_agent),
+               {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+               partition = Keyword.get(opts, :partition),
+               namespace when is_binary(namespace) <- Keyword.get(opts, :namespace),
+               {:ok, %{mode: :ref} = identity} <-
+                 storage_identity(
+                   adapter,
+                   adapter_opts,
+                   instance,
+                   current_agent.module,
+                   current_agent.id,
+                   partition,
+                   namespace
+                 ),
+               {:ok, record} <- build_record(target_agent, instance, opts, identity),
+               {:ok, expected_revision} <- expected_revision(opts),
+               {:ok, expected_value} <-
+                 current_replacement_value(
+                   adapter,
+                   adapter_opts,
+                   current_agent,
+                   record,
+                   identity,
+                   expected_revision,
+                   instance,
+                   partition
+                 ),
+               {:ok, value} <- Record.encode(record),
+               :ok <-
+                 adapter_compare_and_swap(
+                   adapter,
+                   identity.key,
+                   expected_value,
+                   value,
+                   adapter_opts
+                 ) do
+            :ok
+          else
+            nil -> {:error, :stable_namespace_required}
+            {:ok, %{mode: :legacy}} -> {:error, :stable_namespace_required}
+            {:error, _reason} = error -> error
+          end
+        end)
+      end
+    )
+  end
+
+  @doc false
   @spec create_agent(adapter_config() | atom(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []) do
@@ -398,6 +458,53 @@ defmodule Jido.Persistence do
         error
     end
   end
+
+  defp current_replacement_value(
+         adapter,
+         opts,
+         current_agent,
+         target_record,
+         %{mode: :ref, namespace: namespace} = identity,
+         expected_revision,
+         _instance,
+         partition
+       ) do
+    case adapter_get(adapter, identity.key, opts) do
+      {:ok, value} ->
+        with {:ok, current_record} <- Record.decode(value),
+             :ok <-
+               Record.validate_ref(
+                 current_record,
+                 namespace,
+                 current_agent.module,
+                 current_agent.id,
+                 partition
+               ),
+             :ok <- require_active_for_write(current_record),
+             :ok <- check_revision(current_record, target_record, expected_revision) do
+          {:ok, value}
+        end
+
+      {:error, :not_found} ->
+        {:error, :conflict}
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  defp validate_replacement_agents(
+         %Agent{id: id} = current_agent,
+         %Agent{id: id} = target_agent
+       )
+       when is_binary(id) do
+    with {:ok, _current} <- Agent.validate_instance(current_agent),
+         {:ok, _target} <- Agent.validate_instance(target_agent),
+         do: :ok
+  end
+
+  defp validate_replacement_agents(_current_agent, _target_agent),
+    do: {:error, :agent_identity_mismatch}
 
   defp check_revision(current, record, expected_revision) do
     cond do

@@ -62,6 +62,9 @@ design.
 | --- | --- |
 | `lib/jido/agent_server.ex:1-47,432-500` | `Jido.AgentServer` is a `:gen_statem`. It owns one live Agent, state version, active Turn, runtime work, and five total phases including initialization. |
 | `lib/jido/agent_server.ex:85-430` | Public PID/name operations include startup, call, cast, request, inspection, cancellation, debug, lookup, child controls, snapshot, and hibernation. |
+| `lib/jido/agent_server.ex` upgrade path | Explicit upgrade calls wait for idle. Definition replacement validates the target Agent, preserves Plugin declarations, checkpoints, and advances one state version. |
+| `lib/jido/agent_server/runtime_checkpoint.ex` | A successful definition replacement remains the restart source for the original managed child specification. |
+| `lib/jido/persistence.ex` replacement path | A stable namespaced record can change Agent module through one exact-byte compare-and-swap. Module-dependent compatibility keys reject that change. |
 | `lib/jido/agent_server/options.ex` | One Zoi-backed option value validates Agent construction, registration, persistence, limits, executable runtime, lifecycle, and open error policies. `turn_timeout` is a distinct pre-commit limit. |
 | `lib/jido/agent_server.ex` startup path | Startup reserves the Registry identity, restores and validates, starts Plugin roots, waits for readiness, confirms revision-zero creation when required, and then publishes `:ready`. |
 | `lib/jido/agent_server.ex:579-620,1878-1924` | Inspection remains responsive in every phase. Status and snapshot are protocol maps, not target-specific public structs. |
@@ -80,8 +83,8 @@ design.
 | `lib/jido/agent_server/plugin_lifecycle.ex` and `plugin_child.ex` | Plugin roots start in declaration order, use wrapper supervision, expose restarting state, await readiness, and stay outside Agent state. Every generation gets a newly built owned-state and state-version pair. |
 | `lib/jido/agent_server/directive_runtime.ex:80-638` | Built-in effects dispatch Signals, start and stop children, preserve relative relationships, and return explicit uncertain remote results. |
 
-No `code_change/4` callback or other public hot Agent Server state-migration
-contract exists in current code.
+No `code_change/4` callback or public private-state migration contract exists.
+The upgrade path replaces only the immutable Agent value and its checkpoint.
 
 ### Tests and examples
 
@@ -103,6 +106,8 @@ contract exists in current code.
 | `test/jido/agent_server/effect_recovery_test.exs:42-205` | One explicit capability saves work intent before post-commit delivery and resumes it after loss. This does not make ordinary Directives durable. |
 | `test/jido/agent/turn/outcome_test.exs:8-109` | Outcome construction, stage/status consistency, version rules, Directive counts, and timing are validated. |
 | `examples/04_runtime/04_09_agent_observation/turn_observation.ex` | Public observation uses current runtime events and Turn Outcome data. |
+| `test/jido/agent_server/upgrade_test.exs` | Quiescent ordering, schema validation, Plugin-contract rejection, runtime-checkpoint restart, and namespaced durable definition replacement pass. |
+| `test/examples/99_research/99_14_turn_upgrade` and `99_15_state_migration` | UP-01 and UP-02 pass without skips through the explicit upgrade boundary. |
 
 The FA-06 research checks are enabled and passing. Focused Server, Plugin,
 persistence, error, and example suites pass with the selected behavior.
@@ -344,6 +349,7 @@ Create the formal plan only after the user approves this seam.
 | `SRV-REQ-061` | Exact Exec target and loaded-code non-pinning documentation | None | `Proven` |
 | `SRV-REQ-062` to `SRV-REQ-064` | Owner boundary and dependency checks | Preserve through dependent seams | `Proven` |
 | `SRV-REQ-065` | Split-facet example uses only public Plugin and Agent Server contracts | External package build belongs to seam 99 | `Proven in Core` |
+| `SRV-REQ-066` to `SRV-REQ-076` | Agent Server upgrade tests and UP-01/UP-02 examples | Keep the upgrade boundary in core and example gates | `Proven` |
 
 ## Migration and compatibility
 
@@ -366,7 +372,7 @@ No removal or deprecation is approved in this seam.
 | Plugin runtime Init | Keep state and version in each new Init while current state-pull APIs remain. Do not reuse a prior generation's Init. |
 | Children | Keep owned-child and explicit known-node behavior. No Ref, transport, placement, or cluster claim is implied. |
 | Ordinary Directives | Keep transient non-replay behavior. Recoverable capabilities retain their separate intent and acknowledgement contracts. |
-| Code revision | Add definition revision as restore data. Do not claim code pinning or hot private-state migration. |
+| Code revision and upgrade | Keep definition revision as restore data. The explicit idle operation coordinates code installation but does not pin arbitrary loads. Definition replacement does not migrate private Server state or Plugin runtime structure. |
 
 Rollback must restore route order and Plugin callback compatibility together.
 It must also restore persistence result handling, caller errors, and activation
@@ -414,3 +420,5 @@ authoritative writer against a record format that it cannot interpret.
       instance namespace policy, placement, transport, or cluster authority.
 - [x] Public module docs, types, dependent seams, and the main design index use
       the approved contract.
+- [x] Explicit code installation waits for idle, and validated definition
+      replacement preserves commit order and restart recovery.

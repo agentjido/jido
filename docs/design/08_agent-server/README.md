@@ -8,7 +8,9 @@
 `Jido.AgentServer` is the live owner for one Agent activation. It serializes
 Signals, keeps one committed Agent and state version, applies one pre-commit
 Turn timeout, commits before Directive handling, and restores the last runtime
-or durable checkpoint. Public instance lookup reports the Server only after
+or durable checkpoint. It also provides an explicit idle upgrade boundary for
+coordinated code installation and validated Agent definition replacement.
+Public instance lookup reports the Server only after
 Plugin readiness and any required revision-zero write. Every Plugin runtime
 generation gets one immutable owned-state and state-version pair. This does not
 make Agent Server the
@@ -42,7 +44,7 @@ Code and executable tests are canonical for current behavior.
 | Plugins | Every runtime start and replacement receives one matching committed Plugin state and Agent state version. | Keep runtime handles private and retain live state pull for later reconciliation. |
 | Effects and children | Directives run in order after commit. Child and runtime handles stay outside Agent state. | Keep this behavior. Treat uncertain child effects as runtime results, not topology or durability claims. |
 | Stop and observation | Current status is a map with five phases. Outcomes use five stages. Debug events and several error policies are public. | Keep these paths during migration. Define authority-loss stop and transient Plugin degradation without adding topology policy. |
-| Code revision | Agent definitions have no revision. Agent Server has no hot-state migration callback. | Enforce the prerequisite definition revision at construction or restore. Do not claim that it pins loaded Action or Flow code. |
+| Upgrade | An explicit call waits for idle before code installation or validated Agent definition replacement. | It does not pin arbitrary module loads, change Plugin runtime structure, or migrate private Server state. |
 
 ## Remaining dependent work
 
@@ -69,8 +71,10 @@ Code and executable tests are canonical for current behavior.
 6. **Error policy:** Keep current policies during migration, but do not let any
    policy override persistence authority, commit order, or Directive atomicity.
 7. **Code revision:** Use definition revision only as a construction and
-   restore check. Do not promise a snapshot of loaded executable code or a hot
-   state migration until those owners define one.
+   restore check. Do not promise a snapshot of loaded executable code.
+8. **Live upgrade:** Serialize explicit upgrade operations with Turns. Permit
+   Agent definition replacement only when identity and Plugin declarations stay
+   fixed and the target accepts the complete migrated state.
 
 ## Dependencies
 
@@ -88,8 +92,9 @@ Code and executable tests are canonical for current behavior.
 - Dependents: 09 Jido instance, 10 Runtime topology, 11 Topology control plane,
   13 Observability, and 99 Delivery.
 - Completed input: Ref namespace binding and the additive instance facade in
-  seam 09. Deferred inputs are any later observation projection in seam 13 and cross-package proof
-  in seam 99. Hot private-state migration is not a V3 claim.
+  seam 09. Deferred inputs are any later observation projection in seam 13 and
+  cross-package proof in seam 99. Private Agent Server state migration is not a
+  V3 claim.
 
 ## Documents
 

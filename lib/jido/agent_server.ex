@@ -90,6 +90,8 @@ defmodule Jido.AgentServer do
 
   @type server :: pid() | atom() | {:global, term()} | {:via, module(), term()}
   @type signal_result :: {:ok, Agent.t()} | {:error, term()}
+  @type upgrade_operation :: (-> :ok | {:error, term()})
+  @type state_migration :: (Agent.t() -> {:ok, map()} | {:error, term()})
 
   @doc """
   Starts one Agent Server linked to the calling process.
@@ -398,6 +400,50 @@ defmodule Jido.AgentServer do
   @spec snapshot(server(), timeout()) :: map()
   def snapshot(server, timeout \\ 5_000), do: :gen_statem.call(server, :snapshot, timeout)
 
+  @doc """
+  Runs one upgrade operation after the Agent Server becomes idle.
+
+  The Server postpones this call while a Turn or its Directives are active.
+  Signals that arrive after the upgrade request stay behind it in the OTP event
+  order. The operation must return `:ok` or `{:error, reason}` and must not call
+  this Agent Server synchronously.
+
+  This boundary coordinates a code installation. It does not pin arbitrary
+  BEAM module loads that happen outside this call.
+  """
+  @spec upgrade(server(), upgrade_operation()) :: :ok | {:error, term()}
+  def upgrade(server, operation), do: upgrade(server, operation, 5_000)
+
+  @spec upgrade(server(), upgrade_operation(), timeout()) :: :ok | {:error, term()}
+  def upgrade(server, operation, timeout) when is_function(operation, 0) do
+    :gen_statem.call(server, {:upgrade_operation, operation}, timeout)
+  end
+
+  @doc """
+  Replaces the live Agent definition with validated migrated state.
+
+  The migration runs only while the Server is idle. It receives the current
+  committed Agent and must return one complete state map. The target definition
+  must keep the same Plugin declarations because this operation does not replace
+  Plugin runtime structure. A successful replacement advances the state version
+  once and writes the required checkpoint before the new Agent is visible.
+
+  A durable replacement that changes the Agent module requires a stable Jido
+  namespace. Compatible module-and-ID persistence keys cannot change modules in
+  one atomic write.
+  """
+  @spec upgrade(server(), module(), state_migration()) ::
+          {:ok, Agent.t()} | {:error, term()}
+  def upgrade(server, target_module, migration),
+    do: upgrade(server, target_module, migration, 5_000)
+
+  @spec upgrade(server(), module(), state_migration(), timeout()) ::
+          {:ok, Agent.t()} | {:error, term()}
+  def upgrade(server, target_module, migration, timeout)
+      when is_atom(target_module) and is_function(migration, 1) do
+    :gen_statem.call(server, {:upgrade_definition, target_module, migration}, timeout)
+  end
+
   @doc "Persists and stops one Agent Server after it becomes idle."
   @spec hibernate(server(), keyword()) :: :ok | {:error, term()}
   def hibernate(server, opts \\ []) when is_list(opts) do
@@ -650,6 +696,40 @@ defmodule Jido.AgentServer do
     }
 
     {:keep_state_and_data, [{:reply, from, snapshot}]}
+  end
+
+  def handle_event(
+        {:call, from},
+        {:upgrade_operation, operation},
+        :idle,
+        %State{} = data
+      ) do
+    reply = invoke_upgrade_operation(operation)
+    {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, reply}]}
+  end
+
+  def handle_event(
+        {:call, from},
+        {:upgrade_definition, target_module, migration},
+        :idle,
+        %State{} = data
+      ) do
+    upgrade_definition(from, target_module, migration, data)
+  end
+
+  def handle_event({:call, _from}, {:upgrade_operation, _operation}, phase, %State{})
+      when phase in [:initializing, :admitting, :running, :directing] do
+    {:keep_state_and_data, [:postpone]}
+  end
+
+  def handle_event(
+        {:call, _from},
+        {:upgrade_definition, _target_module, _migration},
+        phase,
+        %State{}
+      )
+      when phase in [:initializing, :admitting, :running, :directing] do
+    {:keep_state_and_data, [:postpone]}
   end
 
   def handle_event({:call, from}, {:hibernate, opts}, :idle, %State{} = data) do
@@ -1387,6 +1467,114 @@ defmodule Jido.AgentServer do
         TraceContext.clear()
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
+  end
+
+  defp upgrade_definition(from, target_module, migration, %State{} = data) do
+    with :ok <- definition_upgrade_supported?(data, target_module),
+         {:ok, state} <- invoke_state_migration(migration, data.agent),
+         {:ok, target} <- Agent.new(target_module, id: data.agent.id, state: state),
+         {:ok, plugin_specs} <- Plugin.normalize_all(target.plugins),
+         :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
+      version = data.state_version + 1
+
+      case persist_definition_upgrade(data, target, version) do
+        :ok ->
+          next_data = %{
+            data
+            | agent: target,
+              plugin_specs: plugin_specs,
+              state_version: version
+          }
+
+          {:keep_state, maybe_start_idle_timer(next_data, :idle), [{:reply, from, {:ok, target}}]}
+
+        {:error, reason} ->
+          error = {:persistence_failed, reason}
+
+          {:stop_and_reply, {:shutdown, error}, [{:reply, from, {:error, error}}], data}
+      end
+    else
+      {:error, _reason} = error ->
+        {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, error}]}
+    end
+  end
+
+  defp definition_upgrade_supported?(%State{persistence: nil}, _target_module), do: :ok
+
+  defp definition_upgrade_supported?(%State{agent: %{module: module}}, module), do: :ok
+
+  defp definition_upgrade_supported?(%State{jido: jido}, _target_module) do
+    if is_binary(Jido.namespace(jido)) do
+      :ok
+    else
+      {:error, :stable_namespace_required}
+    end
+  end
+
+  defp invoke_upgrade_operation(operation) do
+    case operation.() do
+      :ok -> :ok
+      {:error, _reason} = error -> error
+      result -> {:error, {:invalid_upgrade_result, result}}
+    end
+  rescue
+    error ->
+      {:error,
+       Error.execution_error("Agent upgrade operation failed",
+         details: %{code: :agent_upgrade_failed, reason: error}
+       )}
+  catch
+    kind, reason ->
+      {:error,
+       Error.execution_error("Agent upgrade operation failed",
+         details: %{code: :agent_upgrade_failed, kind: kind, reason: reason}
+       )}
+  end
+
+  defp invoke_state_migration(migration, agent) do
+    case migration.(agent) do
+      {:ok, state} when is_map(state) and not is_struct(state) -> {:ok, state}
+      {:ok, state} -> {:error, {:invalid_migrated_state, state}}
+      {:error, _reason} = error -> error
+      result -> {:error, {:invalid_migration_result, result}}
+    end
+  rescue
+    error ->
+      {:error,
+       Error.execution_error("Agent state migration failed",
+         details: %{code: :agent_state_migration_failed, reason: error}
+       )}
+  catch
+    kind, reason ->
+      {:error,
+       Error.execution_error("Agent state migration failed",
+         details: %{code: :agent_state_migration_failed, kind: kind, reason: reason}
+       )}
+  end
+
+  defp unchanged_plugin_contract(specs, specs), do: :ok
+  defp unchanged_plugin_contract(_current, _target), do: {:error, :plugin_contract_changed}
+
+  defp persist_definition_upgrade(%State{persistence: nil} = data, target, version) do
+    RuntimeCheckpoint.put_upgrade(data, target, version)
+  end
+
+  defp persist_definition_upgrade(%State{agent: %{module: module}} = data, target, version)
+       when target.module == module do
+    persist_agent(data, target, version, :definition_upgrade)
+  end
+
+  defp persist_definition_upgrade(%State{} = data, target, version) do
+    opts = [
+      instance: data.jido,
+      namespace: Jido.namespace(data.jido),
+      partition: data.partition,
+      revision: version,
+      expected_revision: data.state_version,
+      reason: :definition_upgrade
+    ]
+
+    Jido.Persistence.replace_agent(data.persistence, data.agent, target, opts)
   end
 
   defp start_plugin_readiness(%State{} = data) do

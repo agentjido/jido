@@ -1,12 +1,16 @@
 # UP-01: Turn upgrade
 
-Two tests pass. One enabled test fails.
+All three tests pass.
 
-Two Flow steps call one Action module. A barrier permits a controlled code load between the steps. Idle replacement changes executed behavior on the same Agent PID. The active Turn mixes revisions and returns 11 instead of 2.
+Two Flow steps call one Action module. A barrier pauses one active Turn between
+the steps. `Jido.AgentServer.upgrade/3` waits for the Turn to finish before it
+loads the new code. The active Turn stays on revision 1. The next Turn on the
+same Agent PID uses revision 2.
 
-## Required core feature
+## Implemented core feature
 
-Core needs an explicit revision boundary for the complete Turn. A revision label alone cannot isolate arbitrary module loads.
+Core provides an explicit idle upgrade boundary. A revision label does not
+isolate arbitrary module loads, and this example does not claim that it does.
 
 ## Run
 
@@ -14,9 +18,8 @@ Core needs an explicit revision boundary for the complete Turn. A revision label
 mix test test/examples/99_research/99_14_turn_upgrade --include example --seed 0 --trace
 ```
 
-The failed assertion is enabled and states desired upgrade behavior. When the
-explicit upgrade API exists, connect this example to it. Current startup and
-ordinary Turn APIs retain their existing contracts.
+All assertions are enabled. Current startup and ordinary Turn APIs retain their
+existing contracts.
 
 ## Scope
 

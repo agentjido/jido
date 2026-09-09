@@ -13,7 +13,8 @@ owner work.
 - In scope: standard OTP startup, one live state owner, Signal admission,
   serialization, active-Turn control, task and timer ownership, live commit
   coordination, Directive settlement, Plugin runtime links, child-effect
-  coordination, inspection, hibernation, and process stop behavior.
+  coordination, inspection, hibernation, quiescent upgrade operations,
+  validated Agent definition replacement, and process stop behavior.
 - Out of scope: Agent value and construction meaning, route and candidate
   semantics, Plugin facet callback values, persistence records and CAS result
   meaning, Agent Ref fields, namespace binding, instance facade policy,
@@ -329,6 +330,50 @@ effects.
 shall expose no supported external access to its private state or private
 messages.
 
+### Explicit live upgrade boundary
+
+`SRV-REQ-066`: While a Turn or its Directive batch is active, when an explicit
+upgrade request reaches the state machine, the Agent Server shall postpone the
+request until the activation is idle.
+
+`SRV-REQ-067`: When a quiescent upgrade operation starts, the Agent Server
+shall run it before it admits a Signal that arrived after that upgrade request.
+
+`SRV-REQ-068`: When an Agent definition replacement is requested, the Agent
+Server shall give the migration callback the current committed Agent.
+
+`SRV-REQ-069`: Before an Agent definition replacement is committed, the Agent
+Server shall validate the returned complete state against the target Agent
+definition.
+
+`SRV-REQ-070`: If the target Agent changes the current Plugin declarations,
+then the Agent Server shall reject the definition replacement without changing
+the committed Agent or state version.
+
+`SRV-REQ-071`: If migration or target validation fails, then the Agent Server
+shall preserve the current committed Agent and state version.
+
+`SRV-REQ-072`: When an Agent definition replacement succeeds, the Agent Server
+shall write the required checkpoint before it replaces the live Agent and
+advances the state version by one.
+
+`SRV-REQ-073`: Where durable persistence uses a module-independent stable
+namespace key, when an Agent definition replacement changes the Agent module,
+the Persistence boundary shall compare and replace the old record in one
+confirmed write.
+
+`SRV-REQ-074`: Where durable persistence uses a module-dependent compatibility
+key, if an Agent definition replacement changes the Agent module, then the
+Agent Server shall reject the replacement before a persistence write.
+
+`SRV-REQ-075`: When an in-instance runtime checkpoint contains a successful
+Agent definition replacement, the Agent Server shall restore that replacement
+after an abnormal activation restart.
+
+`SRV-REQ-076`: The explicit upgrade boundary shall not claim to pin arbitrary
+BEAM code loads, replace Plugin runtime structure, or migrate private Agent
+Server state.
+
 ## Public contract
 
 ### Supported compatibility entries
@@ -345,6 +390,7 @@ replacement:
 | Lifecycle | `stop/3`, `hibernate/2`, `attach/3`, `detach/3`, `touch/1` | Process and idle-lifecycle control |
 | Local handles | `whereis/3`, `via_tuple/3`, `alive?/1` | Replaceable PID/name lookup and liveness |
 | Debug | `set_debug/3`, `recent_events/3` | Bounded in-process diagnostic compatibility path |
+| Upgrade | `upgrade/2`, `upgrade/3`, `upgrade/4` | Quiescent code operation or validated Agent definition replacement |
 
 The target does not require new `Status`, `Commit`, or Snapshot structs. Seam
 12 requires the owner to document why compatibility maps and OTP controls
@@ -379,9 +425,10 @@ limit in their options.
 Agent definition revision is immutable Agent definition data. Persistence
 checks it before startup. It is not the Agent state version, activation ID,
 storage revision, or an Action or Flow code snapshot. V3 makes no guarantee
-that a definition revision pins BEAM code during a Turn. A hot upgrade of
-private Agent Server state has no current public migration contract. Any such
-contract needs a separate state-shape, rollback, and in-flight-Turn design.
+that a definition revision pins BEAM code during a Turn. The explicit upgrade
+operation provides an idle installation boundary. Definition replacement
+changes only the immutable Agent value and its checkpoint. A hot upgrade of
+private Agent Server state has no public migration contract.
 
 ## Invariants
 
@@ -423,3 +470,5 @@ These guarantees apply only after the related requirements are approved.
 | `SRV-DEC-006` | What can error policy change? | Keep current policies during migration, but prevent them from overriding authority, commit, and Directive atomicity. | Compatibility remains while safety decisions stay fixed. |
 | `SRV-DEC-007` | Does definition revision pin executable code? | No. Use the code loaded when `Jido.Exec` invokes the selected executable. | Restore checks module meaning without promising a BEAM snapshot. |
 | `SRV-DEC-008` | Is hot private-state upgrade in V3 scope? | Defer it until a separate migration and rollback contract exists. | This seam makes no unsupported live-upgrade claim. |
+| `SRV-DEC-009` | How does coordinated code installation avoid a mixed active Turn? | Run an explicit operator callback only after the Server becomes idle. | Arbitrary module loads stay outside the guarantee. |
+| `SRV-DEC-010` | How can a live Agent use a new state schema? | Validate one migration result against a target definition with the same identity and Plugin declarations, then commit it through the normal checkpoint order. | The Agent value changes without migrating private Server or Plugin runtime structure. |

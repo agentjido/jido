@@ -16,6 +16,16 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
              is_integer(version) and version >= 0 ->
         {agent, version}
 
+      {:ok,
+       %{
+         agent: %Agent{} = agent,
+         state_version: version,
+         upgrade_from_module: source_module
+       }}
+      when agent.id == initial.id and source_module == initial.module and
+             is_integer(version) and version >= 0 ->
+        {agent, version}
+
       _other ->
         {initial, options.state_version}
     end
@@ -32,6 +42,23 @@ defmodule Jido.AgentServer.RuntimeCheckpoint do
   end
 
   def put(%State{}, %Agent{}, _state_version), do: :ok
+
+  @doc false
+  @spec put_upgrade(State.t(), Agent.t(), non_neg_integer()) :: :ok | {:error, term()}
+  def put_upgrade(
+        %State{jido: jido, partition: partition, agent: current},
+        %Agent{} = target,
+        state_version
+      )
+      when is_atom(jido) and not is_nil(jido) do
+    RuntimeStore.put(jido, @hive, key(target.id, partition), %{
+      agent: target,
+      state_version: state_version,
+      upgrade_from_module: current.module
+    })
+  end
+
+  def put_upgrade(%State{}, %Agent{}, _state_version), do: :ok
 
   @doc false
   @spec delete(State.t()) :: :ok | {:error, term()}
