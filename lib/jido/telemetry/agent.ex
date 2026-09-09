@@ -27,7 +27,7 @@ defmodule Jido.Telemetry.Agent do
   def turn_metadata(data) do
     active = data.active
     signal = active.effective_signal || active.source_signal
-    trace = Trace.get(signal) || active.telemetry_span[:metadata] || %{}
+    trace = Trace.get(signal) || active.span[:metadata] || %{}
 
     identity(data)
     |> Map.merge(
@@ -68,8 +68,8 @@ defmodule Jido.Telemetry.Agent do
     Semantic.point([:jido, :agent, :admission, :rejected], metadata, measurements)
   end
 
-  def start(boundary, metadata, measurements \\ %{}) do
-    Semantic.start([:jido, :agent, boundary], metadata, measurements)
+  def start(boundary, metadata, measurements \\ %{}, opts \\ []) do
+    Semantic.start([:jido, :agent, boundary], metadata, measurements, opts)
   end
 
   def finish(span, metadata \\ %{}, measurements \\ %{}, ending \\ :stop)
@@ -101,7 +101,7 @@ defmodule Jido.Telemetry.Agent do
 
   def committed(data, version, directive_count) do
     finish(
-      data.active.telemetry_span,
+      data.active.span,
       Map.merge(turn_metadata(data), %{status: :ok, stage: :commit, committed?: true}),
       %{
         state_version_before: data.active.start_version,
@@ -137,19 +137,20 @@ defmodule Jido.Telemetry.Agent do
 
     unless outcome.committed? do
       finish(
-        data.active.telemetry_span,
+        data.active.span,
         metadata,
         measurements,
         if(kind, do: :exception, else: :stop)
       )
     end
 
-    duration = max(System.monotonic_time() - data.active.telemetry_span.at, 0)
+    duration = max(System.monotonic_time() - data.active.span.at, 0)
 
-    Semantic.emit(
+    Semantic.point(
       [:jido, :agent, :turn, :settled],
+      metadata,
       Map.put(measurements, :duration, duration),
-      metadata
+      link_span: data.active.span
     )
   end
 

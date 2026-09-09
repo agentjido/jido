@@ -91,7 +91,7 @@ defmodule Jido.AgentServer.RuntimeObservabilityTest do
     assert Server.status(pid).state_version == 0
   end
 
-  test "emits Agent Signal and Directive telemetry with bounded metadata", %{jido: jido} do
+  test "emits semantic Turn and Directive telemetry with bounded metadata", %{jido: jido} do
     handler = "agent-runtime-#{System.unique_integer([:positive])}"
     owner = self()
 
@@ -99,8 +99,8 @@ defmodule Jido.AgentServer.RuntimeObservabilityTest do
       :telemetry.attach_many(
         handler,
         [
-          [:jido, :agent_server, :signal, :stop],
-          [:jido, :agent_server, :directive, :stop]
+          [:jido, :agent, :turn, :stop],
+          [:jido, :agent, :directive, :stop]
         ],
         fn event, measurements, metadata, _config ->
           send(owner, {:agent_telemetry, event, measurements, metadata})
@@ -122,21 +122,22 @@ defmodule Jido.AgentServer.RuntimeObservabilityTest do
                })
              )
 
-    assert_receive {:agent_telemetry, [:jido, :agent_server, :signal, :stop], measurements,
-                    signal_meta},
+    assert_receive {:agent_telemetry, [:jido, :agent, :turn, :stop], measurements, turn_meta},
                    2_000
 
     assert is_integer(measurements.duration)
-    assert signal_meta.agent_id == Server.agent(pid).id
-    assert signal_meta.signal_type == "runtime.directive"
+    assert turn_meta.agent_id == Server.agent(pid).id
+    assert turn_meta.signal_type == "runtime.directive"
+    assert turn_meta.status == :ok
+    assert turn_meta.stage == :commit
     assert measurements.directive_count == 1
-    refute Map.has_key?(signal_meta, :agent)
-    refute Map.has_key?(signal_meta, :state)
+    refute Map.has_key?(turn_meta, :agent)
+    refute Map.has_key?(turn_meta, :state)
 
-    assert_receive {:agent_telemetry, [:jido, :agent_server, :directive, :stop], _measurements,
+    assert_receive {:agent_telemetry, [:jido, :agent, :directive, :stop], _measurements,
                     directive_meta},
                    2_000
 
-    assert directive_meta.directive_type == "Emit"
+    assert directive_meta.directive_module == Directive.Emit
   end
 end

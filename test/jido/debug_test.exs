@@ -25,7 +25,7 @@ defmodule JidoTest.DebugTest do
   defp restore_env(app, key, {:ok, value}), do: Application.put_env(app, key, value)
   defp restore_env(app, key, :error), do: Application.delete_env(app, key)
 
-  describe "enable/3 and level/1" do
+  describe "enable/2 and level/1" do
     test "default level is :off" do
       assert Debug.level(@test_instance) == :off
     end
@@ -38,12 +38,6 @@ defmodule JidoTest.DebugTest do
     test "enable :verbose sets level" do
       assert :ok = Debug.enable(@test_instance, :verbose)
       assert Debug.level(@test_instance) == :verbose
-    end
-
-    test "ignores a non-keyword option container" do
-      assert :ok = Debug.enable(@test_instance, :on, %{redact: false})
-      assert Debug.level(@test_instance) == :on
-      assert Debug.override(@test_instance, :redact_sensitive) == nil
     end
 
     test "enable :off disables" do
@@ -83,37 +77,22 @@ defmodule JidoTest.DebugTest do
 
   describe "override/2" do
     test "returns nil when debug is off" do
-      assert Debug.override(@test_instance, :telemetry_log_level) == nil
+      assert Debug.override(@test_instance, :semantic_log_mode) == nil
     end
 
     test "returns override when :on" do
       Debug.enable(@test_instance, :on)
-      assert Debug.override(@test_instance, :telemetry_log_level) == :debug
-      assert Debug.override(@test_instance, :telemetry_log_args) == :keys_only
-      assert Debug.override(@test_instance, :observe_log_level) == :debug
-      assert Debug.override(@test_instance, :observe_debug_events) == :minimal
+      assert Debug.override(@test_instance, :semantic_log_mode) == :interesting
     end
 
     test "returns override when :verbose" do
       Debug.enable(@test_instance, :verbose)
-      assert Debug.override(@test_instance, :telemetry_log_level) == :trace
-      assert Debug.override(@test_instance, :telemetry_log_args) == :full
-      assert Debug.override(@test_instance, :observe_debug_events) == :all
+      assert Debug.override(@test_instance, :semantic_log_mode) == :all
     end
 
     test "returns nil for unknown override key" do
       Debug.enable(@test_instance, :on)
       assert Debug.override(@test_instance, :nonexistent_key) == nil
-    end
-
-    test "redact override when redact: false passed" do
-      Debug.enable(@test_instance, :on, redact: false)
-      assert Debug.override(@test_instance, :redact_sensitive) == false
-    end
-
-    test "no redact override by default" do
-      Debug.enable(@test_instance, :on)
-      assert Debug.override(@test_instance, :redact_sensitive) == nil
     end
   end
 
@@ -136,7 +115,7 @@ defmodule JidoTest.DebugTest do
       status = Debug.status(@test_instance)
       assert status.level == :on
       assert is_map(status.overrides)
-      assert status.overrides.telemetry_log_level == :debug
+      assert status.overrides.semantic_log_mode == :interesting
     end
 
     test "malformed runtime state uses the disabled defaults" do
@@ -145,7 +124,7 @@ defmodule JidoTest.DebugTest do
 
         assert Debug.level(@test_instance) == :off
         refute Debug.enabled?(@test_instance)
-        assert Debug.override(@test_instance, :telemetry_log_level) == nil
+        assert Debug.override(@test_instance, :semantic_log_mode) == nil
         assert Debug.status(@test_instance) == %{level: :off, overrides: %{}}
       end
     end
@@ -217,28 +196,6 @@ defmodule JidoTest.DebugTest do
       Debug.disable(instance_a)
       assert Debug.level(instance_a) == :off
       assert Debug.level(instance_b) == :verbose
-    end
-  end
-
-  describe "integration with Observe.Config" do
-    test "debug override takes priority over global config" do
-      Application.put_env(:jido, :telemetry, log_level: :info)
-
-      Debug.enable(@test_instance, :on)
-
-      assert Jido.Observe.Config.telemetry_log_level(@test_instance) == :debug
-
-      assert Jido.Observe.Config.telemetry_log_level(nil) == :info
-
-      Application.delete_env(:jido, :telemetry)
-    end
-
-    test "verbose override enables trace" do
-      Debug.enable(@test_instance, :verbose)
-
-      assert Jido.Observe.Config.telemetry_log_level(@test_instance) == :trace
-      assert Jido.Observe.Config.telemetry_log_args(@test_instance) == :full
-      assert Jido.Observe.Config.debug_events(@test_instance) == :all
     end
   end
 end

@@ -1,4 +1,4 @@
-defmodule JidoTest.Observe.AgentLifecycleTest do
+defmodule JidoTest.Telemetry.AgentLifecycleTest do
   use JidoTest.Case, async: false
 
   @moduletag capability: "OBS-01"
@@ -28,7 +28,7 @@ defmodule JidoTest.Observe.AgentLifecycleTest do
     :ok =
       :telemetry.attach_many(
         handler,
-        [[:jido, :agent_server, :signal, :start], [:jido, :agent, :turn, :start]],
+        [[:jido, :agent, :turn, :start]],
         &__MODULE__.fail_observer/4,
         {id, self()}
       )

@@ -50,24 +50,22 @@ context.
 
 `Jido.Telemetry.metrics/0` returns low-cardinality metrics from semantic events.
 It does not use Agent, Signal, trace, topology, or error IDs as default tags.
-`legacy_metrics/0` keeps the old Agent Server definitions for migration.
 
 The semantic logger supports `:off`, `:errors`, `:interesting`, and `:all` with
 `semantic_log_mode`. It filters metadata and measurements again before it
 writes a log entry.
 
-Jido does not include an OpenTelemetry dependency or exporter. A host can map
-the semantic catalog to OpenTelemetry without using old Agent Server events.
-The host owns the SDK, sampling, exporters, collector, credentials, and vendor
-configuration.
+Jido has an API-only OpenTelemetry mapping through the optional
+`opentelemetry_api` dependency. It uses the same semantic boundaries and safe
+fields. The host owns the SDK, sampling, exporters, collector, credentials,
+resources, and vendor configuration.
 
 ## Compatibility
 
 - Keep semantic version-1 names and field meanings for additive changes.
 - Use a new versioned contract for a breaking schema change.
-- Keep old Agent Server events, `Jido.Observe`, tracing, logging, and debug
-  history until a separate inventory, parity, notice, and removal review is
-  complete.
+- Remove old Agent Server events and `Jido.Observe` before the V3 release.
+- Keep W3C trace transfer and bounded debug history.
 - Keep telemetry best-effort. Do not use it as a durable audit record.
 
 ## Evidence
@@ -78,8 +76,9 @@ configuration.
   revision, and privacy facts.
 - Topology tests prove activation, repair, cleanup, status, counts, and privacy.
 - Telemetry tests prove schema normalization, stable error codes, semantic
-  metrics, four log modes, and retained legacy metrics.
-- Trace tests prove portable Signal context and explicit Task restoration.
+  metrics, and four log modes.
+- OpenTelemetry tests prove the optional API mapping, safe attributes, links,
+  disabled behavior, portable Signal context, and explicit Task restoration.
 - The semantic boundary demonstration runs all main families together.
 
 ## Documents

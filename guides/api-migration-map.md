@@ -462,19 +462,20 @@ V3 adds these modules:
 
 | V2 module | Status and V3 direction |
 | --- | --- |
-| `Jido.Observe` | **Retained call surface.** Event names and metadata changed for V3 Turn stages. Port every attached handler. |
-| `Jido.Observe.Config` | **Retained call surface.** Review precedence and remove settings for deleted runtime features. |
-| `Jido.Observe.Log` | **Retained.** Test redaction and log levels with V3 Signal and Turn data. |
-| `Jido.Observe.Tracer` | **Retained behavior.** Test callback failure policy and V3 span metadata. |
-| `Jido.Observe.NoopTracer` | **Retained.** |
-| `Jido.Observe.SpanCtx` | **Retained.** Do not store live tracer values in Agent state. |
+| `Jido.Observe` | **Removed.** Attach a handler to the V3 semantic Telemetry catalog. Add `opentelemetry_api` and an SDK in the host when OpenTelemetry is required. |
+| `Jido.Observe.Config` | **Removed.** Use `config :jido, :telemetry` for semantic logs and `config :jido, :opentelemetry` for the optional mapping. |
+| `Jido.Observe.Log` | **Removed.** Use semantic logging through `Jido.Telemetry`. |
+| `Jido.Observe.Tracer` | **Removed.** The optional core mapping uses `opentelemetry_api` directly. |
+| `Jido.Observe.NoopTracer` | **Removed.** The OpenTelemetry API is a no-op when no SDK tracer is active. |
+| `Jido.Observe.SpanCtx` | **Removed.** Jido keeps its private semantic span value. |
 | `Jido.Observe.EventContract` | **Removed.** Use the documented V3 event contract and tests. |
-| `Jido.Telemetry` | **Same name, changed events.** `span_agent_cmd/3` and `span_strategy/4` are removed. Use the V3 lifecycle, Turn, commit, and Directive events. |
-| `Jido.Telemetry.Config` | **Removed.** Use application configuration and `Jido.Observe.Config`. |
+| `Jido.Telemetry` | **Same name, changed events.** `span_agent_cmd/3`, `span_strategy/4`, old Agent Server events, and `legacy_metrics/0` are removed. Use the V3 lifecycle, Turn, commit, Directive, settlement, persistence, and Topology events. |
+| `Jido.Telemetry.Config` | **Removed.** Use application configuration for semantic logs and the optional OpenTelemetry mapping. |
 | `Jido.Telemetry.Formatter` | **Retained call surface.** Its accepted V3 data shapes changed. |
-| `Jido.Tracing.Context` | **Retained call surface.** Also follow the Jido Signal V3 trace migration. |
+| `Jido.Telemetry.OpenTelemetry` | **Added.** It maps semantic events with the optional `opentelemetry_api` dependency. The host owns the SDK and export path. |
+| `Jido.Tracing.Context` | **Retained call surface.** It now captures and restores OpenTelemetry context when the optional integration is active. |
 | `Jido.Tracing.Trace` | **Retained call surface.** It now delegates more Signal trace work to the Signal contract. |
-| `Jido.Debug` | **Retained call surface.** Agent event contents and Server queries changed. |
+| `Jido.Debug` | **Changed.** `:on` selects interesting semantic logs, `:verbose` selects all semantic logs, and redaction options are removed. |
 
 ### Errors and utility modules
 
@@ -487,7 +488,7 @@ V3 adds these modules:
 | `Jido.Error.RoutingError` | **Retained type with a stronger V3 role.** Missing, invalid, and multiple Agent route matches return it. |
 | `Jido.Error.TimeoutError` | **Retained type.** Separate caller timeout from active Turn cancellation. |
 | `Jido.Error.ValidationError` | **Retained type.** Zoi now supplies schema issues. |
-| `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Observe.Config` owns observability defaults and configuration resolution. |
+| `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Telemetry` owns semantic log defaults. |
 | <code>Jido.RuntimeStore</code> | **Private in V3.** It is instance-local coordination state, not durable application storage. Use public instance and relationship functions. Do not copy its internal keys. |
 | `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Agent.Codec.Registry`. |
 | `Jido.Util` | **Retained call surface for internal support.** Prefer the domain modules that own validation, IDs, lookup, and executable resolution. |

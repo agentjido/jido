@@ -1,8 +1,10 @@
 defmodule JidoTest.TelemetryTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Telemetry
   import ExUnit.CaptureLog
+
+  alias Jido.Debug
+  alias Jido.Telemetry
 
   setup do
     config = Application.fetch_env(:jido, :telemetry)
@@ -27,7 +29,7 @@ defmodule JidoTest.TelemetryTest do
   end
 
   test "setup/0 does not detach an existing handler" do
-    handler_id = "jido-agent-metrics"
+    handler_id = "jido-semantic-logger"
     event = [:jido, :telemetry, :sentinel]
     test_pid = self()
 
@@ -51,7 +53,7 @@ defmodule JidoTest.TelemetryTest do
     assert_receive {:sentinel, ^event}
   end
 
-  test "default metrics use semantic events and only fixed vocabulary tags" do
+  test "default metrics use semantic events and fixed vocabulary tags" do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
@@ -79,13 +81,6 @@ defmodule JidoTest.TelemetryTest do
     for metric <- metrics, tag <- metric.tags do
       assert tag in allowed
       refute tag in ~w(agent_id agent_namespace signal_type error_code topology_id)a
-    end
-
-    legacy = Telemetry.legacy_metrics()
-
-    for metric <- legacy do
-      assert metric.tag_values.(%{signal_type: "test"}).jido_instance == :global
-      assert metric.tag_values.(%{jido_instance: __MODULE__}).jido_instance == __MODULE__
     end
   end
 
@@ -118,12 +113,21 @@ defmodule JidoTest.TelemetryTest do
     assert log =~ "status=conflict"
   end
 
-  test "semantic emission is independent of consumer and old redaction settings" do
-    Application.put_env(:jido, :telemetry,
-      semantic_log_mode: :off,
-      log_args: :full,
-      redact_sensitive: false
-    )
+  test "per-instance debug mode takes priority over global semantic logging" do
+    instance = :telemetry_debug_instance
+    event = [:jido, :agent, :turn, :stop]
+    metadata = %{jido_instance: instance, status: :ok, stage: :commit}
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
+    Debug.enable(instance, :verbose)
+    on_exit(fn -> Debug.reset(instance) end)
+
+    log = capture_log(fn -> Telemetry.handle_semantic_event(event, %{}, metadata, nil) end)
+
+    assert log =~ "event=agent.turn.stop"
+  end
+
+  test "semantic emission is independent of consumer configuration" do
+    Application.put_env(:jido, :telemetry, semantic_log_mode: :off)
 
     event = [:jido, :agent, :admission, :rejected]
     handler = {__MODULE__, make_ref()}
@@ -153,128 +157,5 @@ defmodule JidoTest.TelemetryTest do
     refute Map.has_key?(metadata, :private)
   end
 
-  test "trace logs every completed Signal and Directive with bounded summaries" do
-    Application.put_env(:jido, :telemetry, log_level: :trace)
-
-    log =
-      capture_log(fn ->
-        emit_stop(:signal, %{signal_type: "test", directive_count: 2, directive_types: %{emit: 2}})
-
-        emit_stop(:signal, %{signal_type: "empty"})
-        emit_stop(:directive, %{directive_type: "Emit"}, %{result: :ok})
-      end)
-
-    assert log =~ "[signal] type=test directives=2 Emit=2"
-    assert log =~ "[signal] type=empty directives=0"
-    assert log =~ "[directive] type=Emit result=ok"
-  end
-
-  test "debug selects slow, effectful, interesting, and failed Signals" do
-    Application.put_env(:jido, :telemetry,
-      log_level: :debug,
-      slow_signal_threshold_ms: 10,
-      interesting_signal_types: ["interesting"]
-    )
-
-    log =
-      capture_log(fn ->
-        emit_stop(:signal, %{signal_type: "quiet"})
-        emit_stop(:signal, %{signal_type: "slow"}, %{duration: native_ms(11)})
-        emit_stop(:signal, %{signal_type: "effects"}, %{directive_count: 1})
-        emit_stop(:signal, %{signal_type: "interesting"})
-        emit_stop(:signal, %{signal_type: "failed", error: :invalid})
-      end)
-
-    refute log =~ "type=quiet"
-    for type <- ["slow", "effects", "interesting", "failed"], do: assert(log =~ "type=#{type}")
-  end
-
-  test "debug selects slow, interesting, and failed Directives" do
-    Application.put_env(:jido, :telemetry, log_level: :debug, slow_directive_threshold_ms: 10)
-
-    log =
-      capture_log(fn ->
-        emit_stop(:directive, %{directive_type: "Quiet"})
-        emit_stop(:directive, %{directive_type: "Slow"}, %{duration: native_ms(11)})
-        emit_stop(:directive, %{directive_type: "Tool"})
-        emit_stop(:directive, %{directive_type: "Failed", error: :invalid})
-      end)
-
-    refute log =~ "type=Quiet"
-    for type <- ["Slow", "Tool", "Failed"], do: assert(log =~ "type=#{type}")
-  end
-
-  test "exception logs remain visible at the normal telemetry level" do
-    Application.put_env(:jido, :telemetry, log_level: :info)
-
-    log =
-      capture_log(fn ->
-        for kind <- [:signal, :directive] do
-          Telemetry.handle_event(
-            [:jido, :agent_server, kind, :exception],
-            %{duration: 0},
-            %{
-              signal_type: "test",
-              directive_type: "Tool",
-              error: :failed
-            },
-            nil
-          )
-        end
-      end)
-
-    assert log =~ "[signal.error] type=test error=:failed"
-    assert log =~ "[directive.error] type=Tool error=:failed"
-  end
-
-  defp emit_stop(kind, metadata, measurements \\ %{}) do
-    Telemetry.handle_event([:jido, :agent_server, kind, :stop], measurements, metadata, nil)
-  end
-
   defp native_ms(ms), do: System.convert_time_unit(ms, :millisecond, :native)
-
-  test "start events need no logging work" do
-    assert :ok =
-             Telemetry.handle_event(
-               [:jido, :agent_server, :signal, :start],
-               %{},
-               %{agent_id: "agent-1"},
-               nil
-             )
-
-    assert :ok =
-             Telemetry.handle_event(
-               [:jido, :agent_server, :directive, :start],
-               %{},
-               %{agent_id: "agent-1"},
-               nil
-             )
-  end
-
-  test "stop events accept bounded Agent metadata" do
-    assert :ok =
-             Telemetry.handle_event(
-               [:jido, :agent_server, :signal, :stop],
-               %{duration: 1, directive_count: 0},
-               %{
-                 agent_id: "agent-1",
-                 agent_module: __MODULE__,
-                 signal_type: "test.signal",
-                 jido_instance: nil
-               },
-               nil
-             )
-
-    assert :ok =
-             Telemetry.handle_event(
-               [:jido, :agent_server, :directive, :stop],
-               %{duration: 1, result: :ok},
-               %{
-                 agent_id: "agent-1",
-                 directive_type: "Emit",
-                 jido_instance: nil
-               },
-               nil
-             )
-  end
 end

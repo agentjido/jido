@@ -7,10 +7,10 @@
 
 - Contract selected and implemented: 2026-09-10.
 - Alignment state: `Implemented`.
-- Compatibility state: additive semantic events and consumers. Legacy Agent
-  Server telemetry, `Jido.Observe`, tracing, logs, and debug history remain.
-- OpenTelemetry state: host integration boundary. Core has no API, SDK,
-  exporter, collector, network, credential, or vendor dependency.
+- Compatibility state: breaking V3 cleanup. Legacy Agent Server telemetry and
+  `Jido.Observe` are removed. Semantic telemetry is the single source.
+- OpenTelemetry state: Core has an API-only optional mapping. The host owns the
+  SDK, exporter, collector, network, credentials, resources, and vendor policy.
 - Follow-on work: seam 99 owns the final documentation, package, and release
   gate.
 
@@ -23,9 +23,9 @@
 | `OBS-DEC-003` | Use lifecycle operations `activate`, `stop`, `hibernate`, and `thaw`. | Record creation and deletion remain persistence operations. |
 | `OBS-DEC-004` | Use the bounded status and stage vocabularies. | Private evaluator and Plugin callback stages stay internal. |
 | `OBS-DEC-005` | Use semantic log modes `off`, `errors`, `interesting`, and `all`. | Log input passes through the semantic allowlist again. |
-| `OBS-DEC-006` | Keep the OpenTelemetry bridge in the host for V3. | The semantic catalog is the only required translation source. |
-| `OBS-DEC-007` | End the Turn span at the live result. | `turn.settled` remains a later correlated point fact. |
-| `OBS-DEC-008` | Remove no legacy observation path in this seam. | Removal needs inventory, parity, notice, rollback, and separate review. |
+| `OBS-DEC-006` | Keep an API-only optional mapping in Core and all SDK infrastructure in the host. | The semantic catalog directly creates spans when an SDK tracer is active. |
+| `OBS-DEC-007` | End the Turn span at the live result. | `turn.settled` is a zero-duration span linked to the completed Turn. |
+| `OBS-DEC-008` | Remove legacy observation paths before V3 release. | V3 has one source for telemetry, logs, metrics, and optional traces. |
 
 ## Owner alignment
 
@@ -38,7 +38,8 @@
 | Signal | Complete portable W3C trace carrier | `Jido.Signal.Trace` through `Jido.Tracing.Trace` |
 | Task owner | Explicit process-local trace attach and restore | `Jido.Tracing.Context.with_context/2` at Jido-owned Task starts |
 | Default consumers | Semantic metrics and bounded logger | `Jido.Telemetry` |
-| Host | Reporters, OpenTelemetry, sampling, exporters, collectors, credentials, dashboards, and alerts | Outside Jido Core |
+| Optional trace mapping | Semantic spans, safe attributes, error status, links, and W3C context | `Jido.Telemetry.OpenTelemetry` |
+| Host | Reporters, OpenTelemetry SDK, sampling, exporters, collectors, credentials, dashboards, and alerts | Outside Jido Core |
 
 ## Event and result alignment
 
@@ -97,9 +98,6 @@ lifecycle, Turn result, settlement, commit, Directive, persistence, and local
 Topology events, plus an admission-rejection count. Its tags use only fixed
 operation, status, stage, reason, and component vocabularies.
 
-`Jido.Telemetry.legacy_metrics/0` retains the three old Agent Server metric
-definitions. Old Agent Server event emission and its log handler also remain.
-
 The semantic logger reads `semantic_log_mode` from `config :jido, :telemetry`:
 
 | Mode | Terminal facts logged |
@@ -109,19 +107,21 @@ The semantic logger reads `semantic_log_mode` from `config :jido, :telemetry`:
 | `:interesting` | Error facts and operations over `semantic_slow_threshold_ms` |
 | `:all` | Every terminal semantic fact |
 
-The current `log_level: :trace` maps to `:all`, and `:debug` maps to
-`:interesting` when no semantic mode is set. The logger filters the event again
-and does no Agent call, storage call, or network call.
+Per-instance debug mode takes priority over this value. `:on` selects
+`:interesting`, and `:verbose` selects `:all`. The logger filters the event
+again and does no Agent call, storage call, or network call.
+
+When the host declares `opentelemetry_api` and starts an SDK tracer, the same
+semantic boundaries create OpenTelemetry spans. Without the optional API or an
+SDK tracer, this path is a no-op.
 
 ## Compatibility and versioning
 
 - Additive version-1 fields keep the event name and existing field meaning.
 - A breaking change needs a new versioned contract and an overlap period.
-- Current Agent Server events and `Jido.Observe` remain public compatibility
-  paths. Strict tracer mode is not part of semantic runtime emission.
-- Current tracing helpers and debug history remain available.
-- `legacy_metrics/0` supplies the old metric definitions during migration.
-- No removal is approved by this seam.
+- The pre-release V3 change removes `Jido.Observe`, old Agent Server events,
+  their log handler, legacy metrics, and old observation configuration.
+- Current W3C tracing helpers and bounded debug history remain available.
 
 ## Requirement evidence
 
@@ -138,22 +138,22 @@ and does no Agent call, storage call, or network call.
 | `OBS-REQ-033` to `OBS-REQ-036` | Shared allowlist, error code, size, UTF-8, and private-data tests | `Proven` |
 | `OBS-REQ-037` to `OBS-REQ-040` | Semantic metric-tag and four-mode logger tests | `Proven` |
 | `OBS-REQ-041` to `OBS-REQ-043` | Emission and consumer-failure containment tests and no-authority review | `Proven` |
-| `OBS-REQ-044`, `OBS-REQ-045`, `OBS-REQ-047`, `OBS-REQ-055` | No host OpenTelemetry bridge is selected. | `Owner-deferred` |
-| `OBS-REQ-046`, `OBS-REQ-048` | Core has no OpenTelemetry dependency and transfers Task context explicitly. | `Proven` |
-| `OBS-REQ-049` to `OBS-REQ-051` | Schema version 1 and retained legacy paths | `Proven`; removal blocked |
-| `OBS-REQ-052` to `OBS-REQ-054`, `OBS-REQ-056`, `OBS-REQ-057` | Focused catalog, privacy, correlation, disabled-consumer, and legacy-option tests | `Proven` |
+| `OBS-REQ-044` to `OBS-REQ-048`, `OBS-REQ-055` | API-only tracer tests cover safe mapping, span end, settlement link, W3C extraction and injection, Task transfer, disabled mode, and no SDK ownership. A clean no-optional-dependency build covers absence. | `Proven` |
+| `OBS-REQ-049` to `OBS-REQ-051` | Schema version 1 and explicit pre-release V3 removal | `Proven` |
+| `OBS-REQ-052` to `OBS-REQ-054`, `OBS-REQ-056`, `OBS-REQ-057` | Focused catalog, privacy, correlation, disabled-consumer, and optional-integration tests | `Proven` |
 
 ## Verification record
 
-- Focused semantic, Agent, persistence, Topology, trace, and compatibility
-  tests: `109 passed`.
-- Broad affected runtime tests: `612 passed, 1 excluded`.
-- Full `mix quality`: Credo clean, Dialyzer clean, and
-  `1195 passed, 1 excluded`.
-- `mix docs --warnings-as-errors`: passed.
-- `mix run examples/04_runtime/04_09_agent_observation/semantic_boundaries.exs`:
+- Focused OpenTelemetry, semantic lifecycle, local and remote causal trace, and
+  instance-option tests: `42 passed`.
+- Full integrated `mix quality`: formatting, compile, Credo, and Dialyzer
+  passed; `1053 passed, 1 excluded`.
+- `mix compile --no-optional-deps --warnings-as-errors` passed in a clean build
+  path.
+- `mix docs --warnings-as-errors` passed.
+- `mix run examples/04_runtime/04_09_agent_observation/semantic_boundaries.exs`
   passed with Agent, settlement, persistence, and local Topology facts.
-- `git diff --check`: passed.
+- `git diff --check` passed.
 
 ## Completion criteria
 
@@ -166,6 +166,6 @@ and does no Agent call, storage call, or network call.
 - [x] Jido-owned observed Tasks attach and restore trace context.
 - [x] Default metrics use semantic events and low-cardinality tags.
 - [x] The semantic logger supports four safe modes.
-- [x] OpenTelemetry infrastructure stays with the host.
-- [x] Legacy paths remain available with no removal approval.
+- [x] OpenTelemetry API mapping is optional and infrastructure stays with the host.
+- [x] Legacy `Jido.Observe`, Agent Server telemetry, and legacy metrics are removed.
 - [x] Public guides, examples, and module text use the selected contract.

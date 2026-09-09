@@ -87,8 +87,9 @@ the direction but leave the listed owner-seam details open.
     and transport services outside core.
 11. **Public values:** Approve value roles only. Let seam 12, seam 90, and each
     value owner decide exact shapes and migration.
-12. **Observation:** Make semantic Agent events the target. Keep legacy
-    telemetry, `Jido.Observe`, and debug paths during migration.
+12. **Observation:** Make semantic Agent events the single V3 source. Remove
+    legacy Agent Server telemetry and `Jido.Observe`. Keep the OpenTelemetry API
+    mapping optional, and keep W3C tracing and bounded debug history.
 
 ## Dependencies
 

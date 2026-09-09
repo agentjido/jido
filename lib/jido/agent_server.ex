@@ -83,7 +83,6 @@ defmodule Jido.AgentServer do
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
   alias Jido.Error
-  alias Jido.Observe
   alias Jido.Signal
   alias Jido.Telemetry.Agent, as: AgentTelemetry
   alias Jido.Tracing.Context, as: TraceContext
@@ -1396,6 +1395,7 @@ defmodule Jido.AgentServer do
     result =
       AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
 
+    TraceContext.clear()
     notify_startup(data, {:error, normalize_startup_error(reason)})
     result
   end
@@ -1425,15 +1425,13 @@ defmodule Jido.AgentServer do
     maybe_delete_runtime_checkpoint(reason, data)
     retire_remote_spawn(reason, data)
     PluginLifecycle.stop_all(data, :shutdown)
-    TraceContext.clear()
     :ok
   end
 
   defp start_turn(%Signal{} = signal, from, context, %State{} = data) do
     data = cancel_idle_timer(data)
     {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
-    span = start_signal_span(signal, data)
-    active = ActiveTurn.new(signal, from, data.state_version, span, data.turn_timeout)
+    active = ActiveTurn.new(signal, from, data.state_version, data.turn_timeout)
     data = %{data | active: active}
     metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
 
@@ -1442,7 +1440,7 @@ defmodule Jido.AgentServer do
         state_version_before: data.state_version
       })
 
-    data = %{data | active: %{active | telemetry_span: semantic}}
+    data = %{data | active: %{active | span: semantic}}
 
     try do
       with {:ok, command} <- initial_command(signal, context, data) do
@@ -1456,13 +1454,11 @@ defmodule Jido.AgentServer do
       end
     rescue
       error ->
-        finish_span_fault(span, :error, error, __STACKTRACE__)
         AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, error), :error)
         TraceContext.clear()
         reraise error, __STACKTRACE__
     catch
       kind, reason ->
-        finish_span_fault(span, kind, reason, __STACKTRACE__)
         AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, reason), kind)
         TraceContext.clear()
         :erlang.raise(kind, reason, __STACKTRACE__)
@@ -1631,7 +1627,7 @@ defmodule Jido.AgentServer do
     with {:ok, runtime_refs} <-
            plugin_runtime_refs(data, ServerPlugin.admission_modules(plugin_specs)) do
       supervisor = Jido.task_supervisor_name(data.jido)
-      trace = TraceContext.get()
+      trace = TraceContext.capture()
 
       task =
         Task.Supervisor.async(supervisor, fn ->
@@ -1665,7 +1661,7 @@ defmodule Jido.AgentServer do
       if Jido.Tracing.Trace.get(command.signal) do
         command.signal
       else
-        case Jido.Tracing.Trace.put(command.signal, data.active.telemetry_span.metadata) do
+        case Jido.Tracing.Trace.put(command.signal, data.active.span.metadata) do
           {:ok, traced} -> traced
           {:error, _} -> command.signal
         end
@@ -1858,14 +1854,11 @@ defmodule Jido.AgentServer do
         maybe_start_idle_timer(next_data, phase)
       end
 
-    finish_span(active.span, %{directive_count: length(directives), state_version: version})
     if phase == :idle, do: TraceContext.clear()
     {:next_state, phase, next_data, actions}
   end
 
   defp fail_turn(reason, stage, %State{active: %ActiveTurn{} = active} = data) do
-    finish_span_error(active.span, reason)
-    TraceContext.clear()
     signal = active.effective_signal || active.source_signal
     maybe_log_cast_failure(active.caller, signal, reason, data.agent.id)
     outcome = turn_outcome(data, outcome_status(reason), stage, reason)
@@ -1874,6 +1867,8 @@ defmodule Jido.AgentServer do
       data
       |> Map.update!(:error_count, &(&1 + 1))
       |> complete_outcome(outcome)
+
+    TraceContext.clear()
 
     decision =
       case reason do
@@ -1904,10 +1899,9 @@ defmodule Jido.AgentServer do
   defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
     case cancel_exec(active.exec_handle, data) do
       :ok ->
-        finish_span_error(active.span, :cancelled)
-        TraceContext.clear()
         outcome = turn_outcome(data, :cancelled, :execute, :cancelled)
         next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
+        TraceContext.clear()
 
         actions =
           reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
@@ -1915,10 +1909,9 @@ defmodule Jido.AgentServer do
         {:next_state, :idle, next_data, actions}
 
       {:error, error} ->
-        finish_span_error(active.span, error)
-        TraceContext.clear()
         outcome = turn_outcome(data, :indeterminate, :execute, error)
         next_data = complete_outcome(data, outcome)
+        TraceContext.clear()
 
         actions =
           reply_action(active.caller, {:error, error}) ++
@@ -1942,10 +1935,9 @@ defmodule Jido.AgentServer do
 
       {:error, reason} ->
         error = {:turn_timeout_cancellation_failed, reason}
-        finish_span_error(active.span, error)
-        TraceContext.clear()
         outcome = turn_outcome(data, :indeterminate, :execute, error)
         next_data = complete_outcome(data, outcome)
+        TraceContext.clear()
         replies = reply_action(active.caller, {:error, error})
 
         if replies == [] do
@@ -1965,8 +1957,6 @@ defmodule Jido.AgentServer do
 
   defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
     stop_task(data.admission_task)
-    finish_span_error(active.span, :cancelled)
-    TraceContext.clear()
     outcome = turn_outcome(data, :cancelled, :prepare, :cancelled)
 
     next_data =
@@ -1974,6 +1964,8 @@ defmodule Jido.AgentServer do
       |> Map.put(:admission_task, nil)
       |> complete_outcome(outcome)
       |> maybe_start_idle_timer(:idle)
+
+    TraceContext.clear()
 
     actions = reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
     {:next_state, :idle, next_data, actions}
@@ -2162,7 +2154,7 @@ defmodule Jido.AgentServer do
 
   defp start_directive_task(fun, rest, context, span, data) do
     supervisor = Jido.task_supervisor_name(data.jido)
-    trace = TraceContext.get()
+    trace = TraceContext.capture()
     task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
     timer = start_directive_timer(data.directive_timeout, task.ref)
     pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
@@ -2195,9 +2187,9 @@ defmodule Jido.AgentServer do
   defp plugin_state_value(state, key), do: Map.get(state, key)
 
   defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do
-    TraceContext.clear()
     outcome = turn_outcome(data, :succeeded, :directive, nil)
     next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
+    TraceContext.clear()
     {:next_state, :idle, next_data}
   end
 
@@ -2610,19 +2602,19 @@ defmodule Jido.AgentServer do
         {:error, reason} -> {:indeterminate, {:parent_down, {:cancellation_failed, reason}}}
       end
 
-    finish_span_error(active.span, error)
-    TraceContext.clear()
     outcome = turn_outcome(data, status, :execute, error)
     if active.caller, do: :gen_statem.reply(active.caller, {:error, error})
-    {complete_outcome(data, outcome), {status, error}}
+    next_data = complete_outcome(data, outcome)
+    TraceContext.clear()
+    {next_data, {status, error}}
   catch
     kind, reason ->
       error = {:parent_down, {:cancellation_failed, {kind, reason}}}
-      finish_span_error(active.span, error)
-      TraceContext.clear()
       outcome = turn_outcome(data, :indeterminate, :execute, error)
       if active.caller, do: :gen_statem.reply(active.caller, {:error, error})
-      {complete_outcome(data, outcome), {:indeterminate, error}}
+      next_data = complete_outcome(data, outcome)
+      TraceContext.clear()
+      {next_data, {:indeterminate, error}}
   end
 
   defp cancel_active_for_parent(data), do: {data, nil}
@@ -2929,7 +2921,7 @@ defmodule Jido.AgentServer do
     else
       supervisor = Jido.task_supervisor_name(data.jido)
       jido = data.jido
-      trace = TraceContext.get()
+      trace = TraceContext.capture()
 
       task =
         Task.Supervisor.async(supervisor, fn ->
@@ -3009,27 +3001,7 @@ defmodule Jido.AgentServer do
     %{data | debug_events: events}
   end
 
-  defp start_signal_span(signal, data) do
-    safe_start_span([:jido, :agent_server, :signal], %{
-      agent_id: data.agent.id,
-      agent_module: data.agent.module,
-      signal_type: signal.type,
-      jido_instance: data.jido,
-      jido_partition: data.partition
-    })
-  end
-
-  defp start_directive_span(directive, context, data) do
-    legacy =
-      safe_start_span([:jido, :agent_server, :directive], %{
-        agent_id: context.agent_id,
-        agent_module: data.agent.module,
-        signal_type: context.signal.type,
-        directive_type: directive_type(directive),
-        jido_instance: data.jido,
-        jido_partition: data.partition
-      })
-
+  defp start_directive_span(directive, _context, data) do
     metadata =
       Map.merge(AgentTelemetry.turn_metadata(data), %{
         directive_module: Map.get(directive, :__struct__),
@@ -3037,70 +3009,32 @@ defmodule Jido.AgentServer do
         committed?: true
       })
 
-    telemetry =
-      AgentTelemetry.start(:directive, metadata, %{
-        directive_index: data.active.directive_completed_count
-      })
-
-    %{legacy: legacy, telemetry: telemetry}
-  end
-
-  defp safe_start_span(prefix, metadata) do
-    Observe.start_span(prefix, metadata)
-  rescue
-    _error -> nil
-  catch
-    _kind, _reason -> nil
+    AgentTelemetry.start(
+      :directive,
+      metadata,
+      %{directive_index: data.active.directive_completed_count},
+      parent_span: data.active.span
+    )
   end
 
   defp finish_span(nil, _measurements), do: :ok
 
-  defp finish_span(%{legacy: legacy, telemetry: telemetry}, measurements) do
-    finish_span(legacy, measurements)
-    AgentTelemetry.finish(telemetry, %{status: :ok})
-  end
-
   defp finish_span(span, measurements) do
-    Observe.finish_span(span, measurements)
-  rescue
-    _error -> :ok
-  catch
-    _kind, _reason -> :ok
+    AgentTelemetry.finish(span, %{status: :ok}, measurements)
   end
 
   defp finish_span_error(nil, _reason), do: :ok
 
-  defp finish_span_error(%{legacy: legacy, telemetry: telemetry}, reason) do
-    finish_span_error(legacy, reason)
-    AgentTelemetry.finish(telemetry, AgentTelemetry.result_metadata({:error, reason}))
-  end
-
   defp finish_span_error(span, reason) do
-    Observe.finish_span_error(span, :error, reason, [])
-  rescue
-    _error -> :ok
-  catch
-    _kind, _reason -> :ok
+    AgentTelemetry.finish(span, AgentTelemetry.result_metadata({:error, reason}))
   end
 
   defp finish_span_fault(nil, _kind, _reason, _stacktrace), do: :ok
 
-  defp finish_span_fault(%{legacy: legacy, telemetry: telemetry}, kind, reason, stacktrace) do
-    finish_span_fault(legacy, kind, reason, stacktrace)
+  defp finish_span_fault(span, kind, reason, _stacktrace) do
     metadata = AgentTelemetry.result_metadata({:error, reason}) |> Map.put(:kind, kind)
-    AgentTelemetry.finish(telemetry, metadata, %{}, :exception)
+    AgentTelemetry.finish(span, metadata, %{}, :exception)
   end
-
-  defp finish_span_fault(span, kind, reason, stacktrace) do
-    Observe.finish_span_error(span, kind, reason, stacktrace)
-  rescue
-    _error -> :ok
-  catch
-    _kind, _reason -> :ok
-  end
-
-  defp directive_type(%{__struct__: module}), do: module |> Module.split() |> List.last()
-  defp directive_type(_directive), do: "Custom"
 
   defp normalize_event_limit(limit) when is_integer(limit) and limit >= 0, do: limit
   defp normalize_event_limit(_limit), do: 0

@@ -21,7 +21,7 @@ defmodule Jido.AgentServer.CreationCause do
 
   def schema, do: @schema
 
-  def capture(context, %{active: %{telemetry_span: %{metadata: metadata}}}) do
+  def capture(context, %{active: %{span: %{metadata: metadata}}}) do
     trace = Trace.get(context.signal) || metadata
 
     attrs = %{

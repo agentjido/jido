@@ -251,8 +251,8 @@ source Signal
 - `Jido.Error` defines six Splode errors. Some public protocols still return
   atoms, tuples, and maps.
 - Semantic telemetry separates lifecycle, Turn, commit, Directive, and
-  settlement boundaries. It excludes private state and payload data. Legacy
-  Agent Server telemetry, `Jido.Observe`, tracing, and debug paths remain.
+  settlement boundaries. It excludes private state and payload data. It is the
+  single V3 source for Telemetry, logs, metrics, and optional OpenTelemetry.
 - `jido_action` owns executable work. `jido_signal` owns Signals and ordered
   route matching. `jido` owns Agent meaning, Plugin composition, live commit,
   local runtime, persistence policy, errors, and observation.
@@ -470,7 +470,7 @@ No deprecation or removal is approved in this seam.
 | Plugin runtime Init | Keep the implemented coherent state and version input. Keep the current public state-pull recovery path during migration. |
 | Public values and errors | Add values and normalized errors only after owner, purpose, serialization, protocol exceptions, and caller migration are clear. |
 | Topology | Keep static local activation and repair. Do not require live updates for V3. |
-| Observation | Use version-1 semantic events and low-cardinality default consumers. Keep legacy `:agent_server` telemetry, `Jido.Observe`, tracing, logging, and debug until a separate removal review. |
+| Observation | Use version-1 semantic events and low-cardinality default consumers. Remove legacy `:agent_server` telemetry and `Jido.Observe`. Keep the OpenTelemetry API mapping optional and keep SDK infrastructure outside Core. |
 | Package versions | Test a declared compatible V3 pair. Do not use uncommitted sibling `jido_signal` behavior as proof for the Hex dependency. |
 
 Release rollback must not cause an older runtime to ignore a tombstone or

@@ -23,7 +23,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   def start(owner, supervisor, module, args, timeout) do
     ref = make_ref()
     timeout = finite_timeout(timeout)
-    trace = TraceContext.get()
+    trace = TraceContext.capture()
 
     case Task.Supervisor.start_child(supervisor, fn ->
            TraceContext.with_context(trace, fn -> run(owner, ref, module, args) end)

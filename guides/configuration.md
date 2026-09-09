@@ -50,23 +50,14 @@ Set instance options in application configuration:
 ```elixir
 config :my_app, MyApp.Jido,
   max_tasks: 2_000,
-  telemetry: [
-    log_level: :info,
-    slow_signal_threshold_ms: 25,
-    slow_directive_threshold_ms: 10
-  ],
-  observability: [
-    redact_sensitive: true,
-    tracer: MyApp.JidoTracer,
-    tracer_failure_mode: :warn
-  ]
+  debug: false
 ```
 
 Options passed to `MyApp.Jido.start_link/1` override application configuration.
 The default `:max_tasks` value is `1_000`. Jido validates `:name`, `:otp_app`,
 `:namespace`, `:max_tasks`, and `:persistence` before it starts any instance
-child. The established `:debug`, `:telemetry`, and `:observability` groups pass
-to their observation owner. Other unknown instance keys fail validation.
+child. It also accepts the `:debug` setting. Other unknown instance keys fail
+validation.
 
 `max_tasks` limits only children of the instance Task Supervisor. It does not
 limit Agent Server mailboxes, postponed Signals, or Plugin runtime processes.
@@ -118,13 +109,6 @@ continue.
 
 ## Configure observability
 
-Observability settings resolve in this order:
-
-1. A runtime `Jido.Debug` override for the instance
-2. Per-instance application configuration
-3. Global `:jido` application configuration
-4. The Jido default
-
 Runtime debug mode is useful during investigation:
 
 ```elixir
@@ -135,7 +119,7 @@ status = MyApp.Jido.debug_status()
 
 Do not depend on a debug override as permanent production configuration.
 
-Configure bounded semantic logs separately from the retained old log path:
+Configure bounded semantic logs globally:
 
 ```elixir
 config :jido, :telemetry,
@@ -145,7 +129,17 @@ config :jido, :telemetry,
 
 The semantic modes are `:off`, `:errors`, `:interesting`, and `:all`.
 `Jido.Telemetry.metrics/0` returns the low-cardinality semantic metric set.
-Use `legacy_metrics/0` only while an old Agent Server reporter migrates.
+
+The runtime debug setting has priority for events from that Jido instance.
+`:on` selects `:interesting`, and `:verbose` selects `:all`.
+
+OpenTelemetry is optional. A host that uses it must add both
+`opentelemetry_api` and an OpenTelemetry SDK. To disable the Jido mapping while
+the SDK remains active, use:
+
+```elixir
+config :jido, :opentelemetry, enabled: false
+```
 
 ## Keep ownership clear
 

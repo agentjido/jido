@@ -44,8 +44,8 @@ defmodule Jido.InstanceHelpersTest do
     assert instance == Jido.Default
     assert :ok = Jido.debug(:on)
     assert Jido.debug() == :on
-    assert :ok = Jido.debug(:verbose, redact: false)
-    assert Jido.Debug.override(instance, :redact_sensitive) == false
+    assert :ok = Jido.debug(:verbose)
+    assert Jido.Debug.override(instance, :semantic_log_mode) == :all
     assert :ok = Jido.debug(:off)
     assert Jido.debug() == :off
   end

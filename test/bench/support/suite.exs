@@ -9,7 +9,6 @@ Code.require_file("plugin_cases.exs", __DIR__)
 Code.require_file("persistence_cases.exs", __DIR__)
 Code.require_file("scheduler_cases.exs", __DIR__)
 Code.require_file("codec_cases.exs", __DIR__)
-Code.require_file("observe_cases.exs", __DIR__)
 Code.require_file("authoring_cases.exs", __DIR__)
 Code.require_file("topology_cases.exs", __DIR__)
 
@@ -27,7 +26,6 @@ defmodule JidoCoreBench.Suite do
     PersistenceCases,
     SchedulerCases,
     CodecCases,
-    ObserveCases,
     AuthoringCases,
     TopologyCases
   }
@@ -120,7 +118,6 @@ defmodule JidoCoreBench.Suite do
       PersistenceCases.workloads() ++
       SchedulerCases.workloads(s.payloads) ++
       CodecCases.workloads() ++
-      ObserveCases.workloads() ++
       AuthoringCases.workloads(s.sizes) ++
       TopologyCases.workloads(s.sizes)
   end

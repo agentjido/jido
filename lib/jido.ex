@@ -337,7 +337,6 @@ defmodule Jido do
       - `debug(:verbose)` — enable maximum detail
       - `debug(:off)` — disable debug overrides
       - `debug(pid)` — enable debug mode for one Agent Server
-      - `debug(:on, redact: false)` — also disable redaction
       """
       @spec debug() :: Jido.Debug.level()
       def debug, do: Jido.Debug.level(__MODULE__)
@@ -345,9 +344,6 @@ defmodule Jido do
       @spec debug(Jido.Debug.level() | pid()) :: :ok | {:error, term()} | Jido.Debug.level()
       def debug(pid) when is_pid(pid), do: Jido.AgentServer.set_debug(pid, true)
       def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
-
-      @spec debug(Jido.Debug.level(), keyword()) :: :ok
-      def debug(level, opts) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level, opts)
 
       @doc "Returns recent debug events from an Agent Server ring buffer."
       @spec recent(pid(), non_neg_integer()) :: {:ok, [map()]} | {:error, term()}
@@ -416,10 +412,6 @@ defmodule Jido do
 
   @spec debug(Jido.Debug.level()) :: :ok
   def debug(level) when is_atom(level), do: Jido.Debug.enable(@default_instance, level)
-
-  @spec debug(Jido.Debug.level(), keyword()) :: :ok
-  def debug(level, opts) when is_atom(level),
-    do: Jido.Debug.enable(@default_instance, level, opts)
 
   @doc """
   Start the default Jido instance for scripts and Livebook.

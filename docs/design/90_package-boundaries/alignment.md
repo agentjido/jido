@@ -162,8 +162,9 @@ did not rerun runtime tests.
 - Instance persistence defaults and per-Agent adapter overrides or disablement
   are supported.
 - ETS, File, and Redis persistence adapters are in Jido core.
-- Semantic Telemetry, legacy Agent Server Telemetry, `Jido.Observe`, tracing,
-  and local debug paths coexist.
+- Semantic Telemetry, optional OpenTelemetry API mapping, W3C tracing, and local
+  debug paths coexist. Legacy Agent Server Telemetry and `Jido.Observe` are
+  removed before V3 release.
 
 ### Current limits
 
@@ -361,7 +362,7 @@ No deprecation or removal is approved in this seam.
 | Durable values | Do not publish new Ref, Checkpoint, Commit, or Record types until owners, fields, validation, serialization, errors, and migration are approved. |
 | Static Topology | Keep local definition, Builder, Codec, extensions, Controller, readiness, and repair. Live target update is not a V3 package-boundary gate. |
 | Remote children | Keep explicit known-node start and ownership. Do not present it as membership, automatic placement, or failover policy. |
-| Observation | Keep semantic and legacy Telemetry, `Jido.Observe`, tracing, and debug paths until seam 13 proves any replacement. |
+| Observation | Use semantic Telemetry as the single source. Keep the OpenTelemetry API mapping optional and keep SDK and exporter policy outside Core. |
 | Package versions | Test one V3 set. Restore publishable dependency sources before release unless an approved exception exists. |
 | V2 stored data | No automatic conversion is implied. Any import or rejection policy needs versioned fixtures and operator rollback limits. |
 

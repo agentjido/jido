@@ -21,7 +21,7 @@ only when the extension needs the authority that the contract supplies.
 | Convert one Plugin-owned state value | `Jido.Persistence.Plugin` | The facet has no adapter, key, revision, complete-Agent, or commit authority. |
 | Add bounded static Plugin topology | `Jido.Topology.Plugin` | The facet returns canonical static entries. It has no process or live-control authority. |
 | Request runtime work after an Agent commit | `Jido.Agent.Directive` | The runtime handles a typed Directive after commit. A Directive is not a durable delivery guarantee. |
-| Observe Agent behavior | `Jido.Observe.Tracer` or a Telemetry handler | Observation has no authority to change evaluation, commit, or runtime results. |
+| Observe Agent behavior | A semantic Telemetry handler or the optional OpenTelemetry API mapping | Observation has no authority to change evaluation, commit, or runtime results. |
 
 Builders and codecs are public authoring tools. Use them for trusted systems
 that create Agent or Topology definitions. The `spawn_fun` option is a public

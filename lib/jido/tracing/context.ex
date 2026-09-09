@@ -7,9 +7,20 @@ defmodule Jido.Tracing.Context do
   """
 
   alias Jido.Signal
+  alias Jido.Telemetry.OpenTelemetry
   alias Jido.Tracing.Trace
 
   @context_key {:jido, :trace_context}
+  @otel_restore_key {:jido, :opentelemetry_restore_context}
+
+  defmodule Captured do
+    @moduledoc false
+
+    @enforce_keys [:trace, :otel_context]
+    defstruct [:trace, :otel_context]
+
+    @type t :: %__MODULE__{trace: map() | nil, otel_context: term() | nil}
+  end
 
   @doc """
   Ensures trace context exists from a signal.
@@ -25,6 +36,7 @@ defmodule Jido.Tracing.Context do
       nil ->
         trace = Trace.new_root()
         Process.put(@context_key, trace)
+        replace_open_telemetry_context(trace)
 
         case Trace.put(signal, trace) do
           {:ok, traced_signal} -> {traced_signal, trace}
@@ -33,6 +45,7 @@ defmodule Jido.Tracing.Context do
 
       trace ->
         Process.put(@context_key, trace)
+        replace_open_telemetry_context(trace)
         {signal, trace}
     end
   end
@@ -50,6 +63,7 @@ defmodule Jido.Tracing.Context do
 
       trace ->
         Process.put(@context_key, trace)
+        replace_open_telemetry_context(trace)
         :ok
     end
   end
@@ -60,6 +74,7 @@ defmodule Jido.Tracing.Context do
   @spec clear() :: :ok
   def clear do
     Process.delete(@context_key)
+    restore_open_telemetry_context()
     :ok
   end
 
@@ -72,15 +87,29 @@ defmodule Jido.Tracing.Context do
   end
 
   @doc false
-  @spec with_context(map() | nil, (-> result)) :: result when result: term()
+  @spec capture() :: Captured.t()
+  def capture do
+    %Captured{trace: get(), otel_context: OpenTelemetry.current_context()}
+  end
+
+  @doc false
+  @spec with_context(map() | Captured.t() | nil, (-> result)) :: result when result: term()
+  def with_context(%Captured{} = captured, fun) when is_function(fun, 0) do
+    with_contexts(captured.trace, captured.otel_context, fun)
+  end
+
   def with_context(context, fun)
       when (is_map(context) or is_nil(context)) and is_function(fun, 0) do
+    with_contexts(context, OpenTelemetry.context_from_trace(context), fun)
+  end
+
+  defp with_contexts(context, otel_context, fun) do
     previous = get()
 
     if context, do: Process.put(@context_key, context), else: Process.delete(@context_key)
 
     try do
-      fun.()
+      OpenTelemetry.with_context(otel_context, fun)
     after
       if previous,
         do: Process.put(@context_key, previous),
@@ -114,7 +143,7 @@ defmodule Jido.Tracing.Context do
       trace ->
         case Trace.child_of(trace, causation_id) do
           {:error, :invalid_trace_context} = error -> error
-          child -> Trace.put(signal, child)
+          child -> Trace.put(signal, OpenTelemetry.inject_trace_context(child))
         end
     end
   end
@@ -141,5 +170,22 @@ defmodule Jido.Tracing.Context do
         |> Enum.map(fn {k, v} -> {:"jido_#{k}", v} end)
         |> Map.new()
     end
+  end
+
+  defp replace_open_telemetry_context(trace) do
+    restore_open_telemetry_context()
+
+    case OpenTelemetry.restore_trace_context(trace) do
+      nil -> :ok
+      restore_context -> Process.put(@otel_restore_key, restore_context)
+    end
+
+    :ok
+  end
+
+  defp restore_open_telemetry_context do
+    @otel_restore_key
+    |> Process.delete()
+    |> OpenTelemetry.detach_trace_context()
   end
 end
