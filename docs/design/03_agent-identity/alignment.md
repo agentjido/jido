@@ -5,14 +5,15 @@
 ## Status
 
 - Design reviewed: 2026-09-08. This seam is pending approval.
-- Code reviewed: `dc2b6844086a90f384102b2459f800a737f0cfdd` on branch
-  `v3-spike`.
+- Code and Ref implementation reviewed: 2026-09-09 on branch `v3-spike`,
+  after package-boundary commit `82956491`.
 - Prerequisite alignments: [00 Overview](../00_overview/alignment.md),
-  [90 Package boundaries](../90_package-boundaries/alignment.md),
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md), and
-  [01 Agent](../01_agent/alignment.md), all used as pending draft
-  prerequisites.
-- Alignment state: `Draft`.
+  [90 Package boundaries](../90_package-boundaries/alignment.md), and
+  [01 Agent](../01_agent/alignment.md), which are approved. The approved
+  seam-12 error contract remains the validation boundary; its package-boundary
+  inventory revalidation is pending approval.
+- Alignment state: `Ref value implemented; dependent boundary use remains
+  with owner seams`.
 - Approved decisions: None.
 
 The alignment state is execution status. It is not document approval. This
@@ -41,6 +42,8 @@ file defines outcomes and gates. It is not an implementation plan.
 
 ### Canonical code
 
+- `lib/jido/agent/ref.ex`: the public Ref now validates the exact namespace,
+  optional partition, and ID tuple and provides a strict version-1 map codec.
 - `lib/jido/agent.ex:96-135,327-337`: an Agent instance has one nonempty
   string ID and no namespace or partition field.
 - `lib/jido.ex:70-107,144-185`: `use Jido` has no namespace option. Generated
@@ -111,7 +114,7 @@ file defines outcomes and gates. It is not an implementation plan.
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
-| `ID-GAP-001` | `ID-REQ-001` to `ID-REQ-013` | No `Jido.Agent.Ref`; research example has an application struct | Core has no Ref constructor, validator, equality rule, or portable map codec. | `Change` |
+| `ID-GAP-001` | `ID-REQ-001` to `ID-REQ-013` | `Jido.Agent.Ref`, focused contract tests, and the stable-reference example | Core provides the constructor, validator, exact equality, exclusions, and strict version-1 map codec. | `Aligned` |
 | `ID-GAP-002` | `ID-REQ-006`, `ID-REQ-015`, `ID-REQ-017` | Jido instance atom and module scope Registry and storage | No stable namespace can survive module replacement or bind one identity domain across instance lifetimes. | `Change`; seam 09 owns binding |
 | `ID-GAP-003` | `ID-REQ-003`, `ID-REQ-016`, `ID-REQ-026` | Partition is `term()` and tests use `:blue` | The target Ref uses `nil` or a nonempty binary string. | `Change, staged` |
 | `ID-GAP-004` | `ID-REQ-014`, `ID-REQ-018` | Agent, Registry, and RuntimeStore use separate ID and partition inputs | They do not start from one validated Ref. | `Change` |
@@ -119,7 +122,7 @@ file defines outcomes and gates. It is not an implementation plan.
 | `ID-GAP-006` | `ID-REQ-021`, `ID-REQ-023`, `ID-REQ-024` | Parent and child delivery uses saved IDs and PIDs | Delivery does not carry one Ref and a changed PID can make a saved handle stale. | `Change`; seams 08 and 10 own resolution |
 | `ID-GAP-007` | `ID-REQ-022` | Remote spawn carries node, Jido atom, ID, partition, parent PID, and request reference | Stable identity and requested location have no separate public values. | `Change`; do not change placement policy here |
 | `ID-GAP-008` | `ID-REQ-025`, `ID-REQ-026` | Public ID, PID, generated-name, and term-partition APIs are active and tested | A direct replacement would break supported behavior. | `Retain` during additive migration |
-| `ID-GAP-009` | All requirements | Current tests cover separate parts only | No acceptance set proves exact Ref preservation across all boundaries. | `Change evidence` |
+| `ID-GAP-009` | All requirements | Focused Ref tests prove the owned value contract; current runtime tests cover separate consumers | Dependent seams must prove exact Ref preservation at their boundaries. | `Owner-deferred evidence` |
 
 ## Dispositions of earlier analysis
 
@@ -158,6 +161,7 @@ Create the implementation plan later, after the design is approved.
 ### Phase 1 — Establish the public Ref value
 
 - Requirements: `ID-REQ-001` to `ID-REQ-013`.
+- State: implemented and verified on 2026-09-09.
 - Required outcome: one validated, portable, exact-equality Ref and version-1
   map round trip.
 - Constraints: keep the Agent value shape and do not add runtime data to Ref.
@@ -217,7 +221,7 @@ Create the implementation plan later, after the design is approved.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `ID-REQ-001` to `ID-REQ-013` | Application Ref example only | Core value, field validation, exact equality, errors, and version-1 map round trips | `Missing` |
+| `ID-REQ-001` to `ID-REQ-013` | `lib/jido/agent/ref.ex`; `test/jido/agent/ref_test.exs`; stable-reference example and tests | Core value, field validation, exact equality, errors, exclusions, and version-1 map round trips | `Proven` |
 | `ID-REQ-014` | Agent ID and checkpoint identity checks | Ref-to-Agent mismatch test at every binding boundary | `Partial` |
 | `ID-REQ-015` and `ID-REQ-017` | Separate Jido instance Registries and storage keys | Stable namespace tests across instance restart and module rename | `Partial` |
 | `ID-REQ-016` | Partitioned Registry and persistence tests | Ref equality and isolation for `nil` and binary partitions | `Partial` |
@@ -265,7 +269,7 @@ No removal or deprecation is approved in this seam.
 - [ ] Prerequisite drafts are approved or replaced by explicit assumptions.
 - [ ] Every approved `ID-REQ` item has `Proven` evidence.
 - [ ] No unresolved `Conflict` remains in the acceptance matrix.
-- [ ] Ref construction, validation, equality, and portable encoding have public
+- [x] Ref construction, validation, equality, and portable encoding have public
       contract tests.
 - [ ] Namespace and partition isolation work across process, instance, module,
       and node changes.

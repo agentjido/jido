@@ -59,10 +59,26 @@ values.
 
 ## Keep Identity Stable
 
-An Agent ID identifies one logical instance inside a Jido instance and
-partition. A state version identifies one committed revision. An activation ID
-identifies one Agent Server lifetime. Do not use these values as substitutes
-for one another.
+An Agent ID identifies one logical instance in the current Jido instance and
+partition APIs. A `Jido.Agent.Ref` gives the logical Agent one stable
+`{namespace, partition, id}` identity value:
+
+```elixir
+ref =
+  Jido.Agent.Ref.new!(
+    namespace: "my-app/primary",
+    partition: nil,
+    id: agent.id
+  )
+```
+
+The Ref does not contain the Agent module, PID, node, or a revision. Current
+runtime functions still accept IDs, PIDs, and existing partition values while
+Ref-first runtime support is added.
+
+A state version identifies one committed revision. An activation ID identifies
+one Agent Server lifetime. Do not use these values as substitutes for one
+another.
 
 Next, read [State Schemas](state-schemas.livemd) and
 [Portable State And Checkpoints](portable-state-and-checkpoints.md).

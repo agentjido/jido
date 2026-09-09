@@ -1,22 +1,27 @@
 # FA-03: Stable Agent references and durable namespace identity
 
-Status: **Core feature required; application reference works**.
+Status: **Core Ref available; durable namespace identity required**.
 
-Baseline on 2026-09-05: 2 passing and 1 failing checks.
-As of 2026-09-07, the failing test is temporarily skipped, with reasons.
+Result on 2026-09-09: 2 passing and 1 skipped acceptance check.
 The original assertions remain. See the [research test policy](../README.md).
 
 ## Feature and proof
 
-An application reference survives persistent process replacement. Equal IDs in separate namespaces remain isolated. Rebinding the same namespace to a new local Jido instance makes thaw return not_found because storage identity contains the old instance name.
+A `Jido.Agent.Ref` survives persistent process replacement. Equal IDs in
+separate namespaces remain isolated. Rebinding the same namespace to a new
+local Jido instance makes thaw return `not_found` because storage identity
+contains the old instance name.
 
 ## Required change
 
-Use one canonical namespace, partition, and ID value in live addressing and persistence. Add the proposed Ref facade without requiring a saved PID.
+Use the Ref in live addressing and persistence without requiring a saved PID.
 
 ## Scope
 
-StableReference is an example-owned struct. Local lookup uses the current public Jido.whereis_agent/3 and AgentServer API. The passing controls do not establish a core Ref API. Storage uses the controlled in-memory byte adapter.
+`Jido.Agent.Ref` owns the identity value. This example owns the namespace to
+Jido instance binding. Local lookup uses the current public
+`Jido.whereis_agent/3` and AgentServer API. Storage uses the controlled
+in-memory byte adapter.
 
 ## Run
 

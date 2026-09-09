@@ -435,7 +435,7 @@ V3 adds these modules:
 | `Jido.Memory.Space` | **Removed.** Define explicit list, map, retention, and compaction rules in the application. |
 | `Jido.Memory.Agent` | **Removed.** Update memory through routed Actions that return complete state. |
 | `Jido.Memory.Plugin` | **Removed.** Write a V3 Plugin only when memory needs owned state or a live resource. |
-| `Jido.Agent.Identity` | **Removed.** Define identity and revision data in the application domain. |
+| `Jido.Agent.Identity` | **Replaced for stable Agent identity.** Use `Jido.Agent.Ref` for the exact namespace, partition, and ID value. Keep revision data separate. |
 | `Jido.Agent.Identity.Agent` | **Removed.** Access identity through application functions. |
 | `Jido.Agent.Identity.Plugin` | **Removed.** Use a custom V3 Plugin only when identity needs a runtime capability. |
 | `Jido.Agent.Identity.Profile` | **Removed.** Keep profile policy and evolution in the application. |

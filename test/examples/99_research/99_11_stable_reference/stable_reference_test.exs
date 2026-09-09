@@ -1,6 +1,7 @@
 defmodule JidoTest.Examples.StableReferenceTest do
   use JidoTest.Case, async: true
   @moduletag :example
+  alias Jido.Agent.Ref
   alias Jido.Examples.{StableReference, PersistenceProbeStore}
   alias StableReference.Conversation
 
@@ -8,7 +9,7 @@ defmodule JidoTest.Examples.StableReferenceTest do
     store = start_supervised!(PersistenceProbeStore)
     other = :"ref_other_#{System.unique_integer([:positive])}"
     start_supervised!({Jido, name: other})
-    ref = %StableReference{namespace: "chat/primary", partition: "team-a", id: "conversation"}
+    ref = Ref.new!(namespace: "chat/primary", partition: "team-a", id: "conversation")
 
     %{
       store: {PersistenceProbeStore, store: store},

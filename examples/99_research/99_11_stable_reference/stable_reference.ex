@@ -24,20 +24,17 @@ end
 
 defmodule Jido.Examples.StableReference do
   @moduledoc """
-  An application reference resolved through public lookup on each call.
-  Bindings map a stable namespace to a current Jido instance. The example
-  supplies this reference; core does not yet supply Jido.Agent.Ref.
-  """
-  @schema Zoi.struct(__MODULE__, %{
-            namespace: Zoi.string(),
-            partition: Zoi.string(),
-            id: Zoi.string()
-          })
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
-  def schema, do: @schema
+  Resolves a stable Agent Ref through public lookup on each call.
 
-  def append(ref, bindings, text) do
+  Application bindings map the Ref namespace to a current Jido instance.
+  Runtime lookup still uses the current ID and partition API.
+  """
+
+  alias Jido.Agent.Ref
+
+  @spec append(Ref.t(), %{required(String.t()) => atom()}, String.t()) ::
+          {:ok, Jido.Agent.t()} | {:error, term()}
+  def append(%Ref{} = ref, bindings, text) do
     instance = Map.fetch!(bindings, ref.namespace)
 
     case Jido.whereis_agent(instance, ref.id, partition: ref.partition) do
