@@ -229,12 +229,11 @@ defmodule Jido.Error do
     @moduledoc """
     Error for signal routing and dispatch failures.
 
-    Agent command preparation uses this public type for missing routes, invalid
-    Signal types, and multiple matching executable targets. This applies to
-    direct Agent commands and live Agent Server calls. A wrapped Signal Router
-    error retains its details and retry hints, with the original error stored
-    in `details.cause`. Multiple matching targets include `details.count` and
-    `details.targets`.
+    Agent command preparation uses this public type for missing routes and
+    invalid Signal types. This applies to direct Agent commands and live Agent
+    Server calls. When several targets match, Jido uses the first target in
+    Router order. A wrapped Signal Router error retains its details and retry
+    hints, with the original error stored in `details.cause`.
 
     ## Fields
 

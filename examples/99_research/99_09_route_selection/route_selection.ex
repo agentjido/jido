@@ -61,7 +61,7 @@ defmodule Jido.Examples.RouteSelection.Fallback do
 end
 
 defmodule Jido.Examples.RouteSelection.Rewritten do
-  @moduledoc "A Plugin changes the Signal type before route selection."
+  @moduledoc "A Plugin changes the effective Signal type after fixed route selection."
   use Jido.Agent, name: "research_route_rewritten"
   alias Jido.Examples.RouteSelection.{Record, Rewrite}
 

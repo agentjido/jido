@@ -4,13 +4,12 @@
 
 ## Briefing
 
-Jido has one working command path for direct and live execution. The private
-Runner prepares Plugins, selects a Turn, calls `Jido.Exec`, applies Plugin state
-updates, and validates a candidate Agent. The main target change is to select
-one fixed executable from the unchanged source Signal before Plugin
-preparation. The target also gives each Plugin bounded, owned input and makes
-the shared candidate-evaluation boundary clear. All target requirements and
-decisions are pending approval.
+Jido has one command path for direct and live candidate evaluation. The private
+Runner now selects the first Router target from the unchanged source Signal,
+binds that Signal to the Turn, prepares Plugins, calls `Jido.Exec`, applies
+Plugin state updates, and validates a candidate Agent. Bounded, owned Plugin
+input remains seam-05 work. All target requirements and decisions remain
+pending approval.
 
 ## Why this seam exists
 
@@ -26,22 +25,22 @@ decisions are pending approval.
 
 | Area | Current | Target |
 | --- | --- | --- |
-| Route selection | Plugin preparation runs first and can change the Signal used for routing. Jido rejects zero or multiple Router targets. | Keep the received Signal as the source. Use the first Router target from that source before preparation and keep it fixed. |
-| Custom routing | `handle_signal/2` can return a validated `Jido.Agent.Turn`. | Keep the callback. Call it with the source Signal before Plugin preparation and keep its returned executable and input fixed. |
+| Route selection | Jido selects the first Router target from the unchanged source Signal before Plugin preparation. | Keep this implemented order and fixed selection. |
+| Custom routing | `handle_signal/2` receives the source Signal before preparation. Its validated Turn stays fixed. | Keep the callback and fixed input. |
 | Plugin input | Every preparation callback can inspect the complete Agent and change one shared Command. | Use the seam-05 bounded Agent view and one separately owned prepared input for each Plugin. |
 | Candidate assembly | Runner protects Plugin-owned state, applies Plugin updates in order, validates Directives, and validates the complete Agent. | Keep one ordered, fail-fast candidate assembly boundary with bounded Plugin contributions. |
-| Direct and live use | Both paths share Runner preparation and finalization, but the live path adds admission and Directive batch checks. | Share candidate semantics. Keep live-only admission, limits, task control, commit, and dispatch outside the parity claim. |
-| Errors and stages | Errors use mixed raw and typed values. Outcome stages also describe runtime work. | Use defined seam-12 errors and a closed private evaluator-stage set. Let seams 08 and 13 own runtime and Outcome stages. |
+| Direct and live use | Both paths share Runner selection, preparation, and finalization. The live path adds admission and Directive batch checks. | Keep candidate parity and live-only policy separation. |
+| Errors and stages | Private runtime errors identify a closed evaluator stage and map to current Outcome stages. | Keep public direct errors unchanged. Let seams 08 and 13 own runtime and Outcome policy. |
 
 ## Major gaps and work remaining
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Route order conflicts with the target | A Plugin can replace the selected behavior. | Source-Signal, first-match selection that stays fixed. | 04 Turn evaluation, with 01 Agent and 05 Plugins |
+| Route order migration | Plugins that selected behavior by changing Signal type now run after fixed selection. | Document and test source-Signal, first-match selection. | 04 Turn evaluation, with 05 Plugins |
 | Plugin preparation is not isolated | A Plugin can read the complete Agent and replace another Plugin's prepared data. | Bounded views and separately owned inputs. | 05 Plugins, consumed by 04 |
 | Shared evaluator boundary is split | Live work uses admission, async Exec, Server finalization, and live-only checks. | One candidate contract with a clear private prepare/resume shape or one complete call. | 04 Turn evaluation and 08 Agent Server |
-| Error and stage contracts differ | Direct, live, and observation paths can describe the same fault in different ways. | Defined evaluator errors and an explicit mapping to runtime observation. | 04, 08, 12, and 13 |
-| Target proof is incomplete | Research cases for first-match routing and Plugin isolation are skipped. | Passing direct/live route, parity, isolation, failure, and stale-result evidence. | 04, 05, and 08 |
+| Runtime stage evidence | The evaluator stage set maps to current Outcome stages. | Complete runtime and observation evidence. | 08 and 13 |
+| Plugin isolation proof is incomplete | First-match routing now passes, but the isolation research case is still seam-05 work. | Passing bounded-view and owned-input evidence. | 05 Plugins |
 | Executable code is not pinned | A definition revision does not freeze loaded Action or Flow code for a Turn. | An explicit V3 non-guarantee or an owned code-revision contract. | `jido_action` and 04 Turn evaluation |
 
 ## Decisions requested
@@ -69,14 +68,14 @@ decisions are pending approval.
   [90 Package boundaries](../90_package-boundaries/alignment.md),
   [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
   [01 Agent](../01_agent/alignment.md), and
-  [02 Agent authoring](../02_agent-authoring/alignment.md). Overview, Agent,
-  and Agent authoring are approved. Package boundaries and errors remain
-  pending. [03 Agent identity](../03_agent-identity/alignment.md) was also
+  [02 Agent authoring](../02_agent-authoring/alignment.md). Overview, package
+  boundaries, Agent, Agent authoring, and the seam-12 error contract are
+  approved. [03 Agent identity](../03_agent-identity/alignment.md) was also
   reviewed; it does not own candidate evaluation.
 - Dependents: 05 Plugins, 06 Commit and effects, 08 Agent Server, 13
   Observability, and 99 Delivery.
-- Blockers: prerequisite approval; seam-05 bounded callback values; the final
-  private/live stage mapping; and the code-revision decision.
+- Owner dependencies: seam-05 bounded callback values and seam-08 and seam-13
+  runtime evidence. V3 does not pin loaded executable code to Agent `vsn`.
 
 ## Documents
 

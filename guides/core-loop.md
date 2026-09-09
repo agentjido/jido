@@ -9,10 +9,11 @@ For live execution, start an Agent under a Jido instance. Send the Signal throug
 `{:ok, committed_agent}` after commit. A pre-commit failure returns
 `{:error, reason}`. A successful cast confirms sending only.
 
-The Server serializes admission, execution, commit, and directive work. Plugins
-can prepare command input before route selection. The Signal must resolve to
-one executable. The Runner protects Plugin-owned state, validates directives,
-applies owned Plugin state updates, and validates the complete candidate.
+The Server serializes admission, execution, commit, and directive work. Jido
+selects the first executable from the unchanged source Signal. Plugins can then
+prepare command input, but they cannot replace the selection. The Runner
+protects Plugin-owned state, validates directives, applies owned Plugin state
+updates, and validates the complete candidate.
 The Server commits before dispatch. A failed directive preserves that commit
 and stops later directives in its batch. Error policy then applies.
 

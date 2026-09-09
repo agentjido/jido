@@ -5,8 +5,8 @@ source. Declare routes in the Agent definition or the declarative `routes` block
 
 A route target can be an Action or Flow. A `{target, defaults}` route merges
 its defaults with Signal data. Signal data takes precedence. The merge is
-shallow. The resulting route selection must contain exactly one executable;
-zero or multiple targets return a routing error.
+shallow. Jido selects the first target in Jido Signal Router order. No match
+returns a routing error.
 
 The `routes` block can set `signal_source` and declare nested `define` entries
 for generated Signal and command functions. Exact routes can expose interfaces;

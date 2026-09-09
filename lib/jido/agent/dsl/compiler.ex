@@ -5,6 +5,9 @@ defmodule Jido.Agent.DSL.Compiler do
   alias Spark.Dsl.Extension
 
   defmacro __before_compile__(env) do
+    default_handle_signal? =
+      Module.get_attribute(env.module, :jido_handle_signal_definition_count) == 1
+
     original = Module.get_attribute(env.module, :jido_agent_options)
     config = unwrap!(Authoring.attrs(original), env)
     config = host_config(config, env)
@@ -68,6 +71,9 @@ defmodule Jido.Agent.DSL.Compiler do
 
       @doc false
       def __agent_interfaces__, do: unquote(Macro.escape(interfaces))
+
+      @doc false
+      def __jido_default_handle_signal__?, do: unquote(default_handle_signal?)
 
       unquote_splicing(generated)
 

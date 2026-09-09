@@ -5,7 +5,8 @@
 ## Status
 
 - Design reviewed: 2026-09-08.
-- Code reviewed: `54af651c37ce61c1d5e96dbaba324ea596fa2888`.
+- Code and implementation reviewed: 2026-09-09 on branch `v3-spike`, after
+  Agent identity commit `8265fb93`.
 - Prerequisite alignments:
   [00 Overview](../00_overview/alignment.md),
   [90 Package boundaries](../90_package-boundaries/alignment.md),
@@ -14,11 +15,13 @@
   [02 Agent authoring](../02_agent-authoring/alignment.md). The
   [03 Agent identity](../03_agent-identity/alignment.md) alignment was reviewed
   as related context.
-- Alignment state: `Blocked`.
+- Alignment state: `Seam-owned route and evaluator work implemented; Plugin
+  isolation remains with seam 05`.
 
 The alignment state is execution status. It is not document approval.
-Overview, Agent, and Agent authoring are approved. Package boundaries, errors,
-and this seam remain pending approval.
+Overview, package boundaries, Agent, Agent authoring, and the seam-12 error
+contract are approved. This seam remains pending approval. The changed seam-12
+package inventory documents also remain pending approval.
 
 ## Inputs and evidence
 
@@ -48,10 +51,10 @@ and this seam remain pending approval.
 | --- | --- |
 | `lib/jido/agent.ex:439-477` | `Agent.transition/2` validates complete state. `cmd/3` calls the private Runner. The default `handle_signal/2` calls the Runner route helper. |
 | `lib/jido/agent/command.ex:1-74` | A Plugin Command contains the complete Agent, Signal, and caller context. |
-| `lib/jido/agent/turn.ex:1-62` | A public prepared Turn contains one executable and input and accepts Action or Flow targets. |
-| `lib/jido/agent/command/runner.ex:29-47` | Direct execution prepares, calls `Jido.Exec.run/4`, and finalizes. It catches raises, throws, and exits as flat errors. |
-| `lib/jido/agent/command/runner.ex:64-93` | Runner validates input, prepares Plugins, then calls `handle_signal/2` with the prepared Signal. The prepared Signal becomes execution context. |
-| `lib/jido/agent/command/runner.ex:107-118,178-219` | Default routing requires exactly one target and merges route defaults with Signal data so Signal data wins. |
+| `lib/jido/agent/turn.ex` | A public prepared Turn contains the executable, input, and unchanged source Signal. Existing constructors remain compatible. |
+| `lib/jido/agent/command/runner.ex` | Direct execution selects before preparation, calls `Jido.Exec.run/4`, and finalizes. Private Server results use a closed stage set. |
+| `lib/jido/agent/command/runner.ex` | Runner keeps source and effective Signals separate and gives route input effective data without changing the selected executable. |
+| `lib/jido/agent/dsl/compiler.ex`; `lib/jido/agent.ex` | Generated Agents expose a private default-handler marker so the evaluator can keep default route data behavior and custom Turn input behavior distinct. |
 | `lib/jido/agent/command/runner.ex:120-154,229-260` | Finalization normalizes executable output, protects Plugin state, validates Directive ownership, applies Plugin state updates, and validates the candidate. |
 | `lib/jido/plugin.ex:2-24,67-102` | Public Plugin documentation and callbacks expose live admission, a shared Command preparation callback, state update, and Directive ownership. |
 | `lib/jido/plugin.ex:696-723` | Plugin preparation is a serial, fail-fast reduce in declaration order. |
@@ -77,7 +80,8 @@ and this seam remain pending approval.
 | `test/jido/agent_server/runtime_boundary_test.exs:232-259` | Normal `Jido.Exec` execution can exceed `directive_timeout`. |
 | `test/jido/persistence_test.exs:259-345` | A successful Turn writes revision 1. A conflict prevents live state change and Directive dispatch. |
 | `test/jido/agent/turn/outcome_test.exs:24-103` | Current Outcome stage, status, revision, Directive count, and time rules are covered. |
-| `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct/live parity for one route and an unrelated fallback pass. First-match and fixed-selection cases are skipped. |
+| `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct/live parity, fallback, exact-first precedence, and fixed source-Signal selection all pass. |
+| `test/jido/agent/turn_evaluation_test.exs` | Custom routing runs before preparation, Turn source identity is exact, direct/live candidates match, and private stage tags are bounded. |
 | `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state write protection passes. Bounded reads and separate prepared inputs are skipped. |
 
 ## Retained baseline
@@ -105,15 +109,15 @@ All dispositions are recommendations and are pending approval.
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
-| `TURN-GAP-001` | `TURN-REQ-001`, `TURN-REQ-005`, `TURN-REQ-008`, `TURN-REQ-019`, `TURN-REQ-020` | Runner lines 64-90; route research case | Plugin preparation changes the Signal before routing and can replace selection. | `Change` to source-Signal selection and fixed executable. |
-| `TURN-GAP-002` | `TURN-REQ-006`, `TURN-REQ-007` | Runner lines 178-193; Agent route tests | Jido rejects every target count except one. | `Change` to first returned target and keep no-route failure. |
-| `TURN-GAP-003` | `TURN-REQ-011` to `TURN-REQ-013` | Runner lines 221-227; custom routing tests | Custom routing is supported, but it runs after preparation. Callback faults are not fully normalized. | `Change order`; retain the callback and fixed returned Turn. |
-| `TURN-GAP-004` | `TURN-REQ-009`, `TURN-REQ-010` | Runner lines 204-210; route-default tests | Merge precedence works, but route defaults and input are built only after prepared-Signal routing. | `Retain precedence`; keep selected defaults before preparation. |
+| `TURN-GAP-001` | `TURN-REQ-001`, `TURN-REQ-005`, `TURN-REQ-008`, `TURN-REQ-019`, `TURN-REQ-020`, `TURN-REQ-044` | Runner, Turn, focused evaluation tests, and route research case | Selection uses the unchanged source Signal before preparation and stays fixed. | `Aligned` |
+| `TURN-GAP-002` | `TURN-REQ-006`, `TURN-REQ-007` | Runner, Agent route tests, and route research case | Jido selects the first Router target and preserves the normalized no-route error. | `Aligned` |
+| `TURN-GAP-003` | `TURN-REQ-011` to `TURN-REQ-013` | Runner and custom-selection tests | The callback receives the source Signal before Plugins. Its executable and input stay fixed. | `Aligned` |
+| `TURN-GAP-004` | `TURN-REQ-009`, `TURN-REQ-010` | Runner materialization and route-default tests | Route defaults stay fixed and effective Signal data has precedence. | `Aligned` |
 | `TURN-GAP-005` | `TURN-REQ-014` to `TURN-REQ-018` | Plugin Command and preparation code; isolation research case | Order and fail-fast behavior work. Complete Agent access and shared prepared data do not meet isolation. | `Retain` order; `Change` callback data after seam 05. |
 | `TURN-GAP-006` | `TURN-REQ-021` to `TURN-REQ-026` | Runner execution and finalization; Agent and Plugin tests | Outer execution, output shape, state protection, and ownership checks mostly work. Error codes remain incomplete. | `Retain`; align errors with seam 12. |
 | `TURN-GAP-007` | `TURN-REQ-027` to `TURN-REQ-031` | Plugin state update code; isolation research case | Serial owned-state update works, but bounded Transition, owned prepared input, and contribution isolation do not exist. | `Change` after seam-05 contract approval. |
 | `TURN-GAP-008` | `TURN-REQ-032`, `TURN-REQ-033` | Runner lines 120-133; ActiveTurn lines 60-70 | Candidate validation works. No single private result carries all recommended metadata. | `Retain` validation; `Change` private handoff. |
-| `TURN-GAP-009` | `TURN-REQ-034` to `TURN-REQ-036` | Runner lines 29-47,96-105; Plugin wrappers | Fault handling is uneven and no closed evaluator-stage result exists. | `Change` through seam-12 normalization and stage mapping. |
+| `TURN-GAP-009` | `TURN-REQ-034` to `TURN-REQ-036` | Callback wrappers, staged Runner results, and Agent Server mapping | Callback faults use seam-12 errors. Private Server results use the closed stage set. | `Aligned` for current callbacks and runtime mapping |
 | `TURN-GAP-010` | `TURN-REQ-037` to `TURN-REQ-040` | Agent `cmd/3`, Runner, and Agent Server | Direct and live share preparation and finalization, but live execution splits the boundary. | `Retain` candidate semantics; allow one call or prepare/resume. |
 | `TURN-GAP-011` | `TURN-REQ-041`, `TURN-REQ-042` | Agent Server lines 1370-1545 | Runtime policy is outside Runner, but the parity boundary is not stated and live-only checks occur after shared finalization. | `Clarify` ownership and parity. |
 | `TURN-GAP-012` | `TURN-REQ-004`, `TURN-REQ-043` | Direct Agent tests; current architecture | The no-Plugin path works. No contract test proves the external-I/O non-rollback statement. | `Retain`; add bounded documentation and evidence. |
@@ -224,27 +228,28 @@ plan. Create that plan only after the design is approved.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `TURN-REQ-001` to `TURN-REQ-003` | ActiveTurn preserves a source value, but Runner routes after preparation. | Ordered direct/live stage test with a route-changing Plugin. | `Conflict` |
+| `TURN-REQ-001` to `TURN-REQ-003` | Runner and Turn evaluation tests | Ordered direct/live stage test with a route-changing Plugin. | `Proven` |
 | `TURN-REQ-004` | Direct Agent tests run without Plugins. | Keep one Action and one Flow no-Plugin case in the mapped suite. | `Proven` |
-| `TURN-REQ-005` to `TURN-REQ-010` | Router order is available; Jido requires exactly one target. Merge precedence passes. | First-match matrix and fixed-default tests with prepared Signal changes. | `Conflict` |
-| `TURN-REQ-011` to `TURN-REQ-013` | Custom callbacks work after preparation; invalid returns are typed but raw errors remain. | Source-before-prepare and full callback-fault matrix. | `Partial` |
+| `TURN-REQ-005` to `TURN-REQ-010` | Agent route tests and the passing route-selection example | First-match matrix and fixed-default tests with prepared Signal changes. | `Proven` |
+| `TURN-REQ-011` to `TURN-REQ-013` | Custom callback and Turn evaluation tests | Source-before-prepare and callback-fault matrix. | `Proven` |
 | `TURN-REQ-014`, `TURN-REQ-015` | Plugin preparation and live admission order tests. | Keep both direct preparation and live admission coverage. | `Proven` |
 | `TURN-REQ-016` to `TURN-REQ-018` | Isolation research assertions are skipped. | Seam-05 bounded-view and owned-input tests. | `Missing` |
-| `TURN-REQ-019`, `TURN-REQ-020` | Source and effective Signals differ in a live test, but prepared Signal controls routing. | Prove changed effective type and data cannot change selection. | `Conflict` |
+| `TURN-REQ-019`, `TURN-REQ-020` | Direct and live route-selection and custom-selection tests | Changed effective type and data cannot change selection. | `Proven` |
 | `TURN-REQ-021`, `TURN-REQ-022` | Runner and Agent Server use one outer `Jido.Exec` operation. | Action and Flow call-count tests for direct and live paths. | `Proven` |
 | `TURN-REQ-023` to `TURN-REQ-026` | Runner finalization and Plugin contract tests cover state and Directive ownership. | Add stable seam-12 error-code assertions. | `Partial` |
 | `TURN-REQ-027` | Plugin state update reduce is ordered and fail-fast. | Keep declaration-order evidence with three Plugins. | `Proven` |
 | `TURN-REQ-028` to `TURN-REQ-030` | Owned state and owned Directives are bounded, but Agent view and prepared input are not. | Contribution projection and cross-Plugin denial tests. | `Partial` |
 | `TURN-REQ-031`, `TURN-REQ-032` | Plugin failure discards the result; Agent transition validates complete state. | One candidate-discard assertion for each contribution failure type. | `Proven` |
 | `TURN-REQ-033` | Candidate and Directives return; live ActiveTurn stores effective Signal. No one private handoff has all fields. | Private result or prepare/resume contract tests. | `Partial` |
-| `TURN-REQ-034` | Plugin wrappers normalize many faults; Runner returns raw faults in some paths. | Table test for return, raise, throw, exit, and defined error at each callback. | `Partial` |
-| `TURN-REQ-035` | Some Server invariant faults re-raise; Runner catches broad faults. | Inject a broken evaluator invariant and prove OTP exit and restore behavior. | `Conflict` |
-| `TURN-REQ-036` | No closed evaluator-stage error result exists. | One failure test for every private stage and explicit live mapping. | `Missing` |
+| `TURN-REQ-034` | Agent and Plugin wrapper fault tests | Table test for return, raise, throw, exit, and defined error at each callback. | `Proven` for current callbacks |
+| `TURN-REQ-035` | Runner no longer catches internal finalization faults; ActiveTurn checks source identity | Inject a broken evaluator invariant and prove OTP exit and restore behavior. | `Partial`; restart proof belongs to seam 08 |
+| `TURN-REQ-036` | Staged Runner results, focused stage tests, and Agent Server mapping | Keep every private stage and explicit live mapping covered. | `Proven` for current stages |
 | `TURN-REQ-037` to `TURN-REQ-039` | `Agent.cmd/3` uses Runner and returns a candidate without commit or dispatch. | Keep public return and no-side-effect tests. | `Proven` |
 | `TURN-REQ-040` | Direct and live share preparation and finalization. One-route parity passes. | Full Action, Flow, Plugin, failure, output, and Directive parity matrix. | `Partial` |
 | `TURN-REQ-041` | Server-only Directive limits and dispatch checks exist after Runner finalization. | Tests that separate shared ownership checks from live policy checks. | `Partial` |
 | `TURN-REQ-042` | Runner owns no process, timer, persistence, commit, dispatch, or cancellation state. | Architecture check after the private boundary changes. | `Proven` |
 | `TURN-REQ-043` | Current code makes no rollback claim. | Executable-effect test that fails before commit and documents retained external work. | `Partial` |
+| `TURN-REQ-044` | Turn constructors, Runner source binding, ActiveTurn identity check, and focused tests | Keep exact source Signal evidence in direct and live evaluation. | `Proven` |
 
 ## Migration and compatibility
 
@@ -262,6 +267,7 @@ No removal or deprecation is approved in this seam.
 | Errors | Move raw terms to approved seam-12 errors without changing already-composed adjacent-package errors. |
 | Outcomes | Do not change Outcome fields or stages in this seam. Seams 08 and 13 own any migration and compatibility form. |
 | Code revision | Do not claim loaded-code pinning. A later guarantee needs a `jido_action` owner and release-compatible proof. |
+| Turn source | `source_signal` is additive. Existing two-argument Turn constructors remain supported for callback construction. |
 
 Rollback must restore the old route and Plugin callback behavior together. A
 mixed release must not select by the source Signal and then call a Plugin that
@@ -271,10 +277,10 @@ depends on changing route choice without a clear compatibility adapter.
 
 | ID | Type | Owner | Statement | Resolution needed |
 | --- | --- | --- | --- | --- |
-| `TURN-BLK-001` | `Blocker` | 00 Overview | Source-Signal first-match selection and shared candidate evaluation are pending approval. | Approve or replace `OVR-DEC-001` and related requirements. |
-| `TURN-BLK-002` | `Blocker` | 90 Package boundaries | The division between Jido candidate assembly and lower-package execution and routing is pending approval. | Approve or change the package boundary. |
-| `TURN-BLK-003` | `Blocker` | 12 Errors and contracts | Callback error normalization, invariant exits, and stable codes are pending approval. | Approve the seam-12 contract before final error alignment. |
-| `TURN-BLK-004` | `Blocker` | 01 Agent | Direct `cmd/3`, custom routing, combined state, and transition requirements are pending approval. | Approve or change the Agent contract. |
+| `TURN-BLK-001` | `Resolved` | 00 Overview | Source-Signal first-match selection and shared candidate evaluation are approved. | Preserve the Overview contract. |
+| `TURN-BLK-002` | `Resolved` | 90 Package boundaries | Jido owns candidate assembly. Lower packages own execution and routing semantics. | Preserve the package boundary. |
+| `TURN-BLK-003` | `Resolved contract` | 12 Errors and contracts | Callback normalization, invariant exits, and stable codes are approved. | The package inventory document revalidation does not change this contract. |
+| `TURN-BLK-004` | `Resolved` | 01 Agent | Direct `cmd/3`, custom routing, combined state, and transition requirements are approved. | Preserve the Agent contract. |
 | `TURN-BLK-005` | `Approved authoring input` | 02 Agent authoring and `jido_signal` | Authoring preserves Router order and current route-default precedence. | Confirm against the release-compatible `jido_signal` package. |
 | `TURN-BLK-006` | `Blocker` | 05 Plugins | Bounded Agent views, owned prepared inputs, Transition data, and contribution authority have no approved callback contract. | Approve seam-05 value roles and migration before evaluator isolation work. |
 | `TURN-BLK-007` | `Blocker` | 08 Agent Server and 13 Observability | Private evaluator stages have no approved mapping to live control and Outcome stages. | Approve one explicit mapping without making the vocabularies identical. |
@@ -287,7 +293,8 @@ depends on changing route choice without a clear compatibility adapter.
 
 - [ ] All approved `TURN-REQ` requirements have `Proven` evidence.
 - [ ] No unresolved `Conflict` remains.
-- [ ] Source-Signal route and Plugin-isolation research cases pass.
+- [x] The source-Signal route research case passes.
+- [ ] The Plugin-isolation research case passes after seam-05 bounded inputs.
 - [ ] Direct and live candidate parity has Action, Flow, Plugin, failure,
       output, and Directive coverage.
 - [ ] Seam 08 and seam 13 use an explicit evaluator-stage mapping.

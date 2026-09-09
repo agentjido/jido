@@ -17,7 +17,8 @@
 ## Model
 
 One evaluation starts with an immutable Agent instance and one source Signal.
-The source Signal is the value received for the Turn and does not change. Live
+The source Signal is the value received for the Turn and does not change. A
+prepared `Jido.Agent.Turn` contains that exact Signal. Live
 admission can add bounded evaluation context, but the Agent Server must keep the
 source Signal separate.
 
@@ -220,12 +221,17 @@ cancellation operation.
 fails, then the Turn evaluator shall not report that external work as rolled
 back.
 
+`TURN-REQ-044`: When the Turn evaluator prepares a `Jido.Agent.Turn`, the Turn
+evaluator shall include the unchanged source Signal in that Turn.
+
 ## Public contract
 
 The seam adds no required public evaluator module or result struct.
 `Jido.Agent.cmd/3` remains the public direct boundary and returns a candidate
 Agent and Directives or a defined error. `Jido.Agent.Turn` remains the public
-prepared value returned by custom `handle_signal/2` callbacks.
+prepared value returned by custom `handle_signal/2` callbacks. Its
+`source_signal` field can be `nil` during application construction and contains
+the unchanged received Signal after the evaluator binds the Turn.
 
 The private evaluation result carries the candidate, ordered Directives,
 effective Signal, private execution metadata, and a failure stage when needed.

@@ -16,8 +16,9 @@ defmodule Jido.Agent do
   responses can change those results. Use fixed or recorded responses when
   reproducible evaluation is required.
 
-  Agent Plugins can prepare command input before routing. A Plugin cannot
-  change domain output. A stateful Plugin can reduce its own declared state
+  Jido selects the first matching route from the unchanged source Signal before
+  Agent Plugins prepare command input. A Plugin cannot replace that selection
+  or change domain output. A stateful Plugin can reduce its own declared state
   field after executable work. The Agent validates one complete state proposal.
 
   Default Signal routing accepts an executable target or `{executable, defaults}`.
@@ -38,12 +39,12 @@ defmodule Jido.Agent do
   in `handle_signal/2`.
 
   Routing failures during command preparation return `Jido.Error.RoutingError`
-  through both `cmd/3` and `Jido.AgentServer.call/3`. Missing routes, invalid
-  Signal types, and multiple matching targets use this public type. Errors from
-  the Signal Router retain their message, details, and retry hints; the original
-  error is available in `details.cause`. The target is the original error target
-  or, when absent, the Signal type. Multiple matches include `details.count` and
-  `details.targets`.
+  through both `cmd/3` and `Jido.AgentServer.call/3`. Missing routes and invalid
+  Signal types use this public type. When several targets match, Jido uses the
+  first target in Router order. Errors from the Signal Router retain their
+  message, details, and retry hints; the original error is available in
+  `details.cause`. The target is the original error target or, when absent, the
+  Signal type.
 
   ## Declarative authoring
 
@@ -195,6 +196,9 @@ defmodule Jido.Agent do
     quote location: :keep do
       use unquote(dsl), unquote(dsl_opts)
       use Jido.Action.Inline
+      Module.register_attribute(__MODULE__, :jido_handle_signal_definition_count, persist: false)
+      @jido_handle_signal_definition_count 0
+      @on_definition {Jido.Agent, :__on_definition__}
       @before_compile Jido.Agent.DSL.Compiler
       @behaviour Jido.Agent
 
@@ -272,6 +276,15 @@ defmodule Jido.Agent do
       defoverridable handle_signal: 2, checkpoint: 2, restore: 2
     end
   end
+
+  @doc false
+  def __on_definition__(env, _kind, :handle_signal, args, _guards, _body)
+      when length(args) == 2 do
+    count = Module.get_attribute(env.module, :jido_handle_signal_definition_count) || 0
+    Module.put_attribute(env.module, :jido_handle_signal_definition_count, count + 1)
+  end
+
+  def __on_definition__(_env, _kind, _name, _args, _guards, _body), do: :ok
 
   defp authoring_host({:{}, _metadata, [:__jido_internal_host__, :topology, agent_options]}),
     do: {:topology, agent_options}
@@ -488,14 +501,15 @@ defmodule Jido.Agent do
     do: Runner.run(agent, signal, opts)
 
   @doc """
-  Routes one Signal to exactly one executable turn.
+  Routes one Signal to the first matching executable Turn.
 
   A plain target receives Signal data. A `{target, defaults}` route shallowly
   merges the defaults with Signal data, with Signal values taking precedence.
   Both forms require map data. A custom callback can construct its own Turn
   input instead of using this default routing behavior.
 
-  Route selection failures use `Jido.Error.RoutingError`. When `cmd/3` or the
+  The returned Turn contains the unchanged source Signal. Route selection
+  failures use `Jido.Error.RoutingError`. When `cmd/3` or the
   Agent Server invokes a custom callback, a returned Signal routing error is
   also normalized to this type.
   """

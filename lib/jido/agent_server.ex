@@ -1430,6 +1430,9 @@ defmodule Jido.AgentServer do
 
       {:error, reason} ->
         fail_turn(reason, :prepare, data)
+
+      {:error, stage, reason} ->
+        fail_turn(reason, evaluator_outcome_stage(stage), data)
     end
   end
 
@@ -1440,7 +1443,13 @@ defmodule Jido.AgentServer do
     command_options = Keyword.put(exec_opts, :context, command.context)
 
     with {:ok, prepared} <-
-           Runner.prepare(command.agent, command.signal, command_options, data.plugin_specs),
+           Runner.prepare_for_server(
+             command.agent,
+             data.active.source_signal,
+             command.signal,
+             command_options,
+             data.plugin_specs
+           ),
          {:ok, handle} <- start_async_exec(prepared, data),
          :ok <- link_exec(handle) do
       {:ok, handle, prepared}
@@ -1493,11 +1502,18 @@ defmodule Jido.AgentServer do
 
       _result ->
         case Runner.finish_for_server(prepared, result) do
-          {:ok, agent, directives} -> finish_success(agent, directives, data)
-          {:error, reason} -> fail_turn(reason, :finalize, data)
+          {:ok, agent, directives} ->
+            finish_success(agent, directives, data)
+
+          {:error, stage, reason} ->
+            fail_turn(reason, evaluator_outcome_stage(stage), data)
         end
     end
   end
+
+  defp evaluator_outcome_stage(stage) when stage in [:route, :prepare, :input], do: :prepare
+  defp evaluator_outcome_stage(:execute), do: :execute
+  defp evaluator_outcome_stage(stage) when stage in [:compose, :validate], do: :finalize
 
   defp finish_success(%Agent{} = agent, directives, %State{} = data) do
     with {:ok, directives} <- prepare_directives(directives, data) do

@@ -41,9 +41,10 @@ This is a write-ownership rule. It is not a read-security boundary.
 
 ## Keep Preparation Pure
 
-`prepare/2` can change the Signal or caller context before route selection. It
-must not start runtime work. A later Plugin can observe and change the prepared
-command, so declaration order is not an authorization boundary.
+`prepare/2` can change the effective Signal or caller context after route
+selection. It cannot replace the executable selected from the source Signal
+and must not start runtime work. A later Plugin can observe and change the
+prepared command, so declaration order is not an authorization boundary.
 
 Use `admit/3` when a decision needs the live Plugin runtime.
 

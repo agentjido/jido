@@ -307,7 +307,7 @@ defmodule Jido.AgentTest do
             }} = Agent.handle_signal(signal, agent)
   end
 
-  test "requires one Signal to resolve to exactly one executable" do
+  test "selects the first executable when one Signal resolves to several" do
     agent =
       Agent.new!(
         name: "counter",
@@ -317,7 +317,9 @@ defmodule Jido.AgentTest do
       |> Agent.instantiate!()
 
     signal = Signal.new!(type: "counter.add", source: "/test", data: %{})
-    assert {:error, %Jido.Error.RoutingError{}} = Agent.handle_signal(signal, agent)
+
+    assert {:ok, %Turn{executable: Add, source_signal: ^signal}} =
+             Agent.handle_signal(signal, agent)
   end
 
   test "replaces and validates the complete Agent state" do
@@ -607,7 +609,7 @@ defmodule Jido.AgentTest do
       assert {:error, %Jido.Error.RoutingError{details: %{cause: _}}} =
                Agent.handle_signal(%{signal | type: invalid.path}, %{agent | routes: [invalid]})
 
-      assert {:error, %Jido.Error.RoutingError{details: %{count: 2, targets: [Add, Add]}}} =
+      assert {:ok, %Turn{executable: Add}} =
                Agent.handle_signal(signal, %{agent | routes: [%{route | target: [Add, Add]}]})
 
       assert {:error, %Jido.Error.RoutingError{}} =
@@ -881,12 +883,19 @@ defmodule Jido.AgentTest do
 
     test "validates Action and Flow turn input values" do
       flow = JidoTest.AgentFixtures.two_step_flow()
+      signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
       assert {:ok, %Turn{executable: Add, input: %{by: 1}}} = Turn.new(Add, %{by: 1})
       assert %Turn{executable: ^flow, input: []} = Turn.new!(flow, [])
 
+      assert {:ok, %Turn{source_signal: ^signal}} = Turn.new(Add, %{by: 1}, signal)
+      assert %Turn{source_signal: ^signal} = Turn.new!(Add, %{by: 1}, signal)
+
       assert {:error, %Jido.Error.ValidationError{}} = Turn.new(Add, "invalid input")
       assert {:error, %_{} = _error} = Turn.new(String, %{})
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Turn.validate(%Turn{executable: Add, input: %{}, source_signal: :invalid})
 
       assert_raise Jido.Error.ValidationError, fn -> Turn.new!(Add, "invalid input") end
     end

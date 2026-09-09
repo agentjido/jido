@@ -1,20 +1,26 @@
 # FA-01: Route precedence and fixed selection
 
-Status: **Core feature required**.
+Status: **Core feature available**.
 
-Result on 2026-09-05: **2 passing checks; 2 failing acceptance checks.** All checks are enabled.
+Result on 2026-09-09: **4 passing checks.** All checks are enabled.
 
 ## Feature and proof
 
-A single route works in direct and live execution. The fallback handles an unrelated Signal. An exact route plus wildcards returns a RoutingError with three targets. A preparation Plugin changes the selected handler from create to cancel.
+A single route works in direct and live execution. The fallback handles an
+unrelated Signal. An exact route wins before wildcard routes. A preparation
+Plugin cannot replace the executable selected by the source Signal in direct
+or live evaluation.
 
-## Required change
+## Implemented contract
 
-Select the first route by Router precedence from the source Signal. Keep that executable fixed through Plugin preparation.
+Select the first route by Router precedence from the source Signal. Keep that
+executable fixed through Plugin preparation.
 
 ## Scope
 
-The probe uses three explicit Agent DSL definitions and cmd/3. Route defaults and the preparation Plugin are declared in the DSL. It does not replace routing with an example-owned dispatcher.
+The probe uses three explicit Agent DSL definitions and `cmd/3`. Route defaults
+and the preparation Plugin are declared in the DSL. It does not replace routing
+with an example-owned dispatcher.
 
 ## Run
 
@@ -24,6 +30,6 @@ From the jido repository:
 mix test test/examples/99_research/99_09_route_selection --include example --seed 0
 ```
 
-This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
+This command must pass with no skipped check.
 
 [Source](route_selection.ex) · [Tests](../../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)

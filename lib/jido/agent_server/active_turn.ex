@@ -61,6 +61,10 @@ defmodule Jido.AgentServer.ActiveTurn do
   def begin_execution(%__MODULE__{} = active, handle, prepared) do
     turn_context = Map.drop(prepared.context, [:agent_id, :agent_state, :signal])
 
+    if prepared.source_signal != active.source_signal do
+      raise "prepared Turn source Signal does not match the active Turn"
+    end
+
     %{
       active
       | effective_signal: prepared.signal,

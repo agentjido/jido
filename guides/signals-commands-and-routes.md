@@ -1,8 +1,8 @@
 # Signals, Commands, and Routes
 
 A Signal is a typed message. An Agent command combines one Agent instance, one
-Signal, and caller context. Routing selects exactly one Action or Flow for the
-effective Signal.
+Signal, and caller context. Routing selects the first Action or Flow for the
+unchanged source Signal.
 
 Signal construction, transport, and dispatch come from
 [Jido Signal](https://hexdocs.pm/jido_signal/).
@@ -25,8 +25,8 @@ that a business request is unique.
 ## Prepare A Command
 
 `Jido.Agent.Command` carries the current Agent, the Signal, and a caller-owned
-context map. Plugins can prepare the Signal or context before route selection.
-They cannot replace the Agent.
+context map. Jido selects a Turn before Plugins prepare the effective Signal or
+context. Plugins cannot replace the selected executable or the Agent.
 
 The live Server adds these reserved context keys for execution:
 
@@ -56,15 +56,15 @@ not fall back to defaults.
 Default routing requires map-shaped Signal data. The Signal in execution
 context keeps its original data.
 
-## Require One Target
+## Use The First Target
 
 Route patterns can use Jido Signal Router patterns and match predicates. A
-command must have exactly one matching target. No match and multiple matches
-return `Jido.Error.RoutingError` before executable work starts.
+command uses the first matching target in Router order. No match returns
+`Jido.Error.RoutingError` before executable work starts.
 
-An exact route does not silently override a matching wildcard route. Test all
-overlapping patterns. Plugin preparation can change the Signal type before
-route selection, so policy must use the effective Signal.
+Router priority and specificity put an exact route before matching wildcard
+routes. Test all overlapping patterns. Plugin preparation can change the
+effective Signal after selection, but it cannot select a different executable.
 
 ## Generate Interfaces
 

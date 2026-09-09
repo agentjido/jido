@@ -156,7 +156,7 @@ identity and state.
 | `Jido.Agent.Codec.Registry` | Maps stable trusted IDs to modules, schemas, values, and executables. | Use explicit allowlists where V2 used Discovery or dynamic module names. |
 | `Jido.Agent.Command` | Carries the Agent, Signal, and caller context through Plugin preparation. | Use it in `prepare/2` and `admit/3`. Do not store it as Agent state. |
 | `Jido.Agent.Extension` | Lowers extra declarative Agent DSL entities into Core configuration. | Use it for static authoring extensions. It does not add a runtime. |
-| `Jido.Agent.Turn` | Declares one selected executable and its input. | Most applications observe it through the Server, not by constructing it. |
+| `Jido.Agent.Turn` | Declares one selected executable, its input, and the unchanged source Signal. | Most applications observe it through the Server, not by constructing it. |
 | `Jido.Agent.Turn.Outcome` | Gives one stable terminal Turn result. | Use it in error policy and observation code. It is not domain history. |
 
 ## Map the actor runtime
