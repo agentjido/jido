@@ -17,11 +17,13 @@ defmodule Jido.Agent.Codec.Registry do
 
   @kinds [:agent, :action, :flow, :plugin, :schema, :route_match, :atom, :value]
   @schema Zoi.struct(__MODULE__, %{entries: Zoi.map()})
+  @type kind :: :agent | :action | :flow | :plugin | :schema | :route_match | :atom | :value
   @type t :: unquote(Zoi.type_spec(@schema))
   @enforce_keys Zoi.Struct.enforce_keys(@schema)
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @doc "Returns the Registry schema."
+  @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
   @doc "Validates a trusted identifier map."
@@ -40,6 +42,7 @@ defmodule Jido.Agent.Codec.Registry do
   def new(_entries), do: Authoring.error("Registry must contain at most 10000 entries")
 
   @doc "Validates a Registry or raises its error."
+  @spec new!(map() | t()) :: t() | no_return()
   def new!(entries) do
     case new(entries) do
       {:ok, registry} -> registry
@@ -48,6 +51,7 @@ defmodule Jido.Agent.Codec.Registry do
   end
 
   @doc "Resolves a stored identifier of the required kind."
+  @spec resolve(t(), String.t(), kind()) :: {:ok, term()} | {:error, term()}
   def resolve(%__MODULE__{entries: entries}, id, kind) do
     entry =
       case Map.get(entries, id) do
@@ -62,6 +66,7 @@ defmodule Jido.Agent.Codec.Registry do
   end
 
   @doc "Finds the canonical identifier for a trusted value."
+  @spec identifier(t(), kind(), term()) :: {:ok, String.t()} | {:error, term()}
   def identifier(%__MODULE__{entries: entries}, kind, value) do
     exact = Enum.find(entries, fn {_id, entry} -> entry === {kind, value} end)
     compatible = fn -> Enum.find(entries, fn {_id, entry} -> entry == {kind, value} end) end

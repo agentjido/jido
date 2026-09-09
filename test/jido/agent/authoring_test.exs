@@ -46,6 +46,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  defmodule PassThrough do
+    use Jido.Plugin
+
+    def prepare(command, _opts), do: {:ok, command}
+  end
+
   defmodule PreparedCounter do
     use Jido.Agent, name: "prepared_counter"
 
@@ -140,28 +146,58 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defmodule Counter do
-    use Jido.Agent, name: "authoring_counter", description: "All authoring forms"
+    use Jido.Agent,
+      name: "authoring_counter",
+      description: "All authoring forms",
+      vsn: 7
 
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
       metadata %{owner: :test, nested: {:tag, <<255>>}}
       plugin CountTurns, config: %{initial: 0}
+      plugin PassThrough, config: [label: :second]
     end
 
     routes do
       signal_source "/authoring"
 
       route "authoring.add", Add do
-        defaults %{amount: 1}
+        defaults %{amount: 1, flag: false}
         priority 10
         define :add, args: [{:optional, :amount}]
         define :add_exact, args: [:amount]
       end
 
       route "authoring.flow", Flow do
+        defaults %{amount: 2}
+        priority -5
         define :flow_add, args: [:amount]
       end
     end
+  end
+
+  defmodule KeywordCounter do
+    use Jido.Agent,
+      name: "authoring_counter",
+      description: "All authoring forms",
+      vsn: 7,
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      metadata: %{owner: :test, nested: {:tag, <<255>>}},
+      plugins: [{CountTurns, [initial: 0]}, {PassThrough, [label: :second]}],
+      routes: [
+        {"authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10},
+        {"authoring.flow", Flow, defaults: %{amount: 2}, priority: -5}
+      ]
+  end
+
+  defmodule CanonicalSource do
+    def __agent_config__, do: %{module: __MODULE__, name: "private_source", vsn: 1}
+
+    def agent do
+      Agent.new!(module: __MODULE__, name: "public_source", vsn: 12, metadata: %{source: :agent})
+    end
+
+    def handle_signal(_signal, agent), do: {:ok, agent, []}
   end
 
   defmodule InlineCounter do
@@ -194,45 +230,124 @@ defmodule JidoTest.Agent.AuthoringTest do
     defp add(count, amount, multiplier), do: count + amount * multiplier
   end
 
-  defp builder do
-    Builder.new(module: Counter, name: "authoring_counter")
-    |> Builder.vsn(1)
+  defp builder, do: parity_builder(Counter)
+
+  defp parity_builder(module) do
+    Builder.new(module: module, name: "authoring_counter")
+    |> Builder.vsn(7)
     |> Builder.description("All authoring forms")
-    |> Builder.schema(Counter.schema())
+    |> Builder.schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
     |> Builder.metadata(%{owner: :test, nested: {:tag, <<255>>}})
     |> Builder.plugin(CountTurns, %{initial: 0})
-    |> Builder.route("authoring.add", Add, defaults: %{amount: 1}, priority: 10)
-    |> Builder.route("authoring.flow", Flow)
+    |> Builder.plugin(PassThrough, label: :second)
+    |> Builder.route("authoring.add", Add,
+      defaults: %{amount: 1, flag: false},
+      priority: 10
+    )
+    |> Builder.route("authoring.flow", Flow, defaults: %{amount: 2}, priority: -5)
   end
 
-  test "map, keyword, module, Spark, Builder and JSON forms produce equal Agents" do
-    opts = [id: "parity", state: %{count: 4}]
-    expected = Counter.new!(opts)
-    attrs = Map.put(Counter.__agent_config__(), :module, Counter)
+  defp parity_attrs(module) do
+    %{
+      module: module,
+      name: "authoring_counter",
+      description: "All authoring forms",
+      vsn: 7,
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      metadata: %{owner: :test, nested: {:tag, <<255>>}},
+      plugins: [{CountTurns, [initial: 0]}, {PassThrough, [label: :second]}],
+      routes: [
+        {"authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10},
+        {"authoring.flow", Flow, defaults: %{amount: 2}, priority: -5}
+      ]
+    }
+  end
 
-    assert Agent.new!(attrs) == Counter.agent()
-    assert Agent.new!(Map.to_list(attrs)) == Counter.agent()
-    assert Agent.instantiate!(Agent.new!(attrs), opts) == expected
-    assert Agent.new!(Counter, opts) == expected
-    assert Builder.build!(builder()) == Counter.agent()
-    assert Builder.build!(builder(), opts) == expected
-    assert Builder.build!(Builder.new(Counter), opts) == expected
+  defp parity_registry(module, schema) do
+    Registry.new!(%{
+      "agents/authoring-counter" => {:agent, module},
+      "schemas/authoring-counter" => {:schema, schema},
+      "plugins/count-turns" => {:plugin, CountTurns},
+      "plugins/pass-through" => {:plugin, PassThrough},
+      "actions/add" => {:action, Add},
+      "flows/add" => {:flow, Flow},
+      "atoms/amount" => {:atom, :amount},
+      "atoms/flag" => {:atom, :flag},
+      "atoms/initial" => {:atom, :initial},
+      "atoms/label" => {:atom, :label},
+      "atoms/nested" => {:atom, :nested},
+      "atoms/owner" => {:atom, :owner},
+      "atoms/second" => {:atom, :second},
+      "atoms/tag" => {:atom, :tag},
+      "atoms/test" => {:atom, :test}
+    })
+  end
 
-    assert {:ok, document, registry} = Codec.encode(expected)
-    assert Map.has_key?(hd(document["routes"]), "defaults")
-    refute Map.has_key?(hd(document["routes"]), "params")
-    assert {:ok, ^expected} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry, opts)
-    assert {:ok, definition} = Codec.decode(document, registry)
-    assert definition == Counter.agent()
-    assert {:ok, ^document} = Codec.encode(definition, registry)
-    refute Map.has_key?(document, "state")
-    refute Map.has_key?(document, "id")
+  describe "canonical authoring parity acceptance" do
+    test "AUTH-REQ-001 to 004, 006, 009, 011, 014, 036, 038, 039, 041 to 043, 048, and 062" do
+      for {source, module} <- [keyword_module: KeywordCounter, spark_blocks: Counter] do
+        attrs = parity_attrs(module)
+        opts = [id: "parity-#{source}", state: %{count: 4}]
+        expected_definition = module.agent()
+        expected_instance = module.new!(opts)
+        map_definition = Agent.new!(attrs)
+        keyword_definition = Agent.new!(Map.to_list(attrs))
+        built_definition = Builder.build!(parity_builder(module))
+        module_built_definition = Builder.build!(Builder.new(module))
+        registry = parity_registry(module, expected_definition.schema)
 
-    assert {:ok, ^document} =
-             Codec.encode(Counter.new!(id: "different", state: %{count: 7}), registry)
+        assert map_definition === expected_definition
+        assert keyword_definition === expected_definition
+        assert built_definition === expected_definition
+        assert module_built_definition === expected_definition
 
-    assert Enum.map(definition.routes, & &1.path) == ["authoring.add", "authoring.flow"]
-    assert definition.plugins == [{CountTurns, [initial: 0]}]
+        assert {:ok, document} = Codec.encode(expected_definition, registry)
+        json_document = document |> JSON.encode!() |> JSON.decode!()
+        assert {:ok, ^expected_definition} = Codec.decode(json_document, registry)
+        assert {:ok, ^document} = Codec.encode(expected_definition, registry)
+
+        assert Agent.instantiate!(map_definition, opts) === expected_instance
+        assert Agent.instantiate!(keyword_definition, opts) === expected_instance
+        assert Agent.new!(module, opts) === expected_instance
+        assert Builder.build!(parity_builder(module), opts) === expected_instance
+        assert Builder.build!(Builder.new(module), opts) === expected_instance
+        assert {:ok, ^expected_instance} = Codec.decode(json_document, registry, opts)
+        assert {:ok, ^document} = Codec.encode(expected_instance, registry)
+
+        assert document["module"] == "agents/authoring-counter"
+        assert document["schema"] == "schemas/authoring-counter"
+        assert document["vsn"] == 7
+        assert Enum.map(expected_definition.plugins, &elem(&1, 0)) == [CountTurns, PassThrough]
+
+        assert Enum.map(expected_definition.routes, & &1.path) == [
+                 "authoring.add",
+                 "authoring.flow"
+               ]
+
+        assert Enum.map(expected_definition.routes, & &1.priority) == [10, -5]
+
+        assert Enum.map(expected_definition.routes, & &1.target) == [
+                 {Add, %{amount: 1, flag: false}},
+                 {Flow, %{amount: 2}}
+               ]
+
+        refute Map.has_key?(document, "state")
+        refute Map.has_key?(document, "id")
+        refute Map.has_key?(document, "interfaces")
+        refute Map.has_key?(document, "signal_source")
+        refute Map.has_key?(document, "inline_action")
+        assert Map.has_key?(hd(document["routes"]), "defaults")
+        refute Map.has_key?(hd(document["routes"]), "params")
+      end
+
+      assert function_exported?(Counter, :add_signal, 0)
+      refute function_exported?(KeywordCounter, :add_signal, 0)
+    end
+
+    test "AUTH-REQ-061: Builder module input copies canonical agent/0 data" do
+      assert CanonicalSource.__agent_config__().name == "private_source"
+      assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.agent()
+    end
   end
 
   test "all forms use the same direct and live execution path", %{jido: jido} do
@@ -282,6 +397,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, document, registry} = Codec.encode(InlineCounter.agent())
     assert {:ok, decoded} = Codec.decode(document, registry)
     assert hd(decoded.routes).target == {target, %{multiplier: 1}}
+    refute Map.has_key?(document, "interfaces")
+    refute Map.has_key?(document, "signal_source")
+    refute Map.has_key?(document, "inline_action")
   end
 
   test "inline routes accept guarded callback clauses" do
@@ -488,13 +606,15 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   test "Plugin Codec uses the same record and Registry as Agent Codec" do
     {:ok, document, registry} = Codec.encode(Counter.agent())
-    [plugin] = Counter.agent().plugins
-    assert {:ok, encoded} = Jido.Plugin.Codec.encode(plugin, registry)
-    assert document["plugins"] == [encoded]
 
-    assert {:ok, ^plugin} =
-             Jido.Plugin.Codec.decode(JSON.decode!(JSON.encode!(encoded)), registry)
+    for {plugin, encoded} <- Enum.zip(Counter.agent().plugins, document["plugins"]) do
+      assert {:ok, ^encoded} = Jido.Plugin.Codec.encode(plugin, registry)
 
+      assert {:ok, ^plugin} =
+               Jido.Plugin.Codec.decode(JSON.decode!(JSON.encode!(encoded)), registry)
+    end
+
+    [plugin | _] = Counter.agent().plugins
     assert {:ok, encoded, registry} = Jido.Plugin.Codec.encode(plugin)
     assert {:ok, ^plugin} = Jido.Plugin.Codec.decode(encoded, registry)
     assert {:error, _} = Jido.Plugin.Codec.decode(Map.put(encoded, "state", %{}), registry)
@@ -511,7 +631,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Registry.new(%{"bad" => {:route_match, fn _ -> true end}})
   end
 
-  test "generated Codec preserves repeated instance state parsing" do
+  test "Codec derives an instance definition without parsing live state" do
     schema =
       Zoi.object(%{count: Zoi.integer() |> Zoi.transform({__MODULE__, :stringify_count, []})})
 
@@ -522,9 +642,23 @@ defmodule JidoTest.Agent.AuthoringTest do
     instance = %{definition | id: "transformed", state: %{count: 1}}
     assert {:ok, %{state: %{count: "1"}}} = Agent.validate(instance)
     assert {:ok, ^document} = Codec.encode(instance, registry)
+    assert {:ok, generated_document, generated_registry} = Codec.encode(instance)
+    assert {:ok, ^definition} = Codec.decode(generated_document, generated_registry)
+  end
 
-    assert {:error, %Jido.Error.ValidationError{message: "Agent state does not match its schema"}} =
-             Codec.encode(instance)
+  test "valid direct route closures stay valid outside the Codec subset" do
+    local_match = fn signal -> signal.type == "runtime.match" end
+
+    assert {:ok, definition} =
+             Agent.new(
+               name: "runtime_match",
+               routes: [{"runtime.match", Add, match: local_match}]
+             )
+
+    assert {:ok, ^definition} = Agent.validate_definition(definition)
+
+    assert {:error, %Jido.Error.ValidationError{} = error} = Codec.encode(definition)
+    assert error.message == "Route matches must be external unary captures"
   end
 
   test "Codec rejects malformed documents without deriving atoms or modules" do

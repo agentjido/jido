@@ -7,7 +7,11 @@ defmodule Jido.Plugin.Codec do
   alias Jido.Agent.Codec
   alias Jido.Agent.Codec.{Data, Registry}
 
+  @type document :: %{required(String.t()) => term()}
+
   @doc "Encodes a Plugin with a generated temporary Registry."
+  @spec encode(Jido.Plugin.declaration()) ::
+          {:ok, document(), Registry.t()} | {:error, term()}
   def encode(plugin) do
     with {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([plugin]),
          {:ok, registry} <- Codec.Deriver.plugin(plugin),
@@ -16,6 +20,8 @@ defmodule Jido.Plugin.Codec do
   end
 
   @doc "Encodes a Plugin module and options."
+  @spec encode(Jido.Plugin.declaration(), Registry.t() | map()) ::
+          {:ok, document()} | {:error, term()}
   def encode(plugin, registry) do
     with {:ok, [{module, options}]} <- Jido.Plugin.canonical_declarations([plugin]),
          {:ok, registry} <- Registry.new(registry),
@@ -33,6 +39,8 @@ defmodule Jido.Plugin.Codec do
   end
 
   @doc "Decodes a Plugin declaration without starting its runtime."
+  @spec decode(document(), Registry.t() | map()) ::
+          {:ok, {module(), keyword()}} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
          :ok <- Codec.object(document, ~w(type version module options)),

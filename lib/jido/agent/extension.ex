@@ -28,6 +28,7 @@ defmodule Jido.Agent.Extension do
   @optional_callbacks route_target_options: 0
 
   @doc false
+  @spec route_target_extension([module()], atom()) :: {:ok, module() | nil} | {:error, term()}
   def route_target_extension(extensions, option) when is_list(extensions) and is_atom(option) do
     Enum.reduce_while(extensions, {:ok, []}, fn extension, {:ok, claims} ->
       if is_atom(extension) and Code.ensure_loaded?(extension) and
@@ -54,7 +55,17 @@ defmodule Jido.Agent.Extension do
   def route_target_extension(_extensions, option),
     do: error("Invalid Agent extension route target option", %{option: option})
 
-  @doc false
+  @doc """
+  Lowers static extension data to ordinary Agent authoring data.
+
+  The function calls each extension in declaration order. It returns only the
+  lowered core configuration after every entity and route target is claimed.
+  Pass the returned map to `Jido.Agent.new/1`, `Jido.Agent.Builder.new/1`, or
+  another static authoring boundary. This function starts no process and runs
+  no Action or Flow.
+  """
+  @spec lower([module()], map(), [struct()]) ::
+          {:ok, map()} | {:error, Exception.t()}
   def lower(extensions, config, entities) when is_list(extensions) do
     if length(extensions) != length(Enum.uniq(extensions)) do
       error("Duplicate Agent extension")

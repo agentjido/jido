@@ -7,6 +7,9 @@ defmodule Jido.Agent.Codec do
   options. Executable code and schemas are resolved through a trusted Registry.
   The codec never derives module names or creates atoms from document strings.
 
+  Encoding a definition or instance first derives and validates its neutral
+  definition. Instance identity and live state are not parsed or encoded.
+
       {:ok, document, registry} = Jido.Agent.Codec.encode(agent)
       json = JSON.encode!(document)
       {:ok, restored} = Jido.Agent.Codec.decode(JSON.decode!(json), registry,
@@ -19,6 +22,9 @@ defmodule Jido.Agent.Codec do
   collection, and 1 MiB per string.
 
   Each route record stores caller-overridable input values in `"defaults"`.
+  Valid direct definitions can contain local route-match closures. These
+  runtime-only closures are outside the Codec subset. Encodable route matches
+  must be external unary captures in the trusted Registry.
   """
   alias Jido.Agent
   alias Jido.Agent.Authoring
@@ -27,24 +33,25 @@ defmodule Jido.Agent.Codec do
   @fields_v1 ~w(type version module name description schema metadata plugins routes)
   @fields_v2 ~w(type version module vsn name description schema metadata plugins routes)
 
+  @type document :: %{required(String.t()) => term()}
+
   @doc "Encodes authoring data with a generated temporary Registry."
+  @spec encode(Agent.t()) ::
+          {:ok, document(), Registry.t()} | {:error, term()}
   def encode(agent) do
-    with {:ok, agent} <- Agent.validate(agent),
-         {:ok, registry} <- Jido.Agent.Codec.Deriver.agent(agent),
-         {:ok, document} <- encode_generated(agent, registry),
+    with {:ok, definition} <- neutral_definition(agent),
+         {:ok, registry} <- Jido.Agent.Codec.Deriver.agent(definition),
+         {:ok, document} <- encode_validated(definition, registry),
          do: {:ok, document, registry}
   end
 
   @doc "Encodes authoring data through a trusted Registry."
+  @spec encode(Agent.t(), Registry.t() | map()) ::
+          {:ok, document()} | {:error, term()}
   def encode(agent, registry) do
-    with {:ok, agent} <- Agent.validate(agent), do: encode_validated(agent, registry)
+    with {:ok, definition} <- neutral_definition(agent),
+         do: encode_validated(definition, registry)
   end
-
-  defp encode_generated(%Agent{id: nil, state: nil} = agent, registry),
-    do: encode_validated(agent, registry)
-
-  # Keep instance state parsing: static schema transforms need not be idempotent.
-  defp encode_generated(agent, registry), do: encode(agent, registry)
 
   defp encode_validated(agent, registry) do
     with {:ok, registry} <- Registry.new(registry),
@@ -72,6 +79,8 @@ defmodule Jido.Agent.Codec do
   end
 
   @doc "Decodes one neutral Agent definition."
+  @spec decode(document(), Registry.t() | map()) ::
+          {:ok, Agent.t()} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
          {:ok, version} <- definition_object(document),
@@ -97,6 +106,8 @@ defmodule Jido.Agent.Codec do
   end
 
   @doc "Decodes a complete Agent with caller-supplied instance options."
+  @spec decode(document(), Registry.t() | map(), map() | keyword()) ::
+          {:ok, Agent.t()} | {:error, term()}
   def decode(document, registry, opts) do
     with {:ok, definition} <- decode(document, registry), do: Agent.instantiate(definition, opts)
   end
@@ -120,6 +131,16 @@ defmodule Jido.Agent.Codec do
   end
 
   defp document_vsn(document, 2, _module), do: document["vsn"]
+
+  defp neutral_definition(%Agent{} = agent) do
+    cond do
+      Agent.definition?(agent) -> Agent.validate_definition(agent)
+      Agent.instance?(agent) -> agent |> Agent.definition() |> Agent.validate_definition()
+      true -> Agent.validate(agent)
+    end
+  end
+
+  defp neutral_definition(value), do: Agent.validate(value)
 
   defp encode_route(route, registry) do
     {target, defaults} = Authoring.split_target(route.target)
@@ -168,6 +189,7 @@ defmodule Jido.Agent.Codec do
   defp kind(_kind), do: Authoring.error("Unknown executable kind")
 
   @doc false
+  @spec object(term(), [String.t()]) :: :ok | {:error, term()}
   def object(value, fields) when is_map(value) and not is_struct(value) do
     if Enum.sort(Map.keys(value)) == Enum.sort(fields),
       do: :ok,
@@ -176,6 +198,7 @@ defmodule Jido.Agent.Codec do
 
   def object(_value, _fields), do: Authoring.error("Document object must be a map")
   @doc false
+  @spec version(document(), String.t()) :: :ok | {:error, term()}
   def version(%{"version" => 1, "type" => type}, type), do: :ok
   def version(_document, _type), do: Authoring.error("Unknown authoring document type or version")
   defp collection(value, fun) when is_list(value), do: Authoring.traverse(value, fun)

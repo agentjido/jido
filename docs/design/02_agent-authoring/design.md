@@ -4,7 +4,8 @@
 
 All requirements and decisions in this document are recommended targets. The
 [design review index](../README.md#document-review-status) is the source of
-truth for approval. The prerequisite seam documents are pending drafts.
+truth for approval. The Overview and Agent prerequisites are approved. Package
+boundaries and shared errors remain pending assumptions.
 
 ## Scope and owner
 
@@ -46,7 +47,13 @@ They are not an Agent value and are not a public authoring document.
 Codec supports the portable static subset of the normalized definition. A
 valid direct definition can be non-encodable when it contains a route predicate
 or static value that the trusted Registry cannot identify. This limit does not
-make the direct definition invalid.
+make the direct definition invalid. When Codec receives an instance, it derives
+and validates the neutral definition. It does not parse or encode live identity
+or state.
+
+`Jido.Agent.Extension.lower/3` is the public pure data-lowering entry. It runs
+static extension lowerers in declaration order and returns ordinary core Agent
+configuration for direct, Builder, or Codec authoring.
 
 ## Requirements
 
@@ -271,6 +278,9 @@ route-default application to command evaluation.
 Agent Builder shall copy data that produces the module's canonical `agent/0`
 definition.
 
+`AUTH-REQ-062`: When Agent Codec encodes an Agent instance, it shall not parse
+or encode the instance ID or live state.
+
 ## Public contract
 
 ### Supported forms
@@ -329,11 +339,21 @@ payload field names and declaration order.
 
 ### Builder contract
 
-`Builder.new/1` accepts core static fields or a generated Agent module.
-`Builder.name/2`, `description/2`, `schema/2`, `metadata/2`, `plugin/3`, and
-`route/4` stage data. `build/1` returns a definition. `build/2` returns an
-instance. Builder does not run Actions, start processes, or lower Spark
-entities.
+`Builder.new/1` accepts core static fields or a generated Agent module. Module
+input starts from the module's canonical `agent/0` definition, not its private
+compiler data.
+`Builder.name/2`, `vsn/2`, `description/2`, `schema/2`, `metadata/2`,
+`plugin/3`, and `route/4` stage data. `build/1` returns a definition. `build/2`
+returns an instance. Builder does not run Actions, start processes, or lower
+Spark entities.
+
+### Extension data contract
+
+`Jido.Agent.Extension.lower/3` accepts an ordered extension module list, one
+plain core configuration map, and a list of static extension entities. It
+returns a lowered core configuration map or a structured authoring error. The
+caller then supplies the map to direct, Builder, or Codec authoring. The
+function runs no Action, Flow, process, or external service operation.
 
 ### Codec and Registry contract
 
@@ -341,6 +361,12 @@ The Agent Codec stores static Agent configuration in a JSON-compatible,
 versioned document. The Plugin Codec uses the same Registry and tagged record
 format. A generated Registry is for temporary transport and tests. Durable
 authoring data uses application-owned stable identifiers.
+
+Agent Codec writes document version 2 with Agent `vsn`. It reads version 1 for
+compatibility. A version-1 document resolves to `vsn: 1` for a generated Agent
+module and to `nil` for a direct or behavior-only definition. Encoding an
+instance uses its validated neutral definition only; instance ID and state do
+not affect the document.
 
 Registry entry kinds are `agent`, `action`, `flow`, `plugin`, `schema`,
 `route_match`, `atom`, and static struct `value`. Route predicates must be
@@ -382,6 +408,8 @@ bypass common Agent validation.
   subset without becoming invalid.
 - `AUTH-INV-009`: Agent `vsn`, Codec document version, checkpoint
   version, Agent state version, and storage revision are separate concepts.
+- `AUTH-INV-010`: Agent Codec encoding is a static definition operation and
+  does not parse instance state.
 
 ## Downstream guarantees
 
@@ -411,5 +439,5 @@ All recommendations are pending approval.
 | `AUTH-DEC-004` | Can Codec encode an Agent instance? | Yes. Derive and validate its neutral definition, then encode only static data. | Current instance calls stay supported without repeated state parsing. |
 | `AUTH-DEC-005` | Must every valid definition be encodable? | No. Codec supports the Registry-resolvable static subset. | Runtime closures stay valid for direct use and fail clearly at Codec. |
 | `AUTH-DEC-006` | How do data users apply extensions? | Publish the pure lowerer; Builder and Codec consume lowered core data only. | Extension syntax does not enter the document format or runtime. |
-| `AUTH-DEC-007` | How does Agent `vsn` enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | This seam does not redefine checkpoint or restore policy. |
+| `AUTH-DEC-007` | How does Agent `vsn` enter authoring? | Apply the approved seam-01 default and preservation rules to all applicable forms. | Generated modules default to `1`; direct compatibility forms can use `nil`; this seam does not redefine checkpoint or restore policy. |
 | `AUTH-DEC-008` | Does explicit route `defaults:` accept structs? | No. Keep the plain-map rule and retain the legacy tuple exception until a staged migration is approved. | Existing tuple input remains compatible. |

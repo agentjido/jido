@@ -29,14 +29,21 @@ defmodule Jido.Agent.Builder do
   defstruct Zoi.Struct.struct_fields(@schema)
 
   @doc "Returns the Builder schema."
+  @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
   @doc "Starts a Builder with static Agent fields or an Agent module."
   @spec new(map() | keyword() | module()) :: t()
   def new(module) when is_atom(module) do
     with {:module, ^module} <- Code.ensure_loaded(module),
-         true <- function_exported?(module, :__agent_config__, 0) do
-      new(module.__agent_config__() |> Map.put_new(:vsn, 1) |> Map.put(:module, module))
+         true <- function_exported?(module, :__agent_config__, 0),
+         true <- function_exported?(module, :agent, 0),
+         %Agent{} = definition <- module.agent(),
+         true <- Agent.definition?(definition) do
+      definition
+      |> Agent.to_map()
+      |> Map.drop([:id, :state])
+      |> new()
     else
       _ -> failed("Expected an Agent module")
     end
@@ -66,20 +73,26 @@ defmodule Jido.Agent.Builder do
   end
 
   @doc "Sets the name."
+  @spec name(t(), term()) :: t()
   def name(builder, value), do: put(builder, :name, value)
   @doc "Sets the Agent definition version."
+  @spec vsn(t(), term()) :: t()
   def vsn(builder, value), do: put(builder, :vsn, value)
   @doc "Sets the description."
+  @spec description(t(), term()) :: t()
   def description(builder, value), do: put(builder, :description, value)
   @doc "Sets the domain schema."
+  @spec schema(t(), term()) :: t()
   def schema(builder, value), do: put(builder, :schema, value)
   @doc "Sets the metadata map."
+  @spec metadata(t(), term()) :: t()
   def metadata(builder, value), do: put(builder, :metadata, value)
 
   @doc """
   Appends one route. Options are `:defaults`, `:priority`, and `:match`.
   Signal data overrides the defaults with a shallow merge during execution.
   """
+  @spec route(t(), String.t(), term(), map() | keyword()) :: t()
   def route(builder, path, target, opts \\ [])
 
   def route(%__MODULE__{error: error} = builder, _path, _target, _opts) when not is_nil(error),
@@ -124,8 +137,10 @@ defmodule Jido.Agent.Builder do
   end
 
   @doc "Builds a definition or raises its error."
+  @spec build!(t()) :: Agent.t() | no_return()
   def build!(builder), do: unwrap!(build(builder))
   @doc "Builds an instance or raises its error."
+  @spec build!(t(), map() | keyword()) :: Agent.t() | no_return()
   def build!(builder, opts), do: unwrap!(build(builder, opts))
 
   defp put(%__MODULE__{error: error} = builder, _key, _value) when not is_nil(error), do: builder

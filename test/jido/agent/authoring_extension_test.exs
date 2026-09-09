@@ -1,6 +1,9 @@
 defmodule JidoTest.Agent.AuthoringExtensionTest do
   use JidoTest.Case, async: false
 
+  alias Jido.Agent
+  alias Jido.Agent.{Builder, Codec, Extension}
+
   defmodule Label do
     defstruct [:key, :value, :__spark_metadata__]
   end
@@ -251,20 +254,41 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
 
   test "extensions execute in declared order through the shared data contract" do
     assert {:ok, %{order: [:first, :second]}} =
-             Jido.Agent.Extension.lower([First, Second], %{}, [])
+             Extension.lower([First, Second], %{}, [])
 
-    assert {:ok, %{}} = Jido.Agent.Extension.lower([], %{}, [])
+    assert {:ok, %{}} = Extension.lower([], %{}, [])
+  end
+
+  test "public data lowering feeds direct, Builder and Codec authoring" do
+    source = %{
+      name: "data_extended_agent",
+      vsn: 9,
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      metadata: %{source: :data},
+      plugins: [{Turns, []}],
+      routes: [{"add", Add, defaults: %{amount: 1}, priority: 4}]
+    }
+
+    assert {:ok, lowered} = Extension.lower([Labels], source, [%Label{key: :owner, value: "app"}])
+    assert lowered.metadata == %{source: :data, owner: "app"}
+
+    direct = Agent.new!(lowered)
+    assert Builder.build!(Builder.new(lowered)) === direct
+    assert {:ok, document, registry} = Codec.encode(direct)
+    assert {:ok, ^direct} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    refute Map.has_key?(document, "extensions")
+    refute Map.has_key?(document, "entities")
   end
 
   test "duplicate, absent and invalid extension contracts return structured errors" do
     for extensions <- [[First, First], [String], [nil], [InvalidResult], :invalid] do
-      assert {:error, error} = Jido.Agent.Extension.lower(extensions, %{}, [])
+      assert {:error, error} = Extension.lower(extensions, %{}, [])
       assert is_exception(error)
     end
 
-    assert {:error, error} = Jido.Agent.Extension.lower([Reject], %{}, [])
+    assert {:error, error} = Extension.lower([Reject], %{}, [])
     assert Exception.message(error) == "Extension rejection"
-    assert {:error, error} = Jido.Agent.Extension.lower([], %{}, [%Label{key: :x}])
+    assert {:error, error} = Extension.lower([], %{}, [%Label{key: :x}])
     assert Exception.message(error) == "Unclaimed Agent extension entities"
   end
 
