@@ -13,8 +13,7 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
 
     assert {:ok, _} = peer_call(c.peer_a, RemoteParent, :request_child, [parent, c.node_b])
 
-    child =
-      peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)
+    child = peer_call(c.peer_a, Server, :children, [parent], 5_000)[:worker]
 
     assert node(child.pid) == c.node_b
     assert peer_call(c.peer_b, Process, :alive?, [child.pid])
@@ -23,15 +22,28 @@ defmodule JidoTest.Examples.MultiAgent.RemoteChildTest do
              peer_call(c.peer_a, RemoteParent, :request_result, [parent, 21, "request-1"])
 
     result =
-      peer_eventually(fn ->
-        case peer_call(c.peer_a, Server, :agent, [parent]).state.result do
-          result when map_size(result) > 0 -> result
-          _empty -> nil
-        end
-      end)
+      peer_eventually(
+        fn ->
+          case safe_peer_call(c.peer_a, Server, :agent, [parent]) do
+            %{state: %{result: result}} when map_size(result) > 0 -> result
+            _not_ready -> nil
+          end
+        end,
+        timeout: 3_000
+      )
 
     assert result == %{executed_on: c.node_b, request_id: "request-1", value: 21}
     assert :ok = peer_call(c.peer_a, Server, :stop_child, [parent, :worker])
-    peer_eventually(fn -> not peer_call(c.peer_b, Process, :alive?, [child.pid]) end)
+
+    peer_eventually(
+      fn -> not peer_call(c.peer_b, Process, :alive?, [child.pid]) end,
+      timeout: 2_000
+    )
+  end
+
+  defp safe_peer_call(peer, module, function, args) do
+    peer_call(peer, module, function, args, 1_000)
+  catch
+    :exit, _reason -> nil
   end
 end

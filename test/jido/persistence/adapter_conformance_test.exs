@@ -1,9 +1,9 @@
 defmodule JidoTest.Persistence.AdapterConformanceTest do
   use ExUnit.Case, async: false
 
-  alias Jido.Persistence.{ETS, Redis}
+  alias Jido.Persistence.{Ecto, ETS, Redis}
   alias Jido.Persistence.File, as: FilePersistence
-  alias JidoTest.Persistence.AdapterConformance
+  alias JidoTest.Persistence.{AdapterConformance, EctoRepo, EctoSupport}
 
   test "built-in adapters obey the required binary get and CAS contract" do
     for {name, adapter, opts} <- adapters() do
@@ -19,10 +19,16 @@ defmodule JidoTest.Persistence.AdapterConformanceTest do
 
     redis_store = start_supervised!({Elixir.Agent, fn -> %{} end}, id: {:redis_store, suffix})
 
+    ecto_path = EctoSupport.database_path(:conformance)
+    start_supervised!({EctoRepo, EctoSupport.repo_start_options(ecto_path)})
+    EctoSupport.migrate!()
+    on_exit(fn -> EctoSupport.remove_database(ecto_path) end)
+
     [
       {:ets, ETS, [table: :"adapter_conformance_#{suffix}"]},
       {:file, FilePersistence, [path: file_path]},
-      {:redis, Redis, [command_fn: redis_command(redis_store)]}
+      {:redis, Redis, [command_fn: redis_command(redis_store)]},
+      {:ecto, Ecto, [repo: EctoRepo]}
     ]
   end
 

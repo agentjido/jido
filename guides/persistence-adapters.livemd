@@ -116,6 +116,7 @@ Jido includes these adapters:
 | `Jido.Persistence.File` | One local BEAM with no shared writers. |
 | `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
 | `Jido.Persistence.Bedrock` | Shared durable storage through Bedrock KV 0.7 transactions. |
+| `Jido.Persistence.Ecto` | PostgreSQL or SQLite through an application Ecto repository. |
 
 Configure persistence on a Jido instance when most actors use the same store.
 An Agent start option can override or disable that configuration.
@@ -132,6 +133,74 @@ The ETS adapter creates its table when first used. The File adapter is for one
 local writer domain. The Redis adapter lets the host application own its Redis
 client and connection policy. A Redis TTL applies to tombstones too. Thus, it
 also limits the duration of the delayed-writer fence.
+
+## Configure the Ecto adapter
+
+Ecto SQL is an optional Jido dependency. Add Ecto SQL and the driver for the
+application database. For PostgreSQL, add these dependencies:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+def deps do
+  [
+    {:jido, "~> 3.0"},
+    {:ecto_sql, "~> 3.14"},
+    {:postgrex, "~> 1.0"}
+  ]
+end
+```
+
+The application owns and supervises its Ecto repository. Jido does not start
+the repository and does not run migrations. Create this table before a Jido
+instance uses the adapter:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule MyApp.Repo.Migrations.CreateJidoPersistenceRecords do
+  use Ecto.Migration
+
+  def change do
+    create table(:jido_persistence_records, primary_key: false) do
+      add :key, :binary, primary_key: true, null: false
+      add :value, :binary, null: false
+      add :write_token, :binary, null: false
+    end
+  end
+end
+```
+
+The `key` and `value` columns keep the exact adapter bytes. The primary key
+makes create-only writes atomic. `write_token` is private adapter data. It lets
+a same-value CAS report one changed row. Do not add timestamps or other stored
+fields to the default schema.
+
+The repository database role must have direct select, insert, update, and
+delete access to this table. Do not add a trigger or rule that hides rows,
+suppresses writes, or changes the three adapter columns. CAS uses the database
+affected-row result.
+
+Configure the repository on the Jido instance:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+defmodule MyApp.Jido do
+  use Jido,
+    otp_app: :my_app,
+    persistence: {Jido.Persistence.Ecto, repo: MyApp.Repo}
+end
+```
+
+Use `repo_options: [prefix: "tenant"]` when the table uses an Ecto query
+prefix. Use `schema: MyApp.JidoPersistenceRecord` for a different table name.
+The custom schema must have only the binary `key`, `value`, and `write_token`
+fields, and `key` must be its single primary key.
+
+The Ecto adapter supports the PostgreSQL and SQLite Ecto adapters. It rejects
+other database adapters during configuration validation because their upsert
+and affected-row rules do not prove this CAS contract.
 
 ## Configure Bedrock KV
 
@@ -195,12 +264,12 @@ in the Bedrock user keyspace. The timeout must be a positive integer in
 milliseconds or `:infinity`. The adapter rejects a stored key larger than
 16 KiB and a value larger than 128 KiB before it starts a transaction.
 
-The adapter uses one Bedrock transaction for each CAS. `Repo.get/1`
-adds the read conflict, and `Repo.put/2` writes the new exact bytes. Bedrock
-normally retries transaction failures. The adapter sets `retry_limit: 0` for
-writes because a lost commit reply can have an unknown result. It reports a
-resolver abort as a confirmed conflict. It reports every other write failure
-as indeterminate. Jido then stops the affected activation and requires restore
+The adapter uses one Bedrock transaction for each CAS. `Repo.get/1` adds the
+read conflict, and `Repo.put/2` writes the new exact bytes. Bedrock normally
+retries transaction failures. The adapter sets `retry_limit: 0` for writes
+because a lost commit reply can have an unknown result. It reports a resolver
+abort as a confirmed conflict. It reports every other write failure as
+indeterminate. Jido then stops the affected activation and requires restore
 before another write.
 
 Each adapter operation runs in a fresh process. It cannot join an application

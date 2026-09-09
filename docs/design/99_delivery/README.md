@@ -33,8 +33,8 @@ human release decision and an exact-commit CI result.
 | Scope | Every prerequisite requirement range and every skip has a disposition. |
 | Package set | Jido `3.0.0-beta.1`, `jido_action 3.0.0-beta.9`, and `jido_signal 3.0.0-beta.4`. |
 | Plugin seam | The public package consumer uses the four owner facets without private Jido APIs. |
-| Runtime floor | Elixir 1.18.5 and OTP 27.3.4.12 core tests pass. |
-| Current runtime | Elixir 1.20.3 and OTP 29.0.5 are used for the final local gates. |
+| Runtime floor | The Elixir 1.18.5 and OTP 27.3.4.12 result is from the prior candidate and needs a release refresh. |
+| Current runtime | Elixir 1.20.3 and OTP 29.0.5 pass the current quality, example, research, and documentation gates. |
 | Research | 48 checks pass. No research check is skipped. |
 | Core exclusion | `DIST-03` remains excluded because core does not claim cluster-exclusive ownership. |
 | Publication | Not performed. Exact-commit CI and human approval remain external gates. |

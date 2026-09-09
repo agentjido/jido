@@ -6,8 +6,8 @@
 
 - Alignment date: 2026-09-09.
 - Candidate branch: `v3-spike`.
-- Candidate identity: the commit that contains this record, with parent
-  `84dc2dc9`.
+- Candidate identity: the evidence-only commit that contains this record, with
+  parent `ed0a410d`.
 - Alignment state: `Implemented locally; external release approval pending`.
 - Package scope: Jido, `jido_action`, and `jido_signal` only.
 
@@ -35,7 +35,8 @@ text and code differ.
 | Requirements | State | Evidence or limit |
 | --- | --- | --- |
 | `DEL-REQ-001` to `DEL-REQ-009` | `Proven` | Scope ledger, package matrix, and public consumer. |
-| `DEL-REQ-010` to `DEL-REQ-017` | `Proven locally` | Quality, coverage, docs, package, benchmark, example, and two-runtime results. |
+| `DEL-REQ-010`, `DEL-REQ-012`, and `DEL-REQ-015` | `Proven locally` | Exact-tree quality, documentation, example, and research results are current. |
+| `DEL-REQ-011`, `DEL-REQ-013`, `DEL-REQ-014`, `DEL-REQ-016`, and `DEL-REQ-017` | `Refresh required` | Coverage, package, benchmark, and runtime-matrix results are from the prior candidate. |
 | `DEL-REQ-018` | `External gate` | Exact-commit CI needs a published remote commit. No local result claims this gate. |
 | `DEL-REQ-019` and `DEL-REQ-020` | `Proven` | Evidence is bound to the containing commit and its recorded parent. |
 | `DEL-REQ-021` to `DEL-REQ-024` | `Proven` | UP-01, UP-02, and UP-07 pass. `DIST-03` is the only excluded assertion and keeps its ID and reason. |
@@ -63,7 +64,8 @@ from claiming that a package was approved or published.
 - [x] The package uses publishable production dependency sources.
 - [x] A separate public-only package consumer passes.
 - [x] Compatibility and migration limits are explicit.
-- [x] Local quality, coverage, docs, package, benchmark, example, and runtime
-      gates pass.
+- [x] Local quality, docs, and example gates pass.
+- [ ] Coverage, package, benchmark, and runtime-matrix gates are refreshed for
+      the current candidate.
 - [ ] Exact-commit CI passes after the candidate commit is available remotely.
 - [ ] A human release approver accepts and publishes the candidate.

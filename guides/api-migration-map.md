@@ -423,6 +423,7 @@ V3 adds these modules:
 | --- | --- |
 | `Jido.Persistence` | Owns Agent record keys, active and tombstone records, encoding, revision checks, restore, logical delete, and adapter fault containment. |
 | `Jido.Persistence.Adapter` | Defines the minimal byte-store contract. |
+| `Jido.Persistence.Ecto` | Supplies PostgreSQL or SQLite persistence through an application Ecto repository. |
 | `Jido.Persistence.ETS` | Supplies local in-memory Agent persistence. |
 | `Jido.Persistence.File` | Supplies file-backed Agent persistence with one owner per directory. |
 | `Jido.Persistence.Redis` | Supplies Redis-backed Agent persistence. |

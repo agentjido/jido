@@ -131,6 +131,7 @@ active records remain readable through their earlier restore path.
 | `lib/jido/persistence/file.ex` | One-BEAM file CAS with atomic rename and no file-system sync claim. |
 | `lib/jido/persistence/redis.ex` | One-command Redis CAS with application-owned client and TTL policy. |
 | `lib/jido/persistence/bedrock.ex` | Bedrock `0.7.x` transaction mapping, exact-byte CAS, size and option validation, isolated outer transactions, and conservative write-result classification. |
+| `lib/jido/persistence/ecto.ex` | One-statement PostgreSQL or SQLite CAS with an application-owned Ecto repository and schema. |
 
 ## Executable evidence
 
@@ -138,9 +139,10 @@ active records remain readable through their earlier restore path.
 | --- | --- |
 | `test/jido/persistence/record_lifecycle_test.exs` | Exact version-2 shapes, revision-zero startup, restore policies, active and missing delete, delayed-writer fencing, delete-versus-commit race, legacy reads, definition checks, and fail-closed future records. |
 | `test/jido/persistence/plugin_integration_test.exs` | Default checkpoints convert only the paired owned state. Complete custom checkpoints bypass conversion. |
-| `test/jido/persistence/adapter_conformance_test.exs` | ETS, File, and Redis pass one required binary get and exact-byte CAS suite, including concurrent winners. The shared assertions also run for Bedrock. |
+| `test/jido/persistence/adapter_conformance_test.exs` | ETS, File, Redis, Ecto, and Bedrock pass one required binary get and exact-byte CAS suite, including concurrent winners. |
 | `test/jido/persistence/bedrock_test.exs` | Bedrock option, limit, exact-byte, conflict, and indeterminate-result branches pass with a deterministic transaction repo. |
 | `test/jido/persistence/bedrock_integration_test.exs` | A real single-node Bedrock `0.7.x` cluster passes concurrent CAS, Jido record save, clean restart restore, and logical delete. |
+| `test/jido/persistence/ecto_test.exs` | Ecto schema validation, exact bytes, same-value CAS, complete Jido record lifecycle, and database and constraint fault classification pass against SQLite. |
 | `test/jido/persistence/adapter_test.exs` | An adapter with only get and CAS is valid. Option validation failures remain contained. |
 | `test/jido/persistence_test.exs` | Direct lifecycle, revision rules, closed CAS results, write faults, live commit, hibernate, thaw, and stale activation behavior pass. |
 | `test/jido/persistence/indeterminate_write_test.exs` | Stored lost-reply and explicit indeterminate writes stop authority and do not start Directives. |
@@ -184,6 +186,9 @@ active records remain readable through their earlier restore path.
   write is unsupported.
 - `put/3` and `delete/2` remain optional maintenance callbacks. Normal durable
   lifecycle code uses only get and CAS.
+- Ecto applications must add Ecto SQL and a supported driver, supervise their
+  repository, and migrate the binary `key`, `value`, and `write_token` table
+  before Jido starts. Jido does not move existing data into this table.
 - Tombstone purge and same-identity reactivation are not normal Core
   operations. A new Ref is the safe default after durable deletion.
 - Bedrock write transactions set `retry_limit: 0`. This prevents an automatic
@@ -219,7 +224,7 @@ active records remain readable through their earlier restore path.
 - [x] Agent definition revision is checked before restore.
 - [x] Default Plugin state conversion stays within the paired owner slice.
 - [x] Complete custom checkpoints bypass Plugin conversion.
-- [x] ETS, File, Redis, and Bedrock pass one shared get-and-CAS conformance suite.
+- [x] ETS, File, Redis, Ecto, and Bedrock pass one shared get-and-CAS conformance suite.
 - [x] Stable Ref key migration rules are implemented in seam 09.
 - [x] Provisional Registry visibility is decided in seam 08.
 - [ ] The full target design has user approval.
