@@ -1,91 +1,80 @@
-> Seam review entry point. This document is pending approval.
+> Implemented seam review entry point.
 
-# 10 — Runtime topology
+# 10 - Runtime topology
 
 ## Briefing
 
-Jido already has a useful local OTP runtime. One instance starts five local
-services under `:one_for_one`. Agent Servers and Plugin runtime wrappers are
-peers in one Dynamic Supervisor. Execution and Plugin runtime work have explicit
-owner coupling. Logical child Directives support local children and explicit
-placement on a known Erlang node. The recommended V3 target keeps this topology first. It adds
-complete failure-coupling proof, owner-bound Plugin readiness, coherent Plugin
-runtime replacement input, and additive integration with local Agent Ref
-resolution. It does not add cluster discovery, automatic placement, failover,
-leases, fencing, or live topology control.
+One Jido instance owns five local runtime services under `:one_for_one`.
+Agent Servers and Plugin runtime wrappers are peer children in one Dynamic
+Supervisor. A wrapper owns one private Supervisor and one Plugin runtime
+generation.
 
-The [design review index](../README.md#document-review-status) is the source of
-truth for approval. All requirements and decisions in this seam are pending.
+The four Plugin modules define four owner contracts. They do not define four
+process pools:
 
-## Why this seam exists
+| Plugin owner | Runtime role |
+| --- | --- |
+| `Jido.Agent.Plugin` | Pure Agent preparation and owned state |
+| `Jido.AgentServer.Plugin` | Live callbacks and an optional runtime root |
+| `Jido.Persistence.Plugin` | Pure dump and load conversion |
+| `Jido.Topology.Plugin` | Pure static Topology contribution |
 
-- Owner: the local Jido OTP runtime topology below one Jido instance.
-- Owns: runtime process placement, supervisor membership, child ownership,
-  restart coupling, shutdown coupling, logical runtime relationships, explicit
-  known-node child ownership, and local-versus-remote limits.
-- Does not own: Agent state, Turn semantics, persistence records, Agent Ref
-  fields, instance facade names, desired topology, repair policy, transport,
-  cluster authority, or application supervision above the Jido instance.
+Only the Agent Server facet can declare a live runtime root. For first-stage
+V3, its temporary wrapper stays beside Agent Servers in the same Dynamic
+Supervisor. A Plugin declaration must return a permanent root specification.
+The wrapper hosts each root generation as temporary, observes its exit, gets a
+new state-version bootstrap pair from the Agent Server, and starts the next
+generation.
 
-## Current and target state
+## Owned contract
 
-| Area | Current | Recommended target |
-| --- | --- | --- |
-| Instance tree | Task Supervisor, Registry, Runtime Store, Spawn Registry, and Agent Dynamic Supervisor use `:one_for_one`. | Keep this five-child first-stage tree and prove each failure boundary. |
-| Agent placement | Agent Servers are direct peers. Managed Servers default to `:transient`. | Keep direct peers and current restart sources. Keep desired reactivation outside this seam. |
-| Plugin placement | Temporary wrappers share the Agent pool. Each wrapper owns a private supervisor with one permanent Plugin root. | Keep this placement first. Add coherent state-version input and owner-death proof. |
-| Owned work | Execution, admission, Plugin Directive, and error-policy work use bounded processes. Initial readiness and error-policy delivery are not linked to abrupt owner death. | Require all owned work to stop when its owner stops. |
-| Nondurable recovery | An abnormal Server restart restores the latest instance checkpoint. A clean stop removes it. | Keep this same-instance rule and state that instance loss removes the checkpoint. |
-| Logical children | Parent and child handles are private runtime data. Parent bindings and spawn receipts use Runtime Store. | Keep the relationship contract and replace handles through Ref resolution only after seams 03 and 09 are ready. |
-| Remote children | A known target node owns the child process. There is no local fallback. Timeouts can be indeterminate. | Keep this bounded contract. Do not claim discovery, failover, or exclusive cluster authority. |
-| Topology control | A separate application-supervised Controller activates and repairs one static local target. | Keep desired state, readiness policy, and repair in seam 11. |
+- The Jido instance owns one Task Supervisor, Registry, Runtime Store, Spawn
+  Registry, and Agent Dynamic Supervisor.
+- `max_tasks` limits the Task Supervisor only.
+- Managed Agent Servers are direct peer children and use `:transient` by
+  default. Direct linked Servers use `:temporary` by default.
+- All Agent-owned work stops on controlled or abrupt Agent Server death.
+- Runtime checkpoints and spawn receipts can survive their worker restart.
+  They do not survive full instance loss.
+- Logical child ownership does not create a nested OTP Agent tree.
+- Explicit known-node child placement has no local fallback.
+- Stable Agent Refs resolve through the selected local instance. There is no
+  implicit Controller or transport fallback.
+- The application supervises `Jido.Topology.Controller` outside the Jido
+  instance.
 
-## Major gaps and work remaining
+## Boundaries
 
-| Gap | Why it matters | Required outcome | Owner seam |
-| --- | --- | --- | --- |
-| Failure matrix is incomplete | The five-child strategy has no full restart-coupling proof. | Tested effects for each standard child failure and full instance shutdown. | 09 Jido instance, 10 Runtime topology |
-| Work ownership is incomplete | Abrupt Agent death can leave initial readiness or error-policy delivery work until it finishes. | Every owned worker stops with its Agent Server. | 08 Agent Server, 10 Runtime topology |
-| Plugin replacement input is split | A replacement reads current state after it starts and has no matching version input. | One committed Plugin state and matching state version for each generation. | 05 Plugins, 08 Agent Server, 10 Runtime topology |
-| Ref integration is missing | Child delivery and relationships keep replaceable PIDs. | Add local Ref resolution without removing current PID paths. | 03 Identity, 09 Jido instance, 10 Runtime topology |
-| Cluster authority is absent | A known-node start does not prevent two writers or choose recovery placement. | Keep the claim out of core until an explicit external authority contract exists. | 90 Package boundaries, future cluster owner |
-| Control-plane boundary needs one contract | Runtime ownership and desired-state repair can be confused. | Seam 10 supplies components; seam 11 owns target activation and repair. | 10 Runtime topology, 11 Control plane |
+This seam owns local process placement, restart coupling, shutdown coupling,
+Plugin runtime hosting, logical child handles, and explicit known-node child
+ownership.
 
-## Decisions requested
+It does not own Agent state, Turn rules, Plugin callback meaning, persistence
+record meaning, desired Topology, repair policy, transport, discovery,
+automatic placement, failover, leases, fencing, or cluster write authority.
 
-1. **First-stage instance topology:** Keep the current five children,
-   `:one_for_one`, and one Agent Dynamic Supervisor.
-2. **Plugin placement:** Keep temporary Plugin wrappers beside Agent Servers for
-   V3. Require a permanent internal Plugin root and coherent replacement input.
-3. **Nondurable restart:** Keep latest-commit recovery only while the same Jido
-   instance stays live.
-4. **Logical relationships:** Keep private runtime child records, Runtime Store
-   parent bindings, and current child Directives during Ref migration.
-5. **Remote scope:** Keep explicit known-node placement, no local fallback, and
-   indeterminate result handling. Defer discovery, failover, leases, fencing,
-   and exclusive cluster ownership.
-6. **Control-plane split:** Keep static activation and repair in seam 11 and
-   outside the Jido instance supervisor.
+## Evidence
 
-## Dependencies
+- `test/jido/runtime_topology_test.exs` proves the five-child inventory,
+  instance isolation, direct-child replacement, Task Supervisor capacity,
+  Agent and Plugin peer placement, full shutdown, new instance generation,
+  and explicit durable reactivation.
+- Agent Server lifecycle tests prove runtime checkpoint recovery, Plugin root
+  replacement, coherent state-version input, and owner-bound work.
+- Child and distributed tests prove logical ownership, known-node placement,
+  indeterminate results, receipt recovery, and no local fallback.
+- The topology examples prove application-supervised Controller use. The
+  stable-reference example proves local handle replacement without transport
+  fallback.
 
-- Prerequisites: [00 Overview](../00_overview/alignment.md),
-  [90 Package boundaries](../90_package-boundaries/alignment.md),
-  [12 Errors and contracts](../12_errors-and-contracts/alignment.md),
-  [01 Agent](../01_agent/alignment.md),
-  [03 Agent identity](../03_agent-identity/alignment.md),
-  [05 Plugins](../05_plugins/alignment.md),
-  [06 Commit and effects](../06_commit-and-effects/alignment.md),
-  [07 Persistence](../07_persistence/alignment.md),
-  [08 Agent Server](../08_agent-server/alignment.md), and
-  [09 Jido instance](../09_jido-instance/alignment.md). Ref identity, local
-  namespace resolution, and stable persistence identity are implemented inputs.
-- Dependents: 11 Topology control plane, 13 Observability, and 99 Delivery.
-- Blockers: this seam's remaining decisions, runtime placement proof, and the
-  final cluster authority owner. Ref and namespace, Plugin replacement input,
-  and revision-zero durable creation are implemented inputs.
+## Follow-on seams
+
+- 11 Topology control plane owns desired membership, activation order,
+  readiness policy, repair, and cleanup.
+- 13 Observability owns public runtime event and status projections.
+- 99 Delivery owns the complete cross-package and release gate.
 
 ## Documents
 
-- [Target design](design.md)
-- [Alignment plan](alignment.md)
+- [Selected design](design.md)
+- [Implemented alignment and evidence](alignment.md)

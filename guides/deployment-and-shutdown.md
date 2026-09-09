@@ -46,6 +46,11 @@ Plugin runtime processes restart from Plugin specifications. Signal bus
 subscribers and application connections must also have a restart or
 reconciliation rule. Do not put a PID or connection in durable Agent state.
 
+Plugin wrappers are peers of Agent Servers in the same Dynamic Supervisor.
+The four Plugin facet modules separate owner contracts. They do not create
+four runtime pools. A Plugin root, its private Supervisor, and its wrapper stop
+with the Agent Server.
+
 ## Stop and hibernate
 
 Use `stop_agent/2` for a normal permanent stop:
@@ -74,8 +79,10 @@ Use thaw with the same module, ID, and partition to restore it later.
 ## Deploy more than one node
 
 The core registry and runtime store are local to one Jido instance on one node.
-A remote child can use an application-supplied spawn function, but this does not
-create a cluster registry, leader election system, or network partition policy.
+A child Directive can name one known Erlang node with `node:`. The same named
+Jido instance on that node owns the child. An explicit remote start never
+falls back to a local start. This does not create a cluster registry, leader
+election system, automatic placement service, or network partition policy.
 
 For multiple writers, use a persistence adapter with shared atomic
 compare-and-swap behavior. Define ownership, routing, fencing, and reconciliation

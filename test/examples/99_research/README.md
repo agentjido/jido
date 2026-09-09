@@ -1,7 +1,7 @@
 # Jido feature acceptance examples
 
-The research set has 13 executable feature probes. The current result has 39
-passing checks and 6 skipped checks across six proposed core features.
+The research set has 13 executable feature probes. The current result has 42
+passing checks and 3 skipped live-upgrade checks.
 The first ten probes cover general core features. Three more cover live Agent
 and topology upgrades. Each skip names a missing feature. Keep the original
 assertion and remove the skip when that feature is implemented.
@@ -21,9 +21,9 @@ example starts two local Erlang nodes. Each row has its own focused command.
 | FA-01 | [Route precedence and fixed selection](99_09_route_selection/README.md) | 4 | 0 | Core feature available |
 | FA-02 | [Plugin read and prepared-input isolation](99_10_plugin_isolation/README.md) | 4 | 0 | Core feature available |
 | FA-03 | [Stable Agent references and durable namespace identity](99_11_stable_reference/README.md) | 3 | 0 | Implemented and executable |
-| FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 2 | 0 | Core feature available |
-| FA-05 | [Durable deletion](99_13_durable_delete/README.md) | 2 | 1 | Core feature required |
-| FA-06 | [Plugin runtime reconstruction from committed state](99_03_input_resource_lifecycle/README.md) | 1 | 1 | Core feature required; public pull recovery works |
+| FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 2 | 0 | Implemented and executable |
+| FA-05 | [Durable deletion](99_13_durable_delete/README.md) | 3 | 0 | Implemented and executable |
+| FA-06 | [Plugin runtime reconstruction from committed state](99_03_input_resource_lifecycle/README.md) | 2 | 0 | Implemented and executable |
 | FA-07 | [Progress observation with recovery](99_01_progress_observation/README.md) | 5 | 0 | Works as an application extension |
 | FA-08 | [Acknowledged handoff and worker reconciliation](99_04_handoff_reconciliation/README.md) | 3 | 0 | Works as an application protocol |
 | FA-09 | [Shared work budgets](99_05_capacity_deadlines_cleanup/README.md) | 3 | 0 | Works as a local runtime extension |

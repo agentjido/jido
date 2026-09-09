@@ -5,6 +5,8 @@ defmodule Jido.AgentServer.Plugin do
   This facet can admit live commands, prepare outbound Signals, declare one
   permanent runtime root, gate readiness, and dispatch owned Directives after
   commit. Agent Server owns all tasks, limits, restart policy, and settlement.
+  The owner wrapper hosts each root generation as temporary so it can restart
+  the root with a fresh committed state and state version.
   """
 
   alias Jido.Agent.Command

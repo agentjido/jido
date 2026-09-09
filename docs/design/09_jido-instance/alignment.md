@@ -9,8 +9,8 @@
 - Alignment state: `Implemented`.
 - Compatibility state: additive. The ID, PID, partition, generated instance,
   and direct `Jido.AgentServer` APIs remain supported.
-- Follow-on work: seam 10 owns physical Plugin pool placement. Seam 12 owns
-  broader error normalization. Seam 13 owns observation projections.
+- Seam 10 keeps Plugin wrappers in the Agent pool for first-stage V3. Seam 12
+  owns broader error normalization. Seam 13 owns observation projections.
 
 ## Selected contract
 
@@ -130,8 +130,8 @@ adapter or operator operation.
 
 ## Deferred work
 
-- Seam 10 can split Plugin runtime hosts from the Agent Dynamic Supervisor. It
-  must keep the owner-built Plugin child specification and restart contracts.
+- Seam 10 keeps Plugin runtime wrappers in the Agent Dynamic Supervisor. It
+  keeps the owner-built Plugin child specification and restart contracts.
 - Seam 12 can normalize more compatibility results. This seam has stable codes
   for invalid instance configuration, duplicate namespace, missing namespace,
   and namespace mismatch.

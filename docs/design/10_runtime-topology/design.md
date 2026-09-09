@@ -1,10 +1,10 @@
-> Target seam design. This document is pending approval.
+> Selected seam design. This contract is implemented.
 
 # Runtime topology design
 
-All requirements and decisions are recommended targets. EARS syntax does not
-mean that the user approved them. Code defines current behavior until an
-approved target is implemented.
+The requirements and decisions in this document define the implemented seam.
+The [alignment record](alignment.md) gives code, test, compatibility, and limit
+evidence.
 
 ## Scope and owner
 
@@ -24,7 +24,7 @@ approved target is implemented.
 
 ## Model
 
-The first-stage target keeps the implemented local shape:
+The implemented first-stage design keeps this local shape:
 
 ```text
 Application Supervisor
@@ -37,13 +37,13 @@ Application Supervisor
 │       ├── Agent Server                  transient by default
 │       └── Plugin runtime wrapper        temporary
 │           └── private Supervisor
-│               └── Plugin runtime root   permanent
+│               └── Plugin root generation  declared permanent, hosted temporary
 └── Topology Controller                   separate seam-11 child, when used
 ```
 
 The application owns the Supervisor above these children. The five instance
 services have separate local names. Agent Servers and Plugin wrappers have
-different logical roles, but the first target does not require separate pools.
+different logical roles, but first-stage V3 does not use separate pools.
 
 A logical child relationship does not create a nested OTP Agent tree. The
 target Jido instance owns each local Agent Server process. A parent Agent Server
@@ -51,10 +51,10 @@ owns the logical link and the policy for parent death. For an explicit remote
 child, the target node's same-named Jido instance owns the process and runtime
 work. The parent still owns the logical link.
 
-Stable identity, current location, and write authority are separate. A future
-Agent Ref can remain stable while a local PID changes. The instance facade
-resolves local Refs. This seam does not create a distributed directory or
-grant exclusive write authority.
+Stable identity, current location, and write authority are separate. An Agent
+Ref remains stable while a local PID changes. The instance facade resolves
+local Refs. This seam does not create a distributed directory or grant
+exclusive write authority.
 
 ## Requirements
 
@@ -136,7 +136,8 @@ shall place one temporary Plugin wrapper as a peer in the Agent Dynamic
 Supervisor.
 
 `RT-REQ-021`: When a Plugin wrapper starts its Plugin runtime root, the wrapper
-shall own one private Supervisor whose Plugin root uses `restart: :permanent`.
+shall accept a root declared with `restart: :permanent` and host each observed
+runtime generation as `:temporary` under one private Supervisor.
 
 `RT-REQ-022`: If the owning Agent Server stops, then the Plugin wrapper shall
 stop its Plugin runtime root and then stop.
@@ -253,7 +254,7 @@ without selecting the desired target.
 
 ## Public contract
 
-The first-stage contract keeps these implemented public roles:
+The first-stage contract keeps these public roles:
 
 | Role | Public entry or value | Meaning |
 | --- | --- | --- |
@@ -275,7 +276,7 @@ not confirm later child creation when the Directive result is indeterminate.
 
 The Ref-first facade is additive and belongs to seam 09. This seam defines only
 how a resolved handle enters the runtime topology. Current ID and PID APIs stay
-supported until a separate migration is approved and proved.
+supported.
 
 ## Invariants
 
@@ -292,20 +293,20 @@ supported until a separate migration is approved and proved.
 
 ## Downstream guarantees
 
-| Consumer seam | Guaranteed contract after approval |
+| Consumer seam | Guaranteed contract |
 | --- | --- |
 | 11 Topology control plane | Local components, readiness calls, temporary Agent specs, parent bindings, and cleanup operations exist without owning desired state. |
 | 13 Observability | Runtime events can distinguish exit, unreachable state, restart, and indeterminate completion without exposing private handles as identity. |
 | 99 Delivery | The retained local topology and remote limits have failure-injection and compatibility gates. |
 | External cluster owner | Core accepts explicit known-node placement but supplies no election, lease, fencing, or failover promise. |
 
-## Open design decisions
+## Selected design decisions
 
-| ID | Question | Recommended option | Effect |
+| ID | Question | Selected option | Effect |
 | --- | --- | --- | --- |
 | `RT-DEC-001` | Which instance supervision shape is the first V3 target? | Keep five standard children under `:one_for_one`. | No unproved restart cascade is added. |
-| `RT-DEC-002` | Does Plugin runtime need a separate pool? | No for first-stage V3. Keep temporary wrappers in the Agent pool. | Logical ownership does not require a new supervisor. |
-| `RT-DEC-003` | Which Plugin root restart rule applies? | Keep one permanent root under a temporary owner-bound wrapper. | Internal restart stays bounded by Agent lifetime. |
+| `RT-DEC-002` | Does Plugin runtime need a separate pool? | No for first-stage V3. Keep temporary wrappers in the Agent pool. | Four owner facets do not require four process pools. |
+| `RT-DEC-003` | Which Plugin root restart rule applies? | Require a permanent declared specification. Host each generation as temporary under a temporary owner-bound wrapper. | The wrapper can rebuild a lost generation with fresh committed input. |
 | `RT-DEC-004` | Which nonpersistent restart source applies? | Keep the latest same-instance runtime checkpoint. | Abnormal Server restart preserves committed state, but instance loss does not. |
 | `RT-DEC-005` | Do logical relationships remain in core? | Keep current private records, Runtime Store bindings, and built-in child Directives. | Existing Agent and Controller behavior remains compatible. |
 | `RT-DEC-006` | What does core remote placement guarantee? | Explicit known-node ownership, no local fallback, and indeterminate request tracking only. | Core does not claim automatic recovery or exclusive ownership. |

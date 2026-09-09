@@ -93,7 +93,10 @@ defmodule PluginRuntime.Effects.Server do
 end
 ```
 
-The Agent Server facet owns the live callback and runtime root.
+The Agent Server facet owns the live callback and runtime root. Its returned
+child specification is permanent. Jido hosts each runtime generation as
+temporary under an owner-bound wrapper. This lets a replacement receive fresh
+Plugin state and the matching Agent state version.
 
 ## Define the Package
 

@@ -476,6 +476,30 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
   end
 
+  test "abrupt owner death stops a pending error Signal delivery", %{jido: jido} do
+    gate = make_ref()
+    dispatch = {BlockingDispatchAdapter, observer: self(), gate: gate}
+
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        error_policy: {:emit_signal, dispatch},
+        directive_timeout: 10_000,
+        restart: :temporary
+      )
+
+    assert {:error, _reason} = Server.call(server, signal("boundary.fail"))
+    assert_receive {:error_signal_delivery_blocked, ^gate, worker, _signal}, 2_000
+    assert worker in Task.Supervisor.children(Jido.task_supervisor_name(jido))
+    assert server in elem(Process.info(worker, :links), 1)
+
+    server_ref = Process.monitor(server)
+    worker_ref = Process.monitor(worker)
+    Process.exit(server, :kill)
+
+    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 2_000
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
+  end
+
   test "invalid and raised policy results stop the Server with a structured reason", %{jido: jido} do
     for {policy, expected} <- [
           {fn _, _ -> :invalid end, {:invalid_error_policy_result, :invalid}},

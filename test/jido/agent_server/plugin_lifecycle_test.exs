@@ -152,6 +152,34 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
   end
 
+  test "abrupt owner death stops initial Plugin readiness and its runtime", %{jido: jido} do
+    observer = self()
+    gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
+    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+
+    starter =
+      Task.async(fn ->
+        Jido.start_agent(jido, definition, restart: :temporary)
+      end)
+
+    assert_receive {:readiness_waiting, waiter, runtime}, 2_000
+    init = :sys.get_state(runtime)
+    server = init.agent_server
+    {:initializing, state} = :sys.get_state(server)
+    wrapper = state.children[{:plugin, Runtime}].lifecycle_pid
+
+    assert server in elem(Process.info(waiter, :links), 1)
+
+    refs = for pid <- [server, wrapper, waiter, runtime], do: {Process.monitor(pid), pid}
+    Process.exit(server, :kill)
+
+    assert {:error, :killed} = Task.await(starter, 2_000)
+
+    for {ref, pid} <- refs do
+      assert_receive {:DOWN, ^ref, :process, ^pid, _reason}, 2_000
+    end
+  end
+
   test "a rejected initial persistence write cleans up the provisional Plugin runtime", %{
     jido: jido
   } do

@@ -252,6 +252,8 @@ defmodule Jido.AgentServer.PluginChild do
     %{state | readiness: nil}
   end
 
+  # The Plugin declares permanent runtime intent. This wrapper owns the actual
+  # restart so each new generation gets a fresh state-version bootstrap pair.
   defp temporary_spec(child_spec), do: Supervisor.child_spec(child_spec, restart: :temporary)
 
   defp stop_child(pid, reason) when is_pid(pid) do

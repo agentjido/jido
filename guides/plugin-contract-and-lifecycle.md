@@ -60,7 +60,8 @@ after executable Directives in package declaration order.
 
 The Agent Server facet can implement `admit/3`, `prepare_dispatch/4`,
 `dispatch/4`, and `await_ready/2`. It can also implement the standard OTP
-`child_spec/1` callback for one permanent runtime root.
+`child_spec/1` callback for one runtime root. The returned specification must
+use `restart: :permanent`.
 
 Admission runs in declaration order before Turn evaluation. Outbound Signal
 preparation runs in reverse declaration order. Directive dispatch starts only
@@ -75,6 +76,12 @@ state_version: version}`. The state is only the value owned by that Plugin.
 The pair is one immutable committed view for that runtime generation. A
 replacement receives a newly built pair. `Jido.Plugin.state/2` remains
 available when a running resource must reconcile after a later commit.
+
+Jido puts a temporary owner wrapper beside the Agent Server. The wrapper hosts
+each root generation as temporary under its private Supervisor. If the root
+stops, the wrapper asks the Agent Server for a new root specification. This
+keeps the declared permanent intent while it prevents an automatic restart
+with an old state-version pair.
 
 ## Persistence and Topology Facets
 

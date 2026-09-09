@@ -51,7 +51,8 @@ definitions, or topology control.
 
 ## Follow-on seams
 
-- 10 Runtime topology owns any split between Agent and Plugin runtime pools.
+- 10 Runtime topology keeps Agent Servers and Plugin wrappers in one runtime
+  pool for first-stage V3.
 - 11 Topology control plane consumes Ref-first local activation but does not
   gain write authority from the namespace.
 - 12 Errors and contracts owns broader compatibility-result normalization.

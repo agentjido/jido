@@ -45,7 +45,8 @@ defmodule Jido.AgentServer do
 
   Exec roots, Action tasks, Flow tasks, and asynchronous Directives run under
   the Jido instance Task Supervisor. The Server also links each Exec root to
-  itself. Active execution cannot outlive its Agent owner.
+  itself. Initial Plugin readiness and error Signal delivery are also linked
+  to the Server. Owned work cannot outlive its Agent owner.
   """
 
   @behaviour :gen_statem
@@ -1387,9 +1388,12 @@ defmodule Jido.AgentServer do
     token = make_ref()
 
     {pid, ref} =
-      spawn_monitor(fn ->
-        send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
-      end)
+      :erlang.spawn_opt(
+        fn ->
+          send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
+        end,
+        [:link, :monitor]
+      )
 
     timer = start_task_timer(data.readiness_timeout, :plugin_readiness_timeout, token)
 
@@ -2724,7 +2728,7 @@ defmodule Jido.AgentServer do
       jido = data.jido
 
       task =
-        Task.Supervisor.async_nolink(supervisor, fn ->
+        Task.Supervisor.async(supervisor, fn ->
           DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
         end)
 
