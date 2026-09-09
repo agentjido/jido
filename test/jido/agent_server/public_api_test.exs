@@ -493,6 +493,91 @@ defmodule Jido.AgentServer.PublicAPITest do
     refute outcome.committed?
   end
 
+  test "one Server Turn timeout cancels execution and rejects its late result" do
+    test = self()
+
+    policy = fn reason, outcome ->
+      send(test, {:turn_timed_out, reason, outcome})
+      :continue
+    end
+
+    server =
+      start_supervised!(
+        {Server,
+         agent: agent([{"counter.block", BlockingAdd}, {"counter.add", Add}]),
+         turn_timeout: 25,
+         error_policy: policy}
+      )
+
+    gate = make_ref()
+
+    caller =
+      Task.async(fn ->
+        Server.call(
+          server,
+          signal("counter.block", %{
+            by: 1,
+            label: "timed-out",
+            test_pid: test,
+            gate: gate
+          })
+        )
+      end)
+
+    assert_receive {:agent_action_blocked, ^gate, worker}, @receive_timeout
+    monitor = Process.monitor(worker)
+    assert {:error, %Jido.Error.TimeoutError{} = error} = Task.await(caller)
+    assert Jido.Error.code(error) == :agent_turn_timeout
+    assert_receive {:DOWN, ^monitor, :process, ^worker, _reason}, @receive_timeout
+
+    assert_receive {:turn_timed_out, ^error,
+                    %Outcome{status: :timed_out, stage: :execute, committed?: false}}
+
+    send(server, {make_ref(), {:ok, %{count: 99}}})
+    assert Server.agent(server).state == %{count: 0, history: []}
+
+    assert {:ok, %Agent{state: %{count: 2}}} =
+             Server.call(server, signal("counter.add", %{by: 2, label: "after-timeout"}))
+  end
+
+  test "completion before cancellation keeps the commit and rejects the stale Turn id" do
+    test = self()
+
+    server =
+      start_supervised!({Server, agent: agent([{"counter.block", BlockingAdd}]), debug: true})
+
+    gate = make_ref()
+
+    caller =
+      Task.async(fn ->
+        Server.call(
+          server,
+          signal("counter.block", %{
+            by: 3,
+            label: "completed-first",
+            test_pid: test,
+            gate: gate
+          })
+        )
+      end)
+
+    assert_receive {:agent_action_blocked, ^gate, worker}, @receive_timeout
+    turn_id = Server.status(server).active.turn_id
+    send(worker, {:release, gate})
+
+    assert {:ok, committed} = Task.await(caller)
+    assert committed.state.count == 3
+    assert {:error, :stale_turn} = Server.cancel_turn(server, turn_id)
+    assert Server.snapshot(server) == %{agent: committed, state_version: 1}
+
+    assert {:ok, [%{metadata: %{outcome: %Outcome{} = outcome}} | _events]} =
+             Server.recent_events(server)
+
+    assert outcome.id == turn_id
+    assert outcome.status == :succeeded
+    assert outcome.committed?
+  end
+
   test "stops after an indeterminate custom Exec cancellation" do
     server =
       start_supervised!(

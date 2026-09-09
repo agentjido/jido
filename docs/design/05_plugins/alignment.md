@@ -12,8 +12,8 @@
 
 The Plugin package and its four owner facets are implemented. Agent, Agent
 Server, and Persistence use their facets now. Topology has a bounded
-contribution API; its plan call site stays with seam 11. The coherent runtime
-bootstrap value stays with seam 08.
+contribution API; its plan call site stays with seam 11. Seam 08 now supplies
+the coherent runtime bootstrap value for first start and replacement.
 
 This execution state is not approval of all requirements in the target design.
 
@@ -147,7 +147,7 @@ Seam 11 owns lowering order, duplicate checks, limits, and activation.
 | `PLG-REQ-018` to `PLG-REQ-029` | `Proven` | Source-Signal route selection, ordered live admission, bounded preparation, and package-keyed inputs. |
 | `PLG-REQ-030` to `PLG-REQ-039` | `Proven` | Bounded Transition and Contribution values, ordered append, unique Directive ownership, and Agent/Server pairing. |
 | `PLG-REQ-040` to `PLG-REQ-046`, `PLG-REQ-049` to `PLG-REQ-052` | `Proven` | Existing post-commit and runtime lifecycle suites plus owner-module routing. |
-| `PLG-REQ-047`, `PLG-REQ-048` | `Deferred to seam 08` | `Jido.Plugin.Init` still needs one committed owned-state and state-version pair for first start and replacement. |
+| `PLG-REQ-047`, `PLG-REQ-048` | `Proven by seam 08` | `Jido.Plugin.Init` carries one committed owned-state and state-version pair. Agent Server rebuilds it for first start and each replacement. |
 | `PLG-REQ-053` to `PLG-REQ-057` | `Facet proven; integration deferred to seam 07` | Direct conversion, context, portability, and paired-schema tests pass. Record integration is not present. |
 | `PLG-REQ-058` | `Deferred to seam 07` | The custom complete-checkpoint bypass belongs to the Persistence owner. |
 | `PLG-REQ-059`, `PLG-REQ-060` | `Facet proven; integration deferred to seam 11` | Direct canonical contribution tests pass. Definition and plan integration is not present. |
@@ -165,15 +165,15 @@ No removal occurs in this seam.
 - New packages must use owner facets. The package module cannot contain facet
   callbacks.
 - Plugin-owned state stays as one top-level field in the complete Agent state.
-- `Jido.Plugin.state/2` remains available during runtime bootstrap migration.
+- `Jido.Plugin.state/2` remains available as a compatible state-pull path.
 - Scheduler occurrence IDs and durable state meaning do not change.
 
 ## Remaining owner work
 
 | Seam | Required follow-up |
 | --- | --- |
-| 07 Persistence | Call Persistence facets during the approved default checkpoint path. Preserve the complete custom-checkpoint compatibility rule. |
-| 08 Agent Server | Add committed owned state and the matching state version to one immutable runtime Init value for first start and replacement. |
+| 07 Persistence | Preserve the implemented default-checkpoint facet call and complete custom-checkpoint compatibility rule. |
+| 08 Agent Server | Preserve the implemented immutable owned-state and state-version bootstrap pair for first start and replacement. |
 | 11 Topology control plane | Lower Topology facet contributions through the Topology owner before complete plan validation. |
 | 99 Delivery | Migrate built-ins and add a public-only package fixture before legacy removal is considered. |
 
@@ -188,7 +188,7 @@ No removal occurs in this seam.
 - [x] Persistence and Topology facets have bounded public values and direct
       failure proof.
 - [x] Supported mixed behavior remains explicit.
-- [ ] Runtime bootstrap integration is complete in seam 08.
-- [ ] Persistence record integration is complete in seam 07.
+- [x] Runtime bootstrap integration is complete in seam 08.
+- [x] Persistence record integration is complete in seam 07.
 - [ ] Topology plan integration is complete in seam 11.
 - [ ] The full target design has user approval.

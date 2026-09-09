@@ -155,7 +155,8 @@ defmodule JidoTest.ErrorTest do
         :agent_exec_invalid_callback_result,
         :agent_exec_callback_failed,
         :agent_exec_callback_timeout,
-        :agent_exec_callback_task_failed
+        :agent_exec_callback_task_failed,
+        :agent_turn_timeout
       ]
 
       assert Error.stable_codes() == expected

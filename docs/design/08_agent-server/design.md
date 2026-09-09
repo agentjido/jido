@@ -1,10 +1,11 @@
-> Target seam design. This document is pending approval.
+> Selected seam design. The implementation direction was selected on
+> 2026-09-10.
 
 # Agent Server design
 
-All requirements and decisions in this document are recommended targets. EARS
-syntax does not mean that the user approved a requirement. Code defines current
-behavior until an approved target is implemented.
+The requirements in this document define the selected Agent Server contract.
+See [alignment.md](alignment.md) for implementation evidence and deferred
+owner work.
 
 ## Scope and owner
 
@@ -29,7 +30,7 @@ the mutable OTP state for that activation. The Agent value remains immutable,
 portable domain data. A PID or OTP name is a runtime handle, not durable
 identity.
 
-The recommended live sequence is:
+The live sequence is:
 
 ```text
 canonical Agent input or known identity
@@ -69,7 +70,7 @@ in a degraded writer mode. It stops before another Turn.
 
 ## Requirements
 
-Each requirement is a pending target. Its acceptance state is in
+Each requirement is part of the selected target. Its acceptance state is in
 [alignment.md](alignment.md).
 
 ### Server role and OTP boundary
@@ -368,8 +369,10 @@ The owner of each limit must stay clear:
 | Idle limit | Time with no active Turn and no attachment |
 
 A persistence write operation limit is an indeterminate persistence result. It
-is not a general Turn timeout. Exact option names and defaults remain open until
-the owning seams approve them.
+is not a general Turn timeout. `turn_timeout` has a 5,000-millisecond default
+and accepts `:infinity`. `readiness_timeout` and `directive_timeout` keep their
+separate 5,000-millisecond defaults. Persistence adapters own any storage-call
+limit in their options.
 
 ### Code revision
 
@@ -408,7 +411,7 @@ These guarantees apply only after the related requirements are approved.
 | 13 Observability | Current phases, Outcome stages, commit point, settlement point, and interruption limits have explicit meanings. |
 | 99 Delivery | Every Server requirement has one acceptance state and compatibility gate. |
 
-## Open design decisions
+## Selected design decisions
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |

@@ -16,6 +16,7 @@ defmodule Jido.AgentServer.State do
               exec_opts: Zoi.any(description: "Executable runtime options"),
               max_postponed_signals: Zoi.any(description: "Postponed Signal admission limit"),
               postponed_tokens: Zoi.any(description: "Bounded postponed Signal token set"),
+              turn_timeout: Zoi.any(description: "Pre-commit Turn timeout"),
               max_directives_per_turn: Zoi.any(description: "Directive batch limit"),
               directive_timeout: Zoi.any(description: "Plugin and external Directive timeout"),
               readiness_timeout: Zoi.integer(description: "Plugin runtime readiness timeout"),

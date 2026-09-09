@@ -157,40 +157,62 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
     assert initial.state == %{count: 0}
   end
 
-  test "an ordinary Directive batch is not replayed after Server loss", %{jido: jido} do
-    persistence = persistence("non_replay")
-    id = unique_id("commit-non-replay")
-    opts = [id: id, persistence: persistence, restore: false, restart: :temporary]
-    {:ok, server} = Jido.start_agent(jido, Agent, opts)
-    gate = make_ref()
+  for blocked_index <- [0, 1] do
+    @blocked_index blocked_index
+    test "an ordinary Directive batch is not replayed after loss at index #{@blocked_index}", %{
+      jido: jido
+    } do
+      persistence = persistence("non_replay_#{@blocked_index}")
+      id = unique_id("commit-non-replay")
+      sink = start_supervised!({Elixir.Agent, fn -> [] end})
 
-    signal =
-      Signal.new!(
-        "commit.effects",
-        %{effects: [%{label: :once, observer: self(), gate: gate}]},
-        source: "/test"
-      )
+      opts = [
+        id: id,
+        persistence: persistence,
+        restore: false,
+        restart: :temporary,
+        debug: true
+      ]
 
-    assert {:ok, committed} = Server.call(server, signal)
-    assert_receive {:effect_started, :once, worker}, 1_000
+      {:ok, server} = Jido.start_agent(jido, Agent, opts)
+      gate = make_ref()
 
-    server_ref = Process.monitor(server)
-    worker_ref = Process.monitor(worker)
-    Process.exit(server, :kill)
-    assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1_000
-    assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 1_000
-    eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
+      effects =
+        Enum.map(0..2, fn index ->
+          if index == @blocked_index do
+            %{label: index, sink: sink, observer: self(), gate: gate}
+          else
+            %{label: index, sink: sink}
+          end
+        end)
 
-    assert {:ok, restored} =
-             Jido.start_agent(jido, Agent,
-               id: id,
-               persistence: persistence,
-               restore: :required,
-               restart: :temporary
-             )
+      signal = Signal.new!("commit.effects", %{effects: effects}, source: "/test")
 
-    assert Server.snapshot(restored) == %{agent: committed, state_version: 1}
-    refute_receive {:effect_started, :once, _worker}, 100
+      assert {:ok, committed} = Server.call(server, signal)
+      assert_receive {:effect_started, @blocked_index, worker}, 1_000
+      assert Elixir.Agent.get(sink, & &1) == Enum.to_list(0..@blocked_index)
+
+      server_ref = Process.monitor(server)
+      worker_ref = Process.monitor(worker)
+      Process.exit(server, :kill)
+      assert_receive {:DOWN, ^server_ref, :process, ^server, :killed}, 1_000
+      assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 1_000
+      eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
+
+      assert {:ok, restored} =
+               Jido.start_agent(jido, Agent,
+                 id: id,
+                 persistence: persistence,
+                 restore: :required,
+                 restart: :temporary,
+                 debug: true
+               )
+
+      assert Server.snapshot(restored) == %{agent: committed, state_version: 1}
+      assert {:ok, []} = Server.recent_events(restored)
+      assert Elixir.Agent.get(sink, & &1) == Enum.to_list(0..@blocked_index)
+      refute_receive {:effect_started, _label, _worker}, 100
+    end
   end
 
   defp persistence(label) do

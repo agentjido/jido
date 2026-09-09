@@ -31,6 +31,13 @@ defmodule Jido.AgentServer.ActiveTurn do
                 Zoi.integer(description: "Zero-based failed Directive index") |> Zoi.optional(),
               started_monotonic:
                 Zoi.integer(description: "Monotonic Turn start time in milliseconds"),
+              timeout:
+                Zoi.any(description: "Configured pre-commit Turn timeout")
+                |> Zoi.default(:infinity),
+              timeout_deadline:
+                Zoi.integer(description: "Monotonic pre-commit deadline") |> Zoi.optional(),
+              timeout_timer:
+                Zoi.any(description: "Pre-commit timeout timer reference") |> Zoi.optional(),
               span: Zoi.any(description: "Signal telemetry span") |> Zoi.optional(),
               telemetry_span:
                 Zoi.any(description: "Semantic Turn telemetry span") |> Zoi.optional()
@@ -45,16 +52,48 @@ defmodule Jido.AgentServer.ActiveTurn do
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
-  @spec new(Signal.t(), term(), non_neg_integer(), term()) :: t()
-  def new(source_signal, caller, start_version, span) do
+  @spec new(Signal.t(), term(), non_neg_integer(), term(), timeout()) :: t()
+  def new(source_signal, caller, start_version, span, timeout \\ :infinity) do
+    turn_id = ID.generate!()
+    started_monotonic = System.monotonic_time(:millisecond)
+
+    {timeout_deadline, timeout_timer} =
+      case timeout do
+        :infinity ->
+          {nil, nil}
+
+        timeout when is_integer(timeout) and timeout > 0 ->
+          deadline = started_monotonic + timeout
+          timer = :erlang.start_timer(timeout, self(), {:turn_timeout, turn_id})
+          {deadline, timer}
+      end
+
     %__MODULE__{
-      turn_id: ID.generate!(),
+      turn_id: turn_id,
       source_signal: source_signal,
       caller: caller,
       start_version: start_version,
-      started_monotonic: System.monotonic_time(:millisecond),
+      started_monotonic: started_monotonic,
+      timeout: timeout,
+      timeout_deadline: timeout_deadline,
+      timeout_timer: timeout_timer,
       span: span
     }
+  end
+
+  @spec expired?(t()) :: boolean()
+  def expired?(%__MODULE__{timeout_deadline: nil}), do: false
+
+  def expired?(%__MODULE__{timeout_deadline: deadline}) do
+    System.monotonic_time(:millisecond) >= deadline
+  end
+
+  @spec cancel_timeout(t()) :: t()
+  def cancel_timeout(%__MODULE__{timeout_timer: nil} = active), do: active
+
+  def cancel_timeout(%__MODULE__{timeout_timer: timer} = active) do
+    _ = :erlang.cancel_timer(timer)
+    %{active | timeout_timer: nil}
   end
 
   @spec begin_execution(t(), term(), term()) :: t()

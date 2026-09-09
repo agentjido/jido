@@ -70,6 +70,12 @@ The Agent Server owns tasks, timeouts, runtime handles, start order, restart,
 readiness, and settlement. Runtime handles never enter Agent state or a
 checkpoint.
 
+Each runtime receives `%Jido.Plugin.Init{plugin_state: state,
+state_version: version}`. The state is only the value owned by that Plugin.
+The pair is one immutable committed view for that runtime generation. A
+replacement receives a newly built pair. `Jido.Plugin.state/2` remains
+available when a running resource must reconcile after a later commit.
+
 ## Persistence and Topology Facets
 
 The Persistence facet implements `dump/3` and `load/3` for one paired Plugin

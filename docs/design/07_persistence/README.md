@@ -61,8 +61,8 @@ seam 09.
   writer fence.
 - File persistence uses atomic rename for one BEAM. It does not claim file or
   directory sync durability.
-- The current Registry can contain a provisional PID during startup. Seam 08
-  owns stricter publication behavior.
+- Registry identity reservation uses `:starting`. Public lookup and listing
+  expose only `:ready` entries after initial persistence succeeds.
 - Ref-key collision checks, dual reads, rewrite, rollback, and removal gates
   remain with seam 09.
 

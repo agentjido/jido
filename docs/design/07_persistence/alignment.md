@@ -73,8 +73,9 @@ operation. Core does not use purge for normal Agent deletion.
 - A failed initial write makes the start call fail and stops the provisional
   Plugin runtime tree.
 
-The current Registry registration happens as part of process start. Seam 08
-owns any stricter rule for hiding the provisional PID before the initial write.
+The Registry reserves the identity with value `:starting`. Public lookup and
+listing expose it only after the initial write succeeds and Agent Server
+publishes value `:ready`.
 
 ### Commit and write results
 
@@ -154,7 +155,7 @@ active records remain readable through their earlier restore path.
 | `PERS-REQ-017` to `PERS-REQ-020` | `Proven` | Option validation and the closed CAS classification have focused tests. |
 | `PERS-REQ-021` | `Compatible control retained` | Public calls keep current raw controls and existing structured callback errors. A new error family is not added. |
 | `PERS-REQ-022` | `Proven` | Seam 06 and current recovery tests show authority loss after every required write error. |
-| `PERS-REQ-023` to `PERS-REQ-028` | `Proven for the start-call boundary; Registry publication deferred` | Initial CAS and Plugin cleanup pass. Seam 08 owns stricter provisional PID visibility. |
+| `PERS-REQ-023` to `PERS-REQ-028` | `Proven with seam 08 publication` | Initial CAS and Plugin cleanup pass. Public Registry lookup stays hidden until the entry is `:ready`. |
 | `PERS-REQ-029` to `PERS-REQ-038` | `Proven` | Outer validation, restored identity, definition revision, tombstones, races, and safe decoding pass. |
 | `PERS-REQ-039` | `Proven` | Legacy outer format-1 active records load. |
 | `PERS-REQ-040`, `PERS-REQ-041` | `Deferred to seam 09` | Stable Ref exists, but namespace and partition binding are not yet selected. Current keys remain compatible. |
@@ -183,7 +184,7 @@ active records remain readable through their earlier restore path.
 
 | Seam | Required follow-up |
 | --- | --- |
-| 08 Agent Server | Decide whether a provisional startup PID must be hidden from Registry lookup until the revision-zero write is confirmed. |
+| 08 Agent Server | Preserve `:starting` identity reservation and publish `:ready` only after revision-zero creation is confirmed. |
 | 09 Jido instance | Bind Ref namespace and partition values, then own the mixed-key migration and any instance delete facade. |
 | 10 Runtime topology | Consume revision-zero activation without adding discovery or lease meaning to persistence. |
 | 11 Topology control plane | Keep desired Topology and multi-Agent reconciliation outside per-Agent records. |

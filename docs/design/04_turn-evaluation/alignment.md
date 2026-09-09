@@ -64,7 +64,7 @@ package inventory documents also remain pending approval.
 | `lib/jido/agent_server.ex:1493-1564` | The Server persists before it changes live state, increments the revision once, replies, and starts Directives. Pre-commit failure keeps current state. |
 | `lib/jido/agent_server/active_turn.ex:48-129` | ActiveTurn keeps source and effective Signals, start and committed revisions, and Directive progress. |
 | `lib/jido/agent/turn/outcome.ex:13-190` | The public Outcome uses five runtime stages and stores complete source and effective Signals. |
-| `lib/jido/agent_server/options.ex:7-57` | There is no `turn_timeout`. `directive_timeout` also limits admission and custom execution adapters. |
+| `lib/jido/agent_server/options.ex` | Seam 08 adds one `turn_timeout` for active pre-commit work. `directive_timeout` remains a separate limit for Directive work and lower execution-adapter operations. |
 
 ### Tests and examples
 
@@ -140,7 +140,7 @@ proposal and gap report. Git history keeps the removed text.
 | Contribution assembly must avoid an intermediate list. | `Remove as contract`. | This is an implementation choice with no required public effect. |
 | A private module must be named `Jido.Agent.Turn.Evaluator` with one exact `run/3` tuple. | `Replace`. | Keep a private evaluator contract and closed stages. Select names and private tuple shapes in the later implementation plan. |
 | Every callback fault becomes a Splode error and every internal invariant crashes the live runtime. | `Retain`, pending seam 12. | `TURN-REQ-034` and `TURN-REQ-035` use the prerequisite error policy. |
-| The Turn seam owns stable Turn IDs, task references, cancellation, late-result rejection, and a complete `turn_timeout`. | `Defer`. | Seam 08 owns live control and timeout policy. This seam supplies stage and private-result inputs only. |
+| The Turn seam owns stable Turn IDs, task references, cancellation, late-result rejection, and a complete `turn_timeout`. | `Implemented by seam 08`. | This seam supplies stage and private-result inputs. Seam 08 owns live control and the active pre-commit limit. |
 | Direct `cmd/3` has no Server cancellation or Server Turn timeout. | `Retain`. | Direct evaluation runs at the caller boundary and uses executable options only. |
 | The Turn seam owns persistence, revision increment, commit reply order, Directive dispatch, and terminal settlement. | `Remove from this seam`. | Seams 06, 08, and 13 own those rules. Evaluation ends with a validated candidate. |
 | A state version must be an evaluator input. | `Remove`. | Revision stability is a live owner invariant. Equal evaluator input is defined without commit revision. |

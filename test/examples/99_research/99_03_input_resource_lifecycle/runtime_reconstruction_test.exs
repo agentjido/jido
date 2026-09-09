@@ -5,13 +5,18 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
   alias Example.Runtime
 
   setup %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Example.new_for(self()), id: "feed")
+    observer = :"runtime_reconstruction_#{System.unique_integer([:positive])}"
+    Process.register(self(), observer)
+    {:ok, server} = Jido.start_agent(jido, Example.new_for(observer), id: "feed")
     assert_receive {:feed_runtime, runtime, init}, 1_000
     eventually(fn -> Runtime.inspect_runtime(runtime).feed == "A" end)
     %{server: server, runtime: runtime, init: init}
   end
 
-  test "saved state rebuilds the feed through the existing public pull API", c do
+  test "saved state rebuilds the feed through immutable bootstrap state", c do
+    assert Map.get(c.init, :plugin_state) == %{name: "A"}
+    assert Map.get(c.init, :state_version) == 0
+
     old_resource = Runtime.inspect_runtime(c.runtime).resource
     resource_ref = Process.monitor(old_resource)
     assert {:ok, _} = Example.select(c.server, "B")
@@ -32,7 +37,6 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     assert_receive {:DOWN, ^ref, :process, ^resource, _}, 1_000
   end
 
-  @tag skip: "Pending FA-06: runtime Init does not contain committed Plugin state"
   test "replacement Init supplies committed owned state and its version", c do
     assert {:ok, _} = Example.select(c.server, "B")
     version = Jido.AgentServer.snapshot(c.server).state_version

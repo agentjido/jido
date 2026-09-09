@@ -50,7 +50,8 @@ defmodule Jido.AgentServer.PluginChild do
     Process.flag(:trap_exit, true)
     Process.link(owner)
 
-    with {:ok, supervisor} <- Supervisor.start_link([child_spec], strategy: :one_for_one),
+    with {:ok, supervisor} <-
+           Supervisor.start_link([temporary_spec(child_spec)], strategy: :one_for_one),
          child_pid when is_pid(child_pid) <- supervised_child(supervisor, child_spec.id) do
       {:ok,
        %{
@@ -62,7 +63,8 @@ defmodule Jido.AgentServer.PluginChild do
          child_id: child_spec.id,
          plugin_spec: plugin_spec,
          readiness_timeout: readiness_timeout,
-         readiness: nil
+         readiness: nil,
+         restart: nil
        }}
     else
       nil -> {:stop, :plugin_child_not_started}
@@ -88,38 +90,68 @@ defmodule Jido.AgentServer.PluginChild do
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{child_ref: ref} = state) do
     send(state.owner, {:plugin_runtime_restarting, self(), state.child_id})
-    send(self(), {:await_child_restart, reason, @restart_poll_attempts})
-    {:noreply, %{state | child_pid: :restarting, child_ref: nil}}
+    state = stop_readiness(state)
+    token = make_ref()
+    send(state.owner, {:plugin_runtime_bootstrap, self(), state.child_id, token})
+
+    {:noreply,
+     %{
+       state
+       | child_pid: :restarting,
+         child_ref: nil,
+         restart: %{token: token, reason: reason, child_spec: nil}
+     }}
   end
 
-  def handle_info({:await_child_restart, reason, attempts}, state) do
-    case supervised_child(state.supervisor, state.child_id) do
-      child_pid when is_pid(child_pid) ->
-        # Readiness can read Agent state. Keep child lookup responsive while
-        # that work runs, or an Agent lookup can block the read it needs.
-        task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
+  def handle_info(
+        {:plugin_runtime_bootstrap, token, {:ok, child_spec}},
+        %{restart: %{token: token} = restart} = state
+      ) do
+    restart = %{restart | child_spec: child_spec}
+    send(self(), {:start_plugin_runtime, token, @restart_poll_attempts})
+    {:noreply, %{state | restart: restart}}
+  end
 
-        timer =
-          :erlang.start_timer(
-            state.readiness_timeout,
-            self(),
-            {:plugin_readiness_timeout, task.ref}
-          )
+  def handle_info(
+        {:plugin_runtime_bootstrap, token, {:error, reason}},
+        %{restart: %{token: token, reason: exit_reason}} = state
+      ) do
+    {:stop, {:plugin_runtime_bootstrap_failed, state.child_id, exit_reason, reason},
+     %{state | restart: nil}}
+  end
 
-        readiness = %{task: task, timer: timer, child_pid: child_pid, reason: reason}
-        {:noreply, %{state | readiness: readiness}}
+  def handle_info(
+        {:start_plugin_runtime, token, attempts},
+        %{restart: %{token: token, child_spec: child_spec, reason: reason}} = state
+      )
+      when not is_nil(child_spec) do
+    case Supervisor.start_child(state.supervisor, temporary_spec(child_spec)) do
+      {:ok, child_pid} when is_pid(child_pid) ->
+        {:noreply, start_readiness(state, child_pid, reason)}
 
-      _child when attempts > 0 ->
+      {:ok, child_pid, _info} when is_pid(child_pid) ->
+        {:noreply, start_readiness(state, child_pid, reason)}
+
+      {:ok, :undefined} ->
+        {:stop, {:plugin_runtime_restart_ignored, state.child_id, reason}, state}
+
+      {:ok, :undefined, _info} ->
+        {:stop, {:plugin_runtime_restart_ignored, state.child_id, reason}, state}
+
+      {:error, {:already_started, child_pid}} when is_pid(child_pid) ->
+        {:noreply, start_readiness(state, child_pid, reason)}
+
+      {:error, error} when error in [:already_present, :running] and attempts > 0 ->
         Process.send_after(
           self(),
-          {:await_child_restart, reason, attempts - 1},
+          {:start_plugin_runtime, token, attempts - 1},
           @restart_poll_ms
         )
 
         {:noreply, state}
 
-      _child ->
-        {:stop, {:plugin_runtime_restart_timeout, state.child_id, reason}, state}
+      {:error, error} ->
+        {:stop, {:plugin_runtime_restart_failed, state.child_id, reason, error}, state}
     end
   end
 
@@ -132,7 +164,7 @@ defmodule Jido.AgentServer.PluginChild do
       :ok ->
         child_pid = readiness.child_pid
         send(state.owner, {:plugin_runtime_ready, self(), state.child_id, child_pid})
-        {:noreply, %{state | child_pid: child_pid, child_ref: Process.monitor(child_pid)}}
+        {:noreply, %{state | child_pid: child_pid}}
 
       {:error, reason} ->
         {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
@@ -174,10 +206,7 @@ defmodule Jido.AgentServer.PluginChild do
 
   @impl true
   def terminate(_reason, state) do
-    if state.readiness do
-      _ = :erlang.cancel_timer(state.readiness.timer)
-      Task.shutdown(state.readiness.task, :brutal_kill)
-    end
+    _ = stop_readiness(state)
 
     stop_child(state.supervisor, :shutdown)
     :ok
@@ -192,6 +221,38 @@ defmodule Jido.AgentServer.PluginChild do
   catch
     :exit, _reason -> nil
   end
+
+  defp start_readiness(state, child_pid, reason) do
+    # Readiness can read Agent state. Keep child lookup responsive while
+    # that work runs, or an Agent lookup can block the read it needs.
+    task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
+
+    timer =
+      :erlang.start_timer(
+        state.readiness_timeout,
+        self(),
+        {:plugin_readiness_timeout, task.ref}
+      )
+
+    readiness = %{task: task, timer: timer, child_pid: child_pid, reason: reason}
+
+    %{
+      state
+      | child_ref: Process.monitor(child_pid),
+        readiness: readiness,
+        restart: nil
+    }
+  end
+
+  defp stop_readiness(%{readiness: nil} = state), do: state
+
+  defp stop_readiness(%{readiness: readiness} = state) do
+    _ = :erlang.cancel_timer(readiness.timer)
+    Task.shutdown(readiness.task, :brutal_kill)
+    %{state | readiness: nil}
+  end
+
+  defp temporary_spec(child_spec), do: Supervisor.child_spec(child_spec, restart: :temporary)
 
   defp stop_child(pid, reason) when is_pid(pid) do
     if Process.alive?(pid) do

@@ -72,6 +72,7 @@ defmodule Jido.AgentServer.OptionsTest do
           {[error_policy: {:emit_signal, nil}], "requires an external dispatch target"},
           {[error_policy: {:emit_signal, :invalid}], "emit_signal dispatch is invalid"},
           {[default_dispatch: :invalid], "default_dispatch is invalid"},
+          {[turn_timeout: 0], "turn_timeout must be"},
           {[directive_timeout: 0], "directive_timeout must be"},
           {[readiness_timeout: :infinity], "readiness_timeout must be"},
           {[restore: true], "restore must be"},
@@ -103,6 +104,7 @@ defmodule Jido.AgentServer.OptionsTest do
                jido: jido,
                parent: parent,
                idle_timeout: 100,
+               turn_timeout: :infinity,
                directive_timeout: :infinity,
                spawn_fun: fn _ -> :ignore end,
                error_policy: {:emit_signal, {:pid, target: self()}},
@@ -115,6 +117,7 @@ defmodule Jido.AgentServer.OptionsTest do
     assert opts.register
     assert opts.registry == Jido.registry_name(jido)
     assert opts.state_version == 7
+    assert opts.turn_timeout == :infinity
     assert opts.directive_timeout == :infinity
     assert opts.readiness_timeout == 5_000
     assert opts.idle_timeout == 100

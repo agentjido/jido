@@ -68,7 +68,9 @@ specifically a recovery operation.
 
 Plugin runtimes can start provisionally before the initial storage write. Jido
 stops that runtime tree if the write fails. The start call does not return
-success until the write is confirmed.
+success until the write is confirmed. Instance lookup and listing also hide
+the provisional Server. The Registry entry reserves the identity as
+`:starting` and changes to `:ready` only after the confirmed write.
 
 ## Hibernate a live actor
 

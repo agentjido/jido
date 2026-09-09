@@ -5,6 +5,7 @@ defmodule Jido.AgentServer.Options do
   alias Jido.AgentServer.ParentRef
 
   @default_max_postponed_signals 1_000
+  @default_turn_timeout 5_000
   @default_directive_timeout 5_000
   @default_readiness_timeout 5_000
 
@@ -24,6 +25,9 @@ defmodule Jido.AgentServer.Options do
               max_postponed_signals:
                 Zoi.any(description: "Postponed Signal admission limit")
                 |> Zoi.default(@default_max_postponed_signals),
+              turn_timeout:
+                Zoi.any(description: "Pre-commit Turn timeout")
+                |> Zoi.default(@default_turn_timeout),
               max_directives_per_turn:
                 Zoi.any(description: "Directive count limit") |> Zoi.default(:infinity),
               directive_timeout:
@@ -87,6 +91,7 @@ defmodule Jido.AgentServer.Options do
          {:ok, persistence} <- resolve_persistence(attrs),
          :ok <- validate_restore(Map.get(attrs, :restore, :if_found)),
          :ok <- validate_state_version(Map.get(attrs, :state_version, 0)),
+         :ok <- validate_turn_timeout(Map.get(attrs, :turn_timeout, @default_turn_timeout)),
          :ok <-
            validate_directive_timeout(
              Map.get(attrs, :directive_timeout, @default_directive_timeout)
@@ -111,6 +116,7 @@ defmodule Jido.AgentServer.Options do
         exec_opts: Map.get(attrs, :exec_opts, []),
         max_postponed_signals:
           Map.get(attrs, :max_postponed_signals, @default_max_postponed_signals),
+        turn_timeout: Map.get(attrs, :turn_timeout, @default_turn_timeout),
         max_directives_per_turn: Map.get(attrs, :max_directives_per_turn, :infinity),
         directive_timeout: Map.get(attrs, :directive_timeout, @default_directive_timeout),
         readiness_timeout: Map.get(attrs, :readiness_timeout, @default_readiness_timeout),
@@ -344,6 +350,16 @@ defmodule Jido.AgentServer.Options do
   defp validate_directive_timeout(timeout) do
     invalid("directive_timeout must be :infinity or a positive integer", %{
       directive_timeout: timeout
+    })
+  end
+
+  defp validate_turn_timeout(:infinity), do: :ok
+
+  defp validate_turn_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
+
+  defp validate_turn_timeout(timeout) do
+    invalid("turn_timeout must be :infinity or a positive integer", %{
+      turn_timeout: timeout
     })
   end
 

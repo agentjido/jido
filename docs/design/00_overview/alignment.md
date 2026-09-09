@@ -217,8 +217,8 @@ source Signal
 - Plugin runtime handles stay in private Server state. They do not enter Agent
   state or checkpoints.
 - `%Jido.Plugin.Init{}` has a Server PID, Agent ID, module, instance,
-  partition, and options. It does not have committed Plugin state or a matching
-  Agent state version.
+  partition, options, committed Plugin-owned state, and the matching Agent
+  state version. Each runtime generation gets a new immutable value.
 - A nonpersistent named-instance Server stores its last commit in Runtime
   Store. An abnormal Server restart restores it. A clean full instance stop
   removes the nondurable state.
@@ -267,12 +267,12 @@ still define open details and prove each target behavior.
 | `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | `Resolved`: Agent facets receive declared projections and package-owned prepared input. | Preserve the four-owner Plugin contract. |
 | `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | `lib/jido/agent_server.ex:295-309`; `lib/jido/persistence.ex:153-159` | Core has no stable Agent Ref. Registry and persistence identity shapes differ. | `Change, staged`: add Ref-first contracts beside current ID and PID APIs. |
 | `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | `lib/jido/agent.ex:403-420,563-574`; `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs:16-27` | Checkpoints have no enforced definition revision. Restore can use the loaded module definition. | `Change, staged`: add revision and old-checkpoint rules. Keep all authoring forms. |
-| `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex`; `test/jido/persistence/record_lifecycle_test.exs` | `Resolved for the start-call boundary`: revision zero is confirmed after Plugin readiness. Registry can still expose a provisional PID. | Preserve the write and cleanup order. Complete stricter publication in seam 08. |
+| `OVR-GAP-005` | `OVR-REQ-040` | `lib/jido/agent_server.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/jido/persistence/record_lifecycle_test.exs` | `Resolved`: revision zero is confirmed after Plugin readiness. Registry identity stays `:starting` until public `:ready` publication. | Preserve the write, cleanup, and publication order. |
 | `OVR-GAP-006` | `OVR-REQ-039` | `lib/jido/agent_server.ex:1582-1617`; `test/jido/persistence_test.exs:318-356` | Every required persistence write failure now removes the activation before later evaluation. | `Resolved by seam 06`; preserve through seams 07 and 08. |
 | `OVR-GAP-007` | `OVR-REQ-042` | `lib/jido/persistence.ex`; durable-delete and record-lifecycle tests | `Resolved`: normal delete writes a compact CAS tombstone and missing delete writes revision zero. | Keep purge and same-identity reactivation outside normal Core lifecycle. |
-| `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex:1-19`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35-43` | Plugin runtime Init does not contain committed owned state or state version. | `Change`: add a coherent replacement input and keep state-pull compatibility. |
+| `OVR-GAP-008` | `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `lib/jido/agent_server/plugin_lifecycle.ex`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | `Resolved`: first start and replacement get one matching committed owned-state and state-version pair. | Preserve the immutable input and state-pull compatibility. |
 | `OVR-GAP-009` | `OVR-REQ-052`, `OVR-REQ-053`, and `OVR-REQ-065` | `lib/jido/agent_server.ex:257-263,381-389,1878-1923`; `lib/jido/error.ex:1-17` | Current public contracts use structs, maps, tuples, atoms, and partially normalized errors. | `Defer exact shapes`: seam 12 and value owners define the exception and migration inventory. |
-| `OVR-GAP-010` | `OVR-REQ-005` | `lib/jido/plugin.ex`; `lib/jido/agent/plugin.ex`; `lib/jido/agent_server/plugin.ex`; `lib/jido/persistence/plugin.ex`; `lib/jido/topology/plugin.ex` | `Resolved`: one callback-free package selects four closed owner facets. | Complete Persistence, Agent Server bootstrap, and Topology owner integrations in their seams. |
+| `OVR-GAP-010` | `OVR-REQ-005` | `lib/jido/plugin.ex`; `lib/jido/agent/plugin.ex`; `lib/jido/agent_server/plugin.ex`; `lib/jido/persistence/plugin.ex`; `lib/jido/topology/plugin.ex` | `Resolved`: one callback-free package selects four closed owner facets. | Preserve completed Persistence and Agent Server integrations. Complete Topology owner integration in seam 11. |
 | `OVR-GAP-011` | `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Portability is checked at persistence encoding, not at every proposed value boundary. | `Defer boundary timing`: seams 01, 07, and 12 define where rejection occurs. |
 | `OVR-GAP-012` | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,81-90`; `test/jido/topology/authoring_host_test.exs:79-272` | Static authoring and repair exist. Owner-Agent live control and target updates do not. | `Retain and defer`: keep static local Topology; do not make live control a V3 gate. |
 | `OVR-GAP-013` | `OVR-REQ-014`, `OVR-REQ-021`, `OVR-REQ-009`, `OVR-REQ-011`, `OVR-REQ-042`, `OVR-REQ-048` | Six research example files in the evidence table | Eight target-contract tests are skipped. | `Change evidence state`: owner seams supply passing acceptance proof after approval. |
@@ -297,9 +297,9 @@ table delegates them.
 | Core has no positive definition revision. | Add revision through a staged migration. Do not claim that a label pins loaded code. | `OVR-REQ-009` and `OVR-REQ-010`; seams 01, 02, 04, and 07 |
 | Earlier proposals name Checkpoint, Commit, Record, Status, Turn Status, Plugin Context, Transition, Contribution, Runtime values, and Instance Config structs. | Keep the roles. Defer exact types, fields, serialization, and errors to their owners. | `OVR-REQ-052`; seam 12 and value owners |
 | Earlier text can imply a new Result value. | Keep the tagged live result and the separate Turn Outcome. | Public/shared contract; seams 08, 12, and 13 |
-| Plugin runtime Init lacks current state and version. | Add a coherent replacement input and keep the state-pull API during migration. | `OVR-REQ-048`; seams 05, 08, and 10 |
+| Plugin runtime Init lacks current state and version. | `Implemented`: each generation gets coherent owned state and version. Keep the state-pull API during migration. | `OVR-REQ-048`; seams 05, 08, and 10 |
 | Confirmed persistence errors can leave a writable Server active. | Remove write authority after every persistence write failure. | `OVR-REQ-039`; seams 07 and 08 |
-| Persistent startup needs an initial active record. | `Implemented for the start-call boundary`: write after provisional Plugin readiness and before start success. Seam 08 owns stricter Registry publication. | `OVR-REQ-040`; seams 07, 08, and 10 |
+| Persistent startup needs an initial active record. | `Implemented`: write after Plugin readiness and before start success, then publish `:ready`. | `OVR-REQ-040`; seams 07, 08, and 10 |
 | Durable delete must preserve revision history. | `Implemented`: use a compare-and-swap tombstone. Purge and same-identity reactivation remain maintenance policy. | `OVR-REQ-042`; seam 07 |
 | Old proposals remove Builder and Codec. | Remove the removal proposal. Keep both APIs. | `OVR-REQ-008` and `OVR-REQ-063`; seams 01 and 02 |
 | Old proposals remove public PID APIs immediately. | Keep PID APIs during a Ref-first migration. | `OVR-REQ-012` and `OVR-REQ-063`; seams 03, 08, 09, and 12 |
@@ -441,7 +441,7 @@ the implementation tasks.
 | `OVR-REQ-043` | `lib/jido/persistence.ex:285-315`; `test/jido/persistence/checkpoint_portability_test.exs:15-45` | Cross-boundary negative matrix for each approved durable value. | `Partial` |
 | `OVR-REQ-044` and `OVR-REQ-045` | `lib/jido/agent_server/runtime_checkpoint.ex:8-50`; `test/jido/agent_server/runtime_lifecycle_test.exs:293-326` | Add explicit full-instance-stop proof that the nondurable checkpoint is gone. | `Partial` |
 | `OVR-REQ-046` and `OVR-REQ-047` | `lib/jido/agent_server.ex:2-10`; `lib/jido.ex:346-370`; `lib/jido/agent_server/plugin_lifecycle.ex:110-198`; `test/jido/supervisor_test.exs:15-54` | If pools change, prove peer Agent behavior, Plugin isolation, and restart coupling. | `Proven` for logical roles |
-| `OVR-REQ-048` | `test/jido/agent_server/runtime_lifecycle_test.exs:225-289`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:35-43` | State/version coherence for every replacement cause. | `Missing` |
+| `OVR-REQ-048` | `lib/jido/plugin/init.ex`; `test/jido/agent_server/plugin_lifecycle_test.exs`; `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs` | Keep state/version coherence through later placement changes. | `Proven` |
 | `OVR-REQ-049` | `test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs:14-32`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve Signal reentry and mailbox serialization through Plugin migration. | `Proven` |
 | `OVR-REQ-050` and `OVR-REQ-051` | `test/jido/agent_server/public_api_test.exs:333-459`; `lib/jido/agent_server.ex:1596-1637` | Preserve pre-commit cancellation and prove commit and Directive rejection. | `Partial` |
 | `OVR-REQ-052` and `OVR-REQ-053` | `lib/jido/agent_server.ex:257-263,381-389,1878-1923`; `lib/jido/error.ex:1-17`; `test/jido/error/normalization_test.exs:8-321` | Seam-12 inventory for every public entry and protocol exception. | `Partial` |
@@ -466,7 +466,7 @@ No deprecation or removal is approved in this seam.
 | Durable records | Version any new active and tombstone record shape. Define mixed-version read, write, purge, reactivation, and rollback rules before the first new-format write. |
 | Write errors | Removing write authority after confirmed failures changes current error-policy behavior. Define stop or terminal non-writing behavior and automatic-restart reload rules. |
 | Persistence adapters | Keep the binary adapter and atomic compare-and-swap contract. New lifecycle meaning stays above the adapter. |
-| Plugin runtime Init | Add coherent state and version input. Keep the current public state-pull recovery path during migration. |
+| Plugin runtime Init | Keep the implemented coherent state and version input. Keep the current public state-pull recovery path during migration. |
 | Public values and errors | Add values and normalized errors only after owner, purpose, serialization, protocol exceptions, and caller migration are clear. |
 | Topology | Keep static local activation and repair. Do not require live updates for V3. |
 | Observation | Keep semantic events, legacy `:agent_server` telemetry, `Jido.Observe`, tracing, and debug until seam 13 proves replacement coverage. |
@@ -486,7 +486,7 @@ when a safe rollback requires them.
 | `OVR-BLK-003` | `Resolved for Overview` | 04 Turn evaluation and `jido_action` | A definition revision is a compile-time Agent meaning revision. It does not pin Action or Flow BEAM code for a complete Turn. | Seam 04 must record and test this non-guarantee. Any future code pinning needs a separate owned contract. |
 | `OVR-BLK-004` | `Assumption` | 90 and Delivery | The declared Hex `jido_signal` V3 version has the Router precedence used by Jido. | Compile and test the declared compatible package set. |
 | `OVR-BLK-005` | `Resolved implementation` | 05 Plugins, 01 Agent, 07 Persistence | The Persistence facet converts one paired default-checkpoint slice. Complete custom checkpoints bypass conversion. | Preserve this owner boundary. |
-| `OVR-BLK-006` | `Partial owner-seam blocker` | 07 Persistence and 08 Agent Server | Initial records, write-authority loss, and tombstones are implemented. Strict provisional Registry publication remains open. | Complete the publication decision in seam 08. |
+| `OVR-BLK-006` | `Resolved` | 07 Persistence and 08 Agent Server | Initial records, write-authority loss, tombstones, and ready-only public Registry publication are implemented. | Preserve the lifecycle and publication order. |
 | `OVR-BLK-007` | `Assumption` | 12 Errors and contracts | Maps, tuples, atoms, and OTP values can remain documented protocol exceptions. | Complete the seam-12 inventory and migration rules. |
 | `OVR-BLK-008` | `Assumption` | 09 Jido instance and 10 Runtime topology | Plugin runtimes and Agent Servers need separate logical roles, but not necessarily separate Dynamic Supervisors. | Decide physical placement only after restart and readiness proof. |
 | `OVR-BLK-009` | `Resolved` | 11 Topology control plane | Static local Topology is sufficient for the V3 release boundary. | Live owner-Agent control and target updates are deferred. |

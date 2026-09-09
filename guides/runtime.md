@@ -5,7 +5,9 @@ that uses `Jido`. Call `Jido.start_agent(MyAgent, id: id, initial_state: state)`
 for the default instance. Pass an instance as the first argument only when you
 use more than one Jido supervisor. The live API accepts a PID.
 `Jido.whereis_agent/1` resolves an ID in the default instance. Options select a
-partition. A second local registration for that identity fails.
+partition. It returns only a Server that completed Plugin readiness and any
+required revision-zero write. A second local registration for that identity
+fails, including while the first process has only reserved the identity.
 
 Use `AgentServer.agent/1` for current Agent data, `snapshot/1` for the Agent and
 commit revision, `status/1` for execution and queue status, and `children/1` for
@@ -15,6 +17,11 @@ state shape is removed. Do not read it through an old State struct contract.
 `send_request/3` and `receive_response/2` separate sending from waiting.
 `cancel/1` and `cancel_turn/2` cancel eligible pre-commit work. They do not roll
 back an external effect, a completed commit, or directive work.
+
+`turn_timeout` limits active pre-commit work from Plugin admission until commit
+starts. Its default is 5 seconds. A timeout stops owned admission or execution,
+keeps the committed snapshot, and rejects late results. Caller wait time and
+post-commit Directive time use separate limits.
 
 `attach/2` monitors an owner and prevents idle shutdown. Repeated attachment of
 one owner is idempotent. `detach/2` or owner death removes the attachment.

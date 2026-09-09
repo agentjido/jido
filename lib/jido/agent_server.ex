@@ -37,6 +37,12 @@ defmodule Jido.AgentServer do
   without a commit, an Action can return `{:error, reason}`. No separate no-op
   result is required. A failure after commit does not undo the revision.
 
+  `turn_timeout` starts when active pre-commit work starts and stops when commit
+  starts. It covers Plugin admission and candidate evaluation. Timeout cancels
+  owned work, keeps the committed snapshot, and rejects later task messages.
+  Caller wait, Plugin readiness, persistence operations, and post-commit
+  Directive work use separate boundaries.
+
   Exec roots, Action tasks, Flow tasks, and asynchronous Directives run under
   the Jido instance Task Supervisor. The Server also links each Exec root to
   itself. Active execution cannot outlive its Agent owner.
@@ -300,7 +306,8 @@ defmodule Jido.AgentServer do
     key = registry_key(id, Keyword.get(opts, :partition))
 
     case Registry.lookup(registry, key) do
-      [{pid, _value}] -> if Process.alive?(pid), do: pid
+      [{pid, :ready}] -> if Process.alive?(pid), do: pid
+      [{_pid, _status}] -> nil
       [] -> nil
     end
   end
@@ -440,7 +447,8 @@ defmodule Jido.AgentServer do
   def init({%Options{} = opts, startup_reply}) do
     Process.flag(:trap_exit, true)
 
-    with {:ok, restored_agent, restored_version, initial_persistence} <-
+    with :ok <- mark_registry_status(opts, :starting),
+         {:ok, restored_agent, restored_version, initial_persistence} <-
            restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
@@ -463,6 +471,7 @@ defmodule Jido.AgentServer do
         exec_opts: exec_opts,
         max_postponed_signals: max_postponed_signals,
         postponed_tokens: MapSet.new(),
+        turn_timeout: opts.turn_timeout,
         max_directives_per_turn: max_directives_per_turn,
         directive_timeout: opts.directive_timeout,
         readiness_timeout: opts.readiness_timeout,
@@ -530,14 +539,20 @@ defmodule Jido.AgentServer do
 
     case persist_initial_agent(data) do
       {:ok, data} ->
-        AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
-          state_version: data.state_version
-        })
+        case publish_agent(data) do
+          :ok ->
+            AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
+              state_version: data.state_version
+            })
 
-        notify_startup(data, :ok)
-        data = %{data | activation_span: nil, startup_reply: nil}
-        notify_parent_online(data)
-        {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
+            notify_startup(data, :ok)
+            data = %{data | activation_span: nil, startup_reply: nil}
+            notify_parent_online(data)
+            {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
+
+          {:error, reason} ->
+            {:stop, {:shutdown, {:publication_failed, reason}}, data}
+        end
 
       {:error, reason} ->
         {:stop, {:shutdown, {:persistence_failed, reason}}, data}
@@ -898,6 +913,27 @@ defmodule Jido.AgentServer do
 
   def handle_event(
         :info,
+        {:plugin_runtime_bootstrap, lifecycle_pid, plugin, token},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    result =
+      case State.child(data, key) do
+        %ChildInfo{lifecycle_pid: ^lifecycle_pid, pid: :restarting} ->
+          PluginLifecycle.replacement_child_spec(data, plugin)
+
+        _child ->
+          {:error, {:stale_plugin_runtime_bootstrap, plugin}}
+      end
+
+    send(lifecycle_pid, {:plugin_runtime_bootstrap, token, result})
+    :keep_state_and_data
+  end
+
+  def handle_event(
+        :info,
         {:plugin_runtime_ready, lifecycle_pid, plugin, runtime_pid},
         _phase,
         %State{} = data
@@ -941,6 +977,24 @@ defmodule Jido.AgentServer do
 
   def handle_event(
         :info,
+        {:timeout, timer, {:turn_timeout, turn_id}},
+        :admitting,
+        %State{active: %ActiveTurn{turn_id: turn_id, timeout_timer: timer}} = data
+      ) do
+    timeout_admission(data)
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:turn_timeout, turn_id}},
+        :running,
+        %State{active: %ActiveTurn{turn_id: turn_id, timeout_timer: timer}} = data
+      ) do
+    timeout_execution(data)
+  end
+
+  def handle_event(
+        :info,
         {:DOWN, ref, :process, _pid, reason},
         :admitting,
         %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
@@ -951,28 +1005,6 @@ defmodule Jido.AgentServer do
     error =
       Error.execution_error("Agent Plugin admission task exited",
         details: %{code: :plugin_callback_task_failed, callback: :admit, reason: reason}
-      )
-
-    fail_turn(error, :prepare, data)
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:admission_timeout, task_ref}},
-        :admitting,
-        %State{admission_task: %{task: %Task{ref: task_ref} = task, timer: timer}} = data
-      ) do
-    shutdown_task(task)
-    data = %{data | admission_task: nil}
-
-    error =
-      Error.timeout_error("Agent Plugin admission timed out",
-        timeout: data.directive_timeout,
-        details: %{
-          code: :plugin_callback_timeout,
-          callback: :admit,
-          turn_id: data.active.turn_id
-        }
       )
 
     fail_turn(error, :prepare, data)
@@ -1314,7 +1346,7 @@ defmodule Jido.AgentServer do
     data = cancel_idle_timer(data)
     {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
     span = start_signal_span(signal, data)
-    active = ActiveTurn.new(signal, from, data.state_version, span)
+    active = ActiveTurn.new(signal, from, data.state_version, span, data.turn_timeout)
     data = %{data | active: active}
     metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
 
@@ -1407,8 +1439,7 @@ defmodule Jido.AgentServer do
           ServerPlugin.admit(command, plugin_specs, runtime_refs)
         end)
 
-      timer = start_task_timer(data.directive_timeout, :admission_timeout, task.ref)
-      {:next_state, :admitting, %{data | admission_task: %{task: task, timer: timer}}}
+      {:next_state, :admitting, %{data | admission_task: %{task: task, timer: nil}}}
     else
       {:error, reason} -> fail_turn(reason, :prepare, data)
     end
@@ -1419,6 +1450,14 @@ defmodule Jido.AgentServer do
   end
 
   defp begin_turn_execution(%Jido.Agent.Command{} = command, %State{} = data) do
+    if ActiveTurn.expired?(data.active) do
+      timeout_admission(data)
+    else
+      do_begin_turn_execution(command, data)
+    end
+  end
+
+  defp do_begin_turn_execution(%Jido.Agent.Command{} = command, %State{} = data) do
     # Admission receives the original Signal. Attach the Turn trace only at
     # the existing execution boundary, after admission has finished.
     signal =
@@ -1437,13 +1476,23 @@ defmodule Jido.AgentServer do
     case start_exec(command, data) do
       {:ok, handle, prepared} ->
         active = ActiveTurn.begin_execution(data.active, handle, prepared)
-        {:next_state, :running, %{data | active: active}}
+        data = %{data | active: active}
+
+        if ActiveTurn.expired?(active) do
+          timeout_execution(data)
+        else
+          {:next_state, :running, data}
+        end
 
       {:error, reason} ->
-        fail_turn(reason, :prepare, data)
+        if ActiveTurn.expired?(data.active),
+          do: timeout_admission(data),
+          else: fail_turn(reason, :prepare, data)
 
       {:error, stage, reason} ->
-        fail_turn(reason, evaluator_outcome_stage(stage), data)
+        if ActiveTurn.expired?(data.active),
+          do: timeout_admission(data),
+          else: fail_turn(reason, evaluator_outcome_stage(stage), data)
     end
   end
 
@@ -1504,6 +1553,14 @@ defmodule Jido.AgentServer do
   end
 
   defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
+    if ActiveTurn.expired?(data.active) do
+      timeout_execution(data)
+    else
+      do_finish_turn(result, prepared, data)
+    end
+  end
+
+  defp do_finish_turn(result, prepared, data) do
     case result do
       {:error, reason} ->
         fail_turn(reason, :execute, data)
@@ -1517,7 +1574,9 @@ defmodule Jido.AgentServer do
             finish_success(agent, directives, data)
 
           {:error, stage, reason} ->
-            fail_turn(reason, evaluator_outcome_stage(stage), data)
+            if ActiveTurn.expired?(data.active),
+              do: timeout_execution(data),
+              else: fail_turn(reason, evaluator_outcome_stage(stage), data)
         end
     end
   end
@@ -1526,14 +1585,29 @@ defmodule Jido.AgentServer do
   defp evaluator_outcome_stage(stage) when stage in [:compose, :validate], do: :finalize
 
   defp finish_success(%Agent{} = agent, directives, %State{} = data) do
-    with {:ok, directives} <- prepare_directives(directives, data) do
-      commit_turn(agent, directives, data)
+    result = prepare_directives(directives, data)
+
+    if ActiveTurn.expired?(data.active) do
+      timeout_execution(data)
     else
-      {:error, reason} -> fail_turn(reason, :finalize, data)
+      case result do
+        {:ok, directives} -> commit_turn(agent, directives, data)
+        {:error, reason} -> fail_turn(reason, :finalize, data)
+      end
     end
   end
 
   defp commit_turn(agent, directives, %State{active: %ActiveTurn{} = active} = data) do
+    if ActiveTurn.expired?(active) do
+      timeout_execution(data)
+    else
+      active = ActiveTurn.cancel_timeout(active)
+      data = %{data | active: active}
+      do_commit_turn(agent, directives, active, data)
+    end
+  end
+
+  defp do_commit_turn(agent, directives, active, data) do
     # This is a commit revision, not a count of distinct state values.
     version = data.state_version + 1
 
@@ -1651,6 +1725,41 @@ defmodule Jido.AgentServer do
 
         {:stop_and_reply, {:shutdown, {:exec_cancellation_failed, error}}, actions, next_data}
     end
+  end
+
+  defp timeout_admission(%State{active: %ActiveTurn{} = active} = data) do
+    stop_task(data.admission_task)
+    data = %{data | admission_task: nil}
+    fail_turn(turn_timeout_error(active), :prepare, data)
+  end
+
+  defp timeout_execution(%State{active: %ActiveTurn{} = active} = data) do
+    case cancel_exec(active.exec_handle, data) do
+      :ok ->
+        stop_exec_adapter(active.exec_handle)
+        fail_turn(turn_timeout_error(active), :execute, data)
+
+      {:error, reason} ->
+        error = {:turn_timeout_cancellation_failed, reason}
+        finish_span_error(active.span, error)
+        TraceContext.clear()
+        outcome = turn_outcome(data, :indeterminate, :execute, error)
+        next_data = complete_outcome(data, outcome)
+        replies = reply_action(active.caller, {:error, error})
+
+        if replies == [] do
+          {:stop, {:shutdown, error}, next_data}
+        else
+          {:stop_and_reply, {:shutdown, error}, replies, next_data}
+        end
+    end
+  end
+
+  defp turn_timeout_error(%ActiveTurn{} = active) do
+    Error.timeout_error("Agent Turn timed out",
+      timeout: active.timeout,
+      details: %{code: :agent_turn_timeout, turn_id: active.turn_id}
+    )
   end
 
   defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
@@ -2652,6 +2761,7 @@ defmodule Jido.AgentServer do
     do: ActiveTurn.outcome(active, agent.id, status, stage, error)
 
   defp complete_outcome(%State{} = data, %Outcome{} = outcome) do
+    if data.active, do: ActiveTurn.cancel_timeout(data.active)
     AgentTelemetry.settled(data, outcome)
     signal = outcome.effective_signal || outcome.source_signal
     event = if outcome.status == :succeeded, do: :turn_completed, else: :turn_failed
@@ -2960,6 +3070,31 @@ defmodule Jido.AgentServer do
 
   defp persist_initial_agent(%State{} = data),
     do: {:ok, %{data | initial_persistence: :ready}}
+
+  defp publish_agent(%State{registered?: false}), do: :ok
+
+  defp publish_agent(%State{registry: registry, agent: agent, partition: partition}) do
+    key = registry_key(agent.id, partition)
+
+    case Registry.update_value(registry, key, fn _status -> :ready end) do
+      {:ready, _previous} -> :ok
+      :error -> {:error, :registry_entry_not_found}
+    end
+  end
+
+  defp mark_registry_status(%Options{register: false}, _status), do: :ok
+
+  defp mark_registry_status(
+         %Options{registry: registry, agent: agent, partition: partition},
+         status
+       ) do
+    key = registry_key(agent.id, partition)
+
+    case Registry.update_value(registry, key, fn _previous -> status end) do
+      {^status, _previous} -> :ok
+      :error -> {:error, :registry_entry_not_found}
+    end
+  end
 
   defp persist_commit(%State{persistence: nil} = data, agent, version) do
     RuntimeCheckpoint.put(data, agent, version)

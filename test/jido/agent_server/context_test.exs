@@ -23,7 +23,13 @@ defmodule Jido.AgentServer.ContextTest do
 
     @impl true
     def prepare(command, _opts) do
-      {:ok, %{command | context: Map.put(command.context, :prepared, true)}}
+      if delay = Map.get(command.context, :prepare_delay), do: Process.sleep(delay)
+
+      if Map.get(command.context, :prepare_error) do
+        {:error, :prepared_too_late}
+      else
+        {:ok, %{command | context: Map.put(command.context, :prepared, true)}}
+      end
     end
 
     @impl true
@@ -74,7 +80,10 @@ defmodule Jido.AgentServer.ContextTest do
       end
 
       {:ok, server} =
-        Jido.start_agent(jido, Agent, directive_timeout: 10_000, error_policy: policy)
+        Jido.start_agent(jido, Agent,
+          turn_timeout: if(@failure == :timeout, do: 50, else: 10_000),
+          error_policy: policy
+        )
 
       before = Server.snapshot(server)
       gate = make_ref()
@@ -89,22 +98,22 @@ defmodule Jido.AgentServer.ContextTest do
       assert_receive {:admission_blocked, ^gate, worker}, 2_000
       monitor = Process.monitor(worker)
       {:admitting, state} = :sys.get_state(server)
-      %{task: task, timer: timer} = state.admission_task
+      %{task: task} = state.admission_task
+      timer = state.active.timeout_timer
+      turn_id = state.active.turn_id
 
-      send(server, {:timeout, make_ref(), {:admission_timeout, task.ref}})
-      send(server, {:timeout, timer, {:admission_timeout, make_ref()}})
+      send(server, {:timeout, make_ref(), {:turn_timeout, turn_id}})
+      send(server, {:timeout, timer, {:turn_timeout, "stale"}})
       assert Server.status(server).phase == :admitting
 
       if @failure == :exit do
         Process.exit(worker, :kill)
-      else
-        send(server, {:timeout, timer, {:admission_timeout, task.ref}})
       end
 
       assert {:error, error} = Task.await(caller)
 
       expected_code =
-        if @failure == :exit, do: :plugin_callback_task_failed, else: :plugin_callback_timeout
+        if @failure == :exit, do: :plugin_callback_task_failed, else: :agent_turn_timeout
 
       assert Jido.Error.code(error) == expected_code
       assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 2_000
@@ -117,7 +126,7 @@ defmodule Jido.AgentServer.ContextTest do
       refute_received {:context_executed, _}
 
       send(server, {task.ref, {:error, :stale}})
-      send(server, {:timeout, timer, {:admission_timeout, task.ref}})
+      send(server, {:timeout, timer, {:turn_timeout, turn_id}})
       assert Server.status(server).phase == :idle
 
       assert {:ok, committed} =
@@ -130,7 +139,7 @@ defmodule Jido.AgentServer.ContextTest do
   end
 
   test "admission cancellation stops its worker before the reply", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Agent, directive_timeout: 10_000)
+    {:ok, server} = Jido.start_agent(jido, Agent, turn_timeout: 10_000)
     before = Server.snapshot(server)
     test = self()
     gate = make_ref()
@@ -149,9 +158,42 @@ defmodule Jido.AgentServer.ContextTest do
     refute Process.alive?(worker)
     assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 2_000
     assert {:error, :cancelled} = Task.await(caller)
-    assert Process.read_timer(state.admission_task.timer) == false
+    assert Process.read_timer(state.active.timeout_timer) == false
     assert Server.snapshot(server) == before
     assert Server.status(server).phase == :idle
+  end
+
+  test "the Turn deadline replaces a late preparation error", %{jido: jido} do
+    test = self()
+
+    policy = fn error, outcome ->
+      send(test, {:preparation_timed_out, error, outcome})
+      :continue
+    end
+
+    {:ok, server} =
+      Jido.start_agent(jido, Agent, turn_timeout: 50, error_policy: policy)
+
+    assert {:error, %Jido.Error.TimeoutError{} = error} =
+             Server.call(server, signal("context.input", %{value: 7}),
+               context: %{
+                 observer: test,
+                 prepare_delay: 100,
+                 prepare_error: true
+               }
+             )
+
+    assert Jido.Error.code(error) == :agent_turn_timeout
+
+    assert_receive {:preparation_timed_out, ^error,
+                    %{status: :timed_out, stage: :prepare, committed?: false}}
+
+    assert Server.snapshot(server).state_version == 0
+
+    assert {:ok, committed} =
+             Server.call(server, signal("context.input", %{value: 8}), context: %{observer: test})
+
+    assert committed.state == %{value: 8, context_plugin: 1}
   end
 
   test "queued calls retain context when admission is cancelled and excess casts are dropped", %{
@@ -205,7 +247,7 @@ defmodule Jido.AgentServer.ContextTest do
   end
 
   test "admission result releases its monitor and timer", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Agent, directive_timeout: 10_000)
+    {:ok, server} = Jido.start_agent(jido, Agent, turn_timeout: 10_000)
     test = self()
     gate = make_ref()
 
@@ -218,7 +260,8 @@ defmodule Jido.AgentServer.ContextTest do
 
     assert_receive {:admission_blocked, ^gate, worker}, 2_000
     {:admitting, state} = :sys.get_state(server)
-    %{task: task, timer: timer} = state.admission_task
+    %{task: task} = state.admission_task
+    timer = state.active.timeout_timer
     send(worker, {:release, gate})
     assert {:ok, _} = Task.await(caller)
     eventually(fn -> Server.status(server).phase == :idle end)

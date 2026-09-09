@@ -7,18 +7,25 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
   @doc false
   def start_all(%State{} = state) do
-    init = %Init{
-      agent_server: self(),
-      agent_id: state.agent.id,
-      module: nil,
-      jido: state.jido,
-      partition: state.partition,
-      options: []
-    }
-
-    case Plugin.child_specs(init, state.agent.plugins) do
+    case child_specs(state) do
       {:ok, child_specs} -> start_children(state, child_specs)
       {:error, reason} -> {:error, {:plugin_child_specs_failed, reason}, state}
+    end
+  end
+
+  @doc false
+  def replacement_child_spec(%State{} = state, plugin) when is_atom(plugin) do
+    case Enum.find(state.plugin_specs, &(&1.module == plugin)) do
+      nil ->
+        {:error, {:plugin_spec_not_found, plugin}}
+
+      plugin_spec ->
+        with {:ok, [child_spec]} <- Plugin.child_specs(init(state, plugin_spec), [plugin_spec]) do
+          {:ok, child_spec}
+        else
+          {:ok, []} -> {:error, {:plugin_runtime_not_declared, plugin}}
+          {:error, reason} -> {:error, {:plugin_child_spec_failed, plugin, reason}}
+        end
     end
   end
 
@@ -106,6 +113,31 @@ defmodule Jido.AgentServer.PluginLifecycle do
       end
     end)
   end
+
+  defp child_specs(state) do
+    Enum.reduce_while(state.plugin_specs, {:ok, []}, fn plugin_spec, {:ok, child_specs} ->
+      case Plugin.child_specs(init(state, plugin_spec), [plugin_spec]) do
+        {:ok, specs} -> {:cont, {:ok, child_specs ++ specs}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  defp init(%State{} = state, plugin_spec) do
+    %Init{
+      agent_server: self(),
+      agent_id: state.agent.id,
+      module: nil,
+      plugin_state: owned_state(state.agent.state, plugin_spec),
+      state_version: state.state_version,
+      jido: state.jido,
+      partition: state.partition,
+      options: []
+    }
+  end
+
+  defp owned_state(_agent_state, %{state_key: nil}), do: nil
+  defp owned_state(agent_state, %{state_key: key}), do: Map.get(agent_state, key)
 
   defp start_child(state, %{id: plugin} = child_spec) when is_atom(plugin) do
     spec = Supervisor.child_spec(child_spec, [])

@@ -15,9 +15,14 @@ requests return an overload result through their normal contracts.
 post-commit work. Its default is `:infinity`. Set a finite value when an Action
 or Plugin can create a variable amount of work.
 
-`directive_timeout` limits Plugin and external Directive handling. Its default
-is 5 seconds. A caller timeout is a different boundary: the caller can stop
-waiting while accepted actor work continues.
+`turn_timeout` limits active pre-commit work. It starts when the Server accepts
+a Turn, covers Plugin admission and candidate evaluation, and stops when commit
+starts. Its default is 5 seconds. A timeout cancels owned work, preserves the
+last committed snapshot, and rejects late results.
+
+`directive_timeout` limits Plugin and external Directive handling after commit.
+Its default is 5 seconds. A caller timeout is a different boundary: the caller
+can stop waiting while accepted actor work continues.
 
 ## Limit shared execution
 

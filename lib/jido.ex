@@ -570,9 +570,9 @@ defmodule Jido do
 
     jido_instance
     |> registry_name()
-    |> Registry.select([{{:"$1", :"$2", :_}, [], [{{:"$1", :"$2"}}]}])
+    |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
     |> Enum.flat_map(fn
-      {{:agent, key}, pid} ->
+      {{:agent, key}, pid, :ready} ->
         case unwrap_partition_key(key) do
           {^partition, id} when is_binary(id) -> [{id, pid}]
           {nil, id} when is_nil(partition) and is_binary(id) -> [{id, pid}]

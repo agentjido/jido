@@ -6,9 +6,14 @@ keep runtime phases explicit while work runs in supervised tasks.
 ## Activation
 
 Startup constructs or accepts one Agent instance, applies restore policy, starts
-Plugin runtimes, and waits for their readiness checks. `start_link/1` returns
-only after the initial bootstrap reply is ready. `await_ready/2` is also
-available for callers that receive a Server before all dependent work settles.
+Plugin runtimes, and waits for their readiness checks. `start_link/1` keeps the
+standard OTP start contract and can return during initialization. Use
+`await_ready/2` for a directly started Server. `Jido.start_agent/3` waits for
+Plugin readiness and any required initial persistence write.
+
+Instance lookup does not return the Server during this provisional period. A
+Registry entry reserves the identity, but public lookup and listing accept only
+the `:ready` value.
 
 Each activation has a new activation ID. A restarted Server can keep the same
 Agent ID and state version.
@@ -19,6 +24,10 @@ The public status can report initialization, idle work, admission, executable
 work, and Directive dispatch. The Server handles one Agent Turn at a time.
 It can keep its mailbox responsive while Plugin admission, Jido Action
 execution, and Plugin dispatch run in owned tasks.
+
+The Server applies `turn_timeout` from active admission until commit starts.
+It cancels owned pre-commit work on timeout. Directive work starts after commit
+and uses `directive_timeout` instead.
 
 Do not read private state-machine tuples. Use:
 

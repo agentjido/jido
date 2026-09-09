@@ -59,7 +59,7 @@ defines outcomes and gates. It is not the later formal implementation plan.
 | `lib/jido.ex:431-629` | Managed Agent lifecycle uses the Agent Dynamic Supervisor, local Registry, and public Runtime Store parent bindings. |
 | `lib/jido/runtime_store.ex:1-23,57-78` | The instance owns a nondurable ETS table that survives Runtime Store worker restart. |
 | `lib/jido/agent_server.ex:85-145` | Direct startup links to the caller. Managed startup uses the Agent Dynamic Supervisor. Managed children default to `:transient`; direct children default to `:temporary`. |
-| `lib/jido/agent_server.ex` | Startup restores state, starts Plugin children, waits for readiness, and confirms revision zero before the start call succeeds. Registry can expose a provisional PID. |
+| `lib/jido/agent_server.ex` | Startup reserves Registry value `:starting`, restores state, starts Plugin children, waits for readiness, confirms revision zero, and then publishes `:ready`. Public lookup exposes only `:ready`. |
 | `lib/jido/topology/controller/activation.ex` | The Controller preflights durable state. Existing members start with required restore; missing members use create-only revision zero. |
 | `lib/jido/agent_server.ex:1244-1282` | Controlled termination stops execution, readiness, admission, Directive, error-policy, and Plugin runtime work. |
 | `lib/jido/agent_server.ex:1325-1346` | Initial Plugin readiness uses `spawn_monitor/1`, not the instance Task Supervisor or an owner link. |
@@ -69,7 +69,7 @@ defines outcomes and gates. It is not the later formal implementation plan.
 | `lib/jido/agent_server/plugin_lifecycle.ex:9-39,101-198` | Plugin runtime wrappers start in the Agent Dynamic Supervisor and register with instance-local names. |
 | `lib/jido/agent_server/plugin_child.ex:49-70,79-183` | A wrapper links to its Agent Server, owns a private Supervisor, observes root restart, runs readiness, and stops with its owner. |
 | `lib/jido/plugin.ex:915-927` | The current Plugin contract requires a permanent runtime root. |
-| `lib/jido/plugin/init.ex:1-23` | Current Init has Agent Server PID, Agent ID, Plugin module, Jido instance, partition, and options, but no Plugin state or state version. |
+| `lib/jido/plugin/init.ex` | Init has Agent Server PID, Agent ID, Plugin module, Jido instance, partition, options, committed owned state, and its matching state version. |
 | `lib/jido/agent_server/state.ex:28-37` | Parent, children, and unresolved spawn requests are private runtime state. |
 | `lib/jido/agent_server/directive_runtime.ex:38-83,229-365` | Built-in child Directives support local and explicit known-node Agent ownership. |
 | `lib/jido/agent_server/directive_runtime.ex:553-591` | Logical parent bindings use the instance Runtime Store. |
@@ -130,13 +130,13 @@ All dispositions are recommendations and are pending approval.
 | `RT-GAP-002` | `RT-REQ-008` to `RT-REQ-016` | Agent Server child spec and RuntimeCheckpoint | Placement and same-instance restart work. Instance-loss and persistent restart matrices are incomplete. | `Retain`; strengthen evidence |
 | `RT-GAP-003` | `RT-REQ-017` to `RT-REQ-019` | Agent Server task and termination code | Execution ownership is strong. Initial readiness and error-policy delivery are not owner-linked for abrupt death. | `Change` worker ownership |
 | `RT-GAP-004` | `RT-REQ-020` to `RT-REQ-023`, `RT-REQ-025` to `RT-REQ-027` | PluginLifecycle and PluginChild | Current wrapper placement and restart work. Full kill and failure-race coverage is incomplete. | `Retain`; strengthen evidence |
-| `RT-GAP-005` | `RT-REQ-024` | Current Plugin Init and state-pull restart | Replacement gets fresh state after start, not one state-version input. | `Change`; blocked on seams 05 and 08 |
+| `RT-GAP-005` | `RT-REQ-024` | Plugin Init and owner-built replacement child specification | Each generation receives one newly built committed state-version input. | `Resolved by seams 05 and 08`; preserve during topology work |
 | `RT-GAP-006` | `RT-REQ-028` to `RT-REQ-032` | State, DirectiveRuntime, and child tests | Current logical relationship behavior is implemented. Public Ref identity is absent. | `Retain`; migrate handles later |
 | `RT-GAP-007` | `RT-REQ-033` to `RT-REQ-044` | ChildPlacement, SpawnRegistry, and distributed tests | Known-node behavior is strong. Receipt storage is nondurable and gives no ownership transfer. | `Retain` bounded contract; `Defer` authority |
 | `RT-GAP-008` | `RT-REQ-045` to `RT-REQ-047` | No core Agent Ref or namespace | Current child and facade paths use IDs and PIDs. | `Missing`; blocked on seams 03 and 09 |
 | `RT-GAP-009` | `RT-REQ-048` | Core scope and distributed authority research test | The limit is documented. One skipped test shows exclusive ownership is absent. | `Retain` explicit non-guarantee |
 | `RT-GAP-010` | `RT-REQ-049` to `RT-REQ-051` | Controller docs, code, and tests | The split exists, but old seam text mixed runtime and control-plane duties. | `Retain`; clarify owner boundary |
-| `RT-GAP-011` | `RT-REQ-015`, `RT-REQ-025` | Persistence and Agent Server code | Revision-zero create is missing, and Plugin readiness can finish before any durable record exists. | `Blocked` on seams 07 and 08 |
+| `RT-GAP-011` | `RT-REQ-015`, `RT-REQ-025` | Persistence and Agent Server code | Revision-zero create, Plugin cleanup, and ready-only public publication are implemented. | `Resolved input`; preserve during topology work |
 
 ## Disposition of superseded claims
 
@@ -159,9 +159,9 @@ remote-child, and gap-analysis files. Git history keeps their exact text.
 | A separate `Jido.Plugin.Runtime` behavior with `dispatch/3` is the target. | `Remove`. | Seam 05 owns the facet migration and keeps current `Jido.Plugin` compatibility. |
 | Plugin roots are normalized to `restart: :temporary`. | `Remove`. | Current and seam-05 contracts require a permanent root under a temporary wrapper. |
 | A Plugin root gets no Agent Server PID and signals only through a Ref facade. | `Defer migration`. | Current Init has the Server PID. Exact future identity fields remain blocked in seam 05. |
-| Plugin replacement must receive fresh complete state and version in Init. | `Retain target, narrow ownership`. | Seam 05 owns the bootstrap value; seams 08 and 10 own lifecycle and placement. |
+| Plugin replacement must receive fresh complete state and version in Init. | `Implemented by seams 05 and 08`. | Seam 10 owns placement and must preserve the owner-built bootstrap pair. |
 | Add separate Plugin Runtime Init, Context, Status, and `plugin_runtimes` APIs. | `Remove as required`. | No such API exists. Current Plugin context and `children` inspection stay compatible. |
-| Persistent first creation writes revision zero after Plugin readiness. | `Implemented for start-call success`. | Seam 08 owns stricter provisional Registry publication. |
+| Persistent first creation writes revision zero after Plugin readiness. | `Implemented with ready-only publication`. | The Registry value changes from `:starting` to `:ready` only after the write is confirmed. |
 | Add Plugin terminate and every-state-change callbacks. | `Reject`. | OTP shutdown and later Signals remain the selected boundaries. |
 | Explicit remote `node:` selects an Erlang node and never falls back locally. | `Retain`. | This is implemented and tested. |
 | A remote target owns the child process while the parent owns the logical link. | `Retain`. | This is the current ownership model. |
@@ -268,7 +268,7 @@ Create the formal plan only after the user approves this seam.
 | `RT-REQ-018` | Controlled termination code | Abrupt kill during initial readiness, error-policy delivery, and every owned task type | `Conflict` for two worker types; otherwise `Partial` |
 | `RT-REQ-019` | Active-turn tokens and late-result handling | Duplicate and late result tests for every task type | `Partial` |
 | `RT-REQ-020` to `RT-REQ-023` | PluginLifecycle, PluginChild, and runtime lifecycle tests | Wrapper/root restart and owner-kill fault matrix | `Partial` |
-| `RT-REQ-024` | Fresh-state pull after root restart | Atomic Plugin state-version bootstrap and commit-race tests | `Missing` |
+| `RT-REQ-024` | Immutable state-version Init and FA-06 replacement proof | Keep the pair coherent through any topology placement change | `Proven by seam 08` |
 | `RT-REQ-025` | Initial and replacement readiness failure paths | Full first-start, replacement, timeout, and cleanup matrix | `Partial` |
 | `RT-REQ-026` | Current Plugin dispatch contract | Process-free facet parity test after seam-05 migration | `Partial` |
 | `RT-REQ-027` | Agent state tests and private runtime structs | Recursive checkpoint handle-exclusion audit | `Proven` for current paths; target audit is `Partial` |
@@ -289,7 +289,7 @@ No removal or deprecation is approved in this seam.
 | Agent placement | Keep direct peer children and current restart options. Topology-controlled Agents remain temporary. |
 | Runtime checkpoints | Keep same-instance last-commit recovery and clean-stop deletion. Do not convert it into a durability claim. |
 | Persistence | Consume revision-zero creation, tombstones, and all-write-error authority without adding discovery or lease meaning. |
-| Plugin runtime | Keep the temporary wrapper and permanent root. Add state-version bootstrap without removing state-pull compatibility until parity passes. |
+| Plugin runtime | Keep the temporary wrapper role and permanent root contract. The wrapper rebuilds the root specification with a fresh state-version pair for each generation. Keep state-pull compatibility. |
 | Relationships | Keep built-in child Directives, private handles, parent policies, and parent-binding lookup. Add Ref use only after local resolution exists. |
 | Remote placement | Keep top-level `node:` and no fallback. Preserve current uncertain-result and generation behavior. |
 | Identity | Add Ref-first local paths. Keep ID, PID, name, partition, and direct Agent Server APIs. |
@@ -308,8 +308,8 @@ unit.
 | `RT-BLK-001` | `Blocker` | 00 Overview and 90 Package boundaries | Local-core scope, static Topology, explicit known-node placement, and compatibility are pending approval. | Approve or change the Bright Line and package scope. |
 | `RT-BLK-002` | `Blocker` | 12 Errors and contracts | Final runtime, timeout, not-found, and indeterminate error forms are pending. | Approve the error registry without changing runtime result meaning. |
 | `RT-BLK-003` | `Blocker` | 03 Agent identity and 09 Jido instance | Core Agent Ref, namespace binding, partition conversion, and local Ref facade do not exist. | Approve and implement the additive local identity path. |
-| `RT-BLK-004` | `Blocker` | 05 Plugins and 08 Agent Server | No current bootstrap value contains matching committed Plugin state and state version. | Approve the value, restart-race rule, and compatibility path. |
-| `RT-BLK-005` | `Blocker` | 07 Persistence and 08 Agent Server | Revision-zero durable creation and all-write-error authority loss are not implemented. | Approve and align startup, failure, cleanup, and reactivation. |
+| `RT-BLK-004` | `Resolved input` | 05 Plugins and 08 Agent Server | Every Plugin generation receives matching committed Plugin state and state version. | Preserve the immutable pair and compatible state-pull path. |
+| `RT-BLK-005` | `Resolved input` | 07 Persistence and 08 Agent Server | Revision-zero durable creation, all-write-error authority loss, and ready-only publication are implemented. | Preserve startup, failure, cleanup, and reactivation order. |
 | `RT-BLK-006` | `Assumption` | 09 Jido instance and 10 Runtime topology | The current five-child `:one_for_one` tree is the first-stage V3 target. | Approve or change `RT-DEC-001`. |
 | `RT-BLK-007` | `Assumption` | 05 Plugins, 08 Agent Server, 10 Runtime topology | Temporary Plugin wrappers can remain peers in the Agent pool for V3. | Approve or change `RT-DEC-002` and `RT-DEC-003`. |
 | `RT-BLK-008` | `Blocker` | 08 Agent Server, 10 Runtime topology | Initial readiness and error-policy delivery are not owner-linked for abrupt Agent death. | Select owner-bound mechanisms and prove cleanup. |

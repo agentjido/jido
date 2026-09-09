@@ -6,10 +6,11 @@ defmodule Jido.Examples.RuntimeReconstruction.SetFeed do
   def schema, do: @schema
 end
 
-defmodule Jido.Examples.RuntimeReconstruction.Plugin do
-  @moduledoc "Saves desired feed configuration and owns one disposable runtime."
-  use Jido.Plugin
-  alias Jido.Examples.RuntimeReconstruction.{SetFeed, Runtime}
+defmodule Jido.Examples.RuntimeReconstruction.Plugin.Agent do
+  @moduledoc "Owns the portable desired-feed state and its Directive."
+  use Jido.Agent.Plugin
+  alias Jido.Agent.Plugin.Contribution
+  alias Jido.Examples.RuntimeReconstruction.SetFeed
 
   def state_spec(_),
     do:
@@ -18,17 +19,38 @@ defmodule Jido.Examples.RuntimeReconstruction.Plugin do
   def directives(_), do: [SetFeed]
   def validate_directive(directive, _), do: Zoi.parse(SetFeed.schema(), directive)
 
-  def update_state(state, directives, _) do
-    {:ok, Enum.reduce(directives, state, fn %SetFeed{feed: feed}, _ -> %{name: feed} end)}
+  def contribute(transition, _) do
+    state =
+      Enum.reduce(transition.directives, transition.plugin_state, fn
+        %SetFeed{feed: feed}, _state -> %{name: feed}
+      end)
+
+    {:ok, %Contribution{plugin: transition.plugin, state: {:replace, state}}}
   end
+end
+
+defmodule Jido.Examples.RuntimeReconstruction.Plugin.Server do
+  @moduledoc "Owns one disposable feed runtime for an Agent activation."
+  use Jido.AgentServer.Plugin
+  alias Jido.Examples.RuntimeReconstruction.Runtime
 
   def child_spec(init), do: Supervisor.child_spec({Runtime, init}, id: __MODULE__)
   def dispatch(runtime, _, _, _), do: GenServer.call(runtime, :reconcile)
 end
 
+defmodule Jido.Examples.RuntimeReconstruction.Plugin do
+  @moduledoc "Selects the separate Agent and Agent Server owner facets."
+
+  use Jido.Plugin,
+    agent: Jido.Examples.RuntimeReconstruction.Plugin.Agent,
+    agent_server: Jido.Examples.RuntimeReconstruction.Plugin.Server,
+    option_keys: [agent_server: [:observer]]
+end
+
 defmodule Jido.Examples.RuntimeReconstruction.Runtime do
   @moduledoc """
-  Pulls current owned state through Jido.Plugin.state/1 after startup.
+  Builds the first resource from the immutable Plugin bootstrap state.
+  It pulls current owned state only when a later Directive asks it to reconcile.
   The resource is a linked disposable process. No process handle enters Agent state.
   """
   use GenServer
@@ -39,15 +61,7 @@ defmodule Jido.Examples.RuntimeReconstruction.Runtime do
   @impl true
   def init(init) do
     send(Keyword.fetch!(init.options, :observer), {:feed_runtime, self(), init})
-    {:ok, %{init: init, resource: nil, feed: nil}, {:continue, :reconcile}}
-  end
-
-  @impl true
-  def handle_continue(:reconcile, state) do
-    case reconcile(state) do
-      {:ok, next} -> {:noreply, next}
-      {:error, reason} -> {:stop, reason, state}
-    end
+    {:ok, open_resource(%{init: init, resource: nil, feed: nil}, init.plugin_state.name)}
   end
 
   @impl true
@@ -72,16 +86,19 @@ defmodule Jido.Examples.RuntimeReconstruction.Runtime do
   defp reconcile(state) do
     with {:ok, %{name: feed}} <- Jido.Plugin.state(state.init) do
       stop_resource(state.resource)
-
-      resource =
-        spawn_link(fn ->
-          receive do
-            :close -> :ok
-          end
-        end)
-
-      {:ok, %{state | resource: resource, feed: feed}}
+      {:ok, open_resource(state, feed)}
     end
+  end
+
+  defp open_resource(state, feed) do
+    resource =
+      spawn_link(fn ->
+        receive do
+          :close -> :ok
+        end
+      end)
+
+    %{state | resource: resource, feed: feed}
   end
 
   defp stop_resource(nil), do: :ok

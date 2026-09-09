@@ -1,21 +1,21 @@
-> Seam review entry point. This document is pending approval.
+> Seam review entry point. The implementation direction was selected on
+> 2026-09-10. Ref-first instance controls remain with seam 09.
 
 # 08 — Agent Server
 
 ## Briefing
 
-`Jido.AgentServer` is the live owner for one Agent activation. Current code
-already serializes Signals, keeps one committed Agent and state version, runs
-admission and executable work without blocking control calls, commits before
-Directive handling, and restores the last runtime or durable checkpoint. The
-recommended target keeps this base. It adds the prerequisite stable-identity,
-initial-durable-record, all-write-error authority, whole-Turn limit, and
-coherent Plugin-runtime restart contracts. It does not make Agent Server the
+`Jido.AgentServer` is the live owner for one Agent activation. It serializes
+Signals, keeps one committed Agent and state version, applies one pre-commit
+Turn timeout, commits before Directive handling, and restores the last runtime
+or durable checkpoint. Public instance lookup reports the Server only after
+Plugin readiness and any required revision-zero write. Every Plugin runtime
+generation gets one immutable owned-state and state-version pair. This does not
+make Agent Server the
 owner of Agent meaning, Turn evaluation, storage semantics, Jido instance
 policy, or topology policy.
 
-All requirements and decisions are pending approval. Code and executable tests
-remain canonical for current behavior.
+Code and executable tests are canonical for current behavior.
 
 ## Why this seam exists
 
@@ -29,33 +29,29 @@ remain canonical for current behavior.
   instance namespace or lookup policy, placement, cluster authority,
   transport, or application architecture.
 
-## Current and target state
+## Implemented state and retained limits
 
-| Area | Current | Recommended target |
+| Area | Implemented contract | Retained limit |
 | --- | --- | --- |
 | Live owner | One `:gen_statem` owns one Agent, one version, and at most one active Turn. | Keep one serialized commit owner per activation. |
-| Startup | Construct or restore, validate, start Plugin children, await readiness, and confirm revision-zero creation before the start call succeeds. Registry can still expose a provisional PID. | Decide strict provisional publication and keep the implemented persistence order. |
+| Startup | Construct or restore, validate, reserve identity, start Plugin children, await readiness, confirm revision-zero creation, and publish `:ready`. | Keep this order. Ref namespace binding remains with seam 09. |
 | Identity | Public operations use PID, name, ID, instance, and partition values. | Add Ref-based resolution in the instance seam. Keep supported PID/name operations during migration. |
 | Admission | OTP postpones busy Signals. A token set limits callbacks already seen by the state machine. | Keep OTP ordering and state the mailbox limit accurately. Add stable overload and admission errors. |
-| Turn control | Admission and execution are cancellable. Admission reuses `directive_timeout`; native execution has no Server-wide Turn limit. | Use one pre-commit Turn limit and keep caller wait, persistence, readiness, and Directive limits separate. |
+| Turn control | Admission and execution are cancellable. One `turn_timeout` covers active work until commit starts. | Keep caller wait, persistence, readiness, and Directive limits separate. |
 | Commit | Runtime or durable checkpoint succeeds before complete state replacement, reply, and Directives. | Keep the order. Remove write authority after every required persistence write error. |
-| Plugins | Runtimes start before readiness and can restart from fresh owned state, but state and version are not one input. | Give every start or replacement one matching committed Plugin state and Agent state version. |
+| Plugins | Every runtime start and replacement receives one matching committed Plugin state and Agent state version. | Keep runtime handles private and retain live state pull for later reconciliation. |
 | Effects and children | Directives run in order after commit. Child and runtime handles stay outside Agent state. | Keep this behavior. Treat uncertain child effects as runtime results, not topology or durability claims. |
 | Stop and observation | Current status is a map with five phases. Outcomes use five stages. Debug events and several error policies are public. | Keep these paths during migration. Define authority-loss stop and transient Plugin degradation without adding topology policy. |
 | Code revision | Agent definitions have no revision. Agent Server has no hot-state migration callback. | Enforce the prerequisite definition revision at construction or restore. Do not claim that it pins loaded Action or Flow code. |
 
-## Major gaps and work remaining
+## Remaining dependent work
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Initial durable boundary | Ready can mean that no durable record exists. | Revision-zero create before publication. | 07 Persistence, 08 Agent Server |
-| Write authority | Confirmed conflicts can continue under error policy. | One stop-before-next-Turn rule for every required write error. | 06 Commit, 07 Persistence, 08 Agent Server |
 | Runtime identity | PID, ID, partition, and storage identity do not share one Ref. | Additive Ref resolution with current controls retained. | 03 Identity, 08 Agent Server, 09 Jido instance |
-| Turn limit | Admission and execution do not have one Server-owned pre-commit limit. | Distinct, testable operation deadlines and stale-result rejection. | 08 Agent Server, with 04 Turn evaluation |
-| Plugin replacement | Restart reads current state but not one state-version pair. | Coherent bootstrap input for every runtime generation. | 05 Plugins, 08 Agent Server |
 | Public contracts | Maps, atoms, tuples, and executable error policy coexist. | Owner-defined values, stable errors, and staged compatibility. | 08 Agent Server, 12 Errors, 13 Observability |
 
-## Decisions requested
+## Selected decisions
 
 1. **Compatibility API:** Keep documented PID/name Agent Server operations,
    status, Outcomes, and debug paths until an additive Ref-first instance
@@ -91,9 +87,9 @@ remain canonical for current behavior.
   canonical construction and generated live-helper delegation.
 - Dependents: 09 Jido instance, 10 Runtime topology, 11 Topology control plane,
   13 Observability, and 99 Delivery.
-- Blockers: prerequisite approval, Ref and namespace binding, the all-write-
-  error rule, whole-Turn limit details, Plugin bootstrap value names, public
-  error migration, and any hot-code state migration contract.
+- Deferred inputs: Ref namespace binding and the additive instance facade in
+  seam 09, any later observation projection in seam 13, and cross-package proof
+  in seam 99. Hot private-state migration is not a V3 claim.
 
 ## Documents
 

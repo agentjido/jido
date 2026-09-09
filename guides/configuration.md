@@ -56,6 +56,7 @@ Pass actor options to `start_agent/2`.
     id: "agent-42",
     partition: :north,
     max_postponed_signals: 200,
+    turn_timeout: 10_000,
     max_directives_per_turn: 20,
     directive_timeout: 3_000,
     idle_timeout: 60_000,
@@ -70,8 +71,9 @@ Important actor defaults are:
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `:max_postponed_signals` | `1_000` | Limit queued Signals while one Turn is active. |
+| `:turn_timeout` | `5_000` | Limit active pre-commit admission and candidate evaluation. |
 | `:max_directives_per_turn` | `:infinity` | Limit Directive work from one Turn. |
-| `:directive_timeout` | `5_000` | Limit Plugin and external Directive handling. |
+| `:directive_timeout` | `5_000` | Limit Plugin and external Directive handling after commit. |
 | `:idle_timeout` | `:infinity` | Stop a pool-owned idle actor after this time. |
 | `:restore` | `:if_found` | Select durable restore behavior. |
 | `:error_policy` | `:log_only` | Select server behavior after a failed Turn. |

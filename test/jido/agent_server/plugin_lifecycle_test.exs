@@ -75,6 +75,23 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     end
   end
 
+  defmodule BlockingCreateAdapter do
+    @behaviour Jido.Persistence.Adapter
+
+    @impl true
+    def get(_key, _opts), do: {:error, :not_found}
+
+    @impl true
+    def compare_and_swap(_key, :not_found, _value, opts) do
+      observer = Keyword.fetch!(opts, :observer)
+      send(observer, {:initial_write_waiting, self()})
+
+      receive do
+        :confirm_initial_write -> :ok
+      end
+    end
+  end
+
   test "standalone Servers own a runtime tree and stop it on shutdown" do
     server = start_supervised!({Server, agent: Agent})
     assert :ok = Server.await_ready(server)
@@ -167,6 +184,34 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
 
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
     eventually(fn -> Jido.whereis_agent(jido, id) == nil end)
+  end
+
+  test "instance lookup publishes an Agent only after its initial write", %{jido: jido} do
+    observer = __MODULE__.PublicationObserver
+    Process.register(self(), observer)
+    id = unique_id("publication-gate")
+
+    starter =
+      Task.async(fn ->
+        Jido.start_agent(jido, Agent,
+          id: id,
+          persistence: {BlockingCreateAdapter, observer: observer},
+          restore: false,
+          restart: :temporary
+        )
+      end)
+
+    assert_receive {:initial_write_waiting, server}, 1_000
+    registry = Jido.registry_name(jido)
+    assert [{^server, :starting}] = Registry.lookup(registry, {:agent, id})
+    assert Jido.whereis_agent(jido, id) == nil
+    assert Jido.list_agents(jido) == []
+    assert Jido.agent_count(jido) == 0
+
+    send(server, :confirm_initial_write)
+    assert {:ok, ^server} = Task.await(starter, 2_000)
+    assert [{^server, :ready}] = Registry.lookup(registry, {:agent, id})
+    assert Jido.whereis_agent(jido, id) == server
   end
 
   test "failed readiness after a runtime restart stops the owner", %{jido: jido} do
