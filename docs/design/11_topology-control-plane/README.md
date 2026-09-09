@@ -4,8 +4,8 @@
 
 ## Briefing
 
-Jido core owns static local Topology planning and fixed-target repair. It does
-not own a distributed control plane.
+Jido core owns static local Topology planning, same-target repair, and additive
+local Agent target updates. It does not own a distributed control plane.
 
 During pure instance planning, the Topology owner now asks each declared
 `Jido.Topology.Plugin` facet for static entries. The four-module Plugin seam is
@@ -24,9 +24,10 @@ same expansion in their own scope. The common validator checks the complete
 graph before activation. The source definition stays unchanged.
 
 One application-supervised `Jido.Topology.Controller` starts and repairs one
-fixed `%Jido.Topology.Instance{}` on one Jido instance. `reconcile/2` repairs
-that target. It does not resize, update, move, rebalance, hand off, or recover
-an Agent on another node.
+current `%Jido.Topology.Instance{}` on one Jido instance. `reconcile/2` repairs
+that target. `update/3` can add local Agents when every existing Agent and
+resource specification stays unchanged. It does not remove or replace members,
+move or rebalance Agents, hand off work, or recover an Agent on another node.
 
 ## Owned contract
 
@@ -39,7 +40,8 @@ an Agent on another node.
 - A group receives one contribution for its declaration. All expanded members
   receive the resulting group connection.
 - The Controller owns local dependency order, readiness, repair, and cleanup.
-- A Controller target is fixed for its lifetime.
+- A Controller target can grow by additive local Agent updates. Other target
+  changes require Controller replacement.
 - Authoring owner helpers and Plugin facets have no implicit runtime or
   distributed authority.
 
@@ -70,6 +72,9 @@ requirements.
   contributed Bus and subscription work through the local Controller.
 - The existing Topology suites prove authoring, composition, stable local
   plans, readiness, repair, restore, conflict handling, and cleanup.
+- `test/jido/topology/controller_update_test.exs` and research case UP-07 prove
+  additive update, unchanged PID and state retention, later repair, and
+  rejection of removal or replacement.
 - The runtime-topology and distributed-child suites prove that explicit
   known-node activation is the lowest remote primitive and has no fallback or
   exclusive-owner guarantee.

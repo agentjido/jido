@@ -84,6 +84,16 @@ defmodule Jido.Topology.Controller.Runtime do
 
   def handle_call(:reconcile, _from, state), do: {:reply, :ok, request_pass(state)}
 
+  def handle_call({:update, target}, _from, state) do
+    with :ok <- update_idle(state),
+         :ok <- additive_target(state.instance, target) do
+      state = state |> Map.put(:instance, target) |> request_pass()
+      {:reply, :ok, state}
+    else
+      {:error, _reason} = error -> {:reply, error, state}
+    end
+  end
+
   def handle_call({:await_ready, timeout}, from, state) do
     state = refresh_phase(state)
 
@@ -188,6 +198,44 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp current_phase(state), do: state.phase
+
+  defp update_idle(%{active: active}) when map_size(active) == 0, do: :ok
+
+  defp update_idle(_state),
+    do: Jido.Agent.Authoring.error("Topology update requires an idle repair pass")
+
+  defp additive_target(%{id: id} = current, %{id: id} = target) do
+    current_agents = current.plan.agents
+    target_agents = target.plan.agents
+
+    removed = Map.keys(current_agents) -- Map.keys(target_agents)
+
+    changed =
+      current_agents
+      |> Map.keys()
+      |> Enum.filter(&(Map.get(target_agents, &1) != Map.fetch!(current_agents, &1)))
+
+    cond do
+      current.plan.resources != target.plan.resources ->
+        Jido.Agent.Authoring.error("Topology update cannot change resources")
+
+      removed != [] ->
+        Jido.Agent.Authoring.error("Topology update cannot remove Agents", %{
+          removed: Enum.sort(removed)
+        })
+
+      changed != [] ->
+        Jido.Agent.Authoring.error("Topology update cannot change existing Agents", %{
+          changed: Enum.sort(changed)
+        })
+
+      true ->
+        :ok
+    end
+  end
+
+  defp additive_target(_current, _target),
+    do: Jido.Agent.Authoring.error("Topology update identity does not match")
 
   defp request_pass(state) do
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)

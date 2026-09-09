@@ -41,10 +41,12 @@ expanded entries live in its Plan. `Jido.Topology.Plan.build/3` and
 `Jido.Topology.instantiate/2` produce the same expanded plan for the same
 definition, ID, and input.
 
-One `Jido.Topology.Controller` activates one fixed instance on one local Jido
+One `Jido.Topology.Controller` activates one current instance on one local Jido
 instance. The application supervises it beside the Jido instance. It owns
-dependency order, bounded startup, readiness, local repair, and cleanup.
-`reconcile/2` repairs the same target. It does not replace that target.
+dependency order, bounded startup, readiness, local repair, additive Agent
+updates, and cleanup. `reconcile/2` repairs the current target. `update/3`
+accepts only a validated target that keeps every existing Agent and resource
+specification unchanged.
 
 ## Four-module Plugin seam
 
@@ -94,7 +96,7 @@ Jido core and are not core release blockers.
 | Canonical contribution value | `Jido.Topology.Plugin.Contribution` |
 | Direct plan parity | `Jido.Topology.Plan.build/3` |
 | Included-scope addresses and graph validation | `Jido.Topology.Composition` |
-| Fixed-target local activation and repair | `Jido.Topology.Controller` and `Jido.Topology.Controller.Runtime` |
+| Local activation, repair, and additive Agent update | `Jido.Topology.Controller` and `Jido.Topology.Controller.Runtime` |
 | Public local Agent lifecycle and Ref operations | `Jido` and `Jido.Instance.RefFacade` |
 | Durable per-Agent restore | `Jido.Persistence` and `Jido.Topology.Controller.Activation` |
 
@@ -108,6 +110,7 @@ Jido core and are not core release blockers.
 | `TOP-REQ-061` | No external control-plane protocol is selected | `Deferred with its external owner` |
 | `TOP-REQ-062` | Authoring-host, Plugin, Controller, and runtime-topology evidence | `Proven` |
 | `TOP-REQ-063` to `TOP-REQ-068` | Plugin integration unit and executable example tests | `Proven` |
+| `TOP-REQ-069` to `TOP-REQ-076` | Controller update unit tests and UP-07 research example | `Proven` |
 
 ## Executable evidence
 
@@ -117,6 +120,8 @@ Jido core and are not core release blockers.
 | `test/examples/07_topology/07_06_plugin_contribution` | A Topology-only Plugin package contributes a Bus and subscription. The Controller starts them, and a published Signal reaches the Agent. |
 | `test/jido/topology` | Authoring, validation, composition, input, group, Controller, readiness, repair, restore, conflict, and cleanup behavior stays valid. |
 | `test/examples/07_topology` | All documented local systems run through the same Controller contract. |
+| `test/jido/topology/controller_update_test.exs` | Additive targets retain existing PIDs and state, become the later repair target, and reject removals or changed definitions. |
+| `test/examples/99_research/99_16_topology_upgrade` | UP-07 grows a live worker group with no skip and retains unchanged Agent PIDs and state. |
 | Distributed child and authority tests | Known-node placement works as a bounded primitive. The exclusive-owner case remains an explicit non-guarantee. |
 
 ## Compatibility decisions
@@ -128,8 +133,8 @@ Jido core and are not core release blockers.
 | Plugin declarations | Keep module and `{module, options}` forms and their order. |
 | Plan | Add Topology facet expansion to normal instance and direct Plan construction. |
 | Owner helpers | Keep `owner/0` and `new_agent/1` as authoring helpers only. |
-| Controller | Keep application supervision, fixed target, readiness, repair modes, status, and lookup. |
-| Repair | Keep `reconcile/2` as same-target repair. A live update needs a separate contract. |
+| Controller | Keep application supervision, readiness, repair modes, status, lookup, and additive Agent update. |
+| Repair and update | Keep `reconcile/2` as current-target repair. Use `update/3` only for additive Agents. Controller replacement remains required for removal, replacement, or resource changes. |
 | Persistence | Keep independent per-Agent records. Add no desired-placement or authority data to Agent checkpoints. |
 | Remote placement | Keep explicit caller-selected known-node placement and no local fallback. |
 | Cluster features | Add no core membership, discovery, automatic placement, failover, lease, fence, or exclusive-owner claim. |
@@ -144,7 +149,9 @@ Jido core and are not core release blockers.
   must contribute any connection that depends on its contributed resource.
 - Two contributions cannot declare the same key or duplicate the same
   subscription. The common validator rejects the complete plan.
-- The Controller does not resize groups or replace a definition.
+- The Controller can grow a group when existing Agent and resource
+  specifications stay unchanged. It does not remove or replace a member or
+  change resources.
 - A Controller marker prevents unrelated local takeover only. It does not
   fence another Erlang node.
 - Persistent restore does not provide distributed desired-state storage or an
@@ -166,7 +173,7 @@ mix test test/examples/07_topology --only example --seed 0
 mix test test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs \
   --include example --seed 0
 
-4 passed, 1 skipped
+5 passed
 
 mix test test/jido/agent_server/distributed_child_test.exs \
   test/jido/agent_server/remote_lifecycle_test.exs \
@@ -184,7 +191,7 @@ mix docs --warnings-as-errors
 documentation generated with no warnings
 ```
 
-The Topology-upgrade skip is the deferred live-target update contract. The
+The additive Topology-upgrade contract has no skip. The
 distributed-authority skip is the explicit non-guarantee for exclusive cluster
 ownership. The quality exclusion is the same approved external-provider case.
 The diff check also passed.
@@ -201,7 +208,8 @@ The diff check also passed.
       parity with instantiation.
 - [x] The executable example proves a contributed Bus and subscription.
 - [x] The four Plugin owner modules keep separate authority.
-- [x] The local Controller keeps one fixed target and same-target repair.
+- [x] The local Controller keeps same-target repair and accepts only additive
+      local Agent target updates.
 - [x] Authoring owner helpers have no implicit runtime authority.
 - [x] Distributed control-plane policy stays outside Jido core.
 - [x] External distributed requirements are explicit non-core reference

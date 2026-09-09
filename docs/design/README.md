@@ -137,9 +137,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Runtime topology briefing](10_runtime-topology/README.md) | Selected and implemented |
 | [Runtime topology design](10_runtime-topology/design.md) | Selected and implemented |
 | [Runtime topology alignment](10_runtime-topology/alignment.md) | Implemented |
-| [Topology control-plane briefing](11_topology-control-plane/README.md) | Selected and implemented for core |
-| [Topology control-plane design](11_topology-control-plane/design.md) | Selected and implemented for core |
-| [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Implemented for core; distributed contract deferred |
+| [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
+| [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
+| [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
 | [Errors and contracts briefing](12_errors-and-contracts/README.md) | Selected and implemented |
 | [Errors and contracts design](12_errors-and-contracts/design.md) | Selected and implemented |
 | [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Implemented |

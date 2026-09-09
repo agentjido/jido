@@ -13,8 +13,8 @@ application or integration package. They are not Jido core V3 release gates.
   topology. An optional host application or ecosystem integration owns the
   distributed control plane.
 - In scope for Jido core: static definition validation, pure Plugin
-  contribution, local planning, one fixed Controller target, readiness, repair,
-  lookup, and cleanup.
+  contribution, local planning, one current Controller target, additive local
+  Agent updates, readiness, repair, lookup, and cleanup.
 - External reference scope: provider inputs for membership and authority,
   placement output, authority epochs, handoff, recovery, network-partition
   safety, operator controls, and distributed observation.
@@ -49,10 +49,11 @@ contributions, then group contributions, in source and Plugin declaration
 order. Included Topologies expand in their own scopes. The common validator
 checks the complete result. The source definition stays unchanged.
 
-The local Topology Controller has one immutable `%Jido.Topology.Instance{}`
-target. It repairs members of that target on one Jido instance. It does not
-discover nodes, move Agents, replace its target, issue authority, or resolve a
-network partition.
+The local Topology Controller has one current `%Jido.Topology.Instance{}`
+target. It repairs members of that target on one Jido instance. An explicit
+update can add Agents while every existing Agent and resource specification
+stays unchanged. It does not discover nodes, remove or replace live members,
+move Agents, issue authority, or resolve a network partition.
 
 The optional control plane uses these logical values. Exact public type names
 remain open.
@@ -78,8 +79,9 @@ Capability-specific external effects need the same rule if they claim fencing.
 `TOP-REQ-001`: The Jido core topology boundary shall validate static Topology
 definitions and build local execution plans without starting processes.
 
-`TOP-REQ-002`: When the local Topology Controller reconciles, it shall repair
-only the fixed `%Jido.Topology.Instance{}` supplied at startup.
+`TOP-REQ-002` is retired. It required every repair to use only the instance
+supplied at startup. `TOP-REQ-069` and `TOP-REQ-076` replace that requirement
+without assigning new meaning to its identifier.
 
 `TOP-REQ-003`: The Jido core package shall keep cluster membership, automatic
 placement, rebalance, failover, leases, and fencing outside core.
@@ -353,6 +355,36 @@ the Plan.
 operation that starts a process, persists Agent state, replaces a Controller
 target, or grants live or distributed authority.
 
+### Additive local target update
+
+`TOP-REQ-069`: When a Controller accepts an additive local target update, the
+Controller shall replace its current repair target with the validated target.
+
+`TOP-REQ-070`: Before a local target update has live effects, the Controller
+shall validate the target definition and input through normal Topology
+instantiation.
+
+`TOP-REQ-071`: If a target update changes topology identity, any resource, or
+an existing Agent specification, then the Controller shall reject the update
+without changing a live member.
+
+`TOP-REQ-072`: If a target update removes an existing Agent, then the
+Controller shall reject the update without changing a live member.
+
+`TOP-REQ-073`: If a target update is requested during an active repair pass,
+then the Controller shall reject the update without changing the current
+target.
+
+`TOP-REQ-074`: When an accepted target adds Agents, the Controller shall start
+them through the normal dependency, concurrency, timeout, readiness, and
+ownership checks.
+
+`TOP-REQ-075`: When an accepted target retains an existing Agent specification,
+the Controller shall keep that Agent PID and committed state.
+
+`TOP-REQ-076`: When a later repair pass runs after an accepted update, the
+Controller shall repair the updated target.
+
 ## Public contract
 
 The implemented core surface remains the local component contract:
@@ -361,9 +393,10 @@ The implemented core surface remains the local component contract:
 | --- | --- | --- |
 | Static authoring | `Jido.Topology`, DSL, Builder, Codec | Validated local definition; no processes |
 | Pure plan | `Jido.Topology.instantiate/2`, `Jido.Topology.Plan.build/3` | Validated input, ordered static Plugin contribution, and stable local plan |
-| Local activation | `Jido.Topology.Controller.start_link/1` | One fixed target on one Jido instance |
+| Local activation | `Jido.Topology.Controller.start_link/1` | One current target on one Jido instance |
 | Local readiness | `await_ready/2`, `status/2` | Current local pass and component state |
-| Local repair | `reconcile/2` | Repair the same target; not an update |
+| Local repair | `reconcile/2` | Repair the current target; not an update |
+| Local update | `update/3` | Add Agents while existing Agents and resources stay unchanged |
 | Local lookup | `whereis_agent/3`, `whereis_bus/2` | Replaceable local handles |
 
 This design does not add a required control plane to Jido core. An ecosystem
@@ -415,5 +448,5 @@ state that it provides no exclusive-owner guarantee.
 | `TOP-DEC-008` | A holder rejects new mutations when it cannot confirm current authority. | Safety takes priority over write availability. |
 | `TOP-DEC-009` | Preview, cordon, uncordon, drain, move, rebalance, suspend, resume, and status belong to the external contract. | Product UI stays outside this seam. |
 | `TOP-DEC-010` | An owner Agent is not the control plane. | Authoring and Plugin state do not become cluster authority. |
-| `TOP-DEC-011` | Live local target replacement stays deferred. | Distributed placement does not hide a missing local update API. |
+| `TOP-DEC-011` | Support additive local Agent target updates and keep removal, replacement, and resource changes deferred. | Local growth does not imply rebalance, handoff, or distributed authority. |
 | `TOP-DEC-012` | Topology Plugin facets contribute during pure Plan construction. | Static extension is complete without live Plugin authority. |

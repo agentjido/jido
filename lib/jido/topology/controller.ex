@@ -10,10 +10,11 @@ defmodule Jido.Topology.Controller do
   Buses and startup tasks have their own supervised children.
 
   The spike supports eager activation, bounded startup, normal Bus input,
-  logical ownership, and periodic repair. It has no live definition updates,
-  cluster placement, database adapter, or durable work distribution. A normal
-  controller shutdown stops its Agents. Persistent state uses the Jido
-  instance's configured adapter and the existing restore contract.
+  logical ownership, periodic repair, and additive local Agent updates. It has
+  no live replacement or removal, cluster placement, database adapter, or
+  durable work distribution. A normal controller shutdown stops its Agents.
+  Persistent state uses the Jido instance's configured adapter and the existing
+  restore contract.
 
   `:repair` defaults to `:automatic`, which repeats reconciliation using the
   topology's `startup.retry_interval`. Use `repair: :manual` when an application
@@ -88,6 +89,25 @@ defmodule Jido.Topology.Controller do
   """
   def reconcile(controller, timeout \\ 5_000),
     do: GenServer.call(runtime(controller), :reconcile, timeout)
+
+  @doc """
+  Applies one validated additive Agent target to a ready local controller.
+
+  Existing Agent specifications and all resources must stay unchanged. New
+  Agents start through the normal bounded activation pass. Unchanged Agents
+  keep their PIDs and committed state. The new target becomes the source for
+  later repair passes.
+
+  Use controller replacement for removals, changed Agent definitions, resource
+  changes, or an update requested during an active pass.
+  """
+  @spec update(Supervisor.supervisor(), Instance.t(), timeout()) :: :ok | {:error, term()}
+  def update(controller, %Instance{} = target, timeout \\ 5_000) do
+    with {:ok, target} <-
+           Topology.instantiate(target.definition, id: target.id, input: target.input) do
+      GenServer.call(runtime(controller), {:update, target}, timeout)
+    end
+  end
 
   @doc "Resolves a singleton Agent or one keyed group member."
   def whereis_agent(controller, key, member \\ nil),

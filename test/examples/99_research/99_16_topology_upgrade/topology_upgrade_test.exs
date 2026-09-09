@@ -77,7 +77,6 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     assert agent.state.total == 9
   end
 
-  @tag skip: "Pending UP-07: live topology reconciliation is not implemented"
   test "a live target grows three workers to five while unchanged Agents retain PID and state",
        c do
     {instance, controller} = start_team(c.jido)
@@ -86,13 +85,11 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     assert {:ok, _} = Cell.work(hd(old_workers), 7)
     {:ok, target} = Example.build(instance.id, 5)
 
-    # Current public startup is the available submission path. It rejects this
-    # target as already_started. An explicit live-update API is required.
-    assert {:ok, updated} = Controller.start_link(jido: c.jido, topology: target)
-    assert :ok = Controller.await_ready(updated)
-    assert worker_pids(updated, 3) == old_workers
-    assert Controller.whereis_agent(updated, :observer) == observer
-    assert Enum.all?(worker_pids(updated, 5), &is_pid/1)
+    assert :ok = Controller.update(controller, target)
+    assert :ok = Controller.await_ready(controller)
+    assert worker_pids(controller, 3) == old_workers
+    assert Controller.whereis_agent(controller, :observer) == observer
+    assert Enum.all?(worker_pids(controller, 5), &is_pid/1)
     assert Server.agent(hd(old_workers)).state.total == 7
   end
 
