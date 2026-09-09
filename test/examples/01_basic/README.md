@@ -85,9 +85,7 @@ retains normal caller-link behavior.
 
 Each Basic command uses a typed Action. Minimal Agent increments a count in
 one Action, and the profile command applies and normalizes its patch in one
-Action. These commands do not need a Flow. See the
-[dependency probe](../../../docs/examples/inline-step-results.md) for the
-dependency pin and compatibility checks. Use inline Step bodies when an
+Action. These commands do not need a Flow. Use inline Step bodies when an
 example already needs a Flow.
 
 Basic declares command and Signal helpers with nested `define` entries in
@@ -108,12 +106,11 @@ responses make the example state transitions repeatable.
 ## Current result and scope
 
 All 22 tests pass. Agent schema composition preserves root validation
-rules when it adds Plugin fields. See [current results](../../../docs/examples/basic-results.md).
+rules when it adds Plugin fields.
 The core schema and snapshot regression probes also run in the default suite.
 
 The ten old Basic source folders and their repeated domain tests have been
-removed. Their research profiles are kept in
-[the archive](../../../docs/examples/archive/basic). Calculator, retry policy,
+removed. Calculator, retry policy,
 task-list rules, and local round-robin selection are not separate Basic SDK
 acceptance contracts.
 

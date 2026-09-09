@@ -32,11 +32,9 @@ example starts two local Erlang nodes. Each row has its own focused command.
 | UP-02 | [State migration](99_15_state_migration/README.md) | 3 | 1 | Compatible state migration works; definition upgrade required |
 | UP-07 | [Topology upgrade](99_16_topology_upgrade/README.md) | 4 | 1 | Plan comparison and full replacement work; live update required |
 
-[Complete result log](../../docs/examples/feature-acceptance-results.md)
-records each missing contract, proof limits, and validation commands.
-
-[Live-upgrade cases and results](../../docs/examples/live-upgrade-results.md)
-records all ten upgrade targets, the three new examples, and their limits.
+The tables and focused README files record each missing contract, proof limit,
+validation command, and live-upgrade result. Executable tests are the current
+evidence.
 
 ## Retained research
 

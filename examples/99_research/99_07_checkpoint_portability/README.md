@@ -20,5 +20,4 @@ functions.
 There is no database or VM restart.
 
 [Probe Agent](checkpoint_portability_probe.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_07_checkpoint_portability/README.md) ·
-[Results](../../../docs/examples/persistence-boundary-results.md)
+[Acceptance notes](../../../test/examples/99_research/99_07_checkpoint_portability/README.md)

@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_04_handoff_reconciliation --include exampl
 
 This command passes with the current core. The extension policy is part of the example.
 
-[Source](handoff.ex) · [Tests](../../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs) · [Complete result log](../../../docs/examples/feature-acceptance-results.md)
+[Source](handoff.ex) · [Tests](../../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs)

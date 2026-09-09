@@ -170,5 +170,4 @@ ReqLLM HTTP encoding and parsing with local provider responses. No live key is
 needed for tests.
 
 [Tests](../../../test/examples/06_factory/06_04_flow_factory/flow_factory_test.exs)
-· [Results](../../../docs/examples/flow-factory-results.md)
 · [Factory guide](../README.md)

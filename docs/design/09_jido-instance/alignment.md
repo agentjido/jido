@@ -344,7 +344,7 @@ No removal or deprecation is approved in this seam.
 | `INST-BLK-010` | `Assumption` | 09 Jido instance | The current five-child `:one_for_one` tree is the first-stage target. | Approve it or provide failure evidence for another tree. |
 | `INST-BLK-011` | `Assumption` | 05 Plugins, 08 Agent Server | Plugin wrappers can remain in the current Dynamic Supervisor during first-stage alignment. | Change placement only through the owning runtime contract. |
 | `INST-BLK-012` | `Assumption` | 10 Runtime topology, 11 Control plane | Ref-first instance operations are local and do not use Topology or transport fallback. | Keep nonlocal routing in an explicit owner API. |
-| `INST-BLK-013` | `Blocker` | Design index | The main review table still names the removed seam files and does not list `design.md` or `alignment.md`. This task permits edits only in this folder. | Update the review index in a separately authorized edit. |
+| `INST-BLK-013` | `Resolved` | Design index | The main review table now lists the Jido instance briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 
 ## Completion criteria
 

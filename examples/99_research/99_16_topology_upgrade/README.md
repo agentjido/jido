@@ -23,5 +23,3 @@ ordinary Turn APIs retain their existing contracts.
 The comparison covers local Agent entries only. It does not handle Bus resources, ownership, subscriptions, same-module code revisions, rolling batches, or durable rollout recovery.
 
 [Source](topology_upgrade.ex) · [Tests](../../../test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs)
-
-[All ten upgrade cases and results](../../../docs/examples/live-upgrade-results.md)

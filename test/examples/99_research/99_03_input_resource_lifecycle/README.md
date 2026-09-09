@@ -29,4 +29,4 @@ mix test test/examples/99_research/99_03_input_resource_lifecycle --include exam
 This is a secondary check. The missing-contract test remains skipped until
 the feature is implemented. Do not reverse the original assertions.
 
-[Source](../../../../examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Tests](runtime_reconstruction_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction.ex) · [Tests](runtime_reconstruction_test.exs)

@@ -17,5 +17,4 @@ acceptance tests under `test/jido`, beside the core contracts that they prove.
 mix test --include example test/examples/04_runtime --seed 0
 ```
 
-[Source guide](../../../examples/04_runtime/README.md) ·
-[Catalog](../../../docs/examples/catalog.md#runtime)
+[Source guide](../../../examples/04_runtime/README.md)

@@ -259,7 +259,7 @@ Create detailed implementation plans with `ce-plan` only after user approval.
 | `DEL-BLK-007` | `Assumption` | 90 Package boundaries | The minimum core set is Jido, `jido_action`, and `jido_signal`. | Decide whether AI or Browser is part of the release claim. |
 | `DEL-BLK-008` | `Blocker` | Release owner | Final gates have not run on one exact candidate and package matrix. | Run them only after required implementation and docs close. |
 | `DEL-BLK-009` | `Assumption` | Compatibility owner | Supported V3 APIs remain until a version-bounded deprecation passes. | Approve or change `DEL-DEC-005`. |
-| `DEL-BLK-010` | `Blocker` | Documentation owners | The main design index and some non-delivery docs still link to removed design or example files. | Fix them in separate owner-scoped work; this task cannot edit outside seam 99. |
+| `DEL-BLK-010` | `Resolved` | Documentation owners | The design index now uses the three-file seam paths, and Markdown no longer links to the deleted example reports. | Keep repository-wide link checks in the documentation gate. |
 
 ## Completion criteria
 

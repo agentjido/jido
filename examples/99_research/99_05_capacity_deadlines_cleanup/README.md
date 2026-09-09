@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_05_capacity_deadlines_cleanup --include ex
 
 This command passes with the current core. The extension policy is part of the example.
 
-[Source](shared_budget.ex) · [Tests](../../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs) · [Complete result log](../../../docs/examples/feature-acceptance-results.md)
+[Source](shared_budget.ex) · [Tests](../../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)

@@ -15,18 +15,18 @@ callback receives `nil`. Both forms use a supervised dispatch task and the same
 validation, ordering, timeout, and failure rules. A replacement runtime can
 read current committed state through `Jido.Plugin.state/1`. Supplying that
 state and its version directly in replacement Init remains a
-[research contract](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md#fa-06-plugin-runtime-reconstruction-from-committed-state).
+research contract.
 
 After a runtime restart, `await_ready/2` can wait for that state read. Runtime
 lookup stays responsive and reports the runtime unavailable until readiness
 succeeds. Owner shutdown stops the pending readiness task and the runtime.
 Readiness failure stops the owner. See the
-[restart tests](../test/jido/agent/plugin_lifecycle_test.exs).
+[restart tests](../test/jido/agent_server/plugin_lifecycle_test.exs).
 
 The Action cannot change protected Plugin keys. A Plugin cannot replace the
 Agent value. Plugin declarations are validated when the Agent value is built.
 Old manifests, mounts, dependency requirements, and V2 callbacks require a port.
 
 See the [Plugin example](https://github.com/agentjido/jido/tree/v3-spike/examples/01_basic/README.md),
-[contract tests](../test/jido/agent/plugin_test.exs), and
-[runtime tests](../test/jido/agent/plugin_runtime_test.exs).
+[contract tests](../test/jido/plugin/contract_test.exs), and
+[runtime tests](../test/jido/plugin/runtime_test.exs).

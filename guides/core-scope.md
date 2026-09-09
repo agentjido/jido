@@ -103,8 +103,7 @@ Future package names describe possible ownership, not implemented packages:
 The research suite still records missing proposed contracts for route
 selection, Plugin input isolation and replacement Init, stable namespace
 identity, definition revisions, durable deletion, and live upgrades. See the
-[feature results](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md)
-and [upgrade results](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/live-upgrade-results.md).
+current [research test matrix](../test/examples/99_research/README.md).
 The distributed authority example uses an explicit external authority; it does
 not prove that core elects one cluster owner.
 

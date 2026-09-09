@@ -25,5 +25,6 @@ Run the remote child demonstration:
 mix run examples/05_multi_agent/05_05_remote_child/demo.exs
 ```
 
-See the [Multi-agent profiles](../../docs/examples/catalog.md#multi-agent)
-and the [distributed authority queue item](../99_research/99_02_distributed_authority/README.md).
+See the [distributed authority queue
+item](../99_research/99_02_distributed_authority/README.md) for the unsupported
+cluster-ownership contract.

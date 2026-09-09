@@ -27,8 +27,7 @@ mix test --include example test/examples/04_runtime --seed 0
 ```
 
 Each promoted profile links its focused core command. See the
-[Runtime profiles](../../docs/examples/catalog.md#runtime) and the
-[research queue](../99_research/README.md).
+[research queue](../99_research/README.md) for deferred runtime contracts.
 
 The durable scheduling fixture configures the Scheduler in its Agent DSL:
 

@@ -19,5 +19,4 @@ and rejection of a wrong outer identity. No Server, database, or VM restart
 is needed for this boundary.
 
 [Probe Agent](checkpoint_identity_probe.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_06_checkpoint_identity/README.md) ·
-[Results](../../../docs/examples/persistence-boundary-results.md)
+[Acceptance notes](../../../test/examples/99_research/99_06_checkpoint_identity/README.md)

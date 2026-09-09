@@ -727,7 +727,7 @@ Suggested Signals include `gepa.candidate.proposed`,
 
 ### Recursive Language Model Simulation
 
-The [LLM example](../../docs/examples/profiles/03_llm/03_10_recursive_analysis.md)
+The [LLM example](../03_llm/README.md)
 implements bounded recursive calls inside one Turn, with a local corpus store
 and scripted model. Its stress runner can run several root Agents at once.
 The child Agent lifecycle and recovery requirements below remain future work.

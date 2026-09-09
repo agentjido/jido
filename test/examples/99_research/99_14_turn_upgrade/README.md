@@ -26,5 +26,3 @@ existing contracts.
 Only one isolated Action module is reloaded. Tests run serially. The loader does not force a code purge. This is not an OTP release installer.
 
 [Source](../../../../examples/99_research/99_14_turn_upgrade/turn_upgrade.ex) · [Tests](turn_upgrade_test.exs)
-
-[All ten upgrade cases and results](../../../../docs/examples/live-upgrade-results.md)

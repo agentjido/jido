@@ -29,4 +29,4 @@ mix test test/examples/99_research/99_13_durable_delete --include example --seed
 This is a secondary check. The missing-contract test remains skipped until
 the feature is implemented. Do not reverse the original assertions.
 
-[Source](../../../../examples/99_research/99_13_durable_delete/durable_delete.ex) · [Tests](durable_delete_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_13_durable_delete/durable_delete.ex) · [Tests](durable_delete_test.exs)

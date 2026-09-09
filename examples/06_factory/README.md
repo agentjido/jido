@@ -248,8 +248,7 @@ after acceptance. A Mission Agent remains available for inspection and
 cancellation while the Flow runs in its Plugin.
 
 This example produces a software proposal. It does not change a repository or
-run software tests. See its [guide, graph, and IEx API](06_04_flow_factory/README.md)
-and [verification report](../../docs/examples/flow-factory-results.md).
+run software tests. See its [guide, graph, and IEx API](06_04_flow_factory/README.md).
 
 ## Run without IEx
 
@@ -320,5 +319,3 @@ encoding and decoding. A local HTTP adapter supplies fixed provider responses
 and timing barriers. Streaming tests use a local HTTP server with SSE chunks
 through the real Finch transport. No live key or external network request is required. These tests
 verify control flow; they do not verify a live provider account or model quality.
-
-See the [verification report](../../docs/examples/factory-results.md).

@@ -307,7 +307,7 @@ No removal or deprecation is approved in this seam.
 | `TOP-BLK-010` | `Assumption` | 10 Runtime topology | Explicit known-node activation remains the lowest remote placement primitive. | Confirm or add one narrow public activation boundary. |
 | `TOP-BLK-011` | `Assumption` | 13 Observability | Seam 13 will define exact event names and bounded field encodings. | Map the approved transition facts without adding authority. |
 | `TOP-BLK-012` | `Blocker` | 11 Control plane | Live local target replacement is not implemented and is not part of this target. | Keep it deferred or approve a separate design pass. |
-| `TOP-BLK-013` | `Blocker` | Design index owner | The main review table still links to the two removed seam files. This task permits edits only in this folder. | Update `docs/design/README.md` in a separately authorized edit. |
+| `TOP-BLK-013` | `Resolved` | Design index owner | The main review table now lists the control-plane briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 
 ## Completion criteria
 

@@ -292,7 +292,7 @@ This sequence defines outcomes and gates. It is not an implementation plan.
 | `OBS-BLK-009` | `Blocker` | Compatibility owners | There is no old-consumer inventory or parity report. | Complete both before any deprecation proposal. |
 | `OBS-BLK-010` | `Decision` | Release policy | The overlap and removal policy is pending. | Approve or change `OBS-DEC-008`. |
 | `OBS-BLK-011` | `Assumption` | 11 Control plane | An optional control-plane package owns distributed event names and emission. | Confirm when that package is selected. |
-| `OBS-BLK-012` | `Blocker` | Design index and seam 99 | The main review table and delivery gap analysis still refer to removed seam files. This task permits edits only in this folder. | Update those references in separate owner-scoped edits. |
+| `OBS-BLK-012` | `Resolved` | Design index and seam 99 | The main review table and delivery seam now use the observability briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 
 ## Verification record
 

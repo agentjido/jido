@@ -14,5 +14,4 @@ keep 20 acceptance tests under `test/jido/agent`.
 mix test --include example test/examples/05_multi_agent --seed 0
 ```
 
-[Source guide](../../../examples/05_multi_agent/README.md) ·
-[Catalog](../../../docs/examples/catalog.md#multi-agent)
+[Source guide](../../../examples/05_multi_agent/README.md)

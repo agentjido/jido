@@ -324,7 +324,7 @@ plan. Create that plan only after the user approves this seam.
 | `PERS-BLK-009` | `Assumption` | 08 Agent Server | Plugin runtimes can start provisionally and be cleaned up before publication. | Prove all startup failure paths. |
 | `PERS-BLK-010` | `Assumption` | 10 Runtime topology | Persistence restores known identity only and does not own discovery or placement. | Keep later topology contracts separate. |
 | `PERS-BLK-011` | `Blocker` | Adapter owners and 99 Delivery | There is no shared conformance suite or real backend recovery matrix. | Pass the suite before a provider claim. |
-| `PERS-BLK-012` | `Blocker` | Design index owner | `docs/design/README.md` still lists the removed legacy persistence files. | Update the index in a separately authorized edit. |
+| `PERS-BLK-012` | `Resolved` | Design index owner | The design index now lists the persistence briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 
 ## Completion criteria
 

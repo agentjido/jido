@@ -95,10 +95,7 @@ constructs the same expression through `Jido.Expr.new!/2`, then checks a stored
 JSON round trip. This proves the module DSL, Builder, and Codec forms.
 
 The [source folders](../../../examples/02_workflow) match these nine test
-folders. The [research archive](../../../docs/examples/archive/workflow/README.md)
-maps every old domain profile to its replacement. Arithmetic, scoring, SQL
-policy details, citations, and output wording do not need separate SDK fixtures.
+folders. Arithmetic, scoring, SQL policy details, citations, and output wording
+do not need separate SDK fixtures.
 Weather's direct/live comparison, context isolation, duplicate revision, real
 persistence record, and restore checks now live in Effectful Steps.
-
-See the [result report](../../../docs/examples/workflow-results.md).

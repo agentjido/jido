@@ -391,7 +391,7 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-012` | `Assumption` | 10 Runtime topology | Explicit known-node child operations remain supported but grant no cluster authority. | Keep placement and authority outside this seam. |
 | `SRV-BLK-013` | `Blocker` | 04 Turn evaluation and `jido_action` | Definition revision does not pin loaded Action or Flow code. | Approve the V3 non-guarantee or create a lower-owner code-revision contract. |
 | `SRV-BLK-014` | `Blocker` | 08 Agent Server | No public need, state migration, in-flight-Turn, rollback, or test contract exists for `code_change/4`. | Defer hot private-state upgrade or approve a separate design. |
-| `SRV-BLK-015` | `Blocker` | Design index and dependent seam owners | The main design review table and seam 09 still name the removed legacy Server files, but this task permits edits only in this seam. | Update the out-of-scope links in separately authorized edits. |
+| `SRV-BLK-015` | `Resolved` | Design index and dependent seam owners | The main review table and dependent seams now use the Agent Server briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
 
 ## Completion criteria
 

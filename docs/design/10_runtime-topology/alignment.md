@@ -314,7 +314,7 @@ unit.
 | `RT-BLK-008` | `Blocker` | 08 Agent Server, 10 Runtime topology | Initial readiness and error-policy delivery are not owner-linked for abrupt Agent death. | Select owner-bound mechanisms and prove cleanup. |
 | `RT-BLK-009` | `Assumption` | Future cluster or application owner | Known-node placement stays separate from discovery and exclusive authority. | Define an external contract before any stronger claim. |
 | `RT-BLK-010` | `Assumption` | 11 Topology control plane | The Controller remains application-supervised and owns one static local target and its repair. | Confirm in seam 11. |
-| `RT-BLK-011` | `Blocker` | Design index and dependent seams | The main review table, seam 13, and seam 99 still link to removed runtime-topology files. The table also omits this seam's `design.md` and `alignment.md`. This task permits edits only in this folder. | Update those links in separately authorized owner-scoped edits. |
+| `RT-BLK-011` | `Resolved` | Design index and dependent seams | The main review table and dependent seams now use the three-file runtime-topology paths. | Keep repository-wide link checks in the documentation gate. |
 
 ## Verification record
 

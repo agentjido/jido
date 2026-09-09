@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_02_distributed_authority --include example
 
 This command passes with the current core. The extension policy is part of the example.
 
-[Source](fenced_inventory.ex) · [Tests](../../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs) · [Complete result log](../../../docs/examples/feature-acceptance-results.md)
+[Source](fenced_inventory.ex) · [Tests](../../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs)

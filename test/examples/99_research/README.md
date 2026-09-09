@@ -34,12 +34,9 @@ example starts two local Erlang nodes. Each row has its own focused command.
 | UP-02 | [State migration](99_15_state_migration/README.md) | 3 | 1 | Compatible state migration works; definition upgrade required |
 | UP-07 | [Topology upgrade](99_16_topology_upgrade/README.md) | 4 | 1 | Plan comparison and full replacement work; live update required |
 
-[Complete result log](../../../docs/examples/feature-acceptance-results.md)
-records the original failures, missing contracts, proof limits, and validation
-commands. It is a historical record, not the current skip policy.
-
-[Live-upgrade cases and results](../../../docs/examples/live-upgrade-results.md)
-records all ten upgrade targets, the three new examples, and their limits.
+The tables and focused README files record the missing contracts, proof limits,
+validation commands, and live-upgrade results. Executable tests and their tags
+define the current skip policy.
 
 ## Retained research
 

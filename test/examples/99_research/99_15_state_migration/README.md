@@ -26,5 +26,3 @@ existing contracts.
 The passing path is application state migration with a predeclared schema. It does not replace the definition or a Plugin runtime. Crashes during migration and concurrent upgrade requests remain untested.
 
 [Source](../../../../examples/99_research/99_15_state_migration/state_migration.ex) · [Tests](state_migration_test.exs)
-
-[All ten upgrade cases and results](../../../../docs/examples/live-upgrade-results.md)

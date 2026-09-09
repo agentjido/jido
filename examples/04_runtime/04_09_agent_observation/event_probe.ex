@@ -8,8 +8,8 @@ defmodule Jido.Examples.TurnObservation.EventProbe do
   an OBS-03 consumer with a queue/backpressure contract.
   """
 
-  # Existing event names plus the semantic names already proposed in
-  # docs/design/observability.md. Attaching does not create any of these events.
+  # Existing event names plus proposed semantic names. Attaching does not
+  # create any of these events.
   @prefixes [
     [:jido, :agent_server, :signal],
     [:jido, :agent_server, :directive],

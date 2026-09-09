@@ -26,5 +26,4 @@ are outside this proof.
 
 [Probe Agent](indeterminate_write_probe.ex) ·
 [Fault adapter](../persistence_probe_store.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_08_indeterminate_write/README.md) ·
-[Results](../../../docs/examples/persistence-boundary-results.md)
+[Acceptance notes](../../../test/examples/99_research/99_08_indeterminate_write/README.md)

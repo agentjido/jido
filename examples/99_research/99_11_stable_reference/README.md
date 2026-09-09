@@ -26,4 +26,4 @@ mix test test/examples/99_research/99_11_stable_reference --include example --se
 
 This command returns a failing status until the stated core contract exists. Do not skip the assertion or reverse it to accept the current limitation.
 
-[Source](stable_reference.ex) · [Tests](../../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs) · [Complete result log](../../../docs/examples/feature-acceptance-results.md)
+[Source](stable_reference.ex) · [Tests](../../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)

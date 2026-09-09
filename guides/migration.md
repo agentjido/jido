@@ -461,9 +461,8 @@ run `mix examples --seed 0` separately when needed. See the
 The unmet research assertions concern route selection, Plugin read/input
 isolation, durable namespace identity, definition revisions, durable deletion,
 runtime Init snapshots, Turn revision isolation, live state migration, and live
-Topology updates. Cluster-exclusive ownership remains unsupported. See the
-[acceptance record](https://github.com/agentjido/jido/blob/v3-spike/docs/examples/feature-acceptance-results.md)
-and [Test Agents and Plugins](test-agents-and-plugins.livemd).
+Topology updates. Cluster-exclusive ownership remains unsupported. See
+[Test Agents and Plugins](test-agents-and-plugins.livemd).
 
 Before publication, complete the agreed feature scope, repeated test seeds,
 recovery and scale checks, runtime matrix, lint, Dialyzer, docs, and fresh package

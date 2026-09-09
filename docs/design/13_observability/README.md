@@ -57,7 +57,6 @@ canonical implementation record.
 | Incomplete propagation | Define explicit trace transfer across each Jido-owned Task boundary and keep Signal W3C propagation under `jido_signal` ownership. |
 | No OpenTelemetry bridge | Decide package ownership, span timing, optional dependency policy, and compile matrix before implementation. |
 | Compatibility debt | Inventory users of legacy Agent Server events, `Jido.Observe`, tracing, logs, and debug history before any deprecation. |
-| External link drift | The main design review table and seam 99 still name removed seam files. Separate owner-scoped edits must point them to these three files. |
 
 ## Decisions requested
 

@@ -1,7 +1,6 @@
-> Current acceptance runs, 2026-09-05: [ten feature probes](../docs/examples/feature-acceptance-results.md)
-> and [three live-upgrade examples](../docs/examples/live-upgrade-results.md) have 34 passing
-> checks and 11 failing checks across nine proposed core features. All 45 checks
-> are enabled. These reports supersede older research counts for these targets.
+> Current research run, 2026-09-08: 34 checks pass and 11 checks are skipped
+> across the proposed core features. The skipped assertions remain in the test
+> suite.
 
 # Jido V3 examples
 
@@ -47,6 +46,5 @@ Live provider demos require separate credentials and budget. The recursive
 analysis stress runner and 1,000-worker Topology test are independent scale
 checks. They do not prove multi-host capacity.
 
-[Historical research](../docs/examples/README.md) retains earlier plans and
-results. Use the [testing guide](../guides/testing.md) for current test commands
+Use the [testing guide](../guides/testing.md) for current test commands
 and the [migration guide](../guides/migration.md) for V2 changes.

@@ -29,4 +29,4 @@ mix test test/examples/99_research/99_10_plugin_isolation --include example --se
 This is a secondary check. The missing-contract tests remain skipped until
 the feature is implemented. Do not reverse the original assertions.
 
-[Source](../../../../examples/99_research/99_10_plugin_isolation/plugin_isolation.ex) · [Tests](plugin_isolation_test.exs) · [Complete result log](../../../../docs/examples/feature-acceptance-results.md)
+[Source](../../../../examples/99_research/99_10_plugin_isolation/plugin_isolation.ex) · [Tests](plugin_isolation_test.exs)
