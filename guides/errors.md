@@ -9,6 +9,11 @@ Call `Jido.Error.to_map/1` for transport. It keeps scalar path leaves at the
 container depth limit, so field names and list indexes remain useful. Its bounded
 projection also handles hostile binaries and redacts sensitive fields.
 
+Call `Jido.Error.code/1` for a Jido-owned program code. It reads only values in
+the closed registry from `error.details.code`. Call `stable_codes/0` to inspect
+that registry. Do not match a message. A returned application or adjacent
+package error keeps its original owner and shape.
+
 A pre-commit failure retains the previous Agent and revision. A directive failure
 retains the new commit. Review `Jido.Agent.Turn.Outcome` and runtime error policy
 to choose the application response. Every required persistence write error stops

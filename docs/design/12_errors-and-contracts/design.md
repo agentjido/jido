@@ -1,11 +1,11 @@
-> Target seam design. This document is pending approval after package-boundary
-> revalidation. The approved error contract is unchanged.
+> Selected seam design. The approved error contract and its package-boundary
+> revalidation are implemented.
 
 # Errors and public contracts design
 
-The requirements and decisions in this document are approved. The
-[design review index](../README.md#document-review-status) is the source of
-truth for approval.
+The requirements and decisions in this document define the implemented seam.
+The [alignment record](alignment.md) gives current code, test, ownership, and
+compatibility evidence.
 
 ## Scope and owner
 
@@ -166,15 +166,18 @@ struct. It does not add `PersistenceError` or `RuntimeError`.
 
 ### Stable code registry
 
-This registry is closed for this alignment. A later owner can add a code only
+This 21-code registry is closed for this alignment. A later owner can add a code only
 with a requirement, tests, and a dependent-document update. A code is never
 reused for a different meaning.
 
 | Code | Error class | Owner and trigger |
 | --- | --- | --- |
 | `:non_portable_term` | `:invalid` | Agent or Persistence rejects a prohibited nested term. |
+| `:invalid_checkpoint` | `:invalid` | Agent rejects an invalid versioned or custom checkpoint envelope. |
+| `:definition_mismatch` | `:invalid` | Agent or Persistence finds that saved definition data does not match the loaded Agent definition. |
 | `:agent_invalid_callback_result` | `:invalid` or `:execution` | Agent persistence, signal, or executable callback output breaks its contract. |
 | `:agent_callback_failed` | `:execution` | Agent persistence or `handle_signal/2` raises, throws, or exits. |
+| `:plugin_state_owner_violation` | `:execution` | An executable changes state owned by an Agent Plugin facet. |
 | `:plugin_invalid_callback_result` | `:execution` | A Plugin callback output has the wrong shape or breaks its value rules. |
 | `:plugin_callback_failed` | `:execution` | A Plugin callback raises, throws, or exits. |
 | `:plugin_callback_timeout` | `:timeout` | Owned readiness, admission, or Directive work reaches its operation limit. |
@@ -185,6 +188,11 @@ reused for a different meaning.
 | `:agent_exec_callback_failed` | `:execution` | An Exec adapter callback raises, throws, or exits. |
 | `:agent_exec_callback_timeout` | `:timeout` | An Exec adapter callback reaches its operation limit. |
 | `:agent_exec_callback_task_failed` | `:execution` | The owned Exec adapter process cannot start or exits. |
+| `:agent_turn_timeout` | `:timeout` | Active pre-commit Turn work reaches the Agent Server Turn limit. |
+| `:jido_instance_invalid_config` | `:invalid` | Instance configuration or Ref facade options fail validation. |
+| `:jido_namespace_already_bound` | `:invalid` | Another live local instance owns the exact namespace. |
+| `:jido_namespace_required` | `:invalid` | A Ref-first operation targets an instance with no namespace. |
+| `:jido_namespace_mismatch` | `:invalid` | An Agent Ref namespace differs from the selected instance namespace. |
 
 `Jido.Error.code/1` returns only a code in this registry. It accepts an error,
 an `{:error, error}` pair, or the v1 projection map. An adjacent-package code
@@ -216,7 +224,7 @@ values when they are one protocol family.
 | --- | --- | --- |
 | Declared Agent and Plugin callbacks | `{:error, reason}` carries an application error reason. | Callback owner; retain exact reason. |
 | `Jido.Persistence.Adapter` callbacks | `:ok`, `{:ok, bytes}`, and `{:error, reason}`; `:not_found`, `:conflict`, and `:indeterminate` have defined storage meanings. | Seam 07; retain inside adapter protocol. |
-| Current `Jido.Persistence` operations | `:ok`, `{:ok, agent}`, `{:ok, agent, revision}`, or `{:error, reason}`. | Seam 07; retain until its public migration is approved. |
+| Current `Jido.Persistence` operations | `:ok`, `{:ok, agent}`, `{:ok, agent, revision}`, or `{:error, reason}`. Load distinguishes `:not_found` and `:deleted`. Writes distinguish confirmed `:conflict`, documented `{:rejected, reason}`, and indeterminate results. | Seam 07; retain current lifecycle meanings. |
 | `AgentServer.start_link/1`, `start/1`, `child_spec/1`, and `stop/3` | Standard OTP and supervisor start, child-spec, and stop values. | OTP protocol; retain. |
 | `AgentServer.call/3` and async request pair | Agent result plus standard `:gen_statem` call, request, timeout, and process-down behavior. | Seam 08 and OTP; retain. |
 | `AgentServer.cast/2` and `touch/1` | `:ok` means the message was sent. It does not confirm execution. | OTP cast protocol; retain. |
@@ -226,6 +234,9 @@ values when they are one protocol family.
 | `Jido.stop_agent/1..3`, `hibernate/1..3`, and `thaw/2..4` | Current lifecycle controls, including `:not_found`, `:not_running`, and timeout or persistence reasons. | Seam 09; retain until lifecycle policy changes. |
 | `Jido.whereis_agent/1..3`, `list_agents/0..2`, and `agent_count/0..2` | PID or `nil`, `{id, pid}` list, and count. | Registry query protocol; retain. |
 | `Jido.agent_parent_binding/1..3` | `{:ok, binding}` or Map-like `:error`. | Runtime-store lookup protocol; retain. |
+| Ref-first Jido facade | Ref creation returns a Ref or validation error. Resolution returns `{:ok, pid}` or `{:error, :not_found}`. Operations preserve their Agent Server or Persistence result. Delete also uses `:agent_running`. | Seams 03 and 09; retain beside ID and PID APIs. |
+| `Jido.Topology.Controller` | OTP start result, `:ok` readiness and accepted repair, status map, and PID-or-`nil` Agent or Bus lookup. | Seam 11; retain fixed-target local meaning. |
+| Explicit known-node child placement | Confirmed success or failure, indeterminate result, and unreachable result. | Seam 10; retain without discovery or authority meaning. |
 
 The raw control registry does not make each value a good final product API. It
 makes the current contract explicit and gives its owner a safe migration gate.
@@ -255,15 +266,18 @@ refine its owned value, but it shall keep the compatibility disposition.
 | Value | Purpose and validation entry | Compatibility disposition |
 | --- | --- | --- |
 | `Jido.Agent` | Canonical definition or instance; `Agent.new/1`, `instantiate/2`, and validation functions | Retain the approved seam-01 struct. |
+| `Jido.Agent.Ref` | Stable `{namespace, partition, id}` identity; Ref constructors and exact version-1 map conversion | Retain beside current IDs, PIDs, and OTP names. It contains no location or authority. |
 | Agent public map | Complete Agent inspection form; `Agent.to_map/1` | Retain the map and its current keys. It is not the error projection. |
 | Agent checkpoint map | Portable restore envelope; `Agent.checkpoint/2` and `restore/3` | Retain versioned checkpoint semantics. |
 | `Jido.Agent.Turn` and `Outcome` | Prepared work and completed runtime outcome; their constructors and validators | Retain; seams 04 and 08 own fields. |
-| `Jido.Plugin.Init` and Plugin callback contexts | Public runtime callback data; public Zoi validators | Retain; seam 05 owns fields. `Jido.Plugin.Spec` remains internal normalization data. |
+| `Jido.Plugin.Manifest`, `Jido.Plugin.Init`, and owner callback values | Public package metadata and bounded Agent, Agent Server, Persistence, and Topology callback data; owner validators | Retain; seam 05 owns fields. `Jido.Plugin.Spec` and all four owner Specs remain internal normalization data. |
 | Agent Directive structs | Typed effect requests; Directive constructors and validators | Retain; seam 06 owns fields. |
 | Agent Server status, snapshot, child, relationship, and event maps | Narrow inspection and protocol views; built by Agent Server | Retain maps; seam 08 owns fields and versioning. |
 | Registry PID, via tuple, OTP name, and `{id, pid}` list | Direct OTP and Registry interoperation | Retain protocol shapes. |
 | Instance name and partition-key helpers | Module atoms and tagged partition tuples for local runtime addressing | Retain current helper results. Seam 09 owns later Ref migration. |
 | Persistence record and adapter bytes | Internal durable envelope and adapter wire value; Persistence encode/decode validators | Keep record internal and byte protocol public. |
+| Topology definition, instance, Plan, Plugin context, and Plugin contribution | Static local system data and bounded Topology extension values; Topology and owner validators | Retain; seam 11 owns planning and fixed-target activation meaning. |
+| Topology Controller status map and lookup results | Local repair status and replaceable PID handles | Retain the map and PID-or-`nil` results. They are not distributed placement or authority values. |
 | Error v1 map | Bounded observation and transport view; `Jido.Error.to_map/1` | Retain exact top-level keys. |
 
 ## Error projection
@@ -341,8 +355,9 @@ into the error.
 | Consumer seam | Foundational guarantee |
 | --- | --- |
 | 01 Agent and 04 Turn evaluation | Agent state and checkpoints are portable; callback conversions use registered Agent codes. |
-| 05 Plugins | Plugin callback faults, invalid outputs, task loss, and operation limits have registered codes. Returned errors remain exact. |
-| 07 Persistence | Adapter faults and invalid replies have registered codes. Raw adapter controls and public migration remain seam-07 decisions. |
-| 08 Agent Server and 09 Jido instance | Current lifecycle controls stay registered. Exec conversion codes are stable. Final lifecycle migration stays with each owner. |
+| 05 Plugins | Plugin callback faults, invalid outputs, state-owner violations, task loss, and operation limits have registered codes. Returned errors remain exact. |
+| 07 Persistence | Adapter faults, invalid replies, definition mismatch, raw write classifications, and durable lifecycle results keep their selected meanings. |
+| 08 Agent Server and 09 Jido instance | Whole-Turn timeout, instance configuration, and namespace codes are registered. Current lifecycle controls stay compatible. |
+| 10 Runtime topology and 11 Topology | Explicit known-node and fixed-target local Controller results remain owned raw protocols. Topology Plugin contribution uses owner errors. |
 | 13 Observability | Exact v1 projection remains available. No v2 migration is required. |
 | 90 Package boundaries | Adjacent package errors keep their owner and do not require copied Jido modules. |

@@ -101,8 +101,10 @@ defmodule Jido.Agent.VersioningTest do
 
     changed = %{agent | metadata: %{changed: true}}
 
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
+    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}} = error} =
              Agent.checkpoint(changed)
+
+    assert Jido.Error.code(error) == :definition_mismatch
   end
 
   test "default restore rejects module and version mismatches before state acceptance" do

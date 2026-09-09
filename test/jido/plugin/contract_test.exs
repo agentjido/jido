@@ -638,10 +638,11 @@ defmodule Jido.Plugin.ContractTest do
     agent = OwnedStateAgent.new!()
     signal = Signal.new!("owned.overwrite", %{}, source: "/test")
 
-    assert {:error, %Jido.Error.ExecutionError{message: message}} =
+    assert {:error, %Jido.Error.ExecutionError{message: message} = error} =
              OwnedStateAgent.cmd(agent, signal)
 
     assert message == "Agent executable changed Plugin-owned state"
+    assert Jido.Error.code(error) == :plugin_state_owner_violation
   end
 
   test "uses strict equality for numeric changes in nested Plugin-owned state" do

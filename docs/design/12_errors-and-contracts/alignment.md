@@ -1,245 +1,170 @@
-> Seam alignment revalidation. This document is pending approval. The approved
-> error contract is unchanged.
+> Implemented seam alignment. This document records the approved error
+> contract, its package-boundary revalidation, and current evidence.
 
 # Errors and public contracts alignment
 
 ## Status
 
-- Error contract reviewed and approved: 2026-09-09. Package-boundary inventory
-  revalidated: 2026-09-09; this changed document is pending approval.
-- Code base: error-contract alignment commit `3e504be6` on branch `v3-spike`.
-- Approved prerequisite: [00 Overview](../00_overview/alignment.md).
-- Approved prerequisite: [90 Package boundaries](../90_package-boundaries/alignment.md).
-- Alignment state: `Foundational implementation complete; package-boundary
-  inventory revalidated`.
+- Error contract approved: 2026-09-09.
+- Package and owner-seam revalidation completed: 2026-09-10.
+- Alignment state: `Implemented`.
+- Compatibility state: additive. Existing error structs, error codes, returned
+  callback errors, raw protocol controls, projection version 1, and public
+  success shapes stay supported.
+- Follow-on work: seam 13 owns observation use. Seam 99 owns the final public
+  inventory and delivery gate.
 
-The review-status table in `docs/design/README.md` is the source of truth for
-document approval.
+## Revalidation result
 
-## Audit result
+The package boundary and owner seams keep the approved five-class taxonomy.
+They add no need for a persistence class, runtime class, or projection version
+2.
 
-The original draft was not safe to implement as written. It proposed two
-classes that did not represent stable failure kinds, a large code list without
-implemented owners, a projection v2 without a consumer, and public persistence
-changes before seams 07 and 08 had set their lifecycle policy.
+The completed Agent, Plugin, Persistence, Agent Server, and Jido instance seams
+added public owner results. Source already emitted eight codes after the first
+13-code registry was created. Five were registered by their owner seams. This
+revalidation registers the other three existing codes:
 
-This alignment uses current code as the source of evidence. It makes only the
-foundational changes that do not take policy from another owner.
-
-## Retained baseline
-
-- Keep Splode and the current class order.
-- Keep `ValidationError`, `ExecutionError`, `RoutingError`, `TimeoutError`,
-  `CompensationError`, and `InternalError`.
-- Keep returned application and adjacent-package errors exact.
-- Keep tagged and bang Agent APIs on one error path.
-- Keep current persistence adapter controls and public persistence results.
-- Keep current Agent Server and Jido lifecycle controls.
-- Keep exact v1 `to_map/1` keys, arbitrary-term defense, bounds, redaction,
-  UTF-8 safety, and JSON safety.
-- Keep Agent portability checks from approved seam 01.
-- Keep full persistence-record validation as defense in depth.
-
-## Canonical evidence
-
-### Error and projection
-
-- `lib/jido/error.ex` defines five Splode classes and six public Jido error
-  structs.
-- `Jido.Error.stable_codes/0` now publishes the closed Jido-owned registry.
-- `Jido.Error.code/1` reads only a registered Jido code.
-- `Jido.Error.to_map/1` still returns only `type`, `message`, `details`, and
-  `retryable?` at the top level.
-- Error transport tests prove depth, item, string, redaction, stacktrace,
-  UTF-8, and JSON rules.
-
-### Callback boundaries
-
-- `Jido.Agent.Command.Runner` preserves returned callback errors. It now
-  contains `handle_signal/2` raise, throw, and exit faults.
-- `Jido.Agent` preserves checkpoint and restore callback error reasons. It now
-  converts invalid output and callback faults with Agent codes.
-- `Jido.Plugin` preserves callback error reasons. It now codes invalid callback
-  output and raise, throw, and exit faults.
-- `Jido.AgentServer` codes Plugin admission and Directive task loss and limits.
-- `Jido.AgentServer.ExecutionAdapter` codes invalid results, callback faults,
-  process loss, and operation limits. It preserves an exact Exec callback
-  `{:error, reason}`.
-- `Jido.Persistence` preserves adapter error reasons. It now codes invalid
-  adapter replies and raise, throw, and exit faults.
-
-### Portability
-
-- `Jido.Agent.State` validates complete Agent state, including Plugin-owned
-  keys, before acceptance.
-- `Jido.Agent` validates checkpoint output and restore input.
-- `Jido.Persistence` validates the complete record before encode and after
-  decode.
-- `Jido.PortableTerm` rejects all six prohibited term classes. It now bounds
-  paths to 20 segments and bounds each printable segment to 64 bytes.
-
-### Current protocol controls and shaped values
-
-- `Jido.Persistence.Adapter` documents byte values and the `:not_found`,
-  `:conflict`, and `:indeterminate` meanings.
-- Agent Server specs and tests require OTP results, cancellation atoms,
-  readiness controls, debug controls, PID lookup, Registry names, and
-  inspection maps.
-- Jido instance specs and tests require OTP starts, lifecycle controls, PID
-  lookup, `{id, pid}` lists, counts, and Map-like parent lookup.
-- The target design now contains one consolidated failure-position,
-  raw-control, and shaped-value inventory.
-- Package-boundary revalidation classifies `Jido.Plugin.Spec` as internal
-  normalization data. Public Plugin declarations, initialization values, and
-  callback contexts remain in the inventory.
-
-## Gap register
-
-| Gap | Requirement | Audit finding | Alignment disposition | State |
-| --- | --- | --- | --- | --- |
-| `ERR-GAP-001` | `ERR-REQ-001` to `005` | Five classes already cover the failure kinds. Persistence and runtime classes would duplicate operation areas. | Keep five classes and six errors. Keep compensation compatibility. | `Aligned` |
-| `ERR-GAP-002` | `ERR-REQ-003` | There was no stable Jido code registry. | Add the exact 13-code registry and `Error.code/1`. | `Aligned` |
-| `ERR-GAP-003` | `ERR-REQ-006` to `010` | Conversion differed across callbacks. Returned application errors were already a public `term()` contract. | Apply the narrow matrix. Preserve returned reasons. Code only Jido-owned conversions. | `Aligned` for foundational callbacks |
-| `ERR-GAP-004` | `ERR-REQ-011` | Some broad runtime containment can also catch a framework fault. The operation owner must identify each invariant. | Keep the OTP invariant rule. Defer each invariant classification to its runtime owner. | `Owner-deferred` to 08 and 10 |
-| `ERR-GAP-005` | `ERR-REQ-012` and `013` | Persistence controls remain raw. Indeterminate Server writes already remove authority. | Register current controls and preserve them. Do not add a new error class. | `Proven` current rule; migration deferred to 07 and 08 |
-| `ERR-GAP-006` | `ERR-REQ-014` | Plugin and Exec operation limits existed without stable codes. No persistence operation limit exists. | Add Plugin and Exec timeout codes. Do not invent a persistence limit. | `Aligned`; persistence policy deferred to 07 |
-| `ERR-GAP-007` | `ERR-REQ-015` and `016` | The first draft named functions that do not exist and omitted many live controls. | Replace it with the code-based registry in the design. | `Aligned` |
-| `ERR-GAP-008` | `ERR-REQ-017` to `019` | Exact v1 is safe and tested. No v2 consumer exists. | Keep exact v1 and retire the v2 requirement ID. | `Aligned` |
-| `ERR-GAP-009` | `ERR-REQ-020` and `021` | Public value forms were spread across module docs and specs. | Add one grouped failure and shaped-value inventory. | `Aligned` |
-| `ERR-GAP-010` | `ERR-REQ-022` to `024` | Seam 01 added early checks, but path segments were not all bounded. Persistence tests covered too few load cases. | Bound root and nested segments. Test all prohibited terms at Agent and persistence boundaries. | `Aligned` for current accepted values |
-| `ERR-GAP-011` | All | No focused matrix linked codes, projection, callback faults, task loss, limits, and portability. | Add focused contract assertions and run the full non-research suite. | `Aligned` |
-
-## Acceptance matrix
-
-| Requirement | Evidence | State |
+| Existing code | Owner | Trigger |
 | --- | --- | --- |
-| `ERR-REQ-001` to `005` | Error definitions, composition tests, and compensation tests | `Proven` |
-| `ERR-REQ-006` and `007` | Public inventory and existing tagged/bang Agent tests | `Proven` for current converted APIs |
-| `ERR-REQ-008` to `010` | Agent, Plugin, Persistence, and Exec callback tests | `Proven` |
-| `ERR-REQ-011` | Existing Server crash-policy tests and the owner deferral | `Proven` as a rule; per-invariant audit is owner work |
-| `ERR-REQ-012` and `013` | Persistence result tests and indeterminate-write tests | `Proven` |
-| `ERR-REQ-014` | Plugin and Exec timeout code tests | `Proven` for current owned limits |
-| `ERR-REQ-015` and `016` | Protocol registry, current specs, and public API tests | `Proven` |
-| `ERR-REQ-017` and `018` | Exact-key and transport tests | `Proven` |
-| `ERR-REQ-019` | No consumer requires v2 | `Retired` |
-| `ERR-REQ-020` and `021` | Consolidated public inventory | `Proven` at seam level; field detail stays with value owners |
-| `ERR-REQ-022` to `024` | Agent portability tests and standard persistence save/load tests | `Proven` for current state, checkpoint, and record boundaries |
+| `:invalid_checkpoint` | Agent | A versioned or custom checkpoint envelope fails its owned contract. |
+| `:definition_mismatch` | Agent and Persistence | A definition or stored revision does not match the loaded Agent definition. |
+| `:plugin_state_owner_violation` | Agent Plugin | An executable changes a Plugin-owned state key. |
 
-## Completed alignment work
+The names and failure locations do not change. `Jido.Error.code/1` now reads
+them. The closed registry contains 21 codes.
 
-### Taxonomy and codes
+## Selected contract
 
-- Challenged the proposed seven-class design.
-- Kept the five implemented Splode classes.
-- Added a typed, ordered code registry.
-- Added `Jido.Error.code/1` without changing error structs.
+Jido applies this normalization matrix:
 
-### Boundary normalization
+| Failure source | Result | Compatibility rule |
+| --- | --- | --- |
+| Declared callback returns `{:error, reason}` | Preserve the exact reason. | Application and adjacent-package ownership stays intact. |
+| Invalid callback output | Owner validation or execution error with its invalid-result code. | The owner selects the class. |
+| Callback raise, throw, or exit | Owner `ExecutionError` with its callback-failed code. | Diagnostic details stay bounded at transport. |
+| Owned task exit | Owner `ExecutionError` with its task-failed code. | Monitor envelopes do not become public results. |
+| Owned operation limit | Owner `TimeoutError` with its timeout code. | Caller wait timeout stays an OTP control. |
+| Persistence adapter control | Preserve the documented adapter reason. | Persistence owns any later migration. |
+| Broken internal invariant | OTP process exit. | Do not report it as an application rejection. |
 
-- Preserved callback-returned application errors and composed errors.
-- Added codes to existing invalid-result and callback-fault conversions.
-- Contained Agent `handle_signal/2` callback faults.
-- Added codes for owned Plugin and Exec task loss and limits.
-- Kept persistence and lifecycle controls compatible.
+`Jido.Error.to_map/1` returns only `type`, `message`, `details`, and
+`retryable?`. It accepts arbitrary failure terms for defensive reporting. The
+projection is bounded, sanitized, UTF-8 safe, and JSON safe. It can still
+contain application data in allowed detail fields, so the caller must review
+details before exposing them to an untrusted user.
 
-### Projection and values
+Portable Agent state, Plugin state, checkpoint data, and persistence records
+reject every PID, port, reference, function, improper list, and
+non-byte-aligned bitstring. A rejection has `:non_portable_term` and a bounded
+path that does not copy the rejected value.
 
-- Proved the exact v1 top-level shape.
-- Removed the unsupported v2 target.
-- Replaced the incomplete protocol registry.
-- Added the consolidated public result and value inventory.
+## Package-boundary revalidation
 
-### Portability
+| Value group | Public contract | Internal values |
+| --- | --- | --- |
+| Agent | Definition, instance, Ref, Turn, Outcome, Directives, and callback values | Validation and command runner support data |
+| Plugin | Declaration, manifest, Init, owner callback contexts, preparations, transitions, and contributions | `Jido.Plugin.Spec` and all four facet Specs |
+| Agent Server | Public functions, OTP results, status, snapshot, child, relationship, and debug maps | `ChildInfo`, `ParentRef`, Active Turn, runtime checkpoint, and Runtime Store data |
+| Persistence | Adapter byte protocol and documented operation results | Record, checkpoint composition, key selection, and revision implementation data |
+| Jido instance | Generated and root lifecycle functions, optional namespace, Ref facade, PIDs, names, counts, and bindings | Namespace and instance service implementation data |
+| Topology | Definitions, instances, plans, Builder, Codec, Plugin context and contribution, Controller status, readiness, repair, and lookup | Contribution Specs and Controller runtime state |
+| Authoring extension | Agent and Topology extension modules and canonical returned data | DSL collection and lowering support data |
+| Observation | Error projection version 1 and owner-defined semantic facts | Handler and buffer implementation data |
 
-- Retained approved early Agent checks.
-- Bounded root and nested path segments.
-- Added persistence load defense tests for every prohibited term class.
+The revalidation confirms these seam-90 rules:
 
-## Migration phases and gates
+- `Jido.Plugin.Spec` stays internal. Public declarations and callback values
+  stay public.
+- `Jido.AgentServer.ChildInfo`, `Jido.AgentServer.ParentRef`, and
+  `Jido.RuntimeStore` stay internal.
+- Public authoring extensions return canonical Agent or Topology data. Their
+  private normalization types do not become public.
+- Adjacent `jido_action` and `jido_signal` errors keep their package owner.
 
-### Phase 1 — Foundational alignment
+## Raw protocol controls
 
-- State: complete.
-- Result: stable conversion codes, callback containment, exact v1 projection,
-  bounded portability paths, and consolidated inventories.
-- Gate: full package and quality checks pass.
+The full registry stays in the selected design. Owner-seam additions are:
 
-### Phase 2 — Operation-owner migrations
+- Persistence load can return `:not_found` or `:deleted`. Required writes can
+  return confirmed `:conflict`, documented `{:rejected, reason}`, explicit
+  indeterminate results, or another preserved adapter reason.
+- Ref resolution can return `{:ok, pid}` or `{:error, :not_found}`. Ref delete
+  can also return `:agent_running`. Namespace and option failures use registered
+  validation codes.
+- Agent Server keeps cancellation, readiness, lifecycle, request, cast,
+  inspection, and OTP results documented by its owner.
+- Topology Controller keeps `:ok` for accepted repair and readiness, a status
+  map, PID-or-`nil` lookup, and normal OTP start and stop results.
+- Explicit known-node child placement keeps confirmed, indeterminate, and
+  unreachable result meanings. These are not authority grants.
 
-- State: deferred to seams 05, 07, 08, and 09.
-- Result: an owner can add a code or replace a registered control only after it
-  defines the operation policy and proves compatibility.
-- Gate: owner requirements, public tests, and a registry update are approved
-  together.
+No raw control was removed or changed by this seam.
 
-### Phase 3 — Optional projection change
+## Evidence matrix
 
-- State: no work planned.
-- Result: keep exact v1.
-- Gate: seam 13 names a consumer that cannot use v1 and supplies a migration
-  test before it proposes a new projection.
+| Requirement group | Evidence | State |
+| --- | --- | --- |
+| `ERR-REQ-001` to `ERR-REQ-005` | Error module, class, composition, and 21-code registry tests | `Proven` |
+| `ERR-REQ-006` to `ERR-REQ-010` | Agent, Plugin, Persistence, Exec, Topology Plugin, and callback-fault tests | `Proven` |
+| `ERR-REQ-011` | Runtime owner crash-policy and supervisor tests | `Proven` for current owned invariants |
+| `ERR-REQ-012`, `ERR-REQ-013` | Persistence lifecycle, write-result, and authority-loss tests | `Proven` |
+| `ERR-REQ-014` | Plugin, Exec, and whole-Turn timeout tests | `Proven` for current owned limits |
+| `ERR-REQ-015`, `ERR-REQ-016` | Current protocol registry and owner API tests | `Proven` |
+| `ERR-REQ-017`, `ERR-REQ-018` | Exact projection and hostile transport tests | `Proven` |
+| `ERR-REQ-019` | No named version-2 consumer exists | `Retired` |
+| `ERR-REQ-020`, `ERR-REQ-021` | Revalidated public and internal value inventory | `Proven` |
+| `ERR-REQ-022` to `ERR-REQ-024` | Agent, Plugin, checkpoint, record, and persistence portability tests | `Proven` |
 
-## Compatibility rules
+## Canonical implementation
 
-| Area | Rule |
+| Contract | Source |
 | --- | --- |
-| Error classes | Do not add persistence or runtime classes without a failure-kind case that the five classes cannot express. |
-| Compensation | Keep `CompensationError` until `jido_action` has an approved and tested replacement. |
-| Stable codes | Add codes only at Jido-owned conversions. Never reuse a code. Do not match messages. |
-| Returned errors | Preserve declared callback `{:error, reason}` results exactly. |
-| Persistence | Keep adapter and current public control reasons until seams 07 and 08 approve a migration. |
-| Agent Server and instance | Keep raw lifecycle, cancellation, overload, reentry, and inspection controls until their owner approves a migration. |
-| Projection | Keep the exact v1 top-level keys. A new form needs a consumer and migration test. |
-| Portable values | Keep early Agent checks and persistence defense in depth. A later durable-work owner must add its own acceptance check. |
+| Five error classes and six public error modules | `Jido.Error` |
+| Closed stable-code registry and lookup | `Jido.Error.stable_codes/0` and `code/1` |
+| Bounded projection version 1 | `Jido.Error.to_map/1` |
+| Callback fault containment | Agent, Plugin, Persistence, and Exec owner modules |
+| Whole-Turn operation limit | `Jido.AgentServer` |
+| Instance and namespace validation | `Jido.Instance.Options`, `NamespaceRegistry`, and `RefFacade` |
+| Portable recursive term check | `Jido.PortableTerm` |
+| Early Agent acceptance | `Jido.Agent.State` and `Jido.Agent` |
+| Persistence defense in depth | `Jido.Persistence.Record` |
 
-## Assumptions, blockers, and owner dependencies
+## Compatibility decisions
 
-| ID | Type | Owner | Statement | Resolution |
-| --- | --- | --- | --- | --- |
-| `ERR-BLK-001` | `Resolved` | 00 Overview | Overview is approved. | No action. |
-| `ERR-BLK-002` | `Assumption` | 90 Package boundaries | One package owns each public concept; Jido does not copy accepted adjacent errors. | Confirm when seam 90 is approved. |
-| `ERR-BLK-003` | `Resolved` | 12 | Jido keeps Splode and core composition. | Recorded in `ERR-DEC-001` and `008`. |
-| `ERR-BLK-004` | `Owner dependency` | 05, 07, 08, 09 | Final operation meanings can add owner codes or migrate registered controls. | Each owner updates the registry with tests when its design is approved. |
-| `ERR-BLK-005` | `Owner dependency` | 07 and 08 | Confirmed and indeterminate write policy is not fully closed. | Define retry, restart, reload, and any operation limit in those seams. |
-| `ERR-BLK-006` | `Resolved` | 13 Observability | No current projection-v2 consumer was found. | Keep v1. Reopen only with a named consumer. |
-| `ERR-BLK-007` | `Resolved` | 01 Agent | Agent state and checkpoint acceptance points are implemented and approved. | No action for current Agent values. |
-| `ERR-BLK-008` | `Assumption` | 03 and value owners | New identity fields enter errors only after their value types are approved. | Add only bounded owner-approved identifiers. |
-
-Owner dependencies do not block this foundational alignment. They block only
-a future change to the owner's operation contract.
-
-## Dependent-seam updates
-
-- Seam 03 now treats portability as available and keeps Agent Ref details with
-  the identity owner.
-- Seam 05 can use the stable Plugin callback codes. Its final Plugin state and
-  lifecycle contract remains owner work.
-- Seam 07 now records that adapter controls remain raw and that invalid replies
-  and callback faults have Jido codes.
-- Seam 08 and seam 09 now record current lifecycle controls as compatible
-  owner-managed migrations.
-- Seam 13 no longer depends on a speculative projection v2.
-- Seam 90 can use the approved public inventory as evidence.
+- Keep five Splode classes and six current Jido error modules.
+- Keep `CompensationError` until `jido_action` has a proved replacement.
+- Keep stable atoms in `details.code`; do not add a top-level projection code.
+- Keep exact callback-returned error reasons.
+- Keep current raw protocol controls until the operation owner supplies staged
+  migration proof.
+- Keep exact projection version 1. A new projection requires a named consumer.
+- Keep current public PID, Ref, OTP, map, tuple, atom, and keyword forms.
+- Add codes only at Jido-owned conversions. Never reuse a code or match a
+  message.
 
 ## Verification record
 
-- Focused contract tests: 287 passed.
-- Standard persistence portability tests: 5 passed and include all six
-  prohibited term classes.
-- Full non-research package tests: 1,102 passed and 310 excluded.
-- `mix quality`: passed with formatting, warning-free compile, strict Credo,
-  Dialyzer, and 1,110 tests passed with 1 excluded.
+- Focused error, versioning, portability, Plugin, Ref, and Agent Server context
+  tests: 159 passed.
+- Definition-revision research example: 2 passed.
+- `mix quality`: 1,182 passed, 1 expected exclusion, with clean Credo and
+  Dialyzer results.
+- `mix docs --warnings-as-errors`: passed.
+- `git diff --check`: passed.
 
 ## Completion criteria
 
-- [x] The retained baseline is explicit.
-- [x] The gap register states retain, align, or owner-defer for each gap.
-- [x] The five-class taxonomy and six error modules match code.
-- [x] The stable code registry is implemented and tested.
-- [x] The callback normalization matrix is implemented at current core
-      conversion points.
-- [x] The raw-control registry and shaped-value inventory match current APIs.
-- [x] Exact v1 projection behavior is retained and tested.
-- [x] Agent and persistence portability boundaries have focused evidence.
-- [x] Dependent blockers have a specific resolution or owner deferral.
-- [x] The user has approved or changed the `ERR-DEC` items.
+- [x] Five classes and six Jido error modules match source.
+- [x] Every Jido-owned literal in `details.code` is in the 21-code registry.
+- [x] The three previously unregistered owner codes have real-path tests.
+- [x] Callback-returned errors remain exact.
+- [x] Callback invalid output, fault, task loss, and owned timeout have owner
+      conversions.
+- [x] Raw controls have an owner and compatibility rule.
+- [x] Public shaped values and internal support values are distinct.
+- [x] Package-boundary extension categories are in the inventory.
+- [x] Error projection version 1 is exact, bounded, and sanitized.
+- [x] Portable values fail at their owned acceptance boundaries and again at
+      persistence.
+- [x] No new error class or projection version is needed.

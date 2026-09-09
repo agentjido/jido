@@ -1007,6 +1007,14 @@ defmodule Jido.AgentTest do
 
       assert {:error, %Jido.Error.ValidationError{}} =
                Agent.restore(Agent, %{direct_checkpoint | definition: :invalid})
+
+      custom = CallbackPersistenceAgent.new!(id: "custom-malformed")
+      assert {:ok, custom_checkpoint} = Agent.checkpoint(custom, %{saved_by: "test"})
+
+      assert {:error, %Jido.Error.ValidationError{} = error} =
+               Agent.restore(CallbackPersistenceAgent, Map.delete(custom_checkpoint, :version))
+
+      assert Error.code(error) == :invalid_checkpoint
     end
 
     test "contains callback failures and invalid return contracts" do

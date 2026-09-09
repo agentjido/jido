@@ -121,8 +121,11 @@ defmodule Jido.Error do
   """
   @type code ::
           :non_portable_term
+          | :invalid_checkpoint
+          | :definition_mismatch
           | :agent_invalid_callback_result
           | :agent_callback_failed
+          | :plugin_state_owner_violation
           | :plugin_invalid_callback_result
           | :plugin_callback_failed
           | :plugin_callback_timeout
@@ -141,8 +144,11 @@ defmodule Jido.Error do
 
   @stable_codes [
     :non_portable_term,
+    :invalid_checkpoint,
+    :definition_mismatch,
     :agent_invalid_callback_result,
     :agent_callback_failed,
+    :plugin_state_owner_violation,
     :plugin_invalid_callback_result,
     :plugin_callback_failed,
     :plugin_callback_timeout,

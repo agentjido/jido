@@ -378,13 +378,11 @@ No deprecation or removal is approved in this seam.
 | `PKG-BLK-007` | `Approved boundary` | Future package owners | Durable, cluster, and transport names are working names only. | Add package designs and evidence before an availability claim. |
 | `PKG-BLK-008` | `Integration owner dependency` | `jido_browser`, 99 Delivery | The current browser manifest selects V2 Jido packages. | Supply a tested V3 dependency set before Jido Browser claims compatibility. This does not block the core set. |
 | `PKG-BLK-009` | `Release evidence` | 99 Delivery and integration owners | No published core package result or integration-specific public fixture exists. | Prove the core set before its release claim. Prove each integration when it makes its claim. |
-| `PKG-BLK-010` | `Approved early; revalidation needed` | 12 Errors and contracts | Seam 12 was approved before its formal seam-90 prerequisite. Its error contracts remain approved. | Revalidate its public ownership inventory after a related seam-12 change. Do not change its error taxonomy or mark it approved automatically. |
+| `PKG-BLK-010` | `Resolved` | 12 Errors and contracts | Seam 12 was approved before its formal seam-90 prerequisite. Its error taxonomy is unchanged, and its public ownership inventory was revalidated after the owner-seam changes. | Preserve the classified inventory through delivery. |
 
-## Early seam-12 revalidation
+## Completed seam-12 revalidation
 
-This alignment does not change the approved seam-12 documents. The next
-related seam-12 edit must revalidate these statements against the approved
-package boundary:
+Seam 12 revalidated these statements against the approved package boundary:
 
 - `Jido.Plugin.Spec` is internal. The public Plugin declaration and callback
   contexts remain public shaped values.
@@ -393,9 +391,9 @@ package boundary:
 - The public-value inventory must include the extension categories in this
   seam without publishing their private normalization or storage types.
 
-The error taxonomy, stable codes, callback-error preservation, raw controls,
-exact V1 projection, and portability rules do not need revalidation from this
-cleanup.
+The error taxonomy, callback-error preservation, exact V1 projection, and
+portability rules did not change. The stable-code registry now includes all
+Jido-owned codes that the completed owner seams emit.
 
 ## Completion criteria
 

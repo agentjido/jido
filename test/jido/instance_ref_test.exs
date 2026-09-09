@@ -115,6 +115,14 @@ defmodule JidoTest.InstanceRefTest do
     end
   end
 
+  test "a Ref-first operation requires a stable instance namespace" do
+    instance = unique_instance("namespace-required")
+    start_supervised!({Jido, name: instance}, id: instance)
+
+    assert {:error, %Error.ValidationError{} = error} = Jido.agent_ref(instance, "counter")
+    assert Error.code(error) == :jido_namespace_required
+  end
+
   test "instance options preserve observation configuration for its owner seam" do
     name = unique_instance("observation-config")
 

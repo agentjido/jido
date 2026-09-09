@@ -47,8 +47,8 @@ revalidation against this seam when they next change.
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Public extension inventory | Supported APIs have no one retention and migration register. | One classified inventory with support and migration status. | 90 Package boundaries, 12 Errors and contracts, 99 Delivery |
-| Stable identity boundary | Current packages can use IDs, PIDs, and generated names, but core has no stable Agent Ref. | An additive identity boundary before any PID or name restriction. | 03 Agent identity, 09 Jido instance, 12 Errors and contracts |
+| Public extension inventory | Seam 12 now records public values, raw controls, and internal support types. | Preserve the classified inventory through delivery. | 90 Package boundaries, 12 Errors and contracts, 99 Delivery |
+| Stable identity boundary | Agent Ref and the local Ref-first facade are implemented beside IDs, PIDs, and generated names. | Preserve all compatible identity forms through V3. | 03 Agent identity, 09 Jido instance, 12 Errors and contracts |
 | Persistence ownership | Instance defaults and per-Agent overrides coexist. Backend and migration owners are not final. | One approved authority model that keeps the byte adapter and has a staged migration. | 07 Persistence, 09 Jido instance, 90 Package boundaries |
 | Ecosystem contract proof | Core tests do not prove that a released package uses only public contracts. | A public-only fixture and one compatible V3 package matrix. | 90 Package boundaries, 99 Delivery |
 | Future service scope | Durable, cluster, and transport capability lists have no released package contracts. | Capability ownership without claims of available package APIs. | Future package owners, 99 Delivery |
@@ -83,12 +83,12 @@ The user approved these decisions on 2026-09-09.
 ## Dependencies
 
 - Approved prerequisite: [00 Overview](../00_overview/README.md).
-- Early approved dependent: 12 Errors and contracts. Revalidate only its
-  public ownership inventory after a related change.
+- Early approved dependent: 12 Errors and contracts. Its public ownership
+  inventory was revalidated after the owner-seam changes.
 - Other dependents: all owner seams that expose public values, integration
   packages, and 99 Delivery.
-- Blockers: None for this package-boundary direction. Stable identity,
-  persistence lifecycle, and future package APIs remain owner-seam work.
+- Blockers: None for this package-boundary direction. Future package APIs and
+  release evidence remain owner work.
 
 ## Documents
 
