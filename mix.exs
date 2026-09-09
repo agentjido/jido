@@ -389,7 +389,7 @@ defmodule Jido.MixProject do
     [
       # Jido Ecosystem
       {:jido_action, "~> 2.3"},
-      {:jido_signal, "~> 2.2"},
+      {:jido_signal, "~> 2.3"},
 
       # Jido Deps
       {:nimble_options, "~> 1.1"},
