@@ -270,6 +270,9 @@ defmodule Jido.MixProject do
         "Persistence And History": [
           Jido.Persistence,
           Jido.Persistence.Adapter,
+          Jido.Persistence.Bedrock,
+          Jido.Persistence.Ecto,
+          Jido.Persistence.Ecto.Record,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
           Jido.Persistence.Plugin,
@@ -366,7 +369,13 @@ defmodule Jido.MixProject do
       {:opentelemetry_api, "~> 1.0", optional: true},
       {:sched_ex, "~> 1.2.1"},
 
+      # Optional Persistence Adapters
+      {:bedrock, "~> 0.7.0", optional: true},
+      {:bedrock_raft, ">= 0.9.7 and < 0.10.0", optional: true},
+      {:ecto_sql, "~> 3.14", optional: true},
+
       # Development & Test Dependencies
+      {:ecto_sqlite3, "~> 0.24.1", only: :test},
       {:req_llm, "~> 1.21", only: [:dev, :test]},
       {:dotenvy, "~> 1.1", only: [:dev, :test]},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},

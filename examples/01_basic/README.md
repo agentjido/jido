@@ -1,14 +1,24 @@
-# 01 Basic examples
+# Basic examples
 
-Each fixture uses the V3 command contract. Its tests check real framework behavior.
-Run the full acceptance command from the repository root.
+Read these examples in order. They start with a small Agent and then add one
+runtime boundary at a time.
 
-| Fixture | Source | Tests | Contract |
-| --- | --- | --- | --- |
-| 01_01_minimal_agent | [Source](01_01_minimal_agent/minimal_agent.ex) | [Tests](../../test/examples/01_basic/01_01_minimal_agent/minimal_agent_test.exs) | Direct/live agreement and instance isolation. |
-| 01_02_typed_command_agent | [Source](01_02_typed_command_agent/typed_command_agent.ex) | [Tests](../../test/examples/01_basic/01_02_typed_command_agent/typed_command_agent_test.exs) | Construction, route selection, input validation, and complete candidate validation. |
-| 01_03_plugin_state_agent | [Source](01_03_plugin_state_agent/plugin_state_agent.ex) | [Tests](../../test/examples/01_basic/01_03_plugin_state_agent/plugin_state_agent_test.exs) | Plugin state ownership and atomic domain/Plugin commit. |
-| 01_04_directive_agent | [Source](01_04_directive_agent/directive_agent.ex) | [Tests](../../test/examples/01_basic/01_04_directive_agent/directive_agent_test.exs) | Whole-batch validation and ordered post-commit dispatch. |
-| 01_05_controlled_turn_agent | [Source](01_05_controlled_turn_agent/controlled_turn_agent.ex) | [Tests](../../test/examples/01_basic/01_05_controlled_turn_agent/controlled_turn_agent_test.exs) | Turn serialization, cancellation, queued work, and caller timeout. |
+| Order | Example | Main capability |
+| --- | --- | --- |
+| 01_01 | [Minimal Agent](01_01_minimal_agent/README.md) | Agent state, inline Actions, command helpers, and direct or live execution |
+| 01_02 | [Typed Command Agent](01_02_typed_command_agent/README.md) | Typed Action input, route defaults, and complete candidate validation |
+| 01_03 | [Plugin State Agent](01_03_plugin_state_agent/README.md) | Plugin-owned state and atomic commit |
+| 01_04 | [Directive Agent](01_04_directive_agent/README.md) | Whole-batch validation and ordered post-commit effects |
+| 01_05 | [Controlled Turn Agent](01_05_controlled_turn_agent/README.md) | Turn serialization, cancellation, worker cleanup, and caller timeout |
 
-See [all examples](../README.md) and [migration](../../guides/migration.md).
+Run the section from the `jido` repository root:
+
+```sh
+mix test test/examples/01_basic --include example --seed 0
+```
+
+The examples use deterministic local processes. They need no credentials or
+network access. Durable recovery, external services, and multi-agent systems
+belong to later sections.
+
+See [all examples](../README.md), [the matching test guide](../../test/examples/01_basic/README.md), and [migration guidance](../../guides/migration.md).

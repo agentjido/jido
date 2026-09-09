@@ -52,7 +52,7 @@ not rewrite across the two keys automatically.
 | Checkpoints | Agent owns default or complete custom maps. Custom maps bypass Plugin slice conversion. |
 | Plugins | A Persistence facet converts only the state value owned by its paired Agent facet. |
 | Compatibility | Legacy format-1 active records load. Compatible unnamed keys remain. Namespaced operations dual-read and reject a dual-key collision. |
-| Backends | ETS, File, and Redis pass one shared get-and-CAS conformance test. |
+| Backends | ETS, File, Redis, Ecto, and Bedrock pass one shared binary get-and-CAS conformance test. |
 
 ## Important limits
 
@@ -63,6 +63,14 @@ not rewrite across the two keys automatically.
   writer fence.
 - File persistence uses atomic rename for one BEAM. It does not claim file or
   directory sync durability.
+- Bedrock support uses a host `Bedrock.Repo` from Bedrock `0.7.x`. Write
+  transactions use zero retries. A resolver abort is a confirmed conflict, and
+  every other failed write result is indeterminate. Production durability
+  depends on the Bedrock strict durability profile.
+- Ecto persistence uses a host-owned PostgreSQL or SQLite repository and a
+  host-owned three-column binary table. The host runs its migration first.
+- Ecto CAS requires direct table access and unchanged database affected-row
+  results. A table rule or trigger must not hide rows or change adapter bytes.
 - Registry identity reservation uses `:starting`. Public lookup and listing
   expose only `:ready` entries after initial persistence succeeds.
 - Cross-key rewrite is not automatic because the adapter cannot atomically

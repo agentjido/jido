@@ -334,4 +334,4 @@ These guarantees apply only after the related requirements are approved.
 | `PERS-DEC-006` | Keep compatible unnamed keys and add collision-safe stable Ref keys for namespaced operations. | `Implemented by seam 09` | A lone legacy key stays readable. Both keys fail closed. There is no automatic rewrite. |
 | `PERS-DEC-007` | Write version-2 records for compatible unnamed keys and version-3 records for stable Ref keys. Read legacy format 1. | `Implemented` | New lifecycle meaning is explicit and old active records remain readable. |
 | `PERS-DEC-008` | Keep complete custom callbacks and bypass Plugin slice conversion for them. | `Implemented` | Current custom callbacks remain valid. |
-| `PERS-DEC-009` | Defer Ecto and Bedrock placement. | `Deferred` | No unproved backend is claimed as shipped. |
+| `PERS-DEC-009` | Add Ecto and Bedrock through the binary adapter boundary. | `Implemented` | Ecto stores exact bytes in a host-owned table. Bedrock `0.7.x` uses exact-byte transactional CAS, zero-retry write classification, and host-owned durability configuration. Neither adapter owns Agent record meaning. |

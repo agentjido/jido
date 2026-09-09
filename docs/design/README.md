@@ -125,9 +125,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Commit and effects briefing](06_commit-and-effects/README.md) | Selected and implemented |
 | [Commit and effects design](06_commit-and-effects/design.md) | Selected and implemented |
 | [Commit and effects alignment](06_commit-and-effects/alignment.md) | Implemented |
-| [Persistence briefing](07_persistence/README.md) | Selected and implemented |
-| [Persistence design](07_persistence/design.md) | Selected and implemented |
-| [Persistence alignment](07_persistence/alignment.md) | Implemented |
+| [Persistence briefing](07_persistence/README.md) | Pending approval |
+| [Persistence design](07_persistence/design.md) | Pending approval |
+| [Persistence alignment](07_persistence/alignment.md) | Pending approval |
 | [Agent Server briefing](08_agent-server/README.md) | Pending approval |
 | [Agent Server design](08_agent-server/design.md) | Pending approval |
 | [Agent Server alignment](08_agent-server/alignment.md) | Pending approval |

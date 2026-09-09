@@ -146,8 +146,8 @@ SDK tracer, this path is a no-op.
 
 - Focused OpenTelemetry, semantic lifecycle, local and remote causal trace, and
   instance-option tests: `42 passed`.
-- Full `mix quality`: formatting, compile, Credo, and Dialyzer passed;
-  `1037 passed, 1 excluded`.
+- Full integrated `mix quality`: formatting, compile, Credo, and Dialyzer
+  passed; `1053 passed, 1 excluded`.
 - `mix compile --no-optional-deps --warnings-as-errors` passed in a clean build
   path.
 - `mix docs --warnings-as-errors` passed.

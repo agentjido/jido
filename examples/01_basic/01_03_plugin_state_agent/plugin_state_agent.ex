@@ -3,11 +3,9 @@ defmodule Jido.Examples.PluginStateAgent do
   An Agent with state owned by a Plugin.
 
   CountTurns accepts one committed Turn. A second update exceeds its schema.
-  The overwrite input deliberately breaks state ownership. Both rejection paths
-  must preserve the prior Agent state and prevent Directive dispatch.
+  The overwrite command deliberately breaks state ownership. Both rejection
+  paths preserve the prior Agent state.
   """
-
-  alias Jido.Examples.DirectiveAgent.{Effects, Record}
 
   defmodule CountTurns do
     use Jido.Plugin
@@ -20,38 +18,36 @@ defmodule Jido.Examples.PluginStateAgent do
     def update_state(turns, _directives, _opts), do: {:ok, turns + 1}
   end
 
-  defmodule Change do
-    use Jido.Action,
-      name: "basic_sdk_owned_state_change",
-      schema:
-        Zoi.object(%{
-          amount: Zoi.integer(),
-          overwrite?: Zoi.boolean() |> Zoi.default(false),
-          observer: Zoi.pid()
-        })
-
-    @impl true
-    def run(input, %{agent_state: state}) do
-      send(input.observer, {:sdk_action, :change})
-      candidate = %{state | count: state.count + input.amount}
-      candidate = if input.overwrite?, do: %{candidate | turns: 1}, else: candidate
-      {:ok, candidate, [%Record{label: "state accepted"}]}
-    end
-  end
-
   use Jido.Agent, name: "basic_sdk_plugin_state"
 
   agent do
     schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
     plugin CountTurns
-    plugin Effects
   end
 
   routes do
     signal_source "/examples/basic/plugin_state_agent"
 
-    route "basic.owned.change", Change do
+    route "basic.plugin_state.increment" do
+      action %{amount: amount},
+        name: "basic_sdk_owned_state_change",
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+      end
+
       define :increment, args: [:amount]
+    end
+
+    route "basic.plugin_state.overwrite" do
+      action _input,
+        name: "basic_sdk_owned_state_overwrite",
+        schema: Zoi.object(%{}),
+        context: context do
+        {:ok, %{context.agent_state | turns: context.agent_state.turns + 1}}
+      end
+
+      define :overwrite_plugin_state
     end
   end
 end
