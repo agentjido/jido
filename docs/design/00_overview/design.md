@@ -48,10 +48,10 @@ The shared live model is:
 
 ```text
 source Signal
+  -> pure package input preparation
   -> live admission
   -> first route match from the source Signal
   -> one fixed Action or Flow
-  -> isolated Plugin preparation
   -> executable work through Jido.Exec
   -> ordered Plugin contributions
   -> one validated candidate Agent and Directive batch
@@ -134,13 +134,12 @@ runtime handle and not as durable Agent identity.
 `OVR-REQ-013`: When Jido receives a Signal for a Turn, the Turn evaluator shall
 preserve that value as the unchanged source Signal.
 
-`OVR-REQ-014`: When the default Signal Router returns one or more matching
-targets, the Turn evaluator shall select its first target before Plugin
-preparation.
+`OVR-REQ-014`: Before route selection, the Turn evaluator shall prepare one
+portable input for each participating Agent Plugin or reject the Turn.
 
-`OVR-REQ-015`: When the Turn evaluator has selected an executable, Plugin
-admission and preparation shall not replace that executable or cause another
-route lookup.
+`OVR-REQ-015`: Plugin admission and preparation shall not change the source
+Signal, Agent, caller context, or route. The default Signal Router shall select
+the first matching target from the unchanged source Signal.
 
 `OVR-REQ-016`: Where an Agent declares no Plugins, the Turn evaluator shall
 execute the same Agent path without a Plugin dependency.
@@ -159,9 +158,9 @@ be the only writer of Agent domain state.
 `OVR-REQ-020`: While a Turn is in evaluation, each stateful Plugin shall
 replace at most one complete state entry that it owns.
 
-`OVR-REQ-021`: While Plugin preparation or contribution runs, the Plugin
-boundary shall give each Plugin only its declared Agent view, its owned
-prepared input, and the Turn Directives that it owns.
+`OVR-REQ-021`: Agent Plugin preparation shall receive the source Signal, Agent
+identity, Agent module, its owned state, and static options. Agent Server
+admission shall change only its package-owned input.
 
 `OVR-REQ-022`: When more than one Plugin participates in a Turn, the Plugin
 boundary shall run preparation and contribution serially in declaration order.
@@ -411,7 +410,7 @@ contain the required behavior.
 | Runtime handle | PID or OTP name for the current activation. | Agent identity |
 | Runtime location | Current process or node where an Agent activation runs. | Agent identity, Agent Ref |
 | Source Signal | Signal received for the Turn. It never changes. | original event, raw command |
-| Effective Signal | Bounded Signal view after allowed admission or preparation. It cannot select a different executable. | rewritten source Signal |
+| Effective Signal | Execution Signal after system trace attachment. Plugin admission and preparation cannot change its data. | rewritten source Signal |
 | Turn | One fixed Action or Flow and its input for one source Signal. | transaction, job |
 | Executable | Selected Action or Flow. | handler, route result |
 | Candidate Agent | Complete validated immutable Agent proposed by evaluation. | next live state, commit |
@@ -467,7 +466,7 @@ reverse the decision. It identifies work that the owner seam must complete.
 
 | ID | Approved direction | Status | Effect or open detail |
 | --- | --- | --- | --- |
-| `OVR-DEC-001` | Select the first Router match from the source Signal before Plugin preparation and make the fixed selection available to the observation boundary. | Approved | Ambiguous routes become deterministic and route selection can be logged without using Plugin-mutated input. Route-changing Plugins need migration. |
+| `OVR-DEC-001` | Prepare isolated package inputs, then select the first Router match from the unchanged source Signal. | Revised 2026-09-10 | Preparation cannot change routing data. Route-changing Plugins must use package input instead. |
 | `OVR-DEC-002` | Restore the latest in-instance runtime checkpoint and state version after an abnormal nonpersistent restart. | Approved | Abnormal same-instance restart preserves the latest committed state. |
 | `OVR-DEC-003` | Add stable Agent Ref in V3 beside supported ID and PID APIs. | Approved | Seams 03, 07, 09, and 10 need a staged identity migration. |
 | `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | V3 Agent checkpoints store the revision and accept only format version 2. It does not belong to Agent Ref and does not pin loaded BEAM code. |

@@ -28,6 +28,8 @@ map. There is no second Plugin state map.
 The Agent Plugin sequence is:
 
 ```text
+prepare one package input or reject
+  -> select and run Action or Flow
 Action or Flow success
   -> protect Plugin-owned fields
   -> validate Directives
@@ -41,9 +43,10 @@ Action or Flow success
 run({:ok, candidate_state, directives}, original_state, agent_plugin_specs)
 ```
 
-An Agent facet has four optional callbacks:
+An Agent facet has five optional callbacks:
 
 ```elixir
+prepare/2
 state_spec/1
 directives/1
 validate_directive/2
@@ -53,6 +56,11 @@ update_state/3
 `update_state/3` receives the current owned value, the validated Directives
 owned by that facet, and static options. It returns the complete next owned
 value.
+
+`prepare/2` receives a read-only preparation value and static options. It can
+reject or return one portable value. Jido stores that value under the package
+module in `context.plugin_inputs`. The callback cannot change the incoming
+Signal.
 
 ## Requirements
 
@@ -96,6 +104,24 @@ validate it with the facet state schema.
 `PLG-REQ-017`: When an Agent facet returns state, the Plugin pipeline shall
 apply the portable-value rule.
 
+`PLG-REQ-018`: Before route selection, the Agent Plugin boundary shall call
+each `prepare/2` callback in declaration order.
+
+`PLG-REQ-021`: Agent Plugin preparation shall receive the unchanged source
+Signal, Agent identity, Agent module, its owned state, and static options.
+
+`PLG-REQ-022`: Agent Plugin preparation shall return one package-owned input or
+reject evaluation.
+
+`PLG-REQ-023`: The Agent Plugin boundary shall require pure prepared input to
+be portable.
+
+`PLG-REQ-024`: Agent Plugin preparation shall not change the Agent, source
+Signal, caller context, route, or another package's input.
+
+`PLG-REQ-025`: The execution context shall store prepared inputs by Plugin
+package module under `plugin_inputs`.
+
 `PLG-REQ-031`: When more than one Agent facet updates state, the Plugin
 pipeline shall call them in declaration order and stop at the first failure.
 
@@ -124,6 +150,18 @@ the Agent Server shall call them in declaration order.
 
 `PLG-REQ-020`: If an Agent Server facet rejects admission, then the Agent
 Server shall start no executable work.
+
+`PLG-REQ-026`: An Agent Server facet shall change only its own package input or
+reject admission.
+
+`PLG-REQ-027`: Agent Server admission shall not change the Agent, incoming
+Signal, caller context, or another package's input.
+
+`PLG-REQ-028`: A live package input may contain a transient runtime term because
+the input does not enter Agent state or checkpoints.
+
+`PLG-REQ-029`: Direct `Jido.Agent.cmd/3` shall run pure Agent Plugin preparation
+but shall not run Agent Server admission.
 
 `PLG-REQ-040`: When a live commit succeeds, the Agent Server shall start Plugin
 Directive handling after the committed state is authoritative.
@@ -171,18 +209,17 @@ boundary shall keep process and persistence authority out of the callback.
 
 ## Retired requirements
 
-Requirements `PLG-REQ-018`, `PLG-REQ-021` through `PLG-REQ-030`,
-`PLG-REQ-033`, and `PLG-REQ-034` described Agent Plugin preparation,
-domain-state observation, prepared input, or Plugin-added Directives. The
-one-phase design removes those capabilities.
+Requirements `PLG-REQ-030`, `PLG-REQ-033`, and `PLG-REQ-034` described broader
+domain-state observation or Plugin-added Directive phases. Those capabilities
+remain retired.
 
 Scheduler requirements `PLG-REQ-061` through `PLG-REQ-076` remain owned by the
 Scheduler. They do not add work to the Agent Plugin pipeline.
 
 ## Non-goals
 
-- No Agent Plugin preparation phase.
-- No Plugin input map in Action or Flow context.
+- No Plugin replacement of an incoming Signal or caller context.
+- No Plugin write to another package's input.
 - No domain-state observation callback.
 - No Plugin-added Directive phase.
 - No stage behaviour, middleware protocol, or pipeline DSL.

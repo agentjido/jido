@@ -1,4 +1,4 @@
-defmodule Jido.Examples.Applications.Crypto do
+defmodule Jido.Examples.Plugins.Crypto do
   @moduledoc false
 
   alias Jido.Signal

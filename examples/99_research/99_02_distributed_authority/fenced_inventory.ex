@@ -99,7 +99,7 @@ defmodule Jido.Examples.FencedInventory.Gate do
   def admit(nil, command, _) do
     with {:ok, config} <- Client.config(command.agent.id),
          :ok <- Authority.check(config.authority, config.token) do
-      {:ok, %{command | context: Map.merge(command.context, config)}}
+      {:ok, Jido.Agent.Command.put_plugin_input(command, __MODULE__, config)}
     else
       error ->
         {:error,
@@ -131,12 +131,14 @@ defmodule Jido.Examples.FencedInventory do
         name: "research_inventory_record",
         schema: Zoi.object(%{value: Zoi.integer()}),
         context: context do
-        Elixir.Agent.update(context.probe, &(&1 + 1))
+        authority = context.plugin_inputs[Jido.Examples.FencedInventory.Gate]
+
+        Elixir.Agent.update(authority.probe, &(&1 + 1))
 
         with :ok <-
                Jido.Examples.FencedInventory.Authority.effect(
-                 context.authority,
-                 context.token,
+                 authority.authority,
+                 authority.token,
                  value
                ) do
           {:ok, %{context.agent_state | value: value}}

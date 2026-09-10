@@ -159,7 +159,7 @@ with one project-tag exclusion.
 | Remove the neutral definition form. | `Remove` | Two forms are public and tested. Seam 02 also needs the neutral form. |
 | Add a second stored `plugin_state` field beside `state`. | `Remove` | Keep one complete state map and its tested write protection. |
 | Remove `set/2` and replace the private transition API with new public state functions. | `Remove` | Current roles are clear with the combined map. No new accessor abstraction is required. |
-| Select the first route before Plugin preparation. | `Defer implementation` | The rule is approved in Overview. Route choice and preparation order belong to seams 04 and 05. |
+| Run narrow Plugin preparation before route selection. | `Implemented by seams 04 and 05` | Preparation cannot change the Signal. Route choice uses the unchanged source Signal. |
 | Remove custom `handle_signal/2`. | `Remove` | Custom routing is public, documented, and tested. |
 | Remove Builder and Codec. | `Remove` | These are supported authoring boundaries. Checkpoint data stays separate. |
 | Retain `Agent.to_map/1` as a convenience function. | `Remove` | Codec owns portable definition serialization. Checkpoints own identity and live state. |

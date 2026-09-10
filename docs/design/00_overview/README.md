@@ -33,7 +33,7 @@ in the code.
 
 | Area | Canonical current state | Recommended target |
 | --- | --- | --- |
-| Turn selection | Plugins can change a Signal before routing. Jido requires exactly one route match. | Preserve the source Signal. Select the first Router match before Plugin preparation. Fix that executable for the Turn. |
+| Turn selection | Earlier Plugins could change a Signal before routing. | Preserve the source Signal. Prepare isolated package inputs, then select the first Router match from the unchanged Signal. |
 | Evaluation | Direct and live commands share the private Runner. | Keep one candidate-evaluation boundary. Only the live Agent Server commits. |
 | State ownership | An executable writes domain state. Each stateful Plugin can replace one owned state entry. Plugins can read the complete Agent during preparation. | Keep separate write owners. Give each Plugin only its declared Agent view, owned input, and owned Directives. |
 | Commit and effects | One successful live Turn increments `state_version` once. Directive work starts after commit. Action and Flow I/O can occur before commit. | Keep one commit point. Do not claim rollback for pre-commit external I/O. |
@@ -46,7 +46,7 @@ in the code.
 
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
-| Route and Plugin input contract | Current preparation can change selection and expose the complete Agent. | One fixed executable from the source Signal and isolated Plugin-owned inputs. | 01 Agent, 04 Turn evaluation, 05 Plugins |
+| Route and Plugin input contract | Earlier preparation could change selection and expose shared mutable data. | One fixed executable from the source Signal and isolated Plugin-owned inputs. | 01 Agent, 04 Turn evaluation, 05 Plugins |
 | Stable identity and definition revision | Ref value, instance namespace, Ref facade, stable key, and restore checks are implemented. Runtime Topology still uses compatible local handles. | Preserve exact Ref identity when topology work adds new target forms. | 10 |
 | Durable lifecycle | Current creation, write-error, and delete rules do not give one safe record lifecycle. | Initial active records, loss of write authority, and tombstone semantics. | 06 Commit and effects, 07 Persistence, 08 Agent Server, 10 Runtime topology |
 | Plugin ownership and replacement | Four closed owner facets, coherent runtime replacement, Persistence conversion, and Topology planning integration are implemented. | Keep compatibility proof through delivery. | 05, 08, 09, 10, 11 |

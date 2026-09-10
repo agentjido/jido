@@ -5,7 +5,7 @@ is callback-free. It selects no more than one facet for each Jido owner:
 
 | Facet | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Plugin-owned state and Directive validation |
+| `Jido.Agent.Plugin` | Pure input preparation, Plugin-owned state, and Directive validation |
 | `Jido.AgentServer.Plugin` | Live admission, runtime, readiness, outbound preparation, and post-commit dispatch |
 | `Jido.Persistence.Plugin` | Pure dump and load of one paired owned-state value |
 | `Jido.Topology.Plugin` | Pure static Topology contribution |
@@ -40,10 +40,19 @@ The Agent facet can implement these callbacks:
 
 | Callback | Boundary |
 | --- | --- |
+| `prepare/2` | Reject input or return one portable package-owned execution input |
 | `state_spec/1` | Define one owned state key and static schema |
 | `directives/1` | Declare owned Directive modules |
 | `validate_directive/2` | Validate one owned Directive before candidate return |
 | `update_state/3` | Update the owned state value from owned Directives |
+
+`prepare/2` runs in package declaration order before route selection. It
+receives `%Jido.Agent.Plugin.Preparation{}` with the unchanged source Signal,
+Agent identity, Agent module, and the Plugin's owned state. It also receives
+the facet's static options. It can return `{:ok, input}` or `{:error, reason}`.
+The input must be portable. Jido stores it at
+`context.plugin_inputs[PackageModule]`. The callback cannot replace the Signal,
+caller context, route, or Agent state.
 
 An Action or Flow returns the complete candidate state and its Directives. It
 must preserve all Plugin-owned fields. Jido validates each Directive, gives
@@ -58,9 +67,17 @@ The Agent Server facet can implement `admit/3`, `prepare_dispatch/4`,
 `child_spec/1` callback for one runtime root. The returned specification must
 use `restart: :permanent`.
 
-Admission runs in declaration order before Turn evaluation. Outbound Signal
-preparation runs in reverse declaration order. Directive dispatch starts only
-after commit. A dispatch failure does not roll back committed state.
+Admission runs in declaration order after pure preparation and before Turn
+evaluation. `admit/3` can reject the command or replace only its own value at
+`command.plugin_inputs[PackageModule]`. It cannot change the Agent, incoming
+Signal, caller context, or another package's input. A live input can contain a
+runtime value, such as a PID or function, because it is not stored in Agent
+state or a checkpoint.
+
+Direct `Jido.Agent.cmd/3` runs pure preparation but does not run live
+admission. Outbound Signal preparation runs in reverse declaration order.
+Directive dispatch starts only after commit. A dispatch failure does not roll
+back committed state.
 
 The Agent Server owns tasks, timeouts, runtime handles, start order, restart,
 readiness, and settlement. Runtime handles never enter Agent state or a

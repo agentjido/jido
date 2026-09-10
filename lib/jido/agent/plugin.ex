@@ -2,14 +2,20 @@ defmodule Jido.Agent.Plugin do
   @moduledoc """
   Pure Agent-owned facet of a `Jido.Plugin` package.
 
-  An Agent Plugin can own one field in the complete Agent state map and one or
-  more Directive types. After executable success, it can update only its owned
-  field from its owned Directives.
+  Before route selection, an Agent Plugin can reject a Signal or prepare one
+  portable package-owned input for execution. It cannot change the Signal,
+  caller context, route, or Agent state.
+
+  An Agent Plugin can also own one field in the complete Agent state map and
+  one or more Directive types. After executable success, it can update only its
+  owned field from its owned Directives.
   """
 
-  alias Jido.Agent.Plugin.Spec
+  alias Jido.Agent
+  alias Jido.Agent.Plugin.{Preparation, Spec}
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Plugin.Normalizer
+  alias Jido.Signal
 
   @type state_spec :: :none | {atom(), Zoi.schema()}
 
@@ -23,6 +29,8 @@ defmodule Jido.Agent.Plugin do
     end
   end
 
+  @callback prepare(preparation :: Preparation.t(), opts :: keyword()) ::
+              {:ok, term()} | {:error, term()}
   @callback state_spec(opts :: keyword()) :: state_spec() | {:error, term()}
   @callback directives(opts :: keyword()) :: [module()] | {:error, term()}
   @callback validate_directive(directive :: struct(), opts :: keyword()) ::
@@ -30,7 +38,8 @@ defmodule Jido.Agent.Plugin do
   @callback update_state(state :: term(), directives :: [struct()], opts :: keyword()) ::
               {:ok, term()} | {:error, term()}
 
-  @optional_callbacks state_spec: 1,
+  @optional_callbacks prepare: 2,
+                      state_spec: 1,
                       directives: 1,
                       validate_directive: 2,
                       update_state: 3
@@ -66,6 +75,29 @@ defmodule Jido.Agent.Plugin do
       %{agent: %Spec{} = spec} -> [spec]
       %Spec{} = spec -> [spec]
       _spec -> []
+    end)
+  end
+
+  @doc false
+  @spec prepares?([Jido.Plugin.Spec.t()] | [Spec.t()]) :: boolean()
+  def prepares?(plugin_specs) do
+    plugin_specs
+    |> specs()
+    |> Enum.any?(&function_exported?(&1.module, :prepare, 2))
+  end
+
+  @doc false
+  @spec prepare(Agent.instance(), Signal.t(), [Jido.Plugin.Spec.t()] | [Spec.t()]) ::
+          {:ok, %{optional(module()) => term()}} | {:error, term()}
+  def prepare(%Agent{} = agent, %Signal{} = signal, plugin_specs) when is_list(plugin_specs) do
+    plugin_specs
+    |> specs()
+    |> Enum.reduce_while({:ok, %{}}, fn spec, {:ok, inputs} ->
+      case prepare_one(agent, signal, spec) do
+        :none -> {:cont, {:ok, inputs}}
+        {:ok, input} -> {:cont, {:ok, Map.put(inputs, spec.package, input)}}
+        {:error, _reason} = error -> {:halt, error}
+      end
     end)
   end
 
@@ -111,6 +143,58 @@ defmodule Jido.Agent.Plugin do
         )
     end
   end
+
+  defp prepare_one(agent, signal, %Spec{} = spec) do
+    if function_exported?(spec.module, :prepare, 2) do
+      preparation = %Preparation{
+        plugin: spec.package,
+        agent_id: agent.id,
+        agent_module: agent.module,
+        signal: signal,
+        plugin_state: plugin_state(agent.state, spec.state_key)
+      }
+
+      PluginError.safe_apply(
+        spec.package,
+        spec.module,
+        :prepare,
+        [preparation, spec.options],
+        "Agent Plugin preparation failed"
+      )
+      |> validate_preparation_result(spec)
+    else
+      :none
+    end
+  end
+
+  defp validate_preparation_result({:ok, input}, spec) do
+    case Jido.PortableTerm.validate(input, [:plugin_inputs, spec.package]) do
+      :ok ->
+        {:ok, input}
+
+      {:error, path} ->
+        PluginError.invalid_callback(
+          "Agent Plugin prepare/2 returned a non-portable input",
+          spec.package,
+          spec.module,
+          %{code: :non_portable_term, path: path}
+        )
+    end
+  end
+
+  defp validate_preparation_result({:error, _reason} = error, _spec), do: error
+
+  defp validate_preparation_result(result, spec) do
+    PluginError.invalid_callback(
+      "Agent Plugin prepare/2 returned an invalid result",
+      spec.package,
+      spec.module,
+      %{result: result}
+    )
+  end
+
+  defp plugin_state(_state, nil), do: nil
+  defp plugin_state(state, key), do: Map.get(state, key)
 
   defp state_key_conflicts(fields, specs) do
     domain_keys = MapSet.new(Keyword.keys(fields))

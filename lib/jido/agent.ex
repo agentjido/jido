@@ -21,10 +21,12 @@ defmodule Jido.Agent do
   responses can change those results. Use fixed or recorded responses when
   reproducible evaluation is required.
 
-  Jido selects the first matching route from the source Signal. Agent Plugins
-  do not take part in command preparation and cannot change domain output. After
-  executable work, a stateful Plugin can reduce only its declared state field.
-  The Agent validates one complete state proposal.
+  Before route selection, each Agent Plugin can inspect the source Signal,
+  Agent identity, and its owned state. It can reject the command or return one
+  portable input under its package key. It cannot change the source Signal,
+  caller context, route, or Agent state. After executable work, a stateful
+  Plugin can reduce only its declared state field. The Agent validates one
+  complete state proposal.
 
   Default Signal routing accepts an executable target or `{executable, defaults}`.
   The defaults map is combined with the Signal data using
@@ -309,7 +311,13 @@ defmodule Jido.Agent do
     end
   end
 
-  @doc "Applies one Signal to an Agent value without starting a Server."
+  @doc """
+  Applies one Signal to an Agent value without starting a Server.
+
+  This function runs pure Agent Plugin preparation. It does not run live Agent
+  Server Plugin admission, runtime work, replay protection, or outbound Signal
+  preparation.
+  """
   @spec cmd(instance(), Signal.t(), keyword()) ::
           {:ok, instance(), [struct()]} | {:error, term()}
   def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts \\ []) when is_list(opts),

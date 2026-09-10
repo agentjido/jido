@@ -57,6 +57,7 @@ defmodule Jido.AgentServer do
   @max_error_policy_tasks 32
 
   alias Jido.Agent
+  alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Agent.Runner
   alias Jido.Agent.Directive
   alias Jido.Agent.Turn.Outcome
@@ -1445,7 +1446,7 @@ defmodule Jido.AgentServer do
       with {:ok, command} <- initial_command(signal, context, data) do
         data = %{data | active: %{data.active | source_signal: command.signal}}
 
-        if ServerPlugin.admits?(data.plugin_specs) do
+        if AgentPlugin.prepares?(data.plugin_specs) or ServerPlugin.admits?(data.plugin_specs) do
           start_admission_task(command, data)
         else
           begin_turn_execution(command, data)
@@ -1633,7 +1634,12 @@ defmodule Jido.AgentServer do
       task =
         Task.Supervisor.async(supervisor, fn ->
           TraceContext.with_context(trace, fn ->
-            ServerPlugin.admit(command, plugin_specs, runtime_refs)
+            with {:ok, plugin_inputs} <-
+                   AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
+                 command = %{command | plugin_inputs: plugin_inputs},
+                 {:ok, command} <- ServerPlugin.admit(command, plugin_specs, runtime_refs) do
+              {:ok, command}
+            end
           end)
         end)
 

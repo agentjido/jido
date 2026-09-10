@@ -48,6 +48,7 @@ defmodule JidoTest.FeatureObserver.Server do
       end
     end
 
-    {:ok, %{command | context: Map.put(command.context, key, observer)}}
+    input = Map.put(Map.get(command.plugin_inputs, JidoTest.FeatureObserver, %{}), key, observer)
+    {:ok, Jido.Agent.Command.put_plugin_input(command, JidoTest.FeatureObserver, input)}
   end
 end

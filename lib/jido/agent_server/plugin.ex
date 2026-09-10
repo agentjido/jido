@@ -2,11 +2,13 @@ defmodule Jido.AgentServer.Plugin do
   @moduledoc """
   Live Agent Server-owned facet of a `Jido.Plugin` package.
 
-  This facet can admit live commands, prepare outbound Signals, declare one
-  permanent runtime root, gate readiness, and dispatch owned Directives after
-  commit. Agent Server owns all tasks, limits, restart policy, and settlement.
-  The owner wrapper hosts each root generation as temporary so it can restart
-  the root with a fresh committed state and state version.
+  This facet can reject live commands or replace its package-owned input. It
+  cannot change the Agent, source Signal, caller context, or another package's
+  input. It can also prepare outbound Signals, declare one permanent runtime
+  root, gate readiness, and dispatch owned Directives after commit. Agent
+  Server owns all tasks, limits, restart policy, and settlement. The owner
+  wrapper hosts each root generation as temporary so it can restart the root
+  with a fresh committed state and state version.
   """
 
   alias Jido.Agent.Command
@@ -268,23 +270,11 @@ defmodule Jido.AgentServer.Plugin do
 
   defp validate_admission_result({:ok, %Command{} = command}, original, spec) do
     with {:ok, command} <- Command.validate(command),
-         true <- command.agent == original.agent do
+         :ok <- unchanged_admission_field(command.agent, original.agent, :agent, spec),
+         :ok <- unchanged_admission_field(command.signal, original.signal, :signal, spec),
+         :ok <- unchanged_admission_field(command.context, original.context, :context, spec),
+         :ok <- unchanged_foreign_inputs(command.plugin_inputs, original.plugin_inputs, spec) do
       {:ok, command}
-    else
-      false ->
-        PluginError.invalid_callback(
-          label(
-            spec,
-            "Agent Plugin cannot replace the Agent",
-            "Agent Server Plugin cannot replace the Agent"
-          ),
-          spec.package,
-          spec.module,
-          %{callback: :admit}
-        )
-
-      {:error, _reason} = error ->
-        error
     end
   end
 
@@ -301,6 +291,47 @@ defmodule Jido.AgentServer.Plugin do
       spec.module,
       %{result: result}
     )
+  end
+
+  defp unchanged_admission_field(value, value, _field, _spec), do: :ok
+
+  defp unchanged_admission_field(_value, _original, field, spec) do
+    {legacy, current} = admission_field_error(field)
+
+    PluginError.invalid_callback(
+      label(spec, legacy, current),
+      spec.package,
+      spec.module,
+      %{callback: :admit}
+    )
+  end
+
+  defp admission_field_error(:agent),
+    do: {"Agent Plugin cannot replace the Agent", "Agent Server Plugin cannot replace the Agent"}
+
+  defp admission_field_error(:signal),
+    do: {"Agent Plugin cannot change the Signal", "Agent Server Plugin cannot change the Signal"}
+
+  defp admission_field_error(:context),
+    do:
+      {"Agent Plugin cannot change the caller context",
+       "Agent Server Plugin cannot change the caller context"}
+
+  defp unchanged_foreign_inputs(inputs, original, spec) do
+    if Map.delete(inputs, spec.package) === Map.delete(original, spec.package) do
+      :ok
+    else
+      PluginError.invalid_callback(
+        label(
+          spec,
+          "Agent Plugin cannot change another Plugin's input",
+          "Agent Server Plugin cannot change another Plugin's input"
+        ),
+        spec.package,
+        spec.module,
+        %{callback: :admit, field: :plugin_inputs}
+      )
+    end
   end
 
   defp validate_signal(signal, spec) do

@@ -767,11 +767,11 @@ defmodule Jido.AgentTest do
       assert context.signal == signal
     end
 
-    test "rejects caller and Plugin access to reserved context keys" do
+    test "rejects caller access to reserved context keys" do
       agent = agent_with_route("counter.add", Add)
       signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
 
-      for key <- [:agent_id, :agent_state, :signal] do
+      for key <- [:agent_id, :agent_state, :plugin_inputs, :signal] do
         assert {:error,
                 %Jido.Error.ValidationError{
                   message: "Agent command context contains reserved keys"
@@ -788,7 +788,7 @@ defmodule Jido.AgentTest do
       assert_receive {:agent_execution_boundary, _params, received}
       assert Map.take(received, Map.keys(context)) == context
 
-      for key <- [:agent_id, :agent_state, :signal] do
+      for key <- [:agent_id, :agent_state, :plugin_inputs, :signal] do
         assert {:error, %Jido.Error.ValidationError{details: %{keys: [^key]}}} =
                  Agent.cmd(agent, signal, context: Map.put(context, key, nil))
       end

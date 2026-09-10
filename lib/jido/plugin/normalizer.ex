@@ -11,6 +11,7 @@ defmodule Jido.Plugin.Normalizer do
 
   @legacy_callbacks [
     validate_options: 1,
+    prepare: 2,
     child_spec: 1,
     admit: 3,
     prepare_dispatch: 4,
@@ -83,6 +84,7 @@ defmodule Jido.Plugin.Normalizer do
   defp upgrade_spec(%Spec{} = spec) do
     agent =
       if has_any?(spec.module,
+           prepare: 2,
            state_spec: 1,
            update_state: 3,
            directives: 1,
@@ -211,6 +213,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp build_legacy_agent_spec(module, options) do
     if has_any?(module,
+         prepare: 2,
          state_spec: 1,
          update_state: 3,
          directives: 1,
@@ -468,6 +471,7 @@ defmodule Jido.Plugin.Normalizer do
 
         :agent_server ->
           [
+            prepare: 2,
             state_spec: 1,
             update_state: 3,
             directives: 1,
@@ -478,6 +482,7 @@ defmodule Jido.Plugin.Normalizer do
 
         :persistence ->
           [
+            prepare: 2,
             state_spec: 1,
             update_state: 3,
             directives: 1,
@@ -491,6 +496,7 @@ defmodule Jido.Plugin.Normalizer do
 
         :topology ->
           [
+            prepare: 2,
             state_spec: 1,
             update_state: 3,
             directives: 1,
@@ -522,6 +528,7 @@ defmodule Jido.Plugin.Normalizer do
 
   defp facet_has_capability(module, :agent) do
     require_capability(module, :agent,
+      prepare: 2,
       state_spec: 1,
       update_state: 3,
       directives: 1

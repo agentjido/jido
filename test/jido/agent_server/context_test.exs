@@ -23,7 +23,8 @@ defmodule Jido.AgentServer.ContextTest do
         {:error, :prepared_too_late}
       else
         send(command.context.observer, {:context_admitted, command.context, command.signal})
-        {:ok, %{command | context: Map.put(command.context, :admitted, true)}}
+
+        {:ok, Jido.Agent.Command.put_plugin_input(command, __MODULE__, %{admitted: true})}
       end
     end
 
@@ -294,7 +295,7 @@ defmodule Jido.AgentServer.ContextTest do
     assert admitted.jido == jido
     assert admitted.partition == nil
     assert_receive {:context_executed, executed}
-    assert executed.admitted
+    assert executed.plugin_inputs[ContextPlugin].admitted
     assert executed.private_request == private_request
     assert executed.signal.data == command.data
     assert executed.agent_state == %{value: 0, context_plugin: 0}

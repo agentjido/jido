@@ -1,6 +1,6 @@
 # Application examples
 
-These ten examples combine Agents, Plugins, Signals, Directives, Flows, child
+These eight examples combine Agents, Plugins, Signals, Directives, Flows, child
 Agents, and persistence. Source files are in this directory. The matching
 [tests](../../test/examples/08_applications) use the single `:example` tag.
 
@@ -21,8 +21,8 @@ file under `test/examples/08_applications`.
 
 ## Numbered examples
 
-The order starts with Plugin state and input, then adds security, child work,
-reasoning, and Agent groups. Source and test folders use the same `08_NN_name`
+The order starts with Plugin state and input, then adds child work, reasoning,
+and Agent groups. Source and test folders use the same `08_NN_name`
 ID. Keep these IDs stable and assign the next number to each new runnable example.
 
 | ID and source | What it proves | Tests |
@@ -30,13 +30,14 @@ ID. Keep these IDs stable and assign the next number to each new runnable exampl
 | [08_01_audit](08_01_audit/audit.ex) | A Flow commits Agent and Plugin state only after successful work. | [Tests](../../test/examples/08_applications/08_01_audit/audit_test.exs) |
 | [08_02_subscription](08_02_subscription/subscription.ex) | Committed Plugin state repairs external state after dispatch failure and runtime restart. | [Tests](../../test/examples/08_applications/08_02_subscription/subscription_test.exs) |
 | [08_03_inbox](08_03_inbox/inbox.ex) | An input Plugin handles bursts and duplicate events and continues after runtime restart. | [Tests](../../test/examples/08_applications/08_03_inbox/inbox_test.exs) |
-| [08_04_identity](08_04_identity/identity.ex) | A Plugin verifies private-key control, rejects replay and forgery, and signs a correlated reply. | [Tests](../../test/examples/08_applications/08_04_identity/identity_test.exs) |
-| [08_05_secure_signal](08_05_secure_signal/secure_signal.ex) | Identity verifies encrypted input before decryption. Replies are encrypted before signing. | [Tests](../../test/examples/08_applications/08_05_secure_signal/secure_signal_test.exs) |
 | [08_06_coordinator](08_06_coordinator/coordinator.ex) | One Flow commits delegation history, starts child work, and receives a reply and scheduled timeout. | [Tests](../../test/examples/08_applications/08_06_coordinator/coordinator_test.exs) |
 | [08_07_react](08_07_react/react.ex) | A tool loop commits history once, reuses it in later Turns, and preserves it after a failed Turn. | [Tests](../../test/examples/08_applications/08_07_react/react_test.exs) |
 | [08_08_purpose_loop](08_08_purpose_loop/purpose_loop.ex) | Finite scheduled Turns continue without client input, reject duplicate ticks, restore work, and drain. | [Tests](../../test/examples/08_applications/08_08_purpose_loop/purpose_loop_test.exs) |
 | [08_09_fixed_group](08_09_fixed_group/fixed_group.ex) | A controller owns an environment and three Workers that coordinate targeted work through a Bus. | [Tests](../../test/examples/08_applications/08_09_fixed_group/fixed_group_test.exs) |
 | [08_10_elastic_group](08_10_elastic_group/elastic_group.ex) | Persistent roles scale Workers from two to ten, reclaim failed work, and drain back to two. | [Tests](../../test/examples/08_applications/08_10_elastic_group/elastic_group_test.exs) |
+
+Identity and encrypted Signal handling now belong to the focused
+[Plugin examples](../09_plugins/README.md).
 
 Run one numbered example:
 
@@ -44,8 +45,8 @@ Run one numbered example:
 mix test test/examples/08_applications/08_01_audit --include example --seed 0
 ```
 
-Shared [Bus input](support/bus_input.ex) and [cryptographic helpers](support/crypto.ex)
-live in `support/`. They compile with the examples and have no example number.
+Shared [Bus input](support/bus_input.ex) lives in `support/`. It compiles with
+the examples and has no example number.
 The backlog below contains proposed work; assign IDs when runnable examples exist.
 
 ## Test Rules

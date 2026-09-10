@@ -29,7 +29,8 @@ The numbered groups add one type of complexity at a time.
 | `05_multi_agent` | Child lifecycle, requests, worker groups, hierarchies, and remote children |
 | `06_factory` | Runtime-built conversations, systems, departments, and flows |
 | `07_topology` | Independent, hierarchical, bus-connected, keyed, composed, and Plugin-contributed systems |
-| `08_applications` | Audit, subscriptions, inboxes, identity, security, coordination, and groups |
+| `08_applications` | Audit, subscriptions, inboxes, purpose loops, and groups |
+| `09_plugins` | Pure preparation, live admission, identity, encrypted Signals, and composition |
 
 Start with `01_basic/01_01_minimal_agent`. It compares the direct Agent command
 with the live actor call and verifies that both use the same route defaults.

@@ -2,13 +2,12 @@ defmodule Jido.Agent.Runner do
   @moduledoc false
 
   alias Jido.Agent
-  alias Jido.Agent.{Command, Turn}
-  alias Jido.Agent.Plugin.Pipeline, as: AgentPlugin
+  alias Jido.Agent.{Command, Plugin, Turn}
+  alias Jido.Agent.Plugin.Pipeline, as: PluginPipeline
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Router
 
-  @reserved_context_keys [:agent_id, :agent_state, :signal]
   @type stage :: :route | :prepare | :input | :compose | :validate
 
   defmodule Prepared do
@@ -21,6 +20,7 @@ defmodule Jido.Agent.Runner do
       :turn,
       :context,
       :exec_opts,
+      :plugin_inputs,
       :plugin_specs
     ]
     defstruct @enforce_keys
@@ -32,6 +32,7 @@ defmodule Jido.Agent.Runner do
             turn: Jido.Agent.Turn.t(),
             context: map(),
             exec_opts: keyword(),
+            plugin_inputs: %{optional(module()) => term()},
             plugin_specs: [Jido.Agent.Plugin.Spec.t()]
           }
   end
@@ -81,7 +82,7 @@ defmodule Jido.Agent.Runner do
         plugin_specs
       )
       when is_list(exec_opts) and is_list(plugin_specs) do
-    with :ok <- at(:input, reject_reserved_context(command.context)),
+    with :ok <- at(:input, Command.validate_caller_context(command.context)),
          {:ok, selection} <- at(:route, select(command.agent, source_signal)),
          {:ok, plugin_specs} <- at(:prepare, plugin_specs(plugin_specs, :prepared)),
          {:ok, turn} <- at(:input, materialize(selection, source_signal, command.signal)) do
@@ -93,6 +94,7 @@ defmodule Jido.Agent.Runner do
          turn,
          command.context,
          exec_opts,
+         command.plugin_inputs,
          plugin_specs
        )}
     end
@@ -118,22 +120,43 @@ defmodule Jido.Agent.Runner do
     {caller_context, exec_opts} = Keyword.pop(opts, :context, %{})
 
     with {:ok, caller_context} <- at(:input, Command.normalize_context(caller_context)),
-         :ok <- at(:input, reject_reserved_context(caller_context)),
+         :ok <- at(:input, Command.validate_caller_context(caller_context)),
          {:ok, agent} <-
            at(:input, normalize_result_routing_error(Agent.validate_instance(agent), signal)),
          {:ok, signal} <- at(:input, Command.normalize_signal(signal)),
-         {:ok, selection} <- at(:route, select(agent, signal)),
          {:ok, plugin_specs} <- at(:prepare, plugin_specs(agent.plugins, plugin_source)),
+         {:ok, plugin_inputs} <- at(:prepare, Plugin.prepare(agent, signal, plugin_specs)),
+         {:ok, selection} <- at(:route, select(agent, signal)),
          {:ok, turn} <- at(:input, materialize(selection, signal, signal)) do
-      {:ok, prepared(agent, signal, signal, turn, caller_context, exec_opts, plugin_specs)}
+      {:ok,
+       prepared(
+         agent,
+         signal,
+         signal,
+         turn,
+         caller_context,
+         exec_opts,
+         plugin_inputs,
+         plugin_specs
+       )}
     end
   end
 
-  defp prepared(agent, source_signal, signal, turn, caller_context, exec_opts, plugin_specs) do
+  defp prepared(
+         agent,
+         source_signal,
+         signal,
+         turn,
+         caller_context,
+         exec_opts,
+         plugin_inputs,
+         plugin_specs
+       ) do
     context =
       Map.merge(caller_context, %{
         agent_id: agent.id,
         agent_state: agent.state,
+        plugin_inputs: plugin_inputs,
         signal: signal
       })
 
@@ -144,6 +167,7 @@ defmodule Jido.Agent.Runner do
       turn: turn,
       context: context,
       exec_opts: exec_opts,
+      plugin_inputs: plugin_inputs,
       plugin_specs: plugin_specs
     }
   end
@@ -159,7 +183,7 @@ defmodule Jido.Agent.Runner do
          {:ok, output, directives} <-
            at(
              :compose,
-             AgentPlugin.run(
+             PluginPipeline.run(
                {:ok, output, directives},
                prepared.agent.state,
                prepared.plugin_specs
@@ -226,19 +250,6 @@ defmodule Jido.Agent.Runner do
      Error.execution_error("Agent executable returned an invalid result",
        details: %{code: :agent_invalid_callback_result, callback: :execute, result: result}
      )}
-  end
-
-  defp reject_reserved_context(context) do
-    keys = Enum.filter(@reserved_context_keys, &Map.has_key?(context, &1))
-
-    if keys == [] do
-      :ok
-    else
-      {:error,
-       Error.validation_error("Agent command context contains reserved keys",
-         details: %{keys: keys}
-       )}
-    end
   end
 
   defp route_first(router, signal) do

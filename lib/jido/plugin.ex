@@ -31,6 +31,7 @@ defmodule Jido.Plugin do
   """
 
   alias Jido.Agent.Command
+  alias Jido.Agent.Plugin.Preparation
   alias Jido.Plugin.{DirectiveContext, Init, Manifest, SignalContext, Spec}
 
   @type declaration :: module() | {module(), keyword()}
@@ -87,6 +88,8 @@ defmodule Jido.Plugin do
 
   @callback validate_options(opts :: keyword()) ::
               :ok | {:ok, keyword()} | {:error, term()}
+  @callback prepare(preparation :: Preparation.t(), opts :: keyword()) ::
+              {:ok, term()} | {:error, term()}
   @callback admit(runtime_ref :: term() | nil, command :: Command.t(), opts :: keyword()) ::
               {:ok, Command.t()} | {:error, term()}
   @callback prepare_dispatch(
@@ -110,6 +113,7 @@ defmodule Jido.Plugin do
   @callback await_ready(runtime_ref :: term(), opts :: keyword()) :: :ok | {:error, term()}
 
   @optional_callbacks validate_options: 1,
+                      prepare: 2,
                       admit: 3,
                       prepare_dispatch: 4,
                       state_spec: 1,
@@ -136,6 +140,12 @@ defmodule Jido.Plugin do
 
   @doc false
   defdelegate compose_schema(schema, declarations), to: Jido.Agent.Plugin
+
+  @doc false
+  defdelegate prepares?(specs), to: Jido.Agent.Plugin
+
+  @doc false
+  defdelegate prepare(agent, signal, specs), to: Jido.Agent.Plugin
 
   @doc false
   def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do

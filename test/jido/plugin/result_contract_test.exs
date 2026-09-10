@@ -61,6 +61,37 @@ defmodule Jido.Plugin.ResultContractTest do
     end
   end
 
+  test "admit can change only its package-owned input" do
+    command = command()
+
+    assert {:ok, admitted} =
+             run_command(:admit, command, fn current ->
+               {:ok, Command.put_plugin_input(current, CallbackPlugin, %{value: self()})}
+             end)
+
+    assert admitted.plugin_inputs == %{CallbackPlugin => %{value: self()}}
+  end
+
+  test "admit cannot change the Signal, caller context, or a foreign input" do
+    command = %{command() | plugin_inputs: %{__MODULE__ => :original}}
+
+    changes = [
+      {%{command | signal: %{command.signal | data: %{changed: true}}},
+       "Agent Plugin cannot change the Signal"},
+      {%{command | context: %{request: :changed}},
+       "Agent Plugin cannot change the caller context"},
+      {%{command | plugin_inputs: %{__MODULE__ => :changed}},
+       "Agent Plugin cannot change another Plugin's input"}
+    ]
+
+    for {changed, message} <- changes do
+      assert {:error, error} = run_command(:admit, command, fn _current -> {:ok, changed} end)
+      assert error.message == message
+      assert error.details.callback == :admit
+      assert error.details.plugin == CallbackPlugin
+    end
+  end
+
   for {callback, label, failure} <- [
         {:dispatch, "dispatch/4", "Agent Plugin Directive dispatch failed"},
         {:await_ready, "await_ready/2", "Agent Plugin readiness check failed"}

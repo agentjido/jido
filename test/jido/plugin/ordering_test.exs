@@ -82,8 +82,7 @@ defmodule Jido.Plugin.OrderingTest do
     def admit(runtime, command, opts) do
       send(opts[:observer], {:admitted, :first, runtime})
 
-      {:ok,
-       %{command | context: Map.update(command.context, :order, [:first], &(&1 ++ [:first]))}}
+      {:ok, Command.put_plugin_input(command, __MODULE__, :first)}
     end
   end
 
@@ -96,11 +95,7 @@ defmodule Jido.Plugin.OrderingTest do
 
       case Keyword.get(opts, :result, :ok) do
         :ok ->
-          {:ok,
-           %{
-             command
-             | context: Map.update(command.context, :order, [:second], &(&1 ++ [:second]))
-           }}
+          {:ok, Command.put_plugin_input(command, __MODULE__, :second)}
 
         error ->
           {:error, error}
@@ -214,7 +209,11 @@ defmodule Jido.Plugin.OrderingTest do
                ThirdAdmissionPlugin => :third_runtime
              })
 
-    assert admitted.context.order == [:first, :second]
+    assert admitted.plugin_inputs == %{
+             FirstAdmissionPlugin => :first,
+             SecondAdmissionPlugin => :second
+           }
+
     assert_received {:admitted, :first, :first_runtime}
     assert_received {:admitted, :second, :second_runtime}
     assert_received {:admitted, :third, :third_runtime}

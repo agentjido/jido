@@ -1,4 +1,4 @@
-defmodule JidoTest.Examples.Applications.SecureSignalTest do
+defmodule JidoTest.Examples.Plugins.SecureSignalTest do
   use JidoTest.Case, async: false
 
   @moduletag :example
@@ -6,8 +6,8 @@ defmodule JidoTest.Examples.Applications.SecureSignalTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Signal
   alias Jido.Tracing.Trace
-  alias Jido.Examples.Applications.Crypto
-  alias Jido.Examples.Applications.SecureSignal.Agent
+  alias Jido.Examples.Plugins.Crypto
+  alias Jido.Examples.Plugins.SecureSignal.Agent
 
   test "identity verifies ciphertext before secure admission decrypts it", %{jido: jido} do
     {peer_public, peer_private} = Crypto.peer_key_pair()
@@ -22,7 +22,7 @@ defmodule JidoTest.Examples.Applications.SecureSignalTest do
 
     unsigned =
       Signal.new!(
-        "secure.request",
+        "examples.plugins.secure_signal.request",
         %{"message_id" => "message-1"},
         source: "/secure/peer"
       )
@@ -36,7 +36,8 @@ defmodule JidoTest.Examples.Applications.SecureSignalTest do
     assert committed.state.peer == Base.encode16(peer_public, case: :lower)
     refute Map.has_key?(committed.state, :secure)
 
-    assert_receive {:signal, %Signal{type: "secure.accepted"} = reply}
+    assert_receive {:signal, %Signal{type: "examples.plugins.secure_signal.accepted"} = reply}
+
     assert {:ok, _nonce} = Crypto.verify(reply, agent_public)
     assert Trace.get(reply).causation_id == signed.id
 

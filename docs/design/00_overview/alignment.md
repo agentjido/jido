@@ -32,13 +32,14 @@ change runtime behavior.
 
 | Evidence path | Canonical current behavior |
 | --- | --- |
-| `lib/jido/agent.ex:2-21` | An Agent is immutable data. A direct command returns a candidate Agent and Directives and does not commit live state. Plugin preparation occurs before routing. |
+| `lib/jido/agent.ex` | An Agent is immutable data. Direct commands run pure Plugin preparation and do not commit live state. |
 | `lib/jido/agent.ex:370-423` | Agent modules can own complete checkpoint and restore callbacks. Default checkpoints are maps with no definition revision. |
 | `lib/jido/agent.ex:458-477` | `cmd/3` delegates to the Runner. Default routing requires exactly one executable Turn. |
 | `lib/jido/agent/runner.ex` | Direct and live execution share Turn selection and finalization. Direct evaluation does not create a Command. |
 | `lib/jido/agent/runner.ex` | Jido selects the first Router target and normalizes routing failures. |
-| `lib/jido/agent/command.ex:1-22` | The current public Plugin preparation input contains the complete Agent, Signal, and caller context. |
-| `lib/jido/plugin.ex:2-24` | One Plugin behavior combines admission, pure preparation, owned state, Directives, dispatch, and runtime work. |
+| `lib/jido/agent/plugin/preparation.ex` | Pure preparation receives the source Signal, Agent identity and module, and owned Plugin state. |
+| `lib/jido/agent/command.ex` | Live admission keeps package inputs separate from immutable Signal and caller context data. |
+| `lib/jido/plugin.ex` | One Plugin package selects owner-specific facets. The mixed behavior remains for compatibility. |
 | `lib/jido/plugin.ex:67-102` | Current callback contracts use `Jido.Agent.Command`, Plugin Init, and Directive and Signal contexts. |
 | `lib/jido/plugin.ex:190-205` | Live Plugin admission is serial in declaration order. |
 | `lib/jido/plugin.ex:238-265` | Executable writes to Plugin-owned Agent fields are rejected. Plugin runtime children use `Jido.Plugin.Init`. |
@@ -50,7 +51,7 @@ change runtime behavior.
 | `lib/jido/agent_server.ex:257-309` | Status is a map. Lookup uses Agent ID and partition and returns a PID. |
 | `lib/jido/agent_server.ex:381-389` | Snapshot is a map with the Agent and state version. |
 | `lib/jido/agent_server.ex:506-544` | Plugin runtimes become ready, then a new persistent activation confirms revision zero before startup reports success. |
-| `lib/jido/agent_server.ex:1285-1309` | Live admission runs before shared Runner preparation and can change the command Signal. |
+| `lib/jido/agent_server.ex` | Pure preparation and live admission run in one owned task before route selection. |
 | `lib/jido/agent_server.ex:1419-1545` | The Server uses Runner preparation and completion, persists first, installs the candidate, replies, and then starts Directives. |
 | `lib/jido/agent_server.ex:1582-1617` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
 | `lib/jido/agent_server.ex:1639-1756` | Directives are validated before commit and handled after commit. A Directive failure has its own terminal result. |
@@ -168,9 +169,10 @@ The current path is:
 
 ```text
 source Signal
+  -> pure Plugin preparation
   -> live Plugin admission, for live calls
   -> select the first route from the source Signal
-  -> build input from the admitted Signal data
+  -> build input from source Signal data
   -> run one Action or Flow through Jido.Exec
   -> protect Plugin-owned state
   -> validate Directives
@@ -178,12 +180,12 @@ source Signal
   -> validate one candidate Agent
 ```
 
-- Admission and preparation can change the Signal. Route selection uses the
-  changed Signal.
-- The Signal Router returns all targets in precedence order. Jido rejects zero
-  or multiple targets.
-- A preparation callback receives the complete Agent, Signal, and caller
-  context. All Plugins pass one command value through a serial chain.
+- Preparation can reject or return one portable package input. Admission can
+  reject or change only its own package input.
+- Plugins cannot change the Signal, Agent, caller context, route, or another
+  package's input.
+- The Signal Router returns targets in precedence order. Jido selects the first
+  target.
 - An Action or Flow returns the complete proposed state and can do synchronous
   external I/O. It cannot change a Plugin-owned state key.
 - Each stateful Plugin owns at most one state key. Its reducer receives only
@@ -287,7 +289,7 @@ table delegates them.
 
 | Conflict or pressure point | Recommended disposition | Requirement or owner |
 | --- | --- | --- |
-| Plugin preparation occurs before route selection. | Change to source-Signal selection before preparation. | `OVR-REQ-013` through `OVR-REQ-015`; seams 04 and 05 |
+| Plugin preparation occurs before route selection. | Keep this order, but prohibit Signal changes so routing always uses the source Signal. | `OVR-REQ-013` through `OVR-REQ-015`; seams 04 and 05 |
 | Current routing rejects multiple matches. | Select the first Router target by existing precedence. | `OVR-REQ-014`; seam 04 |
 | Plugins see the complete Agent and share prepared input. | Add declared Agent views and isolated Plugin-owned inputs. | `OVR-REQ-021`; seams 01, 04, and 05 |
 | Earlier text says nonpersistent restart resets to the initial Agent. | Remove that target. Keep last-commit runtime-checkpoint restore. | `OVR-REQ-044` and `OVR-REQ-045`; seams 08 through 10 |

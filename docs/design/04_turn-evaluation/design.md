@@ -10,6 +10,7 @@ The sequence is:
 
 ```text
 Agent A0 + source Signal S0
+  -> prepare package inputs from S0
   -> select one fixed Turn from S0
   -> build executable input
   -> call Jido.Exec once
@@ -20,17 +21,19 @@ Agent A0 + source Signal S0
 ```
 
 The default route path selects the first target returned by the Signal Router.
-Route defaults are merged with effective Signal data. Signal data has
-precedence. Live admission can change the effective Signal or caller context,
-but it cannot change the source Signal or the selected executable.
+Route defaults are merged with source Signal data. Signal data has precedence.
+Pure preparation and live admission can reject input. Pure preparation can add
+one portable input for each Plugin package. Live admission can change only its
+own package input. Neither phase can change the Agent, source Signal, or caller
+context.
 
 A custom `handle_signal/2` callback receives the source Signal. A valid Turn
 from that callback fixes its executable and input.
 
-Actions and Flows propose the complete candidate state and the complete
-Directive list. The Agent Plugin pipeline protects owned fields, validates
-Directives, and updates each owned field in declaration order. Agent Plugins
-do not take part before execution.
+Actions and Flows receive package inputs under `context.plugin_inputs`. They
+propose the complete candidate state and the complete Directive list. The
+Agent Plugin pipeline protects owned fields, validates Directives, and updates
+each owned field in declaration order.
 
 ## Requirements
 
@@ -42,8 +45,9 @@ Signal.
 `TURN-REQ-002`: The evaluator shall validate each Agent and Signal one time at
 its evaluation trust boundary before executable work starts.
 
-`TURN-REQ-003`: The evaluator shall process selection, input construction,
-execution, Plugin finalization, and candidate validation in that order.
+`TURN-REQ-003`: The evaluator shall process Plugin preparation, selection,
+input construction, execution, Plugin finalization, and candidate validation
+in that order.
 
 `TURN-REQ-004`: An Agent without Plugins shall use the same evaluation path.
 
@@ -57,7 +61,7 @@ execution, Plugin finalization, and candidate validation in that order.
 
 `TURN-REQ-009`: Selection shall keep route defaults fixed for the Turn.
 
-`TURN-REQ-010`: Route input shall be a shallow merge in which effective Signal
+`TURN-REQ-010`: Route input shall be a shallow merge in which source Signal
 data replaces route defaults.
 
 `TURN-REQ-011`: A custom `handle_signal/2` callback shall receive the source
@@ -67,6 +71,27 @@ Signal.
 
 `TURN-REQ-013`: An invalid custom callback result or fault shall return the
 defined callback error before executable work.
+
+`TURN-REQ-014`: Before selection, the evaluator shall call each declared Agent
+Plugin `prepare/2` callback in declaration order.
+
+`TURN-REQ-015`: Agent Plugin preparation shall receive the unchanged source
+Signal, Agent identity, Agent module, its owned state, and static options.
+
+`TURN-REQ-016`: Agent Plugin preparation shall return one input owned by its
+package or reject evaluation.
+
+`TURN-REQ-017`: The evaluator shall require each pure prepared input to be
+portable.
+
+`TURN-REQ-018`: Agent Plugin preparation shall not replace the Agent, source
+Signal, caller context, route, or another package's input.
+
+`TURN-REQ-019`: Live Agent Server admission shall replace only its own package
+input or reject evaluation.
+
+`TURN-REQ-020`: The evaluator shall expose prepared inputs to the executable
+under the reserved `context.plugin_inputs` key.
 
 ### Execution and candidate assembly
 
@@ -125,7 +150,7 @@ their owner wrapper as defined errors.
 contract for the same executable result.
 
 `TURN-REQ-041`: Live admission, limits, timeouts, persistence, and dispatch
-shall stay outside this candidate contract.
+shall stay outside direct evaluation and candidate finalization.
 
 `TURN-REQ-042`: The evaluator shall own no process, timer, persistence,
 commit, dispatch, or cancellation operation.
@@ -134,9 +159,6 @@ commit, dispatch, or cancellation operation.
 an executable already completed.
 
 `TURN-REQ-044`: A prepared Turn shall contain the unchanged source Signal.
-
-Requirements `TURN-REQ-014` through `TURN-REQ-020` are retired. They specified
-the removed Agent Plugin preparation phase.
 
 ## Public contract
 
@@ -149,6 +171,8 @@ implementation details.
 ## Invariants
 
 - One source Signal selects at most one executable for one Turn.
+- A Plugin cannot change the incoming Signal or caller context.
+- Each Plugin can prepare or admit only its package-owned input.
 - An executable cannot write Plugin-owned state.
 - A Plugin cannot write domain state or another Plugin's state.
 - Direct and live candidate production use one finalization contract.

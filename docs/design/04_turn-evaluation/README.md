@@ -9,6 +9,8 @@ validates one candidate Agent.
 
 ```text
 source Signal
+  -> pure Plugin preparation
+  -> live Plugin admission (Server only)
   -> fixed Turn selection
   -> executable input
   -> Jido.Exec
@@ -18,9 +20,10 @@ source Signal
   -> validate candidate Agent
 ```
 
-Agent Plugins do not prepare input or change the Signal or caller context.
-Live Agent Server Plugins can admit a Command before Runner execution. The
-Runner still selects the executable from the unchanged source Signal.
+Agent Plugins can reject or return one portable package-owned input. Live Agent
+Server Plugins can reject or change only their own package input. No Plugin can
+change the Signal, caller context, Agent, route, or another package's input.
+The Runner selects the executable from the unchanged source Signal.
 
 ## Boundary
 

@@ -16,7 +16,7 @@ or removed V3 API.
 | --- | --- | --- |
 | Four Plugin facets | Added | Use `Jido.Agent.Plugin`, `Jido.AgentServer.Plugin`, `Jido.Persistence.Plugin`, and `Jido.Topology.Plugin`. One `Jido.Plugin` package composes them. |
 | Agent Ref and instance facade | Added | Ref-first functions exist beside supported ID, PID, name, and partition functions. |
-| Turn routing | Changed from an earlier beta | The first target in Router order wins. Selection uses the unchanged source Signal before Plugin preparation. |
+| Turn routing | Changed from an earlier beta | Pure Plugin preparation runs first but cannot change the Signal. The first target for the unchanged source Signal wins. |
 | Durable records | Added and versioned | Compatible unnamed keys use outer format 2. Namespaced Ref keys use outer format 3. Supported V3 outer format-1 active records remain readable. |
 | Agent Server activation | Strengthened | Initial durable creation completes before public readiness. A required write error removes write authority and stops the activation. |
 | Agent Server upgrade | Added | `upgrade/2` and `upgrade/3` serialize a zero-arity operation at idle. Definition replacement validates complete migrated state, preserves identity and Plugin declarations, and advances one checkpoint revision. |

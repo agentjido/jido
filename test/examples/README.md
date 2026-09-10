@@ -1,7 +1,8 @@
 # Example tests
 
 Runnable source lives in the root [example catalog](../../examples/README.md).
-Test folders follow that catalog, including [application examples](08_applications).
+Test folders follow that catalog, including [application examples](08_applications)
+and [Plugin examples](09_plugins).
 Every test uses `:example`, directly or through a shared case template. Do not
 add a separate integration tag or a second copy of an existing assertion.
 
