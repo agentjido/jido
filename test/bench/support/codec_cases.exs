@@ -1,6 +1,6 @@
 defmodule JidoCoreBench.CodecCases do
   @moduledoc false
-  alias Jido.Agent.Codec.Data
+  alias Jido.Codec.Data
   alias JidoCoreBench.Fixtures, as: F
 
   def workloads do

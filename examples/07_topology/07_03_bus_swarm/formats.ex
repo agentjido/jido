@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Topology.Formats do
   @moduledoc "Builder and JSON forms of the Swarm DSL, using stable application Registry IDs."
-  alias Jido.Agent.Codec.Registry
+  alias Jido.Codec.Registry
   alias Jido.Examples.Topology.{Cell, Swarm}
   alias Jido.Topology.{Builder, Codec, Reference}
 
@@ -13,8 +13,8 @@ defmodule Jido.Examples.Topology.Formats do
     |> Builder.group(:workers, Cell, count: Reference.input(:worker_count))
     |> Builder.bus(:work)
     |> Builder.owns(:coordinator, :workers)
-    |> Builder.subscribe(:workers, to: :work, path: "topology.work")
-    |> Builder.startup(concurrency: 32, ready: :all)
+    |> Builder.subscribe(:workers, to: :work, path: "examples.topology.cell.work")
+    |> Builder.startup(concurrency: 32)
   end
 
   @doc "Returns the stable Registry required by the example JSON document."
@@ -35,7 +35,7 @@ defmodule Jido.Examples.Topology.Formats do
 
   @doc "Loads the checked-in JSON example through the stable Registry."
   def from_file do
-    document = __DIR__ |> Path.join("swarm.json") |> File.read!() |> JSON.decode!()
+    document = __DIR__ |> Path.join("fixtures/swarm.json") |> File.read!() |> JSON.decode!()
     Codec.decode(document, registry())
   end
 end

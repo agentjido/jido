@@ -1,60 +1,3 @@
-defmodule Jido.Examples.ProgressObservation.Buffer do
-  @moduledoc """
-  A bounded, demand-read progress buffer for one producer.
-  ETS slots replace old events. Consumers have no pushed message queue.
-  Loss of the buffer does not fail the producer. Terminal state belongs to
-  the Agent and can be queried after the buffer is lost.
-  """
-  use GenServer
-  def start_link(capacity), do: GenServer.start_link(__MODULE__, capacity)
-  def table(pid), do: GenServer.call(pid, :table)
-
-  @impl true
-  def init(capacity) when is_integer(capacity) and capacity > 0 do
-    table = :ets.new(__MODULE__, [:set, :public])
-    :ets.insert(table, [{:sequence, 0}, {:capacity, capacity}])
-    {:ok, table}
-  end
-
-  @impl true
-  def handle_call(:table, _, table), do: {:reply, table, table}
-
-  def publish(table, progress) do
-    capacity = :ets.lookup_element(table, :capacity, 2)
-    sequence = :ets.update_counter(table, :sequence, 1)
-    :ets.insert(table, {rem(sequence, capacity), sequence, progress})
-    :ok
-  rescue
-    ArgumentError -> :ok
-  end
-
-  def read(table, cursor) do
-    events =
-      for {slot, sequence, value} <- :ets.tab2list(table), is_integer(slot), sequence > cursor do
-        {sequence, value}
-      end
-      |> Enum.sort()
-
-    missed =
-      case events do
-        [{first, _} | _] -> max(first - cursor - 1, 0)
-        [] -> 0
-      end
-
-    %{
-      events: events,
-      missed: missed,
-      cursor:
-        case List.last(events) do
-          nil -> cursor
-          {last, _} -> last
-        end
-    }
-  rescue
-    ArgumentError -> %{events: [], missed: :buffer_lost, cursor: cursor}
-  end
-end
-
 defmodule Jido.Examples.ProgressObservation do
   @moduledoc "Application progress and explicit waiting reasons through public Agent commands."
   use Jido.Agent, name: "research_progress_observation"
@@ -69,11 +12,10 @@ defmodule Jido.Examples.ProgressObservation do
   end
 
   routes do
-    signal_source "/examples/progress"
+    signal_source "/examples/research/progress_observation"
 
-    route "progress.wait" do
+    route "examples.research.progress_observation.wait" do
       action %{reason: reason},
-        name: "research_wait",
         schema: Zoi.object(%{reason: Zoi.enum([:approval, :child, :retry, :delivery])}),
         context: context do
         {:ok, %{context.agent_state | waiting: reason, status: :waiting}}
@@ -82,19 +24,18 @@ defmodule Jido.Examples.ProgressObservation do
       define :wait_for, args: [:reason]
     end
 
-    route "progress.work" do
-      action _input, name: "research_progress_work", schema: Zoi.object(%{}), context: context do
-        for step <- 1..10, do: context.report.(%{step: step, total: 10})
-        context.barrier.()
+    route "examples.research.progress_observation.work" do
+      action _input, schema: Zoi.object(%{}), context: context do
+        table = Map.fetch!(context, :progress_table)
+        for step <- 1..10, do: __MODULE__.Buffer.publish(table, %{step: step, total: 10})
         {:ok, %{context.agent_state | waiting: :none, status: :completed, result: "report"}}
       end
 
       define :work
     end
 
-    route "progress.cancel" do
+    route "examples.research.progress_observation.cancel" do
       action _input,
-        name: "research_progress_cancel",
         schema: Zoi.object(%{}),
         context: context do
         {:ok, %{context.agent_state | waiting: :none, status: :cancelled}}

@@ -5,7 +5,7 @@ is callback-free. It selects no more than one facet for each Jido owner:
 
 | Facet | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Pure input preparation, Plugin-owned state, and Directive validation |
+| `Jido.Agent.Plugin` | Pure input preparation, Plugin-owned state, and state reduction |
 | `Jido.AgentServer.Plugin` | Live admission, runtime, readiness, outbound preparation, and post-commit dispatch |
 | `Jido.Persistence.Plugin` | Pure dump and load of one paired owned-state value |
 | `Jido.Topology.Plugin` | Pure static Topology contribution |
@@ -43,22 +43,24 @@ The Agent facet can implement these callbacks:
 | `prepare/2` | Reject input or return one portable package-owned execution input |
 | `state_spec/1` | Define one owned state key and static schema |
 | `directives/1` | Declare owned Directive modules |
-| `validate_directive/2` | Validate one owned Directive before candidate return |
-| `update_state/3` | Update the owned state value from owned Directives |
+| `reduce/2` | Compute the next owned state value after executable success |
 
 `prepare/2` runs in package declaration order before route selection. It
 receives `%Jido.Agent.Plugin.Preparation{}` with the unchanged source Signal,
-Agent identity, Agent module, and the Plugin's owned state. It also receives
-the facet's static options. It can return `{:ok, input}` or `{:error, reason}`.
-The input must be portable. Jido stores it at
-`context.plugin_inputs[PackageModule]`. The callback cannot replace the Signal,
-caller context, route, or Agent state.
+Agent identity, Agent module, the complete current Agent state, and the
+Plugin's owned state. It also receives the facet's static options. It can
+return `{:ok, input}` or `{:error, reason}`. The input must be portable. Jido
+stores it at `context.plugin_inputs[PackageModule].prepared`. The callback
+cannot replace the Signal, caller context, route, or Agent state.
 
 An Action or Flow returns the complete candidate state and its Directives. It
-must preserve all Plugin-owned fields. Jido validates each Directive, gives
-each Agent facet only its owned Directives, and calls `update_state/3` in
-package declaration order. The callback receives only the current owned value.
-Jido validates the returned value with the owned schema.
+must preserve all Plugin-owned fields. Each custom Directive validates itself
+through `Jido.Agent.Directive.validate/1`. Jido validates each Directive once,
+then calls `reduce/2` in package declaration order. The callback receives a
+read-only `%Jido.Agent.Plugin.Reduction{}` with the prior complete state, the
+current complete candidate state, its owned value, its pure prepared input,
+and all validated Directives. It returns only the next value for its owned
+field. Jido validates that value with the owned schema and portable-value rule.
 
 ## Agent Server Facet
 
@@ -68,11 +70,15 @@ The Agent Server facet can implement `admit/3`, `prepare_dispatch/4`,
 use `restart: :permanent`.
 
 Admission runs in declaration order after pure preparation and before Turn
-evaluation. `admit/3` can reject the command or replace only its own value at
-`command.plugin_inputs[PackageModule]`. It cannot change the Agent, incoming
-Signal, caller context, or another package's input. A live input can contain a
-runtime value, such as a PID or function, because it is not stored in Agent
-state or a checkpoint.
+evaluation. `admit/3` receives a read-only
+`%Jido.AgentServer.Plugin.Admission{}`. It can inspect the Signal, caller
+context, complete Agent identity, its owned state, its pure prepared input,
+and the current state version. It returns `{:ok, runtime_input}` or rejects
+the command. Jido stores a successful value at
+`context.plugin_inputs[PackageModule].runtime`. There is no callback return
+path that can replace the Agent, incoming Signal, caller context, prepared
+input, or another package's input. A runtime input can contain a PID,
+reference, or function because it is not stored in Agent state or a checkpoint.
 
 Direct `Jido.Agent.cmd/3` runs pure preparation but does not run live
 admission. Outbound Signal preparation runs in reverse declaration order.
@@ -105,13 +111,20 @@ complete Agent, or commit result. Dump output must be portable. Load output
 must also match the Agent facet's state schema.
 
 The Topology facet implements `contribute/2`. It can return current canonical
-Bus resources, ownership relationships, and Bus subscriptions. It cannot start
+Bus resources, ownership relationships, and Bus subscriptions. Bus is the
+first core resource type. The facet cannot start
 a process, persist data, or control live activation. Jido calls the facet while
 it builds an instance Plan. It processes Agent declarations, then group
 declarations, in source order and keeps Plugin declaration order. Included
 Topologies receive the same expansion in their own scope. Common Topology
 validation checks the complete graph before Controller activation. The source
 definition stays unchanged.
+
+Live placement policy uses a different boundary. A control Agent can receive
+Topology lifecycle Signals, select an exact node, and return a Plugin-owned
+Directive. The Agent Server facet can apply that Directive through
+`Jido.Topology.Controller.place_agent/4` after commit. Static contribution does
+not gain live authority.
 
 See [Plugin Runtimes](plugin-runtimes.livemd) and
 [Plugin-Owned State](plugin-state.md).

@@ -15,15 +15,16 @@ source Signal
   -> executable input
   -> Jido.Exec
   -> protect Plugin-owned fields
-  -> validate Directives
-  -> update Plugin-owned fields
+  -> validate each Directive once
+  -> reduce Plugin-owned fields
   -> validate candidate Agent
 ```
 
-Agent Plugins can reject or return one portable package-owned input. Live Agent
-Server Plugins can reject or change only their own package input. No Plugin can
-change the Signal, caller context, Agent, route, or another package's input.
-The Runner selects the executable from the unchanged source Signal.
+Agent Plugins can reject or return one portable package-owned prepared input.
+Live Agent Server Plugins can reject or return only their own transient runtime
+input. No Plugin can change the Signal, caller context, Agent, route, prepared
+input, or another package's input. The Runner selects the executable from the
+unchanged source Signal.
 
 ## Boundary
 

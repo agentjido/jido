@@ -31,10 +31,15 @@ package-keyed `plugin_inputs` map. Direct `Jido.Agent.cmd/3` evaluation does not
 create this envelope.
 
 Before route selection, a pure Agent Plugin can reject the command or return
-one portable value under its package key. A live Agent Server Plugin can reject
-the command or replace only its own package value. Neither callback can change
-the Signal, caller context, selected executable, Agent, or another package's
-input. Jido then selects one Turn from the unchanged Signal.
+one portable value in its package `prepared` slot. A live Agent Server Plugin
+receives a read-only admission value. It can reject the command or return one
+transient value for its package `runtime` slot. Neither callback can change the
+Signal, caller context, selected executable, Agent, prepared input, or another
+package's input. Jido then selects one Turn from the unchanged Signal.
+
+An Action or Flow reads these separate values as
+`context.plugin_inputs[Package].prepared` and
+`context.plugin_inputs[Package].runtime`.
 
 The live Server adds these reserved context keys for execution:
 

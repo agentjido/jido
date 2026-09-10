@@ -6,18 +6,17 @@ defmodule Jido.Telemetry.Agent do
   alias Jido.Tracing.Trace
 
   def identity(data) do
-    namespace = safe_namespace(data.jido)
-
     %{
-      agent_namespace: namespace,
+      agent_namespace: data.agent_namespace,
       agent_partition: if(is_binary(data.partition), do: data.partition),
       agent_id: data.agent.id,
       agent_module: data.agent.module,
       activation_id: data.activation_id,
-      jido_instance: data.jido,
-      partition: data.partition
+      jido_instance: data.jido
     }
   end
+
+  def namespace(jido), do: safe_namespace(jido)
 
   def lifecycle_metadata(data) do
     cause = if data.parent, do: data.parent.creation_cause
@@ -27,12 +26,11 @@ defmodule Jido.Telemetry.Agent do
   def turn_metadata(data) do
     active = data.active
     signal = active.effective_signal || active.source_signal
-    trace = Trace.get(signal) || active.span[:metadata] || %{}
+
+    trace = active.span[:trace] || Trace.get(signal) || %{}
 
     identity(data)
-    |> Map.merge(
-      Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id, :sampled?])
-    )
+    |> Map.merge(Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id]))
     |> Map.merge(%{
       cause_turn_id: Jido.Signal.get_context(signal, "jidocauseturnid"),
       child_activation_id: Jido.Signal.get_context(signal, "jidochildactivation"),
@@ -49,9 +47,7 @@ defmodule Jido.Telemetry.Agent do
     metadata =
       data
       |> identity()
-      |> Map.merge(
-        Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id, :sampled?])
-      )
+      |> Map.merge(Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id]))
       |> Map.merge(%{
         source_signal_id: signal.id,
         signal_id: signal.id,

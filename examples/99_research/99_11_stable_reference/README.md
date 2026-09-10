@@ -1,34 +1,37 @@
-# FA-03: Stable Agent references and durable namespace identity
+# 99_11 Stable Reference
 
-Status: **Implemented and executable**.
+Status: implemented addressing contract; awaiting a stable runtime lesson.
 
-Result on 2026-09-10: **3 passing acceptance checks.**
+A `Jido.Agent.Ref` keeps durable identity while processes and local Jido
+instances are replaced.
 
-## Feature and proof
+## What this proves
 
-A `Jido.Agent.Ref` survives persistent process replacement. Equal IDs in
-separate namespaces remain isolated. Rebinding the same namespace to a new
-local Jido instance restores the same durable identity.
+- One Ref resolves the current live process after persistent replacement.
+- Equal Agent IDs remain isolated by their Jido namespace.
 
-## Required change
+## Read the code
 
-The Ref is used in live addressing and namespaced persistence without a saved
-PID.
+Read [the conversation Agent and Ref client](stable_reference.ex).
 
-## Scope
-
-`Jido.Agent.Ref` owns the identity value. The Jido instance owns exact local
-namespace binding and Ref resolution. Persistence owns the Ref-derived key.
-Storage uses the controlled in-memory byte adapter.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_11_stable_reference --include example --seed 0
 ```
 
-This is a secondary acceptance check for the public Ref-first contract.
+Expected result: calls reach the correct conversation before and after process
+replacement and namespace rebinding.
 
-[Source](stable_reference.ex) · [Tests](../../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)
+## Gap and limits
+
+The public contract exists. Promote it when the runtime learning path has a
+clear Ref-first addressing lesson. The controlled persistence adapter is local
+and in memory.
+
+## Files
+
+- [Source](stable_reference.ex)
+- [Tests](../../../test/examples/99_research/99_11_stable_reference/stable_reference_test.exs)
+
+Previous: [Plugin Isolation](../99_10_plugin_isolation/README.md) | Next: [Definition Revision](../99_12_definition_revision/README.md)

@@ -17,7 +17,9 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
     }
 
     use Spark.Dsl.Extension,
-      sections: [%Spark.Dsl.Section{name: :roles, entities: [@role]}]
+      dsl_patches: [
+        %Spark.Dsl.Patch.AddEntity{section_path: [:topology, :agents], entity: @role}
+      ]
 
     @behaviour Jido.Topology.Extension
 
@@ -36,7 +38,21 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
   end
 
   defmodule Unclaimed do
-    use Spark.Dsl.Extension, sections: Roles.sections()
+    @role %Spark.Dsl.Entity{
+      name: :role,
+      target: Role,
+      args: [:key, :module],
+      schema: [
+        key: [type: :atom, required: true],
+        module: [type: :atom, required: true]
+      ]
+    }
+
+    use Spark.Dsl.Extension,
+      dsl_patches: [
+        %Spark.Dsl.Patch.AddEntity{section_path: [:topology, :agents], entity: @role}
+      ]
+
     def lower_topology(config, entities), do: {:ok, config, entities}
   end
 
@@ -53,7 +69,7 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
 
     use Spark.Dsl.Extension,
       dsl_patches: [
-        %Spark.Dsl.Patch.AddEntity{section_path: [:agents], entity: @role}
+        %Spark.Dsl.Patch.AddEntity{section_path: [:topology, :agents], entity: @role}
       ]
 
     defdelegate lower_topology(config, entities), to: Roles
@@ -71,7 +87,9 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
     }
 
     use Spark.Dsl.Extension,
-      sections: [%Spark.Dsl.Section{name: :core_struct_roles, entities: [@role]}]
+      dsl_patches: [
+        %Spark.Dsl.Patch.AddEntity{section_path: [:topology, :agents], entity: @role}
+      ]
 
     def lower_topology(config, entities) do
       {roles, rest} =
@@ -134,16 +152,18 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
         defmodule unquote(module) do
           use Jido.Topology, name: "extended_topology", extensions: [Roles]
 
-          roles do
-            role(:operator, Jido.Examples.Topology.Cell)
-          end
+          topology do
+            agents do
+              role(:operator, Jido.Examples.Topology.Cell)
+            end
 
-          resources do
-            bus :events
-          end
+            resources do
+              bus :events
+            end
 
-          connections do
-            subscribe :operator, to: :events, path: "htn.**"
+            connections do
+              subscribe :operator, to: :events, path: "htn.**"
+            end
           end
         end
       end
@@ -167,9 +187,11 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
         defmodule unquote(module) do
           use Jido.Topology, name: "patched_topology", extensions: [PatchedRoles]
 
-          agents do
-            agent(:base, Jido.Examples.Topology.Cell)
-            role(:operator, Jido.Examples.Topology.Cell)
+          topology do
+            agents do
+              agent(:base, Jido.Examples.Topology.Cell)
+              role(:operator, Jido.Examples.Topology.Cell)
+            end
           end
         end
       end
@@ -190,8 +212,10 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
         defmodule unquote(module) do
           use Jido.Topology, name: "core_struct_topology", extensions: [CoreStructRoles]
 
-          core_struct_roles do
-            core_struct_role(:operator, Jido.Examples.Topology.Cell)
+          topology do
+            agents do
+              core_struct_role(:operator, Jido.Examples.Topology.Cell)
+            end
           end
         end
       end
@@ -210,8 +234,10 @@ defmodule JidoTest.Topology.AuthoringExtensionTest do
           defmodule unquote(module) do
             use Jido.Topology, name: "unclaimed", extensions: [Unclaimed]
 
-            roles do
-              role(:operator, Jido.Examples.Topology.Cell)
+            topology do
+              agents do
+                role(:operator, Jido.Examples.Topology.Cell)
+              end
             end
           end
         end

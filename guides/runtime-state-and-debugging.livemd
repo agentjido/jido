@@ -1,7 +1,14 @@
 # Runtime State and Debugging
 
-This Livebook uses only public inspection APIs. It does not read private Agent
-Server state.
+This Livebook uses only public APIs. It shows three different views of one live
+Agent:
+
+- The committed Agent value and revision.
+- The current Agent Server phase and runtime status.
+- A bounded, in-memory history of recent runtime decisions.
+
+The Agent debug buffer is separate from semantic logging. The buffer and
+semantic events do not contain full Signals, Agent state copies, or raw errors.
 
 ## Install Jido
 
@@ -11,7 +18,7 @@ Mix.install([
 ])
 ```
 
-## Define And Start An Agent
+## Define and start an Agent
 
 ```elixir
 defmodule DebugGuide.Counter do
@@ -48,58 +55,139 @@ end
   )
 ```
 
-## Run A Turn
+`debug: true` enables the event buffer for this Agent. `debug_max_events` must
+be a positive integer. Its default is 500.
+
+## Run a Turn
 
 ```elixir
 {:ok, committed} = DebugGuide.Counter.add(counter, 2)
 committed.state
 ```
 
-## Read Public Views
+## Read the public views
 
 ```elixir
 agent = Jido.AgentServer.agent(counter)
-status = Jido.AgentServer.status(counter)
 snapshot = Jido.AgentServer.snapshot(counter)
+status = Jido.AgentServer.status(counter)
 children = Jido.AgentServer.children(counter)
 
 %{
   agent: agent,
-  status: status,
   snapshot: snapshot,
+  status: status,
   children: children
 }
 ```
 
-The snapshot contains portable Agent data and the commit revision. Status is a
-narrow runtime view. Child information is for live ownership and can contain
-process-local values.
+Use each view for one purpose:
 
-## Read Recent Events
+| Function | Result |
+| --- | --- |
+| `agent/1` | The current committed `Jido.Agent` value |
+| `snapshot/1` | `%{agent: agent, state_version: revision}` |
+| `status/1` | A narrow view of current runtime work |
+| `children/1` | Current Agent and Plugin child ownership |
+| `plugin_state/2` | One declared Plugin-owned field from the Agent state map |
+
+The snapshot is a live runtime value. It is not a Codec document or a durable
+checkpoint.
+
+The status contains these top-level fields:
+
+- `phase`: `:initializing`, `:idle`, `:admitting`, `:running`, or `:directing`.
+- `agent_id` and `state_version`.
+- `admission`: postponed work, its limit, and mailbox size.
+- `runtime`: partition, parent, child, error, and idle-lifecycle information.
+- `active`: the current Turn identity and revision information, or `nil`.
+
+Do not read private `:gen_statem` data. Its shape is not a public contract.
+
+## Read recent events
 
 ```elixir
 {:ok, events} = Jido.AgentServer.recent_events(counter, limit: 10)
-Enum.map(events, &Map.take(&1, [:event, :stage, :status]))
+
+Enum.map(events, fn entry ->
+  outcome = entry.metadata[:outcome] || %{}
+
+  %{
+    event: entry.event,
+    at: entry.at,
+    status: outcome[:status],
+    stage: outcome[:stage],
+    committed?: outcome[:committed?]
+  }
+end)
 ```
 
-The event buffer is bounded and newest-first. It is for diagnosis, not durable
-audit history.
+Events are newest-first. The buffer can contain:
 
-## Toggle Debug Mode
+- `:turn_committed` after a new revision becomes live.
+- `:turn_completed` after a successful Turn settles.
+- `:turn_failed` after a failed, cancelled, timed-out, or indeterminate Turn.
+- `:directive_failed` after one post-commit Directive fails.
+- `:error_signal_delivery_failed` when error-policy Signal delivery fails.
+
+A terminal Turn entry contains a bounded outcome map. It includes Turn, Agent,
+and Signal IDs, status, stage, commit state, revisions, Directive counts,
+timing, and a safe error projection when applicable. It does not contain the
+complete `Jido.Agent.Turn.Outcome`, full Signals, or Agent state.
+
+The debug outcome uses the runtime Outcome vocabulary. Its statuses are
+`:succeeded`, `:failed`, `:cancelled`, `:timed_out`, and `:indeterminate`. Its
+stages can include `:prepare`, `:execute`, `:finalize`, `:commit`, and
+`:directive`. Semantic Telemetry maps these values to its smaller public status
+and stage vocabulary.
+
+The event buffer is for a short investigation. It is not durable, and it is not
+an audit record. A restart starts a new buffer.
+
+## Enable and disable the Agent buffer
+
+You can enable the buffer after the Agent starts:
 
 ```elixir
 :ok = Jido.AgentServer.set_debug(counter, false)
+{:error, :debug_not_enabled} = Jido.AgentServer.recent_events(counter)
+
 :ok = Jido.AgentServer.set_debug(counter, true)
+{:ok, _committed} = DebugGuide.Counter.add(counter, 3)
+{:ok, new_events} = Jido.AgentServer.recent_events(counter)
 ```
 
-Use instance debug controls for shared logging and redaction settings. Keep
-full payload logging off unless the data policy permits it.
+Disabling the buffer clears it. Enabling it does not add events for work that
+already finished.
 
-## Stop The Example
+For a stable Agent Ref, use the generated instance functions
+`MyApp.Jido.set_agent_debug/3` and `MyApp.Jido.recent_events/3`. These functions
+resolve the current local Agent activation before they call the same buffer
+API.
+
+## Change semantic log detail
+
+Instance debug mode controls the semantic logger. It does not control the Agent
+event buffer.
+
+```elixir
+:ok = Jido.debug(:on)
+:on = Jido.debug()
+
+:ok = Jido.debug(:verbose)
+:ok = Jido.debug(:off)
+```
+
+`:on` selects `:interesting` semantic logs for the instance. `:verbose` selects
+`:all`. `:off` removes the instance override and uses the global semantic log
+configuration. All modes keep the same metadata filtering.
+
+## Stop the example
 
 ```elixir
 :ok = Jido.stop_agent(counter)
 :ok = Jido.stop()
 ```
 
-Continue with [Observe Agent Turns](observe-agent-turns.livemd).
+Continue with [Observe Agent Turns](observe-agent-turns.html), and then read
+[Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html).

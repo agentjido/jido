@@ -1,10 +1,5 @@
 defmodule Jido.Tracing.Context do
-  @moduledoc """
-  Process-level trace context management for signal tracing.
-
-  Stores trace context in the process dictionary and provides functions
-  for propagating trace information across signal processing boundaries.
-  """
+  @moduledoc false
 
   alias Jido.Signal
   alias Jido.Telemetry.OpenTelemetry
@@ -22,55 +17,42 @@ defmodule Jido.Tracing.Context do
     @type t :: %__MODULE__{trace: map() | nil, otel_context: term() | nil}
   end
 
-  @doc """
-  Ensures trace context exists from a signal.
+  @doc false
+  @spec begin_turn(Signal.t()) :: map()
+  def begin_turn(%Signal{} = signal) do
+    restore_open_telemetry_context()
 
-  If the signal has trace data, stores it in the process dictionary.
-  If not, creates a new root trace and stores it.
+    trace =
+      case Trace.get(signal) do
+        nil ->
+          Trace.new_root()
 
-  Returns `{traced_signal, trace_context}` where traced_signal has trace data attached.
-  """
-  @spec ensure_from_signal(Signal.t()) :: {Signal.t(), map()}
-  def ensure_from_signal(%Signal{} = signal) do
-    case Trace.get(signal) do
-      nil ->
-        trace = Trace.new_root()
-        Process.put(@context_key, trace)
-        replace_open_telemetry_context(trace)
+        parent ->
+          attach_open_telemetry_parent(parent)
 
-        case Trace.put(signal, trace) do
-          {:ok, traced_signal} -> {traced_signal, trace}
-          {:error, _} -> {signal, trace}
-        end
+          case Trace.child_of(parent, Map.get(parent, :causation_id)) do
+            {:error, :invalid_trace_context} -> Trace.new_root()
+            child -> child
+          end
+      end
 
-      trace ->
-        Process.put(@context_key, trace)
-        replace_open_telemetry_context(trace)
-        {signal, trace}
-    end
+    put(trace)
+    trace
   end
 
-  @doc """
-  Sets trace context from a signal's existing trace data.
-
-  Returns `:ok` if trace data was found and stored, `{:error, :no_trace}` otherwise.
-  """
-  @spec set_from_signal(Signal.t()) :: :ok | {:error, :no_trace}
-  def set_from_signal(%Signal{} = signal) do
-    case Trace.get(signal) do
-      nil ->
-        {:error, :no_trace}
-
-      trace ->
-        Process.put(@context_key, trace)
-        replace_open_telemetry_context(trace)
-        :ok
-    end
+  @doc false
+  @spec put(map() | nil) :: :ok
+  def put(nil) do
+    Process.delete(@context_key)
+    :ok
   end
 
-  @doc """
-  Clears the trace context from the process dictionary.
-  """
+  def put(trace) when is_map(trace) do
+    Process.put(@context_key, trace)
+    :ok
+  end
+
+  @doc false
   @spec clear() :: :ok
   def clear do
     Process.delete(@context_key)
@@ -78,13 +60,9 @@ defmodule Jido.Tracing.Context do
     :ok
   end
 
-  @doc """
-  Gets the current trace context, or nil if not set.
-  """
+  @doc false
   @spec get() :: map() | nil
-  def get do
-    Process.get(@context_key)
-  end
+  def get, do: Process.get(@context_key)
 
   @doc false
   @spec capture() :: Captured.t()
@@ -103,78 +81,31 @@ defmodule Jido.Tracing.Context do
     with_contexts(context, OpenTelemetry.context_from_trace(context), fun)
   end
 
-  defp with_contexts(context, otel_context, fun) do
-    previous = get()
-
-    if context, do: Process.put(@context_key, context), else: Process.delete(@context_key)
-
-    try do
-      OpenTelemetry.with_context(otel_context, fun)
-    after
-      if previous,
-        do: Process.put(@context_key, previous),
-        else: Process.delete(@context_key)
-    end
-  end
-
-  @doc """
-  Propagates trace context to a new signal.
-
-  Creates a child span with:
-  - Same trace_id as current context
-  - New span_id for the child signal
-  - parent_span_id set to current span_id
-  - causation_id set to the provided causation_id (typically input_signal.id)
-
-  Returns `{:ok, traced_signal}` on success.
-
-  Returns `{:error, :no_trace_context}` when the process has no trace,
-  `{:error, :invalid_trace_context}` when the stored trace is malformed, or
-  `{:error, :invalid_args}` when the signal or causation ID is invalid.
-  """
+  @doc false
   @spec propagate_to(Signal.t(), String.t()) ::
           {:ok, Signal.t()}
           | {:error, :no_trace_context | :invalid_trace_context | :invalid_args}
   def propagate_to(%Signal{} = signal, causation_id) when is_binary(causation_id) do
     case get() do
-      nil ->
-        {:error, :no_trace_context}
-
-      trace ->
-        case Trace.child_of(trace, causation_id) do
-          {:error, :invalid_trace_context} = error -> error
-          child -> Trace.put(signal, OpenTelemetry.inject_trace_context(child))
-        end
+      nil -> {:error, :no_trace_context}
+      trace -> Trace.put(signal, Map.put(trace, :causation_id, causation_id))
     end
   end
 
-  def propagate_to(_signal, _causation_id) do
-    {:error, :invalid_args}
-  end
+  def propagate_to(_signal, _causation_id), do: {:error, :invalid_args}
 
-  @doc """
-  Returns the current trace context as telemetry metadata.
+  defp with_contexts(context, otel_context, fun) do
+    previous = get()
+    put(context)
 
-  Returns an empty map if no context is set.
-  Keys are prefixed with `jido_` for telemetry namespace.
-  """
-  @spec to_telemetry_metadata() :: map()
-  def to_telemetry_metadata do
-    case get() do
-      nil ->
-        %{}
-
-      trace ->
-        trace
-        |> Trace.telemetry_context()
-        |> Enum.map(fn {k, v} -> {:"jido_#{k}", v} end)
-        |> Map.new()
+    try do
+      OpenTelemetry.with_context(otel_context, fun)
+    after
+      put(previous)
     end
   end
 
-  defp replace_open_telemetry_context(trace) do
-    restore_open_telemetry_context()
-
+  defp attach_open_telemetry_parent(trace) do
     case OpenTelemetry.restore_trace_context(trace) do
       nil -> :ok
       restore_context -> Process.put(@otel_restore_key, restore_context)

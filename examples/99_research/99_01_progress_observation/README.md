@@ -1,29 +1,38 @@
-# FA-07: Progress observation with recovery
+# 99_01 Progress Observation
 
-Status: **Works as an application extension**.
+Status: application extension; not a Jido progress API.
 
-Result on 2026-09-05: **5 passing checks; 0 failing acceptance checks.** All checks are enabled.
+A bounded temporary buffer exposes live progress while terminal state remains
+owned by the Agent.
 
-## Feature and proof
+## What this proves
 
-Waiting reasons are queryable. Ten live progress updates retain only three events, while committed state stays unchanged. Observer loss does not fail work. Cancellation stops active evaluation. A terminal result survives Agent persistence and observer replacement.
+- Progress retention is bounded and observer loss does not fail work.
+- Waiting reasons and terminal results remain queryable through public APIs.
 
-## Required change
+## Read the code
 
-No core feature is required for this proof. Keep application progress and bounded retention outside AgentServer.
+Read [the Agent](progress_observation.ex), then [the progress buffer](buffer.ex).
+The active-Turn barrier exists only in test support.
 
-## Scope
-
-The buffer has one producer and demand-based reads. It sends no queue of notifications to slow consumers. Agent state stores terminal results; it does not persist transient progress. Persistence recovery uses an in-memory test adapter, not a fresh VM or database.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_01_progress_observation --include example --seed 0
 ```
 
-This command passes with the current core. The extension policy is part of the example.
+Expected result: progress stays bounded, cancellation preserves committed state,
+and a terminal result survives Agent and observer replacement.
 
-[Source](progress_observation.ex) · [Tests](../../../test/examples/99_research/99_01_progress_observation/progress_observation_test.exs)
+## Gap and limits
+
+Jido has no first-class progress stream contract. This local ETS buffer has one
+producer, is not durable, and does not push notifications to consumers.
+
+## Files
+
+- [Agent](progress_observation.ex)
+- [Buffer](buffer.ex)
+- [Tests](../../../test/examples/99_research/99_01_progress_observation/progress_observation_test.exs)
+
+Previous: [Plugin State Middleware](../../09_plugins/09_06_state_middleware/README.md) | Next: [Distributed Authority](../99_02_distributed_authority/README.md)

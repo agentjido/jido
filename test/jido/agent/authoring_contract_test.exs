@@ -4,7 +4,8 @@ defmodule Jido.Agent.AuthoringContractTest do
   alias Jido.Agent
   alias Jido.Agent.{Builder, Command, Directive}
   alias JidoTest.AgentFixtures.Add
-  alias Jido.Agent.Codec.{Deriver, Registry}
+  alias Jido.Agent.Codec.Deriver
+  alias Jido.Codec.Registry
 
   defmodule Factory do
     def new, do: Agent.new!(name: "factory") |> Agent.instantiate!(id: "factory")

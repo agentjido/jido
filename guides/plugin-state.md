@@ -20,7 +20,9 @@ defmodule MyApp.TurnCount.Agent do
   end
 
   @impl Jido.Agent.Plugin
-  def update_state(turn_count, _directives, _opts), do: {:ok, turn_count + 1}
+  def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
+    {:ok, reduction.plugin_state + 1}
+  end
 end
 
 defmodule MyApp.TurnCount do
@@ -44,7 +46,7 @@ complete state contract.
 
 An Action can read the complete state through `context.agent_state`. It must
 preserve every Plugin-owned key in its returned state. Only the owning Agent
-Plugin update can change its value.
+Plugin reducer can change its value.
 
 If an Action deletes or replaces a Plugin-owned key, finalization rejects the
 candidate. The live Agent keeps its prior state and does not dispatch
@@ -52,10 +54,11 @@ Directives.
 
 ## Update Before Commit
 
-`update_state/3` runs after executable success and Directive validation. It
-receives the current owned value and only the Directives owned by that Plugin.
-It returns the complete next owned value. Jido validates that value with the
-facet schema and the portable-value rule.
+`reduce/2` runs after executable success and Directive validation. It receives
+the prior complete state, the current complete candidate state, its current
+owned value, its pure prepared input, and all validated Directives. It returns
+only the complete next owned value. Jido validates that value with the facet
+schema and the portable-value rule.
 
 A failed Turn does not commit the update. A direct command returns the
 candidate but does not commit it.

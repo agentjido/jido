@@ -2,18 +2,18 @@ defmodule Jido.AgentServer.Plugin do
   @moduledoc """
   Live Agent Server-owned facet of a `Jido.Plugin` package.
 
-  This facet can reject live commands or replace its package-owned input. It
-  cannot change the Agent, source Signal, caller context, or another package's
-  input. It can also prepare outbound Signals, declare one permanent runtime
-  root, gate readiness, and dispatch owned Directives after commit. Agent
-  Server owns all tasks, limits, restart policy, and settlement. The owner
-  wrapper hosts each root generation as temporary so it can restart the root
-  with a fresh committed state and state version.
+  This facet can reject live commands or return one transient package-owned
+  runtime input. It cannot replace pure prepared input or change the Agent,
+  source Signal, or caller context. It can also prepare outbound Signals,
+  declare one permanent runtime root, gate readiness, and dispatch owned
+  Directives after commit. Agent Server owns all tasks, limits, restart policy,
+  and settlement. The owner wrapper hosts each root generation as temporary so
+  it can restart the root with a fresh committed state and state version.
   """
 
   alias Jido.Agent.Command
-  alias Jido.AgentServer.Plugin.Spec
-  alias Jido.Plugin.{DirectiveContext, Init, SignalContext}
+  alias Jido.AgentServer.Plugin.{Admission, Spec}
+  alias Jido.Plugin.{DirectiveContext, Init, Input, SignalContext}
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Plugin.Normalizer
 
@@ -27,8 +27,8 @@ defmodule Jido.AgentServer.Plugin do
     end
   end
 
-  @callback admit(runtime_ref :: term() | nil, command :: Command.t(), opts :: keyword()) ::
-              {:ok, Command.t()} | {:error, term()}
+  @callback admit(runtime_ref :: term() | nil, admission :: Admission.t(), opts :: keyword()) ::
+              {:ok, term()} | {:error, term()}
   @callback prepare_dispatch(
               runtime_ref :: term() | nil,
               signal :: Jido.Signal.t(),
@@ -65,9 +65,27 @@ defmodule Jido.AgentServer.Plugin do
           {:ok, Command.t()} | {:error, term()}
   def admit(%Command{} = command, specs, runtime_refs)
       when is_list(specs) and is_map(runtime_refs) do
+    admit(command, specs, runtime_refs, 0)
+  end
+
+  @doc false
+  @spec admit(
+          Command.t(),
+          [Jido.Plugin.Spec.t()],
+          %{optional(module()) => term() | nil},
+          non_neg_integer()
+        ) :: {:ok, Command.t()} | {:error, term()}
+  def admit(%Command{} = command, specs, runtime_refs, state_version)
+      when is_list(specs) and is_map(runtime_refs) and is_integer(state_version) and
+             state_version >= 0 do
     with {:ok, specs} <- Normalizer.normalize_all(specs) do
       Enum.reduce_while(specs, {:ok, command}, fn plugin_spec, {:ok, current} ->
-        case admit_one(current, plugin_spec, Map.get(runtime_refs, plugin_spec.module)) do
+        case admit_one(
+               current,
+               plugin_spec,
+               Map.get(runtime_refs, plugin_spec.module),
+               state_version
+             ) do
           {:ok, admitted} -> {:cont, {:ok, admitted}}
           {:error, _reason} = error -> {:halt, error}
         end
@@ -211,9 +229,15 @@ defmodule Jido.AgentServer.Plugin do
     end
   end
 
-  defp admit_one(command, %{agent_server: nil}, _runtime_ref), do: {:ok, command}
+  defp admit_one(command, %{agent_server: nil}, _runtime_ref, _state_version),
+    do: {:ok, command}
 
-  defp admit_one(command, %{agent_server: %Spec{} = spec}, runtime_ref) do
+  defp admit_one(
+         command,
+         %{agent_server: %Spec{legacy?: true} = spec},
+         runtime_ref,
+         _state_version
+       ) do
     if function_exported?(spec.module, :admit, 3) do
       PluginError.safe_apply(
         spec.package,
@@ -222,7 +246,40 @@ defmodule Jido.AgentServer.Plugin do
         [runtime_ref, command, spec.options],
         label(spec, "Agent Plugin admission failed", "Agent Server Plugin admission failed")
       )
-      |> validate_admission_result(command, spec)
+      |> validate_legacy_admission_result(command, spec)
+    else
+      {:ok, command}
+    end
+  end
+
+  defp admit_one(
+         command,
+         %{agent_server: %Spec{} = spec} = plugin_spec,
+         runtime_ref,
+         state_version
+       ) do
+    if function_exported?(spec.module, :admit, 3) do
+      package_input = Map.get(command.plugin_inputs, spec.package, %Input{})
+
+      admission = %Admission{
+        plugin: spec.package,
+        agent_id: command.agent.id,
+        agent_module: command.agent.module,
+        signal: command.signal,
+        caller_context: command.context,
+        plugin_state: owned_state(command.agent.state, plugin_spec),
+        prepared_input: package_input.prepared,
+        state_version: state_version
+      }
+
+      PluginError.safe_apply(
+        spec.package,
+        spec.module,
+        :admit,
+        [runtime_ref, admission, spec.options],
+        "Agent Server Plugin admission failed"
+      )
+      |> validate_runtime_input(command, spec)
     else
       {:ok, command}
     end
@@ -268,19 +325,35 @@ defmodule Jido.AgentServer.Plugin do
     end
   end
 
-  defp validate_admission_result({:ok, %Command{} = command}, original, spec) do
+  defp validate_runtime_input({:ok, runtime_input}, command, spec) do
+    {:ok, Command.put_plugin_runtime_input(command, spec.package, runtime_input)}
+  end
+
+  defp validate_runtime_input({:error, _reason} = error, _command, _spec), do: error
+
+  defp validate_runtime_input(result, _command, spec) do
+    PluginError.invalid_callback(
+      "Agent Server Plugin admit/3 returned an invalid result",
+      spec.package,
+      spec.module,
+      %{result: result}
+    )
+  end
+
+  defp validate_legacy_admission_result({:ok, %Command{} = command}, original, spec) do
     with {:ok, command} <- Command.validate(command),
          :ok <- unchanged_admission_field(command.agent, original.agent, :agent, spec),
          :ok <- unchanged_admission_field(command.signal, original.signal, :signal, spec),
          :ok <- unchanged_admission_field(command.context, original.context, :context, spec),
+         :ok <- unchanged_prepared_input(command.plugin_inputs, original.plugin_inputs, spec),
          :ok <- unchanged_foreign_inputs(command.plugin_inputs, original.plugin_inputs, spec) do
       {:ok, command}
     end
   end
 
-  defp validate_admission_result({:error, _reason} = error, _original, _spec), do: error
+  defp validate_legacy_admission_result({:error, _reason} = error, _original, _spec), do: error
 
-  defp validate_admission_result(result, _original, spec) do
+  defp validate_legacy_admission_result(result, _original, spec) do
     PluginError.invalid_callback(
       label(
         spec,
@@ -330,6 +403,26 @@ defmodule Jido.AgentServer.Plugin do
         spec.package,
         spec.module,
         %{callback: :admit, field: :plugin_inputs}
+      )
+    end
+  end
+
+  defp unchanged_prepared_input(inputs, original, spec) do
+    input = Map.get(inputs, spec.package, %Input{})
+    original_input = Map.get(original, spec.package, %Input{})
+
+    if input.prepared === original_input.prepared do
+      :ok
+    else
+      PluginError.invalid_callback(
+        label(
+          spec,
+          "Agent Plugin cannot change pure prepared input",
+          "Agent Server Plugin cannot change pure prepared input"
+        ),
+        spec.package,
+        spec.module,
+        %{callback: :admit, field: :prepared}
       )
     end
   end

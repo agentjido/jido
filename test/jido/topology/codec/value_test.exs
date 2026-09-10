@@ -1,6 +1,6 @@
 defmodule Jido.Topology.Codec.ValueTest do
   use JidoTest.Case, async: true
-  alias Jido.Agent.Codec.Registry
+  alias Jido.Codec.Registry
   alias Jido.Topology.Codec.Value
   alias Jido.Topology.{Ref, Reference}
 
@@ -10,7 +10,7 @@ defmodule Jido.Topology.Codec.ValueTest do
     value = {Reference.input(:initial), Ref.ref(:subsystem, :worker), day}
     assert {:ok, encoded} = Value.encode(value, registry)
     assert {:ok, ^value} = Value.decode(Jason.decode!(Jason.encode!(encoded)), registry)
-    assert Value.entries(value) == [{:atom, :initial}, {:value, day}]
+    assert Value.registry_entries(value) == [{:atom, :initial}, {:value, day}]
   end
 
   test "malformed maps and duplicate decoded keys return errors" do

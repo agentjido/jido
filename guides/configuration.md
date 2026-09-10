@@ -55,8 +55,9 @@ config :my_app, MyApp.Jido,
 
 Options passed to `MyApp.Jido.start_link/1` override application configuration.
 The default `:max_tasks` value is `1_000`. Jido validates `:name`, `:otp_app`,
-`:namespace`, `:max_tasks`, and `:persistence` before it starts any instance
-child. It also accepts the `:debug` setting. Other unknown instance keys fail
+`:namespace`, `:max_tasks`, `:persistence`, and `:debug` before it starts any
+instance child. `:debug` accepts `false`, `true`, or `:verbose`. Runtime options
+override application configuration. Other unknown instance keys fail
 validation.
 
 `max_tasks` limits only children of the instance Task Supervisor. It does not
@@ -95,7 +96,7 @@ Important actor defaults are:
 | `:error_policy` | `:log_only` | Select server behavior after a failed Turn. |
 | `:on_parent_death` | `:stop` | Select child behavior when its logical parent ends. |
 | `:debug` | `false` | Enable the local debug event buffer. |
-| `:debug_max_events` | `500` | Limit the debug event buffer. |
+| `:debug_max_events` | `500` | Set a positive limit for the safe debug summary buffer. |
 
 Use `:partition` when the same Agent ID must exist in separate registry
 namespaces. Use the same partition for lookup, stop, persistence, hibernate, and
@@ -109,7 +110,8 @@ continue.
 
 ## Configure observability
 
-Runtime debug mode is useful during investigation:
+Use the Jido instance debug level to change semantic log detail during an
+investigation:
 
 ```elixir
 :ok = MyApp.Jido.debug(:on)
@@ -130,8 +132,12 @@ config :jido, :telemetry,
 The semantic modes are `:off`, `:errors`, `:interesting`, and `:all`.
 `Jido.Telemetry.metrics/0` returns the low-cardinality semantic metric set.
 
-The runtime debug setting has priority for events from that Jido instance.
+The instance debug setting has priority for events from that Jido instance.
 `:on` selects `:interesting`, and `:verbose` selects `:all`.
+
+This instance setting does not enable the bounded event buffer for an Agent.
+Use the Agent `:debug` option or `Jido.AgentServer.set_debug/3` for that buffer.
+The semantic metadata allowlist applies in all debug modes.
 
 OpenTelemetry is optional. A host that uses it must add both
 `opentelemetry_api` and an OpenTelemetry SDK. To disable the Jido mapping while
@@ -141,6 +147,9 @@ the SDK remains active, use:
 config :jido, :opentelemetry, enabled: false
 ```
 
+Use `Jido.Telemetry.open_telemetry?/0` to check if Jido has an active SDK
+tracer. Jido does not start the SDK or configure its sampler or exporter.
+
 ## Keep ownership clear
 
 Jido validates its own actor and observability options. A Plugin validates its
@@ -149,4 +158,7 @@ bus and dispatch options. Keep each option at the package boundary that owns
 its contract.
 
 Next, run [Observe Agent Turns](observe-agent-turns.livemd) to inspect semantic
-Turn events.
+Turn events. See [Runtime State and Debugging](runtime-state-and-debugging.livemd)
+for live inspection and the Agent event buffer. See
+[Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.md) for the complete
+production observation contract.

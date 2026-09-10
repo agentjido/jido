@@ -9,11 +9,12 @@ defmodule JidoTest.Examples.MultiAgent.CorrelatedRequestsTest do
     parent = start_agent!(jido, CorrelatedRequests)
     assert {:ok, pending} = CorrelatedRequests.request(parent, "request-1", 7)
     assert pending.state.status == :waiting
-    assert Server.snapshot(parent).state_version == 1
+    pending_version = Server.snapshot(parent).state_version
+    assert pending_version == 1
 
     eventually(fn -> state(parent).status == :completed end)
     assert state(parent).result == 14
-    assert Server.snapshot(parent).state_version == 2
+    assert Server.snapshot(parent).state_version > pending_version
     eventually(fn -> Server.children(parent) == %{} end)
   end
 

@@ -91,6 +91,8 @@ defmodule Jido.AgentServer.Options do
          {:ok, persistence} <- resolve_persistence(attrs),
          :ok <- validate_restore(Map.get(attrs, :restore, :if_found)),
          :ok <- validate_state_version(Map.get(attrs, :state_version, 0)),
+         :ok <- validate_debug(Map.get(attrs, :debug, false)),
+         :ok <- validate_debug_max_events(Map.get(attrs, :debug_max_events, 500)),
          :ok <- validate_turn_timeout(Map.get(attrs, :turn_timeout, @default_turn_timeout)),
          :ok <-
            validate_directive_timeout(
@@ -423,6 +425,15 @@ defmodule Jido.AgentServer.Options do
 
   defp validate_state_version(version) do
     invalid("state_version must be a non-negative integer", %{state_version: version})
+  end
+
+  defp validate_debug(debug) when is_boolean(debug), do: :ok
+  defp validate_debug(debug), do: invalid("debug must be a boolean", %{debug: debug})
+
+  defp validate_debug_max_events(limit) when is_integer(limit) and limit > 0, do: :ok
+
+  defp validate_debug_max_events(limit) do
+    invalid("debug_max_events must be a positive integer", %{debug_max_events: limit})
   end
 
   defp registry(nil), do: nil

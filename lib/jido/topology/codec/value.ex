@@ -1,7 +1,7 @@
 defmodule Jido.Topology.Codec.Value do
   @moduledoc false
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec.{Data, Registry}
+  alias Jido.Codec.Data
   alias Jido.Topology.{Ref, Reference}
 
   def encode(value, registry, depth \\ 0)
@@ -79,47 +79,22 @@ defmodule Jido.Topology.Codec.Value do
 
   def decode(value, registry), do: Data.decode(value, registry)
 
-  def entries(%Ref{}), do: []
-  def entries(%Reference{key: key}), do: entries(key)
+  def registry_entries(%Ref{}), do: []
+  def registry_entries(%Reference{key: key}), do: Data.registry_entries(key)
 
-  def entries(value)
-      when is_nil(value) or is_boolean(value) or is_number(value) or is_binary(value), do: []
-
-  def entries(value) when is_atom(value), do: [{:atom, value}]
-  def entries(value) when is_struct(value), do: [{:value, value}]
-
-  def entries(value) when is_map(value),
-    do: Enum.flat_map(Enum.sort(value), fn {key, value} -> entries(key) ++ entries(value) end)
-
-  def entries(value) when is_tuple(value), do: entries(Tuple.to_list(value))
-  def entries(value) when is_list(value), do: Enum.flat_map(value, &entries/1)
-
-  defp definition_entries(definition) do
-    agents = definition.agents ++ definition.groups
-
-    entries =
-      [{:schema, definition.schema}] ++
-        Enum.map(agents, &{:agent, &1.module}) ++
-        entries(definition.metadata) ++
-        Enum.flat_map(agents, fn agent ->
-          entries(agent.initial_state) ++ entries(Map.take(agent, [:count, :members, :key_by]))
-        end) ++ Enum.flat_map(definition.resources, &entries(&1.config))
-
-    entries ++
-      Enum.flat_map(definition.includes, fn include ->
-        entries(include.inputs) ++ definition_entries(include.topology)
-      end)
-  end
-
-  def registry(definition) do
-    entries = definition_entries(definition)
-
-    entries
-    |> Enum.uniq()
-    |> Enum.with_index()
-    |> Map.new(fn {{kind, _} = value, index} ->
-      {"#{kind}/#{index}", value}
+  def registry_entries(value) when is_map(value) and not is_struct(value) do
+    Enum.flat_map(Enum.sort(value), fn {key, item} ->
+      registry_entries(key) ++ registry_entries(item)
     end)
-    |> Registry.new()
   end
+
+  def registry_entries(value) when is_tuple(value),
+    do: registry_entries(Tuple.to_list(value))
+
+  def registry_entries([]), do: []
+
+  def registry_entries([head | tail]),
+    do: registry_entries(head) ++ registry_entries(tail)
+
+  def registry_entries(value), do: Data.registry_entries(value)
 end

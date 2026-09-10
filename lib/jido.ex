@@ -52,6 +52,20 @@ defmodule Jido do
   acceptable; if delivery should belong to the runtime or an integration layer,
   return a directive.
 
+  ## Observe Runtime Work
+
+  Use `Jido.AgentServer.snapshot/2` for the committed Agent and revision. Use
+  `Jido.AgentServer.status/2` for current runtime work. A per-Agent debug buffer
+  keeps a short diagnostic history when it is enabled.
+
+  `Jido.Telemetry` is the system-wide observation contract. Its semantic event
+  catalog supplies Telemetry events, standard metrics, bounded logs, and
+  optional OpenTelemetry spans. Instance `debug/1` functions change semantic
+  log detail. They do not enable an Agent debug buffer.
+
+  See [Runtime State and Debugging](runtime-state-and-debugging.html) and
+  [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html).
+
   ## For Tests
 
   Start a unique Jido instance in runtime tests:
@@ -316,14 +330,14 @@ defmodule Jido do
         Jido.await_ready(__MODULE__, ref, timeout)
       end
 
-      @doc "Controls the bounded debug buffer through a stable Agent Ref."
+      @doc "Enables or disables one Agent's bounded runtime event buffer."
       @spec set_agent_debug(Jido.Agent.Ref.t(), boolean(), timeout()) ::
               :ok | {:error, term()}
       def set_agent_debug(%Jido.Agent.Ref{} = ref, enabled, timeout \\ 5_000) do
         Jido.set_agent_debug(__MODULE__, ref, enabled, timeout)
       end
 
-      @doc "Returns bounded recent events through a stable Agent Ref."
+      @doc "Returns one Agent's recent runtime events in newest-first order."
       @spec recent_events(Jido.Agent.Ref.t(), keyword(), timeout()) ::
               {:ok, [map()]} | {:error, term()}
       def recent_events(%Jido.Agent.Ref{} = ref, opts \\ [], timeout \\ 5_000) do
@@ -373,32 +387,31 @@ defmodule Jido do
       # Instance debug API
 
       @doc """
-      Controls debug mode for this Jido instance.
+      Controls semantic log detail for this Jido instance.
 
       - `debug()` — returns current debug level
-      - `debug(:on)` — enable developer-friendly verbosity
-      - `debug(:verbose)` — enable maximum detail
-      - `debug(:off)` — disable debug overrides
-      - `debug(pid)` — enable debug mode for one Agent Server
+      - `debug(:on)` — log errors and slow semantic operations
+      - `debug(:verbose)` — log all terminal semantic events
+      - `debug(:off)` — use the global semantic log configuration
+
+      This function does not control an Agent's bounded event buffer. Use
+      `set_agent_debug/3` for that buffer.
       """
-      @spec debug() :: Jido.Debug.level()
+      @spec debug() :: Jido.debug_level()
       def debug, do: Jido.Debug.level(__MODULE__)
 
-      @spec debug(Jido.Debug.level() | pid()) :: :ok | {:error, term()} | Jido.Debug.level()
-      def debug(pid) when is_pid(pid), do: Jido.AgentServer.set_debug(pid, true)
+      @spec debug(Jido.debug_level()) :: :ok
       def debug(level) when is_atom(level), do: Jido.Debug.enable(__MODULE__, level)
 
-      @doc "Returns recent debug events from an Agent Server ring buffer."
-      @spec recent(pid(), non_neg_integer()) :: {:ok, [map()]} | {:error, term()}
-      def recent(pid, limit \\ 50), do: Jido.AgentServer.recent_events(pid, limit: limit)
-
-      @doc "Returns the current debug status for this instance."
+      @doc "Returns the semantic log override for this Jido instance."
       @spec debug_status() :: map()
       def debug_status, do: Jido.Debug.status(__MODULE__)
     end
   end
 
   @type partition :: term()
+  @typedoc "Semantic log detail for one Jido instance."
+  @type debug_level :: :off | :on | :verbose
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
@@ -447,17 +460,20 @@ defmodule Jido do
   def default_instance, do: @default_instance
 
   @doc """
-  Controls debug mode for the default Jido instance (`Jido.Default`).
+  Controls semantic log detail for the default Jido instance (`Jido.Default`).
 
   - `debug()` — returns current debug level
-  - `debug(:on)` — enable developer-friendly verbosity
-  - `debug(:verbose)` — enable maximum detail
-  - `debug(:off)` — disable debug overrides
+  - `debug(:on)` — log errors and slow semantic operations
+  - `debug(:verbose)` — log all terminal semantic events
+  - `debug(:off)` — use the global semantic log configuration
+
+  This function does not control an Agent's bounded event buffer. Use
+  `Jido.AgentServer.set_debug/3` for that buffer.
   """
-  @spec debug() :: Jido.Debug.level()
+  @spec debug() :: debug_level()
   def debug, do: Jido.Debug.level(@default_instance)
 
-  @spec debug(Jido.Debug.level()) :: :ok
+  @spec debug(debug_level()) :: :ok
   def debug(level) when is_atom(level), do: Jido.Debug.enable(@default_instance, level)
 
   @doc """
@@ -566,9 +582,7 @@ defmodule Jido do
 
     with :ok <-
            NamespaceRegistry.bind(claim, Keyword.get(opts, :namespace), name, self()) do
-      if otp_app = opts[:otp_app] do
-        Jido.Debug.maybe_enable_from_config(otp_app, name)
-      end
+      Jido.Debug.configure(name, opts[:debug])
 
       :ok = Jido.RuntimeStore.ensure_table(runtime_store)
 
@@ -788,12 +802,12 @@ defmodule Jido do
   def await_ready(instance, %Ref{} = ref, timeout \\ 5_000),
     do: RefFacade.await_ready(instance, ref, timeout)
 
-  @doc "Controls the bounded debug buffer through a stable Agent Ref."
+  @doc "Enables or disables one Agent's bounded runtime event buffer."
   @spec set_agent_debug(atom(), Ref.t(), boolean(), timeout()) :: :ok | {:error, term()}
   def set_agent_debug(instance, %Ref{} = ref, enabled, timeout \\ 5_000),
     do: RefFacade.set_debug(instance, ref, enabled, timeout)
 
-  @doc "Returns bounded recent events through a stable Agent Ref."
+  @doc "Returns one Agent's recent runtime events in newest-first order."
   @spec recent_events(atom(), Ref.t(), keyword(), timeout()) ::
           {:ok, [map()]} | {:error, term()}
   def recent_events(instance, %Ref{} = ref, opts \\ [], timeout \\ 5_000),

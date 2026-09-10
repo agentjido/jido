@@ -42,7 +42,6 @@ Topology startup defaults are:
 | Option | Default |
 | --- | --- |
 | `:concurrency` | `32` |
-| `:ready` | `:all` |
 | `:max_agents` | `10_000` |
 | `:retry_interval` | `1_000` milliseconds |
 | `:task_timeout` | `10_000` milliseconds |

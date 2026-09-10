@@ -26,7 +26,8 @@ and a forged request fail without changing Agent state.
 ## Important behavior
 
 Pure preparation returns the verified public key and nonce under the identity
-package key in `context.plugin_inputs`. This path works in direct `cmd/3`.
+package `prepared` slot in `context.plugin_inputs`. This path works in direct
+`cmd/3`.
 Live admission claims the nonce before execution. The signing private key and
 replay set stay in Plugin runtime state. Agent state stores only the accepted
 public identity.

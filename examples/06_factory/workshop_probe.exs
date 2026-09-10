@@ -23,7 +23,10 @@ defmodule Jido.Examples.Factory.WorkshopProbe do
         "Use factory_status to inspect the factory. Report its queue, capacity, and schedule."
       )
 
-      ensure(count(table, "factory.command") > 0, "The model did not inspect factory status")
+      ensure(
+        count(table, "examples.factory.command") > 0,
+        "The model did not inspect factory status"
+      )
 
       ask(session, "batch", "add 3 jobs to the factory")
       factory = Jido.whereis_agent(session.jido, session.factory_id)
@@ -36,7 +39,10 @@ defmodule Jido.Examples.Factory.WorkshopProbe do
         "The model did not use numbered demo goals"
       )
 
-      ensure(count(table, "factory.submit_jobs") == 1, "The model did not submit one batch")
+      ensure(
+        count(table, "examples.factory.workshop.submit_jobs") == 1,
+        "The model did not submit one batch"
+      )
 
       await(
         fn ->
@@ -54,7 +60,11 @@ defmodule Jido.Examples.Factory.WorkshopProbe do
         "Use factory_job to inspect job batch/1 and factory_events with job_id batch/1 to read its progress. Report its final result."
       )
 
-      ensure(count(table, "factory.inspect") >= 2, "The model did not read job and event details")
+      ensure(
+        count(table, "examples.factory.inspect") >= 2,
+        "The model did not read job and event details"
+      )
+
       {:ok, status} = Chat.status(session)
 
       ensure(

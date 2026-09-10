@@ -9,19 +9,15 @@ defmodule Jido.Examples.Plugins.SecureSignal.Plugin.Server do
   @moduledoc false
   use Jido.AgentServer.Plugin
 
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Plugin.Admission
   alias Jido.Plugin.{Init, SignalContext}
-  alias Jido.Examples.Plugins.SecureSignal.Plugin
   alias Jido.Examples.Plugins.SecureSignal.Runtime
 
   @impl Jido.AgentServer.Plugin
-  def admit(runtime, %Command{signal: %{data: %{"secure" => envelope}}} = command, _opts) do
-    with {:ok, plaintext} <- Runtime.decrypt(runtime, command.signal, envelope) do
-      {:ok, Command.put_plugin_input(command, Plugin, plaintext)}
-    end
-  end
+  def admit(runtime, %Admission{signal: %{data: %{"secure" => envelope}} = signal}, _opts),
+    do: Runtime.decrypt(runtime, signal, envelope)
 
-  def admit(_runtime, _command, _opts), do: {:error, :secure_data_required}
+  def admit(_runtime, _admission, _opts), do: {:error, :secure_data_required}
 
   @impl Jido.AgentServer.Plugin
   def prepare_dispatch(

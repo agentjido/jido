@@ -1,6 +1,6 @@
 defmodule Jido.Topology.Controller do
   @moduledoc """
-  Starts and repairs one static topology on one local Jido instance.
+  Starts and repairs one topology for one Jido instance.
 
   Add this child after the Jido instance in the application supervision tree.
   Use `:rest_for_one` at that application boundary so a Jido restart also
@@ -9,17 +9,18 @@ defmodule Jido.Topology.Controller do
   loading saved state.
   Buses and startup tasks have their own supervised children.
 
-  The spike supports eager activation, bounded startup, normal Bus input,
-  logical ownership, periodic repair, and additive local Agent updates. It has
-  no live replacement or removal, cluster placement, database adapter, or
-  durable work distribution. A normal controller shutdown stops its Agents.
+  The controller supports eager activation, bounded startup, normal Bus input,
+  logical ownership, periodic repair, additive Agent updates, and exact Erlang
+  node placement. It does not select nodes or rebalance Agents. Those policies
+  belong in a control Agent or Plugin. A normal controller shutdown stops its
+  Agents.
   Persistent state uses the Jido instance's configured adapter and the existing
   restore contract.
 
   `:repair` defaults to `:automatic`, which repeats reconciliation using the
   topology's `startup.retry_interval`. Use `repair: :manual` when an application
   owns repair timing. Initial startup still runs once; later passes require
-  `reconcile/2`. Both modes use the same bounded local activation and cleanup.
+  `reconcile/2`. Both modes use the same bounded activation and cleanup.
   Manual mode retains child supervision and Plugin runtime recovery. It does
   not change the topology target or provide ownership transfer or cluster policy.
   """
@@ -44,14 +45,16 @@ defmodule Jido.Topology.Controller do
   @doc "Starts a local controller. Returns before the topology is ready."
   def start_link(opts) do
     with {:ok, opts} <- Authoring.attrs(opts),
-         :ok <- Authoring.keys(opts, [:jido, :topology, :repair]),
+         :ok <- Authoring.keys(opts, [:jido, :topology, :repair, :lifecycle]),
          repair = Map.get(opts, :repair, :automatic),
          :ok <- validate_repair(repair),
+         lifecycle = Map.get(opts, :lifecycle),
+         :ok <- validate_lifecycle(lifecycle),
          %Instance{} = instance <- Map.get(opts, :topology),
          {:ok, instance} <-
            Topology.instantiate(instance.definition, id: instance.id, input: instance.input),
          jido when is_atom(jido) and not is_nil(jido) <- Map.get(opts, :jido) do
-      Supervisor.start_link(__MODULE__, {jido, instance, repair},
+      Supervisor.start_link(__MODULE__, {jido, instance, repair, lifecycle},
         name: name(jido, instance.id, :controller)
       )
     else
@@ -61,11 +64,11 @@ defmodule Jido.Topology.Controller do
   end
 
   @impl true
-  def init({jido, instance, repair}) do
+  def init({jido, instance, repair, lifecycle}) do
     children = [
       {Task.Supervisor, name: name(jido, instance.id, :tasks)},
       {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one},
-      {Topology.Controller.Runtime, {jido, instance, repair}}
+      {Topology.Controller.Runtime, {jido, instance, repair, lifecycle}}
     ]
 
     Supervisor.init(children, strategy: :one_for_all)
@@ -109,18 +112,75 @@ defmodule Jido.Topology.Controller do
     end
   end
 
+  @doc """
+  Moves one topology Agent to an exact Erlang node.
+
+  This function is a placement mechanism. It does not select a node or apply a
+  rebalance policy. Use the `:member` option for one group member. The call
+  returns after the old Agent has stopped and the new repair pass has started.
+  Use `await_ready/2` to wait for activation on the target node. The Agent
+  restores through configured shared persistence. Without shared persistence,
+  it starts from its declared initial state.
+  """
+  @spec place_agent(Supervisor.supervisor(), term(), node(), keyword()) ::
+          :ok | {:error, term()}
+  def place_agent(controller, target, target_node, opts \\ []) do
+    with {:ok, opts} <- Authoring.attrs(opts),
+         :ok <- Authoring.keys(opts, [:member, :timeout]),
+         timeout = Map.get(opts, :timeout, 5_000),
+         :ok <- validate_timeout(timeout) do
+      GenServer.call(
+        runtime(controller),
+        {:place_agent, target, Map.get(opts, :member), target_node, timeout},
+        timeout
+      )
+    end
+  end
+
   @doc "Resolves a singleton Agent or one keyed group member."
   def whereis_agent(controller, key, member \\ nil),
     do: GenServer.call(runtime(controller), {:agent, key, member})
+
+  @doc "Returns the effective Erlang node for a topology Agent."
+  def agent_node(controller, key, member \\ nil),
+    do: GenServer.call(runtime(controller), {:agent_node, key, member})
 
   @doc "Resolves a topology Bus."
   def whereis_bus(controller, key),
     do: GenServer.call(runtime(controller), {:bus, key})
 
+  @doc "Finds a local Topology Controller by Jido instance and topology ID."
+  @spec whereis(atom(), String.t()) :: pid() | nil
+  def whereis(jido, topology_id) when is_atom(jido) and is_binary(topology_id) do
+    registry = Jido.registry_name(jido)
+
+    if Process.whereis(registry) do
+      case Registry.lookup(registry, {:topology, topology_id, :controller}) do
+        [{pid, _value}] -> pid
+        [] -> nil
+      end
+    else
+      nil
+    end
+  end
+
   defp validate_repair(repair) when repair in [:automatic, :manual], do: :ok
 
   defp validate_repair(_repair),
     do: Authoring.error("Controller repair must be :automatic or :manual")
+
+  defp validate_lifecycle(nil), do: :ok
+  defp validate_lifecycle(pid) when is_pid(pid), do: :ok
+  defp validate_lifecycle(%Jido.Agent.Ref{}), do: :ok
+
+  defp validate_lifecycle(_value),
+    do: Authoring.error("Controller lifecycle target must be an Agent PID or Ref")
+
+  defp validate_timeout(:infinity), do: :ok
+  defp validate_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
+
+  defp validate_timeout(_timeout),
+    do: Authoring.error("Controller timeout must be a positive integer or :infinity")
 
   @doc false
   def name(jido, id, role),

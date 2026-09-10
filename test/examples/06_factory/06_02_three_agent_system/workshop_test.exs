@@ -7,7 +7,7 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
   alias JidoTest.FactoryHTTP, as: HTTP
 
   defp command(agent, operation, id, goal \\ "") do
-    evaluate(agent, "factory.command", %{
+    evaluate(agent, "examples.factory.command", %{
       operation: operation,
       request_id: id,
       job_id: id,
@@ -20,14 +20,14 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     {next, directives}
   end
 
-  defp poll(agent), do: evaluate(agent, "factory.workshop.poll", %{})
+  defp poll(agent), do: evaluate(agent, "examples.factory.workshop.poll", %{})
 
   defp tick(agent) do
     job = agent.state.jobs[agent.state.active_job_id]
 
     evaluate(
       agent,
-      "factory.worker.progress",
+      "examples.factory.work_item.progress",
       Map.take(job, [:generation, :step]) |> Map.put(:job_id, job.id)
     )
   end
@@ -70,7 +70,10 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     {agent, _} = command(agent, :submit, "second", "Second")
     {agent, _} = poll(agent)
     {agent, _} = tick(agent)
-    stale = signal("factory.worker.progress", %{job_id: "first", generation: 0, step: 1})
+
+    stale =
+      signal("examples.factory.work_item.progress", %{job_id: "first", generation: 0, step: 1})
+
     {agent, _} = command(agent, :pause, "first")
     assert agent.state.active_job_id == ""
     assert {:error, _} = Workshop.cmd(agent, stale)
@@ -106,7 +109,7 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     system = HTTP.system!(jido, :workshop, step_delay_ms: 450)
     spec = HTTP.state(system.factory).scheduler.cron["factory_poll"]
     assert spec.cron_expression == "* * * * * * *"
-    assert spec.message.type == "factory.workshop.poll"
+    assert spec.message.type == "examples.factory.workshop.poll"
     assert_eventually(HTTP.state(system.factory).poll_count >= 2, timeout: 3_000)
     assert HTTP.state(system.factory).events == []
 
@@ -180,7 +183,7 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     next_ref = Process.monitor(next_worker)
 
     stale =
-      signal("factory.worker.progress", %{
+      signal("examples.factory.work_item.progress", %{
         job_id: "job",
         generation: old_job.generation,
         step: old_job.step

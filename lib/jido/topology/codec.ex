@@ -2,11 +2,11 @@ defmodule Jido.Topology.Codec do
   @moduledoc """
   Serializes static topology definitions to versioned JSON-compatible documents.
 
-  Version 2 embeds included definitions, import bindings, and exports. Version 1
-  documents remain readable. Source modules for included topologies are resolved
-  during construction; stored composition is a snapshot of their definitions.
+  Version 2 embeds included definitions, import bindings, and exports. Source
+  modules for included topologies are resolved during construction; stored
+  composition is a snapshot of their definitions.
 
-  This Codec uses `Jido.Agent.Codec.Registry` for Agent modules, data schemas,
+  This Codec uses `Jido.Codec.Registry` for Agent modules, data schemas,
   atoms, and static values. Stored strings cannot create atoms or modules.
   `encode/1` derives a temporary Registry. Supply stable Registry IDs to
   `encode/2` for database storage. Instance input, plans, PIDs, Agent state,
@@ -17,9 +17,9 @@ defmodule Jido.Topology.Codec do
   1 MiB per string. The authoring format has no database dependency.
   """
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec.{Data, Registry}
+  alias Jido.Codec.{Data, Registry}
   alias Jido.Topology
-  alias Jido.Topology.Codec.Value
+  alias Jido.Topology.Codec.{Deriver, Value}
 
   @collections [
     :agents,
@@ -31,19 +31,24 @@ defmodule Jido.Topology.Codec do
     :imports,
     :exports
   ]
-  @v1_fields ~w(type version name schema metadata agents groups resources relationships connections startup)
-  @fields @v1_fields ++ ~w(includes imports exports)
+  @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports)
+
+  @type document :: %{required(String.t()) => term()}
 
   @doc "Encodes a definition and derives a temporary Registry."
+  @spec encode(Topology.t()) ::
+          {:ok, document(), Registry.t()} | {:error, term()}
   def encode(definition) do
     with {:ok, definition} <- Topology.new(definition),
-         {:ok, registry} <- Value.registry(definition),
+         {:ok, registry} <- Deriver.topology(definition),
          {:ok, document} <- encode_validated(definition, registry),
          :ok <- Data.check_document(document),
          do: {:ok, document, registry}
   end
 
   @doc "Encodes a definition through a trusted Registry."
+  @spec encode(Topology.t(), Registry.t() | map()) ::
+          {:ok, document()} | {:error, term()}
   def encode(definition, registry) do
     with {:ok, definition} <- Topology.new(definition),
          {:ok, registry} <- Registry.new(registry),
@@ -77,6 +82,8 @@ defmodule Jido.Topology.Codec do
   end
 
   @doc "Decodes a definition without starting processes."
+  @spec decode(document(), Registry.t() | map()) ::
+          {:ok, Topology.t()} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
          {:ok, registry} <- Registry.new(registry),
@@ -109,6 +116,8 @@ defmodule Jido.Topology.Codec do
   end
 
   @doc "Decodes a definition and constructs an instance with explicit input."
+  @spec decode(document(), Registry.t() | map(), map() | keyword()) ::
+          {:ok, Jido.Topology.Instance.t()} | {:error, term()}
   def decode(document, registry, opts) do
     with {:ok, definition} <- decode(document, registry),
          do: Topology.instantiate(definition, opts)
@@ -137,18 +146,15 @@ defmodule Jido.Topology.Codec do
 
   defp decode_entry(_, _, _), do: Authoring.error("Expected a topology record")
 
-  defp fields(:agents), do: [:key, :module, :initial_state, :depends_on]
+  defp fields(:agents), do: [:key, :module, :initial_state, :depends_on, :node]
   defp fields(:groups), do: fields(:agents) ++ [:count, :members, :key_by]
-  defp fields(:resources), do: [:key, :config]
+  defp fields(:resources), do: [:key, :kind, :config]
   defp fields(:relationships), do: [:parent, :child, :on_parent_exit]
   defp fields(:connections), do: [:agent, :to, :path]
-  defp fields(:startup), do: [:concurrency, :ready, :max_agents, :retry_interval, :task_timeout]
+  defp fields(:startup), do: [:concurrency, :max_agents, :retry_interval, :task_timeout]
   defp fields(:includes), do: [:key, :topology, :inputs, :bindings]
   defp fields(:imports), do: [:key, :kind]
   defp fields(:exports), do: [:key, :kind, :from]
-
-  defp document_header(%{"type" => "jido.topology", "version" => 1} = document),
-    do: Data.object(document, @v1_fields)
 
   defp document_header(%{"type" => "jido.topology", "version" => 2} = document),
     do: Data.object(document, @fields)
@@ -163,7 +169,7 @@ defmodule Jido.Topology.Codec do
   defp encode_field(:kind, value, _), do: {:ok, Atom.to_string(value)}
   defp encode_field(:module, value, registry), do: Registry.identifier(registry, :agent, value)
 
-  defp encode_field(field, value, _) when field in [:ready, :on_parent_exit],
+  defp encode_field(:on_parent_exit, value, _),
     do: {:ok, Atom.to_string(value)}
 
   defp encode_field(field, value, registry)
@@ -179,7 +185,8 @@ defmodule Jido.Topology.Codec do
               :parent,
               :child,
               :agent,
-              :depends_on
+              :depends_on,
+              :node
             ],
        do: Value.encode(value, registry)
 
@@ -195,12 +202,11 @@ defmodule Jido.Topology.Codec do
   defp decode_field(:kind, "bus", _), do: {:ok, :bus}
   defp decode_field(:kind, _, _), do: Authoring.error("Unknown topology endpoint kind")
   defp decode_field(:module, value, registry), do: Registry.resolve(registry, value, :agent)
-  defp decode_field(:ready, "all", _), do: {:ok, :all}
   defp decode_field(:on_parent_exit, "stop", _), do: {:ok, :stop}
   defp decode_field(:on_parent_exit, "continue", _), do: {:ok, :continue}
   defp decode_field(:on_parent_exit, "emit_orphan", _), do: {:ok, :emit_orphan}
 
-  defp decode_field(field, _, _) when field in [:ready, :on_parent_exit],
+  defp decode_field(:on_parent_exit, _, _),
     do: Authoring.error("Unknown topology policy")
 
   defp decode_field(field, value, registry)
@@ -216,7 +222,8 @@ defmodule Jido.Topology.Codec do
               :parent,
               :child,
               :agent,
-              :depends_on
+              :depends_on,
+              :node
             ],
        do: Value.decode(value, registry)
 

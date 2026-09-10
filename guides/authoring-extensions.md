@@ -62,8 +62,8 @@ system of actors, use a Topology or application supervision tree.
 ## Extend Topology Authoring
 
 A Topology authoring extension uses the same static lowering model. It can add
-one or more Spark sections, or it can add entities to existing Topology
-sections. The extension implements `Jido.Topology.Extension`:
+entities to sections under `topology do`. The extension implements
+`Jido.Topology.Extension`:
 
 ```elixir
 @behaviour Jido.Topology.Extension
@@ -80,10 +80,10 @@ Pass it to the Topology declaration:
 use Jido.Topology, extensions: [MyApp.TopologyExtension]
 ```
 
-Core collects normal Agents, groups, Buses, relationships, connections,
-composition data, and startup policy first. It then collects foreign entities
-from all extension sections. Each extension consumes its entities in extension
-order and returns ordinary Topology configuration.
+Core collects normal Agents, groups, resources, relationships, connections,
+composition data, and startup policy from `topology do`. It then collects
+foreign entities from extension sections. Each extension consumes its entities
+in extension order and returns ordinary Topology configuration.
 
 The callback receives entity structs, not raw Spark section state. Put required
 lowering input in an entity. Use distinct structs for entities with different

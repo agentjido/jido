@@ -1,18 +1,42 @@
-# Topology Plugin contribution
+# 07_06 Plugin Contribution
 
-The Agent declares one Plugin package. Its Topology facet contributes one Bus
-and connects that Agent declaration to the Bus. The source Topology does not
-repeat this wiring.
+An Agent Plugin contributes one static Bus and one subscription during Topology
+planning, so the Topology does not repeat the wiring.
 
-`Jido.Topology.new/1` validates the static source and does not call Topology
-contribution callbacks. `Jido.Topology.instantiate/2` asks each Topology facet
-for its pure static contribution before it builds the local plan. This
-operation starts no Jido process.
+## What you will learn
 
-The common Topology validator checks the combined entries. Duplicate keys,
-unknown endpoints, duplicate subscriptions, and graph cycles fail before a
-Controller can start the plan.
+- How a `Jido.Topology.Plugin` facet returns a pure static contribution.
+- How the common Topology validator checks contributed resources and connections.
 
-The facet owns only static contribution. It cannot start an Agent, create a
-runtime Plugin process, persist state, replace the Controller target, or grant
-distributed write authority.
+## Read the code
+
+Read [the Topology](plugin_contribution.ex), [the Agent](inbox_worker.ex), then
+[the Plugin and Topology facet](inbox_plugin.ex).
+
+## Run it
+
+```sh
+mix test test/examples/07_topology/07_06_plugin_contribution --include example --seed 0
+```
+
+Expected result: planning adds the Bus and subscription, the Controller starts
+them, and a published Signal changes the worker state.
+
+## Important behavior
+
+The source definition stays unchanged. Contributions are applied during
+instantiation and validated before activation.
+
+## Limits
+
+The facet cannot start a process, grant write authority, persist state, or
+replace the Controller target.
+
+## Files
+
+- [Topology](plugin_contribution.ex)
+- [Agent](inbox_worker.ex)
+- [Plugin and facet](inbox_plugin.ex)
+- [Tests](../../../test/examples/07_topology/07_06_plugin_contribution/plugin_contribution_test.exs)
+
+Previous: [Composed System](../07_05_composed_system/README.md) | Next: [Lifecycle Signals](../07_07_lifecycle_signals/README.md)

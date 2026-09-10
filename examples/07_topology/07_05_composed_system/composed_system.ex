@@ -7,35 +7,35 @@ defmodule Jido.Examples.Topology.ComposedSystem do
              east_workers: Zoi.integer() |> Zoi.min(0) |> Zoi.default(2),
              west_workers: Zoi.integer() |> Zoi.min(0) |> Zoi.default(3)
            })
-  end
 
-  agents do
-    agent :director, Jido.Examples.Topology.Cell
-  end
-
-  resources do
-    bus :events
-  end
-
-  topologies do
-    include :east, Jido.Examples.Topology.WorkerTeam do
-      inputs %{worker_count: input(:east_workers), label: "east"}
-      bind :events, to: :events
+    agents do
+      agent :director, Jido.Examples.Topology.Cell
     end
 
-    include :west, Jido.Examples.Topology.WorkerTeam do
-      inputs %{worker_count: input(:west_workers), label: "west"}
-      bind :events, to: :events
+    resources do
+      bus :events
     end
-  end
 
-  relationships do
-    owns :director, ref(:east, :leader)
-    owns :director, ref(:west, :leader)
-  end
+    topologies do
+      include :east, Jido.Examples.Topology.WorkerTeam do
+        inputs %{worker_count: input(:east_workers), label: "east"}
+        bind :events, to: :events
+      end
 
-  startup do
-    concurrency 4
-    task_timeout 5_000
+      include :west, Jido.Examples.Topology.WorkerTeam do
+        inputs %{worker_count: input(:west_workers), label: "west"}
+        bind :events, to: :events
+      end
+    end
+
+    relationships do
+      owns :director, ref(:east, :leader)
+      owns :director, ref(:west, :leader)
+    end
+
+    startup do
+      concurrency 4
+      task_timeout 5_000
+    end
   end
 end

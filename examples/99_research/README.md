@@ -1,55 +1,47 @@
-# Jido feature acceptance examples
+# Research probes
 
-The research set has 16 executable feature probes. The current result has
-**48 passing checks and no skipped checks**. Ten probes cover general core
-features, three retained probes cover persistence boundaries, and three cover
-bounded live Agent and Topology upgrades.
+These probes record implemented contracts that are not yet promoted into the
+stable learning path, and application extensions that are not Jido core APIs.
+Do not copy a research pattern into an application without reading its status
+and limits.
 
-## Run
+## Application extensions
+
+1. [Progress Observation](99_01_progress_observation/README.md) — bounded temporary progress outside Agent state.
+2. [Distributed Authority](99_02_distributed_authority/README.md) — external fencing across local Erlang nodes.
+3. [Input Resource Lifecycle](99_03_input_resource_lifecycle/README.md) — runtime reconstruction from Plugin state.
+4. [Handoff Reconciliation](99_04_handoff_reconciliation/README.md) — acknowledged request ownership in application state.
+5. [Shared Budget](99_05_capacity_deadlines_cleanup/README.md) — one local admission budget for several teams.
+
+## Persistence and routing contracts
+
+6. [Checkpoint Identity](99_06_checkpoint_identity/README.md)
+7. [Checkpoint Portability](99_07_checkpoint_portability/README.md)
+8. [Indeterminate Write](99_08_indeterminate_write/README.md)
+9. [Route Selection](99_09_route_selection/README.md)
+10. [Plugin Isolation](99_10_plugin_isolation/README.md)
+11. [Stable Reference](99_11_stable_reference/README.md)
+12. [Definition Revision](99_12_definition_revision/README.md)
+13. [Durable Delete](99_13_durable_delete/README.md)
+
+## Upgrade contracts
+
+14. [Turn Upgrade](99_14_turn_upgrade/README.md)
+15. [State Migration](99_15_state_migration/README.md)
+16. [Topology Upgrade](99_16_topology_upgrade/README.md)
+
+## Run the section
 
 ```sh
 mix test test/examples/99_research --include example --seed 0
 ```
 
-This is an optional secondary check. It uses no vendor API or model request.
-The distributed example starts two local Erlang nodes. Each row has its own
-focused command.
+Expected result: every enabled probe passes. The distributed-authority probe
+starts two local Erlang nodes. Research failures must name a missing contract;
+they must not be hidden with an example-only production shim.
 
-| ID | Feature | Pass | Skipped | Result |
-| --- | --- | ---: | ---: | --- |
-| FA-01 | [Route precedence and fixed selection](99_09_route_selection/README.md) | 4 | 0 | Core feature available |
-| FA-02 | [Plugin read and prepared-input isolation](99_10_plugin_isolation/README.md) | 4 | 0 | Core feature available |
-| FA-03 | [Stable Agent references and durable namespace identity](99_11_stable_reference/README.md) | 3 | 0 | Implemented and executable |
-| FA-04 | [Definition revision checks on restore](99_12_definition_revision/README.md) | 2 | 0 | Core feature available |
-| FA-05 | [Durable deletion](99_13_durable_delete/README.md) | 3 | 0 | Implemented and executable |
-| FA-06 | [Plugin runtime reconstruction from committed state](99_03_input_resource_lifecycle/README.md) | 2 | 0 | Implemented and executable |
-| FA-07 | [Progress observation with recovery](99_01_progress_observation/README.md) | 5 | 0 | Works as an application extension |
-| FA-08 | [Acknowledged handoff and worker reconciliation](99_04_handoff_reconciliation/README.md) | 3 | 0 | Works as an application protocol |
-| FA-09 | [Shared work budgets](99_05_capacity_deadlines_cleanup/README.md) | 3 | 0 | Works as a local runtime extension |
-| FA-10 | [Fenced distributed ownership](99_02_distributed_authority/README.md) | 4 | 0 | Works with an explicit external authority |
-| PERSIST-01 | [Checkpoint identity](99_06_checkpoint_identity/README.md) | 1 | 0 | Core loader rejects mismatched identity |
-| PERSIST-02 | [Checkpoint portability](99_07_checkpoint_portability/README.md) | 1 | 0 | Core loader rejects runtime-only values |
-| PERSIST-03 | [Indeterminate write](99_08_indeterminate_write/README.md) | 1 | 0 | Core blocks stale work after an uncertain write |
-| UP-01 | [Turn upgrade](99_14_turn_upgrade/README.md) | 3 | 0 | Core provides an explicit quiescent upgrade boundary |
-| UP-02 | [State migration](99_15_state_migration/README.md) | 4 | 0 | Core validates and checkpoints live definition migration |
-| UP-07 | [Topology upgrade](99_16_topology_upgrade/README.md) | 5 | 0 | Core supports additive local target updates |
+## Promotion rule
 
-The tables and focused README files record each missing contract, proof limit,
-validation command, and live-upgrade result. Executable tests are the current
-evidence.
-
-## Retained research
-
-The original IDs remain stable. The ten probes use existing folders 99_01
-through 99_05 and new folders 99_09 through 99_13. Three completed persistence
-probes remain under 99_06 through 99_08. Each has a small example test and a
-deeper core regression suite.
-The live-upgrade examples use new folders 99_14 through 99_16.
-
-The original DIST-03 source probe and its core tests remain available. The
-core-only exclusive-owner test retains its previously approved skip. The four
-new fencing checks have no skips and use an explicit external authority.
-
-These tests stay in test/examples because they record core requirements.
-Existing CI excludes test/examples; the full command with `--include example`
-runs them.
+Promote a probe only after the public API is stable, its normal usage is clear,
+and it has a concise place in sections `01` through `08`. Remove the research
+copy after promotion unless it still proves a separate boundary.

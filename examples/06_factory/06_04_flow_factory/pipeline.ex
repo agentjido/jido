@@ -10,7 +10,9 @@ defmodule Jido.Examples.Factory.FlowFactory.AskWorker do
          {:ok, agent} <-
            Server.call(
              worker,
-             Jido.Signal.new!("factory.flow.work", input, source: "/factory/flow"),
+             Jido.Signal.new!("examples.factory.flow.work", input,
+               source: "/examples/factory/flow"
+             ),
              context: context,
              timeout: 60_000
            ),
@@ -47,7 +49,7 @@ defmodule Jido.Examples.Factory.FlowFactory.AskWorker do
   defp progress(input, status, artifact, context) do
     signal =
       Jido.Signal.new!(
-        "factory.flow.progress",
+        "examples.factory.flow.progress",
         %{
           mission_id: input.mission_id,
           assignment_id: Contract.assignment_id(input),
@@ -56,7 +58,7 @@ defmodule Jido.Examples.Factory.FlowFactory.AskWorker do
           status: status,
           artifact: artifact
         },
-        source: "/factory/flow"
+        source: "/examples/factory/flow"
       )
 
     GenServer.call(context.progress_sink, {:progress, signal})
@@ -93,24 +95,9 @@ defmodule Jido.Examples.Factory.FlowFactory.Discovery do
   end
 end
 
-defmodule Jido.Examples.Factory.FlowFactory.SkipSecurity do
-  @moduledoc false
-  use Jido.Action, name: "flow_factory_skip_security"
-
-  def run(_, _),
-    do:
-      {:ok,
-       %{
-         verdict: :accepted,
-         findings: [],
-         skipped: true,
-         text: "Security review was not requested."
-       }}
-end
-
 defmodule Jido.Examples.Factory.FlowFactory.Review do
   @moduledoc "Quality and optional security review run independently before a join."
-  alias Jido.Examples.Factory.FlowFactory.{AskWorker, SkipSecurity}
+  alias Jido.Examples.Factory.FlowFactory.AskWorker
   use Jido.Flow, name: "flow_factory_review"
 
   flow do
@@ -136,7 +123,17 @@ defmodule Jido.Examples.Factory.FlowFactory.Review do
           inputs: input(:bundle)
         }
 
-      otherwise action: SkipSecurity, params: %{}
+      otherwise do
+        action [] do
+          {:ok,
+           %{
+             verdict: :accepted,
+             findings: [],
+             skipped: true,
+             text: "Security review was not requested."
+           }}
+        end
+      end
     end
 
     step "verdict", [quality <- result("quality"), security <- result("security")] do

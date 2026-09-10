@@ -23,6 +23,12 @@ records proposed, incomplete, or not yet promoted behavior. A research example
 must state its status and must not present unsupported behavior as the normal
 Jido pattern.
 
+A research README must name the current public contract, the remaining gap or
+reason that promotion is deferred, the executable evidence, and the proof
+limits. When core closes the original gap, either promote the lesson into
+groups `01` through `08` or state the remaining promotion work. Do not keep an
+implemented research copy with no distinct purpose.
+
 ## Agent and Action authoring
 
 Use the Agent DSL as the normal form for a static Agent definition:

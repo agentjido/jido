@@ -1,5 +1,5 @@
 defmodule Jido.Topology.Instance do
-  @moduledoc "A topology definition with validated input and a local execution plan."
+  @moduledoc "A topology definition with validated input and an execution plan."
 
   @schema Zoi.struct(__MODULE__, %{
             id: Zoi.string(),

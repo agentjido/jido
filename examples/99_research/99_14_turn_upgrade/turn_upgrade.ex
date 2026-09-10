@@ -1,49 +1,5 @@
-defmodule Jido.Examples.TurnUpgrade.Step do
-  @moduledoc "The isolated Action that the example reloads between Flow steps."
-  use Jido.Action, name: "research_upgrade_step"
-
-  def run(input, _context),
-    do: {:ok, %{total: input.total + 1, revisions: input.revisions ++ [1]}}
-end
-
-defmodule Jido.Examples.TurnUpgrade.Barrier do
-  @moduledoc false
-  use Jido.Action, name: "research_upgrade_barrier"
-
-  def run(input, %{observer: observer, gate: gate}) do
-    send(observer, {:between_upgrade_steps, gate, self()})
-
-    receive do
-      {:release, ^gate} -> {:ok, input}
-    after
-      5_000 -> {:error, Jido.Action.Error.execution_error("Upgrade barrier timed out")}
-    end
-  end
-
-  def run(input, _context), do: {:ok, input}
-end
-
-defmodule Jido.Examples.TurnUpgrade.Pipeline do
-  @moduledoc false
-  use Jido.Flow, name: "research_upgrade_pipeline"
-
-  flow do
-    step "first",
-      action: Jido.Examples.TurnUpgrade.Step,
-      params: %{total: 0, revisions: []}
-
-    step "barrier", action: Jido.Examples.TurnUpgrade.Barrier, params: result("first")
-    step "second", action: Jido.Examples.TurnUpgrade.Step, params: result("barrier")
-    output result("second")
-  end
-end
-
 defmodule Jido.Examples.TurnUpgrade do
-  @moduledoc """
-  Tests whether a live Turn retains one Action revision across a code load.
-  Only Step is reloaded. Tests are serial and pause outside that module.
-  This is a deployment probe, not a core upgrade API or release installer.
-  """
+  @moduledoc "Probes the public idle boundary for a live Agent code upgrade."
   use Jido.Agent, name: "research_turn_upgrade"
 
   agent do
@@ -54,16 +10,19 @@ defmodule Jido.Examples.TurnUpgrade do
   end
 
   routes do
-    signal_source "/examples/upgrade"
-    route "upgrade.run", __MODULE__.Pipeline
+    signal_source "/examples/research/turn_upgrade"
+    route "examples.research.turn_upgrade.run", __MODULE__.Pipeline
   end
 
-  def run(server, context \\ %{}),
+  def run(server),
     do:
       Jido.AgentServer.call(
         server,
-        Jido.Signal.new!("upgrade.run", %{}, source: "/examples/upgrade"),
-        context: context
+        Jido.Signal.new!(
+          "examples.research.turn_upgrade.run",
+          %{},
+          source: "/examples/research/turn_upgrade"
+        )
       )
 
   @doc "Loads revision 1 or 2 of the isolated Step, with no forced code purge."
@@ -79,7 +38,13 @@ defmodule Jido.Examples.TurnUpgrade do
       Code.compile_quoted(
         quote do
           defmodule unquote(module) do
-            use Jido.Action, name: "research_upgrade_step"
+            use Jido.Action,
+              name: "research_upgrade_step",
+              schema:
+                Zoi.object(%{
+                  total: Zoi.integer(),
+                  revisions: Zoi.list(Zoi.integer())
+                })
 
             def run(input, _context),
               do:
@@ -96,5 +61,29 @@ defmodule Jido.Examples.TurnUpgrade do
     end
 
     :ok
+  end
+end
+
+defmodule Jido.Examples.TurnUpgrade.Step do
+  @moduledoc "The stable Action identity that the probe reloads."
+  use Jido.Action,
+    name: "research_upgrade_step",
+    schema: Zoi.object(%{total: Zoi.integer(), revisions: Zoi.list(Zoi.integer())})
+
+  def run(input, _context),
+    do: {:ok, %{total: input.total + 1, revisions: input.revisions ++ [1]}}
+end
+
+defmodule Jido.Examples.TurnUpgrade.Pipeline do
+  @moduledoc "Runs the reloadable Action twice in one finite Flow."
+  use Jido.Flow, name: "research_upgrade_pipeline"
+
+  flow do
+    step "first",
+      action: Jido.Examples.TurnUpgrade.Step,
+      params: %{total: 0, revisions: []}
+
+    step "second", action: Jido.Examples.TurnUpgrade.Step, params: result("first")
+    output result("second")
   end
 end

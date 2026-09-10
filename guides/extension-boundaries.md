@@ -24,9 +24,10 @@ only when the extension needs the authority that the contract supplies.
 | Observe Agent behavior | A semantic Telemetry handler or the optional OpenTelemetry API mapping | Observation has no authority to change evaluation, commit, or runtime results. |
 
 Builders and codecs are public authoring tools. Use them for trusted systems
-that create Agent or Topology definitions. The `spawn_fun` option is a public
-application boundary for starting an owned child on a known Erlang node. It is
-not a cluster placement service.
+that create Agent or Topology definitions. Child `node:` options and
+`Jido.Topology.Controller.place_agent/4` accept an exact known Erlang node.
+They do not discover nodes, select capacity, rebalance a system, or grant
+distributed authority.
 
 ## Package ownership
 
@@ -40,7 +41,7 @@ integration at that boundary.
 
 Jido owns Agent values, Turn use of the lower packages, Plugin composition,
 candidate assembly, live commit, Directives, the local Agent runtime,
-persistence record meaning, static local Topology, public errors, and semantic
+persistence record meaning, static Topology, public errors, and semantic
 Agent observation.
 
 Focused integration packages can own AI behavior, browser automation, storage

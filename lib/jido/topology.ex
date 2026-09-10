@@ -1,11 +1,17 @@
 defmodule Jido.Topology do
   @moduledoc """
-  A declarative definition of Agents, groups, Buses, and logical ownership.
+  A declarative definition of Agents, groups, resources, and logical ownership.
 
   Module declarations, `Jido.Topology.Builder`, and `Jido.Topology.Codec` use
   the same constructor. Declaration and planning start no processes. Instance
   input is validated separately from Agent state. See the topology examples in
-  `examples/07_topology` for local startup and JSON transport.
+  `examples/07_topology` for startup, control Signals, placement, and JSON
+  transport.
+
+  A module can contain three root blocks. `agent` defines an optional control
+  Agent. `routes` uses the normal Agent DSL and requires `agent`. `topology`
+  contains all topology-specific sections. The control Agent and topology are
+  independent. Starting one never starts the other.
 
   Pass static authoring extensions with
   `use Jido.Topology, extensions: [MyExtension]`. An extension can implement
@@ -107,7 +113,7 @@ defmodule Jido.Topology do
   @doc "Validates a definition or raises its error."
   def new!(attrs), do: unwrap!(new(attrs))
 
-  @doc "Validates input, applies static Plugin contributions, and builds a local plan."
+  @doc "Validates input, applies static Plugin contributions, and builds an execution plan."
   @spec instantiate(t(), map() | keyword()) :: {:ok, Instance.t()} | {:error, Exception.t()}
   def instantiate(definition, opts) do
     with {:ok, definition, _static_composed} <- new_with_composition(definition),

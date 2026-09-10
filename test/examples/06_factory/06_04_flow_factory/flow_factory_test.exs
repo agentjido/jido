@@ -184,7 +184,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
   test "worker retries use the committed result and reject changed inputs", c do
     {:ok, worker} = Jido.start_agent(c.jido, Worker, initial_state: %{role: "research"})
     input = %{mission_id: "one", role: "research", revision: 0, goal: "CSV export", inputs: %{}}
-    request = signal("factory.flow.work", input)
+    request = signal("examples.factory.flow.work", input)
     context = observed(false)
     assert {:ok, first} = Server.call(worker, request, context: context)
     assert_receive {:work, ^input, _}
@@ -193,7 +193,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
     refute_received {:work, _, _}
 
     assert {:error, _} =
-             Server.call(worker, signal("factory.flow.work", %{input | goal: "Changed"}))
+             Server.call(worker, signal("examples.factory.flow.work", %{input | goal: "Changed"}))
 
     assert Server.snapshot(worker).agent == first
   end
@@ -249,20 +249,8 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
   end
 
   defp observed(hold) do
-    observer = self()
-
     %{
-      on_worker: fn input, pid ->
-        send(observer, {:work, input, pid})
-
-        if hold == true or (is_function(hold, 1) and hold.(input)) do
-          receive do
-            :release -> :ok
-          after
-            15_000 -> raise "Worker test barrier was not released"
-          end
-        end
-      end
+      writer: {JidoTest.FactoryWriter.Barrier, %{observer: self(), hold: hold}}
     }
   end
 
@@ -306,7 +294,7 @@ defmodule JidoTest.Examples.Factory.FlowFactoryTest do
 
   defp finished(id, output),
     do:
-      signal("factory.flow.finished", %{
+      signal("examples.factory.flow.finished", %{
         mission_id: id,
         status: :completed,
         output: output,

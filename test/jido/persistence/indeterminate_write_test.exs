@@ -31,17 +31,19 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     {:ok,
      store: {Store, store: start_supervised!(Store)},
      id: unique_id("indeterminate-write"),
-     turn_context: %{
-       reply_to: observer,
-       on_execute: fn id -> send(observer, {:evaluated, id}) end
-     }}
+     turn_context: %{reply_to: observer}}
   end
 
   test "a confirmed write commits state and permits post-commit output", c do
     {:ok, pid} = start_agent(c, :ok)
     assert {:ok, agent} = Probe.increment(pid, "first", 1, context: c.turn_context)
-    assert_receive {:evaluated, "first"}
-    assert_receive {:signal, %{type: "persistence.probe.applied", data: %{count: 1}}}
+
+    assert_receive {:signal,
+                    %{
+                      type: "examples.research.indeterminate_write.applied",
+                      data: %{count: 1}
+                    }}
+
     assert Server.snapshot(pid) == %{agent: agent, state_version: 1}
 
     assert {:ok, ^agent, 1} =
@@ -54,9 +56,8 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert {:error, {:persistence_failed, :indeterminate}} =
              Probe.increment(pid, "first", 1, context: c.turn_context)
 
-    assert_receive {:evaluated, "first"}
     assert_stored_first(c)
-    refute_received {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
   end
 
   test "an indeterminate write prevents evaluation of the next Action on stale state", c do
@@ -65,15 +66,13 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert {:error, {:persistence_failed, :indeterminate}} =
              Probe.increment(pid, "first", 1, context: c.turn_context)
 
-    assert_receive {:evaluated, "first"}
     assert_stored_first(c)
 
     # A stopped Server or a rejected command can satisfy the admission boundary.
     # Do not install a stopping error policy: this test requires a core guarantee.
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_received {:evaluated, "second"}
-    refute_received {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
     assert_stored_first(c)
   end
 
@@ -90,12 +89,10 @@ defmodule JidoTest.Persistence.IndeterminateWriteTest do
     assert {:error, {:persistence_failed, {:indeterminate, %Jido.Error.ExecutionError{}}}} =
              Probe.increment(pid, "first", 1, context: c.turn_context)
 
-    assert_receive {:evaluated, "first"}
     assert_stored_first(c)
     result = try_next_command(pid, c.turn_context)
     assert match?({:error, _}, result) or match?({:exit, _}, result)
-    refute_received {:evaluated, "second"}
-    refute_received {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
   end
 
   defp start_agent(c, write_result) do

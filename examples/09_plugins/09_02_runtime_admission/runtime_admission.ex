@@ -10,15 +10,15 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Plugin.Server do
   @moduledoc false
   use Jido.AgentServer.Plugin
 
-  alias Jido.Agent.Command
-  alias Jido.Examples.Plugins.RuntimeAdmission.{Plugin, Runtime}
+  alias Jido.AgentServer.Plugin.Admission
+  alias Jido.Examples.Plugins.RuntimeAdmission.Runtime
   alias Jido.Plugin.Init
 
   @impl true
-  def admit(runtime, %Command{signal: signal} = command, _opts) do
+  def admit(runtime, %Admission{signal: signal}, _opts) do
     with token when is_binary(token) <- Map.get(signal.data, :token),
          {:ok, authorization} <- Runtime.authorize(runtime, token) do
-      {:ok, Command.put_plugin_input(command, Plugin, authorization)}
+      {:ok, authorization}
     else
       nil -> {:error, :token_required}
       {:error, _reason} = error -> error
@@ -75,7 +75,7 @@ defmodule Jido.Examples.Plugins.RuntimeAdmission.Agent do
                context.plugin_inputs,
                Jido.Examples.Plugins.RuntimeAdmission.Plugin
              ) do
-          {:ok, %{principal: principal, lease: lease}} when is_reference(lease) ->
+          {:ok, %{runtime: %{principal: principal, lease: lease}}} when is_reference(lease) ->
             {:ok,
              %{
                context.agent_state

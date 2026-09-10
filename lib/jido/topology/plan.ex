@@ -1,8 +1,8 @@
 defmodule Jido.Topology.Plan do
-  @moduledoc "An expanded local topology with stable IDs and dependency layers."
+  @moduledoc "An expanded topology with stable IDs, exact nodes, and dependency layers."
 
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Composition, Plugin, Ref, Reference, Validation}
+  alias Jido.Topology.{Composition, Plugin, Ref, Reference, Resource, Validation}
 
   @schema Zoi.struct(__MODULE__, %{
             agents: Zoi.map(),
@@ -35,7 +35,7 @@ defmodule Jido.Topology.Plan do
   defp expand_plan(definition, id, input, composed) do
     with {:ok, inputs} <- Composition.inputs(definition, input),
          {:ok, expanded} <- expand(composed.nodes, inputs, definition.startup.max_agents),
-         resource_specs = Enum.filter(composed.nodes, &(&1.kind == :bus)),
+         resource_specs = Enum.filter(composed.nodes, &Resource.resource?/1),
          {:ok, components} <- component_limits(composed.scopes, expanded, resource_specs),
          {:ok, agents} <-
            Authoring.traverse(expanded, &agent(&1, id, Map.fetch!(inputs, &1.scope))),
@@ -159,7 +159,12 @@ defmodule Jido.Topology.Plan do
         do: spec.key <> "/" <> Composition.escape(spec.member_key),
         else: spec.key
 
-    with {:ok, state} <- Reference.resolve(spec.initial_state, input, Map.get(spec, :member, %{})),
+    member = Map.get(spec, :member, %{})
+
+    with {:ok, state} <- Reference.resolve(spec.initial_state, input, member),
+         {:ok, target_node} <- Reference.resolve(spec.node, input, member),
+         {:ok, target_node} <- target_node(target_node),
+         :ok <- placement_resources(target_node, spec.subscriptions),
          {:ok, _} <-
            Jido.Agent.instantiate(spec.module,
              id: Composition.escape(id) <> "/" <> key,
@@ -172,7 +177,8 @@ defmodule Jido.Topology.Plan do
          key: key,
          id: Composition.escape(id) <> "/" <> key,
          declaration: spec.key,
-         initial_state: state
+         initial_state: state,
+         node: target_node
        })}
     end
   end
@@ -232,4 +238,16 @@ defmodule Jido.Topology.Plan do
 
   defp size_limit(count, limit) when count <= limit, do: :ok
   defp size_limit(_, _), do: Authoring.error("Topology exceeds startup.max_agents")
+
+  defp target_node(nil), do: {:ok, node()}
+  defp target_node(value) when is_atom(value) and value not in [true, false], do: {:ok, value}
+
+  defp target_node(_value),
+    do: Authoring.error("Resolved topology Agent node must be an atom")
+
+  defp placement_resources(_target, []), do: :ok
+  defp placement_resources(target, _subscriptions) when target == node(), do: :ok
+
+  defp placement_resources(_target, _subscriptions),
+    do: Authoring.error("A remote topology Agent cannot subscribe to a local Bus")
 end

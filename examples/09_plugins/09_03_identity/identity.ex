@@ -33,6 +33,7 @@ defmodule Jido.Examples.Plugins.Identity.Agent do
           | accepted: context.agent_state.accepted + 1,
             last_public_key:
               context.plugin_inputs[Jido.Examples.Plugins.Identity.Plugin]
+              |> Map.fetch!(:prepared)
               |> Map.fetch!(:public_key)
               |> Base.encode16(case: :lower)
         }

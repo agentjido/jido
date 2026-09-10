@@ -99,6 +99,7 @@ defmodule JidoTest.InstanceTest do
 
     on_exit(fn ->
       Application.delete_env(:jido_test_instance, TestInstance)
+      Jido.Debug.reset(TestInstance)
       stop_test_instance()
     end)
 
@@ -124,6 +125,16 @@ defmodule JidoTest.InstanceTest do
     assert spec.id == TestInstance
     assert {Jido, :start_link, [opts]} = spec.start
     assert opts[:name] == TestInstance
+  end
+
+  test "runtime debug options override application configuration" do
+    Application.put_env(:jido_test_instance, TestInstance, max_tasks: 500, debug: true)
+    assert {:ok, _pid} = TestInstance.start_link(debug: false)
+    assert TestInstance.debug() == :off
+
+    stop_test_instance()
+    assert {:ok, _pid} = TestInstance.start_link(debug: :verbose)
+    assert TestInstance.debug() == :verbose
   end
 
   test "invalid application instance configuration reaches the final validator" do

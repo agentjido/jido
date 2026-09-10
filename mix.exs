@@ -200,9 +200,13 @@ defmodule Jido.MixProject do
         ],
         "Agent Authoring": [
           Jido.Agent.Builder,
-          Jido.Agent.Codec,
-          Jido.Agent.Codec.Registry,
           Jido.Agent.Extension
+        ],
+        "Authoring Codecs": [
+          Jido.Codec.Registry,
+          Jido.Agent.Codec,
+          Jido.Plugin.Codec,
+          Jido.Topology.Codec
         ],
         "Agent Directives": [
           Jido.Agent.Directive,
@@ -227,7 +231,6 @@ defmodule Jido.MixProject do
         ],
         "Plugin Contracts": [
           Jido.Plugin,
-          Jido.Plugin.Codec,
           Jido.Plugin.Manifest
         ],
         "Built-In Plugins": [
@@ -254,7 +257,6 @@ defmodule Jido.MixProject do
         Topology: [
           Jido.Topology,
           Jido.Topology.Builder,
-          Jido.Topology.Codec,
           Jido.Topology.Controller,
           Jido.Topology.Extension,
           Jido.Topology.Instance,
@@ -263,7 +265,8 @@ defmodule Jido.MixProject do
           Jido.Topology.Plugin.Context,
           Jido.Topology.Plugin.Contribution,
           Jido.Topology.Ref,
-          Jido.Topology.Reference
+          Jido.Topology.Reference,
+          Jido.Topology.Signal
         ],
         "Persistence And History": [
           Jido.Persistence,
@@ -277,14 +280,7 @@ defmodule Jido.MixProject do
           Jido.Persistence.Plugin.Context,
           Jido.Persistence.Redis
         ],
-        Observability: [
-          Jido.Debug,
-          Jido.Telemetry,
-          Jido.Telemetry.Formatter,
-          Jido.Telemetry.OpenTelemetry,
-          Jido.Tracing.Context,
-          Jido.Tracing.Trace
-        ],
+        Observability: [Jido.Telemetry],
         Errors: [
           Jido.Error,
           Jido.Error.CompensationError,

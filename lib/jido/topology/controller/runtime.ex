@@ -3,22 +3,33 @@ defmodule Jido.Topology.Controller.Runtime do
   use GenServer
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Signal.Bus
   alias Jido.Telemetry.Topology, as: TopologyTelemetry
-  alias Jido.Topology.{Controller, Plan}
+  alias Jido.Topology.{Controller, Plan, Resource}
+
+  alias Jido.Topology.Signal.{
+    ComponentFailed,
+    ComponentReady,
+    OperationCompleted,
+    OperationStarted,
+    StatusChanged
+  }
+
   alias Jido.Tracing.Context, as: TraceContext
 
-  def start_link({jido, instance, repair}),
-    do: GenServer.start_link(__MODULE__, {jido, instance, repair})
+  @placement_hive :topology_placements
+
+  def start_link({jido, instance, repair, lifecycle}),
+    do: GenServer.start_link(__MODULE__, {jido, instance, repair, lifecycle})
 
   @impl true
-  def init({jido, instance, repair}) do
+  def init({jido, instance, repair, lifecycle}) do
     Process.flag(:trap_exit, true)
 
     state = %{
       jido: jido,
       instance: instance,
       repair: repair,
+      lifecycle: lifecycle,
       reconcile_requested: false,
       reconcile_timer: nil,
       reconcile_token: nil,
@@ -29,7 +40,12 @@ defmodule Jido.Topology.Controller.Runtime do
       pending: MapSet.new(),
       active: %{},
       pass_count: 0,
-      operation_span: nil
+      operation_span: nil,
+      operation: nil,
+      operation_id: nil,
+      operation_override: nil,
+      last_status: nil,
+      placements: load_placements(jido, instance)
     }
 
     {:ok, state, {:continue, :reconcile}}
@@ -86,9 +102,50 @@ defmodule Jido.Topology.Controller.Runtime do
 
   def handle_call({:update, target}, _from, state) do
     with :ok <- update_idle(state),
-         :ok <- additive_target(state.instance, target) do
-      state = state |> Map.put(:instance, target) |> request_pass()
+         :ok <- additive_target(state.instance, target),
+         :ok <- save_placements(state.jido, target, Map.get(state, :placements, %{})) do
+      state =
+        state
+        |> Map.put(:instance, target)
+        |> Map.put(:operation_override, :update)
+        |> request_pass()
+
       {:reply, :ok, state}
+    else
+      {:error, _reason} = error -> {:reply, error, state}
+    end
+  end
+
+  def handle_call({:place_agent, target, member, target_node, timeout}, _from, state) do
+    with :ok <- update_idle(state),
+         {:ok, key, current} <- placement_target(state, target, member),
+         :ok <- placement_node(target_node),
+         :ok <- placement_resources(current, target_node) do
+      if current.node == target_node do
+        {:reply, :ok, state}
+      else
+        with :ok <- retire(current, state, timeout) do
+          placements = Map.put(Map.get(state, :placements, %{}), key, target_node)
+
+          case save_placements(state.jido, state.instance, placements) do
+            :ok ->
+              state =
+                state
+                |> Map.put(:placements, placements)
+                |> Map.update!(:ready, &Map.delete(&1, key))
+                |> Map.update!(:errors, &Map.delete(&1, key))
+                |> Map.put(:operation_override, :place)
+                |> request_pass()
+
+              {:reply, :ok, state}
+
+            {:error, _reason} = error ->
+              {:reply, error, request_pass(state)}
+          end
+        else
+          {:error, _reason} = error -> {:reply, error, state}
+        end
+      end
     else
       {:error, _reason} = error -> {:reply, error, state}
     end
@@ -116,18 +173,30 @@ defmodule Jido.Topology.Controller.Runtime do
     context = ownership_context(state)
 
     pid =
-      case Map.get(state.instance.plan.agents, key) do
+      case agent_spec(key, state) do
         nil ->
           nil
 
         spec ->
-          case Jido.whereis_agent(state.jido, spec.id) do
+          case whereis_agent(spec, %{jido: state.jido}) do
             pid when is_pid(pid) -> if owned?(:agent, pid, spec, context), do: pid
             _ -> nil
           end
       end
 
     {:reply, pid, state}
+  end
+
+  def handle_call({:agent_node, target, member}, _from, state) do
+    key = Plan.resolve(state.instance.plan, target, :agent, member)
+
+    target_node =
+      case agent_spec(key, state) do
+        nil -> nil
+        spec -> spec.node
+      end
+
+    {:reply, target_node, state}
   end
 
   def handle_call({:bus, target}, _from, state) do
@@ -140,21 +209,7 @@ defmodule Jido.Topology.Controller.Runtime do
           nil
 
         spec ->
-          ready_pid = Map.get(state.ready, key)
-
-          if owned?(:bus, ready_pid, spec, context) do
-            ready_pid
-          else
-            case Bus.whereis(spec.id, jido: state.jido) do
-              {:ok, pid} ->
-                if owned?(:bus, pid, spec, context),
-                  do: pid,
-                  else: nil
-
-              _ ->
-                nil
-            end
-          end
+          Resource.whereis(spec, context)
       end
 
     {:reply, pid, state}
@@ -164,6 +219,15 @@ defmodule Jido.Topology.Controller.Runtime do
   def terminate(reason, state) do
     TopologyTelemetry.finish(Map.get(state, :operation_span), :error, state)
     span = TopologyTelemetry.start(:cleanup, state)
+    operation_id = Jido.Signal.ID.generate!()
+
+    emit(state, fn ->
+      lifecycle_signal(OperationStarted, state.instance.id, %{
+        operation_id: operation_id,
+        operation: "cleanup"
+      })
+    end)
+
     if state.reconcile_timer, do: Process.cancel_timer(state.reconcile_timer)
     Enum.each(state.active, fn {_, job} -> Task.shutdown(job.task, :brutal_kill) end)
 
@@ -174,15 +238,21 @@ defmodule Jido.Topology.Controller.Runtime do
       |> Enum.reverse()
       |> List.flatten()
       |> Enum.each(fn key ->
-        case Map.get(state.instance.plan.agents, key) do
+        case agent_spec(key, state) do
           nil ->
             :ok
 
           spec ->
             safely(fn ->
-              case Jido.whereis_agent(state.jido, spec.id) do
+              case whereis_agent(spec, %{jido: state.jido}) do
                 pid when is_pid(pid) ->
-                  if owned?(:agent, pid, spec, context), do: Jido.stop_agent(state.jido, pid)
+                  if owned?(:agent, pid, spec, context) do
+                    stop_agent(
+                      state.jido,
+                      pid,
+                      state.instance.definition.startup.task_timeout
+                    )
+                  end
 
                 _ ->
                   :ok
@@ -190,10 +260,21 @@ defmodule Jido.Topology.Controller.Runtime do
             end)
         end
       end)
+
+      Jido.RuntimeStore.delete(state.jido, @placement_hive, state.instance.id)
     end
 
     cleanup_status = if intentional_shutdown?(reason), do: :ok, else: :error
     TopologyTelemetry.finish(span, cleanup_status, %{state | ready: %{}})
+
+    emit(state, fn ->
+      lifecycle_signal(OperationCompleted, state.instance.id, %{
+        operation_id: operation_id,
+        operation: "cleanup",
+        status: Atom.to_string(cleanup_status)
+      })
+    end)
+
     :ok
   end
 
@@ -202,7 +283,7 @@ defmodule Jido.Topology.Controller.Runtime do
   defp update_idle(%{active: active}) when map_size(active) == 0, do: :ok
 
   defp update_idle(_state),
-    do: Jido.Agent.Authoring.error("Topology update requires an idle repair pass")
+    do: Jido.Agent.Authoring.error("Topology update or placement requires an idle repair pass")
 
   defp additive_target(%{id: id} = current, %{id: id} = target) do
     current_agents = current.plan.agents
@@ -248,8 +329,20 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp begin_pass(state) do
     keys = Map.keys(state.instance.plan.agents) ++ Map.keys(state.instance.plan.resources)
-    operation = if Map.get(state, :pass_count, 0) == 0, do: :activate, else: :repair
+
+    operation =
+      state.operation_override ||
+        if(Map.get(state, :pass_count, 0) == 0, do: :activate, else: :repair)
+
+    operation_id = Jido.Signal.ID.generate!()
     span = TopologyTelemetry.start(operation, state)
+
+    emit(state, fn ->
+      lifecycle_signal(OperationStarted, state.instance.id, %{
+        operation_id: operation_id,
+        operation: Atom.to_string(operation)
+      })
+    end)
 
     state
     |> Map.merge(%{
@@ -258,7 +351,10 @@ defmodule Jido.Topology.Controller.Runtime do
       pending: MapSet.new(keys),
       phase: :starting,
       reconcile_requested: false,
-      operation_span: span
+      operation_span: span,
+      operation: operation,
+      operation_id: operation_id,
+      operation_override: nil
     })
     |> drive()
   end
@@ -296,7 +392,16 @@ defmodule Jido.Topology.Controller.Runtime do
     do: Enum.all?(spec(key, state).depends_on, &Map.has_key?(state.ready, &1))
 
   defp spec(key, state),
-    do: Map.get(state.instance.plan.agents, key) || Map.fetch!(state.instance.plan.resources, key)
+    do: agent_spec(key, state) || Map.fetch!(state.instance.plan.resources, key)
+
+  defp agent_spec(nil, _state), do: nil
+
+  defp agent_spec(key, state) do
+    case Map.get(state.instance.plan.agents, key) do
+      nil -> nil
+      spec -> Map.put(spec, :node, Map.get(Map.get(state, :placements, %{}), key, spec.node))
+    end
+  end
 
   defp dispatch(key, state) do
     supervisor = Controller.name(state.jido, state.instance.id, :tasks)
@@ -339,10 +444,33 @@ defmodule Jido.Topology.Controller.Runtime do
     end
   end
 
-  defp record(state, key, {:ok, pid}), do: %{state | ready: Map.put(state.ready, key, pid)}
+  defp record(state, key, {:ok, pid}) do
+    emit(state, fn ->
+      lifecycle_signal(
+        ComponentReady,
+        state.instance.id,
+        component_data(Map.get(state, :operation_id), spec(key, state))
+      )
+    end)
 
-  defp record(state, key, {:error, reason}),
-    do: %{state | errors: Map.put(state.errors, key, reason)}
+    %{state | ready: Map.put(state.ready, key, pid)}
+  end
+
+  defp record(state, key, {:error, reason}) do
+    emit(state, fn ->
+      lifecycle_signal(
+        ComponentFailed,
+        state.instance.id,
+        Map.put(
+          component_data(Map.get(state, :operation_id), spec(key, state)),
+          :reason,
+          reason_code(reason)
+        )
+      )
+    end)
+
+    %{state | errors: Map.put(state.errors, key, reason)}
+  end
 
   defp finish_pass(%{reconcile_requested: true} = state) do
     state = complete_pass(state)
@@ -369,9 +497,28 @@ defmodule Jido.Topology.Controller.Runtime do
       state
     )
 
+    emit(state, fn ->
+      lifecycle_signal(OperationCompleted, state.instance.id, %{
+        operation_id: Map.get(state, :operation_id),
+        operation: state |> Map.get(:operation, :repair) |> Atom.to_string(),
+        status: Atom.to_string(phase)
+      })
+    end)
+
+    if Map.get(state, :last_status) != phase do
+      emit(state, fn ->
+        lifecycle_signal(StatusChanged, state.instance.id, %{
+          operation_id: Map.get(state, :operation_id),
+          previous: status(Map.get(state, :last_status)),
+          current: Atom.to_string(phase)
+        })
+      end)
+    end
+
     Map.merge(state, %{
       phase: phase,
       operation_span: nil,
+      last_status: phase,
       pass_count: Map.get(state, :pass_count, 0) + 1
     })
   end
@@ -420,33 +567,23 @@ defmodule Jido.Topology.Controller.Runtime do
         instance_id: state.instance.id,
         parent: if(member.parent, do: Map.fetch!(state.ready, member.parent)),
         bus_ids: bus_ids,
-        retry_interval: state.instance.definition.startup.retry_interval
+        retry_interval: state.instance.definition.startup.retry_interval,
+        task_timeout: state.instance.definition.startup.task_timeout
       }
     end
   end
 
-  defp ensure(spec, %{pool: pool} = context) do
-    case Bus.whereis(spec.id, jido: context.jido) do
-      {:ok, pid} ->
-        if owned?(:bus, pid, spec, context),
-          do: {:ok, pid},
-          else: {:error, :bus_identity_in_use}
-
-      _ ->
-        options = Keyword.merge(spec.config, name: spec.id, jido: context.jido)
-        DynamicSupervisor.start_child(pool, {Bus, options})
-    end
-  end
+  defp ensure(%{kind: _kind} = spec, %{pool: _pool} = context),
+    do: Resource.ensure(spec, context)
 
   defp ensure(spec, context) do
     with {:ok, pid} <- activate(spec, context),
-         :ok <- Server.await_ready(pid),
          :ok <- bind_parent(pid, spec, context),
          do: {:ok, pid}
   end
 
   defp activate(spec, context) do
-    case Jido.whereis_agent(context.jido, spec.id) do
+    case whereis_agent(spec, context) do
       nil ->
         start_agent(spec, context)
 
@@ -458,12 +595,58 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp start_agent(spec, context) do
-    with {:ok, pid} <- Controller.Activation.start(spec, context) do
+    result =
+      if spec.node == node(),
+        do: Controller.Activation.start(spec, context),
+        else: Controller.Activation.start_on_node(spec, context)
+
+    with {:ok, pid} <- result do
       if owned?(:agent, pid, spec, context) do
         {:ok, pid}
       else
-        Jido.stop_agent(context.jido, pid)
+        stop_agent(context.jido, pid, context.task_timeout)
         {:error, :restored_agent_identity_in_use}
+      end
+    end
+  end
+
+  defp placement_target(state, target, member) do
+    key = Plan.resolve(state.instance.plan, target, :agent, member)
+
+    case agent_spec(key, state) do
+      nil -> Jido.Agent.Authoring.error("Unknown topology Agent placement target")
+      spec -> {:ok, key, spec}
+    end
+  end
+
+  defp placement_node(value) when is_atom(value) and value not in [nil, true, false], do: :ok
+
+  defp placement_node(_value),
+    do: Jido.Agent.Authoring.error("Topology Agent node must be an atom")
+
+  defp placement_resources(%{subscriptions: []}, _target_node), do: :ok
+  defp placement_resources(_spec, target_node) when target_node == node(), do: :ok
+
+  defp placement_resources(_spec, _target_node),
+    do: Jido.Agent.Authoring.error("A remote topology Agent cannot subscribe to a local Bus")
+
+  defp retire(%{node: target_node} = spec, state, timeout) do
+    context = ownership_context(state)
+
+    with {:ok, pid} <- lookup_agent(spec, state.jido, timeout) do
+      cond do
+        is_nil(pid) ->
+          :ok
+
+        not owned?(:agent, pid, spec, context) ->
+          Jido.Agent.Authoring.error("Topology Agent identity is in use")
+
+        true ->
+          case stop_agent(state.jido, pid, timeout) do
+            :ok -> :ok
+            {:error, :not_found} -> :ok
+            {:error, reason} -> {:error, {:placement_stop_failed, target_node, reason}}
+          end
       end
     end
   end
@@ -490,7 +673,7 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp owned?(kind, pid, spec, context) when is_pid(pid) do
-    Process.alive?(pid) and safely(fn -> owns?(kind, pid, spec, context) end) == true
+    alive?(pid) and safely(fn -> owns?(kind, pid, spec, context) end) == true
   end
 
   defp owned?(_kind, _pid, _spec, _context), do: false
@@ -502,10 +685,32 @@ defmodule Jido.Topology.Controller.Runtime do
       Map.get(agent.metadata, "jido.topology") == marker(spec, context.instance_id)
   end
 
-  defp owns?(:bus, pid, spec, context) do
-    Map.get(context, :ready, %{})[spec.key] == pid or
-      Enum.any?(DynamicSupervisor.which_children(context.pool), &(elem(&1, 1) == pid))
+  defp lifecycle_signal(module, topology_id, data) do
+    module.new!(Map.put(data, :topology_id, topology_id),
+      source: "/jido/topology/" <> URI.encode(topology_id, &URI.char_unreserved?/1)
+    )
   end
+
+  defp component_data(operation_id, spec) do
+    %{
+      operation_id: operation_id,
+      component: spec.key,
+      kind: Atom.to_string(spec.kind),
+      node: Atom.to_string(Map.get(spec, :node) || node())
+    }
+  end
+
+  defp status(nil), do: nil
+  defp status(value), do: Atom.to_string(value)
+
+  defp reason_code(reason) when is_atom(reason), do: Atom.to_string(reason)
+  defp reason_code({reason, _details}) when is_atom(reason), do: Atom.to_string(reason)
+
+  defp reason_code(%{__struct__: module}) when is_atom(module) do
+    module |> Module.split() |> List.last() |> Macro.underscore()
+  end
+
+  defp reason_code(_reason), do: "unknown"
 
   defp refresh_phase(%{phase: :ready} = state) do
     state = recheck_ready(state)
@@ -516,7 +721,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp recheck_ready(state) do
     Enum.reduce(state.ready, state, fn {key, pid}, acc ->
-      if is_pid(pid) and Process.alive?(pid) do
+      if is_pid(pid) and alive?(pid) do
         acc
       else
         %{
@@ -538,5 +743,69 @@ defmodule Jido.Topology.Controller.Runtime do
     error -> {:error, error}
   catch
     :exit, reason -> {:error, reason}
+  end
+
+  defp whereis_agent(%{node: target, id: id}, %{jido: jido}) when target == node(),
+    do: Jido.whereis_agent(jido, id)
+
+  defp whereis_agent(%{node: target, id: id}, %{jido: jido}) do
+    :erpc.call(target, Jido, :whereis_agent, [jido, id], 1_000)
+  catch
+    _kind, _reason -> nil
+  end
+
+  defp lookup_agent(%{node: target, id: id}, jido, _timeout) when target == node(),
+    do: {:ok, Jido.whereis_agent(jido, id)}
+
+  defp lookup_agent(%{node: target, id: id}, jido, timeout) do
+    {:ok, :erpc.call(target, Jido, :whereis_agent, [jido, id], timeout)}
+  catch
+    kind, reason -> {:error, {:placement_uncertain, target, {kind, reason}}}
+  end
+
+  defp alive?(pid) when node(pid) == node(), do: Process.alive?(pid)
+
+  defp alive?(pid) do
+    :erpc.call(node(pid), Process, :alive?, [pid], 1_000)
+  catch
+    _kind, _reason -> false
+  end
+
+  defp stop_agent(jido, pid, _timeout) when node(pid) == node(), do: Jido.stop_agent(jido, pid)
+
+  defp stop_agent(jido, pid, timeout) do
+    :erpc.call(node(pid), Jido, :stop_agent, [jido, pid], timeout)
+  catch
+    _kind, _reason -> {:error, :remote_stop_uncertain}
+  end
+
+  defp emit(state, signal) when is_function(signal, 0) do
+    case Map.get(state, :lifecycle) do
+      nil -> :ok
+      %Jido.Agent.Ref{} = target -> safely(fn -> Jido.cast(state.jido, target, signal.()) end)
+      target -> safely(fn -> Server.cast(target, signal.()) end)
+    end
+
+    :ok
+  end
+
+  defp load_placements(jido, instance) do
+    case Jido.RuntimeStore.get(jido, @placement_hive, instance.id) do
+      %{definition: definition, placements: placements}
+      when definition == instance.definition and is_map(placements) ->
+        Map.take(placements, Map.keys(instance.plan.agents))
+
+      _other ->
+        %{}
+    end
+  end
+
+  defp save_placements(_jido, _instance, placements) when map_size(placements) == 0, do: :ok
+
+  defp save_placements(jido, instance, placements) do
+    Jido.RuntimeStore.put(jido, @placement_hive, instance.id, %{
+      definition: instance.definition,
+      placements: placements
+    })
   end
 end

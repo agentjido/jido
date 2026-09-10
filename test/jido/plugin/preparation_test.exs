@@ -6,15 +6,31 @@ defmodule Jido.Plugin.PreparationTest do
   defmodule PrepareFacet do
     use Jido.Agent.Plugin
 
-    alias Jido.Agent.Plugin.Preparation
+    alias Jido.Agent.Plugin.{Preparation, Reduction}
+
+    @impl true
+    def state_spec(_opts) do
+      {:observation,
+       Zoi.object(%{
+         candidate_value: Zoi.integer() |> Zoi.default(0),
+         prepared_state_value: Zoi.integer() |> Zoi.default(0),
+         previous_value: Zoi.integer() |> Zoi.default(0)
+       })
+       |> Zoi.default(%{
+         candidate_value: 0,
+         prepared_state_value: 0,
+         previous_value: 0
+       })}
+    end
 
     @impl true
     def prepare(%Preparation{} = preparation, opts) do
       case Keyword.get(opts, :mode, :ok) do
-        :ok ->
+        mode when mode in [:ok, :invalid_reduction] ->
           {:ok,
            %{
              agent_id: preparation.agent_id,
+             state_value: preparation.agent_state.value,
              signal_id: preparation.signal.id,
              signal_type: preparation.signal.type
            }}
@@ -27,6 +43,22 @@ defmodule Jido.Plugin.PreparationTest do
 
         :non_portable ->
           {:ok, self()}
+      end
+    end
+
+    @impl true
+    def reduce(%Reduction{} = reduction, opts) do
+      case Keyword.get(opts, :mode, :ok) do
+        :invalid_reduction ->
+          {:ok, :invalid}
+
+        _mode ->
+          {:ok,
+           %{
+             candidate_value: reduction.state.value,
+             prepared_state_value: reduction.prepared_input.state_value,
+             previous_value: reduction.state_before.value
+           }}
       end
     end
   end
@@ -44,13 +76,14 @@ defmodule Jido.Plugin.PreparationTest do
 
     @impl true
     def run(%{value: value}, context) do
-      prepared = Map.fetch!(context.plugin_inputs, Package)
+      prepared = Map.fetch!(context.plugin_inputs, Package).prepared
 
       {:ok,
        %{
          context.agent_state
          | action_signal_id: context.signal.id,
            prepared_agent_id: prepared.agent_id,
+           prepared_state_value: prepared.state_value,
            prepared_signal_id: prepared.signal_id,
            prepared_signal_type: prepared.signal_type,
            value: value
@@ -68,6 +101,13 @@ defmodule Jido.Plugin.PreparationTest do
     assert next.state.prepared_signal_id == source.id
     assert next.state.prepared_signal_type == source.type
     assert next.state.prepared_agent_id == agent.id
+    assert next.state.prepared_state_value == 0
+
+    assert next.state.observation == %{
+             candidate_value: 7,
+             prepared_state_value: 0,
+             previous_value: 0
+           }
   end
 
   test "live execution uses the same pure preparation", %{jido: jido} do
@@ -80,6 +120,28 @@ defmodule Jido.Plugin.PreparationTest do
     assert next.state.action_signal_id == source.id
     assert next.state.prepared_signal_id == source.id
     assert next.state.prepared_agent_id == agent.id
+    assert next.state.prepared_state_value == 0
+    assert next.state.observation.candidate_value == 8
+  end
+
+  test "reduce can read the prior and candidate state but returns only its owned field" do
+    source = signal("prepare.run", %{value: 9})
+
+    assert {:ok, next, []} = Jido.Agent.cmd(agent(:ok), source)
+    assert next.state.value == 9
+
+    assert next.state.observation == %{
+             candidate_value: 9,
+             prepared_state_value: 0,
+             previous_value: 0
+           }
+  end
+
+  test "reduce must return a valid value for its owned field" do
+    source = signal("prepare.run", %{value: 9})
+
+    assert {:error, error} = Jido.Agent.cmd(agent(:invalid_reduction), source)
+    assert error.message == "Plugin-owned Agent state field is invalid"
   end
 
   test "prepare can reject but cannot return a non-portable or invalid input" do
@@ -112,6 +174,7 @@ defmodule Jido.Plugin.PreparationTest do
         Zoi.object(%{
           action_signal_id: Zoi.string() |> Zoi.default(""),
           prepared_agent_id: Zoi.string() |> Zoi.default(""),
+          prepared_state_value: Zoi.integer() |> Zoi.default(-1),
           prepared_signal_id: Zoi.string() |> Zoi.default(""),
           prepared_signal_type: Zoi.string() |> Zoi.default(""),
           value: Zoi.integer() |> Zoi.default(0)

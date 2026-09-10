@@ -1,6 +1,6 @@
 defmodule Jido.Topology.DSL.Agent do
   @moduledoc false
-  defstruct [:key, :module, :__spark_metadata__, initial_state: %{}, depends_on: []]
+  defstruct [:key, :module, :node, :__spark_metadata__, initial_state: %{}, depends_on: []]
 end
 
 defmodule Jido.Topology.DSL.Group do
@@ -11,6 +11,7 @@ defmodule Jido.Topology.DSL.Group do
     :count,
     :members,
     :key_by,
+    :node,
     :__spark_metadata__,
     initial_state: %{},
     depends_on: []
@@ -19,7 +20,7 @@ end
 
 defmodule Jido.Topology.DSL.Bus do
   @moduledoc false
-  defstruct [:key, :__spark_metadata__, config: []]
+  defstruct [:key, :__spark_metadata__, kind: :bus, config: []]
 end
 
 defmodule Jido.Topology.DSL.Owns do
@@ -60,7 +61,8 @@ defmodule Jido.Topology.DSL.Extension do
     key: [type: :any, required: true],
     module: [type: :atom, required: true],
     initial_state: [type: :any, default: %{}],
-    depends_on: [type: {:list, :any}, default: []]
+    depends_on: [type: {:list, :any}, default: []],
+    node: [type: :any]
   ]
   @agent %Spark.Dsl.Entity{
     name: :agent,
@@ -163,7 +165,6 @@ defmodule Jido.Topology.DSL.Extension do
   @exports_section %Spark.Dsl.Section{name: :exports, patchable?: true, entities: @exports}
   @startup_schema [
     concurrency: [type: :pos_integer],
-    ready: [type: {:in, [:all]}],
     max_agents: [type: :pos_integer],
     retry_interval: [type: :pos_integer],
     task_timeout: [type: :pos_integer]
@@ -171,12 +172,7 @@ defmodule Jido.Topology.DSL.Extension do
   @nested_startup_section %Spark.Dsl.Section{
     name: :startup,
     patchable?: true,
-    schema: @startup_schema,
-    after_define: {__MODULE__, :mark_nested_startup}
-  }
-  @legacy_startup_section %{
-    @nested_startup_section
-    | after_define: {__MODULE__, :mark_legacy_startup}
+    schema: @startup_schema
   }
 
   @entity_sections [
@@ -190,32 +186,15 @@ defmodule Jido.Topology.DSL.Extension do
   ]
   @topology_sections @entity_sections ++ [@nested_startup_section]
 
-  @doc false
-  def mark_nested_startup do
-    quote generated: true do
-      Jido.Topology.DSL.Compiler.register_startup_location!(__MODULE__, :nested, __ENV__)
-    end
-  end
-
-  @doc false
-  def mark_legacy_startup do
-    quote generated: true do
-      Jido.Topology.DSL.Compiler.register_startup_location!(__MODULE__, :legacy, __ENV__)
-    end
-  end
-
-  # Keep the current top-level blocks readable during the beta migration.
-  # The compiler rejects declarations split across both locations.
   use Spark.Dsl.Extension,
-    sections:
-      [
-        %Spark.Dsl.Section{
-          name: :topology,
-          patchable?: true,
-          schema: [schema: [type: :any], metadata: [type: :map]],
-          sections: @topology_sections
-        }
-      ] ++ @entity_sections ++ [@legacy_startup_section]
+    sections: [
+      %Spark.Dsl.Section{
+        name: :topology,
+        patchable?: true,
+        schema: [schema: [type: :any], metadata: [type: :map]],
+        sections: @topology_sections
+      }
+    ]
 end
 
 defmodule Jido.Topology.DSL do

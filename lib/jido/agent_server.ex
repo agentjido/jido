@@ -21,9 +21,10 @@ defmodule Jido.AgentServer do
 
   The Server assigns one stable UUID7 to each admitted Turn. It keeps a private
   `ActiveTurn` until execution and all post-commit Directives stop. It then
-  creates one public `Jido.Agent.Turn.Outcome`. A custom two-argument error
-  policy receives the original error and this Outcome. When debug mode is on,
-  the terminal debug event also contains the Outcome.
+  creates one runtime `Jido.Agent.Turn.Outcome`. A custom two-argument error
+  policy receives the original error and this Outcome. When the Agent debug
+  buffer is on, the terminal event contains a bounded outcome summary. It does
+  not contain the complete Outcome, Agent state, or full Signals.
 
   Before a commit, the Server writes either an instance-owned runtime checkpoint
   or a configured durable persistence record. This prevents a transient Agent
@@ -47,6 +48,14 @@ defmodule Jido.AgentServer do
   the Jido instance Task Supervisor. The Server also links each Exec root to
   itself. Initial Plugin readiness and error Signal delivery are also linked
   to the Server. Owned work cannot outlive its Agent owner.
+
+  Use `agent/2` for the committed Agent, `snapshot/2` for the Agent and commit
+  revision, `status/2` for current runtime work, and `children/2` for live
+  ownership. Use `set_debug/3` and `recent_events/3` for a short diagnostic
+  history for one Agent. Use `Jido.Telemetry` for system-wide runtime
+  observation. See
+  [Runtime State and Debugging](runtime-state-and-debugging.html) for an
+  executable inspection example.
   """
 
   @behaviour :gen_statem
@@ -264,11 +273,18 @@ defmodule Jido.AgentServer do
     :gen_statem.receive_response(request_id, timeout)
   end
 
-  @doc "Returns the current committed Agent."
+  @doc "Returns the current committed Agent value."
   @spec agent(server(), timeout()) :: Agent.t()
   def agent(server, timeout \\ 5_000), do: :gen_statem.call(server, :agent, timeout)
 
-  @doc "Returns a narrow view of the Agent turn state."
+  @doc """
+  Returns a narrow view of current Agent Server work.
+
+  The result contains the runtime phase, Agent ID, commit revision, admission
+  counts, lifecycle information, and a bounded active-Turn summary. The active
+  summary is `nil` when no Turn is active. This function does not return the
+  private `:gen_statem` state.
+  """
   @spec status(server(), timeout()) :: map()
   def status(server, timeout \\ 5_000), do: :gen_statem.call(server, :status, timeout)
 
@@ -290,13 +306,27 @@ defmodule Jido.AgentServer do
     :gen_statem.call(server, {:cancel, turn_id}, timeout)
   end
 
-  @doc "Enables or disables the bounded Agent runtime event buffer."
+  @doc """
+  Enables or disables the bounded runtime event buffer for one Agent.
+
+  Enabling the buffer records new events only. Disabling it clears all stored
+  events. This setting does not change semantic log detail.
+  """
   @spec set_debug(server(), boolean(), timeout()) :: :ok
   def set_debug(server, enabled, timeout \\ 5_000) when is_boolean(enabled) do
     :gen_statem.call(server, {:set_debug, enabled}, timeout)
   end
 
-  @doc "Returns recent Agent runtime events in newest-first order."
+  @doc """
+  Returns recent Agent runtime events in newest-first order.
+
+  Use the `:limit` option to request fewer events than the configured
+  `debug_max_events` value. Entries contain bounded identity, revision,
+  Directive, timing, status, and safe error data. They do not contain Agent
+  state, full Signals, raw errors, or complete Turn Outcome records.
+
+  Returns `{:error, :debug_not_enabled}` when the buffer is off.
+  """
   @spec recent_events(server(), keyword(), timeout()) :: {:ok, [map()]} | {:error, term()}
   def recent_events(server, opts \\ [], timeout \\ 5_000) when is_list(opts) do
     :gen_statem.call(server, {:recent_events, opts}, timeout)
@@ -510,6 +540,7 @@ defmodule Jido.AgentServer do
         agent: agent,
         plugin_specs: plugin_specs,
         jido: opts.jido,
+        agent_namespace: AgentTelemetry.namespace(opts.jido),
         partition: opts.partition,
         registry: opts.registry,
         registered?: opts.register,
@@ -1430,7 +1461,7 @@ defmodule Jido.AgentServer do
 
   defp start_turn(%Signal{} = signal, from, context, %State{} = data) do
     data = cancel_idle_timer(data)
-    {_traced_signal, trace} = TraceContext.ensure_from_signal(signal)
+    trace = TraceContext.begin_turn(signal)
     active = ActiveTurn.new(signal, from, data.state_version, data.turn_timeout)
     data = %{data | active: active}
     metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
@@ -1441,6 +1472,7 @@ defmodule Jido.AgentServer do
       })
 
     data = %{data | active: %{active | span: semantic}}
+    TraceContext.put(semantic.trace)
 
     try do
       with {:ok, command} <- initial_command(signal, context, data) do
@@ -1565,7 +1597,7 @@ defmodule Jido.AgentServer do
   defp persist_definition_upgrade(%State{} = data, target, version) do
     opts = [
       instance: data.jido,
-      namespace: Jido.namespace(data.jido),
+      namespace: data.agent_namespace,
       partition: data.partition,
       revision: version,
       expected_revision: data.state_version,
@@ -1637,7 +1669,13 @@ defmodule Jido.AgentServer do
             with {:ok, plugin_inputs} <-
                    AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
                  command = %{command | plugin_inputs: plugin_inputs},
-                 {:ok, command} <- ServerPlugin.admit(command, plugin_specs, runtime_refs) do
+                 {:ok, command} <-
+                   ServerPlugin.admit(
+                     command,
+                     plugin_specs,
+                     runtime_refs,
+                     data.state_version
+                   ) do
               {:ok, command}
             end
           end)
@@ -1665,16 +1703,12 @@ defmodule Jido.AgentServer do
     # Admission receives the original Signal. Attach the Turn trace only at
     # the existing execution boundary, after admission has finished.
     signal =
-      if Jido.Tracing.Trace.get(command.signal) do
-        command.signal
-      else
-        case Jido.Tracing.Trace.put(command.signal, data.active.span.metadata) do
-          {:ok, traced} -> traced
-          {:error, _} -> command.signal
-        end
+      case Jido.Tracing.Trace.put(command.signal, data.active.span.trace) do
+        {:ok, traced} -> traced
+        {:error, _} -> command.signal
       end
 
-    {signal, _trace} = TraceContext.ensure_from_signal(signal)
+    TraceContext.put(data.active.span.trace)
     command = %{command | signal: signal}
 
     case start_exec(command, data) do
@@ -2086,7 +2120,7 @@ defmodule Jido.AgentServer do
           |> Map.put(:active, active)
           |> record_event(:directive_failed, %{
             turn_id: active.turn_id,
-            reason: reason
+            error: public_error(reason)
           })
 
         outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
@@ -2955,12 +2989,14 @@ defmodule Jido.AgentServer do
   end
 
   defp record_error_policy_dispatch_failure(%State{} = data, reason) do
-    Logger.error("Agent error Signal delivery failed",
-      agent_id: data.agent.id,
-      reason: inspect(reason)
+    error = public_error(reason)
+
+    Logger.error(
+      "Agent error Signal delivery failed " <>
+        "agent_id=#{data.agent.id} error_type=#{error.type} error_code=#{Error.code(reason)}"
     )
 
-    record_event(data, :error_signal_delivery_failed, %{reason: reason})
+    record_event(data, :error_signal_delivery_failed, %{error: error})
   end
 
   defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
@@ -2982,8 +3018,8 @@ defmodule Jido.AgentServer do
       signal_id: signal.id,
       signal_type: signal.type,
       stage: outcome.stage,
-      reason: outcome.error,
-      outcome: outcome
+      error: if(outcome.error, do: public_error(outcome.error)),
+      outcome: outcome_summary(outcome)
     })
   end
 
@@ -3004,6 +3040,29 @@ defmodule Jido.AgentServer do
     events = Enum.take([entry | data.debug_events], data.debug_max_events)
     %{data | debug_events: events}
   end
+
+  defp outcome_summary(%Outcome{} = outcome) do
+    signal = outcome.effective_signal || outcome.source_signal
+
+    %{
+      id: outcome.id,
+      agent_id: outcome.agent_id,
+      signal_id: signal.id,
+      signal_type: signal.type,
+      status: outcome.status,
+      stage: outcome.stage,
+      committed?: outcome.committed?,
+      state_version_before: outcome.state_version_before,
+      state_version_after: outcome.state_version_after,
+      directives: outcome.directives,
+      started_at: outcome.started_at,
+      finished_at: outcome.finished_at,
+      duration_ms: outcome.duration_ms,
+      error: if(outcome.error, do: public_error(outcome.error))
+    }
+  end
+
+  defp public_error(reason), do: Error.to_map(reason)
 
   defp start_directive_span(directive, _context, data) do
     metadata =
@@ -3206,7 +3265,7 @@ defmodule Jido.AgentServer do
   defp persist_initial_agent(%State{initial_persistence: :create, state_version: 0} = data) do
     opts = [
       instance: data.jido,
-      namespace: Jido.namespace(data.jido),
+      namespace: data.agent_namespace,
       partition: data.partition,
       revision: 0,
       reason: :activate
@@ -3266,7 +3325,7 @@ defmodule Jido.AgentServer do
     opts =
       extra_opts
       |> Keyword.put(:instance, data.jido)
-      |> Keyword.put(:namespace, Jido.namespace(data.jido))
+      |> Keyword.put(:namespace, data.agent_namespace)
       |> Keyword.put(:partition, data.partition)
       |> Keyword.put(:revision, version)
       |> Keyword.put(:expected_revision, data.state_version)

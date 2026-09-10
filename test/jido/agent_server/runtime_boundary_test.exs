@@ -452,7 +452,8 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
       end)
 
     event = Enum.find(events, &(&1.event == :error_signal_delivery_failed))
-    assert %Jido.Error.TimeoutError{} = event.metadata.reason
+    assert %{type: :timeout, retryable?: true} = event.metadata.error
+    refute is_struct(event.metadata.error)
     assert Process.alive?(server)
   end
 

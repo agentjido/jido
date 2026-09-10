@@ -34,8 +34,7 @@ defmodule Jido.Examples.PendingJobRecovery do
 
     route "examples.runtime.pending_jobs.request" do
       action input,
-        schema:
-          Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         state = context.agent_state
 

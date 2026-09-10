@@ -1,46 +1,11 @@
-defmodule Jido.Examples.TopologyUpgrade.WorkerV2 do
-  @moduledoc "Revision 2 multiplies each work input by ten."
-  use Jido.Agent, name: "research_topology_worker_v2"
-
-  agent do
-    schema Zoi.object(%{
-             label: Zoi.string() |> Zoi.default("cell"),
-             received: Zoi.integer() |> Zoi.default(0),
-             total: Zoi.integer() |> Zoi.default(0)
-           })
-  end
-
-  routes do
-    signal_source "/examples/topology"
-
-    route "topology.work" do
-      action %{value: value},
-        name: "research_topology_work_v2",
-        schema: Zoi.object(%{value: Zoi.integer()}),
-        context: context do
-        {:ok,
-         %{
-           context.agent_state
-           | total: context.agent_state.total + value * 10,
-             received: context.agent_state.received + 1
-         }}
-      end
-    end
-  end
-end
-
 defmodule Jido.Examples.TopologyUpgrade do
-  @moduledoc """
-  Builds and compares desired local worker sets through public Topology values.
-  The example diff covers Agents only. It does not apply changes or handle
-  ownership, Bus connections, or rollout recovery.
-  """
-  alias Jido.Examples.Topology.Cell
+  @moduledoc "Builds and compares desired local worker sets through public Topology values."
+
   alias Jido.Topology.Builder
 
-  def build(id, count, worker_module \\ Cell) do
+  def build(id, count, worker_module \\ __MODULE__.WorkerV1) do
     Builder.new(name: "research_upgrade_topology")
-    |> Builder.agent(:observer, Cell)
+    |> Builder.agent(:observer, __MODULE__.WorkerV1)
     |> Builder.group(:workers, worker_module, count: count)
     |> Builder.startup(retry_interval: 10)
     |> Builder.build(id: id)
@@ -64,5 +29,76 @@ defmodule Jido.Examples.TopologyUpgrade do
      }}
   end
 
-  def diff(_, _), do: {:error, :topology_identity_mismatch}
+  def diff(_old, _target), do: {:error, :topology_identity_mismatch}
+
+  def work(server, value) do
+    Jido.AgentServer.call(
+      server,
+      Jido.Signal.new!(
+        "examples.research.topology_upgrade.work",
+        %{value: value},
+        source: "/examples/research/topology_upgrade"
+      )
+    )
+  end
+end
+
+defmodule Jido.Examples.TopologyUpgrade.WorkerV1 do
+  @moduledoc "The original worker definition adds each input to its total."
+  use Jido.Agent, name: "research_topology_worker_v1"
+
+  agent do
+    schema Zoi.object(%{
+             label: Zoi.string() |> Zoi.default("cell"),
+             received: Zoi.integer() |> Zoi.default(0),
+             total: Zoi.integer() |> Zoi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/examples/research/topology_upgrade"
+
+    route "examples.research.topology_upgrade.work" do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
+        {:ok,
+         %{
+           context.agent_state
+           | total: context.agent_state.total + value,
+             received: context.agent_state.received + 1
+         }}
+      end
+    end
+  end
+end
+
+defmodule Jido.Examples.TopologyUpgrade.WorkerV2 do
+  @moduledoc "Revision 2 multiplies each work input by ten."
+  use Jido.Agent, name: "research_topology_worker_v2"
+
+  agent do
+    schema Zoi.object(%{
+             label: Zoi.string() |> Zoi.default("cell"),
+             received: Zoi.integer() |> Zoi.default(0),
+             total: Zoi.integer() |> Zoi.default(0)
+           })
+  end
+
+  routes do
+    signal_source "/examples/research/topology_upgrade"
+
+    route "examples.research.topology_upgrade.work" do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
+        {:ok,
+         %{
+           context.agent_state
+           | total: context.agent_state.total + value * 10,
+             received: context.agent_state.received + 1
+         }}
+      end
+    end
+  end
 end

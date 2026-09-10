@@ -81,7 +81,7 @@ defmodule Jido.Topology.CompositionTest do
     assert east.initial_state.label == "east"
     assert west.initial_state.label == "west"
     assert east.subscriptions == west.subscriptions
-    assert east.subscriptions == [%{bus: "bus/events", path: "topology.work"}]
+    assert east.subscriptions == [%{bus: "bus/events", path: "examples.topology.cell.work"}]
     assert east.parent == "component/east/agent/coordinator"
     assert instance.plan.agents[east.parent].parent == "agent/director"
     assert instance.plan.components[["east"]].agents == 2

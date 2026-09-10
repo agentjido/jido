@@ -4,7 +4,8 @@ defmodule Jido.Plugin.Codec do
   Registry. The document stores the Plugin module and its options, never its
   instance state or runtime. Agent Codec uses this same format and Registry.
   """
-  alias Jido.Agent.Codec.{Data, Registry}
+  alias Jido.Agent.Authoring
+  alias Jido.Codec.{Data, Registry}
 
   @type document :: %{required(String.t()) => term()}
 
@@ -13,7 +14,7 @@ defmodule Jido.Plugin.Codec do
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(plugin) do
     with {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([plugin]),
-         {:ok, registry} <- Jido.Agent.Codec.Deriver.plugin(plugin),
+         {:ok, registry} <- derive_registry(plugin),
          {:ok, document} <- encode(plugin, registry),
          do: {:ok, document, registry}
   end
@@ -42,13 +43,26 @@ defmodule Jido.Plugin.Codec do
           {:ok, {module(), keyword()}} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- Data.object(document, ~w(type version module options)),
-         :ok <- Data.version(document, "jido.plugin"),
+         :ok <- document_header(document),
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :plugin),
          {:ok, options} <- Data.decode(document["options"], registry),
          {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([{module, options}]) do
       {:ok, plugin}
     end
+  end
+
+  defp document_header(document) do
+    with :ok <- Data.object(document, ~w(type version module options)),
+         do: document_version(document)
+  end
+
+  defp document_version(%{"type" => "jido.plugin", "version" => 1}), do: :ok
+
+  defp document_version(_document),
+    do: Authoring.error("Unknown authoring document type or version")
+
+  defp derive_registry({module, options}) do
+    Registry.derive([{:plugin, module} | Data.registry_entries(options)])
   end
 end

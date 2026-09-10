@@ -77,6 +77,8 @@ defmodule Jido.AgentServer.OptionsTest do
           {[readiness_timeout: :infinity], "readiness_timeout must be"},
           {[restore: true], "restore must be"},
           {[state_version: -1], "state_version must be"},
+          {[debug: :verbose], "debug must be a boolean"},
+          {[debug_max_events: 0], "debug_max_events must be a positive integer"},
           {[pool: "invalid"], "pool must be an atom"},
           {[idle_timeout: 0], "idle_timeout must be"},
           {[persistence: :invalid], "persistence adapter is invalid"},

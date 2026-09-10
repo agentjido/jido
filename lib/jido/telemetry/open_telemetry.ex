@@ -1,53 +1,46 @@
 defmodule Jido.Telemetry.OpenTelemetry do
-  @moduledoc """
-  Optional OpenTelemetry tracing for Jido semantic telemetry.
+  @moduledoc false
 
-  This integration uses only `opentelemetry_api`. It becomes active when the
-  host application includes and starts an OpenTelemetry SDK. Jido does not
-  start an SDK, select a sampler, or configure an exporter or collector.
-
-  Add the API and SDK to the host application to enable traces:
-
-      {:opentelemetry_api, "~> 1.0"},
-      {:opentelemetry, "~> 1.0"}
-
-  The integration is active by default when an SDK tracer is available. To
-  disable only the Jido integration, use:
-
-      config :jido, :opentelemetry, enabled: false
-
-  Jido maps its bounded semantic metadata to `jido.*` attributes. It does not
-  send raw state, payloads, errors, messages, or stacktraces to OpenTelemetry.
-  The host application owns all export and vendor policy.
-  """
+  alias Jido.Signal.Trace, as: SignalTrace
 
   @ignored_measurements [:duration, :monotonic_time, :system_time]
-  @active_spans_key {:jido, :opentelemetry_active_spans}
 
   defmodule Span do
     @moduledoc false
 
-    @enforce_keys [:span_ctx, :activation_ref, :started_by, :terminal_guard]
-    defstruct [:span_ctx, :activation_ref, :started_by, :terminal_guard]
+    @enforce_keys [:span_ctx, :restore_context, :started_by, :terminal_guard]
+    defstruct [:span_ctx, :restore_context, :started_by, :terminal_guard]
 
     @type t :: %__MODULE__{
             span_ctx: term(),
-            activation_ref: reference(),
+            restore_context: term(),
             started_by: pid(),
             terminal_guard: :atomics.atomics_ref()
           }
   end
 
-  @doc "Returns true when the optional OpenTelemetry API is loaded."
-  @spec available?() :: boolean()
-  def available?, do: Code.ensure_loaded?(:opentelemetry)
-
-  @doc "Returns true when the Jido integration has an active SDK tracer."
+  @doc false
   @spec enabled?() :: boolean()
   def enabled? do
     available?() and configured?() and not noop_tracer?(tracer())
   catch
     _, _ -> false
+  end
+
+  @doc false
+  @spec trace_context(Span.t() | nil) :: map() | nil
+  def trace_context(nil), do: nil
+
+  def trace_context(%Span{span_ctx: span_ctx}) do
+    if enabled?() and call(:otel_span, :is_valid, [span_ctx]) do
+      context = call(:otel_tracer, :set_current_span, [call(:otel_ctx, :new, []), span_ctx])
+
+      context
+      |> inject_carrier()
+      |> trace_from_carrier()
+    end
+  catch
+    _, _ -> nil
   end
 
   @doc false
@@ -73,11 +66,11 @@ defmodule Jido.Telemetry.OpenTelemetry do
           }
         ])
 
-      activation_ref = activate_span(current_context, span_ctx)
+      restore_context = activate_span(current_context, span_ctx)
 
       %Span{
         span_ctx: span_ctx,
-        activation_ref: activation_ref,
+        restore_context: restore_context,
         started_by: self(),
         terminal_guard: :atomics.new(1, signed: false)
       }
@@ -210,39 +203,7 @@ defmodule Jido.Telemetry.OpenTelemetry do
     _, _ -> :ok
   end
 
-  @doc false
-  @spec inject_trace_context(map()) :: map()
-  def inject_trace_context(trace) when is_map(trace) do
-    if enabled?() do
-      context = call(:otel_ctx, :get_current, [])
-      span_ctx = call(:otel_tracer, :current_span_ctx, [context])
-
-      if call(:otel_span, :is_valid, [span_ctx]) do
-        :otel_propagator_text_map
-        |> call(:inject_from, [context, :otel_propagator_trace_context, []])
-        |> Enum.reduce(trace, fn
-          {"traceparent", value}, acc ->
-            Map.put(acc, :traceparent, value)
-
-          {"tracestate", value}, acc ->
-            Map.put(acc, :tracestate, value)
-
-          {key, value}, acc when is_binary(key) and is_binary(value) ->
-            case String.downcase(key) do
-              "traceparent" -> Map.put(acc, :traceparent, value)
-              "tracestate" -> Map.put(acc, :tracestate, value)
-              _other -> acc
-            end
-        end)
-      else
-        trace
-      end
-    else
-      trace
-    end
-  catch
-    _, _ -> trace
-  end
+  defp available?, do: Code.ensure_loaded?(:opentelemetry)
 
   defp configured? do
     config = Application.get_env(:jido, :opentelemetry, [])
@@ -383,36 +344,12 @@ defmodule Jido.Telemetry.OpenTelemetry do
 
   defp activate_span(parent_context, span_ctx) do
     active_context = call(:otel_tracer, :set_current_span, [parent_context, span_ctx])
-    ref = make_ref()
-
-    state =
-      case Process.get(@active_spans_key) do
-        %{base: base, stack: stack} -> %{base: base, stack: [{ref, active_context} | stack]}
-        _other -> %{base: parent_context, stack: [{ref, active_context}]}
-      end
-
-    Process.put(@active_spans_key, state)
-    _ = call(:otel_ctx, :attach, [active_context])
-    ref
+    call(:otel_ctx, :attach, [active_context])
   end
 
-  defp deactivate_span(%Span{started_by: pid, activation_ref: ref}) when pid == self() do
-    case Process.get(@active_spans_key) do
-      %{base: base, stack: stack} ->
-        case Enum.reject(stack, fn {active_ref, _context} -> active_ref == ref end) do
-          [{_active_ref, context} | _rest] = remaining ->
-            Process.put(@active_spans_key, %{base: base, stack: remaining})
-            _ = call(:otel_ctx, :attach, [context])
-
-          [] ->
-            Process.delete(@active_spans_key)
-            _ = call(:otel_ctx, :attach, [base])
-        end
-
-      _other ->
-        :ok
-    end
-
+  defp deactivate_span(%Span{started_by: pid, restore_context: restore_context})
+       when pid == self() do
+    _ = call(:otel_ctx, :detach, [restore_context])
     :ok
   end
 
@@ -430,6 +367,43 @@ defmodule Jido.Telemetry.OpenTelemetry do
     do: [{key, value} | carrier]
 
   defp maybe_add_carrier(carrier, _key, _value), do: carrier
+
+  defp inject_carrier(context) do
+    call(:otel_propagator_text_map, :inject_from, [
+      context,
+      :otel_propagator_trace_context,
+      []
+    ])
+  end
+
+  defp trace_from_carrier(carrier) do
+    fields =
+      Enum.reduce(carrier, %{}, fn
+        {key, value}, acc when is_binary(key) and is_binary(value) ->
+          case String.downcase(key) do
+            "traceparent" -> Map.put(acc, :traceparent, value)
+            "tracestate" -> Map.put(acc, :tracestate, value)
+            _other -> acc
+          end
+
+        _field, acc ->
+          acc
+      end)
+
+    case SignalTrace.from_traceparent(fields[:traceparent], fields[:tracestate]) do
+      {:ok, trace} ->
+        %{
+          trace_id: trace.trace_id,
+          span_id: trace.span_id,
+          trace_flags: trace.trace_flags,
+          traceparent: SignalTrace.to_traceparent(trace)
+        }
+        |> maybe_put(:tracestate, trace.tracestate)
+
+      {:error, :invalid_traceparent} ->
+        nil
+    end
+  end
 
   defp safely(fun) do
     fun.()

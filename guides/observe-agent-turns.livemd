@@ -1,7 +1,9 @@
 # Observe Agent Turns
 
-This Livebook attaches a telemetry handler to the terminal event for one Agent
-Turn. The handler sends the event to this notebook process.
+This Livebook observes the live result and final settlement of one Agent Turn.
+It shows why these are separate events.
+
+## Install Jido
 
 ```elixir
 Mix.install([
@@ -9,7 +11,7 @@ Mix.install([
 ])
 ```
 
-## Declare An Agent
+## Define an Agent and an observer
 
 ```elixir
 defmodule ObserveGuide.Counter do
@@ -37,24 +39,29 @@ end
 
 defmodule ObserveGuide.Forwarder do
   def handle(event, measurements, metadata, receiver) do
-    send(receiver, {:agent_turn, event, measurements, metadata})
+    send(receiver, {:jido_event, event, measurements, metadata})
   end
 end
 ```
 
-## Attach a handler
+The handler only sends the bounded event to another process. Telemetry handlers
+run in the process that emits the event. Do not call the observed Agent or do
+storage or network work in a handler.
 
-Telemetry handlers run in the process that emits the event. Keep the handler
-small and send work to another process.
+## Attach the handler
 
 ```elixir
 observer = self()
 handler_id = "observe-guide-#{System.unique_integer([:positive])}"
 
 :ok =
-  :telemetry.attach(
+  :telemetry.attach_many(
     handler_id,
-    [:jido, :agent, :turn, :settled],
+    [
+      [:jido, :agent, :turn, :stop],
+      [:jido, :agent, :turn, :exception],
+      [:jido, :agent, :turn, :settled]
+    ],
     &ObserveGuide.Forwarder.handle/4,
     observer
   )
@@ -75,31 +82,68 @@ handler_id = "observe-guide-#{System.unique_integer([:positive])}"
 committed.state
 ```
 
-The settled event reports the final outcome after Directive handling. A Turn
-can commit and then fail during post-commit work, so inspect both `:status` and
-`:committed?`.
+The Turn `:stop` event reports the live result. On success, its
+`state_version_after` revision is already live. The `turn.settled` event reports
+the final bounded result after all owned Directive work stops.
+
+This Agent returns no Directives, so the two events occur close together.
 
 ```elixir
-event =
-  receive do
-    {:agent_turn, name, measurements, metadata} ->
-      %{name: name, measurements: measurements, metadata: metadata}
-  after
-    5_000 ->
-      raise "no Agent Turn event arrived"
+events =
+  for _index <- 1..2 do
+    receive do
+      {:jido_event, name, measurements, metadata} ->
+        %{name: name, measurements: measurements, metadata: metadata}
+    after
+      5_000 ->
+        raise "an Agent Turn event did not arrive"
+    end
   end
 
-%{
-  status: event.metadata.status,
-  committed?: event.metadata.committed?,
-  signal_type: event.metadata.signal_type,
-  state_version_after: event.measurements.state_version_after
-}
+Enum.map(events, fn event ->
+  %{
+    name: event.name,
+    status: event.metadata.status,
+    stage: event.metadata.stage,
+    committed?: event.metadata.committed?,
+    turn_id: event.metadata.turn_id,
+    state_version_before: event.measurements.state_version_before,
+    state_version_after: event.measurements[:state_version_after]
+  }
+end)
 ```
 
-Metadata is bounded. It includes stable identity, Signal, Turn, trace, status,
-and stage fields. It excludes Agent state, Signal payloads, process handles,
-caller context, and raw error details.
+Both events have the same `turn_id`. For a successful Turn, `committed?` is
+`true` and `status` is `:ok`.
+
+For a pre-commit failure, the Turn terminal event has `committed?: false`. No
+new revision becomes live. Settlement follows without Directive work.
+
+For a post-commit Directive failure, the Turn `:stop` event remains successful.
+The later settlement event has `committed?: true`, `stage: :directive`, and a
+non-OK status. The committed revision is not rolled back.
+
+## Read safe fields
+
+The event metadata can include stable Agent identity, activation, Turn, Signal,
+trace, status, stage, and safe error fields. Measurements contain integer
+durations, revisions, queue sizes, and counts.
+
+The event does not contain Agent state, Plugin-owned state, Signal data, caller
+context, process handles, or raw error details.
+
+Use these fields to correlate one Turn:
+
+| Field | Meaning |
+| --- | --- |
+| `agent_id` | Logical Agent ID |
+| `activation_id` | Current Agent Server activation |
+| `turn_id` | One admitted Turn |
+| `source_signal_id` | Signal that entered the runtime |
+| `signal_id` | Effective Signal selected for execution |
+| `trace_id` | Distributed trace |
+| `span_id` | Current Turn span |
+| `causation_id` | Signal that caused this Signal |
 
 ## Detach and stop
 
@@ -110,4 +154,4 @@ caller context, and raw error details.
 ```
 
 Read [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html) before you
-connect a production exporter.
+connect a production metric reporter or OpenTelemetry exporter.

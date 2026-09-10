@@ -113,6 +113,32 @@ defmodule Jido.Plugin.OrderingTest do
     end
   end
 
+  defmodule FirstReducerFacet do
+    use Jido.Agent.Plugin
+
+    def state_spec(_opts), do: {:first_reduced, Zoi.integer() |> Zoi.default(0)}
+
+    def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts),
+      do: {:ok, reduction.plugin_state + 1}
+  end
+
+  defmodule FirstReducerPackage do
+    use Jido.Plugin, agent: FirstReducerFacet
+  end
+
+  defmodule SecondReducerFacet do
+    use Jido.Agent.Plugin
+
+    def state_spec(_opts), do: {:second_observed, Zoi.integer() |> Zoi.default(0)}
+
+    def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts),
+      do: {:ok, reduction.state.first_reduced}
+  end
+
+  defmodule SecondReducerPackage do
+    use Jido.Plugin, agent: SecondReducerFacet
+  end
+
   defmodule FirstOutboundPlugin do
     use Jido.Plugin
 
@@ -210,8 +236,8 @@ defmodule Jido.Plugin.OrderingTest do
              })
 
     assert admitted.plugin_inputs == %{
-             FirstAdmissionPlugin => :first,
-             SecondAdmissionPlugin => :second
+             FirstAdmissionPlugin => %Jido.Plugin.Input{runtime: :first},
+             SecondAdmissionPlugin => %Jido.Plugin.Input{runtime: :second}
            }
 
     assert_received {:admitted, :first, :first_runtime}
@@ -308,12 +334,37 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, result: :second_failed}
              ])
 
+    agent = %{Agent.new!() | state: %{first: 0, second: 0}}
+
     assert Jido.Agent.Plugin.Pipeline.run(
-             {:ok, %{first: 0, second: 0}, []},
-             %{first: 0, second: 0},
+             {:ok, agent.state, []},
+             agent,
+             signal("plugin.reduce"),
+             %{},
              Jido.Agent.Plugin.specs(specs)
            ) ==
              {:error, :second_failed}
+  end
+
+  test "explicit reducers form an ordered state middleware chain" do
+    declarations = [FirstReducerPackage, SecondReducerPackage]
+    assert {:ok, specs} = Plugin.normalize_all(declarations)
+
+    agent =
+      Jido.Agent.new!(name: "ordered_reducer_agent", plugins: declarations)
+      |> Jido.Agent.instantiate!()
+
+    assert {:ok, state, []} =
+             Jido.Agent.Plugin.Pipeline.run(
+               {:ok, agent.state, []},
+               agent,
+               signal("plugin.reduce"),
+               %{},
+               Jido.Agent.Plugin.specs(specs)
+             )
+
+    assert state.first_reduced == 1
+    assert state.second_observed == 1
   end
 
   defp command do

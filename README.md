@@ -125,9 +125,10 @@ can compose four independent owner facets: `Jido.Agent.Plugin` for pure input
 preparation and Turn work, `Jido.AgentServer.Plugin` for admission and runtime work,
 `Jido.Persistence.Plugin` for one paired durable value, and
 `Jido.Topology.Plugin` for static plan contributions. A package declares only
-the facets that it needs. A Plugin cannot change an incoming Signal. Prepared
-data enters execution under the package key in `context.plugin_inputs`. Results
-enter through the normal Agent Signal mailbox. See the `Jido.Plugin` API docs.
+the facets that it needs. A Plugin cannot change an incoming Signal. Pure and
+live data enter execution through the separate `prepared` and `runtime` slots
+at `context.plugin_inputs[Package]`. Results enter through the normal Agent
+Signal mailbox. See the `Jido.Plugin` API docs.
 
 ## Persistence
 

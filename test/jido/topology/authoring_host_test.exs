@@ -142,7 +142,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     assert {:ok, %{state: %{count: 3}}} = module.add(server, 3)
   end
 
-  test "a topology without an agent block gets a neutral default owner" do
+  test "the topology block is independent from the optional control Agent block" do
     module = Module.concat(__MODULE__, "Default#{System.unique_integer([:positive])}")
 
     compile_isolated(
@@ -169,6 +169,30 @@ defmodule JidoTest.Topology.AuthoringHostTest do
 
     assert {:ok, %Agent{state: %{}}} = module.new_agent(id: "default-owner")
     assert {:ok, %Instance{}} = module.new(id: "default-topology")
+  end
+
+  test "the control Agent block is independent from the optional topology body" do
+    module = Module.concat(__MODULE__, "ControlOnly#{System.unique_integer([:positive])}")
+
+    compile_isolated(
+      quote do
+        defmodule unquote(module) do
+          use Jido.Topology, name: "control_only"
+
+          agent do
+            schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+          end
+        end
+      end
+    )
+
+    assert %Agent{state: %{count: 0}} = module.new_agent!()
+
+    assert {:ok, %Instance{plan: %{agents: agents, resources: resources}}} =
+             module.new(id: "control-only-topology")
+
+    assert agents == %{}
+    assert resources == %{}
   end
 
   test "module attribute options keep the combined authoring host" do
@@ -221,56 +245,27 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     assert [%{key: "events"}] = module.topology().resources
   end
 
-  test "one topology section cannot be split between legacy and nested locations" do
-    module = Module.concat(__MODULE__, "Split#{System.unique_integer([:positive])}")
+  test "topology-specific sections are valid only inside topology" do
+    for {section, declaration} <- [
+          {:agents, quote(do: agent(:worker, Jido.Examples.Topology.Cell))},
+          {:resources, quote(do: bus(:events))},
+          {:startup, quote(do: concurrency(2))}
+        ] do
+      module = Module.concat(__MODULE__, "Root#{section}#{System.unique_integer([:positive])}")
+      block = {section, [], [[do: declaration]]}
 
-    assert_raise CompileError,
-                 ~r/Topology section :agents cannot be declared in both locations/,
-                 fn ->
-                   compile_isolated(
-                     quote do
-                       defmodule unquote(module) do
-                         use Jido.Topology, name: "split_agents"
+      assert_raise CompileError, fn ->
+        compile_isolated(
+          quote do
+            defmodule unquote(module) do
+              use Jido.Topology, name: "root_topology_section"
 
-                         agents do
-                           agent :legacy, Jido.Examples.Topology.Cell
-                         end
-
-                         topology do
-                           agents do
-                             agent :nested, Jido.Examples.Topology.Cell
-                           end
-                         end
-                       end
-                     end
-                   )
-                 end
-  end
-
-  test "startup cannot be split between legacy and nested locations" do
-    module = Module.concat(__MODULE__, "SplitStartup#{System.unique_integer([:positive])}")
-
-    assert_raise CompileError,
-                 ~r/Topology section :startup cannot be declared in both locations/,
-                 fn ->
-                   compile_isolated(
-                     quote do
-                       defmodule unquote(module) do
-                         use Jido.Topology, name: "split_startup"
-
-                         startup do
-                           concurrency 1
-                         end
-
-                         topology do
-                           startup do
-                             concurrency 2
-                           end
-                         end
-                       end
-                     end
-                   )
-                 end
+              unquote(block)
+            end
+          end
+        )
+      end
+    end
   end
 
   defp compile_isolated(ast) do

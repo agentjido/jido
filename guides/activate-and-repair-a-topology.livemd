@@ -25,20 +25,22 @@ end
 defmodule RepairGuide.System do
   use Jido.Topology, name: "repair_guide_system"
 
-  agents do
-    agent :left, RepairGuide.Cell do
-      initial_state %{label: "left"}
+  topology do
+    agents do
+      agent :left, RepairGuide.Cell do
+        initial_state %{label: "left"}
+      end
+
+      agent :right, RepairGuide.Cell do
+        initial_state %{label: "right"}
+      end
     end
 
-    agent :right, RepairGuide.Cell do
-      initial_state %{label: "right"}
+    startup do
+      concurrency 2
+      retry_interval 1_000
+      task_timeout 5_000
     end
-  end
-
-  startup do
-    concurrency 2
-    retry_interval 1_000
-    task_timeout 5_000
   end
 end
 ```

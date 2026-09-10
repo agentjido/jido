@@ -7,7 +7,7 @@ its package key.
 
 - How `prepare/2` receives a read-only preparation value.
 - How direct and live execution use the same pure preparation.
-- How an Action reads `context.plugin_inputs[Package]`.
+- How an Action reads `context.plugin_inputs[Package].prepared`.
 - How preparation rejects input without changing the Signal.
 
 ## Run it

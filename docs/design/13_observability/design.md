@@ -1,6 +1,6 @@
 # Jido V3 observability design
 
-Status: Selected and implemented.
+Status: Implemented.
 
 The requirements in this file define the selected contract. Current owner,
 code, test, and compatibility proof is in [alignment.md](alignment.md).
@@ -9,9 +9,9 @@ code, test, and compatibility proof is in [alignment.md](alignment.md).
 
 Jido owns semantic observation for the Agent runtime that it owns. This
 includes Agent lifecycle, live Turn evaluation, commit, Directive handling,
-Agent persistence, admission rejection, and the static local Topology
-Controller. The package that owns an optional distributed control plane owns
-its control-plane event names and emission points.
+Agent persistence, admission rejection, the static local Topology Controller,
+and Scheduler delivery. The package that owns an optional distributed control
+plane owns its control-plane event names and emission points.
 
 `jido_action` owns execution and Flow telemetry. `jido_signal` owns the Signal
 envelope and its portable W3C trace carrier. `jido_ai` owns model, tool, token,
@@ -35,6 +35,7 @@ The contract separates these facts:
 5. The Turn reached its terminal Outcome.
 6. A request did not enter a Turn because admission rejected it.
 7. A persistence or local Topology operation completed.
+8. The Scheduler completed one durable-delivery check.
 
 The live Turn result and terminal settlement are not the same fact. A caller
 can receive a committed Agent before Directive work settles. A later Directive
@@ -42,7 +43,7 @@ failure does not undo that commit.
 
 ### Event catalog
 
-All eight rows are implemented.
+All nine rows are implemented.
 
 | Family | Event name | Shape | Meaning |
 | --- | --- | --- | --- |
@@ -50,10 +51,11 @@ All eight rows are implemented.
 | Agent Turn result | `[:jido, :agent, :turn, event]` | Span | From Turn admission to live result or pre-commit failure |
 | Agent commit | `[:jido, :agent, :commit, event]` | Span | One live commit attempt, including required persistence |
 | Agent Directive | `[:jido, :agent, :directive, event]` | Span | One post-commit Directive attempt |
-| Turn settlement | `[:jido, :agent, :turn, :settled]` | Point | One terminal public Turn Outcome |
+| Turn settlement | `[:jido, :agent, :turn, :settled]` | Point | One bounded projection of the terminal Turn result |
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Point | A call or cast did not enter a Turn |
 | Agent persistence | `[:jido, :persistence, :operation, event]` | Span | One public Agent persistence operation |
 | Local Topology | `[:jido, :topology, :operation, event]` | Span | One static local Controller operation |
+| Scheduler delivery | `[:jido, :scheduler, :delivery]` | Point | One bounded durable-delivery outcome |
 
 For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
 uses `:stop`. A raised, thrown, or exited fault that escapes the observed
@@ -73,6 +75,7 @@ are `:load`, `:compare_and_swap`, and `:delete`. Local Topology operations are
 | `kind` | `:error`, `:throw`, `:exit` | Include only on `:exception`. |
 | `admission_reason` | `:deadline_expired`, `:overloaded` | Report why work did not enter a Turn. |
 | `persistence_reason` | `:commit`, `:activate`, `:stop`, `:hibernate`, `:thaw`, `:manual`, `:topology` | Report why the owner requested storage work. |
+| `scheduler_outcome` | `:idle`, `:delivered`, `:state_read_error`, `:timeout`, `:task_error`, `:delivery_error`, `:invalid_result` | Report one bounded durable-delivery result. |
 
 A caller-side wait timeout is not an admission event. The Server must reject
 the work before the admission boundary emits `admission.rejected`.
@@ -86,16 +89,16 @@ apply or when its source value does not pass validation.
 | --- | --- | --- |
 | Schema | `schema_version` | Positive integer; current version is `1` |
 | Agent Ref | `agent_namespace`, `agent_partition`, `agent_id` | Bounded UTF-8 strings projected from `%Jido.Agent.Ref{}` |
-| Current identity overlap | `jido_instance`, `partition` | Current atom/string/integer fields retained only for compatibility |
 | Agent runtime | `agent_module`, `activation_id` | Module atom and bounded ID |
 | Turn and Signal | `turn_id`, `source_signal_id`, `signal_id`, `signal_type` | Bounded UTF-8 strings |
-| Causal trace | `trace_id`, `span_id`, `parent_span_id`, `causation_id`, `cause_turn_id`, `child_activation_id`, `sampled?` | Bounded IDs and Boolean sampling hint |
+| Causal trace | `trace_id`, `span_id`, `parent_span_id`, `causation_id`, `cause_turn_id`, `child_activation_id` | Bounded IDs |
 | Result | `operation`, `status`, `stage`, `kind`, `committed?` | Registered atoms and Boolean |
 | Safe error | `error_type`, `error_code`, `retryable?` | Bounded semantic projection; use `Jido.Error.code/1` for a registered Jido code and omit it when absent |
 | Directive | `directive_module` | Module atom |
 | Admission | `admission_reason` | Registered atom |
 | Persistence | `adapter_module`, `persistence_reason` | Module atom and registered atom |
 | Topology | `topology_id`, `topology_operation`, `component_kind`, `node_id` | Bounded strings or registered atoms |
+| Scheduler | `scheduler_outcome` | Registered atom |
 
 The maximum is 256 bytes for an ID or type and 128 bytes for a
 partition. Invalid UTF-8, larger strings, nested values, and values outside the
@@ -108,11 +111,11 @@ admitted Turn. Trace parentage and Signal causation stay separate because they
 answer different questions.
 
 Semantic metadata excludes complete Agent state, including Plugin-owned fields,
-Signal data, Directive data, caller context, checkpoints, persistence records, encoded keys, raw
-errors, error details, error messages, stacktraces, PIDs, ports, references,
-functions, authenticated actor data, arbitrary application metadata, and
-OpenTelemetry `tracestate`. An audit record, not telemetry, owns authenticated
-actor and operator request data.
+Signal data, Directive data, caller context, checkpoints, persistence records,
+encoded keys, raw errors, error details, error messages, stacktraces, PIDs,
+ports, references, functions, authenticated actor data, arbitrary application
+metadata, and OpenTelemetry `tracestate`. An audit record, not telemetry, owns
+authenticated actor and operator request data.
 
 An optional control-plane package owns its event prefix. Its transition event
 metadata can contain only `schema_version`, registered `operation`, the
@@ -133,23 +136,25 @@ converts them at its boundary. Counts and revisions are integers.
 | Turn start | `state_version_before` | None |
 | Turn result | `state_version_before` | `state_version_after`, `directive_count` |
 | Turn settled | `duration`, `state_version_before`, `directive_count`, `directive_completed`, `directive_failed`, `directive_skipped` | `state_version_after` |
-| Commit | `duration` | `expected_revision`, `state_version_before`, `state_version_after`, `directive_count` |
+| Commit | `duration` | None; the nested persistence span owns storage revisions |
 | Directive | `duration`, `directive_index` | None |
 | Admission rejection | `system_time`, `queue_depth` | `queue_limit`, `wait_duration` |
 | Persistence | `duration` | `expected_revision`, `revision_before`, `revision_after` |
 | Local Topology | `duration` | `component_count`, `ready_count`, `failed_count`, `epoch` |
+| Scheduler delivery | `count` | None |
 
 The `turn.settled` duration measures from Turn start to settlement. It is not
 the live-result duration from the Turn span.
 
 ### Default consumer contract
 
-The default metric set has count and duration metrics for lifecycle,
-Turn result, settlement, commit, Directive, persistence, and local Topology.
-It also has an admission rejection counter. Default metric tags can use only
-the fixed vocabularies `operation`, `status`, `stage`, `admission_reason`,
-`persistence_reason`, `topology_operation`, and `component_kind`. A reporter
-can select a smaller set.
+The default metric set has count and duration metrics for both `:stop` and
+`:exception` events for lifecycle, Turn result, commit, Directive,
+persistence, and local Topology. It also has settlement count and duration,
+admission rejection count, and Scheduler delivery count. Default metric tags
+can use only the fixed vocabularies `operation`, `status`, `stage`,
+`admission_reason`, `persistence_reason`, `topology_operation`,
+`scheduler_outcome`, and `component_kind`. A reporter can select a smaller set.
 
 Default metrics must not tag module names, Signal types, Agent Ref fields,
 activation IDs, Turn IDs, Signal IDs, trace IDs, topology IDs, node IDs, error
@@ -238,8 +243,8 @@ candidate becomes live.
 `OBS-REQ-014`: When one post-commit Directive runs, the Agent Directive
 boundary shall emit one Directive span.
 
-`OBS-REQ-015`: When an admitted Turn reaches a public terminal Outcome, the
-Agent observation boundary shall emit exactly one `turn.settled` event.
+`OBS-REQ-015`: When an admitted Turn reaches its runtime terminal Outcome, the
+Agent observation boundary shall emit exactly one bounded `turn.settled` event.
 
 `OBS-REQ-016`: When a Turn has post-commit Directive work, the Agent observation
 boundary shall emit `turn.settled` after all owned Directive attempts settle.
@@ -289,9 +294,9 @@ boundaries shall put numeric counts in measurements instead of metadata.
 event is emitted, the Agent observation boundary shall project its namespace,
 partition, and ID as `agent_namespace`, `agent_partition`, and `agent_id`.
 
-`OBS-REQ-028`: During the identity migration interval, when an Agent semantic
-event is emitted, the Agent observation boundary shall retain the current
-`jido_instance` and `partition` fields when they are valid.
+`OBS-REQ-028`: When an Agent semantic event is emitted, the Agent observation
+boundary shall omit duplicate
+`jido_instance` and `partition` fields.
 
 `OBS-REQ-029`: When an admitted Turn event is emitted, the Agent observation
 boundary shall include its activation, Turn, source Signal, and effective
@@ -394,6 +399,9 @@ boundaries shall continue to emit the event catalog.
 `OBS-REQ-057`: Whether the optional OpenTelemetry mapping is active or absent,
 the semantic event boundary shall not broaden its metadata allowlist.
 
+`OBS-REQ-058`: When the Scheduler completes one durable-delivery check, it
+shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
+
 ## Invariants
 
 - Observation has no execution or persistence authority.
@@ -409,7 +417,7 @@ the semantic event boundary shall not broaden its metadata allowlist.
 
 | ID | Decision | Recommended answer | Effect if changed |
 | --- | --- | --- | --- |
-| `OBS-DEC-001` | Event catalog | Use the eight families in this file. | Names, tests, metrics, logs, and host mapping change together. |
+| `OBS-DEC-001` | Event catalog | Use the nine families in this file. | Names, tests, metrics, logs, and host mapping change together. |
 | `OBS-DEC-002` | Agent Ref projection | Use `agent_namespace`, `agent_partition`, and `agent_id`. | Identity fields have one stable meaning. |
 | `OBS-DEC-003` | Lifecycle operations | Use `hibernate` and `thaw`; keep create and delete under persistence. | Lifecycle and persistence facts stay separate. |
 | `OBS-DEC-004` | Public statuses and stages | Use the bounded tables and keep private stages hidden. | Dashboards do not depend on evaluator details. |

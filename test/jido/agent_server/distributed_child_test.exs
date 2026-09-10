@@ -46,7 +46,6 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
     assert node(parent) == node_a
     assert {:ok, _agent} = peer_call(peer_a, RemoteParent, :request_child, [parent, node_b])
-    assert {:ok, _agent} = peer_call(peer_a, RemoteParent, :synchronize, [parent])
 
     child = peer_eventually(fn -> peer_call(peer_a, Server, :children, [parent])[:worker] end)
 

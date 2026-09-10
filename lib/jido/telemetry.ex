@@ -1,156 +1,131 @@
 defmodule Jido.Telemetry do
   @moduledoc """
-  Semantic logging, metrics, and optional tracing for the Jido runtime.
+  The public runtime observability API.
 
-  Jido emits version-1 semantic events for Agent lifecycle, Turn result,
-  commit, Directive work, Turn settlement, admission rejection, persistence,
-  and static local Topology operations. Spans use `:start`, `:stop`, and
-  `:exception`. Returned errors use `:stop`. Faults that escape the observed
-  boundary use `:exception`.
+  Jido uses one version-1 semantic event catalog for Telemetry handlers,
+  metrics, semantic logs, and optional OpenTelemetry spans. The catalog covers
+  Agent lifecycle, Turn result, commit, Directive work, Turn settlement,
+  admission rejection, persistence, local Topology operations, and Scheduler
+  delivery.
 
-  A successful Turn span ends when its commit becomes live.
-  `[:jido, :agent, :turn, :settled]` is a separate later fact after Directive
-  work. Agent lifecycle operations are `:activate`, `:stop`, `:hibernate`, and
-  `:thaw`. Persistence operations are `:load`, `:compare_and_swap`, and
-  `:delete`. Local Topology operations are `:activate`, `:repair`, and
-  `:cleanup`.
+  A successful Turn span ends when its commit becomes live. Directive work can
+  continue after this point. The separate
+  `[:jido, :agent, :turn, :settled]` event reports the terminal bounded result
+  after all owned Directive attempts stop. A post-commit failure does not undo
+  the committed Agent or its revision.
 
-  Semantic metadata is a strict scalar allowlist. It includes schema version,
-  bounded identity and correlation, public status, and registered error codes.
-  Revisions, durations, and counts are measurements. Events exclude state,
-  payloads, records, raw errors, process handles, and caller context.
+  Span events use `:start` and one terminal event. A returned result uses
+  `:stop`. An error, throw, or exit that escapes the observed boundary uses
+  `:exception`.
 
-  `metrics/0` returns low-cardinality semantic metrics. When the optional
-  `opentelemetry_api` dependency and a host-managed SDK are available, the same
-  events also create OpenTelemetry spans. Jido does not start an SDK or
-  exporter.
+  Event metadata has a strict scalar allowlist. It excludes Agent and Plugin
+  state, Signal and Directive data, raw errors, records, process handles,
+  credentials, and caller context. Durations, revisions, queue sizes, and
+  counts are measurements.
 
-  Handlers run in the emitting process and must return quickly. Abrupt process
-  or VM loss can prevent final events, so this stream is not a durable journal.
+  `metrics/0` returns low-cardinality metric definitions. If the optional
+  `opentelemetry_api` dependency and a host-managed SDK are active, Jido maps
+  the same operations to spans. Jido does not start an SDK or configure
+  sampling and export.
+
+  Observation is best effort. It cannot change an Agent result and it is not a
+  durable audit record.
+
+  See [Observe Agent Turns](observe-agent-turns.html) and
+  [Telemetry, Tracing, and Logs](telemetry-tracing-and-logs.html) for the
+  complete event and integration contracts.
   """
 
   require Logger
 
   alias Jido.Debug
-  alias Jido.Telemetry.Formatter
-  alias Jido.Telemetry.Semantic
-
-  @typedoc "Supported telemetry event names."
-  @type event_name :: [atom(), ...]
-
-  @typedoc "Telemetry measurements map."
-  @type measurements :: %{
-          optional(:system_time) => integer(),
-          optional(:duration) => integer(),
-          atom() => term()
-        }
-
-  @typedoc "Telemetry metadata map."
-  @type metadata :: %{atom() => term()}
+  alias Jido.Telemetry.{OpenTelemetry, Semantic}
 
   @semantic_handler_id "jido-semantic-logger"
+  @log_scope_key {:jido, :semantic_log_scope}
+
+  @span_metrics [
+    {"jido.agent.lifecycle", [:jido, :agent, :lifecycle], [:operation, :status]},
+    {"jido.agent.turn", [:jido, :agent, :turn], [:status, :stage]},
+    {"jido.agent.commit", [:jido, :agent, :commit], [:status]},
+    {"jido.agent.directive", [:jido, :agent, :directive], [:status]},
+    {"jido.persistence.operation", [:jido, :persistence, :operation],
+     [:operation, :status, :persistence_reason]},
+    {"jido.topology.operation", [:jido, :topology, :operation], [:topology_operation, :status]}
+  ]
+
+  @typedoc "A Jido telemetry event name."
+  @type event_name :: [atom(), ...]
+
+  @typedoc "A Jido telemetry measurement map."
+  @type measurements :: %{optional(atom()) => integer()}
+
+  @typedoc "A Jido telemetry metadata map."
+  @type metadata :: %{atom() => term()}
 
   @doc """
-  Attaches the semantic log handler.
+  Returns metric definitions for the Jido semantic event catalog.
 
-  This function is idempotent and is safe to call more than once.
-  """
-  @spec setup() :: :ok
-  def setup do
-    attach(@semantic_handler_id, semantic_terminal_events(), &__MODULE__.handle_semantic_event/4)
-    :ok
-  end
+  The result contains count and duration metrics for normal and exception span
+  endings. It also contains Turn settlement, admission rejection, and
+  Scheduler delivery metrics. Default tags use only bounded result and
+  operation values. They do not use Agent, Signal, Turn, trace, module, or
+  error IDs.
 
-  @doc """
-  Returns low-cardinality metric definitions for the semantic event catalog.
-
-  Wire these definitions into the reporter in the host application:
-
-      TelemetryMetricsPrometheus.init(Jido.Telemetry.metrics())
+  Pass the returned list to a `Telemetry.Metrics` compatible reporter in the
+  host application.
   """
   @spec metrics() :: [Telemetry.Metrics.t()]
   def metrics do
-    [
-      Telemetry.Metrics.counter("jido.agent.lifecycle.stop.count",
-        event_name: [:jido, :agent, :lifecycle, :stop],
-        tags: [:operation, :status]
-      ),
-      Telemetry.Metrics.summary("jido.agent.lifecycle.stop.duration",
-        event_name: [:jido, :agent, :lifecycle, :stop],
-        tags: [:operation, :status],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.agent.turn.stop.count",
-        event_name: [:jido, :agent, :turn, :stop],
-        tags: [:status, :stage]
-      ),
-      Telemetry.Metrics.summary("jido.agent.turn.stop.duration",
-        event_name: [:jido, :agent, :turn, :stop],
-        tags: [:status, :stage],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.agent.turn.settled.count",
-        event_name: [:jido, :agent, :turn, :settled],
-        tags: [:status, :stage]
-      ),
-      Telemetry.Metrics.summary("jido.agent.turn.settled.duration",
-        event_name: [:jido, :agent, :turn, :settled],
-        tags: [:status, :stage],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.agent.commit.stop.count",
-        event_name: [:jido, :agent, :commit, :stop],
-        tags: [:status]
-      ),
-      Telemetry.Metrics.summary("jido.agent.commit.stop.duration",
-        event_name: [:jido, :agent, :commit, :stop],
-        tags: [:status],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.agent.directive.stop.count",
-        event_name: [:jido, :agent, :directive, :stop],
-        tags: [:status]
-      ),
-      Telemetry.Metrics.summary("jido.agent.directive.stop.duration",
-        event_name: [:jido, :agent, :directive, :stop],
-        tags: [:status],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.agent.admission.rejected.count",
-        event_name: [:jido, :agent, :admission, :rejected],
-        tags: [:admission_reason]
-      ),
-      Telemetry.Metrics.counter("jido.persistence.operation.stop.count",
-        event_name: [:jido, :persistence, :operation, :stop],
-        tags: [:operation, :status, :persistence_reason]
-      ),
-      Telemetry.Metrics.summary("jido.persistence.operation.stop.duration",
-        event_name: [:jido, :persistence, :operation, :stop],
-        tags: [:operation, :status, :persistence_reason],
-        unit: {:native, :millisecond}
-      ),
-      Telemetry.Metrics.counter("jido.topology.operation.stop.count",
-        event_name: [:jido, :topology, :operation, :stop],
-        tags: [:topology_operation, :status]
-      ),
-      Telemetry.Metrics.summary("jido.topology.operation.stop.duration",
-        event_name: [:jido, :topology, :operation, :stop],
-        tags: [:topology_operation, :status],
-        unit: {:native, :millisecond}
-      )
-    ]
+    Enum.flat_map(@span_metrics, &span_metrics/1) ++
+      [
+        Telemetry.Metrics.counter("jido.agent.turn.settled.count",
+          event_name: [:jido, :agent, :turn, :settled],
+          tags: [:status, :stage]
+        ),
+        Telemetry.Metrics.summary("jido.agent.turn.settled.duration",
+          event_name: [:jido, :agent, :turn, :settled],
+          tags: [:status, :stage],
+          unit: {:native, :millisecond}
+        ),
+        Telemetry.Metrics.counter("jido.agent.admission.rejected.count",
+          event_name: [:jido, :agent, :admission, :rejected],
+          tags: [:admission_reason]
+        ),
+        Telemetry.Metrics.counter("jido.scheduler.delivery.count",
+          event_name: [:jido, :scheduler, :delivery],
+          tags: [:scheduler_outcome]
+        )
+      ]
+  end
+
+  @doc """
+  Returns true when the optional OpenTelemetry mapping is active.
+
+  The result is false when `opentelemetry_api` is absent, the Jido mapping is
+  disabled, or the host has a no-op tracer. Jido does not start or configure an
+  OpenTelemetry SDK.
+  """
+  @spec open_telemetry?() :: boolean()
+  def open_telemetry?, do: OpenTelemetry.enabled?()
+
+  @doc false
+  @spec attach_default_handler() :: :ok
+  def attach_default_handler do
+    attach(@semantic_handler_id, semantic_terminal_events(), &__MODULE__.handle_semantic_event/4)
+    :ok
   end
 
   @doc false
   def handle_semantic_event(event, measurements, metadata, _config) do
     metadata = Semantic.normalize_metadata(metadata)
     measurements = Semantic.normalize_measurements(measurements)
-    mode = semantic_log_mode(metadata)
+    mode = semantic_log_mode()
 
     if log_semantic?(mode, event, measurements, metadata) do
       message =
         "[jido.semantic] event=#{event |> Enum.drop(1) |> Enum.join(".")} " <>
-          Formatter.format_metadata(Map.merge(metadata, measurements), max_value_length: 128)
+          format_metadata(Map.merge(metadata, measurements))
 
       if semantic_error?(event, metadata),
         do: Logger.warning(message),
@@ -164,23 +139,36 @@ defmodule Jido.Telemetry do
     _kind, _reason -> :ok
   end
 
+  defp span_metrics({name, event, tags}) do
+    for ending <- [:stop, :exception], metric <- [:count, :duration] do
+      event_name = event ++ [ending]
+      metric_name = "#{name}.#{ending}.#{metric}"
+
+      case metric do
+        :count ->
+          Telemetry.Metrics.counter(metric_name, event_name: event_name, tags: tags)
+
+        :duration ->
+          Telemetry.Metrics.summary(metric_name,
+            event_name: event_name,
+            tags: tags,
+            unit: {:native, :millisecond}
+          )
+      end
+    end
+  end
+
   defp semantic_terminal_events do
-    spans =
-      for prefix <- [
-            [:jido, :agent, :lifecycle],
-            [:jido, :agent, :turn],
-            [:jido, :agent, :commit],
-            [:jido, :agent, :directive],
-            [:jido, :persistence, :operation],
-            [:jido, :topology, :operation]
-          ],
+    span_events =
+      for {_name, prefix, _tags} <- @span_metrics,
           ending <- [:stop, :exception],
           do: prefix ++ [ending]
 
-    spans ++
+    span_events ++
       [
         [:jido, :agent, :turn, :settled],
-        [:jido, :agent, :admission, :rejected]
+        [:jido, :agent, :admission, :rejected],
+        [:jido, :scheduler, :delivery]
       ]
   end
 
@@ -191,9 +179,9 @@ defmodule Jido.Telemetry do
     end
   end
 
-  defp semantic_log_mode(metadata) do
+  defp semantic_log_mode do
     instance_mode =
-      case Map.get(metadata, :jido_instance) do
+      case Process.get(@log_scope_key) do
         instance when is_atom(instance) and not is_nil(instance) ->
           Debug.override(instance, :semantic_log_mode)
 
@@ -201,11 +189,9 @@ defmodule Jido.Telemetry do
           nil
       end
 
-    if instance_mode in [:off, :errors, :interesting, :all] do
-      instance_mode
-    else
-      configured_semantic_log_mode()
-    end
+    if instance_mode in [:off, :errors, :interesting, :all],
+      do: instance_mode,
+      else: configured_semantic_log_mode()
   end
 
   defp configured_semantic_log_mode do
@@ -233,7 +219,7 @@ defmodule Jido.Telemetry do
 
   defp slow_semantic?(measurements) do
     duration = Map.get(measurements, :duration, 0)
-    Formatter.to_ms(duration) >= semantic_slow_threshold_ms()
+    native_to_ms(duration) >= semantic_slow_threshold_ms()
   end
 
   defp semantic_slow_threshold_ms do
@@ -244,6 +230,26 @@ defmodule Jido.Telemetry do
       _value -> 1_000
     end
   end
+
+  defp format_metadata(metadata) do
+    metadata
+    |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+    |> Enum.sort_by(fn {key, _value} -> to_string(key) end)
+    |> Enum.map_join(" ", fn {key, value} -> "#{key}=#{format_value(value)}" end)
+  end
+
+  defp format_value(value) when is_binary(value), do: truncate(value, 128)
+  defp format_value(value) when is_atom(value) or is_number(value), do: to_string(value)
+  defp format_value(value), do: value |> inspect(limit: 10, printable_limit: 128) |> truncate(128)
+
+  defp truncate(value, max) when byte_size(value) <= max, do: value
+  defp truncate(value, max), do: String.slice(value, 0, max - 3) <> "..."
+
+  defp native_to_ms(value) when is_integer(value) do
+    System.convert_time_unit(value, :native, :microsecond) / 1_000
+  end
+
+  defp native_to_ms(_value), do: 0
 
   defp config_value(config, key) when is_list(config), do: Keyword.get(config, key)
   defp config_value(config, key) when is_map(config), do: Map.get(config, key)

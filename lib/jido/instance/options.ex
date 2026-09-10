@@ -21,6 +21,7 @@ defmodule Jido.Instance.Options do
          :ok <- validate_name(Keyword.get(opts, :name)),
          :ok <- validate_otp_app(Keyword.get(opts, :otp_app)),
          :ok <- validate_namespace(Keyword.get(opts, :namespace)),
+         :ok <- validate_debug(Keyword.get(opts, :debug)),
          :ok <- validate_max_tasks(Keyword.get(opts, :max_tasks, @default_max_tasks)),
          {:ok, persistence} <- validate_persistence(Keyword.get(opts, :persistence)) do
       validated =
@@ -70,6 +71,11 @@ defmodule Jido.Instance.Options do
 
   defp validate_namespace(namespace),
     do: invalid("Jido instance namespace must be a nonempty binary", %{namespace: namespace})
+
+  defp validate_debug(debug) when debug in [nil, false, true, :verbose], do: :ok
+
+  defp validate_debug(debug),
+    do: invalid("debug must be false, true, or :verbose", %{debug: debug})
 
   defp validate_max_tasks(:infinity), do: :ok
   defp validate_max_tasks(max_tasks) when is_integer(max_tasks) and max_tasks >= 0, do: :ok

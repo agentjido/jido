@@ -32,7 +32,9 @@ defmodule JidoTest.FeatureObserver.Server do
   @moduledoc false
   use Jido.AgentServer.Plugin
 
-  def admit(_runtime_ref, command, opts) do
+  alias Jido.AgentServer.Plugin.Admission
+
+  def admit(_runtime_ref, %Admission{}, opts) do
     owner_key = Keyword.fetch!(opts, :owner_key)
     owner = :global.whereis_name({JidoTest.FeatureObserver, owner_key})
     key = Keyword.fetch!(opts, :key)
@@ -48,7 +50,6 @@ defmodule JidoTest.FeatureObserver.Server do
       end
     end
 
-    input = Map.put(Map.get(command.plugin_inputs, JidoTest.FeatureObserver, %{}), key, observer)
-    {:ok, Jido.Agent.Command.put_plugin_input(command, JidoTest.FeatureObserver, input)}
+    {:ok, %{key => observer}}
   end
 end

@@ -306,6 +306,15 @@ defmodule Jido.Plugin.ValidationTest do
   end
 
   test "invalid Plugin state and callback results do not return a candidate state" do
+    agent =
+      Jido.Agent.new!(
+        name: "plugin_pipeline_validation",
+        schema: Zoi.object(%{owned: Zoi.integer()})
+      )
+      |> Jido.Agent.instantiate!(state: %{owned: 1})
+
+    source = signal("plugin.pipeline")
+
     for {result, message} <- [
           {{:ok, "invalid"}, "Plugin-owned Agent state field is invalid"},
           {:invalid, "Agent Plugin update_state/3 returned an invalid result"}
@@ -315,7 +324,9 @@ defmodule Jido.Plugin.ValidationTest do
       assert {:error, error} =
                Jido.Agent.Plugin.Pipeline.run(
                  {:ok, %{owned: 1}, [%Effect{value: 2}]},
-                 %{owned: 1},
+                 agent,
+                 source,
+                 %{},
                  Jido.Agent.Plugin.specs(specs)
                )
 
@@ -327,7 +338,9 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:ok, %{owned: 2}, []} =
              Jido.Agent.Plugin.Pipeline.run(
                {:ok, %{owned: 1}, []},
-               %{owned: 1},
+               agent,
+               source,
+               %{},
                Jido.Agent.Plugin.specs(specs)
              )
 
@@ -336,7 +349,9 @@ defmodule Jido.Plugin.ValidationTest do
     assert {:error, :failed} =
              Jido.Agent.Plugin.Pipeline.run(
                {:error, :failed},
-               %{owned: 1},
+               agent,
+               source,
+               %{},
                Jido.Agent.Plugin.specs(specs)
              )
 

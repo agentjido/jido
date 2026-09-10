@@ -1,6 +1,8 @@
 defmodule Jido.Examples.RouteSelection.Record do
   @moduledoc false
-  use Jido.Action, name: "research_route_record"
+  use Jido.Action,
+    name: "research_route_record",
+    schema: Zoi.object(%{handler: Zoi.string()})
 
   def run(%{handler: handler}, %{agent_state: state}) do
     {:ok, %{state | handler: handler}}
@@ -17,9 +19,9 @@ defmodule Jido.Examples.RouteSelection.Single do
   end
 
   routes do
-    signal_source "/examples/route-selection"
+    signal_source "/examples/research/route_selection"
 
-    route "order.create", Record do
+    route "examples.research.route_selection.order.create", Record do
       defaults %{handler: "create"}
     end
   end
@@ -35,13 +37,13 @@ defmodule Jido.Examples.RouteSelection.Fallback do
   end
 
   routes do
-    signal_source "/examples/route-selection"
+    signal_source "/examples/research/route_selection"
 
-    route "order.create", Record do
+    route "examples.research.route_selection.order.create", Record do
       defaults %{handler: "create"}
     end
 
-    route "order.*", Record do
+    route "examples.research.route_selection.order.*", Record do
       defaults %{handler: "order"}
     end
 
@@ -61,13 +63,13 @@ defmodule Jido.Examples.RouteSelection.Fixed do
   end
 
   routes do
-    signal_source "/examples/route-selection"
+    signal_source "/examples/research/route_selection"
 
-    route "order.create", Record do
+    route "examples.research.route_selection.order.create", Record do
       defaults %{handler: "create"}
     end
 
-    route "order.cancel", Record do
+    route "examples.research.route_selection.order.cancel", Record do
       defaults %{handler: "cancel"}
     end
   end
@@ -88,5 +90,11 @@ defmodule Jido.Examples.RouteSelection do
     module.new!(id: "order-router")
   end
 
-  def signal(type), do: Jido.Signal.new!(type, %{}, source: "/examples/route-selection")
+  def signal(type) do
+    Jido.Signal.new!(
+      "examples.research.route_selection.#{type}",
+      %{},
+      source: "/examples/research/route_selection"
+    )
+  end
 end

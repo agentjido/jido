@@ -79,10 +79,13 @@ defmodule Jido.Topology.Composition do
     [
       {:agent, definition.agents},
       {:group, definition.groups},
-      {:bus, definition.resources},
+      {:resource, definition.resources},
       {:import, definition.imports}
     ]
-    |> Enum.flat_map(fn {kind, entries} -> Enum.map(entries, &{&1.key, kind}) end)
+    |> Enum.flat_map(fn
+      {:resource, entries} -> Enum.map(entries, &{&1.key, &1.kind})
+      {kind, entries} -> Enum.map(entries, &{&1.key, kind})
+    end)
     |> Map.new()
   end
 
@@ -114,11 +117,10 @@ defmodule Jido.Topology.Composition do
   defp nodes(definition, path, scopes) do
     specifications =
       Enum.flat_map(
-        [{:agent, definition.agents}, {:group, definition.groups}, {:bus, definition.resources}],
-        fn {kind, values} ->
-          Enum.map(values, &{kind, &1})
-        end
-      )
+        [{:agent, definition.agents}, {:group, definition.groups}],
+        fn {kind, values} -> Enum.map(values, &{kind, &1}) end
+      ) ++
+        Enum.map(definition.resources, &{&1.kind, &1})
 
     Authoring.traverse(specifications, fn {kind, spec} ->
       with {:ok, deps} <-

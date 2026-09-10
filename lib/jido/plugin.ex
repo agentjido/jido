@@ -26,8 +26,16 @@ defmodule Jido.Plugin do
   Callback fields and accessors named `plugin_state` expose only the selected
   value from that owned Agent field.
 
+  The Agent facet can prepare one portable input and reduce one owned state
+  field. The Agent Server facet receives a read-only admission value and can
+  return one transient runtime input. Jido exposes the two inputs as
+  `context.plugin_inputs[Package].prepared` and
+  `context.plugin_inputs[Package].runtime`.
+
   `use Jido.Plugin` with no manifest options is the mixed-callback compatibility
-  form. New Plugins must use an owner-facet manifest.
+  form. Its old Directive validation, state update, and Command admission
+  callbacks remain for source compatibility. New Plugins must use an
+  owner-facet manifest.
   """
 
   alias Jido.Agent.Command
@@ -162,7 +170,7 @@ defmodule Jido.Plugin do
 
   @doc false
   def validate_directive(%Jido.Plugin.Spec{agent: agent_spec}, directive) do
-    Jido.Agent.Plugin.validate_directive(agent_spec, directive)
+    Jido.Agent.Plugin.validate_legacy_directive(agent_spec, directive)
   end
 
   @doc false
@@ -176,6 +184,9 @@ defmodule Jido.Plugin do
 
   @doc false
   defdelegate admit(command, specs, runtime_refs), to: Jido.AgentServer.Plugin
+
+  @doc false
+  defdelegate admit(command, specs, runtime_refs, state_version), to: Jido.AgentServer.Plugin
 
   @doc false
   defdelegate prepare_dispatch(signal, specs, runtime_refs, context, agent_state),

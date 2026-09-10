@@ -59,6 +59,17 @@ defmodule Jido.Telemetry.SemanticTest do
            }
   end
 
+  test "topology operation vocabulary includes update and exact placement" do
+    for operation <- [:activate, :repair, :update, :place, :cleanup] do
+      assert Semantic.normalize_metadata(%{topology_operation: operation}) == %{
+               schema_version: 1,
+               topology_operation: operation
+             }
+    end
+
+    assert Semantic.normalize_metadata(%{topology_operation: :rebalance}) == %{schema_version: 1}
+  end
+
   test "a returned failure stops a span and an escaping fault reports an exception" do
     handler = {__MODULE__, make_ref()}
     prefix = [:jido, :persistence, :operation]

@@ -8,6 +8,7 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   alias Jido.Plugin.Scheduler
   alias Jido.Plugin.Scheduler.{Cancel, Cron, Delivery, Durable, Occurrence, Schedule, WallClock}
   alias Jido.Signal
+  alias Jido.Telemetry.Semantic
   alias Jido.Tracing.Trace
 
   def start_link(%Init{} = init), do: GenServer.start_link(__MODULE__, init)
@@ -535,10 +536,15 @@ defmodule Jido.Plugin.Scheduler.Runtime do
   defp outcome_cursor(_outcome, runtime), do: runtime.delivery_cursor
 
   defp emit_delivery(outcome) do
-    :telemetry.execute(
+    outcome = delivery_outcome(outcome)
+
+    Semantic.point(
       [:jido, :scheduler, :delivery],
-      %{count: 1},
-      %{outcome: delivery_outcome(outcome)}
+      %{
+        scheduler_outcome: outcome,
+        status: if(outcome in [:idle, :delivered], do: :ok, else: :error)
+      },
+      %{count: 1}
     )
   end
 

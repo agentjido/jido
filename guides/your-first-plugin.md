@@ -10,12 +10,14 @@ format conversion. Add `Jido.Topology.Plugin` only for static canonical
 Topology entries.
 
 For owned state, declare a key and schema through `state_spec/1`. Implement
-`update_state/3` to reduce owned Directives into the complete next owned value.
-Keep Agent domain keys under the Action's control.
+`reduce/2` to compute the complete next owned value. The reducer can read the
+prior and candidate Agent states, the pure prepared input, and all validated
+Directives. Keep Agent domain keys under the Action's control.
 
-For a typed effect, declare and validate the Directive in the Agent facet. Put
-post-commit handling in the Agent Server facet. Add `child_spec/1` only when the
-capability needs one permanent runtime root.
+For a typed effect, implement `Jido.Agent.Directive` on the Directive module and
+declare the type in the Agent facet. Put post-commit handling in the Agent
+Server facet. Add `child_spec/1` only when the capability needs one permanent
+runtime root.
 
 See [the callback guide](plugins.md) and
 [the four-facet tests](../test/jido/plugin/facets_test.exs).

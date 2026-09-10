@@ -295,7 +295,7 @@ defmodule Jido.AgentServer.ContextTest do
     assert admitted.jido == jido
     assert admitted.partition == nil
     assert_receive {:context_executed, executed}
-    assert executed.plugin_inputs[ContextPlugin].admitted
+    assert executed.plugin_inputs[ContextPlugin].runtime.admitted
     assert executed.private_request == private_request
     assert executed.signal.data == command.data
     assert executed.agent_state == %{value: 0, context_plugin: 0}

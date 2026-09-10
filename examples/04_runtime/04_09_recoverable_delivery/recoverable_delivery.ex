@@ -21,8 +21,7 @@ defmodule Jido.Examples.RecoverableDelivery do
 
     route "examples.runtime.delivery.record" do
       action %{effect_id: effect_id, value: value},
-        schema:
-          Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         directive = struct!(Deliver, effect_id: effect_id, value: value)
         {:ok, %{context.agent_state | value: value}, [directive]}
@@ -33,8 +32,7 @@ defmodule Jido.Examples.RecoverableDelivery do
 
     route "examples.runtime.delivery.confirm" do
       action %{effect_id: effect_id, value: value},
-        schema:
-          Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        schema: Zoi.object(%{effect_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         confirmation = struct!(Confirm, effect_id: effect_id, value: value)
         {:ok, context.agent_state, [confirmation]}

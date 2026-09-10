@@ -37,29 +37,36 @@ end
 defmodule TopologyGuide.System do
   use Jido.Topology, name: "topology_guide_system"
 
-  agents do
-    agent :leader, TopologyGuide.Cell do
-      initial_state %{label: "leader"}
+  topology do
+    agents do
+      agent :leader, TopologyGuide.Cell do
+        initial_state %{label: "leader"}
+      end
+
+      agent :worker, TopologyGuide.Cell do
+        initial_state %{label: "worker"}
+      end
     end
 
-    agent :worker, TopologyGuide.Cell do
-      initial_state %{label: "worker"}
+    relationships do
+      owns :leader, :worker do
+        on_parent_exit :stop
+      end
     end
-  end
 
-  relationships do
-    owns :leader, :worker do
-      on_parent_exit :stop
+    startup do
+      concurrency 2
+      max_agents 10
+      task_timeout 5_000
     end
-  end
-
-  startup do
-    concurrency 2
-    max_agents 10
-    task_timeout 5_000
   end
 end
 ```
+
+All topology-specific sections are inside `topology do`. A module can also
+have a root `agent do` block for an optional control Agent. A root `routes do`
+block uses the normal Agent route syntax and requires that `agent` block. The
+control Agent and topology are independent values.
 
 ## Build The Plan
 

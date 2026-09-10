@@ -4,7 +4,7 @@ defmodule Jido.Application do
 
   @doc false
   def start(_type, _args) do
-    Jido.Telemetry.setup()
+    Jido.Telemetry.attach_default_handler()
 
     Supervisor.start_link(
       [Jido.Instance.NamespaceRegistry],

@@ -80,7 +80,7 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
       ]
 
       assert Enum.sort(Enum.map(outcomes, &outcome_identity/1)) == Enum.sort(expected)
-      delivery_outcome = Enum.find(outcomes, &(&1.source_signal.id == delivery.id))
+      delivery_outcome = Enum.find(outcomes, &(&1.signal_id == delivery.id))
       assert delivery_outcome.stage == :directive
       assert delivery_outcome.directives.failed == 1
 
@@ -98,7 +98,7 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
 
       for outcome <- outcomes do
         assert [event] = Enum.filter(settled, &(&1.metadata.turn_id == outcome.id))
-        assert event.metadata.source_signal_id == outcome.source_signal.id
+        assert event.metadata.source_signal_id == outcome.signal_id
         assert event.metadata.committed? == outcome.committed?
         assert event.metadata.status == public_status(outcome.status)
 
@@ -480,8 +480,8 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
         assert event.metadata.agent_namespace == namespace
         assert event.metadata.agent_partition == "west"
         assert event.metadata.agent_id == id
-        assert event.metadata.partition == "west"
-        assert event.metadata.jido_instance == instance
+        refute Map.has_key?(event.metadata, :partition)
+        refute Map.has_key?(event.metadata, :jido_instance)
       end
     after
       EventProbe.detach(probe)
@@ -535,7 +535,7 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
   def fail_observer(_event, _measurements, _metadata, _config), do: :ok
 
   defp outcome_identity(outcome) do
-    {outcome.source_signal.id, outcome.status, outcome.committed?, outcome.state_version_before,
+    {outcome.signal_id, outcome.status, outcome.committed?, outcome.state_version_before,
      outcome.state_version_after}
   end
 

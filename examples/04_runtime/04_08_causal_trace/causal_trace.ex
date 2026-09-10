@@ -64,7 +64,10 @@ defmodule Jido.Examples.CausalTrace do
         context: context do
         if input.request_id == context.agent_state.request_id do
           {:ok,
-           %{context.agent_state | results: Map.put(context.agent_state.results, input.slot, input.value)}}
+           %{
+             context.agent_state
+             | results: Map.put(context.agent_state.results, input.slot, input.value)
+           }}
         else
           {:error, :unrelated_result}
         end

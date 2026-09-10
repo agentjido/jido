@@ -40,7 +40,7 @@ Benchmark tests in `test/bench/` use the `:benchmark` tag. All example tests,
 including the former integration scenarios, use `:example`.
 
 All research example tests pass without skips. They include the explicit
-quiescent upgrade boundary, validated definition migration, and additive local
+quiescent upgrade boundary, validated definition migration, and additive
 Topology update. See the
 [research results](../test/examples/99_research/README.md).
 

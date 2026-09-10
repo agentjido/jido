@@ -63,8 +63,9 @@ Agent documents.
 
 ## Use A Trusted Registry
 
-The Registry maps stable identifiers to Agent modules, Action and Flow targets,
-Plugins, schemas, route match functions, atoms, and static structs.
+`Jido.Codec.Registry` maps stable identifiers to Agent modules, Action and Flow
+targets, Plugins, schemas, route match functions, atoms, and static structs.
+Agent, Plugin, and Topology Codecs use this one shared Registry.
 
 Document strings do not create atoms or derive module names. Treat the Registry
 as an application allowlist. For stored documents, define stable application

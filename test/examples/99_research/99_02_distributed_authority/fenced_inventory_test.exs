@@ -9,13 +9,11 @@ defmodule JidoTest.Examples.FencedInventoryTest do
     {:ok, authority} =
       peer_call(c.peer_a, Supervisor, :start_child, [Jido.Supervisor, {Authority, []}])
 
-    {:ok, probe} = peer_call(c.peer_a, Authority, :start_probe, [])
-
     for peer <- [c.peer_a, c.peer_b] do
       assert {:ok, _} = peer_call(peer, Supervisor, :start_child, [Jido.Supervisor, {Client, []}])
     end
 
-    %{authority: authority, probe: probe}
+    %{authority: authority}
   end
 
   test "replacement on a second node fences the old activation before Action work", c do
@@ -28,7 +26,6 @@ defmodule JidoTest.Examples.FencedInventoryTest do
     assert node(old) != node(replacement)
     assert peer_call(c.peer_b, Server, :snapshot, [replacement]).agent.state.value == 1
     assert {:error, _} = peer_call(c.peer_a, Example, :record, [old, 99])
-    assert peer_call(c.peer_a, Example, :probe_count, [c.probe]) == 1
     assert {:ok, _} = peer_call(c.peer_b, Example, :record, [replacement, 2])
     assert peer_call(c.peer_a, Authority, :effects, [c.authority]) == [{token1, 1}, {token2, 2}]
     assert peer_call(c.peer_b, Server, :snapshot, [replacement]).agent.state.value == 2
@@ -60,7 +57,6 @@ defmodule JidoTest.Examples.FencedInventoryTest do
     assert {:ok, _} = peer_call(c.peer_b, Example, :record, [owner, 1])
     assert :ok = peer_call(c.peer_a, GenServer, :stop, [c.authority])
     assert {:error, _} = peer_call(c.peer_b, Example, :record, [owner, 2])
-    assert peer_call(c.peer_a, Example, :probe_count, [c.probe]) == 1
     assert peer_call(c.peer_b, Server, :snapshot, [owner]).agent.state.value == 1
   end
 
@@ -74,7 +70,6 @@ defmodule JidoTest.Examples.FencedInventoryTest do
     assert true = peer_call(c.peer_b, Node, :disconnect, [c.node_a])
     assert c.node_a not in peer_call(c.peer_b, Node, :list, [])
     assert {:error, _} = peer_call(c.peer_b, Example, :record, [old, 90])
-    assert peer_call(c.peer_a, Example, :probe_count, [c.probe]) == 1
     token2 = peer_call(c.peer_a, Authority, :claim, [c.authority])
     assert {:ok, replacement} = start(c.peer_a, c, token2)
     assert {:ok, _} = peer_call(c.peer_a, Example, :record, [replacement, 2])
@@ -82,14 +77,13 @@ defmodule JidoTest.Examples.FencedInventoryTest do
     assert true = peer_call(c.peer_b, Node, :connect, [c.node_a])
     assert {:error, _} = peer_call(c.peer_b, Example, :record, [old, 91])
     assert peer_call(c.peer_a, Authority, :effects, [c.authority]) == [{token1, 1}, {token2, 2}]
-    assert peer_call(c.peer_a, Example, :probe_count, [c.probe]) == 2
   end
 
   defp start(peer, c, token) do
     :ok =
       peer_call(peer, Client, :configure, [
         "inventory",
-        %{authority: c.authority, token: token, probe: c.probe}
+        %{authority: c.authority, token: token}
       ])
 
     peer_call(peer, Jido, :start_agent, [

@@ -19,7 +19,7 @@ defmodule JidoTest.Examples.Applications.InboxTest do
         end
       end)
 
-    Runtime.push(runtime, %{event_id: "slow", delay_ms: 30})
+    Runtime.push(runtime, %{event_id: "first"})
     Runtime.push(runtime, %{event_id: "duplicate"})
     Runtime.push(runtime, %{event_id: "duplicate"})
 

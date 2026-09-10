@@ -57,15 +57,17 @@ defmodule JidoTest.Examples.Factory.SystemTest do
     assert map_size(HTTP.state(system.factory).jobs) == 1
     assert {:error, _} = Tools.command(jido, system.factory_id, :submit, "job", "", "Changed")
     assert {:ok, _} = Tools.command(jido, system.factory_id, :pause, "pause", "job", "")
-    tick = signal("factory.worker.progress", %{job_id: "job", generation: 0, step: 0})
+    tick = signal("examples.factory.work_item.progress", %{job_id: "job", generation: 0, step: 0})
     before = Server.snapshot(system.factory)
     assert {:error, _} = Server.call(system.factory, tick)
     assert Server.snapshot(system.factory) == before
     assert {:ok, _} = Tools.command(jido, system.factory_id, :resume, "resume", "job", "")
-    assert {:ok, _} = Server.call(system.factory, signal("factory.workshop.poll", %{}))
+    assert {:ok, _} = Server.call(system.factory, signal("examples.factory.workshop.poll", %{}))
 
     for step <- 0..2 do
-      tick = signal("factory.worker.progress", %{job_id: "job", generation: 2, step: step})
+      tick =
+        signal("examples.factory.work_item.progress", %{job_id: "job", generation: 2, step: step})
+
       assert {:ok, _} = Server.call(system.factory, tick)
     end
 
@@ -103,7 +105,10 @@ defmodule JidoTest.Examples.Factory.SystemTest do
 
   test "timer work completes without another user command", %{jido: jido} do
     system = HTTP.system!(jido, :workshop, step_delay_ms: 5)
-    command = signal("factory.command", %{operation: :submit, request_id: "job", goal: "demo"})
+
+    command =
+      signal("examples.factory.command", %{operation: :submit, request_id: "job", goal: "demo"})
+
     assert {:ok, _} = Server.call(system.factory, command)
     assert_eventually(HTTP.state(system.factory).jobs["job"].status == :completed, timeout: 3_000)
   end

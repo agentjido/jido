@@ -1,28 +1,37 @@
-# UP-01: Turn upgrade
+# 99_14 Turn Upgrade
 
-All three tests pass.
+Status: implemented Agent Server boundary; not an OTP release installer.
 
-Two Flow steps call one Action module. A barrier pauses one active Turn between
-the steps. `Jido.AgentServer.upgrade/3` waits for the Turn to finish before it
-loads the new code. The active Turn stays on revision 1. The next Turn on the
-same Agent PID uses revision 2.
+An explicit upgrade waits for the active Turn to finish before new Action code
+runs on the same Agent process.
 
-## Implemented core feature
+## What this proves
 
-Core provides an explicit idle upgrade boundary. A revision label does not
-isolate arbitrary module loads, and this example does not claim that it does.
+- An idle code load changes later behavior without replacing the Agent PID.
+- `AgentServer.upgrade/3` serializes the selected load after active work.
 
-## Run
+## Read the code
+
+Read [the Agent, reloadable Action, and Flow](turn_upgrade.ex). The blocking
+Action used to create an active Turn exists only in test support.
+
+## Run it
 
 ```sh
-mix test test/examples/99_research/99_14_turn_upgrade --include example --seed 0 --trace
+mix test test/examples/99_research/99_14_turn_upgrade --include example --seed 0
 ```
 
-All assertions are enabled. Current startup and ordinary Turn APIs retain their
-existing contracts.
+Expected result: the active Turn uses revision 1 and the next Turn uses revision
+2 on the same Agent PID.
 
-## Scope
+## Gap and limits
 
-Only one isolated Action module is reloaded. Tests run serially. The loader does not force a code purge. This is not an OTP release installer.
+The boundary does not pin arbitrary module loads, purge code, install an OTP
+release, or coordinate nodes. Promotion needs clear deployment guidance.
 
-[Source](turn_upgrade.ex) · [Tests](../../../test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs)
+## Files
+
+- [Source](turn_upgrade.ex)
+- [Tests](../../../test/examples/99_research/99_14_turn_upgrade/turn_upgrade_test.exs)
+
+Previous: [Durable Delete](../99_13_durable_delete/README.md) | Next: [State Migration](../99_15_state_migration/README.md)

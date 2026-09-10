@@ -16,10 +16,10 @@ defmodule Jido.Examples.Factory.WorkItem do
   end
 
   routes do
-    signal_source "/examples/factory/worker"
+    signal_source "/examples/factory/work_item"
 
-    route "factory.worker.start" do
-      action _input, name: "factory_worker_start", schema: Zoi.object(%{}), context: context do
+    route "examples.factory.work_item.start" do
+      action _input, schema: Zoi.object(%{}), context: context do
         state = context.agent_state
 
         if state.started do
@@ -32,9 +32,8 @@ defmodule Jido.Examples.Factory.WorkItem do
       define :start
     end
 
-    route "factory.worker.tick" do
+    route "examples.factory.work_item.tick" do
       action %{step: step},
-        name: "factory_worker_tick",
         schema: Zoi.object(%{step: Zoi.integer() |> Zoi.min(0) |> Zoi.max(2)}),
         context: context do
         Jido.Examples.Factory.WorkItem.advance(context.agent_state, step)
@@ -45,8 +44,8 @@ defmodule Jido.Examples.Factory.WorkItem do
   @doc false
   def tick(state) do
     signal =
-      Jido.Signal.new!("factory.worker.tick", %{step: state.step},
-        source: "/factory/worker/timer"
+      Jido.Signal.new!("examples.factory.work_item.tick", %{step: state.step},
+        source: "/examples/factory/work_item/timer"
       )
 
     Jido.Plugin.Scheduler.schedule(state.step_delay_ms, signal)
@@ -56,9 +55,9 @@ defmodule Jido.Examples.Factory.WorkItem do
   def advance(%{started: true, step: step} = state, step) do
     progress =
       Jido.Signal.new!(
-        "factory.worker.progress",
+        "examples.factory.work_item.progress",
         %{job_id: state.job_id, generation: state.generation, step: step},
-        source: "/factory/worker"
+        source: "/examples/factory/work_item"
       )
 
     next = %{state | step: step + 1}

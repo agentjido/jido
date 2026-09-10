@@ -32,7 +32,7 @@ defmodule Jido.Agent.Runner do
             turn: Jido.Agent.Turn.t(),
             context: map(),
             exec_opts: keyword(),
-            plugin_inputs: %{optional(module()) => term()},
+            plugin_inputs: %{optional(module()) => Jido.Plugin.Input.t()},
             plugin_specs: [Jido.Agent.Plugin.Spec.t()]
           }
   end
@@ -185,7 +185,9 @@ defmodule Jido.Agent.Runner do
              :compose,
              PluginPipeline.run(
                {:ok, output, directives},
-               prepared.agent.state,
+               prepared.agent,
+               prepared.source_signal,
+               prepared.plugin_inputs,
                prepared.plugin_specs
              )
            ),

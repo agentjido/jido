@@ -47,9 +47,12 @@ Directives run in list order. The first failure stops the rest of the batch.
 The Agent commit remains. A caller waiting for the state transition can receive
 the committed Agent before later runtime work fails.
 
-Use the settled telemetry event or `Jido.Agent.Turn.Outcome` when you must know
-the result of the complete Turn, including Directives. The Agent Server creates
-the Outcome. It is a terminal runtime record, not an authoring value.
+Use the settled telemetry event when an observer must know the result of the
+complete Turn, including Directives. The event contains a bounded result
+projection. It does not contain the complete `Jido.Agent.Turn.Outcome`.
+
+The Agent Server creates the Outcome as a terminal runtime record. A custom
+error policy receives it after a failure. It is not an authoring value.
 
 ## Keep Timeouts Separate
 

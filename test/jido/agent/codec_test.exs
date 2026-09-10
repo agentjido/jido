@@ -3,7 +3,7 @@ defmodule Jido.Agent.CodecTest do
 
   alias Jido.Agent
   alias Jido.Agent.Codec
-  alias Jido.Agent.Codec.Data
+  alias Jido.Codec.Data
   alias JidoTest.AgentFixtures.Add
 
   defmodule ChangingTarget do

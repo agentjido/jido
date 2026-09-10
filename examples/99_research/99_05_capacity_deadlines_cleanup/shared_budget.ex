@@ -1,35 +1,3 @@
-defmodule Jido.Examples.SharedBudget.Worker do
-  @moduledoc "One review job held at a controlled external-work barrier."
-  use Jido.Agent, name: "research_budget_worker"
-
-  agent do
-    schema Zoi.object(%{
-             job: Zoi.string() |> Zoi.default(""),
-             value: Zoi.integer() |> Zoi.default(0)
-           })
-  end
-
-  routes do
-    signal_source "/examples/shared-budget"
-
-    route "budget.work" do
-      action %{job: job, value: value},
-        name: "research_budget_work",
-        schema: Zoi.object(%{job: Zoi.string(), value: Zoi.integer()}),
-        context: context do
-        send(context.observer, {:budget_work, job, self()})
-
-        receive do
-          :finish -> {:ok, %{job: job, value: value * 2}}
-          :fail -> {:error, Jido.Action.Error.execution_error("controlled review failure")}
-        end
-      end
-
-      define :work, args: [:job, :value]
-    end
-  end
-end
-
 defmodule Jido.Examples.SharedBudget do
   @moduledoc """
   An OTP admission service shared by review teams. It uses only public Jido APIs.
@@ -57,7 +25,8 @@ defmodule Jido.Examples.SharedBudget do
     {:ok,
      %{
        jido: Keyword.fetch!(opts, :jido),
-       observer: Keyword.fetch!(opts, :observer),
+       worker: Keyword.get(opts, :worker, Worker),
+       work_context: Keyword.get(opts, :work_context, %{}),
        limit: Keyword.get(opts, :limit, 8),
        queue_limit: Keyword.get(opts, :queue_limit, 32),
        clock: Keyword.get(opts, :clock, fn -> System.monotonic_time(:millisecond) end),
@@ -146,14 +115,18 @@ defmodule Jido.Examples.SharedBudget do
 
   defp start_available(%{queue: [job | rest]} = state)
        when map_size(state.active) < state.limit do
-    case Jido.start_agent(state.jido, Worker, restart: :temporary, exec_opts: [timeout: 5_000]) do
+    case Jido.start_agent(state.jido, state.worker,
+           restart: :temporary,
+           exec_opts: [timeout: 5_000]
+         ) do
       {:ok, server} ->
-        observer = state.observer
+        worker = state.worker
+        work_context = state.work_context
 
         task =
           Task.Supervisor.async_nolink(state.tasks, fn ->
             try do
-              case Worker.work(server, job.id, job.value, context: %{observer: observer}) do
+              case apply(worker, :work, [server, job.id, job.value, [context: work_context]]) do
                 {:ok, agent} -> {:ok, agent.state.value}
                 error -> error
               end

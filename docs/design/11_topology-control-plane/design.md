@@ -9,12 +9,14 @@ application or integration package. They are not Jido core V3 release gates.
 
 ## Scope and owner
 
-- Owner: `Jido.Topology` and `Jido.Topology.Controller` own static local
-  topology. An optional host application or ecosystem integration owns the
+- Owner: `Jido.Topology` and `Jido.Topology.Controller` own static topology,
+  exact known-node execution, and lifecycle Signals. An optional host
+  application or ecosystem integration owns placement policy and the
   distributed control plane.
 - In scope for Jido core: static definition validation, pure Plugin
-  contribution, local planning, one current Controller target, additive local
-  Agent updates, readiness, repair, lookup, and cleanup.
+  contribution, planning, one current Controller target, additive Agent
+  updates, exact node placement, lifecycle Signals, readiness, repair, lookup,
+  and cleanup.
 - External reference scope: provider inputs for membership and authority,
   placement output, authority epochs, handoff, recovery, network-partition
   safety, operator controls, and distributed observation.
@@ -49,11 +51,12 @@ contributions, then group contributions, in source and Plugin declaration
 order. Included Topologies expand in their own scopes. The common validator
 checks the complete result. The source definition stays unchanged.
 
-The local Topology Controller has one current `%Jido.Topology.Instance{}`
-target. It repairs members of that target on one Jido instance. An explicit
-update can add Agents while every existing Agent and resource specification
-stays unchanged. It does not discover nodes, remove or replace live members,
-move Agents, issue authority, or resolve a network partition.
+The Topology Controller has one current `%Jido.Topology.Instance{}` target. It
+repairs members of that target on one named Jido instance. An explicit update
+can add Agents while every existing Agent and resource specification stays
+unchanged. A declaration or live placement call can name an exact Erlang node.
+The Controller does not discover nodes, select a node, remove live members,
+issue authority, or resolve a network partition.
 
 The optional control plane uses these logical values. Exact public type names
 remain open.
@@ -311,7 +314,7 @@ location, or runtime state.
 
 ### Core compatibility
 
-`TOP-REQ-059`: While no approved migration replaces static local Topology, the
+`TOP-REQ-059`: While no approved migration replaces static Topology, the
 Jido core package shall keep its definition, Builder, Codec, instance, plan,
 Controller, readiness, repair, and lookup contracts supported.
 
@@ -355,12 +358,12 @@ the Plan.
 operation that starts a process, persists Agent state, replaces a Controller
 target, or grants live or distributed authority.
 
-### Additive local target update
+### Additive target update
 
-`TOP-REQ-069`: When a Controller accepts an additive local target update, the
+`TOP-REQ-069`: When a Controller accepts an additive target update, the
 Controller shall replace its current repair target with the validated target.
 
-`TOP-REQ-070`: Before a local target update has live effects, the Controller
+`TOP-REQ-070`: Before a target update has live effects, the Controller
 shall validate the target definition and input through normal Topology
 instantiation.
 
@@ -385,19 +388,104 @@ the Controller shall keep that Agent PID and committed state.
 `TOP-REQ-076`: When a later repair pass runs after an accepted update, the
 Controller shall repair the updated target.
 
+### Canonical DSL, lifecycle, and exact placement
+
+`TOP-REQ-077`: The Topology DSL shall accept `agent`, `routes`, and `topology`
+as root sections.
+
+`TOP-REQ-078`: The Topology DSL shall accept topology-specific sections only
+inside `topology`.
+
+`TOP-REQ-079`: The Topology DSL shall permit `agent` and `topology` to be
+present or absent independently.
+
+`TOP-REQ-080`: When a Topology module declares `routes`, the Agent DSL shall
+require an explicit `agent` block and shall apply the normal Agent route rules.
+
+`TOP-REQ-081`: The Topology authoring boundary shall not start the control
+Agent when it constructs a topology instance.
+
+`TOP-REQ-082`: Where a lifecycle target is configured, the Controller shall
+accept only an Agent PID or `Jido.Agent.Ref`.
+
+`TOP-REQ-083`: Where a lifecycle target is configured, when an operation or
+component changes state, the Controller shall send a Signal in the
+`jido.topology.lifecycle` namespace.
+
+`TOP-REQ-084`: If lifecycle Signal delivery fails, then the Controller shall
+preserve the activation, repair, update, placement, or cleanup result.
+
+`TOP-REQ-085`: When the Controller emits a lifecycle Signal, it shall include
+only bounded topology, operation, component, node, status, and error-code data.
+
+`TOP-REQ-086`: The Controller shall not execute placement or rebalance policy
+as part of lifecycle Signal delivery.
+
+`TOP-REQ-087`: When an Agent or group declaration contains `node`, the Plan
+shall resolve it to one exact Erlang node before activation.
+
+`TOP-REQ-088`: When an Agent or group declaration omits `node`, the Plan shall
+use the Controller node.
+
+`TOP-REQ-089`: When `place_agent/4` accepts an exact node, the Controller shall
+stop the owned Agent before it starts a repair pass for that node.
+
+`TOP-REQ-090`: The Controller shall not discover nodes or select a placement
+target.
+
+`TOP-REQ-091`: If exact remote activation fails, then the Controller shall not
+fall back to local activation.
+
+`TOP-REQ-092`: If a remote Agent declares a subscription to a Controller-owned
+local Bus, then plan construction shall reject the plan.
+
+`TOP-REQ-093`: If the Controller cannot confirm the old remote Agent state
+during placement, then it shall reject the placement as uncertain before it
+starts an Agent on another node.
+
+`TOP-REQ-094`: The Controller shall expose the effective node for one planned
+Agent through `agent_node/3`.
+
+`TOP-REQ-095`: The Topology Codec shall encode and decode only the current V3
+version-2 document format.
+
+`TOP-REQ-096`: The Topology startup contract shall treat readiness as all
+planned components ready and shall not expose a readiness policy option.
+
+`TOP-REQ-097`: The Topology definition shall keep a general resources
+collection while Bus remains the first implemented core resource type.
+
+`TOP-REQ-098`: When exact placement starts an Agent on a new node, the
+Controller shall use the normal restore contract and shall otherwise use the
+declared initial state.
+
+`TOP-REQ-099`: If the Controller Runtime restarts while its Jido instance stays
+live, then the Controller shall retain accepted placement overrides for its
+current definition.
+
+`TOP-REQ-100`: Core resource kinds shall use one internal resource boundary for
+validation, lookup, startup, and ownership checks. Decoded definitions shall
+not select arbitrary runtime modules.
+
+`TOP-REQ-101`: Each Topology lifecycle event shall be a custom `Jido.Signal`
+module. The Controller shall not expose separate lifecycle Signal factory
+functions.
+
 ## Public contract
 
 The implemented core surface remains the local component contract:
 
 | Role | Current public entry | Meaning |
 | --- | --- | --- |
-| Static authoring | `Jido.Topology`, DSL, Builder, Codec | Validated local definition; no processes |
-| Pure plan | `Jido.Topology.instantiate/2`, `Jido.Topology.Plan.build/3` | Validated input, ordered static Plugin contribution, and stable local plan |
-| Local activation | `Jido.Topology.Controller.start_link/1` | One current target on one Jido instance |
-| Local readiness | `await_ready/2`, `status/2` | Current local pass and component state |
-| Local repair | `reconcile/2` | Repair the current target; not an update |
-| Local update | `update/3` | Add Agents while existing Agents and resources stay unchanged |
-| Local lookup | `whereis_agent/3`, `whereis_bus/2` | Replaceable local handles |
+| Static authoring | `Jido.Topology`, DSL, Builder, Codec | Validated definition; no processes |
+| Pure plan | `Jido.Topology.instantiate/2`, `Jido.Topology.Plan.build/3` | Validated input, Plugin contribution, exact nodes, and stable IDs |
+| Activation | `Jido.Topology.Controller.start_link/1` | One current target on one Jido instance |
+| Readiness | `await_ready/2`, `status/2` | Current pass and component state |
+| Repair | `reconcile/2` | Repair the current target; not an update |
+| Update | `update/3` | Add Agents while existing Agents and resources stay unchanged |
+| Placement | `place_agent/4`, `agent_node/3` | Apply and inspect a caller-selected exact node |
+| Lifecycle | Controller `:lifecycle` option and custom modules under `Jido.Topology.Signal` | Best-effort Signals to a control Agent |
+| Lookup | `whereis_agent/3`, `whereis_bus/2`, `whereis/2` | Replaceable runtime handles |
 
 This design does not add a required control plane to Jido core. An ecosystem
 contract can define provider behaviours for membership, authority, desired
@@ -431,7 +519,7 @@ state that it provides no exclusive-owner guarantee.
 | --- | --- |
 | 13 Observability | Control-plane transitions have bounded semantic facts and no Agent state or private handles. |
 | 99 Delivery | Each distributed claim has provider, failure, partition, compatibility, and acceptance evidence. |
-| Ecosystem control plane | Public Jido local activation and persistence components stay distinct from membership and authority policy. |
+| Ecosystem control plane | Public Jido activation and persistence components stay distinct from membership and authority policy. |
 | Host application | A control plane is optional and can be selected without changing core Agent semantics. |
 
 ## Selected design decisions
@@ -439,7 +527,7 @@ state that it provides no exclusive-owner guarantee.
 | ID | Selected option | Effect |
 | --- | --- | --- |
 | `TOP-DEC-001` | Distributed control-plane code lives in an application or focused ecosystem package, not Jido core. | The core boundary stays local. |
-| `TOP-DEC-002` | Keep static local Topology and fixed-target repair. | Existing users keep a supported component. |
+| `TOP-DEC-002` | Keep static Topology and fixed-target repair. | Existing users keep a supported component. |
 | `TOP-DEC-003` | An exclusive-owner claim requires an increasing epoch enforced at every protected commit. | Lease and Registry presence are not enough. |
 | `TOP-DEC-004` | Time-limited leases are optional, but fencing is required for an exclusive claim. | The external design stays provider-neutral. |
 | `TOP-DEC-005` | Membership is advisory placement input only. | Membership failure cannot grant ownership. |
@@ -448,5 +536,11 @@ state that it provides no exclusive-owner guarantee.
 | `TOP-DEC-008` | A holder rejects new mutations when it cannot confirm current authority. | Safety takes priority over write availability. |
 | `TOP-DEC-009` | Preview, cordon, uncordon, drain, move, rebalance, suspend, resume, and status belong to the external contract. | Product UI stays outside this seam. |
 | `TOP-DEC-010` | An owner Agent is not the control plane. | Authoring and Plugin-owned Agent fields do not become cluster authority. |
-| `TOP-DEC-011` | Support additive local Agent target updates and keep removal, replacement, and resource changes deferred. | Local growth does not imply rebalance, handoff, or distributed authority. |
+| `TOP-DEC-011` | Support additive Agent target updates and keep removal, replacement, and resource changes deferred. | Growth does not imply rebalance, handoff, or distributed authority. |
 | `TOP-DEC-012` | Topology Plugin facets contribute during pure Plan construction. | Static extension is complete without live Plugin authority. |
+| `TOP-DEC-013` | Keep one root DSL shape: optional `agent`, Agent-compatible `routes`, and optional `topology`. | Topology-specific sections have one location. |
+| `TOP-DEC-014` | Send lifecycle state as best-effort Signals to an optional control Agent. | Policy uses normal routes and Plugin boundaries. |
+| `TOP-DEC-015` | Keep exact known-node placement in core and keep node selection and rebalance policy outside core. | Core supplies a small mechanism without becoming a cluster manager. |
+| `TOP-DEC-016` | Keep the resources collection general while Bus is the first core type. | Later resource types do not require a new top-level model. |
+| `TOP-DEC-017` | Use one closed resource boundary inside core. | The Controller stays general without letting documents select code. |
+| `TOP-DEC-018` | Define each lifecycle event with `use Jido.Signal`. | Signal type, schema, and construction use the standard Signal contract. |

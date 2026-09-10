@@ -9,13 +9,13 @@ implemented on branch `v3-spike`. The complete package cleanup is not complete.
 
 | Source | Evidence |
 | --- | --- |
-| `lib/jido/agent/plugin/pipeline.ex` | One `run/3` entry point protects state, validates Directives, and updates owned state. |
-| `lib/jido/agent/plugin.ex` | The Agent facet prepares one portable package input and owns state and Directive callbacks. |
-| `lib/jido/agent/runner.ex` | The Runner exposes package inputs without changing the source Signal. |
-| `lib/jido/agent_server/plugin.ex` | Admission can change only its package input. |
-| `test/jido/plugin/preparation_test.exs` | Pure input, direct and live parity, rejection, and portability pass. |
+| `lib/jido/agent/plugin/pipeline.ex` | The evaluator `run/5` path protects state, validates each Directive once, and reduces owned state. |
+| `lib/jido/agent/plugin.ex` | The Agent facet reads complete state during preparation and returns one portable input. |
+| `lib/jido/agent/runner.ex` | The Runner exposes isolated `prepared` and `runtime` slots without changing the source Signal. |
+| `lib/jido/agent_server/plugin.ex` | Admission receives a read-only value and returns only its package runtime input. |
+| `test/jido/plugin/preparation_test.exs` | Full-state reads, pure input, reduction, direct and live parity, rejection, and portability pass. |
 | `test/jido/plugin/contract_test.exs` | Owned-state protection, Directive validation, and reducer isolation pass. |
-| `test/jido/plugin/ordering_test.exs` | State updates run in declaration order and stop at the first error. |
+| `test/jido/plugin/ordering_test.exs` | State reducers run in declaration order and stop at the first error. |
 | Core test suite | 1,017 tests passed with example, benchmark, peer, flaky, and skipped tags excluded. |
 
 ## Gap register

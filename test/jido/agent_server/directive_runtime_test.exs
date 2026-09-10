@@ -19,7 +19,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     runtime: state,
     context: context
   } do
-    {_source, trace} = Context.ensure_from_signal(context.signal)
+    trace = Context.begin_turn(context.signal)
     outbound = signal("runtime.outbound")
     parent = ParentRef.new!(pid: self(), id: "parent", tag: :parent)
     state = %{state | parent: parent, children: %{child: child(self())}}

@@ -31,8 +31,7 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   end
 
   test "semantic spans use bounded names and attributes" do
-    assert OpenTelemetry.available?()
-    assert OpenTelemetry.enabled?()
+    assert Jido.Telemetry.open_telemetry?()
 
     span =
       Semantic.start(
@@ -134,13 +133,17 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     incoming = Jido.Signal.Trace.new(trace_flags: "01", tracestate: "vendor=value")
     source = Signal.new!("test.trace.source", %{}, source: "/test")
     assert {:ok, source} = Jido.Signal.Trace.put(source, incoming)
-    assert {^source, _trace} = Context.ensure_from_signal(source)
+    trace = Context.begin_turn(source)
 
-    outer = Semantic.start([:jido, :agent, :turn], %{turn_id: "turn-1"})
+    outer = Semantic.start([:jido, :agent, :turn], Map.put(trace, :turn_id, "turn-1"))
     assert_receive {:otel_start, outer_span, remote_parent, "jido.agent.turn", _opts}
     outer_ids = TestTracer.ids(outer_span)
     assert :otel_span.hex_trace_id(remote_parent) == incoming.trace_id
     assert :otel_span.hex_span_id(remote_parent) == incoming.span_id
+    assert outer.trace.trace_id == outer_ids.hex_trace_id
+    assert outer.trace.span_id == outer_ids.hex_span_id
+    assert outer.trace.parent_span_id == incoming.span_id
+    Context.put(outer.trace)
 
     captured = Context.capture()
 
@@ -167,6 +170,19 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
 
     Semantic.finish(outer, %{status: :ok, stage: :commit})
     assert_receive {:otel_end, ^outer_ids, _timestamp}
+  end
+
+  test "an untraced Signal lets the SDK make the root sampling decision" do
+    source = Signal.new!("test.trace.source", %{}, source: "/test")
+    trace = Context.begin_turn(source)
+    span = Semantic.start([:jido, :agent, :turn], trace)
+
+    assert_receive {:otel_start, otel_span, parent, "jido.agent.turn", _opts}
+    refute :otel_span.is_valid(parent)
+    assert span.trace.trace_id == TestTracer.ids(otel_span).hex_trace_id
+    assert span.trace.trace_flags == "01"
+
+    Semantic.finish(span, %{status: :ok})
   end
 
   test "configuration can disable OpenTelemetry without disabling semantic events" do

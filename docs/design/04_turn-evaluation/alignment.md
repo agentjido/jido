@@ -10,15 +10,15 @@ The prepared-input Turn evaluation contract is implemented on branch
 | Source | Evidence |
 | --- | --- |
 | `lib/jido/agent/runner.ex` | Direct and live paths share pure preparation, selection, and finalization without a direct-path Command. |
-| `lib/jido/agent/plugin.ex` | Pure preparation returns one portable input for each package. |
-| `lib/jido/agent_server/plugin.ex` | Live admission can change only its package-owned input. |
-| `lib/jido/agent/plugin/pipeline.ex` | One post-execution entry point protects state, validates Directives, and updates owned state. |
+| `lib/jido/agent/plugin.ex` | Pure preparation reads complete Agent state and returns one portable input for each package. |
+| `lib/jido/agent_server/plugin.ex` | Live admission receives a read-only value and returns only its package runtime input. |
+| `lib/jido/agent/plugin/pipeline.ex` | One post-execution entry point protects state, validates each Directive once, and reduces owned state. |
 | `lib/jido/agent/turn.ex` | A Turn keeps the unchanged source Signal. |
 | `test/jido/agent/turn_evaluation_test.exs` | Selection, input, result, and candidate rules pass. |
 | `test/jido/plugin/contract_test.exs` | Owned-state and Directive boundaries pass. |
-| `test/jido/plugin/preparation_test.exs` | Direct and live preparation, rejection, portability, and reserved context pass. |
-| `test/jido/plugin/ordering_test.exs` | Plugin admission and updates are ordered and fail fast. |
-| `test/examples/99_research/99_10_plugin_isolation` | Plugin-owned state update and write protection pass. |
+| `test/jido/plugin/preparation_test.exs` | Complete-state reads, reduction, direct and live preparation, rejection, portability, and reserved context pass. |
+| `test/jido/plugin/ordering_test.exs` | Plugin admission and reducers are ordered and fail fast. |
+| `test/examples/99_research/99_10_plugin_isolation` | Plugin-owned state reduction and write protection pass. |
 
 ## Current implementation
 
@@ -33,8 +33,8 @@ Each path builds and validates one selected Turn and one complete proposed
 state.
 
 The source Signal selects the Turn and supplies route data. A live Agent Server
-Plugin can change only its package input. It cannot change the Signal, caller
-context, Agent, or another package's input.
+Plugin can return only its package runtime input. It cannot change the Signal,
+caller context, Agent, pure prepared input, or another package's input.
 
 ## Remaining work
 

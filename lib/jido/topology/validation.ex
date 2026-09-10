@@ -1,7 +1,7 @@
 defmodule Jido.Topology.Validation do
   @moduledoc false
   alias Jido.Agent.Authoring
-  alias Jido.Topology.{Ref, Reference}
+  alias Jido.Topology.{Ref, Reference, Resource}
 
   @fields [
     :name,
@@ -50,7 +50,7 @@ defmodule Jido.Topology.Validation do
          {:ok, metadata} <- plain_static_map(Map.get(attrs, :metadata, %{})),
          {:ok, agents} <- entries(attrs, :agents, :agent),
          {:ok, groups} <- entries(attrs, :groups, :group),
-         {:ok, resources} <- entries(attrs, :resources, :bus),
+         {:ok, resources} <- entries(attrs, :resources, :resource),
          {:ok, relationships} <- entries(attrs, :relationships, :owns),
          {:ok, connections} <- entries(attrs, :connections, :subscribe),
          {:ok, startup} <- entry(:startup, Map.get(attrs, :startup, %{})),
@@ -91,12 +91,12 @@ defmodule Jido.Topology.Validation do
   defp static_entry(:include, _value), do: :ok
   defp static_entry(_kind, value), do: static(value)
 
-  defp fields(:agent), do: [:key, :module, :initial_state, :depends_on]
+  defp fields(:agent), do: [:key, :module, :initial_state, :depends_on, :node]
   defp fields(:group), do: fields(:agent) ++ [:count, :members, :key_by]
-  defp fields(:bus), do: [:key, :config]
+  defp fields(:resource), do: [:key, :kind, :config]
   defp fields(:owns), do: [:parent, :child, :on_parent_exit]
   defp fields(:subscribe), do: [:agent, :to, :path]
-  defp fields(:startup), do: [:concurrency, :ready, :max_agents, :retry_interval, :task_timeout]
+  defp fields(:startup), do: [:concurrency, :max_agents, :retry_interval, :task_timeout]
   defp fields(:import), do: [:key, :kind]
   defp fields(:export), do: [:key, :kind, :from]
   defp fields(:include), do: [:key, :topology, :inputs, :bindings]
@@ -106,17 +106,25 @@ defmodule Jido.Topology.Validation do
     with {:ok, name} <- key(attrs[:key]),
          {:ok, _definition} <- agent_definition(attrs[:module]),
          {:ok, state} <- initial_state(Map.get(attrs, :initial_state, %{})),
-         {:ok, deps} <- Authoring.traverse(Map.get(attrs, :depends_on, []), &Ref.target/1) do
-      agent = %{key: name, module: attrs.module, initial_state: state, depends_on: deps}
+         {:ok, deps} <- Authoring.traverse(Map.get(attrs, :depends_on, []), &Ref.target/1),
+         {:ok, placement} <- placement(Map.get(attrs, :node)) do
+      agent = %{
+        key: name,
+        module: attrs.module,
+        initial_state: state,
+        depends_on: deps,
+        node: placement
+      }
+
       if kind == :agent, do: {:ok, agent}, else: group(agent, attrs)
     end
   end
 
-  defp normalize(:bus, attrs) do
+  defp normalize(:resource, attrs) do
     with {:ok, name} <- key(attrs[:key]),
-         {:ok, config} <- Authoring.options(Map.get(attrs, :config, [])),
-         :ok <- reserved(config, [:name, :jido, :registry]) do
-      {:ok, %{key: name, config: config}}
+         kind = Map.get(attrs, :kind, :bus),
+         {:ok, config} <- Resource.validate(kind, Map.get(attrs, :config, [])) do
+      {:ok, %{key: name, kind: kind, config: config}}
     end
   end
 
@@ -142,7 +150,6 @@ defmodule Jido.Topology.Validation do
       Map.merge(
         %{
           concurrency: 32,
-          ready: :all,
           max_agents: 10_000,
           retry_interval: 1_000,
           task_timeout: 10_000
@@ -154,7 +161,6 @@ defmodule Jido.Topology.Validation do
          :ok <- positive(result.max_agents, :max_agents),
          :ok <- positive(result.retry_interval, :retry_interval),
          :ok <- positive(result.task_timeout, :task_timeout),
-         :ok <- one_of(result.ready, [:all], :ready),
          do: {:ok, result}
   end
 
@@ -285,6 +291,15 @@ defmodule Jido.Topology.Validation do
   defp initial_state(%Reference{} = value), do: {:ok, value}
   defp initial_state(value), do: plain_static_map(value)
 
+  defp placement(nil), do: {:ok, nil}
+  defp placement(%Reference{} = value), do: {:ok, value}
+
+  defp placement(value) when is_atom(value) and value not in [true, false],
+    do: {:ok, value}
+
+  defp placement(_value),
+    do: Authoring.error("Topology Agent node must be an atom or topology reference")
+
   defp plain_static_map(value) when is_map(value) and not is_struct(value) do
     with :ok <- static(value), do: {:ok, value}
   end
@@ -353,12 +368,6 @@ defmodule Jido.Topology.Validation do
   end
 
   def agent_definition(_module), do: Authoring.error("Expected an Agent module")
-
-  defp reserved(config, keys) do
-    if Enum.any?(keys, &Keyword.has_key?(config, &1)),
-      do: Authoring.error("Topology owns Bus name, Registry, and Jido scope"),
-      else: :ok
-  end
 
   defp path(value) when is_binary(value) and byte_size(value) > 0 do
     case Jido.Signal.Router.add(Jido.Signal.Router.new!(), {value, __MODULE__}) do

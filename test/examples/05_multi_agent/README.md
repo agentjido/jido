@@ -1,17 +1,13 @@
-# Multi-agent feature examples
+# Multi-agent example tests
 
-Multi-agent has six source fixtures and 20 opt-in tests in this directory. The
-two promoted distributed Agent examples also keep deeper acceptance tests
-under `test/jido/agent_server` and `test/jido/observe`.
+This folder mirrors the numbered learning path in
+[the multi-agent examples](../../../examples/05_multi_agent/README.md).
 
-| Order | Test location | Tests |
-| --- | --- | ---: |
-| `05_01` through `05_04` | Numbered test files in this directory | 18 |
-| [05_05_remote_child](05_05_remote_child/README.md) | Numbered test file plus distributed core suites | 1 example |
-| [05_06_remote_lifecycle](05_06_remote_lifecycle/README.md) | Numbered test file plus remote-lifecycle core suite | 1 example |
+Run the section behavior tests:
 
-```shell
-mix test --include example test/examples/05_multi_agent --seed 0
+```sh
+mix test test/examples/05_multi_agent --include example --seed 0
 ```
 
-[Source guide](../../../examples/05_multi_agent/README.md)
+The local tests use public AgentServer APIs. The remote tests start isolated,
+connected Erlang peers and confirm cleanup through the public APIs on each node.

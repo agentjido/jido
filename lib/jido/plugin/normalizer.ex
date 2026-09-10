@@ -23,6 +23,8 @@ defmodule Jido.Plugin.Normalizer do
     await_ready: 2
   ]
 
+  @package_callbacks [reduce: 2] ++ @legacy_callbacks
+
   @doc false
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
           {:ok, [Spec.t()]} | {:error, term()}
@@ -96,7 +98,8 @@ defmodule Jido.Plugin.Normalizer do
           options: spec.options,
           state_key: spec.state_key,
           state_schema: spec.state_schema,
-          directive_modules: spec.directive_modules
+          directive_modules: spec.directive_modules,
+          legacy?: true
         }
       end
 
@@ -219,7 +222,7 @@ defmodule Jido.Plugin.Normalizer do
          directives: 1,
          validate_directive: 2
        ) do
-      build_agent_values(module, module, options)
+      build_agent_values(module, module, options, true)
     else
       {:ok, nil}
     end
@@ -255,13 +258,14 @@ defmodule Jido.Plugin.Normalizer do
 
     with :ok <- validate_facet(facet, Jido.Agent.Plugin, :agent),
          :ok <- facet_has_capability(facet, :agent),
-         do: build_agent_values(manifest.module, facet, facet_options)
+         do: build_agent_values(manifest.module, facet, facet_options, false)
   end
 
-  defp build_agent_values(package, facet, options) do
+  defp build_agent_values(package, facet, options, legacy?) do
     with {:ok, {state_key, state_schema}} <- read_state_spec(package, facet, options),
          {:ok, directive_modules} <- read_directives(package, facet, options),
-         :ok <- validate_agent_contract(package, facet, state_key, directive_modules) do
+         :ok <-
+           validate_agent_contract(package, facet, state_key, directive_modules, legacy?) do
       {:ok,
        %AgentSpec{
          package: package,
@@ -269,7 +273,8 @@ defmodule Jido.Plugin.Normalizer do
          options: options,
          state_key: state_key,
          state_schema: state_schema,
-         directive_modules: directive_modules
+         directive_modules: directive_modules,
+         legacy?: legacy?
        }}
     end
   end
@@ -363,10 +368,10 @@ defmodule Jido.Plugin.Normalizer do
         PluginError.validation(message, %{plugin: package, facet: server.module})
 
       not is_nil(agent) and agent.directive_modules != [] and
-        not function_exported?(agent.module, :update_state, 3) and
+        not reducer?(agent) and
           (is_nil(server) or not server.dispatch?) ->
         PluginError.validation(
-          "Agent Plugin Directives must update state or dispatch runtime work",
+          "Agent Plugin Directives must reduce state or dispatch runtime work",
           %{plugin: package}
         )
 
@@ -406,7 +411,7 @@ defmodule Jido.Plugin.Normalizer do
     do: PluginError.validation("Agent Plugin must use Jido.Plugin", %{plugin: module})
 
   defp callback_free_package(module) do
-    case Enum.find(@legacy_callbacks, fn {function, arity} ->
+    case Enum.find(@package_callbacks, fn {function, arity} ->
            function_exported?(module, function, arity)
          end) do
       nil ->
@@ -473,6 +478,7 @@ defmodule Jido.Plugin.Normalizer do
           [
             prepare: 2,
             state_spec: 1,
+            reduce: 2,
             update_state: 3,
             directives: 1,
             validate_directive: 2,
@@ -484,6 +490,7 @@ defmodule Jido.Plugin.Normalizer do
           [
             prepare: 2,
             state_spec: 1,
+            reduce: 2,
             update_state: 3,
             directives: 1,
             validate_directive: 2,
@@ -498,6 +505,7 @@ defmodule Jido.Plugin.Normalizer do
           [
             prepare: 2,
             state_spec: 1,
+            reduce: 2,
             update_state: 3,
             directives: 1,
             validate_directive: 2,
@@ -530,7 +538,7 @@ defmodule Jido.Plugin.Normalizer do
     require_capability(module, :agent,
       prepare: 2,
       state_spec: 1,
-      update_state: 3,
+      reduce: 2,
       directives: 1
     )
   end
@@ -749,7 +757,7 @@ defmodule Jido.Plugin.Normalizer do
     })
   end
 
-  defp validate_agent_contract(package, facet, state_key, directives) do
+  defp validate_agent_contract(package, facet, state_key, directives, true) do
     validates? = function_exported?(facet, :validate_directive, 2)
     updates? = function_exported?(facet, :update_state, 3)
 
@@ -770,6 +778,47 @@ defmodule Jido.Plugin.Normalizer do
         :ok
     end
   end
+
+  defp validate_agent_contract(package, facet, state_key, directives, false) do
+    reducer? = function_exported?(facet, :reduce, 2)
+    invalid_directive = Enum.find(directives, &(not Directive.validator?(&1)))
+
+    cond do
+      function_exported?(facet, :validate_directive, 2) ->
+        PluginError.validation(
+          "Agent Plugin Directive validation belongs to the Directive module",
+          %{plugin: package, facet: facet, callback: {:validate_directive, 2}}
+        )
+
+      function_exported?(facet, :update_state, 3) ->
+        PluginError.validation("Agent Plugin state middleware must define reduce/2", %{
+          plugin: package,
+          facet: facet,
+          callback: {:update_state, 3}
+        })
+
+      invalid_directive ->
+        PluginError.validation("Agent Plugin Directive must define validate/1", %{
+          plugin: package,
+          facet: facet,
+          directive: invalid_directive
+        })
+
+      reducer? and is_nil(state_key) ->
+        PluginError.validation("Agent Plugin reduce/2 requires state_spec/1", %{
+          plugin: package,
+          facet: facet
+        })
+
+      true ->
+        :ok
+    end
+  end
+
+  defp reducer?(%AgentSpec{legacy?: true, module: module}),
+    do: function_exported?(module, :update_state, 3)
+
+  defp reducer?(%AgentSpec{module: module}), do: function_exported?(module, :reduce, 2)
 
   defp unique_packages(specs) do
     unique_by(specs, & &1.module, "Agent Plugin modules must be unique", :plugin)

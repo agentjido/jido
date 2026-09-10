@@ -14,7 +14,7 @@ guide and the public module documentation when you build an extension.
 | Plugins | One callback-free package manifest can select Agent, Agent Server, Persistence, and Topology owner facets. Each facet has bounded authority. |
 | Persistence | Binary get and exact-byte CAS, versioned active and tombstone records, revision-zero creation, legacy active reads, and Agent-owned checkpoints. |
 | Agent relationships | Local owned children and explicit targeting of a known Erlang node. |
-| Topology | Pure definitions and plans, ordered static Plugin contribution, bounded local activation, readiness, same-target repair, additive local Agent updates, and cleanup. |
+| Topology | Pure definitions and plans, ordered static Plugin contribution, bounded activation, readiness, lifecycle Signals, same-target repair, additive Agent updates, exact known-node placement, and cleanup. |
 
 An extension uses these public APIs and the selection rules in the
 [extension-boundaries guide](extension-boundaries.md).
@@ -88,20 +88,26 @@ to wait for completion and `status/2` to inspect errors. Requests during an
 active pass produce one follow-up pass. They share the controller's startup
 concurrency limit. Healthy Agents retain their PIDs and committed state.
 
-Use `Jido.Topology.Controller.update/3` to add local Agent entries to a ready
+Use `Jido.Topology.Controller.update/3` to add Agent entries to a ready
 controller. The Topology ID, resources, and all existing Agent specifications
 must stay identical. The new target becomes the source for later repair passes.
-Removal, changed definitions, resource changes, placement, and ownership
-transfer require controller replacement or another control plane.
+Removal, changed definitions, resource changes, and ownership transfer require
+Controller replacement or another control plane.
+
+Use `Jido.Topology.Controller.place_agent/4` after a control Agent or Plugin
+selects an exact Erlang node. Use the Controller `:lifecycle` option to send
+best-effort lifecycle Signals to a normal Agent route. Core supplies these
+mechanisms. It does not supply membership discovery, node selection, automatic
+rebalance, fencing, or exclusive ownership.
 
 The independent topology example stops one Agent. In manual mode, it remains
 stopped until the application requests repair. The other Agent keeps its PID
 and state. See the
 [example test](https://github.com/agentjido/jido/blob/v3-spike/test/examples/07_topology/07_01_independent/independent_test.exs).
 
-This operation repairs the existing target. Use `update/3` for additive local
-growth. Destructive changes, placement, and ownership transfer require separate
-contracts.
+This operation repairs the existing target. Use `update/3` for additive growth
+and `place_agent/4` for one exact-node change. Destructive graph changes and
+ownership transfer require separate contracts.
 
 ## Deferred scope
 
@@ -110,7 +116,7 @@ Future package names describe possible ownership, not implemented packages:
 | Concern | Proposed owner or next decision |
 | --- | --- |
 | Database clients, recovery scans, leases, fencing, and retention | A durable extension such as `jido_durable`. Core keeps its storage and commit contract. |
-| Membership, placement, rebalance, and failover | A cluster extension such as `jido_cluster`. Durable authority must come from storage or an explicit authority service. |
+| Membership discovery, placement selection, rebalance policy, and failover | A cluster extension such as `jido_cluster`. It can use the exact-node Controller mechanism. Durable authority must come from storage or an explicit authority service. |
 | Transport gateways, authentication, and durable inboxes | A transport extension such as `jido_fabric`. |
 | Catch-up queues, backoff, and scheduling policy | An application or Scheduler extension, with a failing integration example before another core control is added. |
 | Private Server or Plugin runtime migration and destructive Topology updates | A separate design and acceptance pass. Core upgrade keeps Plugin declarations fixed, and Topology update adds local Agents only. |

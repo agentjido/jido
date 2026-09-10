@@ -1,29 +1,37 @@
-# FA-09: Shared work budgets
+# 99_05 Shared Budget
 
-Status: **Works as a local runtime extension**.
+Status: local runtime extension; not a Jido capacity API.
 
-Result on 2026-09-05: **3 passing checks; 0 failing acceptance checks.** All checks are enabled.
+One admission service shares active and queued work limits across several teams.
 
-## Feature and proof
+## What this proves
 
-Concurrent teams share two active slots and two queue slots. A fifth submission is rejected. Expired queued work never starts. Worker loss releases capacity. Normal service shutdown stops all monitored job Agents, Actions, call Tasks, and the Task supervisor.
+- Overload and queue deadlines are checked before a worker starts.
+- Worker loss releases capacity and service shutdown cleans all owned processes.
 
-## Required change
+## Read the code
 
-No core feature is required for this proof. The application admission service owns the shared budget and uses public Jido lifecycle APIs.
+Read [the budget service](shared_budget.ex), then [the finite default worker](worker.ex).
+The blocking worker used to inspect capacity exists only in test support.
 
-## Scope
-
-Defaults are eight active jobs and 32 queued jobs; tests use two of each to force contention. Limits apply to accepted jobs, not raw BEAM mailbox messages or every internal process. Hard loss of the budget service, durable budgets, and arbitrary deep trees remain outside this proof.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_05_capacity_deadlines_cleanup --include example --seed 0
 ```
 
-This command passes with the current core. The extension policy is part of the example.
+Expected result: accepted work stays within both limits, expired work never
+starts, and shutdown stops job Agents and call Tasks.
 
-[Source](shared_budget.ex) · [Tests](../../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)
+## Gap and limits
+
+The budget is local and temporary. It limits accepted jobs, not BEAM mailboxes,
+deep Agent trees, or work on other nodes.
+
+## Files
+
+- [Budget service](shared_budget.ex)
+- [Default worker](worker.ex)
+- [Tests](../../../test/examples/99_research/99_05_capacity_deadlines_cleanup/shared_budget_test.exs)
+
+Previous: [Handoff Reconciliation](../99_04_handoff_reconciliation/README.md) | Next: [Checkpoint Identity](../99_06_checkpoint_identity/README.md)

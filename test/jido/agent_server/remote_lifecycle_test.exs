@@ -3,8 +3,8 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
   @moduletag capability: "DIST-02"
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.RemoteLifecycle, as: Parent
   alias JidoTest.RemoteChildFixtures, as: Fixtures
+  alias JidoTest.RemoteChildFixtures.LifecycleParent, as: Parent
 
   test "a connected remote process exit carries its observed reason", c do
     {parent, child} = start_pair(c)
@@ -53,7 +53,7 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
              peer_call(c.peer_a, Parent, :create_worker, [
                parent,
                c.node_b,
-               [input: %{worker_module: Fixtures.Child}]
+               Fixtures.Child
              ])
 
     peer_eventually(fn -> peer_call(c.peer_a, Server, :status, [parent]).phase == :idle end)
@@ -62,7 +62,7 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
              peer_call(c.peer_a, Parent, :create_worker, [
                parent,
                c.node_b,
-               [input: %{worker_module: Fixtures.Child}]
+               Fixtures.Child
              ])
 
     replacement =
@@ -107,7 +107,7 @@ defmodule Jido.AgentServer.RemoteLifecycleTest do
              peer_call(c.peer_a, Parent, :create_worker, [
                parent,
                c.node_b,
-               [input: Map.new(opts)]
+               Keyword.get(opts, :worker_module, Jido.Examples.RemoteCounter)
              ])
 
     child = peer_eventually(fn -> peer_call(c.peer_a, Server, :children, [parent])[:worker] end)

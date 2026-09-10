@@ -1,16 +1,60 @@
-defmodule Jido.Examples.Factory.Conversation.Ask do
-  @moduledoc false
-  use Jido.Action,
-    name: "factory_conversation_ask",
-    schema:
-      Zoi.object(%{
-        request_id: Zoi.string() |> Zoi.min(1),
-        text: Zoi.string() |> Zoi.min(1) |> Zoi.max(20_000)
-      })
+defmodule Jido.Examples.Factory.Conversation do
+  @moduledoc "A responsive conversation Agent. Factory events can commit while its model task runs."
+  use Jido.Agent, name: "factory_conversation"
 
   alias Jido.Examples.Factory.{Async, Protocol}
 
-  def run(input, %{agent_state: state}) do
+  agent do
+    schema Zoi.object(%{
+             factory_id: Zoi.string() |> Zoi.default(""),
+             factory_mode: Zoi.enum([:workshop, :departments]) |> Zoi.default(:workshop),
+             messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
+             events: Zoi.list(Zoi.map()) |> Zoi.default([]),
+             seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
+             status: Zoi.enum([:idle, :thinking]) |> Zoi.default(:idle),
+             pending: Zoi.string() |> Zoi.default(""),
+             answer: Zoi.string() |> Zoi.default(""),
+             error: Zoi.string() |> Zoi.default("")
+           })
+
+    plugin Async
+  end
+
+  routes do
+    signal_source "/examples/factory/conversation"
+
+    route "examples.factory.conversation.ask" do
+      action input,
+        schema:
+          Zoi.object(%{
+            request_id: Zoi.string() |> Zoi.min(1),
+            text: Zoi.string() |> Zoi.min(1) |> Zoi.max(20_000)
+          }),
+        context: context do
+        Jido.Examples.Factory.Conversation.begin_request(input, context.agent_state)
+      end
+
+      define :ask, args: [:request_id, :text]
+    end
+
+    route "examples.factory.async.result" do
+      action input, schema: Jido.Examples.Factory.Async.result_schema(), context: context do
+        Jido.Examples.Factory.Conversation.settle(input, context.agent_state)
+      end
+    end
+
+    route "examples.factory.event" do
+      action input,
+        schema: Jido.Examples.Factory.Protocol.event_schema(),
+        context: context do
+        events = Enum.uniq_by(context.agent_state.events ++ [input], & &1.event_id)
+        {:ok, %{context.agent_state | events: Enum.take(events, -100)}}
+      end
+    end
+  end
+
+  @doc false
+  def begin_request(input, state) do
     cond do
       state.status == :thinking ->
         Protocol.invalid("A model request is already active")
@@ -59,15 +103,9 @@ defmodule Jido.Examples.Factory.Conversation.Ask do
          }, [request]}
     end
   end
-end
 
-defmodule Jido.Examples.Factory.Conversation.Settle do
-  @moduledoc false
-  use Jido.Action,
-    name: "factory_conversation_settle",
-    schema: Jido.Examples.Factory.Async.result_schema()
-
-  def run(%{request_id: id} = input, %{agent_state: %{pending: id, status: :thinking} = state}) do
+  @doc false
+  def settle(%{request_id: id} = input, %{pending: id, status: :thinking} = state) do
     case input.status do
       :completed ->
         text = input.result.text
@@ -86,46 +124,5 @@ defmodule Jido.Examples.Factory.Conversation.Settle do
     end
   end
 
-  def run(_, _), do: Jido.Examples.Factory.Protocol.invalid("Model result is stale")
-end
-
-defmodule Jido.Examples.Factory.Conversation do
-  @moduledoc "A responsive conversation Agent. Factory events can commit while its model task runs."
-  use Jido.Agent, name: "factory_conversation"
-
-  agent do
-    schema Zoi.object(%{
-             factory_id: Zoi.string() |> Zoi.default(""),
-             factory_mode: Zoi.enum([:workshop, :departments]) |> Zoi.default(:workshop),
-             messages: Zoi.list(Zoi.map()) |> Zoi.default([]),
-             events: Zoi.list(Zoi.map()) |> Zoi.default([]),
-             seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
-             status: Zoi.enum([:idle, :thinking]) |> Zoi.default(:idle),
-             pending: Zoi.string() |> Zoi.default(""),
-             answer: Zoi.string() |> Zoi.default(""),
-             error: Zoi.string() |> Zoi.default("")
-           })
-
-    plugin Jido.Examples.Factory.Async
-  end
-
-  routes do
-    signal_source "/examples/factory/conversation"
-
-    route "factory.conversation.ask", __MODULE__.Ask do
-      define :ask, args: [:request_id, :text]
-    end
-
-    route "factory.async.result", __MODULE__.Settle
-
-    route "factory.event" do
-      action input,
-        name: "factory_conversation_event",
-        schema: Jido.Examples.Factory.Protocol.event_schema(),
-        context: context do
-        events = Enum.uniq_by(context.agent_state.events ++ [input], & &1.event_id)
-        {:ok, %{context.agent_state | events: Enum.take(events, -100)}}
-      end
-    end
-  end
+  def settle(_, _), do: Protocol.invalid("Model result is stale")
 end

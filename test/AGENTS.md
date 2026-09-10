@@ -28,12 +28,10 @@ shared case template. Do not add an `:integration` tag. Keep runnable source in
 Reuse fixtures; do not copy integration assertions between suites.
 The DIST-03 test `one logical identity has at most one live cluster owner`
 in `test/jido/agent_server/distributed_authority_test.exs` retains its approved skip.
-The 11 known failing research tests listed in `test/examples/99_research/README.md`
-are temporarily skipped. Each has a reason that names its missing feature.
-Keep their assertions. Remove each skip when its feature is implemented.
-Research failures in explicit example runs do not block the core quality check.
-Do not add other skips or exclude a group to hide a failure. A missing or empty
-test selection is an error.
+Keep every research probe enabled. A probe that records an unsupported contract
+must state the gap in its source README and keep its evidence focused on current
+observable behavior. Do not add skips or exclude a group to hide a failure. A
+missing or empty test selection is an error.
 
 The runtime floor is Elixir 1.18 / OTP 27. Use Conventional Commits. Do not edit
 `CHANGELOG.md`.

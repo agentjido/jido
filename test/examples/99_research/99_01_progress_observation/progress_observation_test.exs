@@ -22,26 +22,20 @@ defmodule JidoTest.Examples.ProgressObservationTest do
   end
 
   test "live progress stays bounded while committed state is unchanged", c do
+    alias JidoTest.Examples.ProgressObservationWorker
+
+    {:ok, server} = Jido.start_agent(c.jido, ProgressObservationWorker)
     owner = self()
 
     task =
       Task.async(fn ->
-        Example.work(c.server,
-          context: %{
-            report: &Buffer.publish(c.table, &1),
-            barrier: fn ->
-              send(owner, {:working, self()})
-
-              receive do
-                :release -> :ok
-              end
-            end
-          }
+        ProgressObservationWorker.work(server,
+          context: %{progress_table: c.table, observer: owner}
         )
       end)
 
     assert_receive {:working, worker}, 1_000
-    view = Example.view(c.server, c.table)
+    view = Example.view(server, c.table)
     assert view.committed.status == :idle
     assert Enum.map(view.progress.events, &elem(&1, 0)) == [8, 9, 10]
     assert view.progress.missed == 7
@@ -49,16 +43,14 @@ defmodule JidoTest.Examples.ProgressObservationTest do
     send(worker, :release)
     assert {:ok, result} = Task.await(task)
     assert result.state.result == "report"
-    assert Example.view(c.server, c.table, 10).progress.events == []
+    assert Example.view(server, c.table, 10).progress.events == []
   end
 
   test "observer loss and reconnect preserve the terminal result", c do
     :ok = stop_supervised(Buffer)
 
     assert {:ok, result} =
-             Example.work(c.server,
-               context: %{report: &Buffer.publish(c.table, &1), barrier: fn -> :ok end}
-             )
+             Example.work(c.server, context: %{progress_table: c.table})
 
     replacement = start_supervised!({Buffer, 3})
     view = Example.view(c.server, Buffer.table(replacement))
@@ -68,30 +60,24 @@ defmodule JidoTest.Examples.ProgressObservationTest do
   end
 
   test "cancellation stops active work without committing partial progress", c do
+    alias JidoTest.Examples.ProgressObservationWorker
+
+    {:ok, server} = Jido.start_agent(c.jido, ProgressObservationWorker)
     owner = self()
 
     task =
       Task.async(fn ->
-        Example.work(c.server,
-          context: %{
-            report: &Buffer.publish(c.table, &1),
-            barrier: fn ->
-              send(owner, {:working, self()})
-
-              receive do
-                :release -> :ok
-              end
-            end
-          }
+        ProgressObservationWorker.work(server,
+          context: %{progress_table: c.table, observer: owner}
         )
       end)
 
     assert_receive {:working, worker}, 1_000
     ref = Process.monitor(worker)
-    assert :ok = Jido.AgentServer.cancel(c.server)
+    assert :ok = Jido.AgentServer.cancel(server)
     assert {:error, _} = Task.await(task)
     assert_receive {:DOWN, ^ref, :process, ^worker, _}, 1_000
-    assert Example.view(c.server, c.table).committed.status == :idle
+    assert Example.view(server, c.table).committed.status == :idle
     assert {:ok, _} = Example.cancel_wait(c.server)
     assert Example.view(c.server, c.table).committed.status == :cancelled
   end
@@ -104,9 +90,7 @@ defmodule JidoTest.Examples.ProgressObservationTest do
              Jido.start_agent(c.jido, Example, id: "saved-progress", persistence: store)
 
     assert {:ok, agent} =
-             Example.work(server,
-               context: %{report: &Buffer.publish(c.table, &1), barrier: fn -> :ok end}
-             )
+             Example.work(server, context: %{progress_table: c.table})
 
     assert :ok = Jido.hibernate(c.jido, server)
     assert {:ok, replacement} = Jido.thaw(c.jido, Example, "saved-progress", persistence: store)

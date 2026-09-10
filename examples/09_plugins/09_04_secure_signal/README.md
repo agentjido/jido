@@ -25,9 +25,9 @@ signed encrypted reply without committing plaintext secure data.
 ## Important behavior
 
 Identity verification runs before secure admission. Secure admission writes
-plaintext only to `context.plugin_inputs[SecureSignal.Plugin]`. The signed
-ciphertext Signal stays unchanged. On dispatch, encryption runs before identity
-signing.
+plaintext only to `context.plugin_inputs[SecureSignal.Plugin].runtime`. The
+signed ciphertext Signal stays unchanged. On dispatch, encryption runs before
+identity signing.
 
 Decryption needs a live runtime because the key is private runtime state.
 Therefore, direct `Jido.Agent.cmd/3` does not decrypt this Signal.

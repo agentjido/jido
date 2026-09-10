@@ -1,22 +1,39 @@
-# PERSIST-01: checkpoint identity
+# 99_06 Checkpoint Identity
 
-Status: **enabled regression; fixed in migration preparation**.
+Status: implemented persistence regression; awaiting promotion or removal.
 
-The store holds a valid record for `requested-agent`. The record envelope and
-lookup key agree, but the nested checkpoint contains `different-agent`.
-The loader rejects the record when the restored identity differs from the
-requested identity.
+The loader rejects a valid record whose nested checkpoint identity does not
+match the identity requested by the caller.
 
-Run the local example:
+## What this proves
+
+- The record key and outer envelope cannot hide a different Agent identity.
+- Identity validation occurs before the loaded Agent is returned.
+
+## Read the code
+
+Read [the probe Agent](checkpoint_identity_probe.ex), then
+[the shared fault store](../persistence_probe_store.ex).
+
+## Run it
 
 ```sh
-mix run examples/99_research/99_06_checkpoint_identity/demo.exs
+mix test test/examples/99_research/99_06_checkpoint_identity --include example --seed 0
 ```
 
-The example prints the actual load result. The acceptance tests require an
-error for the mismatch. Controls prove valid identity/state/revision restore
-and rejection of a wrong outer identity. No Server, database, or VM restart
-is needed for this boundary.
+Expected result: the mismatched checkpoint load returns an identity error.
 
-[Probe Agent](checkpoint_identity_probe.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_06_checkpoint_identity/README.md)
+## Gap and limits
+
+The core contract is implemented. Promote the concept into the persistence
+learning path or keep only its focused core regression. This probe uses an
+in-memory byte adapter and no VM restart.
+
+## Files
+
+- [Probe Agent](checkpoint_identity_probe.ex)
+- [Demo](demo.exs)
+- [Shared fault store](../persistence_probe_store.ex)
+- [Tests](../../../test/examples/99_research/99_06_checkpoint_identity/checkpoint_identity_test.exs)
+
+Previous: [Shared Budget](../99_05_capacity_deadlines_cleanup/README.md) | Next: [Checkpoint Portability](../99_07_checkpoint_portability/README.md)

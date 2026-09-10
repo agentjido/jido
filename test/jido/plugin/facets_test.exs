@@ -10,7 +10,14 @@ defmodule Jido.Plugin.FacetsTest do
 
   defmodule Effect do
     @moduledoc false
+    use Jido.Agent.Directive
     defstruct [:label]
+
+    @impl true
+    def validate(%__MODULE__{label: label} = directive) when is_binary(label),
+      do: {:ok, %{directive | label: "validated:" <> label}}
+
+    def validate(_directive), do: {:error, :label_required}
   end
 
   defmodule ForeignEffect do
@@ -18,25 +25,52 @@ defmodule Jido.Plugin.FacetsTest do
     defstruct [:label]
   end
 
+  defmodule SchemaEffect do
+    @moduledoc false
+    use Jido.Agent.Directive
+
+    @schema Zoi.struct(__MODULE__, %{count: Zoi.integer()}, coerce: true)
+    @enforce_keys Zoi.Struct.enforce_keys(@schema)
+    defstruct Zoi.Struct.struct_fields(@schema)
+
+    def schema, do: @schema
+  end
+
   defmodule AgentFacet do
     @moduledoc false
     use Jido.Agent.Plugin
 
+    alias Jido.Agent.Plugin.Reduction
+
     def state_spec(_opts), do: {:facet_count, Zoi.integer() |> Zoi.default(7)}
-    def directives(_opts), do: [Effect]
-    def validate_directive(%Effect{} = directive, _opts), do: {:ok, directive}
-    def update_state(state, _directives, _opts), do: {:ok, state + 1}
+    def directives(_opts), do: [Effect, SchemaEffect]
+    def reduce(%Reduction{plugin_state: state}, _opts), do: {:ok, state + 1}
   end
 
   defmodule ServerFacet do
     @moduledoc false
     use Jido.AgentServer.Plugin
 
-    def admit(_runtime, command, _opts), do: {:ok, command}
+    alias Jido.AgentServer.Plugin.Admission
+
+    def admit(_runtime, %Admission{} = admission, _opts) do
+      {:ok,
+       %{
+         agent_id: admission.agent_id,
+         agent_module: admission.agent_module,
+         caller_context: admission.caller_context,
+         plugin_state: admission.plugin_state,
+         prepared_input: admission.prepared_input,
+         signal_id: admission.signal.id,
+         state_version: admission.state_version
+       }}
+    end
 
     def dispatch(_runtime, %Effect{label: label}, _context, opts) do
       if label == Keyword.fetch!(opts, :server_label), do: :ok, else: {:error, :wrong_label}
     end
+
+    def dispatch(_runtime, %SchemaEffect{}, _context, _opts), do: :ok
   end
 
   defmodule PersistenceFacet do
@@ -159,6 +193,44 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Plugin, topology: InvalidTopologyFacet
   end
 
+  defmodule FacetWithPluginDirectiveValidation do
+    @moduledoc false
+    use Jido.Agent.Plugin
+
+    def directives(_opts), do: [Effect]
+    def validate_directive(directive, _opts), do: {:ok, directive}
+  end
+
+  defmodule PackageWithPluginDirectiveValidation do
+    @moduledoc false
+    use Jido.Plugin, agent: FacetWithPluginDirectiveValidation
+  end
+
+  defmodule FacetWithLegacyStateUpdate do
+    @moduledoc false
+    use Jido.Agent.Plugin
+
+    def state_spec(_opts), do: {:legacy_state, Zoi.integer() |> Zoi.default(0)}
+    def update_state(state, _directives, _opts), do: {:ok, state}
+  end
+
+  defmodule PackageWithLegacyStateUpdate do
+    @moduledoc false
+    use Jido.Plugin, agent: FacetWithLegacyStateUpdate
+  end
+
+  defmodule FacetWithUnvalidatedDirective do
+    @moduledoc false
+    use Jido.Agent.Plugin
+
+    def directives(_opts), do: [ForeignEffect]
+  end
+
+  defmodule PackageWithUnvalidatedDirective do
+    @moduledoc false
+    use Jido.Plugin, agent: FacetWithUnvalidatedDirective
+  end
+
   defmodule MisassignedOptionsPackage do
     @moduledoc false
     use Jido.Plugin, agent: StatelessAgentFacet, option_keys: [topology: [:bus]]
@@ -180,7 +252,7 @@ defmodule Jido.Plugin.FacetsTest do
     assert spec.agent.module == AgentFacet
     assert spec.agent.options == [agent_label: "facet"]
     assert spec.agent_server.module == ServerFacet
-    assert spec.agent_server.options == [server_label: "facet"]
+    assert spec.agent_server.options == [server_label: "validated:facet"]
     assert spec.persistence.module == PersistenceFacet
     assert spec.persistence.options == [prefix: "v3:"]
     assert spec.topology.module == TopologyFacet
@@ -193,16 +265,67 @@ defmodule Jido.Plugin.FacetsTest do
 
     refute Jido.Plugin in Keyword.get_values(Package.module_info(:attributes), :behaviour)
     refute function_exported?(Package, :prepare, 2)
+    refute function_exported?(AgentFacet, :validate_directive, 2)
+    refute function_exported?(AgentFacet, :update_state, 3)
   end
 
-  test "Agent facet updates only its owned state" do
+  test "Agent facet validates each Directive once and reduces only its owned state" do
     agent = agent()
     signal = Signal.new!("facet.run", %{}, source: "/test")
 
-    assert {:ok, candidate, [%Effect{label: "facet"}]} = Agent.cmd(agent, signal)
+    assert {:ok, candidate, [%Effect{label: "validated:facet"}]} = Agent.cmd(agent, signal)
     assert candidate.state.visible == 3
     assert candidate.state.seen == "facet"
     assert candidate.state.facet_count == 8
+  end
+
+  test "explicit Agent facets use reduce and Directive-owned validation" do
+    assert {:ok, %SchemaEffect{count: 2}} =
+             Jido.Agent.Directive.validate(%SchemaEffect{count: 2})
+
+    assert {:error, _issues} = Jido.Agent.Directive.validate(%SchemaEffect{count: "2"})
+
+    assert {:error, validation_error} =
+             Plugin.normalize_all([PackageWithPluginDirectiveValidation])
+
+    assert validation_error.message ==
+             "Agent Plugin Directive validation belongs to the Directive module"
+
+    assert {:error, reducer_error} = Plugin.normalize_all([PackageWithLegacyStateUpdate])
+    assert reducer_error.message == "Agent Plugin state middleware must define reduce/2"
+
+    assert {:error, directive_error} = Plugin.normalize_all([PackageWithUnvalidatedDirective])
+    assert directive_error.message == "Agent Plugin Directive must define validate/1"
+  end
+
+  test "Agent Server admission adds runtime input without replacing pure input or command data" do
+    agent = agent()
+    signal = Signal.new!("facet.run", %{}, source: "/test")
+    assert {:ok, [spec]} = Plugin.normalize_all([{Package, options()}])
+    assert {:ok, command} = Jido.Agent.Command.new(agent, signal, %{request: "one"})
+
+    prepared = %Jido.Plugin.Input{prepared: %{tenant: "alpha"}}
+    command = %{command | plugin_inputs: %{Package => prepared}}
+
+    assert {:ok, admitted} =
+             Jido.AgentServer.Plugin.admit(command, [spec], %{Package => :runtime}, 12)
+
+    assert admitted.agent === command.agent
+    assert admitted.signal === command.signal
+    assert admitted.context === command.context
+
+    assert admitted.plugin_inputs[Package] == %Jido.Plugin.Input{
+             prepared: %{tenant: "alpha"},
+             runtime: %{
+               agent_id: agent.id,
+               agent_module: agent.module,
+               caller_context: %{request: "one"},
+               plugin_state: 7,
+               prepared_input: %{tenant: "alpha"},
+               signal_id: signal.id,
+               state_version: 12
+             }
+           }
   end
 
   test "Server, Persistence, and Topology facets use only their owner values" do
@@ -212,7 +335,7 @@ defmodule Jido.Plugin.FacetsTest do
              Jido.AgentServer.Plugin.dispatch(
                spec,
                nil,
-               %Effect{label: "facet"},
+               %Effect{label: "validated:facet"},
                struct(DirectiveContext)
              )
 
@@ -224,7 +347,7 @@ defmodule Jido.Plugin.FacetsTest do
 
     topology_context = TopologyPlugin.context(spec, "worker", FacetAgent)
     assert {:ok, contribution} = TopologyPlugin.contribute(spec, topology_context)
-    assert contribution.resources == [%{key: "facet_bus", config: []}]
+    assert contribution.resources == [%{key: "facet_bus", kind: :bus, config: []}]
 
     assert contribution.connections == [
              %{agent: "worker", to: "facet_bus", path: "facet.**"}
@@ -315,6 +438,11 @@ defmodule Jido.Plugin.FacetsTest do
   end
 
   defp options do
-    [agent_label: "facet", server_label: "facet", prefix: "v3:", bus: "facet_bus"]
+    [
+      agent_label: "facet",
+      server_label: "validated:facet",
+      prefix: "v3:",
+      bus: "facet_bus"
+    ]
   end
 end

@@ -1,230 +1,36 @@
-# Topology spike
+# Topology examples
 
-These examples define complete local Agent systems in three equal forms:
-Spark DSL, Builder, and JSON through a Codec. All forms use `Jido.Topology.new/1`.
-Construction and group expansion start no processes.
+These examples define and activate complete Agent systems. Construction
+and planning start no process. A Controller owns activation, repair, inspection,
+and cleanup.
 
-| Example | Definition | Behavior |
-| --- | --- | --- |
-| `07_01_independent` | [DSL](07_01_independent/independent.ex) | Two independent Agents |
-| `07_02_hierarchy` | [DSL](07_02_hierarchy/hierarchy.ex) | A coordinator, a leader, and three owned workers |
-| `07_03_bus_swarm` | [DSL](07_03_bus_swarm/swarm.ex), [Builder and Codec](07_03_bus_swarm/formats.ex), [JSON](07_03_bus_swarm/swarm.json) | A coordinator and 1000 workers receive work through a Bus |
-| `07_04_keyed_accounts` | [DSL](07_04_keyed_accounts/accounts.ex) | Agent identities come from account keys |
-| `07_05_composed_system` | [Guide and all forms](07_05_composed_system/README.md) | Two teams share one Bus through imports, bindings, and public exports |
-| `07_06_plugin_contribution` | [Guide and DSL](07_06_plugin_contribution/README.md) | An Agent Plugin contributes its static Bus and subscription |
+## Learning order
 
-## Start at application boot
+1. [Independent Agents](07_01_independent/README.md) — start unrelated singleton Agents and request repair.
+2. [Owned Hierarchy](07_02_hierarchy/README.md) — declare direct parent and child relationships.
+3. [Bus Swarm](07_03_bus_swarm/README.md) — define the same 1,000-worker system with DSL, Builder, and JSON.
+4. [Keyed Accounts](07_04_keyed_accounts/README.md) — derive stable group identity from input records.
+5. [Composed System](07_05_composed_system/README.md) — include reusable Topologies with imports, bindings, and exports.
+6. [Plugin Contribution](07_06_plugin_contribution/README.md) — let an Agent Plugin add static topology wiring.
+7. [Lifecycle Signals](07_07_lifecycle_signals/README.md) — connect an optional control Agent through normal routes.
+8. [Placement Policy](07_08_placement_policy/README.md) — keep node selection in a Plugin and use the exact-node core mechanism.
 
-```elixir
-defmodule MyApp.Jido do
-  use Jido, otp_app: :my_app
-end
-
-# In Application.start/2:
-alias Jido.Examples.Topology.Swarm
-
-children = [
-  {MyApp.Jido, max_tasks: 4_096},
-  {Jido.Topology.Controller,
-   jido: MyApp.Jido,
-   topology: Swarm.new!(id: "research", input: %{worker_count: 1_000})}
-]
-
-Supervisor.start_link(children, strategy: :rest_for_one, name: MyApp.Supervisor)
-```
-
-The application starts the controller. The controller starts Buses and Agents
-in dependency layers, with at most 32 startup tasks at once by default. A Jido
-restart also restarts the controller when the application uses `:rest_for_one`.
-Agents remain peers under the Jido Agent pool. Ownership uses the existing
-logical child API.
-
-For an IEx session:
-
-```elixir
-alias Jido.Examples.Topology.{Cell, Swarm}
-alias Jido.Topology.Controller
-
-{:ok, _} = Jido.start(name: MyApp.Jido, max_tasks: 4_096)
-instance = Swarm.new!(id: "research", input: %{worker_count: 1_000})
-{:ok, controller} = Controller.start_link(jido: MyApp.Jido, topology: instance)
-:ok = Controller.await_ready(controller, 60_000)
-Controller.status(controller)
-
-bus = Controller.whereis_bus(controller, :work)
-{:ok, [_record]} = Jido.Signal.Bus.publish(bus, [Cell.work_signal!(3)])
-worker = Controller.whereis_agent(controller, :workers, 1)
-Jido.AgentServer.agent(worker).state
-
-Supervisor.stop(controller)
-```
-
-The 1000-worker broadcast test sets `max_tasks: 4096`. The default Jido task
-limit is 1000. Startup concurrency and simultaneous Agent execution are
-separate limits. A normal Bus broadcast does not retry a failed Agent turn.
-Each subscriber receives each matching Signal; this is not a work queue.
-
-## Application-controlled repair
-
-The controller uses `repair: :automatic` by default. An application can instead
-choose when the controller repeats a local repair pass:
-
-```elixir
-alias Jido.Examples.Topology.Independent
-alias Jido.Topology.Controller
-
-{:ok, controller} = Controller.start_link(
-  jido: MyApp.Jido,
-  topology: Independent.new!(id: "manual-repair"),
-  repair: :manual
-)
-:ok = Controller.await_ready(controller)
-
-left = Controller.whereis_agent(controller, :left)
-:ok = Jido.stop_agent(MyApp.Jido, left)
-
-# The application selects when to repair the existing target.
-:ok = Controller.reconcile(controller)
-:ok = Controller.await_ready(controller)
-```
-
-Manual mode performs initial startup once. It then waits for explicit repair
-requests. `reconcile/2` returns when it accepts a request; use `await_ready/2`
-for completion and `status/2` for errors. Requests during an active pass produce
-one follow-up pass and share the same concurrency limit. The independent
-example test proves that the other Agent keeps its PID and committed state.
-Child supervision and Plugin recovery continue in both modes.
-
-The request repairs the existing target. It does not resize a group, replace
-a definition, transfer ownership, or provide cluster placement.
-
-## The three authoring forms
-
-```elixir
-alias Jido.Examples.Topology.{Formats, Swarm}
-alias Jido.Topology.{Builder, Codec}
-
-# Compile-time Spark DSL.
-definition = Swarm.topology()
-
-# Runtime Builder.
-{:ok, ^definition} = Builder.build(Formats.builder())
-
-# JSON with stable application Registry IDs.
-{:ok, json} = Formats.json()
-{:ok, ^definition} = Codec.decode(JSON.decode!(json), Formats.registry())
-{:ok, ^definition} = Formats.from_file()
-
-# Instance input is separate from the definition.
-{:ok, instance} = Codec.decode(JSON.decode!(json), Formats.registry(),
-  id: "research", input: %{worker_count: 1_000})
-```
-
-The Codec reuses `Jido.Agent.Codec.Registry`. Agent modules, schemas, atoms,
-and static struct values require trusted entries. JSON cannot create atoms,
-load a module from a string, or supply executable functions. Input and member
-references have explicit tagged JSON records. `Codec.encode/1` can derive a
-temporary Registry; stored documents should use stable application IDs.
-
-The JSON document contains the definition only. It excludes instance input,
-expanded plans, PIDs, runtime status, and committed Agent state. The same
-document can be instantiated more than once with different IDs and input.
-Codec version 2 embeds composed definitions. Version 1 documents remain readable.
-
-## Plugin contributions
-
-An Agent declaration can contain a Plugin package with a
-`Jido.Topology.Plugin` facet. During instance planning, the facet can contribute
-current Bus resources, ownership relationships, and Bus subscriptions. Jido
-applies contributions in Agent declaration order, then group declaration
-order, and then Plugin declaration order. Included Topologies receive the same
-expansion in their own scope.
-
-The source definition remains unchanged. Direct plan construction and normal
-instantiation produce the same expanded plan. All contributed entries pass
-through the common Topology validator and graph checks before activation.
-Contribution is pure and static. It starts no process and grants no runtime,
-persistence, placement, or write authority. See
-[`07_06_plugin_contribution`](07_06_plugin_contribution/README.md).
-
-## DSL blocks
-
-- `topology`: Zoi input schema and metadata.
-- `agents`: singleton `agent` declarations and repeated `group` declarations.
-- `resources`: named `bus` declarations with optional `config`.
-- `relationships`: `owns parent, child` with `on_parent_exit` policy.
-- `connections`: `subscribe agent_or_group, to: bus, path: pattern`.
-- `topologies`: `include` declarations with mapped `inputs` and explicit `bind` declarations.
-- `imports`: required Buses supplied by the containing topology.
-- `exports`: public Agents, groups, and Buses, accessed through `ref(component, export)`.
-- `startup`: `concurrency`, `ready :all`, `max_agents`, `retry_interval`, and `task_timeout`.
-
-The default startup settings are 32 concurrent tasks, all members required,
-10000 Agents maximum, a 1000 ms repair interval, and a 10000 ms task timeout. Groups accept either
-`count` or `members` plus `key_by`. `input(:field)` reads topology input.
-`member(:field)` reads one keyed member in an `initial_state` expression.
-A counted group exposes `member(:index)` as an integer.
-
-Keys normalize to strings. Singleton IDs have the form
-`instance/agent/key`; group member IDs use `instance/group/key/member`.
-Instance IDs and key components escape separators. Counted groups use decimal member keys
-starting at `1`. Keyed groups sort by key and reject duplicates, so input
-order cannot change identity. Zero-member groups are valid. The planner
-checks the Agent count limit before allocating a counted group.
-
-A subscription adds a startup dependency on its Bus. Ownership adds a
-dependency on the parent. `depends_on` adds further readiness dependencies.
-Cycles, unknown keys, duplicate declarations, and multiple owners fail
-validation. A group cannot act as a singleton parent.
-
-## Lifecycle and scope
-
-The controller repairs missing Agents and ownership bindings. Automatic mode
-repeats passes at `startup.retry_interval`; manual mode waits for a request.
-Topology Agents
-are temporary children in the Jido Agent pool. The controller owns reactivation
-after both normal and abnormal exits. Each repair pass checks the
-current processes and required Bus subscriptions. `status/1` reports the
-latest pass and detects dead recorded processes. Startup and check tasks run asynchronously with a time limit. Status calls
-remain available while a member starts. Independent branches do not wait for
-a blocked branch.
-
-A normal controller shutdown stops its owned Agents in reverse dependency
-order. It also stops its Buses and tasks. A controller worker crash can find
-its existing Agents through stable IDs and an ownership marker in metadata.
-A conflicting Agent or Bus is reported; the controller does not take it over.
-Partial startup reports `:degraded` and retries in automatic mode. It leaves successful members
-running. `await_ready/2` waits for all members and uses the caller's timeout.
-
-All declarations remain in the target. A normal Agent stop or parent failure
-can stop children. Automatic mode recreates missing members; manual mode waits
-for the application to request another pass. A pass repairs the whole target.
-Live topology changes and per-member pause are outside this spike. Included
-topologies share one root controller and its execution limits.
-
-Agent restoration uses the existing Jido persistence adapter. The controller
-loads saved state and its revision, validates identity, and reapplies the
-topology metadata and Bus inputs before starting the Server. This is necessary
-because module restoration rebuilds the Agent from its module definition.
-Initial state applies to new Agents; a saved Agent retains its committed state. The restore
-test uses ETS and proves controller restart, not disk or VM durability. Keep
-the definition unchanged when restoring this spike. Definition revisions and
-migration are separate work.
-
-Database records can supply the keyed account input. This spike has no
-database adapter, cluster placement, generated route
-interfaces, on-demand activation, or durable queue protocol. It provides the
-shared authoring and local runtime contracts needed to test those extensions.
-
-## Verification
+## Run the section
 
 ```sh
-mix test test/jido/topology test/examples/07_topology --include example
-mix quality
+mix test test/examples/07_topology --include example --seed 0
 ```
 
-The scale test boots 1000 workers plus one coordinator, publishes one Signal,
-checks every worker's committed result, and checks shutdown cleanup. The
-other tests cover authoring parity, document validation, stable identities,
-startup cycles, ownership, multiple subscriptions, automatic and manual repair,
-concurrent repair requests, identity conflicts, and restoration.
+Expected result: each planned system starts, proves its declared relationships
+or delivery behavior, and cleans its local resources.
+
+## Shared support
+
+The [Cell Agent](support/cell.ex) is the small shared worker used throughout the
+section.
+
+## Limits
+
+The Controller repairs one target and can place an Agent on an exact Erlang
+node. It does not discover nodes, select capacity policy, rebalance a system,
+or provide distributed authority.

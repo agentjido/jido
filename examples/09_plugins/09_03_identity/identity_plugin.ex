@@ -28,20 +28,21 @@ defmodule Jido.Examples.Plugins.Identity.Plugin.Server do
   @moduledoc false
   use Jido.AgentServer.Plugin
 
-  alias Jido.Agent.Command
+  alias Jido.AgentServer.Plugin.Admission
   alias Jido.Plugin.{Init, SignalContext}
-  alias Jido.Examples.Plugins.Identity.Plugin
   alias Jido.Examples.Plugins.Identity.Runtime
 
   @impl Jido.AgentServer.Plugin
-  def admit(runtime, %Command{} = command, _opts) do
-    with {:ok, %{nonce: nonce}} <- Map.fetch(command.plugin_inputs, Plugin),
-         :ok <- Runtime.claim_nonce(runtime, nonce) do
-      {:ok, command}
-    else
-      :error -> {:error, :identity_input_required}
-      {:ok, _input} -> {:error, :invalid_identity_input}
-      {:error, _reason} = error -> error
+  def admit(runtime, %Admission{prepared_input: prepared_input}, _opts) do
+    case prepared_input do
+      %{nonce: nonce} ->
+        with :ok <- Runtime.claim_nonce(runtime, nonce), do: {:ok, :admitted}
+
+      nil ->
+        {:error, :identity_input_required}
+
+      _input ->
+        {:error, :invalid_identity_input}
     end
   end
 

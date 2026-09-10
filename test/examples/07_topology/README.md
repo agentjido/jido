@@ -1,17 +1,14 @@
 # Topology example tests
 
-Run all six example fixtures:
+This folder mirrors the numbered learning path in
+[the Topology examples](../../../examples/07_topology/README.md).
+
+Run the section behavior tests:
 
 ```sh
-mix test test/examples/07_topology --include example
+mix test test/examples/07_topology --include example --seed 0
 ```
 
-The Bus swarm test starts 1000 workers plus one coordinator. It sets the Jido
-task capacity to 4096, verifies broadcast delivery to all workers, and checks
-shutdown cleanup. No external service or database is required.
-
-The Plugin contribution fixture proves that pure instance planning adds a
-declared Bus and subscription before the local Controller starts them.
-
-Core authoring and runtime acceptance tests are in `test/jido/topology`.
-See the [example guide](../../../examples/07_topology/README.md).
+The Bus swarm test is a local scale fixture. Other tests prove ownership,
+manual repair, keyed identity, composition, Plugin contribution, lifecycle
+Signals, placement-policy delegation, and cleanup.

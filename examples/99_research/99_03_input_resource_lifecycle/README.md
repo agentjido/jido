@@ -1,28 +1,40 @@
-# FA-06: Plugin runtime reconstruction from committed state
+# 99_03 Input Resource Lifecycle
 
-Status: **Core feature implemented and proved**.
+Status: implemented contract; not yet promoted to the stable Plugin examples.
 
-Result on 2026-09-10: **2 passing checks.** All checks are enabled.
+A Plugin runtime reconstructs one disposable input resource from committed
+Plugin state and its state version.
 
-## Feature and proof
+## What this proves
 
-The input runtime builds its first resource from the owned `plugin_state` and
-matching `state_version` in `Jido.Plugin.Init`. After a crash it rebuilds feed
-B, rejects stale feed A input, and closes owned resources. It keeps the public
-state-pull path for reconciliation after later commits.
+- Initial and replacement runtimes receive the correct committed Plugin state.
+- A resource closes on replacement, stale input is rejected, and new input continues.
 
-## Scope
+## Read the code
 
-This tests Plugin runtime loss, input generation checks, and resource cleanup. It does not test a live vendor connection or duplicate event IDs. Jido.Plugin.state/1 already supplies a working application recovery mechanism.
+Read [the Agent](runtime_reconstruction.ex), [the Plugin](plugin.ex), then
+[the runtime](runtime.ex).
 
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_03_input_resource_lifecycle --include example --seed 0
 ```
 
-This command returns a passing status.
+Expected result: feed A changes to B, the Plugin runtime restarts on B, and all
+old resources stop.
 
-[Source](runtime_reconstruction.ex) · [Tests](../../../test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs)
+## Gap and limits
+
+Promotion should merge this resource-lifecycle detail with the stable
+subscription example. The resource is local and does not model provider replay
+or duplicate event IDs.
+
+## Files
+
+- [Agent](runtime_reconstruction.ex)
+- [Plugin](plugin.ex)
+- [Runtime](runtime.ex)
+- [Tests](../../../test/examples/99_research/99_03_input_resource_lifecycle/runtime_reconstruction_test.exs)
+
+Previous: [Distributed Authority](../99_02_distributed_authority/README.md) | Next: [Handoff Reconciliation](../99_04_handoff_reconciliation/README.md)

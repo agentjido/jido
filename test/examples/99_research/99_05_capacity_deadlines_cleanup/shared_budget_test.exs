@@ -10,7 +10,8 @@ defmodule JidoTest.Examples.SharedBudgetTest do
       start_supervised!(
         {Example,
          jido: jido,
-         observer: self(),
+         worker: JidoTest.Examples.SharedBudgetWorker,
+         work_context: %{observer: self()},
          limit: 2,
          queue_limit: 2,
          clock: fn -> Elixir.Agent.get(clock, & &1) end}

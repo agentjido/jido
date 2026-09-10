@@ -29,7 +29,7 @@ defmodule JidoTest.Examples.Applications.AuditTest do
 
     success =
       Signal.new!(
-        "audit.turn",
+        "examples.applications.audit.turn",
         %{event: %{operation: :publish}, fail?: false},
         source: "/test/audit"
       )
@@ -45,7 +45,7 @@ defmodule JidoTest.Examples.Applications.AuditTest do
 
     failure =
       Signal.new!(
-        "audit.turn",
+        "examples.applications.audit.turn",
         %{event: %{operation: :delete}, fail?: true},
         source: "/test/audit"
       )

@@ -12,13 +12,13 @@ defmodule Jido.Examples.Topology.Accounts do
                  })
                )
            })
-  end
 
-  agents do
-    group :accounts, Jido.Examples.Topology.Cell do
-      members input(:accounts)
-      key_by :account_id
-      initial_state %{label: member(:label)}
+    agents do
+      group :accounts, Jido.Examples.Topology.Cell do
+        members input(:accounts)
+        key_by :account_id
+        initial_state %{label: member(:label)}
+      end
     end
   end
 end

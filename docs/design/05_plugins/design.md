@@ -32,35 +32,40 @@ prepare one package input or reject
   -> select and run Action or Flow
 Action or Flow success
   -> protect Plugin-owned fields
-  -> validate Directives
-  -> update Plugin-owned fields in declaration order
+  -> validate each Directive once
+  -> reduce Plugin-owned fields in declaration order
   -> validate the complete candidate state
 ```
 
 `Jido.Agent.Plugin.Pipeline` is private. It has one entry point:
 
 ```elixir
-run({:ok, candidate_state, directives}, original_state, agent_plugin_specs)
+run({:ok, candidate_state, directives}, agent, signal, plugin_inputs, agent_plugin_specs)
 ```
 
-An Agent facet has five optional callbacks:
+An Agent facet has four optional callbacks:
 
 ```elixir
 prepare/2
 state_spec/1
 directives/1
-validate_directive/2
-update_state/3
+reduce/2
 ```
 
-`update_state/3` receives the current owned value, the validated Directives
-owned by that facet, and static options. It returns the complete next owned
-value.
+`reduce/2` receives a read-only reduction value and static options. The value
+contains the complete state before the Turn, the current complete candidate
+state, the current owned value, the pure prepared input, and all validated
+Directives. The callback returns only the complete next owned value.
 
 `prepare/2` receives a read-only preparation value and static options. It can
 reject or return one portable value. Jido stores that value under the package
-module in `context.plugin_inputs`. The callback cannot change the incoming
-Signal.
+module in the `prepared` slot of `context.plugin_inputs`. The preparation value
+includes the complete current Agent state. The callback cannot change the
+incoming Signal or state.
+
+Each custom Directive owns `validate/1`. The pipeline validates every
+Directive once after Action or Flow success. The Agent facet declares
+Directive ownership but does not validate a Directive again.
 
 ## Requirements
 
@@ -95,7 +100,7 @@ shall add each Plugin-owned field at the top level.
 `PLG-REQ-014`: If an Action or Flow changes a Plugin-owned field, then Turn
 evaluation shall reject the candidate.
 
-`PLG-REQ-015`: When an Agent facet updates state, the Plugin pipeline shall let
+`PLG-REQ-015`: When an Agent facet reduces state, the Plugin pipeline shall let
 it replace only its owned field.
 
 `PLG-REQ-016`: When an Agent facet returns state, the Plugin pipeline shall
@@ -108,7 +113,8 @@ apply the portable-value rule.
 each `prepare/2` callback in declaration order.
 
 `PLG-REQ-021`: Agent Plugin preparation shall receive the unchanged source
-Signal, Agent identity, Agent module, its owned state, and static options.
+Signal, Agent identity, Agent module, the complete current Agent state, its
+owned state, and static options.
 
 `PLG-REQ-022`: Agent Plugin preparation shall return one package-owned input or
 reject evaluation.
@@ -120,25 +126,25 @@ be portable.
 Signal, caller context, route, or another package's input.
 
 `PLG-REQ-025`: The execution context shall store prepared inputs by Plugin
-package module under `plugin_inputs`.
+package module under the `plugin_inputs[Package].prepared` slot.
 
-`PLG-REQ-031`: When more than one Agent facet updates state, the Plugin
+`PLG-REQ-031`: When more than one Agent facet reduces state, the Plugin
 pipeline shall call them in declaration order and stop at the first failure.
 
-`PLG-REQ-032`: Where an Agent facet has no `update_state/3` callback, the Plugin
+`PLG-REQ-032`: Where an Agent facet has no `reduce/2` callback, the Plugin
 pipeline shall preserve its owned state.
 
-`PLG-REQ-035`: If an Agent state update fails, then Turn evaluation shall
+`PLG-REQ-035`: If an Agent state reduction fails, then Turn evaluation shall
 return no candidate Agent.
 
 `PLG-REQ-036`: When a Plugin declares a Directive type, the Plugin boundary
 shall assign that type to only one Agent facet.
 
-`PLG-REQ-037`: When Turn evaluation accepts a Plugin Directive, it shall
-validate the complete Directive before candidate return.
+`PLG-REQ-037`: When Turn evaluation accepts a Plugin Directive, it shall call
+the Directive module's `validate/1` once before candidate return.
 
 `PLG-REQ-038`: Where a Plugin Directive has no live handler, the Agent Server
-shall treat its successful state update as complete handling.
+shall treat its successful state reduction as complete handling.
 
 `PLG-REQ-039`: Where an Agent Server facet handles a Plugin Directive, the
 paired Agent facet shall own that Directive type.
@@ -151,14 +157,16 @@ the Agent Server shall call them in declaration order.
 `PLG-REQ-020`: If an Agent Server facet rejects admission, then the Agent
 Server shall start no executable work.
 
-`PLG-REQ-026`: An Agent Server facet shall change only its own package input or
-reject admission.
+`PLG-REQ-026`: An Agent Server facet shall return only its own package runtime
+input or reject admission.
 
-`PLG-REQ-027`: Agent Server admission shall not change the Agent, incoming
-Signal, caller context, or another package's input.
+`PLG-REQ-027`: Agent Server admission shall receive a read-only Admission value
+and shall have no return path that changes the Agent, incoming Signal, caller
+context, prepared input, or another package's input.
 
-`PLG-REQ-028`: A live package input may contain a transient runtime term because
-the input does not enter Agent state or checkpoints.
+`PLG-REQ-028`: The execution context shall store a successful live input under
+`plugin_inputs[Package].runtime`. It may contain a transient runtime term
+because the input does not enter Agent state or checkpoints.
 
 `PLG-REQ-029`: Direct `Jido.Agent.cmd/3` shall run pure Agent Plugin preparation
 but shall not run Agent Server admission.

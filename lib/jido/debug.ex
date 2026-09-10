@@ -1,27 +1,5 @@
 defmodule Jido.Debug do
-  @moduledoc """
-  Per-instance debug mode for Jido Agents.
-
-  Provides one entry point to control semantic log verbosity at runtime. Each
-  setting applies to one Jido instance.
-
-  ## Debug Levels
-
-  - `:off` - Use the configured semantic log mode.
-  - `:on` - Log errors and slow semantic operations.
-  - `:verbose` - Log all completed semantic operations.
-
-  ## Usage
-
-      # Via instance module
-      MyApp.Jido.debug(:on)
-      MyApp.Jido.debug(:verbose)
-      MyApp.Jido.debug(:off)
-      MyApp.Jido.debug()          # => :off
-
-      # Via top-level Jido module (applies to Jido.Default)
-      Jido.debug(:on)
-  """
+  @moduledoc false
 
   @type level :: :off | :on | :verbose
   @type instance :: atom()
@@ -64,12 +42,9 @@ defmodule Jido.Debug do
   @spec override(instance(), atom()) :: term() | nil
   def override(instance, key), do: Map.get(status(instance).overrides, key)
 
-  @spec maybe_enable_from_config(atom(), instance()) :: :ok
-  def maybe_enable_from_config(otp_app, instance) do
-    config = Application.get_env(otp_app, instance, [])
-
-    debug = if Keyword.keyword?(config), do: Keyword.get(config, :debug), else: nil
-
+  @doc false
+  @spec configure(instance(), term()) :: :ok
+  def configure(instance, debug) do
     case debug do
       true -> enable(instance, :on)
       :verbose -> enable(instance, :verbose)

@@ -1,12 +1,12 @@
-> Implemented seam review entry point.
+> Implemented for the V3 observability contract.
 
 # 13 - Observability
 
 ## Briefing
 
 Jido now uses one semantic event catalog for Agent lifecycle, Turn result,
-commit, Directive work, Turn settlement, admission rejection, persistence, and
-the static local Topology Controller.
+commit, Directive work, Turn settlement, admission rejection, persistence,
+the static local Topology Controller, and Scheduler delivery.
 
 Every semantic event has `schema_version: 1`. The event boundary keeps only
 approved scalar metadata. It omits state, payloads, raw errors, records,
@@ -24,10 +24,11 @@ not change the command result, durable result, or public Turn Outcome.
 | Agent Turn result | `[:jido, :agent, :turn, event]` | Admission to live result or pre-commit failure |
 | Agent commit | `[:jido, :agent, :commit, event]` | One commit attempt, including required persistence |
 | Agent Directive | `[:jido, :agent, :directive, event]` | One post-commit Directive attempt |
-| Turn settlement | `[:jido, :agent, :turn, :settled]` | One terminal public Outcome |
+| Turn settlement | `[:jido, :agent, :turn, :settled]` | One bounded terminal result |
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Deadline or overload rejection before a Turn |
 | Persistence | `[:jido, :persistence, :operation, event]` | Load, compare-and-swap, or delete |
 | Local Topology | `[:jido, :topology, :operation, event]` | Activation, repair, or cleanup |
+| Scheduler delivery | `[:jido, :scheduler, :delivery]` | One bounded durable-delivery outcome |
 
 For a span, `event` is `:start`, `:stop`, or `:exception`. A returned failure
 uses `:stop`. A fault that escapes the observed boundary uses `:exception`.
@@ -38,13 +39,13 @@ settle later. The separate `turn.settled` fact keeps this difference visible.
 ## Identity and correlation
 
 When an instance has a stable namespace, Agent events project the exact Agent
-Ref fields as `agent_namespace`, `agent_partition`, and `agent_id`. The current
-`jido_instance` and `partition` fields stay during the compatibility interval.
+Ref fields as `agent_namespace`, `agent_partition`, and `agent_id`. Duplicate
+`jido_instance` and `partition` fields are not public metadata.
 
 Activation, Turn, source Signal, effective Signal, trace parent, and Signal
 causation IDs stay separate. Signals keep the complete portable W3C carrier.
-Jido-owned Tasks explicitly attach and restore their process-local trace
-context.
+`Jido.Signal.Trace` is the public W3C carrier. Jido-owned Tasks explicitly
+attach and restore their private process-local trace context.
 
 ## Consumers
 

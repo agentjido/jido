@@ -18,8 +18,7 @@ defmodule Jido.Examples.CorrelatedRequests do
 
     route "examples.multi_agent.requests.start" do
       action %{request_id: request_id, value: value},
-        schema:
-          Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         state = context.agent_state
 

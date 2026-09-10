@@ -2,8 +2,8 @@ defmodule Jido.Examples.IndeterminateWriteProbe do
   @moduledoc """
   PERSIST-03: an uncertain persistence write must prevent further work on stale state.
 
-  The observer callback records Action execution. The output Signal records
-  post-commit dispatch. Both runtime handles stay in caller context.
+  The stored candidate proves Action execution. The output Signal records
+  post-commit dispatch. Its temporary destination stays in caller context.
   """
   use Jido.Agent, name: "research_indeterminate_write"
 
@@ -12,21 +12,19 @@ defmodule Jido.Examples.IndeterminateWriteProbe do
   end
 
   routes do
-    signal_source "/research/indeterminate-write"
+    signal_source "/examples/research/indeterminate_write"
 
-    route "persistence.probe.increment" do
+    route "examples.research.indeterminate_write.increment" do
       action input,
-        name: "research_indeterminate_write_increment",
         schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), amount: Zoi.integer()}),
         context: context do
-        if observe = context[:on_execute], do: observe.(input.request_id)
         next = %{context.agent_state | count: context.agent_state.count + input.amount}
 
         output =
           Jido.Signal.new!(
-            "persistence.probe.applied",
+            "examples.research.indeterminate_write.applied",
             %{request_id: input.request_id, count: next.count},
-            source: "/research/indeterminate-write"
+            source: "/examples/research/indeterminate_write"
           )
 
         directives =

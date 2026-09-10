@@ -11,6 +11,11 @@ defmodule Jido.Agent.Directive do
   An Action or Flow can also perform synchronous I/O before returning its
   complete state. That I/O is outside the Agent state transaction and is not
   undone if the Turn fails.
+
+  A custom Directive uses this module as a behavior. `use Jido.Agent.Directive`
+  supplies a default `validate/1` callback. The default applies `schema/0` when
+  the Directive module defines it. A Directive can override `validate/1` when
+  it needs another validation rule.
   """
 
   alias __MODULE__.{
@@ -27,6 +32,33 @@ defmodule Jido.Agent.Directive do
 
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
+
+  @callback validate(directive :: struct()) :: {:ok, struct()} | {:error, term()}
+
+  @doc "Defines a self-validating custom Agent Directive."
+  defmacro __using__(_opts) do
+    quote location: :keep do
+      @behaviour Jido.Agent.Directive
+
+      @impl Jido.Agent.Directive
+      def validate(%__MODULE__{} = directive) do
+        if function_exported?(__MODULE__, :schema, 0) do
+          Zoi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
+        else
+          {:ok, directive}
+        end
+      end
+
+      def validate(value) do
+        {:error,
+         Jido.Error.validation_error("Expected a #{inspect(__MODULE__)} Directive",
+           details: %{directive: value}
+         )}
+      end
+
+      defoverridable validate: 1
+    end
+  end
 
   @type t ::
           AdoptChild.t()
@@ -72,8 +104,13 @@ defmodule Jido.Agent.Directive do
   @spec built_in_module?(module()) :: boolean()
   def built_in_module?(module) when is_atom(module), do: module in @built_ins
 
-  @doc "Validates one built-in Agent Directive."
-  @spec validate(t()) :: {:ok, t()} | {:error, term()}
+  @doc false
+  @spec validator?(module()) :: boolean()
+  def validator?(module) when is_atom(module),
+    do: built_in_module?(module) or function_exported?(module, :validate, 1)
+
+  @doc "Validates one built-in or custom Agent Directive."
+  @spec validate(struct()) :: {:ok, struct()} | {:error, term()}
   def validate(%{__struct__: module, signal: %Signal{} = signal} = directive)
       when module in [Emit, EmitToParent, EmitToChild] do
     with {:ok, signal} <- Zoi.parse(Signal.schema(), signal),
@@ -102,6 +139,42 @@ defmodule Jido.Agent.Directive do
 
   def validate(%{__struct__: module} = directive) when module in @built_ins do
     Zoi.parse(module.schema(), Map.from_struct(directive))
+  end
+
+  def validate(%{__struct__: module} = directive) do
+    try do
+      case module.validate(directive) do
+        {:ok, %{__struct__: ^module} = validated} ->
+          {:ok, validated}
+
+        {:ok, %{__struct__: actual}} ->
+          {:error,
+           Jido.Error.validation_error("Agent Directive validation changed its type",
+             details: %{expected: module, actual: actual}
+           )}
+
+        {:error, _reason} = error ->
+          error
+
+        result ->
+          {:error,
+           Jido.Error.validation_error("Agent Directive validate/1 returned an invalid result",
+             details: %{directive: module, result: result}
+           )}
+      end
+    rescue
+      error ->
+        {:error,
+         Jido.Error.execution_error("Agent Directive validation failed",
+           details: %{directive: module, error: error}
+         )}
+    catch
+      kind, reason ->
+        {:error,
+         Jido.Error.execution_error("Agent Directive validation failed",
+           details: %{directive: module, kind: kind, reason: reason}
+         )}
+    end
   end
 
   def validate(value) do

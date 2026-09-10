@@ -23,7 +23,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
       action %{"message_id" => message_id},
         schema: Zoi.object(%{"message_id" => Zoi.string() |> Zoi.min(1)}),
         context: context do
-        secure = context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Plugin]
+        secure = context.plugin_inputs[Jido.Examples.Plugins.SecureSignal.Plugin].runtime
 
         reply =
           Jido.Signal.new!(
@@ -40,6 +40,7 @@ defmodule Jido.Examples.Plugins.SecureSignal.Agent do
           | accepted: context.agent_state.accepted + 1,
             peer:
               context.plugin_inputs[Jido.Examples.Plugins.Identity.Plugin]
+              |> Map.fetch!(:prepared)
               |> Map.fetch!(:public_key)
               |> Base.encode16(case: :lower)
         }

@@ -8,22 +8,28 @@ defmodule Jido.Telemetry.Semantic do
 
   @id_keys ~w(agent_namespace agent_id activation_id turn_id source_signal_id signal_id signal_type trace_id span_id parent_span_id causation_id cause_turn_id child_activation_id topology_id node_id)a
   @module_keys ~w(agent_module directive_module adapter_module)a
-  @boolean_keys [:committed?, :retryable?, :sampled?]
+  @boolean_keys [:committed?, :retryable?]
   @status_values ~w(ok error cancelled timed_out conflict indeterminate not_found rejected)a
   @stage_values ~w(evaluate commit directive)a
   @kind_values ~w(error throw exit)a
   @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete)a
   @admission_values ~w(deadline_expired overloaded)a
   @persistence_values ~w(commit activate stop hibernate thaw manual topology)a
-  @topology_values ~w(activate repair cleanup)a
+  @topology_values ~w(activate repair update place cleanup)a
+  @scheduler_values ~w(idle delivered state_read_error timeout task_error delivery_error invalid_result)a
 
   @signed_measurements [:system_time, :monotonic_time]
-  @count_measurements ~w(duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after component_count ready_count failed_count epoch)a
+  @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after component_count ready_count failed_count epoch)a
+  @trace_keys [:trace_id, :span_id, :parent_span_id, :causation_id]
+  @trace_carrier_keys @trace_keys ++ [:trace_flags, :traceparent, :tracestate]
+  @log_scope_key {:jido, :semantic_log_scope}
 
   @type span :: %{
           required(:prefix) => [atom()],
           required(:metadata) => map(),
+          required(:trace) => map() | nil,
           required(:at) => integer(),
+          optional(:log_scope) => atom() | nil,
           optional(:otel) => OpenTelemetry.Span.t() | nil
         }
 
@@ -34,22 +40,31 @@ defmodule Jido.Telemetry.Semantic do
   def start(prefix, metadata, measurements \\ %{}, opts \\ [])
       when is_list(prefix) and is_map(metadata) and is_map(measurements) and is_list(opts) do
     at = System.monotonic_time()
+    trace = Map.take(metadata, @trace_carrier_keys)
+    log_scope = log_scope(metadata)
     metadata = normalize_metadata(metadata)
     measurements = normalize_measurements(measurements)
+
+    otel = OpenTelemetry.start(prefix, metadata, measurements, Keyword.put(opts, :start_time, at))
+    trace = Map.merge(valid_trace(trace) || %{}, OpenTelemetry.trace_context(otel) || %{})
+    trace = if map_size(trace) == 0, do: nil, else: trace
+    metadata = Map.merge(metadata, normalize_metadata(Map.take(trace || %{}, @trace_keys)))
 
     span = %{
       prefix: prefix,
       metadata: metadata,
+      trace: trace,
       at: at,
-      otel:
-        OpenTelemetry.start(prefix, metadata, measurements, Keyword.put(opts, :start_time, at))
+      log_scope: log_scope,
+      otel: otel
     }
 
-    emit(
+    emit_normalized(
       prefix ++ [:start],
       measurements
       |> Map.merge(%{monotonic_time: at, system_time: System.system_time()}),
-      metadata
+      metadata,
+      log_scope
     )
 
     span
@@ -68,11 +83,11 @@ defmodule Jido.Telemetry.Semantic do
       when ending in [:stop, :exception] do
     duration = max(System.monotonic_time() - started, 0)
     measurements = measurements |> normalize_measurements() |> Map.put(:duration, duration)
-    metadata = base |> Map.merge(normalize_metadata(metadata)) |> normalize_metadata()
+    metadata = Map.merge(base, normalize_metadata(metadata))
     ended_at = started + duration
 
     OpenTelemetry.finish(Map.get(span, :otel), ending, metadata, measurements, ended_at)
-    emit(prefix ++ [ending], measurements, metadata)
+    emit_normalized(prefix ++ [ending], measurements, metadata, Map.get(span, :log_scope))
   end
 
   @doc false
@@ -86,10 +101,11 @@ defmodule Jido.Telemetry.Semantic do
       |> Map.put_new(:monotonic_time, at)
       |> Map.put_new(:system_time, System.system_time())
 
+    log_scope = log_scope(metadata)
     metadata = normalize_metadata(metadata)
 
     OpenTelemetry.point(event, metadata, measurements, Keyword.put(opts, :at, at))
-    emit(event, measurements, metadata)
+    emit_normalized(event, measurements, metadata, log_scope)
   end
 
   @doc false
@@ -161,14 +177,6 @@ defmodule Jido.Telemetry.Semantic do
 
   def normalize_measurements(_measurements), do: %{}
 
-  @doc false
-  def emit(event, measurements, metadata) do
-    :telemetry.execute(event, normalize_measurements(measurements), normalize_metadata(metadata))
-    :ok
-  catch
-    _, _ -> :ok
-  end
-
   defp normalize_field({:schema_version, _value}, acc), do: acc
 
   defp normalize_field({key, value}, acc) when key in @id_keys,
@@ -205,6 +213,9 @@ defmodule Jido.Telemetry.Semantic do
   defp normalize_field({:topology_operation, value}, acc) when value in @topology_values,
     do: Map.put(acc, :topology_operation, value)
 
+  defp normalize_field({:scheduler_outcome, value}, acc) when value in @scheduler_values,
+    do: Map.put(acc, :scheduler_outcome, value)
+
   defp normalize_field({:component_kind, value}, acc)
        when is_atom(value) and not is_nil(value),
        do: Map.put(acc, :component_kind, value)
@@ -215,16 +226,6 @@ defmodule Jido.Telemetry.Semantic do
   defp normalize_field({:error_code, value}, acc) when is_atom(value) do
     if value in Error.stable_codes(), do: Map.put(acc, :error_code, value), else: acc
   end
-
-  defp normalize_field({:jido_instance, value}, acc)
-       when is_atom(value) and not is_nil(value),
-       do: Map.put(acc, :jido_instance, value)
-
-  defp normalize_field({:partition, value}, acc) when is_atom(value) or is_integer(value),
-    do: Map.put(acc, :partition, value)
-
-  defp normalize_field({:partition, value}, acc),
-    do: put_bounded_string(acc, :partition, value, 128)
 
   defp normalize_field(_field, acc), do: acc
 
@@ -237,4 +238,35 @@ defmodule Jido.Telemetry.Semantic do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp log_scope(%{jido_instance: instance}) when is_atom(instance) and not is_nil(instance),
+    do: instance
+
+  defp log_scope(_metadata), do: nil
+
+  defp valid_trace(%{traceparent: traceparent} = trace) when is_binary(traceparent), do: trace
+  defp valid_trace(_trace), do: nil
+
+  defp emit_normalized(event, measurements, metadata, nil) do
+    :telemetry.execute(event, measurements, metadata)
+    :ok
+  catch
+    _, _ -> :ok
+  end
+
+  defp emit_normalized(event, measurements, metadata, log_scope) do
+    previous = Process.get(@log_scope_key)
+    Process.put(@log_scope_key, log_scope)
+
+    try do
+      :telemetry.execute(event, measurements, metadata)
+      :ok
+    after
+      if previous,
+        do: Process.put(@log_scope_key, previous),
+        else: Process.delete(@log_scope_key)
+    end
+  catch
+    _, _ -> :ok
+  end
 end

@@ -1,34 +1,37 @@
-# FA-01: Route precedence and fixed selection
+# 99_09 Route Selection
 
-Status: **Core feature available**.
+Status: implemented routing contract; candidate for the stable basic section.
 
-Result on 2026-09-09: **4 passing checks.** All checks are enabled.
+Three Agent definitions compare one route, wildcard fallback, and fixed exact
+selection in direct and live execution.
 
-## Feature and proof
+## What this proves
 
-A single route works in direct and live execution. The fallback handles an
-unrelated Signal. An exact route wins before wildcard routes. The source Signal
-fixes the executable for direct and live evaluation.
+- Router precedence selects an exact route before matching wildcards.
+- The source Signal fixes the executable for the complete evaluation.
 
-## Implemented contract
+## Read the code
 
-Select the first route by Router precedence from the source Signal. Keep that
-executable fixed through execution.
+Read [the three Agent definitions and shared Action](route_selection.ex).
 
-## Scope
-
-The probe uses three explicit Agent DSL definitions and `cmd/3`. Route defaults
-are declared in the DSL. It does not replace routing with an example-owned
-dispatcher.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_09_route_selection --include example --seed 0
 ```
 
-This command must pass with no skipped check.
+Expected result: direct and live execution select the same handler, exact routes
+win, and unrelated input reaches the fallback.
 
-[Source](route_selection.ex) · [Tests](../../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)
+## Gap and limits
+
+The public contract exists. Promote the smallest useful route-precedence lesson
+to `01_basic`, then remove this research copy. This probe does not define an
+application-owned dispatcher.
+
+## Files
+
+- [Source](route_selection.ex)
+- [Tests](../../../test/examples/99_research/99_09_route_selection/route_selection_test.exs)
+
+Previous: [Indeterminate Write](../99_08_indeterminate_write/README.md) | Next: [Plugin Isolation](../99_10_plugin_isolation/README.md)

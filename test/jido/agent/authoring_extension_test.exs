@@ -163,6 +163,9 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                     ) do
             use Jido.Agent, name: "unknown_route_target", extensions: [Labels]
 
+            agent do
+            end
+
             routes do
               route "unknown", unknown: Add
             end
@@ -203,6 +206,9 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
                                      )
                                    ) do
                            use Jido.Agent, name: "invalid_route_target", extensions: [Labels]
+
+                           agent do
+                           end
 
                            routes do
                              unquote(routes)

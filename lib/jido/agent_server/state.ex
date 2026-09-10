@@ -7,6 +7,9 @@ defmodule Jido.AgentServer.State do
               agent: Zoi.any(description: "Live immutable Agent value"),
               plugin_specs: Zoi.list(Zoi.any(), description: "Validated Agent Plugin specs"),
               jido: Zoi.any(description: "Owning Jido instance") |> Zoi.optional(),
+              agent_namespace:
+                Zoi.string(description: "Cached public Agent namespace")
+                |> Zoi.optional(),
               partition: Zoi.any(description: "Logical Agent partition") |> Zoi.optional(),
               registry: Zoi.any(description: "Jido instance Registry") |> Zoi.optional(),
               registered?:

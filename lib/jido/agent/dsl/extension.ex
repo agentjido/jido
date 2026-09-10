@@ -48,7 +48,8 @@ defmodule Jido.Agent.DSL.Extension do
     name: :agent,
     patchable?: true,
     schema: [schema: [type: :any], metadata: [type: :map]],
-    entities: [@plugin]
+    entities: [@plugin],
+    after_define: {__MODULE__, :mark_agent_block}
   }
   @routes %Spark.Dsl.Section{
     name: :routes,
@@ -56,6 +57,13 @@ defmodule Jido.Agent.DSL.Extension do
     imports: [Jido.Agent.DSL.Macros],
     entities: [@route]
   }
+
+  @doc false
+  def mark_agent_block do
+    quote generated: true do
+      Jido.Agent.DSL.Compiler.register_agent_block!(__MODULE__)
+    end
+  end
 
   use Spark.Dsl.Extension, sections: [@agent, @routes]
 end

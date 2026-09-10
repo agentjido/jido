@@ -6,7 +6,7 @@ defmodule Jido.Telemetry.Topology do
   @prefix [:jido, :topology, :operation]
 
   @doc false
-  def start(operation, state) when operation in [:activate, :repair, :cleanup] do
+  def start(operation, state) when operation in [:activate, :repair, :update, :place, :cleanup] do
     Semantic.start(@prefix, metadata(operation, state), component_measurements(state))
   end
 

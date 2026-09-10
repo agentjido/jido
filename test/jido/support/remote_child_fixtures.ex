@@ -21,6 +21,9 @@ end
 defmodule JidoTest.RemoteChildFixtures.Parent do
   use Jido.Agent, name: "test_remote_parent"
 
+  agent do
+  end
+
   routes do
     route "test.remote.directive", JidoTest.RemoteChildFixtures.Apply
     route "jido.agent.child.*", Jido.Examples.Support.KeepState
@@ -30,8 +33,49 @@ end
 defmodule JidoTest.RemoteChildFixtures.Child do
   use Jido.Agent, name: "test_remote_child"
 
+  agent do
+  end
+
   routes do
     route "test.remote.hold", JidoTest.RemoteChildFixtures.Hold
+  end
+end
+
+defmodule JidoTest.RemoteChildFixtures.LifecycleParent do
+  use Jido.Agent, name: "test_remote_lifecycle_parent"
+
+  agent do
+    schema Zoi.object(%{observations: Zoi.list(Zoi.map()) |> Zoi.default([])})
+  end
+
+  routes do
+    signal_source "/test/remote/lifecycle"
+
+    route "test.remote.create_worker" do
+      action input,
+        schema: Zoi.object(%{target_node: Zoi.atom(), worker_module: Zoi.module()}),
+        context: context do
+        directive =
+          Jido.Agent.Directive.spawn_child(input.worker_module, :worker,
+            node: input.target_node,
+            restart: :temporary
+          )
+
+        {:ok, context.agent_state, [directive]}
+      end
+
+      define :create_worker, args: [:target_node, :worker_module]
+    end
+
+    route "jido.agent.child.exit" do
+      action input, context: context do
+        observation = if input.reason == :noconnection, do: :unreachable, else: :exited
+        event = %{child_id: input.child_id, observation: observation, reason: input.reason}
+        {:ok, %{context.agent_state | observations: context.agent_state.observations ++ [event]}}
+      end
+    end
+
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
   end
 end
 

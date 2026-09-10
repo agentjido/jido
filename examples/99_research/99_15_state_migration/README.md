@@ -1,28 +1,36 @@
-# UP-02: State migration
+# 99_15 State Migration
 
-All four tests pass.
+Status: implemented upgrade contract; awaiting stable upgrade guidance.
 
-A wallet and its owned audit state migrate in one live commit when the static schema accepts both formats. Invalid target data preserves the whole old snapshot. The migration survives saved-state recovery and an upgrade ID prevents a repeated transformation.
+A live Agent migrates domain and Plugin-owned state as one validated commit.
 
-## Implemented core feature
+## What this proves
 
-A strict old schema rejects the new state format. The explicit Agent Server
-upgrade operation installs a target definition only after the target validates
-the complete migrated state. Ordinary Turn validation stays unchanged.
+- A compatible schema supports an idempotent migration through a normal Turn.
+- An explicit upgrade validates complete migrated state against a new definition.
 
-## Run
+## Read the code
+
+Read [the schemas, Plugin, migration Action, and Agent definitions](state_migration.ex).
+The named migration Action is shared by all three definitions.
+
+## Run it
 
 ```sh
-mix test test/examples/99_research/99_15_state_migration --include example --seed 0 --trace
+mix test test/examples/99_research/99_15_state_migration --include example --seed 0
 ```
 
-All assertions are enabled. Current startup and ordinary Turn APIs retain their
-existing contracts.
+Expected result: valid state migrates once and survives restore, while invalid
+target data leaves the complete old snapshot unchanged.
 
-## Scope
+## Gap and limits
 
-The compatible path remains an application migration with a predeclared
-schema. The strict path replaces the Agent definition but keeps the same Agent
-identity and Plugin declarations. It does not replace Plugin runtime structure.
+The strict upgrade keeps Agent identity and Plugin declarations fixed. It does
+not replace Plugin runtime structure or coordinate a distributed deployment.
 
-[Source](state_migration.ex) · [Tests](../../../test/examples/99_research/99_15_state_migration/state_migration_test.exs)
+## Files
+
+- [Source](state_migration.ex)
+- [Tests](../../../test/examples/99_research/99_15_state_migration/state_migration_test.exs)
+
+Previous: [Turn Upgrade](../99_14_turn_upgrade/README.md) | Next: [Topology Upgrade](../99_16_topology_upgrade/README.md)

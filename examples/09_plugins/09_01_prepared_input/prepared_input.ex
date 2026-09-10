@@ -50,7 +50,7 @@ defmodule Jido.Examples.Plugins.PreparedInput.Agent do
 
     route "examples.plugins.prepared_input.accept" do
       action _input, schema: Zoi.object(%{}), context: context do
-        prepared = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin]
+        prepared = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin].prepared
 
         {:ok,
          %{

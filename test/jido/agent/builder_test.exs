@@ -76,7 +76,5 @@ defmodule Jido.Agent.BuilderTest do
     builder = Builder.new(name: "valid") |> Builder.plugin(String)
     assert {:error, error} = Builder.build(builder)
     assert error.message == "Agent Plugin must use Jido.Plugin"
-    valid = Builder.new(name: "valid")
-    assert {:ok, ^valid} = Zoi.parse(Builder.schema(), valid)
   end
 end

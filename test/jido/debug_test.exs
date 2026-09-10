@@ -130,49 +130,25 @@ defmodule JidoTest.DebugTest do
     end
   end
 
-  describe "maybe_enable_from_config/2" do
-    test "enables when config has debug: true" do
-      Application.put_env(:jido_test, @test_instance, debug: true)
-
-      Debug.maybe_enable_from_config(:jido_test, @test_instance)
+  describe "configure/2" do
+    test "enables true as normal debug" do
+      Debug.configure(@test_instance, true)
       assert Debug.level(@test_instance) == :on
-
-      Application.delete_env(:jido_test, @test_instance)
     end
 
-    test "enables verbose when config has debug: :verbose" do
-      Application.put_env(:jido_test, @test_instance, debug: :verbose)
-
-      Debug.maybe_enable_from_config(:jido_test, @test_instance)
+    test "enables :verbose" do
+      Debug.configure(@test_instance, :verbose)
       assert Debug.level(@test_instance) == :verbose
-
-      Application.delete_env(:jido_test, @test_instance)
     end
 
-    test "does nothing when no debug config" do
-      Application.put_env(:jido_test, @test_instance, [])
-
-      Debug.maybe_enable_from_config(:jido_test, @test_instance)
+    test "keeps debug off for false" do
+      Debug.configure(@test_instance, false)
       assert Debug.level(@test_instance) == :off
-
-      Application.delete_env(:jido_test, @test_instance)
     end
 
-    test "disables stale runtime override when debug config is absent" do
+    test "disables a stale override when debug is absent" do
       Debug.enable(@test_instance, :on)
-      Application.put_env(:jido_test, @test_instance, [])
-
-      Debug.maybe_enable_from_config(:jido_test, @test_instance)
-      assert Debug.level(@test_instance) == :off
-
-      Application.delete_env(:jido_test, @test_instance)
-    end
-
-    test "malformed instance configuration disables stale runtime state" do
-      Debug.enable(@test_instance, :on)
-      Application.put_env(:jido_test, @test_instance, :invalid_container)
-
-      assert Debug.maybe_enable_from_config(:jido_test, @test_instance) == :ok
+      Debug.configure(@test_instance, nil)
       assert Debug.level(@test_instance) == :off
     end
   end

@@ -9,7 +9,8 @@ authoring form that makes the system definition clear.
 builder =
   Jido.Topology.Builder.new(name: "built_system")
   |> Jido.Topology.Builder.agent(:leader, MyApp.Cell,
-    initial_state: %{label: "leader"}
+    initial_state: %{label: "leader"},
+    node: node()
   )
   |> Jido.Topology.Builder.group(:workers, MyApp.Cell, count: 3)
   |> Jido.Topology.Builder.owns(:leader, :workers)
@@ -19,6 +20,9 @@ builder =
 ```
 
 The Builder keeps its first error. Check the final result.
+
+The `node:` option is an exact Erlang node. It can also be a topology input or
+member reference. The default is the Controller node.
 
 ## Encode Static Composition
 
@@ -31,7 +35,10 @@ json = JSON.encode!(document)
 The document contains static topology data. It does not contain instance input,
 an expanded plan, PIDs, Agent state, runtime status, or completed work.
 
-Use stable IDs in a trusted `Jido.Agent.Codec.Registry` for stored documents.
+The current V3 Topology document version is 2. The Codec does not decode
+version-1 Topology documents.
+
+Use stable IDs in a trusted `Jido.Codec.Registry` for stored documents.
 Document strings cannot create atoms or derive module names.
 
 ## Include Reusable Topologies

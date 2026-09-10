@@ -16,7 +16,7 @@ defmodule Jido.Agent.Codec do
         id: agent.id, state: agent.state)
 
   Generated Registry IDs are for temporary transport and tests. Supply a
-  `Jido.Agent.Codec.Registry` with stable application IDs for stored documents.
+  `Jido.Codec.Registry` with stable application IDs for stored documents.
   This is authoring serialization, not an Agent checkpoint or effect journal.
   Documents are limited to 100 nested levels, 100000 nodes, 10000 entries per
   collection, and 1 MiB per string.
@@ -28,7 +28,8 @@ defmodule Jido.Agent.Codec do
   """
   alias Jido.Agent
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec.{Data, Registry}
+  alias Jido.Agent.Codec.Deriver
+  alias Jido.Codec.{Data, Registry}
 
   @fields ~w(type version module vsn name description schema metadata plugins routes)
 
@@ -39,7 +40,7 @@ defmodule Jido.Agent.Codec do
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(agent) do
     with {:ok, definition} <- neutral_definition(agent),
-         {:ok, registry} <- Jido.Agent.Codec.Deriver.agent(definition),
+         {:ok, registry} <- Deriver.agent(definition),
          {:ok, document} <- encode_validated(definition, registry),
          do: {:ok, document, registry}
   end

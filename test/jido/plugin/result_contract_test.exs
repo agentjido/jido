@@ -69,19 +69,26 @@ defmodule Jido.Plugin.ResultContractTest do
                {:ok, Command.put_plugin_input(current, CallbackPlugin, %{value: self()})}
              end)
 
-    assert admitted.plugin_inputs == %{CallbackPlugin => %{value: self()}}
+    assert admitted.plugin_inputs == %{
+             CallbackPlugin => %Jido.Plugin.Input{runtime: %{value: self()}}
+           }
   end
 
   test "admit cannot change the Signal, caller context, or a foreign input" do
-    command = %{command() | plugin_inputs: %{__MODULE__ => :original}}
+    command = %{
+      command()
+      | plugin_inputs: %{__MODULE__ => %Jido.Plugin.Input{runtime: :original}}
+    }
 
     changes = [
       {%{command | signal: %{command.signal | data: %{changed: true}}},
        "Agent Plugin cannot change the Signal"},
       {%{command | context: %{request: :changed}},
        "Agent Plugin cannot change the caller context"},
-      {%{command | plugin_inputs: %{__MODULE__ => :changed}},
-       "Agent Plugin cannot change another Plugin's input"}
+      {%{
+         command
+         | plugin_inputs: %{__MODULE__ => %Jido.Plugin.Input{runtime: :changed}}
+       }, "Agent Plugin cannot change another Plugin's input"}
     ]
 
     for {changed, message} <- changes do

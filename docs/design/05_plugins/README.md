@@ -12,19 +12,19 @@ A Plugin package can select four owner facets:
 | Topology | `Jido.Topology.Plugin` | Add static Topology entries |
 
 Before selection, an Agent Plugin can reject or return one portable input under
-its package key. After an Action or Flow succeeds, the pipeline protects
-Plugin-owned state, validates Directives, and calls each `update_state/3`
-callback in declaration order.
+its package `prepared` slot. After an Action or Flow succeeds, the pipeline
+protects Plugin-owned state, validates each Directive once, and calls each
+`reduce/2` callback in declaration order.
 
 Agent Plugins cannot change Signals, caller context, Agents, routes, or another
-package's input. Agent Server Plugins can replace only their own live input.
-Actions and Flows own domain calculations and produce the complete Directive
-list.
+package's input. Agent Server Plugins receive a read-only admission value and
+can return only their own `runtime` input. Actions and Flows own domain
+calculations and produce the complete Directive list.
 
 ## Current state
 
 - Narrow pure preparation and the post-execution Agent Plugin pipeline are implemented.
-- The pipeline has one internal `run/3` entry point.
+- The evaluator uses one internal `run/5` entry point.
 - Plugin state remains in the complete `Agent.state` map.
 - Agent Server, Persistence, and Topology facets keep their existing owner
   contracts.

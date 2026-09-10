@@ -19,18 +19,14 @@ defmodule Jido.Agent.Builder do
   alias Jido.Agent
   alias Jido.Agent.Authoring
 
-  @schema Zoi.struct(__MODULE__, %{
-            config: Zoi.map(),
-            reversed_routes: Zoi.list(Zoi.any()) |> Zoi.default([]),
-            error: Zoi.any() |> Zoi.nullable()
-          })
-  @opaque t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
+  @opaque t :: %__MODULE__{
+            config: map(),
+            reversed_routes: [Jido.Signal.Router.Route.t()],
+            error: Exception.t() | nil
+          }
 
-  @doc "Returns the Builder schema."
-  @spec schema() :: Zoi.schema()
-  def schema, do: @schema
+  @enforce_keys [:config, :error]
+  defstruct [:config, :error, reversed_routes: []]
 
   @doc "Starts a Builder with static Agent fields or an Agent module."
   @spec new(map() | keyword() | module()) :: t()

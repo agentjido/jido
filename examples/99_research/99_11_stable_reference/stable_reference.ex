@@ -7,11 +7,10 @@ defmodule Jido.Examples.StableReference.Conversation do
   end
 
   routes do
-    signal_source "/examples/stable-reference"
+    signal_source "/examples/research/stable_reference"
 
-    route "conversation.append" do
+    route "examples.research.stable_reference.conversation.append" do
       action %{text: text},
-        name: "research_append",
         schema: Zoi.object(%{text: Zoi.string()}),
         context: context do
         {:ok, %{context.agent_state | messages: context.agent_state.messages ++ [text]}}
@@ -37,7 +36,11 @@ defmodule Jido.Examples.StableReference do
           {:ok, Jido.Agent.t()} | {:error, term()}
   def append(%Ref{} = ref, instance, text) when is_atom(instance) do
     signal =
-      Signal.new!("conversation.append", %{text: text}, source: "/examples/stable-reference")
+      Signal.new!(
+        "examples.research.stable_reference.conversation.append",
+        %{text: text},
+        source: "/examples/research/stable_reference"
+      )
 
     Jido.call(instance, ref, signal)
   end

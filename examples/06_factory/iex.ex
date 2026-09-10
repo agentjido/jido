@@ -208,8 +208,7 @@ defmodule Jido.Examples.Factory.IEx do
     with {:ok, pid} <- Jido.start_agent(jido, Owner, id: id) do
       case Owner.boot(pid, mode) do
         {:ok, _} ->
-          # The next turn starts after the boot turn's Directives finish.
-          with {:ok, _} <- Owner.ready(pid),
+          with :ok <- await_agent(jido, "#{id}/factory", 5_000),
                {:ok, _} <- Tools.command(jido, "#{id}/factory", :status, "startup", "", "") do
             {:ok, pid}
           else
@@ -222,6 +221,28 @@ defmodule Jido.Examples.Factory.IEx do
           Jido.stop_agent(jido, pid)
           {:error, reason}
       end
+    end
+  end
+
+  defp await_agent(jido, id, timeout) do
+    deadline = System.monotonic_time(:millisecond) + timeout
+    await_agent_until(jido, id, deadline)
+  end
+
+  defp await_agent_until(jido, id, deadline) do
+    case Jido.whereis_agent(jido, id) do
+      pid when is_pid(pid) ->
+        :ok
+
+      nil ->
+        if System.monotonic_time(:millisecond) >= deadline do
+          {:error, :factory_start_timeout}
+        else
+          receive do
+          after
+            10 -> await_agent_until(jido, id, deadline)
+          end
+        end
     end
   end
 end

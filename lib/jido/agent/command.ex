@@ -2,36 +2,28 @@ defmodule Jido.Agent.Command do
   @moduledoc """
   The live Agent Server admission envelope.
 
-  Agent Plugin preparation stores package-owned input in `plugin_inputs`.
-  Agent Server Plugin admission can reject the Command or replace only its own
-  package input. Plugins cannot change the Agent, Signal, or caller context.
+  Agent Plugin preparation stores package-owned values in the `prepared` input
+  slot. Agent Server Plugin admission can reject the Command or fill only its
+  package `runtime` slot. Plugins cannot change the Agent, Signal, caller
+  context, or the other facet's input.
   Direct `Jido.Agent.cmd/3` evaluation does not allocate a Command.
   """
 
   alias Jido.Agent
   alias Jido.Error
+  alias Jido.Plugin.Input
   alias Jido.Signal
   alias Jido.Signal.Context, as: SignalContext
 
-  @schema Zoi.struct(
-            __MODULE__,
-            %{
-              agent: Zoi.any(description: "Current immutable Agent value"),
-              signal: Zoi.any(description: "Signal for this command"),
-              context: Zoi.map(description: "Caller execution context") |> Zoi.default(%{}),
-              plugin_inputs:
-                Zoi.map(description: "Package-owned prepared execution inputs")
-                |> Zoi.default(%{})
-            }
-          )
+  @type t :: %__MODULE__{
+          agent: Agent.instance(),
+          signal: Signal.t(),
+          context: map(),
+          plugin_inputs: %{optional(module()) => Input.t()}
+        }
 
-  @type t :: unquote(Zoi.type_spec(@schema))
-  @enforce_keys Zoi.Struct.enforce_keys(@schema)
-  defstruct Zoi.Struct.struct_fields(@schema)
-
-  @doc "Returns the data schema for an Agent command."
-  @spec schema() :: Zoi.schema()
-  def schema, do: @schema
+  @enforce_keys [:agent, :signal]
+  defstruct [:agent, :signal, context: %{}, plugin_inputs: %{}]
 
   @doc "Creates one validated Agent command."
   @spec new(Jido.Agent.instance(), Jido.Signal.t(), map()) ::
@@ -68,11 +60,19 @@ defmodule Jido.Agent.Command do
 
   def validate(value), do: invalid("Expected a Jido.Agent.Command value", %{value: value})
 
-  @doc "Stores one package-owned input in a live command."
+  @doc false
   @spec put_plugin_input(t(), module(), term()) :: t()
   def put_plugin_input(%__MODULE__{} = command, plugin, input)
       when is_atom(plugin) and not is_nil(plugin) do
-    %{command | plugin_inputs: Map.put(command.plugin_inputs, plugin, input)}
+    put_plugin_runtime_input(command, plugin, input)
+  end
+
+  @doc false
+  @spec put_plugin_runtime_input(t(), module(), term()) :: t()
+  def put_plugin_runtime_input(%__MODULE__{} = command, plugin, input)
+      when is_atom(plugin) and not is_nil(plugin) do
+    package_input = command.plugin_inputs |> Map.get(plugin, %Input{}) |> Input.put_runtime(input)
+    %{command | plugin_inputs: Map.put(command.plugin_inputs, plugin, package_input)}
   end
 
   @doc false
@@ -120,9 +120,24 @@ defmodule Jido.Agent.Command do
   end
 
   defp validate_plugin_inputs(inputs) when is_map(inputs) and not is_struct(inputs) do
-    case Enum.find(Map.keys(inputs), &(not is_atom(&1) or is_nil(&1))) do
-      nil -> :ok
-      key -> invalid("Agent command Plugin input key must be a module", %{key: key})
+    invalid_entry =
+      Enum.find(inputs, fn
+        {key, %Input{}} -> not is_atom(key) or is_nil(key)
+        {_key, _input} -> true
+      end)
+
+    case invalid_entry do
+      nil ->
+        :ok
+
+      {key, %Input{}} ->
+        invalid("Agent command Plugin input key must be a module", %{key: key})
+
+      {key, input} ->
+        invalid("Agent command Plugin input must use Jido.Plugin.Input", %{
+          key: key,
+          input: input
+        })
     end
   end
 

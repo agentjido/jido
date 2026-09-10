@@ -10,6 +10,7 @@ pure preparation, add live admission, and then compose both forms.
 3. [Identity](09_03_identity/README.md) — combine pure signature verification with live replay protection.
 4. [Secure Signal](09_04_secure_signal/README.md) — decrypt ciphertext into a package input and preserve the incoming Signal.
 5. [Composition](09_05_composition/README.md) — use independent pure and live package inputs in one Agent.
+6. [State Middleware](09_06_state_middleware/README.md) — read complete Turn state and reduce only one owned field.
 
 ## Run the section
 
@@ -29,7 +30,9 @@ mix test test/examples/09_plugins --include example --seed 0
 ## Contract summary
 
 - `Jido.Agent.Plugin.prepare/2` can reject or return one portable input.
-- `Jido.AgentServer.Plugin.admit/3` can reject or replace only its package input.
+- `Jido.AgentServer.Plugin.admit/3` can reject or return one transient runtime input.
+- `Jido.Agent.Plugin.reduce/2` can read the complete candidate and return only its owned state value.
 - Neither callback can change the Agent, incoming Signal, caller context, route, or another package input.
 - Direct `Jido.Agent.cmd/3` runs pure preparation but not live admission.
-- Actions and Flows read prepared values from `context.plugin_inputs`.
+- Actions and Flows read `context.plugin_inputs[Package].prepared` and
+  `context.plugin_inputs[Package].runtime`.

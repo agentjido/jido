@@ -134,6 +134,7 @@ defmodule JidoTest.InstanceRefTest do
           [name: name, unknown: true],
           [name: name, namespace: ""],
           [name: name, max_tasks: -1],
+          [name: name, debug: :invalid],
           [name: name, persistence: :not_an_adapter]
         ] do
       assert {:error, %Error.ValidationError{} = error} = Jido.start_link(opts)

@@ -79,7 +79,7 @@ Jido supervisor.
 | `await/3`, `await_all/3`, `await_any/3`, `await_child/4` | `Jido.AgentServer.call/3`, `send_request/3`, `receive_response/2`, and application coordination | A successful call waits for one commit. `await_ready/2` only waits for Plugin runtime readiness. |
 | `cancel/2` | `Jido.AgentServer.cancel/2` or `cancel_turn/3` | Use the stable Turn ID when cancellation must not affect a later Turn. |
 | `get_child/2`, `get_children/1` | `Jido.AgentServer.children/2` | The public result is a view. Do not depend on private child records. |
-| `list_actions/1`, `list_plugins/1`, `list_sensors/1`, `list_demos/1`, the matching `get_*_by_slug/1` calls, and `refresh_discovery/0` | Explicit module references and `Jido.Agent.Codec.Registry` | V3 does not scan and publish an application catalog. |
+| `list_actions/1`, `list_plugins/1`, `list_sensors/1`, `list_demos/1`, the matching `get_*_by_slug/1` calls, and `refresh_discovery/0` | Explicit module references and `Jido.Codec.Registry` | V3 does not scan and publish an application catalog. |
 | `default_instance/0`, `generate_id/0`, `debug/0..2` | Same names | These calls remain. Use public Agent constructors instead of assigning generated IDs by hand when possible. |
 
 ## Map Agent modules and generated functions
@@ -153,8 +153,8 @@ identity and state.
 | --- | --- | --- |
 | `Jido.Agent.Builder` | Builds definitions and instances in ordered programmatic steps. | Use it when the definition comes from application data rather than one module. |
 | `Jido.Agent.Codec` | Encodes and decodes versioned authoring documents. | Use it for trusted Agent definition transport, not for Agent checkpoints. |
-| `Jido.Agent.Codec.Registry` | Maps stable trusted IDs to modules, schemas, values, and executables. | Use explicit allowlists where V2 used Discovery or dynamic module names. |
-| `Jido.Agent.Command` | Carries the Agent, Signal, and caller context through live admission. | Agent Server `admit/3` uses Command. Direct `cmd/3` does not create one. Do not store it as Agent state. |
+| `Jido.Codec.Registry` | Maps stable trusted IDs to modules, schemas, values, and executables for all authoring Codecs. | Use explicit allowlists where V2 used Discovery or dynamic module names. |
+| `Jido.Agent.Command` | Carries the Agent, Signal, caller context, and isolated Plugin inputs through live admission. | Agent Server owns this envelope. Plugin `admit/3` receives a bounded `Jido.AgentServer.Plugin.Admission` value. Direct `cmd/3` does not create a Command. |
 | `Jido.Agent.Extension` | Lowers extra declarative Agent DSL entities into Core configuration. | Use it for static authoring extensions. It does not add a runtime. |
 | `Jido.Agent.Turn` | Declares one selected executable, its input, and the unchanged source Signal. | Most applications observe it through the Server, not by constructing it. |
 | `Jido.Agent.Turn.Outcome` | Gives one stable terminal Turn result. | The Agent Server produces it for error policy and observation code. It has no public authoring API and is not domain history. |
@@ -291,14 +291,14 @@ needs them.
 | `mount/2` | Static defaults in Agent-facet `state_spec/1`; live setup in Agent-Server-facet `child_spec/1` |
 | `handle_signal/2` | Action or Flow logic, Agent-Server-facet `admit/3`, or explicit Agent routing |
 | `prepare_signal/2` | Action or Flow input handling; Agent-Server-facet `admit/3` for live checks |
-| `prepare_action/3` | Action or Flow input handling, or Agent-Server-facet `admit/3` with Command |
+| `prepare_action/3` | Action or Flow input handling, or Agent-Server-facet `admit/3` with a read-only Admission value |
 | `prepare_emit/2` | Agent-Server-facet `prepare_dispatch/4` with `Jido.Plugin.SignalContext` |
-| `transform_result/3` | Domain change in the Action or Flow; Plugin-owned field change in Agent-facet `update_state/3` |
+| `transform_result/3` | Domain change in the Action or Flow; Plugin-owned field change in Agent-facet `reduce/2` |
 | `subscriptions/2` | `Jido.Plugin.Bus` or `Jido.Plugin.SensorManager` |
 | `signal_routes/1` | Agent routes |
 | `on_checkpoint/2`, `on_restore/2` | Persistence-facet `dump/3` and `load/3` for one paired owned value; runtime reconstruction stays in the Agent Server facet |
 | `child_spec/1` with V2 config | Agent-Server-facet `child_spec/1` with `Jido.Plugin.Init` |
-| Custom `DirectiveExec` | Agent-facet `directives/1` and `validate_directive/2`; Agent-Server-facet `dispatch/4` |
+| Custom `DirectiveExec` | Directive-module `validate/1`, Agent-facet `directives/1`, and Agent-Server-facet `dispatch/4` |
 
 ### V2 Plugin support modules
 
@@ -316,18 +316,18 @@ needs them.
 
 | V3 module | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Owns one state value and validates and reduces owned Directives. |
+| `Jido.Agent.Plugin` | Prepares pure input and reduces one owned state value after Directive validation. |
 | `Jido.AgentServer.Plugin` | Owns live admission, runtime lifecycle callbacks, outbound preparation, and post-commit dispatch. |
 | `Jido.Persistence.Plugin` | Converts one paired owned-state value without storage or commit authority. |
 | `Jido.Persistence.Plugin.Context` | Gives a Persistence facet package and record versions, direction, and reason. |
 | `Jido.Topology.Plugin` | Contributes bounded canonical static Topology entries. |
 | `Jido.Topology.Plugin.Context` | Gives a Topology facet package version and static Agent identity. |
-| `Jido.Topology.Plugin.Contribution` | Holds current canonical Bus resources, ownership relationships, and Bus subscriptions. |
+| `Jido.Topology.Plugin.Contribution` | Holds current canonical Bus resources, ownership relationships, and Bus subscriptions. Bus is the first core resource type. |
 | `Jido.Plugin.Manifest` | Selects owner facets and maps common static options. |
 | `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, and declared options. It is not a state snapshot. |
 | `Jido.Plugin.SignalContext` | Gives outbound Signal preparation a bounded context. |
 | `Jido.Plugin.DirectiveContext` | Gives post-commit Plugin dispatch the value of its owned Agent state field. |
-| `Jido.Plugin.Codec` | Encodes Plugin declarations through the trusted Agent codec Registry. |
+| `Jido.Plugin.Codec` | Encodes Plugin declarations through the shared trusted Codec Registry. |
 | `Jido.Plugin.Audit` | Commits selected domain audit records in Plugin-owned state. |
 | `Jido.Plugin.Audit.Record` | Holds one portable audit record. |
 | `Jido.Plugin.Dispatch` | Owns explicit post-commit Signal delivery. |
@@ -358,7 +358,7 @@ definition while it runs.
 | --- | --- |
 | `Jido.Pod` | `Jido.Topology` plus `Jido.Topology.Controller` for static startup and repair. Use an application controller for dynamic membership. |
 | `Jido.Pod.Plugin` | Topology ownership declarations or a custom V3 Plugin. |
-| `Jido.Pod.Topology` | `Jido.Topology` for declarations and `Jido.Topology.Plan` for the expanded local plan. |
+| `Jido.Pod.Topology` | `Jido.Topology` for declarations and `Jido.Topology.Plan` for the expanded plan. |
 | `Jido.Pod.Topology.Node` | An Agent or group declaration in `Jido.Topology`. |
 | `Jido.Pod.Topology.Link` | An ownership, subscription, import, or export declaration. Select the exact relationship. |
 | `Jido.Pod.Mutation` | **Removed.** V3 has no live definition update contract. |
@@ -376,11 +376,12 @@ definition while it runs.
 | `Jido.Topology` | Declares Agents, groups, Buses, ownership, connections, imports, exports, and startup policy. |
 | `Jido.Topology.Builder` | Builds the same declaration through programmatic steps. |
 | `Jido.Topology.Codec` | Encodes and decodes trusted topology authoring documents. |
-| `Jido.Topology.Instance` | Holds validated topology input and one local plan. |
-| `Jido.Topology.Plan` | Holds stable IDs, dependency layers, and expanded local resources. |
+| `Jido.Topology.Instance` | Holds validated topology input and one plan. |
+| `Jido.Topology.Plan` | Holds stable IDs, exact nodes, dependency layers, and expanded resources. |
 | `Jido.Topology.Ref` | Refers to one exported value from an included topology. |
 | `Jido.Topology.Reference` | Refers to topology input or one keyed group member. |
-| `Jido.Topology.Controller` | Starts and repairs one static topology on one local Jido instance. |
+| `Jido.Topology.Controller` | Starts and repairs one topology, emits lifecycle Signals, and applies exact known-node placement. |
+| `Jido.Topology.Signal` | Catalogs the bounded lifecycle Signal types sent to an optional control Agent. Each event is a custom Signal module under this namespace. |
 
 ## Replace Await, Scheduler, and Sensor modules
 
@@ -466,13 +467,13 @@ V3 adds these modules:
 | `Jido.Observe.NoopTracer` | **Removed.** The OpenTelemetry API is a no-op when no SDK tracer is active. |
 | `Jido.Observe.SpanCtx` | **Removed.** Jido keeps its private semantic span value. |
 | `Jido.Observe.EventContract` | **Removed.** Use the documented V3 event contract and tests. |
-| `Jido.Telemetry` | **Same name, changed events.** `span_agent_cmd/3`, `span_strategy/4`, old Agent Server events, and `legacy_metrics/0` are removed. Use the V3 lifecycle, Turn, commit, Directive, settlement, persistence, and Topology events. |
+| `Jido.Telemetry` | **Same name, changed events.** `span_agent_cmd/3`, `span_strategy/4`, old Agent Server events, and `legacy_metrics/0` are removed. Use the V3 lifecycle, Turn, commit, Directive, settlement, admission, persistence, Topology, and Scheduler events. |
 | `Jido.Telemetry.Config` | **Removed.** Use application configuration for semantic logs and the optional OpenTelemetry mapping. |
-| `Jido.Telemetry.Formatter` | **Retained call surface.** Its accepted V3 data shapes changed. |
-| `Jido.Telemetry.OpenTelemetry` | **Added.** It maps semantic events with the optional `opentelemetry_api` dependency. The host owns the SDK and export path. |
-| `Jido.Tracing.Context` | **Retained call surface.** It now captures and restores OpenTelemetry context when the optional integration is active. |
-| `Jido.Tracing.Trace` | **Retained call surface.** It now delegates more Signal trace work to the Signal contract. |
-| `Jido.Debug` | **Changed.** `:on` selects interesting semantic logs, `:verbose` selects all semantic logs, and redaction options are removed. |
+| `Jido.Telemetry.Formatter` | **Removed.** Semantic log formatting is private. |
+| <code>Jido&#46;Telemetry&#46;OpenTelemetry</code> | **Private in V3.** Use `Jido.Telemetry.open_telemetry?/0`. The host owns the SDK and export path. |
+| <code>Jido&#46;Tracing&#46;Context</code> | **Private in V3.** Jido-owned runtime boundaries transfer process context. |
+| <code>Jido&#46;Tracing&#46;Trace</code> | **Private in V3.** Use `Jido.Signal.Trace` for the portable W3C carrier. |
+| <code>Jido&#46;Debug</code> | **Private in V3.** Use generated instance `debug/0`, `debug/1`, and `debug_status/0` functions. Use the explicit Agent Server or Ref debug-history functions for one Agent. |
 
 ### Errors and utility modules
 
@@ -487,7 +488,7 @@ V3 adds these modules:
 | `Jido.Error.ValidationError` | **Retained type.** Zoi now supplies schema issues. |
 | `Jido.Config.Defaults` | **Removed.** Runtime modules own their defaults. `Jido.Telemetry` owns semantic log defaults. |
 | <code>Jido.RuntimeStore</code> | **Private in V3.** It is instance-local coordination state, not durable application storage. Use public instance and relationship functions. Do not copy its internal keys. |
-| `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Agent.Codec.Registry`. |
+| `Jido.Discovery` | **Removed.** Its catalog, list, slug lookup, refresh, timestamp, and asynchronous initialization functions have no Core V3 catalog. Use explicit modules and a trusted `Jido.Codec.Registry`. |
 | `Jido.Util` | **Retained call surface for internal support.** Prefer the domain modules that own validation, IDs, lookup, and executable resolution. |
 
 ## Remove installer and generator calls

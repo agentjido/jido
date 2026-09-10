@@ -3,7 +3,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   alias Jido.Agent
   alias Jido.Agent.{Builder, Codec}
-  alias Jido.Agent.Codec.Registry
+  alias Jido.Codec.Registry
   alias Jido.AgentServer, as: Server
 
   def stringify_count(value, _opts), do: Integer.to_string(value)
@@ -113,6 +113,9 @@ defmodule JidoTest.Agent.AuthoringTest do
 
   defmodule NamedAgent do
     use Jido.Agent, name: "named_agent"
+
+    agent do
+    end
 
     routes do
       signal_source "/named"
@@ -605,6 +608,12 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:ok, encoded, registry} = Jido.Plugin.Codec.encode(plugin)
     assert {:ok, ^plugin} = Jido.Plugin.Codec.decode(encoded, registry)
     assert {:error, _} = Jido.Plugin.Codec.decode(Map.put(encoded, "state", %{}), registry)
+    assert {module, _options} = plugin
+
+    assert registry.entries == %{
+             "plugin/0" => {:plugin, module},
+             "atom/1" => {:atom, :initial}
+           }
   end
 
   test "trusted aliases decode and re-encode with the canonical identifier" do
@@ -677,7 +686,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "decoded map aliases reject duplicates after all entries decode" do
-    alias Jido.Agent.Codec.Data
+    alias Jido.Codec.Data
 
     registry = Registry.new!(%{"key" => {:atom, :key}, "alias" => {:alias, "key"}})
     key = %{"$type" => "atom", "id" => "key"}
@@ -850,6 +859,20 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
   end
 
+  test "routes require an explicit agent block" do
+    assert_raise CompileError, ~r/agent block is required/i, fn ->
+      compile_isolated("""
+      defmodule JidoTest.RouteWithoutAgent#{System.unique_integer([:positive])} do
+        use Jido.Agent, name: "route_without_agent"
+
+        routes do
+          route "test.add", JidoTest.Agent.AuthoringTest.Add
+        end
+      end
+      """)
+    end
+  end
+
   test "removed route params and Plugin labels fail compilation" do
     assert_raise CompileError, ~r/params/, fn ->
       compile_agent("route \"test.add\", Add, params: %{amount: 1}")
@@ -903,12 +926,14 @@ defmodule JidoTest.Agent.AuthoringTest do
   defp compile_agent(routes, opts \\ "", extra \\ "", source? \\ true) do
     name = "JidoTest.GeneratedAgent#{System.unique_integer([:positive])}"
     source = if source?, do: "signal_source \"/test\"", else: ""
+    agent = if String.contains?(extra, "agent do"), do: "", else: "agent do\nend"
 
     compile_isolated("""
     defmodule #{name} do
         alias JidoTest.Agent.AuthoringTest.Add, warn: false
         alias JidoTest.Agent.AuthoringTest.ListInputs, warn: false
       use Jido.Agent, name: "compiled"#{opts}
+      #{agent}
       #{extra}
       routes do
         #{source}

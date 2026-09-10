@@ -1,6 +1,6 @@
 defmodule Jido.Examples.Topology.ComposedFormats do
   @moduledoc "Builder and JSON forms of the composed system, with stable Registry IDs."
-  alias Jido.Agent.Codec.Registry
+  alias Jido.Codec.Registry
   alias Jido.Examples.Topology.{Cell, ComposedSystem, WorkerTeam}
   alias Jido.Topology.{Builder, Codec, Ref, Reference}
 
@@ -44,7 +44,9 @@ defmodule Jido.Examples.Topology.ComposedFormats do
 
   @doc "Reads the checked-in composition document."
   def from_file do
-    document = __DIR__ |> Path.join("composed_system.json") |> File.read!() |> JSON.decode!()
+    document =
+      __DIR__ |> Path.join("fixtures/composed_system.json") |> File.read!() |> JSON.decode!()
+
     Codec.decode(document, registry())
   end
 end

@@ -1,29 +1,37 @@
-# UP-07: Topology upgrade
+# 99_16 Topology Upgrade
 
-All five tests pass.
+Status: additive local update implemented; broader rollout remains research.
 
-A pure Agent plan comparison finds additions, removals, changed definitions, and unchanged entries. The second worker definition changes real behavior. Invalid target validation has no live effects. Full controller replacement grows three workers to five and restores saved state, but replaces every PID.
+A Topology Controller adds local Agents while unchanged members keep their PIDs
+and state.
 
-## Implemented core feature
+## What this proves
 
-`Jido.Topology.Controller.update/3` accepts an additive local Agent target. It
-retains unchanged members and makes the new target authoritative for later
-repair passes.
+- Pure plan comparison identifies added, removed, changed, and unchanged Agents.
+- A validated additive update changes later repair without replacing existing members.
 
-## Run
+## Read the code
+
+Read [the builder, plan comparison, and two worker definitions](topology_upgrade.ex).
+
+## Run it
 
 ```sh
-mix test test/examples/99_research/99_16_topology_upgrade --include example --seed 0 --trace
+mix test test/examples/99_research/99_16_topology_upgrade --include example --seed 0
 ```
 
-All assertions are enabled. Current startup and ordinary Turn APIs retain their
-existing contracts.
+Expected result: three workers grow to five in place, invalid targets have no
+effect, and a full Controller replacement restores saved state with new PIDs.
 
-## Scope
+## Gap and limits
 
-The live update adds local Agent entries only. It rejects removal, replacement,
-resource changes, and an update during an active pass. It does not handle
-ownership transfer, subscriptions, same-module code revisions, rolling batches,
-or durable rollout recovery.
+Live update accepts additive local Agent entries only. Removal, replacement,
+resource changes, ownership transfer, rolling batches, and durable rollout
+recovery remain unsupported.
 
-[Source](topology_upgrade.ex) · [Tests](../../../test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs)
+## Files
+
+- [Source](topology_upgrade.ex)
+- [Tests](../../../test/examples/99_research/99_16_topology_upgrade/topology_upgrade_test.exs)
+
+Previous: [State Migration](../99_15_state_migration/README.md) | Next: return to [Basic Examples](../../01_basic/README.md)

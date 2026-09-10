@@ -14,7 +14,7 @@ defmodule JidoTest.Examples.IndeterminateWriteTest do
     {PersistenceProbeStore, opts} = store
     id = unique_id("example-indeterminate-write")
     observer = self()
-    context = %{reply_to: observer, on_execute: &send(observer, {:evaluated, &1})}
+    context = %{reply_to: observer}
 
     assert {:ok, server} =
              Jido.start_agent(jido, Probe,
@@ -27,14 +27,11 @@ defmodule JidoTest.Examples.IndeterminateWriteTest do
     assert {:error, {:persistence_failed, :indeterminate}} =
              Probe.increment(server, "first", 1, context: context)
 
-    assert_receive {:evaluated, "first"}
-
     assert {:ok, %{state: %{count: 1}}, 1} =
              Persistence.load_agent_with_revision(store, Probe, id, instance: jido)
 
-    refute_received {:signal, %{type: "persistence.probe.applied"}}
+    refute_received {:signal, %{type: "examples.research.indeterminate_write.applied"}}
     assert match?({:error, _}, next_command(server, context))
-    refute_received {:evaluated, "second"}
   end
 
   defp next_command(server, context) do

@@ -27,16 +27,6 @@ defmodule Jido.Agent.Codec.DeriverTest do
     assert Enum.count(registry.entries, fn {_id, entry} -> entry == {:atom, :status} end) == 1
   end
 
-  test "plugin derivation includes its module and static options" do
-    assert {:ok, registry} =
-             Deriver.plugin({Jido.Plugin.Scheduler, label: :primary, value: %URI{port: 443}})
-
-    assert {:plugin, Jido.Plugin.Scheduler} in Map.values(registry.entries)
-    assert {:atom, :label} in Map.values(registry.entries)
-    assert {:atom, :primary} in Map.values(registry.entries)
-    assert {:value, %URI{port: 443}} in Map.values(registry.entries)
-  end
-
   test "agent derivation stops at the first invalid route" do
     definition = Agent.new!(name: "invalid_route", routes: [{"valid", Add}])
     [route] = definition.routes

@@ -90,8 +90,10 @@ defmodule Jido.Examples.Factory.FlowFactory.Runner.Runtime do
           end
 
         signal =
-          Jido.Signal.new!("factory.flow.finished", Map.put(data, :mission_id, state.mission_id),
-            source: "/factory/flow"
+          Jido.Signal.new!(
+            "examples.factory.flow.finished",
+            Map.put(data, :mission_id, state.mission_id),
+            source: "/examples/factory/flow"
           )
 
         Server.cast(state.init.agent_server, signal)

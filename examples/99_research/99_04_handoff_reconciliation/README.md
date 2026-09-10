@@ -1,29 +1,37 @@
-# FA-08: Acknowledged handoff and worker reconciliation
+# 99_04 Handoff Reconciliation
 
-Status: **Works as an application protocol**.
+Status: application protocol; not a Jido handoff API.
 
-Result on 2026-09-05: **3 passing checks; 0 failing acceptance checks.** All checks are enabled.
+A coordinator transfers one request only after the new worker acknowledges its
+ownership generation.
 
-## Feature and proof
+## What this proves
 
-Real child Agents acknowledge transfer. The coordinator rejects stale and duplicate results. An unavailable recipient leaves the old owner. Recipient loss clears the pending offer, and explicit reconciliation starts a replacement with a new generation. Parent shutdown removes children.
+- The old owner remains authoritative until acknowledgement.
+- Stale results, duplicate results, and a failed recipient do not replace ownership.
 
-## Required change
+## Read the code
 
-No core feature is required for this proof. Keep request authority, acknowledgements, generations, and desired worker policy in application state.
+Read [the coordinator](handoff.ex), then [the worker](worker.ex).
 
-## Scope
-
-There is one request and one live coordinator. The tests cover recipient loss, not durable coordinator loss or arbitrary network partitions. The coordinator controls accepted results; external effects require their own fencing.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_04_handoff_reconciliation --include example --seed 0
 ```
 
-This command passes with the current core. The extension policy is part of the example.
+Expected result: transfer commits after acknowledgement, a recipient crash
+clears the offer, and explicit reconciliation starts a new generation.
 
-[Source](handoff.ex) · [Tests](../../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs)
+## Gap and limits
+
+The protocol supports one request and one live coordinator. It does not restore
+a durable coordinator, solve network partitions, or fence external effects.
+
+## Files
+
+- [Coordinator](handoff.ex)
+- [Worker](worker.ex)
+- [Tests](../../../test/examples/99_research/99_04_handoff_reconciliation/handoff_test.exs)
+
+Previous: [Input Resource Lifecycle](../99_03_input_resource_lifecycle/README.md) | Next: [Shared Budget](../99_05_capacity_deadlines_cleanup/README.md)

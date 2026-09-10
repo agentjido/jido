@@ -84,6 +84,13 @@ Jido instance on that node owns the child. An explicit remote start never
 falls back to a local start. This does not create a cluster registry, leader
 election system, automatic placement service, or network partition policy.
 
+A Topology Agent or group can also declare `node:`. Use
+`Jido.Topology.Controller.place_agent/4` when a control Agent or Plugin has
+selected a new exact node. This operation is a mechanism, not a placement
+policy. The new Agent restores through configured shared persistence. Without
+shared persistence, it starts from declared initial state. A remote Agent
+cannot subscribe to a Controller-owned local Bus.
+
 For multiple writers, use a persistence adapter with shared atomic
 compare-and-swap behavior. Define ownership, routing, fencing, and reconciliation
 in the application or in an integration package. Do not use the File adapter

@@ -1,34 +1,37 @@
-# FA-05: Durable deletion
+# 99_13 Durable Delete
 
-Status: **Core feature implemented**.
+Status: implemented persistence contract; awaiting a stable lifecycle lesson.
 
-Result on 2026-09-09: **3 passing checks.** All checks are enabled.
+A durable tombstone prevents a delayed old writer from recreating a deleted
+Agent record.
 
-## Feature and proof
+## What this proves
 
-Existing revisions reject a stale writer. Deletion writes a compact tombstone
-and returns `:deleted` on load. A delayed initial writer conflicts and cannot
-recreate the deleted record lifetime.
+- Compare-and-swap rejects stale revisions before deletion.
+- The deletion fence remains after the record becomes unavailable to load.
 
-## Implemented change
+## Read the code
 
-Jido retains a tombstone and updates lifecycle state with compare-and-swap. It
-rejects old writers across the deletion boundary.
+Read [the order Agent and delayed write helper](durable_delete.ex).
 
-## Scope
-
-The example uses public persistence APIs and an atomic in-memory byte adapter.
-It proves retention of the revision fence after deletion. It does not define
-tombstone retention or physical purge policy.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_13_durable_delete --include example --seed 0
 ```
 
-This command returns a passing status.
+Expected result: deletion returns `:deleted`, and an old initial writer cannot
+replace the tombstone.
 
-[Source](durable_delete.ex) · [Tests](../../../test/examples/99_research/99_13_durable_delete/durable_delete_test.exs)
+## Gap and limits
+
+The fence exists. Promotion should place deletion beside persistence lifecycle
+and compare-and-swap. Tombstone retention and physical purge policy are not
+defined here.
+
+## Files
+
+- [Source](durable_delete.ex)
+- [Tests](../../../test/examples/99_research/99_13_durable_delete/durable_delete_test.exs)
+
+Previous: [Definition Revision](../99_12_definition_revision/README.md) | Next: [Turn Upgrade](../99_14_turn_upgrade/README.md)

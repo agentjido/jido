@@ -41,12 +41,13 @@ defmodule Jido.Topology.ValidationTest do
           {[agents: [%{key: :child, module: 42}]], "Expected an Agent module"},
           {[resources: [%{key: :bus, config: [name: :outside]}]],
            "Topology owns Bus name, Registry, and Jido scope"},
+          {[resources: [%{key: :queue, kind: :queue}]], "Unsupported topology option"},
           {[connections: [%{agent: :child, to: :bus, path: ""}]],
            "Bus subscription path must be a nonempty string"},
           {[connections: [%{agent: :child, to: :bus, path: "a..b"}]],
            "Invalid Bus subscription path"},
           {[startup: %{concurrency: 0}], "Expected a positive integer"},
-          {[startup: %{ready: :none}], "Unsupported topology option"}
+          {[startup: %{ready: :none}], "Unknown authoring fields"}
         ] do
       assert {:error, error} = Topology.new([name: "invalid-topology"] ++ attrs)
       assert error.message == message

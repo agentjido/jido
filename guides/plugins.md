@@ -17,8 +17,7 @@ end
 Select only the facets that the package needs. Each facet has one owner and one
 bounded authority:
 
-- `Jido.Agent.Plugin` validates owned Directives and updates one owned state
-  value.
+- `Jido.Agent.Plugin` prepares pure input and reduces one owned state value.
 - `Jido.AgentServer.Plugin` handles live admission, one optional permanent
   runtime root, readiness, outbound Signal preparation, and post-commit work.
 - `Jido.Persistence.Plugin` converts one paired owned-state value without
@@ -27,8 +26,10 @@ bounded authority:
   live-control authority.
 
 The Action cannot change protected Plugin keys. After execution, each Agent
-facet receives its current owned state and only its owned Directives. It
-returns the complete next owned state.
+facet can read the prior complete state, the current candidate state, its pure
+prepared input, and all validated Directives. It returns only the complete next
+value for its owned state field. Each custom Directive owns its `validate/1`
+callback.
 
 The Agent Server owns all runtime processes and tasks. It runs Directive work
 after commit. A failed dispatch does not undo the commit. Supplying committed

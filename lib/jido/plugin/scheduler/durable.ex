@@ -5,7 +5,7 @@ defmodule Jido.Plugin.Scheduler.Durable do
 
   @marker "jidodurabletick"
   @progress [:pending, :last_scheduled_at]
-  @trace ~w(id jidotraceid jidospanid jidoparentspanid jidocausationid traceparent tracestate)
+  @trace ~w(id jidocausationid traceparent tracestate)
 
   def enabled?(spec), do: Map.get(spec, :delivery) == :durable
   def marked?(signal), do: Signal.get_context(signal, @marker) == true

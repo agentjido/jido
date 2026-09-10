@@ -50,7 +50,10 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
     assert flushed.state.buffer == []
 
     assert_receive {:signal,
-                    %Jido.Signal{type: "examples.runtime.burst_buncher.batch", data: %{batch_id: "batch-1"}}},
+                    %Jido.Signal{
+                      type: "examples.runtime.burst_buncher.batch",
+                      data: %{batch_id: "batch-1"}
+                    }},
                    500
   end
 
@@ -64,7 +67,11 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     assert {:ok, _agent} = BurstBuncher.add_item(buncher, "item-2", :second)
 
-    assert_receive {:signal, %Jido.Signal{type: "examples.runtime.burst_buncher.batch", data: %{items: items}}},
+    assert_receive {:signal,
+                    %Jido.Signal{
+                      type: "examples.runtime.burst_buncher.batch",
+                      data: %{items: items}
+                    }},
                    500
 
     assert Enum.map(items, & &1.id) == ["item-1", "item-2"]
@@ -90,5 +97,4 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     assert Server.agent(buncher).state.buffer == []
   end
-
 end

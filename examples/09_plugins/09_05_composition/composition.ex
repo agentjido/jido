@@ -20,8 +20,10 @@ defmodule Jido.Examples.Plugins.Composition.Agent do
 
     route "examples.plugins.composition.accept" do
       action %{token: _token}, schema: Zoi.object(%{token: Zoi.string()}), context: context do
-        tenant = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin]
-        authorization = context.plugin_inputs[Jido.Examples.Plugins.RuntimeAdmission.Plugin]
+        tenant = context.plugin_inputs[Jido.Examples.Plugins.PreparedInput.Plugin].prepared
+
+        authorization =
+          context.plugin_inputs[Jido.Examples.Plugins.RuntimeAdmission.Plugin].runtime
 
         {:ok,
          %{

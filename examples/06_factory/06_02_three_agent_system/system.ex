@@ -1,47 +1,9 @@
-defmodule Jido.Examples.Factory.System.Boot do
-  @moduledoc false
-  use Jido.Action,
-    name: "factory_system_boot",
-    schema:
-      Zoi.object(%{
-        mode: Zoi.enum([:workshop, :departments]) |> Zoi.default(:workshop),
-        step_delay_ms: Zoi.integer() |> Zoi.min(1) |> Zoi.default(2_000)
-      })
-
-  alias Jido.Agent.Directive
-  alias Jido.Examples.Factory.{Conversation, Orchestrator, Protocol, Workshop}
-
-  def run(input, %{agent_state: %{started: false} = state, agent_id: id}) do
-    factory = if input.mode == :departments, do: Orchestrator, else: Workshop
-
-    factory_opts =
-      if input.mode == :workshop,
-        do: %{initial_state: %{step_delay_ms: input.step_delay_ms}},
-        else: %{}
-
-    directives = [
-      Directive.spawn_child(Conversation, "conversation",
-        opts: %{initial_state: %{factory_id: "#{id}/factory", factory_mode: input.mode}}
-      ),
-      Directive.spawn_child(factory, "factory", opts: factory_opts)
-    ]
-
-    boot =
-      if input.mode == :departments,
-        do: Orchestrator.boot_signal!(),
-        else: Workshop.boot_signal!()
-
-    directives = directives ++ [Directive.emit_to_child("factory", boot)]
-
-    {:ok, %{state | started: true, mode: input.mode}, directives}
-  end
-
-  def run(_, _), do: Protocol.invalid("System is already started")
-end
-
 defmodule Jido.Examples.Factory.System do
   @moduledoc "Owns the conversation and factory Agents. Relays factory event Signals to the conversation."
   use Jido.Agent, name: "factory_system"
+
+  alias Jido.Agent.Directive
+  alias Jido.Examples.Factory.{Conversation, Orchestrator, Protocol, Workshop}
 
   agent do
     schema Zoi.object(%{
@@ -55,17 +17,22 @@ defmodule Jido.Examples.Factory.System do
   routes do
     signal_source "/examples/factory/system"
 
-    route "factory.system.boot", __MODULE__.Boot do
+    route "examples.factory.system.boot" do
+      action input,
+        schema:
+          Zoi.object(%{
+            mode: Zoi.enum([:workshop, :departments]) |> Zoi.default(:workshop),
+            step_delay_ms: Zoi.integer() |> Zoi.min(1) |> Zoi.default(2_000)
+          }),
+        context: context do
+        Jido.Examples.Factory.System.boot_state(input, context)
+      end
+
       define :boot, args: [{:optional, :mode}]
     end
 
-    route "factory.system.ready", Jido.Examples.Support.KeepState do
-      define :ready
-    end
-
-    route "factory.event" do
+    route "examples.factory.event" do
       action input,
-        name: "factory_system_event",
         schema: Jido.Examples.Factory.Protocol.event_schema(),
         context: context do
         events = Enum.take(context.agent_state.events ++ [input], -100)
@@ -77,9 +44,37 @@ defmodule Jido.Examples.Factory.System do
     route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
-      action %{tag: tag}, name: "factory_system_exit", context: context do
+      action %{tag: tag}, context: context do
         {:ok, %{context.agent_state | child_exits: context.agent_state.child_exits ++ [tag]}}
       end
     end
+  end
+
+  @doc false
+  def boot_state(_, %{agent_state: %{started: true}}),
+    do: Protocol.invalid("System is already started")
+
+  def boot_state(input, %{agent_state: state, agent_id: id}) do
+    factory = if input.mode == :departments, do: Orchestrator, else: Workshop
+
+    factory_opts =
+      if input.mode == :workshop,
+        do: %{initial_state: %{step_delay_ms: input.step_delay_ms}},
+        else: %{}
+
+    boot =
+      if input.mode == :departments,
+        do: Orchestrator.boot_signal!(),
+        else: Workshop.boot_signal!()
+
+    directives = [
+      Directive.spawn_child(Conversation, "conversation",
+        opts: %{initial_state: %{factory_id: "#{id}/factory", factory_mode: input.mode}}
+      ),
+      Directive.spawn_child(factory, "factory", opts: factory_opts),
+      Directive.emit_to_child("factory", boot)
+    ]
+
+    {:ok, %{state | started: true, mode: input.mode}, directives}
   end
 end

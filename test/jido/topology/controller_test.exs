@@ -6,12 +6,75 @@ defmodule Jido.Topology.ControllerTest do
   alias Jido.Signal.Bus
   alias Jido.Topology.{Builder, Controller}
 
+  defmodule LifecycleControl do
+    use Jido.Agent, name: "topology_lifecycle_control"
+
+    agent do
+      schema Zoi.object(%{events: Zoi.list(Zoi.string()) |> Zoi.default([])})
+    end
+
+    routes do
+      route "jido.topology.lifecycle.**" do
+        action _input, context: context do
+          {:ok,
+           %{
+             context.agent_state
+             | events: context.agent_state.events ++ [context.signal.type]
+           }}
+        end
+      end
+    end
+  end
+
   test "invalid repair policy fails before topology activation", %{jido: jido} do
     assert {:error, %Jido.Error.ValidationError{}} =
              Controller.start_link(
                jido: jido,
                topology: Independent.new!(id: "invalid-repair"),
                repair: :sometimes
+             )
+
+    assert Jido.agent_count(jido) == 0
+  end
+
+  test "sends lifecycle Signals to a normal control Agent route", %{jido: jido} do
+    assert Jido.Topology.Signal.types() == [
+             "jido.topology.lifecycle.operation.started",
+             "jido.topology.lifecycle.operation.completed",
+             "jido.topology.lifecycle.component.ready",
+             "jido.topology.lifecycle.component.failed",
+             "jido.topology.lifecycle.status.changed"
+           ]
+
+    {:ok, control} = Jido.start_agent(jido, LifecycleControl, id: "topology-control")
+
+    controller =
+      start_supervised!(
+        {Controller,
+         jido: jido,
+         topology: Independent.new!(id: "lifecycle-signals"),
+         lifecycle: control,
+         repair: :manual}
+      )
+
+    assert :ok = Controller.await_ready(controller)
+
+    eventually(fn ->
+      events = Server.agent(control).state.events
+
+      "jido.topology.lifecycle.operation.started" in events and
+        "jido.topology.lifecycle.component.ready" in events and
+        "jido.topology.lifecycle.operation.completed" in events and
+        "jido.topology.lifecycle.status.changed" in events
+    end)
+  end
+
+  test "validates the optional lifecycle target before activation", %{jido: jido} do
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Controller.start_link(
+               jido: jido,
+               topology: Independent.new!(id: "invalid-lifecycle"),
+               lifecycle: :not_an_agent
              )
 
     assert Jido.agent_count(jido) == 0
@@ -79,7 +142,7 @@ defmodule Jido.Topology.ControllerTest do
     for {_ending, metadata, measurements} <- observed do
       assert metadata.schema_version == 1
       assert metadata.topology_id == instance.id
-      assert metadata.jido_instance == jido
+      refute Map.has_key?(metadata, :jido_instance)
       refute Map.has_key?(metadata, :components)
       refute Map.has_key?(metadata, :errors)
       assert measurements.component_count == 2
@@ -157,8 +220,8 @@ defmodule Jido.Topology.ControllerTest do
       |> Builder.agent(:cell, Cell)
       |> Builder.bus(:a)
       |> Builder.bus(:b)
-      |> Builder.subscribe(:cell, to: :a, path: "topology.work")
-      |> Builder.subscribe(:cell, to: :b, path: "topology.work")
+      |> Builder.subscribe(:cell, to: :a, path: "examples.topology.cell.work")
+      |> Builder.subscribe(:cell, to: :b, path: "examples.topology.cell.work")
       |> Builder.build!(id: "multiple")
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})

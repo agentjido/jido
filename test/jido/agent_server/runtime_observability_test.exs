@@ -3,7 +3,6 @@ defmodule Jido.AgentServer.RuntimeObservabilityTest do
 
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
-  alias Jido.Agent.Turn.Outcome
   alias Jido.Signal
   alias JidoTest.AgentRuntimeFixtures.RuntimeAgent
 
@@ -22,13 +21,17 @@ defmodule Jido.AgentServer.RuntimeObservabilityTest do
     assert length(events) == 2
     assert Enum.map(events, & &1.event) == [:turn_completed, :turn_committed]
 
-    assert %Outcome{
+    assert %{
              status: :succeeded,
              stage: :commit,
              committed?: true,
              state_version_before: 1,
              state_version_after: 2
            } = hd(events).metadata.outcome
+
+    refute is_struct(hd(events).metadata.outcome)
+    refute Map.has_key?(hd(events).metadata.outcome, :source_signal)
+    refute Map.has_key?(hd(events).metadata.outcome, :effective_signal)
 
     refute Enum.any?(events, &Map.has_key?(&1, :server_state))
 

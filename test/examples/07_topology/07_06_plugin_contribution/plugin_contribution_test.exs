@@ -16,7 +16,7 @@ defmodule Jido.Examples.Topology.PluginContributionTest do
     assert Map.has_key?(instance.plan.resources, "bus/inbox")
 
     assert instance.plan.agents["agent/worker"].subscriptions == [
-             %{bus: "bus/inbox", path: "plugin.work"}
+             %{bus: "bus/inbox", path: "examples.topology.plugin_contribution.work"}
            ]
 
     controller = start_supervised!({Controller, jido: jido, topology: instance})

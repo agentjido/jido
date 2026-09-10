@@ -1,0 +1,79 @@
+{
+  "agents": [
+    {
+      "depends_on": [],
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "key": "coordinator",
+      "module": "agents/cell",
+      "node": null
+    }
+  ],
+  "connections": [
+    {
+      "agent": "workers",
+      "path": "examples.topology.cell.work",
+      "to": "work"
+    }
+  ],
+  "exports": [],
+  "groups": [
+    {
+      "count": {
+        "$type": "topology.input",
+        "key": {
+          "$type": "atom",
+          "id": "fields/worker_count"
+        }
+      },
+      "depends_on": [],
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "key": "workers",
+      "module": "agents/cell",
+      "node": null
+    }
+  ],
+  "imports": [],
+  "includes": [],
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        {
+          "$type": "atom",
+          "id": "fields/purpose"
+        },
+        "Bus fan-out"
+      ]
+    ]
+  },
+  "name": "bus_swarm",
+  "relationships": [
+    {
+      "child": "workers",
+      "on_parent_exit": "stop",
+      "parent": "coordinator"
+    }
+  ],
+  "resources": [
+    {
+      "config": [],
+      "key": "work",
+      "kind": "bus"
+    }
+  ],
+  "schema": "schemas/swarm",
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  },
+  "type": "jido.topology",
+  "version": 2
+}

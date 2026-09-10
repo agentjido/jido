@@ -91,8 +91,8 @@ defmodule Jido.Examples.StateMigration.CompatibleWallet do
   end
 
   routes do
-    signal_source "/examples/migration"
-    route "wallet.migrate", Migrate
+    signal_source "/examples/research/state_migration"
+    route "examples.research.state_migration.wallet.migrate", Migrate
   end
 end
 
@@ -108,8 +108,8 @@ defmodule Jido.Examples.StateMigration.StrictWallet do
   end
 
   routes do
-    signal_source "/examples/migration"
-    route "wallet.migrate", Migrate
+    signal_source "/examples/research/state_migration"
+    route "examples.research.state_migration.wallet.migrate", Migrate
   end
 end
 
@@ -125,8 +125,8 @@ defmodule Jido.Examples.StateMigration.MigratedWallet do
   end
 
   routes do
-    signal_source "/examples/migration"
-    route "wallet.migrate", Migrate
+    signal_source "/examples/research/state_migration"
+    route "examples.research.state_migration.wallet.migrate", Migrate
   end
 end
 
@@ -139,8 +139,10 @@ defmodule Jido.Examples.StateMigration do
   def migrate(server, id \\ "wallet-1-to-2", currency \\ "USD") do
     Jido.AgentServer.call(
       server,
-      Jido.Signal.new!("wallet.migrate", %{upgrade_id: id, currency: currency},
-        source: "/examples/migration"
+      Jido.Signal.new!(
+        "examples.research.state_migration.wallet.migrate",
+        %{upgrade_id: id, currency: currency},
+        source: "/examples/research/state_migration"
       )
     )
   end

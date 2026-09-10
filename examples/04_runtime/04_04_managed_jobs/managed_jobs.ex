@@ -29,8 +29,7 @@ defmodule Jido.Examples.ManagedJobs do
 
     route "examples.runtime.jobs.start" do
       action input,
-        schema:
-          Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        schema: Zoi.object(%{job_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
         context: context do
         state = context.agent_state
 

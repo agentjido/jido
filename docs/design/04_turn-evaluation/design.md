@@ -23,17 +23,17 @@ Agent A0 + source Signal S0
 The default route path selects the first target returned by the Signal Router.
 Route defaults are merged with source Signal data. Signal data has precedence.
 Pure preparation and live admission can reject input. Pure preparation can add
-one portable input for each Plugin package. Live admission can change only its
-own package input. Neither phase can change the Agent, source Signal, or caller
-context.
+one portable input for each Plugin package. Live admission can add one
+transient runtime input for each Plugin package. Neither phase can change the
+Agent, source Signal, or caller context.
 
 A custom `handle_signal/2` callback receives the source Signal. A valid Turn
 from that callback fixes its executable and input.
 
 Actions and Flows receive package inputs under `context.plugin_inputs`. They
 propose the complete candidate state and the complete Directive list. The
-Agent Plugin pipeline protects owned fields, validates Directives, and updates
-each owned field in declaration order.
+Agent Plugin pipeline protects owned fields, validates each Directive once,
+and reduces each owned field through `reduce/2` in declaration order.
 
 ## Requirements
 
@@ -76,7 +76,8 @@ defined callback error before executable work.
 Plugin `prepare/2` callback in declaration order.
 
 `TURN-REQ-015`: Agent Plugin preparation shall receive the unchanged source
-Signal, Agent identity, Agent module, its owned state, and static options.
+Signal, Agent identity, Agent module, the complete current state, its owned
+state, and static options.
 
 `TURN-REQ-016`: Agent Plugin preparation shall return one input owned by its
 package or reject evaluation.
@@ -87,11 +88,11 @@ portable.
 `TURN-REQ-018`: Agent Plugin preparation shall not replace the Agent, source
 Signal, caller context, route, or another package's input.
 
-`TURN-REQ-019`: Live Agent Server admission shall replace only its own package
-input or reject evaluation.
+`TURN-REQ-019`: Live Agent Server admission shall return only its own package
+runtime input or reject evaluation.
 
-`TURN-REQ-020`: The evaluator shall expose prepared inputs to the executable
-under the reserved `context.plugin_inputs` key.
+`TURN-REQ-020`: The evaluator shall expose separate `prepared` and `runtime`
+slots for each package under the reserved `context.plugin_inputs` key.
 
 ### Execution and candidate assembly
 
@@ -111,22 +112,23 @@ fields.
 `TURN-REQ-026`: The evaluator shall validate every built-in or Plugin-owned
 Directive before candidate return.
 
-`TURN-REQ-027`: Agent Plugin state updates shall run serially in declaration
+`TURN-REQ-027`: Agent Plugin state reducers shall run serially in declaration
 order.
 
-`TURN-REQ-028`: An Agent Plugin update shall receive only its current owned
-value, its owned Directives, and its static options.
+`TURN-REQ-028`: An Agent Plugin reducer shall receive the prior complete state,
+the current complete candidate state, its owned value, its pure prepared input,
+all validated Directives, and its static options.
 
-`TURN-REQ-029`: An Agent Plugin update shall replace only its owned field.
+`TURN-REQ-029`: An Agent Plugin reducer shall return only its owned field.
 
-`TURN-REQ-030`: An Agent Plugin update shall not receive the complete
-executable output or another Plugin's Directives.
+`TURN-REQ-030`: An Agent Plugin reducer shall not change the Signal, caller
+context, domain state, or another Plugin's state or input.
 
 `TURN-REQ-031`: Plugin finalization shall stop at the first failure and return
 no candidate.
 
 `TURN-REQ-032`: The evaluator shall validate the complete proposed state one
-time after all Plugin state updates.
+time after all Plugin state reductions.
 
 `TURN-REQ-033`: Successful direct evaluation shall return the candidate Agent
 and ordered Directive list.

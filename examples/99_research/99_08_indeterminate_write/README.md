@@ -1,29 +1,39 @@
-# PERSIST-03: indeterminate write
+# 99_08 Indeterminate Write
 
-Status: **enabled regression; fixed in migration preparation**.
+Status: implemented persistence safety regression; awaiting promotion.
 
-The in-memory adapter writes the candidate bytes, then returns
-`{:error, :indeterminate}`. The stored count becomes `1`, but the live count
-stays uncommitted. The Server stops before a second Action can run. It does
-not dispatch the unconfirmed Directive or save stale state during shutdown.
+An uncertain persistence result stops work on stale live state and blocks the
+unconfirmed post-commit effect.
 
-Run the local example:
+## What this proves
+
+- Stored candidate bytes do not imply a committed live Turn.
+- Later work cannot continue from state whose write result is uncertain.
+
+## Read the code
+
+Read [the probe Agent](indeterminate_write_probe.ex), then
+[the shared fault store](../persistence_probe_store.ex).
+
+## Run it
 
 ```sh
-mix run examples/99_research/99_08_indeterminate_write/demo.exs
+mix test test/examples/99_research/99_08_indeterminate_write --include example --seed 0
 ```
 
-The admission test requires no further Action evaluation or Directive dispatch
-until authoritative state is loaded. It permits the Server to stop or reject
-the next command. It does not prescribe a shutdown reason or automatic reload.
-It uses the default error policy so an application policy cannot hide the gap.
+Expected result: storage contains the candidate revision, no output Signal is
+dispatched, and the live server cannot execute a later command.
 
-Controls prove that a confirmed write permits output, and that an uncertain
-reply can follow a stored write without dispatching its Directive. Observer
-callbacks and the output PID stay in caller context. The store process is
-owned by the caller. Database durability, Postgres integration, and VM restart
-are outside this proof.
+## Gap and limits
 
-[Probe Agent](indeterminate_write_probe.ex) ·
-[Fault adapter](../persistence_probe_store.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_08_indeterminate_write/README.md)
+The core safety contract is implemented. The probe does not prescribe automatic
+reload, a shutdown reason, database durability, or cross-node recovery.
+
+## Files
+
+- [Probe Agent](indeterminate_write_probe.ex)
+- [Demo](demo.exs)
+- [Shared fault store](../persistence_probe_store.ex)
+- [Tests](../../../test/examples/99_research/99_08_indeterminate_write/indeterminate_write_test.exs)
+
+Previous: [Checkpoint Portability](../99_07_checkpoint_portability/README.md) | Next: [Route Selection](../99_09_route_selection/README.md)

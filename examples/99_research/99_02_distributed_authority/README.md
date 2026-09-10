@@ -1,29 +1,40 @@
-# FA-10: Fenced distributed ownership
+# 99_02 Distributed Authority
 
-Status: **Works with an explicit external authority**.
+Status: application extension with an explicit external authority.
 
-Result on 2026-09-05: **4 passing checks; 0 failing acceptance checks.** All checks are enabled.
+Two local Erlang nodes use ownership tokens to fence Agent admission,
+persistence writes, and external effects.
 
-## Feature and proof
+## What this proves
 
-Two Erlang nodes run real inventory Agents. Replacement fences old admission before Action work. Storage and the sink reject stale tokens. Authority loss rejects work. A disconnected old owner remains fenced after reconnection.
+- A replacement owner can fence an older live Agent before its Action runs.
+- Storage and effect boundaries reject stale tokens after disconnect and reconnect.
 
-## Required change
+## Read the code
 
-No core feature is required for this controlled proof under the current admit callback and persistence adapter. Preserve an authority check before Action work if the proposed Plugin API removes admit/3.
+Read [the inventory Agent](fenced_inventory.ex), [the admission Plugin](gate.ex),
+then [the controlled authority and adapters](support/authority.ex).
 
-## Scope
-
-The external authority is a controlled GenServer, not a consensus service or production lease provider. Claim, byte writes, and sink checks serialize there. Core-only exclusive activation remains unsupported; the existing skipped DIST-03 test is unchanged. The disconnect test blocks automatic reconnection with a temporary peer cookie change.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_02_distributed_authority --include example --seed 0
 ```
 
-This command passes with the current core. The extension policy is part of the example.
+Expected result: only the latest token can admit work, persist state, or commit
+an external effect on either peer node.
 
-[Source](fenced_inventory.ex) · [Tests](../../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs)
+## Gap and limits
+
+Jido does not provide cluster-wide exclusive ownership. The controlled authority
+is not a consensus service, lease provider, or durable production store.
+
+## Files
+
+- [Agent](fenced_inventory.ex)
+- [Admission Plugin](gate.ex)
+- [Authority and adapters](support/authority.ex)
+- [Core ownership probe](distributed_authority_probe.ex)
+- [Tests](../../../test/examples/99_research/99_02_distributed_authority/fenced_inventory_test.exs)
+
+Previous: [Progress Observation](../99_01_progress_observation/README.md) | Next: [Input Resource Lifecycle](../99_03_input_resource_lifecycle/README.md)

@@ -2,8 +2,9 @@ defmodule Jido.Topology.Plugin.Contribution do
   @moduledoc """
   Static canonical entries returned by one Topology Plugin facet.
 
-  The first contract accepts current Bus resources, ownership relationships,
-  and Bus subscriptions. It cannot add Agent definitions or new resource kinds.
+  The current contract accepts Bus resources, ownership relationships, and Bus
+  subscriptions. Bus is the first core resource type. A contribution cannot
+  add Agent definitions or another resource type.
   """
 
   alias Jido.Error

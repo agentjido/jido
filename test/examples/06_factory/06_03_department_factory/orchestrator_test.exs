@@ -113,7 +113,7 @@ defmodule JidoTest.Examples.Factory.OrchestratorTest do
     before = Server.snapshot(system.factory)
 
     late =
-      signal("factory.async.result", %{
+      signal("examples.factory.async.result", %{
         request_id: "mission/build/1",
         status: :completed,
         error: "",

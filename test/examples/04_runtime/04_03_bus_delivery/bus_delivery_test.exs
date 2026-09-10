@@ -24,7 +24,7 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
 
     route "examples.runtime.bus_delivery.record" do
       action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
-        context.plugin_inputs[JidoTest.FeatureObserver].on_delivery.(%{value: value})
+        context.plugin_inputs[JidoTest.FeatureObserver].runtime.on_delivery.(%{value: value})
         state = context.agent_state
 
         if context.signal.id in state.seen do

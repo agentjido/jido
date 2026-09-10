@@ -9,6 +9,7 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
 
   defmodule Effect do
     @moduledoc false
+    use Jido.Agent.Directive
     defstruct [:label, :sink, :observer, :gate]
   end
 
@@ -17,7 +18,6 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
     use Jido.Agent.Plugin
 
     def directives(_opts), do: [Effect]
-    def validate_directive(%Effect{} = effect, _opts), do: {:ok, effect}
   end
 
   defmodule ServerFacet do

@@ -36,6 +36,19 @@ defmodule Jido.Topology.Controller.Activation do
     end
   end
 
+  def start_on_node(spec, context) do
+    :erpc.call(spec.node, __MODULE__, :start, [spec, context], context.task_timeout)
+  catch
+    :error, {:erpc, reason} when reason in [:timeout, :noconnection] ->
+      {:error, {:placement_uncertain, spec.node, reason}}
+
+    :error, {:erpc, reason} ->
+      {:error, {:remote_activation_failed, spec.node, reason}}
+
+    kind, reason ->
+      {:error, {:placement_uncertain, spec.node, {kind, reason}}}
+  end
+
   defp saved_state(spec, _state, nil), do: {:ok, spec.initial_state, 0, :if_found}
 
   defp saved_state(spec, context, persistence) do

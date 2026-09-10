@@ -14,20 +14,20 @@ defmodule Jido.Topology.DSL.Compiler do
     validate_extensions!(extensions, env)
     extensions = Enum.filter(extensions, &extension?(&1, :lower_topology))
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
-    agents = section_entities(dsl, :agents, env)
+    agents = section_entities(dsl, :agents)
     fields = opts(dsl, [:topology], [:schema, :metadata])
 
     entity_groups = [
       {:agents, :agent, Enum.filter(agents, &is_struct(&1, DSL.Agent))},
       {:groups, :group, Enum.filter(agents, &is_struct(&1, DSL.Group))},
-      {:resources, :bus, core_entities(:resources, section_entities(dsl, :resources, env))},
+      {:resources, :resource, core_entities(:resources, section_entities(dsl, :resources))},
       {:relationships, :owns,
-       core_entities(:relationships, section_entities(dsl, :relationships, env))},
+       core_entities(:relationships, section_entities(dsl, :relationships))},
       {:connections, :subscribe,
-       core_entities(:connections, section_entities(dsl, :connections, env))},
-      {:includes, :include, core_entities(:topologies, section_entities(dsl, :topologies, env))},
-      {:imports, :import, core_entities(:imports, section_entities(dsl, :imports, env))},
-      {:exports, :export, core_entities(:exports, section_entities(dsl, :exports, env))}
+       core_entities(:connections, section_entities(dsl, :connections))},
+      {:includes, :include, core_entities(:topologies, section_entities(dsl, :topologies))},
+      {:imports, :import, core_entities(:imports, section_entities(dsl, :imports))},
+      {:exports, :export, core_entities(:exports, section_entities(dsl, :exports))}
     ]
 
     fields =
@@ -35,7 +35,7 @@ defmodule Jido.Topology.DSL.Compiler do
         put_entities(fields, field, entities)
       end)
 
-    startup = section_opts(dsl, :startup, env)
+    startup = section_opts(dsl, :startup)
 
     fields = if startup == %{}, do: fields, else: Map.put(fields, :startup, startup)
     overlap = Enum.filter(Map.keys(fields), &Map.has_key?(config, &1))
@@ -87,15 +87,6 @@ defmodule Jido.Topology.DSL.Compiler do
     case Jido.Topology.new(config) do
       {:ok, _definition} -> :ok
       {:error, error} -> fail_from_source(config, module.__topology_sources__(), error, env)
-    end
-  end
-
-  @doc false
-  def register_startup_location!(module, location, env) do
-    case Module.get_attribute(module, :jido_topology_startup_location) do
-      nil -> Module.put_attribute(module, :jido_topology_startup_location, location)
-      ^location -> :ok
-      _other -> fail!(env, "Topology section :startup cannot be declared in both locations")
     end
   end
 
@@ -156,27 +147,11 @@ defmodule Jido.Topology.DSL.Compiler do
     end)
   end
 
-  defp section_entities(dsl, section, env) do
-    legacy = Extension.get_entities(dsl, [section])
-    nested = Extension.get_entities(dsl, [:topology, section])
+  defp section_entities(dsl, section), do: Extension.get_entities(dsl, [:topology, section])
 
-    if legacy != [] and nested != [] do
-      fail!(env, "Topology section #{inspect(section)} cannot be declared in both locations")
-    end
-
-    legacy ++ nested
-  end
-
-  defp section_opts(dsl, :startup, env) do
-    keys = [:concurrency, :ready, :max_agents, :retry_interval, :task_timeout]
-    legacy = opts(dsl, [:startup], keys)
-    nested = opts(dsl, [:topology, :startup], keys)
-
-    if legacy != %{} and nested != %{} do
-      fail!(env, "Topology section :startup cannot be declared in both locations")
-    end
-
-    Map.merge(legacy, nested)
+  defp section_opts(dsl, :startup) do
+    keys = [:concurrency, :max_agents, :retry_interval, :task_timeout]
+    opts(dsl, [:topology, :startup], keys)
   end
 
   defp put_entities(fields, _, []), do: fields

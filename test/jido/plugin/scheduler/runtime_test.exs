@@ -166,7 +166,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
     assert {:noreply, completed} = Runtime.handle_info({task.ref, outcome}, runtime)
 
     assert_receive {:telemetry, [:jido, :scheduler, :delivery], %{count: 1}, metadata}
-    assert metadata == %{outcome: :delivery_error}
+    assert metadata == %{scheduler_outcome: :delivery_error, status: :error, schema_version: 1}
     Runtime.terminate(:normal, completed)
   end
 
@@ -308,7 +308,7 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
     assert {:ok, source} = Trace.put(source, source_trace)
     local = Signal.new!("test.local", %{}, source: "/test")
     assert {:ok, local} = Trace.put(local, local_trace)
-    assert :ok = Context.set_from_signal(local)
+    assert :ok = Context.put(Trace.get(local))
     delayed = Signal.new!("test.delayed", %{}, source: "/test")
     runtime = runtime()
     context = directive_context(runtime, source, %{cron: %{}}, 1)
@@ -326,7 +326,8 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
     trace = Trace.get(delivered)
     assert trace.trace_id == source_trace.trace_id
     assert trace.span_id not in [source_trace.span_id, local_trace.span_id]
-    assert trace.parent_span_id == source_trace.span_id
+    assert trace.span_id != source_trace.span_id
+    refute Map.has_key?(trace, :parent_span_id)
     assert trace.causation_id == source.id
   end
 

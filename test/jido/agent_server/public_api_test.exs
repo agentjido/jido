@@ -485,9 +485,10 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert_receive {:DOWN, ^monitor, :process, ^worker, _reason}, @receive_timeout
     assert %Agent{state: %{count: 0, history: []}} = Server.agent(server)
 
-    assert {:ok, [%{metadata: %{outcome: %Outcome{} = outcome}} | _events]} =
+    assert {:ok, [%{metadata: %{outcome: outcome}} | _events]} =
              Server.recent_events(server)
 
+    assert is_map(outcome) and not is_struct(outcome)
     assert outcome.id == turn_id
     assert outcome.status == :cancelled
     refute outcome.committed?
@@ -570,9 +571,10 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert {:error, :stale_turn} = Server.cancel_turn(server, turn_id)
     assert Server.snapshot(server) == %{agent: committed, state_version: 1}
 
-    assert {:ok, [%{metadata: %{outcome: %Outcome{} = outcome}} | _events]} =
+    assert {:ok, [%{metadata: %{outcome: outcome}} | _events]} =
              Server.recent_events(server)
 
+    assert is_map(outcome) and not is_struct(outcome)
     assert outcome.id == turn_id
     assert outcome.status == :succeeded
     assert outcome.committed?

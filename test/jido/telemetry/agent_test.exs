@@ -77,7 +77,7 @@ defmodule Jido.Telemetry.AgentTest do
         agent_module: __MODULE__,
         status: :ok,
         committed?: true,
-        partition: "partition-1",
+        partition: "removed-compatibility-field",
         private: "secret",
         retryable?: :not_a_boolean
       })
@@ -94,7 +94,6 @@ defmodule Jido.Telemetry.AgentTest do
              agent_module: __MODULE__,
              status: :ok,
              committed?: true,
-             partition: "partition-1",
              schema_version: 1
            }
   end

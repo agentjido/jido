@@ -3,8 +3,9 @@ defmodule Jido.Topology.Plugin do
   Pure Topology-owned facet of a `Jido.Plugin` package.
 
   A callback can return current canonical Bus resources, ownership
-  relationships, and Bus subscriptions. It cannot start a process, activate a
-  plan, persist data, or add a new resource kind through this contract.
+  relationships, and Bus subscriptions. Bus is the first core resource type.
+  It cannot start a process, activate a plan, persist data, or add another
+  resource type through this contract.
 
   `Jido.Topology.instantiate/2` invokes these facets during pure plan
   construction. It processes Agent declarations, then group declarations, in
@@ -49,7 +50,7 @@ defmodule Jido.Topology.Plugin do
            ),
          {:ok, contribution} <- callback_contribution(result, spec),
          :ok <- contribution_owner(contribution, spec),
-         {:ok, resources} <- validate_entries(:bus, contribution.resources),
+         {:ok, resources} <- validate_entries(:resource, contribution.resources),
          {:ok, relationships} <- validate_entries(:owns, contribution.relationships),
          {:ok, connections} <- validate_entries(:subscribe, contribution.connections) do
       {:ok,

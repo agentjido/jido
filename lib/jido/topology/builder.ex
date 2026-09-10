@@ -63,7 +63,9 @@ defmodule Jido.Topology.Builder do
     do: append(builder, :group, %{key: key, module: module}, opts)
 
   @doc "Appends one Bus resource."
-  def bus(builder, key, opts \\ []), do: append(builder, :bus, %{key: key}, opts)
+  def bus(builder, key, opts \\ []),
+    do: append(builder, :resource, %{key: key, kind: :bus}, opts)
+
   @doc "Declares logical ownership."
   def owns(builder, parent, child, opts \\ []),
     do: append(builder, :owns, %{parent: parent, child: child}, opts)
@@ -156,7 +158,7 @@ defmodule Jido.Topology.Builder do
 
   defp collection(:agent), do: :agents
   defp collection(:group), do: :groups
-  defp collection(:bus), do: :resources
+  defp collection(:resource), do: :resources
   defp collection(:owns), do: :relationships
   defp collection(:subscribe), do: :connections
   defp collection(:include), do: :includes

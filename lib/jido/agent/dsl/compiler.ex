@@ -20,6 +20,12 @@ defmodule Jido.Agent.DSL.Compiler do
     # Module access can read an older loaded version during recompilation.
     dsl = Module.get_attribute(env.module, :spark_dsl_config) || %{}
     routes = Extension.get_entities(dsl, [:routes])
+    source = Extension.get_opt(dsl, [:routes], :signal_source)
+
+    if (routes != [] or source != nil) and
+         is_nil(Module.get_attribute(env.module, :jido_agent_block_declared)) do
+      fail!(env, "An agent block is required when routes are declared")
+    end
 
     {plugins, entities} =
       dsl
@@ -56,7 +62,6 @@ defmodule Jido.Agent.DSL.Compiler do
         do: routes,
         else: lowered_interfaces(routes, Map.get(config, :routes, []), env)
 
-    source = Extension.get_opt(dsl, [:routes], :signal_source)
     interfaces = interfaces(routes, source, env)
 
     generated = generate(interfaces, env)
@@ -76,6 +81,10 @@ defmodule Jido.Agent.DSL.Compiler do
       end
     end
   end
+
+  @doc false
+  def register_agent_block!(module),
+    do: Module.put_attribute(module, :jido_agent_block_declared, true)
 
   defp host_config(config, env) do
     if Module.get_attribute(env.module, :jido_agent_combined_extensions) do

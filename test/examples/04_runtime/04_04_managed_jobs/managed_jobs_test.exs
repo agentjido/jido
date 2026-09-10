@@ -9,9 +9,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)
 
     assert {:ok, pending} =
-             ManagedJobs.start_job(agent, "job", 3,
-               context: JidoTest.JobRunner.context(self())
-             )
+             ManagedJobs.start_job(agent, "job", 3, context: JidoTest.JobRunner.context(self()))
 
     assert pending.state.status == :running
     assert_receive {:job_work, worker, 3}, 1_000
@@ -35,10 +33,9 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     assert Map.from_struct(intent) == %{job_id: "job", value: 3}
     assert Server.snapshot(agent) == before
     refute_received {:job_work, _, _}
+
     assert {:ok, _} =
-             ManagedJobs.start_job(agent, "job", 3,
-               context: JidoTest.JobRunner.context(self())
-             )
+             ManagedJobs.start_job(agent, "job", 3, context: JidoTest.JobRunner.context(self()))
 
     assert_receive {:job_work, worker, 3}, 1_000
     assert state(agent).status == :running
@@ -88,5 +85,4 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "10"
   end
-
 end

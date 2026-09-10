@@ -1,7 +1,6 @@
 defmodule JidoTest.Examples.TopologyUpgradeTest do
   use JidoTest.Case, async: true
   @moduletag :example
-  alias Jido.Examples.Topology.Cell
   alias Jido.Examples.TopologyUpgrade, as: Example
   alias Jido.Topology.Controller
   alias Jido.AgentServer, as: Server
@@ -35,7 +34,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
   test "invalid target validation has no effect on a running topology", c do
     {instance, controller} = start_team(c.jido)
     workers = worker_pids(controller, 3)
-    assert {:ok, _} = Cell.work(hd(workers), 7)
+    assert {:ok, _} = Example.work(hd(workers), 7)
     assert {:error, _} = Example.build(instance.id, -1)
     assert worker_pids(controller, 3) == workers
     assert Server.agent(hd(workers)).state.total == 7
@@ -46,7 +45,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     controller = start_supervised!({Controller, jido: c.jido, topology: target})
     assert :ok = Controller.await_ready(controller)
     worker = Controller.whereis_agent(controller, :workers, 1)
-    assert {:ok, agent} = Cell.work(worker, 2)
+    assert {:ok, agent} = Example.work(worker, 2)
     assert agent.state.total == 20
     assert agent.state.received == 1
     assert Server.agent(Controller.whereis_agent(controller, :observer)).state.total == 0
@@ -57,7 +56,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     {instance, controller} = start_team(PersistentJido)
     old_workers = worker_pids(controller, 3)
     observer = Controller.whereis_agent(controller, :observer)
-    assert {:ok, _} = Cell.work(hd(old_workers), 7)
+    assert {:ok, _} = Example.work(hd(old_workers), 7)
     monitors = Map.new([observer | old_workers], &{Process.monitor(&1), &1})
     stop_supervised!({Controller, instance.id})
 
@@ -73,7 +72,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     assert Enum.all?(new_workers, &(&1 not in old_workers))
     assert Controller.whereis_agent(replacement, :observer) != observer
     assert Server.agent(hd(new_workers)).state.total == 7
-    assert {:ok, agent} = Cell.work(hd(new_workers), 2)
+    assert {:ok, agent} = Example.work(hd(new_workers), 2)
     assert agent.state.total == 9
   end
 
@@ -82,7 +81,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     {instance, controller} = start_team(c.jido)
     old_workers = worker_pids(controller, 3)
     observer = Controller.whereis_agent(controller, :observer)
-    assert {:ok, _} = Cell.work(hd(old_workers), 7)
+    assert {:ok, _} = Example.work(hd(old_workers), 7)
     {:ok, target} = Example.build(instance.id, 5)
 
     assert :ok = Controller.update(controller, target)

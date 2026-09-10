@@ -1,23 +1,38 @@
-# PERSIST-02: checkpoint portability
+# 99_07 Checkpoint Portability
 
-Status: **enabled regression; fixed in migration preparation**.
+Status: implemented persistence regression; awaiting promotion or removal.
 
-The store supplies a valid record with a PID nested in Agent state. The loader
-rejects that process handle. It checks portable data on load and save. A valid
-domain schema alone does not prove portability.
+The loader rejects a process-local value inserted into a stored Agent checkpoint.
 
-Run the local example:
+## What this proves
+
+- A domain schema does not by itself guarantee checkpoint portability.
+- Save and load validation reject runtime-only BEAM terms.
+
+## Read the code
+
+Read [the probe Agent](checkpoint_portability_probe.ex), then
+[the shared fault store](../persistence_probe_store.ex).
+
+## Run it
 
 ```sh
-mix run examples/99_research/99_07_checkpoint_portability/demo.exs
+mix test test/examples/99_research/99_07_checkpoint_portability --include example --seed 0
 ```
 
-The example inserts the PID through the byte adapter so the save validator
-cannot hide the load gap. Controls prove that portable nested data round trips
-and that normal save rejects a PID before it reaches storage. This first probe
-covers a nested PID. The recursive check also rejects references, ports, and
-functions.
-There is no database or VM restart.
+Expected result: a stored nested PID is rejected during load.
 
-[Probe Agent](checkpoint_portability_probe.ex) ·
-[Acceptance notes](../../../test/examples/99_research/99_07_checkpoint_portability/README.md)
+## Gap and limits
+
+The core contract is implemented. Promote it into a stable persistence example
+or keep only the full core term-matrix tests. This probe uses one PID and no VM
+restart.
+
+## Files
+
+- [Probe Agent](checkpoint_portability_probe.ex)
+- [Demo](demo.exs)
+- [Shared fault store](../persistence_probe_store.ex)
+- [Tests](../../../test/examples/99_research/99_07_checkpoint_portability/checkpoint_portability_test.exs)
+
+Previous: [Checkpoint Identity](../99_06_checkpoint_identity/README.md) | Next: [Indeterminate Write](../99_08_indeterminate_write/README.md)

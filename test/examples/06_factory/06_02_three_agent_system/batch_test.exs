@@ -5,7 +5,8 @@ defmodule JidoTest.Examples.Factory.BatchTest do
   alias Jido.Examples.Factory.{Conversation, Tools, Workshop}
   alias JidoTest.FactoryHTTP, as: HTTP
 
-  defp batch(id, goals), do: signal("factory.submit_jobs", %{request_id: id, goals: goals})
+  defp batch(id, goals),
+    do: signal("examples.factory.workshop.submit_jobs", %{request_id: id, goals: goals})
 
   test "a batch creates distinct jobs in order and a retry does not add jobs or events" do
     original = Workshop.new!()
@@ -35,7 +36,7 @@ defmodule JidoTest.Examples.Factory.BatchTest do
     assert {:ok, occupied, _} =
              Workshop.cmd(
                Workshop.new!(),
-               signal("factory.command", %{
+               signal("examples.factory.command", %{
                  operation: :submit,
                  request_id: "batch/1",
                  goal: "Existing"

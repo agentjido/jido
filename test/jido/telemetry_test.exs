@@ -23,60 +23,38 @@ defmodule JidoTest.TelemetryTest do
     :ok
   end
 
-  test "setup/0 is idempotent" do
-    assert :ok = Telemetry.setup()
-    assert :ok = Telemetry.setup()
-  end
-
-  test "setup/0 does not detach an existing handler" do
-    handler_id = "jido-semantic-logger"
-    event = [:jido, :telemetry, :sentinel]
-    test_pid = self()
-
-    :telemetry.detach(handler_id)
-
-    :ok =
-      :telemetry.attach(
-        handler_id,
-        event,
-        fn event, _measurements, _metadata, pid -> send(pid, {:sentinel, event}) end,
-        test_pid
-      )
-
-    on_exit(fn ->
-      :telemetry.detach(handler_id)
-      Telemetry.setup()
-    end)
-
-    assert :ok = Telemetry.setup()
-    :telemetry.execute(event, %{}, %{})
-    assert_receive {:sentinel, ^event}
+  test "the public API is metrics and OpenTelemetry status" do
+    assert function_exported?(Telemetry, :metrics, 0)
+    assert function_exported?(Telemetry, :open_telemetry?, 0)
+    refute function_exported?(Telemetry, :setup, 0)
+    refute Code.ensure_loaded?(Jido.Telemetry.Formatter)
   end
 
   test "default metrics use semantic events and fixed vocabulary tags" do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
-    assert names == [
-             [:jido, :agent, :lifecycle, :stop, :count],
-             [:jido, :agent, :lifecycle, :stop, :duration],
-             [:jido, :agent, :turn, :stop, :count],
-             [:jido, :agent, :turn, :stop, :duration],
-             [:jido, :agent, :turn, :settled, :count],
-             [:jido, :agent, :turn, :settled, :duration],
-             [:jido, :agent, :commit, :stop, :count],
-             [:jido, :agent, :commit, :stop, :duration],
-             [:jido, :agent, :directive, :stop, :count],
-             [:jido, :agent, :directive, :stop, :duration],
-             [:jido, :agent, :admission, :rejected, :count],
-             [:jido, :persistence, :operation, :stop, :count],
-             [:jido, :persistence, :operation, :stop, :duration],
-             [:jido, :topology, :operation, :stop, :count],
-             [:jido, :topology, :operation, :stop, :duration]
-           ]
+    assert length(names) == 28
+
+    for prefix <- [
+          [:jido, :agent, :lifecycle],
+          [:jido, :agent, :turn],
+          [:jido, :agent, :commit],
+          [:jido, :agent, :directive],
+          [:jido, :persistence, :operation],
+          [:jido, :topology, :operation]
+        ],
+        ending <- [:stop, :exception],
+        metric <- [:count, :duration] do
+      assert (prefix ++ [ending, metric]) in names
+    end
+
+    assert [:jido, :agent, :turn, :settled, :count] in names
+    assert [:jido, :agent, :admission, :rejected, :count] in names
+    assert [:jido, :scheduler, :delivery, :count] in names
 
     allowed =
-      ~w(operation status stage admission_reason persistence_reason topology_operation component_kind)a
+      ~w(operation status stage admission_reason persistence_reason topology_operation scheduler_outcome component_kind)a
 
     for metric <- metrics, tag <- metric.tags do
       assert tag in allowed
@@ -121,7 +99,7 @@ defmodule JidoTest.TelemetryTest do
     Debug.enable(instance, :verbose)
     on_exit(fn -> Debug.reset(instance) end)
 
-    log = capture_log(fn -> Telemetry.handle_semantic_event(event, %{}, metadata, nil) end)
+    log = capture_log(fn -> Jido.Telemetry.Semantic.point(event, metadata) end)
 
     assert log =~ "event=agent.turn.stop"
   end

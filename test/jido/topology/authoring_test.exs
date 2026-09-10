@@ -43,6 +43,33 @@ defmodule Jido.Topology.AuthoringTest do
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
   end
 
+  test "exact node placement survives Builder, Codec, and plan construction" do
+    target_node = :"worker@127.0.0.1"
+
+    builder =
+      Builder.new(name: "placed")
+      |> Builder.agent(:worker, Cell, node: target_node)
+
+    assert {:ok, definition} = Builder.build(builder)
+    assert hd(definition.agents).node == target_node
+    assert {:ok, document, registry} = Codec.encode(definition)
+    assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
+    assert {:ok, instance} = Builder.build(builder, id: "placed")
+    assert instance.plan.agents["agent/worker"].node == target_node
+  end
+
+  test "a remote Agent cannot subscribe to a local resource" do
+    builder =
+      Builder.new(name: "remote-resource")
+      |> Builder.agent(:worker, Cell, node: :"worker@127.0.0.1")
+      |> Builder.bus(:events)
+      |> Builder.subscribe(:worker, to: :events, path: "examples.topology.cell.work")
+
+    assert {:ok, _definition} = Builder.build(builder)
+    assert {:error, error} = Builder.build(builder, id: "remote-resource")
+    assert error.message == "A remote topology Agent cannot subscribe to a local Bus"
+  end
+
   test "every accepted Reference key survives a definition Codec round trip" do
     for reference <- [
           Reference.input(:initial),
@@ -244,7 +271,7 @@ defmodule Jido.Topology.AuthoringTest do
     assert {:ok, ^document} = Codec.encode(definition, registry)
 
     v1 = document |> Map.drop(~w(includes imports exports)) |> Map.put("version", 1)
-    assert {:ok, ^definition} = Codec.decode(v1, registry)
+    assert {:error, _} = Codec.decode(v1, registry)
   end
 
   test "both Codec entry points retain data and output document bounds" do
@@ -270,9 +297,11 @@ defmodule Jido.Topology.AuthoringTest do
           """
           defmodule JidoTest.InvalidTopologyCycle do
             use Jido.Topology, name: "cycle"
-            agents do
-              agent :a, Jido.Examples.Topology.Cell, depends_on: [:b]
-              agent :b, Jido.Examples.Topology.Cell, depends_on: [:a]
+            topology do
+              agents do
+                agent :a, Jido.Examples.Topology.Cell, depends_on: [:b]
+                agent :b, Jido.Examples.Topology.Cell, depends_on: [:a]
+              end
             end
           end
           """,

@@ -3,12 +3,12 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
   @moduletag :example
   alias Jido.Examples.RuntimeReconstruction, as: Example
   alias Example.Runtime
+  alias Jido.AgentServer, as: Server
 
   setup %{jido: jido} do
-    observer = :"runtime_reconstruction_#{System.unique_integer([:positive])}"
-    Process.register(self(), observer)
-    {:ok, server} = Jido.start_agent(jido, Example.new_for(observer), id: "feed")
-    assert_receive {:feed_runtime, runtime, init}, 1_000
+    {:ok, server} = Jido.start_agent(jido, Example, id: unique_id("feed"))
+    runtime = plugin_runtime(server)
+    init = Runtime.inspect_runtime(runtime).init
     eventually(fn -> Runtime.inspect_runtime(runtime).feed == "A" end)
     %{server: server, runtime: runtime, init: init}
   end
@@ -25,7 +25,10 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     current_ref = Process.monitor(current_resource)
     Process.exit(c.runtime, :kill)
     assert_receive {:DOWN, ^current_ref, :process, ^current_resource, _}, 1_000
-    assert_receive {:feed_runtime, replacement, _init}, 1_000
+
+    replacement =
+      eventually(fn -> plugin_runtime(c.server) != c.runtime && plugin_runtime(c.server) end)
+
     assert replacement != c.runtime
     eventually(fn -> Runtime.inspect_runtime(replacement).feed == "B" end)
     assert {:error, :stale_feed} = Runtime.input(replacement, "A", "old")
@@ -41,8 +44,19 @@ defmodule JidoTest.Examples.RuntimeReconstructionTest do
     assert {:ok, _} = Example.select(c.server, "B")
     version = Jido.AgentServer.snapshot(c.server).state_version
     Process.exit(c.runtime, :kill)
-    assert_receive {:feed_runtime, _replacement, init}, 1_000
+
+    replacement =
+      eventually(fn -> plugin_runtime(c.server) != c.runtime && plugin_runtime(c.server) end)
+
+    init = Runtime.inspect_runtime(replacement).init
     assert Map.get(init, :plugin_state) == %{name: "B"}
     assert Map.get(init, :state_version) == version
+  end
+
+  defp plugin_runtime(server) do
+    case Server.children(server)[{:plugin, Example.Plugin}] do
+      %{pid: pid} when is_pid(pid) -> pid
+      _child -> nil
+    end
   end
 end

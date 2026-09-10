@@ -203,7 +203,7 @@ end
 Replace patch returns such as `{:ok, %{count: next_count}}` with complete state
 based on `context.agent_state`. Do not copy V2 StateOps into the new result.
 The Action must preserve protected Plugin-owned state keys. The owning Agent
-Plugin facet changes those keys through `update_state/3`.
+Plugin facet changes those keys through `reduce/2`.
 
 Replace `signal_routes` with definition routes or the declarative `routes` block.
 Move a sequence of Actions into a Flow when it represents one command. A Flow
@@ -263,7 +263,7 @@ The Server no longer exposes the old GenServer State structure.
 | State machine domain state | Fields in the Agent schema and explicit transitions |
 | Pure input preparation | Action or Flow input handling |
 | Admission that needs live state or a resource | `c:Jido.AgentServer.Plugin.admit/3` |
-| Plugin-owned state update | `c:Jido.Agent.Plugin.update_state/3` |
+| Plugin-owned state update | `c:Jido.Agent.Plugin.reduce/2` |
 | Runtime work after commit | Typed Plugin Directive and `c:Jido.AgentServer.Plugin.dispatch/4` |
 | Observation | Public snapshots/status and V3 telemetry |
 
@@ -306,8 +306,8 @@ defmodule MyApp.CounterPlugin.Agent do
   end
 
   @impl Jido.Agent.Plugin
-  def update_state(state, _directives, _opts) do
-    {:ok, %{state | turns: state.turns + 1}}
+  def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
+    {:ok, %{reduction.plugin_state | turns: reduction.plugin_state.turns + 1}}
   end
 end
 
@@ -331,8 +331,8 @@ Port each capability explicitly:
 | Signal or Action preparation hooks | Move pure input work into the Action or Flow; use Agent Server admission for live checks |
 | Live admission | Use `c:Jido.AgentServer.Plugin.admit/3` |
 | Emit preparation | Use `c:Jido.AgentServer.Plugin.prepare_dispatch/4` with its Signal context |
-| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.update_state/3` only for its owned Agent field |
-| `DirectiveExec` or `directive_handler` | Declare and validate Directive types in the Agent facet; implement `dispatch/4` in the Agent Server facet |
+| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.reduce/2` only for its owned Agent field |
+| `DirectiveExec` or `directive_handler` | Implement `Jido.Agent.Directive.validate/1`, declare the type in the Agent facet, and implement `dispatch/4` in the Agent Server facet |
 | `child_spec(config)` | Put `child_spec/1` in the Agent Server facet; accept `Jido.Plugin.Init` and read `init.options` |
 | Plugin checkpoint or restore hooks | Use `c:Jido.Persistence.Plugin.dump/3` and `c:Jido.Persistence.Plugin.load/3` for one paired owned value |
 | Static topology metadata | Use `c:Jido.Topology.Plugin.contribute/2` for bounded canonical entries |
@@ -377,7 +377,7 @@ registration checks do not establish exclusive ownership across a cluster.
 **Check:** test shutdown, detached owners, idle expiry, worker limits, remote
 failure, and cleanup. See
 [Agent Server Lifecycle](agent-server-lifecycle.md) and the
-[bounded worker example](https://github.com/agentjido/jido/tree/v3-spike/test/examples/05_multi_agent/05_03_bounded_workers).
+[Factory examples](https://github.com/agentjido/jido/tree/v3-spike/examples/06_factory).
 
 ## Convert stored data explicitly
 
@@ -474,7 +474,7 @@ run `mix examples --seed 0` separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
 All research example assertions pass. They include the quiescent upgrade
-boundary, validated live definition migration, and additive local Topology
+boundary, validated live definition migration, and additive Topology
 updates. Stable Agent identity, durable deletion, Plugin runtime reconstruction,
 source-Signal route selection, and Plugin-owned state isolation also pass.
 Cluster-exclusive ownership remains unsupported. See

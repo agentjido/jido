@@ -51,13 +51,18 @@ defmodule Jido.AgentServer.CreationCause do
   def put(signal, nil), do: signal
 
   def put(signal, %__MODULE__{} = cause) do
-    case Trace.child_of(cause, cause.signal_id) do
-      {:error, :invalid_trace_context} ->
+    trace =
+      cause
+      |> Map.from_struct()
+      |> Map.take([:trace_id, :span_id])
+      |> Map.put(:causation_id, cause.signal_id)
+
+    case Trace.put(signal, trace) do
+      {:ok, signal} ->
+        {:ok, signal} = Signal.put_context(signal, "jidocauseturnid", cause.turn_id)
         signal
 
-      child ->
-        {:ok, signal} = Trace.put(signal, child)
-        {:ok, signal} = Signal.put_context(signal, "jidocauseturnid", cause.turn_id)
+      {:error, _reason} ->
         signal
     end
   end

@@ -1,33 +1,37 @@
-# FA-02: Plugin-owned state isolation
+# 99_10 Plugin Isolation
 
-Status: **Core feature available**.
+Status: implemented Plugin contract; candidate for stable Plugin guidance.
 
-Result on 2026-09-09: **2 passing checks.** All checks are enabled.
+An Agent Action changes domain state while a Plugin alone controls its owned
+state field.
 
-## Feature and proof
+## What this proves
 
-Owned Plugin state updates successfully. An Action cannot overwrite it, and a
-failed live Turn preserves the committed state.
+- A successful Turn applies Plugin state reduction after Action execution.
+- An Action cannot overwrite Plugin-owned state, and a failed Turn preserves it.
 
-## Implemented contract
+## Read the code
 
-An Action or Flow proposes domain state. After success, the Plugin updates only
-its owned field. The pipeline rejects an executable that changes that field.
+Read [the Agent and Plugin](plugin_isolation.ex).
 
-## Scope
-
-The example uses one domain field and one Plugin-owned field in the same Agent
-state map. Callback isolation is an API contract, not a sandbox for untrusted
-BEAM code.
-
-## Run
-
-From the jido repository:
+## Run it
 
 ```sh
 mix test test/examples/99_research/99_10_plugin_isolation --include example --seed 0
 ```
 
-This command must pass with no skipped check.
+Expected result: the Plugin increments its field after valid work and the
+pipeline rejects an Action candidate that changes that field.
 
-[Source](plugin_isolation.ex) · [Tests](../../../test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs)
+## Gap and limits
+
+The public contract exists. Promotion should add this boundary to the stable
+Plugin learning path. Isolation is an API contract, not a sandbox for untrusted
+BEAM code.
+
+## Files
+
+- [Source](plugin_isolation.ex)
+- [Tests](../../../test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs)
+
+Previous: [Route Selection](../99_09_route_selection/README.md) | Next: [Stable Reference](../99_11_stable_reference/README.md)

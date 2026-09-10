@@ -4,8 +4,9 @@
 
 ## Briefing
 
-Jido core owns static local Topology planning, same-target repair, and additive
-local Agent target updates. It does not own a distributed control plane.
+Jido core owns static Topology planning, same-target repair, additive Agent
+target updates, best-effort lifecycle Signals, and exact known-node placement.
+It does not own node selection or a distributed control plane.
 
 During pure instance planning, the Topology owner now asks each declared
 `Jido.Topology.Plugin` facet for static entries. The four-module Plugin seam is
@@ -25,9 +26,10 @@ graph before activation. The source definition stays unchanged.
 
 One application-supervised `Jido.Topology.Controller` starts and repairs one
 current `%Jido.Topology.Instance{}` on one Jido instance. `reconcile/2` repairs
-that target. `update/3` can add local Agents when every existing Agent and
-resource specification stays unchanged. It does not remove or replace members,
-move or rebalance Agents, hand off work, or recover an Agent on another node.
+that target. `update/3` can add Agents when every existing Agent and resource
+specification stays unchanged. `place_agent/4` applies a caller-selected exact
+Erlang node. It does not remove members, discover nodes, select placement,
+rebalance the system, hand off durable work, or grant distributed authority.
 
 ## Owned contract
 
@@ -39,15 +41,18 @@ move or rebalance Agents, hand off work, or recover an Agent on another node.
   fail before Controller activation.
 - A group receives one contribution for its declaration. All expanded members
   receive the resulting group connection.
-- The Controller owns local dependency order, readiness, repair, and cleanup.
-- A Controller target can grow by additive local Agent updates. Other target
-  changes require Controller replacement.
+- The root `agent` and `topology` blocks are independent. Root `routes` uses the
+  Agent DSL and requires `agent`. Topology sections exist only under `topology`.
+- The Controller owns dependency order, readiness, repair, exact placement,
+  lifecycle Signals, and cleanup.
+- A Controller target can grow by additive Agent updates. Agent placement can
+  change through `place_agent/4`. Other target changes require replacement.
 - Authoring owner helpers and Plugin facets have no implicit runtime or
   distributed authority.
 
 ## Distributed boundary
 
-Membership, discovery, automatic placement, rebalance, handoff, automatic
+Membership, discovery, placement selection, rebalance, handoff, automatic
 failover, leases, fencing, network-partition policy, and operator controls stay
 outside Jido core. An application or focused integration can build those
 functions with public Jido activation, Ref, persistence, and inspection
@@ -75,6 +80,10 @@ requirements.
 - `test/jido/topology/controller_update_test.exs` and research case UP-07 prove
   additive update, unchanged PID and state retention, later repair, and
   rejection of removal or replacement.
+- `test/jido/topology/controller_placement_test.exs` proves exact placement and
+  movement across two Erlang nodes.
+- The lifecycle and placement-policy examples prove that dedicated Signals,
+  normal Agent routes, and Plugin Directives form the policy boundary.
 - The runtime-topology and distributed-child suites prove that explicit
   known-node activation is the lowest remote primitive and has no fallback or
   exclusive-owner guarantee.

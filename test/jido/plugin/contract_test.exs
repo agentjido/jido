@@ -353,7 +353,7 @@ defmodule Jido.Plugin.ContractTest do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.normalize_all([UnhandledDirectivePlugin])
 
-    assert message == "Agent Plugin Directives must update state or dispatch runtime work"
+    assert message == "Agent Plugin Directives must reduce state or dispatch runtime work"
   end
 
   test "allows typed Directive dispatch without a Plugin process" do
@@ -525,6 +525,8 @@ defmodule Jido.Plugin.ContractTest do
   test "uses strict equality for numeric changes in nested Plugin-owned state" do
     assert {:ok, specs} = Jido.Plugin.normalize_all([OwnedStatePlugin])
     original = %{owned: %{count: 1, nested: %{value: 2}}}
+    agent = %{OwnedStateAgent.new!() | state: original}
+    signal = Signal.new!("owned.pipeline", %{}, source: "/test")
 
     for changed <- [
           %{owned: %{count: 1.0, nested: %{value: 2}}},
@@ -533,7 +535,9 @@ defmodule Jido.Plugin.ContractTest do
       assert {:error, %Jido.Error.ExecutionError{} = error} =
                Jido.Agent.Plugin.Pipeline.run(
                  {:ok, changed, []},
-                 original,
+                 agent,
+                 signal,
+                 %{},
                  Jido.Agent.Plugin.specs(specs)
                )
 

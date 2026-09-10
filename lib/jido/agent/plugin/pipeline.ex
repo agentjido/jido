@@ -1,25 +1,59 @@
 defmodule Jido.Agent.Plugin.Pipeline do
   @moduledoc false
 
+  alias Jido.Agent
   alias Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.Spec
+  alias Jido.Agent.Plugin.{Reduction, Spec}
   alias Jido.Error
+  alias Jido.Plugin.Input
   alias Jido.Plugin.Error, as: PluginError
+  alias Jido.Signal
 
   @type result :: {:ok, map(), [struct()]} | {:error, term()}
 
   @doc false
-  @spec run(result(), map(), [Spec.t()]) :: result()
-  def run({:ok, state, directives}, original_state, specs)
-      when is_map(state) and is_map(original_state) and is_list(directives) and is_list(specs) do
-    with :ok <- protect_owned_state(state, original_state, specs),
+  @spec run(result(), Agent.instance(), Signal.t(), %{optional(module()) => Input.t()}, [Spec.t()]) ::
+          result()
+  def run({:ok, state, directives}, %Agent{} = agent, %Signal{} = signal, plugin_inputs, specs)
+      when is_map(state) and is_map(plugin_inputs) and is_list(directives) and is_list(specs) do
+    run_pipeline(
+      {:ok, state, directives},
+      agent.state,
+      agent.id,
+      agent.module,
+      signal,
+      plugin_inputs,
+      specs
+    )
+  end
+
+  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs), do: error
+
+  defp run_pipeline(
+         {:ok, state, directives},
+         state_before,
+         agent_id,
+         agent_module,
+         signal,
+         plugin_inputs,
+         specs
+       ) do
+    with :ok <- protect_owned_state(state, state_before, specs),
          {:ok, directives} <- validate_directives(directives, specs),
-         {:ok, state} <- update_owned_state(state, directives, specs) do
+         {:ok, state} <-
+           reduce_owned_state(
+             state,
+             state_before,
+             agent_id,
+             agent_module,
+             signal,
+             plugin_inputs,
+             directives,
+             specs
+           ) do
       {:ok, state, directives}
     end
   end
-
-  def run({:error, _reason} = error, _original_state, _specs), do: error
 
   defp protect_owned_state(state, original_state, specs) do
     changed =
@@ -67,39 +101,77 @@ defmodule Jido.Agent.Plugin.Pipeline do
   end
 
   defp validate_directive(directive, specs) do
-    cond do
-      Jido.Agent.Directive.built_in?(directive) ->
-        Jido.Agent.Directive.validate(directive)
+    if Jido.Agent.Directive.built_in?(directive) do
+      Jido.Agent.Directive.validate(directive)
+    else
+      case Plugin.directive_owner(specs, directive) do
+        %Spec{legacy?: true} = spec ->
+          Plugin.validate_legacy_directive(spec, directive)
 
-      spec = Plugin.directive_owner(specs, directive) ->
-        Plugin.validate_directive(spec, directive)
+        %Spec{} ->
+          Jido.Agent.Directive.validate(directive)
 
-      true ->
-        {:error,
-         Error.validation_error("Agent Directive has no owner",
-           kind: :config,
-           details: %{directive: directive}
-         )}
+        nil ->
+          {:error,
+           Error.validation_error("Agent Directive has no owner",
+             kind: :config,
+             details: %{directive: directive}
+           )}
+      end
     end
   end
 
-  defp update_owned_state(state, directives, specs) do
+  defp reduce_owned_state(
+         state,
+         state_before,
+         agent_id,
+         agent_module,
+         signal,
+         plugin_inputs,
+         directives,
+         specs
+       ) do
     Enum.reduce_while(specs, {:ok, state}, fn spec, {:ok, current_state} ->
-      case update_one(spec, current_state, directives) do
+      case reduce_one(
+             spec,
+             current_state,
+             state_before,
+             agent_id,
+             agent_module,
+             signal,
+             plugin_inputs,
+             directives
+           ) do
         {:ok, updated} -> {:cont, {:ok, updated}}
         {:error, _reason} = error -> {:halt, error}
       end
     end)
   end
 
-  defp update_one(%Spec{state_key: nil}, state, _directives), do: {:ok, state}
+  defp reduce_one(
+         %Spec{state_key: nil},
+         state,
+         _state_before,
+         _agent_id,
+         _agent_module,
+         _signal,
+         _inputs,
+         _directives
+       ),
+       do: {:ok, state}
 
-  defp update_one(%Spec{} = spec, state, directives) do
+  defp reduce_one(
+         %Spec{legacy?: true} = spec,
+         state,
+         _state_before,
+         _agent_id,
+         _agent_module,
+         _signal,
+         _inputs,
+         directives
+       ) do
     if function_exported?(spec.module, :update_state, 3) do
-      owned_directives =
-        Enum.filter(directives, fn directive ->
-          directive.__struct__ in spec.directive_modules
-        end)
+      owned_directives = owned_directives(directives, spec)
 
       PluginError.safe_apply(
         spec.package,
@@ -108,13 +180,51 @@ defmodule Jido.Agent.Plugin.Pipeline do
         [Map.get(state, spec.state_key), owned_directives, spec.options],
         "Agent Plugin update_state/3 failed"
       )
-      |> validate_update(spec, state)
+      |> validate_reduction(spec, state, :update_state)
     else
       {:ok, state}
     end
   end
 
-  defp validate_update({:ok, value}, spec, state) do
+  defp reduce_one(
+         %Spec{} = spec,
+         state,
+         state_before,
+         agent_id,
+         agent_module,
+         signal,
+         inputs,
+         directives
+       ) do
+    if function_exported?(spec.module, :reduce, 2) do
+      package_input = Map.get(inputs, spec.package, %Input{})
+
+      reduction = %Reduction{
+        plugin: spec.package,
+        agent_id: agent_id,
+        agent_module: agent_module,
+        signal: signal,
+        state_before: state_before,
+        state: state,
+        plugin_state: Map.get(state, spec.state_key),
+        prepared_input: package_input.prepared,
+        directives: directives
+      }
+
+      PluginError.safe_apply(
+        spec.package,
+        spec.module,
+        :reduce,
+        [reduction, spec.options],
+        "Agent Plugin reduction failed"
+      )
+      |> validate_reduction(spec, state, :reduce)
+    else
+      {:ok, state}
+    end
+  end
+
+  defp validate_reduction({:ok, value}, spec, state, _callback) do
     case Zoi.parse(spec.state_schema, value) do
       {:ok, value} ->
         with :ok <- portable(value, spec) do
@@ -131,15 +241,22 @@ defmodule Jido.Agent.Plugin.Pipeline do
     end
   end
 
-  defp validate_update({:error, _reason} = error, _spec, _state), do: error
+  defp validate_reduction({:error, _reason} = error, _spec, _state, _callback), do: error
 
-  defp validate_update(result, spec, _state) do
+  defp validate_reduction(result, spec, _state, callback) do
     PluginError.invalid_callback(
-      "Agent Plugin update_state/3 returned an invalid result",
+      "Agent Plugin #{callback_label(callback)} returned an invalid result",
       spec.package,
       spec.module,
       %{result: result}
     )
+  end
+
+  defp callback_label(:reduce), do: "reduce/2"
+  defp callback_label(:update_state), do: "update_state/3"
+
+  defp owned_directives(directives, spec) do
+    Enum.filter(directives, &(&1.__struct__ in spec.directive_modules))
   end
 
   defp portable(value, spec) do

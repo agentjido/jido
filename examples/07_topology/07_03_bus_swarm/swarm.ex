@@ -8,30 +8,29 @@ defmodule Jido.Examples.Topology.Swarm do
            })
 
     metadata %{purpose: "Bus fan-out"}
-  end
 
-  agents do
-    agent :coordinator, Jido.Examples.Topology.Cell
+    agents do
+      agent :coordinator, Jido.Examples.Topology.Cell
 
-    group :workers, Jido.Examples.Topology.Cell do
-      count input(:worker_count)
+      group :workers, Jido.Examples.Topology.Cell do
+        count input(:worker_count)
+      end
     end
-  end
 
-  resources do
-    bus :work
-  end
+    resources do
+      bus :work
+    end
 
-  relationships do
-    owns :coordinator, :workers
-  end
+    relationships do
+      owns :coordinator, :workers
+    end
 
-  connections do
-    subscribe :workers, to: :work, path: "topology.work"
-  end
+    connections do
+      subscribe :workers, to: :work, path: "examples.topology.cell.work"
+    end
 
-  startup do
-    concurrency 32
-    ready :all
+    startup do
+      concurrency 32
+    end
   end
 end
