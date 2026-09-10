@@ -37,7 +37,7 @@ defmodule Jido.Agent.Codec.RegistryTest do
              Registry.identifier(registry, :action, String)
   end
 
-  test "identifier prefers an exact static value before a compatible value" do
+  test "identifier requires exact static value identity" do
     integer = %URI{scheme: "https", host: "example.com", port: 1}
     float = %URI{scheme: "https", host: "example.com", port: 1.0}
 
@@ -50,8 +50,10 @@ defmodule Jido.Agent.Codec.RegistryTest do
     assert {:ok, "values/integer"} = Registry.identifier(registry, :value, integer)
     assert {:ok, "values/float"} = Registry.identifier(registry, :value, float)
 
-    compatible = Registry.new!(%{"values/integer" => {:value, integer}})
-    assert {:ok, "values/integer"} = Registry.identifier(compatible, :value, float)
+    integer_only = Registry.new!(%{"values/integer" => {:value, integer}})
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Registry.identifier(integer_only, :value, float)
   end
 
   test "constructor rejects invalid identifiers, entries, values, duplicates, and aliases" do

@@ -36,9 +36,10 @@ forms. Caller context also accepts `nil` as an empty map.
 
 ## Module Roles
 
-An Agent behavior module implements `handle_signal/2`. A module created with
+An Agent behavior module can implement `handle_signal/2` for custom selection.
+When this callback is absent, Jido uses the Agent routes. A module created with
 `use Jido.Agent` also supplies static configuration through `__agent_config__/0`.
-`Agent.new(module, options)` and `Builder.new(module)` require this authoring
+`Agent.instantiate(module, options)` and `Builder.new(module)` require this authoring
 configuration.
 
 Agent Server startup and `SpawnAgent` also accept constructor modules with
@@ -57,6 +58,8 @@ json = JSON.encode!(document)
 
 The document stores static Agent configuration. It does not store instance
 state, runtime resources, completed work, or a live deployment.
+The current V3 document version is 2. The Codec does not decode version-1
+Agent documents.
 
 ## Use A Trusted Registry
 

@@ -45,7 +45,7 @@ defmodule Jido.Examples.AgentHierarchy do
       define :grow, args: [:depth]
     end
 
-    route "jido.agent.child.started", Jido.Examples.KeepState
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
       action %{tag: tag}, name: "example_hierarchy_exit", context: context do

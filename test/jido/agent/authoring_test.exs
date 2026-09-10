@@ -35,21 +35,9 @@ defmodule JidoTest.Agent.AuthoringTest do
     def update_state(turns, _directives, _opts), do: {:ok, turns + 1}
   end
 
-  defmodule PrepareAmount do
-    use Jido.Plugin
-
-    def prepare(command, _opts) do
-      amount = command.signal.data.amount
-      amount = if is_binary(amount), do: String.to_integer(amount), else: amount
-      signal = %{command.signal | data: %{command.signal.data | amount: amount + 1}}
-      {:ok, %{command | signal: signal}}
-    end
-  end
-
   defmodule PassThrough do
     use Jido.Plugin
-
-    def prepare(command, _opts), do: {:ok, command}
+    def state_spec(_opts), do: :none
   end
 
   defmodule PreparedCounter do
@@ -57,7 +45,6 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     agent do
       schema Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
-      plugin PrepareAmount
     end
 
     routes do
@@ -193,7 +180,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   defmodule CanonicalSource do
     def __agent_config__, do: %{module: __MODULE__, name: "private_source", vsn: 1}
 
-    def agent do
+    def definition do
       Agent.new!(module: __MODULE__, name: "public_source", vsn: 12, metadata: %{source: :agent})
     end
 
@@ -288,7 +275,7 @@ defmodule JidoTest.Agent.AuthoringTest do
       for {source, module} <- [keyword_module: KeywordCounter, spark_blocks: Counter] do
         attrs = parity_attrs(module)
         opts = [id: "parity-#{source}", state: %{count: 4}]
-        expected_definition = module.agent()
+        expected_definition = module.definition()
         expected_instance = module.new!(opts)
         map_definition = Agent.new!(attrs)
         keyword_definition = Agent.new!(Map.to_list(attrs))
@@ -308,7 +295,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
         assert Agent.instantiate!(map_definition, opts) === expected_instance
         assert Agent.instantiate!(keyword_definition, opts) === expected_instance
-        assert Agent.new!(module, opts) === expected_instance
+        assert Agent.instantiate!(module, opts) === expected_instance
         assert Builder.build!(parity_builder(module), opts) === expected_instance
         assert Builder.build!(Builder.new(module), opts) === expected_instance
         assert {:ok, ^expected_instance} = Codec.decode(json_document, registry, opts)
@@ -344,14 +331,14 @@ defmodule JidoTest.Agent.AuthoringTest do
       refute function_exported?(KeywordCounter, :add_signal, 0)
     end
 
-    test "AUTH-REQ-061: Builder module input copies canonical agent/0 data" do
+    test "AUTH-REQ-061: Builder module input copies canonical definition/0 data" do
       assert CanonicalSource.__agent_config__().name == "private_source"
-      assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.agent()
+      assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.definition()
     end
   end
 
   test "all forms use the same direct and live execution path", %{jido: jido} do
-    {:ok, document, registry} = Codec.encode(Counter.agent())
+    {:ok, document, registry} = Codec.encode(Counter.definition())
 
     instances = [
       Counter.new!(id: "spark"),
@@ -371,7 +358,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "inline routes compile ordinary Actions that Builder and Codec can reuse", %{jido: jido} do
-    target = InlineCounter.route_action("inline.add")
+    target = InlineCounter.route_action!("inline.add")
     assert target.__jido_executable__().kind == :action
     assert target.name() == "inline_authoring_add"
 
@@ -394,7 +381,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     assert built_candidate.state.count == 15
 
-    assert {:ok, document, registry} = Codec.encode(InlineCounter.agent())
+    assert {:ok, document, registry} = Codec.encode(InlineCounter.definition())
     assert {:ok, decoded} = Codec.decode(document, registry)
     assert hd(decoded.routes).target == {target, %{multiplier: 1}}
     refute Map.has_key?(document, "interfaces")
@@ -544,8 +531,8 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     assert_raise Jido.Error.ValidationError, fn -> Counter.add_signal!(1, input: %{amount: 2}) end
     assert {:error, _} = Counter.add_signal(1, signal: [source: "bad source"])
-    assert {:error, _} = Agent.new(:missing_agent_module, [])
-    assert {:error, _} = Agent.new(%{}, [])
+    assert {:error, _} = Agent.instantiate(:missing_agent_module, [])
+    assert {:error, _} = Agent.instantiate(%{}, [])
   end
 
   test "a live helper forwards runtime validation without a commit", %{jido: jido} do
@@ -557,20 +544,20 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert committed.state.count == 0
   end
 
-  test "helpers leave Plugin preparation and executable validation to execution", %{jido: jido} do
+  test "helpers leave executable validation to execution", %{jido: jido} do
     agent = PreparedCounter.new!()
-    assert {:ok, signal} = PreparedCounter.add_signal("2")
-    assert signal.data == %{amount: "2"}
+    assert {:ok, signal} = PreparedCounter.add_signal(2)
+    assert signal.data == %{amount: 2}
     assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
-    assert candidate.state.count == 3
+    assert candidate.state.count == 2
 
     {:ok, server} = Jido.start_agent(jido, agent)
-    assert {:ok, ^candidate} = PreparedCounter.add(server, "2")
+    assert {:ok, ^candidate} = PreparedCounter.add(server, 2)
     assert Server.snapshot(server).state_version == 1
   end
 
   test "raw wildcard and predicate routes and static structs survive the Codec" do
-    definition = RawCounter.agent()
+    definition = RawCounter.definition()
     assert {:ok, document, registry} = Codec.encode(definition)
     assert {:ok, ^definition} = Codec.decode(JSON.decode!(JSON.encode!(document)), registry)
     assert {:ok, rebuilt} = Builder.build(Builder.new(RawCounter))
@@ -605,23 +592,23 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "Plugin Codec uses the same record and Registry as Agent Codec" do
-    {:ok, document, registry} = Codec.encode(Counter.agent())
+    {:ok, document, registry} = Codec.encode(Counter.definition())
 
-    for {plugin, encoded} <- Enum.zip(Counter.agent().plugins, document["plugins"]) do
+    for {plugin, encoded} <- Enum.zip(Counter.definition().plugins, document["plugins"]) do
       assert {:ok, ^encoded} = Jido.Plugin.Codec.encode(plugin, registry)
 
       assert {:ok, ^plugin} =
                Jido.Plugin.Codec.decode(JSON.decode!(JSON.encode!(encoded)), registry)
     end
 
-    [plugin | _] = Counter.agent().plugins
+    [plugin | _] = Counter.definition().plugins
     assert {:ok, encoded, registry} = Jido.Plugin.Codec.encode(plugin)
     assert {:ok, ^plugin} = Jido.Plugin.Codec.decode(encoded, registry)
     assert {:error, _} = Jido.Plugin.Codec.decode(Map.put(encoded, "state", %{}), registry)
   end
 
   test "trusted aliases decode and re-encode with the canonical identifier" do
-    {:ok, document, registry} = Codec.encode(Counter.agent())
+    {:ok, document, registry} = Codec.encode(Counter.definition())
     canonical = document["module"]
     registry = Registry.new!(Map.put(registry.entries, "old/counter", {:alias, canonical}))
     assert {:ok, definition} = Codec.decode(%{document | "module" => "old/counter"}, registry)
@@ -662,7 +649,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "Codec rejects malformed documents without deriving atoms or modules" do
-    {:ok, document, registry} = Codec.encode(Counter.agent())
+    {:ok, document, registry} = Codec.encode(Counter.definition())
 
     for bad <- [
           nil,
@@ -715,7 +702,7 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   test "Codec bounds documents and rejects runtime data on encode" do
-    {:ok, document, registry} = Codec.encode(Counter.agent())
+    {:ok, document, registry} = Codec.encode(Counter.definition())
     deep = Enum.reduce(1..102, nil, fn _, acc -> [acc] end)
 
     for value <- [deep, List.duplicate(0, 10_001), String.duplicate("a", 1_048_577), <<255>>] do
@@ -723,7 +710,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     end
 
     for value <- [self(), make_ref(), fn -> :ok end, [1 | 2]] do
-      assert {:error, _} = Codec.encode(%{Counter.agent() | metadata: %{runtime: value}})
+      assert {:error, _} = Codec.encode(%{Counter.definition() | metadata: %{runtime: value}})
     end
   end
 

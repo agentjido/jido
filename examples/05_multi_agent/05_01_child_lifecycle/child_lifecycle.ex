@@ -1,25 +1,6 @@
-defmodule Jido.Examples.ChildLifecycle.Start do
-  @moduledoc false
-  use Jido.Action,
-    name: "example_child_start",
-    schema:
-      Zoi.object(%{
-        tag: Zoi.string() |> Zoi.min(1),
-        restart: Zoi.enum([:temporary, :transient]) |> Zoi.default(:transient)
-      })
-
-  def run(input, %{agent_state: state}) do
-    if input.tag in state.desired do
-      {:error, Jido.Action.Error.validation_error("child tag is already in use")}
-    else
-      {:ok, %{state | desired: state.desired ++ [input.tag]},
-       [Jido.Agent.Directive.spawn_agent(Jido.Examples.Worker, input.tag, restart: input.restart)]}
-    end
-  end
-end
-
 defmodule Jido.Examples.ChildLifecycle do
-  @moduledoc "Starts, tracks, restarts, and stops real child Agents. PIDs stay in runtime state."
+  @moduledoc "Starts, tracks, restarts, and stops child Agents without storing PIDs."
+
   use Jido.Agent, name: "example_child_lifecycle"
 
   agent do
@@ -27,25 +8,49 @@ defmodule Jido.Examples.ChildLifecycle do
   end
 
   routes do
-    signal_source "/examples/children"
+    signal_source "/examples/multi_agent/child_lifecycle"
 
-    route "examples.children.start", Jido.Examples.ChildLifecycle.Start do
+    route "examples.multi_agent.children.start" do
+      action input,
+        schema:
+          Zoi.object(%{
+            tag: Zoi.string() |> Zoi.min(1),
+            restart: Zoi.enum([:temporary, :transient]) |> Zoi.default(:transient)
+          }),
+        context: context do
+        if input.tag in context.agent_state.desired do
+          {:error, Jido.Action.Error.validation_error("child tag is already in use")}
+        else
+          candidate = %{context.agent_state | desired: context.agent_state.desired ++ [input.tag]}
+
+          directive =
+            Jido.Agent.Directive.spawn_agent(Jido.Examples.Worker, input.tag,
+              restart: input.restart
+            )
+
+          {:ok, candidate, [directive]}
+        end
+      end
+
       define :start_worker, args: [:tag, {:optional, :restart}]
     end
 
-    route "examples.children.stop" do
+    route "examples.multi_agent.children.stop" do
       action %{tag: tag},
-        name: "example_child_stop",
         schema: Zoi.object(%{tag: Zoi.string() |> Zoi.min(1)}),
         context: context do
-        next = %{context.agent_state | desired: List.delete(context.agent_state.desired, tag)}
-        {:ok, next, [Jido.Agent.Directive.stop_child(tag)]}
+        candidate = %{
+          context.agent_state
+          | desired: List.delete(context.agent_state.desired, tag)
+        }
+
+        {:ok, candidate, [Jido.Agent.Directive.stop_child(tag)]}
       end
 
       define :stop_worker, args: [:tag]
     end
 
-    route "jido.agent.child.*", Jido.Examples.KeepState
-    route "examples.work.result", Jido.Examples.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState
+    route "examples.multi_agent.worker.result", Jido.Examples.Support.KeepState
   end
 end

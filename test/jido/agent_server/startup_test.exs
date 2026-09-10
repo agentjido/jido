@@ -36,7 +36,7 @@ defmodule Jido.AgentServer.StartupTest do
       receive do
         :construct_agent ->
           definition = %{
-            Agent.agent()
+            Agent.definition()
             | plugins: [{HeldIgnoredRuntimePlugin, [observer: observer]}]
           }
 
@@ -119,7 +119,7 @@ defmodule Jido.AgentServer.StartupTest do
 
   test "a Plugin runtime that returns ignore rejects Agent startup", %{jido: jido} do
     id = unique_id("ignored-runtime")
-    definition = %{Agent.agent() | plugins: [{IgnoredRuntimePlugin, []}]}
+    definition = %{Agent.definition() | plugins: [{IgnoredRuntimePlugin, []}]}
 
     assert {:error,
             {:bootstrap_failed,

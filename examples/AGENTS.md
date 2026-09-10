@@ -13,6 +13,11 @@ Each example must teach one main Jido capability. A stable example must:
 - State what it proves and what it does not prove.
 - Work as an independent integration fixture when practical.
 
+Keep only examples that teach a distinct Jido capability. Do not add a stable
+example for an application policy that only combines capabilities that the
+learning path already covers. Put that policy in a guide or a larger demo
+unless the composition itself teaches a new Jido contract.
+
 Groups `01` through `08` are the stable learning path. Group `99_research`
 records proposed, incomplete, or not yet promoted behavior. A research example
 must state its status and must not present unsupported behavior as the normal
@@ -58,11 +63,22 @@ Follow these rules:
    those forms.
 10. Use `define` for the main commands that a reader will call.
 11. Use static Zoi schemas at Agent, Action, and Flow boundaries.
-12. Keep runtime clients, callbacks, PIDs, references, and other temporary values
-   in execution context. Do not put them in Agent state, Signals, or Directives.
-13. Return a complete candidate state. Keep post-commit effects in Directives
+12. Use Action or Signal input for requested work. Use execution context for
+    runtime services and execution metadata. Use Agent state for durable domain
+    data.
+13. Keep runtime clients, callbacks, PIDs, references, and other temporary values
+    in execution context. Do not put them in Agent state, Signals, or Directives.
+14. Do not call another `Jido.Action` module's `run/2` function directly. Run the
+    Action through a Flow, route, or public executor so that input validation,
+    context handling, and instrumentation remain active.
+15. Validate a complete plan from an external source before any side effect
+    starts. This rule applies to model-selected tools, parallel work, and other
+    plans that can cause more than one operation.
+16. Give every retry, repair loop, and tool loop an explicit application limit.
+    Document the result when the limit is reached.
+17. Return a complete candidate state. Keep post-commit effects in Directives
     and Plugin dispatch.
-14. Do not use raw `send` or `receive` in an example Action or Flow body. Use
+18. Do not use raw `send` or `receive` in an example Action or Flow body. Use
     Signals and Directives for domain communication. Do not pass test-only
     observers, blockers, gates, or work functions through execution context.
 
@@ -291,4 +307,6 @@ For each section review:
 5. Add or update each numbered README.
 6. Keep example tests focused on documented public behavior.
 7. Run the focused section test.
-8. Report guideline gaps and lessons that can improve these instructions.
+8. After removal or renumbering, delete empty folders and verify that source
+   folders, test folders, and README links still match.
+9. Report guideline gaps and lessons that can improve these instructions.

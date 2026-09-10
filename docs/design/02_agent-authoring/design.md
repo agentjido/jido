@@ -41,7 +41,7 @@ means that equivalent supported source data produces strictly equal canonical
 neutral definitions. It does not mean that every source form has compile-time
 functions or syntax.
 
-For a generated Agent module, `agent/0` is the canonical public definition.
+For a generated Agent module, `definition/0` is the canonical public definition.
 `__agent_config__/0` and `__agent_interfaces__/0` are private compiler data.
 They are not an Agent value and are not a public authoring document.
 
@@ -97,8 +97,8 @@ combine keyword fields and Spark block fields into one core configuration.
 `AUTH-REQ-010`: If a core field appears in both keyword and Spark block form,
 then the Agent DSL compiler shall reject the module at compile time.
 
-`AUTH-REQ-011`: When a generated Agent module exposes `agent/0`, the generated
-function shall return the canonical validated neutral definition.
+`AUTH-REQ-011`: When a generated Agent module exposes `definition/0`, the
+generated function shall return the canonical validated neutral definition.
 
 `AUTH-REQ-012`: The Agent DSL compiler shall keep `__agent_config__/0` and
 `__agent_interfaces__/0` as private compiler metadata.
@@ -226,12 +226,11 @@ shall resolve it directly to one canonical entry.
 Agent Codec shall return an authoring error without changing direct Agent
 validity.
 
-`AUTH-REQ-048`: Where seam 01 adds Agent `vsn`, the Agent Codec shall preserve
-it in a versioned authoring document and shall keep an approved rule for
-existing version-1 documents.
+`AUTH-REQ-048`: When the Agent Codec processes a version-2 Agent document, it
+shall preserve the Agent `vsn`.
 
 `AUTH-REQ-049`: The Plugin Codec shall encode one canonical Plugin declaration
-as module and options and shall exclude Plugin state and runtime data.
+as module and options and shall exclude Plugin-owned state values and runtime data.
 
 ### Authoring extensions and validation
 
@@ -276,8 +275,8 @@ boundary.
 route-default application to command evaluation.
 
 `AUTH-REQ-061`: When `Builder.new/1` receives a generated Agent module, the
-Agent Builder shall copy data that produces the module's canonical `agent/0`
-definition.
+Agent Builder shall copy data from the module's canonical `definition/0`
+result.
 
 `AUTH-REQ-062`: When Agent Codec encodes an Agent instance, it shall not parse
 or encode the instance ID or live state.
@@ -289,7 +288,7 @@ or encode the instance ID or live state.
 | Form | Definition entry | Instance entry | Source-only features |
 | --- | --- | --- | --- |
 | Direct map or keyword | `Agent.new/1` | `Agent.instantiate/2` | None |
-| Agent module and Spark | `module.agent/0` | `module.new/1` or `Agent.new/2` | Compile checks, inline syntax, `define` helpers |
+| Agent module and Spark | `module.definition/0` | `module.new/1` | Compile checks, inline syntax, `define` helpers |
 | Builder | `Builder.build/1` | `Builder.build/2` | Staged first-error workflow |
 | Codec | `Codec.decode/2` | `Codec.decode/3` | Versioned JSON data and trusted Registry |
 
@@ -341,7 +340,7 @@ payload field names and declaration order.
 ### Builder contract
 
 `Builder.new/1` accepts core static fields or a generated Agent module. Module
-input starts from the module's canonical `agent/0` definition, not its private
+input starts from the module's canonical `definition/0`, not its private
 compiler data.
 `Builder.name/2`, `vsn/2`, `description/2`, `schema/2`, `metadata/2`,
 `plugin/3`, and `route/4` stage data. `build/1` returns a definition. `build/2`
@@ -363,11 +362,9 @@ versioned document. The Plugin Codec uses the same Registry and tagged record
 format. A generated Registry is for temporary transport and tests. Durable
 authoring data uses application-owned stable identifiers.
 
-Agent Codec writes document version 2 with Agent `vsn`. It reads version 1 for
-compatibility. A version-1 document resolves to `vsn: 1` for a generated Agent
-module and to `nil` for a direct or behavior-only definition. Encoding an
-instance uses its validated neutral definition only; instance ID and state do
-not affect the document.
+Agent Codec reads and writes document version 2 with Agent `vsn`. It rejects
+version-1 documents. Encoding an instance uses its validated neutral
+definition only; instance ID and state do not affect the document.
 
 Registry entry kinds are `agent`, `action`, `flow`, `plugin`, `schema`,
 `route_match`, `atom`, and static struct `value`. Route predicates must be
@@ -434,7 +431,7 @@ These approved guarantees apply to dependent seams.
 | --- | --- | --- | --- |
 | `AUTH-DEC-001` | Which authoring forms remain? | Keep module, Spark, direct map and keyword, Builder, Codec, and neutral definitions. | The historical module-only proposal is retired. |
 | `AUTH-DEC-002` | What does authoring parity include? | Compare canonical neutral Agent definitions only. | Module helpers and syntax can differ without creating another Agent contract. |
-| `AUTH-DEC-003` | What is the module authority? | Make `agent/0` canonical and keep `__agent_config__/0` private compiler data. | Keyword declarations do not need to be canonical inside private metadata. |
+| `AUTH-DEC-003` | What is the module authority? | Make `definition/0` canonical and keep `__agent_config__/0` private compiler data. | Keyword declarations do not need to be canonical inside private metadata. |
 | `AUTH-DEC-004` | Can Codec encode an Agent instance? | Yes. Derive and validate its neutral definition, then encode only static data. | Current instance calls stay supported without repeated state parsing. |
 | `AUTH-DEC-005` | Must every valid definition be encodable? | No. Codec supports the Registry-resolvable static subset. | Runtime closures stay valid for direct use and fail clearly at Codec. |
 | `AUTH-DEC-006` | How do data users apply extensions? | Publish the pure lowerer; Builder and Codec consume lowered core data only. | Extension syntax does not enter the document format or runtime. |

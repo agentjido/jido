@@ -447,6 +447,6 @@ state that it provides no exclusive-owner guarantee.
 | `TOP-DEC-007` | Handoff restores through the normal durable Agent record. | The control plane does not copy checkpoint content. |
 | `TOP-DEC-008` | A holder rejects new mutations when it cannot confirm current authority. | Safety takes priority over write availability. |
 | `TOP-DEC-009` | Preview, cordon, uncordon, drain, move, rebalance, suspend, resume, and status belong to the external contract. | Product UI stays outside this seam. |
-| `TOP-DEC-010` | An owner Agent is not the control plane. | Authoring and Plugin state do not become cluster authority. |
+| `TOP-DEC-010` | An owner Agent is not the control plane. | Authoring and Plugin-owned Agent fields do not become cluster authority. |
 | `TOP-DEC-011` | Support additive local Agent target updates and keep removal, replacement, and resource changes deferred. | Local growth does not imply rebalance, handoff, or distributed authority. |
 | `TOP-DEC-012` | Topology Plugin facets contribute during pure Plan construction. | Static extension is complete without live Plugin authority. |

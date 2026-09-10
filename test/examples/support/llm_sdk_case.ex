@@ -8,8 +8,9 @@ defmodule JidoTest.LLMSDKCase do
       use JidoTest.Case, async: false
 
       import JidoTest.WorkflowSDKCase,
-        only: [start_agent!: 2, start_agent!: 3, idle: 1, errors: 1]
+        only: [start_agent!: 2, start_agent!: 3, errors: 1]
 
+      import JidoTest.AgentCase, only: [agent_result: 1]
       import JidoTest.LLMSDKCase
       alias Jido.AgentServer, as: Server
       alias JidoTest.LLMService, as: Service

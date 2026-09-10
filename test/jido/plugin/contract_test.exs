@@ -1,69 +1,21 @@
 defmodule Jido.Plugin.ContractTest do
   use ExUnit.Case, async: true
 
-  alias Jido.Agent.Command
   alias Jido.Signal
 
-  defmodule TraceAction do
-    use Jido.Action, name: "agent_plugin_trace"
-
-    @impl Jido.Action
-    def run(%{trace: trace}, context) do
-      {:ok, %{context.agent_state | trace: trace}}
-    end
-  end
-
-  defmodule TracePlugin do
-    use Jido.Plugin
-
-    @impl true
-    def prepare(%Command{} = command, opts) do
-      label = Keyword.fetch!(opts, :label)
-
-      signal = %{
-        command.signal
-        | data: %{command.signal.data | trace: command.signal.data.trace ++ [label]}
-      }
-
-      {:ok, %{command | signal: signal}}
-    end
-  end
-
   defmodule CallbackOnlyPlugin do
-    def prepare(%Command{} = command, _opts), do: {:ok, command}
+    def state_spec(_opts), do: :none
   end
 
   defmodule MarkerOnlyPlugin do
     def __jido_plugin__, do: :agent
-    def prepare(%Command{} = command, _opts), do: {:ok, command}
+    def state_spec(_opts), do: :none
   end
 
   defmodule RaisingMarkerPlugin do
     @behaviour Jido.Plugin
 
     def __jido_plugin__, do: raise("invalid marker")
-    def prepare(%Command{} = command, _opts), do: {:ok, command}
-  end
-
-  defmodule SecondTracePlugin do
-    use Jido.Plugin
-
-    @impl true
-    def prepare(command, opts), do: TracePlugin.prepare(command, opts)
-  end
-
-  defmodule RejectPlugin do
-    use Jido.Plugin
-
-    @impl true
-    def prepare(_command, _opts), do: {:error, :rejected}
-  end
-
-  defmodule InvalidPreparePlugin do
-    use Jido.Plugin
-
-    @impl true
-    def prepare(_command, _opts), do: {:ok, :not_a_command}
   end
 
   defmodule AdmissionPlugin do
@@ -76,15 +28,6 @@ defmodule Jido.Plugin.ContractTest do
         :replace -> {:ok, %{command | agent: %{command.agent | id: "replacement"}}}
         :reject -> {:error, :denied}
       end
-    end
-  end
-
-  defmodule ReplaceAgentPlugin do
-    use Jido.Plugin
-
-    @impl true
-    def prepare(command, _opts) do
-      {:ok, %{command | agent: %{command.agent | id: "replacement"}}}
     end
   end
 
@@ -330,35 +273,6 @@ defmodule Jido.Plugin.ContractTest do
     def validate_directive(directive, _opts), do: {:ok, directive}
   end
 
-  defmodule PluginAgent do
-    use Jido.Agent,
-      name: "plugin_agent",
-      schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])}),
-      routes: [{"trace.run", TraceAction}],
-      plugins: [{TracePlugin, label: "a"}, {SecondTracePlugin, label: "b"}]
-  end
-
-  defmodule RejectingAgent do
-    use Jido.Agent,
-      name: "rejecting_agent",
-      routes: [{"trace.run", TraceAction}],
-      plugins: [RejectPlugin]
-  end
-
-  defmodule InvalidPrepareAgent do
-    use Jido.Agent,
-      name: "invalid_prepare_agent",
-      routes: [{"trace.run", TraceAction}],
-      plugins: [InvalidPreparePlugin]
-  end
-
-  defmodule ReplaceAgent do
-    use Jido.Agent,
-      name: "replace_agent",
-      routes: [{"trace.run", TraceAction}],
-      plugins: [ReplaceAgentPlugin]
-  end
-
   defmodule InvalidStateAgent do
     use Jido.Agent,
       name: "invalid_state_agent",
@@ -421,13 +335,6 @@ defmodule Jido.Plugin.ContractTest do
       plugins: [NormalizingDirectivePlugin]
   end
 
-  test "use Jido.Plugin declares the v3 Agent Plugin contract" do
-    behaviours = TracePlugin.module_info(:attributes) |> Keyword.fetch!(:behaviour)
-
-    assert Jido.Plugin in behaviours
-    assert TracePlugin.__jido_plugin__() == :agent
-  end
-
   test "requires the use Jido.Plugin authoring boundary" do
     assert {:error, %Jido.Error.ValidationError{message: message}} =
              Jido.Plugin.normalize_all([CallbackOnlyPlugin])
@@ -487,39 +394,16 @@ defmodule Jido.Plugin.ContractTest do
     end
   end
 
-  test "prepares one command in declaration order" do
-    agent = PluginAgent.new!()
-    signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-
-    assert PluginAgent.plugins() == [
-             {TracePlugin, label: "a"},
-             {SecondTracePlugin, label: "b"}
-           ]
-
-    assert agent.plugins == PluginAgent.agent().plugins
-    assert Jido.Agent.definition(agent) == PluginAgent.agent()
-    assert {:ok, next_agent, []} = PluginAgent.cmd(agent, signal)
-    assert next_agent.state.trace == ["a", "b"]
-  end
-
-  test "can reject a command before executable work" do
-    agent = RejectingAgent.new!()
-    signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-
-    assert {:error, :rejected} = RejectingAgent.cmd(agent, signal)
-  end
-
-  test "rejects an invalid prepared command" do
-    agent = InvalidPrepareAgent.new!()
-    signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-
-    assert {:error, %Jido.Error.ExecutionError{}} = InvalidPrepareAgent.cmd(agent, signal)
-  end
-
   test "admission keeps its error contract for invalid commands and Agent replacement" do
-    agent = PluginAgent.new!()
+    agent =
+      Jido.Agent.new!(
+        name: "plugin_admission_contract",
+        schema: Zoi.object(%{trace: Zoi.list(Zoi.string()) |> Zoi.default([])})
+      )
+      |> Jido.Agent.instantiate!()
+
     signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-    assert {:ok, command} = Command.new(agent, signal)
+    assert {:ok, command} = Jido.Agent.Command.new(agent, signal)
 
     assert {:ok, invalid_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :invalid}])
 
@@ -549,13 +433,6 @@ defmodule Jido.Plugin.ContractTest do
 
     assert {:ok, reject_specs} = Jido.Plugin.normalize_all([{AdmissionPlugin, mode: :reject}])
     assert {:error, :denied} = Jido.Plugin.admit(command, reject_specs, %{})
-  end
-
-  test "does not let a Plugin replace the Agent" do
-    agent = ReplaceAgent.new!()
-    signal = Signal.new!("trace.run", %{trace: []}, source: "/test")
-
-    assert {:error, %Jido.Error.ExecutionError{}} = ReplaceAgent.cmd(agent, signal)
   end
 
   test "validates the complete Action state" do
@@ -654,7 +531,11 @@ defmodule Jido.Plugin.ContractTest do
           %{owned: %{count: 1, nested: %{value: 2.0}}}
         ] do
       assert {:error, %Jido.Error.ExecutionError{} = error} =
-               Jido.Plugin.protect_state({:ok, changed, []}, original, specs)
+               Jido.Agent.Plugin.Pipeline.run(
+                 {:ok, changed, []},
+                 original,
+                 Jido.Agent.Plugin.specs(specs)
+               )
 
       assert error.message == "Agent executable changed Plugin-owned state"
       assert error.details.keys == [:owned]

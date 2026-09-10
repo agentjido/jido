@@ -15,16 +15,14 @@ defmodule Jido.Plugin.ResultContractTest do
     use Jido.Plugin
 
     @impl true
-    def prepare(command, opts), do: Keyword.fetch!(opts, :callback).(command)
+    def admit(_runtime, command, opts), do: Keyword.fetch!(opts, :callback).(command)
     @impl true
-    def admit(_runtime, command, opts), do: prepare(command, opts)
+    def dispatch(_runtime, _directive, _context, opts), do: Keyword.fetch!(opts, :callback).(nil)
     @impl true
-    def dispatch(_runtime, _directive, _context, opts), do: prepare(nil, opts)
-    @impl true
-    def await_ready(_runtime, opts), do: prepare(nil, opts)
+    def await_ready(_runtime, opts), do: Keyword.fetch!(opts, :callback).(nil)
   end
 
-  for callback <- [:prepare, :admit] do
+  for callback <- [:admit] do
     test "#{callback} validates before it compares the Agent" do
       command = command()
       changed = %{command | agent: %{command.agent | id: "replacement"}, context: []}
@@ -37,13 +35,14 @@ defmodule Jido.Plugin.ResultContractTest do
       assert actual.details == expected.details
     end
 
-    test "#{callback} keeps numeric Agent equality and the returned value" do
+    test "#{callback} validates numerically equal Agent state" do
       command = command()
       changed = %{command | agent: %{command.agent | state: %{count: 1.0}}}
       assert changed.agent == command.agent
       refute changed.agent === command.agent
-      assert {:ok, actual} = run_command(unquote(callback), command, fn _ -> {:ok, changed} end)
-      assert actual === changed
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               run_command(unquote(callback), command, fn _ -> {:ok, changed} end)
     end
 
     test "#{callback} keeps Agent replacement error details" do
@@ -52,14 +51,11 @@ defmodule Jido.Plugin.ResultContractTest do
       assert {:error, error} = run_command(unquote(callback), command, fn _ -> {:ok, changed} end)
       assert error.message == "Agent Plugin cannot replace the Agent"
 
-      expected =
-        if unquote(callback) == :admit,
-          do: %{
-            code: :plugin_invalid_callback_result,
-            plugin: CallbackPlugin,
-            callback: :admit
-          },
-          else: %{code: :plugin_invalid_callback_result, plugin: CallbackPlugin}
+      expected = %{
+        code: :plugin_invalid_callback_result,
+        plugin: CallbackPlugin,
+        callback: :admit
+      }
 
       assert error.details == expected
     end
@@ -124,13 +120,6 @@ defmodule Jido.Plugin.ResultContractTest do
   end
 
   defp spec(fun), do: %Spec{module: CallbackPlugin, options: [callback: fun], runtime?: true}
-
-  defp run_command(:prepare, command, fun) do
-    case Plugin.prepare_specs(command, [spec(fun)]) do
-      {:ok, prepared, _specs} -> {:ok, prepared}
-      error -> error
-    end
-  end
 
   defp run_command(:admit, command, fun), do: Plugin.admit(command, [spec(fun)], %{})
 

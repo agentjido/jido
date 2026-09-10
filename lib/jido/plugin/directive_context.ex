@@ -2,7 +2,7 @@ defmodule Jido.Plugin.DirectiveContext do
   @moduledoc """
   Narrow post-commit context for one Plugin Directive.
 
-  `turn_context` contains prepared caller and Plugin additions for this Turn.
+  `turn_context` contains the admitted caller context for this Turn.
   It excludes the reserved Agent state and Signal fields. It is transient and
   is not added to the Directive, Agent checkpoint, or emitted Signals.
   """
@@ -15,12 +15,13 @@ defmodule Jido.Plugin.DirectiveContext do
               source_signal:
                 Zoi.struct(Jido.Signal, description: "Signal received by the Server"),
               effective_signal:
-                Zoi.struct(Jido.Signal, description: "Signal after Plugin preparation"),
+                Zoi.struct(Jido.Signal, description: "Signal after live admission"),
               state_version:
                 Zoi.integer(description: "Committed Agent state version") |> Zoi.min(0),
-              plugin_state: Zoi.any(description: "Committed Plugin-owned Agent state"),
+              plugin_state:
+                Zoi.any(description: "Committed value from the Plugin-owned Agent field"),
               turn_context:
-                Zoi.map(description: "Prepared transient Turn context") |> Zoi.default(%{}),
+                Zoi.map(description: "Admitted transient Turn context") |> Zoi.default(%{}),
               jido: Zoi.atom(description: "Optional Jido instance") |> Zoi.optional(),
               partition: Zoi.any(description: "Optional Agent partition") |> Zoi.optional()
             },

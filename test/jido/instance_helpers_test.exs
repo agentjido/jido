@@ -116,6 +116,9 @@ defmodule Jido.InstanceHelpersTest do
   end
 
   test "invalid parent bindings are rejected and missing metadata is normalized", %{jido: jido} do
+    assert :error = Jido.agent_parent_binding(jido, "child", [:invalid])
+    assert :error = Jido.agent_parent_binding(jido, :invalid, [])
+
     for binding <- [:invalid, %{parent_id: 42, tag: :child}] do
       assert :ok = Jido.RuntimeStore.put(jido, :agent_relationships, "child", binding)
       assert :error = Jido.agent_parent_binding(jido, "child")

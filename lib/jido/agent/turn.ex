@@ -36,6 +36,7 @@ defmodule Jido.Agent.Turn do
   @spec schema() :: Zoi.schema()
   def schema, do: @schema
 
+  @doc "Creates and validates one Turn."
   @spec new(term(), term()) :: {:ok, t()} | {:error, Exception.t()}
   def new(executable, input \\ %{}) do
     validate(%__MODULE__{executable: executable, input: input})
@@ -51,6 +52,7 @@ defmodule Jido.Agent.Turn do
     })
   end
 
+  @doc "Creates one Turn or raises its validation error."
   @spec new!(term(), term()) :: t() | no_return()
   def new!(executable, input \\ %{}) do
     case new(executable, input) do
@@ -71,10 +73,10 @@ defmodule Jido.Agent.Turn do
   @doc false
   @spec bind_source(t(), Jido.Signal.t()) :: {:ok, t()} | {:error, Exception.t()}
   def bind_source(%__MODULE__{source_signal: nil} = turn, %Jido.Signal{} = source_signal),
-    do: validate(%{turn | source_signal: source_signal})
+    do: {:ok, %{turn | source_signal: source_signal}}
 
   def bind_source(%__MODULE__{source_signal: source_signal} = turn, source_signal),
-    do: validate(turn)
+    do: {:ok, turn}
 
   def bind_source(%__MODULE__{} = turn, %Jido.Signal{} = source_signal) do
     {:error,
@@ -87,13 +89,51 @@ defmodule Jido.Agent.Turn do
      )}
   end
 
-  @spec validate(t()) :: {:ok, t()} | {:error, Exception.t()}
+  @doc "Validates one Agent Turn."
+  @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
   def validate(%__MODULE__{} = turn) do
-    with :ok <- Jido.Executable.validate(turn.executable),
-         :ok <- validate_data(turn.input, :input),
+    with :ok <- validate_plan(turn),
          :ok <- validate_source_signal(turn.source_signal) do
       {:ok, turn}
     end
+  end
+
+  def validate(value) do
+    {:error,
+     Error.validation_error("Expected a Jido.Agent.Turn value",
+       kind: :input,
+       subject: __MODULE__,
+       details: %{value: value}
+     )}
+  end
+
+  @doc false
+  @spec selected(term(), term(), Jido.Signal.t()) :: {:ok, t()} | {:error, Exception.t()}
+  def selected(executable, input, %Jido.Signal{} = source_signal) do
+    turn = %__MODULE__{executable: executable, input: input, source_signal: source_signal}
+
+    with :ok <- validate_plan(turn), do: {:ok, turn}
+  end
+
+  @doc false
+  @spec validate_selected(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate_selected(%__MODULE__{source_signal: %Jido.Signal{}} = turn) do
+    with :ok <- validate_plan(turn), do: {:ok, turn}
+  end
+
+  def validate_selected(value) do
+    {:error,
+     Error.validation_error("Expected a selected Jido.Agent.Turn value",
+       kind: :input,
+       subject: __MODULE__,
+       details: %{value: value}
+     )}
+  end
+
+  defp validate_plan(%__MODULE__{} = turn) do
+    with :ok <- Jido.Executable.validate(turn.executable),
+         :ok <- validate_data(turn.input, :input),
+         do: :ok
   end
 
   defp validate_data(value, _field) when is_map(value) or is_list(value) or is_nil(value),

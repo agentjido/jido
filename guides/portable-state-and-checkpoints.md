@@ -10,22 +10,22 @@ monitors, tasks, and Plugin runtime processes do not enter the record.
 
 ## The default checkpoint
 
-Agents created with `use Jido.Agent` have default `checkpoint/2` and
-`restore/2` callbacks. The default checkpoint contains the Agent identity and
-its complete validated state. Complete state includes the domain state and each
-Plugin state slice. A generated Agent module also owns a positive `vsn`. Jido
-stores it in the default version-2 checkpoint and rejects a module or `vsn`
-mismatch before it accepts saved state.
+The public Agent checkpoint boundary uses core default behavior when an Agent
+module does not define `checkpoint/2` or `restore/2`. The default checkpoint
+contains the Agent identity and its complete validated state. The one state map
+includes domain fields and each Plugin-owned top-level field. A generated Agent
+module also owns a positive `vsn`. Jido stores it in the version-2 checkpoint
+and rejects a module or `vsn` mismatch before it accepts saved state.
 
 ```elixir
-{:ok, checkpoint} = MyAgent.checkpoint(agent, %{
+{:ok, checkpoint} = Jido.Agent.checkpoint(agent, %{
   instance: MyApp.Jido,
   partition: nil,
   revision: 7,
   reason: :manual
 })
 
-{:ok, restored} = MyAgent.restore(checkpoint, %{
+{:ok, restored} = Jido.Agent.restore(MyAgent, checkpoint, %{
   instance: MyApp.Jido,
   partition: nil,
   revision: 7,
@@ -53,7 +53,7 @@ The facet cannot read the adapter, record key, complete Agent state, process,
 or commit result. Dump output must be portable. Load output must also match the
 paired Agent-facet state schema.
 
-Direct and behavior-only definitions keep the version-1 checkpoint format with
+Direct and behavior-only definitions use the version-2 checkpoint format with
 an embedded definition. This includes an explicitly unversioned direct
 definition that uses a generated module as its behavior but owns changed static
 data. Direct definitions can contain runtime authoring data in memory. The
@@ -64,7 +64,7 @@ definitions.
 ## Portable terms only
 
 Checkpoint data must remain valid outside the current process and BEAM node.
-Do not put these values in persistent Agent or Plugin state:
+Do not put these values in the persistent complete Agent state:
 
 - PIDs
 - ports
@@ -85,10 +85,10 @@ plain-map payload.
 
 ```elixir
 def checkpoint(agent, _context) do
-  {:ok, %{version: 1, id: agent.id, state: agent.state}}
+  {:ok, %{id: agent.id, state: agent.state}}
 end
 
-def restore(%{version: 1, id: id, state: state}, _context) do
+def restore(%{id: id, state: state}, _context) do
   new(id: id, state: state)
 end
 ```
@@ -96,8 +96,8 @@ end
 The public `Jido.Agent.checkpoint/2` function wraps a new custom payload in a
 core-owned version-2 envelope. The envelope contains `agent_module`, `vsn`, and
 the opaque `payload`. `Jido.Agent.restore/3` checks the module and `vsn`, then
-passes only the payload to the callback. It still passes a legacy raw custom
-map directly to the callback.
+passes only the payload to the callback. Raw custom payload maps are not
+checkpoint envelopes and restore rejects them.
 
 Persistence does not apply Plugin owned-state conversion to a complete custom
 checkpoint. The custom callback owns the complete payload and its migration.
@@ -105,9 +105,9 @@ checkpoint. The custom callback owns the complete payload and its migration.
 Restore must return an Agent with the module and ID that the persistence record
 names. Jido rejects a checkpoint that changes this identity.
 
-Treat a format change as a data migration. Accept old versions for as long as
-stored records can contain them. Return a clear error for a version that the
-current code cannot read.
+Treat a format change as a data migration. Convert version-1 Agent checkpoints
+before you use the V3 code. The current Agent boundary reads and writes only
+version 2.
 
 ## Context is not state
 

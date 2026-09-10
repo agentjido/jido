@@ -2,138 +2,71 @@ defmodule Jido.Agent.Turn.OutcomeTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent.Turn.Outcome
+  alias Jido.AgentServer.ActiveTurn
   alias Jido.Signal
   alias Jido.Signal.ID
 
-  test "schema, map, keyword, struct, and raising constructors agree" do
-    assert %Zoi.Types.Struct{module: Outcome} = Outcome.schema()
-    attrs = attrs()
-
-    assert {:ok, %Outcome{} = outcome} = Outcome.new(attrs)
-    assert {:ok, ^outcome} = Outcome.new(Map.to_list(attrs))
-    assert {:ok, ^outcome} = Outcome.new(outcome)
-    assert Outcome.new!(attrs) == outcome
-
-    assert {:error, %Jido.Error.ValidationError{}} = apply(Outcome, :new, [:invalid])
-
-    assert_raise Jido.Error.ValidationError, fn ->
-      Outcome.new!(%{attrs | id: "not-a-turn-id"})
-    end
-  end
-
-  test "accepts all valid terminal status and stage combinations" do
-    for status <- [:failed, :cancelled, :timed_out, :indeterminate],
-        stage <- [:prepare, :execute, :finalize, :commit] do
-      assert {:ok, %Outcome{status: ^status, stage: ^stage, committed?: false}} =
-               Outcome.new(attrs(status: status, stage: stage))
-    end
-
-    for stage <- [:commit, :directive] do
-      assert {:ok, %Outcome{status: :succeeded, stage: ^stage, committed?: true}} =
-               Outcome.new(
-                 attrs(
-                   status: :succeeded,
-                   stage: stage,
-                   committed?: true,
-                   state_version_after: 4,
-                   error: nil
-                 )
-               )
-    end
-
-    assert {:ok, %Outcome{status: :failed, stage: :directive, committed?: true}} =
-             Outcome.new(
-               attrs(
-                 stage: :directive,
-                 committed?: true,
-                 state_version_after: 4,
-                 directives: summary(3, 1, 1, 1, 1)
-               )
-             )
-  end
-
-  test "rejects inconsistent status, stage, and state version fields" do
-    invalid = [
-      attrs(status: :succeeded, error: :failure),
-      attrs(status: :succeeded, stage: :commit, error: nil),
-      attrs(stage: :directive),
-      attrs(committed?: true, state_version_after: 3),
-      attrs(committed?: true, state_version_after: 5),
-      attrs(state_version_after: 4),
-      attrs(
-        status: :succeeded,
-        stage: :prepare,
-        committed?: true,
-        state_version_after: 4,
-        error: nil
-      )
-    ]
-
-    for attrs <- invalid do
-      assert {:error, %Jido.Error.ValidationError{}} = Outcome.new(attrs)
-    end
-  end
-
-  test "validates every Directive count and failed index rule" do
-    for directives <- [
-          summary(2, 2, 0, nil, 0),
-          summary(3, 1, 1, 1, 1),
-          summary(3, 0, 1, 0, 2)
-        ] do
-      assert {:ok, %Outcome{directives: ^directives}} = Outcome.new(attrs(directives: directives))
-    end
-
-    for directives <- [
-          summary(2, 1, 0, nil, 0),
-          summary(2, 1, 1, nil, 0),
-          summary(2, 1, 1, 0, 0),
-          summary(2, 0, 2, 0, 0),
-          summary(0, 0, 0, 0, 0)
-        ] do
-      assert {:error, %Jido.Error.ValidationError{}} = Outcome.new(attrs(directives: directives))
-    end
-  end
-
-  test "requires ordered timestamps and a non-negative measured duration" do
-    assert {:ok, %Outcome{duration_ms: 5}} = Outcome.new(attrs())
-    assert {:ok, %Outcome{duration_ms: 4}} = Outcome.new(attrs(duration_ms: 4))
-
-    for changes <- [[finished_at: 4], [duration_ms: -1], [started_at: 11, finished_at: 10]] do
-      assert {:error, _reason} = Outcome.new(attrs(changes))
-    end
-  end
-
-  defp attrs(overrides \\ []) do
+  test "ActiveTurn produces the terminal Outcome record" do
     signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
+    active = ActiveTurn.new(signal, nil, 3)
+    outcome = ActiveTurn.outcome(active, "counter-1", :failed, :execute, :failure)
 
-    Map.merge(
-      %{
-        id: ID.generate!(),
-        agent_id: "counter-1",
-        source_signal: signal,
-        effective_signal: signal,
-        status: :failed,
-        stage: :execute,
-        committed?: false,
-        state_version_before: 3,
-        state_version_after: nil,
-        error: :simulated_failure,
-        directives: summary(0, 0, 0, nil, 0),
-        started_at: 5,
-        finished_at: 10,
-        duration_ms: 5
-      },
-      Map.new(overrides)
-    )
+    assert %Outcome{
+             id: id,
+             agent_id: "counter-1",
+             source_signal: ^signal,
+             effective_signal: nil,
+             status: :failed,
+             stage: :execute,
+             committed?: false,
+             state_version_before: 3,
+             state_version_after: nil,
+             error: :failure,
+             directives: %{
+               total: 0,
+               completed: 0,
+               failed: 0,
+               failed_index: nil,
+               skipped: 0
+             },
+             started_at: started_at,
+             finished_at: finished_at,
+             duration_ms: duration_ms
+           } = outcome
+
+    assert ID.valid?(id)
+    assert finished_at >= started_at
+    assert duration_ms >= 0
   end
 
-  defp summary(total, completed, failed, failed_index, skipped) do
-    %{
-      total: total,
-      completed: completed,
-      failed: failed,
-      failed_index: failed_index,
-      skipped: skipped
-    }
+  test "ActiveTurn records commit and Directive completion" do
+    signal = Signal.new!("counter.add", %{}, source: "/test")
+
+    outcome =
+      signal
+      |> ActiveTurn.new(nil, 8)
+      |> ActiveTurn.mark_committed(9, 3)
+      |> ActiveTurn.mark_directive_completed()
+      |> ActiveTurn.mark_directive_failed()
+      |> ActiveTurn.outcome("counter-1", :failed, :directive, :dispatch_failed)
+
+    assert %Outcome{
+             committed?: true,
+             state_version_before: 8,
+             state_version_after: 9,
+             directives: %{
+               total: 3,
+               completed: 1,
+               failed: 1,
+               failed_index: 1,
+               skipped: 1
+             }
+           } = outcome
+  end
+
+  test "Outcome has no public authoring API" do
+    refute function_exported?(Outcome, :schema, 0)
+    refute function_exported?(Outcome, :new, 1)
+    refute function_exported?(Outcome, :new!, 1)
   end
 end

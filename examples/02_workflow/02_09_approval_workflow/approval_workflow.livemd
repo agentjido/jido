@@ -1,0 +1,289 @@
+# Flight Booking Approval Workflow
+
+This Livebook uses the complete `02_09` example. You will search for a flight,
+select one offer, inspect the approval Directive, and submit one booking through
+a local adapter.
+
+The example has no network calls and needs no credentials. Run each cell in
+order.
+
+## Install Jido
+
+Use the current Jido checkout and Kino for the Mermaid diagram.
+
+```elixir
+Mix.install([
+  {:jido, path: Path.expand("../../..", __DIR__)},
+  {:kino, "~> 0.19"}
+])
+```
+
+## Load The Example
+
+The files stay beside the example. This cell loads the existing modules. The
+notebook does not copy the Agent, Flow, Actions, Plugin, ports, or adapters.
+
+```elixir
+example_files = [
+  "ports.ex",
+  "support/adapters.ex",
+  "booking_plugin.ex",
+  "booking_actions.ex",
+  "search_flow.ex",
+  "approval_workflow.ex"
+]
+
+unless Code.ensure_loaded?(Jido.Examples.ApprovalWorkflow) do
+  Enum.each(example_files, fn file ->
+    Code.require_file(Path.join(__DIR__, file))
+  end)
+end
+
+alias Jido.AgentServer, as: Server
+alias Jido.Examples.ApprovalWorkflow, as: Example
+
+alias Jido.Examples.ApprovalWorkflow.{
+  FakeBookingAPI,
+  FixtureSearch
+}
+```
+
+## See The Commit Boundary
+
+Each public command starts one Agent Turn. Search and selection commit state.
+Approval commits `:submitting` state and a typed Directive. Plugin dispatch can
+start only after that commit. The provider result returns as a Signal and starts
+a later Turn.
+
+```elixir
+Kino.Mermaid.new("""
+sequenceDiagram
+    autonumber
+    actor Developer
+    participant Server as AgentServer
+    participant Flow as SearchFlow
+    participant Plugin as BookingPlugin
+    participant API as BookingAPI
+
+    Developer->>Server: search_flights(constraints, search context)
+    Server->>Flow: validate, search, and prepare options
+    Flow-->>Server: complete candidate state
+    Server->>Server: commit awaiting_selection
+    Server-->>Developer: searched Agent
+
+    Developer->>Server: select_fare(option, revision, passenger)
+    Server->>Server: commit awaiting_approval
+    Server-->>Developer: selected Agent
+
+    Developer->>Server: approve_booking(booking context)
+    Server->>Server: commit submitting + SubmitBooking
+    Server-->>Developer: submitting Agent
+    Note over Server,Plugin: Directive dispatch starts after the state commit
+    Server->>Plugin: dispatch SubmitBooking
+    Plugin->>API: book(request, idempotency_key)
+    API-->>Plugin: ok, booking_id
+    Plugin-->>Server: booking_succeeded Signal
+    Server->>Server: later Turn commits booked
+""")
+```
+
+## Start The Local Runtime
+
+The example keeps adapters in Turn context. It does not put the adapter PID in
+Agent state, a Signal, or the Directive.
+
+This setup cell is safe to run again. It stops the prior demo Agent before it
+starts a new one. Livebook owns the local booking adapter process.
+
+```elixir
+{:ok, _jido} = Jido.start()
+
+agent_id = "approval-workflow-livebook"
+
+case Jido.whereis_agent(agent_id) do
+  nil -> :ok
+  prior_server -> Jido.stop_agent(prior_server)
+end
+
+{:ok, booking_api} = Kino.start_child({FakeBookingAPI, []})
+{:ok, server} = Jido.start_agent(Example, id: agent_id)
+
+Server.snapshot(server)
+```
+
+The initial `state_version` is zero. The Agent starts with `:idle` booking
+status.
+
+## Search For Flights
+
+`FixtureSearch` is a deterministic implementation of the search port. Replace
+the fixture data to try other inputs. The Flow validates the request, calls the
+port, filters the offers, sorts them, and returns the complete next Agent state.
+
+```elixir
+constraints = %{
+  origin: "ORD",
+  destination: "LAX",
+  date: "2026-10-01",
+  max_price: 400
+}
+
+offers = [
+  %{
+    id: "fare-2",
+    origin: "ORD",
+    destination: "LAX",
+    date: "2026-10-01",
+    price: 350,
+    fare_revision: "r2"
+  },
+  %{
+    id: "fare-1",
+    origin: "ORD",
+    destination: "LAX",
+    date: "2026-10-01",
+    price: 300,
+    fare_revision: "r1"
+  }
+]
+
+{:ok, searched} =
+  Example.search_flights(server,
+    input: %{constraints: constraints},
+    context: %{search: {FixtureSearch, {:ok, offers}}}
+  )
+
+%{
+  status: searched.state.booking_status,
+  search_revision: searched.state.search_revision,
+  option_ids: Enum.map(searched.state.offered_options, & &1.id),
+  state_version: Server.snapshot(server).state_version
+}
+```
+
+The expected status is `:awaiting_selection`. The lower-cost `fare-1` is first,
+and the state version is one.
+
+## Select One Current Offer
+
+Selection includes the search revision. A stale client cannot select an offer
+from an older search result.
+
+```elixir
+{:ok, selected} =
+  Example.select_fare(
+    server,
+    "fare-1",
+    searched.state.search_revision,
+    "passenger-ref"
+  )
+
+%{
+  status: selected.state.booking_status,
+  approval: selected.state.approval,
+  selected_offer: selected.state.selection.id,
+  state_version: Server.snapshot(server).state_version
+}
+```
+
+The expected status is `:awaiting_approval`. The state version is two.
+
+## Preview Approval Without Dispatch
+
+A direct command evaluates the same route against an Agent value. It returns a
+candidate Agent and its Directives, but it does not commit live state or call the
+provider. This is useful when you test the pure command boundary.
+
+```elixir
+booking_context = %{booking_adapter: {FakeBookingAPI, booking_api}}
+{:ok, approval_signal} = Example.approve_booking_signal()
+
+{:ok, candidate, [directive]} =
+  Example.cmd(selected, approval_signal, context: booking_context)
+
+%{
+  live_status: Server.agent(server).state.booking_status,
+  candidate_status: candidate.state.booking_status,
+  directive_type: directive.__struct__,
+  directive: Map.from_struct(directive),
+  provider_calls: FakeBookingAPI.calls(booking_api)
+}
+```
+
+The live status stays `:awaiting_approval`. The candidate status is
+`:submitting`, and the provider call list stays empty. The Directive contains
+portable request data and one stable idempotency key.
+
+## Commit And Dispatch Approval
+
+The live command commits the candidate. The Agent Server then dispatches the
+Directive through `BookingPlugin`. The Plugin calls the booking port and casts a
+correlated result Signal back to the Agent Server.
+
+```elixir
+{:ok, submitting} =
+  Example.approve_booking(server, context: booking_context)
+
+terminal_agent =
+  Enum.reduce_while(1..100, nil, fn _attempt, _last_agent ->
+    current_agent = Server.agent(server)
+
+    if current_agent.state.booking_status in [:booked, :failed] do
+      {:halt, current_agent}
+    else
+      Process.sleep(10)
+      {:cont, current_agent}
+    end
+  end)
+
+if terminal_agent.state.booking_status not in [:booked, :failed] do
+  raise "booking did not reach a terminal state"
+end
+
+%{
+  approval_returned: submitting.state.booking_status,
+  terminal_status: terminal_agent.state.booking_status,
+  booking_id: terminal_agent.state.booking_id,
+  provider_calls: FakeBookingAPI.calls(booking_api),
+  state_version: Server.snapshot(server).state_version
+}
+```
+
+The approval call returns the committed `:submitting` Agent. The correlated
+result Signal completes a later Turn and changes live status to `:booked`. The
+state version is four: search, selection, approval, and provider result.
+
+The bounded wait reads only the public Agent API. It is notebook coordination,
+not part of the example Agent or Action code.
+
+## Verify Duplicate Protection
+
+The Agent accepts approval only from `:awaiting_approval`. A repeated approval
+fails before it creates another provider request.
+
+```elixir
+{:error, duplicate_error} =
+  Example.approve_booking(server, context: booking_context)
+
+%{
+  error: Jido.Flow.Error.to_map(duplicate_error),
+  provider_call_count: length(FakeBookingAPI.calls(booking_api)),
+  live_status: Server.agent(server).state.booking_status
+}
+```
+
+The provider call count stays one, and live status stays `:booked`.
+
+## Stop The Example
+
+```elixir
+:ok = Jido.stop_agent(server)
+:ok = Kino.terminate_child(booking_api)
+:ok = Jido.stop()
+```
+
+This example does not provide durable Directive delivery, provider retry, or
+recovery after process loss. Read the
+[source README](README.md) and the
+[behavior tests](../../../test/examples/02_workflow/02_09_approval_workflow/approval_workflow_test.exs)
+for the failure and stale-result cases.

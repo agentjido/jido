@@ -236,8 +236,8 @@ Agent Server starts it, the Agent Server shall own its runtime root and wait
 for readiness before it reports Agent readiness.
 
 `SRV-REQ-042`: When the Agent Server starts or replaces a Plugin runtime, it
-shall provide one immutable input with the latest committed owned Plugin state
-and matching Agent state version.
+shall provide one immutable input with the latest committed value from the
+Plugin-owned Agent field and matching Agent state version.
 
 `SRV-REQ-043`: While a required Plugin runtime is restarting, the Agent Server
 shall keep inspection and control calls responsive.
@@ -438,7 +438,7 @@ private Agent Server state has no public migration contract.
   succeeds.
 - `SRV-INV-003`: Directive work never starts before commit.
 - `SRV-INV-004`: A post-commit failure never rolls back committed state.
-- `SRV-INV-005`: Runtime handles never enter Agent or Plugin-owned state.
+- `SRV-INV-005`: Runtime handles never enter the complete Agent state.
 - `SRV-INV-006`: Loss of persistence write authority cannot become a degraded
   writer mode.
 - `SRV-INV-007`: Agent identity, runtime location, activation identity, state

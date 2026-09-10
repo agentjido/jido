@@ -135,7 +135,7 @@ An instance has a nonempty binary ID and validated state. Separate these steps
 when using generic construction or the Builder:
 
 ```elixir
-definition = MyApp.Counter.agent()
+definition = MyApp.Counter.definition()
 {:ok, agent} = Jido.Agent.instantiate(definition, id: "counter-1", state: %{count: 5})
 ```
 
@@ -202,8 +202,8 @@ end
 
 Replace patch returns such as `{:ok, %{count: next_count}}` with complete state
 based on `context.agent_state`. Do not copy V2 StateOps into the new result.
-The Action must preserve protected Plugin state keys. The owning Agent Plugin
-facet changes those keys through `contribute/2`.
+The Action must preserve protected Plugin-owned state keys. The owning Agent
+Plugin facet changes those keys through `update_state/3`.
 
 Replace `signal_routes` with definition routes or the declarative `routes` block.
 Move a sequence of Actions into a Flow when it represents one command. A Flow
@@ -211,9 +211,8 @@ must also produce complete domain state. Do not split it into separate live
 calls if your application requires one commit.
 
 Jido uses the first matching target in Router order. Router priority and
-specificity put an exact route before a matching wildcard route. Selection uses
-the unchanged source Signal before Plugin preparation. A prepared effective
-Signal cannot select a different executable.
+specificity put an exact route before a matching wildcard route. Agent Plugins
+do not change the Signal or selected executable.
 
 **Check:** assert that unrelated fields survive success. Test no-match and
 multiple-match Signals. Test every pattern match that used the old two-element
@@ -262,9 +261,9 @@ The Server no longer exposes the old GenServer State structure.
 | --- | --- |
 | Domain calculation or branching | Action or Flow |
 | State machine domain state | Fields in the Agent schema and explicit transitions |
-| Pure input preparation | `c:Jido.Agent.Plugin.prepare/2` |
+| Pure input preparation | Action or Flow input handling |
 | Admission that needs live state or a resource | `c:Jido.AgentServer.Plugin.admit/3` |
-| Plugin-owned state update | `c:Jido.Agent.Plugin.contribute/2` |
+| Plugin-owned state update | `c:Jido.Agent.Plugin.update_state/3` |
 | Runtime work after commit | Typed Plugin Directive and `c:Jido.AgentServer.Plugin.dispatch/4` |
 | Observation | Public snapshots/status and V3 telemetry |
 
@@ -300,7 +299,6 @@ in an Agent facet:
 ```elixir
 defmodule MyApp.CounterPlugin.Agent do
   use Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.Contribution
 
   @impl Jido.Agent.Plugin
   def state_spec(_opts) do
@@ -308,9 +306,8 @@ defmodule MyApp.CounterPlugin.Agent do
   end
 
   @impl Jido.Agent.Plugin
-  def contribute(transition, _opts) do
-    next = %{transition.plugin_state | turns: transition.plugin_state.turns + 1}
-    {:ok, %Contribution{plugin: transition.plugin, state: {:replace, next}}}
+  def update_state(state, _directives, _opts) do
+    {:ok, %{state | turns: state.turns + 1}}
   end
 end
 
@@ -323,7 +320,7 @@ Add `plugin MyApp.CounterPlugin` inside the Agent's `agent` block. Use
 `plugin MyPlugin, config: [option: value]` for per-Agent options. This example counts
 successful candidate reductions; only a successful live commit stores the count.
 Set a default on the owned object itself when the key can be absent. A default
-on a nested field alone does not create the outer Plugin state object.
+on a nested field alone does not create the outer Plugin-owned state object.
 
 Port each capability explicitly:
 
@@ -331,10 +328,10 @@ Port each capability explicitly:
 | --- | --- |
 | Manifest, requirements, automatic routes | Declare Plugins and routes on the Agent explicitly |
 | `mount/2` | Put portable defaults in the state schema; put runtime setup in an owned child |
-| Signal or Action preparation hooks | Use `c:Jido.Agent.Plugin.prepare/2` with a bounded Preparation value |
+| Signal or Action preparation hooks | Move pure input work into the Action or Flow; use Agent Server admission for live checks |
 | Live admission | Use `c:Jido.AgentServer.Plugin.admit/3` |
 | Emit preparation | Use `c:Jido.AgentServer.Plugin.prepare_dispatch/4` with its Signal context |
-| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.contribute/2` only for owned Plugin state and Directives |
+| `transform_result/3` | Put domain transformations in the Action or Flow; use `c:Jido.Agent.Plugin.update_state/3` only for its owned Agent field |
 | `DirectiveExec` or `directive_handler` | Declare and validate Directive types in the Agent facet; implement `dispatch/4` in the Agent Server facet |
 | `child_spec(config)` | Put `child_spec/1` in the Agent Server facet; accept `Jido.Plugin.Init` and read `init.options` |
 | Plugin checkpoint or restore hooks | Use `c:Jido.Persistence.Plugin.dump/3` and `c:Jido.Persistence.Plugin.load/3` for one paired owned value |
@@ -345,9 +342,8 @@ committed owned state after a restart. `Init` does not contain a state snapshot
 or state version. `await_ready/2` can wait for reconstruction; readiness failure
 stops the owner. A Plugin without a child receives `nil` in `dispatch/4`.
 
-Each Agent facet receives only the top-level domain fields from `observes/1`,
-its owned state, and its own prepared input. This is a callback API boundary.
-It is not a sandbox for untrusted BEAM code.
+Each Agent facet receives only its owned state and owned Directives. This is a
+callback API boundary. It is not a sandbox for untrusted BEAM code.
 
 **Check:** test owned state protection, callback order, readiness, owner shutdown,
 restart reconstruction, and dispatch errors. See
@@ -399,8 +395,8 @@ identity, definition revision, complete state, and recursive portability.
 
 1. Stop old writers and export a backup with the V2 application.
 2. Decode records with the old code. Record the Agent ID, module, partition,
-   domain state, Plugin state, history, and pending work.
-3. Convert each domain and Plugin state value to the new schemas. Decide how
+   complete Agent state, history, and pending work.
+3. Convert each domain field and Plugin-owned field to the new schemas. Decide how
    to reconcile external work that might already have completed.
 4. Construct and validate a V3 instance. If you add a namespace, confirm that
    no compatible and stable keys exist for the same Ref. Save through the V3
@@ -413,7 +409,7 @@ identity, definition revision, complete state, and recursive portability.
 
 Do not run old and new writers against the same logical records during this
 conversion. The adapter cannot atomically move one record across two keys.
-There is no general converter for application-specific Plugin state or
+There is no general converter for application-specific Plugin-owned fields or
 external effects. Core adapters also have no key-list contract. Inventory
 legacy module keys that would collapse to the same `{namespace, partition,
 id}` before cutover.
@@ -459,7 +455,7 @@ replacement or removal. A module rename alone is not proof of equal behavior.
 Compile and test after each area. For the application port, verify these outcomes:
 
 - Constructors validate state and return the expected result shape.
-- Direct and live commands preserve unrelated fields and protect Plugin state.
+- Direct and live commands preserve unrelated fields and protect Plugin-owned fields.
 - Invalid input and failed work leave committed state unchanged.
 - Effect retries obey the application's idempotency rules.
 - Restart and restore rebuild owned runtimes without losing pending work.
@@ -480,7 +476,7 @@ run `mix examples --seed 0` separately when needed. See the
 All research example assertions pass. They include the quiescent upgrade
 boundary, validated live definition migration, and additive local Topology
 updates. Stable Agent identity, durable deletion, Plugin runtime reconstruction,
-source-Signal route selection, and Plugin input isolation also pass.
+source-Signal route selection, and Plugin-owned state isolation also pass.
 Cluster-exclusive ownership remains unsupported. See
 [Test Agents and Plugins](test-agents-and-plugins.livemd).
 

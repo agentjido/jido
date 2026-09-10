@@ -38,22 +38,22 @@ document approval.
   one immutable value with static fields, top-level `vsn`, ID, and one state
   map.
 - `lib/jido/agent.ex`: generated modules, direct definitions, instantiation,
-  validation, complete schema, and `to_map/1` remain public.
-- `lib/jido/agent.ex`: checkpoint and restore keep version-1 reads, write the
-  generated-module version-2 format, enforce strict current definitions, and
-  wrap custom payloads in a core-owned revision envelope.
+  validation, and complete-schema functions remain public.
+- `lib/jido/agent/checkpoint.ex`: checkpoint and restore use only the V3
+  version-2 formats, enforce strict current definitions, and wrap custom
+  payloads in a core-owned revision envelope.
 - `lib/jido/agent.ex`: internal complete transition, public domain `set/2`,
   direct `cmd/3`, and custom `handle_signal/2` are implemented.
 - `lib/jido/agent/validation.ex` and `lib/jido/agent/state.ex`: validation
   defines the two forms, applies the compatible revision defaults, composes
   schemas, and validates complete portable state.
-- `lib/jido/agent/command/runner.ex:29-93,120-133`: direct and live preparation
+- `lib/jido/agent/runner.ex`: direct and live preparation
   use the Runner, and finalization returns one candidate and Directive list.
 - `lib/jido/plugin.ex:104-143,238-255,823-855`: Plugins have unique state keys,
   their schemas extend the combined state, executable writes are protected,
   and each Plugin updates its own field.
 - `lib/jido/agent/builder.ex` and `lib/jido/agent/codec.ex`: Builder and Codec
-  preserve `vsn`; Codec writes version 2 and reads version 1.
+  preserve `vsn`; Codec reads and writes only version 2.
 - `lib/jido/portable_term.ex` and `lib/jido/persistence.ex`: recursive
   portability has bounded paths and runs at Agent state acceptance and again
   at persistence.
@@ -70,7 +70,7 @@ document approval.
   malformed checkpoints, and callback faults.
 - `test/jido/agent/schema_test.exs:69-153` and
   `test/jido/plugin/contract_test.exs:584-650`: tests cover combined schema,
-  root validation, Plugin state write protection, and one complete commit.
+  root validation, Plugin-owned field protection, and one complete commit.
 - `test/jido/agent/authoring_contract_test.exs:13-86`,
   `test/jido/agent/builder_test.exs:19-65`, and
   `test/jido/agent/codec_test.exs:29-67`: tests cover one authoring contract,
@@ -82,7 +82,7 @@ document approval.
   cover envelope identity and persistence-time portability.
 - `test/jido/agent/versioning_test.exs`: focused tests cover defaults, explicit
   and invalid revisions, Builder and Codec round trips, strict definition
-  equality, version-1 compatibility, version-2 restore, custom envelopes, and
+  equality, version-1 rejection, version-2 restore, custom envelopes, and
   module or revision mismatch.
 - `test/jido/agent/portable_state_test.exs` and
   `test/jido/persistence/checkpoint_portability_test.exs`: focused tests cover
@@ -109,23 +109,25 @@ with one project-tag exclusion.
 - `RB-02`: A definition and its instances share static module, name,
   description, schema, Plugin, route, and metadata data.
 - `RB-03`: An instance has a nonempty binary ID and one complete plain state
-  map. The map contains domain and Plugin-owned state.
+  map. The map contains domain and Plugin-owned fields.
 - `RB-04`: Plugin schemas compose into the complete Agent schema. An executable
   cannot change Plugin-owned keys. A Plugin can replace only its own key.
-- `RB-05`: `new/1`, `new/2`, `instantiate/2`, explicit validation, definition
-  inspection, complete-schema functions, `to_map/1`, and `set/2` are supported.
+- `RB-05`: `new/1`, generated-module `new/1`, `instantiate/2`, explicit
+  validation, definition inspection, complete-schema functions, and `set/2`
+  are supported. Codec owns portable definition serialization.
 - `RB-06`: `set/2` deep-merges domain fields. The private transition boundary
   replaces and validates the complete combined state.
 - `RB-07`: `cmd/3` evaluates without a Server. It returns a candidate and
   Directives. It does not commit or dispatch.
-- `RB-08`: Direct and live paths use `Jido.Agent.Command.Runner` for candidate
+- `RB-08`: Direct and live paths use `Jido.Agent.Runner` for candidate
   preparation and finalization.
 - `RB-09`: Custom `handle_signal/2` remains the Agent routing callback. This
   seam does not select the default route order.
 - `RB-10`: Builder and Codec are supported authoring paths. Codec documents
   are separate from checkpoint data.
 - `RB-11`: `checkpoint/2` and `restore/3` accept context maps and support
-  complete custom module callbacks. The default version-1 checkpoint is a map.
+  complete custom module callbacks. All Agent checkpoint envelopes use
+  version 2.
 - `RB-12`: Default restore uses the current generated module definition when
   available. Direct and behavior-only Agents can use the embedded definition.
 - `RB-13`: An Agent has no live PID, state version, timer, task, monitor, or
@@ -142,26 +144,28 @@ with one project-tag exclusion.
 | `AGT-GAP-003` | `AGT-REQ-017` to `AGT-REQ-021` | Runner and direct tests above | Direct evaluation works. Routing and error details depend on pending seams. | `Retain`; defer owner details |
 | `AGT-GAP-004` | `AGT-REQ-022` to `AGT-REQ-025` | Agent, Builder, Codec, and serialization tests above | Older proposals removed supported boundaries. Current code does not. | `Remove` the removal proposals |
 | `AGT-GAP-005` | `AGT-REQ-026` to `AGT-REQ-029` | Agent schema, Builder, Codec, and versioning tests | Top-level `vsn`, generated default `1`, compatible `nil`, and authoring preservation are implemented. | `Implemented; approved` |
-| `AGT-GAP-006` | `AGT-REQ-030` to `AGT-REQ-035` | Agent checkpoint code and versioning tests | Strict generated definitions, version-2 writes, version-1 reads, and early revision mismatch are implemented. | `Implemented; compatible` |
+| `AGT-GAP-006` | `AGT-REQ-030` to `AGT-REQ-035` | Agent checkpoint code and versioning tests | Strict generated definitions, version-2 reads and writes, version-1 rejection, and early revision mismatch are implemented. | `Implemented` |
 | `AGT-GAP-007` | `AGT-REQ-036` to `AGT-REQ-038` | Portable-term, Agent state, and persistence tests | Agent and persistence reject all prohibited terms with bounded paths while static definitions stay valid in memory. | `Implemented; approved Agent contract` |
 | `AGT-GAP-008` | `AGT-REQ-039` | Agent callback and error tests | Several callback faults still return raw tuples or arbitrary terms. | `Defer` exact shapes to seam 12 |
 | `AGT-GAP-009` | All requirements | Focused tests above | No one acceptance set maps each Agent requirement to public evidence. | `Change evidence` |
-| `AGT-GAP-010` | `AGT-REQ-035`, `AGT-REQ-040` | Custom callback and versioning tests | New opaque callback maps use a core-owned module and `vsn` envelope; legacy raw maps remain readable. | `Implemented; approved` |
+| `AGT-GAP-010` | `AGT-REQ-035`, `AGT-REQ-040` | Custom callback and versioning tests | Opaque callback maps use a core-owned module and `vsn` envelope; raw payload maps are rejected. | `Implemented` |
 | `AGT-GAP-011` | `AGT-REQ-032`, `AGT-REQ-036`, `AGT-REQ-041` | Direct checkpoint and portability tests | Static direct definitions remain unrestricted in memory; the embedded durable form is limited to portable maps and fails with a typed path. | `Implemented; approved` |
+| `AGT-GAP-012` | `AGT-REQ-042` | Agent public API tests and Codec tests | The general Agent map function is absent. Codec owns portable definition serialization. | `Implemented; breaking V3 selection` |
 
 ## Dispositions of superseded proposals
 
 | Earlier proposal or conflict | Disposition | Reason and owner |
 | --- | --- | --- |
 | Remove the neutral definition form. | `Remove` | Two forms are public and tested. Seam 02 also needs the neutral form. |
-| Split Plugin state into a new `plugin_state` field. | `Remove` | This seam keeps the combined map and its tested write protection. Seam 05 can propose a later reviewed migration. |
+| Add a second stored `plugin_state` field beside `state`. | `Remove` | Keep one complete state map and its tested write protection. |
 | Remove `set/2` and replace the private transition API with new public state functions. | `Remove` | Current roles are clear with the combined map. No new accessor abstraction is required. |
 | Select the first route before Plugin preparation. | `Defer implementation` | The rule is approved in Overview. Route choice and preparation order belong to seams 04 and 05. |
 | Remove custom `handle_signal/2`. | `Remove` | Custom routing is public, documented, and tested. |
-| Remove Builder, Codec, and `to_map/1`. | `Remove` | These are supported compatibility boundaries. Checkpoint data stays separate. |
+| Remove Builder and Codec. | `Remove` | These are supported authoring boundaries. Checkpoint data stays separate. |
+| Retain `Agent.to_map/1` as a convenience function. | `Remove` | Codec owns portable definition serialization. Checkpoints own identity and live state. |
 | Replace map checkpoints with one fixed public struct. | `Remove` | A struct is not required for revision checks. Exact persistence records belong to seam 07. |
 | Remove complete checkpoint and restore callbacks. | `Remove` | Current callbacks stay until an approved Plugin or persistence composition has replacement proof. |
-| Restore all Agents only from a loaded generated module. | `Change in stages` | Use strict module and revision checks for the new generated-module format. Keep version-1, direct, and behavior-only restore. |
+| Restore all Agents only from a loaded generated module. | `Change in stages` | Use strict module and revision checks. Keep current V3 direct and behavior-only restore. |
 | Require a positive revision for every definition. | `Change in stages` | Generated modules get a revision. Direct and behavior-only compatibility forms can stay unversioned. |
 | Validate portable state at every Agent boundary without migration. | `Change after audit` | Early validation is the target, but current permissive schemas and stored state need compatibility evidence. |
 | Define Agent Ref, persistence record, commit, or Agent Server state here. | `Defer` | Seams 03, 07, 06, and 08 own those contracts. |
@@ -203,11 +207,12 @@ It is not a separate implementation plan.
 - Constraints: revision does not pin loaded executable code and does not define
   Agent identity or state version.
 - Compatibility: existing generated modules default to `1`; direct and
-  behavior-only forms can stay unversioned; old Codec documents still decode.
-- Verification: module, direct, Builder, Codec, `to_map/1`, and invalid-revision
-  contract tests.
-- Exit criteria: existing module source and version-1 Codec documents work,
-  and every versioned normalized definition has one revision.
+  behavior-only forms can stay unversioned. Version-1 Codec documents require
+  conversion before V3 decode.
+- Verification: module, direct, Builder, Codec, and invalid-revision contract
+  tests.
+- Exit criteria: existing module source works, version-1 Codec documents are
+  rejected, and every versioned normalized definition has one revision.
 
 ### Phase 3 — Enforce portable combined state
 
@@ -230,9 +235,9 @@ It is not a separate implementation plan.
   and reject a mismatch before state acceptance.
 - Constraints: keep combined state, plain maps, complete custom callbacks, and
   separation from persistence records.
-- Compatibility: read version 1; keep embedded-definition restore for direct
-  and behavior-only Agents; do not rewrite stored data in place.
-- Verification: version-1 fixtures, version-2 module and revision mismatch,
+- Compatibility: keep version-2 embedded-definition restore for direct and
+  behavior-only Agents. Convert version-1 data before V3 restore.
+- Verification: version-1 rejection, version-2 module and revision mismatch,
   strict static-definition check, custom callback faults, and restore tests.
 - Exit criteria: new versioned checkpoints have a proved revision gate and all
   retained checkpoint fixtures still restore as specified.
@@ -255,29 +260,32 @@ It is not a separate implementation plan.
 | --- | --- | --- | --- |
 | `AGT-REQ-001` to `AGT-REQ-009` | `lib/jido/agent.ex:96-337`; `test/jido/agent_test.exs:157-317,434-546` | Stable public contract inventory. | `Proven` |
 | `AGT-REQ-010` to `AGT-REQ-016` | `lib/jido/plugin.ex:126-143,238-255,823-855`; `test/jido/plugin/contract_test.exs:584-650` | Public wording check for combined checkpoint state. | `Proven` |
-| `AGT-REQ-017` to `AGT-REQ-021` | `lib/jido/agent/command/runner.ex:29-133`; `test/jido/agent_test.exs:341-369,718-858` | Cross-check the approved seam-04 Turn input contract. | `Proven` |
+| `AGT-REQ-017` to `AGT-REQ-021` | `lib/jido/agent/runner.ex`; `test/jido/agent_test.exs` | Cross-check the approved seam-04 Turn input contract. | `Proven` |
 | `AGT-REQ-022` to `AGT-REQ-025` | `lib/jido/agent.ex:259-387`; Builder, Codec, and serialization contract tests | Stable compatibility inventory. | `Proven` |
-| `AGT-REQ-026` to `AGT-REQ-029` | `test/jido/agent/versioning_test.exs` | Default, explicit, invalid, direct, Builder, Codec, and map round trips. | `Proven` |
+| `AGT-REQ-026` to `AGT-REQ-029` | `test/jido/agent/versioning_test.exs` | Default, explicit, invalid, direct, Builder, and Codec round trips. | `Proven` |
 | `AGT-REQ-030` | `test/jido/agent/versioning_test.exs` | Mutated static data and exact normalized equality cases. | `Proven` |
-| `AGT-REQ-031` and `AGT-REQ-032` | `lib/jido/agent.ex:403-423,563-598`; `test/jido/agent_test.exs:888-976` | Versioned fixtures that lock current read behavior. | `Proven` |
+| `AGT-REQ-031` and `AGT-REQ-032` | `test/jido/agent/versioning_test.exs` | Version-1 rejection fixture. | `Retired; rejection proven` |
 | `AGT-REQ-033` and `AGT-REQ-034` | `test/jido/agent/versioning_test.exs` | Version-2 write, module mismatch, revision mismatch, and static-definition mismatch tests. | `Proven` |
-| `AGT-REQ-035` and `AGT-REQ-040` | `test/jido/agent_test.exs`; `test/jido/agent/versioning_test.exs` | Custom envelope and legacy raw-map compatibility. | `Proven` |
+| `AGT-REQ-035` and `AGT-REQ-040` | `test/jido/agent_test.exs`; `test/jido/agent/versioning_test.exs` | Custom envelope and raw-payload rejection. | `Proven` |
 | `AGT-REQ-036` to `AGT-REQ-038`, `AGT-REQ-041` | `test/jido/agent/portable_state_test.exs`; `test/jido/persistence/checkpoint_portability_test.exs` | Early Agent checks, every rejected term class, bounded paths, direct definitions, and load defense in depth. | `Proven` |
 | `AGT-REQ-039` | Shared seam-12 error normalization and callback-fault tests | None | `Proven` |
+| `AGT-REQ-042` | `test/jido/agent_test.exs`; Agent Codec tests | Public API absence and portable definition serialization. | `Proven` |
 
 ## Migration and compatibility
 
-No removal or deprecation is approved in this seam.
+V3 removes the earlier general `Agent.to_map/1` convenience and the core
+module `new/2` constructor. Generated Agent modules keep `new/1`, and Codec is
+the portable definition serialization boundary.
 
 | Area | Compatibility rule and gate |
 | --- | --- |
-| Agent forms | Keep neutral definitions, instances, and their current constructors. |
+| Agent forms | Keep neutral definitions and instances. Use core `new/1`, generated-module `new/1`, or `instantiate/2` at the applicable boundary. |
 | Combined state | Keep one map, schema composition, Plugin key protection, and complete candidate validation. |
 | Public state API | Keep `set/2` and direct struct access. Keep complete transition private. Add no new accessor family in this seam. |
 | Direct execution | Keep `cmd/3` and generated module delegation. Do not require a Server. |
 | Routing | Keep custom `handle_signal/2`. Apply a route-order change only after seams 04 and 05 approve and prove migration. |
-| Authoring | Keep DSL, direct data, Builder, Codec, `to_map/1`, and current version-1 Codec decode. Add revision without removing a form. |
-| Checkpoints | Keep plain maps, version-1 reads, direct and behavior-only embedded definitions, and custom callbacks. Add version 2 only for the approved revision path. |
+| Authoring | Keep DSL, direct data, Builder, and Codec. Codec is the only portable definition projection and accepts only version 2. |
+| Checkpoints | Keep version-2 plain maps, direct and behavior-only embedded definitions, and custom callbacks. Reject version 1 and raw custom payloads. |
 | Portable state | Keep early Agent rejection and persistence defense in depth with the reviewed code and bounded path. |
 | Errors | Do not invent interim raw tuples or codes. Convert through the approved seam-12 migration. |
 | Later seam values | This seam does not define Agent Ref, commit, persistence record, live result, state version, or Agent Server fields. |
@@ -291,8 +299,8 @@ No removal or deprecation is approved in this seam.
 | `AGT-BLK-003` | `Explicit assumption` | 12 Errors and contracts | The implemented typed portability error is approved for Agent. Other callback fault normalization remains deferred. | Review the shared error matrix in seam 12. A conflict requires a migration. |
 | `AGT-BLK-004` | `Resolved` | 01 Agent, 02 Agent authoring | Existing generated modules default to `vsn: 1`; direct and behavior-only definitions can stay unversioned. Seam 02 has adopted this contract. | No action. |
 | `AGT-BLK-005` | `Approved implementation` | 01 Agent, 07 Persistence | A version-2 plain map supplies the `vsn` gate; no public Checkpoint struct is required. | Seam 07 must adopt this contract. |
-| `AGT-BLK-006` | `Approved implementation` | 01 Agent, 07 Persistence | New custom maps use a core envelope with a raw legacy read path. Direct embedded checkpoints are limited to portable definitions. | Seam 07 must preserve these compatibility rules. |
-| `AGT-BLK-007` | `Resolved for Agent` | 04 Turn evaluation, 05 Plugins | This seam preserves custom routing and combined Plugin state without implementing route order or the deferred Plugin model. | Seams 04 and 05 own their later implementation. |
+| `AGT-BLK-006` | `Implemented` | 01 Agent, 07 Persistence | Custom maps use a V3 core envelope. Direct embedded checkpoints are limited to portable definitions. | Seam 07 must preserve the current V3 rules. |
+| `AGT-BLK-007` | `Resolved for Agent` | 04 Turn evaluation, 05 Plugins | This seam preserves custom routing and Plugin-owned fields in the combined Agent state without implementing route order or the deferred Plugin model. | Seams 04 and 05 own their later implementation. |
 | `AGT-BLK-008` | `Resolved for Agent` | 03 Agent identity, 08 Agent Server | The current Agent ID stays in the instance while Agent Ref and live state version remain outside this seam. | Seams 03 and 08 own those values. |
 
 ## Completion criteria
@@ -305,8 +313,8 @@ No removal or deprecation is approved in this seam.
 - [x] No unresolved `Conflict` remains in the acceptance matrix.
 - [x] Both Agent forms, combined state, direct execution, Builder, Codec,
       custom routing, and checkpoint callbacks remain supported.
-- [x] Agent `vsn` has Builder, Codec, default, and old-input evidence.
-- [x] Version-1 and new-format checkpoint fixtures pass their stated rules.
+- [x] Agent `vsn` has Builder, Codec, default, and rejected-old-input evidence.
+- [x] Version-1 rejection and version-2 checkpoint fixtures pass their stated rules.
 - [x] Portable combined state is checked at every approved acceptance point and
       again at persistence.
 - [x] No route, identity, Plugin facet, record, commit, or Agent Server detail is

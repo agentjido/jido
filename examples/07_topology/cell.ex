@@ -29,6 +29,6 @@ defmodule Jido.Examples.Topology.Cell do
       define :work, args: [:value]
     end
 
-    route "jido.agent.**", Jido.Examples.KeepState
+    route "jido.agent.**", Jido.Examples.Support.KeepState
   end
 end

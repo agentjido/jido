@@ -21,7 +21,8 @@ defmodule Jido.Plugin.SignalContext do
               target: Zoi.any(description: "Outbound Signal target"),
               state_version:
                 Zoi.integer(description: "Committed Agent state version") |> Zoi.min(0),
-              plugin_state: Zoi.any(description: "Committed Plugin-owned Agent state"),
+              plugin_state:
+                Zoi.any(description: "Committed value from the Plugin-owned Agent field"),
               jido: Zoi.atom(description: "Optional Jido instance") |> Zoi.optional(),
               partition: Zoi.any(description: "Optional Agent partition") |> Zoi.optional()
             },

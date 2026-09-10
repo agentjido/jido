@@ -1,6 +1,6 @@
 defmodule JidoTest.CausalTraceFixtures do
   @moduledoc false
-  alias Jido.Examples.TurnObservation.EventProbe
+  alias Jido.Examples.Runtime.EventProbe
 
   # The probe owner must outlive the peer RPC caller. Events are copied by the
   # same external handler used in the local example.

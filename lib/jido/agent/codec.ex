@@ -30,8 +30,7 @@ defmodule Jido.Agent.Codec do
   alias Jido.Agent.Authoring
   alias Jido.Agent.Codec.{Data, Registry}
 
-  @fields_v1 ~w(type version module name description schema metadata plugins routes)
-  @fields_v2 ~w(type version module vsn name description schema metadata plugins routes)
+  @fields ~w(type version module vsn name description schema metadata plugins routes)
 
   @type document :: %{required(String.t()) => term()}
 
@@ -80,13 +79,12 @@ defmodule Jido.Agent.Codec do
 
   @doc "Decodes one neutral Agent definition."
   @spec decode(document(), Registry.t() | map()) ::
-          {:ok, Agent.t()} | {:error, term()}
+          {:ok, Agent.definition()} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         {:ok, version} <- definition_object(document),
+         :ok <- definition_object(document),
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :agent),
-         vsn = document_vsn(document, version, module),
          {:ok, schema} <- Registry.resolve(registry, document["schema"], :schema),
          {:ok, metadata} <- Data.decode(document["metadata"], registry),
          {:ok, plugins} <-
@@ -94,7 +92,7 @@ defmodule Jido.Agent.Codec do
          {:ok, routes} <- collection(document["routes"], &decode_route(&1, registry)) do
       Agent.new(%{
         module: module,
-        vsn: vsn,
+        vsn: document["vsn"],
         name: document["name"],
         description: document["description"],
         schema: schema,
@@ -107,38 +105,28 @@ defmodule Jido.Agent.Codec do
 
   @doc "Decodes a complete Agent with caller-supplied instance options."
   @spec decode(document(), Registry.t() | map(), map() | keyword()) ::
-          {:ok, Agent.t()} | {:error, term()}
+          {:ok, Agent.instance()} | {:error, term()}
   def decode(document, registry, opts) do
     with {:ok, definition} <- decode(document, registry), do: Agent.instantiate(definition, opts)
   end
 
-  defp definition_object(%{"type" => "jido.agent", "version" => 1} = document) do
-    with :ok <- object(document, @fields_v1), do: {:ok, 1}
-  end
-
   defp definition_object(%{"type" => "jido.agent", "version" => 2} = document) do
-    with :ok <- object(document, @fields_v2), do: {:ok, 2}
+    Data.object(document, @fields)
   end
 
   defp definition_object(_document),
     do: Authoring.error("Unknown authoring document type or version")
 
-  defp document_vsn(_document, 1, module) do
-    if Code.ensure_loaded?(module) and function_exported?(module, :__agent_config__, 0) and
-         function_exported?(module, :agent, 0),
-       do: 1,
-       else: nil
+  defp neutral_definition(%Agent{id: nil, state: nil} = definition),
+    do: Agent.validate_definition(definition)
+
+  defp neutral_definition(%Agent{id: id, state: state} = agent)
+       when is_binary(id) and is_map(state) and not is_struct(state) do
+    with {:ok, agent} <- Agent.validate_instance(agent),
+         do: agent |> Agent.definition() |> Agent.validate_definition()
   end
 
-  defp document_vsn(document, 2, _module), do: document["vsn"]
-
-  defp neutral_definition(%Agent{} = agent) do
-    cond do
-      Agent.definition?(agent) -> Agent.validate_definition(agent)
-      Agent.instance?(agent) -> agent |> Agent.definition() |> Agent.validate_definition()
-      true -> Agent.validate(agent)
-    end
-  end
+  defp neutral_definition(%Agent{} = agent), do: Agent.validate(agent)
 
   defp neutral_definition(value), do: Agent.validate(value)
 
@@ -162,7 +150,7 @@ defmodule Jido.Agent.Codec do
   end
 
   defp decode_route(data, registry) do
-    with :ok <- object(data, ~w(path target kind defaults match priority)),
+    with :ok <- Data.object(data, ~w(path target kind defaults match priority)),
          {:ok, kind} <- kind(data["kind"]),
          {:ok, target} <- Registry.resolve(registry, data["target"], kind),
          {:ok, defaults} <- Data.decode(data["defaults"], registry),
@@ -188,19 +176,6 @@ defmodule Jido.Agent.Codec do
   defp kind("flow"), do: {:ok, :flow}
   defp kind(_kind), do: Authoring.error("Unknown executable kind")
 
-  @doc false
-  @spec object(term(), [String.t()]) :: :ok | {:error, term()}
-  def object(value, fields) when is_map(value) and not is_struct(value) do
-    if Enum.sort(Map.keys(value)) == Enum.sort(fields),
-      do: :ok,
-      else: Authoring.error("Unknown or missing document fields")
-  end
-
-  def object(_value, _fields), do: Authoring.error("Document object must be a map")
-  @doc false
-  @spec version(document(), String.t()) :: :ok | {:error, term()}
-  def version(%{"version" => 1, "type" => type}, type), do: :ok
-  def version(_document, _type), do: Authoring.error("Unknown authoring document type or version")
   defp collection(value, fun) when is_list(value), do: Authoring.traverse(value, fun)
   defp collection(_value, _fun), do: Authoring.error("Document collection must be a list")
 end

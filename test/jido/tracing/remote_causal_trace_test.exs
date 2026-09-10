@@ -33,9 +33,9 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
         do: assert(node(child.pid) == c.node_b)
 
     events = await_turns(c, probes, 7)
-    [cause] = turns(events, "causal.begin")
-    work = turns(events, "causal.compute")
-    results = turns(events, "causal.result")
+    [cause] = turns(events, "examples.runtime.causal_trace.begin")
+    work = turns(events, "examples.runtime.causal_trace.compute")
+    results = turns(events, "examples.runtime.causal_trace.result")
     started = turns(events, "jido.agent.child.started")
     activations = activations(events, "parent")
     assert length(work) == 2

@@ -107,8 +107,8 @@ projection of the Agent Ref in seam 03. They identify a logical Agent. An
 admitted Turn. Trace parentage and Signal causation stay separate because they
 answer different questions.
 
-Semantic metadata excludes Agent state, Plugin state, Signal data, Directive
-data, caller context, checkpoints, persistence records, encoded keys, raw
+Semantic metadata excludes complete Agent state, including Plugin-owned fields,
+Signal data, Directive data, caller context, checkpoints, persistence records, encoded keys, raw
 errors, error details, error messages, stacktraces, PIDs, ports, references,
 functions, authenticated actor data, arbitrary application metadata, and
 OpenTelemetry `tracestate`. An audit record, not telemetry, owns authenticated

@@ -1,7 +1,8 @@
 # Signals, Commands, and Routes
 
-A Signal is a typed message. An Agent command combines one Agent instance, one
-Signal, and caller context. Routing selects the first Action or Flow for the
+A Signal is a typed message. Direct evaluation accepts one Agent instance, one
+Signal, and caller context. Live Agent Server admission stores these values in
+a `Jido.Agent.Command`. Routing selects the first Action or Flow for the
 unchanged source Signal.
 
 Signal construction, transport, and dispatch come from
@@ -24,21 +25,19 @@ that a business request is unique.
 
 ## Prepare A Command
 
-`Jido.Agent.Command` carries the current Agent, the Signal, and a caller-owned
-context map. Jido selects a Turn before Plugins prepare the effective Signal or
-context. Plugins cannot replace the selected executable or the Agent.
+`Jido.Agent.Command` is the live Agent Server admission envelope. It carries
+the current Agent, the Signal, and a caller-owned context map. Direct
+`Jido.Agent.cmd/3` evaluation does not create this envelope. Jido selects one
+Turn from the Signal. Agent Plugins do not change the Signal, context, selected
+executable, or Agent.
 
 The live Server adds these reserved context keys for execution:
 
 - `:agent_id`
 - `:agent_state`
 - `:signal`
-- `:plugin_inputs`
 - `:jido`
 - `:partition`
-
-`plugin_inputs` is keyed by Plugin package module. Each value belongs to that
-package. It is read-only execution context.
 
 Caller context is not stored or copied into emitted Signals. Application code
 must select any value that must enter state or a new Signal.
@@ -67,8 +66,7 @@ command uses the first matching target in Router order. No match returns
 `Jido.Error.RoutingError` before executable work starts.
 
 Router priority and specificity put an exact route before matching wildcard
-routes. Test all overlapping patterns. Plugin preparation can change the
-effective Signal after selection, but it cannot select a different executable.
+routes. Test all overlapping patterns.
 
 ## Generate Interfaces
 

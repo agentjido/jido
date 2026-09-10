@@ -61,7 +61,7 @@ route input. The complete Agent data schema validates the returned state.
 ## Inspect The Definition
 
 ```elixir
-definition = FirstAgent.Counter.agent()
+definition = FirstAgent.Counter.definition()
 
 %{
   definition?: Jido.Agent.definition?(definition),

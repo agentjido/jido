@@ -1,7 +1,7 @@
 defmodule JidoCoreBench.EdgeCases do
   @moduledoc false
   alias JidoCoreBench.Fixtures, as: F
-  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Runner
 
   def workloads(route_sizes) do
     context_cases() ++
@@ -42,8 +42,7 @@ defmodule JidoCoreBench.EdgeCases do
               Map.merge(context, %{
                 agent_id: agent.id,
                 agent_state: agent.state,
-                signal: signal,
-                plugin_inputs: %{}
+                signal: signal
               })
             )
 

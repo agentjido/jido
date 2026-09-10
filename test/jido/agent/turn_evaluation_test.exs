@@ -1,22 +1,12 @@
 defmodule Jido.Agent.TurnEvaluationTest do
   use JidoTest.Case, async: true
 
-  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Runner
   alias Jido.Agent
+  alias Jido.Agent.Command
   alias Jido.Plugin
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
-
-  defmodule RewriteType do
-    @moduledoc false
-    use Jido.Plugin
-
-    @impl true
-    def prepare(command, _opts) do
-      send(command.signal.data.observer, {:prepared, command.signal.type})
-      {:ok, %{command | signal: %{command.signal | type: "changed.route"}}}
-    end
-  end
 
   defmodule CustomRouteAgent do
     @moduledoc false
@@ -28,7 +18,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
           count: Zoi.integer() |> Zoi.default(0),
           history: Zoi.list(Zoi.string()) |> Zoi.default([])
         }),
-      plugins: [RewriteType]
+      plugins: []
 
     @impl true
     def handle_signal(%Signal{} = signal, _agent) do
@@ -37,7 +27,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     end
   end
 
-  test "custom selection uses the source Signal before Plugin preparation" do
+  test "custom selection uses the source Signal" do
     source = Signal.new!("source.route", %{observer: self()}, source: "/test")
     agent = CustomRouteAgent.new!(id: "direct")
 
@@ -46,11 +36,10 @@ defmodule Jido.Agent.TurnEvaluationTest do
     assert prepared.turn.source_signal == source
     assert prepared.turn.executable == Add
     assert prepared.turn.input == %{by: 1, label: "source.route"}
-    assert prepared.signal.type == "changed.route"
+    assert prepared.signal.type == "source.route"
     assert prepared.context.signal == prepared.signal
 
     assert_receive {:selected, "source.route"}
-    assert_receive {:prepared, "source.route"}
   end
 
   test "direct and live evaluation keep the selected custom Turn fixed", %{jido: jido} do
@@ -65,9 +54,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
     assert live.state == direct.state
 
     assert_receive {:selected, "source.route"}
-    assert_receive {:prepared, "source.route"}
     assert_receive {:selected, "source.route"}
-    assert_receive {:prepared, "source.route"}
   end
 
   test "a custom Turn cannot replace its received source Signal" do
@@ -79,25 +66,36 @@ defmodule Jido.Agent.TurnEvaluationTest do
              Jido.Agent.Turn.bind_source(turn, source)
   end
 
+  test "Turn validation returns an error for values that are not Turns" do
+    assert {:error,
+            %Jido.Error.ValidationError{
+              message: "Expected a Jido.Agent.Turn value",
+              subject: Jido.Agent.Turn
+            }} = Jido.Agent.Turn.validate(:invalid)
+  end
+
   test "the private evaluator reports its closed preparation and finalization stages" do
     source = Signal.new!("missing.route", %{}, source: "/test")
     agent = Agent.new!(name: "missing_route") |> Agent.instantiate!()
     {:ok, specs} = Plugin.normalize_all(agent.plugins)
+    {:ok, command} = Command.new(agent, source)
 
     assert {:error, :route, %Jido.Error.RoutingError{}} =
-             Runner.prepare_for_server(agent, source, source, [], specs)
+             Runner.prepare_for_server(command, source, [], specs)
+
+    command = %{command | context: %{agent_id: "reserved"}}
 
     assert {:error, :input, %Jido.Error.ValidationError{}} =
-             Runner.prepare_for_server(agent, source, source, [context: :invalid], specs)
+             Runner.prepare_for_server(command, source, [], specs)
 
     selected = Signal.new!("source.route", %{observer: self()}, source: "/test")
     selected_agent = CustomRouteAgent.new!(id: "stages")
     {:ok, selected_specs} = Plugin.normalize_all(selected_agent.plugins)
+    {:ok, selected_command} = Command.new(selected_agent, selected)
 
     assert {:ok, prepared} =
              Runner.prepare_for_server(
-               selected_agent,
-               selected,
+               selected_command,
                selected,
                [],
                selected_specs

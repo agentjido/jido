@@ -92,19 +92,31 @@ defmodule Jido.Agent.Ref do
   def validate(value), do: invalid("Expected a Jido.Agent.Ref value", %{value: value})
 
   @doc "Returns the exact version-1 public map for one Agent Ref."
-  @spec to_map(t()) :: map()
+  @spec to_map(term()) :: {:ok, map()} | {:error, Error.ValidationError.t()}
   def to_map(%__MODULE__{} = ref) do
     case validate(ref) do
       {:ok, validated} ->
-        %{
-          "version" => @version,
-          "namespace" => validated.namespace,
-          "partition" => validated.partition,
-          "id" => validated.id
-        }
+        {:ok,
+         %{
+           "version" => @version,
+           "namespace" => validated.namespace,
+           "partition" => validated.partition,
+           "id" => validated.id
+         }}
 
       {:error, error} ->
-        raise error
+        {:error, error}
+    end
+  end
+
+  def to_map(value), do: invalid("Expected a Jido.Agent.Ref value", %{value: value})
+
+  @doc "Returns the exact version-1 public map or raises its validation error."
+  @spec to_map!(term()) :: map() | no_return()
+  def to_map!(value) do
+    case to_map(value) do
+      {:ok, value} -> value
+      {:error, error} -> raise error
     end
   end
 

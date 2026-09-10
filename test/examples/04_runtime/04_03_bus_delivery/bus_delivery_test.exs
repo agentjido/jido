@@ -1,16 +1,66 @@
+defmodule JidoTest.Examples.Runtime.BusDeliveryFixture do
+  @moduledoc false
+
+  use Jido.Agent, name: "test_bus_delivery"
+
+  agent do
+    schema Zoi.object(%{
+             seen: Zoi.list(Zoi.string()) |> Zoi.default([]),
+             values: Zoi.list(Zoi.integer()) |> Zoi.default([])
+           })
+
+    plugin Jido.Plugin.Bus.Client,
+      config: [
+        bus: :example_commands,
+        path: "examples.runtime.bus_delivery.**",
+        durable: "test-consumer",
+        start_from: :origin,
+        retry_delay_ms: 10
+      ]
+  end
+
+  routes do
+    signal_source "/test/bus_delivery"
+
+    route "examples.runtime.bus_delivery.record" do
+      action %{value: value}, schema: Zoi.object(%{value: Zoi.integer()}), context: context do
+        context.on_delivery.(%{value: value})
+        state = context.agent_state
+
+        if context.signal.id in state.seen do
+          {:ok, state}
+        else
+          {:ok,
+           %{
+             state
+             | seen: state.seen ++ [context.signal.id],
+               values: state.values ++ [value]
+           }}
+        end
+      end
+
+      define :record, args: [:value]
+    end
+  end
+end
+
 defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
   use JidoTest.FeatureSDKCase
   @moduletag group: :runtime
   alias Jido.Examples.BusDelivery
   alias Jido.Plugin.Bus.Client
   alias Jido.Signal.Bus
+  alias JidoTest.Examples.Runtime.BusDeliveryFixture
 
   test "durable delivery waits for a commit before it sends the next record", %{jido: jido} do
     bus = start_supervised!({Bus, name: :example_commands, jido: jido})
-    {:ok, agent} = Jido.start_agent(jido, observed(BusDelivery, :on_delivery))
+    {:ok, agent} = Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery))
 
     assert {:ok, [_, _]} =
-             Bus.publish(bus, [BusDelivery.record_signal!(1), BusDelivery.record_signal!(2)])
+             Bus.publish(bus, [
+               BusDeliveryFixture.record_signal!(1),
+               BusDeliveryFixture.record_signal!(2)
+             ])
 
     assert_receive {:feature_work, first, %{value: 1}}, 1_000
     assert state(agent).values == []
@@ -28,10 +78,13 @@ defmodule JidoTest.Examples.Runtime.BusDeliveryTest do
     bus = start_supervised!({Bus, name: :example_commands, jido: jido})
 
     {:ok, agent} =
-      Jido.start_agent(jido, observed(BusDelivery, :on_delivery), error_policy: :log_only)
+      Jido.start_agent(jido, observed(BusDeliveryFixture, :on_delivery), error_policy: :log_only)
 
     assert {:ok, [_, _]} =
-             Bus.publish(bus, [BusDelivery.record_signal!(3), BusDelivery.record_signal!(4)])
+             Bus.publish(bus, [
+               BusDeliveryFixture.record_signal!(3),
+               BusDeliveryFixture.record_signal!(4)
+             ])
 
     assert_receive {:feature_work, first, %{value: 3}}, 1_000
     send(first, :fail)

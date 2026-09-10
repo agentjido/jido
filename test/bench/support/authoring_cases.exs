@@ -12,7 +12,7 @@ defmodule JidoCoreBench.AuthoringCases do
         "authoring/builder/#{size}/#{mode}",
         fn _ -> F.definition(size) end,
         fn definition ->
-          attrs = definition |> Jido.Agent.to_map() |> Map.drop([:id, :state, :routes])
+          attrs = definition |> Map.from_struct() |> Map.drop([:id, :state, :routes])
           routes = definition.routes
 
           {initial, appended} =

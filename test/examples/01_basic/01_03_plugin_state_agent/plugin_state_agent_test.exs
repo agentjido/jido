@@ -38,7 +38,7 @@ defmodule JidoTest.Examples.Basic.PluginStateAgentTest do
     before = Server.snapshot(server)
 
     assert {:error, %Jido.Error.ExecutionError{} = error} = Agent.increment(server, 5)
-    assert error.message == "Agent Plugin state is invalid"
+    assert error.message == "Plugin-owned Agent state field is invalid"
     assert Server.snapshot(server) == before
     assert {:ok, 1} = Server.plugin_state(server, CountTurns)
   end

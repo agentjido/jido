@@ -140,7 +140,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
       end
     )
 
-    definition = module.agent()
+    definition = module.definition()
     assert definition.metadata == %{owner: "consumer"}
     assert [{Turns, []}] = definition.plugins
     assert Enum.count(definition.routes, &(&1.target == Add)) == 3

@@ -41,8 +41,9 @@ an arbitrary external API atomic with Agent state.
 ## Keep durable facts in state
 
 Ordinary Directive structs are transient Turn outputs. Do not use a Directive
-list as a durable outbox. Store the business intent in validated Agent or Plugin
-state. Then, derive the next Directive from that state.
+list as a durable outbox. Store the business intent in a validated domain or
+Plugin-owned field of the complete Agent state. Then derive the next Directive
+from that state.
 
 Use a bounded structure and define retention. Unbounded pending work can make
 every checkpoint more expensive.
@@ -78,5 +79,5 @@ later failed. They help diagnosis, but they are not the recovery protocol. The
 pending operation in state is the source of truth.
 
 For a complete example, see
-`examples/04_runtime/04_11_recoverable_delivery` and its tests in the
+`examples/04_runtime/04_09_recoverable_delivery` and its tests in the
 repository.

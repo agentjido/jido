@@ -48,7 +48,8 @@ design.
   fixed executable choice, candidate assembly, and the executable-code
   non-pinning recommendation.
 - [Plugin design](../05_plugins/design.md): owns Agent Server facets, runtime
-  readiness, and the matching Plugin-state and state-version bootstrap target.
+  readiness, and the matching Plugin-owned-field and state-version bootstrap
+  target.
 - [Commit design](../06_commit-and-effects/design.md): owns checkpoint,
   replacement, reply, Directive, settlement, and non-replay order.
 - [Persistence design](../07_persistence/design.md): owns initial active records,
@@ -105,7 +106,7 @@ The upgrade path replaces only the immutable Agent value and its checkpoint.
 | `test/jido/agent_server/commit_boundary_test.exs` | Crashes at the first and second ordinary Directive positions do not replay a batch or reconstruct the prior activation's Outcome. |
 | `test/jido/agent_server/effect_recovery_test.exs:42-205` | One explicit capability saves work intent before post-commit delivery and resumes it after loss. This does not make ordinary Directives durable. |
 | `test/jido/agent/turn/outcome_test.exs:8-109` | Outcome construction, stage/status consistency, version rules, Directive counts, and timing are validated. |
-| `examples/04_runtime/04_09_agent_observation/turn_observation.ex` | Public observation uses current runtime events and Turn Outcome data. |
+| `examples/04_runtime/04_07_agent_observation/turn_observation.ex` | Public observation uses current runtime events and Turn Outcome data. |
 | `test/jido/agent_server/upgrade_test.exs` | Quiescent ordering, schema validation, Plugin-contract rejection, runtime-checkpoint restart, and namespaced durable definition replacement pass. |
 | `test/examples/99_research/99_14_turn_upgrade` and `99_15_state_migration` | UP-01 and UP-02 pass without skips through the explicit upgrade boundary. |
 

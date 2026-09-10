@@ -83,7 +83,7 @@ defmodule Jido.Examples.RemoteParent do
       define :request_child, args: [:target_node]
     end
 
-    route "examples.remote.synchronize", Jido.Examples.KeepState do
+    route "examples.remote.synchronize", Jido.Examples.Support.KeepState do
       define :synchronize
     end
 
@@ -97,6 +97,6 @@ defmodule Jido.Examples.RemoteParent do
       end
     end
 
-    route "jido.agent.child.*", Jido.Examples.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState
   end
 end

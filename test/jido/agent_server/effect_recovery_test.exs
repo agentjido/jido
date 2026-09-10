@@ -3,8 +3,9 @@ defmodule Jido.AgentServer.EffectRecoveryTest do
   @moduletag capability: "REC-01"
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.RecoverableDelivery, as: Agent
-  alias Jido.Examples.RecoverableDelivery.{Deliver, Output, Sink}
+  alias Jido.Examples.RecoverableDelivery.{Deliver, Output}
+  alias JidoTest.RecoverableDeliveryAgent, as: Agent
+  alias JidoTest.RecoverableDeliverySink, as: Sink
 
   defmodule FaultFile do
     @moduledoc false

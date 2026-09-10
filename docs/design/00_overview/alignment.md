@@ -35,15 +35,15 @@ change runtime behavior.
 | `lib/jido/agent.ex:2-21` | An Agent is immutable data. A direct command returns a candidate Agent and Directives and does not commit live state. Plugin preparation occurs before routing. |
 | `lib/jido/agent.ex:370-423` | Agent modules can own complete checkpoint and restore callbacks. Default checkpoints are maps with no definition revision. |
 | `lib/jido/agent.ex:458-477` | `cmd/3` delegates to the Runner. Default routing requires exactly one executable Turn. |
-| `lib/jido/agent/command/runner.ex:29-132` | Direct and live execution share the Runner. Plugin preparation occurs before route selection, state protection, Plugin reduction, and candidate validation. |
-| `lib/jido/agent/command/runner.ex:178-227` | Jido rejects multiple Router targets and normalizes routing failures. |
+| `lib/jido/agent/runner.ex` | Direct and live execution share Turn selection and finalization. Direct evaluation does not create a Command. |
+| `lib/jido/agent/runner.ex` | Jido selects the first Router target and normalizes routing failures. |
 | `lib/jido/agent/command.ex:1-22` | The current public Plugin preparation input contains the complete Agent, Signal, and caller context. |
 | `lib/jido/plugin.ex:2-24` | One Plugin behavior combines admission, pure preparation, owned state, Directives, dispatch, and runtime work. |
 | `lib/jido/plugin.ex:67-102` | Current callback contracts use `Jido.Agent.Command`, Plugin Init, and Directive and Signal contexts. |
 | `lib/jido/plugin.ex:190-205` | Live Plugin admission is serial in declaration order. |
-| `lib/jido/plugin.ex:238-265` | Executable writes to Plugin state are rejected. Plugin runtime children use `Jido.Plugin.Init`. |
-| `lib/jido/plugin.ex:797-875` | A Plugin cannot replace the Agent. Plugin state reduction is ordered and receives only owned Directives. |
-| `lib/jido/plugin/init.ex:1-19` | Runtime Init has a Server PID and Agent ID, but no committed Plugin state or state version. |
+| `lib/jido/plugin.ex:238-265` | Executable writes to Plugin-owned Agent fields are rejected. Plugin runtime children use `Jido.Plugin.Init`. |
+| `lib/jido/plugin.ex:797-875` | A Plugin cannot replace the Agent. Plugin-owned field reduction is ordered and receives only owned Directives. |
+| `lib/jido/plugin/init.ex:1-19` | Runtime Init has a Server PID and Agent ID, but no committed Plugin-owned field value or state version. |
 | `lib/jido/plugin/scheduler.ex:30-48` | Scheduler documents durable pending work, acknowledgement, and the bounded `delivery_interval` option. |
 | `lib/jido/plugin/scheduler/runtime.ex:415-436` | Scheduler applies `delivery_interval` between pending-work attempts. |
 | `lib/jido/agent_server.ex:2-42` | The Agent Server owns serialized live Turns, one commit, ordered Directives, and state-version rules. Executable I/O can occur before commit. |
@@ -109,7 +109,7 @@ change runtime behavior.
 | `test/jido/observe/agent_lifecycle_test.exs:48-302` | Terminal Outcomes, commit boundaries, lifecycle events, and bounded metadata are proved. |
 | `test/jido/error/normalization_test.exs:8-321` | Error constructors and public normalization are covered. |
 | `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-37` | Direct and live parity, first-match precedence, and fixed source-Signal selection all pass. |
-| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin state ownership, declared-view isolation, and separate prepared inputs all pass. |
+| `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs:6-34` | Plugin-owned field ownership, declared-view isolation, and separate prepared inputs all pass. |
 | `test/examples/99_research/99_11_stable_reference/stable_reference_test.exs` | The Core Ref facade resolves current local PIDs and restores durable identity after a namespace is rebound to another local instance name. All three FA03 cases pass. |
 | `test/examples/99_research/99_12_definition_revision/definition_revision_test.exs` | Same-definition restore and revision-mismatch rejection pass. |
 | `test/examples/99_research/99_13_durable_delete/durable_delete_test.exs` | Compare-and-swap deletion and tombstone fencing pass without a skip. |
@@ -157,9 +157,9 @@ recommended target.
 - `Jido.Agent.cmd/3` returns a candidate Agent and Directives. It starts no
   process, commits no live state, handles no Directive, and emits no Agent
   runtime telemetry.
-- `%Jido.Agent.Command{}` and `%Jido.Agent.Turn{}` are current command and
-  selection values. `%Jido.Agent.Turn.Outcome{}` is the current public terminal
-  live-Turn value.
+- `%Jido.Agent.Command{}` is the live admission value. `%Jido.Agent.Turn{}` is
+  the selected executable plan. `%Jido.Agent.Turn.Outcome{}` is the terminal
+  runtime record produced by the Agent Server.
 - Complete Agent `checkpoint/2` and `restore/2` callbacks are supported.
 
 ### Current Turn and Plugin path
@@ -169,9 +169,8 @@ The current path is:
 ```text
 source Signal
   -> live Plugin admission, for live calls
-  -> sequential Plugin prepare chain
-  -> route the prepared Signal
-  -> require exactly one matching target
+  -> select the first route from the source Signal
+  -> build input from the admitted Signal data
   -> run one Action or Flow through Jido.Exec
   -> protect Plugin-owned state
   -> validate Directives
@@ -264,7 +263,7 @@ still define open details and prove each target behavior.
 
 | Gap | Requirement | Current evidence | Difference | Recommended disposition |
 | --- | --- | --- | --- | --- |
-| `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
+| `OVR-GAP-001` | `OVR-REQ-013` through `OVR-REQ-015` | `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | `Resolved`: selection uses the first source-Signal match before preparation. | Preserve the implemented order. |
 | `OVR-GAP-002` | `OVR-REQ-020` through `OVR-REQ-022` | `lib/jido/agent/plugin.ex`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | `Resolved`: Agent facets receive declared projections and package-owned prepared input. | Preserve the four-owner Plugin contract. |
 | `OVR-GAP-003` | `OVR-REQ-011` and `OVR-REQ-012` | Agent Ref, namespace registry, Ref facade, persistence formats, and FA03 | Ref identity, local resolution, and stable storage are implemented beside current ID and PID APIs. Topology delivery still uses compatible handles. | `Resolved for value, instance, and persistence`; seam 10 owns topology use. |
 | `OVR-GAP-004` | `OVR-REQ-009` and `OVR-REQ-010` | Agent revision, checkpoint, Codec, and restore tests | Definition revision is preserved and mismatches fail. Compatible old checkpoints retain defined handling. | `Resolved` |
@@ -428,8 +427,8 @@ the implementation tasks.
 | `OVR-REQ-006` through `OVR-REQ-008` | Agent, Builder, Codec, and authoring tests | None | `Proven` |
 | `OVR-REQ-009` and `OVR-REQ-010` | Definition revision, authoring, Codec, checkpoint, and restore tests | None | `Proven` |
 | `OVR-REQ-011` and `OVR-REQ-012` | Ref contract tests, instance Ref tests, stable-key persistence tests, and three passing FA03 cases | Topology delivery, node-move, and stale-location tests remain with seam 10. | `Proven for value, local instance, and persistence` |
-| `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex:95-103`; `lib/jido/agent/command/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct and live first-match and fixed-selection tests pass. | `Proven` |
-| `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/command/runner.ex:29-132`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs:6-14` | Preserve parity after the route and Plugin-input changes. | `Proven` for current behavior |
+| `OVR-REQ-013` through `OVR-REQ-015` | `../jido_signal/lib/jido_signal/router/index.ex`; `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Direct and live first-match and fixed-selection tests pass. | `Proven` |
+| `OVR-REQ-016` through `OVR-REQ-018` | `lib/jido/agent/runner.ex`; `test/examples/99_research/99_09_route_selection/route_selection_test.exs` | Preserve direct and live finalization parity. | `Proven` for current behavior |
 | `OVR-REQ-019` through `OVR-REQ-023` | `lib/jido/agent/plugin.ex`; `test/jido/plugin/facets_test.exs`; `test/examples/99_research/99_10_plugin_isolation/plugin_isolation_test.exs` | Declared observation, isolated input, deterministic ownership, and direct/live compatibility tests pass. | `Proven` |
 | `OVR-REQ-024` through `OVR-REQ-030` | `lib/jido/agent_server.ex:1493-1545,1639-1756`; `test/jido/agent_server/public_api_test.exs:87-181`; `test/jido/agent_server/directive_execution_test.exs:27-184` | Keep equal-state and paired pre-commit failure proof. Keep explicit executable-I/O limits. | `Proven` for current target wording |
 | `OVR-REQ-031` through `OVR-REQ-034` | `lib/jido/plugin/scheduler.ex:30-48`; `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-212` | Preserve stable ID, retry, acknowledgement, unrelated-Turn, and restart proof. | `Proven` for Scheduler |

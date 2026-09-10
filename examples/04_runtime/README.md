@@ -1,44 +1,38 @@
-# Runtime feature examples
+# Runtime examples
 
-This sequence has 13 source fixtures and 34 opt-in example tests. The five
-promoted capability examples also have deeper core acceptance suites. Each
-profile gives its focused test command.
+These examples move from short-lived runtime work to observation, recovery,
+and durable scheduling. Each example uses deterministic local services and
+public Jido APIs.
 
-| Order | Added feature | Tests |
-| --- | --- | ---: |
-| [04_01_scheduled_signals](04_01_scheduled_signals/scheduled_counter.ex) | A Scheduler Directive produces a later Signal and a separate commit. | 3 example |
-| [04_02_keyed_timers](04_02_keyed_timers/burst_buncher.ex) | A Plugin replaces one keyed timer and ignores stale generations. | 4 example |
-| [04_03_bus_delivery](04_03_bus_delivery/bus_delivery.ex) | A Bus Client retries failed Turns and acknowledges after commit. | 4 example |
-| [04_04_managed_jobs](04_04_managed_jobs/managed_jobs.ex) | An Agent-owned Plugin starts linked work after commit. | 6 example |
-| [04_05_runtime_inspection](04_05_runtime_inspection/agent_live_debugger.ex) | Inspection reports committed state and revision during active work. | 2 example |
-| [04_06_state_recovery](04_06_state_recovery/persistent_counter_recovery.ex) | Restore retains state, duplicate ledger, and revision. | 5 example |
-| [04_07_input_deduplication](04_07_input_deduplication/deduplicating_inbox.ex) | A stable input ID rejects duplicate work before commit. | 2 example |
-| [04_08_commit_outbox](04_08_commit_outbox/audit_outbox.ex) | Business state and audit intent restore together. | 3 example |
-| [04_09_agent_observation](04_09_agent_observation/turn_observation.ex) | SDK events expose Agent, admission, persistence, and local Topology facts. | 1 example plus core suite |
-| [04_10_causal_trace](04_10_causal_trace/causal_trace.ex) | Local and remote child work retains explicit creation causes. | 1 example plus core suite |
-| [04_11_recoverable_delivery](04_11_recoverable_delivery/recoverable_delivery.ex) | An application Plugin resumes committed output intent after loss. | 1 example plus core suite |
-| [04_12_pending_job_recovery](04_12_pending_job_recovery/pending_job_recovery.ex) | An application protocol preserves approval and requires explicit retry after restart. | 1 example plus core suite |
-| [04_13_durable_scheduling](04_13_durable_scheduling/scheduled_occurrence_recovery.ex) | Saved schedule occurrences retry at a configured interval until the result commit acknowledges them. | 1 example plus core suite |
+## Learning order
 
-Run the opt-in example tests:
+1. [Scheduled Signals](04_01_scheduled_signals/README.md) — emit later work with Scheduler Directives.
+2. [Keyed Timers](04_02_keyed_timers/README.md) — own replaceable OTP timers in a Plugin runtime.
+3. [Bus Delivery](04_03_bus_delivery/README.md) — consume an ordered durable Bus subscription.
+4. [Managed Jobs](04_04_managed_jobs/README.md) — run linked work after the request commit.
+5. [Runtime Inspection](04_05_runtime_inspection/README.md) — read safe snapshots and runtime status.
+6. [State Recovery](04_06_state_recovery/README.md) — restore state, revision, and input identity.
+7. [Agent Observation](04_07_agent_observation/README.md) — collect semantic SDK events.
+8. [Causal Trace](04_08_causal_trace/README.md) — follow one trace through parent and child work.
+9. [Recoverable Delivery](04_09_recoverable_delivery/README.md) — resume committed external intent.
+10. [Pending Job Recovery](04_10_pending_job_recovery/README.md) — make retry after runtime loss explicit.
+11. [Durable Scheduling](04_11_durable_scheduling/README.md) — save and acknowledge schedule occurrences.
 
-```shell
-mix test --include example test/examples/04_runtime --seed 0
+## Run the section
+
+```sh
+mix test test/examples/04_runtime --include example --seed 0
 ```
 
-Each promoted profile links its focused core command. See the
-[research queue](../99_research/README.md) for deferred runtime contracts.
+Expected result: the runtime behavior tests pass without network access or
+credentials.
 
-The durable scheduling fixture configures the Scheduler in its Agent DSL:
+## Shared support
 
-```elixir
-agent do
-  plugin Jido.Plugin.Scheduler, config: [delivery_interval: 250]
-end
-```
+- [Event probe](support/event_probe.ex) collects semantic telemetry for two observation examples.
+- [Job runtime](support/job_runtime.ex) supplies the managed work port and Plugin runtime used by two job examples.
 
-This sets the delay after each pending-work attempt to 250 milliseconds. The
-default is 100. The integration test rejects result writes, checks the interval
-and saved occurrence, then permits the result commit. Occurrence identity,
-acknowledgement, and the one-pending-occurrence limit retain their existing rules.
-See [core extension points](../../guides/core-scope.md#scheduler-delivery-interval).
+## Limits
+
+These examples use local processes and local persistence adapters. The
+multi-node ownership and remote lifecycle contracts start in the next section.

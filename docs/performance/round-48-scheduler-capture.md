@@ -6,9 +6,10 @@ The delivery task referenced two fields through the complete runtime map.
 The change binds the server and previous-job values before it builds the task
 function. Cron definitions, timer state, and options stay in the runtime.
 
-Five fresh-VM pairs measured the actual runtime handler with an owned empty
-Plugin-state reply fixture. It checks the idle result and removes the task,
-timer, and reply process. It does not measure a complete Agent Server Turn.
+Five fresh-VM pairs measured the actual runtime handler with an empty
+Plugin-owned-field reply fixture. It checks the idle result and removes the
+task, timer, and reply process. It does not measure a complete Agent Server
+Turn.
 
 | Payload | Time ratio | Faster pairs | p95 ratio | Caller reduction ratio | Sampled process-peak ratio |
 | --- | ---: | ---: | ---: | ---: | ---: |

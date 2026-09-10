@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.PendingJobRecoveryTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.PendingJobRecovery, as: Agent
-  alias Jido.Examples.ManagedJobs.Jobs
+  alias Jido.Examples.Runtime.JobRuntime, as: Jobs
 
   setup %{jido_pid: jido_pid} do
     suffix = :crypto.strong_rand_bytes(12) |> Base.url_encode64(padding: false)
@@ -101,18 +101,13 @@ defmodule Jido.AgentServer.PendingJobRecoveryTest do
   end
 
   defp hold_attempt(server, operation, attempt) do
-    observer = self()
-
-    work = fn value ->
-      send(observer, {:job_work, self(), attempt})
-
-      receive do
-        :release -> {:ok, Integer.to_string(value * 2)}
-      end
-    end
-
     assert {:ok, _} =
-             apply(Agent, operation, [server, "job-1", attempt, [context: %{work: work}]])
+             apply(Agent, operation, [
+               server,
+               "job-1",
+               attempt,
+               [context: JidoTest.JobRunner.context(self(), attempt)]
+             ])
 
     assert_receive {:job_work, task, ^attempt}, 1_000
     task

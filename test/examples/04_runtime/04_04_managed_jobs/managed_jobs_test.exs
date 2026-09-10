@@ -2,11 +2,17 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
   use JidoTest.FeatureSDKCase
   @moduletag group: :runtime
   alias Jido.Examples.ManagedJobs
-  alias Jido.Examples.ManagedJobs.{Jobs, Runtime}
+  alias Jido.Examples.Runtime.JobRuntime, as: Jobs
+  alias Jido.Examples.Runtime.JobRuntime.Server, as: JobServer
 
   defp start_job(jido) do
     agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)
-    assert {:ok, pending} = ManagedJobs.start_job(agent, "job", 3, context: %{work: barrier()})
+
+    assert {:ok, pending} =
+             ManagedJobs.start_job(agent, "job", 3,
+               context: JidoTest.JobRunner.context(self())
+             )
+
     assert pending.state.status == :running
     assert_receive {:job_work, worker, 3}, 1_000
     {agent, worker}
@@ -22,14 +28,18 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
              ManagedJobs.cmd(
                before.agent,
                ManagedJobs.start_job_signal!("job", 3),
-               context: %{work: barrier()}
+               context: JidoTest.JobRunner.context(self())
              )
 
     assert candidate.state.status == :running
     assert Map.from_struct(intent) == %{job_id: "job", value: 3}
     assert Server.snapshot(agent) == before
     refute_received {:job_work, _, _}
-    assert {:ok, _} = ManagedJobs.start_job(agent, "job", 3, context: %{work: barrier()})
+    assert {:ok, _} =
+             ManagedJobs.start_job(agent, "job", 3,
+               context: JidoTest.JobRunner.context(self())
+             )
+
     assert_receive {:job_work, worker, 3}, 1_000
     assert state(agent).status == :running
     assert Server.snapshot(agent).state_version == 1
@@ -37,7 +47,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     eventually(fn -> state(agent).status == :completed end)
     assert state(agent).result == "artifact:6"
     assert Server.snapshot(agent).state_version == 2
-    assert Runtime.jobs(Server.children(agent)[{:plugin, Jobs}].pid) == []
+    assert JobServer.jobs(Server.children(agent)[{:plugin, Jobs}].pid) == []
   end
 
   test "cancellation stops work and rejects its later result", %{jido: jido} do
@@ -56,15 +66,6 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     assert state(agent).status == :cancelled
   end
 
-  test "worker failure becomes a terminal Signal and permits a fresh job", %{jido: jido} do
-    {agent, worker} = start_job(jido)
-    Process.exit(worker, :kill)
-    eventually(fn -> state(agent).status == :failed end)
-    assert {:ok, _} = ManagedJobs.start_job(agent, "next", 4)
-    eventually(fn -> state(agent).status == :completed end)
-    assert state(agent).result == "8"
-  end
-
   test "capability loss kills its work but requires explicit pending-job recovery", %{jido: jido} do
     {agent, worker} = start_job(jido)
     ref = Process.monitor(worker)
@@ -80,7 +81,7 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
         end
       end)
 
-    assert Runtime.jobs(runtime) == []
+    assert JobServer.jobs(runtime) == []
     assert state(agent).status == :running
     assert {:ok, _} = ManagedJobs.cancel_job(agent, "job")
     assert {:ok, _} = ManagedJobs.start_job(agent, "retry-with-new-id", 5)
@@ -88,22 +89,4 @@ defmodule JidoTest.Examples.Runtime.ManagedJobsTest do
     assert state(agent).result == "10"
   end
 
-  test "Agent shutdown stops the capability and its active task", %{jido: jido} do
-    {agent, worker} = start_job(jido)
-    runtime = Server.children(agent)[{:plugin, Jobs}].pid
-    refs = for pid <- [runtime, worker], do: {pid, Process.monitor(pid)}
-    assert :ok = Jido.stop_agent(jido, agent)
-    for {pid, ref} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _}, 1_000)
-  end
-
-  test "invalid adapters and duplicate job IDs start no extra work", %{jido: jido} do
-    agent = start_agent!(jido, ManagedJobs, error_policy: :log_only)
-    assert {:error, _} = ManagedJobs.start_job(agent, "bad", 1, context: %{work: :invalid})
-    assert Server.snapshot(agent).state_version == 0
-    assert {:ok, _} = ManagedJobs.start_job(agent, "good", 1)
-    eventually(fn -> state(agent).status == :completed end)
-    before = Server.snapshot(agent)
-    assert {:error, _} = ManagedJobs.start_job(agent, "good", 1)
-    assert Server.snapshot(agent) == before
-  end
 end

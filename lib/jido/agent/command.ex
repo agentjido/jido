@@ -1,12 +1,16 @@
 defmodule Jido.Agent.Command do
   @moduledoc """
-  The input value passed through the Agent Plugin chain.
+  The live Agent Server admission envelope.
 
-  A Plugin can inspect the Agent and can prepare the Signal or caller context.
-  It cannot replace the Agent value or change executable output.
+  An Agent Server Plugin can inspect the Agent and can change the effective
+  Signal or caller context. It cannot replace the Agent value. Direct
+  `Jido.Agent.cmd/3` evaluation does not allocate a Command.
   """
 
+  alias Jido.Agent
   alias Jido.Error
+  alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
 
   @schema Zoi.struct(
             __MODULE__,
@@ -26,27 +30,29 @@ defmodule Jido.Agent.Command do
   def schema, do: @schema
 
   @doc "Creates one validated Agent command."
-  @spec new(Jido.Agent.t(), Jido.Signal.t(), map()) ::
+  @spec new(Jido.Agent.instance(), Jido.Signal.t(), map()) ::
           {:ok, t()} | {:error, Exception.t()}
   def new(agent, signal, context \\ %{}) do
     validate(%__MODULE__{agent: agent, signal: signal, context: context})
   end
 
+  @doc false
+  @spec new_trusted_agent(Jido.Agent.instance(), Jido.Signal.t(), map()) ::
+          {:ok, t()} | {:error, Exception.t()}
+  def new_trusted_agent(%Agent{} = agent, signal, context) do
+    with {:ok, signal} <- normalize_signal(signal),
+         :ok <- validate_context(context) do
+      {:ok, %__MODULE__{agent: agent, signal: signal, context: context}}
+    end
+  end
+
   @doc "Validates one Agent command."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
   def validate(%__MODULE__{} = command) do
-    cond do
-      not agent?(command.agent) ->
-        invalid("Agent command must contain a Jido.Agent", %{agent: command.agent})
-
-      not signal?(command.signal) ->
-        invalid("Agent command must contain a Jido.Signal", %{signal: command.signal})
-
-      not is_map(command.context) or is_struct(command.context) ->
-        invalid("Agent command context must be a map", %{context: command.context})
-
-      true ->
-        {:ok, command}
+    with {:ok, agent} <- Agent.validate_instance(command.agent),
+         {:ok, signal} <- normalize_signal(command.signal),
+         :ok <- validate_context(command.context) do
+      {:ok, %{command | agent: agent, signal: signal}}
     end
   end
 
@@ -63,11 +69,38 @@ defmodule Jido.Agent.Command do
     end
   end
 
-  defp agent?(%{__struct__: Jido.Agent}), do: true
-  defp agent?(_value), do: false
+  @doc false
+  @spec validate_admitted(t()) :: {:ok, t()} | {:error, Exception.t()}
+  def validate_admitted(%__MODULE__{} = command) do
+    with {:ok, signal} <- normalize_signal(command.signal),
+         :ok <- validate_context(command.context) do
+      {:ok, %{command | signal: signal}}
+    end
+  end
 
-  defp signal?(%{__struct__: Jido.Signal}), do: true
-  defp signal?(_value), do: false
+  @doc false
+  @spec normalize_signal(term()) :: {:ok, Signal.t()} | {:error, Exception.t()}
+  def normalize_signal(%Signal{} = signal) do
+    type = signal.type
+    input = if is_binary(type), do: signal, else: %{signal | type: "jido.validation"}
+
+    with {:ok, signal} <- Zoi.parse(Signal.schema(), input),
+         {:ok, extensions} <- SignalContext.normalize(signal.extensions) do
+      {:ok, %{signal | type: type, extensions: extensions}}
+    else
+      {:error, issues} -> invalid("Agent command Signal is invalid", %{issues: issues})
+    end
+  end
+
+  def normalize_signal(value) do
+    invalid("Agent command must contain a Jido.Signal", %{signal: value})
+  end
+
+  defp validate_context(context) when is_map(context) and not is_struct(context), do: :ok
+
+  defp validate_context(context) do
+    invalid("Agent command context must be a map", %{context: context})
+  end
 
   defp invalid(message, details) do
     {:error, Error.validation_error(message, kind: :config, details: details)}

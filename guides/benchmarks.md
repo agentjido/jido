@@ -116,7 +116,8 @@ Schema version 2 adds the caller collection before timing. Do not compare its
 time samples with version 1. Rerun both revisions with the same current scripts.
 
 The `scheduler/task_capture` cases call the actual scheduler runtime delivery
-handler. An owned reply fixture supplies empty Plugin state. These cases cover
+handler. An owned reply fixture supplies an empty Plugin-owned field. These
+cases cover
 task start, argument transfer, idle result, timer removal, and process cleanup.
 They do not measure a complete Agent Server Turn or cron activation. Run
 `mix run test/bench/capture_scheduler.exs --output PATH` for a separate trace of the

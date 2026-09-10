@@ -193,10 +193,7 @@ defmodule Jido.MixProject do
         "Agent Contracts": [
           Jido.Agent,
           Jido.Agent.Plugin,
-          Jido.Agent.Plugin.Contribution,
-          Jido.Agent.Plugin.Preparation,
           Jido.Agent.Ref,
-          Jido.Agent.Plugin.Transition,
           Jido.Agent.Command,
           Jido.Agent.Turn,
           Jido.Agent.Turn.Outcome

@@ -7,15 +7,6 @@ defmodule Jido.Examples.RouteSelection.Record do
   end
 end
 
-defmodule Jido.Examples.RouteSelection.Rewrite do
-  @moduledoc "Prepares a different Signal type to test the route selection boundary."
-  use Jido.Plugin
-
-  def prepare(command, _opts) do
-    {:ok, %{command | signal: %{command.signal | type: "order.cancel"}}}
-  end
-end
-
 defmodule Jido.Examples.RouteSelection.Single do
   @moduledoc "A single route provides the control."
   use Jido.Agent, name: "research_route_single"
@@ -60,14 +51,13 @@ defmodule Jido.Examples.RouteSelection.Fallback do
   end
 end
 
-defmodule Jido.Examples.RouteSelection.Rewritten do
-  @moduledoc "A Plugin changes the effective Signal type after fixed route selection."
-  use Jido.Agent, name: "research_route_rewritten"
-  alias Jido.Examples.RouteSelection.{Record, Rewrite}
+defmodule Jido.Examples.RouteSelection.Fixed do
+  @moduledoc "A two-route Agent keeps selection in the Agent boundary."
+  use Jido.Agent, name: "research_route_fixed"
+  alias Jido.Examples.RouteSelection.Record
 
   agent do
     schema Zoi.object(%{handler: Zoi.string() |> Zoi.default("")})
-    plugin Rewrite
   end
 
   routes do
@@ -85,13 +75,13 @@ end
 
 defmodule Jido.Examples.RouteSelection do
   @moduledoc "Route precedence and fixed selection with explicit DSL definitions."
-  alias __MODULE__.{Fallback, Rewritten, Single}
+  alias __MODULE__.{Fallback, Fixed, Single}
 
   def new(mode) do
     module =
       case mode do
         :fallback -> Fallback
-        :rewrite -> Rewritten
+        :fixed -> Fixed
         :single -> Single
       end
 

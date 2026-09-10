@@ -43,6 +43,44 @@ defmodule JidoTest.InstanceRefTest do
     use Jido, otp_app: :jido, namespace: "jido/test/generated-instance"
   end
 
+  @ref_api_contract [
+    {:agent_ref, [1, 2], :agent_ref, [2, 3]},
+    {:resolve_agent, [1], :resolve_agent, [2]},
+    {:start_agent_ref, [2, 3], :start_agent_ref, [3, 4]},
+    {:activate_agent, [2, 3], :activate_agent, [3, 4]},
+    {:call, [2, 3], :call, [3, 4]},
+    {:cast, [2], :cast, [3]},
+    {:send_request, [2, 3], :send_request, [3, 4]},
+    {:receive_response, [1, 2], :receive_response, [1, 2]},
+    {:stop_agent_ref, [1, 2, 3], :stop_agent_ref, [2, 3, 4]},
+    {:hibernate_ref, [1, 2], :hibernate_ref, [2, 3]},
+    {:delete_agent, [2, 3], :delete_agent, [3, 4]},
+    {:cancel, [1, 2], :cancel, [2, 3]},
+    {:cancel_turn, [2, 3], :cancel_turn, [3, 4]},
+    {:attach_ref, [1, 2, 3], :attach, [2, 3, 4]},
+    {:detach_ref, [1, 2, 3], :detach, [2, 3, 4]},
+    {:touch_ref, [1], :touch, [2]},
+    {:agent, [1, 2], :agent, [2, 3]},
+    {:plugin_state, [2, 3], :plugin_state, [3, 4]},
+    {:status, [1, 2], :status, [2, 3]},
+    {:snapshot, [1, 2], :snapshot, [2, 3]},
+    {:children, [1, 2], :children, [2, 3]},
+    {:await_ready, [1, 2], :await_ready, [2, 3]},
+    {:set_agent_debug, [2, 3], :set_agent_debug, [3, 4]},
+    {:recent_events, [1, 2, 3], :recent_events, [2, 3, 4]}
+  ]
+
+  test "a generated instance exposes the complete Ref-first API" do
+    Enum.each(@ref_api_contract, fn {generated_name, generated_arities, root_name, root_arities} ->
+      assert Enum.all?(
+               generated_arities,
+               &function_exported?(NamespacedInstance, generated_name, &1)
+             )
+
+      assert Enum.all?(root_arities, &function_exported?(Jido, root_name, &1))
+    end)
+  end
+
   test "a namespace is exact, local, and unique while its instance is live" do
     namespace = unique_namespace("binding")
     first = unique_instance("first")

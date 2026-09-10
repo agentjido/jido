@@ -206,8 +206,8 @@ ID and set its causation identity from the effective Signal ID.
 
 `COMMIT-REQ-036`: When the Agent Server stores a checkpoint, it shall exclude
 the transient Directive batch, caller context, task handles, and Turn runtime
-state unless an explicit capability first places required portable data in
-Agent or Plugin-owned state.
+state unless an explicit capability first places required portable data in a
+domain or Plugin-owned field of the complete Agent state.
 
 ### Explicit recoverable work
 
@@ -264,10 +264,10 @@ requires only that its commit and Directive summary match the actual order.
 | Persistent adapter | The configured adapter confirmed the required compare-and-swap before live replacement. | Stronger durability than that adapter and deployment document. |
 | Explicit recoverable capability | Pending intent was part of the committed candidate, subject to checkpoint preservation. | Delivery, acknowledgement, external completion, or exactly-once execution. |
 
-The default Agent checkpoint contains the complete combined Agent and Plugin
-state. A custom checkpoint is valid current behavior, but it can weaken a
-capability's recovery claim. The capability and Agent author must make that
-composition explicit.
+The default Agent checkpoint contains the complete Agent state map with its
+domain and Plugin-owned fields. A custom checkpoint is valid current behavior,
+but it can weaken a capability's recovery claim. The capability and Agent
+author must make that composition explicit.
 
 ## Invariants
 
@@ -292,7 +292,7 @@ These guarantees apply only after the related requirements are approved.
 | 08 Agent Server | One explicit sequence governs validation, checkpoint, replacement, reply, Directive handling, and settlement. |
 | 13 Observability | Commit and settlement are separate semantic events with one Turn identity and accurate failure position. |
 | 99 Delivery | Every commit, failure, causation, and recovery claim has a stable acceptance identifier. |
-| Capability packages | Core permits portable intent in Agent or Plugin state but does not supply a universal outbox or exactly-once guarantee. |
+| Capability packages | Core permits portable intent in domain or Plugin-owned Agent fields but does not supply a universal outbox or exactly-once guarantee. |
 
 ## Design decisions
 

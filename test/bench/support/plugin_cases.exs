@@ -11,7 +11,7 @@ end
 defmodule JidoCoreBench.PluginCases do
   @moduledoc false
   alias JidoCoreBench.Fixtures, as: F
-  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Runner
 
   def workloads do
     for count <- [0, 1_000, 10_000], operation <- [:validate, :prepare] do
@@ -47,8 +47,7 @@ defmodule JidoCoreBench.PluginCases do
                 %{
                   agent_id: agent.id,
                   agent_state: agent.state,
-                  signal: signal,
-                  plugin_inputs: %{}
+                  signal: signal
                 }
               )
             )

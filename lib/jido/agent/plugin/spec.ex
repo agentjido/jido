@@ -7,9 +7,7 @@ defmodule Jido.Agent.Plugin.Spec do
             options: [],
             state_key: nil,
             state_schema: nil,
-            observations: [],
-            directive_modules: [],
-            legacy?: false
+            directive_modules: []
 
   @type t :: %__MODULE__{
           package: module(),
@@ -17,8 +15,6 @@ defmodule Jido.Agent.Plugin.Spec do
           options: keyword(),
           state_key: atom() | nil,
           state_schema: Zoi.schema() | nil,
-          observations: [atom()],
-          directive_modules: [module()],
-          legacy?: boolean()
+          directive_modules: [module()]
         }
 end

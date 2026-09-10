@@ -267,7 +267,7 @@ refine its owned value, but it shall keep the compatibility disposition.
 | --- | --- | --- |
 | `Jido.Agent` | Canonical definition or instance; `Agent.new/1`, `instantiate/2`, and validation functions | Retain the approved seam-01 struct. |
 | `Jido.Agent.Ref` | Stable `{namespace, partition, id}` identity; Ref constructors and exact version-1 map conversion | Retain beside current IDs, PIDs, and OTP names. It contains no location or authority. |
-| Agent public map | Complete Agent inspection form; `Agent.to_map/1` | Retain the map and its current keys. It is not the error projection. |
+| Agent Codec document | Portable Agent definition authoring data; `Jido.Agent.Codec` | Retain as the portable definition projection. It excludes instance identity and live state. |
 | Agent checkpoint map | Portable restore envelope; `Agent.checkpoint/2` and `restore/3` | Retain versioned checkpoint semantics. |
 | `Jido.Agent.Turn` and `Outcome` | Prepared work and completed runtime outcome; their constructors and validators | Retain; seams 04 and 08 own fields. |
 | `Jido.Plugin.Manifest`, `Jido.Plugin.Init`, and owner callback values | Public package metadata and bounded Agent, Agent Server, Persistence, and Topology callback data; owner validators | Retain; seam 05 owns fields. `Jido.Plugin.Spec` and all four owner Specs remain internal normalization data. |

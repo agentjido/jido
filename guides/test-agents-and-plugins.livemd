@@ -98,7 +98,7 @@ end
 
 For a state-only Plugin, test option normalization, state initialization,
 Directive validation, and `update_state/3` as ordinary functions. Then run one
-Agent Turn to verify that Plugin state commits with domain state.
+Agent Turn to verify that Plugin-owned and domain fields commit together.
 
 For a Plugin runtime, start the Agent under a unique Jido instance. Verify its
 child specification, startup failure behavior, Directive handling, cleanup, and

@@ -3,9 +3,9 @@ defmodule Jido.Plugin.Scheduler.OccurrenceRuntimeTest do
   @moduletag capability: "REC-03"
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.ScheduledOccurrenceProbe, as: Agent
   alias Jido.Plugin.Scheduler
   alias JidoTest.ScheduledOccurrenceFixtures.{Clock, TimedAgent}
+  alias JidoTest.ScheduledOccurrenceFixtures.TimedAgent, as: Agent
 
   setup %{jido_pid: jido_pid} do
     start_supervised!({Clock, []})

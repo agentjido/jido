@@ -5,7 +5,7 @@ is callback-free. It selects no more than one facet for each Jido owner:
 
 | Facet | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Pure Turn preparation, owned state, and owned Directives |
+| `Jido.Agent.Plugin` | Plugin-owned state and Directive validation |
 | `Jido.AgentServer.Plugin` | Live admission, runtime, readiness, outbound preparation, and post-commit dispatch |
 | `Jido.Persistence.Plugin` | Pure dump and load of one paired owned-state value |
 | `Jido.Topology.Plugin` | Pure static Topology contribution |
@@ -41,20 +41,15 @@ The Agent facet can implement these callbacks:
 | Callback | Boundary |
 | --- | --- |
 | `state_spec/1` | Define one owned state key and static schema |
-| `observes/1` | Select top-level domain fields for the callback projection |
-| `prepare/2` | Change the effective Signal, bounded caller context, or this package's prepared input |
-| `contribute/2` | Keep or replace owned state and append owned Directives |
 | `directives/1` | Declare owned Directive modules |
 | `validate_directive/2` | Validate one owned Directive before candidate return |
+| `update_state/3` | Update the owned state value from owned Directives |
 
-`Jido.Agent.Plugin.Preparation` does not contain the complete Agent or another
-package's input. Route selection uses the unchanged source Signal before
-preparation. The selected Action or Flow reads prepared values from
-`context.plugin_inputs[PackageModule]`.
-
-`Jido.Agent.Plugin.Contribution` can replace only one complete owned-state
-value. Its Directives must belong to the same Agent facet. Jido appends them
-after executable Directives in package declaration order.
+An Action or Flow returns the complete candidate state and its Directives. It
+must preserve all Plugin-owned fields. Jido validates each Directive, gives
+each Agent facet only its owned Directives, and calls `update_state/3` in
+package declaration order. The callback receives only the current owned value.
+Jido validates the returned value with the owned schema.
 
 ## Agent Server Facet
 
@@ -75,7 +70,9 @@ Each runtime receives `%Jido.Plugin.Init{plugin_state: state,
 state_version: version}`. The state is only the value owned by that Plugin.
 The pair is one immutable committed view for that runtime generation. A
 replacement receives a newly built pair. `Jido.Plugin.state/2` remains
-available when a running resource must reconcile after a later commit.
+available when a running resource must reconcile after a later commit. The
+`plugin_state` field is selected from the complete Agent state map. It is not a
+second stored map.
 
 Jido puts a temporary owner wrapper beside the Agent Server. The wrapper hosts
 each root generation as temporary under its private Supervisor. If the root
@@ -98,13 +95,6 @@ declarations, in source order and keeps Plugin declaration order. Included
 Topologies receive the same expansion in their own scope. Common Topology
 validation checks the complete graph before Controller activation. The source
 definition stays unchanged.
-
-## Compatibility Form
-
-`use Jido.Plugin` with no options is the supported mixed-callback compatibility
-form. Current built-in Plugins use it while they move to owner facets. This
-form can receive a complete `Jido.Agent.Command` in `prepare/2`; it is not an
-isolation boundary.
 
 See [Plugin Runtimes](plugin-runtimes.livemd) and
 [Plugin-Owned State](plugin-state.md).

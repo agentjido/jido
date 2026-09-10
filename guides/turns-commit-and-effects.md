@@ -8,17 +8,16 @@ ID and can commit at most one new Agent revision.
 | Stage | Work |
 | --- | --- |
 | Admission | Runtime Plugins accept or reject the Signal |
-| Preparation | Plugins prepare the Signal and caller context |
-| Routing | The effective Signal selects one executable |
+| Routing | The Signal selects one executable |
 | Execution | One Action or Flow returns candidate state and Directives |
 | Finalization | Plugins update owned state and Jido validates all state |
 | Commit | Persistence succeeds and the live Agent value changes |
 | Dispatch | Directives run in declared order |
 | Settlement | Jido records the terminal Outcome |
 
-Direct commands use preparation, routing, execution, and finalization. They
-return a candidate and Directives. Admission, live commit, dispatch, and
-settlement belong to the Agent Server.
+Direct commands use routing, execution, and finalization. They return a
+candidate and Directives. Admission, live commit, dispatch, and settlement
+belong to the Agent Server.
 
 ## Locate The Commit Boundary
 
@@ -49,7 +48,8 @@ The Agent commit remains. A caller waiting for the state transition can receive
 the committed Agent before later runtime work fails.
 
 Use the settled telemetry event or `Jido.Agent.Turn.Outcome` when you must know
-the result of the complete Turn, including Directives.
+the result of the complete Turn, including Directives. The Agent Server creates
+the Outcome. It is a terminal runtime record, not an authoring value.
 
 ## Keep Timeouts Separate
 

@@ -1,23 +1,3 @@
-defmodule Jido.Examples.BusDelivery.Record do
-  @moduledoc false
-  use Jido.Action,
-    name: "example_bus_record",
-    schema: Zoi.object(%{value: Zoi.integer()})
-
-  def run(input, context) do
-    if observer = context[:on_delivery], do: observer.(input)
-    state = context.agent_state
-    id = context.signal.id
-
-    if id in state.seen do
-      # Durable delivery must acknowledge a retry that was already committed.
-      {:ok, state}
-    else
-      {:ok, %{state | seen: state.seen ++ [id], values: state.values ++ [input.value]}}
-    end
-  end
-end
-
 defmodule Jido.Examples.BusDelivery do
   @moduledoc """
   A durable Bus subscription delivers ordered Signals to an Agent. The Client
@@ -36,7 +16,7 @@ defmodule Jido.Examples.BusDelivery do
     plugin Jido.Plugin.Bus.Client,
       config: [
         bus: :example_commands,
-        path: "examples.bus.**",
+        path: "examples.runtime.bus_delivery.**",
         durable: "example-consumer",
         start_from: :origin,
         retry_delay_ms: 10
@@ -44,9 +24,24 @@ defmodule Jido.Examples.BusDelivery do
   end
 
   routes do
-    signal_source "/examples/bus"
+    signal_source "/examples/runtime/bus_delivery"
 
-    route "examples.bus.record", Jido.Examples.BusDelivery.Record do
+    route "examples.runtime.bus_delivery.record" do
+      action %{value: value},
+        schema: Zoi.object(%{value: Zoi.integer()}),
+        context: context do
+        state = context.agent_state
+        signal_id = context.signal.id
+
+        if signal_id in state.seen do
+          # A retry of an already committed record must still succeed so that
+          # the durable subscription can acknowledge it.
+          {:ok, state}
+        else
+          {:ok, %{state | seen: state.seen ++ [signal_id], values: state.values ++ [value]}}
+        end
+      end
+
       define :record, args: [:value]
     end
   end

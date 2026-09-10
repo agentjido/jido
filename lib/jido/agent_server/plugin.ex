@@ -63,8 +63,7 @@ defmodule Jido.AgentServer.Plugin do
           {:ok, Command.t()} | {:error, term()}
   def admit(%Command{} = command, specs, runtime_refs)
       when is_list(specs) and is_map(runtime_refs) do
-    with {:ok, command} <- Command.validate(command),
-         {:ok, specs} <- Normalizer.normalize_all(specs) do
+    with {:ok, specs} <- Normalizer.normalize_all(specs) do
       Enum.reduce_while(specs, {:ok, command}, fn plugin_spec, {:ok, current} ->
         case admit_one(current, plugin_spec, Map.get(runtime_refs, plugin_spec.module)) do
           {:ok, admitted} -> {:cont, {:ok, admitted}}
@@ -132,7 +131,7 @@ defmodule Jido.AgentServer.Plugin do
     end
   end
 
-  @doc "Gets the current state owned by one Plugin runtime."
+  @doc "Gets one Plugin-owned field from the current complete Agent state."
   @spec state(Init.t(), timeout()) :: {:ok, term()} | {:error, term()}
   def state(%Init{agent_server: agent_server, module: package}, timeout \\ 5_000) do
     Jido.AgentServer.plugin_state(agent_server, package, timeout)
@@ -268,8 +267,8 @@ defmodule Jido.AgentServer.Plugin do
   end
 
   defp validate_admission_result({:ok, %Command{} = command}, original, spec) do
-    with {:ok, command} <- Command.validate(command),
-         true <- command.agent == original.agent do
+    with true <- command.agent == original.agent,
+         {:ok, command} <- Command.validate_admitted(command) do
       {:ok, command}
     else
       false ->

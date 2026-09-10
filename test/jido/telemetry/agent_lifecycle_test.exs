@@ -4,8 +4,8 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
   @moduletag capability: "OBS-01"
 
   alias Jido.AgentServer, as: Server
-  alias Jido.Examples.TurnObservation, as: Agent
-  alias Jido.Examples.TurnObservation.EventProbe
+  alias Jido.Examples.Runtime.EventProbe
+  alias JidoTest.TelemetryAgent, as: Agent
 
   test "pure evaluation returns a candidate without Agent runtime events" do
     {:ok, agent} = Agent.new(id: unique_id())

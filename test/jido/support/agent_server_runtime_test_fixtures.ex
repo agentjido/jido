@@ -68,11 +68,6 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
     use Jido.Plugin
 
     @impl true
-    def prepare(command, _opts) do
-      {:ok, %{command | signal: %{command.signal | source: "/plugin-prepared"}}}
-    end
-
-    @impl true
     def directives(_opts), do: [CountedDirective]
 
     @impl true

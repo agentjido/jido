@@ -184,7 +184,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Mission do
       end
     end
 
-    route "jido.agent.child.started", Jido.Examples.KeepState
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
   end
 
   @doc false

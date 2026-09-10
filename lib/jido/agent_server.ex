@@ -57,11 +57,10 @@ defmodule Jido.AgentServer do
   @max_error_policy_tasks 32
 
   alias Jido.Agent
-  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Runner
   alias Jido.Agent.Directive
   alias Jido.Agent.Turn.Outcome
   alias Jido.Plugin
-  alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.AgentServer.Plugin, as: ServerPlugin
   alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
   alias Jido.Plugin.SignalContext, as: PluginSignalContext
@@ -174,9 +173,9 @@ defmodule Jido.AgentServer do
   `:context`. The default timeout is 5,000 milliseconds. Context accepts a map,
   keyword list, or `nil`, as in `Jido.Agent.cmd/3`.
 
-  Caller context passes through Plugin admission and preparation to execution.
+  Caller context passes through Plugin admission to execution.
   It belongs to this Turn, including its post-commit Plugin work. Jido does not
-  add it to Signal data, Agent or Plugin state, persistence, or emitted Signals.
+  add it to Signal data, the complete Agent state, persistence, or emitted Signals.
   Application code must select any values it wants to store or emit.
 
   A durable revision conflict returns `{:error, {:persistence_failed, :conflict}}`
@@ -243,7 +242,7 @@ defmodule Jido.AgentServer do
     :gen_statem.stop(server, normalize_stop_reason(reason), timeout)
   end
 
-  @doc "Returns the current portable state owned by one declared Plugin."
+  @doc "Returns one declared Plugin's owned field from the complete Agent state map."
   @spec plugin_state(server(), module(), timeout()) :: {:ok, term()} | {:error, term()}
   def plugin_state(server, plugin, timeout \\ 5_000) when is_atom(plugin) do
     :gen_statem.call(server, {:plugin_state, plugin}, timeout)
@@ -1444,6 +1443,8 @@ defmodule Jido.AgentServer do
 
     try do
       with {:ok, command} <- initial_command(signal, context, data) do
+        data = %{data | active: %{data.active | source_signal: command.signal}}
+
         if ServerPlugin.admits?(data.plugin_specs) do
           start_admission_task(command, data)
         else
@@ -1468,7 +1469,7 @@ defmodule Jido.AgentServer do
   defp upgrade_definition(from, target_module, migration, %State{} = data) do
     with :ok <- definition_upgrade_supported?(data, target_module),
          {:ok, state} <- invoke_state_migration(migration, data.agent),
-         {:ok, target} <- Agent.new(target_module, id: data.agent.id, state: state),
+         {:ok, target} <- Agent.instantiate(target_module, id: data.agent.id, state: state),
          {:ok, plugin_specs} <- Plugin.normalize_all(target.plugins),
          :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
       version = data.state_version + 1
@@ -1618,7 +1619,7 @@ defmodule Jido.AgentServer do
 
   defp initial_command(%Signal{} = signal, context, %State{} = data) do
     context = Map.merge(context, %{jido: data.jido, partition: data.partition})
-    Jido.Agent.Command.new(data.agent, signal, context)
+    Jido.Agent.Command.new_trusted_agent(data.agent, signal, context)
   end
 
   defp start_admission_task(command, %State{} = data) do
@@ -1697,14 +1698,11 @@ defmodule Jido.AgentServer do
     exec_opts =
       Keyword.put(data.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
 
-    command_options = Keyword.put(exec_opts, :context, command.context)
-
     with {:ok, prepared} <-
            Runner.prepare_for_server(
-             command.agent,
+             command,
              data.active.source_signal,
-             command.signal,
-             command_options,
+             exec_opts,
              data.plugin_specs
            ),
          {:ok, handle} <- start_async_exec(prepared, data),
@@ -2100,7 +2098,7 @@ defmodule Jido.AgentServer do
   end
 
   defp start_plugin_directive(directive, rest, context, span, %State{} = data) do
-    case AgentPlugin.directive_owner(data.plugin_specs, directive) do
+    case Plugin.directive_owner(data.plugin_specs, directive) do
       %Jido.Plugin.Spec{dispatch?: false} ->
         complete_directive({:ok, data}, rest, context, span)
 

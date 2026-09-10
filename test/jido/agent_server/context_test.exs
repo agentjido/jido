@@ -17,18 +17,13 @@ defmodule Jido.AgentServer.ContextTest do
         end
       end
 
-      send(command.context.observer, {:context_admitted, command.context, command.signal})
-      {:ok, %{command | context: Map.put(command.context, :admitted, true)}}
-    end
-
-    @impl true
-    def prepare(command, _opts) do
       if delay = Map.get(command.context, :prepare_delay), do: Process.sleep(delay)
 
       if Map.get(command.context, :prepare_error) do
         {:error, :prepared_too_late}
       else
-        {:ok, %{command | context: Map.put(command.context, :prepared, true)}}
+        send(command.context.observer, {:context_admitted, command.context, command.signal})
+        {:ok, %{command | context: Map.put(command.context, :admitted, true)}}
       end
     end
 
@@ -300,7 +295,6 @@ defmodule Jido.AgentServer.ContextTest do
     assert admitted.partition == nil
     assert_receive {:context_executed, executed}
     assert executed.admitted
-    assert executed.prepared
     assert executed.private_request == private_request
     assert executed.signal.data == command.data
     assert executed.agent_state == %{value: 0, context_plugin: 0}
@@ -310,7 +304,6 @@ defmodule Jido.AgentServer.ContextTest do
     refute Map.has_key?(dispatch.turn_context, :agent_id)
     refute Map.has_key?(dispatch.turn_context, :agent_state)
     refute Map.has_key?(dispatch.turn_context, :signal)
-    refute Map.has_key?(dispatch.turn_context, :plugin_inputs)
     assert dispatch.source_signal == command
     assert dispatch.effective_signal.data == command.data
     assert dispatch.plugin_state == 1

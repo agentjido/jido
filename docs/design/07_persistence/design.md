@@ -18,7 +18,7 @@ record states the compatibility and migration limits.
   clients, discovery, placement, leases, multi-Agent transactions, and durable
   workflow history.
 - Adjacent owners: seam 01 owns Agent checkpoints. Seam 03 owns Agent Ref. Seam
-  05 owns Plugin state conversion. Seam 06 owns commit order. Seam 08 owns
+  05 owns Plugin-owned field conversion. Seam 06 owns commit order. Seam 08 owns
   Agent Server lifecycle. Seam 10 owns runtime topology. Seam 12 owns public
   errors.
 

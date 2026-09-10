@@ -1,8 +1,8 @@
 # Runtime patterns
 
 Use one Signal for one Turn. Use saved IDs for work that must survive retries.
-Keep durable intent in validated Agent or Plugin state. Let owned resources
-perform the work and send completion through another Signal. Acknowledge work
+Keep durable intent in domain or Plugin-owned fields of validated Agent state.
+Let owned resources perform the work and send completion through another Signal. Acknowledge work
 in the same commit as its business result where the example requires it.
 
 Use explicit child ownership and bounded concurrency. Distinguish a remote

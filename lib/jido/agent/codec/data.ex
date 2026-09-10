@@ -122,6 +122,23 @@ defmodule Jido.Agent.Codec.Data do
     end
   end
 
+  @doc false
+  @spec object(term(), [String.t()]) :: :ok | {:error, term()}
+  def object(value, fields) when is_map(value) and not is_struct(value) do
+    if Enum.sort(Map.keys(value)) == Enum.sort(fields),
+      do: :ok,
+      else: Authoring.error("Unknown or missing document fields")
+  end
+
+  def object(_value, _fields), do: Authoring.error("Document object must be a map")
+
+  @doc false
+  @spec version(map(), String.t()) :: :ok | {:error, term()}
+  def version(%{"version" => 1, "type" => type}, type), do: :ok
+
+  def version(_document, _type),
+    do: Authoring.error("Unknown authoring document type or version")
+
   defp check(_value, depth, nodes) when depth > 100 or nodes > 100_000,
     do: Authoring.error("Authoring document exceeds its size or depth limit")
 

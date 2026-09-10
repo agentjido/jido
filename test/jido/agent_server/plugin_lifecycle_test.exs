@@ -123,7 +123,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   end
 
   test "failed runtime startup returns a Plugin error", %{jido: jido} do
-    definition = %{Agent.agent() | plugins: [{Runtime, start_error: :unavailable}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, start_error: :unavailable}]}
 
     assert {:error, {:bootstrap_failed, {:plugin_child_start_failed, Runtime, _}}} =
              Jido.start_agent(jido, definition, restart: :temporary)
@@ -132,7 +132,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   test "initial Plugin readiness has a finite timeout and cleans up", %{jido: jido} do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
-    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
 
     starter =
       Task.async(fn ->
@@ -155,7 +155,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   test "abrupt owner death stops initial Plugin readiness and its runtime", %{jido: jido} do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
-    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
 
     starter =
       Task.async(fn ->
@@ -244,7 +244,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
 
   test "failed readiness after a runtime restart stops the owner", %{jido: jido} do
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:error, :not_ready}] end})
-    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
     {:ok, server} = Jido.start_agent(jido, definition, restart: :temporary)
     runtime = Server.children(server)[{:plugin, Runtime}].pid
     ref = Process.monitor(server)
@@ -304,7 +304,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
   defp paused_restart(jido, opts \\ []) do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [:ok, {:wait, observer}] end})
-    definition = %{Agent.agent() | plugins: [{Runtime, gate: gate}]}
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: gate}]}
 
     {:ok, server} =
       Jido.start_agent(jido, definition,

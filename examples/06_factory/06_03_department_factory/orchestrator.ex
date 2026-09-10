@@ -168,7 +168,7 @@ defmodule Jido.Examples.Factory.Orchestrator do
     route "factory.command", __MODULE__.Command
     route "factory.inspect", Jido.Examples.Factory.Inspection
     route "factory.async.result", __MODULE__.Settle
-    route "jido.agent.child.*", Jido.Examples.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState
   end
 
   @doc false

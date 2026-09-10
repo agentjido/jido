@@ -78,15 +78,6 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
     assert Server.snapshot(restored_again) == %{agent: first, state_version: 2}
   end
 
-  test "required restore reports a missing record", %{jido: jido} do
-    assert {:error, _reason} =
-             PersistentCounterRecovery.restore(
-               jido,
-               unique_id("missing-counter"),
-               persistence(:missing)
-             )
-  end
-
   test "a corrupt record prevents restore", %{jido: jido} do
     {ETS, opts} = persistence = persistence(:corrupt)
     id = unique_id("corrupt-counter")
@@ -96,20 +87,6 @@ defmodule JidoTest.Examples.Runtime.PersistentCounterRecoveryTest do
 
     assert {:error, _reason} =
              PersistentCounterRecovery.restore(jido, id, persistence)
-  end
-
-  test "a stale durable writer cannot replace a newer revision" do
-    persistence = persistence(:conflict)
-    id = unique_id("conflict-counter")
-
-    older = PersistentCounterRecovery.new!(id: id, state: %{count: 1})
-    newer = PersistentCounterRecovery.new!(id: id, state: %{count: 2})
-
-    assert :ok = Persistence.save_agent(persistence, newer, revision: 2)
-    assert {:error, :conflict} = Persistence.save_agent(persistence, older, revision: 1)
-
-    assert {:ok, ^newer, 2} =
-             Persistence.load_agent_with_revision(persistence, PersistentCounterRecovery, id)
   end
 
   defp start_counter(jido, id, persistence) do

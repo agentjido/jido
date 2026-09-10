@@ -128,18 +128,13 @@ defmodule Jido.Plugin.Scheduler do
   @spec occurrence(Signal.t()) :: {:ok, Occurrence.t()} | {:error, term()}
   defdelegate occurrence(signal), to: Occurrence, as: :from_signal
 
+  @doc "Checks that a durable occurrence matches the current Scheduler state."
+  @spec admit_occurrence(map(), Signal.t()) :: :ok | {:error, term()}
+  defdelegate admit_occurrence(state, signal), to: Durable, as: :admit
+
   @doc "Confirms a pending durable occurrence with the business state commit."
   @spec acknowledge(String.t()) :: Acknowledge.t()
   def acknowledge(occurrence_id), do: %Acknowledge{occurrence_id: occurrence_id}
-
-  @impl Jido.Plugin
-  def prepare(command, _opts) do
-    if Durable.marked?(command.signal) do
-      with :ok <- Durable.admit(command.agent.state.scheduler, command.signal), do: {:ok, command}
-    else
-      {:ok, command}
-    end
-  end
 
   @doc "Creates one recurring schedule cancellation Directive."
   @spec cancel(term()) :: Cancel.t()

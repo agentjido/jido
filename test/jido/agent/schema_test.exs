@@ -67,7 +67,7 @@ defmodule Jido.Agent.SchemaTest do
   end
 
   test "composition preserves required Plugin fields and the root rule" do
-    definition = %{PlainAgent.agent() | plugins: [RequiredState]}
+    definition = %{PlainAgent.definition() | plugins: [RequiredState]}
 
     assert {:error, %ValidationError{details: %{errors: errors}}} =
              Jido.Agent.instantiate(definition)
@@ -82,7 +82,7 @@ defmodule Jido.Agent.SchemaTest do
   end
 
   test "validation composes the current Plugin options and domain schema on each call" do
-    definition = %{PlainAgent.agent() | plugins: [{ConfiguredState, minimum: 0}]}
+    definition = %{PlainAgent.definition() | plugins: [{ConfiguredState, minimum: 0}]}
     assert {:ok, agent} = Jido.Agent.instantiate(definition, state: %{owned: 0})
     assert {:ok, ^agent} = Jido.Agent.validate_instance(agent)
 

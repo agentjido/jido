@@ -64,7 +64,7 @@ interfaces. It does not start an Agent Server.
 ## Inspect Generated Data
 
 ```elixir
-definition = AgentDSL.Profile.agent()
+definition = AgentDSL.Profile.definition()
 
 %{
   name: AgentDSL.Profile.name(),

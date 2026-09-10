@@ -154,6 +154,8 @@ defmodule Jido do
         )
       end
 
+      # Compatible Agent lifecycle API
+
       @doc "Starts an Agent under this Jido instance."
       @spec start_agent(module() | Jido.Agent.t(), keyword()) ::
               DynamicSupervisor.on_start_child()
@@ -181,117 +183,154 @@ defmodule Jido do
       @spec agent_count(keyword()) :: non_neg_integer()
       def agent_count(opts \\ []), do: Jido.agent_count(__MODULE__, opts)
 
+      # Stable Agent Ref API
+
       @doc "Builds one stable Agent Ref in this instance namespace."
+      @spec agent_ref(String.t(), keyword()) ::
+              {:ok, Jido.Agent.Ref.t()} | {:error, Jido.Error.ValidationError.t()}
       def agent_ref(id, opts \\ []), do: Jido.agent_ref(__MODULE__, id, opts)
 
       @doc "Resolves the current local PID for one stable Agent Ref."
+      @spec resolve_agent(Jido.Agent.Ref.t()) :: {:ok, pid()} | {:error, term()}
       def resolve_agent(%Jido.Agent.Ref{} = ref), do: Jido.resolve_agent(__MODULE__, ref)
 
       @doc "Starts one Agent with an explicit stable Agent Ref."
+      @spec start_agent_ref(Jido.Agent.Ref.t(), module() | Jido.Agent.t(), keyword()) ::
+              DynamicSupervisor.on_start_child()
       def start_agent_ref(%Jido.Agent.Ref{} = ref, agent, opts \\ []) do
         Jido.start_agent_ref(__MODULE__, ref, agent, opts)
       end
 
       @doc "Activates one durable Agent with an explicit stable Agent Ref."
+      @spec activate_agent(Jido.Agent.Ref.t(), module(), keyword()) ::
+              DynamicSupervisor.on_start_child()
       def activate_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
         Jido.activate_agent(__MODULE__, ref, agent_module, opts)
       end
 
       @doc "Sends one synchronous Signal through a stable Agent Ref."
+      @spec call(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
+              Jido.AgentServer.signal_result()
       def call(%Jido.Agent.Ref{} = ref, signal, timeout_or_opts \\ 5_000) do
         Jido.call(__MODULE__, ref, signal, timeout_or_opts)
       end
 
       @doc "Sends one asynchronous Signal through a stable Agent Ref."
+      @spec cast(Jido.Agent.Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
       def cast(%Jido.Agent.Ref{} = ref, signal), do: Jido.cast(__MODULE__, ref, signal)
 
       @doc "Starts one asynchronous Signal request through a stable Agent Ref."
+      @spec send_request(Jido.Agent.Ref.t(), Jido.Signal.t(), timeout()) :: term()
       def send_request(%Jido.Agent.Ref{} = ref, signal, timeout \\ 5_000) do
         Jido.send_request(__MODULE__, ref, signal, timeout)
       end
 
       @doc "Receives an Agent request response with the standard OTP envelope."
+      @spec receive_response(term(), timeout()) :: term()
       def receive_response(request_id, timeout \\ 5_000) do
         Jido.receive_response(request_id, timeout)
       end
 
       @doc "Stops the local Agent resolved by a stable Agent Ref."
+      @spec stop_agent_ref(Jido.Agent.Ref.t(), term(), timeout()) ::
+              :ok | {:error, term()}
       def stop_agent_ref(%Jido.Agent.Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000) do
         Jido.stop_agent_ref(__MODULE__, ref, reason, timeout)
       end
 
       @doc "Persists and stops the local Agent resolved by a stable Agent Ref."
+      @spec hibernate_ref(Jido.Agent.Ref.t(), keyword()) :: :ok | {:error, term()}
       def hibernate_ref(%Jido.Agent.Ref{} = ref, opts \\ []) do
         Jido.hibernate_ref(__MODULE__, ref, opts)
       end
 
       @doc "Writes a durable tombstone for one inactive stable Agent Ref."
+      @spec delete_agent(Jido.Agent.Ref.t(), module(), keyword()) :: :ok | {:error, term()}
       def delete_agent(%Jido.Agent.Ref{} = ref, agent_module, opts \\ []) do
         Jido.delete_agent(__MODULE__, ref, agent_module, opts)
       end
 
       @doc "Cancels current pre-commit work for one stable Agent Ref."
+      @spec cancel(Jido.Agent.Ref.t(), timeout()) :: :ok | {:error, term()}
       def cancel(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.cancel(__MODULE__, ref, timeout)
       end
 
       @doc "Cancels one matching Turn for a stable Agent Ref."
+      @spec cancel_turn(Jido.Agent.Ref.t(), String.t(), timeout()) ::
+              :ok | {:error, term()}
       def cancel_turn(%Jido.Agent.Ref{} = ref, turn_id, timeout \\ 5_000) do
         Jido.cancel_turn(__MODULE__, ref, turn_id, timeout)
       end
 
       @doc "Attaches an owner process through a stable Agent Ref."
+      @spec attach_ref(Jido.Agent.Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
       def attach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
         Jido.attach(__MODULE__, ref, owner_pid, timeout)
       end
 
       @doc "Detaches an owner process through a stable Agent Ref."
+      @spec detach_ref(Jido.Agent.Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
       def detach_ref(%Jido.Agent.Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000) do
         Jido.detach(__MODULE__, ref, owner_pid, timeout)
       end
 
       @doc "Resets the idle timer through a stable Agent Ref."
+      @spec touch_ref(Jido.Agent.Ref.t()) :: :ok | {:error, term()}
       def touch_ref(%Jido.Agent.Ref{} = ref), do: Jido.touch(__MODULE__, ref)
 
       @doc "Returns the committed Agent for one stable Agent Ref."
+      @spec agent(Jido.Agent.Ref.t(), timeout()) :: Jido.Agent.t() | {:error, term()}
       def agent(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.agent(__MODULE__, ref, timeout)
       end
 
-      @doc "Returns one Plugin-owned state value through a stable Agent Ref."
+      @doc "Returns one Plugin-owned field from the complete Agent state through a stable Ref."
+      @spec plugin_state(Jido.Agent.Ref.t(), module(), timeout()) ::
+              {:ok, term()} | {:error, term()}
       def plugin_state(%Jido.Agent.Ref{} = ref, plugin, timeout \\ 5_000) do
         Jido.plugin_state(__MODULE__, ref, plugin, timeout)
       end
 
       @doc "Returns Turn status through a stable Agent Ref."
+      @spec status(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
       def status(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.status(__MODULE__, ref, timeout)
       end
 
       @doc "Returns a committed snapshot through a stable Agent Ref."
+      @spec snapshot(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
       def snapshot(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.snapshot(__MODULE__, ref, timeout)
       end
 
       @doc "Returns child runtime status through a stable Agent Ref."
+      @spec children(Jido.Agent.Ref.t(), timeout()) :: map() | {:error, term()}
       def children(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.children(__MODULE__, ref, timeout)
       end
 
       @doc "Waits for runtime readiness through a stable Agent Ref."
+      @spec await_ready(Jido.Agent.Ref.t(), timeout()) :: :ok | {:error, term()}
       def await_ready(%Jido.Agent.Ref{} = ref, timeout \\ 5_000) do
         Jido.await_ready(__MODULE__, ref, timeout)
       end
 
       @doc "Controls the bounded debug buffer through a stable Agent Ref."
+      @spec set_agent_debug(Jido.Agent.Ref.t(), boolean(), timeout()) ::
+              :ok | {:error, term()}
       def set_agent_debug(%Jido.Agent.Ref{} = ref, enabled, timeout \\ 5_000) do
         Jido.set_agent_debug(__MODULE__, ref, enabled, timeout)
       end
 
       @doc "Returns bounded recent events through a stable Agent Ref."
+      @spec recent_events(Jido.Agent.Ref.t(), keyword(), timeout()) ::
+              {:ok, [map()]} | {:error, term()}
       def recent_events(%Jido.Agent.Ref{} = ref, opts \\ [], timeout \\ 5_000) do
         Jido.recent_events(__MODULE__, ref, opts, timeout)
       end
+
+      # Compatible relationship and persistence API
 
       @doc "Fetches one Agent logical-parent binding under this Jido instance."
       @spec agent_parent_binding(String.t(), keyword()) :: {:ok, map()} | :error
@@ -308,6 +347,8 @@ defmodule Jido do
       def thaw(agent_module, agent_id, opts \\ []) do
         Jido.thaw(__MODULE__, agent_module, agent_id, opts)
       end
+
+      # Instance service names
 
       @doc "Returns the Registry name for this Jido instance."
       @spec registry_name() :: atom()
@@ -328,6 +369,8 @@ defmodule Jido do
       @doc "Returns the RuntimeStore name for this Jido instance."
       @spec runtime_store_name() :: atom()
       def runtime_store_name, do: Jido.runtime_store_name(__MODULE__)
+
+      # Instance debug API
 
       @doc """
       Controls debug mode for this Jido instance.
@@ -355,11 +398,14 @@ defmodule Jido do
     end
   end
 
-  @type agent_id :: String.t() | atom()
   @type partition :: term()
 
   # Default instance name for scripts/Livebook
   @default_instance Jido.Default
+
+  # ---------------------------------------------------------------------------
+  # Generated instance configuration
+  # ---------------------------------------------------------------------------
 
   @doc false
   def merge_instance_config(config, overrides) do
@@ -375,8 +421,9 @@ defmodule Jido do
 
   def instance_options(config, name, otp_app, namespace, persistence) when is_list(config) do
     if Keyword.keyword?(config) do
+      # Generated helpers address the instance by its module name.
       config
-      |> Keyword.put_new(:name, name)
+      |> Keyword.put(:name, name)
       |> Keyword.put_new(:otp_app, otp_app)
       |> Keyword.put_new(:namespace, namespace)
       |> Keyword.put_new(:persistence, persistence)
@@ -387,6 +434,10 @@ defmodule Jido do
 
   def instance_options(config, _name, _otp_app, _namespace, _persistence), do: config
 
+  # ---------------------------------------------------------------------------
+  # Default instance
+  # ---------------------------------------------------------------------------
+
   @doc """
   Returns the default Jido instance name.
 
@@ -394,10 +445,6 @@ defmodule Jido do
   """
   @spec default_instance() :: atom()
   def default_instance, do: @default_instance
-
-  # ---------------------------------------------------------------------------
-  # Debug API (default instance delegates)
-  # ---------------------------------------------------------------------------
 
   @doc """
   Controls debug mode for the default Jido instance (`Jido.Default`).
@@ -464,6 +511,10 @@ defmodule Jido do
       pid -> Supervisor.stop(pid)
     end
   end
+
+  # ---------------------------------------------------------------------------
+  # Instance supervisor
+  # ---------------------------------------------------------------------------
 
   @doc """
   Starts a Jido instance supervisor.
@@ -546,6 +597,10 @@ defmodule Jido do
     end
   end
 
+  # ---------------------------------------------------------------------------
+  # Instance runtime names and metadata
+  # ---------------------------------------------------------------------------
+
   @doc """
   Generate a unique identifier.
 
@@ -625,101 +680,124 @@ defmodule Jido do
   @doc "Builds one stable Agent Ref in the selected instance namespace."
   @spec agent_ref(atom(), String.t(), keyword()) ::
           {:ok, Ref.t()} | {:error, Jido.Error.ValidationError.t()}
-  def agent_ref(jido_instance, id, opts \\ []),
-    do: RefFacade.build_ref(jido_instance, id, opts)
+  def agent_ref(instance, id, opts \\ []),
+    do: RefFacade.build_ref(instance, id, opts)
 
   @doc "Resolves the current local PID for one stable Agent Ref."
   @spec resolve_agent(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
-  def resolve_agent(jido_instance, %Ref{} = ref), do: RefFacade.resolve(jido_instance, ref)
+  def resolve_agent(instance, %Ref{} = ref), do: RefFacade.resolve(instance, ref)
 
   @doc "Starts one Agent with an explicit stable Agent Ref."
   @spec start_agent_ref(atom(), Ref.t(), module() | Jido.Agent.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def start_agent_ref(jido_instance, %Ref{} = ref, agent, opts \\ []),
-    do: RefFacade.start_agent(jido_instance, ref, agent, opts)
+  def start_agent_ref(instance, %Ref{} = ref, agent, opts \\ []),
+    do: RefFacade.start_agent(instance, ref, agent, opts)
 
   @doc "Activates one durable Agent with an explicit stable Agent Ref."
   @spec activate_agent(atom(), Ref.t(), module(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def activate_agent(jido_instance, %Ref{} = ref, agent_module, opts \\ []),
-    do: RefFacade.activate_agent(jido_instance, ref, agent_module, opts)
+  def activate_agent(instance, %Ref{} = ref, agent_module, opts \\ []),
+    do: RefFacade.activate_agent(instance, ref, agent_module, opts)
 
   @doc "Sends one synchronous Signal through a stable Agent Ref."
-  def call(jido_instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000),
-    do: RefFacade.call(jido_instance, ref, signal, timeout_or_opts)
+  @spec call(atom(), Ref.t(), Jido.Signal.t(), timeout() | keyword()) ::
+          Jido.AgentServer.signal_result()
+  def call(instance, %Ref{} = ref, signal, timeout_or_opts \\ 5_000),
+    do: RefFacade.call(instance, ref, signal, timeout_or_opts)
 
   @doc "Sends one best-effort asynchronous Signal through a stable Agent Ref."
-  def cast(jido_instance, %Ref{} = ref, signal), do: RefFacade.cast(jido_instance, ref, signal)
+  @spec cast(atom(), Ref.t(), Jido.Signal.t()) :: :ok | {:error, term()}
+  def cast(instance, %Ref{} = ref, signal), do: RefFacade.cast(instance, ref, signal)
 
   @doc "Starts one asynchronous Signal request through a stable Agent Ref."
-  def send_request(jido_instance, %Ref{} = ref, signal, timeout \\ 5_000),
-    do: RefFacade.send_request(jido_instance, ref, signal, timeout)
+  @spec send_request(atom(), Ref.t(), Jido.Signal.t(), timeout()) :: term()
+  def send_request(instance, %Ref{} = ref, signal, timeout \\ 5_000),
+    do: RefFacade.send_request(instance, ref, signal, timeout)
 
   @doc "Receives an Agent request response with the standard OTP envelope."
+  @spec receive_response(term(), timeout()) :: term()
   defdelegate receive_response(request_id, timeout \\ 5_000), to: Jido.AgentServer
 
   @doc "Stops the local Agent resolved by a stable Agent Ref."
-  def stop_agent_ref(jido_instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000),
-    do: RefFacade.stop(jido_instance, ref, reason, timeout)
+  @spec stop_agent_ref(atom(), Ref.t(), term(), timeout()) :: :ok | {:error, term()}
+  def stop_agent_ref(instance, %Ref{} = ref, reason \\ :shutdown, timeout \\ 5_000),
+    do: RefFacade.stop(instance, ref, reason, timeout)
 
   @doc "Persists and stops the local Agent resolved by a stable Agent Ref."
-  def hibernate_ref(jido_instance, %Ref{} = ref, opts \\ []),
-    do: RefFacade.hibernate(jido_instance, ref, opts)
+  @spec hibernate_ref(atom(), Ref.t(), keyword()) :: :ok | {:error, term()}
+  def hibernate_ref(instance, %Ref{} = ref, opts \\ []),
+    do: RefFacade.hibernate(instance, ref, opts)
 
   @doc "Writes a durable tombstone for one inactive stable Agent Ref."
-  def delete_agent(jido_instance, %Ref{} = ref, agent_module, opts \\ []),
-    do: RefFacade.delete(jido_instance, ref, agent_module, opts)
+  @spec delete_agent(atom(), Ref.t(), module(), keyword()) :: :ok | {:error, term()}
+  def delete_agent(instance, %Ref{} = ref, agent_module, opts \\ []),
+    do: RefFacade.delete(instance, ref, agent_module, opts)
 
   @doc "Cancels current pre-commit work for one stable Agent Ref."
-  def cancel(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.cancel(jido_instance, ref, timeout)
+  @spec cancel(atom(), Ref.t(), timeout()) :: :ok | {:error, term()}
+  def cancel(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.cancel(instance, ref, timeout)
 
   @doc "Cancels one matching Turn for a stable Agent Ref."
-  def cancel_turn(jido_instance, %Ref{} = ref, turn_id, timeout \\ 5_000),
-    do: RefFacade.cancel_turn(jido_instance, ref, turn_id, timeout)
+  @spec cancel_turn(atom(), Ref.t(), String.t(), timeout()) :: :ok | {:error, term()}
+  def cancel_turn(instance, %Ref{} = ref, turn_id, timeout \\ 5_000),
+    do: RefFacade.cancel_turn(instance, ref, turn_id, timeout)
 
   @doc "Attaches an owner process through a stable Agent Ref."
-  def attach(jido_instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
-    do: RefFacade.attach(jido_instance, ref, owner_pid, timeout)
+  @spec attach(atom(), Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
+  def attach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
+    do: RefFacade.attach(instance, ref, owner_pid, timeout)
 
   @doc "Detaches an owner process through a stable Agent Ref."
-  def detach(jido_instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
-    do: RefFacade.detach(jido_instance, ref, owner_pid, timeout)
+  @spec detach(atom(), Ref.t(), pid(), timeout()) :: :ok | {:error, term()}
+  def detach(instance, %Ref{} = ref, owner_pid \\ self(), timeout \\ 5_000),
+    do: RefFacade.detach(instance, ref, owner_pid, timeout)
 
   @doc "Resets the idle timer through a stable Agent Ref."
-  def touch(jido_instance, %Ref{} = ref), do: RefFacade.touch(jido_instance, ref)
+  @spec touch(atom(), Ref.t()) :: :ok | {:error, term()}
+  def touch(instance, %Ref{} = ref), do: RefFacade.touch(instance, ref)
 
   @doc "Returns the committed Agent through a stable Agent Ref."
-  def agent(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.agent(jido_instance, ref, timeout)
+  @spec agent(atom(), Ref.t(), timeout()) :: Jido.Agent.t() | {:error, term()}
+  def agent(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.agent(instance, ref, timeout)
 
-  @doc "Returns one Plugin-owned state value through a stable Agent Ref."
-  def plugin_state(jido_instance, %Ref{} = ref, plugin, timeout \\ 5_000),
-    do: RefFacade.plugin_state(jido_instance, ref, plugin, timeout)
+  @doc "Returns one Plugin-owned field from the complete Agent state through a stable Ref."
+  @spec plugin_state(atom(), Ref.t(), module(), timeout()) ::
+          {:ok, term()} | {:error, term()}
+  def plugin_state(instance, %Ref{} = ref, plugin, timeout \\ 5_000),
+    do: RefFacade.plugin_state(instance, ref, plugin, timeout)
 
   @doc "Returns Turn status through a stable Agent Ref."
-  def status(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.status(jido_instance, ref, timeout)
+  @spec status(atom(), Ref.t(), timeout()) :: map() | {:error, term()}
+  def status(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.status(instance, ref, timeout)
 
   @doc "Returns a committed snapshot through a stable Agent Ref."
-  def snapshot(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.snapshot(jido_instance, ref, timeout)
+  @spec snapshot(atom(), Ref.t(), timeout()) :: map() | {:error, term()}
+  def snapshot(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.snapshot(instance, ref, timeout)
 
   @doc "Returns child runtime status through a stable Agent Ref."
-  def children(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.children(jido_instance, ref, timeout)
+  @spec children(atom(), Ref.t(), timeout()) :: map() | {:error, term()}
+  def children(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.children(instance, ref, timeout)
 
   @doc "Waits for runtime readiness through a stable Agent Ref."
-  def await_ready(jido_instance, %Ref{} = ref, timeout \\ 5_000),
-    do: RefFacade.await_ready(jido_instance, ref, timeout)
+  @spec await_ready(atom(), Ref.t(), timeout()) :: :ok | {:error, term()}
+  def await_ready(instance, %Ref{} = ref, timeout \\ 5_000),
+    do: RefFacade.await_ready(instance, ref, timeout)
 
   @doc "Controls the bounded debug buffer through a stable Agent Ref."
-  def set_agent_debug(jido_instance, %Ref{} = ref, enabled, timeout \\ 5_000),
-    do: RefFacade.set_debug(jido_instance, ref, enabled, timeout)
+  @spec set_agent_debug(atom(), Ref.t(), boolean(), timeout()) :: :ok | {:error, term()}
+  def set_agent_debug(instance, %Ref{} = ref, enabled, timeout \\ 5_000),
+    do: RefFacade.set_debug(instance, ref, enabled, timeout)
 
   @doc "Returns bounded recent events through a stable Agent Ref."
-  def recent_events(jido_instance, %Ref{} = ref, opts \\ [], timeout \\ 5_000),
-    do: RefFacade.recent_events(jido_instance, ref, opts, timeout)
+  @spec recent_events(atom(), Ref.t(), keyword(), timeout()) ::
+          {:ok, [map()]} | {:error, term()}
+  def recent_events(instance, %Ref{} = ref, opts \\ [], timeout \\ 5_000),
+    do: RefFacade.recent_events(instance, ref, opts, timeout)
 
   # ---------------------------------------------------------------------------
   # Agent Lifecycle
@@ -764,16 +842,16 @@ defmodule Jido do
   def start_agent(agent, opts) when is_list(opts),
     do: start_agent(@default_instance, agent, opts)
 
-  def start_agent(jido_instance, agent) when is_atom(jido_instance),
-    do: start_agent(jido_instance, agent, [])
+  def start_agent(instance, agent) when is_atom(instance),
+    do: start_agent(instance, agent, [])
 
   @doc "Starts an Agent with options in the selected Jido instance."
   @spec start_agent(atom(), module() | Jido.Agent.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def start_agent(jido_instance, agent, opts) when is_atom(jido_instance) do
+  def start_agent(instance, agent, opts) when is_atom(instance) do
     if is_list(opts) and Keyword.keyword?(opts) do
       opts
-      |> Keyword.merge(agent: agent, jido: jido_instance, register: true)
+      |> Keyword.merge(agent: agent, jido: instance, register: true)
       |> Jido.AgentServer.start()
     else
       {:error,
@@ -797,25 +875,25 @@ defmodule Jido do
   def stop_agent(pid_or_id, opts) when is_list(opts),
     do: stop_agent(@default_instance, pid_or_id, opts)
 
-  def stop_agent(jido_instance, pid_or_id) when is_atom(jido_instance),
-    do: stop_agent(jido_instance, pid_or_id, [])
+  def stop_agent(instance, pid_or_id) when is_atom(instance),
+    do: stop_agent(instance, pid_or_id, [])
 
   @doc "Stops an Agent with options in the selected Jido instance."
   @spec stop_agent(atom(), Jido.AgentServer.server() | String.t(), keyword()) ::
           :ok | {:error, :not_found}
-  def stop_agent(jido_instance, pid_or_id, opts)
+  def stop_agent(instance, pid_or_id, opts)
 
-  def stop_agent(jido_instance, id, opts)
-      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
-    case whereis_agent(jido_instance, id, opts) do
+  def stop_agent(instance, id, opts)
+      when is_atom(instance) and is_binary(id) and is_list(opts) do
+    case whereis_agent(instance, id, opts) do
       nil -> {:error, :not_found}
-      pid -> stop_agent(jido_instance, pid, opts)
+      pid -> stop_agent(instance, pid, opts)
     end
   end
 
-  def stop_agent(jido_instance, server, opts)
-      when is_atom(jido_instance) and is_list(opts) do
-    with {:ok, pid} <- owned_agent_server(jido_instance, server, opts) do
+  def stop_agent(instance, server, opts)
+      when is_atom(instance) and is_list(opts) do
+    with {:ok, pid} <- owned_agent_server(instance, server, opts) do
       Jido.AgentServer.stop(pid)
     end
   catch
@@ -836,15 +914,15 @@ defmodule Jido do
   def whereis_agent(id, opts) when is_binary(id) and is_list(opts),
     do: whereis_agent(@default_instance, id, opts)
 
-  def whereis_agent(jido_instance, id) when is_atom(jido_instance),
-    do: whereis_agent(jido_instance, id, [])
+  def whereis_agent(instance, id) when is_atom(instance),
+    do: whereis_agent(instance, id, [])
 
   @doc "Looks up an Agent with options in the selected Jido instance."
   @spec whereis_agent(atom(), String.t(), keyword()) :: pid() | nil
-  def whereis_agent(jido_instance, id, opts)
-      when is_atom(jido_instance) and is_binary(id) and is_list(opts) do
+  def whereis_agent(instance, id, opts)
+      when is_atom(instance) and is_binary(id) and is_list(opts) do
     Jido.AgentServer.whereis(
-      registry_name(jido_instance),
+      registry_name(instance),
       id,
       partition: Keyword.get(opts, :partition)
     )
@@ -857,15 +935,15 @@ defmodule Jido do
   @doc "Lists Agents with default-instance options, or lists a selected instance."
   @spec list_agents(keyword() | atom()) :: [{String.t(), pid()}]
   def list_agents(opts) when is_list(opts), do: list_agents(@default_instance, opts)
-  def list_agents(jido_instance) when is_atom(jido_instance), do: list_agents(jido_instance, [])
+  def list_agents(instance) when is_atom(instance), do: list_agents(instance, [])
 
   @doc "Lists Agents with options in the selected Jido instance."
   @spec list_agents(atom(), keyword()) :: [{String.t(), pid()}]
-  def list_agents(jido_instance, opts)
-      when is_atom(jido_instance) and is_list(opts) do
+  def list_agents(instance, opts)
+      when is_atom(instance) and is_list(opts) do
     partition = Keyword.get(opts, :partition)
 
-    jido_instance
+    instance
     |> registry_name()
     |> Registry.select([{{:"$1", :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}])
     |> Enum.flat_map(fn
@@ -889,11 +967,11 @@ defmodule Jido do
   @doc "Counts Agents with default-instance options, or counts a selected instance."
   @spec agent_count(keyword() | atom()) :: non_neg_integer()
   def agent_count(opts) when is_list(opts), do: agent_count(@default_instance, opts)
-  def agent_count(jido_instance) when is_atom(jido_instance), do: agent_count(jido_instance, [])
+  def agent_count(instance) when is_atom(instance), do: agent_count(instance, [])
 
   @doc "Counts live Agents with options in the selected Jido instance."
   @spec agent_count(atom(), keyword()) :: non_neg_integer()
-  def agent_count(jido_instance, opts), do: length(list_agents(jido_instance, opts))
+  def agent_count(instance, opts), do: length(list_agents(instance, opts))
 
   @doc "Fetches one Agent logical-parent binding from the default instance."
   @spec agent_parent_binding(String.t()) :: {:ok, map()} | :error
@@ -909,21 +987,27 @@ defmodule Jido do
   def agent_parent_binding(child_id, opts) when is_binary(child_id) and is_list(opts),
     do: agent_parent_binding(@default_instance, child_id, opts)
 
-  def agent_parent_binding(jido_instance, child_id) when is_atom(jido_instance),
-    do: agent_parent_binding(jido_instance, child_id, [])
+  def agent_parent_binding(instance, child_id) when is_atom(instance),
+    do: agent_parent_binding(instance, child_id, [])
 
   @doc "Fetches a parent binding with options from the selected Jido instance."
   @spec agent_parent_binding(atom(), String.t(), keyword()) :: {:ok, map()} | :error
-  def agent_parent_binding(jido_instance, child_id, opts) do
-    case RuntimeStore.fetch(
-           jido_instance,
-           :agent_relationships,
-           partition_key(child_id, Keyword.get(opts, :partition))
-         ) do
-      {:ok, binding} -> normalize_parent_binding(binding)
-      :error -> :error
+  def agent_parent_binding(instance, child_id, opts)
+      when is_atom(instance) and is_binary(child_id) and is_list(opts) do
+    with true <- Keyword.keyword?(opts),
+         {:ok, binding} <-
+           RuntimeStore.fetch(
+             instance,
+             :agent_relationships,
+             partition_key(child_id, Keyword.get(opts, :partition))
+           ) do
+      normalize_parent_binding(binding)
+    else
+      _reason -> :error
     end
   end
+
+  def agent_parent_binding(_instance, _child_id, _opts), do: :error
 
   @doc "Persists and stops one live Agent Server in the default instance."
   @spec hibernate(Jido.AgentServer.server()) :: :ok | {:error, term()}
@@ -938,15 +1022,15 @@ defmodule Jido do
   def hibernate(server, opts) when is_list(opts),
     do: hibernate(@default_instance, server, opts)
 
-  def hibernate(jido_instance, server) when is_atom(jido_instance),
-    do: hibernate(jido_instance, server, [])
+  def hibernate(instance, server) when is_atom(instance),
+    do: hibernate(instance, server, [])
 
   @doc "Hibernates an Agent with options in the selected Jido instance."
   @spec hibernate(atom(), Jido.AgentServer.server(), keyword()) ::
           :ok | {:error, term()}
-  def hibernate(jido_instance, server, opts)
-      when is_atom(jido_instance) and is_list(opts) do
-    with {:ok, pid} <- owned_agent_server(jido_instance, server, opts) do
+  def hibernate(instance, server, opts)
+      when is_atom(instance) and is_list(opts) do
+    with {:ok, pid} <- owned_agent_server(instance, server, opts) do
       Jido.AgentServer.hibernate(pid, opts)
     end
   end
@@ -966,18 +1050,18 @@ defmodule Jido do
       when is_atom(agent_module) and is_binary(agent_id) and is_list(opts),
       do: thaw(@default_instance, agent_module, agent_id, opts)
 
-  def thaw(jido_instance, agent_module, agent_id)
-      when is_atom(jido_instance) and is_atom(agent_module) and is_binary(agent_id),
-      do: thaw(jido_instance, agent_module, agent_id, [])
+  def thaw(instance, agent_module, agent_id)
+      when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id),
+      do: thaw(instance, agent_module, agent_id, [])
 
   @doc "Thaws an Agent with options in the selected Jido instance."
   @spec thaw(atom(), module(), String.t(), keyword()) ::
           DynamicSupervisor.on_start_child()
-  def thaw(jido_instance, agent_module, agent_id, opts)
-      when is_atom(jido_instance) and is_atom(agent_module) and is_binary(agent_id) and
+  def thaw(instance, agent_module, agent_id, opts)
+      when is_atom(instance) and is_atom(agent_module) and is_binary(agent_id) and
              is_list(opts) do
     opts = opts |> Keyword.put(:id, agent_id) |> Keyword.put(:restore, :required)
-    start_agent(jido_instance, agent_module, opts)
+    start_agent(instance, agent_module, opts)
   end
 
   defp normalize_parent_binding(%{parent_id: parent_id, tag: _tag} = binding)
@@ -993,14 +1077,14 @@ defmodule Jido do
 
   defp normalize_parent_binding(_binding), do: :error
 
-  defp owned_agent_server(jido_instance, server, opts) do
-    with true <- not is_nil(jido_instance),
+  defp owned_agent_server(instance, server, opts) do
+    with true <- not is_nil(instance),
          true <- Keyword.keyword?(opts),
          pid when is_pid(pid) <- safe_whereis(server),
          {:ok, %{agent_id: agent_id, partition: partition}} <-
            Jido.AgentServer.creation_info(pid),
          true <- partition_matches?(opts, partition),
-         ^pid <- owned_registry_pid(jido_instance, agent_id, partition, pid) do
+         ^pid <- owned_registry_pid(instance, agent_id, partition, pid) do
       {:ok, pid}
     else
       _reason -> {:error, :not_found}
@@ -1019,17 +1103,17 @@ defmodule Jido do
     not Keyword.has_key?(opts, :partition) or Keyword.get(opts, :partition) == partition
   end
 
-  defp owned_registry_pid(jido_instance, agent_id, partition, pid)
+  defp owned_registry_pid(instance, agent_id, partition, pid)
        when node(pid) == node() do
-    whereis_agent(jido_instance, agent_id, partition: partition)
+    whereis_agent(instance, agent_id, partition: partition)
   end
 
-  defp owned_registry_pid(jido_instance, agent_id, partition, pid) do
+  defp owned_registry_pid(instance, agent_id, partition, pid) do
     :erpc.call(
       node(pid),
       __MODULE__,
       :whereis_agent,
-      [jido_instance, agent_id, [partition: partition]],
+      [instance, agent_id, [partition: partition]],
       1_000
     )
   catch

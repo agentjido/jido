@@ -14,11 +14,10 @@ defmodule Jido.Examples.AgentLiveDebugger do
   end
 
   routes do
-    signal_source "/examples/agent_live_debugger"
+    signal_source "/examples/runtime/inspection"
 
-    route "examples.debug.work" do
-      action %{result: result}, name: "examples_agent_live_debugger_work", context: context do
-        if observer = context[:on_work], do: observer.(%{result: result})
+    route "examples.runtime.inspection.record" do
+      action %{result: result}, context: context do
         {:ok, %{context.agent_state | status: "complete", result: result}}
       end
 

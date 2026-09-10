@@ -5,7 +5,7 @@ defmodule JidoTest.Examples.Basic.MinimalAgentTest do
   alias Jido.Examples.MinimalAgent
 
   test "direct and live execution agree on route defaults and Signal overrides", %{jido: jido} do
-    definition = MinimalAgent.agent()
+    definition = MinimalAgent.definition()
     assert definition.id == nil
     assert definition.state == nil
 

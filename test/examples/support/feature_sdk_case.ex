@@ -11,35 +11,30 @@ defmodule JidoTest.FeatureSDKCase do
   end
 
   def observed(module, key) do
+    owner_key = System.unique_integer([:positive, :monotonic])
+    :yes = :global.register_name({JidoTest.FeatureObserver, owner_key}, self())
+
     module
     |> Jido.Agent.Builder.new()
-    |> Jido.Agent.Builder.plugin(JidoTest.FeatureObserver, owner: self(), key: key)
+    |> Jido.Agent.Builder.plugin(JidoTest.FeatureObserver, owner_key: owner_key, key: key)
     |> Jido.Agent.Builder.build!()
   end
 
   def state(server), do: Jido.AgentServer.snapshot(server).agent.state
-
-  def barrier do
-    owner = self()
-
-    fn value ->
-      send(owner, {:job_work, self(), value})
-
-      receive do
-        {:finish, result} -> result
-      after
-        5_000 -> raise "job test barrier was not released"
-      end
-    end
-  end
 end
 
 defmodule JidoTest.FeatureObserver do
   @moduledoc false
-  use Jido.Plugin
+  use Jido.Plugin, agent_server: JidoTest.FeatureObserver.Server
+end
 
-  def prepare(command, opts) do
-    owner = Keyword.fetch!(opts, :owner)
+defmodule JidoTest.FeatureObserver.Server do
+  @moduledoc false
+  use Jido.AgentServer.Plugin
+
+  def admit(_runtime_ref, command, opts) do
+    owner_key = Keyword.fetch!(opts, :owner_key)
+    owner = :global.whereis_name({JidoTest.FeatureObserver, owner_key})
     key = Keyword.fetch!(opts, :key)
 
     observer = fn input ->

@@ -1,14 +1,18 @@
 # Plugin-Owned State
 
-A stateful Plugin owns one key in the complete Agent state. The Agent schema
-owns domain fields. The Agent Plugin facet owns its one declared value.
+A stateful Plugin owns one key in the complete `agent.state` map. The Agent
+schema owns the domain fields. The Agent Plugin facet owns its one declared
+field. There is no separate Plugin state map or Agent struct field.
+
+Jido uses `plugin_state` in callback contexts and accessor names for the value
+selected from that owned field. This name describes a bounded view, not a
+second storage location.
 
 ## Declare the Facet and Package
 
 ```elixir
 defmodule MyApp.TurnCount.Agent do
   use Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.Contribution
 
   @impl Jido.Agent.Plugin
   def state_spec(_opts) do
@@ -16,13 +20,7 @@ defmodule MyApp.TurnCount.Agent do
   end
 
   @impl Jido.Agent.Plugin
-  def contribute(transition, _opts) do
-    {:ok,
-     %Contribution{
-       plugin: transition.plugin,
-       state: {:replace, transition.plugin_state + 1}
-     }}
-  end
+  def update_state(turn_count, _directives, _opts), do: {:ok, turn_count + 1}
 end
 
 defmodule MyApp.TurnCount do
@@ -39,31 +37,27 @@ agent do
 end
 ```
 
-Jido combines the domain schema and all Plugin state schemas into one complete
-state contract.
+Jido combines the domain schema and all Plugin-owned field schemas into one
+complete state contract.
 
 ## Preserve the Existing Value
 
-An Action can read Plugin state through `context.agent_state`. It must preserve
-that key in its returned state. Only the owning Agent Plugin contribution can
-change the value.
+An Action can read the complete state through `context.agent_state`. It must
+preserve every Plugin-owned key in its returned state. Only the owning Agent
+Plugin update can change its value.
 
 If an Action deletes or replaces a Plugin-owned key, finalization rejects the
 candidate. The live Agent keeps its prior state and does not dispatch
 Directives.
 
-## Contribute Before Commit
+## Update Before Commit
 
-`contribute/2` runs after executable success and before complete state
-validation. `Jido.Agent.Plugin.Transition` contains the current owned value,
-the package's prepared input, declared before and after domain projections,
-and Directives owned by the package.
+`update_state/3` runs after executable success and Directive validation. It
+receives the current owned value and only the Directives owned by that Plugin.
+It returns the complete next owned value. Jido validates that value with the
+facet schema and the portable-value rule.
 
-Return `state: :unchanged` to preserve the value. Return
-`state: {:replace, complete_owned_state}` to replace it. Jido validates the
-replacement with the facet schema and the portable-value rule.
-
-A failed Turn does not commit the contribution. A direct command returns the
+A failed Turn does not commit the update. A direct command returns the
 candidate but does not commit it.
 
 ## Convert One Owned Value for Persistence
@@ -85,9 +79,8 @@ object. Defaults on nested fields do not create a missing outer object.
 
 ## Understand the Trust Boundary
 
-The callback API prevents accidental cross-owner data use. It is not a sandbox
-for untrusted BEAM code. An Agent facet receives only its declared projection,
-but code in the same VM still has normal Elixir and Erlang capabilities.
+The callback API prevents accidental cross-owner state changes. It is not a
+sandbox for untrusted BEAM code.
 
 See [Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md) and
 [State Schemas](state-schemas.livemd).

@@ -10,7 +10,7 @@ defmodule Jido.Persistence.Checkpoint do
   @custom_checkpoint_kind :agent_custom
 
   @doc false
-  @spec dump(Agent.t(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
+  @spec dump(Agent.instance(), map(), pos_integer(), term()) :: {:ok, map()} | {:error, term()}
   def dump(%Agent{} = agent, context, record_format, reason) do
     with {:ok, checkpoint} <- Agent.checkpoint(agent, context),
          {:ok, checkpoint} <- dump_plugin_state(agent, checkpoint, record_format, reason) do
@@ -64,9 +64,6 @@ defmodule Jido.Persistence.Checkpoint do
     end)
   end
 
-  defp dump_owned_state(_state, _specs, _record_format, _reason),
-    do: {:error, {:invalid_checkpoint, :state}}
-
   defp load_owned_state(state, specs, record_format, reason) when is_map(state) do
     Enum.reduce_while(specs, {:ok, state}, fn
       %{agent: %AgentSpec{state_key: key}, persistence: %PersistenceSpec{}} = spec,
@@ -92,7 +89,7 @@ defmodule Jido.Persistence.Checkpoint do
   defp plugin_declarations(agent_module, checkpoint) do
     cond do
       generated_agent_module?(agent_module) ->
-        case agent_module.agent() do
+        case agent_module.definition() do
           %Agent{} = definition -> {:ok, definition.plugins}
           _value -> {:error, {:invalid_persistence_record, :agent_definition}}
         end
@@ -110,7 +107,8 @@ defmodule Jido.Persistence.Checkpoint do
   end
 
   defp generated_agent_module?(module) do
-    module != Agent and Code.ensure_loaded?(module) and function_exported?(module, :agent, 0)
+    module != Agent and Code.ensure_loaded?(module) and
+      function_exported?(module, :definition, 0)
   end
 
   defp custom_checkpoint?(checkpoint), do: Map.get(checkpoint, :kind) == @custom_checkpoint_kind

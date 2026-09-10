@@ -3,16 +3,26 @@ defmodule JidoTest.RecoveryFixtures do
   alias Jido.Examples.PendingJobRecovery, as: Agent
 
   def approve_held(server, observer) do
-    work = fn value ->
-      task = self()
-      Elixir.Agent.update(observer, fn _ -> task end)
+    Agent.approve_job(server, "job-1", "attempt-1",
+      context: %{job_runner: {__MODULE__.Runner, observer}}
+    )
+  end
+end
 
-      receive do
-        :release -> {:ok, Integer.to_string(value * 2)}
-      end
+defmodule JidoTest.RecoveryFixtures.Runner do
+  @moduledoc false
+
+  @behaviour Jido.Examples.Runtime.JobRunner
+
+  @impl true
+  def run(observer, value) do
+    Elixir.Agent.update(observer, fn _ -> self() end)
+
+    receive do
+      :release -> {:ok, Integer.to_string(value * 2)}
+    after
+      5_000 -> raise "recovery runner was not released"
     end
-
-    Agent.approve_job(server, "job-1", "attempt-1", context: %{work: work})
   end
 end
 

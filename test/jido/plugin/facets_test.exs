@@ -2,7 +2,6 @@ defmodule Jido.Plugin.FacetsTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Plugin.Contribution
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Plugin
   alias Jido.Plugin.DirectiveContext
@@ -24,29 +23,9 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Agent.Plugin
 
     def state_spec(_opts), do: {:facet_count, Zoi.integer() |> Zoi.default(7)}
-    def observes(_opts), do: [:visible]
     def directives(_opts), do: [Effect]
     def validate_directive(%Effect{} = directive, _opts), do: {:ok, directive}
-
-    def prepare(preparation, opts) do
-      input = %{
-        label: Keyword.fetch!(opts, :agent_label),
-        visible: preparation.agent_state.visible
-      }
-
-      {:ok, %{preparation | input: input}}
-    end
-
-    def contribute(transition, _opts) do
-      directive = %Effect{label: transition.input.label}
-
-      {:ok,
-       %Contribution{
-         plugin: transition.plugin,
-         state: {:replace, transition.plugin_state + 1},
-         directives: [directive]
-       }}
-    end
+    def update_state(state, _directives, _opts), do: {:ok, state + 1}
   end
 
   defmodule ServerFacet do
@@ -113,8 +92,8 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Action, name: "plugin_facet_record"
 
     def run(_input, context) do
-      plugin_input = Map.fetch!(context.plugin_inputs, Package)
-      {:ok, %{context.agent_state | visible: plugin_input.visible + 1, seen: plugin_input.label}}
+      state = %{context.agent_state | visible: context.agent_state.visible + 1, seen: "facet"}
+      {:ok, state, [%Effect{label: "facet"}]}
     end
   end
 
@@ -126,7 +105,7 @@ defmodule Jido.Plugin.FacetsTest do
   defmodule StatelessAgentFacet do
     @moduledoc false
     use Jido.Agent.Plugin
-    def prepare(preparation, _opts), do: {:ok, preparation}
+    def state_spec(_opts), do: :none
   end
 
   defmodule InvalidPersistencePackage do
@@ -185,32 +164,11 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Plugin, agent: StatelessAgentFacet, option_keys: [topology: [:bus]]
   end
 
-  defmodule ForeignContributionFacet do
+  defmodule ReturnForeign do
     @moduledoc false
-    use Jido.Agent.Plugin
+    use Jido.Action, name: "plugin_facet_return_foreign"
 
-    def directives(_opts), do: [Effect]
-    def validate_directive(%Effect{} = directive, _opts), do: {:ok, directive}
-
-    def contribute(transition, _opts) do
-      {:ok,
-       %Contribution{
-         plugin: transition.plugin,
-         directives: [%ForeignEffect{label: "foreign"}]
-       }}
-    end
-  end
-
-  defmodule ForeignContributionPackage do
-    @moduledoc false
-    use Jido.Plugin, agent: ForeignContributionFacet
-  end
-
-  defmodule KeepState do
-    @moduledoc false
-    use Jido.Action, name: "plugin_facet_keep_state"
-
-    def run(_input, context), do: {:ok, context.agent_state}
+    def run(_input, context), do: {:ok, context.agent_state, [%ForeignEffect{label: "foreign"}]}
   end
 
   test "one manifest normalizes to four owner-specific Specs" do
@@ -237,7 +195,7 @@ defmodule Jido.Plugin.FacetsTest do
     refute function_exported?(Package, :prepare, 2)
   end
 
-  test "Agent facet preparation and contribution stay bounded" do
+  test "Agent facet updates only its owned state" do
     agent = agent()
     signal = Signal.new!("facet.run", %{}, source: "/test")
 
@@ -327,20 +285,19 @@ defmodule Jido.Plugin.FacetsTest do
     assert message == "Topology Plugin context does not match its owner"
   end
 
-  test "an Agent facet cannot contribute a foreign Directive" do
+  test "an executable cannot return a Directive without an owner" do
     agent =
       Agent.new!(
-        name: "foreign_plugin_contribution",
+        name: "foreign_plugin_directive",
         schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-        plugins: [ForeignContributionPackage],
-        routes: [{"facet.foreign", KeepState}]
+        routes: [{"facet.foreign", ReturnForeign}]
       )
       |> Agent.instantiate!()
 
     signal = Signal.new!("facet.foreign", %{}, source: "/test")
 
-    assert {:error, %Jido.Error.ExecutionError{message: message}} = Agent.cmd(agent, signal)
-    assert message == "Agent Plugin contribution contains a foreign Directive"
+    assert {:error, %Jido.Error.ValidationError{message: message}} = Agent.cmd(agent, signal)
+    assert message == "Agent Directive has no owner"
   end
 
   defp agent do

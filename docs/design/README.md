@@ -105,26 +105,26 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Architectural seam template](SEAM_TEMPLATE.md) | Pending approval |
 | [Jido V3 library vision](VISION.md) | Pending approval |
 | [Overview briefing](00_overview/README.md) | Approved |
-| [Overview design](00_overview/design.md) | Approved |
+| [Overview design](00_overview/design.md) | Pending approval |
 | [Overview alignment](00_overview/alignment.md) | Pending approval |
-| [Agent briefing](01_agent/README.md) | Approved |
-| [Agent design](01_agent/design.md) | Approved |
-| [Agent alignment](01_agent/alignment.md) | Approved |
-| [Agent authoring briefing](02_agent-authoring/README.md) | Approved |
-| [Agent authoring design](02_agent-authoring/design.md) | Approved |
-| [Agent authoring alignment](02_agent-authoring/alignment.md) | Approved |
+| [Agent briefing](01_agent/README.md) | Pending approval |
+| [Agent design](01_agent/design.md) | Pending approval |
+| [Agent alignment](01_agent/alignment.md) | Pending approval |
+| [Agent authoring briefing](02_agent-authoring/README.md) | Pending approval |
+| [Agent authoring design](02_agent-authoring/design.md) | Pending approval |
+| [Agent authoring alignment](02_agent-authoring/alignment.md) | Pending approval |
 | [Agent identity briefing](03_agent-identity/README.md) | Selected and implemented |
 | [Agent identity design](03_agent-identity/design.md) | Selected and implemented |
 | [Agent identity alignment](03_agent-identity/alignment.md) | Implemented; external delivery deferred |
-| [Turn evaluation briefing](04_turn-evaluation/README.md) | Selected and implemented |
-| [Turn evaluation design](04_turn-evaluation/design.md) | Selected and implemented |
-| [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Implemented |
-| [Plugin briefing](05_plugins/README.md) | Selected and implemented |
-| [Plugin design](05_plugins/design.md) | Selected and implemented |
-| [Plugin alignment](05_plugins/alignment.md) | Implemented |
+| [Turn evaluation briefing](04_turn-evaluation/README.md) | Pending approval |
+| [Turn evaluation design](04_turn-evaluation/design.md) | Pending approval |
+| [Turn evaluation alignment](04_turn-evaluation/alignment.md) | Pending approval |
+| [Plugin briefing](05_plugins/README.md) | Pending approval |
+| [Plugin design](05_plugins/design.md) | Pending approval |
+| [Plugin alignment](05_plugins/alignment.md) | Pending approval |
 | [Commit and effects briefing](06_commit-and-effects/README.md) | Selected and implemented |
 | [Commit and effects design](06_commit-and-effects/design.md) | Selected and implemented |
-| [Commit and effects alignment](06_commit-and-effects/alignment.md) | Implemented |
+| [Commit and effects alignment](06_commit-and-effects/alignment.md) | Pending approval |
 | [Persistence briefing](07_persistence/README.md) | Pending approval |
 | [Persistence design](07_persistence/design.md) | Pending approval |
 | [Persistence alignment](07_persistence/alignment.md) | Pending approval |
@@ -141,7 +141,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |
 | [Topology control-plane alignment](11_topology-control-plane/alignment.md) | Pending approval |
 | [Errors and contracts briefing](12_errors-and-contracts/README.md) | Selected and implemented |
-| [Errors and contracts design](12_errors-and-contracts/design.md) | Selected and implemented |
+| [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
 | [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Implemented |
 | [Observability briefing](13_observability/README.md) | Selected and implemented |
 | [Observability design](13_observability/design.md) | Selected and implemented |

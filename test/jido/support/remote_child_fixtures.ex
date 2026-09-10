@@ -23,7 +23,7 @@ defmodule JidoTest.RemoteChildFixtures.Parent do
 
   routes do
     route "test.remote.directive", JidoTest.RemoteChildFixtures.Apply
-    route "jido.agent.child.*", Jido.Examples.KeepState
+    route "jido.agent.child.*", Jido.Examples.Support.KeepState
   end
 end
 

@@ -9,7 +9,6 @@ end
 defmodule Jido.Examples.RuntimeReconstruction.Plugin.Agent do
   @moduledoc "Owns the portable desired-feed state and its Directive."
   use Jido.Agent.Plugin
-  alias Jido.Agent.Plugin.Contribution
   alias Jido.Examples.RuntimeReconstruction.SetFeed
 
   def state_spec(_),
@@ -19,13 +18,13 @@ defmodule Jido.Examples.RuntimeReconstruction.Plugin.Agent do
   def directives(_), do: [SetFeed]
   def validate_directive(directive, _), do: Zoi.parse(SetFeed.schema(), directive)
 
-  def contribute(transition, _) do
+  def update_state(state, directives, _) do
     state =
-      Enum.reduce(transition.directives, transition.plugin_state, fn
+      Enum.reduce(directives, state, fn
         %SetFeed{feed: feed}, _state -> %{name: feed}
       end)
 
-    {:ok, %Contribution{plugin: transition.plugin, state: {:replace, state}}}
+    {:ok, state}
   end
 end
 

@@ -20,8 +20,27 @@ defmodule Jido.Examples.PersistentCounterRecovery do
   end
 
   routes do
-    route "examples.persistent_counter.increment",
-          Jido.Examples.PersistentCounterRecovery.Increment
+    route "examples.runtime.state_recovery.increment" do
+      action %{amount: amount},
+        schema: Zoi.object(%{amount: Zoi.integer()}),
+        context: context do
+        state = context.agent_state
+        signal_id = context.signal.id
+
+        if signal_id in state.handled_signal_ids do
+          # The successful retry keeps the same value but creates a new commit.
+          {:ok, state}
+        else
+          {:ok,
+           %{
+             state
+             | count: state.count + amount,
+               handled_signal_ids: state.handled_signal_ids ++ [signal_id],
+               last_command: %{signal_id: signal_id, amount: amount}
+           }}
+        end
+      end
+    end
   end
 
   alias Jido.AgentServer, as: Server
@@ -51,34 +70,10 @@ defmodule Jido.Examples.PersistentCounterRecovery do
   def increment_signal!(command_id, amount \\ 1)
       when is_binary(command_id) and is_integer(amount) do
     Signal.new!(
-      "examples.persistent_counter.increment",
+      "examples.runtime.state_recovery.increment",
       %{amount: amount},
       id: command_id,
-      source: "/examples/persistent_counter_recovery"
+      source: "/examples/runtime/state_recovery"
     )
-  end
-end
-
-defmodule Jido.Examples.PersistentCounterRecovery.Increment do
-  @moduledoc false
-
-  use Jido.Action,
-    name: "examples_persistent_counter_increment",
-    schema: Zoi.object(%{amount: Zoi.integer()})
-
-  @impl Jido.Action
-  def run(%{amount: amount}, %{agent_state: state, signal: signal}) do
-    if signal.id in state.handled_signal_ids do
-      # Success preserves the value but creates one new commit revision.
-      {:ok, state}
-    else
-      {:ok,
-       %{
-         state
-         | count: state.count + amount,
-           handled_signal_ids: state.handled_signal_ids ++ [signal.id],
-           last_command: %{signal_id: signal.id, amount: amount}
-       }}
-    end
   end
 end

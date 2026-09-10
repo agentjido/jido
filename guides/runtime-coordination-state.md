@@ -5,24 +5,26 @@ and owner.
 
 | State kind | Owner | Lifetime | Portable |
 | --- | --- | --- | --- |
-| Agent state | Agent value | Until the next value replaces it | Yes |
-| Plugin state | Agent value | Same as Agent state | Yes |
+| Complete Agent state | Agent value | Until the next value replaces it | Yes |
+| Plugin-owned Agent field | Declaring Plugin | Same as complete Agent state | Yes |
 | Plugin runtime state | Runtime process | Process lifetime | Not necessary |
 | Runtime coordination state | Jido instance | Instance lifetime | Not necessary |
 | Persistence checkpoint | Persistence adapter | Adapter-defined | Yes |
 
-## Agent and Plugin state
+## Complete Agent state
 
-Use Agent state for domain facts that define what the Agent knows now. Use a
-Plugin state slice for portable facts that one Plugin owns. Both commit through
-the Turn boundary and can enter a checkpoint.
+The Agent has one complete `agent.state` map. Use domain fields for facts that
+define what the Agent knows now. Use one Plugin-owned top-level field for
+portable facts that one Plugin owns. These fields commit together through the
+Turn boundary and enter the same checkpoint. There is no separate Plugin state
+map.
 
 ## Plugin runtime state
 
 Use a Plugin runtime for resources that need a process lifecycle. Examples are
 a connection, poller, watcher, or worker pool. Runtime state can contain local
 process resources because it does not enter the Agent checkpoint. Store only
-the portable configuration necessary to rebuild it in Agent or Plugin state.
+the portable configuration necessary to rebuild it in the complete Agent state.
 
 ## Instance coordination state
 
@@ -49,8 +51,8 @@ coordination store.
 
 Ask these questions in order:
 
-1. Is this a domain fact that must commit with the Turn? Put it in Agent or
-   Plugin state.
+1. Is this a portable fact that must commit with the Turn? Put it in a domain
+   field or the owning Plugin's field in the complete Agent state.
 2. Is this a process resource that you can rebuild? Put it in a Plugin runtime.
 3. Is this short-lived coordination for one Jido instance? Let the owning Jido
    subsystem use runtime coordination state.

@@ -13,7 +13,8 @@ evidence.
   restart and shutdown coupling, Plugin runtime placement, logical runtime
   relationships, known-node child placement, and integration points for local
   Agent Ref resolution.
-- Out of scope: Agent and Plugin state meaning, Turn and commit behavior,
+- Out of scope: domain and Plugin-owned Agent state meaning, Turn and commit
+  behavior,
   persistence record meaning, Ref fields, namespace binding, desired topology,
   readiness policy for a complete topology, live target changes, transport,
   automatic cluster placement, leases, fencing, and deployment.
@@ -146,8 +147,8 @@ stop its Plugin runtime root and then stop.
 wrapper shall keep inspection responsive while readiness runs.
 
 `RT-REQ-024`: When the Agent Server starts or replaces a Plugin runtime, it
-shall provide the latest committed owned Plugin state and matching Agent state
-version in one immutable bootstrap value.
+shall provide the latest committed value from the Plugin-owned Agent field and
+matching Agent state version in one immutable bootstrap value.
 
 `RT-REQ-025`: If initial or replacement Plugin readiness fails or reaches its
 limit, then the Agent Server shall fail the activation after it stops the
@@ -284,7 +285,7 @@ supported.
   hierarchy.
 - `RT-INV-002`: Agent identity, runtime location, activation identity, state
   version, and write authority remain separate.
-- `RT-INV-003`: Runtime handles do not enter portable Agent or Plugin state.
+- `RT-INV-003`: Runtime handles do not enter the portable complete Agent state.
 - `RT-INV-004`: Explicit remote placement never implies local fallback.
 - `RT-INV-005`: A known-node request is not a cluster discovery or authority
   contract.

@@ -12,7 +12,6 @@ defmodule Jido.Plugin.Spec do
             legacy?: false,
             state_key: nil,
             state_schema: nil,
-            observations: [],
             directive_modules: [],
             dispatch?: false,
             runtime?: false
@@ -28,7 +27,6 @@ defmodule Jido.Plugin.Spec do
           legacy?: boolean(),
           state_key: atom() | nil,
           state_schema: Zoi.schema() | nil,
-          observations: [atom()],
           directive_modules: [module()],
           dispatch?: boolean(),
           runtime?: boolean()

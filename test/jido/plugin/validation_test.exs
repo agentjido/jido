@@ -147,14 +147,15 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "state_spec requires a usable Zoi schema and a safe state key" do
     for {state_spec, message} <- [
-          {{nil, Zoi.integer()}, "state key must not be nil"},
-          {{:__struct__, Zoi.integer()}, "state key is reserved"},
-          {{:owned, %URI{scheme: "https"}}, "state schema must be a Zoi schema"}
+          {{nil, Zoi.integer()}, "Plugin-owned Agent state key must not be nil"},
+          {{:__struct__, Zoi.integer()}, "Plugin-owned Agent state key is reserved"},
+          {{:owned, %URI{scheme: "https"}},
+           "Plugin-owned Agent state schema must be a Zoi schema"}
         ] do
       assert {:error, %Jido.Error.ValidationError{} = error} =
                Plugin.normalize_all([{Configurable, state: state_spec}])
 
-      assert error.message == "Agent Plugin #{message}"
+      assert error.message == message
       assert error.details.plugin == Configurable
     end
 
@@ -165,7 +166,7 @@ defmodule Jido.Plugin.ValidationTest do
                plugins: [{Configurable, state: {:owned, %URI{scheme: "https"}}}]
              })
 
-    assert error.message == "Agent Plugin state schema must be a Zoi schema"
+    assert error.message == "Plugin-owned Agent state schema must be a Zoi schema"
   end
 
   test "normalizes options and declaration callbacks once for reusable specs" do
@@ -306,22 +307,39 @@ defmodule Jido.Plugin.ValidationTest do
 
   test "invalid Plugin state and callback results do not return a candidate state" do
     for {result, message} <- [
-          {{:ok, "invalid"}, "Agent Plugin state is invalid"},
+          {{:ok, "invalid"}, "Plugin-owned Agent state field is invalid"},
           {:invalid, "Agent Plugin update_state/3 returned an invalid result"}
         ] do
       {:ok, specs} = Plugin.normalize_all([{Configurable, result: result}])
-      assert {:error, error} = Plugin.update_state({:ok, %{owned: 1}, [%Effect{value: 2}]}, specs)
+
+      assert {:error, error} =
+               Jido.Agent.Plugin.Pipeline.run(
+                 {:ok, %{owned: 1}, [%Effect{value: 2}]},
+                 %{owned: 1},
+                 Jido.Agent.Plugin.specs(specs)
+               )
+
       assert error.message == message
     end
 
     {:ok, specs} = Plugin.normalize_all([{Configurable, result: {:ok, 2}}])
 
-    assert {:ok, %{owned: 2}, [:unknown]} =
-             Plugin.update_state({:ok, %{owned: 1}, [:unknown]}, specs)
+    assert {:ok, %{owned: 2}, []} =
+             Jido.Agent.Plugin.Pipeline.run(
+               {:ok, %{owned: 1}, []},
+               %{owned: 1},
+               Jido.Agent.Plugin.specs(specs)
+             )
 
     assert Plugin.directive_owner(specs, :unknown) == nil
-    assert {:error, :failed} = Plugin.update_state({:error, :failed}, specs)
-    assert {:error, :failed} = Plugin.protect_state({:error, :failed}, %{owned: 1}, specs)
+
+    assert {:error, :failed} =
+             Jido.Agent.Plugin.Pipeline.run(
+               {:error, :failed},
+               %{owned: 1},
+               Jido.Agent.Plugin.specs(specs)
+             )
+
     {:ok, [spec]} = Plugin.normalize_all([{Configurable, validation_result: :invalid}])
     assert {:error, error} = Plugin.validate_directive(spec, %Effect{})
     assert error.message == "Agent Plugin validate_directive/2 returned an invalid result"

@@ -1,10 +1,36 @@
+defmodule Jido.Examples.ConditionalRoutes do
+  @moduledoc "Explicit provider policy composed with ordered SDK Choice execution."
+  use Jido.Agent, name: "workflow_routes_agent"
+
+  agent do
+    schema Zoi.object(%{
+             route: Zoi.atom() |> Zoi.default(:none),
+             result: Zoi.map() |> Zoi.default(%{})
+           })
+  end
+
+  routes do
+    signal_source "/workflow"
+
+    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline do
+      define :fetch
+    end
+  end
+end
+
 defmodule Jido.Examples.ConditionalRoutes.Select do
   @moduledoc false
-  use Jido.Action, name: "workflow_route_select"
 
+  use Jido.Action,
+    name: "workflow_route_select",
+    schema:
+      Zoi.object(%{
+        route: Zoi.enum([:primary, :second, :fallback, :reject]),
+        value: Zoi.map() |> Zoi.optional()
+      })
+
+  @impl true
   def run(input, context) do
-    Jido.Examples.Workflow.Observation.record(context, input.route, input)
-
     case input.route do
       :reject ->
         {:error, Jido.Action.Error.execution_error("primary rejected", stage: :reject)}
@@ -21,16 +47,18 @@ defmodule Jido.Examples.ConditionalRoutes.Select do
         end
 
       route ->
-        if context[:reject_selected],
-          do: {:error, Jido.Action.Error.execution_error("selected route failed", stage: route)},
-          else: {:ok, %{route: route, result: input.value}}
+        {:ok, %{route: route, result: input.value}}
     end
   end
 end
 
 defmodule Jido.Examples.ConditionalRoutes.Pipeline do
   @moduledoc "The first matching Choice runs; expected failure capture is explicit."
-  use Jido.Flow, name: "workflow_routes"
+
+  use Jido.Flow,
+    name: "workflow_routes",
+    schema: Zoi.object(%{}),
+    output_schema: Zoi.object(%{route: Zoi.atom(), result: Zoi.map()})
 
   flow do
     step "fetch", [params <- input(), ctx <- context()] do
@@ -62,25 +90,5 @@ defmodule Jido.Examples.ConditionalRoutes.Pipeline do
     end
 
     output result("route")
-  end
-end
-
-defmodule Jido.Examples.ConditionalRoutes do
-  @moduledoc "Explicit provider policy composed with ordered SDK Choice execution."
-  use Jido.Agent, name: "workflow_routes_agent"
-
-  agent do
-    schema Zoi.object(%{
-             route: Zoi.atom() |> Zoi.default(:none),
-             result: Zoi.map() |> Zoi.default(%{})
-           })
-  end
-
-  routes do
-    signal_source "/workflow"
-
-    route "workflow.routes", Jido.Examples.ConditionalRoutes.Pipeline do
-      define :fetch
-    end
   end
 end

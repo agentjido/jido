@@ -54,7 +54,7 @@ projection is bounded, sanitized, UTF-8 safe, and JSON safe. It can still
 contain application data in allowed detail fields, so the caller must review
 details before exposing them to an untrusted user.
 
-Portable Agent state, Plugin state, checkpoint data, and persistence records
+Portable complete Agent state, checkpoint data, and persistence records
 reject every PID, port, reference, function, improper list, and
 non-byte-aligned bitstring. A rejection has `:non_portable_term` and a bounded
 path that does not copy the rejected value.

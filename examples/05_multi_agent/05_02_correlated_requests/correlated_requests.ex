@@ -1,90 +1,6 @@
-defmodule Jido.Examples.CorrelatedRequests.Request do
-  @moduledoc false
-  use Jido.Action,
-    name: "example_correlated_request",
-    schema: Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()})
-
-  alias Jido.Agent.Directive
-  alias Jido.Examples.Worker
-
-  def run(input, %{agent_state: state} = context) do
-    cond do
-      state.status == :waiting ->
-        {:error, Jido.Action.Error.validation_error("a request is already waiting")}
-
-      input.request_id in state.seen ->
-        {:error, Jido.Action.Error.validation_error("request ID is already used")}
-
-      true ->
-        tag = input.request_id
-
-        next = %{
-          state
-          | request_id: tag,
-            status: :waiting,
-            result: nil,
-            seen: state.seen ++ [tag]
-        }
-
-        {:ok, next,
-         [
-           Directive.spawn_agent(Map.get(context, :worker, Worker), tag,
-             restart: :temporary,
-             opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1_000]}
-           ),
-           Directive.emit_to_child(tag, Worker.calculate_signal!(tag, tag, tag, input.value))
-         ]}
-    end
-  end
-end
-
-defmodule Jido.Examples.CorrelatedRequests.Result do
-  @moduledoc false
-  use Jido.Action,
-    name: "example_correlated_result",
-    schema:
-      Zoi.object(%{
-        request_id: Zoi.string(),
-        job_id: Zoi.string(),
-        tag: Zoi.string(),
-        value: Zoi.integer()
-      })
-
-  def run(
-        %{request_id: id, job_id: id, tag: id, value: value},
-        %{agent_state: %{request_id: id, status: :waiting} = state}
-      ) do
-    {:ok, %{state | status: :completed, result: value}, [Jido.Agent.Directive.stop_child(id)]}
-  end
-
-  def run(_, _), do: {:error, Jido.Action.Error.validation_error("result is stale or unrelated")}
-end
-
-defmodule Jido.Examples.CorrelatedRequests.Cancel do
-  @moduledoc false
-  use Jido.Action,
-    name: "example_correlated_cancel",
-    schema: Zoi.object(%{request_id: Zoi.string()})
-
-  def run(%{request_id: id}, %{agent_state: %{request_id: id, status: :waiting} = state}) do
-    {:ok, %{state | status: :cancelled}, [Jido.Agent.Directive.stop_child(id)]}
-  end
-
-  def run(_, _), do: {:error, Jido.Action.Error.validation_error("request is not waiting")}
-end
-
-defmodule Jido.Examples.CorrelatedRequests.Exit do
-  @moduledoc false
-  use Jido.Action, name: "example_correlated_exit"
-
-  def run(%{tag: id}, %{agent_state: %{request_id: id, status: :waiting} = state}),
-    do: {:ok, %{state | status: :failed}}
-
-  def run(_, %{agent_state: state}), do: {:ok, state}
-end
-
 defmodule Jido.Examples.CorrelatedRequests do
-  @moduledoc "Commits pending work, receives a correlated child result, and rejects stale replies."
+  @moduledoc "Commits pending work, accepts one correlated child result, and rejects stale replies."
+
   use Jido.Agent, name: "example_correlated_requests"
 
   agent do
@@ -98,18 +14,97 @@ defmodule Jido.Examples.CorrelatedRequests do
   end
 
   routes do
-    signal_source "/examples/requests"
+    signal_source "/examples/multi_agent/correlated_requests"
 
-    route "examples.requests.start", Jido.Examples.CorrelatedRequests.Request do
+    route "examples.multi_agent.requests.start" do
+      action %{request_id: request_id, value: value},
+        schema:
+          Zoi.object(%{request_id: Zoi.string() |> Zoi.min(1), value: Zoi.integer()}),
+        context: context do
+        state = context.agent_state
+
+        cond do
+          state.status == :waiting ->
+            {:error, Jido.Action.Error.validation_error("a request is already waiting")}
+
+          request_id in state.seen ->
+            {:error, Jido.Action.Error.validation_error("request ID is already used")}
+
+          true ->
+            candidate = %{
+              state
+              | request_id: request_id,
+                status: :waiting,
+                result: nil,
+                seen: state.seen ++ [request_id]
+            }
+
+            directives = [
+              Jido.Agent.Directive.spawn_agent(Jido.Examples.Worker, request_id,
+                restart: :temporary,
+                opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1_000]}
+              ),
+              Jido.Agent.Directive.emit_to_child(
+                request_id,
+                Jido.Examples.Worker.calculate_signal!(request_id, request_id, request_id, value)
+              )
+            ]
+
+            {:ok, candidate, directives}
+        end
+      end
+
       define :request, args: [:request_id, :value]
     end
 
-    route "examples.requests.cancel", Jido.Examples.CorrelatedRequests.Cancel do
+    route "examples.multi_agent.requests.cancel" do
+      action %{request_id: request_id},
+        schema: Zoi.object(%{request_id: Zoi.string()}),
+        context: context do
+        state = context.agent_state
+
+        if state.request_id == request_id and state.status == :waiting do
+          {:ok, %{state | status: :cancelled}, [Jido.Agent.Directive.stop_child(request_id)]}
+        else
+          {:error, Jido.Action.Error.validation_error("request is not waiting")}
+        end
+      end
+
       define :cancel, args: [:request_id]
     end
 
-    route "examples.work.result", Jido.Examples.CorrelatedRequests.Result
-    route "jido.agent.child.started", Jido.Examples.KeepState
-    route "jido.agent.child.exit", Jido.Examples.CorrelatedRequests.Exit
+    route "examples.multi_agent.worker.result" do
+      action input,
+        schema:
+          Zoi.object(%{
+            request_id: Zoi.string(),
+            job_id: Zoi.string(),
+            tag: Zoi.string(),
+            value: Zoi.integer()
+          }),
+        context: context do
+        state = context.agent_state
+
+        if input.request_id == state.request_id and input.job_id == state.request_id and
+             input.tag == state.request_id and state.status == :waiting do
+          {:ok, %{state | status: :completed, result: input.value},
+           [Jido.Agent.Directive.stop_child(state.request_id)]}
+        else
+          {:error, Jido.Action.Error.validation_error("result is stale or unrelated")}
+        end
+      end
+    end
+
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
+
+    route "jido.agent.child.exit" do
+      action input, context: context do
+        state = context.agent_state
+
+        if input.tag == state.request_id and state.status == :waiting,
+          do: {:ok, %{state | status: :failed}},
+          else: {:ok, state}
+      end
+    end
   end
 end

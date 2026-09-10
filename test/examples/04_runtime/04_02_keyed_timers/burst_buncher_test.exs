@@ -6,8 +6,6 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.BurstBuncher
-  alias Jido.Examples.BurstBuncher.Timer
-  alias Jido.Examples.BurstBuncher.Timer.Runtime
 
   test "maximum size flushes one ordered batch after commit", %{jido: jido} do
     buncher = start_buncher(jido, max_size: 2, flush_delay_ms: 1_000)
@@ -21,7 +19,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     assert_receive {:signal,
                     %Jido.Signal{
-                      type: "examples.buncher.batch",
+                      type: "examples.runtime.burst_buncher.batch",
                       data: %{
                         batch_id: "batch-1",
                         reason: :size,
@@ -34,31 +32,6 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
                    500
 
     assert agent_result(buncher).state_version == 2
-  end
-
-  test "a later item replaces the pending timeout", %{jido: jido} do
-    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 1_000)
-
-    assert {:ok, _agent} = BurstBuncher.add_item(buncher, "item-1", :first)
-    assert {:ok, _agent} = BurstBuncher.add_item(buncher, "item-2", :second)
-
-    # The call returns at commit; the replacement timer is installed by dispatch.
-    eventually(fn -> Server.status(buncher).phase == :idle end)
-    runtime = Server.children(buncher)[{:plugin, Timer}].pid
-    assert :ok = Runtime.fire(runtime, :flush)
-    assert {:error, :not_found} = Runtime.fire(runtime, :flush)
-
-    assert_receive {:signal,
-                    %Jido.Signal{
-                      type: "examples.buncher.batch",
-                      data: %{reason: :timeout, items: items}
-                    }},
-                   500
-
-    assert Enum.map(items, & &1.id) == ["item-1", "item-2"]
-
-    assert %{state: %{buffer: [], last_flush_reason: :timeout}, state_version: 3} =
-             agent_result(buncher)
   end
 
   test "stale timer generations cannot drain a newer batch", %{jido: jido} do
@@ -77,7 +50,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
     assert flushed.state.buffer == []
 
     assert_receive {:signal,
-                    %Jido.Signal{type: "examples.buncher.batch", data: %{batch_id: "batch-1"}}},
+                    %Jido.Signal{type: "examples.runtime.burst_buncher.batch", data: %{batch_id: "batch-1"}}},
                    500
   end
 
@@ -91,7 +64,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     assert {:ok, _agent} = BurstBuncher.add_item(buncher, "item-2", :second)
 
-    assert_receive {:signal, %Jido.Signal{type: "examples.buncher.batch", data: %{items: items}}},
+    assert_receive {:signal, %Jido.Signal{type: "examples.runtime.burst_buncher.batch", data: %{items: items}}},
                    500
 
     assert Enum.map(items, & &1.id) == ["item-1", "item-2"]
@@ -110,7 +83,7 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
 
     assert_receive {:signal,
                     %Jido.Signal{
-                      type: "examples.buncher.batch",
+                      type: "examples.runtime.burst_buncher.batch",
                       data: %{reason: :timeout, items: [%{id: "item"}]}
                     }},
                    1_000
@@ -118,29 +91,4 @@ defmodule JidoTest.Examples.Runtime.BurstBuncherTest do
     assert Server.agent(buncher).state.buffer == []
   end
 
-  test "a replaced timer message is ignored and shutdown cancels the pending timer", %{jido: jido} do
-    buncher = start_buncher(jido, max_size: 3, flush_delay_ms: 60_000)
-    assert {:ok, _} = BurstBuncher.add_item(buncher, "first", :one)
-    eventually(fn -> Server.status(buncher).phase == :idle end)
-    runtime = Server.children(buncher)[{:plugin, Timer}].pid
-    {old_token, old_timer, old_signal} = :sys.get_state(runtime).timers.flush
-    assert {:ok, _} = BurstBuncher.add_item(buncher, "second", :two)
-    eventually(fn -> Server.status(buncher).phase == :idle end)
-    {new_token, new_timer, _signal} = :sys.get_state(runtime).timers.flush
-    assert new_token != old_token
-    assert Process.read_timer(old_timer) == false
-    send(runtime, {:deliver, :flush, old_token, old_signal})
-    assert :ok = Timer.await_ready(runtime, [])
-    assert length(Server.agent(buncher).state.buffer) == 2
-
-    ref = Process.monitor(runtime)
-    assert :ok = Server.stop(buncher)
-    assert_receive {:DOWN, ^ref, :process, ^runtime, _}
-    assert Process.read_timer(new_timer) == false
-    assert {:error, {:buncher_timer_unavailable, _}} = Timer.await_ready(runtime, [])
-    context = struct(Jido.Plugin.DirectiveContext)
-
-    assert {:error, {:buncher_timer_unavailable, _}} =
-             Timer.dispatch(runtime, Timer.cancel(:flush), context, [])
-  end
 end

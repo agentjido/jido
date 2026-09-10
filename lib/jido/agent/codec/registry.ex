@@ -68,10 +68,7 @@ defmodule Jido.Agent.Codec.Registry do
   @doc "Finds the canonical identifier for a trusted value."
   @spec identifier(t(), kind(), term()) :: {:ok, String.t()} | {:error, term()}
   def identifier(%__MODULE__{entries: entries}, kind, value) do
-    exact = Enum.find(entries, fn {_id, entry} -> entry === {kind, value} end)
-    compatible = fn -> Enum.find(entries, fn {_id, entry} -> entry == {kind, value} end) end
-
-    case exact || compatible.() do
+    case Enum.find(entries, fn {_id, entry} -> entry === {kind, value} end) do
       {id, _} -> {:ok, id}
       nil -> Authoring.error("Registry has no identifier for value", %{kind: kind})
     end
@@ -109,13 +106,16 @@ defmodule Jido.Agent.Codec.Registry do
       else: Authoring.error("Route matches must be external unary captures")
   end
 
-  defp value_valid(kind, value) when kind in [:agent, :plugin] and is_atom(value) do
-    callback = if kind == :agent, do: :handle_signal, else: :__jido_plugin__
-    arity = if kind == :agent, do: 2, else: 0
-
-    if Code.ensure_loaded?(value) and function_exported?(value, callback, arity),
+  defp value_valid(:agent, value) when is_atom(value) do
+    if agent_module?(value),
       do: :ok,
-      else: Authoring.error("Invalid Registry module", %{kind: kind})
+      else: Authoring.error("Invalid Registry module", %{kind: :agent})
+  end
+
+  defp value_valid(:plugin, value) when is_atom(value) do
+    if Code.ensure_loaded?(value) and function_exported?(value, :__jido_plugin__, 0),
+      do: :ok,
+      else: Authoring.error("Invalid Registry module", %{kind: :plugin})
   end
 
   defp value_valid(kind, value) when kind in [:action, :flow] do
@@ -128,6 +128,17 @@ defmodule Jido.Agent.Codec.Registry do
   end
 
   defp value_valid(kind, _value), do: Authoring.error("Invalid Registry value", %{kind: kind})
+
+  defp agent_module?(Jido.Agent), do: true
+
+  defp agent_module?(module) do
+    Code.ensure_loaded?(module) and
+      (function_exported?(module, :handle_signal, 2) or
+         module.module_info(:attributes)
+         |> Keyword.get_values(:behaviour)
+         |> List.flatten()
+         |> Enum.member?(Jido.Agent))
+  end
 
   defp unique_values(entries) do
     values = entries |> Map.values() |> Enum.reject(&match?({:alias, _}, &1))

@@ -74,8 +74,9 @@ The user approved these decisions on 2026-09-09.
 7. **Release gate:** Prove one explicit `jido`, `jido_action`, and
    `jido_signal` set through public contracts before a core release claim.
    Each integration package proves its own added compatibility.
-8. **Stored data:** Keep core record, Agent state, Plugin state, and backend
-   storage migration ownership separate.
+8. **Stored data:** Keep core record, domain-field, Plugin-owned-field, and
+   backend storage migration ownership separate. Domain and Plugin-owned
+   fields remain in one Agent state map.
 9. **Boundary evidence:** Use a small public-only fixture when an integration
    package makes a V3 compatibility claim. Internal core tests are not the only
    evidence for that claim.

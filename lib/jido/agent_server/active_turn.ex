@@ -11,7 +11,7 @@ defmodule Jido.AgentServer.ActiveTurn do
               turn_id: Zoi.string(description: "Stable Turn identifier"),
               source_signal: Zoi.struct(Signal, description: "Signal received by the Server"),
               effective_signal:
-                Zoi.struct(Signal, description: "Signal after Plugin preparation")
+                Zoi.struct(Signal, description: "Signal after live admission")
                 |> Zoi.optional(),
               caller: Zoi.any(description: "Optional synchronous caller") |> Zoi.optional(),
               exec_handle:
@@ -96,7 +96,7 @@ defmodule Jido.AgentServer.ActiveTurn do
   @spec begin_execution(t(), term(), term()) :: t()
   def begin_execution(%__MODULE__{} = active, handle, prepared) do
     turn_context =
-      Map.drop(prepared.context, [:agent_id, :agent_state, :signal, :plugin_inputs])
+      Map.drop(prepared.context, [:agent_id, :agent_state, :signal])
 
     if prepared.source_signal != active.source_signal do
       raise "prepared Turn source Signal does not match the active Turn"
@@ -146,7 +146,7 @@ defmodule Jido.AgentServer.ActiveTurn do
     skipped =
       active.directive_count - active.directive_completed_count - active.directive_failure_count
 
-    Outcome.new!(%{
+    %Outcome{
       id: active.turn_id,
       agent_id: agent_id,
       source_signal: active.source_signal,
@@ -167,6 +167,6 @@ defmodule Jido.AgentServer.ActiveTurn do
       started_at: started_at,
       finished_at: finished_at,
       duration_ms: duration_ms
-    })
+    }
   end
 end

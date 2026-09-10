@@ -32,7 +32,7 @@ boundaries. The contract and its implementation evidence were approved on
 | State | One complete map includes domain and Plugin-owned fields. | Keep one map and keep separate write owners. |
 | Direct execution | `cmd/3` returns a candidate Agent and Directives. | Keep this process-free evaluation contract. |
 | Authoring | Module DSL, direct data, Builder, and Codec use shared validation. | Keep all forms and one normalized definition contract. |
-| Checkpoints | Version-1 maps and complete custom callbacks are supported. | Keep them readable, write version 2 for generated modules, and wrap new custom payloads in a core-owned revision envelope. |
+| Checkpoints | Version-2 default maps and complete custom callbacks are supported. | Keep one V3 format, check module revision, and wrap custom payloads in a core-owned revision envelope. |
 | Portable state | Persistence rejects nonportable records. | Reject nonportable state when the Agent accepts it and again at persistence. Keep static direct definitions unrestricted in memory. |
 
 ## Major gaps and work remaining
@@ -52,9 +52,9 @@ boundaries. The contract and its implementation evidence were approved on
    default for existing `use Jido.Agent` modules and allow unversioned direct
    definitions.
    Effect: module authors get a compatible restore gate.
-3. **Checkpoint evolution:** Use a version-2 default map for versioned
-   module definitions while version 1 and custom callbacks stay supported.
-   Effect: restore can check module meaning without a forced checkpoint struct.
+3. **Checkpoint format:** Use version 2 for generated, direct, behavior-only,
+   and custom checkpoints. Do not read version-1 checkpoints or raw custom
+   payloads. Effect: restore has one format and a clear module revision gate.
 4. **Portable state:** Add early state checks after a compatibility audit
    and use the error contract from seam 12.
    Effect: direct, live, and persistent paths accept the same portable state.
@@ -63,7 +63,7 @@ boundaries. The contract and its implementation evidence were approved on
 
 1. **Custom checkpoint envelope:** Jido wraps a new opaque custom callback
    payload in a versioned core-owned `agent_module` and `vsn` envelope. Restore
-   also keeps the legacy raw-map read path.
+   accepts only this V3 envelope.
 2. **Direct durable definitions:** Direct definitions stay unrestricted in
    memory. The default checkpoint supports only the portable embedded subset.
    Other definitions get a typed portability error and need a generated module

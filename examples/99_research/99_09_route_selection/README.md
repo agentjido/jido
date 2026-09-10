@@ -7,20 +7,19 @@ Result on 2026-09-09: **4 passing checks.** All checks are enabled.
 ## Feature and proof
 
 A single route works in direct and live execution. The fallback handles an
-unrelated Signal. An exact route wins before wildcard routes. A preparation
-Plugin cannot replace the executable selected by the source Signal in direct
-or live evaluation.
+unrelated Signal. An exact route wins before wildcard routes. The source Signal
+fixes the executable for direct and live evaluation.
 
 ## Implemented contract
 
 Select the first route by Router precedence from the source Signal. Keep that
-executable fixed through Plugin preparation.
+executable fixed through execution.
 
 ## Scope
 
 The probe uses three explicit Agent DSL definitions and `cmd/3`. Route defaults
-and the preparation Plugin are declared in the DSL. It does not replace routing
-with an example-owned dispatcher.
+are declared in the DSL. It does not replace routing with an example-owned
+dispatcher.
 
 ## Run
 

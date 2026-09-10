@@ -11,7 +11,7 @@ commit. The separate settlement fact can occur later.
 Use `Jido.Error.to_map/1` at a transport boundary. It omits stacktraces,
 redacts sensitive fields, limits depth and collection size, and keeps bounded
 validation paths. Invalid UTF-8 binaries use bounded inspection. Do not add
-raw Agent state, Plugin state, secrets, or arbitrary exception values to
+raw Agent state, including Plugin-owned fields, secrets, or arbitrary exception values to
 public metadata.
 
 Every semantic event has `schema_version: 1`. Namespaced Agent events project
@@ -30,7 +30,7 @@ startup, sampling, export, and vendor configuration.
 
 See the [runtime observation tests](../test/jido/agent_server/runtime_observability_test.exs),
 the [OpenTelemetry contract tests](../test/jido/telemetry/open_telemetry_test.exs),
-and the [causal trace checks](../test/examples/04_runtime/04_10_causal_trace/causal_trace_test.exs).
+and the [causal trace checks](../test/examples/04_runtime/04_08_causal_trace/causal_trace_test.exs).
 Run the
-[semantic boundary demonstration](../examples/04_runtime/04_09_agent_observation/semantic_boundaries.exs)
+[semantic boundary demonstration](../examples/04_runtime/04_07_agent_observation/semantic_boundaries.exs)
 to see Agent, persistence, and local Topology facts together.

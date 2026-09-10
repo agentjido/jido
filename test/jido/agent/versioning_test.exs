@@ -30,11 +30,11 @@ defmodule Jido.Agent.VersioningTest do
 
   test "generated modules own a positive version and direct definitions can be unversioned" do
     assert DefaultVersionAgent.vsn() == 1
-    assert DefaultVersionAgent.agent().vsn == 1
+    assert DefaultVersionAgent.definition().vsn == 1
     assert DefaultVersionAgent.new!().vsn == 1
 
     assert VersionedAgent.vsn() == 3
-    assert VersionedAgent.agent().vsn == 3
+    assert VersionedAgent.definition().vsn == 3
     assert VersionedAgent.new!().vsn == 3
 
     assert Agent.new!(name: "unversioned").vsn == nil
@@ -63,25 +63,27 @@ defmodule Jido.Agent.VersioningTest do
   test "definition, map, Builder, and Codec preserve the version" do
     agent = VersionedAgent.new!(id: "versioned", state: %{count: 2})
     assert Agent.definition(agent).vsn == 3
-    assert Agent.to_map(agent).vsn == 3
+    assert Map.fetch!(agent, :vsn) == 3
 
     assert Builder.new(name: "built", vsn: 8) |> Builder.build!() |> Map.fetch!(:vsn) == 8
-    assert Builder.new(VersionedAgent) |> Builder.build!() == VersionedAgent.agent()
+    assert Builder.new(VersionedAgent) |> Builder.build!() == VersionedAgent.definition()
 
-    assert {:ok, document, registry} = Codec.encode(VersionedAgent.agent())
+    assert {:ok, document, registry} = Codec.encode(VersionedAgent.definition())
     assert document["version"] == 2
     assert document["vsn"] == 3
     assert {:ok, %{vsn: 3}} = Codec.decode(document, registry)
 
-    legacy_document = document |> Map.delete("vsn") |> Map.put("version", 1)
-    assert {:ok, %{vsn: 1}} = Codec.decode(legacy_document, registry)
+    version_one = document |> Map.delete("vsn") |> Map.put("version", 1)
+    assert {:error, %Jido.Error.ValidationError{}} = Codec.decode(version_one, registry)
 
     direct = Agent.new!(name: "direct_codec")
     assert {:ok, direct_document, direct_registry} = Codec.encode(direct)
     assert {:ok, %{vsn: nil}} = Codec.decode(direct_document, direct_registry)
 
-    direct_legacy = direct_document |> Map.delete("vsn") |> Map.put("version", 1)
-    assert {:ok, %{vsn: nil}} = Codec.decode(direct_legacy, direct_registry)
+    direct_version_one = direct_document |> Map.delete("vsn") |> Map.put("version", 1)
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Codec.decode(direct_version_one, direct_registry)
   end
 
   test "generated default checkpoints use version 2 and reject changed definitions" do
@@ -118,7 +120,7 @@ defmodule Jido.Agent.VersioningTest do
              Agent.restore(VersionedAgent, %{checkpoint | vsn: 2})
   end
 
-  test "version-1 generated checkpoints imply version 1" do
+  test "version-1 checkpoints are not part of the V3 format" do
     agent = DefaultVersionAgent.new!(id: "legacy")
 
     checkpoint = %{
@@ -130,25 +132,21 @@ defmodule Jido.Agent.VersioningTest do
       state: agent.state
     }
 
-    assert {:ok, ^agent} = Agent.restore(DefaultVersionAgent, checkpoint)
-
-    versioned_checkpoint = %{checkpoint | agent_module: VersionedAgent}
-
-    assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
-             Agent.restore(VersionedAgent, versioned_checkpoint)
+    assert {:error, %Jido.Error.ValidationError{details: %{code: :invalid_checkpoint}}} =
+             Agent.restore(DefaultVersionAgent, checkpoint)
   end
 
   test "an explicit unversioned definition derived from a generated module stays embedded" do
-    definition = %{VersionedAgent.agent() | vsn: nil, metadata: %{owner: :application}}
+    definition = %{VersionedAgent.definition() | vsn: nil, metadata: %{owner: :application}}
     agent = Agent.instantiate!(definition, id: "derived", state: %{count: 2})
 
-    assert {:ok, %{version: 1, definition: ^definition} = checkpoint} =
+    assert {:ok, %{version: 2, definition: ^definition} = checkpoint} =
              Agent.checkpoint(agent)
 
     assert {:ok, ^agent} = Agent.restore(VersionedAgent, checkpoint)
   end
 
-  test "custom callbacks use a core envelope and accept legacy raw payloads" do
+  test "custom callbacks use the V3 core envelope" do
     agent = CustomCheckpointAgent.new!(id: "custom", state: %{count: 9})
     assert {:ok, checkpoint} = Agent.checkpoint(agent)
 
@@ -161,7 +159,9 @@ defmodule Jido.Agent.VersioningTest do
            }
 
     assert {:ok, ^agent} = Agent.restore(CustomCheckpointAgent, checkpoint)
-    assert {:ok, ^agent} = Agent.restore(CustomCheckpointAgent, checkpoint.payload)
+
+    assert {:error, %Jido.Error.ValidationError{details: %{code: :invalid_checkpoint}}} =
+             Agent.restore(CustomCheckpointAgent, checkpoint.payload)
 
     assert {:error, %Jido.Error.ValidationError{details: %{code: :definition_mismatch}}} =
              Agent.restore(CustomCheckpointAgent, %{checkpoint | vsn: 3})

@@ -12,9 +12,6 @@ defmodule Jido.Plugin.Normalizer do
   @legacy_callbacks [
     validate_options: 1,
     child_spec: 1,
-    prepare: 2,
-    prepare_turn: 2,
-    observes: 1,
     admit: 3,
     prepare_dispatch: 4,
     state_spec: 1,
@@ -86,9 +83,6 @@ defmodule Jido.Plugin.Normalizer do
   defp upgrade_spec(%Spec{} = spec) do
     agent =
       if has_any?(spec.module,
-           prepare: 2,
-           prepare_turn: 2,
-           observes: 1,
            state_spec: 1,
            update_state: 3,
            directives: 1,
@@ -100,9 +94,7 @@ defmodule Jido.Plugin.Normalizer do
           options: spec.options,
           state_key: spec.state_key,
           state_schema: spec.state_schema,
-          observations: spec.observations,
-          directive_modules: spec.directive_modules,
-          legacy?: true
+          directive_modules: spec.directive_modules
         }
       end
 
@@ -170,7 +162,6 @@ defmodule Jido.Plugin.Normalizer do
 
   defp build_legacy_spec(module, options) do
     with :ok <- validate_legacy_contract(module),
-         :ok <- validate_legacy_preparation(module),
          :ok <- legacy_has_capability(module),
          {:ok, options} <- read_legacy_options(module, options),
          {:ok, agent} <- build_legacy_agent_spec(module, options),
@@ -220,15 +211,12 @@ defmodule Jido.Plugin.Normalizer do
 
   defp build_legacy_agent_spec(module, options) do
     if has_any?(module,
-         prepare: 2,
-         prepare_turn: 2,
-         observes: 1,
          state_spec: 1,
          update_state: 3,
          directives: 1,
          validate_directive: 2
        ) do
-      build_agent_values(module, module, options, true)
+      build_agent_values(module, module, options)
     else
       {:ok, nil}
     end
@@ -264,14 +252,13 @@ defmodule Jido.Plugin.Normalizer do
 
     with :ok <- validate_facet(facet, Jido.Agent.Plugin, :agent),
          :ok <- facet_has_capability(facet, :agent),
-         do: build_agent_values(manifest.module, facet, facet_options, false)
+         do: build_agent_values(manifest.module, facet, facet_options)
   end
 
-  defp build_agent_values(package, facet, options, legacy?) do
+  defp build_agent_values(package, facet, options) do
     with {:ok, {state_key, state_schema}} <- read_state_spec(package, facet, options),
-         {:ok, observations} <- read_observations(package, facet, options),
          {:ok, directive_modules} <- read_directives(package, facet, options),
-         :ok <- validate_agent_contract(package, facet, state_key, directive_modules, legacy?) do
+         :ok <- validate_agent_contract(package, facet, state_key, directive_modules) do
       {:ok,
        %AgentSpec{
          package: package,
@@ -279,9 +266,7 @@ defmodule Jido.Plugin.Normalizer do
          options: options,
          state_key: state_key,
          state_schema: state_schema,
-         observations: observations,
-         directive_modules: directive_modules,
-         legacy?: legacy?
+         directive_modules: directive_modules
        }}
     end
   end
@@ -375,7 +360,6 @@ defmodule Jido.Plugin.Normalizer do
         PluginError.validation(message, %{plugin: package, facet: server.module})
 
       not is_nil(agent) and agent.directive_modules != [] and
-        not function_exported?(agent.module, :contribute, 2) and
         not function_exported?(agent.module, :update_state, 3) and
           (is_nil(server) or not server.dispatch?) ->
         PluginError.validation(
@@ -485,9 +469,7 @@ defmodule Jido.Plugin.Normalizer do
         :agent_server ->
           [
             state_spec: 1,
-            observes: 1,
-            prepare: 2,
-            contribute: 2,
+            update_state: 3,
             directives: 1,
             validate_directive: 2,
             dump: 3,
@@ -497,9 +479,7 @@ defmodule Jido.Plugin.Normalizer do
         :persistence ->
           [
             state_spec: 1,
-            observes: 1,
-            prepare: 2,
-            contribute: 2,
+            update_state: 3,
             directives: 1,
             validate_directive: 2,
             admit: 3,
@@ -512,8 +492,7 @@ defmodule Jido.Plugin.Normalizer do
         :topology ->
           [
             state_spec: 1,
-            observes: 1,
-            prepare: 2,
+            update_state: 3,
             directives: 1,
             validate_directive: 2,
             admit: 3,
@@ -544,9 +523,7 @@ defmodule Jido.Plugin.Normalizer do
   defp facet_has_capability(module, :agent) do
     require_capability(module, :agent,
       state_spec: 1,
-      observes: 1,
-      prepare: 2,
-      contribute: 2,
+      update_state: 3,
       directives: 1
     )
   end
@@ -618,27 +595,6 @@ defmodule Jido.Plugin.Normalizer do
     )
   end
 
-  defp validate_legacy_preparation(module) do
-    legacy? = function_exported?(module, :prepare, 2)
-    bounded? = function_exported?(module, :prepare_turn, 2)
-    observes? = function_exported?(module, :observes, 1)
-
-    cond do
-      legacy? and bounded? ->
-        PluginError.validation("Agent Plugin must define only one preparation callback", %{
-          plugin: module
-        })
-
-      observes? and not bounded? ->
-        PluginError.validation("Agent Plugin observes/1 requires prepare_turn/2", %{
-          plugin: module
-        })
-
-      true ->
-        :ok
-    end
-  end
-
   defp legacy_has_capability(module) do
     if has_any?(module, Keyword.delete(@legacy_callbacks, :validate_options)) do
       :ok
@@ -669,7 +625,7 @@ defmodule Jido.Plugin.Normalizer do
        do: error
 
   defp validate_state_spec({nil, _schema}, package, facet) do
-    PluginError.validation("Agent Plugin state key must not be nil", %{
+    PluginError.validation("Plugin-owned Agent state key must not be nil", %{
       plugin: package,
       facet: facet,
       state_key: nil
@@ -677,7 +633,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp validate_state_spec({:__struct__, _schema}, package, facet) do
-    PluginError.validation("Agent Plugin state key is reserved", %{
+    PluginError.validation("Plugin-owned Agent state key is reserved", %{
       plugin: package,
       facet: facet,
       state_key: :__struct__
@@ -688,7 +644,7 @@ defmodule Jido.Plugin.Normalizer do
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
     cond do
       is_nil(Zoi.Type.impl_for(schema)) ->
-        PluginError.validation("Agent Plugin state schema must be a Zoi schema", %{
+        PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
           plugin: package,
           facet: facet,
           schema: schema
@@ -700,7 +656,7 @@ defmodule Jido.Plugin.Normalizer do
             {:ok, {key, schema}}
 
           {:error, reason} ->
-            PluginError.validation("Agent Plugin state schema must contain static data", %{
+            PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
               plugin: package,
               facet: facet,
               state_key: key,
@@ -715,54 +671,6 @@ defmodule Jido.Plugin.Normalizer do
       plugin: package,
       facet: facet,
       value: value
-    })
-  end
-
-  defp read_observations(package, facet, options) do
-    result =
-      if function_exported?(facet, :observes, 1) do
-        PluginError.safe_apply(
-          package,
-          facet,
-          :observes,
-          [options],
-          "Agent Plugin observes/1 failed"
-        )
-      else
-        []
-      end
-
-    validate_observations(result, package, facet)
-  end
-
-  defp validate_observations({:error, _reason} = error, _package, _facet), do: error
-
-  defp validate_observations(observations, package, facet) when is_list(observations) do
-    cond do
-      Enum.any?(observations, &(not is_atom(&1))) ->
-        PluginError.validation("Agent Plugin observations must be atom field names", %{
-          plugin: package,
-          facet: facet,
-          observations: observations
-        })
-
-      Enum.uniq(observations) != observations ->
-        PluginError.validation("Agent Plugin observations must be unique", %{
-          plugin: package,
-          facet: facet,
-          observations: observations
-        })
-
-      true ->
-        {:ok, observations}
-    end
-  end
-
-  defp validate_observations(observations, package, facet) do
-    PluginError.validation("Agent Plugin observes/1 must return a list", %{
-      plugin: package,
-      facet: facet,
-      observations: observations
     })
   end
 
@@ -834,13 +742,9 @@ defmodule Jido.Plugin.Normalizer do
     })
   end
 
-  defp validate_agent_contract(package, facet, state_key, directives, legacy?) do
+  defp validate_agent_contract(package, facet, state_key, directives) do
     validates? = function_exported?(facet, :validate_directive, 2)
-
-    reduces? =
-      if legacy?,
-        do: function_exported?(facet, :update_state, 3),
-        else: function_exported?(facet, :contribute, 2)
+    updates? = function_exported?(facet, :update_state, 3)
 
     cond do
       directives != [] and not validates? ->
@@ -849,7 +753,7 @@ defmodule Jido.Plugin.Normalizer do
           facet: facet
         })
 
-      legacy? and reduces? and is_nil(state_key) ->
+      updates? and is_nil(state_key) ->
         PluginError.validation("Agent Plugin update_state/3 requires state_spec/1", %{
           plugin: package,
           facet: facet
@@ -867,7 +771,7 @@ defmodule Jido.Plugin.Normalizer do
   defp unique_state_keys(specs) do
     specs
     |> Enum.reject(&(is_nil(&1.agent) or is_nil(&1.agent.state_key)))
-    |> unique_by(& &1.agent.state_key, "Agent Plugin state keys must be unique", :state_key)
+    |> unique_by(& &1.agent.state_key, "Plugin-owned Agent state keys must be unique", :state_key)
   end
 
   defp unique_directives(specs) do
@@ -902,7 +806,6 @@ defmodule Jido.Plugin.Normalizer do
       legacy?: legacy?,
       state_key: field(agent, :state_key),
       state_schema: field(agent, :state_schema),
-      observations: field(agent, :observations, []),
       directive_modules: field(agent, :directive_modules, []),
       dispatch?: not is_nil(server) and server.dispatch?,
       runtime?: not is_nil(server) and server.runtime?

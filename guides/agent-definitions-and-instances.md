@@ -13,10 +13,10 @@ A value with only an ID or only state is invalid.
 
 ## Declare A Definition
 
-An Agent module provides its neutral definition through `agent/0`:
+An Agent module provides its neutral definition through `definition/0`:
 
 ```elixir
-definition = MyApp.Counter.agent()
+definition = MyApp.Counter.definition()
 true = Jido.Agent.definition?(definition)
 ```
 

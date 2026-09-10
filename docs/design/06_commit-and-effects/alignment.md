@@ -77,15 +77,16 @@ portable pending intent, stable operation ID, acknowledgement, retry, ordering,
 cancellation, retention, and duplicate policy. Completion returns through a
 new Signal and a normal new Turn.
 
-The default Agent checkpoint includes combined Agent and Plugin state. A
-Persistence facet can convert its paired owned-state value. A custom complete
-checkpoint bypasses that conversion and keeps its complete callback contract.
+The default Agent checkpoint includes the sole complete Agent state map, with
+its domain and Plugin-owned fields. A Persistence facet can convert its paired
+owned value. A custom complete checkpoint bypasses that conversion and keeps
+its complete callback contract.
 
 ## Canonical source
 
 | Source | Implemented contract |
 | --- | --- |
-| `lib/jido/agent/command/runner.ex` | Produces and validates one complete candidate and ordered Directive list without live authority. |
+| `lib/jido/agent/runner.ex` | Produces and validates one complete candidate and ordered Directive list without live authority. |
 | `lib/jido/agent_server.ex` | Validates the live batch, checkpoints, replaces the Agent, advances one version, replies, handles Directives serially, and settles. Every persistence failure forces activation stop. |
 | `lib/jido/agent_server/active_turn.ex` | Preserves Turn ID, source and effective Signals, versions, caller, and exact Directive progress during one activation. |
 | `lib/jido/agent/turn/outcome.ex` | Validates terminal stage, commit state, version transition, and Directive completion, failure, and skip counts. |

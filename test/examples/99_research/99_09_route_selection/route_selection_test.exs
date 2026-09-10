@@ -27,9 +27,9 @@ defmodule JidoTest.Examples.RouteSelectionTest do
     assert agent.state.handler == "create"
   end
 
-  test "preparation cannot replace the executable selected by the source Signal", %{jido: jido} do
+  test "the source Signal fixes selection for direct and live evaluation", %{jido: jido} do
     source = Example.signal("order.create")
-    agent = Example.new(:rewrite)
+    agent = Example.new(:fixed)
 
     assert {:ok, direct, []} = Jido.Agent.cmd(agent, source)
     assert {:ok, server} = Jido.start_agent(jido, agent)

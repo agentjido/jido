@@ -1,7 +1,6 @@
 defmodule Jido.AgentServer.CommitBoundaryTest do
   use JidoTest.Case, async: false
 
-  alias Jido.Agent.Plugin.Contribution
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Turn.Outcome
   alias Jido.Signal
@@ -19,10 +18,6 @@ defmodule Jido.AgentServer.CommitBoundaryTest do
 
     def directives(_opts), do: [Effect]
     def validate_directive(%Effect{} = effect, _opts), do: {:ok, effect}
-
-    def contribute(transition, _opts) do
-      {:ok, %Contribution{plugin: transition.plugin}}
-    end
   end
 
   defmodule ServerFacet do

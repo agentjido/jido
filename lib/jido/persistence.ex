@@ -18,7 +18,8 @@ defmodule Jido.Persistence do
   Direct `save_agent/3` calls use the revision supplied in their options.
 
   Caller execution context is not part of the checkpoint. Only values that
-  application code puts in portable Agent or Plugin state can be stored.
+  application code puts in the portable complete Agent state can be stored.
+  This map contains both domain fields and Plugin-owned fields.
 
   A Plugin Persistence facet can convert only its paired owned-state value in
   the default checkpoint path. Complete custom Agent checkpoints bypass this

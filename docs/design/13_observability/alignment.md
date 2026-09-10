@@ -68,8 +68,8 @@ All semantic events have `schema_version: 1`. The shared boundary accepts only:
 - current `jido_instance` and safe `partition` overlap fields; and
 - approved integer time, revision, count, and capacity measurements.
 
-The boundary omits invalid UTF-8, oversized strings, nested values, Agent and
-Plugin state, Signal and Directive data, caller context, checkpoints, records,
+The boundary omits invalid UTF-8, oversized strings, nested values, complete
+Agent state, Signal and Directive data, caller context, checkpoints, records,
 encoded keys, raw errors, error details, error messages, stacktraces, PIDs,
 ports, references, functions, actor data, application metadata, and
 OpenTelemetry `tracestate`.
@@ -151,7 +151,7 @@ SDK tracer, this path is a no-op.
 - `mix compile --no-optional-deps --warnings-as-errors` passed in a clean build
   path.
 - `mix docs --warnings-as-errors` passed.
-- `mix run examples/04_runtime/04_09_agent_observation/semantic_boundaries.exs`
+- `mix run examples/04_runtime/04_07_agent_observation/semantic_boundaries.exs`
   passed with Agent, settlement, persistence, and local Topology facts.
 - `git diff --check` passed.
 

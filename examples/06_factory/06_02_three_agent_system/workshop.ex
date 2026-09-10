@@ -265,7 +265,7 @@ defmodule Jido.Examples.Factory.Workshop do
     route "factory.inspect", Jido.Examples.Factory.Inspection
     route "factory.workshop.poll", __MODULE__.Poll
     route "factory.worker.progress", __MODULE__.Tick
-    route "jido.agent.child.started", Jido.Examples.KeepState
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
       action %{tag: tag}, name: "factory_workshop_worker_exit", context: context do

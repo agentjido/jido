@@ -167,25 +167,26 @@ defmodule Jido.AgentServer.Options do
     end
   end
 
-  defp instantiate_agent(%Agent{} = agent, id, initial_state) do
-    cond do
-      Agent.definition?(agent) ->
-        Agent.instantiate(agent, instance_overrides(id, initial_state))
+  defp instantiate_agent(%Agent{id: nil, state: nil} = definition, id, initial_state) do
+    Agent.instantiate(definition, instance_overrides(id, initial_state))
+  end
 
-      Agent.instance?(agent) and is_nil(id) and is_nil(initial_state) ->
+  defp instantiate_agent(%Agent{id: id, state: state} = agent, requested_id, initial_state)
+       when is_binary(id) and is_map(state) and not is_struct(state) do
+    with {:ok, agent} <- Agent.validate_instance(agent) do
+      if is_nil(requested_id) and is_nil(initial_state) do
         {:ok, agent}
-
-      Agent.instance?(agent) ->
+      else
         invalid("cannot override an Agent instance with Server options", %{
           agent_id: agent.id,
-          id: id,
+          id: requested_id,
           initial_state: initial_state
         })
-
-      true ->
-        Agent.validate(agent)
+      end
     end
   end
+
+  defp instantiate_agent(%Agent{} = agent, _id, _initial_state), do: Agent.validate(agent)
 
   defp instantiate_agent(module, id, initial_state) when is_atom(module) and not is_nil(module) do
     overrides = instance_overrides(id, initial_state)
@@ -193,10 +194,17 @@ defmodule Jido.AgentServer.Options do
     with {:module, ^module} <- Code.ensure_loaded(module) do
       result =
         cond do
-          function_exported?(module, :__agent_config__, 0) -> Agent.new(module, overrides)
-          function_exported?(module, :new, 1) -> module.new(overrides)
-          function_exported?(module, :new, 0) -> module.new()
-          true -> invalid("Agent module must implement new/0 or new/1", %{module: module})
+          function_exported?(module, :__agent_config__, 0) ->
+            Agent.instantiate(module, overrides)
+
+          function_exported?(module, :new, 1) ->
+            module.new(overrides)
+
+          function_exported?(module, :new, 0) ->
+            module.new()
+
+          true ->
+            invalid("Agent module must implement new/0 or new/1", %{module: module})
         end
 
       with {:ok, agent} <- normalize_agent_result(result, module),

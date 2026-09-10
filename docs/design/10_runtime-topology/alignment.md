@@ -36,9 +36,9 @@ Plugin runtime wrapper is temporary and linked to its Agent Server. It owns a
 private Supervisor and one runtime generation. Plugin authors must return a
 root specification with `restart: :permanent`. The wrapper changes the hosted
 generation to `:temporary`. This lets the wrapper observe root loss, request a
-fresh committed Plugin state and Agent state version, and start the new
-generation. The wrapper, the private Supervisor, and the root stop with the
-Agent Server.
+fresh committed value from the Plugin-owned Agent field and its Agent state
+version, and start the new generation. The wrapper, the private Supervisor, and
+the root stop with the Agent Server.
 
 Admission, execution, Plugin Directive, and error Signal delivery workers use
 the selected instance Task Supervisor. Initial Plugin readiness is linked and
@@ -94,7 +94,7 @@ adapter. It does not put all owner logic back in that module.
 | Same-instance checkpoint recovery | `Jido.AgentServer.RuntimeCheckpoint` |
 | Linked initial readiness and owner-linked Task workers | `Jido.AgentServer` |
 | Plugin wrapper, private Supervisor, and root generation | `Jido.AgentServer.PluginLifecycle` and `Jido.AgentServer.PluginChild` |
-| Fresh Plugin state-version bootstrap pair | `Jido.Plugin.Init` and `Jido.AgentServer.PluginLifecycle` |
+| Fresh Plugin-owned-field and state-version bootstrap pair | `Jido.Plugin.Init` and `Jido.AgentServer.PluginLifecycle` |
 | Logical child ownership and known-node placement | `Jido.AgentServer.DirectiveRuntime` and `Jido.AgentServer.ChildPlacement` |
 | Spawn generation recovery | `Jido.AgentServer.SpawnRegistry` |
 | Local Ref resolution with no fallback | `Jido.Instance.RefFacade` |

@@ -13,7 +13,7 @@ conversion produced the error. Codes live in `error.details.code` and are read
 with `Jido.Error.code/1`. The closed registry now contains every code that Jido
 source emits in that position.
 
-The owner seams added definition, checkpoint, Plugin-state protection,
+The owner seams added definition, checkpoint, Plugin-owned-field protection,
 whole-Turn timeout, instance configuration, and namespace results. Seam 12
 registers those existing results without renaming them. This is additive:
 callers that already inspect `details.code` keep the same value.
@@ -41,8 +41,8 @@ forms. This seam does not convert all atoms and tuples into exceptions.
 redacts sensitive keys, removes stacktraces, repairs invalid UTF-8, and returns
 JSON-safe data. There is no projection version 2.
 
-Agent state, Plugin-owned state, checkpoint values, and complete persistence
-records reject PIDs, ports, references, functions, improper lists, and
+Complete Agent state, checkpoint values, and complete persistence records
+reject PIDs, ports, references, functions, improper lists, and
 non-byte-aligned bitstrings at their owned acceptance boundaries. Persistence
 checks the complete record again as defense in depth.
 

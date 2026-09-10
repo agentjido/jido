@@ -123,9 +123,9 @@ defmodule Jido.Agent.DSL.Generator do
     #{runtime_options(mode)}
 
     Raw input values are packaged without coercion or executable validation.
-    Plugins prepare input during command execution, then the Action or Flow
-    validates its input. Constructing a Signal does not execute a command.
-    Unknown or duplicate options are errors.
+    The Action or Flow validates its input during command execution.
+    Constructing a Signal does not execute a command. Unknown or duplicate
+    options are errors.
     """
   end
 

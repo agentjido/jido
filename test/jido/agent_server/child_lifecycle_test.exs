@@ -134,7 +134,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
   end
 
   test "an asynchronously prepared child target uses the restarted child PID", %{jido: jido} do
-    definition = %{RuntimeAgent.agent() | plugins: [BlockingDispatchPlugin]}
+    definition = %{RuntimeAgent.definition() | plugins: [BlockingDispatchPlugin]}
     {:ok, parent} = Jido.start_agent(jido, definition, id: unique_id("target-parent"))
 
     assert {:ok, _agent} =
@@ -184,7 +184,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
 
   test "an asynchronously prepared parent target observes parent loss", %{jido: jido} do
     observer = self()
-    definition = %{ChildAgent.agent() | plugins: [BlockingDispatchPlugin]}
+    definition = %{ChildAgent.definition() | plugins: [BlockingDispatchPlugin]}
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("target-parent"))
 
     parent_ref =

@@ -265,10 +265,11 @@ defmodule Jido.Agent.Validation do
   defp validate_module(module) when is_atom(module) and not is_nil(module) do
     case Code.ensure_loaded(module) do
       {:module, ^module} ->
-        if function_exported?(module, :handle_signal, 2) do
+        if module == Agent or agent_behaviour?(module) or
+             function_exported?(module, :handle_signal, 2) do
           :ok
         else
-          invalid("Agent module must implement handle_signal/2", %{module: module})
+          invalid("Agent module must implement the Jido.Agent behavior", %{module: module})
         end
 
       {:error, reason} ->
@@ -277,6 +278,13 @@ defmodule Jido.Agent.Validation do
   end
 
   defp validate_module(module), do: invalid("Agent module must be a module", %{module: module})
+
+  defp agent_behaviour?(module) do
+    module.module_info(:attributes)
+    |> Keyword.get_values(:behaviour)
+    |> List.flatten()
+    |> Enum.member?(Agent)
+  end
 
   defp validate_routes(routes) when is_list(routes) do
     with {:ok, routes} <- Jido.Agent.Authoring.routes(routes),
@@ -295,7 +303,7 @@ defmodule Jido.Agent.Validation do
     Enum.reduce_while(routes, :ok, fn route, :ok ->
       {target, _defaults} = Authoring.split_target(route.target)
 
-      case Jido.Executable.validate(target) do
+      case validate_target(target) do
         :ok ->
           {:cont, :ok}
 
@@ -304,6 +312,19 @@ defmodule Jido.Agent.Validation do
       end
     end)
   end
+
+  defp validate_target([]), do: Jido.Executable.validate([])
+
+  defp validate_target(targets) when is_list(targets) do
+    Enum.reduce_while(targets, :ok, fn target, :ok ->
+      case Jido.Executable.validate(target) do
+        :ok -> {:cont, :ok}
+        {:error, _reason} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  defp validate_target(target), do: Jido.Executable.validate(target)
 
   defp normalize_attrs(attrs, source) do
     case Authoring.to_attrs(attrs) do

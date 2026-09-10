@@ -121,7 +121,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
       end
     )
 
-    owner = module.agent()
+    owner = module.definition()
     assert %Agent{module: ^module, name: "combined_topology"} = owner
     assert owner.metadata == %{kind: :owner}
     assert [%{path: "owner.add", target: Add}] = owner.routes
@@ -165,7 +165,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
              plugins: [],
              routes: [],
              metadata: %{}
-           } = module.agent()
+           } = module.definition()
 
     assert {:ok, %Agent{state: %{}}} = module.new_agent(id: "default-owner")
     assert {:ok, %Instance{}} = module.new(id: "default-topology")
@@ -189,7 +189,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
       end
     )
 
-    assert %Agent{name: "attribute_options"} = module.agent()
+    assert %Agent{name: "attribute_options"} = module.definition()
     assert Enum.map(module.topology().agents, & &1.key) == ["worker"]
   end
 
@@ -216,7 +216,7 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     assert %Agent{
              name: "map_options",
              description: "Topology owner"
-           } = module.agent()
+           } = module.definition()
 
     assert [%{key: "events"}] = module.topology().resources
   end

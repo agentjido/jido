@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.DirectiveContext do
   The narrow runtime context for post-commit Directive handling.
 
   It contains only the source Agent id, the turn Signals, and the transient
-  context prepared for that Turn.
+  context admitted for that Turn.
   """
 
   @schema Zoi.struct(
@@ -13,9 +13,9 @@ defmodule Jido.AgentServer.DirectiveContext do
                 Zoi.string(description: "Optional source Turn identifier") |> Zoi.optional(),
               agent_id: Zoi.string(description: "Source Agent identifier"),
               source_signal: Zoi.any(description: "Signal received by the Server"),
-              signal: Zoi.any(description: "Signal after Plugin preparation"),
+              signal: Zoi.any(description: "Signal after live admission"),
               turn_context:
-                Zoi.map(description: "Prepared transient Turn context") |> Zoi.default(%{})
+                Zoi.map(description: "Admitted transient Turn context") |> Zoi.default(%{})
             }
           )
 

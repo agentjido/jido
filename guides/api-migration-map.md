@@ -45,7 +45,7 @@ the module count above. Migrate them as part of the same application change:
 | An Action result can be a state patch. | The selected executable returns the complete next domain state. |
 | A Strategy owns command policy and progress. | Actions and Flows own domain work. Plugins own admission and runtime capabilities. |
 | Plugin options declare metadata, routes, schedules, and state. | The Agent declares Plugin options and routes. Each Plugin declares its state and Directive contracts. |
-| Server state and status structs expose runtime detail. | Public queries return the Agent, a narrow status, children, Plugin state, or a snapshot. |
+| Server state and status structs expose runtime detail. | Public queries return the Agent, a narrow status, children, one Plugin-owned field, or a snapshot. |
 | Pods and WorkerPool manage mutable groups. | Topology declares a static system. Application code owns dynamic capacity policy. |
 | Storage combines Agent checkpoints and Thread storage. | Persistence stores versioned Agent checkpoints. Thread storage belongs to the application. |
 
@@ -97,13 +97,13 @@ identity and state.
 | --- | --- | --- |
 | `new/1` generic constructor creates an instance | `new/1` | Creates and validates a neutral definition. It does not create an instance. |
 | `MyAgent.new/1` returns an Agent | `MyAgent.new/1` returns `{:ok, agent}` | Match the tagged result, or use `new!/1` where a raised error is correct. |
-| No definition function | `MyAgent.agent/0`, `definition/1`, `definition?/1` | These functions expose the declared, neutral Agent. |
+| No definition function | `MyAgent.definition/0`, `definition/1`, `definition?/1` | These functions expose the declared, neutral Agent. |
 | No explicit instance boundary | `instantiate/2`, `instantiate!/2`, `instance?/1` | Instance creation adds identity and validated complete state. |
 | `cmd(agent, action_or_instruction, opts)` returns `{agent, directives}` | `cmd(agent, signal, opts)` returns `{:ok, candidate, directives}` or `{:error, reason}` | Build a Signal and route it to one Action or Flow. |
 | `set/2` deep-merges state without full validation | `set/2` merges domain fields and validates the complete next state | Plugin-owned keys are protected. |
 | `validate(agent, opts)` | `validate/1`, `validate_definition/1`, `validate_instance/1` | Remove the V2 `:strict` option and select the required value boundary. |
-| `schema/0` accepts NimbleOptions or Zoi | `schema/0`, `domain_schema/0`, `complete_schema/0` use static Zoi data schemas | `complete_schema/0` includes Plugin-owned state. |
-| No portable Agent map function | `to_map/1` | Use this for a complete portable data view. Use `Jido.Agent.Codec` for an authoring document and `Jido.Persistence` for a checkpoint. |
+| `schema/0` accepts NimbleOptions or Zoi | `schema/0`, `domain_schema/0`, `complete_schema/0` use static Zoi data schemas | `complete_schema/0` includes Plugin-owned fields in the Agent state map. |
+| Ad hoc Agent map conversion | No general Agent map helper | Use `Jido.Agent.Codec` for a portable definition document and the checkpoint boundary for identity and live state. Read public struct fields directly for local inspection. |
 | `on_before_cmd/2`, `on_after_cmd/3` | `handle_signal/2`, route declarations, and Plugin callbacks | Do not make a callback-for-callback port. Put domain work in Actions or Flows. |
 | `signal_routes/0..1` | `routes/0` and the `routes do` block | Routes are part of the Agent definition. |
 | `checkpoint/2`, `restore/2` | Same callback names, plus public `checkpoint/2` and `restore/3` functions | The stored envelope and validation contract changed. V2 records are not V3 records. |
@@ -116,9 +116,9 @@ identity and state.
 | `name/0`, `description/0`, `schema/0` | Same names | `schema/0` is now the declared domain data schema. |
 | `category/0`, `tags/0`, `vsn/0` | `metadata/0` | Move portable application metadata into the metadata map. |
 | `plugins/0`, `plugin_specs/0` | `plugins/0` | V3 returns canonical ordered declarations. The internal Spec is not a public authoring API. |
-| `plugin_state(agent, plugin)` | `Jido.AgentServer.plugin_state/3` or a Plugin runtime's `Jido.Plugin.state/2` | Read committed Plugin state from the live owner. Direct Agent state still contains the portable owned key. |
+| `plugin_state(agent, plugin)` | `Jido.AgentServer.plugin_state/3` or a Plugin runtime's `Jido.Plugin.state/2` | Read one committed Plugin-owned field from the live Agent. This is a selected view of the complete state map, not a second state store. |
 | `strategy/0`, `strategy_opts/0`, `strategy_snapshot/1` | No direct functions | Port execution to Actions or Flows and read live Turn state through the Server. |
-| `signal_routes/0..1` | `routes/0`, `route_action/1` | An inline route can expose its generated Action module when needed for tests or codecs. |
+| `signal_routes/0..1` | `routes/0`, `route_action!/1` | An inline route can expose its generated Action module when needed for tests or codecs. |
 | `new/1` | `new/1`, `new!/1` | The non-raising form now returns a tagged result. |
 | `cmd/2..3` with an Action, Instruction, or list | `cmd/2..3` with one Signal | One Signal selects one executable. Put an Action sequence in one Flow. |
 | `set/2`, `validate/1..2` | `Jido.Agent.set/2`, `validate/1`, `validate_definition/1`, or `validate_instance/1` | These functions are no longer generated on each Agent module. |
@@ -138,7 +138,7 @@ identity and state.
 | `Jido.Agent.StateOp.SetPath` | **Removed.** Update the nested value in application code, then return the complete state. |
 | `Jido.Agent.StateOp.DeletePath` | **Removed.** Update the nested value in application code, then return the complete state. |
 | `Jido.Agent.StateOps` | **Removed.** There is no operation interpreter in the V3 Agent contract. |
-| `Jido.Agent.Strategy` | **Removed.** Split domain execution, live admission, Plugin state, and post-commit work across their V3 owners. |
+| `Jido.Agent.Strategy` | **Removed.** Split domain execution, live admission, Plugin-owned field updates, and post-commit work across their V3 owners. |
 | `Jido.Agent.Strategy.Direct` | **Removed.** Signal routing and `Jido.Exec` supply the standard execution path. |
 | `Jido.Agent.Strategy.FSM` | **Removed.** Keep state-machine data in the Agent schema and make transitions explicit Actions or Flows. |
 | `Jido.Agent.Strategy.FSM.Machine` | **Removed.** Use an application state-machine value if the domain needs one. |
@@ -154,10 +154,10 @@ identity and state.
 | `Jido.Agent.Builder` | Builds definitions and instances in ordered programmatic steps. | Use it when the definition comes from application data rather than one module. |
 | `Jido.Agent.Codec` | Encodes and decodes versioned authoring documents. | Use it for trusted Agent definition transport, not for Agent checkpoints. |
 | `Jido.Agent.Codec.Registry` | Maps stable trusted IDs to modules, schemas, values, and executables. | Use explicit allowlists where V2 used Discovery or dynamic module names. |
-| `Jido.Agent.Command` | Carries the Agent, Signal, and caller context into selection and live admission. | New Agent facets receive `Jido.Agent.Plugin.Preparation`. The mixed compatibility `prepare/2` and Agent Server `admit/3` still use Command. Do not store it as Agent state. |
+| `Jido.Agent.Command` | Carries the Agent, Signal, and caller context through live admission. | Agent Server `admit/3` uses Command. Direct `cmd/3` does not create one. Do not store it as Agent state. |
 | `Jido.Agent.Extension` | Lowers extra declarative Agent DSL entities into Core configuration. | Use it for static authoring extensions. It does not add a runtime. |
 | `Jido.Agent.Turn` | Declares one selected executable, its input, and the unchanged source Signal. | Most applications observe it through the Server, not by constructing it. |
-| `Jido.Agent.Turn.Outcome` | Gives one stable terminal Turn result. | Use it in error policy and observation code. It is not domain history. |
+| `Jido.Agent.Turn.Outcome` | Gives one stable terminal Turn result. | The Agent Server produces it for error policy and observation code. It has no public authoring API and is not domain history. |
 
 ## Map the actor runtime
 
@@ -223,7 +223,7 @@ failure behavior.
 | `emit_to_parent/3` | `Jido.Agent.Directive.EmitToParent` and `emit_to_parent/1` | The runtime resolves the current logical parent. Do not read a parent from Agent state. |
 | No child-specific emit struct | `Jido.Agent.Directive.EmitToChild` and `emit_to_child/2` | Address a tracked child by tag. |
 | `Jido.Agent.Directive.Cron` | `Jido.Plugin.Scheduler.Cron` | Declare the Scheduler Plugin first. |
-| `Jido.Agent.Directive.CronCancel` | `Jido.Plugin.Scheduler.Cancel` | Cancellation updates Scheduler Plugin state. |
+| `Jido.Agent.Directive.CronCancel` | `Jido.Plugin.Scheduler.Cancel` | Cancellation updates the Scheduler-owned Agent field. |
 | `Jido.Agent.Directive.Schedule` | `Jido.Plugin.Scheduler.Schedule` | The scheduled payload is a Signal. |
 | `Jido.Agent.Directive.RunInstruction` | A routed Action or Flow | There is no post-commit Instruction execution Directive. Send a later Signal when work must be a later Turn. |
 | `Jido.Agent.Directive.StartSensor` | `Jido.Plugin.SensorManager.Start` | Port the old Sensor module to the V3 child contract. |
@@ -255,7 +255,7 @@ required V3 Directive.
 | `Jido.Actions.Lifecycle.StopSelf` | Use `Jido.Agent.Directive.stop/1`. |
 | `Jido.Actions.Scheduling` | **Removed container module.** Declare `Jido.Plugin.Scheduler`. |
 | `Jido.Actions.Scheduling.ScheduleSignal` | Return `Jido.Plugin.Scheduler.schedule/2` from an application Action. |
-| `Jido.Actions.Scheduling.ScheduleTimeout` | Schedule an explicit timeout Signal. Keep timeout identity in domain or Plugin state when it matters. |
+| `Jido.Actions.Scheduling.ScheduleTimeout` | Schedule an explicit timeout Signal. Keep timeout identity in a domain or Plugin-owned Agent field when it matters. |
 | `Jido.Actions.Scheduling.ScheduleCron` | Return `Jido.Plugin.Scheduler.cron/4`. |
 | `Jido.Actions.Scheduling.CancelCron` | Return `Jido.Plugin.Scheduler.cancel/1`. |
 | `Jido.Actions.Status` | **Removed container module.** V3 does not reserve a domain status convention. |
@@ -289,11 +289,11 @@ needs them.
 | --- | --- |
 | `plugin_spec/1` | Callback-free `Jido.Plugin` package manifest and its selected owner facets |
 | `mount/2` | Static defaults in Agent-facet `state_spec/1`; live setup in Agent-Server-facet `child_spec/1` |
-| `handle_signal/2` | Agent-facet `prepare/2`, Agent-Server-facet `admit/3`, or explicit Agent routing |
-| `prepare_signal/2` | Agent-facet `prepare/2` for pure changes; Agent-Server-facet `admit/3` for live checks |
-| `prepare_action/3` | Agent-facet `prepare/2` with bounded Preparation or Agent-Server-facet `admit/3` with Command |
+| `handle_signal/2` | Action or Flow logic, Agent-Server-facet `admit/3`, or explicit Agent routing |
+| `prepare_signal/2` | Action or Flow input handling; Agent-Server-facet `admit/3` for live checks |
+| `prepare_action/3` | Action or Flow input handling, or Agent-Server-facet `admit/3` with Command |
 | `prepare_emit/2` | Agent-Server-facet `prepare_dispatch/4` with `Jido.Plugin.SignalContext` |
-| `transform_result/3` | Domain change in the Action or Flow; owned Plugin state and Directive change in Agent-facet `contribute/2` |
+| `transform_result/3` | Domain change in the Action or Flow; Plugin-owned field change in Agent-facet `update_state/3` |
 | `subscriptions/2` | `Jido.Plugin.Bus` or `Jido.Plugin.SensorManager` |
 | `signal_routes/1` | Agent routes |
 | `on_checkpoint/2`, `on_restore/2` | Persistence-facet `dump/3` and `load/3` for one paired owned value; runtime reconstruction stays in the Agent Server facet |
@@ -316,10 +316,7 @@ needs them.
 
 | V3 module | Purpose |
 | --- | --- |
-| `Jido.Agent.Plugin` | Owns pure preparation, one state value, and owned Directives. |
-| `Jido.Agent.Plugin.Preparation` | Gives an Agent facet its declared domain projection, owned state and input, and source and effective Signals. |
-| `Jido.Agent.Plugin.Transition` | Gives an Agent facet bounded before and after projections after executable success. |
-| `Jido.Agent.Plugin.Contribution` | Returns unchanged or replaced owned state plus appended owned Directives. |
+| `Jido.Agent.Plugin` | Owns one state value and validates and reduces owned Directives. |
 | `Jido.AgentServer.Plugin` | Owns live admission, runtime lifecycle callbacks, outbound preparation, and post-commit dispatch. |
 | `Jido.Persistence.Plugin` | Converts one paired owned-state value without storage or commit authority. |
 | `Jido.Persistence.Plugin.Context` | Gives a Persistence facet package and record versions, direction, and reason. |
@@ -329,7 +326,7 @@ needs them.
 | `Jido.Plugin.Manifest` | Selects owner facets and maps common static options. |
 | `Jido.Plugin.Init` | Gives a Plugin runtime its owner, module, and declared options. It is not a state snapshot. |
 | `Jido.Plugin.SignalContext` | Gives outbound Signal preparation a bounded context. |
-| `Jido.Plugin.DirectiveContext` | Gives post-commit Plugin dispatch its Agent and Plugin state view. |
+| `Jido.Plugin.DirectiveContext` | Gives post-commit Plugin dispatch the value of its owned Agent state field. |
 | `Jido.Plugin.Codec` | Encodes Plugin declarations through the trusted Agent codec Registry. |
 | `Jido.Plugin.Audit` | Commits selected domain audit records in Plugin-owned state. |
 | `Jido.Plugin.Audit.Record` | Holds one portable audit record. |
@@ -346,7 +343,7 @@ needs them.
 | `Jido.Plugin.Scheduler.Enqueue` | Records one due occurrence through an Agent Turn before later business work. |
 | `Jido.Plugin.Scheduler.Occurrence` | Carries stable occurrence identity for delivery and recovery. |
 | `Jido.Plugin.Scheduler.Acknowledge` | Commits occurrence acknowledgement with domain state. |
-| `Jido.Plugin.SensorManager` | Keeps desired resource processes aligned with Plugin state. |
+| `Jido.Plugin.SensorManager` | Keeps desired resource processes aligned with its Plugin-owned Agent field. |
 | `Jido.Plugin.SensorManager.Init` | Gives one sensor process its Agent owner and configuration. |
 | `Jido.Plugin.SensorManager.Start` | Adds or replaces one desired sensor process. |
 | `Jido.Plugin.SensorManager.Stop` | Removes one desired sensor process. |
@@ -390,7 +387,7 @@ definition while it runs.
 | V2 module | V3 direction |
 | --- | --- |
 | `Jido.Await` | **Removed.** Replace `alive?/1` with `AgentServer.alive?/1`; replace `completion/3` with a call or request; coordinate `all/3` and `any/3` in the application; use `children/2` for child views; and use `cancel/2` or `cancel_turn/3` for cancellation. Do not map `await_ready/2` to V2 completion. |
-| `Jido.Scheduler` | **Replaced** by `Jido.Plugin.Scheduler`. Replace `run_every/3..5`, cron-spec helpers, and `cancel/1` with Scheduler Plugin Directives and Agent routes. Scheduler state belongs to the Agent Plugin state. |
+| `Jido.Scheduler` | **Replaced** by `Jido.Plugin.Scheduler`. Replace `run_every/3..5`, cron-spec helpers, and `cancel/1` with Scheduler Plugin Directives and Agent routes. Scheduler state belongs in the Scheduler-owned field of the complete Agent state. |
 | `Jido.Sensor` | **Removed behavior.** Its `init/2`, `handle_event/2`, and `terminate/2` callbacks do not have a callback-for-callback port. Port the resource to a standard OTP child that accepts `Jido.Plugin.SensorManager.Init`. |
 | `Jido.Sensor.Runtime` | **Replaced** by the SensorManager-owned child and its application module. |
 | `Jido.Sensor.Spec` | **Replaced** by a SensorManager tag, module, and portable config map. |

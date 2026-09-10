@@ -135,7 +135,8 @@ end
   end)
 ```
 
-The desired sensor set is portable Plugin state. The Sensor Manager runtime
+The desired sensor set is in a portable Plugin-owned Agent field. The Sensor
+Manager runtime
 owns the PIDs and restarts the sensor while its tag remains desired.
 
 ## Stop The Example

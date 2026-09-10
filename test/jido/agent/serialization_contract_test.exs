@@ -38,7 +38,7 @@ defmodule Jido.Agent.SerializationContractTest do
   end
 
   test "Agent authoring JSON declares its type and rejects the old type" do
-    assert {:ok, document, registry} = Codec.encode(Probe.agent())
+    assert {:ok, document, registry} = Codec.encode(Probe.definition())
     assert document["type"] == "jido.agent"
     assert {:ok, _definition} = Codec.decode(document, registry)
     assert {:error, _reason} = Codec.decode(%{document | "type" => "jido.actor"}, registry)

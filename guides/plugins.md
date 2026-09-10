@@ -17,8 +17,8 @@ end
 Select only the facets that the package needs. Each facet has one owner and one
 bounded authority:
 
-- `Jido.Agent.Plugin` prepares Turn input and contributes owned state and
-  Directives.
+- `Jido.Agent.Plugin` validates owned Directives and updates one owned state
+  value.
 - `Jido.AgentServer.Plugin` handles live admission, one optional permanent
   runtime root, readiness, outbound Signal preparation, and post-commit work.
 - `Jido.Persistence.Plugin` converts one paired owned-state value without
@@ -26,9 +26,9 @@ bounded authority:
 - `Jido.Topology.Plugin` contributes static canonical Topology entries without
   live-control authority.
 
-The Action cannot change protected Plugin keys. Each Agent facet receives only
-its declared domain projection and its owned state and input. The selected
-executable reads package inputs from `context.plugin_inputs`.
+The Action cannot change protected Plugin keys. After execution, each Agent
+facet receives its current owned state and only its owned Directives. It
+returns the complete next owned state.
 
 The Agent Server owns all runtime processes and tasks. It runs Directive work
 after commit. A failed dispatch does not undo the commit. Supplying committed
@@ -43,9 +43,6 @@ give the Plugin live-control authority. Instance planning applies Topology
 contributions in stable Agent, group, and Plugin declaration order. It validates
 the combined graph before activation and keeps generated entries out of the
 source definition.
-
-`use Jido.Plugin` with no options keeps the mixed compatibility behavior for
-current built-ins. New packages should use owner facets.
 
 See [Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md),
 [Plugin-Owned State](plugin-state.md), and

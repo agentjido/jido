@@ -112,7 +112,7 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     refute_received :directive_validated
     assert ID.valid?(context.turn_id)
     assert context.source_signal.source == "/test"
-    assert context.effective_signal.source == "/plugin-prepared"
+    assert context.effective_signal.source == "/test"
     refute Map.has_key?(context, :agent)
   end
 

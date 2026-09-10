@@ -222,7 +222,7 @@ active records remain readable through their earlier restore path.
 - [x] Logical deletion fences delayed writers and concurrent newer commits.
 - [x] Legacy format-1 active records remain readable.
 - [x] Agent definition revision is checked before restore.
-- [x] Default Plugin state conversion stays within the paired owner slice.
+- [x] Default Plugin-owned field conversion stays within the paired owner value.
 - [x] Complete custom checkpoints bypass Plugin conversion.
 - [x] ETS, File, Redis, Ecto, and Bedrock pass one shared get-and-CAS conformance suite.
 - [x] Stable Ref key migration rules are implemented in seam 09.

@@ -59,7 +59,7 @@ defmodule JidoTest.Examples.LLM.ToolCallTest do
 
     assert {:error, _} =
              Jido.Exec.run(
-               Jido.Examples.ToolCall.Search,
+               Jido.Examples.LLM.SearchTool,
                %{id: "x", query: [], operation: :read},
                %{tools: client(tools)},
                task_supervisor: Jido.task_supervisor_name(jido)

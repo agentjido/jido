@@ -6,7 +6,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
   alias Jido.Agent.Directive.{EmitToChild, SpawnAgent}
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.CausalTrace, as: Agent
-  alias Jido.Examples.TurnObservation.EventProbe
+  alias Jido.Examples.Runtime.EventProbe
   alias Jido.Tracing.Trace
   alias JidoTest.RemoteChildFixtures, as: Fixtures
 
@@ -35,9 +35,9 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
   test "work and result Turns retain one trace and distinct causal spans", c do
     with_events(c, fn events, _server, _probe ->
-      [parent] = turns(events, "causal.begin")
-      children = turns(events, "causal.compute")
-      results = turns(events, "causal.result")
+      [parent] = turns(events, "examples.runtime.causal_trace.begin")
+      children = turns(events, "examples.runtime.causal_trace.compute")
+      results = turns(events, "examples.runtime.causal_trace.result")
       assert length(children) == 2
       assert length(results) == 2
       all = [parent | children ++ results]
@@ -62,7 +62,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
   test "child-start Turns retain the trace of the spawning parent Turn", c do
     with_events(c, fn events, _server, _probe ->
-      [parent] = turns(events, "causal.begin")
+      [parent] = turns(events, "examples.runtime.causal_trace.begin")
       started = turns(events, "jido.agent.child.started")
       assert length(started) == 2
 
@@ -79,7 +79,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
   test "child activation and notification expose the cause without changing source identity", c do
     with_events(c, fn events, _server, _probe ->
-      [parent] = turns(events, "causal.begin")
+      [parent] = turns(events, "examples.runtime.causal_trace.begin")
       started = turns(events, "jido.agent.child.started")
 
       activations =
@@ -247,7 +247,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
   test "a later child command uses its own trace and an explicit retry retains its cause", c do
     with_events(c, fn events, server, probe ->
-      [creation] = turns(events, "causal.begin")
+      [creation] = turns(events, "examples.runtime.causal_trace.begin")
       child = Server.children(server).left
       # The caller supplies the trace for its own retry. Agents do not invent it.
       original = Trace.new_root()
@@ -266,11 +266,11 @@ defmodule JidoTest.Tracing.CausalTraceTest do
           events =
             Enum.filter(EventProbe.events(probe), &(Enum.take(&1.event, 2) == [:jido, :agent]))
 
-          if Enum.any?(turns(events, "causal.compute"), &(&1.signal_id == independent.id)),
+          if Enum.any?(turns(events, "examples.runtime.causal_trace.compute"), &(&1.signal_id == independent.id)),
             do: events
         end)
 
-      observed = Map.new(turns(events, "causal.compute"), &{&1.signal_id, &1})
+      observed = Map.new(turns(events, "examples.runtime.causal_trace.compute"), &{&1.signal_id, &1})
       failure = observed[failed.id]
       retried = observed[retry.id]
       fresh = observed[independent.id]

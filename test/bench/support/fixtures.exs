@@ -23,7 +23,7 @@ defmodule JidoCoreBench.PreparePlugin do
   @moduledoc false
   use Jido.Plugin
   @impl true
-  def prepare(command, _opts), do: {:ok, command}
+  def state_spec(_opts), do: :none
 end
 
 defmodule JidoCoreBench.AdmitPlugin do
@@ -40,7 +40,7 @@ end
 defmodule JidoCoreBench.Fixtures do
   @moduledoc false
   alias Jido.Agent, as: CoreAgent
-  alias Jido.Agent.Command.Runner
+  alias Jido.Agent.Runner
   alias JidoCoreBench.{Add, Fail, PreparePlugin}
 
   @schema Zoi.object(%{

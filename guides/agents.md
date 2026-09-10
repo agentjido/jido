@@ -1,6 +1,6 @@
 # Agent values and state
 
-An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.agent()` or
+An Agent definition has `id: nil` and `state: nil`. Call `MyAgent.definition()` or
 `Jido.Agent.new/1` to create a definition. Call `MyAgent.new/1` or
 `Jido.Agent.instantiate/2` to create an instance. The bang forms raise on error.
 Instance options contain only `:id` and `:state`.
@@ -32,4 +32,4 @@ Duplicate extensions, unclaimed entities and invalid callback results fail.
 
 Keep this work static. Do not start a process, run an Action, or contact a
 service from a lowerer. Reuse the same semantic lowerer for data and Builder
-frontends. Extensions do not change the Agent runtime or Plugin state rules.
+frontends. Extensions do not change the Agent runtime or Plugin-owned field rules.

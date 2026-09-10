@@ -80,7 +80,7 @@ An ecosystem package must not:
 - read or change private AgentServer state;
 - send private AgentServer messages;
 - require a generated supervisor or Registry name;
-- change Agent or Plugin state outside Turn evaluation;
+- change any field in the complete Agent state outside Turn evaluation;
 - dispatch runtime-owned work before commit;
 - treat a PID or OTP name as durable Agent identity;
 - depend on an ETS table layout.
@@ -98,7 +98,7 @@ move or restriction needs an approved migration with compatibility evidence.
 
 Plugin runtime resources do not belong in checkpoints. Keep processes,
 connections, watchers, and worker pools in the supervised runtime. Keep only
-portable configuration and rebuild data in Plugin state.
+portable configuration and rebuild data in a Plugin-owned Agent field.
 
 A Persistence Plugin facet can convert only its paired owned-state value in the
 default checkpoint path. A complete custom Agent checkpoint bypasses this

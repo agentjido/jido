@@ -2,7 +2,6 @@ defmodule Jido.Plugin.RuntimeTest do
   use ExUnit.Case, async: true
 
   alias Jido.Agent
-  alias Jido.Agent.Command
   alias Jido.Plugin
   alias Jido.Signal
 
@@ -13,13 +12,6 @@ defmodule Jido.Plugin.RuntimeTest do
     def run(%{amount: amount}, %{agent_state: state}) do
       {:ok, %{state | count: state.count + amount}}
     end
-  end
-
-  defmodule MiddlewareOnlyPlugin do
-    use Jido.Plugin
-
-    @impl Plugin
-    def prepare(%Command{} = command, _opts), do: {:ok, command}
   end
 
   defmodule RuntimePlugin do
@@ -190,10 +182,6 @@ defmodule Jido.Plugin.RuntimeTest do
     %{agent: agent, agent_host: agent_host, init: init}
   end
 
-  test "middleware-only Plugins add no runtime child", %{init: init} do
-    assert {:ok, []} = Plugin.child_specs(init, [MiddlewareOnlyPlugin])
-  end
-
   test "public Plugin runtime structs expose Zoi schemas" do
     assert %Zoi.Types.Struct{module: Plugin.Init} = Plugin.Init.schema()
 
@@ -308,7 +296,7 @@ defmodule Jido.Plugin.RuntimeTest do
   test "rejects a repeated Plugin module", %{init: init} do
     declarations = [
       {RuntimePlugin, test: self(), label: :first},
-      MiddlewareOnlyPlugin,
+      ProcessPlugin,
       {RuntimePlugin, test: self(), label: :second}
     ]
 

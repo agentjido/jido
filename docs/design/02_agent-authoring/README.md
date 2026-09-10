@@ -8,10 +8,10 @@ Jido supports Agent modules, Spark blocks, direct map and keyword data,
 Builder, and Codec documents. These forms use one Agent constructor, but some
 source features exist only for modules. The aligned target keeps all
 supported forms. It defines parity as equality of the canonical Agent
-definition, makes `agent/0` the module authority, keeps generated interfaces as
+definition, makes `definition/0` the module authority, keeps generated interfaces as
 module API, and gives Codec a clear portable subset. The current implementation
 now preserves the Agent `vsn`, starts Builder module input from
-`agent/0`, encodes instances from their neutral definitions, and publishes the
+`definition/0`, encodes instances from their neutral definitions, and publishes the
 pure data extension lowerer. One requirement-mapped suite proves the common
 definition and instance boundary for keyword-only and Spark-block modules. The
 contract and its implementation evidence are approved.
@@ -35,7 +35,7 @@ review.
 | Area | Current | Target |
 | --- | --- | --- |
 | Forms | Module, Spark, direct data, Builder, and Codec are supported. | Keep all forms and one canonical definition result. |
-| Module authority | `agent/0` is canonical. Builder module input reads it. The private config can remain in input form. | Keep `agent/0` as canonical and `__agent_config__/0` as private compiler data. |
+| Module authority | `definition/0` is canonical. Builder module input reads it. The private config can remain in input form. | Keep `definition/0` as canonical and `__agent_config__/0` as private compiler data. |
 | Interfaces | `define` generates Signal and live-call helpers only on modules. | Keep module-only helpers outside definition parity. |
 | Codec | Static data uses a trusted Registry and a closed JSON format. Instance encoding derives the neutral definition and does not parse live state. | Keep definition-first encoding. Keep nonportable source forms valid but not encodable. |
 | Extensions | Spark and data users can call the documented pure lowerer. Builder and Codec accept lowered data only. | Keep one pure data-lowering boundary and keep runtime ownership out. |

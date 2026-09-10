@@ -17,7 +17,6 @@ defmodule Jido.Topology.Codec do
   1 MiB per string. The authoring format has no database dependency.
   """
   alias Jido.Agent.Authoring
-  alias Jido.Agent.Codec, as: AgentCodec
   alias Jido.Agent.Codec.{Data, Registry}
   alias Jido.Topology
   alias Jido.Topology.Codec.Value
@@ -149,10 +148,10 @@ defmodule Jido.Topology.Codec do
   defp fields(:exports), do: [:key, :kind, :from]
 
   defp document_header(%{"type" => "jido.topology", "version" => 1} = document),
-    do: AgentCodec.object(document, @v1_fields)
+    do: Data.object(document, @v1_fields)
 
   defp document_header(%{"type" => "jido.topology", "version" => 2} = document),
-    do: AgentCodec.object(document, @fields)
+    do: Data.object(document, @fields)
 
   defp document_header(_), do: Authoring.error("Unknown topology document type or version")
 

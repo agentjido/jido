@@ -26,7 +26,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert id == occurrence.id
     assert [%{occurrence: ^occurrence}] = completed.state.ticks
     assert completed.state.scheduler.cron["job-1"].pending == nil
-    assert {:error, :stale_or_invalid_schedule_occurrence} = Example.cmd(completed, tick)
+    assert_stale(Example.cmd(completed, tick))
     assert {:ok, repeated, [_]} = enqueue(completed, @first)
     assert repeated == completed
   end
@@ -60,7 +60,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
 
     assert replacement.state.generation == 2
     assert replacement.state.scheduler.cron["job-1"].pending == nil
-    assert {:error, :stale_or_invalid_schedule_occurrence} = Example.cmd(replacement, tick)
+    assert_stale(Example.cmd(replacement, tick))
     assert {:ok, ^replacement, [_]} = enqueue(replacement, @first)
     assert {:ok, next, [_]} = enqueue(replacement, @first, 2)
     assert {:ok, old} = Scheduler.occurrence(tick)
@@ -74,7 +74,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     tick = pending.state.scheduler.cron["job-1"].pending
     assert {:ok, cancelled, [_]} = Example.cmd(pending, Example.cancel_schedule_signal!("job-1"))
     assert cancelled.state.scheduler.cron == %{}
-    assert {:error, :stale_or_invalid_schedule_occurrence} = Example.cmd(cancelled, tick)
+    assert_stale(Example.cmd(cancelled, tick))
     assert {:ok, ^cancelled, [_]} = enqueue(cancelled, @first)
 
     assert {:ok, recreated, [_]} =
@@ -118,8 +118,7 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
     assert {:ok, pending, [_]} = enqueue(armed, @first)
     tick = pending.state.scheduler.cron["job-1"].pending
 
-    assert {:error, :stale_or_invalid_schedule_occurrence} =
-             Example.cmd(pending, %{tick | data: %{job_id: "other"}})
+    assert_stale(Example.cmd(pending, %{tick | data: %{job_id: "other"}}))
 
     assert {:error, :unknown_schedule_occurrence} =
              Scheduler.update_state(
@@ -141,6 +140,13 @@ defmodule Jido.Plugin.Scheduler.DurableTest do
                Scheduler.cron("job-1", "* * * * *", signal, delivery: :durable),
                []
              )
+  end
+
+  defp assert_stale(result) do
+    assert {:error,
+            %Jido.Action.Error.ExecutionFailureError{
+              details: %{reason: :stale_or_invalid_schedule_occurrence}
+            }} = result
   end
 
   test "malformed external control directives remain errors" do

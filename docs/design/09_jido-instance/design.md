@@ -252,7 +252,7 @@ partition.
 instance facade shall return `nil` on the current compatibility lookup path.
 
 `INST-REQ-048`: When a Ref-first inspection operation resolves a live Server,
-the instance facade shall delegate Agent, Plugin state, status, snapshot,
+the instance facade shall delegate Agent, `plugin_state`, status, snapshot,
 children, readiness, and debug inspection to supported Agent Server operations.
 
 `INST-REQ-049`: While current debug controls remain supported, the generated

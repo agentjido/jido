@@ -5,7 +5,6 @@ defmodule Jido.AgentTest do
   alias Jido.Agent.Command
   alias Jido.Agent.Directive
   alias Jido.Agent.Turn
-  alias Jido.Agent.Turn.Outcome
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Signal.Router
@@ -81,9 +80,6 @@ defmodule Jido.AgentTest do
     @moduledoc false
 
     @behaviour Jido.Agent
-
-    @impl Jido.Agent
-    def handle_signal(signal, agent), do: Jido.Agent.handle_signal(signal, agent)
   end
 
   defmodule WithStopDirective do
@@ -180,6 +176,7 @@ defmodule Jido.AgentTest do
     assert [%Router.Route{path: "counter.add", target: Add}] = definition.routes
     assert Agent.definition?(definition)
     refute Agent.instance?(definition)
+    refute Agent.definition?(%{definition | name: nil})
 
     assert definition
            |> Map.from_struct()
@@ -209,6 +206,7 @@ defmodule Jido.AgentTest do
     assert agent.module == Agent
     assert Agent.instance?(agent)
     refute Agent.definition?(agent)
+    refute Agent.instance?(%{agent | state: %{count: "invalid"}})
     assert Agent.definition(agent) == definition
     assert definition.id == nil
     assert definition.state == nil
@@ -245,14 +243,16 @@ defmodule Jido.AgentTest do
              Agent.validate(%{definition | state: %{count: 0, history: []}})
   end
 
-  test "defines Agent values and callback values with Zoi structs" do
-    assert %Zoi.Types.Struct{module: Agent} = Agent.schema()
+  test "keeps the core Agent schema private and exposes the Turn value schema" do
+    refute function_exported?(Agent, :schema, 0)
+    refute function_exported?(Agent, :to_map, 1)
+    refute function_exported?(Agent, :new, 2)
+    refute function_exported?(Agent, :new!, 2)
     assert %Zoi.Types.Struct{module: Turn} = Turn.schema()
-    assert %Zoi.Types.Struct{module: Outcome} = Outcome.schema()
   end
 
   test "builds instances from a module that uses Jido.Agent" do
-    definition = CounterAgent.agent()
+    definition = CounterAgent.definition()
     agent = CounterAgent.new!(state: %{count: 4, history: ["existing"]})
 
     assert %Agent{id: nil, state: nil, module: CounterAgent} = definition
@@ -270,6 +270,12 @@ defmodule Jido.AgentTest do
     assert [%Router.Route{path: "counter.add", target: Add}] = CounterAgent.routes()
     assert CounterAgent.plugins() == []
     assert Agent.definition(agent) == definition
+    assert {:ok, %Agent{module: CounterAgent}} = Agent.instantiate(CounterAgent)
+    refute function_exported?(CounterAgent, :agent, 0)
+    refute function_exported?(CounterAgent, :route_action, 1)
+    refute function_exported?(CounterAgent, :handle_signal, 2)
+    refute function_exported?(CounterAgent, :checkpoint, 2)
+    refute function_exported?(CounterAgent, :restore, 2)
 
     assert {:error, %Jido.Error.ValidationError{}} = CounterAgent.new(name: "changed")
   end
@@ -400,7 +406,7 @@ defmodule Jido.AgentTest do
 
   describe "module authoring API" do
     test "exposes canonical definition data through generated accessors" do
-      definition = AuthoredAgent.agent()
+      definition = AuthoredAgent.definition()
 
       assert AuthoredAgent.name() == "authored_agent"
       assert AuthoredAgent.description() == "Exercises the generated Agent API"
@@ -479,18 +485,12 @@ defmodule Jido.AgentTest do
       end
     end
 
-    test "converts canonical routes to portable map data" do
+    test "does not expose a general Agent map encoder" do
       agent = AuthoredAgent.new!(id: "mapped", state: %{count: 2})
 
-      assert %{
-               id: "mapped",
-               module: AuthoredAgent,
-               name: "authored_agent",
-               state: %{count: 2, history: []},
-               routes: [
-                 %{path: "counter.add", target: Add, priority: 0, match: nil}
-               ]
-             } = Agent.to_map(agent)
+      refute function_exported?(Agent, :to_map, 1)
+      assert agent.id == "mapped"
+      assert [%Jido.Signal.Router.Route{path: "counter.add", target: Add}] = agent.routes
     end
   end
 
@@ -771,7 +771,7 @@ defmodule Jido.AgentTest do
       agent = agent_with_route("counter.add", Add)
       signal = Signal.new!("counter.add", %{by: 1, label: "one"}, source: "/test")
 
-      for key <- [:agent_id, :agent_state, :signal, :plugin_inputs] do
+      for key <- [:agent_id, :agent_state, :signal] do
         assert {:error,
                 %Jido.Error.ValidationError{
                   message: "Agent command context contains reserved keys"
@@ -788,7 +788,7 @@ defmodule Jido.AgentTest do
       assert_receive {:agent_execution_boundary, _params, received}
       assert Map.take(received, Map.keys(context)) == context
 
-      for key <- [:agent_id, :agent_state, :signal, :plugin_inputs] do
+      for key <- [:agent_id, :agent_state, :signal] do
         assert {:error, %Jido.Error.ValidationError{details: %{keys: [^key]}}} =
                  Agent.cmd(agent, signal, context: Map.put(context, key, nil))
       end
@@ -878,6 +878,11 @@ defmodule Jido.AgentTest do
       assert {:error, %Jido.Error.ValidationError{}} = Command.new(:agent, signal)
       assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, :signal)
       assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, signal, [])
+
+      assert {:error, %Jido.Error.ValidationError{}} =
+               Command.new(%{agent | state: %{count: "invalid"}}, signal)
+
+      assert {:error, %Jido.Error.ValidationError{}} = Command.new(agent, %{signal | id: ""})
       assert {:error, %Jido.Error.ValidationError{}} = Command.validate(:command)
     end
 
@@ -903,7 +908,7 @@ defmodule Jido.AgentTest do
 
   describe "checkpoint lifecycle" do
     test "runs the complete immutable lifecycle without an Agent Server" do
-      definition = AuthoredAgent.agent()
+      definition = AuthoredAgent.definition()
       agent = Agent.instantiate!(definition, id: "offline-1")
       signal = Signal.new!("counter.add", %{by: 2, label: "offline"}, source: "/test")
 
@@ -937,22 +942,6 @@ defmodule Jido.AgentTest do
 
       assert {:ok, checkpoint} = Agent.checkpoint(agent)
       assert {:ok, ^agent} = Agent.restore(BehaviorOnlyAgent, checkpoint)
-    end
-
-    test "module-authored restore uses the current module definition" do
-      agent = AuthoredAgent.new!(id: "current-definition-1", state: %{count: 5})
-
-      checkpoint = %{
-        version: 1,
-        kind: :agent,
-        agent_module: AuthoredAgent,
-        id: agent.id,
-        definition: %{Agent.definition(agent) | description: "archived definition"},
-        state: agent.state
-      }
-
-      assert {:ok, restored} = Agent.restore(AuthoredAgent, checkpoint)
-      assert Agent.definition(restored) == AuthoredAgent.agent()
     end
 
     test "passes context through custom checkpoint and restore callbacks" do

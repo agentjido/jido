@@ -117,6 +117,15 @@ defmodule JidoTest.InstanceTest do
     assert opts[:max_tasks] == 2_000
   end
 
+  test "instance module keeps its module name when runtime options include another name" do
+    other_name = Module.concat(TestInstance, Other)
+    spec = TestInstance.child_spec(name: other_name)
+
+    assert spec.id == TestInstance
+    assert {Jido, :start_link, [opts]} = spec.start
+    assert opts[:name] == TestInstance
+  end
+
   test "invalid application instance configuration reaches the final validator" do
     Application.put_env(:jido_test_instance, TestInstance, :invalid)
 

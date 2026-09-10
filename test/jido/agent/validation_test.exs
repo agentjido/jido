@@ -30,7 +30,7 @@ defmodule Jido.Agent.ValidationTest do
   test "checks Plugin schema composition before routes and metadata" do
     assert {:error,
             %ValidationError{
-              message: "Agent Plugin state key conflicts with the Agent domain schema"
+              message: "Plugin-owned Agent state key conflicts with the domain schema"
             }} =
              Agent.new(
                name: "conflict",

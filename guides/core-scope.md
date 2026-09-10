@@ -118,7 +118,7 @@ Future package names describe possible ownership, not implemented packages:
 The research suite records executable contracts for replacement Init, stable
 namespace identity, durable deletion, the explicit quiescent upgrade boundary,
 validated Agent definition migration, and additive Topology updates. It also
-proves source-Signal route selection and Plugin input isolation. See the current
+proves source-Signal route selection and Plugin-owned state isolation. See the current
 [research test matrix](../test/examples/99_research/README.md).
 The distributed authority example uses an explicit external authority; it does
 not prove that core elects one cluster owner.

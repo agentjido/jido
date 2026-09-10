@@ -37,11 +37,10 @@ defmodule Jido.Agent.Builder do
   def new(module) when is_atom(module) do
     with {:module, ^module} <- Code.ensure_loaded(module),
          true <- function_exported?(module, :__agent_config__, 0),
-         true <- function_exported?(module, :agent, 0),
-         %Agent{} = definition <- module.agent(),
-         true <- Agent.definition?(definition) do
+         true <- function_exported?(module, :definition, 0),
+         %Agent{id: nil, state: nil} = definition <- module.definition() do
       definition
-      |> Agent.to_map()
+      |> Map.from_struct()
       |> Map.drop([:id, :state])
       |> new()
     else
@@ -124,23 +123,23 @@ defmodule Jido.Agent.Builder do
   end
 
   @doc "Builds one neutral Agent definition."
-  @spec build(t()) :: {:ok, Agent.t()} | {:error, Exception.t()}
+  @spec build(t()) :: {:ok, Agent.definition()} | {:error, Exception.t()}
   def build(%__MODULE__{error: error}) when not is_nil(error), do: {:error, error}
 
   def build(%__MODULE__{config: config, reversed_routes: routes}),
     do: Agent.new(Map.put(config, :routes, Enum.reverse(routes)))
 
   @doc "Builds a complete Agent with the supplied instance options."
-  @spec build(t(), map() | keyword()) :: {:ok, Agent.t()} | {:error, Exception.t()}
+  @spec build(t(), map() | keyword()) :: {:ok, Agent.instance()} | {:error, Exception.t()}
   def build(builder, opts) do
     with {:ok, definition} <- build(builder), do: Agent.instantiate(definition, opts)
   end
 
   @doc "Builds a definition or raises its error."
-  @spec build!(t()) :: Agent.t() | no_return()
+  @spec build!(t()) :: Agent.definition() | no_return()
   def build!(builder), do: unwrap!(build(builder))
   @doc "Builds an instance or raises its error."
-  @spec build!(t(), map() | keyword()) :: Agent.t() | no_return()
+  @spec build!(t(), map() | keyword()) :: Agent.instance() | no_return()
   def build!(builder, opts), do: unwrap!(build(builder, opts))
 
   defp put(%__MODULE__{error: error} = builder, _key, _value) when not is_nil(error), do: builder

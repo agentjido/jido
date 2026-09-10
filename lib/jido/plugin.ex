@@ -21,16 +21,18 @@ defmodule Jido.Plugin do
         agent_server: MyApp.Capability.Server,
         option_keys: [agent: [:fields], agent_server: [:endpoint]]
 
-  `use Jido.Plugin` with no manifest options is the supported mixed-callback
-  compatibility form. It keeps the beta contract while packages move callbacks
-  to their owner facets. The compatibility form has complete Command access in
-  `prepare/2` and is not an isolation boundary.
+  A stateful Agent facet owns one top-level field in the complete
+  `Jido.Agent.state` map. Jido does not store Plugin state in a second map.
+  Callback fields and accessors named `plugin_state` expose only the selected
+  value from that owned Agent field.
+
+  `use Jido.Plugin` with no manifest options is the mixed-callback compatibility
+  form. New Plugins must use an owner-facet manifest.
   """
 
   alias Jido.Agent.Command
   alias Jido.Plugin.{DirectiveContext, Init, Manifest, SignalContext, Spec}
 
-  @type result :: {:ok, proposed_state :: map(), directives :: [struct()]} | {:error, term()}
   @type declaration :: module() | {module(), keyword()}
   @type state_spec :: :none | {atom(), Zoi.schema()}
 
@@ -83,11 +85,6 @@ defmodule Jido.Plugin do
     end
   end
 
-  @callback prepare(command :: Command.t(), opts :: keyword()) ::
-              {:ok, Command.t()} | {:error, term()}
-  @callback observes(opts :: keyword()) :: [atom()] | {:error, term()}
-  @callback prepare_turn(preparation :: Jido.Agent.Plugin.Preparation.t(), opts :: keyword()) ::
-              {:ok, Jido.Agent.Plugin.Preparation.t()} | {:error, term()}
   @callback validate_options(opts :: keyword()) ::
               :ok | {:ok, keyword()} | {:error, term()}
   @callback admit(runtime_ref :: term() | nil, command :: Command.t(), opts :: keyword()) ::
@@ -113,9 +110,6 @@ defmodule Jido.Plugin do
   @callback await_ready(runtime_ref :: term(), opts :: keyword()) :: :ok | {:error, term()}
 
   @optional_callbacks validate_options: 1,
-                      prepare: 2,
-                      observes: 1,
-                      prepare_turn: 2,
                       admit: 3,
                       prepare_dispatch: 4,
                       state_spec: 1,
@@ -144,33 +138,22 @@ defmodule Jido.Plugin do
   defdelegate compose_schema(schema, declarations), to: Jido.Agent.Plugin
 
   @doc false
-  def prepare(%Command{} = command, declarations) do
-    with {:ok, command, specs, _inputs} <-
-           Jido.Agent.Plugin.prepare_evaluation(command, command.signal, declarations) do
-      {:ok, command, specs}
-    end
+  def directive_owner(specs, %{__struct__: directive_module}) when is_list(specs) do
+    Enum.find(specs, fn
+      %{agent: %Jido.Agent.Plugin.Spec{directive_modules: modules}} ->
+        directive_module in modules
+
+      _spec ->
+        false
+    end)
   end
 
-  @doc false
-  def prepare_specs(%Command{} = command, specs), do: prepare(command, specs)
+  def directive_owner(_specs, _directive), do: nil
 
   @doc false
-  defdelegate prepare_evaluation(command, source_signal, declarations), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate protect_state(result, original_state, specs), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate update_state(result, specs), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate state_keys(specs), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate directive_owner(specs, directive), to: Jido.Agent.Plugin
-
-  @doc false
-  defdelegate validate_directive(spec, directive), to: Jido.Agent.Plugin
+  def validate_directive(%Jido.Plugin.Spec{agent: agent_spec}, directive) do
+    Jido.Agent.Plugin.validate_directive(agent_spec, directive)
+  end
 
   @doc false
   defdelegate admits?(specs), to: Jido.AgentServer.Plugin

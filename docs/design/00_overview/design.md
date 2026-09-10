@@ -257,8 +257,8 @@ only serialized state and commit owner.
 and Plugin runtime hosts as capability resources.
 
 `OVR-REQ-048`: When a Plugin runtime is replaced, the Plugin runtime boundary
-shall give it one current committed Plugin state value and the matching Agent
-state version.
+shall give it the current value from its owned Agent state field and the
+matching Agent state version.
 
 `OVR-REQ-049`: When a Plugin runtime requests an Agent state change, the Plugin
 runtime shall send a Signal through the Agent mailbox.
@@ -294,8 +294,8 @@ publish one terminal Turn Outcome.
 boundary shall preserve the defined Agent result and runtime outcome.
 
 `OVR-REQ-059`: When the Agent observation boundary emits semantic telemetry,
-it shall exclude Agent state, Plugin state, payloads, caller context, process
-handles, and raw error detail from metadata.
+it shall exclude complete Agent state, including Plugin-owned fields, payloads,
+caller context, process handles, and raw error detail from metadata.
 
 ### Topology, package scope, and compatibility
 
@@ -337,7 +337,7 @@ is clearer than a struct.
 | --- | --- | --- |
 | Signal | Immutable input envelope. The received value is the source Signal. | `jido_signal`; seams 04 and 05 own Jido use. |
 | Agent definition | Static schema, routes, Plugin declarations, metadata, and module-owned `vsn`. | 01 Agent and 02 Agent authoring |
-| Agent instance | Immutable identity and complete portable domain and Plugin state. | 01 Agent |
+| Agent instance | Immutable identity and one complete portable state map with domain and Plugin-owned fields. | 01 Agent |
 | Agent Ref | Stable identity, separate from runtime location. | 03 Agent identity, then 07, 09, and 10 |
 | Turn | One fixed executable and input for one source Signal. | 04 Turn evaluation |
 | Candidate Agent | Complete validated Agent proposed by evaluation. | 01 and 04 |
@@ -386,7 +386,7 @@ contain the required behavior.
 | --- | --- | --- |
 | `OVR-INV-001` | One source Signal selects one fixed executable for one Turn. | `OVR-REQ-013` through `OVR-REQ-015` |
 | `OVR-INV-002` | Direct and live paths use one candidate-evaluation boundary. | `OVR-REQ-016` through `OVR-REQ-018` |
-| `OVR-INV-003` | Domain state, Plugin state, and candidate assembly have separate write owners. | `OVR-REQ-019` through `OVR-REQ-023` |
+| `OVR-INV-003` | Domain and Plugin-owned fields share one Agent state map but have separate write owners. | `OVR-REQ-019` through `OVR-REQ-023` |
 | `OVR-INV-004` | One live Turn has one commit point and one state-version increment. | `OVR-REQ-024` through `OVR-REQ-026` |
 | `OVR-INV-005` | Executable I/O and runtime-owned Directive work have different commit guarantees. | `OVR-REQ-027` through `OVR-REQ-030` |
 | `OVR-INV-006` | Recoverable capability work uses saved intent, stable IDs, and Signal reentry. | `OVR-REQ-031` through `OVR-REQ-034` |
@@ -421,7 +421,7 @@ contain the required behavior.
 | Commit | Operation that makes one candidate Agent live after required persistence succeeds. | candidate, persistence write |
 | Turn Outcome | Terminal observation after Directive work settles or the Turn stops. | live result, commit result |
 | Directive | Typed request for runtime-owned post-commit work. | guaranteed durable effect |
-| Durable work intent | Portable pending work with a stable operation ID in Agent or Plugin state. | Directive queue, universal outbox |
+| Durable work intent | Portable pending work with a stable operation ID in a domain or Plugin-owned Agent field. | Directive queue, universal outbox |
 | Runtime checkpoint | Nondurable in-instance snapshot for abnormal nonpersistent Server restart. | persistence record, initial Agent |
 | Agent checkpoint | Portable Agent reconstruction data. | runtime checkpoint, Codec document |
 | Persistence record | Durable lifecycle and compare-and-swap envelope. | Agent identity, checkpoint |
@@ -429,7 +429,7 @@ contain the required behavior.
 | Agent `vsn` | Positive module-owned revision of normalized Agent-definition meaning. It does not pin loaded BEAM code by itself. | checkpoint format version, state version, package version |
 | Plugin | User-declared reusable capability. | adapter, authoring extension |
 | Plugin facet | Proposed owner-specific Plugin behavior. | arbitrary hook, adapter |
-| Plugin runtime | Supervised resources for one Plugin on one Agent activation. | Plugin state |
+| Plugin runtime | Supervised resources for one Plugin on one Agent activation. | Plugin-owned Agent field |
 | Jido instance | Named local supervision and service boundary. | namespace, cluster |
 | Runtime topology | OTP process and ownership layout below one Jido instance. | Topology definition |
 | Topology control plane | Static definitions, plans, repair, and possible future live target control. | Agent pool |
@@ -446,7 +446,7 @@ approved. Detailed owner contracts remain open.
 | --- | --- |
 | 90 Package boundaries | Jido is the local coordination layer above `jido_action` and `jido_signal`. Extension categories stay separate. |
 | 12 Errors and contracts | Each public value and error has one owner. Live result and Turn Outcome are different. Documented protocol exceptions can use maps, tuples, or OTP values. |
-| 01 Agent | Agent definitions and instances are immutable. Domain and Plugin state have separate write owners. Agent values have no runtime handles. |
+| 01 Agent | Agent definitions and instances are immutable. Domain and Plugin-owned fields share one state map and have separate write owners. Agent values have no runtime handles. |
 | 02 Agent authoring | DSL, direct data, Builder, Codec, and inline Actions reach one normalized definition contract. |
 | 03 Agent identity | Stable identity, location, and write authority are separate. Ref-first migration keeps supported ID and PID APIs. |
 | 04 Turn evaluation | One source Signal selects one fixed executable. Direct and live paths share candidate evaluation. |
@@ -470,7 +470,7 @@ reverse the decision. It identifies work that the owner seam must complete.
 | `OVR-DEC-001` | Select the first Router match from the source Signal before Plugin preparation and make the fixed selection available to the observation boundary. | Approved | Ambiguous routes become deterministic and route selection can be logged without using Plugin-mutated input. Route-changing Plugins need migration. |
 | `OVR-DEC-002` | Restore the latest in-instance runtime checkpoint and state version after an abnormal nonpersistent restart. | Approved | Abnormal same-instance restart preserves the latest committed state. |
 | `OVR-DEC-003` | Add stable Agent Ref in V3 beside supported ID and PID APIs. | Approved | Seams 03, 07, 09, and 10 need a staged identity migration. |
-| `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | Default checkpoints and durable records store a snapshot for restore validation. A missing revision in a valid version-1 default checkpoint means `vsn: 1`. It does not belong to Agent Ref and does not pin loaded BEAM code. |
+| `OVR-DEC-004` | Use `vsn` as the positive module-owned definition revision. Store it on the immutable Agent definition, copy it to instances, and preserve it through all authoring forms. Generated modules default to `1`; compatible unversioned direct forms can use `nil`. | Approved | V3 Agent checkpoints store the revision and accept only format version 2. It does not belong to Agent Ref and does not pin loaded BEAM code. |
 | `OVR-DEC-005` | Separate Plugin responsibilities by their Agent, Agent Server, Persistence, and Topology owners. | Approved direction; detailed model deferred | Seam 05 must later define the smallest coherent declaration, callback, and composition model. The exact four-facet model is not approved. |
 | `OVR-DEC-006` | Keep complete Agent `checkpoint/2` and `restore/2` callbacks until Persistence composition is explicit. | Approved | No Plugin contract can silently replace custom checkpoint meaning. |
 | `OVR-DEC-007` | Require initial active records, loss of write authority after every write error, and tombstones. | Approved | Seams 07 and 08 must define failure, retention, purge, reactivation, and restart rules. |

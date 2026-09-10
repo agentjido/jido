@@ -4,7 +4,6 @@ defmodule Jido.Plugin.Codec do
   Registry. The document stores the Plugin module and its options, never its
   instance state or runtime. Agent Codec uses this same format and Registry.
   """
-  alias Jido.Agent.Codec
   alias Jido.Agent.Codec.{Data, Registry}
 
   @type document :: %{required(String.t()) => term()}
@@ -14,7 +13,7 @@ defmodule Jido.Plugin.Codec do
           {:ok, document(), Registry.t()} | {:error, term()}
   def encode(plugin) do
     with {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([plugin]),
-         {:ok, registry} <- Codec.Deriver.plugin(plugin),
+         {:ok, registry} <- Jido.Agent.Codec.Deriver.plugin(plugin),
          {:ok, document} <- encode(plugin, registry),
          do: {:ok, document, registry}
   end
@@ -43,8 +42,8 @@ defmodule Jido.Plugin.Codec do
           {:ok, {module(), keyword()}} | {:error, term()}
   def decode(document, registry) do
     with :ok <- Data.check_document(document),
-         :ok <- Codec.object(document, ~w(type version module options)),
-         :ok <- Codec.version(document, "jido.plugin"),
+         :ok <- Data.object(document, ~w(type version module options)),
+         :ok <- Data.version(document, "jido.plugin"),
          {:ok, registry} <- Registry.new(registry),
          {:ok, module} <- Registry.resolve(registry, document["module"], :plugin),
          {:ok, options} <- Data.decode(document["options"], registry),

@@ -59,7 +59,7 @@ defmodule Jido.Examples.Factory.System do
       define :boot, args: [{:optional, :mode}]
     end
 
-    route "factory.system.ready", Jido.Examples.KeepState do
+    route "factory.system.ready", Jido.Examples.Support.KeepState do
       define :ready
     end
 
@@ -74,7 +74,7 @@ defmodule Jido.Examples.Factory.System do
       end
     end
 
-    route "jido.agent.child.started", Jido.Examples.KeepState
+    route "jido.agent.child.started", Jido.Examples.Support.KeepState
 
     route "jido.agent.child.exit" do
       action %{tag: tag}, name: "factory_system_exit", context: context do

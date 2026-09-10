@@ -25,6 +25,9 @@ defmodule Jido.Agent.Directive do
     StopChild
   }
 
+  alias Jido.Signal
+  alias Jido.Signal.Context, as: SignalContext
+
   @type t ::
           AdoptChild.t()
           | Emit.t()
@@ -59,204 +62,6 @@ defmodule Jido.Agent.Directive do
     :restore,
     :state_version
   ]
-
-  alias Jido.Signal
-  alias Jido.Signal.Context, as: SignalContext
-
-  defmodule Error do
-    @moduledoc "Reports a structured turn or runtime error to the Server policy."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                error: Zoi.any(description: "Error value"),
-                context: Zoi.atom(description: "Optional error context") |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule Emit do
-    @moduledoc "Dispatches one Signal after the Agent state commit."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                signal: Zoi.any(description: "Signal to dispatch"),
-                dispatch:
-                  Zoi.any(description: "Optional Signal dispatch configuration") |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule EmitToParent do
-    @moduledoc "Sends one Signal to the current logical parent Agent."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{signal: Zoi.any(description: "Signal to send to the parent")},
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule EmitToChild do
-    @moduledoc "Sends one Signal to a tracked child Agent."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                tag: Zoi.any(description: "Tracked child tag"),
-                signal: Zoi.any(description: "Signal to send to the child")
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule Spawn do
-    @moduledoc "Starts one generic process under the Jido instance supervisor."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                child_spec: Zoi.any(description: "OTP child specification"),
-                tag: Zoi.any(description: "Optional correlation tag") |> Zoi.optional()
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule SpawnAgent do
-    @moduledoc """
-    Starts and tracks one logical child Agent on the selected Erlang node.
-
-    Omit `node` to use the parent's node. A remote node must run the same named
-    Jido instance and have the Agent module available. Remote startup uses the
-    parent's `directive_timeout`. A lost reply is an indeterminate outcome;
-    retrying the same request resolves the same child identity.
-    """
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                agent: Zoi.any(description: "Agent module or Agent value"),
-                tag: Zoi.any(description: "Child relationship tag"),
-                node:
-                  Zoi.atom(description: "Target Erlang node; nil selects the local node")
-                  |> Zoi.optional(),
-                opts:
-                  Zoi.map(description: "Child Agent Server options")
-                  |> Zoi.refine({Jido.Agent.Directive, :validate_spawn_agent_opts, []})
-                  |> Zoi.default(%{}),
-                meta: Zoi.map(description: "Relationship metadata") |> Zoi.default(%{}),
-                restart:
-                  Zoi.atom(description: "OTP restart policy")
-                  |> Zoi.refine({Jido.Agent.Directive, :validate_restart_policy, []})
-                  |> Zoi.default(:transient)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule AdoptChild do
-    @moduledoc "Attaches one live orphaned or unattached child Agent."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                child: Zoi.any(description: "Child PID or Agent id"),
-                tag: Zoi.any(description: "Child relationship tag"),
-                meta: Zoi.map(description: "Relationship metadata") |> Zoi.default(%{})
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule StopChild do
-    @moduledoc "Stops and untracks one child Agent."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{
-                tag: Zoi.any(description: "Tracked child tag"),
-                reason: Zoi.any(description: "Stop reason") |> Zoi.default(:normal)
-              },
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
-
-  defmodule Stop do
-    @moduledoc "Stops the Agent Server after the Agent state commit."
-
-    @schema Zoi.struct(
-              __MODULE__,
-              %{reason: Zoi.any(description: "Stop reason") |> Zoi.default(:normal)},
-              coerce: true
-            )
-
-    @type t :: unquote(Zoi.type_spec(@schema))
-    @enforce_keys Zoi.Struct.enforce_keys(@schema)
-    defstruct Zoi.Struct.struct_fields(@schema)
-
-    @doc false
-    def schema, do: @schema
-  end
 
   @doc "Returns true when the value is a built-in Agent Directive."
   @spec built_in?(term()) :: boolean()
@@ -350,26 +155,33 @@ defmodule Jido.Agent.Directive do
   def validate_agent_target(value), do: {:error, {:invalid_agent, value}}
 
   @doc "Creates an Emit Directive."
+  @spec emit(Signal.t(), term()) :: Emit.t()
   def emit(signal, dispatch \\ nil), do: %Emit{signal: signal, dispatch: dispatch}
 
   @doc "Creates an Emit Directive for one target PID."
+  @spec emit_to_pid(Signal.t(), pid(), keyword()) :: Emit.t()
   def emit_to_pid(signal, pid, opts \\ []) when is_pid(pid) and is_list(opts) do
     %Emit{signal: signal, dispatch: {:pid, Keyword.put(opts, :target, pid)}}
   end
 
   @doc "Creates an EmitToParent Directive."
+  @spec emit_to_parent(Signal.t()) :: EmitToParent.t()
   def emit_to_parent(signal), do: %EmitToParent{signal: signal}
 
   @doc "Creates an EmitToChild Directive."
+  @spec emit_to_child(term(), Signal.t()) :: EmitToChild.t()
   def emit_to_child(tag, signal), do: %EmitToChild{tag: tag, signal: signal}
 
   @doc "Creates an Error Directive."
+  @spec error(term(), atom() | nil) :: Error.t()
   def error(error, context \\ nil), do: %Error{error: error, context: context}
 
   @doc "Creates a generic Spawn Directive."
+  @spec spawn(Supervisor.child_spec(), term()) :: Spawn.t()
   def spawn(child_spec, tag \\ nil), do: %Spawn{child_spec: child_spec, tag: tag}
 
   @doc "Creates a SpawnAgent Directive. Pass `node: target_node` for a remote owned child."
+  @spec spawn_agent(module() | Jido.Agent.t(), term(), keyword()) :: SpawnAgent.t()
   def spawn_agent(agent, tag, opts \\ []) do
     %SpawnAgent{
       agent: agent,
@@ -382,11 +194,14 @@ defmodule Jido.Agent.Directive do
   end
 
   @doc "Creates an AdoptChild Directive."
+  @spec adopt_child(pid() | String.t(), term(), map()) :: AdoptChild.t()
   def adopt_child(child, tag, meta \\ %{}), do: %AdoptChild{child: child, tag: tag, meta: meta}
 
   @doc "Creates a StopChild Directive."
+  @spec stop_child(term(), term()) :: StopChild.t()
   def stop_child(tag, reason \\ :normal), do: %StopChild{tag: tag, reason: reason}
 
   @doc "Creates a Stop Directive."
+  @spec stop(term()) :: Stop.t()
   def stop(reason \\ :normal), do: %Stop{reason: reason}
 end

@@ -71,7 +71,7 @@ name or claim that a package API is available.
 
 | Capability group | May own | Must not own |
 | --- | --- | --- |
-| Durable services, with `jido_durable` as a working name | Production storage integrations, record catalogs and scans, recovery controllers, claims and fencing, leases, indeterminate-write reconciliation, tombstone cleanup, migration tools, durable request receipts, result lookup, history, compaction, and retention | Agent candidate assembly, core commit order, Plugin state writes, or Signal envelope meaning |
+| Durable services, with `jido_durable` as a working name | Production storage integrations, record catalogs and scans, recovery controllers, claims and fencing, leases, indeterminate-write reconciliation, tombstone cleanup, migration tools, durable request receipts, result lookup, history, compaction, and retention | Agent candidate assembly, core commit order, Plugin-owned field writes, or Signal envelope meaning |
 | Cluster services, with `jido_cluster` as a working name | Membership, node, a distributed location directory, placement, rebalance, failover coordination, load, and capacity | Durable write authority from a Registry result or Agent state persistence |
 | Transport services, with `jido_fabric` as a working name | Cross-namespace delivery, external reference encoding, request correlation, admission, backpressure, delivery timeout, gateways, authentication, tenancy, store-and-forward, and durable inboxes | Inspection of Agent checkpoints or commits, or replacement of local Turn and commit rules |
 | `jido_ai` | Model integration, AI behavior, tools, request orchestration, retry and quota policy, and AI-specific observation | Core Agent semantics or private Agent Server access |
@@ -91,7 +91,7 @@ Each category grants different authority.
 | Add an application facade, policy, supervision, or multi-component coordination | Ordinary Elixir composition | Wrap public modules and use standard OTP |
 | Define executable computation | Action or Flow | Implement in `jido_action`; Jido consumes it through `Jido.Exec` |
 | Define, route, serialize, or deliver an event | Signal contract | Implement in `jido_signal` |
-| Add a reusable capability at an Agent or Agent Server lifecycle point | Plugin | Use declared Plugin state, callbacks, Directives, and optional runtime only |
+| Add a reusable capability at an Agent or Agent Server lifecycle point | Plugin | Use declared Plugin-owned fields, callbacks, Directives, and optional runtime only |
 | Replace one external infrastructure operation | Adapter | Implement the narrow adapter owned by that package |
 | Add static DSL syntax | Authoring extension | Lower to the canonical Agent or Topology value before runtime |
 | Request runtime-owned work after commit | Directive | Return a typed Directive through the Turn result |
@@ -113,7 +113,7 @@ An ecosystem package uses documented public modules. It does not:
 - read or change private Agent Server state;
 - send private Agent Server messages;
 - construct a generated supervisor or Registry name as a required dependency;
-- change candidate Agent or Plugin state outside the Turn evaluator;
+- change candidate domain or Plugin-owned Agent fields outside the Turn evaluator;
 - dispatch runtime-owned work before the related commit;
 - treat a PID or OTP name as durable Agent identity.
 
@@ -235,8 +235,8 @@ messages.
 `PKG-REQ-020`: An external package shall not require a generated Jido
 supervisor or Registry name.
 
-`PKG-REQ-021`: An external package shall not change candidate Agent or Plugin
-state outside the Turn evaluator.
+`PKG-REQ-021`: An external package shall not change candidate domain or
+Plugin-owned Agent fields outside the Turn evaluator.
 
 `PKG-REQ-022`: An external package shall not dispatch runtime-owned
 Directive work before the related commit.
@@ -292,8 +292,8 @@ shall preserve instance persistence defaults and supported per-Agent
 persistence selection.
 
 `PKG-REQ-036`: When a stored format changes, the migration design shall assign
-separate owners to record format, Agent state, Plugin state, and backend
-storage migration.
+separate owners to record format, domain fields, Plugin-owned fields, and
+backend storage migration. The fields remain in one complete Agent state map.
 
 `PKG-REQ-037`: Before Jido claims core V3 compatibility, its release owner
 shall prove one explicit `jido`, `jido_action`, and `jido_signal` package set
@@ -360,5 +360,5 @@ The user approved `PKG-DEC-001` through `PKG-DEC-009` on 2026-09-09.
 | `PKG-DEC-005` | Do PID commands and generated-name helpers become private? | No immediate change. Add Ref-first and instance facades first, then review deprecation. | Current application and integration code has a staged path. |
 | `PKG-DEC-006` | Is static Topology permanent core scope? | Yes, for local definition, activation, readiness, and repair. | Cluster placement and failover remain separate. |
 | `PKG-DEC-007` | Are future package names and APIs fixed? | No. Keep capability groups, but require package-specific design and proof. | Documents do not claim unavailable APIs. |
-| `PKG-DEC-008` | Who owns stored-data migration? | Use separate core-record, Agent-state, Plugin-state, and backend-storage owners. | A version change cannot hide application or operator work. |
+| `PKG-DEC-008` | Who owns stored-data migration? | Use separate core-record, domain-field, Plugin-owned-field, and backend-storage owners. The fields remain in one Agent state map. | A version change cannot hide application or operator work. |
 | `PKG-DEC-009` | What proves an ecosystem boundary? | Prove the three-package core set through public contracts. Each integration package adds its own public-only compatibility proof. | An integration does not block the core release, and internal core tests are not its only evidence. |

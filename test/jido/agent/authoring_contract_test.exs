@@ -61,12 +61,12 @@ defmodule Jido.Agent.AuthoringContractTest do
              Jido.AgentServer.Options.new(agent: Factory)
 
     assert :ok = Directive.validate_agent_target(Factory)
-    assert {:error, %{message: "Expected an Agent module"}} = Agent.new(Factory, [])
+    assert {:error, %{message: "Expected an Agent module"}} = Agent.instantiate(Factory, [])
 
     assert {:error, %{message: "Expected an Agent module"}} =
              Builder.new(Factory) |> Builder.build()
 
-    assert {:error, %{message: "Agent module must implement handle_signal/2"}} =
+    assert {:error, %{message: "Agent module must implement the Jido.Agent behavior"}} =
              Agent.new(name: "behavior", module: Factory)
   end
 
@@ -97,6 +97,8 @@ defmodule Jido.Agent.AuthoringContractTest do
            }
 
     registry = Registry.new!(%{"integer" => {:value, %URI{port: 1}}})
-    assert {:ok, "integer"} = Registry.identifier(registry, :value, %URI{port: 1.0})
+
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Registry.identifier(registry, :value, %URI{port: 1.0})
   end
 end

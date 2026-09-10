@@ -161,7 +161,10 @@ defmodule Jido.Topology.Plan do
 
     with {:ok, state} <- Reference.resolve(spec.initial_state, input, Map.get(spec, :member, %{})),
          {:ok, _} <-
-           Jido.Agent.new(spec.module, id: Composition.escape(id) <> "/" <> key, state: state) do
+           Jido.Agent.instantiate(spec.module,
+             id: Composition.escape(id) <> "/" <> key,
+             state: state
+           ) do
       {:ok,
        spec
        |> Map.drop([:member])

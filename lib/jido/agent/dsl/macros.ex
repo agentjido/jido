@@ -3,7 +3,7 @@ defmodule Jido.Agent.DSL.Macros do
 
   alias Jido.Action.Inline
 
-  @entity Jido.Agent.DSL.Extension.Routes.Route
+  @entity :"Elixir.Jido.Agent.DSL.Extension.Routes.Route"
   @route_options [:defaults, :priority, :match, :do]
   defmacro route(path, target_or_options) do
     if Keyword.keyword?(target_or_options) do

@@ -51,7 +51,7 @@ defmodule Jido.Agent.Codec.Deriver do
   defp data(entries, _value), do: entries
 
   # As in Flow's Deriver, collect into an accumulator. Keep Agent's existing
-  # first-occurrence IDs and exact deduplication; lookup still uses ==.
+  # first-occurrence IDs, exact deduplication, and exact Registry lookup.
   defp add(entries, kind, value), do: [{kind, value} | entries]
 
   defp build(entries) do

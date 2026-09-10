@@ -185,7 +185,7 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, key: :shared}
              ])
 
-    assert state_error.message == "Agent Plugin state keys must be unique"
+    assert state_error.message == "Plugin-owned Agent state keys must be unique"
     assert state_error.details.state_key == :shared
 
     assert {:error, directive_error} =
@@ -309,7 +309,11 @@ defmodule Jido.Plugin.OrderingTest do
                {SecondStatePlugin, result: :second_failed}
              ])
 
-    assert Plugin.update_state({:ok, %{first: 0, second: 0}, []}, specs) ==
+    assert Jido.Agent.Plugin.Pipeline.run(
+             {:ok, %{first: 0, second: 0}, []},
+             %{first: 0, second: 0},
+             Jido.Agent.Plugin.specs(specs)
+           ) ==
              {:error, :second_failed}
   end
 

@@ -66,8 +66,11 @@ defmodule Jido.Agent.RefTest do
     assert {:error, %ValidationError{}} = Ref.validate(%{ref | partition: ""})
     assert {:error, %ValidationError{}} = Ref.validate(%{ref | id: ""})
 
+    assert {:error, %ValidationError{}} = Ref.to_map(%{ref | id: ""})
+    assert {:error, %ValidationError{}} = Ref.to_map(:invalid)
+
     assert_raise ValidationError, fn ->
-      Ref.to_map(%{ref | id: ""})
+      Ref.to_map!(%{ref | id: ""})
     end
   end
 
@@ -118,7 +121,8 @@ defmodule Jido.Agent.RefTest do
         "id" => "order-123"
       }
 
-      assert Ref.to_map(ref) == encoded
+      assert {:ok, ^encoded} = Ref.to_map(ref)
+      assert Ref.to_map!(ref) == encoded
       assert {:ok, ^ref} = Ref.from_map(encoded)
       assert Ref.from_map!(encoded) == ref
     end
