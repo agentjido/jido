@@ -17,7 +17,7 @@ defmodule Jido.Agent.Checkpoint do
          :ok <- current_vsn(agent.module, agent.vsn) do
       if callback?(agent.module, :checkpoint) do
         with {:ok, payload} <- invoke(agent.module, :checkpoint, [agent, context]),
-             :ok <- plain_map(payload, :checkpoint),
+             :ok <- checkpoint_payload(payload),
              :ok <- portable(payload, [:checkpoint, :payload]) do
           {:ok,
            %{
@@ -127,7 +127,7 @@ defmodule Jido.Agent.Checkpoint do
   defp restore_custom(module, checkpoint, context) do
     with true <- exact_keys?(checkpoint, @custom_keys),
          :ok <- custom_header(module, checkpoint),
-         :ok <- plain_map(checkpoint.payload, :restore),
+         :ok <- custom_payload(checkpoint.payload, checkpoint),
          :ok <- portable(checkpoint.payload, [:checkpoint, :payload]),
          true <- callback?(module, :restore),
          {:ok, agent} <- invoke(module, :restore, [checkpoint.payload, context]),
@@ -137,7 +137,6 @@ defmodule Jido.Agent.Checkpoint do
     else
       false -> invalid_checkpoint(checkpoint)
       {:error, _reason} = error -> error
-      result -> invalid_callback(:restore, result)
     end
   end
 
@@ -250,8 +249,13 @@ defmodule Jido.Agent.Checkpoint do
     kind, reason -> {:error, kind, reason}
   end
 
-  defp plain_map(value, _callback) when is_map(value) and not is_struct(value), do: :ok
-  defp plain_map(value, callback), do: invalid_callback(callback, {:ok, value})
+  defp checkpoint_payload(value) when is_map(value) and not is_struct(value), do: :ok
+
+  defp checkpoint_payload(value),
+    do: invalid("Agent checkpoint callback must return a map", %{checkpoint: value})
+
+  defp custom_payload(value, _checkpoint) when is_map(value) and not is_struct(value), do: :ok
+  defp custom_payload(_value, checkpoint), do: invalid_checkpoint(checkpoint)
 
   defp portable(value, root) do
     case PortableTerm.validate(value, root) do

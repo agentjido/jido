@@ -70,15 +70,6 @@ defmodule Jido.Agent.Command do
   end
 
   @doc false
-  @spec validate_admitted(t()) :: {:ok, t()} | {:error, Exception.t()}
-  def validate_admitted(%__MODULE__{} = command) do
-    with {:ok, signal} <- normalize_signal(command.signal),
-         :ok <- validate_context(command.context) do
-      {:ok, %{command | signal: signal}}
-    end
-  end
-
-  @doc false
   @spec normalize_signal(term()) :: {:ok, Signal.t()} | {:error, Exception.t()}
   def normalize_signal(%Signal{} = signal) do
     type = signal.type

@@ -267,8 +267,8 @@ defmodule Jido.AgentServer.Plugin do
   end
 
   defp validate_admission_result({:ok, %Command{} = command}, original, spec) do
-    with true <- command.agent == original.agent,
-         {:ok, command} <- Command.validate_admitted(command) do
+    with {:ok, command} <- Command.validate(command),
+         true <- command.agent == original.agent do
       {:ok, command}
     else
       false ->
