@@ -38,7 +38,7 @@ defmodule ChildGuide.Parent do
     route "child.start" do
       action _input, name: "child_guide_start", context: context do
         directive =
-          Jido.Agent.Directive.spawn_agent(
+          Jido.Agent.Directive.spawn_child(
             ChildGuide.Worker,
             :worker,
             opts: %{id: "child-worker"},

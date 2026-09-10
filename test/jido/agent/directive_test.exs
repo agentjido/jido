@@ -3,10 +3,13 @@ defmodule Jido.Agent.DirectiveTest do
   alias Jido.Agent.Directive
   alias Jido.Signal
 
-  test "built-in validation checks Error, Spawn and child adoption fields" do
+  test "built-in validation checks Error, SpawnProcess and child adoption fields" do
+    process = Directive.spawn_process({Elixir.Agent, fn -> 0 end})
+    refute Map.has_key?(process, :tag)
+
     for directive <- [
           Directive.error(:failed, :action),
-          Directive.spawn({Elixir.Agent, fn -> 0 end}),
+          process,
           Directive.adopt_child(self(), :child)
         ] do
       assert Directive.built_in?(directive)
@@ -23,19 +26,19 @@ defmodule Jido.Agent.DirectiveTest do
     assert :ok = Directive.validate_restart_policy(:temporary)
     assert {:error, message} = Directive.validate_restart_policy(:invalid)
     assert message =~ "restart must be one of"
-    assert :ok = Directive.validate_spawn_agent_opts(%{id: "child"})
+    assert :ok = Directive.validate_spawn_child_opts(%{id: "child"})
 
     assert {:error, message} =
-             Directive.validate_spawn_agent_opts(%{restore: :required, persistence: :invalid})
+             Directive.validate_spawn_child_opts(%{restore: :required, persistence: :invalid})
 
     assert message =~ "does not support lifecycle options"
-    assert {:error, message} = Directive.validate_spawn_agent_opts([])
+    assert {:error, message} = Directive.validate_spawn_child_opts([])
     assert message =~ "opts must be a map"
     assert {:error, {:invalid_agent, 42}} = Directive.validate_agent_target(42)
     agent = JidoTest.AgentFixtures.CounterAgent.new!()
     invalid = %{agent | state: %{count: :invalid, history: []}}
     assert {:error, _} = Directive.validate_agent_target(invalid)
-    assert {:error, _} = Directive.validate(Directive.spawn_agent(invalid, :child))
+    assert {:error, _} = Directive.validate(Directive.spawn_child(invalid, :child))
   end
 
   test "Signal Directives validate the complete outbound envelope" do

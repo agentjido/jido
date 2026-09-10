@@ -178,7 +178,7 @@ defmodule Jido.Examples.Factory.Orchestrator do
   def start_departments(state) do
     directives =
       Enum.map(Plan.steps(), fn step ->
-        Directive.spawn_agent(Department, step.id,
+        Directive.spawn_child(Department, step.id,
           opts: %{initial_state: %{department: step.id}, exec_opts: [timeout: 50_000]}
         )
       end)

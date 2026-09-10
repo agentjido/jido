@@ -106,7 +106,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     context: context
   } do
     spec = {Elixir.Agent, fn -> :ready end}
-    directive = Directive.spawn(spec)
+    directive = Directive.spawn_process(spec)
 
     for result <- [{:ok, self()}, {:ok, self(), :info}, :ignore] do
       runtime = %{state | spawn_fun: fn ^spec -> result end}
@@ -115,7 +115,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
 
     runtime = %{state | spawn_fun: fn ^spec -> {:error, :unavailable} end}
 
-    assert {:error, {:spawn_failed, :unavailable}, ^runtime} =
+    assert {:error, {:spawn_process_failed, :unavailable}, ^runtime} =
              DirectiveRuntime.handle(directive, context, runtime)
 
     assert {:ok, ^state} = DirectiveRuntime.handle(directive, context, state)
@@ -153,7 +153,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
 
     assert {:error, {:child_tag_in_use, :child}, ^occupied} =
              DirectiveRuntime.handle(
-               Directive.spawn_agent(RemoteCounter, :child),
+               Directive.spawn_child(RemoteCounter, :child),
                context,
                occupied
              )
@@ -191,7 +191,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     assert {:error, {:not_an_agent_child, :child}, ^plugin} =
              DirectiveRuntime.handle(Directive.stop_child(:child), context, plugin)
 
-    directive = Directive.spawn_agent(RemoteCounter, :child, node: :remote@localhost)
+    directive = Directive.spawn_child(RemoteCounter, :child, node: :remote@localhost)
     request = {1, make_ref()}
 
     pending = %{
@@ -253,7 +253,7 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
 
     assert {:error, :jido_instance_required_for_child_agent, ^standalone} =
              DirectiveRuntime.handle(
-               Directive.spawn_agent(RemoteCounter, :child),
+               Directive.spawn_child(RemoteCounter, :child),
                context,
                standalone
              )

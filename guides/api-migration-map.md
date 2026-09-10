@@ -215,8 +215,8 @@ failure behavior.
 | `Jido.Agent.Directive` | **Same name, new contract.** `validate/1` and `built_in?/1` are new. The built-in set is closed; custom types belong to a declared Plugin. |
 | `Jido.Agent.Directive.Emit`, `emit/2` | **Retained.** Delivery happens after commit. Use the Jido Signal V3 dispatch format. |
 | `Jido.Agent.Directive.Error`, `error/2` | **Retained.** Prefer `{:error, reason}` when the Turn must fail before commit. |
-| `Jido.Agent.Directive.Spawn`, `spawn/2` | **Retained.** It starts a generic supervised process. It does not make it a child Agent. |
-| `Jido.Agent.Directive.SpawnAgent`, `spawn_agent/3` | **Same name, new contract.** V3 supports explicit remote placement through `node:` and has new lost-reply behavior. |
+| `Jido.Agent.Directive.SpawnProcess`, `spawn_process/1` | **Renamed from `Spawn` and `spawn/2`.** It starts an untracked supervised process. It has no relationship tag. |
+| `Jido.Agent.Directive.SpawnChild`, `spawn_child/3` | **Renamed from `SpawnAgent` and `spawn_agent/3`.** V3 supports explicit remote placement through `node:` and has new lost-reply behavior. |
 | `Jido.Agent.Directive.AdoptChild`, `adopt_child/3` | **Retained with new ownership data.** Test local and remote adoption. |
 | `Jido.Agent.Directive.StopChild`, `stop_child/2` | **Retained.** It identifies the child by relationship tag. |
 | `Jido.Agent.Directive.Stop`, `stop/1` | **Retained.** The state commit happens before the Server stops. |
@@ -250,7 +250,7 @@ required V3 Directive.
 | `Jido.Actions.Lifecycle` | **Removed container module.** Use runtime Directives from application Actions. |
 | `Jido.Actions.Lifecycle.NotifyParent` | Use `Jido.Agent.Directive.emit_to_parent/1`. |
 | `Jido.Actions.Lifecycle.NotifyPid` | Use `Jido.Agent.Directive.emit_to_pid/3`. |
-| `Jido.Actions.Lifecycle.SpawnChild` | Use `Jido.Agent.Directive.spawn_agent/3`. |
+| `Jido.Actions.Lifecycle.SpawnChild` | Use `Jido.Agent.Directive.spawn_child/3`. |
 | `Jido.Actions.Lifecycle.StopChild` | Use `Jido.Agent.Directive.stop_child/2`. |
 | `Jido.Actions.Lifecycle.StopSelf` | Use `Jido.Agent.Directive.stop/1`. |
 | `Jido.Actions.Scheduling` | **Removed container module.** Declare `Jido.Plugin.Scheduler`. |

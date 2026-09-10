@@ -7,7 +7,7 @@ defmodule JidoTest.Examples.MultiAgent.ChildLifecycleTest do
     parent = start_agent!(jido, ChildLifecycle)
     before = Server.snapshot(parent)
 
-    assert {:ok, candidate, [%Jido.Agent.Directive.SpawnAgent{tag: "worker"}]} =
+    assert {:ok, candidate, [%Jido.Agent.Directive.SpawnChild{tag: "worker"}]} =
              ChildLifecycle.cmd(before.agent, ChildLifecycle.start_worker_signal!("worker"))
 
     assert candidate.state.desired == ["worker"]

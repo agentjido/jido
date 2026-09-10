@@ -10,8 +10,8 @@ An Outcome is the terminal record for one admitted Turn.
 | `Emit` | Dispatch one Signal through a target |
 | `EmitToParent` | Send a Signal to the logical parent |
 | `EmitToChild` | Send a Signal to a tracked child |
-| `Spawn` | Start a supervised OTP child |
-| `SpawnAgent` | Start and track a child Agent |
+| `SpawnProcess` | Start an untracked supervised OTP process |
+| `SpawnChild` | Start and track a child Agent |
 | `AdoptChild` | Attach an existing live child |
 | `StopChild` | Stop and remove one tracked child |
 | `Stop` | Stop the current Agent Server |
@@ -22,7 +22,8 @@ Use constructors from `Jido.Agent.Directive`:
 ```elixir
 emit = Jido.Agent.Directive.emit(signal, dispatch_target)
 to_child = Jido.Agent.Directive.emit_to_child(:worker, signal)
-spawn = Jido.Agent.Directive.spawn_agent(MyApp.Worker, :worker)
+child = Jido.Agent.Directive.spawn_child(MyApp.Worker, :worker)
+process = Jido.Agent.Directive.spawn_process({Task, fn -> do_work() end})
 ```
 
 A Plugin Agent facet can define more Directive types. It owns their validation

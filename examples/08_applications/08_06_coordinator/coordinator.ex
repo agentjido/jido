@@ -61,7 +61,7 @@ defmodule Jido.Examples.Applications.Coordinator.Delegate do
 
     {:ok, next_state,
      [
-       Directive.spawn_agent(WorkerAgent, :worker, restart: :temporary),
+       Directive.spawn_child(WorkerAgent, :worker, restart: :temporary),
        Directive.emit_to_child(:worker, work),
        Scheduler.schedule(100, timeout)
      ]}

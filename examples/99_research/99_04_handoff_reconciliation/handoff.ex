@@ -113,7 +113,7 @@ defmodule Jido.Examples.Handoff.Change do
   end
 
   defp change(_, _, state), do: {:ok, state}
-  defp spawn_worker(tag), do: Directive.spawn_agent(Handoff.Worker, tag, restart: :temporary)
+  defp spawn_worker(tag), do: Directive.spawn_child(Handoff.Worker, tag, restart: :temporary)
 
   defp offer(request, owner, generation) do
     Directive.emit_to_child(

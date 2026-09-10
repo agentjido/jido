@@ -20,10 +20,10 @@ defmodule Jido.Examples.Factory.System.Boot do
         else: %{}
 
     directives = [
-      Directive.spawn_agent(Conversation, "conversation",
+      Directive.spawn_child(Conversation, "conversation",
         opts: %{initial_state: %{factory_id: "#{id}/factory", factory_mode: input.mode}}
       ),
-      Directive.spawn_agent(factory, "factory", opts: factory_opts)
+      Directive.spawn_child(factory, "factory", opts: factory_opts)
     ]
 
     boot =

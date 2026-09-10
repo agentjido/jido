@@ -1,6 +1,6 @@
 # Owned Agents
 
-Use `SpawnAgent` to create an owned child with a stable tag. Use `StopChild` or
+Use `SpawnChild` to create an owned child with a stable tag. Use `StopChild` or
 `AgentServer.stop_child/3` to stop it. Inspect `AgentServer.children/1`.
 Parent bindings and child monitors belong to the runtime. Keep process handles
 out of persisted Agent state.

@@ -7,8 +7,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     EmitToChild,
     EmitToParent,
     Error,
-    Spawn,
-    SpawnAgent,
+    SpawnChild,
+    SpawnProcess,
     Stop,
     StopChild
   }
@@ -68,10 +68,10 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     {:error, {:reported_error, error_context, error}, state}
   end
 
-  def handle(%Spawn{} = directive, _context, state), do: spawn_generic(directive, state)
+  def handle(%SpawnProcess{} = directive, _context, state), do: spawn_process(directive, state)
 
-  def handle(%SpawnAgent{} = directive, context, state),
-    do: spawn_agent(directive, context, state)
+  def handle(%SpawnChild{} = directive, context, state),
+    do: spawn_child(directive, context, state)
 
   def handle(%AdoptChild{} = directive, _context, state), do: adopt_child(directive, state)
   def handle(%StopChild{} = directive, _context, state), do: stop_child(directive, state)
@@ -205,7 +205,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     kind, reason -> {:error, {:emit_dispatch_failed, {kind, reason}}}
   end
 
-  defp spawn_generic(%Spawn{child_spec: child_spec}, state) do
+  defp spawn_process(%SpawnProcess{child_spec: child_spec}, state) do
     result =
       cond do
         is_function(state.spawn_fun, 1) ->
@@ -222,26 +222,26 @@ defmodule Jido.AgentServer.DirectiveRuntime do
       {:ok, _pid} -> {:ok, state}
       {:ok, _pid, _info} -> {:ok, state}
       :ignore -> {:ok, state}
-      {:error, reason} -> {:error, {:spawn_failed, reason}, state}
+      {:error, reason} -> {:error, {:spawn_process_failed, reason}, state}
     end
   end
 
-  defp spawn_agent(%SpawnAgent{} = directive, context, %State{jido: jido} = state)
+  defp spawn_child(%SpawnChild{} = directive, context, %State{jido: jido} = state)
        when is_atom(jido) and not is_nil(jido) do
     with nil <- State.child(state, directive.tag),
          {:ok, request, cause, next_state} <-
            prepare_spawn(directive, CreationCause.capture(context, state), state) do
-      do_spawn_agent(directive, request, cause, next_state, state)
+      do_spawn_child(directive, request, cause, next_state, state)
     else
       %ChildInfo{} -> {:error, {:child_tag_in_use, directive.tag}, state}
       {:error, reason} -> {:error, reason, state}
     end
   end
 
-  defp spawn_agent(%SpawnAgent{}, _context, state),
+  defp spawn_child(%SpawnChild{}, _context, state),
     do: {:error, :jido_instance_required_for_child_agent, state}
 
-  defp do_spawn_agent(directive, request, cause, %State{jido: jido} = state, previous) do
+  defp do_spawn_child(directive, request, cause, %State{jido: jido} = state, previous) do
     child_id = Map.get(directive.opts, :id, "#{state.agent.id}/#{directive.tag}")
     child_partition = Map.get(directive.opts, :partition, state.partition)
 
@@ -314,10 +314,10 @@ defmodule Jido.AgentServer.DirectiveRuntime do
           | child_spawn_requests: Map.delete(previous.child_spawn_requests, directive.tag)
         }
 
-        {:error, {:spawn_agent_failed, :spawn_request_closed}, resolved}
+        {:error, {:spawn_child_failed, :spawn_request_closed}, resolved}
 
       {:error, reason} ->
-        {:error, {:spawn_agent_failed, reason}, previous}
+        {:error, {:spawn_child_failed, reason}, previous}
     end
   end
 
@@ -350,7 +350,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     end
   end
 
-  defp start_agent_process(%SpawnAgent{node: target} = directive, opts, state)
+  defp start_agent_process(%SpawnChild{node: target} = directive, opts, state)
        when is_nil(target) or target == node() do
     ChildPlacement.start_local(state.jido, opts, directive.restart)
   end

@@ -17,7 +17,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Start do
     else
       workers =
         Enum.map(Contract.roles(), fn role ->
-          Directive.spawn_agent(Worker, role,
+          Directive.spawn_child(Worker, role,
             restart: :temporary,
             opts: %{initial_state: %{role: role}, exec_opts: [timeout: 50_000]}
           )

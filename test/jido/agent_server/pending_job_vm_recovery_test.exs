@@ -30,7 +30,7 @@ defmodule Jido.AgentServer.PendingJobVMRecoveryTest do
                ])
 
       directive =
-        Directive.spawn_agent(Agent, :worker, restart: :temporary)
+        Directive.spawn_child(Agent, :worker, restart: :temporary)
 
       command =
         Jido.Signal.new!("test.remote.directive", %{directive: directive}, source: "/test")

@@ -354,7 +354,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.ControllerLogic do
   def spawn_worker(group_id, generation, index) do
     worker_id = worker_id(group_id, index)
 
-    Directive.spawn_agent(WorkerAgent, worker_tag(index),
+    Directive.spawn_child(WorkerAgent, worker_tag(index),
       opts: %{
         id: worker_id,
         initial_state: %{
@@ -458,7 +458,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.Start do
     worker_indexes = Map.new(Enum.zip(worker_ids, indexes))
 
     environment =
-      Directive.spawn_agent(EnvironmentAgent, :environment,
+      Directive.spawn_child(EnvironmentAgent, :environment,
         opts: %{
           id: environment_id,
           initial_state: %{group_id: group_id, generation: generation}
@@ -468,7 +468,7 @@ defmodule Jido.Examples.Applications.ElasticGroup.Start do
       )
 
     monitor =
-      Directive.spawn_agent(MonitorAgent, :monitor,
+      Directive.spawn_child(MonitorAgent, :monitor,
         opts: %{
           id: monitor_id,
           initial_state: %{group_id: group_id, generation: generation}

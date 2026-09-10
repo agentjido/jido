@@ -184,7 +184,7 @@ defmodule Jido.Examples.Applications.FixedGroup.Start do
       end)
 
     environment =
-      Directive.spawn_agent(EnvironmentAgent, :environment,
+      Directive.spawn_child(EnvironmentAgent, :environment,
         opts: %{
           id: environment_id,
           initial_state: %{group_id: group_id, generation: generation}
@@ -197,7 +197,7 @@ defmodule Jido.Examples.Applications.FixedGroup.Start do
       worker_ids
       |> Enum.with_index(1)
       |> Enum.map(fn {worker_id, index} ->
-        Directive.spawn_agent(WorkerAgent, "worker-#{index}",
+        Directive.spawn_child(WorkerAgent, "worker-#{index}",
           opts: %{
             id: worker_id,
             initial_state: %{

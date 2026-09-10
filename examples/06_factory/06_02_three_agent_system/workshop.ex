@@ -157,7 +157,7 @@ defmodule Jido.Examples.Factory.Workshop.Poll do
 
     directives = [
       event,
-      Jido.Agent.Directive.spawn_agent(Jido.Examples.Factory.WorkItem, tag,
+      Jido.Agent.Directive.spawn_child(Jido.Examples.Factory.WorkItem, tag,
         restart: :temporary,
         opts: %{
           initial_state: %{

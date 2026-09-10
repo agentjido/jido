@@ -36,7 +36,7 @@ defmodule Jido.Examples.CausalTrace do
           directives =
             Enum.flat_map([:left, :right], fn slot ->
               [
-                Directive.spawn_agent(Worker, slot, node: input[:node], restart: :temporary),
+                Directive.spawn_child(Worker, slot, node: input[:node], restart: :temporary),
                 Directive.emit_to_child(
                   slot,
                   Worker.compute_signal!(input.request_id, slot, input.value)

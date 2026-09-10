@@ -62,7 +62,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     parent_id = unique_id("parent")
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
 
-    spawn = Directive.spawn_agent(ChildAgent, :worker, meta: %{role: :worker})
+    spawn = Directive.spawn_child(ChildAgent, :worker, meta: %{role: :worker})
 
     assert {:ok, agent} =
              Server.call(
@@ -114,7 +114,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                parent,
                signal("runtime.directive", %{
                  event: :spawned,
-                 directive: Directive.spawn_agent(ChildAgent, :worker)
+                 directive: Directive.spawn_child(ChildAgent, :worker)
                })
              )
 
@@ -142,7 +142,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                parent,
                signal("runtime.directive", %{
                  event: :spawned,
-                 directive: Directive.spawn_agent(ChildAgent, :worker, restart: :transient)
+                 directive: Directive.spawn_child(ChildAgent, :worker, restart: :transient)
                })
              )
 
@@ -244,9 +244,9 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
       signal: source
     }
 
-    directive = Directive.spawn_agent(ChildAgent, :worker, opts: %{id: child_id})
+    directive = Directive.spawn_child(ChildAgent, :worker, opts: %{id: child_id})
 
-    assert {:error, {:spawn_agent_failed, {:relationship_persist_failed, :not_running}}, ^state} =
+    assert {:error, {:spawn_child_failed, {:relationship_persist_failed, :not_running}}, ^state} =
              Jido.AgentServer.DirectiveRuntime.handle(directive, context, state)
 
     eventually(fn -> Jido.whereis_agent(jido, child_id) == nil end)
@@ -275,14 +275,14 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                signal("runtime.directive", %{
                  event: :invalid_factory,
                  directive:
-                   Directive.spawn_agent(IgnoringFactory, :invalid,
+                   Directive.spawn_child(IgnoringFactory, :invalid,
                      opts: %{id: requested_id, partition: :blue}
                    )
                })
              )
 
     assert_receive {:factory_spawn_failed,
-                    {:spawn_agent_failed,
+                    {:spawn_child_failed,
                      %Jido.Error.ValidationError{
                        message: "Agent Server Agent constructor ignored the requested id"
                      }}, outcome},
@@ -299,7 +299,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                signal("runtime.directive", %{
                  event: :valid_factory,
                  directive:
-                   Directive.spawn_agent(CompatibleFactory, :valid,
+                   Directive.spawn_child(CompatibleFactory, :valid,
                      opts: %{id: requested_id, partition: :blue}
                    )
                })
@@ -320,7 +320,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
 
     directive =
-      Directive.spawn_agent(ChildAgent, :worker,
+      Directive.spawn_child(ChildAgent, :worker,
         node: node(),
         opts: %{id: expected_id, partition: :blue}
       )
@@ -431,7 +431,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                parent,
                signal("runtime.directive", %{
                  event: :spawned,
-                 directive: Directive.spawn_agent(ChildAgent, :worker)
+                 directive: Directive.spawn_child(ChildAgent, :worker)
                })
              )
 
@@ -467,7 +467,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                  signal("runtime.directive", %{
                    event: :spawned,
                    directive:
-                     Directive.spawn_agent(ChildAgent, :worker,
+                     Directive.spawn_child(ChildAgent, :worker,
                        restart: :permanent,
                        opts: %{on_parent_death: policy}
                      )
@@ -517,7 +517,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
                parent,
                signal("runtime.directive", %{
                  event: :spawned,
-                 directive: Directive.spawn_agent(ChildAgent, :worker, restart: :transient)
+                 directive: Directive.spawn_child(ChildAgent, :worker, restart: :transient)
                })
              )
 

@@ -10,7 +10,7 @@ defmodule Jido.Examples.RemoteLifecycle.RequestWorker do
 
   def run(input, %{agent_state: state}) do
     directive =
-      Jido.Agent.Directive.spawn_agent(input.worker_module, :worker,
+      Jido.Agent.Directive.spawn_child(input.worker_module, :worker,
         node: input.target_node,
         restart: :temporary
       )

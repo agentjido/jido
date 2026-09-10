@@ -43,7 +43,7 @@ defmodule JidoTest.Examples.Factory.WorkshopTest do
     {agent,
      [
        _event,
-       %Jido.Agent.Directive.SpawnAgent{restart: :temporary},
+       %Jido.Agent.Directive.SpawnChild{restart: :temporary},
        %Jido.Agent.Directive.EmitToChild{}
      ]} = poll(agent)
 

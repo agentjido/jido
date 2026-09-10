@@ -5,7 +5,7 @@ lifecycle policy, and delivery path. Runtime state owns process handles.
 
 ## Use Stable Tags
 
-`spawn_agent/3` starts a child after the parent commit. The tag identifies the
+`spawn_child/3` starts a child after the parent commit. The tag identifies the
 relationship inside that parent. A tag that is already in use is not a free
 slot for another child.
 
@@ -39,7 +39,7 @@ same job. Use the job ID for duplicate detection and external idempotency.
 
 ## Treat Remote Starts As Uncertain
 
-Pass `node:` to `spawn_agent/3` for a remote child. The remote node must run the
+Pass `node:` to `spawn_child/3` for a remote child. The remote node must run the
 same named Jido instance and have compatible Agent code.
 
 A timeout or node disconnect does not prove that the child never started. Retry

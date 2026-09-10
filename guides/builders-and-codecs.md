@@ -42,7 +42,7 @@ When this callback is absent, Jido uses the Agent routes. A module created with
 `Agent.instantiate(module, options)` and `Builder.new(module)` require this authoring
 configuration.
 
-Agent Server startup and `SpawnAgent` also accept constructor modules with
+Agent Server startup and `SpawnChild` also accept constructor modules with
 `new/0` or `new/1`. Such a constructor can return an Agent whose behavior module
 is different. It does not need to declare Agent configuration itself.
 

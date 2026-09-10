@@ -1,4 +1,4 @@
-defmodule Jido.Agent.Directive.SpawnAgent do
+defmodule Jido.Agent.Directive.SpawnChild do
   @moduledoc """
   Starts and tracks one logical child Agent on the selected Erlang node.
 
@@ -18,7 +18,7 @@ defmodule Jido.Agent.Directive.SpawnAgent do
                 |> Zoi.optional(),
               opts:
                 Zoi.map(description: "Child Agent Server options")
-                |> Zoi.refine({Jido.Agent.Directive, :validate_spawn_agent_opts, []})
+                |> Zoi.refine({Jido.Agent.Directive, :validate_spawn_child_opts, []})
                 |> Zoi.default(%{}),
               meta: Zoi.map(description: "Relationship metadata") |> Zoi.default(%{}),
               restart:

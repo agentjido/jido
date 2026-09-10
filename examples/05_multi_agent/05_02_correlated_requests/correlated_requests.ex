@@ -40,7 +40,7 @@ defmodule Jido.Examples.CorrelatedRequests do
             }
 
             directives = [
-              Jido.Agent.Directive.spawn_agent(Jido.Examples.Worker, request_id,
+              Jido.Agent.Directive.spawn_child(Jido.Examples.Worker, request_id,
                 restart: :temporary,
                 opts: %{error_policy: :stop_on_error, exec_opts: [timeout: 1_000]}
               ),

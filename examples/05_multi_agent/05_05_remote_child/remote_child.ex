@@ -47,7 +47,7 @@ defmodule Jido.Examples.RemoteParent.RequestChild do
 
   def run(%{target_node: target}, %{agent_state: state}) do
     directive =
-      Jido.Agent.Directive.spawn_agent(Jido.Examples.RemoteCounter, :worker,
+      Jido.Agent.Directive.spawn_child(Jido.Examples.RemoteCounter, :worker,
         node: target,
         restart: :temporary
       )

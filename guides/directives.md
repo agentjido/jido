@@ -5,9 +5,10 @@ The Server validates the batch before commit and dispatches it after commit.
 Direct execution returns the batch to the caller without dispatch.
 
 Use the built-in `Jido.Agent.Directive` types for supported runtime operations.
-Use `SpawnAgent` and `StopChild` for owned Agents. Declare other types through a
-Plugin Agent facet. Put validation in that facet. Put optional post-commit
-dispatch in the Plugin Agent Server facet. The V2
+Use `SpawnChild` and `StopChild` for owned Agents. Use `SpawnProcess` only for
+an untracked supervised OTP process. Declare other types through a Plugin Agent
+facet. Put validation in that facet. Put optional post-commit dispatch in the
+Plugin Agent Server facet. The V2
 `DirectiveExec` protocol and custom `directive_handler` option are removed.
 
 If one directive fails, the committed state remains. Later directives in that

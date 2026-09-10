@@ -3,7 +3,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
   @moduletag capability: "OBS-02"
 
   alias Jido.Agent.Directive
-  alias Jido.Agent.Directive.{EmitToChild, SpawnAgent}
+  alias Jido.Agent.Directive.{EmitToChild, SpawnChild}
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.CausalTrace, as: Agent
   alias Jido.Examples.Runtime.EventProbe
@@ -21,7 +21,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
       assert candidate.state.request_id == "request-1"
       assert agent.state.request_id == ""
 
-      assert [%SpawnAgent{tag: :left}, %EmitToChild{}, %SpawnAgent{tag: :right}, %EmitToChild{}] =
+      assert [%SpawnChild{tag: :left}, %EmitToChild{}, %SpawnChild{tag: :right}, %EmitToChild{}] =
                directives
 
       for %EmitToChild{signal: signal} <- directives,
@@ -115,7 +115,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
     try do
       assert {:ok, parent} = Jido.start_agent(c.jido, Fixtures.Parent, id: id)
-      directive = Directive.spawn_agent(Agent.Worker, :worker, restart: :permanent)
+      directive = Directive.spawn_child(Agent.Worker, :worker, restart: :permanent)
       first_signal = signal("test.remote.directive", %{directive: directive})
       assert {:ok, _} = Server.call(parent, first_signal)
       first = eventually(fn -> Server.children(parent)[:worker] end)
@@ -181,7 +181,7 @@ defmodule JidoTest.Tracing.CausalTraceTest do
 
     try do
       assert {:ok, parent} = Jido.start_agent(c.jido, Fixtures.Parent, id: id)
-      directive = Directive.spawn_agent(Agent.Worker, :worker, restart: :temporary)
+      directive = Directive.spawn_child(Agent.Worker, :worker, restart: :temporary)
       command = signal("test.remote.directive", %{directive: directive})
       assert {:ok, _} = Server.call(parent, command)
       first = eventually(fn -> Server.children(parent)[:worker] end)

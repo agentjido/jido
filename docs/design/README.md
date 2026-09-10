@@ -135,7 +135,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Jido instance design](09_jido-instance/design.md) | Selected and implemented |
 | [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |
 | [Runtime topology briefing](10_runtime-topology/README.md) | Selected and implemented |
-| [Runtime topology design](10_runtime-topology/design.md) | Selected and implemented |
+| [Runtime topology design](10_runtime-topology/design.md) | Pending approval |
 | [Runtime topology alignment](10_runtime-topology/alignment.md) | Pending approval |
 | [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
 | [Topology control-plane design](11_topology-control-plane/design.md) | Pending approval |

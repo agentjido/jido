@@ -80,7 +80,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
     parent = start_parent(c)
 
     for {tag, opts} <- [{:default, []}, {:explicit, [node: c.node_a]}] do
-      dispatch(c, parent, Directive.spawn_agent(RemoteCounter, tag, opts))
+      dispatch(c, parent, Directive.spawn_child(RemoteCounter, tag, opts))
       child = child(c, parent, tag)
       assert node(child.pid) == c.node_a
       assert :ok = peer_call(c.peer_a, Server, :stop_child, [parent, tag])
@@ -89,7 +89,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
   test "remote restart retains state and explicit stop removes a permanent child", c do
     parent = start_parent(c)
-    directive = Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b, restart: :permanent)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b, restart: :permanent)
     dispatch(c, parent, directive)
     first = child(c, parent)
     assert {:ok, _} = peer_call(c.peer_a, RemoteCounter, :record, [first.pid, 11])
@@ -124,7 +124,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
       dispatch(
         c,
         parent,
-        Directive.spawn_agent(Fixtures.Child, :worker, node: c.node_b, restart: :permanent)
+        Directive.spawn_child(Fixtures.Child, :worker, node: c.node_b, restart: :permanent)
       )
 
       worker = child(c, parent)
@@ -155,7 +155,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   test "an unavailable node reports an uncertain outcome and never falls back locally", c do
     parent = start_parent(c)
     missing = :"jido_missing@127.0.0.1"
-    dispatch(c, parent, Directive.spawn_agent(RemoteCounter, :worker, node: missing))
+    dispatch(c, parent, Directive.spawn_child(RemoteCounter, :worker, node: missing))
 
     assert {{:child_spawn_indeterminate, :worker, ^missing, request, :noconnection}, outcome} =
              failure(c)
@@ -174,13 +174,13 @@ defmodule Jido.AgentServer.DistributedChildTest do
     ])
 
     parent = start_parent(c)
-    dispatch(c, parent, Directive.spawn_agent(JidoTest.OnlyOriginAgent, :worker, node: c.node_b))
-    assert {{:spawn_agent_failed, _}, %{status: :failed}} = failure(c)
+    dispatch(c, parent, Directive.spawn_child(JidoTest.OnlyOriginAgent, :worker, node: c.node_b))
+    assert {{:spawn_child_failed, _}, %{status: :failed}} = failure(c)
     assert supervised(c.peer_b, c.jido) == []
     assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
     assert :ok = peer_call(c.peer_b, Supervisor, :terminate_child, [Jido.Supervisor, c.jido])
-    dispatch(c, parent, Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b))
-    assert {{:spawn_agent_failed, _}, %{status: :failed}} = failure(c)
+    dispatch(c, parent, Directive.spawn_child(RemoteCounter, :worker, node: c.node_b))
+    assert {{:spawn_child_failed, _}, %{status: :failed}} = failure(c)
     assert peer_call(c.peer_a, Jido, :whereis_agent, [c.jido, "parent/worker"]) == nil
   end
 
@@ -194,9 +194,9 @@ defmodule Jido.AgentServer.DistributedChildTest do
                [id: "parent/worker"]
              ])
 
-    directive = Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
     dispatch(c, parent, directive)
-    assert {{:spawn_agent_failed, {:child_identity_in_use, "parent/worker"}}, _} = failure(c)
+    assert {{:spawn_child_failed, {:child_identity_in_use, "parent/worker"}}, _} = failure(c)
     assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
     assert :ok = peer_call(c.peer_a, Jido, :stop_agent, [c.jido, other])
     dispatch(c, parent, directive)
@@ -211,7 +211,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
     parent = start_parent(c, directive_timeout: 100)
     supervisor = Jido.agent_supervisor_name(c.jido)
     assert :ok = peer_call(c.peer_b, :sys, :suspend, [supervisor])
-    directive = Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
 
     try do
       dispatch(c, parent, directive)
@@ -219,7 +219,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
       assert {{:child_spawn_indeterminate, :worker, _, request, :timeout},
               %{status: :indeterminate}} = failure(c)
 
-      dispatch(c, parent, Directive.spawn_agent(RemoteCounter, :worker, node: c.node_a))
+      dispatch(c, parent, Directive.spawn_child(RemoteCounter, :worker, node: c.node_a))
       assert {{:child_spawn_pending, :worker, _, ^request}, _} = failure(c)
       dispatch(c, parent, directive)
       assert {{:child_spawn_indeterminate, :worker, _, ^request, :timeout}, _} = failure(c)
@@ -248,7 +248,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
     assert :ok = peer_call(c.peer_b, :sys, :suspend, [supervisor])
 
     try do
-      dispatch(c, parent, Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b))
+      dispatch(c, parent, Directive.spawn_child(RemoteCounter, :worker, node: c.node_b))
       assert {{:child_spawn_indeterminate, _, _, _, :timeout}, _} = failure(c)
       assert :ok = peer_call(c.peer_a, Jido, :stop_agent, [c.jido, parent])
     after
@@ -263,7 +263,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   test "an old request cannot recreate a stopped child, including after registry restart", c do
     alias Jido.AgentServer.{ChildPlacement, SpawnRegistry}
     parent = start_parent(c)
-    directive = Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
     dispatch(c, parent, directive)
     first = child(c, parent)
     parent_ref = peer_call(c.peer_b, Server, :status, [first.pid]).runtime.parent
@@ -307,7 +307,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
     dispatch(
       c,
       parent,
-      Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b, restart: :temporary)
+      Directive.spawn_child(RemoteCounter, :worker, node: c.node_b, restart: :temporary)
     )
 
     worker = child(c, parent)
@@ -349,7 +349,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   test "failed remote stop keeps ownership until the registry is available", c do
     alias Jido.AgentServer.SpawnRegistry
     parent = start_parent(c)
-    dispatch(c, parent, Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b))
+    dispatch(c, parent, Directive.spawn_child(RemoteCounter, :worker, node: c.node_b))
     worker = child(c, parent)
     assert :ok = peer_call(c.peer_b, Supervisor, :terminate_child, [c.jido, SpawnRegistry])
 
@@ -366,7 +366,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   test "a closed late start resolves uncertainty before a new generation", c do
     parent = start_parent(c, directive_timeout: 100)
     supervisor = Jido.agent_supervisor_name(c.jido)
-    directive = Directive.spawn_agent(RemoteCounter, :worker, node: c.node_b)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
     assert :ok = peer_call(c.peer_b, :sys, :suspend, [supervisor])
 
     try do
@@ -392,7 +392,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
     assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
     dispatch(c, parent, directive)
-    assert {{:spawn_agent_failed, :spawn_request_closed}, _} = failure(c)
+    assert {{:spawn_child_failed, :spawn_request_closed}, _} = failure(c)
     assert peer_call(c.peer_a, Server, :status, [parent]).runtime.pending_child_spawns == %{}
     dispatch(c, parent, directive)
     assert node(child(c, parent).pid) == c.node_b

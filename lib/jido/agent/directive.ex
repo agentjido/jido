@@ -19,8 +19,8 @@ defmodule Jido.Agent.Directive do
     EmitToChild,
     EmitToParent,
     Error,
-    Spawn,
-    SpawnAgent,
+    SpawnChild,
+    SpawnProcess,
     Stop,
     StopChild
   }
@@ -34,8 +34,8 @@ defmodule Jido.Agent.Directive do
           | EmitToChild.t()
           | EmitToParent.t()
           | Error.t()
-          | Spawn.t()
-          | SpawnAgent.t()
+          | SpawnChild.t()
+          | SpawnProcess.t()
           | Stop.t()
           | StopChild.t()
 
@@ -45,14 +45,14 @@ defmodule Jido.Agent.Directive do
     EmitToChild,
     EmitToParent,
     Error,
-    Spawn,
-    SpawnAgent,
+    SpawnChild,
+    SpawnProcess,
     Stop,
     StopChild
   ]
 
   @restart_policies [:permanent, :temporary, :transient]
-  @unsupported_spawn_agent_opts [
+  @unsupported_spawn_child_opts [
     :node,
     :lifecycle_mod,
     :pool,
@@ -93,8 +93,8 @@ defmodule Jido.Agent.Directive do
      )}
   end
 
-  def validate(%SpawnAgent{} = directive) do
-    with {:ok, directive} <- Zoi.parse(SpawnAgent.schema(), Map.from_struct(directive)),
+  def validate(%SpawnChild{} = directive) do
+    with {:ok, directive} <- Zoi.parse(SpawnChild.schema(), Map.from_struct(directive)),
          :ok <- validate_agent_target(directive.agent) do
       {:ok, directive}
     end
@@ -120,20 +120,20 @@ defmodule Jido.Agent.Directive do
   end
 
   @doc false
-  def validate_spawn_agent_opts(opts, _refinement_opts \\ [])
+  def validate_spawn_child_opts(opts, _refinement_opts \\ [])
 
-  def validate_spawn_agent_opts(opts, _refinement_opts) when is_map(opts) do
-    unsupported = Enum.filter(@unsupported_spawn_agent_opts, &Map.has_key?(opts, &1))
+  def validate_spawn_child_opts(opts, _refinement_opts) when is_map(opts) do
+    unsupported = Enum.filter(@unsupported_spawn_child_opts, &Map.has_key?(opts, &1))
 
     case unsupported do
       [] -> :ok
-      [:node] -> {:error, "Use SpawnAgent.node for placement, not opts.node"}
-      keys -> {:error, "SpawnAgent does not support lifecycle options #{inspect(keys)}"}
+      [:node] -> {:error, "Use SpawnChild.node for placement, not opts.node"}
+      keys -> {:error, "SpawnChild does not support lifecycle options #{inspect(keys)}"}
     end
   end
 
-  def validate_spawn_agent_opts(value, _refinement_opts),
-    do: {:error, "SpawnAgent opts must be a map, got: #{inspect(value)}"}
+  def validate_spawn_child_opts(value, _refinement_opts),
+    do: {:error, "SpawnChild opts must be a map, got: #{inspect(value)}"}
 
   @doc false
   def validate_agent_target(%Jido.Agent{} = agent) do
@@ -176,14 +176,14 @@ defmodule Jido.Agent.Directive do
   @spec error(term(), atom() | nil) :: Error.t()
   def error(error, context \\ nil), do: %Error{error: error, context: context}
 
-  @doc "Creates a generic Spawn Directive."
-  @spec spawn(Supervisor.child_spec(), term()) :: Spawn.t()
-  def spawn(child_spec, tag \\ nil), do: %Spawn{child_spec: child_spec, tag: tag}
+  @doc "Creates a SpawnProcess Directive for an untracked supervised OTP process."
+  @spec spawn_process(Supervisor.child_spec()) :: SpawnProcess.t()
+  def spawn_process(child_spec), do: %SpawnProcess{child_spec: child_spec}
 
-  @doc "Creates a SpawnAgent Directive. Pass `node: target_node` for a remote owned child."
-  @spec spawn_agent(module() | Jido.Agent.t(), term(), keyword()) :: SpawnAgent.t()
-  def spawn_agent(agent, tag, opts \\ []) do
-    %SpawnAgent{
+  @doc "Creates a SpawnChild Directive. Pass `node: target_node` for remote placement."
+  @spec spawn_child(module() | Jido.Agent.t(), term(), keyword()) :: SpawnChild.t()
+  def spawn_child(agent, tag, opts \\ []) do
+    %SpawnChild{
       agent: agent,
       tag: tag,
       node: Keyword.get(opts, :node),

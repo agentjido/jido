@@ -183,10 +183,10 @@ child for that stopped parent activation.
 
 ### Explicit remote-owned children
 
-`RT-REQ-033`: When `SpawnAgent` omits a node, the child placement boundary
+`RT-REQ-033`: When `SpawnChild` omits a node, the child placement boundary
 shall target the parent's current Erlang node.
 
-`RT-REQ-034`: When `SpawnAgent` supplies an Erlang node, the child placement
+`RT-REQ-034`: When `SpawnChild` supplies an Erlang node, the child placement
 boundary shall target the same-named Jido instance on that node.
 
 `RT-REQ-035`: When an explicit remote target accepts a child, that target Jido
@@ -264,7 +264,7 @@ The first-stage contract keeps these public roles:
 | Agent lifecycle | `start_agent`, `stop_agent`, `whereis_agent`, `hibernate`, `thaw` | Current ID, PID, name, and partition compatibility |
 | Runtime inspection | `Jido.AgentServer.status/2`, `children/2`, `creation_info/2` | Bounded current activation data |
 | Relationships | built-in child Directives and `agent_parent_binding` | Private live handles plus instance-scoped binding data |
-| Remote placement | `Directive.spawn_agent/3` with top-level `node:` | Explicit known-node request, not discovery |
+| Remote placement | `Directive.spawn_child/3` with top-level `node:` | Explicit known-node request, not discovery |
 
 `node:` is an Erlang node atom. The target must run compatible Agent code and
 the same named Jido instance. Agent Server options remain in `opts`; a node

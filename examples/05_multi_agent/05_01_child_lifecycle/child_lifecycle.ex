@@ -24,7 +24,7 @@ defmodule Jido.Examples.ChildLifecycle do
           candidate = %{context.agent_state | desired: context.agent_state.desired ++ [input.tag]}
 
           directive =
-            Jido.Agent.Directive.spawn_agent(Jido.Examples.Worker, input.tag,
+            Jido.Agent.Directive.spawn_child(Jido.Examples.Worker, input.tag,
               restart: input.restart
             )
 

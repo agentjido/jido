@@ -80,7 +80,7 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
 
     supervisor = Jido.agent_supervisor_name(c.jido)
     assert :ok = peer_call(c.peer_b, :sys, :suspend, [supervisor])
-    directive = Directive.spawn_agent(Agent.Worker, :worker, node: c.node_b)
+    directive = Directive.spawn_child(Agent.Worker, :worker, node: c.node_b)
 
     try do
       first = dispatch(c, parent, directive)
@@ -119,7 +119,7 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
       dispatch(
         c,
         parent,
-        Directive.spawn_agent(Agent.Worker, :worker, node: c.node_b, restart: :permanent)
+        Directive.spawn_child(Agent.Worker, :worker, node: c.node_b, restart: :permanent)
       )
 
     events = await_turns(c, probes, 2)
@@ -156,7 +156,7 @@ defmodule JidoTest.Tracing.RemoteCausalTraceTest do
     probes = probes(c, ["parent", "parent/worker"])
     assert {:ok, parent} = peer_call(c.peer_a, Fixtures, :start_parent, [c.jido, [id: "parent"]])
     assert :ok = peer_call(c.peer_b, Supervisor, :terminate_child, [Jido.Supervisor, c.jido])
-    command = dispatch(c, parent, Directive.spawn_agent(Agent.Worker, :worker, node: c.node_b))
+    command = dispatch(c, parent, Directive.spawn_child(Agent.Worker, :worker, node: c.node_b))
     events = await_turns(c, probes, 1)
     [failure] = turns(events, "test.remote.directive")
     assert failure.signal_id == command.id

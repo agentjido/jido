@@ -14,7 +14,7 @@ defmodule Jido.Examples.AgentHierarchy.Grow do
       else
         Enum.flat_map(["left", "right"], fn tag ->
           [
-            Directive.spawn_agent(AgentHierarchy, tag, restart: :temporary),
+            Directive.spawn_child(AgentHierarchy, tag, restart: :temporary),
             Directive.emit_to_child(tag, AgentHierarchy.grow_signal!(depth - 1))
           ]
         end)
