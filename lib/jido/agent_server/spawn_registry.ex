@@ -84,37 +84,10 @@ defmodule Jido.AgentServer.SpawnRegistry do
   end
 
   @impl true
-  def handle_info({:DOWN, ref, :process, owner, :noconnection}, state) do
-    if Map.get(state.monitors, owner) == ref do
-      # Connection loss is not proof of parent death. Preserve the latest
-      # generation so a late request cannot recreate a child after reconnect.
-      next =
-        Enum.reduce(state.requests, state, fn
-          {{^owner, _} = key, entry}, acc -> put_entry(acc, key, %{entry | status: :closed})
-          _, acc -> acc
-        end)
-
-      {:noreply, %{next | monitors: Map.delete(next.monitors, owner)}}
-    else
-      {:noreply, state}
-    end
-  end
-
-  def handle_info({:DOWN, ref, :process, owner, _reason}, state) do
-    if Map.get(state.monitors, owner) == ref do
-      {removed, kept} = Enum.split_with(state.requests, fn {{pid, _tag}, _} -> pid == owner end)
-      Enum.each(removed, fn {key, _} -> RuntimeStore.delete(state.jido, @hive, key) end)
-      by_pid = Map.reject(state.by_pid, fn {_pid, {parent, _}} -> parent == owner end)
-
-      {:noreply,
-       %{
-         state
-         | requests: Map.new(kept),
-           monitors: Map.delete(state.monitors, owner),
-           by_pid: by_pid
-       }}
-    else
-      {:noreply, state}
+  def handle_info({:DOWN, ref, :process, owner, reason}, state) do
+    case Map.fetch(state.monitors, owner) do
+      {:ok, ^ref} -> {:noreply, owner_down(state, owner, reason)}
+      _stale -> {:noreply, state}
     end
   end
 
@@ -130,6 +103,31 @@ defmodule Jido.AgentServer.SpawnRegistry do
   end
 
   def handle_info({:nodedown, _target}, state), do: {:noreply, state}
+
+  defp owner_down(state, owner, :noconnection) do
+    # Connection loss is not proof of parent death. Preserve the latest
+    # generation so a late request cannot recreate a child after reconnect.
+    next =
+      Enum.reduce(state.requests, state, fn
+        {{^owner, _} = key, entry}, acc -> put_entry(acc, key, %{entry | status: :closed})
+        _, acc -> acc
+      end)
+
+    %{next | monitors: Map.delete(next.monitors, owner)}
+  end
+
+  defp owner_down(state, owner, _reason) do
+    {removed, kept} = Enum.split_with(state.requests, fn {{pid, _tag}, _} -> pid == owner end)
+    Enum.each(removed, fn {key, _} -> RuntimeStore.delete(state.jido, @hive, key) end)
+    by_pid = Map.reject(state.by_pid, fn {_pid, {parent, _}} -> parent == owner end)
+
+    %{
+      state
+      | requests: Map.new(kept),
+        monitors: Map.delete(state.monitors, owner),
+        by_pid: by_pid
+    }
+  end
 
   defp put_entry(state, {owner, _tag} = key, entry) do
     :ok = RuntimeStore.put(state.jido, @hive, key, entry)
