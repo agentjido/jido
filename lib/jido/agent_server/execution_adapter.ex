@@ -176,8 +176,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
         handle_message(owner, ref, module, handle, message)
 
       {:jido_exec_adapter_cancel, ^ref, requester, request_ref} ->
-        result = normalize_cancel(invoke(module, :cancel, [handle]), module)
-        send(requester, {:jido_exec_adapter_cancelled, request_ref, result})
+        result = cancel_handle(module, handle, requester, request_ref)
 
         if result == :ok do
           stop_handle(handle)
@@ -214,8 +213,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
         stop_handle(handle)
 
       {:jido_exec_adapter_cancel, ^ref, requester, request_ref} ->
-        result = normalize_cancel(invoke(module, :cancel, [handle]), module)
-        send(requester, {:jido_exec_adapter_cancelled, request_ref, result})
+        result = cancel_handle(module, handle, requester, request_ref)
 
         if result == :ok do
           stop_handle(handle)
@@ -226,6 +224,12 @@ defmodule Jido.AgentServer.ExecutionAdapter do
       _message ->
         await_terminal_ack(owner, ref, token, module, handle)
     end
+  end
+
+  defp cancel_handle(module, handle, requester, request_ref) do
+    result = normalize_cancel(invoke(module, :cancel, [handle]), module)
+    send(requester, {:jido_exec_adapter_cancelled, request_ref, result})
+    result
   end
 
   defp validate_handle(%Task{pid: pid}, _module) when is_pid(pid), do: {:ok, pid}
