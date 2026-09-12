@@ -9,40 +9,6 @@ defmodule Jido.AgentServer.Options do
   @default_directive_timeout 5_000
   @default_readiness_timeout 5_000
 
-  @allowed_keys [
-    :agent,
-    :cron_specs,
-    :debug,
-    :debug_max_events,
-    :default_dispatch,
-    :directive_handler,
-    :directive_timeout,
-    :error_policy,
-    :exec_module,
-    :exec_opts,
-    :id,
-    :idle_timeout,
-    :initial_state,
-    :jido,
-    :max_directives_per_turn,
-    :max_postponed_signals,
-    :name,
-    :on_parent_death,
-    :parent,
-    :partition,
-    :persistence,
-    :pool,
-    :pool_key,
-    :readiness_timeout,
-    :register,
-    :registry,
-    :restart,
-    :restore,
-    :spawn_fun,
-    :state_version,
-    :turn_timeout
-  ]
-
   @schema Zoi.struct(
             __MODULE__,
             %{
@@ -112,12 +78,10 @@ defmodule Jido.AgentServer.Options do
   end
 
   def new(%{} = attrs) do
-    with :ok <- validate_known_keys(attrs),
-         :ok <- validate_identity_options(attrs),
+    with :ok <- validate_identity_options(attrs),
          :ok <- reject_custom_directive_handler(attrs),
          {:ok, agent} <- build_agent(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
-         :ok <- validate_register(Map.get(attrs, :register, not is_nil(Map.get(attrs, :jido)))),
          :ok <- validate_registration(attrs),
          :ok <- validate_parent_policy(Map.get(attrs, :on_parent_death, :stop)),
          :ok <- validate_spawn_fun(Map.get(attrs, :spawn_fun)),
@@ -178,13 +142,6 @@ defmodule Jido.AgentServer.Options do
   end
 
   def new(_value), do: invalid("options must be a map or keyword list")
-
-  defp validate_known_keys(attrs) do
-    case Map.keys(attrs) -- @allowed_keys do
-      [] -> :ok
-      keys -> invalid("options contain unknown keys", %{keys: Enum.sort(keys)})
-    end
-  end
 
   defp reject_custom_directive_handler(attrs) do
     if Map.has_key?(attrs, :directive_handler) do
@@ -327,11 +284,6 @@ defmodule Jido.AgentServer.Options do
     do: :ok
 
   defp validate_name(name), do: invalid("name is invalid", %{name: name})
-
-  defp validate_register(register) when is_boolean(register), do: :ok
-
-  defp validate_register(register),
-    do: invalid("register must be a boolean", %{register: register})
 
   defp validate_registration(attrs) do
     register = Map.get(attrs, :register, not is_nil(Map.get(attrs, :jido)))

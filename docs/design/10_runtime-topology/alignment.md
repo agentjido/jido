@@ -1,12 +1,12 @@
-> The implemented topology baseline remains. The Agent Server work and
-> relationship refinement is pending approval.
+> Implemented seam alignment. This document records the selected contract and
+> its evidence.
 
 # Runtime topology alignment
 
 ## Status
 
-- Baseline selected and implemented: 2026-09-09.
-- Alignment state: `Implemented baseline with pending refinement`.
+- Design selected and implemented: 2026-09-09.
+- Alignment state: `Implemented`.
 - Compatibility state: additive. Existing instance, Agent Server, Plugin,
   child, and explicit known-node APIs remain supported.
 - Follow-on work: seam 11 owns desired state and repair. Seam 13 owns public
@@ -46,12 +46,6 @@ monitored by the Agent Server. Replacement readiness is linked and monitored
 by the Plugin wrapper. Controlled and abrupt owner death stops each owned
 worker.
 
-The proposed refinement expands this rule to every Agent Server operation that
-can run user code, call storage, call a remote runtime, or use an independent
-time limit. It also gives all worker results one activation-and-work fence.
-Tasks perform work. The private Agent Server Runtime remains the only state
-authority.
-
 The Runtime Store owns nondurable coordination data for one live instance
 generation. Its ETS table survives a Runtime Store worker restart because the
 instance Supervisor owns the table. A full instance stop removes the table.
@@ -74,12 +68,6 @@ does not cause a Controller call or remote transport call.
 instance. It owns declared membership, dependency order, readiness, repair,
 and cleanup. The Jido instance only executes requested component lifecycle
 operations.
-
-The proposed relationship refinement keeps logical Agent relationships and
-Plugin runtime ownership in separate private capability projections. Runtime
-Store keeps only process-independent parent binding data. Spawn Registry owns
-distributed request generation, closure, and duplicate-suppression history.
-The Agent Server keeps current live handles and pending operation identity.
 
 ## Four-module Plugin seam
 
@@ -125,7 +113,6 @@ adapter. It does not put all owner logic back in that module.
 | `RT-REQ-045` to `RT-REQ-047` | Instance Ref and stable-reference proof tests | `Proven` |
 | `RT-REQ-048` | Package boundary, missing cluster services, and the named research skip | `Proven` as an explicit non-guarantee |
 | `RT-REQ-049` to `RT-REQ-051` | Controller tests, application supervision guide, and topology examples | `Proven` for the runtime/control-plane split |
-| `RT-REQ-052` to `RT-REQ-061` | Agent Server work, lifecycle, relationship recovery, distributed child, and relative-target tests | `Missing or partial`; proposed work and state boundaries are not implemented |
 
 ## Compatibility decisions
 
@@ -143,8 +130,6 @@ adapter. It does not put all owner logic back in that module.
 | Identity | Keep Ref-first local resolution and current ID and PID paths. |
 | Controller | Keep it outside the Jido instance. |
 | Cluster features | Add no discovery, automatic placement, rebalance, failover, lease, fence, or exclusive-owner claim. |
-| Agent Server work | Expand Task Supervisor ownership but keep all state authority in the private Runtime. |
-| Private child state | Separate logical Agent relationship and Plugin runtime projections without adding a pool. |
 
 ## Limits
 
@@ -158,10 +143,6 @@ adapter. It does not put all owner logic back in that module.
   the remote process is dead.
 - A stable Ref is not a location lease or write-authority grant.
 - The static Controller does not add a cluster control plane.
-- The current broad Agent Server state and mixed child map do not yet prove the
-  proposed private capability split.
-- Some storage, preparation, finalization, built-in effect, and upgrade work
-  can still run in the Agent Server process.
 
 ## Verification record
 
@@ -230,11 +211,3 @@ pass without skips. The documentation warning gate and diff check also passed.
       states.
 - [x] Cluster authority and automatic placement stay outside Jido core.
 - [x] Seam 11 owns desired state and repair through public runtime operations.
-- [ ] All user, storage, remote, and independently timed Agent Server work uses
-      the instance Task Supervisor.
-- [ ] Every worker result uses one activation-and-work fence and has no state
-      authority.
-- [ ] Logical Agent relationships and Plugin runtime ownership use separate
-      private capability projections.
-- [ ] Relationship restore and distributed request ownership match
-      `RT-REQ-057` through `RT-REQ-061`.

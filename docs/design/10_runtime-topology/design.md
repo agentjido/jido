@@ -1,12 +1,10 @@
-> The implemented topology baseline remains selected. The expanded Agent
-> Server work and relationship refinements are pending approval.
+> Selected seam design. This contract is implemented.
 
 # Runtime topology design
 
-Requirements `RT-REQ-001` through `RT-REQ-051` define the implemented
-baseline. Requirements `RT-REQ-052` through `RT-REQ-061` define the proposed
-Agent Server refinement. The [alignment record](alignment.md) gives code, test,
-compatibility, gap, and limit evidence.
+The requirements and decisions in this document define the implemented seam.
+The [alignment record](alignment.md) gives code, test, compatibility, and limit
+evidence.
 
 ## Scope and owner
 
@@ -48,13 +46,6 @@ The application owns the Supervisor above these children. The five instance
 services have separate local names. Agent Servers and Plugin wrappers have
 different logical roles, but first-stage V3 does not use separate pools.
 
-The Task Supervisor is the execution owner for Agent Server work that can run
-user code, call storage, call a remote runtime, or use an independent time
-limit. A private Agent Server Runtime starts this work and keeps all state
-authority. Every result returns with activation and work identity, plus Turn,
-version, Directive, or relationship identity when it applies. A Task is an
-execution location. It is not another state owner.
-
 A logical child relationship does not create a nested OTP Agent tree. The
 target Jido instance owns each local Agent Server process. A parent Agent Server
 owns the logical link and the policy for parent death. For an explicit remote
@@ -65,12 +56,6 @@ Stable identity, current location, and write authority are separate. An Agent
 Ref remains stable while a local PID changes. The instance facade resolves
 local Refs. This seam does not create a distributed directory or grant
 exclusive write authority.
-
-The Agent Server keeps two separate private capability projections. One tracks
-logical Agent relationships. The other tracks Plugin runtime ownership and
-readiness. This separation does not require separate Dynamic Supervisors.
-Runtime Store keeps only process-independent child-to-parent binding data.
-Spawn Registry keeps distributed request generation and closure history.
 
 ## Requirements
 
@@ -268,48 +253,6 @@ repair timing, and cleanup policy under the seam-11 contract.
 Topology Controller, it shall execute the normal Jido lifecycle operation
 without selecting the desired target.
 
-### Agent Server work and relationship refinement
-
-`RT-REQ-052`: When an Agent Server starts work that can run user code, call
-storage, call a remote runtime, or use an independent time limit, the runtime
-topology shall run that work under the selected Jido instance Task Supervisor.
-
-`RT-REQ-053`: If an Agent Server stops while it owns work described by
-`RT-REQ-052`, then the runtime topology shall stop that work before termination
-completes.
-
-`RT-REQ-054`: When owned Agent Server work returns a result, the result shall
-identify its activation and work item, plus its Turn, expected state version,
-Directive position, or relationship operation when those values apply.
-
-`RT-REQ-055`: When an owned Task returns a result, the Task shall have no
-authority to replace the live Agent, advance its state version, change a
-relationship, advance a Directive, or change lifecycle state.
-
-`RT-REQ-056`: The Agent Server shall keep logical Agent relationships and
-Plugin runtime ownership in separate private capability projections, even when
-their processes remain peers in one Agent Dynamic Supervisor.
-
-`RT-REQ-057`: When Runtime Store keeps a child-to-parent binding, it shall keep
-only stable identity and process-independent relationship data and shall not
-keep PIDs, monitors, Task data, or Agent Server Runtime state.
-
-`RT-REQ-058`: When a child activation restores a valid parent binding, it shall
-resolve the current parent, install a new monitor, and announce the new child
-activation before either side treats the live handle as current.
-
-`RT-REQ-059`: When a parent accepts a child-online result, it shall validate
-the child identity, relationship tag, parent identity, placement condition,
-and child activation before it replaces the current child handle.
-
-`RT-REQ-060`: When an Agent Server uses a distributed child-spawn request, the
-Agent Server shall keep only the current pending operation identity and Spawn
-Registry shall keep generation, closure, and duplicate-suppression history.
-
-`RT-REQ-061`: When a relative Signal target depends on the current logical
-relationship, the Agent Server shall resolve the target immediately before
-dispatch.
-
 ## Public contract
 
 The first-stage contract keeps these public roles:
@@ -348,10 +291,6 @@ supported.
   contract.
 - `RT-INV-006`: Runtime topology supplies owned components; the topology
   control plane decides desired state and repair.
-- `RT-INV-007`: Task placement can move execution, but it cannot move Agent
-  Server state authority.
-- `RT-INV-008`: Logical Agent relationships and Plugin runtime ownership are
-  separate lifecycle projections.
 
 ## Downstream guarantees
 
@@ -362,7 +301,7 @@ supported.
 | 99 Delivery | The retained local topology and remote limits have failure-injection and compatibility gates. |
 | External cluster owner | Core accepts explicit known-node placement but supplies no election, lease, fencing, or failover promise. |
 
-## Design decisions
+## Selected design decisions
 
 | ID | Question | Selected option | Effect |
 | --- | --- | --- | --- |
@@ -374,6 +313,3 @@ supported.
 | `RT-DEC-006` | What does core remote placement guarantee? | Explicit known-node ownership, no local fallback, and indeterminate request tracking only. | Core does not claim automatic recovery or exclusive ownership. |
 | `RT-DEC-007` | How does Agent Ref enter this seam? | Resolve locally through seam 09 at each operation and keep PID compatibility. | Identity can outlive a process without adding remote discovery. |
 | `RT-DEC-008` | Who owns activation and repair of a declared Topology? | Keep it in seam 11 and in an application-supervised Controller. | The Jido instance remains a component runtime, not a control plane. |
-| `RT-DEC-009` | Which Agent Server work belongs under the Task Supervisor? | **Proposed:** all user, storage, remote, and independently timed work. | The Runtime keeps serialized decisions while blocking work stays outside it. |
-| `RT-DEC-010` | Do logical Agent children and Plugin runtime children share one private projection? | **Proposed:** no. Keep separate capability projections without adding another process pool. | Each lifecycle has one clear state model and monitor path. |
-| `RT-DEC-011` | How is relationship recovery data divided? | **Proposed:** Runtime Store keeps process-independent parent binding, Spawn Registry keeps distributed request history, and Agent Server keeps only current live and pending projections. | Restart can rebuild fresh handles without persisting process state. |

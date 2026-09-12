@@ -1,5 +1,4 @@
-> The core commit contract is implemented. The owned-work refinement is
-> pending approval.
+> Selected commit-and-effects design. The core contract is implemented.
 
 # Commit and effects design
 
@@ -15,10 +14,10 @@ truth for approval. Code remains canonical for current behavior.
   Directive order and failure atomicity, source and causation continuity, and
   the distinction between ordinary Directives and recoverable work.
 - Out of scope: Turn selection and candidate production; Plugin facet shapes;
-  Agent Server admission, Task Supervisor placement, and lifecycle policy;
-  persistence record and adapter formats; Signal envelope and transport
-  semantics; durable workflow orchestration; external receiver transactions;
-  and exactly-once delivery.
+  Agent Server admission, task, supervision, and lifecycle policy; persistence
+  record and adapter formats; Signal envelope and transport semantics; durable
+  workflow orchestration; external receiver transactions; and exactly-once
+  delivery.
 
 ## Model
 
@@ -58,33 +57,13 @@ There are three distinct completion points:
 External business completion is a fourth, capability-specific point. It is not
 implied by Turn settlement.
 
-### Commit execution shape
-
-The commit boundary separates storage execution from authority publication.
-The Agent Server Runtime prepares one immutable commit attempt. An owned worker
-can write the runtime checkpoint or call the persistence compare-and-swap. It
-returns one classified receipt. The worker cannot replace the live Agent,
-advance the version, reply to the caller, or start a Directive.
-
-The Runtime accepts a receipt only when its activation, work, Turn, and
-expected-version identity match the current commit attempt. It then performs
-the in-memory publication in the existing order. A stale, duplicate, or
-indeterminate receipt cannot publish a candidate. Task placement changes where
-blocking storage work runs. It does not split commit authority.
-
-The same rule applies to post-commit work. A worker can execute one external or
-Plugin operation and return a result. Only the Runtime can accept that result,
-advance the Directive position, update a live relationship projection, or
-settle the Turn.
-
 ### Ownership boundaries
 
 | Owner | Owns here | Must not own here |
 | --- | --- | --- |
 | Turn evaluator, seam 04 | Produces one validated candidate and ordered Directive list. | Live state, revision, persistence, dispatch, or settlement. |
 | Plugin boundary, seam 05 | Applies pure owned-state contributions before candidate return and defines owned post-commit handlers. | Commit choice, storage result, or foreign state. |
-| Agent Server Runtime, seams 06 and 08 | Owns the commit attempt, accepts a current receipt, publishes the live state, and coordinates post-commit handling. | Candidate semantics, storage durability strength, or Signal envelope meaning. |
-| Agent Server-owned worker, seams 08 and 10 | Performs one checkpoint, storage, or post-commit operation and returns a classified result. | Live replacement, version advancement, caller reply, Directive position, settlement, or relationship authority. |
+| Agent Server, seams 06 and 08 | Executes the live commit order and coordinates post-commit handling. | Candidate semantics, storage durability strength, or Signal envelope meaning. |
 | Persistence, seam 07 | Encodes, validates, and atomically writes the record through its adapter. | Candidate production, Directive dispatch, or external effect acknowledgement. |
 | Signals, `jido_signal` | Defines Signal identity, context, trace fields, dispatch, and bus behavior. | Agent commit, state revision, or durability of Agent work. |
 
@@ -264,29 +243,6 @@ retention policy after restart.
 shall not block unrelated later Turns unless that capability declares and
 enforces a narrower admission policy.
 
-### Owned-work authority
-
-`COMMIT-REQ-045`: When an Agent Server runs a required checkpoint or
-persistence operation in an owned worker, the worker shall return one
-classified receipt and shall not replace the live Agent, advance the state
-version, reply to the caller, or start a Directive.
-
-`COMMIT-REQ-046`: When the Agent Server Runtime receives a commit receipt, it
-shall validate the activation, work item, Turn, and expected state version that
-apply before it makes the candidate authoritative.
-
-`COMMIT-REQ-047`: If a commit receipt is stale, duplicate, mismatched, or
-indeterminate, then the Agent Server Runtime shall not publish its candidate or
-start its Directive batch.
-
-`COMMIT-REQ-048`: When an owned worker executes post-commit work, it shall
-return one result and shall not directly change the live Agent, relationship
-projection, Directive position, or Turn settlement.
-
-`COMMIT-REQ-049`: When checkpoint, persistence, or post-commit work moves to an
-owned worker, the validation, checkpoint, publication, reply, Directive, and
-settlement order shall remain unchanged.
-
 ## Public contract
 
 This seam adds no required public commit function, transaction object, outbox
@@ -325,8 +281,6 @@ author must make that composition explicit.
   of committed owned state.
 - `COMMIT-INV-006`: Stable Agent identity, runtime location, state version, and
   write authority are separate values.
-- `COMMIT-INV-007`: A worker can perform commit or effect work, but only the
-  Runtime can accept its result and change live authority.
 
 ## Downstream guarantees
 
@@ -351,5 +305,3 @@ These guarantees apply only after the related requirements are approved.
 | `COMMIT-DEC-005` | Does a Directive timeout prove absence of an effect? | **Selected on 2026-09-09:** no. Report runtime timeout and require application duplicate policy for retries. | Settlement status is not an external transaction result. |
 | `COMMIT-DEC-006` | How does custom checkpointing affect recoverable work? | **Selected on 2026-09-09:** require preservation of every owned field used by the declared guarantee. | Custom callbacks remain supported. Seam 07 owns composition and proof. |
 | `COMMIT-DEC-007` | Does core provide a general durable delivery facility? | **Selected on 2026-09-09:** no. Keep it capability-owned and evaluate reusable implementations as separate public Plugin contracts. | Core keeps no universal outbox, cursor, or global admission gate. |
-| `COMMIT-DEC-008` | Can blocking storage execution leave the Runtime process? | **Proposed:** yes. Use one owned worker that returns a fenced receipt. Keep live publication in the Runtime. | Runtime responsiveness improves without creating a second commit authority. |
-| `COMMIT-DEC-009` | Can a post-commit worker update Runtime state directly? | **Proposed:** no. It returns one result for Runtime acceptance. | Directive order, relationship changes, and settlement stay serialized. |

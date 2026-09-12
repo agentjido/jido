@@ -1,5 +1,4 @@
-> The V3 observability baseline is implemented. Agent Server task-boundary
-> coverage is pending approval.
+> Implemented for the V3 observability contract.
 
 # 13 - Observability
 
@@ -48,10 +47,6 @@ causation IDs stay separate. Signals keep the complete portable W3C carrier.
 `Jido.Signal.Trace` is the public W3C carrier. Jido-owned Tasks explicitly
 attach and restore their private process-local trace context.
 
-Semantic events follow operations, not processes. Moving Agent Server work
-into an owned Task does not add a public event family or stage. Internal work
-references, Task PIDs, monitors, and timers remain private metadata.
-
 ## Consumers
 
 `Jido.Telemetry.metrics/0` returns low-cardinality metrics from semantic events.
@@ -86,10 +81,8 @@ resources, and vendor configuration.
 - OpenTelemetry tests prove the optional API mapping, safe attributes, links,
   disabled behavior, portable Signal context, and explicit Task restoration.
 - The semantic boundary demonstration runs all main families together.
-- Expanded Task coverage for Agent Server preparation, finalization, storage,
-  effects, and upgrade work is proposed and does not yet have complete proof.
 
 ## Documents
 
-- [Target design](design.md)
-- [Alignment and evidence](alignment.md)
+- [Selected design](design.md)
+- [Implemented alignment and evidence](alignment.md)

@@ -162,26 +162,20 @@ defmodule Jido.AgentServer.ExecutionAdapter do
     Process.link(owner)
 
     with {:ok, handle} <- invoke(module, :run_async, args),
-         {:ok, exec_pid, ownership} <- validate_handle(handle, module) do
-      exec_monitor_ref = monitor_exec(exec_pid, ownership)
-      link_exec(exec_pid)
+         {:ok, exec_pid} <- validate_handle(handle, module) do
+      if Process.alive?(exec_pid), do: Process.link(exec_pid)
       send(owner, {:jido_exec_adapter_started, ref, exec_pid})
-      loop(owner, ref, module, handle, exec_monitor_ref, exec_pid)
+      loop(owner, ref, module, handle)
     else
       {:error, error} ->
         send(owner, {:jido_exec_adapter_start_failed, ref, error})
     end
   end
 
-  defp loop(owner, ref, module, handle, exec_monitor_ref, exec_pid) do
+  defp loop(owner, ref, module, handle) do
     receive do
-      {:DOWN, ^exec_monitor_ref, :process, ^exec_pid, reason}
-      when is_reference(exec_monitor_ref) ->
-        error = exec_process_exit_error(module, exec_pid, reason)
-        send(owner, {:jido_exec_adapter_execution_failed, ref, error})
-
       {:jido_exec_adapter_forward, ^ref, message} ->
-        handle_message(owner, ref, module, handle, message, exec_monitor_ref, exec_pid)
+        handle_message(owner, ref, module, handle, message)
 
       {:jido_exec_adapter_cancel, ^ref, requester, request_ref} ->
         result = normalize_cancel(invoke(module, :cancel, [handle]), module)
@@ -190,15 +184,15 @@ defmodule Jido.AgentServer.ExecutionAdapter do
         if result == :ok do
           stop_handle(handle)
         else
-          loop(owner, ref, module, handle, exec_monitor_ref, exec_pid)
+          loop(owner, ref, module, handle)
         end
 
       message ->
-        handle_message(owner, ref, module, handle, message, exec_monitor_ref, exec_pid)
+        handle_message(owner, ref, module, handle, message)
     end
   end
 
-  defp handle_message(owner, ref, module, handle, message, exec_monitor_ref, exec_pid) do
+  defp handle_message(owner, ref, module, handle, message) do
     token = make_ref()
     send(owner, {:jido_exec_adapter_callback_started, ref, token, :handle_message})
 
@@ -210,7 +204,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
     send(owner, {:jido_exec_adapter_callback_result, ref, token, result})
 
     if result == :ignore do
-      loop(owner, ref, module, handle, exec_monitor_ref, exec_pid)
+      loop(owner, ref, module, handle)
     else
       await_terminal_ack(owner, ref, token, module, handle)
     end
@@ -236,16 +230,14 @@ defmodule Jido.AgentServer.ExecutionAdapter do
     end
   end
 
-  defp validate_handle(%{pid: pid, owner: owner}, module) do
-    cond do
-      owner != self() -> {:error, invalid_handle_owner_error(module, owner)}
-      is_pid(pid) -> {:ok, pid, :owned}
-      true -> validate_handle(%{pid: pid}, module)
-    end
-  end
+  defp validate_handle(%Task{pid: pid}, _module) when is_pid(pid), do: {:ok, pid}
+
+  defp validate_handle(%{pid: pid, owner: owner}, _module)
+       when is_pid(pid) and owner == self(),
+       do: {:ok, pid}
 
   defp validate_handle(%{pid: pid}, _module) when is_pid(pid) do
-    if Process.alive?(pid), do: {:ok, pid, :generic}, else: {:error, invalid_handle_error(pid)}
+    if Process.alive?(pid), do: {:ok, pid}, else: {:error, invalid_handle_error(pid)}
   end
 
   defp validate_handle(handle, module) do
@@ -258,18 +250,6 @@ defmodule Jido.AgentServer.ExecutionAdapter do
          handle: inspect(handle)
        }
      )}
-  end
-
-  defp invalid_handle_owner_error(module, owner) do
-    Error.execution_error("Agent Exec run_async returned a handle owned by another process",
-      details: %{
-        code: :agent_exec_invalid_callback_result,
-        module: module,
-        callback: :run_async,
-        owner: inspect(owner),
-        expected_owner: inspect(self())
-      }
-    )
   end
 
   defp invalid_handle_error(pid) do
@@ -331,27 +311,6 @@ defmodule Jido.AgentServer.ExecutionAdapter do
         module: module,
         callback: callback,
         kind: kind,
-        reason: reason
-      }
-    )
-  end
-
-  defp monitor_exec(pid, :generic), do: Process.monitor(pid)
-  defp monitor_exec(_pid, :owned), do: nil
-
-  defp link_exec(pid) do
-    Process.link(pid)
-    :ok
-  catch
-    :error, :noproc -> :ok
-  end
-
-  defp exec_process_exit_error(module, pid, reason) do
-    Error.execution_error("Agent Exec process exited before a terminal result",
-      details: %{
-        code: :agent_exec_callback_task_failed,
-        module: module,
-        pid: inspect(pid),
         reason: reason
       }
     )

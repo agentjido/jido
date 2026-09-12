@@ -1,17 +1,15 @@
-> Proposed seam refinement. It keeps the selected runtime behavior and narrows
-> the internal Agent Server design. Review is pending.
+> Selected seam design. The implementation direction was selected on
+> 2026-09-10.
 
 # Agent Server design
 
-The requirements in this document include the implemented Agent Server
-contract and a proposed internal refinement. See
-[alignment.md](alignment.md) for current evidence and remaining work.
+The requirements in this document define the selected Agent Server contract.
+See [alignment.md](alignment.md) for implementation evidence and deferred
+owner work.
 
 ## Scope and owner
 
-- Public owner: `Jido.AgentServer`, as the stable API facade.
-- Runtime owner: private `Jido.AgentServer.Runtime`, as the live activation
-  state machine.
+- Owner: `Jido.AgentServer` and its private live activation state machine.
 - In scope: standard OTP startup, one live state owner, Signal admission,
   serialization, active-Turn control, task and timer ownership, live commit
   coordination, Directive settlement, Plugin runtime links, child-effect
@@ -28,96 +26,10 @@ contract and a proposed internal refinement. See
 
 ## Model
 
-One Agent Server is one replaceable activation of one logical Agent. The public
-`Jido.AgentServer` module is an API facade. A private Runtime owns the mutable
-OTP state for that activation. The facade and Runtime are not separate
-processes. The PID or OTP name returned by public startup is the Runtime handle,
-not durable identity. The Agent value remains immutable, portable domain data.
-
-### Facade and Runtime
-
-```text
-caller or supervisor
-  -> Jido.AgentServer public facade
-  -> Jido.AgentServer.Runtime :gen_statem process
-       -> owned supervised work
-       -> typed result message
-       -> serialized Runtime decision
-```
-
-The facade owns public names, validation that belongs at the API edge, and OTP
-delegation. The private Runtime owns callbacks, state, event ordering,
-authority, phase changes, and result acceptance. `child_spec/1` keeps its start
-MFA on `Jido.AgentServer.start_link/1`. This keeps stack traces, supervision
-trees, and existing application code understandable.
-
-The Runtime starts work but does not give work authority. A task can prepare a
-Turn, call a Plugin, call storage, perform a remote operation, or run an upgrade
-callback. Only the Runtime can accept the result and change live state.
-
-### Runtime state shape
-
-The target private state has four parts:
-
-| Part | Content |
-| --- | --- |
-| Authority | Committed Agent, state version, activation identity, instance context, and configuration |
-| Phase work | One phase-specific value for initialization, admission, execution, commit, Directive settlement, or upgrade |
-| Capabilities | Plugin runtimes, logical relationships, attachments, persistence context, and debug state |
-| Admission control | OTP postponed-event tokens and the documented limits |
-
-One flat value does not need one optional field for every phase. A phase work
-value contains the task, timer, caller, Turn identity, and expected version
-needed for that phase. A result that does not match the live activation and
-phase work identity has no authority.
-
-### Work boundaries
-
-| Stage | Runtime decides | Owned work can do | Runtime accepts |
-| --- | --- | --- | --- |
-| Initialize | Start order and readiness state | Restore, Plugin setup, readiness wait, and initial storage call | Validated startup result for this activation |
-| Admit and evaluate | Admit one Signal and start one Turn | Plugin admission, Runner preparation, Exec coordination, and Runner finalization | Candidate Agent and ordered Directives for this Turn |
-| Commit | Freeze cancellation and preserve old authority | Runtime-checkpoint or durable storage call | Confirmed write result for the expected version |
-| Direct | Preserve order and choose the next Directive | Plugin callback, dispatch, child operation, or other external effect | One result for the current Directive index |
-| Policy and upgrade | Apply only allowed lifecycle decisions | Application error policy, code operation, or state migration | Validated decision or complete migrated Agent |
-
-Small pure validation and state transition functions can run in Runtime. User
-code, storage calls, remote calls, and work with an independent timeout must
-not run in Runtime.
-
-### Relationship state
-
-Logical Agent relationships are a private runtime projection. They are not an
-OTP supervision tree.
-
-```text
-child Runtime
-  parent reference and monitor
-  -> Runtime Store child-to-parent binding
-
-parent Runtime
-  child entries by tag
-  <- child-online announcement after restart
-
-SpawnRegistry
-  distributed spawn generation and closed-request history
-```
-
-The relationship capability contains `parent`, `orphaned_from`, logical Agent
-`children`, pending local relationship operations, and the parent-death policy.
-Plugin runtime children use a different capability value.
-
-The Runtime Store binding contains stable child and parent identity,
-partition, tag, metadata, and creation-cause data. It does not contain a
-PID, monitor, task, or Runtime state. On restart, the child loads this binding,
-resolves the current parent, creates a new monitor, and announces itself. The
-parent validates the child identity and activation before it rebuilds the live
-entry.
-
-`SpawnRegistry` owns distributed request generation, closure, and late-arrival
-fencing. The Agent Server can keep the identity of one pending request, but it
-does not own the distributed request history. Seam 10 owns placement and the
-complete runtime-topology contract.
+One Agent Server is one replaceable activation of one logical Agent. It owns
+the mutable OTP state for that activation. The Agent value remains immutable,
+portable domain data. A PID or OTP name is a runtime handle, not durable
+identity.
 
 The live sequence is:
 
@@ -159,9 +71,7 @@ in a degraded writer mode. It stops before another Turn.
 
 ## Requirements
 
-Each requirement defines target behavior. `SRV-REQ-001` through
-`SRV-REQ-076` record the implemented baseline. `SRV-REQ-077` through
-`SRV-REQ-096` define the proposed internal refinement. Acceptance state is in
+Each requirement is part of the selected target. Its acceptance state is in
 [alignment.md](alignment.md).
 
 ### Server role and OTP boundary
@@ -464,94 +374,12 @@ after an abnormal activation restart.
 BEAM code loads, replace Plugin runtime structure, or migrate private Agent
 Server state.
 
-### Internal facade and work boundaries
-
-`SRV-REQ-077`: While the documented direct API remains supported,
-`Jido.AgentServer` shall expose startup, Signal input, Turn control,
-inspection, lifecycle, local-handle, debug, child, and upgrade functions as a
-public facade.
-
-`SRV-REQ-078`: When `Jido.AgentServer.start_link/1` succeeds, it shall return
-the PID of the one private Runtime process and shall not start a second facade
-process.
-
-`SRV-REQ-079`: When a supervisor uses `Jido.AgentServer.child_spec/1`, the
-child specification shall keep `Jido.AgentServer.start_link/1` as its public
-start entry.
-
-`SRV-REQ-080`: While one activation is live, only the private Runtime shall
-implement its OTP callbacks and accept events that can change live authority.
-
-`SRV-REQ-081`: When Agent Server work can call user code, storage, a remote
-runtime, or another operation with an independent limit, the Runtime shall run
-that work outside its process under the owning Jido Task Supervisor.
-
-`SRV-REQ-082`: When owned work reports a result, the result shall identify the
-activation, work item, and related Turn or expected state version where those
-values apply.
-
-`SRV-REQ-083`: If an owned-work result is late, duplicate, or does not match
-the current phase work, then the Runtime shall reject it without changing the
-Agent, state version, relationship projection, or Directive position.
-
-`SRV-REQ-084`: If owned work exits or is cancelled before the Runtime accepts
-a valid result, then that work shall not change live Server authority.
-
-`SRV-REQ-085`: While the Runtime is in one phase, its private phase-work value
-shall contain only the task, timer, caller, Turn identity, and expected version
-that can be valid in that phase.
-
-### Logical relationship projection
-
-`SRV-REQ-086`: While a logical parent-child relationship is live, the parent
-and child Agent Servers shall remain OTP peers and shall not use the logical
-relationship as their OTP supervision relationship.
-
-`SRV-REQ-087`: The Runtime shall keep the live parent reference, former-parent
-reference, logical Agent children, pending relationship work, and parent-death
-policy in one private relationship capability value.
-
-`SRV-REQ-088`: The Runtime shall keep Plugin runtime children separate from
-logical Agent children.
-
-`SRV-REQ-089`: Where a named Jido instance preserves a child-to-parent binding,
-the binding shall contain stable identity and process-independent relationship
-data and shall not contain PIDs, monitors, tasks, or Runtime state.
-
-`SRV-REQ-090`: When a child activation restores a valid parent binding, it
-shall resolve the current parent handle, create a new monitor, and announce its
-current activation before the parent rebuilds the live child entry.
-
-`SRV-REQ-091`: When a parent receives a child-online event, it shall validate
-the child identity, relationship tag, parent identity, placement condition,
-and current activation identity before it replaces a live child entry.
-
-`SRV-REQ-092`: When a logical parent exits, the child Runtime shall remove the
-stale monitor, apply the configured parent-death policy, and report any Agent
-behavior as a later Signal rather than an in-place Agent state change.
-
-`SRV-REQ-093`: The Agent Server shall not store a live ParentRef, ChildInfo,
-PID, monitor, spawn request reference, or orphan record in the Agent value or
-an Agent checkpoint.
-
-`SRV-REQ-094`: When an Agent Server uses a distributed child-spawn request, it
-shall use the Spawn Registry contract for request generation, closure, and
-late-arrival fencing.
-
-`SRV-REQ-095`: When a relative Signal target depends on the current logical
-relationship, the Runtime shall resolve that relationship immediately before
-dispatch and shall not persist the resolved PID as domain state.
-
-`SRV-REQ-096`: When public inspection reports Agent children or a parent, it
-shall return the documented public relationship projection and shall not
-return monitor references, task handles, or private Runtime state.
-
 ## Public contract
 
 ### Supported compatibility entries
 
-`Jido.AgentServer` remains the public facade for these roles until an approved
-migration proves a replacement:
+The current public roles remain supported until an approved migration proves a
+replacement:
 
 | Role | Entries | Result meaning |
 | --- | --- | --- |
@@ -559,37 +387,19 @@ migration proves a replacement:
 | Signal input | `call/3`, `cast/2`, `send_request/3`, `receive_response/2` | Commit result, best-effort send, or OTP request protocol |
 | Turn control | `cancel/2`, `cancel_turn/3` | Active pre-commit cancellation or defined rejection |
 | Inspection | `agent/2`, `plugin_state/3`, `status/2`, `snapshot/2`, `children/2`, `await_ready/2` | Current committed or bounded runtime view |
-| Logical relationships | `adopt_child/4`, `stop_child/3`, `children/2` | Compatible parent-owned relationship control and public child projection |
 | Lifecycle | `stop/3`, `hibernate/2`, `attach/3`, `detach/3`, `touch/1` | Process and idle-lifecycle control |
 | Local handles | `whereis/3`, `via_tuple/3`, `alive?/1` | Replaceable PID/name lookup and liveness |
 | Debug | `set_debug/3`, `recent_events/3` | Bounded in-process diagnostic compatibility path |
 | Upgrade | `upgrade/2`, `upgrade/3`, `upgrade/4` | Quiescent code operation or validated Agent definition replacement |
 
-`start_link/2`, `adopt_parent/2`, and `creation_info/1` remain exported
-compatibility entries for Jido runtime components. They are not general
-application extension points. The facade must keep their current message and
-reply behavior while supervised startup and runtime topology use them.
-
 The target does not require new `Status`, `Commit`, or Snapshot structs. Seam
 12 requires the owner to document why compatibility maps and OTP controls
 remain. Seam 13 owns any change to Outcome availability or observation data.
 
-A Ref-first instance facade is additive and belongs to seam 09. It resolves
-identity and calls the direct `Jido.AgentServer` facade. These two facade roles
-do not conflict: seam 09 owns identity resolution; seam 08 owns the stable
-direct Server API and Runtime delegation. Neither makes PID identity durable.
-
-### Delegation contract
-
-The facade delegates OTP operations to `Jido.AgentServer.Runtime`. The
-delegation keeps the current message and reply protocols. Public functions do
-not access Runtime state directly. Private Runtime messages are not public
-extension points.
-
-`start_link/1` and `start/1` can validate public options before they start the
-Runtime. The Runtime remains responsible for startup ordering and readiness.
-`cast/2` remains best effort. The facade returns `:ok` after the message is
-sent; this does not prove admission, commit, or Directive completion.
+A Ref-first command and lifecycle facade is additive and belongs to seam 09.
+That facade resolves identity and calls this runtime boundary. It cannot make
+PID identity durable or remove current functions without a separate approved
+migration.
 
 ### Time limits
 
@@ -635,15 +445,6 @@ private Agent Server state has no public migration contract.
   version, definition revision, and storage revision remain separate values.
 - `SRV-INV-008`: Agent Server policy does not become instance or topology
   policy.
-- `SRV-INV-009`: The public facade and private Runtime identify one OTP
-  process, not two owners.
-- `SRV-INV-010`: An owned task can produce a result but cannot commit it.
-- `SRV-INV-011`: A work result without a match to current phase work has no
-  authority.
-- `SRV-INV-012`: Logical Agent relationships and Plugin runtime ownership do
-  not share one child-state model.
-- `SRV-INV-013`: Runtime Store can preserve a logical relationship binding but
-  cannot preserve a live relationship handle.
 
 ## Downstream guarantees
 
@@ -651,13 +452,13 @@ These guarantees apply only after the related requirements are approved.
 
 | Consumer seam | Guaranteed contract |
 | --- | --- |
-| 09 Jido instance | A resolved runtime handle reaches the same direct Agent Server facade. Ref resolution stays instance-owned. |
-| 10 Runtime topology | One activation owns its local relationship projection. Runtime Store keeps process-independent bindings, SpawnRegistry keeps distributed request generations, and placement stays outside Agent Server. |
+| 09 Jido instance | A resolved runtime handle has serialized command, control, inspection, and lifecycle behavior; Ref resolution stays instance-owned. |
+| 10 Runtime topology | One activation owns live state; placement and cluster authority remain outside Agent Server. |
 | 11 Topology control plane | Child effects use runtime contracts but do not define Topology reconciliation policy. |
 | 13 Observability | Current phases, Outcome stages, commit point, settlement point, and interruption limits have explicit meanings. |
 | 99 Delivery | Every Server requirement has one acceptance state and compatibility gate. |
 
-## Proposed design decisions
+## Selected design decisions
 
 | ID | Question | Recommended option | Effect |
 | --- | --- | --- | --- |
@@ -671,8 +472,3 @@ These guarantees apply only after the related requirements are approved.
 | `SRV-DEC-008` | Is hot private-state upgrade in V3 scope? | Defer it until a separate migration and rollback contract exists. | This seam makes no unsupported live-upgrade claim. |
 | `SRV-DEC-009` | How does coordinated code installation avoid a mixed active Turn? | Run an explicit operator callback only after the Server becomes idle. | Arbitrary module loads stay outside the guarantee. |
 | `SRV-DEC-010` | How can a live Agent use a new state schema? | Validate one migration result against a target definition with the same identity and Plugin declarations, then commit it through the normal checkpoint order. | The Agent value changes without migrating private Server or Plugin runtime structure. |
-| `SRV-DEC-011` | How can the public module become a facade without breaking `start_link/1`? | Let a private Runtime implement `:gen_statem`; return that Runtime PID and keep the public child-spec MFA. | Existing supervision and direct APIs keep one-process behavior. |
-| `SRV-DEC-012` | Which work stays in the Runtime process? | Keep pure validation, state transitions, result acceptance, commit installation, and lifecycle decisions. Run user, storage, remote, and independently timed work in owned tasks. | The Runtime stays responsive without giving tasks commit authority. |
-| `SRV-DEC-013` | How are task results authorized? | Use one internal work envelope with activation, work, Turn, Directive index, and expected-version identity as applicable. | Late and duplicate messages become one general rejection rule. |
-| `SRV-DEC-014` | How are relationships represented? | Keep the V2 logical projection and Runtime Store binding, but retain V3 monitor, activation, creation-cause, and spawn-generation checks. | Restart recovery stays simple and stale process generations cannot silently take ownership. |
-| `SRV-DEC-015` | Do Agent children and Plugin runtimes share one child map? | No. Give each lifecycle model its own private capability value and transitions. | Monitor handling and public child meaning become easier to verify. |

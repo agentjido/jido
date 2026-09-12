@@ -129,8 +129,6 @@ Events are newest-first. The buffer can contain:
 - `:turn_failed` after a failed, cancelled, timed-out, or indeterminate Turn.
 - `:directive_failed` after one post-commit Directive fails.
 - `:error_signal_delivery_failed` when error-policy Signal delivery fails.
-- `:definition_upgrade_completed` after a validated definition replacement becomes live.
-- `:definition_upgrade_failed` when a definition replacement does not change live state.
 
 A terminal Turn entry contains a bounded outcome map. It includes Turn, Agent,
 and Signal IDs, status, stage, commit state, revisions, Directive counts,

@@ -1,5 +1,5 @@
-> The implemented observation baseline remains. Expanded Agent Server
-> task-boundary coverage is pending approval.
+> Implemented seam alignment. This record maps the selected observation
+> contract to its owners, compatibility rules, and evidence.
 
 # Jido V3 observability alignment
 
@@ -7,16 +7,14 @@
 
 - Contract refinement implemented: 2026-09-09.
 - Documentation refinement implemented: 2026-09-10.
-- Alignment state: `Implemented baseline with pending refinement`.
+- Alignment state: `Implemented`.
 - Compatibility state: breaking V3 cleanup. Legacy Agent Server telemetry and
   `Jido.Observe` are removed. Semantic telemetry is the single source.
 - OpenTelemetry state: Core has an API-only optional mapping. The host owns the
   SDK, exporter, collector, network, credentials, resources, and vendor policy.
 - Follow-on work: the V3 package and release gate remain.
-- Agent Server refinement: `OBS-REQ-059` through `OBS-REQ-061` are not
-  implemented for all proposed owned-work paths.
 
-## Decision alignment
+## Selected decisions
 
 | ID | Decision | Result |
 | --- | --- | --- |
@@ -28,7 +26,6 @@
 | `OBS-DEC-006` | Keep an API-only optional mapping in Core and all SDK infrastructure in the host. | The semantic catalog directly creates spans when an SDK tracer is active. |
 | `OBS-DEC-007` | End the Turn span at the live result. | `turn.settled` is a zero-duration span linked to the completed Turn. |
 | `OBS-DEC-008` | Remove legacy observation paths before V3 release. | V3 has one source for telemetry, logs, metrics, and optional traces. |
-| `OBS-DEC-009` | Keep semantic spans attached to operations, not Runtime or Task processes. | `Pending`; the public event and stage vocabulary does not change. |
 
 ## Owner alignment
 
@@ -129,14 +126,6 @@ SDK tracer, this path is a no-op.
 - `Jido.Signal.Trace` is the public W3C carrier. Jido trace integration stays private.
 - Bounded debug history remains available through Agent Server and Ref APIs.
 
-## Agent Server refinement
-
-The proposed Agent Server Runtime split does not add semantic event names,
-public stages, or worker identity fields. Existing spans continue to describe
-the semantic operation across Runtime and Task processes. Each new owned-work
-path must transfer trace context and must exclude its private work reference,
-Task PID, monitor, and timer.
-
 ## Requirement evidence
 
 | Requirements | Evidence | State |
@@ -155,7 +144,6 @@ Task PID, monitor, and timer.
 | `OBS-REQ-044` to `OBS-REQ-048`, `OBS-REQ-055` | API-only tracer tests cover safe mapping, span end, settlement link, W3C extraction and injection, Task transfer, disabled mode, and no SDK ownership. A clean no-optional-dependency build covers absence. | `Proven` |
 | `OBS-REQ-049` to `OBS-REQ-051` | Schema version 1 and explicit pre-release V3 removal | `Proven` |
 | `OBS-REQ-052` to `OBS-REQ-054`, `OBS-REQ-056` to `OBS-REQ-058` | Focused catalog, privacy, correlation, Scheduler, disabled-consumer, and optional-integration tests | `Proven` |
-| `OBS-REQ-059` to `OBS-REQ-061` | Agent Server preparation, finalization, checkpoint, persistence, effect, relationship, and upgrade Task tests | `Missing or partial`; the expanded owned-work paths are not implemented |
 
 ## Verification record
 
@@ -178,7 +166,3 @@ changes, so their package verification stays outside this documentation record.
 - [x] OpenTelemetry API mapping is optional and infrastructure stays with the host.
 - [x] Legacy `Jido.Observe`, Agent Server telemetry, and legacy metrics are removed.
 - [x] Public guides, examples, and module text use the selected contract.
-- [ ] Agent Server Runtime-to-Task moves preserve the existing semantic start,
-      terminal, status, stage, and ordering meanings.
-- [ ] Every new Agent Server-owned Task transfers trace context and excludes
-      private worker identity from semantic metadata.

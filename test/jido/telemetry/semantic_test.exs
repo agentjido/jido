@@ -12,7 +12,6 @@ defmodule Jido.Telemetry.SemanticTest do
              agent_partition: "west",
              agent_id: "order-1",
              agent_module: __MODULE__,
-             target_agent_module: String,
              status: :conflict,
              stage: :commit,
              operation: :compare_and_swap,
@@ -28,7 +27,6 @@ defmodule Jido.Telemetry.SemanticTest do
              agent_partition: "west",
              agent_id: "order-1",
              agent_module: __MODULE__,
-             target_agent_module: String,
              status: :conflict,
              stage: :commit,
              operation: :compare_and_swap,
@@ -42,13 +40,6 @@ defmodule Jido.Telemetry.SemanticTest do
              }),
              :agent_partition
            )
-  end
-
-  test "metadata normalization permits the definition upgrade persistence reason" do
-    assert Semantic.normalize_metadata(%{persistence_reason: :definition_upgrade}) == %{
-             schema_version: 1,
-             persistence_reason: :definition_upgrade
-           }
   end
 
   test "measurement normalization keeps only approved integers" do

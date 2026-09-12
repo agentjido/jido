@@ -122,8 +122,8 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Plugin briefing](05_plugins/README.md) | Pending approval |
 | [Plugin design](05_plugins/design.md) | Pending approval |
 | [Plugin alignment](05_plugins/alignment.md) | Pending approval |
-| [Commit and effects briefing](06_commit-and-effects/README.md) | Pending approval |
-| [Commit and effects design](06_commit-and-effects/design.md) | Pending approval |
+| [Commit and effects briefing](06_commit-and-effects/README.md) | Selected and implemented |
+| [Commit and effects design](06_commit-and-effects/design.md) | Selected and implemented |
 | [Commit and effects alignment](06_commit-and-effects/alignment.md) | Pending approval |
 | [Persistence briefing](07_persistence/README.md) | Pending approval |
 | [Persistence design](07_persistence/design.md) | Pending approval |
@@ -134,7 +134,7 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Jido instance briefing](09_jido-instance/README.md) | Selected and implemented |
 | [Jido instance design](09_jido-instance/design.md) | Selected and implemented |
 | [Jido instance alignment](09_jido-instance/alignment.md) | Implemented |
-| [Runtime topology briefing](10_runtime-topology/README.md) | Pending approval |
+| [Runtime topology briefing](10_runtime-topology/README.md) | Selected and implemented |
 | [Runtime topology design](10_runtime-topology/design.md) | Pending approval |
 | [Runtime topology alignment](10_runtime-topology/alignment.md) | Pending approval |
 | [Topology control-plane briefing](11_topology-control-plane/README.md) | Pending approval |
@@ -143,9 +143,9 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Errors and contracts briefing](12_errors-and-contracts/README.md) | Selected and implemented |
 | [Errors and contracts design](12_errors-and-contracts/design.md) | Pending approval |
 | [Errors and contracts alignment](12_errors-and-contracts/alignment.md) | Implemented |
-| [Observability briefing](13_observability/README.md) | Pending approval |
-| [Observability design](13_observability/design.md) | Pending approval |
-| [Observability alignment](13_observability/alignment.md) | Pending approval |
+| [Observability briefing](13_observability/README.md) | Selected and implemented |
+| [Observability design](13_observability/design.md) | Selected and implemented |
+| [Observability alignment](13_observability/alignment.md) | Selected and implemented |
 | [Package boundaries briefing](90_package-boundaries/README.md) | Approved |
 | [Package boundaries design](90_package-boundaries/design.md) | Approved |
 | [Package boundaries alignment](90_package-boundaries/alignment.md) | Approved |

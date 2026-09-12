@@ -211,7 +211,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
         is_function(state.spawn_fun, 1) ->
           state.spawn_fun.(child_spec)
 
-        is_atom(state.jido) and not is_nil(state.jido) ->
+        is_atom(state.jido) ->
           DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), child_spec)
 
         true ->
@@ -219,16 +219,11 @@ defmodule Jido.AgentServer.DirectiveRuntime do
       end
 
     case result do
-      {:ok, pid} when is_pid(pid) -> {:ok, state}
-      {:ok, pid, _info} when is_pid(pid) -> {:ok, state}
+      {:ok, _pid} -> {:ok, state}
+      {:ok, _pid, _info} -> {:ok, state}
       :ignore -> {:ok, state}
       {:error, reason} -> {:error, {:spawn_process_failed, reason}, state}
-      other -> {:error, {:spawn_process_failed, {:invalid_result, other}}, state}
     end
-  rescue
-    error -> {:error, {:spawn_process_failed, {:error, error}}, state}
-  catch
-    kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}, state}
   end
 
   defp spawn_child(%SpawnChild{} = directive, context, %State{jido: jido} = state)

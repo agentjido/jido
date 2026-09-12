@@ -4,8 +4,6 @@
 
 Narrow prepared input and the post-execution Agent Plugin pipeline are
 implemented on branch `v3-spike`. The complete package cleanup is not complete.
-The process-neutral callback rules in `PLG-REQ-077` through `PLG-REQ-080` are
-pending approval and implementation.
 
 ## Current evidence
 
@@ -27,17 +25,12 @@ pending approval and implementation.
 | Mixed `use Jido.Plugin` package callbacks remain in the normalizer. | Plugin declaration | Open |
 | Built-in Plugins still use the mixed package form. | Plugin packages | Open |
 | Identity and Secure Signal use package inputs without Signal replacement. | Examples | Fixed |
-| Plugin callback contracts do not yet state that caller process identity is private. | Plugin callback boundary | Pending design approval |
-| Live callback paths do not yet have one complete proof for Task containment, same-Server reentry, and no live authority. | Agent Server and Plugin boundary | Missing evidence |
 
 ## Ordered follow-up
 
 1. Move each built-in Plugin to explicit owner facets.
 2. Remove mixed package normalization and `legacy?` fields.
-3. Move live callback execution only after the Agent Server work boundary is
-   approved.
-4. Prove callback parity, reentry rejection, and stale-result rejection.
-5. Run core, example, benchmark, peer, docs, and Dialyzer checks.
+3. Run core, example, benchmark, peer, docs, and Dialyzer checks.
 
 ## Acceptance matrix
 
@@ -49,4 +42,3 @@ pending approval and implementation.
 | `PLG-REQ-036` to `PLG-REQ-039` | Directive ownership and runtime tests |
 | `PLG-REQ-040` to `PLG-REQ-051` | Agent Server commit and Plugin lifecycle tests |
 | `PLG-REQ-053` to `PLG-REQ-060` | Persistence and Topology facet tests |
-| `PLG-REQ-077` to `PLG-REQ-080` | Direct-versus-Task callback parity, same-Server reentry, owner-death, and stale-result tests |

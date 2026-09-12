@@ -359,94 +359,6 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert_receive {:DOWN, ^child_ref, :process, ^child, _reason}, 2_000
   end
 
-  test "a local online notice cannot replace a different live child", %{jido: jido} do
-    parent_id = unique_id("online-parent")
-    {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
-
-    parent_ref = ParentRef.new!(pid: parent, id: parent_id, tag: :worker, meta: %{})
-
-    {:ok, original} =
-      Jido.start_agent(jido, ChildAgent,
-        id: unique_id("online-original"),
-        parent: parent_ref,
-        restart: :temporary
-      )
-
-    eventually(fn ->
-      case Server.children(parent) do
-        %{worker: %{pid: ^original}} -> true
-        _children -> false
-      end
-    end)
-
-    notify_child_online(parent, original)
-    assert Server.children(parent).worker.pid == original
-
-    {duplicate, duplicate_ref} =
-      while_suspended(parent, fn ->
-        {:ok, duplicate} =
-          Jido.start_agent(jido, ChildAgent,
-            id: unique_id("online-duplicate"),
-            parent: parent_ref,
-            restart: :temporary
-          )
-
-        notify_child_online(parent, duplicate)
-        {duplicate, Process.monitor(duplicate)}
-      end)
-
-    assert_receive {:DOWN, ^duplicate_ref, :process, ^duplicate, _reason}, 2_000
-
-    assert Process.alive?(original)
-    assert Server.children(parent).worker.pid == original
-  end
-
-  test "a local online notice replaces a confirmed-dead child", %{jido: jido} do
-    parent_id = unique_id("dead-online-parent")
-    {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: parent_id)
-
-    parent_ref = ParentRef.new!(pid: parent, id: parent_id, tag: :worker, meta: %{})
-
-    {:ok, original} =
-      Jido.start_agent(jido, ChildAgent,
-        id: unique_id("dead-online-original"),
-        parent: parent_ref,
-        restart: :temporary
-      )
-
-    eventually(fn ->
-      case Server.children(parent) do
-        %{worker: %{pid: ^original}} -> true
-        _children -> false
-      end
-    end)
-
-    replacement =
-      while_suspended(parent, fn ->
-        {:ok, replacement} =
-          Jido.start_agent(jido, ChildAgent,
-            id: unique_id("dead-online-replacement"),
-            parent: parent_ref,
-            restart: :temporary
-          )
-
-        notify_child_online(parent, replacement)
-        original_ref = Process.monitor(original)
-        Process.exit(original, :kill)
-        assert_receive {:DOWN, ^original_ref, :process, ^original, :killed}, 2_000
-        replacement
-      end)
-
-    eventually(fn ->
-      case Server.children(parent) do
-        %{worker: %{pid: ^replacement}} -> true
-        _children -> false
-      end
-    end)
-
-    assert Process.alive?(replacement)
-  end
-
   test "parent death policy uses private runtime state", %{jido: jido} do
     {:ok, parent} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("death-parent"))
 
@@ -662,27 +574,5 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
 
     assert tracked.meta == %{role: :worker}
     assert Server.status(restarted).runtime.parent.id == parent_id
-  end
-
-  defp notify_child_online(parent, child) do
-    assert {:ok, info} = Server.creation_info(child)
-
-    send(
-      parent,
-      {:agent_child_online, child, info.agent_id, info.agent_module, info.partition,
-       info.parent.tag, info.parent.meta}
-    )
-
-    :ok
-  end
-
-  defp while_suspended(server, fun) do
-    :ok = :sys.suspend(server)
-
-    try do
-      fun.()
-    after
-      :ok = :sys.resume(server)
-    end
   end
 end

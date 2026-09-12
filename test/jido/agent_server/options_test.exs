@@ -85,8 +85,6 @@ defmodule Jido.AgentServer.OptionsTest do
           {[jido: "invalid"], "jido must be an atom"},
           {[registry: "invalid"], "registry must be an atom"},
           {[name: {:invalid, :name}], "name is invalid"},
-          {[register: nil], "register must be a boolean"},
-          {[register: "yes"], "register must be a boolean"},
           {[register: true, registry: nil], "requires an Agent Registry"},
           {[register: true, registry: Registry, name: :agent], "cannot be used together"},
           {[directive_handler: fn _ -> :ok end], "does not support custom Directive handlers"},
@@ -97,20 +95,6 @@ defmodule Jido.AgentServer.OptionsTest do
 
     assert_invalid([:invalid], "must be a keyword list")
     assert_invalid(:invalid, "must be a map or keyword list")
-  end
-
-  test "unknown options produce a configuration error" do
-    assert {:error,
-            %Jido.Error.ValidationError{
-              kind: :config,
-              message: "Agent Server options contain unknown keys",
-              details: %{keys: [:other_unknown, :unknown_timeout]}
-            }} =
-             Options.new(%{
-               agent: RemoteCounter,
-               unknown_timeout: 10,
-               other_unknown: true
-             })
   end
 
   test "parent, registration and finite lifecycle options are normalized", %{jido: jido} do
