@@ -23,6 +23,25 @@ defmodule Jido.Plugin.Bus.ClientRuntimeTest do
     end
   end
 
+  test "Bus scope defaults preserve explicit global and instance options", %{jido: jido} do
+    for {opts, lookup_opts} <- [
+          {[], [jido: jido]},
+          {[jido: nil], []},
+          {[jido: __MODULE__.OtherInstance], [jido: __MODULE__.OtherInstance]}
+        ] do
+      init = %Init{
+        agent_server: self(),
+        agent_id: "client",
+        module: Client,
+        jido: jido,
+        options: [bus: :input] ++ opts
+      }
+
+      assert {:ok, state, {:continue, :subscribe}} = Runtime.init(init)
+      assert state.config.lookup_opts == lookup_opts
+    end
+  end
+
   test "an absent Bus produces a subscription failure", %{jido: jido} do
     init = %Init{
       agent_server: self(),

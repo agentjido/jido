@@ -600,9 +600,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   defp inherit_bus_scope({:bus, opts}, jido) when is_atom(jido) and not is_nil(jido) do
-    if Keyword.has_key?(opts, :jido),
-      do: {:bus, opts},
-      else: {:bus, Keyword.put(opts, :jido, jido)}
+    {:bus, Keyword.put_new(opts, :jido, jido)}
   end
 
   defp inherit_bus_scope(targets, jido) when is_list(targets) do

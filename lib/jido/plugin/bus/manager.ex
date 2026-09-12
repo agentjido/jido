@@ -27,12 +27,8 @@ defmodule Jido.Plugin.Bus.Manager do
   def child_spec(%Init{} = init) do
     init.options
     |> Keyword.put_new(:name, init.agent_id)
-    |> put_default_scope(init.jido)
+    |> Keyword.put_new(:jido, init.jido)
     |> Bus.child_spec()
     |> Map.put(:id, __MODULE__)
-  end
-
-  defp put_default_scope(opts, jido) do
-    if Keyword.has_key?(opts, :jido), do: opts, else: Keyword.put(opts, :jido, jido)
   end
 end

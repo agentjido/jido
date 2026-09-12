@@ -163,7 +163,7 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
 
   defp validate_options(%Init{} = init) do
     opts = init.options
-    scope = if Keyword.has_key?(opts, :jido), do: Keyword.get(opts, :jido), else: init.jido
+    scope = Keyword.get(opts, :jido, init.jido)
 
     config = %{
       bus: Keyword.get(opts, :bus),
