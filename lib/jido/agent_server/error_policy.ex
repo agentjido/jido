@@ -4,7 +4,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
   require Logger
 
   alias Jido.Agent.Turn.Outcome
-  alias Jido.AgentServer.{Debug, DirectiveRuntime, State}
+  alias Jido.AgentServer.{Debug, DirectiveRuntime, State, Work}
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Tracing.Context, as: TraceContext
@@ -65,32 +65,39 @@ defmodule Jido.AgentServer.ErrorPolicy do
   end
 
   @doc false
-  def handle_result(%State{} = data, ref, result) do
+  def handle_result(%State{} = data, ref, %Work.Result{} = result) do
     pending = Map.fetch!(data.error_policy_tasks, ref)
-    release_task_result(pending)
-    data = drop_task(data, ref)
 
-    case result do
-      :ok ->
-        {:keep_state, data}
+    case Work.result(pending, ref, result) do
+      {:ok, value} ->
+        Work.release(pending)
+        data = drop_task(data, ref)
 
-      {:error, reason} ->
-        {:keep_state, record_dispatch_failure(data, reason)}
+        case value do
+          :ok ->
+            {:keep_state, data}
 
-      other ->
-        reason =
-          Error.execution_error("Agent error Signal delivery returned an invalid result",
-            details: %{result: other}
-          )
+          {:error, reason} ->
+            {:keep_state, record_dispatch_failure(data, reason)}
 
-        {:keep_state, record_dispatch_failure(data, reason)}
+          other ->
+            reason =
+              Error.execution_error("Agent error Signal delivery returned an invalid result",
+                details: %{result: other}
+              )
+
+            {:keep_state, record_dispatch_failure(data, reason)}
+        end
+
+      :stale ->
+        :keep_state_and_data
     end
   end
 
   @doc false
   def handle_down(%State{} = data, ref, reason) do
     pending = Map.fetch!(data.error_policy_tasks, ref)
-    cancel_timer(pending.timer)
+    Work.cancel_timer(pending.timer)
     data = drop_task(data, ref)
 
     error =
@@ -106,7 +113,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
     pending = Map.fetch!(data.error_policy_tasks, task_ref)
 
     if pending.timer == timer do
-      shutdown_task(pending.task)
+      Work.shutdown(pending.task)
       data = drop_task(data, task_ref)
 
       error =
@@ -122,7 +129,7 @@ defmodule Jido.AgentServer.ErrorPolicy do
 
   @doc false
   def stop_all(%State{} = data) do
-    Enum.each(data.error_policy_tasks, fn {_ref, pending} -> stop_task(pending) end)
+    Enum.each(data.error_policy_tasks, fn {_ref, pending} -> Work.stop(pending) end)
     :ok
   end
 
@@ -139,17 +146,23 @@ defmodule Jido.AgentServer.ErrorPolicy do
       jido = data.jido
       trace = TraceContext.capture()
 
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
-          end)
-        end)
+      work =
+        Work.start(
+          supervisor,
+          data.activation_id,
+          :error_policy_dispatch,
+          fn ->
+            TraceContext.with_context(trace, fn ->
+              DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
+            end)
+          end,
+          turn_id: Map.get(signal.data, :turn_id),
+          expected_version: data.state_version,
+          timeout: dispatch_timeout(data),
+          timeout_tag: :error_policy_dispatch_timeout
+        )
 
-      timeout = dispatch_timeout(data)
-      timer = start_timer(timeout, task.ref)
-      pending = %{task: task, timer: timer}
-      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
+      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, work.task.ref, work)}
     end
   rescue
     error -> record_dispatch_failure(data, error)
@@ -175,32 +188,5 @@ defmodule Jido.AgentServer.ErrorPolicy do
     )
 
     Debug.record(data, :error_signal_delivery_failed, %{error: error})
-  end
-
-  defp start_timer(timeout, task_ref) do
-    :erlang.start_timer(timeout, self(), {:error_policy_dispatch_timeout, task_ref})
-  end
-
-  defp release_task_result(%{task: %Task{ref: ref}, timer: timer}) do
-    Process.demonitor(ref, [:flush])
-    cancel_timer(timer)
-  end
-
-  defp stop_task(%{task: %Task{} = task, timer: timer}) do
-    shutdown_task(task)
-    cancel_timer(timer)
-  end
-
-  defp shutdown_task(%Task{} = task) do
-    Task.shutdown(task, :brutal_kill)
-  catch
-    :exit, _reason -> :ok
-  end
-
-  defp cancel_timer(nil), do: :ok
-
-  defp cancel_timer(timer) do
-    _result = :erlang.cancel_timer(timer)
-    :ok
   end
 end

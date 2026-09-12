@@ -32,7 +32,8 @@ defmodule Jido.AgentServer.Runtime do
     Persistence,
     State,
     Upgrade,
-    View
+    View,
+    Work
   }
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
@@ -602,17 +603,23 @@ defmodule Jido.AgentServer.Runtime do
 
   def handle_event(
         :info,
-        {ref, result},
+        {ref, %Work.Result{} = result},
         :admitting,
-        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
+        %State{admission_task: %Work{task: %Task{ref: ref}} = pending} = data
       ) do
-    release_task_result(pending)
-    data = %{data | admission_task: nil}
+    case Work.result(pending, ref, result) do
+      {:ok, value} ->
+        Work.release(pending)
+        data = %{data | admission_task: nil}
 
-    case result do
-      {:ok, %Jido.Agent.Command{} = command} -> begin_turn_execution(command, data)
-      {:error, reason} -> fail_turn(reason, :prepare, data)
-      other -> fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
+        case value do
+          {:ok, %Jido.Agent.Command{} = command} -> begin_turn_execution(command, data)
+          {:error, reason} -> fail_turn(reason, :prepare, data)
+          other -> fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
+        end
+
+      :stale ->
+        :keep_state_and_data
     end
   end
 
@@ -638,9 +645,9 @@ defmodule Jido.AgentServer.Runtime do
         :info,
         {:DOWN, ref, :process, _pid, reason},
         :admitting,
-        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
+        %State{admission_task: %Work{task: %Task{ref: ref}} = pending} = data
       ) do
-    cancel_task_timer(pending.timer)
+    Work.cancel_timer(pending.timer)
     data = %{data | admission_task: nil}
 
     error =
@@ -653,41 +660,52 @@ defmodule Jido.AgentServer.Runtime do
 
   def handle_event(
         :info,
-        {ref, result},
+        {ref, %Work.Result{} = result},
         :directing,
-        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
+        %State{directive_task: %Work{task: %Task{ref: ref}} = pending} = data
       ) do
-    release_task_result(pending)
-    data = %{data | directive_task: nil}
+    case Work.result(pending, ref, result) do
+      {:ok, value} ->
+        Work.release(pending)
+        data = %{data | directive_task: nil}
 
-    directive_result =
-      case result do
-        :ok ->
-          {:ok, data}
+        directive_result =
+          case value do
+            :ok ->
+              {:ok, data}
 
-        {:dispatch_relative_signal, directive} ->
-          case DirectiveRuntime.dispatch_prepared(directive, data, self()) do
-            :ok -> {:ok, data}
-            {:error, reason} -> {:error, reason, data}
+            {:dispatch_relative_signal, directive} ->
+              case DirectiveRuntime.dispatch_prepared(directive, data, self()) do
+                :ok -> {:ok, data}
+                {:error, reason} -> {:error, reason, data}
+              end
+
+            {:error, reason} ->
+              {:error, reason, data}
+
+            other ->
+              {:error, {:invalid_plugin_dispatch_result, other}, data}
           end
 
-        {:error, reason} ->
-          {:error, reason, data}
+        complete_directive(
+          directive_result,
+          pending.metadata.rest,
+          pending.metadata.context,
+          pending.metadata.span
+        )
 
-        other ->
-          {:error, {:invalid_plugin_dispatch_result, other}, data}
-      end
-
-    complete_directive(directive_result, pending.rest, pending.context, pending.span)
+      :stale ->
+        :keep_state_and_data
+    end
   end
 
   def handle_event(
         :info,
         {:DOWN, ref, :process, _pid, reason},
         :directing,
-        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
+        %State{directive_task: %Work{task: %Task{ref: ref}} = pending} = data
       ) do
-    cancel_task_timer(pending.timer)
+    Work.cancel_timer(pending.timer)
     data = %{data | directive_task: nil}
 
     error =
@@ -695,7 +713,13 @@ defmodule Jido.AgentServer.Runtime do
         details: %{code: :plugin_callback_task_failed, callback: :dispatch, reason: reason}
       )
 
-    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span, :exit)
+    complete_directive(
+      {:error, error, data},
+      pending.metadata.rest,
+      pending.metadata.context,
+      pending.metadata.span,
+      :exit
+    )
   end
 
   def handle_event(
@@ -703,10 +727,10 @@ defmodule Jido.AgentServer.Runtime do
         {:timeout, timer, {:directive_timeout, task_ref}},
         :directing,
         %State{
-          directive_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending
+          directive_task: %Work{task: %Task{ref: task_ref} = task, timer: timer} = pending
         } = data
       ) do
-    shutdown_task(task)
+    Work.shutdown(task)
     data = %{data | directive_task: nil}
 
     error =
@@ -719,12 +743,17 @@ defmodule Jido.AgentServer.Runtime do
         }
       )
 
-    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span)
+    complete_directive(
+      {:error, error, data},
+      pending.metadata.rest,
+      pending.metadata.context,
+      pending.metadata.span
+    )
   end
 
   def handle_event(
         :info,
-        {ref, result},
+        {ref, %Work.Result{} = result},
         _phase,
         %State{} = data
       )
@@ -936,12 +965,12 @@ defmodule Jido.AgentServer.Runtime do
     end
 
     stop_plugin_readiness(data.plugin_bootstrap)
-    stop_task(data.admission_task)
-    stop_task(data.directive_task)
+    Work.stop(data.admission_task)
+    Work.stop(data.directive_task)
     ErrorPolicy.stop_all(data)
 
     if data.directive_task do
-      finish_span_error(data.directive_task.span, {:agent_stopped, reason})
+      finish_span_error(data.directive_task.metadata.span, {:agent_stopped, reason})
     end
 
     AgentTelemetry.interrupted(data, reason)
@@ -1071,23 +1100,6 @@ defmodule Jido.AgentServer.Runtime do
 
   defp stop_plugin_readiness(nil), do: :ok
 
-  defp release_task_result(%{task: %Task{ref: ref}, timer: timer}) do
-    Process.demonitor(ref, [:flush])
-    cancel_task_timer(timer)
-  end
-
-  defp stop_task(%{task: %Task{} = task} = pending) do
-    cancel_task_timer(Map.get(pending, :timer))
-    shutdown_task(task)
-  end
-
-  defp stop_task(nil), do: :ok
-
-  defp shutdown_task(%Task{} = task) do
-    _result = Task.shutdown(task, :brutal_kill)
-    :ok
-  end
-
   defp initial_command(%Signal{} = signal, context, %State{} = data) do
     context = Map.merge(context, %{jido: data.jido, partition: data.partition})
     Jido.Agent.Command.new_trusted_agent(data.agent, signal, context)
@@ -1101,25 +1113,32 @@ defmodule Jido.AgentServer.Runtime do
       supervisor = Jido.task_supervisor_name(data.jido)
       trace = TraceContext.capture()
 
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            with {:ok, plugin_inputs} <-
-                   AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
-                 command = %{command | plugin_inputs: plugin_inputs},
-                 {:ok, command} <-
-                   ServerPlugin.admit(
-                     command,
-                     plugin_specs,
-                     runtime_refs,
-                     data.state_version
-                   ) do
-              {:ok, command}
-            end
-          end)
-        end)
+      work =
+        Work.start(
+          supervisor,
+          data.activation_id,
+          :admission,
+          fn ->
+            TraceContext.with_context(trace, fn ->
+              with {:ok, plugin_inputs} <-
+                     AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
+                   command = %{command | plugin_inputs: plugin_inputs},
+                   {:ok, command} <-
+                     ServerPlugin.admit(
+                       command,
+                       plugin_specs,
+                       runtime_refs,
+                       data.state_version
+                     ) do
+                {:ok, command}
+              end
+            end)
+          end,
+          turn_id: data.active.turn_id,
+          expected_version: data.state_version
+        )
 
-      {:next_state, :admitting, %{data | admission_task: %{task: task, timer: nil}}}
+      {:next_state, :admitting, %{data | admission_task: work}}
     else
       {:error, reason} -> fail_turn(reason, :prepare, data)
     end
@@ -1398,7 +1417,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   defp timeout_admission(%State{active: %ActiveTurn{} = active} = data) do
-    stop_task(data.admission_task)
+    Work.stop(data.admission_task)
     data = %{data | admission_task: nil}
     fail_turn(turn_timeout_error(active), :prepare, data)
   end
@@ -1432,7 +1451,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    stop_task(data.admission_task)
+    Work.stop(data.admission_task)
     outcome = turn_outcome(data, :cancelled, :prepare, :cancelled)
 
     next_data =
@@ -1631,20 +1650,27 @@ defmodule Jido.AgentServer.Runtime do
   defp start_directive_task(fun, rest, context, span, data) do
     supervisor = Jido.task_supervisor_name(data.jido)
     trace = TraceContext.capture()
-    task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
-    timer = start_directive_timer(data.directive_timeout, task.ref)
-    pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
-    {:keep_state, %{data | directive_task: pending}}
+
+    work =
+      Work.start(
+        supervisor,
+        data.activation_id,
+        :directive,
+        fn -> TraceContext.with_context(trace, fun) end,
+        turn_id: data.active.turn_id,
+        expected_version: data.state_version,
+        directive_index: data.active.directive_completed_count,
+        timeout: data.directive_timeout,
+        timeout_tag: :directive_timeout,
+        metadata: %{rest: rest, context: context, span: span}
+      )
+
+    {:keep_state, %{data | directive_task: work}}
   rescue
     error -> complete_directive({:error, error, data}, rest, context, span)
   catch
     kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
   end
-
-  defp start_directive_timer(:infinity, _task_ref), do: nil
-
-  defp start_directive_timer(timeout, task_ref),
-    do: :erlang.start_timer(timeout, self(), {:directive_timeout, task_ref})
 
   defp start_task_timer(:infinity, _tag, _task_ref), do: nil
 
