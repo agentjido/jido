@@ -15,13 +15,7 @@ defmodule Jido.RuntimeStore do
   def child_spec(opts) do
     name = Keyword.fetch!(opts, :name)
 
-    %{
-      id: name,
-      start: {__MODULE__, :start_link, [opts]},
-      restart: :permanent,
-      shutdown: 5_000,
-      type: :worker
-    }
+    %{super(opts) | id: name}
   end
 
   @doc false
