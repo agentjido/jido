@@ -84,17 +84,8 @@ defmodule Jido.Instance.NamespaceRegistry do
   def handle_call({:claim, namespace, instance, owner}, _from, state) do
     case Map.get(state.bindings, namespace) do
       nil ->
-        token = make_ref()
-        monitor = Process.monitor(owner)
-        binding = %{token: token, instance: instance, owner: owner, monitor: monitor}
-        put_binding(namespace, binding)
-
-        {:reply, {:ok, token},
-         %{
-           state
-           | bindings: Map.put(state.bindings, namespace, binding),
-             monitors: Map.put(state.monitors, monitor, namespace)
-         }}
+        {token, state} = claim_binding(state, namespace, instance, owner)
+        {:reply, {:ok, token}, state}
 
       %{instance: ^instance, owner: current_owner} when is_pid(current_owner) ->
         {:reply, {:ok, :existing}, state}
@@ -151,17 +142,8 @@ defmodule Jido.Instance.NamespaceRegistry do
         {:reply, {:error, already_bound(namespace, current_owner)}, state}
 
       nil ->
-        token = make_ref()
-        monitor = Process.monitor(owner)
-        binding = %{token: token, instance: instance, owner: owner, monitor: monitor}
-        put_binding(namespace, binding)
-
-        {:reply, :ok,
-         %{
-           state
-           | bindings: Map.put(state.bindings, namespace, binding),
-             monitors: Map.put(state.monitors, monitor, namespace)
-         }}
+        {_token, state} = claim_binding(state, namespace, instance, owner)
+        {:reply, :ok, state}
     end
   end
 
@@ -194,6 +176,20 @@ defmodule Jido.Instance.NamespaceRegistry do
       nil -> {:noreply, state}
       namespace -> {:noreply, delete_binding(state, namespace, monitor)}
     end
+  end
+
+  defp claim_binding(state, namespace, instance, owner) do
+    token = make_ref()
+    monitor = Process.monitor(owner)
+    binding = %{token: token, instance: instance, owner: owner, monitor: monitor}
+    put_binding(namespace, binding)
+
+    {token,
+     %{
+       state
+       | bindings: Map.put(state.bindings, namespace, binding),
+         monitors: Map.put(state.monitors, monitor, namespace)
+     }}
   end
 
   defp delete_binding(state, namespace, monitor) do
