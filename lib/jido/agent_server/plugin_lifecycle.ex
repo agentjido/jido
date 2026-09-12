@@ -115,12 +115,17 @@ defmodule Jido.AgentServer.PluginLifecycle do
   end
 
   defp child_specs(state) do
-    Enum.reduce_while(state.plugin_specs, {:ok, []}, fn plugin_spec, {:ok, child_specs} ->
+    state.plugin_specs
+    |> Enum.reduce_while({:ok, []}, fn plugin_spec, {:ok, child_specs} ->
       case Plugin.child_specs(init(state, plugin_spec), [plugin_spec]) do
-        {:ok, specs} -> {:cont, {:ok, child_specs ++ specs}}
+        {:ok, specs} -> {:cont, {:ok, Enum.reverse(specs, child_specs)}}
         {:error, reason} -> {:halt, {:error, reason}}
       end
     end)
+    |> case do
+      {:ok, child_specs} -> {:ok, Enum.reverse(child_specs)}
+      {:error, _reason} = error -> error
+    end
   end
 
   defp init(%State{} = state, plugin_spec) do
