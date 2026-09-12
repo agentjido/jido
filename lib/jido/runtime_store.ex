@@ -115,7 +115,7 @@ defmodule Jido.RuntimeStore do
   def handle_call({:list, hive}, _from, %{table: table} = state) do
     entries =
       :ets.select(table, [
-        {{{hive, :"$1"}, :"$2"}, [], [{{:"$1", :"$2"}}]}
+        {{{:"$1", :"$2"}, :"$3"}, [{:"=:=", :"$1", {:const, hive}}], [{{:"$2", :"$3"}}]}
       ])
 
     {:reply, entries, state}

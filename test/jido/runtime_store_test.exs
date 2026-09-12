@@ -164,6 +164,18 @@ defmodule JidoTest.RuntimeStoreTest do
       assert [{"child-1", %{parent_id: "parent-1"}}] == RuntimeStore.list(jido, :relationships)
     end
 
+    test "hives are literal terms even when they contain ETS pattern markers", %{jido: jido} do
+      hives = [:ordinary, :_, :"$1", {:nested, :_}, %{scope: :"$2"}, 1, 1.0]
+
+      for hive <- hives do
+        assert :ok = RuntimeStore.put(jido, hive, :key, hive)
+      end
+
+      for hive <- hives do
+        assert RuntimeStore.list(jido, hive) === [{:key, hive}]
+      end
+    end
+
     test "retains entries when the RuntimeStore process restarts", %{jido: jido} do
       runtime_store = Jido.runtime_store_name(jido)
       runtime_store_pid = Process.whereis(runtime_store)
