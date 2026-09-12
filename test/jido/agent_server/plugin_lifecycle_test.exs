@@ -172,6 +172,13 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert server in elem(Process.info(waiter, :links), 1)
 
     refs = for pid <- [server, wrapper, waiter, runtime], do: {Process.monitor(pid), pid}
+
+    # Attach the startup monitor before testing the observed exit reason.
+    eventually(fn ->
+      {:monitors, monitors} = Process.info(starter.pid, :monitors)
+      {:process, server} in monitors
+    end)
+
     Process.exit(server, :kill)
 
     assert {:error, :killed} = Task.await(starter, 2_000)
