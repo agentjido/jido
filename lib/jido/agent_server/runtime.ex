@@ -29,7 +29,7 @@ defmodule Jido.AgentServer.Runtime do
     Options,
     ParentRef,
     PluginLifecycle,
-    RuntimeCheckpoint,
+    Persistence,
     State,
     Upgrade,
     View
@@ -52,7 +52,7 @@ defmodule Jido.AgentServer.Runtime do
 
     with :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
-           restore_initial_agent(opts),
+           Persistence.restore_initial(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          {:ok, exec_module} <- validate_exec_module(opts.exec_module),
@@ -145,7 +145,7 @@ defmodule Jido.AgentServer.Runtime do
     cancel_task_timer(readiness.timer)
     data = %{data | plugin_bootstrap: nil}
 
-    case persist_initial_agent(data) do
+    case Persistence.persist_initial(data) do
       {:ok, data} ->
         case publish_agent(data) do
           :ok ->
@@ -289,7 +289,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   def handle_event({:call, from}, {:hibernate, opts}, :idle, %State{} = data) do
-    case persist_agent(data, data.agent, data.state_version, :hibernate, opts) do
+    case Persistence.persist(data, data.agent, data.state_version, :hibernate, opts) do
       :ok ->
         {:stop_and_reply, {:shutdown, :hibernate}, [{:reply, from, :ok}], data}
 
@@ -946,8 +946,8 @@ defmodule Jido.AgentServer.Runtime do
 
     AgentTelemetry.interrupted(data, reason)
     cancel_idle_timer(data)
-    maybe_persist_on_stop(reason, data)
-    maybe_delete_runtime_checkpoint(reason, data)
+    Persistence.persist_on_stop(reason, data)
+    Persistence.delete_runtime_checkpoint(reason, data)
     retire_remote_spawn(reason, data)
     PluginLifecycle.stop_all(data, :shutdown)
     :ok
@@ -1288,7 +1288,7 @@ defmodule Jido.AgentServer.Runtime do
       AgentTelemetry.with_span(
         :commit,
         Map.put(AgentTelemetry.turn_metadata(data), :stage, :commit),
-        fn -> persist_commit(data, agent, version) end
+        fn -> Persistence.commit(data, agent, version) end
       )
 
     case result do
@@ -1742,14 +1742,6 @@ defmodule Jido.AgentServer.Runtime do
            details: %{module: module}
          )}
     end
-  end
-
-  defp validate_exec_module(module) do
-    {:error,
-     Error.validation_error("Agent Server Exec module must be a module",
-       kind: :config,
-       details: %{module: module}
-     )}
   end
 
   defp validate_keyword(value, _field) when is_list(value) and value == [], do: {:ok, value}
@@ -2326,68 +2318,6 @@ defmodule Jido.AgentServer.Runtime do
     %{data | idle_timer: nil}
   end
 
-  defp restore_initial_agent(%Options{restore: false, persistence: nil} = opts) do
-    {:ok, opts.agent, opts.state_version, :none}
-  end
-
-  defp restore_initial_agent(%Options{restore: false} = opts) do
-    {:ok, opts.agent, opts.state_version, :create}
-  end
-
-  defp restore_initial_agent(%Options{persistence: nil, restore: :required}) do
-    {:error, :persistence_not_configured}
-  end
-
-  defp restore_initial_agent(%Options{persistence: nil} = opts) do
-    {agent, version} = RuntimeCheckpoint.restore(opts)
-    {:ok, agent, version, :none}
-  end
-
-  defp restore_initial_agent(%Options{} = opts) do
-    load_opts = [
-      instance: opts.jido,
-      namespace: Jido.namespace(opts.jido),
-      partition: opts.partition
-    ]
-
-    case Jido.Persistence.load_agent_with_revision(
-           opts.persistence,
-           opts.agent.module,
-           opts.agent.id,
-           load_opts
-         ) do
-      {:ok, agent, version} ->
-        {:ok, agent, version, :restored}
-
-      {:error, :not_found} when opts.restore == :if_found ->
-        {:ok, opts.agent, opts.state_version, :create}
-
-      {:error, _reason} = error ->
-        error
-    end
-  end
-
-  defp persist_initial_agent(%State{initial_persistence: :create, state_version: 0} = data) do
-    opts = [
-      instance: data.jido,
-      namespace: data.agent_namespace,
-      partition: data.partition,
-      revision: 0,
-      reason: :activate
-    ]
-
-    case Jido.Persistence.create_agent(data.persistence, data.agent, opts) do
-      :ok -> {:ok, %{data | initial_persistence: :ready}}
-      {:error, _reason} = error -> error
-    end
-  end
-
-  defp persist_initial_agent(%State{initial_persistence: :create, state_version: version}),
-    do: {:error, {:invalid_initial_revision, version}}
-
-  defp persist_initial_agent(%State{} = data),
-    do: {:ok, %{data | initial_persistence: :ready}}
-
   defp publish_agent(%State{registered?: false}), do: :ok
 
   defp publish_agent(%State{registry: registry, agent: agent, partition: partition}) do
@@ -2413,72 +2343,17 @@ defmodule Jido.AgentServer.Runtime do
     end
   end
 
-  defp persist_commit(%State{persistence: nil} = data, agent, version) do
-    RuntimeCheckpoint.put(data, agent, version)
-  end
-
-  defp persist_commit(%State{} = data, agent, version) do
-    persist_agent(data, agent, version, :commit)
-  end
-
-  defp persist_agent(data, agent, version, reason, extra_opts \\ [])
-
-  defp persist_agent(%State{persistence: nil}, %Agent{}, _version, _reason, _extra_opts),
-    do: {:error, :persistence_not_configured}
-
-  defp persist_agent(%State{} = data, %Agent{} = agent, version, reason, extra_opts) do
-    opts =
-      extra_opts
-      |> Keyword.put(:instance, data.jido)
-      |> Keyword.put(:namespace, data.agent_namespace)
-      |> Keyword.put(:partition, data.partition)
-      |> Keyword.put(:revision, version)
-      |> Keyword.put(:expected_revision, data.state_version)
-      |> Keyword.put(:reason, reason)
-
-    Jido.Persistence.save_agent(data.persistence, agent, opts)
-  end
-
-  defp maybe_persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
-  defp maybe_persist_on_stop({:shutdown, {:persistence_failed, _reason}}, %State{}), do: :ok
-
-  defp maybe_persist_on_stop(reason, %State{persistence: persistence} = data)
-       when not is_nil(persistence) do
-    if clean_shutdown?(reason) do
-      case persist_agent(data, data.agent, data.state_version, :stop) do
-        :ok ->
-          :ok
-
-        {:error, error} ->
-          Logger.error("Agent persistence failed during shutdown",
-            agent_id: data.agent.id,
-            pool: data.pool,
-            reason: inspect(error)
-          )
-      end
-    end
-  end
-
-  defp maybe_persist_on_stop(_reason, %State{}), do: :ok
-
-  defp maybe_delete_runtime_checkpoint(reason, %State{} = data) do
-    if clean_shutdown?(reason), do: RuntimeCheckpoint.delete(data), else: :ok
-  end
-
   defp retire_remote_spawn(reason, %State{parent: %ParentRef{spawn_ref: request}, jido: jido})
        when not is_nil(request) and not is_nil(jido) do
-    if clean_shutdown?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
+    if Persistence.clean_shutdown?(reason),
+      do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
+
     :ok
   catch
     :exit, _ -> :ok
   end
 
   defp retire_remote_spawn(_reason, _data), do: :ok
-
-  defp clean_shutdown?(:normal), do: true
-  defp clean_shutdown?(:shutdown), do: true
-  defp clean_shutdown?({:shutdown, _reason}), do: true
-  defp clean_shutdown?(_reason), do: false
 
   defp normalize_stop_reason(:normal), do: :normal
   defp normalize_stop_reason(:shutdown), do: :shutdown
