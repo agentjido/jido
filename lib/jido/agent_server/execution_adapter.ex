@@ -122,14 +122,12 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   end
 
   @doc false
-  def callback_finished(%__MODULE__{} = adapter, token) do
-    if adapter.callback_token == token do
-      cancel_timer(adapter.timer)
-      %{adapter | callback_token: nil, timer: nil}
-    else
-      adapter
-    end
+  def callback_finished(%__MODULE__{callback_token: token} = adapter, token) do
+    cancel_timer(adapter.timer)
+    %{adapter | callback_token: nil, timer: nil}
   end
+
+  def callback_finished(%__MODULE__{} = adapter, _stale_token), do: adapter
 
   @doc false
   def started(%__MODULE__{} = adapter, exec_pid) do
