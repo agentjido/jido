@@ -57,10 +57,10 @@ defmodule Jido.Agent.Plugin.Pipeline do
 
   defp protect_owned_state(state, original_state, specs) do
     changed =
-      specs
-      |> Enum.map(& &1.state_key)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.filter(&(Map.fetch(state, &1) !== Map.fetch(original_state, &1)))
+      for %{state_key: key} <- specs,
+          not is_nil(key),
+          Map.fetch(state, key) !== Map.fetch(original_state, key),
+          do: key
 
     if changed == [] do
       :ok
