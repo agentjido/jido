@@ -5,9 +5,6 @@ defmodule Jido.AgentServer.Runtime do
 
   require Logger
 
-  @error_policy_dispatch_fallback_timeout 5_000
-  @max_error_policy_tasks 32
-
   alias Jido.Agent
   alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Agent.Runner
@@ -24,8 +21,10 @@ defmodule Jido.AgentServer.Runtime do
     AdmissionDeadline,
     ChildInfo,
     ChildPlacement,
+    Debug,
     DirectiveContext,
     DirectiveRuntime,
+    ErrorPolicy,
     ExecutionAdapter,
     Options,
     ParentRef,
@@ -335,12 +334,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   def handle_event({:call, from}, {:recent_events, opts}, _phase, %State{} = data) do
-    if data.debug do
-      limit = opts |> Keyword.get(:limit, data.debug_max_events) |> normalize_event_limit()
-      {:keep_state_and_data, [{:reply, from, {:ok, Enum.take(data.debug_events, limit)}}]}
-    else
-      {:keep_state_and_data, [{:reply, from, {:error, :debug_not_enabled}}]}
-    end
+    {:keep_state_and_data, [{:reply, from, Debug.recent(data, opts)}]}
   end
 
   def handle_event({:call, from}, {:adopt_parent, %ParentRef{} = parent}, _phase, data) do
@@ -735,25 +729,7 @@ defmodule Jido.AgentServer.Runtime do
         %State{} = data
       )
       when is_map_key(data.error_policy_tasks, ref) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    release_task_result(pending)
-    data = drop_error_policy_task(data, ref)
-
-    case result do
-      :ok ->
-        {:keep_state, data}
-
-      {:error, reason} ->
-        {:keep_state, record_error_policy_dispatch_failure(data, reason)}
-
-      other ->
-        reason =
-          Error.execution_error("Agent error Signal delivery returned an invalid result",
-            details: %{result: other}
-          )
-
-        {:keep_state, record_error_policy_dispatch_failure(data, reason)}
-    end
+    ErrorPolicy.handle_result(data, ref, result)
   end
 
   def handle_event(
@@ -763,16 +739,7 @@ defmodule Jido.AgentServer.Runtime do
         %State{} = data
       )
       when is_map_key(data.error_policy_tasks, ref) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    cancel_task_timer(pending.timer)
-    data = drop_error_policy_task(data, ref)
-
-    error =
-      Error.execution_error("Agent error Signal delivery task exited",
-        details: %{reason: reason}
-      )
-
-    {:keep_state, record_error_policy_dispatch_failure(data, error)}
+    ErrorPolicy.handle_down(data, ref, reason)
   end
 
   def handle_event(
@@ -782,21 +749,7 @@ defmodule Jido.AgentServer.Runtime do
         %State{} = data
       )
       when is_map_key(data.error_policy_tasks, task_ref) do
-    pending = Map.fetch!(data.error_policy_tasks, task_ref)
-
-    if pending.timer == timer do
-      shutdown_task(pending.task)
-      data = drop_error_policy_task(data, task_ref)
-
-      error =
-        Error.timeout_error("Agent error Signal delivery timed out",
-          timeout: error_policy_dispatch_timeout(data)
-        )
-
-      {:keep_state, record_error_policy_dispatch_failure(data, error)}
-    else
-      :keep_state_and_data
-    end
+    ErrorPolicy.handle_timeout(data, task_ref, timer)
   end
 
   def handle_event(
@@ -985,7 +938,7 @@ defmodule Jido.AgentServer.Runtime do
     stop_plugin_readiness(data.plugin_bootstrap)
     stop_task(data.admission_task)
     stop_task(data.directive_task)
-    Enum.each(data.error_policy_tasks, fn {_ref, pending} -> stop_task(pending) end)
+    ErrorPolicy.stop_all(data)
 
     if data.directive_task do
       finish_span_error(data.directive_task.span, {:agent_stopped, reason})
@@ -1056,7 +1009,7 @@ defmodule Jido.AgentServer.Runtime do
         AgentTelemetry.finish_definition_upgrade(span, result, data.state_version, version)
 
         next_data =
-          record_event(next_data, :definition_upgrade_completed, %{
+          Debug.record(next_data, :definition_upgrade_completed, %{
             status: :ok,
             agent_module: data.agent.module,
             target_agent_module: target.module,
@@ -1082,13 +1035,13 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   defp record_definition_upgrade_failure(data, target_module, reason) do
-    record_event(data, :definition_upgrade_failed, %{
+    Debug.record(data, :definition_upgrade_failed, %{
       status: :error,
       agent_module: data.agent.module,
       target_agent_module: target_module,
       state_version_before: data.state_version,
       state_version_after: nil,
-      error: public_error(reason)
+      error: Debug.public_error(reason)
     })
   end
 
@@ -1355,7 +1308,7 @@ defmodule Jido.AgentServer.Runtime do
         state_version: version,
         active: committed_active
       })
-      |> record_event(:turn_committed, %{
+      |> Debug.record(:turn_committed, %{
         turn_id: active.turn_id,
         signal_id: active.effective_signal.id,
         signal_type: active.effective_signal.type,
@@ -1399,7 +1352,7 @@ defmodule Jido.AgentServer.Runtime do
           {:stop, {:shutdown, {:persistence_failed, failure}}, next_data}
 
         _reason ->
-          error_policy_decision(outcome, next_data)
+          ErrorPolicy.decision(outcome, next_data)
       end
 
     case decision do
@@ -1603,9 +1556,9 @@ defmodule Jido.AgentServer.Runtime do
         next_data =
           next_data
           |> Map.put(:active, active)
-          |> record_event(:directive_failed, %{
+          |> Debug.record(:directive_failed, %{
             turn_id: active.turn_id,
-            error: public_error(reason)
+            error: Debug.public_error(reason)
           })
 
         outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
@@ -2175,7 +2128,7 @@ defmodule Jido.AgentServer.Runtime do
   defp apply_directive_error_policy(%Outcome{} = outcome, data) do
     next_data = %{data | error_count: data.error_count + 1}
 
-    case error_policy_decision(outcome, next_data) do
+    case ErrorPolicy.decision(outcome, next_data) do
       {:continue, policy_data} ->
         TraceContext.clear()
         {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle)}
@@ -2183,114 +2136,6 @@ defmodule Jido.AgentServer.Runtime do
       {:stop, stop_reason, policy_data} ->
         {:stop, {:shutdown, stop_reason}, policy_data}
     end
-  end
-
-  defp error_policy_decision(%Outcome{}, %State{error_policy: :log_only} = data),
-    do: {:continue, data}
-
-  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: :stop_on_error} = data),
-    do: {:stop, {:agent_error, outcome.error}, data}
-
-  defp error_policy_decision(
-         %Outcome{} = outcome,
-         %State{error_policy: {:max_errors, max}} = data
-       ) do
-    if data.error_count >= max,
-      do: {:stop, {:max_agent_errors, outcome.error}, data},
-      else: {:continue, data}
-  end
-
-  defp error_policy_decision(
-         %Outcome{} = outcome,
-         %State{error_policy: {:emit_signal, dispatch}} = data
-       ) do
-    source_signal = outcome.effective_signal || outcome.source_signal
-
-    if source_signal.type != "jido.agent.error" do
-      signal =
-        Signal.new!(
-          type: "jido.agent.error",
-          source: "/agent/#{data.agent.id}",
-          data: %{
-            agent_id: data.agent.id,
-            turn_id: outcome.id,
-            status: outcome.status,
-            stage: outcome.stage,
-            committed?: outcome.committed?,
-            error: Error.to_map(outcome.error)
-          }
-        )
-
-      data = start_error_policy_dispatch(signal, dispatch, data)
-
-      {:continue, data}
-    else
-      {:continue, data}
-    end
-  end
-
-  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: policy} = data)
-       when is_function(policy, 2) do
-    case policy.(outcome.error, outcome) do
-      :continue -> {:continue, data}
-      {:stop, stop_reason} -> {:stop, stop_reason, data}
-      other -> {:stop, {:invalid_error_policy_result, other}, data}
-    end
-  rescue
-    error -> {:stop, {:error_policy_failed, error}, data}
-  catch
-    kind, reason -> {:stop, {:error_policy_failed, {kind, reason}}, data}
-  end
-
-  defp start_error_policy_dispatch(signal, dispatch, %State{} = data) do
-    if map_size(data.error_policy_tasks) >= @max_error_policy_tasks do
-      error =
-        Error.execution_error("Agent error Signal delivery limit was reached",
-          details: %{limit: @max_error_policy_tasks}
-        )
-
-      record_error_policy_dispatch_failure(data, error)
-    else
-      supervisor = Jido.task_supervisor_name(data.jido)
-      jido = data.jido
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
-          end)
-        end)
-
-      timeout = error_policy_dispatch_timeout(data)
-      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
-      pending = %{task: task, timer: timer}
-      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
-    end
-  rescue
-    error -> record_error_policy_dispatch_failure(data, error)
-  catch
-    kind, reason -> record_error_policy_dispatch_failure(data, {kind, reason})
-  end
-
-  defp error_policy_dispatch_timeout(%State{directive_timeout: :infinity}),
-    do: @error_policy_dispatch_fallback_timeout
-
-  defp error_policy_dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
-
-  defp drop_error_policy_task(%State{} = data, ref) do
-    %{data | error_policy_tasks: Map.delete(data.error_policy_tasks, ref)}
-  end
-
-  defp record_error_policy_dispatch_failure(%State{} = data, reason) do
-    error = public_error(reason)
-
-    Logger.error(
-      "Agent error Signal delivery failed " <>
-        "agent_id=#{data.agent.id} error_type=#{error.type} error_code=#{Error.code(reason)}"
-    )
-
-    record_event(data, :error_signal_delivery_failed, %{error: error})
   end
 
   defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
@@ -2307,12 +2152,12 @@ defmodule Jido.AgentServer.Runtime do
     |> then(fn data ->
       if outcome.status == :succeeded, do: %{data | error_count: 0}, else: data
     end)
-    |> record_event(event, %{
+    |> Debug.record(event, %{
       turn_id: outcome.id,
       signal_id: signal.id,
       signal_type: signal.type,
       stage: outcome.stage,
-      error: if(outcome.error, do: public_error(outcome.error)),
+      error: if(outcome.error, do: Debug.public_error(outcome.error)),
       outcome: View.outcome_summary(outcome)
     })
   end
@@ -2326,16 +2171,6 @@ defmodule Jido.AgentServer.Runtime do
       _error -> :failed
     end
   end
-
-  defp record_event(%State{debug: false} = data, _event, _metadata), do: data
-
-  defp record_event(%State{} = data, event, metadata) do
-    entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
-    events = Enum.take([entry | data.debug_events], data.debug_max_events)
-    %{data | debug_events: events}
-  end
-
-  defp public_error(reason), do: Error.to_map(reason)
 
   defp start_directive_span(directive, _context, data) do
     metadata =
@@ -2371,9 +2206,6 @@ defmodule Jido.AgentServer.Runtime do
     metadata = AgentTelemetry.result_metadata({:error, reason}) |> Map.put(:kind, kind)
     AgentTelemetry.finish(span, metadata, %{}, :exception)
   end
-
-  defp normalize_event_limit(limit) when is_integer(limit) and limit >= 0, do: limit
-  defp normalize_event_limit(_limit), do: 0
 
   defp persist_own_relationship(%State{jido: jido, parent: %ParentRef{} = parent} = data)
        when is_atom(jido) and not is_nil(jido) do
