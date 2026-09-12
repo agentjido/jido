@@ -252,12 +252,12 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
     pid = child.lifecycle_pid || child.pid
 
-    if Process.alive?(pid) do
-      try do
-        GenServer.stop(pid, normalize_stop_reason(reason), 5_000)
-      catch
-        :exit, _reason -> Process.exit(pid, normalize_stop_reason(reason))
-      end
+    reason = normalize_stop_reason(reason)
+
+    try do
+      GenServer.stop(pid, reason, 5_000)
+    catch
+      :exit, _reason -> Process.exit(pid, reason)
     end
 
     :ok

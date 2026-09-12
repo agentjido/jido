@@ -104,6 +104,7 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert :ok = PluginLifecycle.await_all(state)
     assert :ok = Server.stop(server)
     for {ref, pid} <- refs, do: assert_receive({:DOWN, ^ref, :process, ^pid, _})
+    assert :ok = PluginLifecycle.stop_all(state, :normal)
   end
 
   test "runtime lookup reports missing and stopped Plugin processes" do

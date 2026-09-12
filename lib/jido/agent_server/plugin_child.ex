@@ -257,13 +257,9 @@ defmodule Jido.AgentServer.PluginChild do
   defp temporary_spec(child_spec), do: Supervisor.child_spec(child_spec, restart: :temporary)
 
   defp stop_child(pid, reason) when is_pid(pid) do
-    if Process.alive?(pid) do
-      try do
-        GenServer.stop(pid, reason, 5_000)
-      catch
-        :exit, _reason -> Process.exit(pid, reason)
-      end
-    end
+    GenServer.stop(pid, reason, 5_000)
+  catch
+    :exit, _reason -> Process.exit(pid, reason)
   end
 
   defp stop_child(_child, _reason), do: :ok
