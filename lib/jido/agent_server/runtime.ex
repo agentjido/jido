@@ -20,6 +20,7 @@ defmodule Jido.AgentServer.Runtime do
 
   alias Jido.AgentServer.{
     ActiveTurn,
+    AdmissionControl,
     AdmissionDeadline,
     ChildInfo,
     ChildPlacement,
@@ -31,7 +32,8 @@ defmodule Jido.AgentServer.Runtime do
     PluginLifecycle,
     RuntimeCheckpoint,
     State,
-    Upgrade
+    Upgrade,
+    View
   }
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
@@ -225,7 +227,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   def handle_event({:call, from}, :status, phase, %State{} = data) do
-    {:keep_state_and_data, [{:reply, from, public_status(phase, data)}]}
+    {:keep_state_and_data, [{:reply, from, View.status(phase, data, message_queue_len())}]}
   end
 
   def handle_event({:call, from}, :creation_info, _phase, %State{} = data) do
@@ -241,8 +243,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   def handle_event({:call, from}, :children, _phase, %State{} = data) do
-    children = Map.new(data.children, fn {key, child} -> {key, public_child(child)} end)
-    {:keep_state_and_data, [{:reply, from, children}]}
+    {:keep_state_and_data, [{:reply, from, View.children(data)}]}
   end
 
   def handle_event({:call, from}, :snapshot, _phase, %State{} = data) do
@@ -345,7 +346,7 @@ defmodule Jido.AgentServer.Runtime do
   def handle_event({:call, from}, {:adopt_parent, %ParentRef{} = parent}, _phase, data) do
     case attach_parent(data, parent) do
       {:ok, next_data} ->
-        reply = relationship_info(next_data)
+        reply = View.relationship_info(next_data)
         {:keep_state, next_data, [{:reply, from, {:ok, reply}}]}
 
       {:error, reason} ->
@@ -434,11 +435,11 @@ defmodule Jido.AgentServer.Runtime do
         :initializing,
         %State{} = data
       ) do
-    postpone_call(from, token, signal, deadline, data)
+    AdmissionControl.postpone_call(from, token, signal, deadline, data)
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, :initializing, %State{} = data) do
-    postpone_cast(token, signal, data)
+    AdmissionControl.postpone_cast(token, signal, data)
   end
 
   def handle_event(
@@ -447,7 +448,7 @@ defmodule Jido.AgentServer.Runtime do
         :idle,
         %State{} = data
       ) do
-    data = forget_postponed(data, token)
+    data = AdmissionControl.forget(data, token)
 
     if AdmissionDeadline.expired?(deadline) do
       AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
@@ -458,7 +459,7 @@ defmodule Jido.AgentServer.Runtime do
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, :idle, %State{} = data) do
-    start_turn(signal, nil, %{}, forget_postponed(data, token))
+    start_turn(signal, nil, %{}, AdmissionControl.forget(data, token))
   end
 
   def handle_event(
@@ -467,15 +468,15 @@ defmodule Jido.AgentServer.Runtime do
         :admitting,
         %State{} = data
       ) do
-    if reentrant_admission_call?(from, data.admission_task) do
+    if AdmissionControl.reentrant_task_call?(from, data.admission_task) do
       {:keep_state_and_data, [{:reply, from, {:error, :reentrant_admission}}]}
     else
-      postpone_call(from, token, signal, deadline, data)
+      AdmissionControl.postpone_call(from, token, signal, deadline, data)
     end
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, :admitting, %State{} = data) do
-    postpone_cast(token, signal, data)
+    AdmissionControl.postpone_cast(token, signal, data)
   end
 
   def handle_event(
@@ -484,15 +485,15 @@ defmodule Jido.AgentServer.Runtime do
         :running,
         %State{} = data
       ) do
-    if reentrant_turn_call?(from, data.active) do
+    if AdmissionControl.reentrant_turn_call?(from, data.active) do
       {:keep_state_and_data, [{:reply, from, {:error, :reentrant_turn}}]}
     else
-      postpone_call(from, token, signal, deadline, data)
+      AdmissionControl.postpone_call(from, token, signal, deadline, data)
     end
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, :running, %State{} = data) do
-    postpone_cast(token, signal, data)
+    AdmissionControl.postpone_cast(token, signal, data)
   end
 
   def handle_event(
@@ -501,15 +502,15 @@ defmodule Jido.AgentServer.Runtime do
         :directing,
         %State{} = data
       ) do
-    if reentrant_directive_call?(from, data.directive_task) do
+    if AdmissionControl.reentrant_task_call?(from, data.directive_task) do
       {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
     else
-      postpone_call(from, token, signal, deadline, data)
+      AdmissionControl.postpone_call(from, token, signal, deadline, data)
     end
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, :directing, %State{} = data) do
-    postpone_cast(token, signal, data)
+    AdmissionControl.postpone_cast(token, signal, data)
   end
 
   def handle_event(:info, {:signal, %Signal{} = signal}, _phase, %State{}) do
@@ -1733,142 +1734,12 @@ defmodule Jido.AgentServer.Runtime do
     [{:next_event, :internal, {:handle_directives, directives, context}}]
   end
 
-  defp public_status(phase, %State{} = data) do
-    message_queue_len =
-      case Process.info(self(), :message_queue_len) do
-        {:message_queue_len, length} -> length
-        nil -> 0
-      end
-
-    %{
-      phase: phase,
-      agent_id: data.agent.id,
-      state_version: data.state_version,
-      admission: %{
-        postponed: MapSet.size(data.postponed_tokens),
-        limit: data.max_postponed_signals,
-        message_queue_len: message_queue_len
-      },
-      runtime: %{
-        partition: data.partition,
-        parent: public_parent(data.parent),
-        child_count: map_size(data.children),
-        pending_child_spawns: pending_child_spawns(data),
-        error_count: data.error_count,
-        lifecycle: %{
-          pool: data.pool,
-          attached: map_size(data.attachments),
-          idle_timeout: data.idle_timeout,
-          idle_timer?: not is_nil(data.idle_timer)
-        }
-      },
-      active: public_active(data.active)
-    }
-  end
-
-  defp public_active(nil), do: nil
-
-  defp public_active(%ActiveTurn{} = active) do
-    signal = active.effective_signal || active.source_signal
-
-    %{
-      turn_id: active.turn_id,
-      source_signal_id: active.source_signal.id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      start_version: active.start_version,
-      committed_version: active.committed_version
-    }
-  end
-
-  defp postpone_call(from, token, signal, deadline, %State{} = data) do
-    cond do
-      AdmissionDeadline.expired?(deadline) ->
-        AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
-
-        {:keep_state, forget_postponed(data, token),
-         [{:reply, from, {:error, :admission_timeout}}]}
-
-      MapSet.member?(data.postponed_tokens, token) ->
-        {:keep_state_and_data, [:postpone]}
-
-      admission_full?(data) ->
-        AgentTelemetry.admission_rejected(data, signal, :overloaded)
-        {:keep_state_and_data, [{:reply, from, {:error, overload_error(data)}}]}
-
-      true ->
-        {:keep_state, remember_postponed(data, token), [:postpone]}
+  defp message_queue_len do
+    case Process.info(self(), :message_queue_len) do
+      {:message_queue_len, length} -> length
+      nil -> 0
     end
   end
-
-  defp postpone_cast(token, signal, %State{} = data) do
-    cond do
-      MapSet.member?(data.postponed_tokens, token) ->
-        {:keep_state_and_data, [:postpone]}
-
-      admission_full?(data) ->
-        AgentTelemetry.admission_rejected(data, signal, :overloaded)
-
-        Logger.warning("Agent Signal cast dropped because the Server is overloaded",
-          agent_id: data.agent.id,
-          signal_id: signal.id,
-          signal_type: signal.type
-        )
-
-        :keep_state_and_data
-
-      true ->
-        {:keep_state, remember_postponed(data, token), [:postpone]}
-    end
-  end
-
-  defp remember_postponed(%State{} = data, token) do
-    %{data | postponed_tokens: MapSet.put(data.postponed_tokens, token)}
-  end
-
-  defp forget_postponed(%State{} = data, token) do
-    %{data | postponed_tokens: MapSet.delete(data.postponed_tokens, token)}
-  end
-
-  defp admission_full?(%State{max_postponed_signals: :infinity}), do: false
-
-  defp admission_full?(%State{} = data) do
-    MapSet.size(data.postponed_tokens) >= data.max_postponed_signals
-  end
-
-  defp overload_error(%State{} = data) do
-    {:overloaded,
-     %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
-  end
-
-  defp reentrant_turn_call?(
-         {caller, _tag},
-         %ActiveTurn{exec_handle: %ExecutionAdapter{exec_pid: root}}
-       )
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_turn_call?(_from, _active), do: false
-
-  defp reentrant_admission_call?({caller, _tag}, %{task: %Task{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_admission_call?(_from, _admission_task), do: false
-
-  defp reentrant_directive_call?({caller, _tag}, %{task: %Task{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_directive_call?(_from, _directive_task), do: false
 
   defp plugin_runtime_refs(%State{} = data, modules) do
     Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
@@ -1885,46 +1756,6 @@ defmodule Jido.AgentServer.Runtime do
 
   defp plugin_runtime_ref(data, %Jido.Plugin.Spec{module: module}) do
     PluginLifecycle.runtime_ref(data, module)
-  end
-
-  defp related_exec_process?(pid, root, _visited, _depth) when pid == root, do: true
-  defp related_exec_process?(_pid, _root, _visited, depth) when depth >= 8, do: false
-
-  defp related_exec_process?(pid, root, visited, depth) do
-    if Map.has_key?(visited, pid) do
-      false
-    else
-      visited = Map.put(visited, pid, true)
-
-      pid
-      |> exec_process_parents()
-      |> Enum.any?(&related_exec_process?(&1, root, visited, depth + 1))
-    end
-  end
-
-  defp exec_process_parents(pid) when node(pid) != node(), do: []
-
-  defp exec_process_parents(pid) do
-    monitored_by =
-      case Process.info(pid, :monitored_by) do
-        {:monitored_by, pids} -> pids
-        nil -> []
-      end
-
-    callers =
-      case Process.info(pid, :dictionary) do
-        {:dictionary, dictionary} ->
-          dictionary
-          |> Keyword.get(:"$callers", [])
-          |> List.wrap()
-
-        nil ->
-          []
-      end
-
-    (monitored_by ++ callers)
-    |> Enum.filter(&is_pid/1)
-    |> Enum.uniq()
   end
 
   defp ensure_directive_limit(_directives, :infinity), do: :ok
@@ -2279,12 +2110,6 @@ defmodule Jido.AgentServer.Runtime do
     end
   end
 
-  defp pending_child_spawns(data) do
-    for {tag, %{status: :pending} = request} <- data.child_spawn_requests, into: %{} do
-      {tag, %{node: request.directive.node, request_id: request.request_id}}
-    end
-  end
-
   defp track_online_child(data, pid, info) do
     tag = info.parent.tag
     meta = info.parent.meta
@@ -2337,15 +2162,6 @@ defmodule Jido.AgentServer.Runtime do
     end
   end
 
-  defp relationship_info(%State{} = data) do
-    %{
-      agent_id: data.agent.id,
-      agent_module: data.agent.module,
-      partition: data.partition,
-      parent: public_parent(data.parent)
-    }
-  end
-
   defp directive_context(%State{} = data) do
     signal = Signal.new!(type: "jido.agent.runtime", source: "/agent/#{data.agent.id}", data: %{})
 
@@ -2353,33 +2169,6 @@ defmodule Jido.AgentServer.Runtime do
       agent_id: data.agent.id,
       source_signal: signal,
       signal: signal
-    }
-  end
-
-  defp public_child(%ChildInfo{} = child), do: public_child_map(child)
-
-  defp public_child_map(%ChildInfo{} = child) do
-    %{
-      pid: child.pid,
-      module: child.module,
-      id: child.id,
-      partition: child.partition,
-      tag: child.tag,
-      kind: child.kind,
-      meta: child.meta
-    }
-  end
-
-  defp public_parent(nil), do: nil
-
-  defp public_parent(%ParentRef{} = parent) do
-    %{
-      pid: parent.pid,
-      id: parent.id,
-      partition: parent.partition,
-      tag: parent.tag,
-      spawn_ref: parent.spawn_ref,
-      meta: parent.meta
     }
   end
 
@@ -2524,7 +2313,7 @@ defmodule Jido.AgentServer.Runtime do
       signal_type: signal.type,
       stage: outcome.stage,
       error: if(outcome.error, do: public_error(outcome.error)),
-      outcome: outcome_summary(outcome)
+      outcome: View.outcome_summary(outcome)
     })
   end
 
@@ -2544,27 +2333,6 @@ defmodule Jido.AgentServer.Runtime do
     entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
     events = Enum.take([entry | data.debug_events], data.debug_max_events)
     %{data | debug_events: events}
-  end
-
-  defp outcome_summary(%Outcome{} = outcome) do
-    signal = outcome.effective_signal || outcome.source_signal
-
-    %{
-      id: outcome.id,
-      agent_id: outcome.agent_id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      status: outcome.status,
-      stage: outcome.stage,
-      committed?: outcome.committed?,
-      state_version_before: outcome.state_version_before,
-      state_version_after: outcome.state_version_after,
-      directives: outcome.directives,
-      started_at: outcome.started_at,
-      finished_at: outcome.finished_at,
-      duration_ms: outcome.duration_ms,
-      error: if(outcome.error, do: public_error(outcome.error))
-    }
   end
 
   defp public_error(reason), do: Error.to_map(reason)
