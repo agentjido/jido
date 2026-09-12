@@ -272,7 +272,10 @@ defmodule JidoTest.Topology.AuthoringHostTest do
     owner = self()
 
     {pid, ref} =
-      spawn_monitor(fn -> send(owner, {self(), :compiled, Code.compile_quoted(ast)}) end)
+      spawn_monitor(fn ->
+        {result, _diagnostics} = Code.with_diagnostics(fn -> Code.compile_quoted(ast) end)
+        send(owner, {self(), :compiled, result})
+      end)
 
     receive do
       {:DOWN, ^ref, :process, ^pid, :normal} ->

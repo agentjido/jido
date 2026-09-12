@@ -7,7 +7,7 @@ path.
 Run all examples:
 
 ```shell
-mix examples
+mix test.examples
 ```
 
 Run one example file while you change it:

@@ -50,7 +50,7 @@ revalidation against this seam when they next change.
 | Public extension inventory | Seam 12 now records public values, raw controls, and internal support types. | Preserve the classified inventory through delivery. | 90 Package boundaries, 12 Errors and contracts, 99 Delivery |
 | Stable identity boundary | Agent Ref and the local Ref-first facade are implemented beside IDs, PIDs, and generated names. | Preserve all compatible identity forms through V3. | 03 Agent identity, 09 Jido instance, 12 Errors and contracts |
 | Persistence ownership | Instance defaults and per-Agent overrides coexist. Backend and migration owners are not final. | One approved authority model that keeps the byte adapter and has a staged migration. | 07 Persistence, 09 Jido instance, 90 Package boundaries |
-| Ecosystem contract proof | The unpacked core package passes a public-only consumer against one exact V3 matrix. | Each added integration package supplies its own matrix and fixture. | Integration package owner |
+| Ecosystem contract proof | Core tests and package checks cover the selected V3 matrix. | Each integration package owns its compatibility evidence. | Integration package owner |
 | Future service scope | Durable, cluster, and transport capability lists have no released package contracts. | Capability ownership without claims of available package APIs. | Future package owners, 99 Delivery |
 | Integration ownership | AI and browser ownership is clear at a high level, but V3 compatibility is not complete. | Public Action, Signal, Plugin, Directive, and instance integration with no private Jido access. | `jido_ai`, `jido_browser`, 90 Package boundaries |
 
@@ -77,10 +77,6 @@ The user approved these decisions on 2026-09-09.
 8. **Stored data:** Keep core record, domain-field, Plugin-owned-field, and
    backend storage migration ownership separate. Domain and Plugin-owned
    fields remain in one Agent state map.
-9. **Boundary evidence:** Use a small public-only fixture when an integration
-   package makes a V3 compatibility claim. Internal core tests are not the only
-   evidence for that claim.
-
 ## Dependencies
 
 - Approved prerequisite: [00 Overview](../00_overview/README.md).

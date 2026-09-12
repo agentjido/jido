@@ -22,7 +22,7 @@ Run the full section from the `jido` repository root:
 mix test --include example test/examples/02_workflow --seed 0
 ```
 
-Run one folder to test one example. These tests also run in `mix examples` and
+Run one folder to test one example. These tests also run in `mix test.examples` and
 `mix test --only example`. Each test has the `:example` tag and the
 `group: :workflow` tag.
 

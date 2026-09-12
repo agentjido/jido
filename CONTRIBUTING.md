@@ -121,11 +121,12 @@ Welcome to the Jido contributor's guide! We're excited that you're interested in
    mix test
 
    # Run core tests that start external BEAM nodes
-   mix peer --seed 0
+   mix test.peer
 
    # Run secondary suites separately
-   mix benchmarks --seed 0
-   mix examples --seed 0
+   mix test.bench
+   mix test.examples
+   mix test.all
 
    # Run with coverage
    mix test --cover

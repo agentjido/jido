@@ -8,7 +8,7 @@ add a separate integration tag or a second copy of an existing assertion.
 
 ```sh
 mix test                               # Excludes examples
-mix examples --seed 0                  # Runs all example tests
+mix test.examples                      # Runs all example tests
 mix test test/examples/08_applications --include example --seed 0
 ```
 

@@ -64,10 +64,6 @@ source.
 package shall use publishable dependency sources, unless the approval owner
 records a release-source exception.
 
-`DEL-REQ-008`: When the selected package set is tested, a public-only consumer
-fixture shall compile and run without private Jido modules, messages, process
-names, or repository-only paths.
-
 `DEL-REQ-009`: When a package matrix result is recorded, the evidence record
 shall include each package commit or immutable package checksum.
 

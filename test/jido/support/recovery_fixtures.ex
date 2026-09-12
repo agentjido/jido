@@ -16,7 +16,8 @@ defmodule JidoTest.RecoveryFixtures.Runner do
 
   @impl true
   def run(observer, value) do
-    Elixir.Agent.update(observer, fn _ -> self() end)
+    task = self()
+    Elixir.Agent.update(observer, fn _ -> task end)
 
     receive do
       :release -> {:ok, Integer.to_string(value * 2)}

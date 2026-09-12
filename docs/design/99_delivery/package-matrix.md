@@ -24,24 +24,8 @@ test dependencies do not enter the package claim.
 Jido declares Elixir `~> 1.18`. The tested floor and current runtime are the
 evidence points. They do not claim every intermediate OTP patch.
 
-## Public consumer
-
-The fixture at [`integration/public_consumer`](../../../integration/public_consumer)
-depends on an unpacked Jido package by `JIDO_CANDIDATE_PATH`. It uses only
-public modules. It proves:
-
-- all four Plugin owners through one `Jido.Plugin.Manifest`;
-- public Signal creation;
-- Agent construction and Plugin-owned state;
-- versioned Agent persistence;
-- Agent Ref startup, resolution, and stop through a Jido instance;
-- static Topology Plugin contribution and planning.
-
-The Jido package excludes `integration`, `examples`, `test`, and `docs/design`.
-Thus, the fixture is evidence and is not shipped as production code.
-
 ## Packages outside this claim
 
 Jido AI, Jido Browser, future transport packages, and future distributed
 control-plane packages are not part of this matrix. Each owner must add its own
-exact version set and public-only proof before it claims V3 compatibility.
+exact version set and compatibility tests before it claims V3 compatibility.

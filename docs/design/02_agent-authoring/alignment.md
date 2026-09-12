@@ -252,7 +252,7 @@ It is not a separate implementation plan.
 - Compatibility: no supported authoring API is removed without a separate
   approved staged migration.
 - Verification: format, compile, focused tests, full package tests, Basic
-  examples, public-only extension fixture, and compatible V3 package matrix.
+  examples, extension contract tests, and compatible V3 package matrix.
 - Exit criteria: the acceptance matrix has no `Missing` or `Conflict` state for
   an approved requirement.
 

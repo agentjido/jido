@@ -470,7 +470,7 @@ mix quality
 The current local candidate passes the core suite on Elixir 1.18.5 / OTP
 27.3.4.12 and the full local gates on Elixir 1.20.3 / OTP 29.0.5. Core coverage
 is above the 90% release threshold. Example acceptance tests are secondary;
-run `mix examples --seed 0` separately when needed. See the
+run `mix test.examples` separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
 All research example assertions pass. They include the quiescent upgrade

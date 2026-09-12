@@ -46,7 +46,7 @@ review.
 | Gap | Why it matters | Required outcome | Owner seam |
 | --- | --- | --- | --- |
 | Shared authoring errors | Authoring uses structured errors, but final shared codes and callback rules remain pending. | Apply the approved seam-12 contract without changing authoring meaning. | 12 Errors and contracts |
-| Release compatibility | Local tests prove the current package set, but publication gates remain broader. | Keep one compatible V3 package matrix and public-only extension proof. | 90 Package boundaries, 99 Delivery |
+| Release compatibility | Local tests prove the current package set, but publication gates remain broader. | Keep one compatible V3 package matrix and extension contract tests. | 90 Package boundaries, 99 Delivery |
 
 ## Approved decisions
 

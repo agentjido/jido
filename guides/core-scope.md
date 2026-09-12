@@ -142,7 +142,7 @@ Run core tests and static checks by default:
 mix quality
 ```
 
-Benchmark tests (`mix benchmarks --seed 0`) and example tests are separate,
+Benchmark tests (`mix test.bench`) and example tests are separate,
 secondary checks. Run focused extension examples when needed:
 
 ```sh
@@ -151,6 +151,6 @@ mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
   test/examples/08_applications --include example --seed 0
 ```
 
-Run all examples separately with `mix examples --seed 0`. All example tests
+Run all examples separately with `mix test.examples`. All example tests
 pass without skips. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).

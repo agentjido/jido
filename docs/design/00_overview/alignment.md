@@ -425,7 +425,7 @@ the implementation tasks.
 
 | Requirement | Evidence now | Required evidence | Evidence state |
 | --- | --- | --- | --- |
-| `OVR-REQ-001` through `OVR-REQ-005` | Core boundaries, published dependencies, and the public package consumer | None | `Proven` |
+| `OVR-REQ-001` through `OVR-REQ-005` | Core boundaries, published dependencies, and core contract tests | None | `Proven` |
 | `OVR-REQ-006` through `OVR-REQ-008` | Agent, Builder, Codec, and authoring tests | None | `Proven` |
 | `OVR-REQ-009` and `OVR-REQ-010` | Definition revision, authoring, Codec, checkpoint, and restore tests | None | `Proven` |
 | `OVR-REQ-011` and `OVR-REQ-012` | Ref contract tests, instance Ref tests, stable-key persistence tests, and three passing FA03 cases | Topology delivery, node-move, and stale-location tests remain with seam 10. | `Proven for value, local instance, and persistence` |
@@ -449,7 +449,7 @@ the implementation tasks.
 | `OVR-REQ-052` and `OVR-REQ-053` | `Jido.Error`; seam-12 public value and raw control inventories; error normalization tests | Preserve the inventory through delivery and add no unowned release result. | `Proven` |
 | `OVR-REQ-054` through `OVR-REQ-059` | Semantic owner modules; Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Preserve the version-1 catalog and legacy overlap through delivery. | `Proven` |
 | `OVR-REQ-060` and `OVR-REQ-061` | `lib/jido/topology/controller.ex:1-24,73-90`; `test/jido/topology/controller_test.exs:20-330`; `test/jido/topology/authoring_host_test.exs:79-272` | Add owner desired-state and live-target tests only if seam 11 approves those contracts. | `Proven` for static scope |
-| `OVR-REQ-062` | Hex dependency tree, package matrix, and public package consumer | None | `Proven` |
+| `OVR-REQ-062` | Hex dependency tree, package matrix, and package checks | None | `Proven` |
 | `OVR-REQ-063` | Public inventory and delivery compatibility register | None | `Proven` |
 | `OVR-REQ-064` | Initial record, commit, restore, tombstone, and reactivation tests | None | `Proven` |
 | `OVR-REQ-065` and `OVR-REQ-066` | Seam-12 protocol registry; instance, Server, Persistence, and Topology option-validation tests | Preserve current raw controls until an owner proves a staged migration. | `Proven` |

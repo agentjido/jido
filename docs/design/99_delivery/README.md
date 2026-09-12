@@ -4,11 +4,9 @@
 
 ## Briefing
 
-The local Jido V3 candidate has one defined core package set, one public-only
-consumer, and four delivery records. The package uses published Hex sources for
-`jido_action` and `jido_signal`. The consumer proves the public Plugin facets for
-Agents, Agent Servers, persistence, and Topology together with Signal, Agent Ref,
-durable storage, and instance operations.
+The local Jido V3 candidate has one defined core package set and four delivery
+records. The package uses published Hex sources for `jido_action` and
+`jido_signal`.
 
 The candidate includes an explicit quiescent Agent Server upgrade boundary,
 validated Agent definition migration, and additive local Topology target
@@ -32,7 +30,7 @@ human release decision and an exact-commit CI result.
 | --- | --- |
 | Scope | Every prerequisite requirement range and every skip has a disposition. |
 | Package set | Jido `3.0.0-beta.1`, `jido_action 3.0.0-beta.9`, and `jido_signal 3.0.0-beta.4`. |
-| Plugin seam | The public package consumer uses the four owner facets without private Jido APIs. |
+| Plugin seam | Core contract tests cover the four owner facets. |
 | Runtime floor | The Elixir 1.18.5 and OTP 27.3.4.12 result is from the prior candidate and needs a release refresh. |
 | Current runtime | Elixir 1.20.3 and OTP 29.0.5 pass the current quality, example, research, and documentation gates. |
 | Research | 48 checks pass. No research check is skipped. |

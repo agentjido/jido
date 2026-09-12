@@ -27,15 +27,14 @@ new publication decision.
 | Research subset | `mix test test/examples/99_research --include example --seed 0` | Elixir 1.20.3, OTP 29.0.5 | 48 pass; no skips. |
 | Documentation | `mix docs --no-open -f html --warnings-as-errors` | Elixir 1.20.3, OTP 29.0.5 | Pass. |
 | Hex package | `mix hex.build --unpack --output <temporary-package>` | Elixir 1.20.3, OTP 29.0.5 | Prior candidate passed. Refresh before release approval. |
-| Public consumer | `JIDO_CANDIDATE_PATH=<temporary-package> MIX_BUILD_PATH=<temporary-build> MIX_DEPS_PATH=<temporary-deps> mix deps.get` then `mix test --seed 0` | Elixir 1.20.3, OTP 29.0.5 | Prior candidate passed 1 test. Refresh before release approval. |
 
 ## Package inspection
 
 The unpacked package contains `lib`, `mix.exs`, `.formatter.exs`, `README.md`,
 `usage-rules.md`, `guides`, and `LICENSE`. It excludes tests, examples,
-benchmarks, integration fixtures, design records, build output, and repository
-metadata. The package metadata selects Hex `jido_action 3.0.0-beta.9` and Hex
-`jido_signal 3.0.0-beta.4`.
+benchmarks, design records, build output, and repository metadata. The package
+metadata selects Hex `jido_action 3.0.0-beta.9` and Hex `jido_signal
+3.0.0-beta.4`.
 
 ## Exceptions and external gates
 

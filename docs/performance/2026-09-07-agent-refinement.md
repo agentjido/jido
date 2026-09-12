@@ -110,7 +110,7 @@ Dialyzer checks. Its test step runs in a separate test environment:
 mix test test/jido --include flaky --seed 0
 ```
 
-CI uses this selection. The test helper excludes `:benchmark` and `:example`.
+CI uses this selection. The test helper excludes `:bench` and `:example`.
 Benchmark tests (`mix benchmarks`) and example tests (`mix examples`) are
 secondary and run only when selected separately. Research failures do not block
 the core quality check. The 11 known research failures have individual

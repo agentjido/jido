@@ -27,14 +27,14 @@ text and code differ.
 | Agent Server | Admission, execution, commit, Plugin runtime reconstruction, readiness, failure, settlement, quiescent upgrade, and validated definition migration pass. | `Proven` |
 | Topology | Static local planning, Plugin contribution, activation, readiness, repair, and additive target update pass. | `Proven` |
 | Errors and observation | The code registry is closed. Semantic lifecycle, Turn, persistence, and Topology events have bounded metadata and default consumers. | `Proven` |
-| Package source | Production dependencies use published Hex packages. The unpacked Jido candidate passes a separate public consumer. | `Proven` |
+| Package source | Production dependencies use published Hex packages. | `Proven` |
 | Compatibility | No API is deprecated or removed. Stored-data, downgrade, rollback, and live-upgrade limits are explicit. | `Proven` |
 
 ## Delivery requirement disposition
 
 | Requirements | State | Evidence or limit |
 | --- | --- | --- |
-| `DEL-REQ-001` to `DEL-REQ-009` | `Proven` | Scope ledger, package matrix, and public consumer. |
+| `DEL-REQ-001` to `DEL-REQ-007`, and `DEL-REQ-009` | `Proven` | Scope ledger and package matrix. |
 | `DEL-REQ-010`, `DEL-REQ-012`, and `DEL-REQ-015` | `Proven locally` | Exact-tree quality, documentation, example, and research results are current. |
 | `DEL-REQ-011`, `DEL-REQ-013`, `DEL-REQ-014`, `DEL-REQ-016`, and `DEL-REQ-017` | `Refresh required` | Coverage, package, benchmark, and runtime-matrix results are from the prior candidate. |
 | `DEL-REQ-018` | `External gate` | Exact-commit CI needs a published remote commit. No local result claims this gate. |
@@ -62,7 +62,6 @@ from claiming that a package was approved or published.
 - [x] Every prerequisite requirement range and test skip has a disposition.
 - [x] Required core contracts have executable evidence.
 - [x] The package uses publishable production dependency sources.
-- [x] A separate public-only package consumer passes.
 - [x] Compatibility and migration limits are explicit.
 - [x] Local quality, docs, and example gates pass.
 - [ ] Coverage, package, benchmark, and runtime-matrix gates are refreshed for

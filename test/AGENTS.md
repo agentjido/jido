@@ -12,14 +12,15 @@ Use deterministic model adapters or local HTTP/SSE for required examples.
 
 There are four test execution categories: core, peer, benchmark, and example.
 Peer tests are core contracts that start external BEAM nodes. Plain `mix test`
-and `mix quality` exclude them. Run them with `mix peer --seed 0`. `mix quality`
+and `mix quality` exclude them. Run them with `mix test.peer`. `mix quality`
 runs fast core tests, plus format, compile, lint, and Dialyzer checks.
 CI selects `mix test test/jido --include flaky --seed 0` with peer, benchmark,
 and example tags excluded by the test helper.
-Benchmark and example tests are secondary. Run `mix benchmarks --seed 0` or
-`mix examples --seed 0` separately when needed. Give every peer test the
+Benchmark and example tests are secondary. Run `mix test.bench` or
+`mix test.examples` separately when needed. Run all supported test categories with
+`mix test.all`. Give every peer test the
 `:peer` tag through `JidoTest.PeerCase`. Give every benchmark test the
-`:benchmark` tag and keep it in `test/bench/`.
+`:bench` tag and keep it in `test/bench/`.
 Give every example test the `:example` tag, directly or through a
 shared case template. Do not add an `:integration` tag. Keep runnable source in
 `examples/`, assertions in `test/examples/`, and focused core tests in

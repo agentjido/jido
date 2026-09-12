@@ -2,7 +2,7 @@ Code.require_file("support/suite.exs", __DIR__)
 
 defmodule JidoCoreBenchTest do
   use ExUnit.Case, async: false
-  @moduletag :benchmark
+  @moduletag :bench
   alias JidoCoreBench.{Fixtures, Measure, Report, Suite}
 
   setup do
@@ -12,7 +12,7 @@ defmodule JidoCoreBenchTest do
 
   test "smoke cases check results, copied values, and process cleanup" do
     workloads = Suite.workloads("smoke")
-    assert length(workloads) == 132
+    assert length(workloads) == 120
     assert length(Enum.uniq_by(workloads, & &1.id)) == length(workloads)
     assert Enum.any?(workloads, &(&1.id == "topology/builder/agents_128"))
     assert Enum.any?(workloads, &(&1.id == "topology/definition/agents_128"))

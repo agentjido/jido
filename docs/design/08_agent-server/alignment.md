@@ -312,8 +312,8 @@ Create the formal plan only after the user approves this seam.
   Server contract decides placement or cluster authority.
 - Compatibility: no PID/name, map, Outcome, debug, or error-policy removal
   without its separate approved gate.
-- Verification: public-only package fixture, full Jido tests, cross-package V3
-  matrix, docs, types, format, compile, lint, and coverage.
+- Verification: full Jido tests, cross-package V3 matrix, docs, types, format,
+  compile, lint, and coverage.
 - Exit criteria: the acceptance matrix has no `Missing`, `Conflict`, or
   `Blocked` entry for an approved requirement.
 

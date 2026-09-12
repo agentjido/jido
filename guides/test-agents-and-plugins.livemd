@@ -106,6 +106,6 @@ restart behavior. Use messages or public inspection functions instead of sleep
 calls.
 
 In this repository, `mix quality` runs core tests and the static checks.
-Benchmark tests and example tests are secondary. Run `mix benchmarks --seed 0`
-or `mix examples --seed 0` separately when needed. All example assertions,
+Benchmark tests and example tests are secondary. Run `mix test.bench`
+or `mix test.examples` separately when needed. All example assertions,
 including the bounded live-upgrade contracts, pass without skips.

@@ -49,7 +49,7 @@ a 1 MiB binary. Smoke uses small state for the main matrix; fixed boundary cases
 still use their stated payloads. Actions do no network or provider work.
 Each call must produce its expected result. Server cleanup runs even when a
 result check fails. The benchmark contract tests are in
-`test/bench/core_bench_test.exs`; run them with `mix benchmarks --seed 0`.
+`test/bench/core_bench_test.exs`; run them with `mix test.bench`.
 
 ## Measurements
 

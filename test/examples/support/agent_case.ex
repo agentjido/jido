@@ -4,7 +4,7 @@ defmodule JidoTest.AgentCase do
 
   Each test gets an isolated Jido instance from `JidoTest.Case`. The
   `:example` tag keeps the suite out of the default test run. Use
-  `mix test --only example` or `mix examples` to run the suite.
+  `mix test --only example` or `mix test.examples` to run the suite.
   """
 
   use ExUnit.CaseTemplate

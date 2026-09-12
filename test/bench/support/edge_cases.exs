@@ -42,12 +42,15 @@ defmodule JidoCoreBench.EdgeCases do
               Map.merge(context, %{
                 agent_id: agent.id,
                 agent_state: agent.state,
+                plugin_inputs: %{},
                 signal: signal
               })
             )
 
           {:error, error} ->
-            keys = Map.keys(context) |> Enum.filter(&(&1 in [:agent_id, :agent_state, :signal]))
+            keys =
+              Enum.filter([:agent_id, :agent_state, :signal], &Map.has_key?(context, &1))
+
             F.equal!(error.details, %{keys: keys})
         end
       end)

@@ -42,9 +42,9 @@ not a gate exception.
 | --- | --- | --- | --- | --- |
 | `SCOPE-DIST` | Deferred | Future distributed control-plane owner | Core has no membership, automatic placement, lease, fencing, failover, or operator control plane. Static local Topology stays available. | Review with a public external package and its conformance suite. |
 | `SCOPE-OTEL` | Deferred | Host integration owner | Core emits semantic Telemetry but does not include an OpenTelemetry SDK or bridge. | Review when a host bridge has disabled and in-memory SDK proof. |
-| `SCOPE-TRANSPORT` | Deferred | Future transport owner | Core does not claim a general transport package or durable fabric API. Public Signal input remains available. | Review with a named package and public-only fixture. |
+| `SCOPE-TRANSPORT` | Deferred | Future transport owner | Core does not claim a general transport package or durable fabric API. Public Signal input remains available. | Review with a named package and transport contract tests. |
 | `SCOPE-REF-DELIVERY` | Deferred | Future transport and placement owners | Local Ref resolution is implemented. Core does not claim Ref-addressed transport or automatic placement across nodes. | Review with replaceable-handle delivery and Ref-preserving placement tests. |
-| `SCOPE-AI-BROWSER` | Excluded | Jido AI and Jido Browser owners | This package result does not claim V3 compatibility for AI or Browser. Core remains usable without either package. | Each package adds its exact matrix and public-only proof. |
+| `SCOPE-AI-BROWSER` | Excluded | Jido AI and Jido Browser owners | This package result does not claim V3 compatibility for AI or Browser. Core remains usable without either package. | Each package adds its exact matrix and compatibility tests. |
 | `SCOPE-ERR-019` | Excluded | Errors seam | The proposed error projection version 2 was retired. Version 1 remains the contract. | Review only with a new versioned error design. |
 
 ## Skip classification

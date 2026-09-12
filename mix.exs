@@ -149,9 +149,10 @@ defmodule Jido.MixProject do
       preferred_envs: [
         q: :test,
         quality: :test,
-        peer: :test,
-        benchmarks: :test,
-        examples: :test,
+        "test.bench": :test,
+        "test.peer": :test,
+        "test.examples": :test,
+        "test.all": :test,
         coveralls: :test,
         "coveralls.github": :test,
         "coveralls.lcov": :test,
@@ -388,10 +389,12 @@ defmodule Jido.MixProject do
       # Default exclusions are declared once in test/test_helper.exs.
       test: "test --preload-modules",
 
-      # Run filtered suites only when requested.
-      peer: "test test/jido --only peer --seed 0",
-      benchmarks: "test test/bench --only benchmark",
-      examples: "test test/examples --only example",
+      # Run one test category or all supported categories with a fixed seed.
+      "test.bench": "test test/bench --only bench --seed 0",
+      "test.peer": "test test/jido --only peer --seed 0",
+      "test.examples": "test test/examples --only example --seed 0",
+      "test.all":
+        "test --preload-modules --include bench --include example --include flaky --include peer --seed 0",
 
       # Helper to run docs
       docs: "docs --open",
