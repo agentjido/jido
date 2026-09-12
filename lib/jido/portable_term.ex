@@ -39,15 +39,11 @@ defmodule Jido.PortableTerm do
       key_path = append(path, {:map_key, index})
       value_path = append(path, path_segment(key, index))
 
-      case validate_term(key, key_path) do
-        :ok ->
-          case validate_term(value, value_path) do
-            :ok -> {:cont, :ok}
-            {:error, _path} = error -> {:halt, error}
-          end
-
-        {:error, _path} = error ->
-          {:halt, error}
+      with :ok <- validate_term(key, key_path),
+           :ok <- validate_term(value, value_path) do
+        {:cont, :ok}
+      else
+        {:error, _path} = error -> {:halt, error}
       end
     end)
   end
