@@ -1,25 +1,32 @@
-> Seam alignment evidence. The implementation direction was selected on
-> 2026-09-10. Seam 09 now supplies the Ref-first instance controls.
+> Seam alignment evidence. The current behavior was reviewed on 2026-09-12.
+> The facade, work-boundary, and relationship refinements are pending approval.
 
 # Agent Server alignment
 
 ## Status
 
-- Implementation reviewed: 2026-09-10 on branch `v3-spike`.
+- Current source reviewed: 2026-09-12 on branch `v3-spike`.
 - Prerequisites: package boundaries, stable Agent identity values, fixed
   source-Signal evaluation, owner-specific Plugin facets, commit authority,
   durable record lifecycle, Agent definition versions, and current public
   error contracts are present.
-- Alignment state: `Implemented; Ref-first instance integration is also complete`.
+- Current behavior state: `Implemented` for `SRV-REQ-001` through
+  `SRV-REQ-076` as recorded below.
+- Refinement state: `Not implemented` for `SRV-REQ-077` through
+  `SRV-REQ-096`.
 
-The Agent Server now has one active pre-commit timeout, strict ready
-publication, and coherent Plugin runtime bootstrap values. Existing
-PID-and-name controls, status maps, Outcomes, error policies, and debug paths
-remain compatible. Seam 09 owns Ref resolution and the additive instance
-facade. Seam 13 owns any later observation projection.
+The current Agent Server has one active pre-commit timeout, strict ready
+publication, and coherent Plugin runtime bootstrap values. Existing PID and
+name controls, status maps, Outcomes, error policies, and debug paths remain
+compatible. Seam 09 owns Ref resolution and its additive instance facade. Seam
+13 owns any later observation projection.
 
-This execution state is not approval of every requirement in the target
-design.
+The proposed refinement does not change this behavior. It makes
+`Jido.AgentServer` a stable public facade, moves `:gen_statem` callbacks to one
+private Runtime process, moves all slow or user-defined work outside that
+process, and gives logical relationships one clear private boundary.
+
+This evidence is not approval of the proposed refinement.
 
 ## Inputs and evidence
 
@@ -55,34 +62,71 @@ design.
 - [Persistence design](../07_persistence/design.md): owns initial active records,
   CAS results, tombstones, restore meaning, and the implemented all-write-error
   authority rule.
+- [Runtime-topology design](../10_runtime-topology/design.md): keeps Agent
+  Servers as peers, keeps relationship bindings in Runtime Store, places owned
+  work under the Task Supervisor, and gives distributed spawn generations to
+  SpawnRegistry.
+- [Observability design](../13_observability/design.md): requires explicit
+  Task trace transfer, keeps existing semantic operations and stages, and
+  excludes private work identity from public metadata.
 - [Target design](design.md): defines this seam's recommended runtime contract.
 
 ### Canonical code
 
 | Evidence | Canonical current behavior |
 | --- | --- |
-| `lib/jido/agent_server.ex:1-47,432-500` | `Jido.AgentServer` is a `:gen_statem`. It owns one live Agent, state version, active Turn, runtime work, and five total phases including initialization. |
-| `lib/jido/agent_server.ex:85-430` | Public PID/name operations include startup, call, cast, request, inspection, cancellation, debug, lookup, child controls, snapshot, and hibernation. |
+| `lib/jido/agent_server.ex` module and callbacks | `Jido.AgentServer` is a `:gen_statem`. It owns one live Agent, state version, active Turn, runtime work, and five total phases including initialization. |
+| `lib/jido/agent_server.ex` public functions before `callback_mode/0` | Public PID/name operations include startup, call, cast, request, inspection, cancellation, debug, lookup, child controls, snapshot, and hibernation. |
 | `lib/jido/agent_server.ex` upgrade path | Explicit upgrade calls wait for idle. Definition replacement validates the target Agent, preserves Plugin declarations, checkpoints, and advances one state version. |
 | `lib/jido/agent_server/runtime_checkpoint.ex` | A successful definition replacement remains the restart source for the original managed child specification. |
 | `lib/jido/persistence.ex` replacement path | A stable namespaced record can change Agent module through one exact-byte compare-and-swap. Module-dependent compatibility keys reject that change. |
 | `lib/jido/agent_server/options.ex` | One Zoi-backed option value validates Agent construction, registration, persistence, limits, executable runtime, lifecycle, and open error policies. `turn_timeout` is a distinct pre-commit limit. |
 | `lib/jido/agent_server.ex` startup path | Startup reserves the Registry identity, restores and validates, starts Plugin roots, waits for readiness, confirms revision-zero creation when required, and then publishes `:ready`. |
-| `lib/jido/agent_server.ex:579-620,1878-1924` | Inspection remains responsive in every phase. Status and snapshot are protocol maps, not target-specific public structs. |
-| `lib/jido/agent_server.ex:759-848,1926-1978` | Busy Signals use OTP postponement. A token set bounds only events already seen by the state machine. Full calls fail; full casts are dropped. |
-| `lib/jido/agent_server.ex:709-756,1596-1637` | Admission and executable work can be cancelled. Current controls are atoms such as `:idle`, `:directing`, `:stale_turn`, and `:cancelled`. |
+| `lib/jido/agent_server.ex` inspection events and `public_status/2` | Inspection remains responsive in every phase. Status and snapshot are protocol maps, not target-specific public structs. |
+| `lib/jido/agent_server.ex` Signal events and postponement helpers | Busy Signals use OTP postponement. A token set bounds only events already seen by the state machine. Full calls fail; full casts are dropped. |
+| `lib/jido/agent_server.ex` cancellation events and helpers | Admission and executable work can be cancelled. Current controls are atoms such as `:idle`, `:directing`, `:stale_turn`, and `:cancelled`. |
 | `lib/jido/agent_server.ex` Turn path | One ActiveTurn starts before live admission. One Server timer covers admission and candidate evaluation until commit begins. Owned admission and executable work are cancelled on timeout. |
-| `lib/jido/agent_server.ex:1469-1545` | Runner finalization and live Directive validation precede checkpoint work. A successful commit writes first, replaces the complete Agent, increments one version, replies, and then starts Directives. |
-| `lib/jido/agent_server.ex:1582-1617` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
-| `lib/jido/agent_server.ex:1639-1862` | Directives run in list order after commit. One failure stops the batch. Process-backed work has one Directive timeout and does not roll back state. |
-| `lib/jido/agent_server.ex:1981-2008` | Synchronous reentry from admission, executable, and Directive process trees is detected and rejected. |
-| `lib/jido/agent_server.ex:2148-2218` | Plugin lifecycle-owner loss stops the Server. Other child exits remove private tracking and create a later child-exit Signal. |
-| `lib/jido/agent_server.ex:2504-2598` | Current error policy permits log-only, stop, maximum-error, error-Signal, and application-function behavior. |
-| `lib/jido/agent_server.ex:2874-2955` | Persistent startup loads durable state. Nonpersistent named startup restores `RuntimeStore`. Commits write runtime or durable checkpoints. Clean stop deletes the runtime checkpoint. |
+| `lib/jido/agent_server.ex` finalization and commit helpers | Runner finalization and live Directive validation precede checkpoint work. A successful commit writes first, replaces the complete Agent, increments one version, replies, and then starts Directives. |
+| `lib/jido/agent_server.ex` persistence-failure path | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
+| `lib/jido/agent_server.ex` Directive events and helpers | Directives run in list order after commit. One failure stops the batch. Process-backed work has one Directive timeout and does not roll back state. |
+| `lib/jido/agent_server.ex` reentry checks | Synchronous reentry from admission, executable, and Directive process trees is detected and rejected. |
+| `lib/jido/agent_server.ex` monitor and child-exit handling | Plugin lifecycle-owner loss stops the Server. Other child exits remove private tracking and create a later child-exit Signal. |
+| `lib/jido/agent_server.ex` error-policy helpers | Current error policy permits log-only, stop, maximum-error, error-Signal, and application-function behavior. |
+| `lib/jido/agent_server.ex` restore, persist, and checkpoint helpers | Persistent startup loads durable state. Nonpersistent named startup restores `RuntimeStore`. Commits write runtime or durable checkpoints. Clean stop deletes the runtime checkpoint. |
 | `lib/jido/agent_server/active_turn.ex` | One Zoi-backed private ActiveTurn keeps Turn identity, source and effective Signals, caller, task handle, prepared result, versions, Directive progress, and the pre-commit deadline. |
 | `lib/jido/agent/turn/outcome.ex:1-195` | One public validated Outcome uses five stages, five terminal statuses, complete source/effective Signals, commit fields, and exact Directive counts. |
 | `lib/jido/agent_server/plugin_lifecycle.ex` and `plugin_child.ex` | Plugin roots start in declaration order, use wrapper supervision, expose restarting state, await readiness, and stay outside Agent state. Every generation gets a newly built owned-state and state-version pair. |
-| `lib/jido/agent_server/directive_runtime.ex:80-638` | Built-in effects dispatch Signals, start and stop children, preserve relative relationships, and return explicit uncertain remote results. |
+| `lib/jido/agent_server/directive_runtime.ex` | Built-in effects dispatch Signals, start and stop children, preserve relative relationships, and return explicit uncertain remote results. |
+
+### Current internal shape
+
+This section records code-quality evidence. It does not change the public
+contract.
+
+| Evidence | Current difference from the proposed shape |
+| --- | --- |
+| `lib/jido/agent_server.ex` | The public facade and `:gen_statem` callback module are the same 3,434-line module. It has 79 `handle_event` clauses and 235 private function clauses in the reviewed worktree. |
+| `lib/jido/agent_server/state.ex` | One broad State value has phase work, persistence, Plugin, relationship, attachment, observation, and lifecycle fields. Many fields use `Zoi.any` and are optional outside one phase. |
+| `lib/jido/agent_server.ex` Turn path | Plugin admission is in a Task, but Runner preparation and finalization still run in the Runtime process. |
+| `lib/jido/agent_server.ex` persistence and upgrade paths | Runtime-checkpoint calls, persistence calls, an application error-policy function, upgrade operation, and migration work can run in the Runtime process. |
+| `lib/jido/agent_server/directive_runtime.ex` | Some built-in child and dispatch operations run directly and return modified complete Server State. This couples effect code to Runtime representation. |
+| `lib/jido/agent_server/state.ex` and `plugin_lifecycle.ex` | One `children` map contains logical Agent children and Plugin runtime children. The `kind` field selects the lifecycle model. |
+| `lib/jido/agent_server.ex` and `directive_runtime.ex` | Parent restore, adoption, child-online validation, parent death, Runtime Store binding, remote spawn generation, and monitor changes are spread across the main Runtime and Directive code. |
+
+These facts do not show a known behavior defect. They show a narrow refactor
+boundary. The current tests must remain the compatibility baseline.
+
+### V2 relationship history
+
+Tag `v2.3.3` had a useful relationship model that should remain in V3:
+
+| V2 evidence | Useful behavior | V3 refinement |
+| --- | --- | --- |
+| `lib/jido/agent_server/state.ex` at `v2.3.3` | Runtime State owned `parent`, `orphaned_from`, `children`, and `on_parent_death`. | Keep these fields in one nested relationship capability. |
+| `lib/jido/agent_server/parent_ref.ex` and `child_info.ex` at `v2.3.3` | Parent and child data represented a logical relationship between OTP peers. | Keep the logical model and add activation identity where a live process generation matters. |
+| `lib/jido/runtime_store.ex` and the V2 Agent Server relationship path | Runtime Store held a child-to-parent binding with stable IDs, partition, tag, and metadata. A restarted child resolved and announced the current parent. | Keep the small binding. Do not store PIDs, monitors, or distributed request history in it. |
+| V2 Agent state injection | V2 copied `ParentRef` into `agent.state.__parent__` and copied the former parent into `__orphaned_from__`. | Do not restore this behavior. Live runtime references must stay outside Agent and checkpoint data. |
+| V2 monitor and I/O path | Relationship I/O and monitor identity had fewer stale-generation checks and could run inline. | Keep V3 monitor references, activation IDs, creation causes, SpawnRegistry generations, and owned work boundaries. |
 
 No `code_change/4` callback or public private-state migration contract exists.
 The upgrade path replaces only the immutable Agent value and its checkpoint.
@@ -122,8 +166,10 @@ persistence, error, and example suites pass with the selected behavior.
   lifecycle, debug, and child-control operations are supported.
 - `SRV-RB-004`: Busy Signals use OTP postponement. The configured token limit
   does not bound the process mailbox.
-- `SRV-RB-005`: Admission, executable work, and bounded Directive work run
-  outside the state-machine process so inspection and control stay responsive.
+- `SRV-RB-005`: Plugin admission, executable work, and process-backed
+  Directive work use owned processes. Runner preparation and finalization,
+  persistence calls, some built-in effects, application error-policy
+  functions, and upgrade callbacks can still run in the state-machine process.
 - `SRV-RB-006`: Direct and live evaluation share Runner preparation and
   finalization. Live selection uses the unchanged source Signal.
 - `SRV-RB-007`: Live Directive batch checks and checkpoint success precede
@@ -147,7 +193,7 @@ persistence, error, and example suites pass with the selected behavior.
 
 ## Gap register
 
-This register records the state after implementation.
+This register records the implemented baseline and the proposed refinement.
 
 | Gap | Requirement | Current evidence | Difference | Disposition |
 | --- | --- | --- | --- | --- |
@@ -179,6 +225,13 @@ This register records the state after implementation.
 | `SRV-GAP-026` | `SRV-REQ-061` | Runner and Exec boundary tests | The exact selected executable is invoked with loaded code; no code pin is claimed. | `Resolved` |
 | `SRV-GAP-027` | `SRV-REQ-062` to `SRV-REQ-065` | Owner modules, public APIs, and split-facet example | Server code does not own Ref fields, candidate meaning, record meaning, placement, or cluster authority. Cross-package release proof remains with seam 99. | `Resolved for Server`; delivery follow-up |
 | `SRV-GAP-028` | Hot private-state upgrade | No `code_change/4` or migration tests | The old proposal implied code revision behavior without a state migration contract. | `Deferred`; separate design required |
+| `SRV-GAP-029` | `SRV-REQ-077` to `SRV-REQ-080` | `Jido.AgentServer` contains public functions and all `:gen_statem` callbacks. | The public facade and private Runtime are one module. | `Missing`; extract without adding a process or changing public API |
+| `SRV-GAP-030` | `SRV-REQ-081` to `SRV-REQ-084` | Current admission, Exec, and process-backed Directive tasks prove the pattern. | Runner preparation and finalization, storage, built-in effects, function policy, and upgrade work can still block Runtime. Result identity is not one uniform protocol. | `Partial`; define one owned-work boundary and fence |
+| `SRV-GAP-031` | `SRV-REQ-085` | `Jido.AgentServer.State` has phase task fields and one ActiveTurn. | One broad State value permits fields from unrelated phases and capabilities. | `Missing`; use phase-specific work values and nested capability state |
+| `SRV-GAP-032` | `SRV-REQ-086`, `SRV-REQ-087`, `SRV-REQ-089`, `SRV-REQ-090`, and `SRV-REQ-092` | Current child tests and Runtime Store binding preserve the V2 logical-peer and restart model. | Relationship logic is spread across the main Runtime and Directive code. | `Partial`; centralize pure relationship transitions without moving topology policy into this seam |
+| `SRV-GAP-033` | `SRV-REQ-088` | `ChildInfo.kind` distinguishes `:agent` and Plugin entries. | Agent and Plugin children share one map and general monitor path. | `Missing`; separate the two lifecycle models |
+| `SRV-GAP-034` | `SRV-REQ-091`, `SRV-REQ-093`, and `SRV-REQ-096` | V3 keeps runtime handles outside Agent checkpoints and validates current child identity. | Public parent data still exposes a private distributed `spawn_ref`; relationship generation checks are spread across paths. | `Partial`; define one public projection and one internal validation boundary |
+| `SRV-GAP-035` | `SRV-REQ-094`, `SRV-REQ-095` | `SpawnRegistry`, remote child tests, and relative dispatch exist. | Per-Server pending request state and distributed registry duties are not clearly separated in the code shape. | `Partial`; keep only current operation identity in Runtime and keep request history in SpawnRegistry |
 
 ## Dispositions of superseded claims
 
@@ -304,7 +357,51 @@ Create the formal plan only after the user approves this seam.
 - Exit criteria: every runtime generation starts from one coherent committed
   view.
 
-### Phase 5 — Close ownership, migration, and release evidence
+### Phase 5 — Separate the public facade and private Runtime
+
+- Requirements: `SRV-REQ-077` to `SRV-REQ-080`.
+- Required outcome: `Jido.AgentServer` retains every supported direct API and
+  public child-spec entry. A private Runtime owns all `:gen_statem` callbacks.
+- Constraints: use one OTP process and preserve message, reply, startup,
+  registration, and supervision behavior.
+- Compatibility: the PID from `start_link/1` remains the live Runtime PID.
+- Verification: public API parity, child-spec equality, startup failure,
+  registration, linking, and supervision tests.
+- Exit criteria: application code does not need to name the private Runtime.
+
+### Phase 6 — Establish one owned-work protocol
+
+- Requirements: `SRV-REQ-081` to `SRV-REQ-085`.
+- Required outcome: user, storage, remote, and independently timed work runs
+  outside Runtime. One tagged result protocol controls acceptance.
+- Constraints: tasks cannot commit state. OTP postponement remains the only
+  busy-Signal queue.
+- Compatibility: keep current public phases, timeout meanings, cancellation
+  results, call timing, and Directive order.
+- Verification: status and control responsiveness under blocked preparation,
+  finalization, storage, policy, effect, and upgrade work; stale, duplicate,
+  exit, cancel, and timeout tests for each work kind.
+- Exit criteria: every external work result has one current identity test and
+  one authority-free stale path.
+
+### Phase 7 — Isolate relationship and Plugin capability state
+
+- Requirements: `SRV-REQ-086` to `SRV-REQ-096`.
+- Required outcome: one private relationship transition boundary keeps the V2
+  logical-peer and restart model with V3 generation fences. Agent children and
+  Plugin runtime children use separate values.
+- Constraints: seam 10 owns placement, distributed spawn policy, Runtime Store
+  service meaning, and SpawnRegistry service meaning.
+- Compatibility: keep current child Directives, parent-death policies, child
+  Signals, known-node behavior, and public child inspection unless a separate
+  migration is approved.
+- Verification: restart, adoption, replacement, stale monitor, tag reuse,
+  parent death during each Turn stage, relative dispatch, distributed late
+  arrival, and Plugin replacement tests.
+- Exit criteria: relationship transitions do not depend on complete Runtime
+  State and Plugin monitor events cannot enter the Agent-child path.
+
+### Phase 8 — Close ownership, migration, and release evidence
 
 - Requirements: all approved `SRV-REQ` identifiers.
 - Required outcome: the Ref-first instance facade can use this boundary without
@@ -351,6 +448,13 @@ Create the formal plan only after the user approves this seam.
 | `SRV-REQ-062` to `SRV-REQ-064` | Owner boundary and dependency checks | Preserve through dependent seams | `Proven` |
 | `SRV-REQ-065` | Split-facet example uses only public Plugin and Agent Server contracts | External package build belongs to seam 99 | `Proven in Core` |
 | `SRV-REQ-066` to `SRV-REQ-076` | Agent Server upgrade tests and UP-01/UP-02 examples | Keep the upgrade boundary in core and example gates | `Proven` |
+| `SRV-REQ-077` to `SRV-REQ-080` | Current public API and one-process behavior form the compatibility baseline | Facade/Runtime module split with complete API, child-spec, startup, supervision, and failure parity | `Missing` |
+| `SRV-REQ-081` to `SRV-REQ-084` | Admission, Exec, Plugin Directive, readiness, and error-Signal tasks prove parts of the model | One owned-work envelope and responsiveness, exit, timeout, cancellation, stale, and duplicate proof for every external work kind | `Partial` |
+| `SRV-REQ-085` | ActiveTurn and named task fields show current phase data | Phase-specific private work values that reject invalid combinations | `Missing` |
+| `SRV-REQ-086` to `SRV-REQ-092` | Current local and distributed child tests; V2 relationship history; Runtime Store restore | Central relationship transition tests for restore, online validation, monitors, adoption, parent death, and replacement | `Partial` |
+| `SRV-REQ-093` | Checkpoint and runtime-boundary tests | Preserve proof after relationship extraction | `Proven now; migration proof required` |
+| `SRV-REQ-094`, `SRV-REQ-095` | SpawnRegistry, distributed child, and relative dispatch tests | Explicit duty split between current Runtime operation and registry history | `Partial` |
+| `SRV-REQ-096` | Current child projection hides monitors and task handles | Remove or separately approve the current public parent `spawn_ref`; prove no other private field escapes | `Partial` |
 
 ## Migration and compatibility
 
@@ -358,6 +462,8 @@ No removal or deprecation is approved in this seam.
 
 | Area | Compatibility rule and gate |
 | --- | --- |
+| Public facade | Keep every documented direct function on `Jido.AgentServer`. The private Runtime is not a new public entry point. |
+| Process identity | Keep one process. `start_link/1`, Registry lookup, links, monitors, and supervisor children continue to use the Runtime PID. |
 | PID and name API | Keep all documented current operations beside the implemented Ref-first instance calls. |
 | Startup | Keep module, neutral definition, and Agent instance inputs. Add revision and initial-write checks without changing canonical construction ownership. |
 | Identity | Keep IDs and term-valued partitions. Ref-first operations require the implemented namespace and binary-or-`nil` Ref partition. |
@@ -372,6 +478,8 @@ No removal or deprecation is approved in this seam.
 | Runtime checkpoints | Keep same-instance abnormal-restart recovery. Clean instance stop continues to remove nondurable checkpoints. |
 | Plugin runtime Init | Keep state and version in each new Init while current state-pull APIs remain. Do not reuse a prior generation's Init. |
 | Children | Keep owned-child and explicit known-node behavior. No Ref, transport, placement, or cluster claim is implied. |
+| Relationship state | Keep V2-compatible parent, orphan, adoption, child, and parent-death meanings. Do not restore V2 live-reference injection into Agent state. Keep V3 activation and spawn-generation checks. |
+| Internal work | Moving work into tasks must not change public result order, timeout scope, cancellation meaning, commit authority, or Directive order. |
 | Ordinary Directives | Keep transient non-replay behavior. Recoverable capabilities retain their separate intent and acknowledgement contracts. |
 | Code revision and upgrade | Keep definition revision as restore data. The explicit idle operation coordinates code installation but does not pin arbitrary loads. Definition replacement does not migrate private Server state or Plugin runtime structure. |
 
@@ -399,12 +507,17 @@ authoritative writer against a record format that it cannot interpret.
 | `SRV-BLK-013` | `Resolved design` | 04 Turn evaluation and `jido_action` | Agent `vsn` does not pin loaded Action or Flow code. | V3 uses the code loaded when `Jido.Exec` invokes the selected executable. |
 | `SRV-BLK-014` | `Deferred` | Separate future seam | No public need or safe contract exists for `code_change/4`. | Do not claim hot private-state migration in V3. |
 | `SRV-BLK-015` | `Resolved` | Design index and dependent seam owners | The main review table and dependent seams now use the Agent Server briefing, design, and alignment files. | Keep repository-wide link checks in the documentation gate. |
+| `SRV-BLK-016` | `Decision required` | 08 Agent Server | The facade/Runtime split and owned-work protocol are code-quality changes, not current behavior. | Approve `SRV-DEC-011` through `SRV-DEC-013` before implementation. |
+| `SRV-BLK-017` | `Decision required` | 08 Agent Server and 10 Runtime topology | V2 relationship projection, V3 generation fencing, and Agent/Plugin child separation cross the local runtime-topology boundary. | Approve `SRV-DEC-014` and `SRV-DEC-015` with seam 10 ownership unchanged. |
+| `SRV-BLK-018` | `Compatibility decision required` | 08 Agent Server and 12 Errors and contracts | The current public parent projection includes a distributed `spawn_ref`. | Decide whether it remains documented compatibility data or moves to a private projection through a staged change. |
 
 ## Completion criteria
 
-- [x] The selected implementation records every `SRV-DEC` item.
+- [x] The current implementation records `SRV-DEC-001` through
+      `SRV-DEC-010`.
+- [ ] The user approves `SRV-DEC-011` through `SRV-DEC-015`.
 - [x] Prerequisite implementation inputs are present.
-- [x] Every Server-owned `SRV-REQ` item has `Proven` evidence.
+- [x] `SRV-REQ-001` through `SRV-REQ-076` have the recorded current evidence.
 - [x] No unresolved `Conflict`, `Missing`, or `Blocked` entry remains for an
       approved requirement.
 - [x] Source-Signal selection, whole-Turn timeout, cancellation race, and late
@@ -423,3 +536,10 @@ authoritative writer against a record format that it cannot interpret.
       the approved contract.
 - [x] Explicit code installation waits for idle, and validated definition
       replacement preserves commit order and restart recovery.
+- [ ] The public facade and private Runtime have complete one-process API and
+      supervision parity.
+- [ ] Every slow or user-defined work kind uses one fenced owned-work protocol.
+- [ ] Logical Agent relationships use one private capability and transition
+      boundary, separate from Plugin runtime children.
+- [ ] `SRV-REQ-077` through `SRV-REQ-096` have requirement-mapped tests with no
+      `Missing` or `Partial` evidence state.

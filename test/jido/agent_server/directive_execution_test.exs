@@ -304,6 +304,42 @@ defmodule Jido.AgentServer.DirectiveExecutionTest do
     assert barrier.state.events == [:committed, :barrier]
   end
 
+  test "contains a SpawnProcess callback fault after commit", %{jido: jido} do
+    test = self()
+
+    policy = fn reason, outcome ->
+      send(test, {:spawn_process_failed, reason, outcome})
+      :continue
+    end
+
+    {:ok, pid} =
+      Jido.start_agent(jido, RuntimeAgent,
+        id: unique_id("spawn-process-fault"),
+        spawn_fun: fn :fault -> raise "spawn failed" end,
+        error_policy: policy
+      )
+
+    assert {:ok, committed} =
+             Server.call(
+               pid,
+               signal("runtime.directive", %{
+                 event: :committed,
+                 directive: Directive.spawn_process(:fault)
+               })
+             )
+
+    assert committed.state.events == [:committed]
+
+    assert_receive {:spawn_process_failed,
+                    {:spawn_process_failed, {:error, %RuntimeError{message: "spawn failed"}}},
+                    %Outcome{stage: :directive, committed?: true}}
+
+    assert {:ok, barrier} =
+             Server.call(pid, signal("runtime.record", %{event: :barrier}))
+
+    assert barrier.state.events == [:committed, :barrier]
+  end
+
   test "waits for external Emit results and skips later Directives after failure", %{jido: jido} do
     test = self()
     {dead_target, dead_ref} = spawn_monitor(fn -> :ok end)

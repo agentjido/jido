@@ -4,9 +4,9 @@ defmodule Jido.Telemetry do
 
   Jido uses one version-1 semantic event catalog for Telemetry handlers,
   metrics, semantic logs, and optional OpenTelemetry spans. The catalog covers
-  Agent lifecycle, Turn result, commit, Directive work, Turn settlement,
-  admission rejection, persistence, local Topology operations, and Scheduler
-  delivery.
+  Agent lifecycle, definition upgrade, Turn result, commit, Directive work,
+  Turn settlement, admission rejection, persistence, local Topology operations,
+  and Scheduler delivery.
 
   A successful Turn span ends when its commit becomes live. Directive work can
   continue after this point. The separate
@@ -46,6 +46,7 @@ defmodule Jido.Telemetry do
 
   @span_metrics [
     {"jido.agent.lifecycle", [:jido, :agent, :lifecycle], [:operation, :status]},
+    {"jido.agent.definition_upgrade", [:jido, :agent, :definition_upgrade], [:status]},
     {"jido.agent.turn", [:jido, :agent, :turn], [:status, :stage]},
     {"jido.agent.commit", [:jido, :agent, :commit], [:status]},
     {"jido.agent.directive", [:jido, :agent, :directive], [:status]},

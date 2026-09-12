@@ -87,7 +87,8 @@ defmodule Jido.AgentServer do
     ParentRef,
     PluginLifecycle,
     RuntimeCheckpoint,
-    State
+    State,
+    Upgrade
   }
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
@@ -734,7 +735,7 @@ defmodule Jido.AgentServer do
         :idle,
         %State{} = data
       ) do
-    reply = invoke_upgrade_operation(operation)
+    reply = Upgrade.operation(operation)
     {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, reply}]}
   end
 
@@ -1000,6 +1001,10 @@ defmodule Jido.AgentServer do
     case verify_child_online(pid, child_id, tag, data) do
       {:ok, info} ->
         {:keep_state, track_online_child(data, pid, info)}
+
+      {:error, {:child_tag_in_use, _tag} = reason, :stop} ->
+        _ = ChildPlacement.stop(data.jido, pid, reason, data.directive_timeout)
+        :keep_state_and_data
 
       {:error, _reason, :stop} ->
         _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
@@ -1291,6 +1296,16 @@ defmodule Jido.AgentServer do
 
   def handle_event(
         :info,
+        {:jido_exec_adapter_execution_failed, ref, error},
+        :running,
+        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
+      ) do
+    ExecutionAdapter.cancel_timer(adapter)
+    fail_turn(error, :execute, data)
+  end
+
+  def handle_event(
+        :info,
         {:jido_exec_adapter_callback_started, ref, token, callback},
         :running,
         %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
@@ -1500,111 +1515,55 @@ defmodule Jido.AgentServer do
   end
 
   defp upgrade_definition(from, target_module, migration, %State{} = data) do
-    with :ok <- definition_upgrade_supported?(data, target_module),
-         {:ok, state} <- invoke_state_migration(migration, data.agent),
-         {:ok, target} <- Agent.instantiate(target_module, id: data.agent.id, state: state),
-         {:ok, plugin_specs} <- Plugin.normalize_all(target.plugins),
-         :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
-      version = data.state_version + 1
+    span = AgentTelemetry.start_definition_upgrade(data, target_module)
 
-      case persist_definition_upgrade(data, target, version) do
-        :ok ->
-          next_data = %{
-            data
-            | agent: target,
-              plugin_specs: plugin_specs,
-              state_version: version
-          }
+    case Upgrade.definition(data, target_module, migration) do
+      {:ok, target, plugin_specs, version} ->
+        next_data = %{
+          data
+          | agent: target,
+            plugin_specs: plugin_specs,
+            state_version: version
+        }
 
-          {:keep_state, maybe_start_idle_timer(next_data, :idle), [{:reply, from, {:ok, target}}]}
+        result = {:ok, target}
+        AgentTelemetry.finish_definition_upgrade(span, result, data.state_version, version)
 
-        {:error, reason} ->
-          error = {:persistence_failed, reason}
+        next_data =
+          record_event(next_data, :definition_upgrade_completed, %{
+            status: :ok,
+            agent_module: data.agent.module,
+            target_agent_module: target.module,
+            state_version_before: data.state_version,
+            state_version_after: version
+          })
 
-          {:stop_and_reply, {:shutdown, error}, [{:reply, from, {:error, error}}], data}
-      end
-    else
-      {:error, _reason} = error ->
-        {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, error}]}
+        {:keep_state, maybe_start_idle_timer(next_data, :idle), [{:reply, from, result}]}
+
+      {:error, reason} ->
+        error = {:error, reason}
+        AgentTelemetry.finish_definition_upgrade(span, error, data.state_version)
+        next_data = record_definition_upgrade_failure(data, target_module, reason)
+        {:keep_state, maybe_start_idle_timer(next_data, :idle), [{:reply, from, error}]}
+
+      {:stop, error} ->
+        result = {:error, error}
+        AgentTelemetry.finish_definition_upgrade(span, result, data.state_version)
+        next_data = record_definition_upgrade_failure(data, target_module, error)
+
+        {:stop_and_reply, {:shutdown, error}, [{:reply, from, result}], next_data}
     end
   end
 
-  defp definition_upgrade_supported?(%State{persistence: nil}, _target_module), do: :ok
-
-  defp definition_upgrade_supported?(%State{agent: %{module: module}}, module), do: :ok
-
-  defp definition_upgrade_supported?(%State{jido: jido}, _target_module) do
-    if is_binary(Jido.namespace(jido)) do
-      :ok
-    else
-      {:error, :stable_namespace_required}
-    end
-  end
-
-  defp invoke_upgrade_operation(operation) do
-    case operation.() do
-      :ok -> :ok
-      {:error, _reason} = error -> error
-      result -> {:error, {:invalid_upgrade_result, result}}
-    end
-  rescue
-    error ->
-      {:error,
-       Error.execution_error("Agent upgrade operation failed",
-         details: %{code: :agent_upgrade_failed, reason: error}
-       )}
-  catch
-    kind, reason ->
-      {:error,
-       Error.execution_error("Agent upgrade operation failed",
-         details: %{code: :agent_upgrade_failed, kind: kind, reason: reason}
-       )}
-  end
-
-  defp invoke_state_migration(migration, agent) do
-    case migration.(agent) do
-      {:ok, state} when is_map(state) and not is_struct(state) -> {:ok, state}
-      {:ok, state} -> {:error, {:invalid_migrated_state, state}}
-      {:error, _reason} = error -> error
-      result -> {:error, {:invalid_migration_result, result}}
-    end
-  rescue
-    error ->
-      {:error,
-       Error.execution_error("Agent state migration failed",
-         details: %{code: :agent_state_migration_failed, reason: error}
-       )}
-  catch
-    kind, reason ->
-      {:error,
-       Error.execution_error("Agent state migration failed",
-         details: %{code: :agent_state_migration_failed, kind: kind, reason: reason}
-       )}
-  end
-
-  defp unchanged_plugin_contract(specs, specs), do: :ok
-  defp unchanged_plugin_contract(_current, _target), do: {:error, :plugin_contract_changed}
-
-  defp persist_definition_upgrade(%State{persistence: nil} = data, target, version) do
-    RuntimeCheckpoint.put_upgrade(data, target, version)
-  end
-
-  defp persist_definition_upgrade(%State{agent: %{module: module}} = data, target, version)
-       when target.module == module do
-    persist_agent(data, target, version, :definition_upgrade)
-  end
-
-  defp persist_definition_upgrade(%State{} = data, target, version) do
-    opts = [
-      instance: data.jido,
-      namespace: data.agent_namespace,
-      partition: data.partition,
-      revision: version,
-      expected_revision: data.state_version,
-      reason: :definition_upgrade
-    ]
-
-    Jido.Persistence.replace_agent(data.persistence, data.agent, target, opts)
+  defp record_definition_upgrade_failure(data, target_module, reason) do
+    record_event(data, :definition_upgrade_failed, %{
+      status: :error,
+      agent_module: data.agent.module,
+      target_agent_module: target_module,
+      state_version_before: data.state_version,
+      state_version_after: nil,
+      error: public_error(reason)
+    })
   end
 
   defp start_plugin_readiness(%State{} = data) do
@@ -2769,10 +2728,29 @@ defmodule Jido.AgentServer do
         end
 
       nil when node(pid) == node() ->
-        :ok
+        verify_local_child_slot(pid, tag, data)
 
       nil ->
         {:error, :unknown_remote_child, :stop}
+    end
+  end
+
+  defp verify_local_child_slot(pid, tag, data) do
+    case State.child(data, tag) do
+      nil ->
+        :ok
+
+      %ChildInfo{pid: ^pid} ->
+        :ok
+
+      %ChildInfo{pid: existing_pid}
+      when is_pid(existing_pid) and node(existing_pid) == node() ->
+        if Process.alive?(existing_pid),
+          do: {:error, {:child_tag_in_use, tag}, :stop},
+          else: :ok
+
+      %ChildInfo{} ->
+        {:error, {:child_tag_in_use, tag}, :stop}
     end
   end
 
@@ -2946,6 +2924,8 @@ defmodule Jido.AgentServer do
     end
   rescue
     error -> {:stop, {:error_policy_failed, error}, data}
+  catch
+    kind, reason -> {:stop, {:error_policy_failed, {kind, reason}}, data}
   end
 
   defp start_error_policy_dispatch(signal, dispatch, %State{} = data) do

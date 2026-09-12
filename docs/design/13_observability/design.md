@@ -1,9 +1,12 @@
 # Jido V3 observability design
 
-Status: Implemented.
+Status: Implemented baseline with a pending Agent Server task-boundary
+refinement.
 
-The requirements in this file define the selected contract. Current owner,
-code, test, and compatibility proof is in [alignment.md](alignment.md).
+Requirements `OBS-REQ-001` through `OBS-REQ-058` define the implemented
+baseline. Requirements `OBS-REQ-059` through `OBS-REQ-061` define the proposed
+Agent Server refinement. Current owner, code, test, compatibility, and gap
+evidence is in [alignment.md](alignment.md).
 
 ## Scope and owner
 
@@ -21,6 +24,11 @@ storage, dashboards, and alerts.
 
 Telemetry, logs, traces, metrics, and debug history are observation channels.
 They do not authorize work, make a result durable, or replace audit records.
+
+Semantic operations, not process boundaries, define observation. Moving Agent
+Server work from its Runtime process into an owned Task does not create a new
+event family or public stage. The existing lifecycle, Turn, commit, Directive,
+settlement, admission, and persistence meanings stay fixed.
 
 ## Model
 
@@ -191,6 +199,11 @@ and stacktraces are not recorded.
 Jido-owned Task boundaries must transfer trace context explicitly. Lower-level
 packages transfer context for tasks that they own. A Signal remains the
 portable carrier across processes, nodes, queues, and durable boundaries.
+
+An internal Agent Server work reference, Task PID, monitor, or timer is not
+semantic identity. It remains private and does not enter telemetry metadata.
+The existing activation, Turn, Signal, Directive, revision, trace, and
+causation values provide public correlation.
 
 ## Requirements
 
@@ -402,6 +415,19 @@ the semantic event boundary shall not broaden its metadata allowlist.
 `OBS-REQ-058`: When the Scheduler completes one durable-delivery check, it
 shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
 
+`OBS-REQ-059`: When Agent Server work moves between the Runtime process and an
+owned Task, the observation boundary shall preserve the existing semantic span
+start, terminal event, status, stage, and ordering meaning without adding a
+process-stage event.
+
+`OBS-REQ-060`: When Agent Server-owned work emits or completes an observed
+operation, the observation boundary shall exclude its internal work reference,
+Task PID, monitor, and timer from semantic metadata.
+
+`OBS-REQ-061`: When a new Agent Server path moves observed work into an owned
+Task, its owner shall transfer, attach, and restore the applicable trace
+context under `OBS-REQ-032` and `OBS-REQ-048`.
+
 ## Invariants
 
 - Observation has no execution or persistence authority.
@@ -412,8 +438,9 @@ shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
 - Semantic emission failure preserves the runtime result.
 - Telemetry is best-effort and is not an audit journal.
 - Export and vendor policy stay outside Jido core.
+- A process or Task boundary does not create a new semantic operation.
 
-## Selected design decisions
+## Design decisions
 
 | ID | Decision | Recommended answer | Effect if changed |
 | --- | --- | --- | --- |
@@ -425,6 +452,7 @@ shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
 | `OBS-DEC-006` | OpenTelemetry owner | Keep an API-only optional mapping in Core. Keep SDK and export infrastructure in the host. | Core can trace without owning deployment policy. |
 | `OBS-DEC-007` | OpenTelemetry Turn span end | End at the live result and report settlement as a later point. | Result and settlement durations stay distinct. |
 | `OBS-DEC-008` | Legacy overlap | Remove `Jido.Observe` and old Agent Server events before the V3 release. | V3 has one observation source and a breaking migration. |
+| `OBS-DEC-009` | Agent Server Task boundaries | **Proposed:** keep semantic spans attached to operations, not Runtime or Task processes. | Runtime refactors do not expand the public event or stage vocabulary. |
 
 ## Downstream guarantees
 

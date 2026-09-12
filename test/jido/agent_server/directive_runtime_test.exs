@@ -128,6 +128,51 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
            )
   end
 
+  test "generic spawning contains custom callback faults and invalid results", %{
+    runtime: state,
+    context: context
+  } do
+    spec = {Elixir.Agent, fn -> :ready end}
+    directive = Directive.spawn_process(spec)
+
+    for {spawn_fun, reason} <- [
+          {fn ^spec -> raise "spawn failed" end,
+           {:error, %RuntimeError{message: "spawn failed"}}},
+          {fn ^spec -> throw(:spawn_failed) end, {:throw, :spawn_failed}},
+          {fn ^spec -> exit(:spawn_failed) end, {:exit, :spawn_failed}}
+        ] do
+      runtime = %{state | spawn_fun: spawn_fun}
+
+      assert {:error, {:spawn_process_failed, ^reason}, ^runtime} =
+               DirectiveRuntime.handle(directive, context, runtime)
+    end
+
+    for result <- [
+          :ok,
+          nil,
+          {:ok},
+          {:ok, :not_a_pid},
+          {:ok, :not_a_pid, :info},
+          {:error, :failed, :extra}
+        ] do
+      runtime = %{state | spawn_fun: fn ^spec -> result end}
+
+      assert {:error, {:spawn_process_failed, {:invalid_result, ^result}}, ^runtime} =
+               DirectiveRuntime.handle(directive, context, runtime)
+    end
+  end
+
+  test "generic spawning requires a non-nil Jido instance without a custom callback", %{
+    runtime: state,
+    context: context
+  } do
+    runtime = %{state | jido: nil, spawn_fun: nil}
+    directive = Directive.spawn_process({Elixir.Agent, fn -> :ready end})
+
+    assert {:error, {:spawn_process_failed, :jido_instance_required}, ^runtime} =
+             DirectiveRuntime.handle(directive, context, runtime)
+  end
+
   test "adoption rejects self, dead children, missing ids and occupied tags", %{
     runtime: state,
     context: context

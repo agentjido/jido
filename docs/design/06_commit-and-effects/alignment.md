@@ -1,4 +1,5 @@
-> Implemented commit-and-effects alignment.
+> The implemented commit baseline remains. The owned-work authority refinement
+> is pending approval.
 
 # Commit and effects alignment
 
@@ -9,11 +10,19 @@
   identity, source-Signal Turn selection, and owner-specific Plugin facets are
   present.
 - Alignment state: `Implemented with deferred owner integrations`.
+- Refinement state: `Not implemented` for `COMMIT-REQ-045` through
+  `COMMIT-REQ-049`.
 
 The live commit order, failure boundary, Directive order, and write-authority
 rule are implemented. Persistence record composition remains with seam 07.
-Startup durability remains with seams 07 and 08. Public interrupted-settlement
-observation remains with seam 13.
+Revision-zero startup durability is implemented across seams 07 and 08. Public
+interrupted-settlement observation remains with seam 13.
+
+The proposed Agent Server shape moves blocking checkpoint, persistence, and
+post-commit execution into owned workers. This does not move commit authority.
+The Runtime remains the only component that can accept a current receipt,
+publish the candidate, advance the version, reply, change Directive position,
+or settle the Turn.
 
 This execution state is not approval of all requirements in the target design.
 
@@ -119,6 +128,7 @@ its complete callback contract.
 | `COMMIT-REQ-033` to `COMMIT-REQ-036` | `Proven` | Active Turn, Plugin Directive context, outbound Signal trace, and checkpoint exclusions preserve the boundary. |
 | `COMMIT-REQ-037`, `COMMIT-REQ-038`, `COMMIT-REQ-040` to `COMMIT-REQ-044` | `Pattern proven; capability-owned` | Recoverable delivery and Scheduler prove saved intent, stable IDs, later acknowledgement Turns, retry, cancellation, and duplicate rules. Core does not generalize the policy. |
 | `COMMIT-REQ-039` | `Proven in seam 07` | Default Plugin owned-slice conversion and complete custom-checkpoint bypass have focused integration tests. |
+| `COMMIT-REQ-045` to `COMMIT-REQ-049` | `Missing` | The current commit order is proven, but storage and all post-commit work do not yet use one fenced worker-result contract. |
 
 ## Compatibility and migration
 
@@ -139,7 +149,8 @@ its complete callback contract.
 | Seam | Required follow-up |
 | --- | --- |
 | 07 Persistence | Complete. Default Persistence facets, custom checkpoint bypass, and revision-zero active records are implemented. |
-| 08 Agent Server | Integrate the initial durable-record boundary and the complete startup lifecycle. Keep the all-write-error stop rule. |
+| 08 Agent Server | Separate blocking storage execution from Runtime publication. Add one fenced receipt contract and keep the all-write-error stop rule. |
+| 10 Runtime topology | Own commit and effect workers under the instance Task Supervisor and stop them with the activation. |
 | 13 Observability | Define public evidence for a Turn interrupted after commit and before terminal settlement. |
 | Capability owners | Define acknowledgement, retry, ordering, cancellation, retention, and duplicate policy for each recoverable operation. |
 | 99 Delivery | Keep commit, timeout, interrupted-batch, and recovery acceptance evidence in the final matrix. |
@@ -160,5 +171,9 @@ its complete callback contract.
       outbox.
 - [x] Custom checkpoint preservation is complete in seam 07.
 - [x] Revision-zero durable activation is complete for the start-call boundary.
+- [ ] A checkpoint or persistence worker has no live publication authority.
+- [ ] A post-commit worker has no Directive, relationship, or settlement
+      authority.
+- [ ] Stale and duplicate worker results cannot publish or advance work.
 - [ ] Interrupted-settlement observation is complete in seam 13.
 - [ ] The full target design has user approval.

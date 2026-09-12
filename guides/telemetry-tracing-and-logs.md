@@ -62,6 +62,7 @@ Span families use `:start` and one terminal event. A returned failure uses
 | Family | Event | Main metadata | Main measurements |
 | --- | --- | --- | --- |
 | Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Agent identity, `operation`, `status`, `activation_id` | `duration`, `state_version` |
+| Definition upgrade | `[:jido, :agent, :definition_upgrade, event]` | Agent identity, source and target Agent modules, `status` | `duration`, revisions |
 | Turn result | `[:jido, :agent, :turn, event]` | Turn, Signal, trace, `status`, `stage`, `committed?` | `duration`, revisions, `directive_count` |
 | Commit | `[:jido, :agent, :commit, event]` | Turn identity, `status`, `stage` | `duration` |
 | Directive | `[:jido, :agent, :directive, event]` | Turn identity, `directive_module`, `status` | `duration`, `directive_index` |
@@ -129,7 +130,7 @@ Jido applies one strict allowlist before it emits an event. The public fields
 can include:
 
 - Agent identity: `agent_namespace`, `agent_partition`, and `agent_id`.
-- Runtime identity: `agent_module` and `activation_id`.
+- Runtime identity: `agent_module`, `target_agent_module`, and `activation_id`.
 - Turn and Signal identity: `turn_id`, `source_signal_id`, `signal_id`, and
   `signal_type`.
 - Trace and cause identity: `trace_id`, `span_id`, `parent_span_id`,
@@ -165,6 +166,7 @@ The list contains count and duration metrics for both `:stop` and `:exception`
 events from these span families:
 
 - Agent lifecycle
+- Definition upgrade
 - Turn result
 - commit
 - Directive
@@ -248,6 +250,7 @@ config :jido, :opentelemetry, enabled: false
 | Semantic work | OpenTelemetry span name |
 | --- | --- |
 | Agent lifecycle | `jido.agent.lifecycle.<operation>` |
+| Definition upgrade | `jido.agent.definition_upgrade` |
 | Turn result | `jido.agent.turn` |
 | Commit | `jido.agent.commit` |
 | Directive | `jido.agent.directive` |

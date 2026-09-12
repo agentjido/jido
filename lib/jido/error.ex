@@ -137,6 +137,8 @@ defmodule Jido.Error do
           | :agent_exec_callback_timeout
           | :agent_exec_callback_task_failed
           | :agent_turn_timeout
+          | :agent_upgrade_failed
+          | :agent_state_migration_failed
           | :jido_instance_invalid_config
           | :jido_namespace_already_bound
           | :jido_namespace_required
@@ -160,6 +162,8 @@ defmodule Jido.Error do
     :agent_exec_callback_timeout,
     :agent_exec_callback_task_failed,
     :agent_turn_timeout,
+    :agent_upgrade_failed,
+    :agent_state_migration_failed,
     :jido_instance_invalid_config,
     :jido_namespace_already_bound,
     :jido_namespace_required,

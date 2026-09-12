@@ -67,6 +67,12 @@ Each custom Directive owns `validate/1`. The pipeline validates every
 Directive once after Action or Flow success. The Agent facet declares
 Directive ownership but does not validate a Directive again.
 
+Plugin callbacks use explicit input and result values. Their contract does not
+include the caller PID, process dictionary, link set, monitor set, or Task
+identity. A direct Agent call can run pure callbacks in its caller process. A
+live Agent Server can run callbacks inside owned Tasks. The execution location
+must not change callback order, input, result, or authority.
+
 ## Requirements
 
 ### Declaration
@@ -214,6 +220,25 @@ boundary shall accept only canonical supported entries.
 
 `PLG-REQ-060`: When a Topology facet contributes static data, the Topology
 boundary shall keep process and persistence authority out of the callback.
+
+### Callback execution boundary
+
+`PLG-REQ-077`: When Jido invokes a Plugin callback, the callback contract shall
+not derive Agent identity, Agent Server identity, or runtime authority from the
+calling PID or process dictionary.
+
+`PLG-REQ-078`: Whether a Plugin callback runs in a direct caller process or an
+Agent Server-owned Task, Jido shall preserve its documented input, result,
+ordering, and failure contract.
+
+`PLG-REQ-079`: When an Agent Server waits for a Plugin callback result, the
+Plugin callback shall not make a synchronous call to that same Agent Server
+activation.
+
+`PLG-REQ-080`: When a Plugin callback runs in an Agent Server-owned Task, the
+Task shall return a value or fault result and shall not directly change the
+live Agent, state version, relationship projection, lifecycle state, or
+Directive position.
 
 ## Retired requirements
 

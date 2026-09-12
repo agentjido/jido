@@ -12,7 +12,7 @@ bounded transport value. The map always has the top-level keys `type`,
 
 Some Jido-owned conversions have a stable code in `error.details.code`. Use
 `Jido.Error.code/1` to read it. Do not match a human-readable message.
-`Jido.Error.stable_codes/0` returns the closed 21-code registry. It includes
+`Jido.Error.stable_codes/0` returns the closed 23-code registry. It includes
 checkpoint and definition failures, Plugin-owned-field protection, callback
 and task failures, operation limits, and instance namespace failures.
 

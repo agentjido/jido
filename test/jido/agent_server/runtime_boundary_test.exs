@@ -106,6 +106,9 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
             {:release_exec_callback, :run_async} -> :invalid_handle
           end
 
+        :run_handle ->
+          Keyword.fetch!(opts, :handle)
+
         _mode ->
           worker = spawn(fn -> wait_for_stop() end)
           send(observer, {:boundary_exec_started, self(), worker})
@@ -237,6 +240,81 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
       assert Server.status(server).phase == :idle
       assert Process.alive?(server)
     end
+  end
+
+  test "custom Exec rejects Task and map handles owned by another process", %{jido: jido} do
+    task =
+      Task.async(fn ->
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    worker =
+      spawn(fn ->
+        receive do
+          :stop -> :ok
+        end
+      end)
+
+    worker_ref = Process.monitor(worker)
+
+    for handle <- [task, %{pid: worker, owner: self()}] do
+      {:ok, server} =
+        Jido.start_agent(jido, Agent,
+          exec_module: BoundaryExec,
+          exec_opts: [observer: self(), mode: :run_handle, handle: handle],
+          turn_timeout: 200,
+          restart: :temporary
+        )
+
+      assert {:error,
+              %Jido.Error.ExecutionError{
+                message: "Agent Exec run_async returned a handle owned by another process",
+                details: %{callback: :run_async}
+              } = error} = Server.call(server, signal("boundary.emit", %{count: 1}))
+
+      assert Error.code(error) == :agent_exec_invalid_callback_result
+      assert Process.alive?(handle.pid)
+      assert Server.status(server).phase == :idle
+    end
+
+    Task.shutdown(task, :brutal_kill)
+    send(worker, :stop)
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :normal}
+  end
+
+  test "a generic Exec PID normal exit fails the Turn", %{jido: jido} do
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        exec_module: BoundaryExec,
+        exec_opts: [observer: self(), mode: :normal_exit],
+        turn_timeout: :infinity,
+        restart: :temporary
+      )
+
+    original = Server.snapshot(server)
+    caller = Task.async(fn -> Server.call(server, signal("boundary.emit", %{count: 1})) end)
+    assert_receive {:boundary_exec_started, _owner, worker}, 2_000
+
+    gate = make_ref()
+    send(server, {:exec_probe, gate})
+    assert_receive {:exec_callback_started, :handle_message, ^gate, _owner}, 2_000
+
+    worker_ref = Process.monitor(worker)
+    send(worker, :stop)
+    assert_receive {:DOWN, ^worker_ref, :process, ^worker, :normal}, 2_000
+
+    assert {:error,
+            %Jido.Error.ExecutionError{
+              message: "Agent Exec process exited before a terminal result",
+              details: %{reason: :normal}
+            } = error} = Task.await(caller, 2_000)
+
+    assert Error.code(error) == :agent_exec_callback_task_failed
+    assert Server.snapshot(server) == original
+    assert Server.status(server).phase == :idle
+    assert Process.alive?(server)
   end
 
   test "a valid custom Exec execution can exceed the Directive timeout", %{jido: jido} do
@@ -501,11 +579,16 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
   end
 
-  test "invalid and raised policy results stop the Server with a structured reason", %{jido: jido} do
+  test "invalid and faulted policy results stop the Server with a structured reason", %{
+    jido: jido
+  } do
     for {policy, expected} <- [
           {fn _, _ -> :invalid end, {:invalid_error_policy_result, :invalid}},
           {fn _, _ -> raise "policy failed" end,
-           {:error_policy_failed, %RuntimeError{message: "policy failed"}}}
+           {:error_policy_failed, %RuntimeError{message: "policy failed"}}},
+          {fn _, _ -> throw(:policy_failed) end,
+           {:error_policy_failed, {:throw, :policy_failed}}},
+          {fn _, _ -> exit(:policy_failed) end, {:error_policy_failed, {:exit, :policy_failed}}}
         ] do
       {:ok, server} = Jido.start_agent(jido, Agent, error_policy: policy, restart: :temporary)
       ref = Process.monitor(server)

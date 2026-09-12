@@ -35,6 +35,12 @@ propose the complete candidate state and the complete Directive list. The
 Agent Plugin pipeline protects owned fields, validates each Directive once,
 and reduces each owned field through `reduce/2` in declaration order.
 
+The evaluator is a value boundary, not a process owner. Direct evaluation can
+run it in the caller process. Live evaluation can run it inside a Task owned by
+an Agent Server. In both locations, it receives explicit values and returns a
+candidate and Directives or an error. It does not identify its caller through
+`self/0`, process dictionary values, links, monitors, or task ownership.
+
 ## Requirements
 
 ### Selection and input
@@ -162,6 +168,14 @@ an executable already completed.
 
 `TURN-REQ-044`: A prepared Turn shall contain the unchanged source Signal.
 
+`TURN-REQ-045`: When an Agent Server runs evaluation inside an owned Task, the
+evaluator shall return only a candidate Agent and ordered Directive list or an
+error, and shall receive no live commit, relationship, or lifecycle authority.
+
+`TURN-REQ-046`: Whether evaluation runs in a direct caller process or an Agent
+Server-owned Task, evaluation order, result meaning, and error meaning shall
+not depend on the caller PID or process dictionary.
+
 ## Public contract
 
 This seam adds no public evaluator module. `Jido.Agent.cmd/3` and
@@ -179,3 +193,4 @@ implementation details.
 - A Plugin cannot write domain state or another Plugin's state.
 - Direct and live candidate production use one finalization contract.
 - Evaluation has no commit or post-commit authority.
+- Evaluation location does not change evaluation authority or result meaning.

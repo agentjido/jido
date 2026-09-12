@@ -1,4 +1,5 @@
-> Implemented seam review entry point.
+> The topology baseline is implemented. The Agent Server work and relationship
+> refinement is pending approval.
 
 # 10 - Runtime topology
 
@@ -33,7 +34,7 @@ generation.
 - `max_tasks` limits the Task Supervisor only.
 - Managed Agent Servers are direct peer children and use `:transient` by
   default. Direct linked Servers use `:temporary` by default.
-- All Agent-owned work stops on controlled or abrupt Agent Server death.
+- Current Agent-owned workers stop on controlled or abrupt Agent Server death.
 - Runtime checkpoints and spawn receipts can survive their worker restart.
   They do not survive full instance loss.
 - Logical child ownership does not create a nested OTP Agent tree.
@@ -42,6 +43,19 @@ generation.
   implicit Controller or transport fallback.
 - The application supervises `Jido.Topology.Controller` outside the Jido
   instance.
+
+## Proposed Agent Server refinement
+
+- Put all user, storage, remote, and independently timed Agent Server work
+  under the instance Task Supervisor.
+- Keep state, commit, relationship, Directive, and lifecycle authority in the
+  private Agent Server Runtime.
+- Fence every result with activation and work identity, plus the related Turn,
+  version, Directive, or relationship identity when required.
+- Keep logical Agent relationships and Plugin runtime children in separate
+  private capability projections. Do not add a second process pool.
+- Keep process-independent parent bindings in Runtime Store and distributed
+  request history in Spawn Registry.
 
 ## Boundaries
 
@@ -53,7 +67,7 @@ It does not own Agent state, Turn rules, Plugin callback meaning, persistence
 record meaning, desired Topology, repair policy, transport, discovery,
 automatic placement, failover, leases, fencing, or cluster write authority.
 
-## Evidence
+## Baseline evidence
 
 - `test/jido/runtime_topology_test.exs` proves the five-child inventory,
   instance isolation, direct-child replacement, Task Supervisor capacity,
@@ -67,6 +81,9 @@ automatic placement, failover, leases, fencing, or cluster write authority.
   stable-reference example proves local handle replacement without transport
   fallback.
 
+The expanded Task ownership, uniform result fencing, and separate private
+capability projections are not implemented. Their evidence is pending.
+
 ## Follow-on seams
 
 - 11 Topology control plane owns desired membership, activation order,
@@ -76,5 +93,5 @@ automatic placement, failover, leases, fencing, or cluster write authority.
 
 ## Documents
 
-- [Selected design](design.md)
-- [Implemented alignment and evidence](alignment.md)
+- [Target design](design.md)
+- [Alignment and evidence](alignment.md)

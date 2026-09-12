@@ -68,11 +68,29 @@ defmodule Jido.Telemetry.Agent do
     Semantic.start([:jido, :agent, boundary], metadata, measurements, opts)
   end
 
+  def start_definition_upgrade(data, target_module) do
+    metadata = Map.put(identity(data), :target_agent_module, target_module)
+    start(:definition_upgrade, metadata, %{state_version_before: data.state_version})
+  end
+
   def finish(span, metadata \\ %{}, measurements \\ %{}, ending \\ :stop)
   def finish(nil, _metadata, _measurements, _ending), do: :ok
 
   def finish(span, metadata, measurements, ending) do
     Semantic.finish(span, metadata, measurements, ending)
+  end
+
+  def finish_definition_upgrade(span, result, state_version_before, state_version_after \\ nil) do
+    measurements = %{state_version_before: state_version_before}
+
+    measurements =
+      if is_integer(state_version_after) do
+        Map.put(measurements, :state_version_after, state_version_after)
+      else
+        measurements
+      end
+
+    finish(span, result_metadata(result), measurements)
   end
 
   def with_span(boundary, metadata, fun) do

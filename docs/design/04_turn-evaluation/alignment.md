@@ -3,7 +3,8 @@
 ## Status
 
 The prepared-input Turn evaluation contract is implemented on branch
-`v3-spike`.
+`v3-spike`. The process-neutral execution refinement in `TURN-REQ-045` and
+`TURN-REQ-046` is pending approval and implementation.
 
 ## Evidence
 
@@ -27,6 +28,12 @@ starts asynchronous `Jido.Exec`, and then calls the same Runner finalization.
 This split lets the Agent Server own live admission, task, and timeout policy
 without duplicating pure preparation or candidate assembly.
 
+The current split already keeps commit authority out of the Runner. However,
+some live preparation and finalization still run in the Agent Server process.
+The [Agent Server target design](../08_agent-server/design.md) proposes moving
+the complete live evaluation value boundary into one owned Task. That move
+must not change evaluator results or give the Task live authority.
+
 The direct path validates its Agent and Signal at entry and runs pure Plugin
 preparation. The live path runs the same preparation and then live admission.
 Each path builds and validates one selected Turn and one complete proposed
@@ -41,8 +48,11 @@ caller context, Agent, pure prepared input, or another package's input.
 | Gap | Owner | State |
 | --- | --- | --- |
 | Mixed Plugin package callbacks remain as a separate declaration compatibility path. | Plugin declaration | Open |
+| The complete live evaluation boundary does not yet run in one owned Task. | Agent Server | Pending design approval |
+| Process-neutral evaluation behavior does not yet have focused direct-versus-Task evidence. | Turn evaluation | Missing evidence |
 
 ## Acceptance
 
-The contract is complete when core and example checks pass and dependent design
-documents describe the narrow prepared-input authority.
+The contract is complete when core and example checks pass, dependent design
+documents describe the narrow prepared-input authority, and direct and
+Task-contained evaluation have the same value semantics.

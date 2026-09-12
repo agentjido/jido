@@ -32,6 +32,11 @@ This seam owns selection, executable-result normalization, candidate assembly,
 and direct/live candidate parity. It does not own live admission, tasks,
 timeouts, persistence, commit, or post-commit Directive handling.
 
+The evaluator is process-free. Direct evaluation can call it in the caller
+process. A live Agent Server can call it inside an owned Task. This execution
+location does not give the evaluator live Agent, commit, relationship, or
+lifecycle authority.
+
 The public entry point is `Jido.Agent.cmd/3`. `Jido.Agent.Turn` remains the
 public value returned by custom `handle_signal/2` callbacks. The Runner and
 Agent Plugin pipeline remain private. Direct evaluation does not create a

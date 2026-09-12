@@ -160,6 +160,8 @@ defmodule JidoTest.ErrorTest do
         :agent_exec_callback_timeout,
         :agent_exec_callback_task_failed,
         :agent_turn_timeout,
+        :agent_upgrade_failed,
+        :agent_state_migration_failed,
         :jido_instance_invalid_config,
         :jido_namespace_already_bound,
         :jido_namespace_required,
@@ -178,6 +180,11 @@ defmodule JidoTest.ErrorTest do
       assert Error.code(error) == :agent_callback_failed
       assert Error.code({:error, error}) == :agent_callback_failed
       assert Error.code(%{code: :plugin_callback_failed}) == :plugin_callback_failed
+      assert Error.code(%{details: %{code: :agent_upgrade_failed}}) == :agent_upgrade_failed
+
+      assert Error.code(%{details: %{code: :agent_state_migration_failed}}) ==
+               :agent_state_migration_failed
+
       assert Error.code(%{details: %{code: :unknown}}) == nil
       assert Error.code(:agent_callback_failed) == nil
     end
