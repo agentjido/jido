@@ -1,0 +1,47 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_bus",
+  "schema": "schemas/bus",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "worker",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    }
+  ],
+  "groups": [],
+  "resources": [
+    {
+      "key": "events",
+      "kind": "bus",
+      "config": []
+    }
+  ],
+  "relationships": [],
+  "connections": [
+    {
+      "agent": "worker",
+      "to": "events",
+      "path": "authoring.work"
+    }
+  ],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

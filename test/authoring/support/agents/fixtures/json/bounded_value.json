@@ -1,0 +1,24 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/bounded_value",
+  "vsn": 1,
+  "name": "authoring_bounded_value",
+  "description": null,
+  "schema": "schemas/bounded_value",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "value.set",
+      "target": "actions/value",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

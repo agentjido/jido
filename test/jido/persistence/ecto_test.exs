@@ -41,6 +41,19 @@ defmodule JidoTest.Persistence.EctoTest do
     def __adapter__, do: __MODULE__.Adapter
   end
 
+  defmodule FaultRepo do
+    def __adapter__, do: Process.get({__MODULE__, :adapter}, fn -> Ecto.Adapters.SQLite3 end).()
+    def get(_schema, _key, opts), do: reply(opts)
+    def insert_all(_schema, _records, opts), do: reply(opts)
+    def update_all(_query, _updates, opts), do: reply(opts)
+    def delete_all(_query, opts), do: reply(opts)
+    defp reply(opts), do: Keyword.fetch!(opts, :reply).()
+  end
+
+  defmodule FaultSchema do
+    def __schema__(_field), do: Process.get({__MODULE__, :failure}).()
+  end
+
   setup_all do
     path = EctoSupport.database_path(:integration)
     start_supervised!({EctoRepo, EctoSupport.repo_start_options(path)})
@@ -153,5 +166,58 @@ defmodule JidoTest.Persistence.EctoTest do
                "value",
                constrained_opts
              )
+  end
+
+  test "unexpected repository replies remain errors and CAS results remain indeterminate" do
+    opts = [repo: FaultRepo, repo_options: [reply: fn -> :unexpected end]]
+    error = {:invalid_ecto_result, :unexpected}
+    assert {:error, ^error} = EctoPersistence.get("key", opts)
+    assert {:error, ^error} = EctoPersistence.put("key", "value", opts)
+    assert {:error, ^error} = EctoPersistence.delete("key", opts)
+
+    for expected <- [:not_found, "old"] do
+      assert {:error, {:indeterminate, ^error}} =
+               EctoPersistence.compare_and_swap("key", expected, "value", opts)
+    end
+  end
+
+  test "repository throws and exits do not escape and cannot confirm a write" do
+    for {kind, callback} <- [throw: fn -> throw(:offline) end, exit: fn -> exit(:offline) end] do
+      opts = [repo: FaultRepo, repo_options: [reply: callback]]
+      assert {:error, {:ecto, ^kind, :offline}} = EctoPersistence.get("key", opts)
+
+      for expected <- [:not_found, "old"] do
+        assert {:error, {:indeterminate, {:ecto, ^kind, :offline}}} =
+                 EctoPersistence.compare_and_swap("key", expected, "value", opts)
+      end
+    end
+  end
+
+  test "configuration callback faults and non-module schemas return validation errors" do
+    assert {:error, _} = EctoPersistence.validate_options(repo: __MODULE__.Missing)
+
+    assert {:error, ":schema must be an Ecto schema module"} =
+             EctoPersistence.validate_options(repo: FaultRepo, schema: "schema")
+
+    assert_raise ArgumentError, ~r/requires a :repo module/, fn ->
+      EctoPersistence.get("key", [])
+    end
+
+    for {callback, detail} <- [
+          {fn -> raise "invalid config" end, "invalid config"},
+          {fn -> throw(:invalid_config) end, "{:throw, :invalid_config}"}
+        ] do
+      Process.put({FaultRepo, :adapter}, callback)
+      assert {:error, message} = EctoPersistence.validate_options(repo: FaultRepo)
+      assert message == ":repo validation failed: " <> detail
+      Process.delete({FaultRepo, :adapter})
+
+      Process.put({FaultSchema, :failure}, callback)
+
+      assert {:error, message} =
+               EctoPersistence.validate_options(repo: FaultRepo, schema: FaultSchema)
+
+      assert message == ":schema validation failed: " <> detail
+    end
   end
 end

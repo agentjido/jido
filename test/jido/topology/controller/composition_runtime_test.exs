@@ -126,6 +126,12 @@ defmodule Jido.Topology.Controller.CompositionRuntimeTest do
     controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
     assert_receive {:readiness_blocked, first}, 1_000
 
+    assert {:error, %{message: "Topology update or placement requires an idle repair pass"}} =
+             Controller.update(controller, instance)
+
+    assert {:error, %{message: "Topology update or placement requires an idle repair pass"}} =
+             Controller.place_agent(controller, :first, node())
+
     for _ <- 1..10, do: assert(:ok == Controller.reconcile(controller))
     assert %{active: 1, pending: 1} = Controller.status(controller)
     send(first, :release)

@@ -1,0 +1,24 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/built_flow",
+  "vsn": 1,
+  "name": "authoring_built_flow",
+  "description": null,
+  "schema": "schemas/built_flow",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "total.set",
+      "target": "flows/set",
+      "kind": "flow",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

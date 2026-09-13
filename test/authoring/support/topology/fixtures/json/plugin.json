@@ -1,0 +1,47 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_plugin",
+  "schema": "schemas/plugin",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "solo",
+      "module": "agents/plugin_worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    }
+  ],
+  "groups": [
+    {
+      "key": "workers",
+      "module": "agents/plugin_worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null,
+      "count": 2
+    }
+  ],
+  "resources": [],
+  "relationships": [],
+  "connections": [],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

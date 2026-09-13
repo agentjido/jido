@@ -31,6 +31,16 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
     def speedup, do: 1
   end
 
+  defmodule RaisingTimeScale do
+    def now(_timezone), do: ~U[2030-01-01 00:00:00Z]
+    def speedup, do: raise("clock unavailable")
+  end
+
+  defmodule ThrowingTimeScale do
+    def now(_timezone), do: throw(:clock_unavailable)
+    def speedup, do: 1
+  end
+
   defmodule FiniteTimeScale do
     @behaviour SchedEx.TimeScale
     @key {__MODULE__, :clock}
@@ -334,7 +344,11 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
   test "invalid time scale results fail before SchedEx arithmetic" do
     for {time_scale, reason} <- [
           {ZeroTimeScale, {:invalid_time_scale_speedup, 0}},
-          {InvalidNowTimeScale, {:invalid_time_scale_now, :not_a_datetime}}
+          {InvalidNowTimeScale, {:invalid_time_scale_now, :not_a_datetime}},
+          {RaisingTimeScale,
+           {:time_scale_unavailable, :speedup,
+            {:error, %RuntimeError{message: "clock unavailable"}}}},
+          {ThrowingTimeScale, {:time_scale_unavailable, :now, {:throw, :clock_unavailable}}}
         ] do
       runtime = %{
         runtime()
@@ -347,6 +361,32 @@ defmodule Jido.Plugin.Scheduler.RuntimeTest do
       assert failed.cron_jobs == %{}
       assert is_reference(failed.retry_timer)
       Runtime.terminate(:normal, failed)
+    end
+  end
+
+  test "boot failures preserve their cause when state or the clock is unavailable" do
+    for {reply, expected} <- [
+          {{:error, :state_unavailable}, :state_unavailable},
+          {{:ok, %{cron: %{job: spec()}}},
+           {:cron_activation_failed, :job, {:invalid_time_scale_speedup, 0}}}
+        ] do
+      {server, monitor} =
+        spawn_monitor(fn ->
+          receive do
+            {:"$gen_call", from, {:plugin_state, Scheduler}} -> :gen_statem.reply(from, reply)
+          end
+        end)
+
+      state = %{runtime() | agent_server: server, options: [time_scale: ZeroTimeScale]}
+
+      assert {:stop, {:scheduler_boot_failed, ^expected}, failed} =
+               Runtime.handle_continue(:reconcile_agent, state)
+
+      assert failed.cron_jobs == %{}
+      assert_receive {:DOWN, ^monitor, :process, ^server, :normal}
+
+      assert {:stop, {:scheduler_boot_failed, {:agent_server_unavailable, _}}, ^state} =
+               Runtime.handle_continue(:reconcile_agent, state)
     end
   end
 

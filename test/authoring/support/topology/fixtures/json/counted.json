@@ -1,0 +1,69 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_counted",
+  "schema": "schemas/counted",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "observer",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [
+        "workers"
+      ],
+      "node": null
+    }
+  ],
+  "groups": [
+    {
+      "key": "workers",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/value"
+            },
+            {
+              "$type": "topology.member",
+              "key": {
+                "$type": "atom",
+                "id": "atoms/index"
+              }
+            }
+          ]
+        ]
+      },
+      "depends_on": [],
+      "node": null,
+      "count": {
+        "$type": "topology.input",
+        "key": {
+          "$type": "atom",
+          "id": "atoms/count"
+        }
+      }
+    }
+  ],
+  "resources": [],
+  "relationships": [],
+  "connections": [],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 3,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/required_profile",
+  "vsn": 1,
+  "name": "authoring_required_profile",
+  "description": null,
+  "schema": "schemas/required_profile",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "profile.rename",
+      "target": "actions/rename",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

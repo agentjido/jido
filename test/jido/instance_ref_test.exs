@@ -261,6 +261,71 @@ defmodule JidoTest.InstanceRefTest do
     assert {:error, :deleted} = Jido.activate_agent(second, ref, Counter)
   end
 
+  test "Ref startup rejects conflicting identity options before starting an Agent" do
+    instance = unique_instance("ref-options")
+    start_supervised!({Jido, name: instance, namespace: unique_namespace("ref-options")})
+    {:ok, ref} = Jido.agent_ref(instance, "counter", partition: "west")
+
+    for {key, value} <- [id: "other", partition: "east"] do
+      assert {:error, %{details: %{key: ^key, value: ^value}}} =
+               Jido.start_agent_ref(instance, ref, Counter, [{key, value}])
+    end
+
+    for opts <- [:invalid, [:invalid], %{id: "counter"}] do
+      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+               Jido.agent_ref(instance, "counter", opts)
+
+      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+               Jido.start_agent_ref(instance, ref, Counter, opts)
+
+      assert {:error, %{message: "Ref facade options must be a keyword list"}} =
+               Jido.delete_agent(instance, ref, Counter, opts)
+    end
+
+    assert Jido.agent_count(instance) == 0
+
+    assert {:ok, server} =
+             Jido.start_agent_ref(instance, ref, Counter, id: ref.id, partition: ref.partition)
+
+    assert Jido.resolve_agent(instance, ref) == {:ok, server}
+    assert {:error, :agent_running} = Jido.delete_agent(instance, ref, Counter)
+    assert Jido.agent(instance, ref).state == %{count: 0}
+  end
+
+  test "Ref runtime controls preserve their Server results and reject a missing activation" do
+    instance = unique_instance("ref-controls")
+    start_supervised!({Jido, name: instance, namespace: unique_namespace("ref-controls")})
+    {:ok, ref} = Jido.agent_ref(instance, "counter")
+    {:ok, server} = Jido.start_agent_ref(instance, ref, Counter)
+
+    assert Jido.cancel(instance, ref) == Jido.AgentServer.cancel(server)
+
+    assert Jido.cancel_turn(instance, ref, "absent") ==
+             Jido.AgentServer.cancel_turn(server, "absent")
+
+    assert :ok = Jido.attach(instance, ref)
+    assert Jido.AgentServer.status(server).runtime.lifecycle.attached == 1
+    assert :ok = Jido.touch(instance, ref)
+    assert :ok = Jido.detach(instance, ref)
+    assert Jido.AgentServer.status(server).runtime.lifecycle.attached == 0
+
+    assert Jido.plugin_state(instance, ref, __MODULE__) ==
+             Jido.AgentServer.plugin_state(server, __MODULE__)
+
+    assert :ok = Jido.stop_agent_ref(instance, ref)
+
+    for operation <- [
+          &Jido.cancel(instance, &1),
+          &Jido.cancel_turn(instance, &1, "absent"),
+          &Jido.attach(instance, &1),
+          &Jido.detach(instance, &1),
+          &Jido.touch(instance, &1),
+          &Jido.plugin_state(instance, &1, __MODULE__)
+        ] do
+      assert {:error, :not_found} = operation.(ref)
+    end
+  end
+
   test "namespaced storage detects dual-key collisions and still reads one legacy key" do
     namespace = unique_namespace("collision")
     legacy_instance = unique_instance("legacy")

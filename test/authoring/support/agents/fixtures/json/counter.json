@@ -1,0 +1,29 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/counter",
+  "vsn": 3,
+  "name": "authoring_counter",
+  "description": null,
+  "schema": "schemas/count",
+  "metadata": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/case"}, "counter"]]},
+  "plugins": [],
+  "routes": [
+    {
+      "path": "counter.add",
+      "target": "actions/add",
+      "kind": "action",
+      "defaults": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/amount"}, 1]]},
+      "match": null,
+      "priority": 10
+    },
+    {
+      "path": "counter.*",
+      "target": "actions/add",
+      "kind": "action",
+      "defaults": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/amount"}, 5]]},
+      "match": null,
+      "priority": -1
+    }
+  ]
+}

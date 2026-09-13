@@ -1,0 +1,54 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/ordered_routes",
+  "vsn": 1,
+  "name": "authoring_ordered_routes",
+  "description": null,
+  "schema": "schemas/ordered_routes",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "ordered.pick",
+      "target": "actions/choose",
+      "kind": "action",
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "first"
+          ]
+        ]
+      },
+      "match": null,
+      "priority": 5
+    },
+    {
+      "path": "ordered.pick",
+      "target": "actions/choose",
+      "kind": "action",
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "second"
+          ]
+        ]
+      },
+      "match": null,
+      "priority": 5
+    }
+  ]
+}

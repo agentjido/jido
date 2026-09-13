@@ -30,6 +30,144 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     :ok
   end
 
+  test "the bridge normalizes scalar attributes and drops unsupported values" do
+    span =
+      OpenTelemetry.start(
+        [:jido, :topology, :operation],
+        %{
+          "external" => "ignored",
+          topology_operation: :repair,
+          schema_version: 1,
+          trace_id: "trace",
+          span_id: "span",
+          parent_span_id: "parent",
+          error_code: :conflict,
+          ready?: true,
+          absent: nil,
+          nested: %{private: true},
+          fractional: 0.5
+        },
+        %{count: 2, duration: 3, monotonic_time: 4, system_time: 5}
+      )
+
+    assert_receive {:otel_start, _ctx, _parent, "jido.topology.repair", opts}
+
+    assert opts.attributes == %{
+             "jido.topology.operation" => "repair",
+             "jido.schema.version" => 1,
+             "jido.trace.id" => "trace",
+             "jido.span.id" => "span",
+             "jido.parent_span.id" => "parent",
+             "jido.error.code" => "conflict",
+             "jido.ready" => true,
+             "jido.count" => 2
+           }
+
+    assert :ok =
+             OpenTelemetry.finish(span, :stop, %{status: :error, error_type: "storage"}, %{}, 99)
+
+    ids = TestTracer.ids(span.span_ctx)
+    assert_receive {:otel_set_attributes, ^ids, %{"error.type" => "storage"}}
+    assert_receive {:otel_status, ^ids, :error}
+    assert_receive {:otel_end, ^ids, 99}
+  end
+
+  test "direct bridge spans accept explicit parents and links" do
+    parent = OpenTelemetry.start([:jido, :parent], %{}, %{})
+    assert_receive {:otel_start, parent_ctx, _, "jido.parent", _}
+    parent_ids = TestTracer.ids(parent_ctx)
+    assert :ok = OpenTelemetry.finish(parent, :stop, %{}, %{}, 10)
+
+    child = OpenTelemetry.start([:jido, :child], %{}, %{}, parent_span: parent)
+    assert_receive {:otel_start, _, actual_parent, "jido.child", _}
+    assert TestTracer.ids(actual_parent) == parent_ids
+    assert :ok = OpenTelemetry.finish(child, :stop, %{}, %{}, 11)
+
+    assert :ok =
+             OpenTelemetry.point([:jido, :point], %{}, %{},
+               parent_span: parent,
+               link_span: parent
+             )
+
+    assert_receive {:otel_start, point, actual_parent, "jido.point", opts}
+    assert TestTracer.ids(actual_parent) == parent_ids
+    assert [%{trace_id: trace_id, span_id: span_id}] = opts.links
+    assert %{trace_id: trace_id, span_id: span_id} == Map.take(parent_ids, [:trace_id, :span_id])
+    ids = TestTracer.ids(point)
+    assert_receive {:otel_end, ^ids, timestamp}
+    assert timestamp == opts.start_time
+    refute :otel_span.is_valid(:otel_tracer.current_span_ctx())
+  end
+
+  test "missing carriers do not install context and callback faults restore the caller context" do
+    before = OpenTelemetry.current_context()
+
+    for carrier <- [nil, :invalid, %{}, %{traceparent: 123, tracestate: [:invalid]}] do
+      assert OpenTelemetry.context_from_trace(carrier) == nil
+      assert OpenTelemetry.restore_trace_context(carrier) == nil
+    end
+
+    assert OpenTelemetry.with_context(nil, fn -> :returned end) == :returned
+    assert OpenTelemetry.detach_trace_context(nil) == :ok
+    incoming = Jido.Signal.Trace.new(trace_flags: "01")
+
+    context =
+      OpenTelemetry.context_from_trace(%{traceparent: Jido.Signal.Trace.to_traceparent(incoming)})
+
+    assert_raise RuntimeError, "work failed", fn ->
+      OpenTelemetry.with_context(context, fn ->
+        assert :otel_span.hex_trace_id(:otel_tracer.current_span_ctx()) == incoming.trace_id
+        raise "work failed"
+      end)
+    end
+
+    assert OpenTelemetry.current_context() == before
+  end
+
+  test "configuration maps disable tracing and malformed configuration fails closed" do
+    Application.put_env(:jido, :opentelemetry, %{enabled: false})
+    refute OpenTelemetry.enabled?()
+    assert OpenTelemetry.start([:jido, :disabled], %{}, %{}) == nil
+    assert OpenTelemetry.current_context() == nil
+    assert OpenTelemetry.point([:jido, :disabled], %{}, %{}) == :ok
+    assert OpenTelemetry.finish(nil, :stop, %{}, %{}, 0) == :ok
+
+    Application.put_env(:jido, :opentelemetry, :default)
+    assert OpenTelemetry.enabled?()
+    Application.put_env(:jido, :opentelemetry, [:invalid | :tail])
+    refute OpenTelemetry.enabled?()
+  end
+
+  test "bad event names do not interrupt the caller or alter its context" do
+    before = OpenTelemetry.current_context()
+    assert OpenTelemetry.start(["not-an-atom"], %{}, %{}) == nil
+    assert OpenTelemetry.point(["not-an-atom"], %{}, %{}) == :ok
+    assert OpenTelemetry.current_context() == before
+  end
+
+  test "exception event and status failures still end spans and restore context" do
+    for callback <- [:add_event, :set_status] do
+      assert :opentelemetry.set_default_tracer({TestTracer, %{owner: self(), fail: callback}})
+      before = OpenTelemetry.current_context()
+      span = OpenTelemetry.start([:jido, :fault], %{}, %{})
+      ids = TestTracer.ids(span.span_ctx)
+      assert :ok = OpenTelemetry.finish(span, :exception, %{status: :error}, %{}, 12)
+      assert_receive {:otel_end, ^ids, 12}
+      assert OpenTelemetry.current_context() == before
+    end
+  end
+
+  test "an end-span failure restores the caller context" do
+    assert :opentelemetry.set_default_tracer({TestTracer, %{owner: self(), fail: :end_span}})
+    before = OpenTelemetry.current_context()
+    span = OpenTelemetry.start([:jido, :fault], %{}, %{})
+    assert :otel_span.is_valid(span.span_ctx)
+    refute OpenTelemetry.current_context() == before
+
+    assert :ok = OpenTelemetry.finish(span, :stop, %{status: :ok}, %{}, 12)
+    assert OpenTelemetry.current_context() == before
+  end
+
   test "semantic spans use bounded names and attributes" do
     assert Jido.Telemetry.open_telemetry?()
 

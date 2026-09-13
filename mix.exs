@@ -108,7 +108,8 @@ defmodule Jido.MixProject do
       deps: deps(),
       test_ignore_filters: [
         fn path ->
-          String.starts_with?(path, "test/bench/") and
+          (String.starts_with?(path, "test/bench/") or
+             String.starts_with?(path, "test/authoring/")) and
             not String.ends_with?(path, "_test.exs")
         end
       ],
@@ -152,6 +153,7 @@ defmodule Jido.MixProject do
         "test.bench": :test,
         "test.peer": :test,
         "test.examples": :test,
+        "test.authoring": :test,
         "test.all": :test,
         coveralls: :test,
         "coveralls.github": :test,
@@ -395,8 +397,9 @@ defmodule Jido.MixProject do
       "test.bench": "test test/bench --only bench --seed 0",
       "test.peer": "test test/jido --only peer --seed 0",
       "test.examples": "test test/examples --only example --seed 0",
+      "test.authoring": "test test/authoring --only authoring --seed 0",
       "test.all":
-        "test --preload-modules --include bench --include example --include flaky --include peer --seed 0",
+        "test --preload-modules --include bench --include example --include authoring --include flaky --include peer --seed 0",
 
       # Helper to run docs
       docs: "docs --open",

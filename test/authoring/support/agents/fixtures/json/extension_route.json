@@ -1,0 +1,32 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/extension_route",
+  "vsn": 1,
+  "name": "authoring_extension_route",
+  "description": null,
+  "schema": "schemas/extension_route",
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        {
+          "$type": "atom",
+          "id": "atoms/extension"
+        },
+        "route"
+      ]
+    ]
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "text.write",
+      "target": "actions/text",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

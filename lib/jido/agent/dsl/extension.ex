@@ -47,7 +47,10 @@ defmodule Jido.Agent.DSL.Extension do
   @agent %Spark.Dsl.Section{
     name: :agent,
     patchable?: true,
-    schema: [schema: [type: :any], metadata: [type: :map]],
+    schema: [
+      schema: [type: :any],
+      metadata: [type: {:custom, __MODULE__, :validate_metadata, []}, type_doc: "map"]
+    ],
     entities: [@plugin],
     after_define: {__MODULE__, :mark_agent_block}
   }
@@ -62,6 +65,14 @@ defmodule Jido.Agent.DSL.Extension do
   def mark_agent_block do
     quote generated: true do
       Jido.Agent.DSL.Compiler.register_agent_block!(__MODULE__)
+    end
+  end
+
+  @doc false
+  def validate_metadata(value) do
+    case Jido.Agent.Validation.field(:metadata, value) do
+      {:ok, metadata} -> {:ok, metadata}
+      {:error, error} -> {:error, Exception.message(error)}
     end
   end
 

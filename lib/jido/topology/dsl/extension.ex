@@ -186,12 +186,23 @@ defmodule Jido.Topology.DSL.Extension do
   ]
   @topology_sections @entity_sections ++ [@nested_startup_section]
 
+  @doc false
+  def validate_metadata(value) do
+    case Jido.Topology.Validation.field(:metadata, value) do
+      :ok -> {:ok, value}
+      {:error, error} -> {:error, Exception.message(error)}
+    end
+  end
+
   use Spark.Dsl.Extension,
     sections: [
       %Spark.Dsl.Section{
         name: :topology,
         patchable?: true,
-        schema: [schema: [type: :any], metadata: [type: :map]],
+        schema: [
+          schema: [type: :any],
+          metadata: [type: {:custom, __MODULE__, :validate_metadata, []}, type_doc: "map"]
+        ],
         sections: @topology_sections
       }
     ]

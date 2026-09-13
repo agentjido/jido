@@ -1,0 +1,47 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_combined",
+  "schema": "schemas/combined",
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        {
+          "$type": "atom",
+          "id": "atoms/role_count"
+        },
+        1
+      ],
+      [
+        "kind",
+        "topology"
+      ]
+    ]
+  },
+  "agents": [
+    {
+      "key": "worker",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    }
+  ],
+  "groups": [],
+  "resources": [],
+  "relationships": [],
+  "connections": [],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

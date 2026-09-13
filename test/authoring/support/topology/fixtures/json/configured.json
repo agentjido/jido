@@ -1,0 +1,117 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_configured",
+  "schema": "schemas/configured",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "parent",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "orphan",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "continued",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "stopped",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "remote",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": {
+        "$type": "atom",
+        "id": "nodes/remote"
+      }
+    }
+  ],
+  "groups": [],
+  "resources": [
+    {
+      "key": "events",
+      "kind": "bus",
+      "config": [
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atoms/max_log_size"
+            },
+            17
+          ]
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "parent": "parent",
+      "child": "orphan",
+      "on_parent_exit": "emit_orphan"
+    },
+    {
+      "parent": "parent",
+      "child": "continued",
+      "on_parent_exit": "continue"
+    },
+    {
+      "parent": "parent",
+      "child": "stopped",
+      "on_parent_exit": "stop"
+    }
+  ],
+  "connections": [
+    {
+      "agent": "parent",
+      "to": "events",
+      "path": "authoring.work"
+    }
+  ],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 2,
+    "max_agents": 5,
+    "retry_interval": 37,
+    "task_timeout": 211
+  }
+}

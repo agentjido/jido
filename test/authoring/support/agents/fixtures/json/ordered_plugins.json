@@ -1,0 +1,37 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/ordered_plugins",
+  "vsn": 1,
+  "name": "authoring_ordered_plugins",
+  "description": null,
+  "schema": "schemas/ordered_plugins",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [
+    {
+      "type": "jido.plugin",
+      "version": 1,
+      "module": "plugins/first",
+      "options": []
+    },
+    {
+      "type": "jido.plugin",
+      "version": 1,
+      "module": "plugins/second",
+      "options": []
+    }
+  ],
+  "routes": [
+    {
+      "path": "plugins.set",
+      "target": "actions/value",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

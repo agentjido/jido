@@ -1,0 +1,21 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/inline",
+  "vsn": 1,
+  "name": "authoring_inline",
+  "description": null,
+  "schema": "schemas/count",
+  "metadata": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/case"}, "inline"]]},
+  "plugins": [],
+  "routes": [
+    {
+      "path": "inline.add",
+      "target": "actions/add",
+      "kind": "action",
+      "defaults": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/amount"}, 1]]},
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

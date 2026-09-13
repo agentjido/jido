@@ -1,5 +1,5 @@
 defmodule Jido.Agent.BuilderTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
   alias Jido.Agent.Builder
 
   defmodule CheckedTarget do
@@ -14,6 +14,33 @@ defmodule Jido.Agent.BuilderTest do
     def validate_params(value), do: {:ok, value}
     def validate_output(value), do: {:ok, value}
     def run(_input, _context), do: raise("authoring must not execute Actions")
+  end
+
+  test "field setters preserve values without changing the original Builder" do
+    schema = Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)})
+    base = Builder.new(name: "original")
+
+    changed =
+      base
+      |> Builder.name("changed")
+      |> Builder.vsn(7)
+      |> Builder.description("Updated fields")
+      |> Builder.schema(schema)
+      |> Builder.metadata(%{"owner" => "test"})
+
+    assert Builder.build!(changed) ===
+             Jido.Agent.new!(
+               name: "changed",
+               vsn: 7,
+               description: "Updated fields",
+               schema: schema,
+               metadata: %{"owner" => "test"}
+             )
+
+    assert Builder.build!(base) === Jido.Agent.new!(name: "original")
+
+    assert %Jido.Agent{id: "built", name: "changed", state: %{count: 2}} =
+             Builder.build!(changed, id: "built", state: %{count: 2})
   end
 
   test "appending routes checks each new target and build checks the complete definition" do

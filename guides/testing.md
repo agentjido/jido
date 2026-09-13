@@ -14,7 +14,7 @@ Dialyzer checks:
 mix quality
 ```
 
-There are four test execution categories:
+There are five test execution categories:
 
 | Category | Command | Default quality check |
 | --- | --- | --- |
@@ -22,12 +22,13 @@ There are four test execution categories:
 | Peer core | `mix test.peer` | Not included |
 | Benchmark | `mix test.bench` | Not included |
 | Example, including research | `mix test.examples` | Not included |
+| Agent and Topology authoring | `mix test.authoring` | Not included |
 
 CI and the test step in `mix quality` use
 `mix test test/jido --include flaky --seed 0`. They run fast core tests with a
 fixed seed, including the tagged flaky tests but excluding peer tests.
 
-Default `mix test` excludes `:bench`, `:example`, `:flaky`, `:peer`, and
+Default `mix test` excludes `:bench`, `:example`, `:authoring`, `:flaky`, `:peer`, and
 approved `:skip` tests. Tests that use `JidoTest.PeerCase` get the `:peer` tag
 and start actual BEAM nodes. Run peer and example tests separately when needed:
 
@@ -38,6 +39,13 @@ mix test.examples
 
 Benchmark tests in `test/bench/` use the `:bench` tag. All example tests,
 including the former integration scenarios, use `:example`.
+
+The Agent and Topology authoring corpus in `test/authoring/` uses `:authoring`.
+Run it with `mix test.authoring`. Both sets check source compilation, definition
+parity, saved JSON, and instantiation. Agent cases compare direct and live
+execution. Topology cases check pure plans without starting a controller.
+Source fixtures load only when the suite runs. There is no authoring CI job. See the
+[corpus guide](../test/authoring/README.md) for cases and extension rules.
 
 All research example tests pass without skips. They include the explicit
 quiescent upgrade boundary, validated definition migration, and additive
@@ -69,20 +77,20 @@ Run core-test coverage with:
 mix test --cover test/jido --include flaky --seed 0
 ```
 
-CI uses the same paths without `--cover`. Benchmark and example tests run separately.
+CI uses the same paths without `--cover`. Benchmark, example, and authoring tests run separately.
 Example source lines do not count toward the core coverage goal; all selected
 tests can contribute coverage of the core modules they call.
 
-Run all four categories with:
+Run all five categories with:
 
 ```sh
 mix test.all
 ```
 
-As an optional secondary check, run all four categories with core coverage:
+As an optional secondary check, run all five categories with core coverage:
 
 ```sh
-mix test --include bench --include example --include flaky --include peer --seed 0 --cover
+mix test --include bench --include example --include authoring --include flaky --include peer --seed 0 --cover
 ```
 
 The Mix summary threshold and ExCoveralls minimum are both 90%. Keep the

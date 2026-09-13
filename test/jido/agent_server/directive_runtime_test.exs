@@ -236,6 +236,38 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     end
   end
 
+  test "an uncertain placement retry retains its request and original creation cause", %{
+    runtime: state,
+    context: context
+  } do
+    offline = :"child-unavailable@127.0.0.1"
+    directive = Directive.spawn_child(RemoteCounter, :child, node: offline)
+
+    assert {:error, {:child_spawn_indeterminate, :child, ^offline, request, :noconnection},
+            pending} =
+             DirectiveRuntime.handle(directive, context, state)
+
+    assert pending.children == %{}
+    assert pending.agent == state.agent
+
+    assert %{request_id: ^request, status: :pending, creation_cause: cause} =
+             pending.child_spawn_requests.child
+
+    later_signal = signal("later.request")
+    later = %{context | source_signal: later_signal, signal: later_signal}
+
+    assert {:error, {:child_spawn_indeterminate, :child, ^offline, ^request, :noconnection},
+            ^pending} =
+             DirectiveRuntime.handle(directive, later, pending)
+
+    assert pending.child_spawn_requests.child.creation_cause == cause
+
+    assert {:error, {:child_spawn_pending, :child, ^offline, ^request}, ^pending} =
+             DirectiveRuntime.handle(Directive.spawn_child(RemoteCounter, :child), later, pending)
+
+    assert Jido.whereis_agent(state.jido, "#{state.agent.id}/child") == nil
+  end
+
   test "reported errors and unsupported Directives retain the current state", %{
     runtime: state,
     context: context

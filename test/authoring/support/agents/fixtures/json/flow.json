@@ -1,0 +1,28 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/flow",
+  "vsn": 2,
+  "name": "authoring_flow",
+  "description": null,
+  "schema": "schemas/count",
+  "metadata": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/case"}, "flow"]]},
+  "plugins": [
+    {
+      "type": "jido.plugin",
+      "version": 1,
+      "module": "plugins/count-turns",
+      "options": [{"$type": "tuple", "items": [{"$type": "atom", "id": "atoms/initial"}, 2]}]
+    }
+  ],
+  "routes": [
+    {
+      "path": "flow.add",
+      "target": "flows/add",
+      "kind": "flow",
+      "defaults": {"$type": "map", "entries": [[{"$type": "atom", "id": "atoms/amount"}, 2]]},
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

@@ -1,0 +1,211 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_repeated",
+  "schema": "schemas/repeated",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [],
+  "groups": [],
+  "resources": [
+    {
+      "key": "events",
+      "kind": "bus",
+      "config": []
+    }
+  ],
+  "relationships": [],
+  "connections": [],
+  "includes": [
+    {
+      "key": "team/a",
+      "topology": {
+        "type": "jido.topology",
+        "version": 2,
+        "name": "authoring_child",
+        "schema": "schemas/child",
+        "metadata": {
+          "$type": "map",
+          "entries": []
+        },
+        "agents": [
+          {
+            "key": "worker",
+            "module": "agents/worker",
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "atoms/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "depends_on": [],
+            "node": null
+          }
+        ],
+        "groups": [],
+        "resources": [],
+        "relationships": [],
+        "connections": [
+          {
+            "agent": "worker",
+            "to": "events",
+            "path": "authoring.work"
+          }
+        ],
+        "includes": [],
+        "imports": [
+          {
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "exports": [
+          {
+            "key": "public_worker",
+            "kind": "agent",
+            "from": "worker"
+          }
+        ],
+        "startup": {
+          "concurrency": 32,
+          "max_agents": 10000,
+          "retry_interval": 1000,
+          "task_timeout": 10000
+        }
+      },
+      "inputs": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "atoms/label"
+              }
+            }
+          ]
+        ]
+      },
+      "bindings": [
+        {
+          "key": "events",
+          "to": "events"
+        }
+      ]
+    },
+    {
+      "key": "team%2Fa",
+      "topology": {
+        "type": "jido.topology",
+        "version": 2,
+        "name": "authoring_child",
+        "schema": "schemas/child",
+        "metadata": {
+          "$type": "map",
+          "entries": []
+        },
+        "agents": [
+          {
+            "key": "worker",
+            "module": "agents/worker",
+            "initial_state": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "atoms/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "depends_on": [],
+            "node": null
+          }
+        ],
+        "groups": [],
+        "resources": [],
+        "relationships": [],
+        "connections": [
+          {
+            "agent": "worker",
+            "to": "events",
+            "path": "authoring.work"
+          }
+        ],
+        "includes": [],
+        "imports": [
+          {
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "exports": [
+          {
+            "key": "public_worker",
+            "kind": "agent",
+            "from": "worker"
+          }
+        ],
+        "startup": {
+          "concurrency": 32,
+          "max_agents": 10000,
+          "retry_interval": 1000,
+          "task_timeout": 10000
+        }
+      },
+      "inputs": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "right"
+          ]
+        ]
+      },
+      "bindings": [
+        {
+          "key": "events",
+          "to": "events"
+        }
+      ]
+    }
+  ],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

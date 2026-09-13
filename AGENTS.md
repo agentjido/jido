@@ -14,8 +14,8 @@ Use ASD-STE100 Simplified Technical English. Do not use skills unless requested.
 ## Checks
 
 - Declared floor: Elixir 1.18 and OTP 27. Validate it during beta QA.
-- Default quality check: `mix quality`. It runs fast core tests, not peer, benchmark, or example tests.
-- Run filtered suites separately when needed: `mix test.peer`, `mix test.bench`, and `mix test.examples`.
+- Default quality check: `mix quality`. It runs fast core tests, not peer, benchmark, example, or authoring tests.
+- Run filtered suites separately when needed: `mix test.peer`, `mix test.bench`, `mix test.examples`, and `mix test.authoring`.
 - Run every supported test category with `mix test.all`.
 - Compile with `mix compile --warnings-as-errors`.
 - Keep coverage at or above 90%. Aim above 93% to retain a maintenance buffer.

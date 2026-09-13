@@ -1,0 +1,56 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/static_metadata",
+  "vsn": 1,
+  "name": "authoring_static_metadata",
+  "description": null,
+  "schema": "schemas/static_metadata",
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        {
+          "$type": "atom",
+          "id": "atoms/stamp"
+        },
+        {
+          "$type": "value",
+          "id": "values/day"
+        }
+      ],
+      [
+        {
+          "$type": "atom",
+          "id": "atoms/values"
+        },
+        {
+          "$type": "tuple",
+          "items": [
+            {
+              "$type": "atom",
+              "id": "atoms/ready"
+            },
+            {
+              "$type": "binary",
+              "value": "/w=="
+            },
+            1,
+            1.0
+          ]
+        }
+      ]
+    ]
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "metadata.inspect",
+      "target": "actions/noop",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

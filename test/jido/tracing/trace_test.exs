@@ -66,5 +66,21 @@ defmodule JidoTest.Tracing.TraceTest do
              {:error, :invalid_trace_context}
 
     assert Trace.get(signal) == nil
+
+    assert Trace.child_of(nil, "cause") == {:error, :invalid_trace_context}
+    assert Trace.child_of(Trace.new_root(), 1) == {:error, :invalid_trace_context}
+    assert Trace.put(signal, nil) == {:error, :invalid_args}
+    assert Trace.put(nil, Trace.new_root()) == {:error, :invalid_args}
+  end
+
+  test "telemetry context contains only validated trace and causation identifiers" do
+    trace = Trace.child_of(Trace.new_root(), "cause") |> Map.put(:private, "secret")
+
+    assert Trace.telemetry_context(trace) ==
+             Map.take(trace, [:trace_id, :span_id, :parent_span_id, :causation_id])
+
+    assert Trace.telemetry_context(%{}) == %{}
+    assert Trace.telemetry_context(nil) == %{}
+    assert Trace.context_names() == ["traceparent", "tracestate", "jidocausationid"]
   end
 end

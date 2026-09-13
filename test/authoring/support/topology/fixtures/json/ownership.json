@@ -1,0 +1,63 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_ownership",
+  "schema": "schemas/ownership",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "parent",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "child",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [],
+      "node": null
+    },
+    {
+      "key": "observer",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [
+        "child"
+      ],
+      "node": null
+    }
+  ],
+  "groups": [],
+  "resources": [],
+  "relationships": [
+    {
+      "parent": "parent",
+      "child": "child",
+      "on_parent_exit": "continue"
+    }
+  ],
+  "connections": [],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

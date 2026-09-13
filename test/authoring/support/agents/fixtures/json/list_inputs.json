@@ -1,0 +1,24 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/list_inputs",
+  "vsn": 1,
+  "name": "authoring_list_inputs",
+  "description": null,
+  "schema": "schemas/list_inputs",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "items.replace",
+      "target": "actions/items",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/predicate_routes",
+  "vsn": 1,
+  "name": "authoring_predicate_routes",
+  "description": null,
+  "schema": "schemas/predicate_routes",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "choice.set",
+      "target": "actions/choose",
+      "kind": "action",
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "positive"
+          ]
+        ]
+      },
+      "match": "matches/positive",
+      "priority": 100
+    },
+    {
+      "path": "choice.set",
+      "target": "actions/choose",
+      "kind": "action",
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "fallback"
+          ]
+        ]
+      },
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

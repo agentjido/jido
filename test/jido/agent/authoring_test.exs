@@ -1,10 +1,9 @@
 defmodule JidoTest.Agent.AuthoringTest do
-  use JidoTest.Case, async: false
+  use ExUnit.Case, async: false
 
   alias Jido.Agent
   alias Jido.Agent.{Builder, Codec}
   alias Jido.Codec.Registry
-  alias Jido.AgentServer, as: Server
 
   def stringify_count(value, _opts), do: Integer.to_string(value)
 
@@ -220,147 +219,47 @@ defmodule JidoTest.Agent.AuthoringTest do
     defp add(count, amount, multiplier), do: count + amount * multiplier
   end
 
-  defp builder, do: parity_builder(Counter)
+  test "block and keyword declarations retain their own module identity" do
+    block = Counter.definition()
+    keyword = KeywordCounter.definition()
 
-  defp parity_builder(module) do
-    Builder.new(module: module, name: "authoring_counter")
-    |> Builder.vsn(7)
-    |> Builder.description("All authoring forms")
-    |> Builder.schema(Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}))
-    |> Builder.metadata(%{owner: :test, nested: {:tag, <<255>>}})
-    |> Builder.plugin(CountTurns, %{initial: 0})
-    |> Builder.plugin(PassThrough, label: :second)
-    |> Builder.route("authoring.add", Add,
-      defaults: %{amount: 1, flag: false},
-      priority: 10
-    )
-    |> Builder.route("authoring.flow", Flow, defaults: %{amount: 2}, priority: -5)
+    assert block.module == Counter
+    assert keyword.module == KeywordCounter
+    assert %{keyword | module: Counter} === block
+    assert function_exported?(Counter, :add_signal, 0)
+    refute function_exported?(KeywordCounter, :add_signal, 0)
   end
 
-  defp parity_attrs(module) do
-    %{
-      module: module,
-      name: "authoring_counter",
-      description: "All authoring forms",
-      vsn: 7,
-      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
-      metadata: %{owner: :test, nested: {:tag, <<255>>}},
-      plugins: [{CountTurns, [initial: 0]}, {PassThrough, [label: :second]}],
-      routes: [
-        {"authoring.add", Add, defaults: %{amount: 1, flag: false}, priority: 10},
-        {"authoring.flow", Flow, defaults: %{amount: 2}, priority: -5}
-      ]
-    }
+  test "Builder module input copies public definition data" do
+    assert CanonicalSource.__agent_config__().name == "private_source"
+    assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.definition()
   end
 
-  defp parity_registry(module, schema) do
-    Registry.new!(%{
-      "agents/authoring-counter" => {:agent, module},
-      "schemas/authoring-counter" => {:schema, schema},
-      "plugins/count-turns" => {:plugin, CountTurns},
-      "plugins/pass-through" => {:plugin, PassThrough},
-      "actions/add" => {:action, Add},
-      "flows/add" => {:flow, Flow},
-      "atoms/amount" => {:atom, :amount},
-      "atoms/flag" => {:atom, :flag},
-      "atoms/initial" => {:atom, :initial},
-      "atoms/label" => {:atom, :label},
-      "atoms/nested" => {:atom, :nested},
-      "atoms/owner" => {:atom, :owner},
-      "atoms/second" => {:atom, :second},
-      "atoms/tag" => {:atom, :tag},
-      "atoms/test" => {:atom, :test}
-    })
-  end
-
-  describe "canonical authoring parity acceptance" do
-    test "AUTH-REQ-001 to 004, 006, 009, 011, 014, 036, 038, 039, 041 to 043, 048, and 062" do
-      for {source, module} <- [keyword_module: KeywordCounter, spark_blocks: Counter] do
-        attrs = parity_attrs(module)
-        opts = [id: "parity-#{source}", state: %{count: 4}]
-        expected_definition = module.definition()
-        expected_instance = module.new!(opts)
-        map_definition = Agent.new!(attrs)
-        keyword_definition = Agent.new!(Map.to_list(attrs))
-        built_definition = Builder.build!(parity_builder(module))
-        module_built_definition = Builder.build!(Builder.new(module))
-        registry = parity_registry(module, expected_definition.schema)
-
-        assert map_definition === expected_definition
-        assert keyword_definition === expected_definition
-        assert built_definition === expected_definition
-        assert module_built_definition === expected_definition
-
-        assert {:ok, document} = Codec.encode(expected_definition, registry)
-        json_document = document |> JSON.encode!() |> JSON.decode!()
-        assert {:ok, ^expected_definition} = Codec.decode(json_document, registry)
-        assert {:ok, ^document} = Codec.encode(expected_definition, registry)
-
-        assert Agent.instantiate!(map_definition, opts) === expected_instance
-        assert Agent.instantiate!(keyword_definition, opts) === expected_instance
-        assert Agent.instantiate!(module, opts) === expected_instance
-        assert Builder.build!(parity_builder(module), opts) === expected_instance
-        assert Builder.build!(Builder.new(module), opts) === expected_instance
-        assert {:ok, ^expected_instance} = Codec.decode(json_document, registry, opts)
-        assert {:ok, ^document} = Codec.encode(expected_instance, registry)
-
-        assert document["module"] == "agents/authoring-counter"
-        assert document["schema"] == "schemas/authoring-counter"
-        assert document["vsn"] == 7
-        assert Enum.map(expected_definition.plugins, &elem(&1, 0)) == [CountTurns, PassThrough]
-
-        assert Enum.map(expected_definition.routes, & &1.path) == [
-                 "authoring.add",
-                 "authoring.flow"
-               ]
-
-        assert Enum.map(expected_definition.routes, & &1.priority) == [10, -5]
-
-        assert Enum.map(expected_definition.routes, & &1.target) == [
-                 {Add, %{amount: 1, flag: false}},
-                 {Flow, %{amount: 2}}
-               ]
-
-        refute Map.has_key?(document, "state")
-        refute Map.has_key?(document, "id")
-        refute Map.has_key?(document, "interfaces")
-        refute Map.has_key?(document, "signal_source")
-        refute Map.has_key?(document, "inline_action")
-        assert Map.has_key?(hd(document["routes"]), "defaults")
-        refute Map.has_key?(hd(document["routes"]), "params")
+  test "block metadata accepts mixed keys and rejects structs with a DSL error" do
+    compiled =
+      compile_agent("", "", """
+      agent do
+        metadata %{"owner" => "string", :owner => :atom}
       end
+      """)
 
-      assert function_exported?(Counter, :add_signal, 0)
-      refute function_exported?(KeywordCounter, :add_signal, 0)
-    end
+    {module, _bytecode} =
+      Enum.find(compiled, fn {module, _bytecode} ->
+        function_exported?(module, :definition, 0)
+      end)
 
-    test "AUTH-REQ-061: Builder module input copies canonical definition/0 data" do
-      assert CanonicalSource.__agent_config__().name == "private_source"
-      assert Builder.build!(Builder.new(CanonicalSource)) === CanonicalSource.definition()
-    end
-  end
+    assert module.definition().metadata === %{"owner" => "string", :owner => :atom}
 
-  test "all forms use the same direct and live execution path", %{jido: jido} do
-    {:ok, document, registry} = Codec.encode(Counter.definition())
-
-    instances = [
-      Counter.new!(id: "spark"),
-      Builder.build!(builder(), id: "builder"),
-      elem(Codec.decode(document, registry, id: "codec"), 1)
-    ]
-
-    for agent <- instances do
-      {:ok, server} = Jido.start_agent(jido, agent)
-      signal = Counter.add_signal!(3)
-      assert {:ok, expected, []} = Counter.cmd(agent, signal)
-      assert {:ok, ^expected} = Counter.add(server, 3)
-      assert expected.state == %{count: 3, turns: 1}
-      assert {:ok, flow_candidate, []} = Counter.cmd(expected, Counter.flow_add_signal!(2))
-      assert {:ok, ^flow_candidate} = Counter.flow_add(server, 2)
+    assert_raise Spark.Error.DslError, ~r/metadata/, fn ->
+      compile_agent("", "", """
+      agent do
+        metadata ~D[2026-09-13]
+      end
+      """)
     end
   end
 
-  test "inline routes compile ordinary Actions that Builder and Codec can reuse", %{jido: jido} do
+  test "inline routes compile ordinary Actions with access to private helpers" do
     target = InlineCounter.route_action!("inline.add")
     assert target.__jido_executable__().kind == :action
     assert target.name() == "inline_authoring_add"
@@ -368,28 +267,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     signal = InlineCounter.add_inline_signal!(3, 2)
     assert {:ok, candidate, []} = InlineCounter.cmd(InlineCounter.new!(), signal)
     assert candidate.state.count == 6
-
-    {:ok, server} = Jido.start_agent(jido, InlineCounter)
-    assert {:ok, committed} = InlineCounter.add_inline(server, 4)
-    assert committed.state.count == 4
-
-    built =
-      Builder.new(name: "inline_builder")
-      |> Builder.schema(InlineCounter.schema())
-      |> Builder.route("inline.add", target, defaults: %{multiplier: 1})
-      |> Builder.build!()
-
-    assert {:ok, built_candidate, []} =
-             Agent.cmd(Agent.instantiate!(built), InlineCounter.add_inline_signal!(5, 3))
-
-    assert built_candidate.state.count == 15
-
-    assert {:ok, document, registry} = Codec.encode(InlineCounter.definition())
-    assert {:ok, decoded} = Codec.decode(document, registry)
-    assert hd(decoded.routes).target == {target, %{multiplier: 1}}
-    refute Map.has_key?(document, "interfaces")
-    refute Map.has_key?(document, "signal_source")
-    refute Map.has_key?(document, "inline_action")
   end
 
   test "inline routes accept guarded callback clauses" do
@@ -538,27 +415,6 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Agent.instantiate(%{}, [])
   end
 
-  test "a live helper forwards runtime validation without a commit", %{jido: jido} do
-    {:ok, server} = Jido.start_agent(jido, Counter)
-    before = Server.snapshot(server)
-    assert {:error, %Jido.Error.ValidationError{}} = Counter.add(server, 2, timeout: :invalid)
-    assert Server.snapshot(server) == before
-    assert {:ok, committed} = Counter.add(server, 0, context: %{})
-    assert committed.state.count == 0
-  end
-
-  test "helpers leave executable validation to execution", %{jido: jido} do
-    agent = PreparedCounter.new!()
-    assert {:ok, signal} = PreparedCounter.add_signal(2)
-    assert signal.data == %{amount: 2}
-    assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
-    assert candidate.state.count == 2
-
-    {:ok, server} = Jido.start_agent(jido, agent)
-    assert {:ok, ^candidate} = PreparedCounter.add(server, 2)
-    assert Server.snapshot(server).state_version == 1
-  end
-
   test "raw wildcard and predicate routes and static structs survive the Codec" do
     definition = RawCounter.definition()
     assert {:ok, document, registry} = Codec.encode(definition)
@@ -590,7 +446,7 @@ defmodule JidoTest.Agent.AuthoringTest do
     assert {:error, _} = Builder.build(Builder.new(state: %{count: 1}))
     assert {:error, _} = Builder.build(Builder.new([:invalid]))
     assert {:error, _} = Builder.build(Builder.new(:missing_agent_module))
-    assert {:error, _} = Builder.build(builder(), name: "override")
+    assert {:error, _} = Builder.build(Builder.new(Counter), name: "override")
     assert_raise Jido.Error.ValidationError, fn -> Builder.build!(Builder.new(unknown: true)) end
   end
 
@@ -985,4 +841,52 @@ defmodule JidoTest.Agent.AuthoringTest do
   end
 
   defp normalized_spec(source), do: String.replace(source, ~r/\s+/, "")
+end
+
+defmodule JidoTest.Agent.AuthoringRuntimeTest do
+  use JidoTest.Case, async: false
+
+  alias Jido.AgentServer, as: Server
+  alias JidoTest.Agent.AuthoringTest.{Counter, InlineCounter, PreparedCounter}
+
+  test "generated Action and Flow helpers commit the direct candidate", %{jido: jido} do
+    agent = Counter.new!()
+    {:ok, server} = Jido.start_agent(jido, agent)
+
+    assert {:ok, expected, []} = Counter.cmd(agent, Counter.add_signal!(3))
+    assert {:ok, ^expected} = Counter.add(server, 3)
+    assert expected.state == %{count: 3, turns: 1}
+
+    assert {:ok, flow_candidate, []} = Counter.cmd(expected, Counter.flow_add_signal!(2))
+    assert {:ok, ^flow_candidate} = Counter.flow_add(server, 2)
+    assert flow_candidate.state == %{count: 5, turns: 2}
+    assert Server.snapshot(server).state_version == 2
+  end
+
+  test "generated inline helpers apply route defaults", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, InlineCounter)
+    assert {:ok, committed} = InlineCounter.add_inline(server, 4)
+    assert committed.state == %{count: 4}
+  end
+
+  test "a live helper forwards runtime validation without a commit", %{jido: jido} do
+    {:ok, server} = Jido.start_agent(jido, Counter)
+    before = Server.snapshot(server)
+    assert {:error, %Jido.Error.ValidationError{}} = Counter.add(server, 2, timeout: :invalid)
+    assert Server.snapshot(server) == before
+    assert {:ok, committed} = Counter.add(server, 0, context: %{})
+    assert committed.state.count == 0
+  end
+
+  test "helpers leave executable validation to execution", %{jido: jido} do
+    agent = PreparedCounter.new!()
+    assert {:ok, signal} = PreparedCounter.add_signal(2)
+    assert signal.data == %{amount: 2}
+    assert {:ok, candidate, []} = PreparedCounter.cmd(agent, signal)
+    assert candidate.state.count == 2
+
+    {:ok, server} = Jido.start_agent(jido, agent)
+    assert {:ok, ^candidate} = PreparedCounter.add(server, 2)
+    assert Server.snapshot(server).state_version == 1
+  end
 end

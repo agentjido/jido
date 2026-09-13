@@ -1,0 +1,24 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/nested_profile",
+  "vsn": 1,
+  "name": "authoring_nested_profile",
+  "description": null,
+  "schema": "schemas/nested_profile",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "nested.rename",
+      "target": "actions/nested",
+      "kind": "action",
+      "defaults": null,
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

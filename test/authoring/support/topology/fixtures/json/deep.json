@@ -1,0 +1,324 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_deep",
+  "schema": "schemas/deep",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "agents": [
+    {
+      "key": "observer",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": []
+      },
+      "depends_on": [
+        {
+          "$type": "topology.ref",
+          "component": "region",
+          "key": "leader"
+        },
+        {
+          "$type": "topology.ref",
+          "component": "region",
+          "key": "workers"
+        }
+      ],
+      "node": null
+    }
+  ],
+  "groups": [],
+  "resources": [
+    {
+      "key": "events",
+      "kind": "bus",
+      "config": []
+    }
+  ],
+  "relationships": [],
+  "connections": [
+    {
+      "agent": "observer",
+      "to": {
+        "$type": "topology.ref",
+        "component": "region",
+        "key": "events"
+      },
+      "path": "authoring.work"
+    }
+  ],
+  "includes": [
+    {
+      "key": "region",
+      "topology": {
+        "type": "jido.topology",
+        "version": 2,
+        "name": "authoring_deep_region",
+        "schema": "schemas/deep_region",
+        "metadata": {
+          "$type": "map",
+          "entries": []
+        },
+        "agents": [],
+        "groups": [],
+        "resources": [],
+        "relationships": [],
+        "connections": [],
+        "includes": [
+          {
+            "key": "team",
+            "topology": {
+              "type": "jido.topology",
+              "version": 2,
+              "name": "authoring_deep_leaf",
+              "schema": "schemas/deep_leaf",
+              "metadata": {
+                "$type": "map",
+                "entries": []
+              },
+              "agents": [
+                {
+                  "key": "leader",
+                  "module": "agents/worker",
+                  "initial_state": {
+                    "$type": "map",
+                    "entries": [
+                      [
+                        {
+                          "$type": "atom",
+                          "id": "atoms/label"
+                        },
+                        {
+                          "$type": "topology.input",
+                          "key": {
+                            "$type": "atom",
+                            "id": "atoms/label"
+                          }
+                        }
+                      ]
+                    ]
+                  },
+                  "depends_on": [],
+                  "node": null
+                }
+              ],
+              "groups": [
+                {
+                  "key": "workers",
+                  "module": "agents/worker",
+                  "initial_state": {
+                    "$type": "map",
+                    "entries": [
+                      [
+                        {
+                          "$type": "atom",
+                          "id": "atoms/label"
+                        },
+                        {
+                          "$type": "topology.input",
+                          "key": {
+                            "$type": "atom",
+                            "id": "atoms/label"
+                          }
+                        }
+                      ],
+                      [
+                        {
+                          "$type": "atom",
+                          "id": "atoms/value"
+                        },
+                        {
+                          "$type": "topology.member",
+                          "key": {
+                            "$type": "atom",
+                            "id": "atoms/index"
+                          }
+                        }
+                      ]
+                    ]
+                  },
+                  "depends_on": [
+                    "leader"
+                  ],
+                  "node": null,
+                  "count": {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "atoms/count"
+                    }
+                  }
+                }
+              ],
+              "resources": [],
+              "relationships": [],
+              "connections": [
+                {
+                  "agent": "workers",
+                  "to": "events",
+                  "path": "authoring.work"
+                }
+              ],
+              "includes": [],
+              "imports": [
+                {
+                  "key": "events",
+                  "kind": "bus"
+                }
+              ],
+              "exports": [
+                {
+                  "key": "leader",
+                  "kind": "agent",
+                  "from": "leader"
+                },
+                {
+                  "key": "workers",
+                  "kind": "group",
+                  "from": "workers"
+                },
+                {
+                  "key": "events",
+                  "kind": "bus",
+                  "from": "events"
+                }
+              ],
+              "startup": {
+                "concurrency": 32,
+                "max_agents": 3,
+                "retry_interval": 1000,
+                "task_timeout": 10000
+              }
+            },
+            "inputs": {
+              "$type": "map",
+              "entries": [
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/count"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "atoms/count"
+                    }
+                  }
+                ],
+                [
+                  {
+                    "$type": "atom",
+                    "id": "atoms/label"
+                  },
+                  {
+                    "$type": "topology.input",
+                    "key": {
+                      "$type": "atom",
+                      "id": "atoms/label"
+                    }
+                  }
+                ]
+              ]
+            },
+            "bindings": [
+              {
+                "key": "events",
+                "to": "events"
+              }
+            ]
+          }
+        ],
+        "imports": [
+          {
+            "key": "events",
+            "kind": "bus"
+          }
+        ],
+        "exports": [
+          {
+            "key": "leader",
+            "kind": "agent",
+            "from": {
+              "$type": "topology.ref",
+              "component": "team",
+              "key": "leader"
+            }
+          },
+          {
+            "key": "workers",
+            "kind": "group",
+            "from": {
+              "$type": "topology.ref",
+              "component": "team",
+              "key": "workers"
+            }
+          },
+          {
+            "key": "events",
+            "kind": "bus",
+            "from": {
+              "$type": "topology.ref",
+              "component": "team",
+              "key": "events"
+            }
+          }
+        ],
+        "startup": {
+          "concurrency": 32,
+          "max_agents": 10000,
+          "retry_interval": 1000,
+          "task_timeout": 10000
+        }
+      },
+      "inputs": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/count"
+            },
+            {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "atoms/count"
+              }
+            }
+          ],
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            {
+              "$type": "topology.input",
+              "key": {
+                "$type": "atom",
+                "id": "atoms/label"
+              }
+            }
+          ]
+        ]
+      },
+      "bindings": [
+        {
+          "key": "events",
+          "to": "events"
+        }
+      ]
+    }
+  ],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 5,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

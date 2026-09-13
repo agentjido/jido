@@ -57,6 +57,29 @@ defmodule Jido.Telemetry.SemanticTest do
              revision_after: 2,
              queue_depth: 0
            }
+
+    assert Semantic.normalize_measurements(nil) == %{}
+    assert Semantic.normalize_metadata(nil) == %{schema_version: Semantic.schema_version()}
+
+    assert Semantic.normalize_metadata(%{component_kind: :agent}) ==
+             %{schema_version: 1, component_kind: :agent}
+  end
+
+  test "result metadata classifies returned outcomes without exposing payloads" do
+    for result <- [:ok, {:ok, :private}, {:ok, :private, 2}, :ignored] do
+      assert Semantic.result_metadata(result) == %{status: :ok}
+    end
+
+    for {result, status} <- [
+          {{:error, :not_found}, :not_found},
+          {{:error, :deleted}, :not_found},
+          {{:error, :conflict}, :conflict},
+          {{:error, :indeterminate}, :indeterminate},
+          {{:error, {:indeterminate, :private}}, :indeterminate},
+          {{:error, {:rejected, :private}}, :rejected}
+        ] do
+      assert Semantic.result_metadata(result) == %{status: status}
+    end
   end
 
   test "topology operation vocabulary includes update and exact placement" do

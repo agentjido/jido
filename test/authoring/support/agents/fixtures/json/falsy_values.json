@@ -1,0 +1,49 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/falsy_values",
+  "vsn": 1,
+  "name": "authoring_falsy_values",
+  "description": null,
+  "schema": "schemas/falsy_values",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": [
+    {
+      "path": "config.set",
+      "target": "actions/config",
+      "kind": "action",
+      "defaults": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/amount"
+            },
+            7
+          ],
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/enabled"
+            },
+            true
+          ],
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/note"
+            },
+            "default"
+          ]
+        ]
+      },
+      "match": null,
+      "priority": 0
+    }
+  ]
+}

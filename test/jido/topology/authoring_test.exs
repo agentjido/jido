@@ -15,23 +15,9 @@ defmodule Jido.Topology.AuthoringTest do
   alias Jido.Topology
   alias Jido.Topology.{Builder, Codec, Plan, Ref, Reference}
 
-  test "DSL, Builder, and JSON produce equal definitions and plans" do
-    definition = Swarm.topology()
-    assert {:ok, ^definition} = Builder.build(Formats.builder())
-    assert {:ok, json} = Formats.json()
-    assert {:ok, ^definition} = Codec.decode(JSON.decode!(json), Formats.registry())
-    assert {:ok, ^definition} = Formats.from_file()
+  test "a large group plan keeps resource order and ownership" do
     assert {:ok, instance} = Swarm.new(id: "demo", input: %{worker_count: 1_000})
     assert map_size(instance.plan.agents) == 1_001
-
-    assert {:ok, ^instance} =
-             Codec.decode(JSON.decode!(json), Formats.registry(),
-               id: "demo",
-               input: %{worker_count: 1_000}
-             )
-
-    assert {:ok, ^instance} =
-             Builder.build(Formats.builder(), id: "demo", input: %{worker_count: 1_000})
 
     assert instance.plan.layers |> List.first() |> Enum.member?("bus/work")
     assert instance.plan.agents["group/workers/1000"].parent == "agent/coordinator"
@@ -290,6 +276,36 @@ defmodule Jido.Topology.AuthoringTest do
     assert {:ok, instance} = Swarm.new(id: "private", input: %{worker_count: 2})
     assert {:error, _} = Codec.encode(instance)
     assert {:error, _} = Topology.new(name: "runtime", metadata: %{pid: self()})
+  end
+
+  test "block metadata accepts mixed keys and rejects structs and runtime values" do
+    module = Module.concat(__MODULE__, "Metadata#{System.unique_integer([:positive])}")
+
+    compile_isolated("""
+    defmodule #{module} do
+      use Jido.Topology, name: "metadata"
+      topology do
+        metadata %{"owner" => "string", :owner => :atom}
+      end
+    end
+    """)
+
+    assert module.topology().metadata === %{"owner" => "string", :owner => :atom}
+
+    for metadata <- ["~D[2026-09-13]", "%{pid: self()}"] do
+      invalid = Module.concat(__MODULE__, "InvalidMetadata#{System.unique_integer([:positive])}")
+
+      assert_raise Spark.Error.DslError, ~r/metadata/, fn ->
+        compile_isolated("""
+        defmodule #{invalid} do
+          use Jido.Topology, name: "invalid_metadata"
+          topology do
+            metadata #{metadata}
+          end
+        end
+        """)
+      end
+    end
   end
 
   test "DSL compile validation rejects cycles and mixed authoring fields" do

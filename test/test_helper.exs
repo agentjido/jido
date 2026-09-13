@@ -4,4 +4,5 @@ ExUnit.start()
 # Tests that start external BEAM nodes: mix test.peer
 # Benchmark contract tests: mix test.bench
 # All examples, including application scenarios: mix test.examples
-ExUnit.configure(exclude: [:skip, :flaky, :peer, :example, :bench])
+# Agent and Topology authoring corpus: mix test.authoring
+ExUnit.configure(exclude: [:skip, :flaky, :peer, :example, :bench, :authoring])

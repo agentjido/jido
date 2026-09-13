@@ -1,0 +1,48 @@
+{
+  "type": "jido.topology",
+  "version": 2,
+  "name": "authoring_minimal",
+  "schema": "schemas/minimal",
+  "metadata": {
+    "$type": "map",
+    "entries": [
+      [
+        "suite",
+        "topology"
+      ]
+    ]
+  },
+  "agents": [
+    {
+      "key": "worker",
+      "module": "agents/worker",
+      "initial_state": {
+        "$type": "map",
+        "entries": [
+          [
+            {
+              "$type": "atom",
+              "id": "atoms/label"
+            },
+            "single"
+          ]
+        ]
+      },
+      "depends_on": [],
+      "node": null
+    }
+  ],
+  "groups": [],
+  "resources": [],
+  "relationships": [],
+  "connections": [],
+  "includes": [],
+  "imports": [],
+  "exports": [],
+  "startup": {
+    "concurrency": 32,
+    "max_agents": 10000,
+    "retry_interval": 1000,
+    "task_timeout": 10000
+  }
+}

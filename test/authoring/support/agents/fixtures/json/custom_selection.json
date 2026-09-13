@@ -1,0 +1,15 @@
+{
+  "type": "jido.agent",
+  "version": 2,
+  "module": "agents/custom_selection",
+  "vsn": 1,
+  "name": "authoring_custom_selection",
+  "description": null,
+  "schema": "schemas/custom_selection",
+  "metadata": {
+    "$type": "map",
+    "entries": []
+  },
+  "plugins": [],
+  "routes": []
+}

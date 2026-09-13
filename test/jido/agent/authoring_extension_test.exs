@@ -1,5 +1,5 @@
 defmodule JidoTest.Agent.AuthoringExtensionTest do
-  use JidoTest.Case, async: false
+  use ExUnit.Case, async: false
 
   alias Jido.Agent
   alias Jido.Agent.{Builder, Codec, Extension}
@@ -111,7 +111,7 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     def update_state(n, _, _), do: {:ok, n + 1}
   end
 
-  test "foreign entities lower with ordinary Plugins, routes and generated helpers", %{jido: jido} do
+  test "foreign entities lower with ordinary Plugins, routes and generated helpers" do
     module = Module.concat(__MODULE__, "Agent#{System.unique_integer([:positive])}")
 
     compile_isolated(
@@ -145,8 +145,8 @@ defmodule JidoTest.Agent.AuthoringExtensionTest do
     assert [{Turns, []}] = definition.plugins
     assert Enum.count(definition.routes, &(&1.target == Add)) == 3
     assert Enum.any?(definition.routes, &(&1.target == {Add, %{amount: 1}}))
-    {:ok, server} = Jido.start_agent(jido, module)
-    assert {:ok, %{state: %{count: 3, turns: 1}}} = module.add(server, 3)
+    signal = module.add_signal!(3)
+    assert {:ok, %{state: %{count: 3, turns: 1}}, []} = Agent.cmd(module.new!(), signal)
     assert {:ok, document, registry} = Jido.Agent.Codec.encode(definition)
     assert {:ok, ^definition} = Jido.Agent.Codec.decode(document, registry)
   end
