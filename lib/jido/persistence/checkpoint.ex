@@ -46,45 +46,46 @@ defmodule Jido.Persistence.Checkpoint do
   end
 
   defp dump_owned_state(state, specs, record_format, reason) when is_map(state) do
-    Enum.reduce_while(specs, {:ok, state}, fn
-      %{agent: %AgentSpec{state_key: key}, persistence: %PersistenceSpec{}} = spec,
-      {:ok, current} ->
-        context = PersistencePlugin.context(spec, :dump, record_format, reason)
-
-        with {:ok, value} <- Map.fetch(current, key),
-             {:ok, dumped} <- PersistencePlugin.dump(spec, value, context) do
-          {:cont, {:ok, Map.put(current, key, dumped)}}
-        else
-          :error -> {:halt, {:error, {:invalid_checkpoint, {:missing_plugin_state, key}}}}
-          {:error, _reason} = error -> {:halt, error}
-        end
-
-      _spec, result ->
-        {:cont, result}
-    end)
+    convert_owned_state(state, specs, :dump, record_format, reason)
   end
 
   defp load_owned_state(state, specs, record_format, reason) when is_map(state) do
-    Enum.reduce_while(specs, {:ok, state}, fn
-      %{agent: %AgentSpec{state_key: key}, persistence: %PersistenceSpec{}} = spec,
-      {:ok, current} ->
-        context = PersistencePlugin.context(spec, :load, record_format, reason)
-
-        with {:ok, value} <- Map.fetch(current, key),
-             {:ok, loaded} <- PersistencePlugin.load(spec, value, context) do
-          {:cont, {:ok, Map.put(current, key, loaded)}}
-        else
-          :error -> {:halt, {:error, {:invalid_persistence_record, :plugin_state}}}
-          {:error, _reason} = error -> {:halt, error}
-        end
-
-      _spec, result ->
-        {:cont, result}
-    end)
+    convert_owned_state(state, specs, :load, record_format, reason)
   end
 
   defp load_owned_state(_state, _specs, _record_format, _reason),
     do: {:error, {:invalid_persistence_record, :checkpoint}}
+
+  defp convert_owned_state(state, specs, direction, record_format, reason) do
+    Enum.reduce_while(specs, {:ok, state}, fn
+      %{agent: %AgentSpec{state_key: key}, persistence: %PersistenceSpec{}} = spec,
+      {:ok, current} ->
+        context = PersistencePlugin.context(spec, direction, record_format, reason)
+
+        with {:ok, value} <- Map.fetch(current, key),
+             {:ok, converted} <- convert_plugin_value(spec, value, context, direction) do
+          {:cont, {:ok, Map.put(current, key, converted)}}
+        else
+          :error -> {:halt, missing_plugin_state(direction, key)}
+          {:error, _reason} = error -> {:halt, error}
+        end
+
+      _spec, result ->
+        {:cont, result}
+    end)
+  end
+
+  defp convert_plugin_value(spec, value, context, :dump),
+    do: PersistencePlugin.dump(spec, value, context)
+
+  defp convert_plugin_value(spec, value, context, :load),
+    do: PersistencePlugin.load(spec, value, context)
+
+  defp missing_plugin_state(:dump, key),
+    do: {:error, {:invalid_checkpoint, {:missing_plugin_state, key}}}
+
+  defp missing_plugin_state(:load, _key),
+    do: {:error, {:invalid_persistence_record, :plugin_state}}
 
   defp plugin_declarations(agent_module, checkpoint) do
     cond do

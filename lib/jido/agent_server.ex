@@ -1595,15 +1595,7 @@ defmodule Jido.AgentServer do
   end
 
   defp persist_definition_upgrade(%State{} = data, target, version) do
-    opts = [
-      instance: data.jido,
-      namespace: data.agent_namespace,
-      partition: data.partition,
-      revision: version,
-      expected_revision: data.state_version,
-      reason: :definition_upgrade
-    ]
-
+    opts = persistence_write_opts(data, version, :definition_upgrade)
     Jido.Persistence.replace_agent(data.persistence, data.agent, target, opts)
   end
 
@@ -3322,16 +3314,19 @@ defmodule Jido.AgentServer do
     do: {:error, :persistence_not_configured}
 
   defp persist_agent(%State{} = data, %Agent{} = agent, version, reason, extra_opts) do
-    opts =
-      extra_opts
-      |> Keyword.put(:instance, data.jido)
-      |> Keyword.put(:namespace, data.agent_namespace)
-      |> Keyword.put(:partition, data.partition)
-      |> Keyword.put(:revision, version)
-      |> Keyword.put(:expected_revision, data.state_version)
-      |> Keyword.put(:reason, reason)
+    opts = persistence_write_opts(data, version, reason, extra_opts)
 
     Jido.Persistence.save_agent(data.persistence, agent, opts)
+  end
+
+  defp persistence_write_opts(data, version, reason, extra_opts \\ []) do
+    extra_opts
+    |> Keyword.put(:instance, data.jido)
+    |> Keyword.put(:namespace, data.agent_namespace)
+    |> Keyword.put(:partition, data.partition)
+    |> Keyword.put(:revision, version)
+    |> Keyword.put(:expected_revision, data.state_version)
+    |> Keyword.put(:reason, reason)
   end
 
   defp maybe_persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
