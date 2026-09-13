@@ -613,26 +613,6 @@ defmodule Jido.Error do
   @spec retryable?(term()) :: boolean()
   def retryable?({:error, reason, _effects}), do: retryable?(reason)
   def retryable?({:error, reason}), do: retryable?(reason)
-  def retryable?(%ValidationError{details: details}), do: retryable_hint(details, false)
-
-  def retryable?(%ExecutionError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%RoutingError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%TimeoutError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%CompensationError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%InternalError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
-  def retryable?(%Internal.UnknownError{details: details} = error),
-    do: retryable_hint(details, default_retryable?(error))
-
   def retryable?(%{retryable?: value}) when is_boolean(value), do: value
   def retryable?(%{retryable: value}) when is_boolean(value), do: value
   def retryable?(%{"retryable" => value}) when is_boolean(value), do: value
@@ -776,10 +756,6 @@ defmodule Jido.Error do
     end
   end
 
-  defp sanitize_transport(value, _depth) when is_tuple(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_function(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_pid(value), do: safe_inspect(value)
-  defp sanitize_transport(value, _depth) when is_reference(value), do: safe_inspect(value)
   defp sanitize_transport(value, _depth), do: safe_inspect(value)
 
   defp sanitize_key(key) when is_atom(key), do: key

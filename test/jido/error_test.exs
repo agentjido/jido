@@ -315,6 +315,22 @@ defmodule JidoTest.ErrorTest do
       assert Error.retryable?({:error, %{type: :validation_error}}) == false
     end
 
+    test "keeps retry defaults and detail hints for each Jido error struct" do
+      errors = [
+        {Error.validation_error("invalid"), false},
+        {Error.execution_error("failed"), true},
+        {Error.routing_error("missing"), true},
+        {Error.timeout_error("late"), true},
+        {Error.compensation_error("undo failed"), true},
+        {Error.internal_error("failed"), true}
+      ]
+
+      for {error, default} <- errors do
+        assert Error.retryable?(error) == default
+        assert Error.retryable?(%{error | details: %{retryable?: not default}}) == not default
+      end
+    end
+
     test "recognizes known string types from public payloads" do
       payload = %{
         "type" => "validation_error",

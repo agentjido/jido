@@ -18,13 +18,13 @@ defmodule Jido.Util.DeepMerge do
 
   defp do_merge(left, right) when is_list(left) and is_list(right) do
     cond do
-      not keyword_list?(left) ->
+      not Keyword.keyword?(left) ->
         right
 
       right == [] ->
         left
 
-      keyword_list?(right) ->
+      Keyword.keyword?(right) ->
         Keyword.merge(left, right, &merge_value/3)
 
       true ->
@@ -35,6 +35,4 @@ defmodule Jido.Util.DeepMerge do
   defp do_merge(_left, right), do: right
 
   defp merge_value(_key, left, right), do: do_merge(left, right)
-
-  defp keyword_list?(list), do: Keyword.keyword?(list)
 end

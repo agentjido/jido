@@ -172,7 +172,7 @@ defmodule Jido.Codec.Data do
 
   defp check(value, depth, nodes)
        when is_map(value) and not is_struct(value) and map_size(value) <= 10_000 do
-    if Enum.all?(Map.keys(value), &is_binary/1),
+    if Enum.all?(value, fn {key, _value} -> is_binary(key) end),
       do: check_map(:maps.iterator(value), depth + 1, nodes + 1),
       else: Authoring.error("Document object keys must be strings")
   end

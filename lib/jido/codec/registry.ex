@@ -34,7 +34,7 @@ defmodule Jido.Codec.Registry do
 
   def new(entries)
       when is_map(entries) and not is_struct(entries) and map_size(entries) <= 10_000 do
-    with {:ok, _} <- Authoring.traverse(Enum.to_list(entries), &validate_entry/1),
+    with :ok <- validate_entries(entries),
          :ok <- unique_values(entries),
          :ok <- aliases(entries) do
       {:ok, %__MODULE__{entries: entries}}
@@ -97,6 +97,15 @@ defmodule Jido.Codec.Registry do
   end
 
   defp validate_entry(_entry), do: Authoring.error("Invalid Registry entry")
+
+  defp validate_entries(entries) do
+    Enum.reduce_while(entries, :ok, fn entry, :ok ->
+      case validate_entry(entry) do
+        {:ok, _id} -> {:cont, :ok}
+        {:error, _error} = error -> {:halt, error}
+      end
+    end)
+  end
 
   defp identifier_valid(id) when is_binary(id) and byte_size(id) in 1..255 do
     if String.valid?(id), do: :ok, else: Authoring.error("Invalid Registry identifier")
