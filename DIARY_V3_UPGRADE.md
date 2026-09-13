@@ -3,10 +3,10 @@
 Status: Working document  
 Branch: `v3-spike`  
 Initial snapshot date: 2026-08-28  
-Current checkpoint date: 2026-09-07  
+Current checkpoint date: 2026-09-10\
 v2 baseline: `548b2a34` (`main`)  
 Initial spike head: `f5c37675`  
-Latest code checkpoint: `aaba18fe`
+Latest diary code checkpoint: `fd49a240`
 
 ## Purpose
 
@@ -974,6 +974,178 @@ proposed features. Their scope must be resolved before claiming a clean beta
 release gate. Keep the assertions intact. Cluster-exclusive ownership also
 remains unsupported. Repeated test seeds and recovery and scale checks remain
 part of the release work. This checkpoint does not publish a package.
+
+## 2026-09-09 — Give each Agent a stable reference
+
+Status: Implemented for local Jido instances. Remote Ref delivery remains open.
+
+Key commits:
+
+- `8265fb93` — `feat(agent): add stable agent reference`
+- `42da77c3` — `feat(jido): add ref-first instance facade`
+
+### Problem
+
+An Agent ID, a process PID, and a Jido instance name answered different
+identity questions. A PID changes on restart. A module can change during an
+upgrade. Applications needed one value for the logical Agent that could stay
+the same through those changes.
+
+### Change
+
+`Jido.Agent.Ref` identifies one Agent with its namespace, partition, and ID.
+The Ref does not contain a PID, node, Agent module, or revision. A Jido
+instance can resolve a Ref to its current local Agent Server. Ref-based
+start, call, control, inspection, and delete functions sit beside the existing
+ID and PID functions. Namespaced persistence uses the same stable identity.
+
+### Reason
+
+Application code needs a durable name for an Agent, while the runtime must be
+free to replace its process and code. Separating identity from location also
+makes the limits of local lookup clear.
+
+### Effect
+
+Callers can keep one Ref across local process and instance restarts, module
+changes, and node changes. A Ref is an identifier, not a credential or a
+cluster ownership claim. Core does not yet provide remote Ref lookup or
+exclusive write authority across nodes.
+
+### Lesson
+
+A stable identity does not require a stable process. It also does not solve
+discovery or distributed authority by itself.
+
+## 2026-09-09 — Give each Plugin concern one owner
+
+Status: Implemented. Pure preparation was narrowed on 2026-09-10.
+
+Key commits:
+
+- `c835ad5e` — `feat(plugin): split owner facet contracts`
+- `fd49a240` — `feat: add isolated plugin preparation inputs`
+
+### Problem
+
+A Plugin can affect Agent state, live processes, stored state, and Topology.
+When one callback surface crosses those boundaries, an author cannot easily
+tell which code may change domain state or perform runtime work.
+
+### Change
+
+One Plugin package can declare four owner facets. `Jido.Agent.Plugin` owns
+pure preparation, one state field, and its Directives.
+`Jido.AgentServer.Plugin` owns live admission and runtime work.
+`Jido.Persistence.Plugin` converts only the Plugin's owned state value.
+`Jido.Topology.Plugin` contributes static plan entries.
+
+Agent preparation receives read-only data and can return only one portable
+package-owned input. It cannot replace the Signal, caller context, route, or
+Agent. After Action or Flow execution, the Agent pipeline protects other
+owners' state and reduces Plugin-owned fields in declaration order.
+
+### Reason
+
+Each callback must have the authority needed for its own job, with a clear
+boundary for state, processes, storage, and planning.
+
+### Effect
+
+Plugin authors can put each part of a capability in its owner facet. An Agent
+Plugin cannot silently reroute a command or change another Plugin's state.
+Runtime handles stay outside portable Agent state.
+
+### Lesson
+
+A Plugin package can compose several concerns without giving every callback
+the same authority.
+
+## 2026-09-09 — Define the full lifetime of a durable Agent
+
+Status: Implemented in the V3 candidate.
+
+Key commits:
+
+- `6ef283fb` — `feat(commit): enforce write authority boundary`
+- `7889b336` — `feat(persistence): add durable record lifecycle`
+
+### Problem
+
+A successful process start did not by itself prove that a new Agent had a
+stored record. A delayed writer could also recreate data after deletion. If a
+required write had an uncertain result, a live Server could no longer know
+which state was authoritative.
+
+### Change
+
+A persistent Agent Server confirms a create-only revision-zero record after
+Plugin readiness and before start succeeds. Each later required checkpoint
+write completes before the new Agent becomes live and before Directives run.
+Normal delete writes a compare-and-swap tombstone with a new revision. Every
+required write error ends that Server activation's write authority. A new
+activation must load the authoritative record before it does more work.
+
+### Reason
+
+The runtime must not report durable readiness before the first write. It must
+also prevent an old writer from reviving a deleted record while the tombstone
+remains or continuing after an uncertain write.
+
+### Effect
+
+Applications get a defined create, commit, restore, and delete sequence.
+Confirmed conflicts and indeterminate results both stop further writes by
+that activation. A timeout or uncertain result can still follow completed
+external work. Compare-and-swap is not a cluster lease, and Jido does not
+promise exactly-once external effects.
+
+### Lesson
+
+Durability needs rules for creation and deletion as well as update. When a
+write result is uncertain, stopping the old writer protects the next restore.
+
+## 2026-09-09 — Change live Agents at an explicit idle point
+
+Status: Implemented for bounded Agent and Topology changes.
+
+Key commits:
+
+- `4367dc39` — `feat(agent_server): add explicit live upgrade boundary`
+- `42181323` — `feat(topology): support additive live targets`
+
+### Problem
+
+A live Agent can have a Turn in progress when its code or definition changes.
+A running Topology can also need another Agent without losing the state of its
+existing members. Those changes need an explicit point where the runtime can
+check what stays the same.
+
+### Change
+
+`Jido.AgentServer.upgrade` serializes an upgrade operation with Turns and runs
+it when the Server is idle. Definition replacement validates the complete
+migrated state and keeps identity and Plugin declarations fixed.
+`Jido.Topology.Controller.update` accepts added Agent targets when all
+existing Agent and resource specifications remain unchanged.
+
+### Reason
+
+An upgrade must have a clear boundary between the old and new definitions.
+The Controller must preserve existing members when an additive target does
+not change them.
+
+### Effect
+
+Applications can coordinate a live definition change and add local Topology
+Agents while unchanged members keep their processes and state. This does not
+pin arbitrary BEAM code, migrate private Server or Plugin runtime state, or
+support Topology removal and replacement in place.
+
+### Lesson
+
+Live change is useful when its allowed scope is exact and the runtime can
+reject a change outside that scope.
 
 ## Entry format for future changes
 
