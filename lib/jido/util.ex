@@ -417,4 +417,31 @@ defmodule Jido.Util do
         :ok
     end
   end
+
+  @doc """
+  Returns `true` when an exit reason represents a clean process shutdown.
+
+  OTP treats `:normal`, `:shutdown` and `{:shutdown, term}` as clean exits:
+  they are not logged as crashes and do not restart `:transient` children.
+  Every other reason is abnormal.
+
+  Use this when propagating an exit reason from one process to another so that
+  normal shutdowns stay quiet instead of surfacing as crash reports.
+
+  ## Examples
+
+      iex> Jido.Util.clean_exit_reason?(:normal)
+      true
+
+      iex> Jido.Util.clean_exit_reason?({:shutdown, :idle_timeout})
+      true
+
+      iex> Jido.Util.clean_exit_reason?(:killed)
+      false
+  """
+  @spec clean_exit_reason?(term()) :: boolean()
+  def clean_exit_reason?(:normal), do: true
+  def clean_exit_reason?(:shutdown), do: true
+  def clean_exit_reason?({:shutdown, _term}), do: true
+  def clean_exit_reason?(_reason), do: false
 end

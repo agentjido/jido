@@ -32,6 +32,7 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   require Logger
 
   alias Jido.Persist
+  alias Jido.Util
 
   @impl true
   def init(_opts, state) do
@@ -171,17 +172,12 @@ defmodule Jido.AgentServer.Lifecycle.Keyed do
   def terminate(reason, state) do
     lifecycle = state.lifecycle
 
-    if clean_shutdown?(reason) && lifecycle.storage do
+    if Util.clean_exit_reason?(reason) && lifecycle.storage do
       hibernate_agent(state)
     end
 
     :ok
   end
-
-  defp clean_shutdown?(:normal), do: true
-  defp clean_shutdown?(:shutdown), do: true
-  defp clean_shutdown?({:shutdown, _}), do: true
-  defp clean_shutdown?(_), do: false
 
   defp maybe_restore_agent_from_storage(state) do
     lifecycle = state.lifecycle

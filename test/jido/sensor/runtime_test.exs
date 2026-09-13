@@ -669,6 +669,27 @@ defmodule JidoTest.Sensor.RuntimeTest do
       assert_receive {:DOWN, ^ref, :process, ^pid, {:owner_down, :killed}}, 500
     end
 
+    for reason <- [:normal, :shutdown, {:shutdown, :restart}] do
+      test "preserves a #{inspect(reason)} exit of the monitored owner" do
+        reason = unquote(Macro.escape(reason))
+        owner = spawn(fn -> receive do: ({:exit, exit_reason} -> exit(exit_reason)) end)
+
+        {:ok, pid} =
+          Runtime.start(
+            sensor: MinimalSensor,
+            context: %{agent_ref: self()},
+            owner_pid: owner
+          )
+
+        on_exit(fn -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
+
+        ref = Process.monitor(pid)
+        send(owner, {:exit, reason})
+
+        assert_receive {:DOWN, ^ref, :process, ^pid, ^reason}, 500
+      end
+    end
+
     test "ignores DOWN-shaped messages when no owner monitor exists" do
       {:ok, pid} =
         Runtime.start(

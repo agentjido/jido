@@ -168,4 +168,21 @@ defmodule JidoTest.UtilTest do
       assert :ok = Util.cond_log(:debug, :info, "with opts", domain: [:test])
     end
   end
+
+  describe "clean_exit_reason?/1" do
+    test "accepts the exit reasons OTP treats as a clean shutdown" do
+      assert Util.clean_exit_reason?(:normal)
+      assert Util.clean_exit_reason?(:shutdown)
+      assert Util.clean_exit_reason?({:shutdown, :idle_timeout})
+      assert Util.clean_exit_reason?({:shutdown, {:nested, :term}})
+    end
+
+    test "rejects abnormal exit reasons" do
+      refute Util.clean_exit_reason?(:killed)
+      refute Util.clean_exit_reason?(:timeout)
+      refute Util.clean_exit_reason?({:owner_down, :normal})
+      refute Util.clean_exit_reason?({:badmatch, :oops})
+      refute Util.clean_exit_reason?(:shutdowns)
+    end
+  end
 end
