@@ -29,6 +29,7 @@ defmodule Jido.Telemetry.Semantic do
           required(:metadata) => map(),
           required(:trace) => map() | nil,
           required(:at) => integer(),
+          optional(:terminal_guard) => :atomics.atomics_ref(),
           optional(:log_scope) => atom() | nil,
           optional(:otel) => OpenTelemetry.Span.t() | nil
         }
@@ -55,6 +56,7 @@ defmodule Jido.Telemetry.Semantic do
       metadata: metadata,
       trace: trace,
       at: at,
+      terminal_guard: :atomics.new(1, signed: false),
       log_scope: log_scope,
       otel: otel
     }
@@ -81,13 +83,17 @@ defmodule Jido.Telemetry.Semantic do
         ending
       )
       when ending in [:stop, :exception] do
-    duration = max(System.monotonic_time() - started, 0)
-    measurements = measurements |> normalize_measurements() |> Map.put(:duration, duration)
-    metadata = Map.merge(base, normalize_metadata(metadata))
-    ended_at = started + duration
+    if claim_terminal?(span) do
+      duration = max(System.monotonic_time() - started, 0)
+      measurements = measurements |> normalize_measurements() |> Map.put(:duration, duration)
+      metadata = Map.merge(base, normalize_metadata(metadata))
+      ended_at = started + duration
 
-    OpenTelemetry.finish(Map.get(span, :otel), ending, metadata, measurements, ended_at)
-    emit_normalized(prefix ++ [ending], measurements, metadata, Map.get(span, :log_scope))
+      OpenTelemetry.finish(Map.get(span, :otel), ending, metadata, measurements, ended_at)
+      emit_normalized(prefix ++ [ending], measurements, metadata, Map.get(span, :log_scope))
+    end
+
+    :ok
   end
 
   @doc false
@@ -246,6 +252,11 @@ defmodule Jido.Telemetry.Semantic do
 
   defp valid_trace(%{traceparent: traceparent} = trace) when is_binary(traceparent), do: trace
   defp valid_trace(_trace), do: nil
+
+  defp claim_terminal?(%{terminal_guard: guard}),
+    do: :atomics.compare_exchange(guard, 1, 0, 1) == :ok
+
+  defp claim_terminal?(_span), do: true
 
   defp emit_normalized(event, measurements, metadata, nil) do
     :telemetry.execute(event, measurements, metadata)

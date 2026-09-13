@@ -70,6 +70,64 @@ defmodule Jido.Telemetry.SemanticTest do
     assert Semantic.normalize_metadata(%{topology_operation: :rebalance}) == %{schema_version: 1}
   end
 
+  test "one span emits one terminal semantic event" do
+    event = [:jido, :agent, :turn, :stop]
+    handler = {__MODULE__, make_ref()}
+    count = :atomics.new(1, signed: false)
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        event,
+        fn _name, _measurements, _metadata, counter ->
+          :atomics.add(counter, 1, 1)
+        end,
+        count
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    span = Semantic.start([:jido, :agent, :turn], %{turn_id: "one"})
+    assert :ok = Semantic.finish(span, %{status: :ok})
+    assert :ok = Semantic.finish(span, %{status: :ok})
+    assert :atomics.get(count, 1) == 1
+  end
+
+  test "competing finishes emit one terminal semantic event" do
+    prefix = [:jido, :agent, :turn]
+    handler = {__MODULE__, make_ref()}
+    count = :atomics.new(1, signed: false)
+
+    :ok =
+      :telemetry.attach_many(
+        handler,
+        for(ending <- [:stop, :exception], do: prefix ++ [ending]),
+        fn _name, _measurements, _metadata, counter ->
+          :atomics.add(counter, 1, 1)
+        end,
+        count
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    span = Semantic.start(prefix, %{turn_id: "competing"})
+    parent = self()
+
+    tasks =
+      for ending <- [:stop, :exception] do
+        Task.async(fn ->
+          send(parent, {:ready, self()})
+          receive do: (:finish -> Semantic.finish(span, %{status: :ok}, %{}, ending))
+        end)
+      end
+
+    for _task <- tasks, do: assert_receive({:ready, _pid})
+    for task <- tasks, do: send(task.pid, :finish)
+    for task <- tasks, do: assert(:ok = Task.await(task))
+
+    assert :atomics.get(count, 1) == 1
+  end
+
   test "a returned failure stops a span and an escaping fault reports an exception" do
     handler = {__MODULE__, make_ref()}
     prefix = [:jido, :persistence, :operation]
