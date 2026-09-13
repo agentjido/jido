@@ -110,14 +110,13 @@ defmodule Jido.Topology.Plugin do
   end
 
   defp append_contributions(definition, contributions) do
-    Enum.reduce(contributions, definition, fn contribution, current ->
-      %{
-        current
-        | resources: current.resources ++ contribution.resources,
-          relationships: current.relationships ++ contribution.relationships,
-          connections: current.connections ++ contribution.connections
-      }
-    end)
+    %{
+      definition
+      | resources: definition.resources ++ Enum.flat_map(contributions, & &1.resources),
+        relationships:
+          definition.relationships ++ Enum.flat_map(contributions, & &1.relationships),
+        connections: definition.connections ++ Enum.flat_map(contributions, & &1.connections)
+    }
   end
 
   defp callback_contribution({:ok, %Contribution{} = contribution}, spec) do

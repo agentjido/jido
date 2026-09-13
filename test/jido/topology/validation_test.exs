@@ -9,6 +9,22 @@ defmodule Jido.Topology.ValidationTest do
 
   alias JidoTest.AgentFixtures.CounterAgent
 
+  test "dependency layers are sorted and reject cycles or missing dependencies" do
+    edges = %{
+      "a" => [],
+      "b" => ["a"],
+      "c" => ["a", "a"],
+      "d" => ["b", "c"],
+      "e" => []
+    }
+
+    assert {:ok, [["a", "e"], ["b", "c"], ["d"]]} = Validation.layers(edges)
+    assert {:error, cycle} = Validation.layers(%{"a" => ["b"], "b" => ["a"]})
+    assert cycle.message == "Topology startup or ownership graph contains a cycle"
+    assert {:error, missing} = Validation.layers(%{"a" => ["missing"]})
+    assert missing.message == cycle.message
+  end
+
   test "Instance schema validates constructed topology values" do
     definition = Topology.new!(name: "instance-schema")
     assert {:ok, instance} = Topology.instantiate(definition, id: "instance-schema")

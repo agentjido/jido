@@ -401,27 +401,42 @@ defmodule Jido.Topology.Validation do
     if length(values) == MapSet.size(MapSet.new(values)), do: :ok, else: Authoring.error(message)
   end
 
-  def layers(edges), do: layers(edges, [])
-  defp layers(edges, acc) when map_size(edges) == 0, do: {:ok, Enum.reverse(acc)}
+  def layers(edges) do
+    {remaining, dependents} =
+      Enum.reduce(edges, {%{}, %{}}, fn {key, deps}, {remaining, dependents} ->
+        deps = Enum.uniq(deps)
 
-  defp layers(edges, acc) do
-    ready =
-      edges
-      |> Enum.filter(fn {_, deps} -> deps == [] end)
-      |> Enum.map(&elem(&1, 0))
-      |> Enum.sort()
+        dependents =
+          Enum.reduce(deps, dependents, fn dependency, acc ->
+            Map.update(acc, dependency, [key], &[key | &1])
+          end)
 
-    if ready == [] do
-      Authoring.error("Topology startup or ownership graph contains a cycle")
-    else
-      completed = MapSet.new(ready)
+        {Map.put(remaining, key, length(deps)), dependents}
+      end)
 
-      remaining =
-        Map.new(Map.drop(edges, ready), fn {key, deps} ->
-          {key, Enum.reject(deps, &MapSet.member?(completed, &1))}
+    ready = for {key, 0} <- remaining, do: key
+    collect_layers(remaining, dependents, Enum.sort(ready), [])
+  end
+
+  defp collect_layers(remaining, _dependents, [], acc) when map_size(remaining) == 0,
+    do: {:ok, Enum.reverse(acc)}
+
+  defp collect_layers(_remaining, _dependents, [], _acc),
+    do: Authoring.error("Topology startup or ownership graph contains a cycle")
+
+  defp collect_layers(remaining, dependents, ready, acc) do
+    remaining = Map.drop(remaining, ready)
+
+    {remaining, next} =
+      Enum.reduce(ready, {remaining, MapSet.new()}, fn key, {counts, next} ->
+        Enum.reduce(Map.get(dependents, key, []), {counts, next}, fn dependent, {counts, next} ->
+          count = Map.fetch!(counts, dependent) - 1
+          counts = Map.put(counts, dependent, count)
+          next = if count == 0, do: MapSet.put(next, dependent), else: next
+          {counts, next}
         end)
+      end)
 
-      layers(remaining, [ready | acc])
-    end
+    collect_layers(remaining, dependents, next |> MapSet.to_list() |> Enum.sort(), [ready | acc])
   end
 end

@@ -84,17 +84,14 @@ defmodule Jido.Topology.Codec.Value do
 
   def registry_entries(value) when is_map(value) and not is_struct(value) do
     Enum.flat_map(Enum.sort(value), fn {key, item} ->
-      registry_entries(key) ++ registry_entries(item)
+      [key, item] |> Enum.flat_map(&registry_entries/1)
     end)
   end
 
   def registry_entries(value) when is_tuple(value),
     do: registry_entries(Tuple.to_list(value))
 
-  def registry_entries([]), do: []
-
-  def registry_entries([head | tail]),
-    do: registry_entries(head) ++ registry_entries(tail)
+  def registry_entries(value) when is_list(value), do: Enum.flat_map(value, &registry_entries/1)
 
   def registry_entries(value), do: Data.registry_entries(value)
 end
