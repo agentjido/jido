@@ -59,7 +59,7 @@ defmodule Jido.Examples.SequentialFlow.Pipeline do
       {:ok, %{value: value * 2}}
     end
 
-    step "gate", failure <- input(:failure), after: ["double"] do
+    step "gate", failure <- input(:failure), needs: ["double"] do
       if failure == :middle,
         do: {:error, Jido.Action.Error.execution_error("gate rejected", stage: :gate)},
         else: {:ok, %{checked: true}}
@@ -68,7 +68,7 @@ defmodule Jido.Examples.SequentialFlow.Pipeline do
     step "finish",
       action: Jido.Examples.SequentialFlow.Finish,
       params: %{value: result("double", :value), failure: input(:failure)},
-      after: ["gate"]
+      needs: ["gate"]
 
     output result("finish")
   end

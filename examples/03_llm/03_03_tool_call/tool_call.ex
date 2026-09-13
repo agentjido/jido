@@ -29,14 +29,12 @@ defmodule Jido.Examples.ToolCall.Pipeline do
     schema: Adapter.prompt_schema()
 
   flow do
-    step "select" do
-      action prompt <- input(:prompt),
-             schema: Adapter.prompt_schema(),
-             context: context do
-        with {:ok, raw} <- Adapter.call(context, :model, :select, %{prompt: prompt}),
-             {:ok, [call]} <- ToolPlan.parse([raw]) do
-          {:ok, call}
-        end
+    step "select",
+         prompt <- input(:prompt),
+         inline: [schema: Adapter.prompt_schema(), context: context] do
+      with {:ok, raw} <- Adapter.call(context, :model, :select, %{prompt: prompt}),
+           {:ok, [call]} <- ToolPlan.parse([raw]) do
+        {:ok, call}
       end
     end
 

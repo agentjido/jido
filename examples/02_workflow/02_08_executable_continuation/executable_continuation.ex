@@ -59,6 +59,13 @@ defmodule Jido.Examples.ExecutableContinuation.Add do
   end
 end
 
+defmodule Jido.Examples.ExecutableContinuation.Decision do
+  @moduledoc false
+  use Jido.Action, name: "workflow_continuation_decision"
+
+  def run(input, _context), do: {:ok, input}
+end
+
 defmodule Jido.Examples.ExecutableContinuation.Pipeline do
   @moduledoc "Terminal Dispatch selects a result or the next executable in the same Exec call."
   use Jido.Flow,
@@ -68,13 +75,10 @@ defmodule Jido.Examples.ExecutableContinuation.Pipeline do
     output_schema: Zoi.object(%{value: Zoi.integer() |> Zoi.min(0), request: Zoi.string()})
 
   flow do
-    dispatch "next" do
-      decision input <- input() do
-        {:ok, input}
-      end
-
-      expander Jido.Examples.ExecutableContinuation.Expand
-    end
+    dispatch "next",
+      decision: Jido.Examples.ExecutableContinuation.Decision,
+      expander: Jido.Examples.ExecutableContinuation.Expand,
+      params: input()
 
     output result("next")
   end

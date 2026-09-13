@@ -12,6 +12,22 @@ defmodule Jido.Examples.Applications.Audit.Agent do
   end
 end
 
+defmodule Jido.Examples.Applications.Audit.Decision do
+  @moduledoc false
+  use Jido.Action, name: "application_audit_decision"
+
+  def run(%{event: event, fail?: fail?}, _context) do
+    if fail?, do: {:error, :simulated_failure}, else: {:ok, %{event: event}}
+  end
+end
+
+defmodule Jido.Examples.Applications.Audit.Expand do
+  @moduledoc false
+  use Jido.Action, name: "application_audit_expand"
+
+  def run(params, _context), do: {:continue, params, Jido.Examples.Applications.Audit.Commit}
+end
+
 defmodule Jido.Examples.Applications.Audit.Flow do
   @moduledoc "Validates one event, then returns Agent and Plugin changes as one Flow result."
 
@@ -20,15 +36,10 @@ defmodule Jido.Examples.Applications.Audit.Flow do
     schema: Zoi.object(%{event: Zoi.any(), fail?: Zoi.boolean()})
 
   flow do
-    dispatch "decision" do
-      decision [event <- input(:event), fail? <- input(:fail?)] do
-        if fail?, do: {:error, :simulated_failure}, else: {:ok, %{event: event}}
-      end
-
-      expander params do
-        {:continue, params, Jido.Examples.Applications.Audit.Commit}
-      end
-    end
+    dispatch "decision",
+      decision: Jido.Examples.Applications.Audit.Decision,
+      expander: Jido.Examples.Applications.Audit.Expand,
+      params: %{event: input(:event), fail?: input(:fail?)}
 
     output result("decision")
   end

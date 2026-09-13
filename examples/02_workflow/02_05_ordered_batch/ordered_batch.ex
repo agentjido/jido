@@ -53,6 +53,13 @@ defmodule Jido.Examples.OrderedBatch.Collected do
   end
 end
 
+defmodule Jido.Examples.OrderedBatch.Append do
+  @moduledoc false
+  use Jido.Action, name: "workflow_batch_append"
+
+  def run(%{items: items, item: item}, _context), do: {:ok, %{items: items ++ [item]}}
+end
+
 defmodule Jido.Examples.OrderedBatch.Strict do
   @moduledoc "An ordered Map feeds a serial Reduce; any item failure rejects the Turn."
 
@@ -71,9 +78,8 @@ defmodule Jido.Examples.OrderedBatch.Strict do
       collection result("convert")
       initial %{items: value([])}
 
-      action [items <- accumulator(:items), item <- item()] do
-        {:ok, %{items: items ++ [item]}}
-      end
+      action Jido.Examples.OrderedBatch.Append
+      params %{items: accumulator(:items), item: item()}
     end
 
     output result("append")

@@ -61,11 +61,9 @@ defmodule Jido.Examples.ParallelJoin.Pipeline do
       action: Jido.Examples.ParallelJoin.Fetch,
       params: %{side: :right, value: input(:value), fail: input(:fail)}
 
-    step "join" do
-      action [left <- result("left"), right <- result("right")] do
-        joined = %{left: left, right: right}
-        {:ok, %{result: joined}}
-      end
+    step "join", [left <- result("left"), right <- result("right")] do
+      joined = %{left: left, right: right}
+      {:ok, %{result: joined}}
     end
 
     output result("join")

@@ -95,9 +95,25 @@ defmodule Jido.Examples.Factory.FlowFactory.Discovery do
   end
 end
 
+defmodule Jido.Examples.Factory.FlowFactory.SkipSecurityReview do
+  @moduledoc false
+  use Jido.Action, name: "flow_factory_skip_security_review"
+
+  def run(_params, _context) do
+    {:ok,
+     %{
+       verdict: :accepted,
+       findings: [],
+       skipped: true,
+       text: "Security review was not requested."
+     }}
+  end
+end
+
 defmodule Jido.Examples.Factory.FlowFactory.Review do
   @moduledoc "Quality and optional security review run independently before a join."
   alias Jido.Examples.Factory.FlowFactory.AskWorker
+  alias Jido.Examples.Factory.FlowFactory.SkipSecurityReview
   use Jido.Flow, name: "flow_factory_review"
 
   flow do
@@ -123,17 +139,7 @@ defmodule Jido.Examples.Factory.FlowFactory.Review do
           inputs: input(:bundle)
         }
 
-      otherwise do
-        action [] do
-          {:ok,
-           %{
-             verdict: :accepted,
-             findings: [],
-             skipped: true,
-             text: "Security review was not requested."
-           }}
-        end
-      end
+      otherwise action: SkipSecurityReview, params: %{}
     end
 
     step "verdict", [quality <- result("quality"), security <- result("security")] do

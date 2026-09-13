@@ -15,6 +15,15 @@ defmodule Jido.Examples.BoundedIteration do
   end
 end
 
+defmodule Jido.Examples.BoundedIteration.Repair do
+  @moduledoc false
+  use Jido.Action, name: "workflow_iteration_repair"
+
+  def run(%{current: current, repair_size: repair_size}, _context) do
+    {:ok, %{current | missing: current.missing - repair_size, repairs: current.repairs + 1}}
+  end
+end
+
 defmodule Jido.Examples.BoundedIteration.Pipeline do
   @moduledoc "A while loop validates each replacement state and permits at most three repairs."
 
@@ -43,15 +52,8 @@ defmodule Jido.Examples.BoundedIteration.Pipeline do
     iterate "repair" do
       state @state_schema, initial: %{missing: input(:missing), repairs: 0}
 
-      action [current <- state(), repair_size <- input(:repair_size)] do
-        next = %{
-          current
-          | missing: current.missing - repair_size,
-            repairs: current.repairs + 1
-        }
-
-        {:ok, next}
-      end
+      action Jido.Examples.BoundedIteration.Repair
+      params %{current: state(), repair_size: input(:repair_size)}
 
       update body_result()
       while state(:missing) > 0

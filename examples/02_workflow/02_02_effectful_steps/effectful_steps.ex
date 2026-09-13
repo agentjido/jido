@@ -94,12 +94,10 @@ defmodule Jido.Examples.EffectfulSteps.Pipeline do
     output_schema: Zoi.object(%{key: Zoi.string() |> Zoi.min(1), result: Zoi.map()})
 
   flow do
-    step "guard" do
-      action params <- input() do
-        if params.allowed,
-          do: {:ok, params},
-          else: {:error, Jido.Action.Error.validation_error("request denied", stage: :guard)}
-      end
+    step "guard", params <- input() do
+      if params.allowed,
+        do: {:ok, params},
+        else: {:error, Jido.Action.Error.validation_error("request denied", stage: :guard)}
     end
 
     step "read", action: Jido.Examples.EffectfulSteps.Read, params: result("guard")

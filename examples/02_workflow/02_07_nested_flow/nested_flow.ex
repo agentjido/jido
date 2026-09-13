@@ -27,14 +27,12 @@ defmodule Jido.Examples.NestedFlow.Child do
     output_schema: Zoi.object(%{text: Zoi.string() |> Zoi.min(1), request: Zoi.string()})
 
   flow do
-    step "write" do
-      action [text <- input(:text), role <- input(:role)], context: context do
-        {:ok,
-         %{
-           text: text <> ":" <> Atom.to_string(role),
-           request: Map.get(context, :request, "none")
-         }}
-      end
+    step "write", [text <- input(:text), role <- input(:role)], inline: [context: context] do
+      {:ok,
+       %{
+         text: text <> ":" <> Atom.to_string(role),
+         request: Map.get(context, :request, "none")
+       }}
     end
 
     output result("write")
