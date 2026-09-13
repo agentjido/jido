@@ -28,7 +28,7 @@ defmodule Jido.Agent.Extension do
   @optional_callbacks route_target_options: 0
 
   @doc false
-  @spec route_target_extension([module()], atom()) :: {:ok, module() | nil} | {:error, term()}
+  @spec route_target_extension([module()], atom()) :: {:ok, module()} | {:error, term()}
   def route_target_extension(extensions, option) when is_list(extensions) and is_atom(option) do
     Enum.reduce_while(extensions, {:ok, []}, fn extension, {:ok, claims} ->
       if is_atom(extension) and Code.ensure_loaded?(extension) and

@@ -219,6 +219,7 @@ defmodule Jido.AgentTest do
     signal = Signal.new!("counter.add", %{by: 1}, source: "/test")
 
     assert {:error, %Jido.Error.ValidationError{}} = Agent.transition(definition, %{})
+    assert {:error, %Jido.Error.ValidationError{}} = Agent.set(definition, %{})
     assert {:error, %Jido.Error.ValidationError{}} = Agent.checkpoint(definition)
     assert {:error, %Jido.Error.ValidationError{}} = Agent.cmd(definition, signal)
 

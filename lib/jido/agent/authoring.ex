@@ -46,15 +46,12 @@ defmodule Jido.Agent.Authoring do
          :ok <- defaults(opts) do
       target = if Map.has_key?(opts, :defaults), do: {target, opts.defaults}, else: target
 
-      case Router.normalize(%Router.Route{
-             path: path,
-             target: target,
-             priority: Map.get(opts, :priority, 0),
-             match: Map.get(opts, :match)
-           }) do
-        {:ok, [route]} -> {:ok, route}
-        error -> error
-      end
+      normalize_one_route(%Router.Route{
+        path: path,
+        target: target,
+        priority: Map.get(opts, :priority, 0),
+        match: Map.get(opts, :match)
+      })
     end
   end
 
@@ -71,15 +68,19 @@ defmodule Jido.Agent.Authoring do
         error("Expected one route specification")
 
       other ->
-        case Router.normalize(other) do
-          {:ok, [route]} -> {:ok, route}
-          {:ok, _routes} -> error("Expected one route specification")
-          {:error, _error} = error -> error
-        end
+        normalize_one_route(other)
     end)
   end
 
   def routes(value), do: error("Agent routes must be a list", %{value: value})
+
+  defp normalize_one_route(spec) do
+    case Router.normalize(spec) do
+      {:ok, [route]} -> {:ok, route}
+      {:ok, _routes} -> error("Expected one route specification")
+      {:error, _error} = error -> error
+    end
+  end
 
   def keys(map, allowed) do
     case Map.keys(map) -- allowed do

@@ -492,7 +492,7 @@ defmodule JidoTest.Agent.AuthoringTest do
 
     assert function_spec(module, :increment, 3) ==
              normalized_spec(
-               "increment(Jido.AgentServer.server(), term(), keyword()) :: {:ok, Jido.Agent.t()} | {:error, term()}"
+               "increment(Jido.AgentServer.server(), term(), keyword()) :: {:ok, Jido.Agent.instance()} | {:error, term()}"
              )
   end
 

@@ -157,6 +157,17 @@ defmodule Jido.Agent.DSL.Compiler do
   end
 
   defp interfaces(routes, source, env) do
+    route_counts = Enum.frequencies_by(routes, & &1.path)
+
+    source_result =
+      if Enum.any?(routes, &(&1.interfaces != [])) do
+        if is_binary(source),
+          do: Jido.Signal.validate_uri_reference(source, []),
+          else: :missing
+      else
+        :ok
+      end
+
     Enum.flat_map(routes, fn route ->
       Enum.map(route.interfaces, fn interface ->
         env = location(env, interface)
@@ -164,13 +175,12 @@ defmodule Jido.Agent.DSL.Compiler do
         if String.contains?(route.path, "*") or route.match != nil,
           do: fail!(env, "define requires an exact route without a match predicate")
 
-        if Enum.count(routes, &(&1.path == route.path)) > 1,
+        if Map.fetch!(route_counts, route.path) > 1,
           do: fail!(env, "An exposed Signal type must have exactly one route")
 
-        if not is_binary(source), do: fail!(env, "signal_source is required for define")
-
-        case Jido.Signal.validate_uri_reference(source, []) do
+        case source_result do
           :ok -> :ok
+          :missing -> fail!(env, "signal_source is required for define")
           {:error, reason} -> fail!(env, "Invalid signal_source: #{reason}")
         end
 

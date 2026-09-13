@@ -125,11 +125,12 @@ defmodule Jido.Agent.Ref do
   def from_map(value) do
     case Zoi.parse(@map_schema, value) do
       {:ok, decoded} ->
-        new(
-          namespace: decoded["namespace"],
-          partition: decoded["partition"],
-          id: decoded["id"]
-        )
+        {:ok,
+         %__MODULE__{
+           namespace: decoded["namespace"],
+           partition: decoded["partition"],
+           id: decoded["id"]
+         }}
 
       {:error, issues} ->
         invalid("Agent Ref map is invalid", %{issues: issues})

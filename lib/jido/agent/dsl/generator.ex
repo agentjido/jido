@@ -82,7 +82,7 @@ defmodule Jido.Agent.DSL.Generator do
   defp argument_type({:options, _}), do: quote(do: keyword())
   defp argument_type(_argument), do: quote(do: term())
 
-  defp result_type(:call), do: quote(do: {:ok, Jido.Agent.t()} | {:error, term()})
+  defp result_type(:call), do: quote(do: {:ok, Jido.Agent.instance()} | {:error, term()})
   defp result_type(:signal), do: quote(do: {:ok, Jido.Signal.t()} | {:error, term()})
   defp result_type(:signal!), do: quote(do: Jido.Signal.t())
 

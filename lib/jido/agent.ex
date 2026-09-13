@@ -307,7 +307,11 @@ defmodule Jido.Agent do
   def set(%__MODULE__{} = agent, attrs) do
     with {:ok, attrs} <- normalize_domain_attrs(attrs),
          :ok <- validate_domain_attrs(agent, attrs) do
-      transition(agent, State.merge(agent.state, attrs))
+      if not is_map(agent.state) or is_struct(agent.state) do
+        invalid("Agent.set/2 requires an instance", %{id: agent.id, state: agent.state})
+      else
+        transition(agent, State.merge(agent.state, attrs))
+      end
     end
   end
 
