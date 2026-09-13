@@ -56,7 +56,6 @@ defmodule Jido.AgentServer.PluginChild do
       {:ok,
        %{
          owner: owner,
-         owner_ref: Process.monitor(owner),
          supervisor: supervisor,
          child_pid: child_pid,
          child_ref: Process.monitor(child_pid),
@@ -78,11 +77,6 @@ defmodule Jido.AgentServer.PluginChild do
   end
 
   @impl true
-  def handle_info({:DOWN, ref, :process, _pid, reason}, %{owner_ref: ref} = state) do
-    stop_child(state.child_pid, :shutdown)
-    {:stop, {:shutdown, {:owner_down, reason}}, state}
-  end
-
   def handle_info({:EXIT, owner, reason}, %{owner: owner} = state) do
     stop_child(state.child_pid, :shutdown)
     {:stop, {:shutdown, {:owner_down, reason}}, state}

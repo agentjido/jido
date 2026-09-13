@@ -964,7 +964,6 @@ defmodule Jido do
       {{:agent, key}, pid, :ready} ->
         case unwrap_partition_key(key) do
           {^partition, id} when is_binary(id) -> [{id, pid}]
-          {nil, id} when is_nil(partition) and is_binary(id) -> [{id, pid}]
           _other -> []
         end
 

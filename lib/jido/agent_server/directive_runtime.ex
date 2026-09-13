@@ -51,16 +51,13 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def handle(%EmitToParent{}, _context, state), do: {:error, :no_parent, state}
 
   def handle(%EmitToChild{tag: tag, signal: signal}, context, state) do
-    case State.child(state, tag) do
-      %ChildInfo{kind: :agent, pid: pid} ->
-        Server.cast(pid, propagate(signal, context.signal))
+    case agent_child(state, tag) do
+      {:ok, child} ->
+        Server.cast(child.pid, propagate(signal, context.signal))
         {:ok, state}
 
-      nil ->
-        {:error, {:child_not_found, tag}, state}
-
-      _child ->
-        {:error, {:not_an_agent_child, tag}, state}
+      {:error, reason} ->
+        {:error, reason, state}
     end
   end
 
@@ -128,15 +125,12 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def prepare_signal(%EmitToParent{}, _context, %State{}), do: {:error, :no_parent}
 
   def prepare_signal(%EmitToChild{tag: tag, signal: signal} = directive, context, state) do
-    case State.child(state, tag) do
-      %ChildInfo{kind: :agent, id: id} ->
-        {:ok, %{directive | signal: propagate(signal, context.signal)}, {:agent, id}}
+    case agent_child(state, tag) do
+      {:ok, child} ->
+        {:ok, %{directive | signal: propagate(signal, context.signal)}, {:agent, child.id}}
 
-      nil ->
-        {:error, {:child_not_found, tag}}
-
-      _child ->
-        {:error, {:not_an_agent_child, tag}}
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -160,8 +154,15 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   def dispatch_prepared(%EmitToChild{tag: tag, signal: signal}, state, _agent_server) do
+    case agent_child(state, tag) do
+      {:ok, child} -> Server.cast(child.pid, signal)
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp agent_child(state, tag) do
     case State.child(state, tag) do
-      %ChildInfo{kind: :agent, pid: pid} -> Server.cast(pid, signal)
+      %ChildInfo{kind: :agent} = child -> {:ok, child}
       nil -> {:error, {:child_not_found, tag}}
       _child -> {:error, {:not_an_agent_child, tag}}
     end
