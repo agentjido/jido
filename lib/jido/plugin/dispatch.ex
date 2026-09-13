@@ -23,8 +23,6 @@ defmodule Jido.Plugin.Dispatch do
 
   @doc "Creates one post-commit Signal delivery Directive."
   @spec send(Signal.t(), SignalDispatch.dispatch_configs()) :: Send.t()
-  def send(%Signal{} = signal, target), do: %Send{signal: signal, target: target}
-
   def send(signal, target), do: %Send{signal: signal, target: target}
 
   @impl Jido.Plugin

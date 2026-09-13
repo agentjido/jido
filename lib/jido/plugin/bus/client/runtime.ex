@@ -104,18 +104,18 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   defp deliver_record(%RecordedSignal{} = record, state) do
     case call_agent(state.agent_server, record.signal, state.config.timeout) do
       {:ok, _agent} -> acknowledge(record, state)
-      {:error, reason} -> retry(record, :deliver, reason, state)
+      {:error, _reason} -> retry(record, :deliver, state)
     end
   end
 
   defp acknowledge(%RecordedSignal{} = record, state) do
     case Bus.ack(state.bus, state.subscription_id, record.cursor) do
       :ok -> {:noreply, %{state | pending: nil}}
-      {:error, reason} -> retry(record, :ack, reason, state)
+      {:error, _reason} -> retry(record, :ack, state)
     end
   end
 
-  defp retry(record, stage, _reason, state) do
+  defp retry(record, stage, state) do
     token = make_ref()
     timer = Process.send_after(self(), {:retry_record, token}, state.config.retry_delay_ms)
     pending = %{record: record, stage: stage, token: token}
