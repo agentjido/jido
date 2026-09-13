@@ -136,6 +136,60 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Plugin, agent_server: AgentFacet
   end
 
+  defmodule AgentFacetWithTopologyCallback do
+    @moduledoc false
+    use Jido.Agent.Plugin
+    def state_spec(_opts), do: :none
+    def contribute(_context, _opts), do: {:ok, %{}}
+  end
+
+  defmodule PackageWithForeignFacetCallback do
+    @moduledoc false
+    use Jido.Plugin, agent: AgentFacetWithTopologyCallback
+  end
+
+  defmodule PackageWithOwnedCallback do
+    @moduledoc false
+    use Jido.Plugin, agent: AgentFacet
+    def contribute(_context, _opts), do: {:ok, %{}}
+  end
+
+  defmodule AgentFacetWithDumpCallback do
+    @moduledoc false
+    use Jido.Agent.Plugin
+    def state_spec(_opts), do: :none
+    def dump(value, _context, _opts), do: {:ok, value}
+  end
+
+  defmodule TopologyFacetWithLoadCallback do
+    @moduledoc false
+    use Jido.Topology.Plugin
+    def contribute(_context, _opts), do: {:ok, %{}}
+    def load(value, _context, _opts), do: {:ok, value}
+  end
+
+  defmodule PackageWithForeignDumpCallback do
+    @moduledoc false
+    use Jido.Plugin, agent: AgentFacetWithDumpCallback
+  end
+
+  defmodule PackageWithForeignLoadCallback do
+    @moduledoc false
+    use Jido.Plugin, topology: TopologyFacetWithLoadCallback
+  end
+
+  defmodule PackageWithOwnedDumpCallback do
+    @moduledoc false
+    use Jido.Plugin, agent: AgentFacet
+    def dump(value, _context, _opts), do: {:ok, value}
+  end
+
+  defmodule PackageWithOwnedLoadCallback do
+    @moduledoc false
+    use Jido.Plugin, agent: AgentFacet
+    def load(value, _context, _opts), do: {:ok, value}
+  end
+
   defmodule StatelessAgentFacet do
     @moduledoc false
     use Jido.Agent.Plugin
@@ -369,6 +423,20 @@ defmodule Jido.Plugin.FacetsTest do
              Plugin.normalize_all([MisassignedOptionsPackage])
 
     assert mapping_message == "Plugin option mapping names an unselected facet"
+  end
+
+  test "normalization rejects callbacks on the wrong Plugin owner" do
+    for {package, callback} <- [
+          {PackageWithForeignFacetCallback, {:contribute, 2}},
+          {PackageWithOwnedCallback, {:contribute, 2}},
+          {PackageWithForeignDumpCallback, {:dump, 3}},
+          {PackageWithForeignLoadCallback, {:load, 3}},
+          {PackageWithOwnedDumpCallback, {:dump, 3}},
+          {PackageWithOwnedLoadCallback, {:load, 3}}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{} = error} = Plugin.normalize_all([package])
+      assert error.details.callback == callback
+    end
   end
 
   test "Persistence rejects foreign contexts, non-portable output, and invalid loaded state" do

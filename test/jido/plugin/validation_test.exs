@@ -190,6 +190,36 @@ defmodule Jido.Plugin.ValidationTest do
     refute_received {:callback, _, _}
   end
 
+  test "Plugin Codec encodes a declaration after one normalization" do
+    original_opts = [validation_result: {:ok, [validated: true]}]
+
+    assert {:ok, document, _registry} = Plugin.Codec.encode({OptionValidator, original_opts})
+    assert document["type"] == "jido.plugin"
+
+    assert_received {:callback, :validate_options, ^original_opts}
+    assert_received {:callback, :state_spec, [validated: true]}
+    assert_received {:callback, :directives, [validated: true]}
+    refute_received {:callback, _, _}
+  end
+
+  test "false cannot be a Directive module" do
+    assert {:error, %Jido.Error.ValidationError{}} =
+             Plugin.normalize_all([{Configurable, directives: [false]}])
+  end
+
+  test "false cannot be a Plugin option owner" do
+    manifest = %Jido.Plugin.Manifest{
+      module: Configurable,
+      agent: Configurable,
+      option_keys: %{false => []}
+    }
+
+    assert {:error, %Jido.Error.ValidationError{message: message}} =
+             Jido.Plugin.Manifest.validate(manifest, [])
+
+    assert message == "Plugin option mapping has an unknown owner"
+  end
+
   test "rejects mixed declarations and normalized specs before callbacks run" do
     original_opts = [validation_result: {:ok, [validated: true]}]
     declaration = {OptionValidator, original_opts}

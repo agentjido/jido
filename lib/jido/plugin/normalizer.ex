@@ -23,7 +23,7 @@ defmodule Jido.Plugin.Normalizer do
     await_ready: 2
   ]
 
-  @package_callbacks [reduce: 2] ++ @legacy_callbacks
+  @package_callbacks [reduce: 2, dump: 3, load: 3, contribute: 2] ++ @legacy_callbacks
 
   @doc false
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
@@ -471,7 +471,8 @@ defmodule Jido.Plugin.Normalizer do
             await_ready: 2,
             child_spec: 1,
             dump: 3,
-            load: 3
+            load: 3,
+            contribute: 2
           ]
 
         :agent_server ->
@@ -483,7 +484,8 @@ defmodule Jido.Plugin.Normalizer do
             directives: 1,
             validate_directive: 2,
             dump: 3,
-            load: 3
+            load: 3,
+            contribute: 2
           ]
 
         :persistence ->
@@ -498,7 +500,8 @@ defmodule Jido.Plugin.Normalizer do
             prepare_dispatch: 4,
             dispatch: 4,
             await_ready: 2,
-            child_spec: 1
+            child_spec: 1,
+            contribute: 2
           ]
 
         :topology ->
@@ -709,8 +712,15 @@ defmodule Jido.Plugin.Normalizer do
   defp validate_directive_modules({:error, _reason} = error, _package, _facet), do: error
 
   defp validate_directive_modules(directives, package, facet) when is_list(directives) do
+    atom_modules? = Enum.all?(directives, &is_atom/1)
+    unloaded = if atom_modules?, do: first_invalid(directives, &(not Code.ensure_loaded?(&1)))
+
+    not_struct =
+      if atom_modules? and unloaded == nil,
+        do: first_invalid(directives, &(not function_exported?(&1, :__struct__, 0)))
+
     cond do
-      Enum.any?(directives, &(not is_atom(&1))) ->
+      not atom_modules? ->
         PluginError.validation("Agent Plugin Directive modules must be atoms", %{
           plugin: package,
           facet: facet,
@@ -724,18 +734,18 @@ defmodule Jido.Plugin.Normalizer do
           directives: directives
         })
 
-      directive = Enum.find(directives, &(not Code.ensure_loaded?(&1))) ->
+      unloaded != nil ->
         PluginError.validation("Agent Plugin Directive modules must be loaded", %{
           plugin: package,
           facet: facet,
-          directive: directive
+          directive: elem(unloaded, 1)
         })
 
-      directive = Enum.find(directives, &(not function_exported?(&1, :__struct__, 0))) ->
+      not_struct != nil ->
         PluginError.validation("Agent Plugin Directive modules must define a struct", %{
           plugin: package,
           facet: facet,
-          directive: directive
+          directive: elem(not_struct, 1)
         })
 
       Enum.any?(directives, &Directive.built_in_module?/1) ->
@@ -755,6 +765,10 @@ defmodule Jido.Plugin.Normalizer do
       facet: facet,
       directives: value
     })
+  end
+
+  defp first_invalid(values, predicate) do
+    Enum.find_value(values, fn value -> if predicate.(value), do: {:invalid, value} end)
   end
 
   defp validate_agent_contract(package, facet, state_key, directives, true) do

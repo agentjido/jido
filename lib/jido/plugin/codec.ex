@@ -15,7 +15,7 @@ defmodule Jido.Plugin.Codec do
   def encode(plugin) do
     with {:ok, [plugin]} <- Jido.Plugin.canonical_declarations([plugin]),
          {:ok, registry} <- derive_registry(plugin),
-         {:ok, document} <- encode(plugin, registry),
+         {:ok, document} <- encode_normalized(plugin, registry),
          do: {:ok, document, registry}
   end
 
@@ -25,7 +25,11 @@ defmodule Jido.Plugin.Codec do
   def encode(plugin, registry) do
     with {:ok, [{module, options}]} <- Jido.Plugin.canonical_declarations([plugin]),
          {:ok, registry} <- Registry.new(registry),
-         {:ok, module_id} <- Registry.identifier(registry, :plugin, module),
+         do: encode_normalized({module, options}, registry)
+  end
+
+  defp encode_normalized({module, options}, registry) do
+    with {:ok, module_id} <- Registry.identifier(registry, :plugin, module),
          {:ok, options} <- Data.encode(options, registry) do
       document = %{
         "type" => "jido.plugin",
