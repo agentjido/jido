@@ -7,6 +7,7 @@ defmodule Jido.Scheduler.Job do
 
   alias Crontab.CronExpression.Parser
   alias Crontab.Scheduler, as: CronScheduler
+  alias Jido.Util
 
   @tick :tick
   @retry_schedule :retry_schedule
@@ -113,7 +114,12 @@ defmodule Jido.Scheduler.Job do
   def handle_info(@retry_schedule, state), do: {:noreply, retry_schedule(state)}
 
   def handle_info({:DOWN, ref, :process, pid, reason}, %{owner_ref: ref, owner_pid: pid} = state) do
-    {:stop, {:owner_down, reason}, state}
+    Logger.debug(fn ->
+      "Scheduler job for #{inspect(state.cron_expr)} owner #{inspect(pid)} exited: " <>
+        inspect(reason)
+    end)
+
+    {:stop, owner_exit_reason(reason), state}
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, state) do
@@ -136,6 +142,11 @@ defmodule Jido.Scheduler.Job do
     end)
 
     :ok
+  end
+
+  @spec owner_exit_reason(term()) :: term()
+  defp owner_exit_reason(reason) do
+    if Util.clean_exit_reason?(reason), do: reason, else: {:owner_down, reason}
   end
 
   @spec parse_cron(String.t()) :: {:ok, Crontab.CronExpression.t()} | {:error, term()}

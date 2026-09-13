@@ -28,6 +28,14 @@ defmodule Jido.Sensor.Runtime do
   - `:id` - Instance ID (auto-generated if not provided)
   - `:owner_pid` - Optional owner process to monitor; runtime stops if owner exits
 
+  ## Owner Monitoring
+
+  When `:owner_pid` is given the runtime monitors that process and stops as soon
+  as it exits. A clean owner exit reason (`:normal`, `:shutdown` or
+  `{:shutdown, term}`) is mirrored as-is so the runtime shuts down quietly with
+  its owner; any other reason is wrapped as `{:owner_down, reason}`. This is the
+  reason passed to the sensor's `c:Jido.Sensor.terminate/2` callback.
+
   ## Signal Delivery
 
   When the sensor emits a signal:
@@ -51,6 +59,7 @@ defmodule Jido.Sensor.Runtime do
   require Logger
 
   alias Jido.Signal.Dispatch
+  alias Jido.Util
 
   @type server :: pid() | atom() | {:via, module(), term()}
 
@@ -134,7 +143,7 @@ defmodule Jido.Sensor.Runtime do
          :ok <- ensure_sensor_loaded(sensor),
          {:ok, config} <- parse_config(sensor, opts[:config] || %{}),
          context = opts[:context] || %{},
-         id = opts[:id] || Jido.Util.generate_id(),
+         id = opts[:id] || Util.generate_id(),
          owner_pid = opts[:owner_pid],
          owner_ref = monitor_owner(owner_pid),
          {:ok, state, directives} <- call_sensor_init(sensor, config, context, id) do
@@ -180,7 +189,7 @@ defmodule Jido.Sensor.Runtime do
       "Sensor.Runtime #{state.id} owner #{inspect(owner_pid)} exited: #{inspect(reason)}"
     end)
 
-    {:stop, {:owner_down, reason}, state}
+    {:stop, owner_exit_reason(reason), state}
   end
 
   @impl GenServer
@@ -207,9 +216,6 @@ defmodule Jido.Sensor.Runtime do
 
   defp normalize_opts(opts) when is_map(opts), do: Map.to_list(opts)
   defp normalize_opts(opts) when is_list(opts), do: opts
-
-  defp monitor_owner(owner_pid) when is_pid(owner_pid), do: Process.monitor(owner_pid)
-  defp monitor_owner(_owner_pid), do: nil
 
   defp ensure_sensor_loaded(sensor) do
     case Code.ensure_loaded(sensor) do
@@ -257,6 +263,17 @@ defmodule Jido.Sensor.Runtime do
     else
       {:ok, %{id: id, config: config, context: context}, []}
     end
+  end
+
+  # ---------------------------------------------------------------------------
+  # Private: Owner Monitoring
+  # ---------------------------------------------------------------------------
+
+  defp monitor_owner(owner_pid) when is_pid(owner_pid), do: Process.monitor(owner_pid)
+  defp monitor_owner(_owner_pid), do: nil
+
+  defp owner_exit_reason(reason) do
+    if Util.clean_exit_reason?(reason), do: reason, else: {:owner_down, reason}
   end
 
   # ---------------------------------------------------------------------------

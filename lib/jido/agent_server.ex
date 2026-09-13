@@ -216,6 +216,7 @@ defmodule Jido.AgentServer do
   alias Jido.Telemetry.Formatter
   alias Jido.Tracing.Context, as: TraceContext
   alias Jido.Tracing.Trace
+  alias Jido.Util
 
   @type server :: pid() | atom() | {:via, module(), term()} | String.t()
   @cron_restart_base_ms 500
@@ -2901,7 +2902,7 @@ defmodule Jido.AgentServer do
     {tracked_pid, state} = untrack_cron_job(state, logical_id, cancel?: false)
 
     if tracked_pid == pid do
-      if normal_cron_exit?(reason) do
+      if Util.clean_exit_reason?(reason) do
         state
       else
         schedule_cron_restart(state, logical_id, reason)
@@ -2955,11 +2956,6 @@ defmodule Jido.AgentServer do
         %{state | cron_restart_timers: timers}
     end
   end
-
-  defp normal_cron_exit?(:normal), do: true
-  defp normal_cron_exit?(:shutdown), do: true
-  defp normal_cron_exit?({:shutdown, _}), do: true
-  defp normal_cron_exit?(_), do: false
 
   # ---------------------------------------------------------------------------
   # Internal: Drain Loop

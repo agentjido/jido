@@ -200,6 +200,29 @@ defmodule JidoTest.SchedulerTest do
     end
   end
 
+  describe "owner lifecycle" do
+    for reason <- [:normal, :shutdown, {:shutdown, :restart}] do
+      test "preserves a #{inspect(reason)} owner exit" do
+        reason = unquote(Macro.escape(reason))
+        {owner, job} = start_owned_job()
+        ref = Process.monitor(job)
+
+        send(owner, {:exit, reason})
+
+        assert_receive {:DOWN, ^ref, :process, ^job, ^reason}, 500
+      end
+    end
+
+    test "wraps an abnormal owner exit" do
+      {owner, job} = start_owned_job()
+      ref = Process.monitor(job)
+
+      Process.exit(owner, :kill)
+
+      assert_receive {:DOWN, ^ref, :process, ^job, {:owner_down, :killed}}, 500
+    end
+  end
+
   describe "alive?/1" do
     test "returns true for a running cron job" do
       {:ok, pid} = Scheduler.run_every(fn -> :ok end, "* * * * *")
@@ -305,5 +328,28 @@ defmodule JidoTest.SchedulerTest do
         send(owner, :stop)
       end)
     end
+  end
+
+  defp start_owned_job do
+    test_pid = self()
+
+    owner =
+      spawn(fn ->
+        {:ok, job} = Scheduler.run_every(fn -> :ok end, "* * * * *")
+        send(test_pid, {:job_started, self(), job})
+
+        receive do
+          {:exit, reason} -> exit(reason)
+        end
+      end)
+
+    assert_receive {:job_started, ^owner, job}, 500
+    on_exit(fn -> kill_if_alive([owner, job]) end)
+
+    {owner, job}
+  end
+
+  defp kill_if_alive(pids) do
+    Enum.each(pids, fn pid -> if Process.alive?(pid), do: Process.exit(pid, :kill) end)
   end
 end
