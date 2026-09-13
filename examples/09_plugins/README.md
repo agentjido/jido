@@ -1,7 +1,7 @@
 # Plugin examples
 
 These examples show the Plugin data and ownership contract. They start with
-pure preparation, add live admission, and then compose both forms.
+pure preparation, add live admission, then cover owned state and persistence.
 
 ## Learning order
 
@@ -11,6 +11,7 @@ pure preparation, add live admission, and then compose both forms.
 4. [Secure Signal](09_04_secure_signal/README.md) — decrypt ciphertext into a package input and preserve the incoming Signal.
 5. [Composition](09_05_composition/README.md) — use independent pure and live package inputs in one Agent.
 6. [State Middleware](09_06_state_middleware/README.md) — read complete Turn state and reduce only one owned field.
+7. [Persisted State](09_07_persisted_state/README.md) — convert one Plugin-owned field and reject invalid stored values.
 
 ## Run the section
 
@@ -31,8 +32,9 @@ mix test test/examples/09_plugins --include example --seed 0
 
 - `Jido.Agent.Plugin.prepare/2` can reject or return one portable input.
 - `Jido.AgentServer.Plugin.admit/3` can reject or return one transient runtime input.
+- Neither preparation nor admission can change the Agent, incoming Signal, caller context, route, or another package input.
 - `Jido.Agent.Plugin.reduce/2` can read the complete candidate and return only its owned state value.
-- Neither callback can change the Agent, incoming Signal, caller context, route, or another package input.
+- `Jido.Persistence.Plugin.dump/3` and `load/3` convert only their paired Plugin-owned state value.
 - Direct `Jido.Agent.cmd/3` runs pure preparation but not live admission.
 - Actions and Flows read `context.plugin_inputs[Package].prepared` and
   `context.plugin_inputs[Package].runtime`.

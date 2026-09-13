@@ -22,3 +22,14 @@ defmodule Jido.Examples.Topology.InboxWorker do
     end
   end
 end
+
+defmodule Jido.Examples.Topology.InvalidInboxWorker do
+  @moduledoc "An Agent whose Plugin contributes an invalid Bus resource key."
+  use Jido.Agent,
+    name: "topology_invalid_inbox_worker",
+    plugins: [{Jido.Examples.Topology.InboxPlugin, bus: nil}]
+
+  agent do
+    schema Zoi.object(%{})
+  end
+end

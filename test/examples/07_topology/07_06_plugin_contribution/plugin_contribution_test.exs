@@ -3,7 +3,7 @@ defmodule Jido.Examples.Topology.PluginContributionTest do
   @moduletag :example
 
   alias Jido.AgentServer
-  alias Jido.Examples.Topology.{InboxWorker, PluginContribution}
+  alias Jido.Examples.Topology.{InboxWorker, InvalidPluginContribution, PluginContribution}
   alias Jido.Signal.Bus
   alias Jido.Topology.Controller
 
@@ -28,5 +28,15 @@ defmodule Jido.Examples.Topology.PluginContributionTest do
     assert is_pid(bus)
     assert {:ok, [_record]} = Bus.publish(bus, [InboxWorker.work_signal!(5)])
     eventually(fn -> AgentServer.agent(worker).state.total == 5 end)
+  end
+
+  test "invalid Plugin resources stop planning before activation", %{jido: jido} do
+    assert Jido.agent_count(jido) == 0
+
+    assert {:error, %Jido.Error.ValidationError{} = error} =
+             InvalidPluginContribution.new(id: "invalid-plugin-contribution")
+
+    assert error.message == "Topology keys must be nonempty strings or atoms"
+    assert Jido.agent_count(jido) == 0
   end
 end

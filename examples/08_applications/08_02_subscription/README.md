@@ -19,12 +19,14 @@ mix test test/examples/08_applications/08_02_subscription --include example --se
 ```
 
 Expected result: a subscription commits, the Plugin runtime stops, and its
-replacement reconstructs the same subscription.
+replacement reconstructs the same subscription. When the Agent stops, the
+replacement runtime stops too.
 
 ## Important behavior
 
 The desired subscription is durable Agent data. The runtime projection is
-temporary and can be replaced without changing the Agent Turn.
+temporary and can be replaced without changing the Agent Turn. The Agent owns
+the replacement runtime; stopping the Agent leaves no runtime process behind.
 
 ## Limits
 

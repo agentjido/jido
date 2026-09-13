@@ -8,3 +8,14 @@ defmodule Jido.Examples.Topology.PluginContribution do
     end
   end
 end
+
+defmodule Jido.Examples.Topology.InvalidPluginContribution do
+  @moduledoc "A Topology that rejects an invalid Plugin contribution during planning."
+  use Jido.Topology, name: "invalid_plugin_contribution"
+
+  topology do
+    agents do
+      agent :worker, Jido.Examples.Topology.InvalidInboxWorker
+    end
+  end
+end

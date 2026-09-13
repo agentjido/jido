@@ -21,4 +21,4 @@ The Action changes `count`. The Plugin records the count before and after the
 Action, the validated note, and the number of successful Turns. Direct
 evaluation returns a candidate. Live execution commits the same reduction.
 
-Previous: [Composition](../09_05_composition/README.md) | Next: [Progress Observation Research](../../99_research/99_01_progress_observation/README.md)
+Previous: [Composition](../09_05_composition/README.md) | Next: [Persisted State](../09_07_persisted_state/README.md)
