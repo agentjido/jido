@@ -32,7 +32,6 @@ defmodule Jido.Agent.TurnEvaluationTest do
     agent = CustomRouteAgent.new!(id: "direct")
 
     assert {:ok, prepared} = Runner.prepare(agent, source, [])
-    assert prepared.source_signal == source
     assert prepared.turn.source_signal == source
     assert prepared.turn.executable == Add
     assert prepared.turn.input == %{by: 1, label: "source.route"}

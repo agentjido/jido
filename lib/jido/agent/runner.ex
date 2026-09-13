@@ -15,7 +15,6 @@ defmodule Jido.Agent.Runner do
 
     @enforce_keys [
       :agent,
-      :source_signal,
       :signal,
       :turn,
       :context,
@@ -27,7 +26,6 @@ defmodule Jido.Agent.Runner do
 
     @type t :: %__MODULE__{
             agent: Jido.Agent.instance(),
-            source_signal: Jido.Signal.t(),
             signal: Jido.Signal.t(),
             turn: Jido.Agent.Turn.t(),
             context: map(),
@@ -63,16 +61,6 @@ defmodule Jido.Agent.Runner do
   end
 
   @doc false
-  @spec prepare(Agent.instance(), Signal.t(), keyword(), [Jido.Plugin.Spec.t()]) ::
-          {:ok, Prepared.t()} | {:error, term()}
-  def prepare(%Agent{} = agent, %Signal{} = signal, opts, plugin_specs)
-      when is_list(opts) and is_list(plugin_specs) do
-    agent
-    |> prepare_direct(signal, opts, {:prepared, plugin_specs})
-    |> unstage()
-  end
-
-  @doc false
   @spec prepare_for_server(Command.t(), Signal.t(), keyword(), [Jido.Plugin.Spec.t()]) ::
           {:ok, Prepared.t()} | {:error, stage(), term()}
   def prepare_for_server(
@@ -89,7 +77,6 @@ defmodule Jido.Agent.Runner do
       {:ok,
        prepared(
          command.agent,
-         source_signal,
          command.signal,
          turn,
          command.context,
@@ -132,7 +119,6 @@ defmodule Jido.Agent.Runner do
        prepared(
          agent,
          signal,
-         signal,
          turn,
          caller_context,
          exec_opts,
@@ -144,7 +130,6 @@ defmodule Jido.Agent.Runner do
 
   defp prepared(
          agent,
-         source_signal,
          signal,
          turn,
          caller_context,
@@ -162,7 +147,6 @@ defmodule Jido.Agent.Runner do
 
     %Prepared{
       agent: agent,
-      source_signal: source_signal,
       signal: signal,
       turn: turn,
       context: context,
@@ -186,7 +170,7 @@ defmodule Jido.Agent.Runner do
              PluginPipeline.run(
                {:ok, output, directives},
                prepared.agent,
-               prepared.source_signal,
+               prepared.turn.source_signal,
                prepared.plugin_inputs,
                prepared.plugin_specs
              )
@@ -235,14 +219,12 @@ defmodule Jido.Agent.Runner do
          do: Turn.selected(executable, input, source_signal)
   end
 
-  defp normalize_exec_result({:ok, output}) when is_map(output) and not is_struct(output),
-    do: {:ok, output, []}
+  defp normalize_exec_result({:ok, output}), do: normalize_exec_result({:ok, output, []})
 
   defp normalize_exec_result({:ok, output, directives})
        when is_map(output) and not is_struct(output),
        do: {:ok, output, List.wrap(directives)}
 
-  defp normalize_exec_result({:ok, output}), do: invalid_state_output(output)
   defp normalize_exec_result({:ok, output, _directives}), do: invalid_state_output(output)
   defp normalize_exec_result({:error, reason}), do: {:error, reason}
   defp normalize_exec_result({:error, reason, _extras}), do: {:error, reason}
@@ -298,9 +280,6 @@ defmodule Jido.Agent.Runner do
   end
 
   defp plugin_specs(specs, :prepared), do: {:ok, Jido.Agent.Plugin.specs(specs)}
-
-  defp plugin_specs(_declarations, {:prepared, specs}),
-    do: {:ok, Jido.Agent.Plugin.specs(specs)}
 
   defp invalid_state_output(output) do
     {:error,

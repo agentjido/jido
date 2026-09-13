@@ -98,7 +98,7 @@ defmodule Jido.AgentServer.ActiveTurn do
     turn_context =
       Map.drop(prepared.context, [:agent_id, :agent_state, :plugin_inputs, :signal])
 
-    if prepared.source_signal != active.source_signal do
+    if prepared.turn.source_signal != active.source_signal do
       raise "prepared Turn source Signal does not match the active Turn"
     end
 
