@@ -89,5 +89,10 @@ The Turn span can finish at commit. Directive work can fail later. Use
 `Jido.Agent.Turn.Outcome`, the settled telemetry event, or the bounded debug
 buffer when you need terminal settlement.
 
+The `{:emit_signal, dispatch}` error policy sends a custom
+`Jido.AgentServer.Signal.Error` with type `jido.agent.error`. Its data contains
+the Agent and Turn IDs, status, stage, commit flag, and transport error map.
+Its context carries the failed input's causation ID and available trace context.
+
 See [Admission, Cancellation, And Timeouts](admission-cancellation-and-timeouts.md)
 and [Extension Boundaries](extension-boundaries.md).

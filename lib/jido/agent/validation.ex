@@ -234,7 +234,7 @@ defmodule Jido.Agent.Validation do
     end
   end
 
-  defp instance_id(nil), do: {:ok, Jido.Util.generate_id()}
+  defp instance_id(nil), do: {:ok, Jido.Signal.ID.generate!()}
   defp instance_id(id), do: validate_id(id)
 
   defp validate_id(id) when is_binary(id) and byte_size(id) > 0, do: {:ok, id}

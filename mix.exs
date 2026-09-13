@@ -224,6 +224,7 @@ defmodule Jido.MixProject do
         "Actor Runtime": [
           Jido,
           Jido.AgentServer,
+          Jido.AgentServer.Signal.Error,
           Jido.AgentServer.DirectiveContext,
           Jido.AgentServer.Plugin,
           Jido.Plugin.DirectiveContext,
@@ -243,11 +244,13 @@ defmodule Jido.MixProject do
           Jido.Plugin.Dispatch,
           Jido.Plugin.Dispatch.Send,
           Jido.Plugin.Heartbeat,
+          Jido.Plugin.Heartbeat.Signal.Tick,
           Jido.Plugin.Scheduler,
           Jido.Plugin.Scheduler.Acknowledge,
           Jido.Plugin.Scheduler.Cancel,
           Jido.Plugin.Scheduler.Cron,
           Jido.Plugin.Scheduler.Enqueue,
+          Jido.Plugin.Scheduler.Signal.Enqueue,
           Jido.Plugin.Scheduler.Occurrence,
           Jido.Plugin.Scheduler.Schedule,
           Jido.Plugin.SensorManager,
@@ -292,7 +295,6 @@ defmodule Jido.MixProject do
           Jido.Error.ValidationError
         ],
         Utilities: [
-          Jido.ID,
           Jido.Util
         ]
       ]

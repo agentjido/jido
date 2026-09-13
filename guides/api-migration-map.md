@@ -521,7 +521,9 @@ code calls one, first record the behavior that the application needs. Then
 port that behavior through a public V3 contract or make it application-owned.
 Do not copy a V2 internal struct or callback into V3.
 
-**Jido.Application**, **Jido.ID**, and **Jido.Util.DeepMerge** remain private. Their
+**Jido.ID** is removed. Use `Jido.Signal.ID.generate!/0` to generate UUID7 identifiers.
+
+**Jido.Application** and **Jido.Util.DeepMerge** remain private. Their
 continued names do not make them public migration contracts.
 
 ## Build the migration documentation from this map

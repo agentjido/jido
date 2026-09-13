@@ -1,6 +1,7 @@
 defmodule Jido.Plugin.Scheduler.Durable do
   @moduledoc false
   alias Jido.Plugin.Scheduler.{Acknowledge, Occurrence, Queue}
+  alias Jido.Plugin.Scheduler.Signal.Enqueue
   alias Jido.Signal
 
   @marker "jidodurabletick"
@@ -21,15 +22,11 @@ defmodule Jido.Plugin.Scheduler.Durable do
   def current_queue?(_state, %Queue{}), do: false
 
   def enqueue_signal(job_id, generation, scheduled_at) do
-    Signal.new!(
-      "jido.scheduler.enqueue",
-      %{
-        job_id: job_id,
-        generation: generation,
-        scheduled_at: DateTime.to_iso8601(DateTime.shift_zone!(scheduled_at, "Etc/UTC"))
-      },
-      source: "/jido/scheduler"
-    )
+    Enqueue.new!(%{
+      job_id: job_id,
+      generation: generation,
+      scheduled_at: DateTime.to_iso8601(DateTime.shift_zone!(scheduled_at, "Etc/UTC"))
+    })
   end
 
   def replace(nil, spec), do: {:ok, spec}

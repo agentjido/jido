@@ -5,13 +5,12 @@ defmodule JidoTest.UtilTest do
   alias JidoTest.TestActions
 
   describe "generate_id/0" do
-    test "generates unique non-empty binary identifiers" do
+    test "generates unique UUID7 identifiers" do
       id1 = Util.generate_id()
       id2 = Util.generate_id()
 
-      assert is_binary(id1)
-      assert is_binary(id2)
-      assert String.length(id1) > 0
+      assert Jido.Signal.ID.valid?(id1)
+      assert Jido.Signal.ID.valid?(id2)
       refute id1 == id2
     end
   end

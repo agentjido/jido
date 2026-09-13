@@ -616,11 +616,12 @@ defmodule Jido do
   # ---------------------------------------------------------------------------
 
   @doc """
-  Generate a unique identifier.
+  Generate a UUID7 identifier.
 
-  Delegates to `Jido.Util.generate_id/0`.
+  Delegates to `Jido.Signal.ID.generate!/0`.
   """
-  defdelegate generate_id(), to: Jido.Util
+  @spec generate_id() :: Jido.Signal.ID.uuid7()
+  defdelegate generate_id(), to: Jido.Signal.ID, as: :generate!
 
   @doc "Returns the Registry name for the default Jido instance."
   @spec registry_name() :: atom()

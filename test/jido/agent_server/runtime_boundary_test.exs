@@ -4,7 +4,9 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
   alias Jido.Agent.Directive
   alias Jido.AgentServer, as: Server
   alias Jido.AgentServer.ParentRef
+  alias Jido.AgentServer.Signal.Error, as: ErrorSignal
   alias Jido.Error
+  alias Jido.Tracing.Trace
   alias JidoTest.AgentFixtures
 
   @moduletag capture_log: true
@@ -407,17 +409,66 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
       Jido.start_agent(jido, Agent, error_policy: {:emit_signal, {:pid, target: self()}})
 
     original = Server.snapshot(server)
-    assert {:error, _} = Server.call(server, signal("boundary.fail"))
+    trace = Map.put(Trace.new_root(), :tracestate, "vendor=value")
+    assert {:ok, input} = Trace.put(signal("boundary.fail"), trace)
+    assert {:error, reason} = Server.call(server, input)
     assert_receive {:signal, error_signal}
-    assert error_signal.type == "jido.agent.error"
+    assert error_signal.type == ErrorSignal.type()
+    assert error_signal.source == "/agent/#{original.agent.id}"
+    assert {:ok, validated} = ErrorSignal.validate_data(error_signal.data)
+    assert validated == error_signal.data
     assert error_signal.data.agent_id == original.agent.id
+    assert error_signal.data.error == Error.to_map(reason)
     assert error_signal.data.stage == :execute
     refute error_signal.data.committed?
+    assert Jido.Signal.get_context(error_signal, "jidocausationid") == input.id
+    emitted_trace = Trace.get(error_signal)
+    assert emitted_trace.trace_id == trace.trace_id
+    assert emitted_trace.tracestate == trace.tracestate
+    refute emitted_trace.span_id == trace.span_id
     assert Server.snapshot(server) == original
 
     assert {:error, _} = Server.call(server, error_signal)
     refute_received {:signal, _}
     assert Server.snapshot(server) == original
+  end
+
+  test "error Signals report invalid input without requiring its ID or trace", %{jido: jido} do
+    {:ok, server} =
+      Jido.start_agent(jido, Agent, error_policy: {:emit_signal, {:pid, target: self()}})
+
+    for invalid_id <- [nil, 42, true, "", <<255>>] do
+      input = %{signal("boundary.fail") | id: invalid_id}
+      assert {:error, reason} = Server.call(server, input)
+      assert_receive {:signal, error_signal}
+
+      assert error_signal.type == ErrorSignal.type()
+      assert error_signal.data.stage == :prepare
+      assert error_signal.data.error == Error.to_map(reason)
+      assert Jido.Signal.get_context(error_signal, "jidocausationid") == nil
+      assert Trace.get(error_signal) == nil
+      assert Server.status(server).phase == :idle
+    end
+  end
+
+  test "invalid input IDs do not break the trace carried by error Signals", %{jido: jido} do
+    {:ok, server} =
+      Jido.start_agent(jido, Agent, error_policy: {:emit_signal, {:pid, target: self()}})
+
+    trace = Trace.new_root()
+    trace_id = trace.trace_id
+    assert {:ok, input} = Trace.put(signal("boundary.fail"), trace)
+
+    for invalid_id <- [42, true, "", <<255>>] do
+      assert {:error, _reason} = Server.call(server, %{input | id: invalid_id})
+      assert_receive {:signal, error_signal}
+      assert Jido.Signal.get_context(error_signal, "jidocausationid") == nil
+
+      emitted_trace = Trace.get(error_signal)
+
+      assert %{trace_id: ^trace_id} =
+               Trace.child_of(emitted_trace, Map.get(emitted_trace, :causation_id))
+    end
   end
 
   test "error Signal delivery is bounded and does not block control calls", %{jido: jido} do
@@ -431,9 +482,12 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
         debug: true
       )
 
-    assert {:error, _reason} = Server.call(server, signal("boundary.fail"))
+    input = signal("boundary.fail")
+    assert {:error, _reason} = Server.call(server, input)
     assert_receive {:error_signal_delivery_blocked, ^gate, worker, error_signal}, 2_000
     assert error_signal.type == "jido.agent.error"
+    assert Jido.Signal.get_context(error_signal, "jidocausationid") == input.id
+    assert %{trace_id: _trace_id} = Trace.get(error_signal)
     worker_ref = Process.monitor(worker)
 
     assert Server.status(server).phase == :idle

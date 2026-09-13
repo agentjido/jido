@@ -91,6 +91,8 @@ defmodule Jido.AgentServer do
   }
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
+  alias Jido.AgentServer.Signal.Error, as: ErrorSignal
+  alias Jido.AgentServer.Signal.Runtime, as: RuntimeSignal
   alias Jido.Error
   alias Jido.Signal
   alias Jido.Telemetry.Agent, as: AgentTelemetry
@@ -2836,7 +2838,7 @@ defmodule Jido.AgentServer do
   end
 
   defp directive_context(%State{} = data) do
-    signal = Signal.new!(type: "jido.agent.runtime", source: "/agent/#{data.agent.id}", data: %{})
+    signal = RuntimeSignal.new!(%{}, source: "/agent/#{data.agent.id}")
 
     %DirectiveContext{
       agent_id: data.agent.id,
@@ -2906,20 +2908,36 @@ defmodule Jido.AgentServer do
        ) do
     source_signal = outcome.effective_signal || outcome.source_signal
 
-    if source_signal.type != "jido.agent.error" do
+    if source_signal.type != ErrorSignal.type() do
       signal =
-        Signal.new!(
-          type: "jido.agent.error",
-          source: "/agent/#{data.agent.id}",
-          data: %{
+        ErrorSignal.new!(
+          %{
             agent_id: data.agent.id,
             turn_id: outcome.id,
             status: outcome.status,
             stage: outcome.stage,
             committed?: outcome.committed?,
             error: Error.to_map(outcome.error)
-          }
+          },
+          source: "/agent/#{data.agent.id}"
         )
+
+      signal =
+        with id when is_binary(id) and byte_size(id) > 0 <- source_signal.id,
+             :ok <- Signal.validate_utf8_string(id, []),
+             {:ok, causal} <- Signal.put_context(signal, "jidocausationid", id) do
+          causal
+        else
+          _invalid -> signal
+        end
+
+      signal =
+        with %Jido.Signal.Trace{} = trace <- Jido.Signal.Trace.get(source_signal),
+             {:ok, traced} <- Jido.Signal.Trace.put(signal, trace) do
+          traced
+        else
+          _unavailable -> signal
+        end
 
       data = start_error_policy_dispatch(signal, dispatch, data)
 

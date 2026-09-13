@@ -6,12 +6,12 @@ defmodule Jido.PublicAPITest do
     assert Jido.agent_supervisor_name(MyApp.Sub.Jido) == MyApp.Sub.Jido.AgentSupervisor
   end
 
-  test "generates unique identifiers" do
+  test "generates unique UUID7 identifiers" do
     id1 = Jido.generate_id()
     id2 = Jido.generate_id()
 
-    assert is_binary(id1)
-    assert is_binary(id2)
+    assert Jido.Signal.ID.valid?(id1)
+    assert Jido.Signal.ID.valid?(id2)
     refute id1 == id2
   end
 

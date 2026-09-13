@@ -26,6 +26,10 @@ directive =
 Declare `Jido.Plugin.Scheduler` and add a route for
 `"jido.scheduler.enqueue"` to `Jido.Plugin.Scheduler.Enqueue`.
 
+The runtime creates this control message with
+`Jido.Plugin.Scheduler.Signal.Enqueue`. The custom Signal and the Action share
+one data schema for `job_id`, `generation`, and `scheduled_at`.
+
 ## Follow The Protocol
 
 1. The runtime detects a due UTC slot.

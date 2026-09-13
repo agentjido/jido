@@ -10,13 +10,7 @@ defmodule Jido.Plugin.Scheduler.Enqueue do
   """
   use Jido.Action,
     name: "scheduler_enqueue",
-    schema:
-      Zoi.object(%{
-        job_id: Zoi.any(),
-        generation: Zoi.integer() |> Zoi.min(0) |> Zoi.max(2_147_483_647),
-        scheduled_at:
-          Zoi.string() |> Zoi.refine({Jido.Plugin.Scheduler.Occurrence, :validate_utc, []})
-      })
+    schema: Jido.Plugin.Scheduler.Signal.Enqueue.schema()
 
   @impl true
   def run(input, context) do

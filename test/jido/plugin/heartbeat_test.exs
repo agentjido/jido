@@ -46,6 +46,33 @@ defmodule Jido.Plugin.HeartbeatTest do
     assert is_pid(runtime_pid)
   end
 
+  test "default ticks preserve configured data and have a new Signal ID each time" do
+    data = %{source: :clock, count: 1}
+
+    init = %Init{
+      agent_server: self(),
+      agent_id: "heartbeat-agent",
+      module: Heartbeat,
+      options: [interval: 60_000, signal_data: data]
+    }
+
+    runtime = start_supervised!({Heartbeat.Runtime, init})
+    send(runtime, :tick)
+
+    assert_receive {:"$gen_cast",
+                    {:signal, _token,
+                     %Jido.Signal{
+                       id: first_id,
+                       type: "jido.agent.heartbeat",
+                       source: "/plugin/heartbeat",
+                       data: ^data
+                     }}}
+
+    send(runtime, :tick)
+    assert_receive {:"$gen_cast", {:signal, _token, %Jido.Signal{id: second_id, data: ^data}}}
+    refute first_id == second_id
+  end
+
   test "rejects invalid options before runtime startup" do
     for {opts, reason} <- [
           {[interval: 0], {:invalid_heartbeat_interval, 0}},

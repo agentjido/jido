@@ -18,17 +18,15 @@ defmodule Jido.Util do
   but they can also be useful for developers building applications with Jido.
   """
 
-  alias Jido.Signal.ID, as: SignalID
-
   require Logger
 
   @name_regex ~r/^[a-zA-Z][a-zA-Z0-9_]*$/
 
   @doc """
-  Generates a unique ID.
+  Generates a UUID7 identifier with `Jido.Signal.ID.generate!/0`.
   """
-  @spec generate_id() :: String.t()
-  def generate_id, do: SignalID.generate!()
+  @spec generate_id() :: Jido.Signal.ID.uuid7()
+  defdelegate generate_id(), to: Jido.Signal.ID, as: :generate!
 
   @doc """
   Converts a string to a binary.

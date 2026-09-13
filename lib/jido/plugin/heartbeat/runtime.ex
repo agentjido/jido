@@ -5,6 +5,7 @@ defmodule Jido.Plugin.Heartbeat.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Plugin.Heartbeat
+  alias Jido.Plugin.Heartbeat.Signal.Tick
   alias Jido.Plugin.Init
   alias Jido.Signal
 
@@ -21,7 +22,11 @@ defmodule Jido.Plugin.Heartbeat.Runtime do
   @impl true
   def handle_info(:tick, state) do
     signal =
-      Signal.new!(state.signal_type, state.signal_data, source: state.source)
+      if state.signal_type == Tick.type() do
+        Tick.new!(state.signal_data, source: state.source)
+      else
+        Signal.new!(state.signal_type, state.signal_data, source: state.source)
+      end
 
     Server.cast(state.agent_server, signal)
     {:noreply, schedule(state)}
