@@ -49,8 +49,8 @@ jobs:
       otp_version: "29"
       elixir_version: "1.20"
       preflight_command: >-
-        mix quality &&
-        mix test.all --cover &&
+        MIX_ENV=test mix quality &&
+        MIX_ENV=test mix test.all --cover &&
         mix docs --no-open -f html --warnings-as-errors &&
         mix hex.audit
       dry_run: ${{ inputs.dry_run || false }}
