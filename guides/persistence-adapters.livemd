@@ -251,15 +251,14 @@ application:
 def deps do
   [
     {:jido, "~> 3.0"},
-    {:bedrock, "~> 0.7.0"},
-    {:bedrock_raft, ">= 0.9.7 and < 0.10.0", override: true}
+    {:bedrock, "~> 0.7.2"},
+    {:bedrock_raft, "~> 0.10.0", override: true}
   ]
 end
 ```
 
-The explicit Bedrock Raft dependency is required. Bedrock `0.7.x` has a broad
-Raft requirement, but it uses the `0.9.x` client API. The host constraint keeps
-resolution from selecting incompatible `0.10.x` releases.
+The explicit Bedrock Raft dependency keeps the host on the tested `0.10.x`
+client API used by Bedrock `0.7.2` and later `0.7.x` releases.
 
 Define the Bedrock cluster and repo. The repo must use `Bedrock.Repo`:
 

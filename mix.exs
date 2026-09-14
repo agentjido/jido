@@ -373,8 +373,8 @@ defmodule Jido.MixProject do
       {:sched_ex, "~> 1.2.1"},
 
       # Optional Persistence Adapters
-      {:bedrock, "~> 0.7.0", optional: true},
-      {:bedrock_raft, ">= 0.9.7 and < 0.10.0", optional: true},
+      {:bedrock, "~> 0.7.2", optional: true},
+      {:bedrock_raft, "~> 0.10.0", optional: true},
       {:ecto_sql, "~> 3.14", optional: true},
 
       # Development & Test Dependencies

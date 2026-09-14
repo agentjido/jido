@@ -2,10 +2,10 @@ defmodule Jido.Persistence.Bedrock do
   @moduledoc """
   Bedrock KV persistence adapter for binary keys and values.
 
-  This adapter supports Bedrock `0.7.x`. The required `:repo` option must be a
+  This adapter supports Bedrock `0.7.2` and later `0.7.x` releases. The required `:repo` option must be a
   loaded module created with `use Bedrock.Repo`. The host application must
-  supervise the matching Bedrock cluster. The host must add Bedrock `0.7.x`
-  and Bedrock Raft from `0.9.7` up to, but not including, `0.10.0`. Bedrock is
+  supervise the matching Bedrock cluster. The host must add Bedrock `0.7.2` or
+  later `0.7.x` and Bedrock Raft `0.10.x`. Bedrock is
   optional, so applications that do not select this adapter do not need it.
 
   The optional `:prefix` is a non-empty binary. It defaults to
@@ -30,8 +30,7 @@ defmodule Jido.Persistence.Bedrock do
   turn an adapter write into an uncommitted nested transaction.
 
   Bedrock `0.7.x` provides strictly serializable transactions. It uses the
-  Bedrock Raft `0.9.x` client API. The supported Raft range starts at `0.9.7`
-  and does not include `0.10.0`. A successful Bedrock commit is acknowledged
+  Bedrock Raft `0.10.x` client API. A successful Bedrock commit is acknowledged
   after every required log has appended and synced its write-ahead log. The
   Bedrock cluster configuration controls the durability profile. Use Bedrock's
   strict durability mode for production. The adapter does not make a relaxed
@@ -44,8 +43,8 @@ defmodule Jido.Persistence.Bedrock do
   @default_timeout_in_ms 5_000
   @max_key_bytes 16 * 1024
   @max_value_bytes 128 * 1024
-  @bedrock_version_requirement "~> 0.7.0"
-  @bedrock_raft_version_requirement ">= 0.9.7 and < 0.10.0"
+  @bedrock_version_requirement "~> 0.7.2"
+  @bedrock_raft_version_requirement "~> 0.10.0"
   @option_keys [:prefix, :repo, :timeout_in_ms]
   @repo_functions [__cluster__: 0, clear: 1, get: 1, put: 2, transact: 2]
   @bedrock_retry_abort_message "Transaction retry limit exceeded after 0 attempts. Last error: :aborted"
@@ -321,7 +320,7 @@ defmodule Jido.Persistence.Bedrock do
   defp validate_dependencies do
     cond do
       not Code.ensure_loaded?(Bedrock.Repo) ->
-        {:error, "requires the optional bedrock dependency at version 0.7.x"}
+        {:error, "requires the optional bedrock dependency at version 0.7.2 or later 0.7.x"}
 
       error = dependency_version_error() ->
         {:error, error}

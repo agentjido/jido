@@ -39,8 +39,8 @@ persistence:
    timeout_in_ms: 5_000}
 ```
 
-The host application must add Bedrock `0.7.x` and constrain Bedrock Raft to
-`>= 0.9.7 and < 0.10.0`. It must configure the durability profile and supervise
+The host application must add Bedrock `0.7.2` or later `0.7.x` and constrain
+Bedrock Raft to `~> 0.10.0`. It must configure the durability profile and supervise
 the Bedrock cluster before the Jido instance. See
 [Persistence Adapters](persistence-adapters.html) for the transaction and
 failure rules.
