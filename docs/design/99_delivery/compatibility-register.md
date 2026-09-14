@@ -1,7 +1,7 @@
 # Compatibility register
 
-This register applies to the Jido `3.0.0-beta.1` core candidate and the package
-matrix in this folder.
+This register applies to the Jido `3.0.0-beta.1` candidate, including its
+optional Bedrock adapter, and the package matrix in this folder.
 
 ## Support interval
 
@@ -18,6 +18,7 @@ or removed V3 API.
 | Agent Ref and instance facade | Added | Ref-first functions exist beside supported ID, PID, name, and partition functions. |
 | Turn routing | Changed from an earlier beta | Pure Plugin preparation runs first but cannot change the Signal. The first target for the unchanged source Signal wins. |
 | Durable records | Added and versioned | Compatible unnamed keys use outer format 2. Namespaced Ref keys use outer format 3. Supported V3 outer format-1 active records remain readable. |
+| Bedrock persistence | Included; release blocked | The adapter uses Bedrock KV 0.7 transactions. Strict cluster startup and MinIO-backed snapshot recovery must pass before this beta claims the adapter is ready. |
 | Agent Server activation | Strengthened | Initial durable creation completes before public readiness. A required write error removes write authority and stops the activation. |
 | Agent Server upgrade | Added | `upgrade/2` and `upgrade/3` serialize a zero-arity operation at idle. Definition replacement validates complete migrated state, preserves identity and Plugin declarations, and advances one checkpoint revision. |
 | Topology Plugin planning | Added | Contributions are pure plan input. They cannot start processes, persist state, or grant authority. |
@@ -49,4 +50,6 @@ replacement or another control plane.
 
 This candidate does not claim cluster-exclusive ownership, automatic failover,
 or a built-in OpenTelemetry bridge. The [scope ledger](scope-ledger.md) gives
-each excluded or deferred item an owner and review point.
+each excluded or deferred item an owner and review point. Bedrock persistence
+is included, so its failing service gates are release blockers, not scope
+exclusions.

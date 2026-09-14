@@ -60,7 +60,7 @@ rg -n 'mount|prepare_signal|prepare_action|transform_result|on_checkpoint|on_res
 ## Update dependencies and installation
 
 The candidate requires Elixir 1.18 or later. The declared OTP minimum is 27.
-Core now requires `jido_action ~> 3.0.0-beta.9` and
+Core now requires `jido_action ~> 3.0.0-beta.11` and
 `jido_signal ~> 3.0.0-beta.4`.
 
 ### What you need to change
@@ -467,10 +467,12 @@ The default quality check includes core tests, not benchmark or example tests:
 mix quality
 ```
 
-The current local candidate passes the core suite on Elixir 1.18.5 / OTP
-27.3.4.12 and the full local gates on Elixir 1.20.3 / OTP 29.0.5. Core coverage
-is above the 90% release threshold. Example acceptance tests are secondary;
-run `mix test.examples` separately when needed. See the
+The current local candidate passes `mix quality` on Elixir 1.20.3 / OTP
+29.0.5. Its full local suite fails the cluster-authority research probe, and
+its included Bedrock service profile has open failures. On Elixir 1.18.5 /
+OTP 27.3.4.12, test compilation fails in an example Directive before core
+tests run. Example acceptance tests are secondary; run `mix test.examples`
+separately when needed. See the
 [test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
 
 All research example assertions pass. They include the quiescent upgrade
@@ -480,7 +482,8 @@ source-Signal route selection, and Plugin-owned state isolation also pass.
 Cluster-exclusive ownership remains unsupported. See
 [Test Agents and Plugins](test-agents-and-plugins.livemd).
 
-The delivery record contains the local runtime, lint, Dialyzer, docs, package,
-example, benchmark, and public-consumer checks. Publication still needs an
-exact-commit CI result and human release approval. Deferred requirements do not
-add contracts to this beta candidate.
+The release evidence record in the repository lists current
+passes, failures, and checks still required. Bedrock persistence is included
+in the beta scope, so its strict startup and snapshot failures block
+publication. Exact-commit CI and human release approval also remain. Deferred
+requirements do not add contracts to this beta candidate.

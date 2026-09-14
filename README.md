@@ -10,8 +10,9 @@ Agent is, instantiate that declaration as an Agent value, and run the value as
 an OTP actor when you need a live process.
 
 This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
-changes from V2. The package is not published. Local delivery checks are
-complete, but exact-commit CI and human release approval remain. See the
+changes from V2. The package is not published. Core quality and authoring
+checks pass, but local system and Bedrock storage gates still fail. Exact-commit
+CI and human release approval also remain. See the
 [migration guide](guides/migration.md) for the API changes and known limits.
 
 ## Core model

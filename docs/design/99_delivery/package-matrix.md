@@ -1,15 +1,31 @@
 # Package matrix
 
-This matrix defines the only V3 compatibility claim made by this local
-candidate.
+This matrix identifies the dependencies selected by the Jido 3.0.0-beta.1
+candidate. It does not claim that the blocked Bedrock profile passes.
 
 ## Core set
 
 | Package | Version and source | Immutable identity | Status |
 | --- | --- | --- | --- |
-| `jido` | `3.0.0-beta.1`; local Hex build from `v3-spike` | The commit that contains this record; parent `66c4d054` | Unpublished candidate |
-| `jido_action` | Hex `3.0.0-beta.9` | Registry checksum `df9009a5870234be9de844dce161ea64a377598d8a197427fc1c8b14139dc6f9`; source tag `v3.0.0-beta.9` at `ac8331d7bf6b0378aa8d9ad862dddeefefde1308` | Published source selected |
+| `jido` | `3.0.0-beta.1`; local source on `v3-spike` | The commit that contains this record; code parent `8d7e26c3` | Unpublished candidate; release gates open |
+| `jido_action` | Hex `3.0.0-beta.11` | Registry checksum `97c60e158f81713d792c7631ed567673919f1a7d0f9024685863f9ac3fb71818` | Published source selected |
 | `jido_signal` | Hex `3.0.0-beta.4` | Registry checksum `284d4f199b22b358906598ebfba734d37ea8a9404baed47939b94b50d837a05b`; source commit `1a62b1ddc306091cdcb7883ce63490f0f6ed2905` | Published source selected |
+
+## Bedrock beta dependency set
+
+`Jido.Persistence.Bedrock` is included in the beta package and its release
+claim. It is optional for applications that do not use it. The current
+candidate selects these published packages:
+
+| Package | Version and source | Registry checksum | Status |
+| --- | --- | --- | --- |
+| `bedrock` | Hex `0.7.2` | `a08b779f65b42b159700f050ac76d4514fb9414aafa8a6305026e79fbf332959` | Strict startup and snapshot recovery gates fail |
+| `bedrock_raft` | Hex `0.10.1` | `6cafdefd445917d1f717cdc09d8d6be3a98cd12fc791f45b62ca6704e89682da` | Selected by the tested Bedrock profile |
+
+Local Bedrock commits `900ee439`, `905c567f`, and `8e97b5b8` are not in Hex
+`0.7.2`. They are development work, not a publishable dependency source for
+this Jido candidate. Recheck this matrix after a fixed Bedrock version is
+published and selected.
 
 The Jido production dependency tree has no path or Git source. Development and
 test dependencies do not enter the package claim.

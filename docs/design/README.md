@@ -152,6 +152,10 @@ This table is the source of truth for design approval. A moved or changed docume
 | [Delivery briefing](99_delivery/README.md) | Pending approval |
 | [Delivery design](99_delivery/design.md) | Pending approval |
 | [Delivery alignment](99_delivery/alignment.md) | Pending approval |
+| [Delivery scope ledger](99_delivery/scope-ledger.md) | Pending approval |
+| [Delivery package matrix](99_delivery/package-matrix.md) | Pending approval |
+| [Delivery compatibility register](99_delivery/compatibility-register.md) | Pending approval |
+| [Delivery evidence](99_delivery/evidence.md) | Pending approval |
 
 ## Delivery evidence
 

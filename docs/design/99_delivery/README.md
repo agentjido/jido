@@ -1,12 +1,13 @@
-> Delivery seam selected and implemented for the local Jido V3 core candidate.
+> Delivery seam prepared for the local Jido V3 beta candidate; release gates remain open.
 
 # 99 — Delivery
 
 ## Briefing
 
-The local Jido V3 candidate has one defined core package set and four delivery
-records. The package uses published Hex sources for `jido_action` and
-`jido_signal`.
+The local Jido V3 candidate has one defined beta package set and four delivery
+records. The package uses published Hex sources for `jido_action`,
+`jido_signal`, and the optional Bedrock dependencies. Bedrock persistence is
+included in the beta claim; its current service failures block publication.
 
 The candidate includes an explicit quiescent Agent Server upgrade boundary,
 validated Agent definition migration, and additive local Topology target
@@ -29,13 +30,14 @@ human release decision and an exact-commit CI result.
 | Area | Result |
 | --- | --- |
 | Scope | Every prerequisite requirement range and every skip has a disposition. |
-| Package set | Jido `3.0.0-beta.1`, `jido_action 3.0.0-beta.9`, and `jido_signal 3.0.0-beta.4`. |
+| Package set | Jido `3.0.0-beta.1`, Hex `jido_action 3.0.0-beta.11`, Hex `jido_signal 3.0.0-beta.4`, optional Hex Bedrock `0.7.2`, and Bedrock Raft `0.10.1`. |
 | Plugin seam | Core contract tests cover the four owner facets. |
-| Runtime floor | The Elixir 1.18.5 and OTP 27.3.4.12 result is from the prior candidate and needs a release refresh. |
-| Current runtime | Elixir 1.20.3 and OTP 29.0.5 pass the current quality, example, research, and documentation gates. |
-| Research | 48 checks pass. No research check is skipped. |
-| Core exclusion | `DIST-03` remains excluded because core does not claim cluster-exclusive ownership. |
-| Publication | Not performed. Exact-commit CI and human approval remain external gates. |
+| Runtime floor | Elixir 1.18.5/OTP 27 fails while compiling an example Directive before core tests run. |
+| Current runtime | Elixir 1.20.3 and OTP 29.0.5 pass quality, 92.4% core-only coverage, 240 examples, 523 authoring tests, seven benchmark tests, and docs. The full local suite, Bedrock services, and MinIO snapshots have known failures. |
+| Authoring | 523 authoring tests pass; the larger case library remains future work. |
+| Core exclusion | `DIST-03` remains excluded. The enabled `SYSTEM-CLUSTER-01` probe still fails; its `:flaky` tag is not an exception. |
+| Hex package | Build, unpack inspection, fresh dependency resolution, production compile, and docs pass. `mix hex.publish --dry-run` stops at missing authentication; no upload occurred. |
+| Publication | Not performed. Bedrock recovery, local suite, support floor, exact-commit CI, and human approval remain open gates. |
 
 ## Example contract classification
 

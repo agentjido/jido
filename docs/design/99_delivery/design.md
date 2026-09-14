@@ -108,6 +108,10 @@ and applicable exception IDs.
 commit, then the release owner shall either remove them from the verification
 environment or record their exact diff in the evidence record.
 
+`DEL-REQ-043`: Where the beta includes `Jido.Persistence.Bedrock`, the release
+owner shall record passing real Bedrock service and MinIO snapshot profiles
+against the exact published Bedrock dependency set in the package matrix.
+
 ### Tests and allowed research skips
 
 `DEL-REQ-021`: If a skipped test maps to a release-required requirement, then

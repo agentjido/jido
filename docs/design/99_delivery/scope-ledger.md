@@ -13,8 +13,8 @@ disposition without copying each ID to a separate row.
 | Gate-exception owner | Human release approver |
 | Publication approval owner | Human release approver |
 
-No gate exception is active. A deferred or excluded feature is a scope limit,
-not a gate exception.
+No gate exception is approved. A deferred or excluded feature is a scope limit,
+not a gate exception. A failing release gate remains a blocker.
 
 ## Requirement ranges
 
@@ -47,11 +47,26 @@ not a gate exception.
 | `SCOPE-AI-BROWSER` | Excluded | Jido AI and Jido Browser owners | This package result does not claim V3 compatibility for AI or Browser. Core remains usable without either package. | Each package adds its exact matrix and compatibility tests. |
 | `SCOPE-ERR-019` | Excluded | Errors seam | The proposed error projection version 2 was retired. Version 1 remains the contract. | Review only with a new versioned error design. |
 
+## Bedrock beta gate
+
+`Jido.Persistence.Bedrock` is included in this beta, not deferred or excluded.
+The release requires passing `mix test.services` and the separate MinIO
+snapshot profile against the exact published Bedrock dependency set in the
+[package matrix](package-matrix.md). The current failures in
+`SYSTEM-BEDROCK-01`, `SYSTEM-BEDROCK-04`, and `SYSTEM-BEDROCK-05`, plus the
+native snapshot upload error recorded by `SYSTEM-BEDROCK-03`, block that gate.
+Local, unpublished Bedrock patches do not close it.
+
 ## Skip classification
 
 | Assertion | Status | Owner | Reason and user effect | Review point |
 | --- | --- | --- | --- | --- |
 | `DIST-03` | Excluded | Future distributed authority owner | Core does not guarantee one live owner across a cluster. Applications that need this must supply fenced external authority. | Review with enforceable epochs at every protected commit. |
+
+`SYSTEM-CLUSTER-01` is a second, enabled probe of the same excluded cluster
+authority contract. It currently fails in `mix test.all`; the `:flaky` tag is
+not a release exception or proof of an intermittent fault. The release owner
+must resolve the gate disposition before publication.
 
 UP-01, UP-02, and UP-07 are implemented and are release-required evidence.
 Their assertions pass without skip tags.
