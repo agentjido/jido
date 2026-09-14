@@ -2,25 +2,30 @@
 
 Use `JidoTest.Case` for an isolated instance and `JidoTest.Eventually` for bounded
 asynchronous assertions. Prefer barriers and process monitors to arbitrary waits.
-Do not use log output, `Process.sleep/1`, or a finite `refute_receive` as a
+Do not use `Process.sleep/1` or a finite `refute_receive` as a
 completion signal. Use replies, process monitors, or explicit state barriers.
-Capture logs only when log or redaction behavior is the contract under test.
+Core tests capture logs only when log or redaction behavior is the contract.
+System and service tests can watch scoped logs for service readiness and failure
+evidence. Follow a readiness log with a real protocol or state check. Use event
+waits, not sleep timers or repeated polling, in these suites.
 
 Test complete candidate state, failure isolation, Turn order, Plugin ownership,
 post-commit effects, persistence faults, remote lifecycle and resource cleanup.
 Use deterministic model adapters or local HTTP/SSE for required examples.
 
-There are five test execution categories: core, peer, benchmark, example, and
-authoring.
+There are six test execution categories: core, peer, benchmark, example,
+authoring, and local system. External storage services are a separate opt-in
+profile, not part of `mix test.all`.
 Peer tests are core contracts that start external BEAM nodes. Plain `mix test`
 and `mix quality` exclude them. Run them with `mix test.peer`. `mix quality`
 runs fast core tests, plus format, compile, lint, and Dialyzer checks.
 CI selects `mix test test/jido --include flaky --seed 0` with peer, benchmark,
-example, and authoring tags excluded by the test helper.
-Benchmark, example, and authoring tests are secondary. Run `mix test.bench`,
-`mix test.examples`, or `mix test.authoring` separately when needed.
-Run all supported test categories with
-`mix test.all`. Give every peer test the
+example, authoring, system, and service tags excluded by the test helper.
+Benchmark, example, authoring, and system tests are secondary. Run `mix test.bench`,
+`mix test.examples`, `mix test.authoring`, or `mix test.system` separately when needed.
+Run all six normal categories with `mix test.all`. Run Redis, PostgreSQL and real
+Bedrock tests explicitly with `mix test.services`. Run the nested MinIO profile
+only with `mix test.services.minio` or its explicit path. Give every peer core test the
 `:peer` tag through `JidoTest.PeerCase`. Give every benchmark test the
 `:bench` tag and keep it in `test/bench/`.
 Give every example test the `:example` tag, directly or through a
@@ -39,6 +44,21 @@ Tag authoring tests with `:authoring`. Compile source fixtures only when the sui
 do not add them to `elixirc_paths`. Invalid source fixtures are test inputs, not
 normal compilation inputs. The authoring suite has no CI job.
 Reuse fixtures; do not copy integration assertions between suites.
+Keep local runtime tests in `test/system/runtime/`, tagged `:system`.
+Keep external storage tests in `test/system/services/`, tagged `:service` only.
+Never add `:system` to service tests: ExUnit combines include filters with OR.
+Use the shared case template to start storage before the isolated Jido tree.
+System peer scenarios retain only the `:system` tag; they are not core peer
+tests. External Bedrock peers retain only `:service`. Never let an include tag
+pull an external storage profile into `mix test.all`.
+Keep suite-only helpers in `test/system/support/` and shared adapter or effect
+fixtures in `test/support/`. Check state, effects, resources, and semantic
+telemetry together. Keep focused core regressions in `test/jido/`.
+Reuse the scenario modules in `test/system/support/scenarios/` across adapters.
+When a service profile is selected, a missing service must fail with its
+prerequisite; do not skip it or use an in-memory
+replacement. Keep unresolved system probes enabled and describe them in
+`test/system/README.md` and `test/system/TODO.md`.
 The DIST-03 test `one logical identity has at most one live cluster owner`
 in `test/jido/agent_server/distributed_authority_test.exs` retains its approved skip.
 Keep every research probe enabled. A probe that records an unsupported contract
