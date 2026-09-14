@@ -226,8 +226,9 @@ defmodule Jido.Plugin.Bus.IntegrationTest do
 
     new_bus = start_supervised!({Bus, name: :plugin_bus, jido: jido}, id: :reconnect_test_bus)
     send(client, {:reconnect, token})
-    assert {:error, :not_ready} = GenServer.call(client, :await_ready)
-    assert :sys.get_state(client).reconnect_token == next_token
+    pending = :sys.get_state(client)
+    assert pending.subscription_id == nil
+    assert pending.reconnect_token == next_token
 
     send(client, {:reconnect, next_token})
     assert :ok = GenServer.call(client, :await_ready)

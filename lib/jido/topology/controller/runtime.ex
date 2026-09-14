@@ -4,7 +4,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   alias Jido.AgentServer, as: Server
   alias Jido.Telemetry.Topology, as: TopologyTelemetry
-  alias Jido.Topology.{Controller, Plan, Resource}
+  alias Jido.Topology.{BusInputs, Controller, Plan, Resource}
 
   alias Jido.Topology.Signal.{
     ComponentFailed,
@@ -578,8 +578,21 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp ensure(spec, context) do
     with {:ok, pid} <- activate(spec, context),
+         :ok <- ready_bus_inputs(pid, spec, context),
          :ok <- bind_parent(pid, spec, context),
          do: {:ok, pid}
+  end
+
+  defp ready_bus_inputs(_pid, %{subscriptions: []}, _context), do: :ok
+
+  defp ready_bus_inputs(pid, _spec, context) do
+    case Map.get(Server.children(pid), {:plugin, BusInputs}) do
+      %{pid: runtime} when is_pid(runtime) ->
+        BusInputs.await_ready(runtime, timeout: context.task_timeout)
+
+      _missing ->
+        {:error, :subscription_unavailable}
+    end
   end
 
   defp activate(spec, context) do

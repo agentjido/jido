@@ -40,11 +40,28 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   end
 
   @impl true
-  def handle_call(:await_ready, _from, %{subscription_id: id} = state) when is_binary(id) do
-    {:reply, :ok, state}
-  end
+  def handle_call(:await_ready, _from, state) do
+    case Bus.whereis(state.config.bus, state.config.lookup_opts) do
+      {:ok, bus} when bus == state.bus and is_binary(state.subscription_id) ->
+        {:reply, :ok, state}
 
-  def handle_call(:await_ready, _from, state), do: {:reply, {:error, :not_ready}, state}
+      {:ok, _replacement} ->
+        if state.bus_ref, do: Process.demonitor(state.bus_ref, [:flush])
+
+        state =
+          state
+          |> cancel_record_retry()
+          |> Map.merge(%{bus: nil, bus_ref: nil, subscription_id: nil, reconnect_token: nil})
+
+        case connect(state) do
+          {:ok, connected} -> {:reply, :ok, connected}
+          {:error, _reason} -> {:reply, {:error, :not_ready}, schedule_reconnect(state)}
+        end
+
+      {:error, _reason} ->
+        {:reply, {:error, :not_ready}, state}
+    end
+  end
 
   @impl true
   def handle_info({:signal, signal}, state) do

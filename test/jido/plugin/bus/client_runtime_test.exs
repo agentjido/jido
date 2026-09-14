@@ -3,6 +3,35 @@ defmodule Jido.Plugin.Bus.ClientRuntimeTest do
   alias Jido.Plugin.Bus.Client
   alias Jido.Plugin.Bus.Client.Runtime
   alias Jido.Plugin.Init
+  alias Jido.Signal.Bus
+
+  test "readiness reconnects to a replaced Bus before its retry timer fires", %{jido: jido} do
+    bus = start_supervised!({Bus, name: :ready_bus, jido: jido}, id: :ready_bus)
+
+    init = %Init{
+      agent_server: self(),
+      agent_id: "client",
+      module: Client,
+      jido: jido,
+      options: [bus: :ready_bus, retry_delay_ms: 60_000]
+    }
+
+    client = start_supervised!({Runtime, init})
+    assert :ok = Client.await_ready(client, [])
+    monitor = Process.monitor(bus)
+    stop_supervised!(:ready_bus)
+    assert_receive {:DOWN, ^monitor, :process, ^bus, _}
+    eventually(fn -> :sys.get_state(client).bus == nil end)
+    stale_token = :sys.get_state(client).reconnect_token
+    replacement = start_supervised!({Bus, name: :ready_bus, jido: jido}, id: :ready_bus)
+
+    assert :ok = Client.await_ready(client, [])
+    state = :sys.get_state(client)
+    assert state.bus == replacement
+    assert is_binary(state.subscription_id)
+    send(client, {:reconnect, stale_token})
+    assert :sys.get_state(client).subscription_id == state.subscription_id
+  end
 
   test "invalid subscription options fail before the Client subscribes", %{jido: jido} do
     for {opts, reason} <- [
