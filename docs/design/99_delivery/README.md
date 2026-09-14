@@ -1,4 +1,4 @@
-> Delivery seam for the approved Jido V3 beta.1 candidate; two beta-only exceptions remain open for later releases.
+> Jido V3 beta.1 is published; two beta-only exceptions remain open for later releases.
 
 # 99 — Delivery
 
@@ -39,7 +39,7 @@ recorded there; the release workflow must still pass on its exact commit.
 | Authoring | 523 authoring tests pass; the larger case library remains future work. |
 | Core exclusion | `DIST-03` remains excluded. The user directed a skip for `SYSTEM-CLUSTER-01`, which asserts the same out-of-scope cluster authority contract. |
 | Hex package | Build, unpack inspection, fresh dependency resolution, production compile, and docs pass. The [CI Hex dry run](https://github.com/agentjido/jido/actions/runs/34876701594) passes on `c147595e`, before the skip; no upload occurred. |
-| Publication | Approved for beta.1 with named Bedrock and runtime-floor exceptions. The release workflow must still pass on the exact candidate before upload. |
+| Publication | Published on 2026-09-14 from tagged commit `5413df11`, with named Bedrock and runtime-floor exceptions. The [publish workflow](https://github.com/agentjido/jido/actions/runs/34886362229) passed. |
 
 ## Example contract classification
 
@@ -61,5 +61,5 @@ recorded there; the release workflow must still pass on its exact commit.
 
 This seam closes after [00 Overview](../00_overview/alignment.md) through
 [13 Observability](../13_observability/alignment.md), plus
-[90 Package boundaries](../90_package-boundaries/alignment.md). The local result
-is an input to CI and the human publication decision. It is not a publication.
+[90 Package boundaries](../90_package-boundaries/alignment.md). These records
+preserve the proof and exceptions for the published beta.
