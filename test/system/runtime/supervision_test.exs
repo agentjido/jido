@@ -6,7 +6,6 @@ defmodule JidoTest.System.SupervisionTest do
   @moduletag adapter: :ets
 
   alias JidoTest.RecoverableDeliveryAgent, as: Probe
-  alias JidoTest.System.Observability
 
   @tag :research
   test "immediate Jido replacement must wait for the old tree to release its names", c do
@@ -31,9 +30,9 @@ defmodule JidoTest.System.SupervisionTest do
 
     monitors =
       monitor_agent_tree(c, server) ++
-        Enum.map([c.sink, c.jido_pid | children], &{&1, Process.monitor(&1)})
+        Enum.map([c.jido_pid | children], &{&1, Process.monitor(&1)})
 
-    parent_monitor = Process.monitor(c.world)
+    prior_monitor = Process.monitor(c.jido_pid)
     held = Process.whereis(Jido.task_supervisor_name(c.jido))
 
     # Hold the old registered child at a scheduler boundary. It cannot consume
@@ -43,29 +42,31 @@ defmodule JidoTest.System.SupervisionTest do
 
     try do
       Process.exit(c.jido_pid, :kill)
-      assert_receive {:DOWN, ^parent_monitor, :process, _, reason}, 10_000
-      assert reason == :shutdown
-
-      log =
-        Observability.await_log(c.observer, fn log ->
-          text = inspect(log.msg)
-          String.contains?(text, "already_started") or String.contains?(text, "already started")
-        end)
-
-      assert inspect(log.msg) =~ inspect(held)
+      assert_receive {:DOWN, ^prior_monitor, :process, _, :killed}, 10_000
+      assert Process.alive?(c.world)
+      assert Process.alive?(held)
     after
       if Process.alive?(held), do: :erlang.resume_process(held)
     end
 
     await_down(monitors)
-    assert Process.whereis(c.jido) == nil
-    assert Process.whereis(Jido.task_supervisor_name(c.jido)) == nil
+    jido_name = c.jido
+
+    replacement =
+      c.world
+      |> Supervisor.which_children()
+      |> Enum.find_value(fn
+        {^jido_name, pid, _, _} when is_pid(pid) -> pid
+        _ -> nil
+      end)
+
+    assert is_pid(replacement) and replacement != c.jido_pid
+    assert Process.whereis(c.jido) == replacement
+    assert Process.whereis(Jido.task_supervisor_name(c.jido)) != held
     assert {:ok, %{state: %{value: 7}}, 2} = load(c, id)
     refute Process.alive?(c.sink)
 
     assert Process.alive?(c.world),
-           "SYSTEM-SUPERVISION-01: immediate replacement exhausted the parent restart budget " <>
-             "while an old Jido child retained its registered name. The checkpoint survived, " <>
-             "but the application tree did not recover."
+           "SYSTEM-SUPERVISION-01: immediate replacement did not preserve the application tree"
   end
 end

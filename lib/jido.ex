@@ -547,6 +547,7 @@ defmodule Jido do
   """
   def start_link(opts) do
     with {:ok, opts} <- Options.validate(opts),
+         :ok <- await_previous_children(Keyword.fetch!(opts, :name)),
          {:ok, claim} <-
            NamespaceRegistry.claim(Keyword.get(opts, :namespace), Keyword.fetch!(opts, :name)) do
       result =
@@ -557,6 +558,42 @@ defmodule Jido do
         )
 
       if not match?({:ok, _pid}, result), do: NamespaceRegistry.release(claim)
+      result
+    end
+  end
+
+  defp await_previous_children(name) do
+    if Process.whereis(name) do
+      :ok
+    else
+      names = [
+        task_supervisor_name(name),
+        registry_name(name),
+        runtime_store_name(name),
+        Jido.AgentServer.SpawnRegistry.name(name),
+        agent_supervisor_name(name)
+      ]
+
+      monitors =
+        for child_name <- names,
+            pid = Process.whereis(child_name),
+            is_pid(pid),
+            do: {pid, Process.monitor(pid)}
+
+      deadline = System.monotonic_time(:millisecond) + @shutdown_timeout_ms
+
+      result =
+        Enum.reduce_while(monitors, :ok, fn {pid, ref}, :ok ->
+          remaining = max(deadline - System.monotonic_time(:millisecond), 0)
+
+          receive do
+            {:DOWN, ^ref, :process, ^pid, _reason} -> {:cont, :ok}
+          after
+            remaining -> {:halt, {:error, {:previous_instance_still_stopping, pid}}}
+          end
+        end)
+
+      for {_pid, ref} <- monitors, do: Process.demonitor(ref, [:flush])
       result
     end
   end
