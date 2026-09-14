@@ -8,7 +8,7 @@
 - Candidate branch: `release/v3`.
 - Candidate identity: the commit that contains this record; the local full
   suite was run on its code and test changes before this documentation update.
-- Alignment state: `Prepared locally; Bedrock tests skipped and support floor failing`.
+- Alignment state: `Prepared locally; all real Bedrock tests skipped and support floor failing`.
 - Package scope: Jido with its optional Bedrock adapter, plus the exact
   `jido_action`, `jido_signal`, Bedrock, and Bedrock Raft versions in the
   [package matrix](package-matrix.md).
@@ -49,7 +49,7 @@ text and code differ.
 | `DEL-REQ-039` | `Proven` | Public docs state that Jido cannot undo external work completed before a failed commit. |
 | `DEL-REQ-040` | `Proven` | This seam contains gates and records, not a task backlog. |
 | `DEL-REQ-041` and `DEL-REQ-042` | `Satisfied by execution` | The user directed implementation. Repository instructions did not permit use of a planning skill. Commits and records provide traceability. |
-| `DEL-REQ-043` | `Blocked` | Bedrock is included in beta. The service profiles pass with three Bedrock tests skipped after prior failures. This does not prove strict startup or snapshot recovery. |
+| `DEL-REQ-043` | `Blocked` | Bedrock is included in beta. All 33 real Bedrock service tests and the MinIO snapshot test are skipped. This does not prove strict startup or snapshot recovery. |
 
 ## Remaining release gates
 

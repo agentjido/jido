@@ -14,8 +14,8 @@ mix test.services.minio # Separate opt-in direct S3 and Bedrock snapshot profile
 have only the `:service` tag; local system tests have only `:system`.
 Plain `mix test` and `mix quality` exclude both tags. There is no new CI job.
 The local cluster-authority probe is skipped by user direction. The base
-service profile passes with two Bedrock tests skipped, and the MinIO profile
-passes with its Bedrock snapshot test skipped. The known Bedrock placeholder,
+service profile passes with all 33 real Bedrock tests skipped. The MinIO profile
+passes on repeat with its Bedrock snapshot test skipped. The known placeholder,
 strict-startup, upload, and cold-rebuild gaps remain. See
 [the implementation record](SCENARIOS.md) for current evidence.
 
@@ -129,12 +129,13 @@ checks storage recovery after fixture cleanup, not unassisted Bedrock shutdown.
 
 ### Strict Bedrock and MinIO profiles
 
-The base service command also includes a strict Bedrock probe on three isolated
+The base service command contains a strict Bedrock probe on three isolated
 BEAM nodes. Each has a persistent coordinator and worker directory. A shared
 test bootstrap requests three logs and three replicas. It checks actual log
 placement before node loss and required Agent restoration. Startup currently
 failed in Bedrock before those durability checks could run (`SYSTEM-BEDROCK-04`).
-It is temporarily skipped pending the upstream fix. This is not evidence of
+It is skipped with the full real Bedrock service suite pending upstream fixes.
+This is not evidence of
 strict durability. All peers run on one host; this test
 does not simulate independent disks, physical power loss, or network partition.
 
@@ -161,7 +162,7 @@ timer. Native upload currently fails (`SYSTEM-BEDROCK-03`). An explicit control
 uploads the same files as binary, then rebuilds the cluster with cold
 materializers. Coordinator metadata and log WAL are retained. The rebuild also
 fails to reach readiness (`SYSTEM-BEDROCK-05`), so snapshot recovery is not yet
-proved. The snapshot test is temporarily skipped pending upstream fixes;
+proved. The snapshot test is skipped pending upstream fixes;
 neither control is a production fix or an in-memory substitute.
 
 The direct S3 profile uses the same 21 Agent and four Topology scenarios as
@@ -209,9 +210,10 @@ passed 24 of 26 direct S3 scenarios before the Topology target fix. It made
 identity reads and can change with runtime ordering.
 
 The latest full local MinIO profile on 2026-09-14 passed 28 tests and skipped
-the Bedrock snapshot test. All direct S3 and S3 pressure tests passed. The
-earlier snapshot run failed cold rebuild and recorded two native-upload
-encoding errors. The runner removed its owned test service and data.
+the Bedrock snapshot test on repeat. The first run had one direct S3 Topology
+readiness timeout, which did not repeat. An earlier Bedrock snapshot run failed
+cold rebuild and recorded two native-upload encoding errors. The runner
+removed its owned test service and data after each run.
 
 Record the MinIO release and endpoint settings used for each later conformance run.
 A MinIO result does not prove AWS S3 conformance. The profile does not test
@@ -312,8 +314,9 @@ The full-Jido probe holds the parent supervisor until the killed tree releases
 its registered names. This isolates durable target recovery from the
 immediate-restart race. The separate `SYSTEM-SUPERVISION-01` probe now passes
 with a bounded wait for old named children, but that local fix still needs
-review and repeated runs. `SYSTEM-BEDROCK-01` is temporarily skipped after
-failing unassisted placeholder shutdown; `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
+review and repeated runs. `SYSTEM-BEDROCK-01` failed unassisted placeholder
+shutdown and `SYSTEM-BEDROCK-02` passed with Bedrock 0.7.2 before the real
+Bedrock service suite was paused by user direction.
 The peer probe retains the absent exclusive-owner contract
 (`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip. It is
 skipped by user direction because cluster-exclusive ownership is outside the

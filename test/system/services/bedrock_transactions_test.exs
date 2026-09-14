@@ -4,6 +4,7 @@ defmodule JidoTest.System.Services.BedrockTransactions do
   use JidoTest.System.Case, async: false
   @moduletag :service
   @moduletag adapter: :bedrock
+  @moduletag skip: "Bedrock service suite paused pending upstream fixes (bedrock-kv/bedrock#319)"
   alias Jido.AgentServer, as: Server
   alias JidoTest.RecoverableDeliveryAgent, as: Probe
   alias JidoTest.RecoverableDeliverySink, as: Sink

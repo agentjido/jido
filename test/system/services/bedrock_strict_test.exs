@@ -5,6 +5,7 @@ Code.require_file("../support/bedrock_peers.exs", __DIR__)
 defmodule JidoTest.System.Services.BedrockStrict do
   use JidoTest.System.Case, async: false
   @moduletag :service
+  @moduletag skip: "Bedrock service suite paused pending upstream fixes (bedrock-kv/bedrock#319)"
   # The host control has a local File record. The scenario Agents use the
   # actual strict Bedrock adapter on isolated peers; no fallback is selected.
   @moduletag adapter: :file
@@ -12,7 +13,6 @@ defmodule JidoTest.System.Services.BedrockStrict do
   alias JidoTest.System.{BedrockPeers, ControlledAgent, Observability, Peers}
 
   @tag :research
-  @tag skip: "Bedrock upstream fix pending: bedrock-kv/bedrock#319"
   test "a strict three-node Bedrock cluster retains committed Agent state after node loss", c do
     local = start_agent(c, module: ControlledAgent)
     assert {:ok, _} = Jido.AgentServer.call(local, ControlledAgent.signal(1))

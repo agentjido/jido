@@ -52,10 +52,10 @@ not a gate exception. A failing release gate remains a blocker.
 `Jido.Persistence.Bedrock` is included in this beta, not deferred or excluded.
 The release design still requires passing real Bedrock and MinIO snapshot
 behavior against the exact published Bedrock dependency set in the
-[package matrix](package-matrix.md). The user directed temporary skips for the
-tests covering `SYSTEM-BEDROCK-01`, `SYSTEM-BEDROCK-04`, and the combined
-`SYSTEM-BEDROCK-03/05` snapshot path while upstream fixes are in progress.
-Both opt-in commands now pass with skips, but that does not satisfy
+[package matrix](package-matrix.md). The user directed a pause of all real
+Bedrock service tests, including previously passing cases, plus the MinIO
+Bedrock snapshot test, while upstream fixes are in progress.
+The opt-in commands can pass with these skips, but that does not satisfy
 `DEL-REQ-043` or prove strict durability and snapshot recovery. No release
 gate waiver has been approved. Local, unpublished Bedrock patches do not close it.
 
@@ -65,8 +65,8 @@ gate waiver has been approved. Local, unpublished Bedrock patches do not close i
 | --- | --- | --- | --- | --- |
 | `DIST-03` | Excluded | Future distributed authority owner | Core does not guarantee one live owner across a cluster. Applications that need this must supply fenced external authority. | Review with enforceable epochs at every protected commit. |
 | `SYSTEM-CLUSTER-01` | Skipped by user direction | Future distributed authority owner | This system probe asserts the same excluded cluster-exclusive owner contract. It remains in source, but normal suites and CI do not run it. | Review with `DIST-03` when cluster authority becomes supported. |
-| `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` | Temporarily skipped by user direction | Bedrock upstream | The published dependency fails placeholder shutdown and strict startup; service checks that pass do not prove these paths. | Re-enable after an upstream release and rerun the base service profile. |
-| `SYSTEM-BEDROCK-03/05` snapshot test | Temporarily skipped by user direction | Bedrock upstream | The native upload and cold rebuild remain unverified; direct S3 tests still run. | Re-enable after an upstream release and rerun the MinIO profile. |
+| Five real Bedrock service modules | Skipped by user direction | Bedrock upstream and Jido release owner | All 33 tests are paused, including previously passing cases. The published dependency still has known placeholder and strict-startup failures. | Re-enable after an upstream release and rerun the base service profile. |
+| Bedrock/MinIO snapshot module | Skipped by user direction | Bedrock upstream and Jido release owner | Native upload and cold rebuild remain unverified; direct S3 tests still run. | Re-enable after an upstream release and rerun the MinIO profile. |
 
 The skip removes this unsupported contract from the local full-suite gate.
 It does not establish cluster-wide ownership. The Bedrock skips also do not

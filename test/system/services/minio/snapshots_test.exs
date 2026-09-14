@@ -4,6 +4,7 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
   use JidoTest.System.Case, async: false
   @moduletag :service
   @moduletag adapter: :bedrock_minio
+  @moduletag skip: "Bedrock snapshot suite paused pending upstream fixes (agentjido/jido#370)"
   alias Bedrock.ControlPlane.Coordinator
   alias Bedrock.DataPlane.Materializer.Olivine.Logic
   alias Bedrock.ObjectStorage
@@ -14,7 +15,6 @@ defmodule JidoTest.System.Services.MinIOSnapshots do
   alias JidoTest.System.Observability
 
   @tag :research
-  @tag skip: "Bedrock snapshot upload and recovery fixes pending: agentjido/jido#370"
   test "real shard snapshots restore Agent state after cluster and materializer rebuild", c do
     level = Logger.level()
     Logger.configure(level: :info)

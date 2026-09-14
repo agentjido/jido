@@ -10,6 +10,7 @@ defmodule JidoTest.System.Services.BedrockRestart do
   @moduletag :tmp_dir
   @moduletag :service
   @moduletag adapter: :bedrock
+  @moduletag skip: "Bedrock service suite paused pending upstream fixes (bedrock-kv/bedrock#319)"
   @moduletag timeout: 60_000
 
   defmodule Counter do

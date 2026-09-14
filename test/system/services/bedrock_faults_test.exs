@@ -4,6 +4,7 @@ defmodule JidoTest.System.Services.BedrockFaults do
   use JidoTest.System.Case, async: false
   @moduletag :service
   @moduletag adapter: :bedrock
+  @moduletag skip: "Bedrock service suite paused pending upstream fixes (bedrock-kv/bedrock#319)"
   alias Jido.AgentServer, as: Server
   alias JidoTest.BedrockIntegration
   alias JidoTest.RecoverableDeliveryAgent, as: Probe
@@ -73,7 +74,6 @@ defmodule JidoTest.System.Services.BedrockFaults do
   end
 
   @tag :research
-  @tag skip: "Bedrock upstream fix pending: bedrock-kv/bedrock#319"
   test "Bedrock cluster shutdown must remove its own placeholder", c do
     name = c.cluster.otp_name_for_worker(Bedrock.ControlPlane.Distributor.Placeholder.worker_id())
     placeholder = Process.whereis(name)

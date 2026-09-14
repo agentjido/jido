@@ -244,9 +244,11 @@ and affected-row rules do not prove this CAS contract.
 
 ## Configure Bedrock KV
 
-Bedrock support is optional. In this beta, the Bedrock adapter has passing
-single-node storage and transaction checks, but strict multi-node startup and
-MinIO-backed snapshot recovery are not verified. Known upstream defects are
+Bedrock support is optional. Its core adapter unit tests remain active. Real
+Bedrock service checks, including previously passing single-node storage and
+transaction cases, are paused in this beta pending upstream fixes. Strict
+multi-node startup and MinIO-backed snapshot recovery are not verified. Known
+upstream defects are
 tracked in [Bedrock issue 319](https://github.com/bedrock-kv/bedrock/issues/319)
 and [Jido issue 370](https://github.com/agentjido/jido/issues/370). Do not rely
 on this beta for those durability paths until fixed and retested.

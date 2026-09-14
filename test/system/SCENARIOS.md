@@ -20,7 +20,7 @@ external effects.
 | Immediate supervisor replacement | `runtime/supervision_test.exs` | Held old child, bounded name-release wait, replacement tree and unchanged checkpoint; passes with local Jido fix |
 | Redis storage faults | `services/redis_faults_test.exs` | Real SIGKILL/AOF restart and TCP proxy reply loss after Lua execution; both pass |
 | PostgreSQL | `services/postgres_test.exs` | Real isolated Docker database; same 25 Agent/Topology scenarios pass |
-| Bedrock storage faults | `services/bedrock_faults_test.exs` | Three same-identity restarts and live coordinator/log replacement pass on Bedrock 0.7.2; unassisted placeholder cleanup fails |
+| Bedrock storage faults | `services/bedrock_faults_test.exs` | Paused; earlier Bedrock 0.7.2 runs passed restarts and coordinator/log replacement, while unassisted placeholder cleanup failed |
 | Real trace export | `runtime/open_telemetry_test.exs` | Four SDK tests pass: exported parentage, exporter failure isolation, handler failure isolation, and paired overhead measurements |
 | Metrics and logs | `runtime/observability_test.exs` | Public counters, host revision gauge, structured log identity and payload redaction |
 | Composed Topology | `support/scenarios/topology.exs` | Included teams, logical ownership, exact local placement and shared Bus replacement; latest run passes, earlier readiness timeout needs repeats |
@@ -31,9 +31,9 @@ external effects.
 | Shared-store stale write | `services/redis_partition_test.exs` | Connected peers partition while an old Agent holds work; another Agent commits revision two through the same real Redis store; old write loses CAS after rejoin; passes |
 | Cluster ownership | `runtime/peers_test.exs` | Same logical identity activates on connected peers with separate stores; exposes `SYSTEM-CLUSTER-01`, not a distributed File guarantee |
 | Long seeded burn-in | `burn_in.exs` and `support/turn_model.exs` | Fresh Mix processes, independent oracle, replay artifacts, process/memory/mailbox/record/byte growth checks |
-| Bedrock transaction faults | `services/bedrock_transactions_test.exs` | Real resolver conflict and reply loss after log sync; both pass with saved-state and effect checks |
-| Strict Bedrock peers | `services/bedrock_strict_test.exs` | Real three-node bootstrap requests three logs and replicas; startup fails before node-loss durability checks |
-| Bedrock/MinIO | `services/minio/snapshots_test.exs` | Explicit endpoint, owned bucket, real compacted snapshots, binary-upload control, cluster/cold-materializer rebuild, owned-object cleanup; upload and rebuild gaps remain |
+| Bedrock transaction faults | `services/bedrock_transactions_test.exs` | Paused; earlier resolver-conflict and reply-loss runs passed saved-state and effect checks |
+| Strict Bedrock peers | `services/bedrock_strict_test.exs` | Paused; earlier three-node startup failed before node-loss durability checks |
+| Bedrock/MinIO | `services/minio/snapshots_test.exs` | Paused; earlier native upload and cold rebuild failed. Direct S3 tests remain active. |
 | Direct S3/MinIO | `services/minio/s3_test.exs`, `services/minio/s3_pressure_test.exs`, and `run_s3_minio_local.py` | Real conditional object writes, shared Agent scenarios, 48 competing creates, eight rounds each of token and checkpoint writes, and an accepted write with a lost reply; pressure tests pass |
 | Compact run evidence | `support/report.exs` | Per-run JSON in ignored `tmp/system-runs`; revisions, effects, event counts, resource counts, and interrupted operation IDs |
 
@@ -53,10 +53,11 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 - `SYSTEM-SUPERVISION-01` passes with a bounded wait for old Jido
   children to release registered names. This needs review and repeated runs.
 - `SYSTEM-BEDROCK-01`: the placeholder survives unassisted cluster shutdown.
-- `SYSTEM-BEDROCK-01`, `SYSTEM-BEDROCK-04`, and the MinIO snapshot test for
-  `SYSTEM-BEDROCK-03/05` are temporarily skipped by user direction while
-  Bedrock upstream fixes are pending. The assertions remain in source.
-- `SYSTEM-BEDROCK-02` passes after the upgrade to Bedrock 0.7.2.
+- All five real Bedrock service modules and the MinIO snapshot module are
+  skipped by user direction while upstream fixes are pending. Their assertions
+  remain in source. Core adapter unit tests and non-Bedrock services still run.
+- `SYSTEM-BEDROCK-02` passed before the service suite was paused after the
+  upgrade to Bedrock 0.7.2.
 - `SYSTEM-CLUSTER-01`: separate local registries permit two cluster owners.
   The user directed a skip because cluster-exclusive ownership is outside the
   V3 beta scope. The probe stays in source, but it is not in `mix test.all` or
@@ -88,10 +89,10 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 | `mix test.authoring`, 2026-09-14 | 523/523 pass |
 | `mix test.bench`, 2026-09-14 | 7/7 benchmark contract tests pass |
 | `mix test.system`, 2026-09-14, seed 0 | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
-| `mix test.services`, 2026-09-14, seed 0 | 84 pass, 2 skipped; all other service tests remain active |
+| `mix test.services`, 2026-09-14, seed 0 | 53 pass, 33 skipped; all real Bedrock service modules paused, Redis and PostgreSQL active |
 | Focused sustained partition probes | Two local peer tests pass with held Turn and late spawn; shared-Redis stale-write test passes with real CAS |
 | `mix test.all --cover`, 2026-09-14 | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
-| Full MinIO profile, 2026-09-14, seed 0 | 28 pass, 1 skipped; the Bedrock snapshot test is skipped, while direct S3 tests pass. The owned bucket and objects were removed, and the dedicated server stopped. The prior run recorded cold-rebuild failure and two native-upload encoding errors. |
+| Full MinIO profile, 2026-09-14, seed 0 | First run: 27/28 pass, one direct S3 Topology readiness timeout, one Bedrock skip. Immediate repeat: 28 pass, one Bedrock skip. The owned bucket and objects were removed and the server stopped. Earlier Bedrock run recorded cold-rebuild failure and two native-upload encoding errors. |
 | Direct S3 MinIO pressure repeats, seed 0 | Four fresh local runs each pass both tests against MinIO `RELEASE.2025-10-15T17-29-55Z` |
 | Burn-in, two runs, 20 rounds, seeds 93 and 94 | All eight selected tests pass; 1086 model commands and six BEAM crashes across both runs |
 | Redis Bus readiness, fresh runs at seeds 0, 7 and 19 | All pass with the unchanged readiness call; original intermittent failure remains unexplained |

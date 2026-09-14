@@ -19,8 +19,9 @@ assertions and core work.
 | `mix test.bench` | 7/7 pass; these are benchmark contract tests, not a load run |
 | `mix test.system` | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
 | `mix test.all --cover` | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
-| `mix test.services` | 84 pass, 2 skipped: `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` await upstream fixes |
+| `mix test.services` | 53 pass, 33 skipped: all five real Bedrock service modules are paused; Redis and PostgreSQL tests remain active |
 | MinIO profile via owned local MinIO | 28 pass, 1 skipped: the snapshot test covers `SYSTEM-BEDROCK-03` and `SYSTEM-BEDROCK-05` |
+| MinIO repeat on this change | First run: 27/28 pass, one direct S3 Topology readiness timeout, one Bedrock skip. Immediate repeat: 28 pass, one Bedrock skip. Keep the timeout visible; no cause is established. |
 | Direct S3/MinIO pressure repeats (2026-09-14) | Four fresh 2/2 runs pass |
 | Two burn-in runs, 20 rounds each (2026-09-13) | 8 selected tests pass; 1,086 model commands and 6 BEAM crashes |
 
@@ -28,17 +29,19 @@ The latest full-suite run used the code on `release/v3`. Earlier focused runs
 used the Jido changes committed on `v3-spike`. The
 Topology target and owned-Agent probes
 `SYSTEM-TOPOLOGY-01/02/03` now pass. Bedrock replacement
-`SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
+`SYSTEM-BEDROCK-02` passed in an earlier run with Bedrock 0.7.2; it is now
+paused with the other real Bedrock service tests.
 The supervisor and Bus probes also passed, but their changes still need review
 and repeated runs before the earlier timing failures can be closed.
 `SYSTEM-CLUSTER-01` is skipped by user direction: it tests a cluster-wide
 owner guarantee that Jido core does not provide. The test remains in source,
 but neither `mix test.all` nor the CI core selection runs it. The approved
-`DIST-03` core skip is unchanged. The user directed temporary skips for the
-three tests blocked by Bedrock upstream defects. Their source and assertions
-remain. Passing service profiles with skips do not prove strict startup or
-MinIO snapshot recovery. No passing Bedrock case was skipped or replaced with
-an in-memory adapter.
+`DIST-03` core skip is unchanged. The user directed a pause of every real
+Bedrock service test, including previously passing cases, while upstream fixes
+are pending. Their source and assertions remain. Core Bedrock adapter unit
+tests still run. A passing service profile with these skips does not prove
+Bedrock durability. No non-Bedrock case was skipped or replaced with an
+in-memory adapter.
 
 ## Topology target durability — verified paths and open edges
 

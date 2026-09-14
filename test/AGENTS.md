@@ -60,8 +60,8 @@ prerequisite; do not skip it or use an in-memory
 replacement. Keep unresolved system probes enabled and describe them in
 `test/system/README.md` and `test/system/TODO.md`, except the user-directed
 `SYSTEM-CLUSTER-01` skip for the excluded cluster-authority contract and the
-three user-directed Bedrock skips pending upstream fixes. Keep all other
-service tests active.
+user-directed pause of all real Bedrock service modules pending upstream fixes.
+Keep the core Bedrock adapter unit tests and all non-Bedrock service tests active.
 The DIST-03 test `one logical identity has at most one live cluster owner`
 in `test/jido/agent_server/distributed_authority_test.exs` retains its approved skip.
 Keep other research probes enabled. A probe that records an unsupported contract
