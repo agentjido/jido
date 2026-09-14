@@ -10,6 +10,7 @@ defmodule JidoTest.RecoverableDeliverySink do
   end
 
   def records(jido), do: GenServer.call(address(jido), :records)
+  def attempts(jido), do: GenServer.call(address(jido), :attempts)
 
   def hold(jido, stage) when stage in [:none, :before_write, :after_write],
     do: GenServer.call(address(jido), {:hold, stage})
@@ -18,12 +19,14 @@ defmodule JidoTest.RecoverableDeliverySink do
 
   @impl Jido.Examples.RecoverableDelivery.Sink
   def deliver(jido, directive) do
-    {stage, available?} = GenServer.call(address(jido), {:attempt, self(), directive.effect_id})
-    barrier(stage, :before_write)
+    {stage, available?, observer} =
+      GenServer.call(address(jido), {:attempt, self(), directive.effect_id})
+
+    barrier(stage, :before_write, observer, directive.effect_id)
 
     if available? do
       with :ok <- GenServer.call(address(jido), {:write, directive}) do
-        barrier(stage, :after_write)
+        barrier(stage, :after_write, observer, directive.effect_id)
         :ok
       end
     else
@@ -36,7 +39,9 @@ defmodule JidoTest.RecoverableDeliverySink do
     {:ok,
      %{
        records: %{},
+       attempts: [],
        observer: Keyword.fetch!(opts, :observer),
+       on_attempt: Keyword.get(opts, :on_attempt, fn _effect_id -> :ok end),
        hold: :none,
        available?: true
      }}
@@ -45,14 +50,20 @@ defmodule JidoTest.RecoverableDeliverySink do
   @impl true
   def handle_call(:records, _from, state), do: {:reply, state.records, state}
 
+  def handle_call(:attempts, _from, state), do: {:reply, Enum.reverse(state.attempts), state}
+
   def handle_call({:hold, stage}, _from, state), do: {:reply, :ok, %{state | hold: stage}}
 
   def handle_call({:available, value}, _from, state),
     do: {:reply, :ok, %{state | available?: value}}
 
   def handle_call({:attempt, worker, effect_id}, _from, state) do
+    state.on_attempt.(effect_id)
     send(state.observer, {:effect_attempt, effect_id, worker})
-    {:reply, {state.hold, state.available?}, state}
+    attempt = %{effect_id: effect_id, worker: worker}
+
+    {:reply, {state.hold, state.available?, state.observer},
+     %{state | attempts: [attempt | state.attempts]}}
   end
 
   def handle_call({:write, %{effect_id: id, value: value}}, _from, state) do
@@ -65,7 +76,9 @@ defmodule JidoTest.RecoverableDeliverySink do
 
   defp address(jido), do: {:via, Registry, {Jido.registry_name(jido), {__MODULE__, :sink}}}
 
-  defp barrier(stage, stage) when stage != :none do
+  defp barrier(stage, stage, observer, effect_id) when stage != :none do
+    send(observer, {:effect_barrier, stage, effect_id, self()})
+
     receive do
       :release -> :ok
     after
@@ -73,7 +86,7 @@ defmodule JidoTest.RecoverableDeliverySink do
     end
   end
 
-  defp barrier(_stage, _expected), do: :ok
+  defp barrier(_stage, _expected, _observer, _effect_id), do: :ok
 end
 
 defmodule JidoTest.RecoverableDeliveryAgent do

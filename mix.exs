@@ -109,7 +109,8 @@ defmodule Jido.MixProject do
       test_ignore_filters: [
         fn path ->
           (String.starts_with?(path, "test/bench/") or
-             String.starts_with?(path, "test/authoring/")) and
+             String.starts_with?(path, "test/authoring/") or
+             String.starts_with?(path, "test/system/")) and
             not String.ends_with?(path, "_test.exs")
         end
       ],
@@ -154,6 +155,9 @@ defmodule Jido.MixProject do
         "test.peer": :test,
         "test.examples": :test,
         "test.authoring": :test,
+        "test.system": :test,
+        "test.services": :test,
+        "test.services.minio": :test,
         "test.all": :test,
         coveralls: :test,
         "coveralls.github": :test,
@@ -375,6 +379,8 @@ defmodule Jido.MixProject do
 
       # Development & Test Dependencies
       {:ecto_sqlite3, "~> 0.24.1", only: :test},
+      {:postgrex, "~> 0.19 or ~> 1.0", only: :test},
+      {:opentelemetry, "~> 1.0", only: :test, runtime: false},
       {:req_llm, "~> 1.21", only: [:dev, :test]},
       {:dotenvy, "~> 1.1", only: [:dev, :test]},
       {:git_ops, "~> 2.9", only: :dev, runtime: false},
@@ -393,13 +399,18 @@ defmodule Jido.MixProject do
       # Default exclusions are declared once in test/test_helper.exs.
       test: "test --preload-modules",
 
-      # Run one test category or all supported categories with a fixed seed.
+      # Run normal categories with a fixed seed. Services are opt-in and are
+      # deliberately absent from test.all.
       "test.bench": "test test/bench --only bench --seed 0",
       "test.peer": "test test/jido --only peer --seed 0",
       "test.examples": "test test/examples --only example --seed 0",
       "test.authoring": "test test/authoring --only authoring --seed 0",
+      "test.system": "test test/system/runtime --only system --seed 0",
+      "test.services":
+        "test #{Path.wildcard("test/system/services/*_test.exs") |> Enum.join(" ")} --only service --seed 0",
+      "test.services.minio": "test test/system/services/minio --only service --seed 0",
       "test.all":
-        "test --preload-modules --include bench --include example --include authoring --include flaky --include peer --seed 0",
+        "test --preload-modules --include bench --include example --include authoring --include system --include flaky --include peer --seed 0",
 
       # Helper to run docs
       docs: "docs --open",

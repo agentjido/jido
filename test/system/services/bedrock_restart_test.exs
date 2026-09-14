@@ -1,4 +1,4 @@
-defmodule JidoTest.Persistence.BedrockIntegrationTest do
+defmodule JidoTest.System.Services.BedrockRestart do
   use ExUnit.Case, async: false
 
   alias Jido.Persistence
@@ -8,6 +8,8 @@ defmodule JidoTest.Persistence.BedrockIntegrationTest do
   alias JidoTest.Persistence.AdapterConformance
 
   @moduletag :tmp_dir
+  @moduletag :service
+  @moduletag adapter: :bedrock
   @moduletag timeout: 60_000
 
   defmodule Counter do
