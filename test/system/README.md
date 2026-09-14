@@ -313,7 +313,9 @@ with a bounded wait for old named children, but that local fix still needs
 review and repeated runs. `SYSTEM-BEDROCK-01` still fails on unassisted
 placeholder shutdown; `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
 The peer probe retains the absent exclusive-owner contract
-(`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip.
+(`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip. It is
+tagged `:flaky` for tracking, but the current failure is repeatable and the
+probe remains enabled in `mix test.all`.
 The JSON/Flow/Directive journey's `SYSTEM-BUS-01` timeout did not recur in
 the latest full run with nonblocking Client delivery. Keep it enabled
 and repeat it before closing the timing failure.

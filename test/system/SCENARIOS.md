@@ -55,7 +55,9 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 - `SYSTEM-BEDROCK-01`: the placeholder survives unassisted cluster shutdown.
 - `SYSTEM-BEDROCK-02` passes after the upgrade to Bedrock 0.7.2.
 - `SYSTEM-CLUSTER-01`: separate local registries permit two cluster owners.
-  The approved core DIST-03 skip is unchanged.
+  It is tagged `:flaky` for tracking, but the current contract gap is repeatable.
+  The probe remains enabled in `mix test.all`; the approved core DIST-03 skip
+  is unchanged.
 - `SYSTEM-BUS-01` and shared-Bus replacement readiness pass in the latest
   full run with nonblocking Client delivery. Earlier timing failures
   still need repeated fresh-BEAM runs; no adapter defect is established.

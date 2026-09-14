@@ -30,8 +30,10 @@ Topology target and owned-Agent probes
 `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
 The supervisor and Bus probes also passed, but their changes still need review
 and repeated runs before the earlier timing failures can be closed.
-`SYSTEM-CLUSTER-01` tests a cluster-wide owner guarantee that Jido core does
-not provide. The approved `DIST-03` core skip is unchanged. Strict Bedrock
+`SYSTEM-CLUSTER-01` is tagged `:flaky` for tracking, but its current failure is
+repeatable: it tests a cluster-wide owner guarantee that Jido core does not
+provide. It remains enabled in `mix test.all`. The approved `DIST-03` core skip
+is unchanged. Strict Bedrock
 startup and MinIO snapshot recovery still block their later assertions. No
 failed probe was skipped or replaced with an in-memory adapter.
 
