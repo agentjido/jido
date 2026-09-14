@@ -2,8 +2,9 @@
 
 `TODO.md` tracks completed probes and remaining work. This file records
 implementation status and test evidence. A passing probe establishes only the
-contract named by the probe. It does not establish durable Topology targets,
-exclusive cluster ownership, or exactly-once external effects.
+contract named by the probe. Durable Topology target recovery now passes for
+the tested restarts; it does not establish cluster-wide ownership or exactly-once
+external effects.
 
 ## Added scenarios
 
@@ -16,15 +17,15 @@ exclusive cluster ownership, or exactly-once external effects.
 | Restore boundaries | `support/scenarios/restoration.exs` | Both restore modes reject an unsupported Plugin record; a tombstone during a held read prevents activation |
 | Independent state oracle | `support/turn_model.exs` | Mixed success, rejection, cancellation, timeout, conflict, deletion, restart, and uncertain writes; seeded generation and bounded failure reduction |
 | Combined overload | `support/scenarios/overload.exs` | Caller timeout, full queue, rejected calls/cast, Bus replacement, and worker death; exact request and event accounting |
-| Immediate supervisor replacement | `runtime/supervision_test.exs` | Enabled `SYSTEM-SUPERVISION-01` failure with held old child, failed-start logs, parent shutdown, and unchanged checkpoint |
+| Immediate supervisor replacement | `runtime/supervision_test.exs` | Held old child, bounded name-release wait, replacement tree and unchanged checkpoint; passes with local Jido fix |
 | Redis storage faults | `services/redis_faults_test.exs` | Real SIGKILL/AOF restart and TCP proxy reply loss after Lua execution; both pass |
-| PostgreSQL | `services/postgres_test.exs` | Real isolated Docker database; same 25 Agent/Topology scenarios; only two known Topology gaps remain |
-| Bedrock storage faults | `services/bedrock_faults_test.exs` | Three same-identity restarts pass; live coordinator/log replacement and unassisted placeholder cleanup fail |
+| PostgreSQL | `services/postgres_test.exs` | Real isolated Docker database; same 25 Agent/Topology scenarios pass |
+| Bedrock storage faults | `services/bedrock_faults_test.exs` | Three same-identity restarts and live coordinator/log replacement pass on Bedrock 0.7.2; unassisted placeholder cleanup fails |
 | Real trace export | `runtime/open_telemetry_test.exs` | Four SDK tests pass: exported parentage, exporter failure isolation, handler failure isolation, and paired overhead measurements |
 | Metrics and logs | `runtime/observability_test.exs` | Public counters, host revision gauge, structured log identity and payload redaction |
-| Composed Topology | `support/scenarios/topology.exs` | Included teams, logical ownership, exact local placement and shared Bus replacement; one 2026-09-14 ETS run timed out on replacement readiness |
-| Partial Topology cleanup | `runtime/topology_cleanup_test.exs` | Real resource ownership conflict, accepted added members, control-tree failure during cleanup; exposes `SYSTEM-TOPOLOGY-03` |
-| Signal journey | `runtime/signal_journey_test.exs` | JSON validation and explicit key conversion, Bus/Router, Action/Flow, commit, Directive, failed acknowledgement and replay; exposes `SYSTEM-BUS-01` |
+| Composed Topology | `support/scenarios/topology.exs` | Included teams, logical ownership, exact local placement and shared Bus replacement; latest run passes, earlier readiness timeout needs repeats |
+| Partial Topology cleanup | `runtime/topology_cleanup_test.exs` | Real resource ownership conflict, accepted added members, control-tree failure during cleanup; `SYSTEM-TOPOLOGY-03` passes |
+| Signal journey | `runtime/signal_journey_test.exs` | JSON validation and explicit key conversion, Bus/Router, Action/Flow, commit, Directive, failed acknowledgement and replay; latest run passes, earlier `SYSTEM-BUS-01` timeout needs repeats |
 | Peer reconstruction | `runtime/peers_test.exs` | Three actual BEAM SIGKILLs with required File restores, held-work interruption and witnessed node loss; passes |
 | Sustained peer partitions | `runtime/peers_test.exs` | Remote held Turn cancellation, child/task cleanup, closed request, lost startup reply, explicit replacement and stale lifecycle rejection; independent standard-IO control and blocked data-link cookies; both pass |
 | Shared-store stale write | `services/redis_partition_test.exs` | Connected peers partition while an old Agent holds work; another Agent commits revision two through the same real Redis store; old write loses CAS after rejoin; passes |
@@ -40,35 +41,24 @@ The ordered fault queue retains the simple single-fault API. The effect sink
 records each attempt separately from its deduplicated records. Synchronization
 uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 
-## Open contracts
+## Open contracts and recent fixes
 
-- `SYSTEM-TOPOLOGY-01` and `SYSTEM-TOPOLOGY-02` remain enabled failing probes.
-  A target accepted by a live Controller does not survive its Runtime restart
-  or full Jido restart. Agent checkpoint durability is checked separately.
+- `SYSTEM-TOPOLOGY-01/02/03` now pass. Accepted targets restore after Runtime
+  and whole-Jido replacement, and Controller cleanup stops owned added Agents.
+  Full BEAM target reconstruction and explicit target deletion/replacement
+  remain separate work in `TODO.md`.
 - File returns raw OS errors. Persistence classifies an unclassified write
   error as indeterminate and stops the Agent. A failed temporary write does not
   currently produce the narrower `:rejected` classification.
-- `SYSTEM-SUPERVISION-01`: immediate Jido replacement exhausts its parent's
-  restart budget while a held old Task Supervisor retains its name. The probe
-  releases the child and verifies cleanup before failing the recovery contract.
+- `SYSTEM-SUPERVISION-01` passes with a bounded wait for old Jido
+  children to release registered names. This needs review and repeated runs.
 - `SYSTEM-BEDROCK-01`: the placeholder survives unassisted cluster shutdown.
-- `SYSTEM-BEDROCK-02`: live coordinator/log replacement reaches a new layout,
-  but the transaction system does not become ready. Runs observed Distributor
-  `startup_sweep_failed` / `already_started`; the 2026-09-14 coordinator run
-  instead reported `sequencer_unavailable` / `wrong_epoch`. Fixture-assisted
-  full restart is a separate checkpoint recovery control.
-- `SYSTEM-TOPOLOGY-03`: three owned members survive control-tree failure during
-  cleanup of a partial accepted update. The test removes them after collecting
-  the ownership evidence.
+- `SYSTEM-BEDROCK-02` passes after the upgrade to Bedrock 0.7.2.
 - `SYSTEM-CLUSTER-01`: separate local registries permit two cluster owners.
   The approved core DIST-03 skip is unchanged.
-- `SYSTEM-BUS-01`: durable input can be replayed during Agent initialization.
-  Its synchronous Agent call competes with Plugin readiness, and startup can
-  time out. ETS, File and SQLite reproduced this in the full normal run;
-  focused ETS passed. This remains a timing-sensitive probe, not a claimed fix.
-- Shared-Bus replacement readiness also timed out once on ETS in the
-  2026-09-14 local run. The failed component was not captured; this is not
-  evidence of an ETS adapter defect.
+- `SYSTEM-BUS-01` and shared-Bus replacement readiness pass in the latest
+  full run with nonblocking Client delivery. Earlier timing failures
+  still need repeated fresh-BEAM runs; no adapter defect is established.
 - `SYSTEM-BEDROCK-03`: native S3 snapshot upload passes an iolist to ExAws,
   which attempts JSON encoding and raises `Jason.EncodeError`. The test's
   binary-upload control uses the same real compacted files and real MinIO.
@@ -80,20 +70,23 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
   30-second fixture deadline. Coordinator metadata and log WAL are retained;
   the original materializer files are preserved as evidence. Snapshot recovery
   is not proved.
-- New durable target APIs and storage guarantees are not added by this test
-  work. Service prerequisites must fail explicitly, not select a fake adapter
-  or silently skip a scenario.
+- The new target store covers the selected local and service restart paths,
+  not cluster-wide owner authority or every target lifecycle rule. Service
+  prerequisites must fail explicitly, not select a fake adapter or silently
+  skip a scenario.
 
 ## Verification
 
 | Check | Result |
 | --- | --- |
-| `mix quality`, 2026-09-14 | Format, warnings-as-errors compilation, configured Credo checks and Dialyzer pass; 1104 core tests pass |
-| `mix test.system`, 2026-09-14, seed 0 | 101/113 pass; nine Topology/supervision/ownership failures, two durable Bus startup timeouts on File and SQLite, and one shared-Bus replacement readiness timeout on ETS |
-| `mix test.services`, 2026-09-14, seed 0, explicit Redis binary | 76/86 pass; six Topology target failures, three Bedrock replacement/shutdown failures and one strict-startup failure. The shared-Redis partition passes |
+| `mix quality`, 2026-09-14 | 1106 core tests pass; format, warnings-as-errors compile, Credo, and Dialyzer pass |
+| `mix test.authoring`, 2026-09-14 | 523/523 pass |
+| `mix test.bench`, 2026-09-14 | 7/7 benchmark contract tests pass |
+| `mix test.system`, 2026-09-14, seed 0 | 112/113 pass; only `SYSTEM-CLUSTER-01` fails |
+| `mix test.services`, 2026-09-14, seed 0 | 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail |
 | Focused sustained partition probes | Two local peer tests pass with held Turn and late spawn; shared-Redis stale-write test passes with real CAS |
-| `mix test.all --cover`, 2026-09-13, before the S3 adapter commit | 1991/2003 pass, 1 skipped, 87 excluded; 12 named system failures, 94.1% coverage. All 87 service statuses were `excluded` with an invalid Redis executable in the environment. This full command has not been rerun after the S3 commit |
-| Full MinIO profile, 2026-09-14, seed 0 | 26/29 pass: two S3 Topology target failures and one Bedrock cold-rebuild readiness failure. Native upload also reports two `Jason.EncodeError` results; the binary control uploads two real snapshots. The owned bucket and objects were removed, and the dedicated server stopped |
+| `mix test.all --cover`, 2026-09-14 | 2015/2016 pass, 1 skipped, 115 excluded; only `SYSTEM-CLUSTER-01` fails; 93.5% coverage |
+| Full MinIO profile, 2026-09-14, seed 0 | 28/29 pass; Bedrock cold-rebuild readiness fails. Native upload reports two `Jason.EncodeError` results; the binary control uploads two real snapshots. The owned bucket and objects were removed, and the dedicated server stopped |
 | Direct S3 MinIO pressure repeats, seed 0 | Four fresh local runs each pass both tests against MinIO `RELEASE.2025-10-15T17-29-55Z` |
 | Burn-in, two runs, 20 rounds, seeds 93 and 94 | All eight selected tests pass; 1086 model commands and six BEAM crashes across both runs |
 | Redis Bus readiness, fresh runs at seeds 0, 7 and 19 | All pass with the unchanged readiness call; original intermittent failure remains unexplained |
@@ -109,13 +102,9 @@ MinIO remain outside `mix test.all`. No CI job was added.
 
 The scenario families in the TODO now have runnable tests. This does not mean
 every downstream assertion has passed: strict Bedrock startup and MinIO rebuild
-block their later checks, and several runtime probes deliberately retain failed
-contracts. Durable Topology target records, acceptance/CAS semantics, deletion,
-restore/version rules and exclusive cluster authority remain core design work.
-No new public API or guarantee was invented to make those probes green.
+block their later checks. Target deletion/replacement rules and exclusive
+cluster authority remain design work. The Jido fixes and dependency upgrade
+are committed locally but need review and repeated runs before the earlier
+timing failures can be called resolved.
 
-The local simplification pass kept the shared scenario design. It clarified the
-Flow projection name and preserves the original model failure artifact before
-reduction. No independent review was run: subagents were prohibited.
-Code review: skipped (ce-code-review unavailable) — its independent review
-workflow requires subagents; the final local diff scan is not that review.
+The probes do not claim exclusive cluster ownership or exactly-once effects.

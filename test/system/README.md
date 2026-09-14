@@ -13,10 +13,11 @@ mix test.services.minio # Separate opt-in direct S3 and Bedrock snapshot profile
 `mix test.all` does not start Redis, PostgreSQL, MinIO, or a real Bedrock cluster. Service tests
 have only the `:service` tag; local system tests have only `:system`.
 Plain `mix test` and `mix quality` exclude both tags. There is no new CI job.
-Open Topology, supervisor replacement, and Bedrock recovery contracts are
-**enabled, failing probes**, not skipped tests or assertions that a fault must
-occur. Neither complete profile is expected to pass until those contracts are
-repaired. See [the implementation record](SCENARIOS.md) for current evidence.
+The local profile has one enabled failing probe for cluster-wide exclusive
+ownership, which Jido core does not provide. The base service profile still
+has Bedrock placeholder-shutdown and strict-startup failures. MinIO snapshot
+upload and cold rebuild remain separate gaps. See
+[the implementation record](SCENARIOS.md) for current evidence.
 
 ## Layout
 
@@ -198,20 +199,17 @@ On 2026-09-14, four fresh local MinIO runs passed both pressure tests. The
 first run made 690 GET, 382 PUT, and one DELETE request. Request counts can
 change with the order of concurrent work.
 
-On 2026-09-14, a local MinIO `RELEASE.2025-10-15T17-29-55Z` run used one
+An earlier local MinIO `RELEASE.2025-10-15T17-29-55Z` run used one
 loopback HTTP endpoint, one owned bucket per test, explicit test credentials,
 single-attempt ExAws `2.7.0` requests, and the default object-size limit. It
-passed 24 of 26 scenarios. The two failures were the already documented
-`SYSTEM-TOPOLOGY-01` and `SYSTEM-TOPOLOGY-02` runtime target-recovery gaps.
-All S3 checkpoint, effect, fencing, restoration, and maintenance scenarios
-passed. This run made 628 GET, 139 PUT, and two DELETE requests across its
-26 scenarios. These counts include identity reads and can change with runtime
-ordering.
+passed 24 of 26 direct S3 scenarios before the Topology target fix. It made
+628 GET, 139 PUT, and two DELETE requests. These historical counts include
+identity reads and can change with runtime ordering.
 
-The full local MinIO profile on 2026-09-14 passed 26 of 29 tests. Both S3
-pressure tests passed. The two S3 target-recovery probes and the separate
-Bedrock snapshot rebuild probe failed; native snapshot upload also reported
-two encoding errors. The runner removed its owned test service and data.
+The latest full local MinIO profile on 2026-09-14 passed 28 of 29 tests.
+All direct S3 and S3 pressure tests passed. Only the Bedrock snapshot rebuild
+probe failed; native snapshot upload also reported two encoding errors. The
+runner removed its owned test service and data.
 
 Record the MinIO release and endpoint settings used for each later conformance run.
 A MinIO result does not prove AWS S3 conformance. The profile does not test
@@ -303,40 +301,31 @@ disconnected from a replaced Bus after the Controller reported ready. The fix
 checks its Bus input Plugin and reconnects the Client before readiness succeeds.
 The focused Client regression and the full Signal scenario cover this change.
 
-- `SYSTEM-TOPOLOGY-01`: after two accepted updates from one to three members,
-  a Runtime crash restores the original one-member target. Two live Agents
-  become invisible to the Controller and survive its shutdown. The probe
-  records these facts, removes the orphaned test Agents, then fails the required
-  membership and ownership assertion.
-- `SYSTEM-TOPOLOGY-02`: a full Jido restart restores the original one-member
-  target, not the accepted two-member target. The added Agent's checkpoint
-  survives. Resubmitting the updated target recovers its exact state and
-  revision. The probe then fails the required automatic membership assertion.
+`SYSTEM-TOPOLOGY-01/02/03` now pass. The accepted target survives Runtime
+and whole-Jido replacement, and Controller cleanup stops owned added Agents.
+The accepted Agent checkpoints retain their identities. Explicit target
+deletion and fresh-BEAM target reconstruction remain outside these probes.
 
 The full-Jido probe holds the parent supervisor until the killed tree releases
-its registered names. This isolates durable target recovery from an additional
-immediate-restart race described in the TODO. It does not claim that an
-uncoordinated hard kill of a supervisor is safe.
-`runtime/supervision_test.exs` now reproduces that separate race with a held
-old Task Supervisor and scoped OTP failure logs (`SYSTEM-SUPERVISION-01`).
-The Bedrock fault probes separately retain the placeholder shutdown and live
-replacement gaps (`SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-02`).
-The partial-update probe retains owned-member cleanup failure
-(`SYSTEM-TOPOLOGY-03`). The peer probe retains the absent exclusive-owner
-contract (`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip.
-The JSON/Flow/Directive journey also found a startup timeout when a durable
-Bus replays input before Agent readiness (`SYSTEM-BUS-01`). ETS, File and SQLite
-reproduced it under the full normal suite. Focused ETS also passed, so this is
-timing-sensitive. It stays enabled.
+its registered names. This isolates durable target recovery from the
+immediate-restart race. The separate `SYSTEM-SUPERVISION-01` probe now passes
+with a bounded wait for old named children, but that local fix still needs
+review and repeated runs. `SYSTEM-BEDROCK-01` still fails on unassisted
+placeholder shutdown; `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
+The peer probe retains the absent exclusive-owner contract
+(`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip.
+The JSON/Flow/Directive journey's `SYSTEM-BUS-01` timeout did not recur in
+the latest full run with nonblocking Client delivery. Keep it enabled
+and repeat it before closing the timing failure.
 
 One Redis Bus-replacement run also timed out while waiting for Controller
 readiness. Ten focused runs with seeds 1 through 10, then runs with seeds 0, 7
 and 19, passed with the same
 readiness call and timeout. The cause is not established. The test stays enabled
 and now reports Controller status and component errors if readiness fails.
-An included-team replacement also timed out on ETS in the 2026-09-14 local run;
-that path did not capture component errors. Do not count a passing repeat as a
-repair of either intermittent failure.
+An included-team replacement also timed out on ETS in an earlier run; that path
+did not capture component errors. The latest run passed. Do not count one
+passing repeat as proof that either timing failure is fixed.
 
 ## Focused runs and longer repetition
 
