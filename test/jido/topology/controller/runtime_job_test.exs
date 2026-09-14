@@ -122,7 +122,9 @@ defmodule Jido.Topology.Controller.RuntimeJobTest do
 
     state = %{
       jido: jido,
+      owner: self(),
       instance: instance,
+      target_revision: 0,
       repair: :manual,
       reconcile_requested: false,
       reconcile_timer: nil,

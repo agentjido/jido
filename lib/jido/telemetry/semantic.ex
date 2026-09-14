@@ -19,7 +19,7 @@ defmodule Jido.Telemetry.Semantic do
   @scheduler_values ~w(idle delivered state_read_error timeout task_error delivery_error invalid_result)a
 
   @signed_measurements [:system_time, :monotonic_time]
-  @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after component_count ready_count failed_count epoch)a
+  @count_measurements ~w(count duration state_version state_version_before state_version_after directive_count directive_index directive_completed directive_failed directive_skipped queue_depth queue_limit wait_duration expected_revision revision_before revision_after target_revision component_count ready_count failed_count epoch)a
   @trace_keys [:trace_id, :span_id, :parent_span_id, :causation_id]
   @trace_carrier_keys @trace_keys ++ [:trace_flags, :traceparent, :tracestate]
   @log_scope_key {:jido, :semantic_log_scope}

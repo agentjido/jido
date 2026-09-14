@@ -24,6 +24,8 @@ defmodule Jido.Topology.Controller.Activation do
       pool = Jido.agent_supervisor_name(context.jido)
 
       with {:ok, pid} <- DynamicSupervisor.start_child(pool, child) do
+        Jido.Topology.Controller.Owner.track(context.owner, pid)
+
         case Server.await_ready(pid) do
           :ok ->
             {:ok, pid}

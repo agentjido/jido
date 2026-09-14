@@ -65,13 +65,15 @@ defmodule Jido.Topology.Controller do
 
   @impl true
   def init({jido, instance, repair, lifecycle}) do
-    children = [
-      {Task.Supervisor, name: name(jido, instance.id, :tasks)},
-      {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one},
-      {Topology.Controller.Runtime, {jido, instance, repair, lifecycle}}
-    ]
+    with {:ok, owner} <- Topology.Controller.Owner.start(jido, self(), instance.id) do
+      children = [
+        {Task.Supervisor, name: name(jido, instance.id, :tasks)},
+        {DynamicSupervisor, name: name(jido, instance.id, :resources), strategy: :one_for_one},
+        {Topology.Controller.Runtime, {jido, instance, repair, lifecycle, owner}}
+      ]
 
-    Supervisor.init(children, strategy: :one_for_all)
+      Supervisor.init(children, strategy: :one_for_all)
+    end
   end
 
   @doc "Returns status from the latest repair pass."

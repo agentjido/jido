@@ -25,6 +25,7 @@ defmodule Jido.Telemetry.Topology do
 
   defp component_measurements(state) do
     %{
+      target_revision: state.target_revision,
       component_count:
         map_size(state.instance.plan.agents) + map_size(state.instance.plan.resources),
       ready_count: map_size(state.ready),

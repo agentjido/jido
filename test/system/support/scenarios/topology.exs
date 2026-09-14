@@ -144,6 +144,7 @@ defmodule JidoTest.System.Scenarios.Topology do
         assert_receive {:DOWN, ^monitor, :process, ^old_runtime, :killed}, 10_000
         await_new_runtime(c, controller, old_runtime)
         status = Controller.status(controller)
+        assert status.target_revision == 2
         found = members(controller, 3)
         still_live = Enum.map(original, &Server.snapshot/1)
 
@@ -209,6 +210,7 @@ defmodule JidoTest.System.Scenarios.Topology do
 
         assert :ok = Controller.await_ready(replacement)
         actual_count = Controller.status(replacement).agents
+        assert Controller.status(replacement).target_revision == 1
         recovered_member = Controller.whereis_agent(replacement, :workers, 2)
         assert {:ok, still_saved, 1} = load_cell(c, committed.id)
         assert still_saved.state == committed.state

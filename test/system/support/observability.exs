@@ -10,7 +10,11 @@ defmodule JidoTest.System.Observability do
     [:jido, :persistence, :operation],
     [:jido, :topology, :operation]
   ]
-  @points [[:jido, :agent, :admission, :rejected], [:jido, :agent, :turn, :settled]]
+  @points [
+    [:jido, :agent, :admission, :rejected],
+    [:jido, :agent, :turn, :settled],
+    [:jido, :topology, :ownership, :settled]
+  ]
 
   def start!(namespace, on_exit, context) do
     owner = self()

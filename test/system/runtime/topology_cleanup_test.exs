@@ -86,6 +86,18 @@ defmodule JidoTest.System.TopologyCleanup do
     Process.exit(controller, :kill)
     await_down(monitors)
     Task.await(stop, 10_000)
+
+    {_, [:jido, :topology, :ownership, :settled], measurements, metadata} =
+      Observability.await(c.observer, fn
+        {_, [:jido, :topology, :ownership, :settled], _, %{topology_id: id}} ->
+          id == c.namespace
+
+        _ ->
+          false
+      end)
+
+    assert metadata.status == :ok
+    assert measurements.failed_count == 0
     assert Process.alive?(unrelated)
     survivors = Enum.filter(owned, &Process.alive?/1)
     for pid <- survivors, do: stop_agent(c, pid)

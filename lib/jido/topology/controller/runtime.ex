@@ -5,6 +5,7 @@ defmodule Jido.Topology.Controller.Runtime do
   alias Jido.AgentServer, as: Server
   alias Jido.Telemetry.Topology, as: TopologyTelemetry
   alias Jido.Topology.{BusInputs, Controller, Plan, Resource}
+  alias Jido.Topology.Controller.TargetStore
 
   alias Jido.Topology.Signal.{
     ComponentFailed,
@@ -16,39 +17,43 @@ defmodule Jido.Topology.Controller.Runtime do
 
   alias Jido.Tracing.Context, as: TraceContext
 
-  @placement_hive :topology_placements
-
-  def start_link({jido, instance, repair, lifecycle}),
-    do: GenServer.start_link(__MODULE__, {jido, instance, repair, lifecycle})
+  def start_link({jido, instance, repair, lifecycle, owner}),
+    do: GenServer.start_link(__MODULE__, {jido, instance, repair, lifecycle, owner})
 
   @impl true
-  def init({jido, instance, repair, lifecycle}) do
+  def init({jido, instance, repair, lifecycle, owner}) do
     Process.flag(:trap_exit, true)
 
-    state = %{
-      jido: jido,
-      instance: instance,
-      repair: repair,
-      lifecycle: lifecycle,
-      reconcile_requested: false,
-      reconcile_timer: nil,
-      reconcile_token: nil,
-      ready: %{},
-      errors: %{},
-      waiters: %{},
-      phase: :starting,
-      pending: MapSet.new(),
-      active: %{},
-      pass_count: 0,
-      operation_span: nil,
-      operation: nil,
-      operation_id: nil,
-      operation_override: nil,
-      last_status: nil,
-      placements: load_placements(jido, instance)
-    }
+    with {:ok, accepted, revision, placements} <- TargetStore.load(jido, instance) do
+      state = %{
+        jido: jido,
+        owner: owner,
+        instance: accepted,
+        target_revision: revision,
+        repair: repair,
+        lifecycle: lifecycle,
+        reconcile_requested: false,
+        reconcile_timer: nil,
+        reconcile_token: nil,
+        ready: %{},
+        errors: %{},
+        waiters: %{},
+        phase: :starting,
+        pending: MapSet.new(),
+        active: %{},
+        pass_count: 0,
+        operation_span: nil,
+        operation: nil,
+        operation_id: nil,
+        operation_override: nil,
+        last_status: nil,
+        placements: placements
+      }
 
-    {:ok, state, {:continue, :reconcile}}
+      {:ok, state, {:continue, :reconcile}}
+    else
+      {:error, reason} -> {:stop, reason}
+    end
   end
 
   @impl true
@@ -89,6 +94,7 @@ defmodule Jido.Topology.Controller.Runtime do
        status: current_phase(state),
        repair: state.repair,
        agents: map_size(state.instance.plan.agents),
+       target_revision: state.target_revision,
        resources: map_size(state.instance.plan.resources),
        ready: map_size(state.ready),
        errors: state.errors,
@@ -103,16 +109,22 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_call({:update, target}, _from, state) do
     with :ok <- update_idle(state),
          :ok <- additive_target(state.instance, target),
-         :ok <- save_placements(state.jido, target, Map.get(state, :placements, %{})) do
+         {:ok, revision} <-
+           TargetStore.accept(state.jido, state.target_revision, target, state.placements) do
       state =
         state
         |> Map.put(:instance, target)
+        |> Map.put(:target_revision, revision)
         |> Map.put(:operation_override, :update)
         |> request_pass()
 
       {:reply, :ok, state}
     else
-      {:error, _reason} = error -> {:reply, error, state}
+      {:error, {:indeterminate, reason}} = error ->
+        {:stop, {:target_write_indeterminate, reason}, error, state}
+
+      {:error, _reason} = error ->
+        {:reply, error, state}
     end
   end
 
@@ -127,17 +139,26 @@ defmodule Jido.Topology.Controller.Runtime do
         with :ok <- retire(current, state, timeout) do
           placements = Map.put(Map.get(state, :placements, %{}), key, target_node)
 
-          case save_placements(state.jido, state.instance, placements) do
-            :ok ->
+          case TargetStore.accept(
+                 state.jido,
+                 state.target_revision,
+                 state.instance,
+                 placements
+               ) do
+            {:ok, revision} ->
               state =
                 state
                 |> Map.put(:placements, placements)
+                |> Map.put(:target_revision, revision)
                 |> Map.update!(:ready, &Map.delete(&1, key))
                 |> Map.update!(:errors, &Map.delete(&1, key))
                 |> Map.put(:operation_override, :place)
                 |> request_pass()
 
               {:reply, :ok, state}
+
+            {:error, {:indeterminate, reason}} = error ->
+              {:stop, {:target_write_indeterminate, reason}, error, state}
 
             {:error, _reason} = error ->
               {:reply, error, request_pass(state)}
@@ -260,8 +281,6 @@ defmodule Jido.Topology.Controller.Runtime do
             end)
         end
       end)
-
-      Jido.RuntimeStore.delete(state.jido, @placement_hive, state.instance.id)
     end
 
     cleanup_status = if intentional_shutdown?(reason), do: :ok, else: :error
@@ -445,6 +464,9 @@ defmodule Jido.Topology.Controller.Runtime do
   end
 
   defp record(state, key, {:ok, pid}) do
+    if Map.has_key?(state.instance.plan.agents, key),
+      do: Jido.Topology.Controller.Owner.track(state.owner, pid)
+
     emit(state, fn ->
       lifecycle_signal(
         ComponentReady,
@@ -565,6 +587,7 @@ defmodule Jido.Topology.Controller.Runtime do
       %{
         jido: state.jido,
         instance_id: state.instance.id,
+        owner: state.owner,
         parent: if(member.parent, do: Map.fetch!(state.ready, member.parent)),
         bus_ids: bus_ids,
         retry_interval: state.instance.definition.startup.retry_interval,
@@ -800,25 +823,5 @@ defmodule Jido.Topology.Controller.Runtime do
     end
 
     :ok
-  end
-
-  defp load_placements(jido, instance) do
-    case Jido.RuntimeStore.get(jido, @placement_hive, instance.id) do
-      %{definition: definition, placements: placements}
-      when definition == instance.definition and is_map(placements) ->
-        Map.take(placements, Map.keys(instance.plan.agents))
-
-      _other ->
-        %{}
-    end
-  end
-
-  defp save_placements(_jido, _instance, placements) when map_size(placements) == 0, do: :ok
-
-  defp save_placements(jido, instance, placements) do
-    Jido.RuntimeStore.put(jido, @placement_hive, instance.id, %{
-      definition: instance.definition,
-      placements: placements
-    })
   end
 end

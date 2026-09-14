@@ -113,7 +113,24 @@ defmodule Jido.Topology.ControllerBoundaryTest do
              Controller.place_agent(controller, :worker, node())
 
     assert Jido.RuntimeStore.get(jido, :topology_placements, instance.id) == saved
+
+    owner = self()
+    topology_id = instance.id
+    handler = {__MODULE__, make_ref()}
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        [:jido, :topology, :ownership, :settled],
+        fn _, _, %{topology_id: id}, _ ->
+          if id == topology_id, do: send(owner, {:ownership_settled, id})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
     assert :ok = Supervisor.stop(controller)
+    assert_receive {:ownership_settled, ^topology_id}, 1_000
     assert Jido.RuntimeStore.get(jido, :topology_placements, instance.id) == nil
   end
 
