@@ -1,9 +1,6 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
   workflow_dispatch:
     inputs:
       operation:
@@ -30,11 +27,6 @@ on:
         required: false
         type: boolean
         default: false
-      skip_tests:
-        description: "Skip tests before release"
-        required: false
-        type: boolean
-        default: false
       version_override:
         description: "Optional bare SemVer override (for example 1.2.3, not v1.2.3)"
         required: false
@@ -53,9 +45,16 @@ jobs:
     with:
       operation: ${{ inputs.operation || 'auto' }}
       tag_name: ${{ inputs.tag_name || '' }}
+      release_branch: release/v3
+      otp_version: "29"
+      elixir_version: "1.20"
+      preflight_command: >-
+        mix quality &&
+        mix test.all --cover &&
+        mix docs --no-open -f html --warnings-as-errors &&
+        mix hex.audit
       dry_run: ${{ inputs.dry_run || false }}
       hex_dry_run: ${{ inputs.hex_dry_run || false }}
-      skip_tests: ${{ inputs.skip_tests || false }}
       version_override: ${{ inputs.version_override || '' }}
     secrets:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
