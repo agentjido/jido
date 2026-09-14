@@ -26,7 +26,7 @@ on:
         type: boolean
         default: false
       hex_dry_run:
-        description: "Hex dry run only (run all git/release steps, but skip actual Hex publish)"
+        description: "With prepare + dry_run, check Hex only; with publish, skip actual Hex publish"
         required: false
         type: boolean
         default: false
@@ -47,6 +47,7 @@ permissions:
 
 jobs:
   release:
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.operation == 'prepare' && inputs.dry_run == true && inputs.hex_dry_run == true) }}
     name: Release
     uses: agentjido/github-actions/.github/workflows/jido-release.yml@v5
     with:
@@ -58,3 +59,39 @@ jobs:
       version_override: ${{ inputs.version_override || '' }}
     secrets:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+
+  hex_dry_run:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.operation == 'prepare' && inputs.dry_run == true && inputs.hex_dry_run == true }}
+    name: Hex dry run
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up BEAM
+        uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1
+        with:
+          otp-version: "29.0.5"
+          elixir-version: "1.20.3"
+
+      - name: Install Hex and Rebar
+        run: |
+          mix local.hex --if-missing --force
+          mix local.rebar --if-missing --force
+
+      - name: Get dependencies
+        run: mix deps.get
+
+      - name: Build package and docs without publishing
+        env:
+          HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+        run: mix hex.publish --dry-run --yes
+
+      - name: Summarize dry run
+        if: always()
+        run: |
+          echo "## Jido Hex dry run" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "- No tag, Git push, GitHub release, or Hex upload is performed by this job." >> "$GITHUB_STEP_SUMMARY"
