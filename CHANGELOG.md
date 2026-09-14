@@ -13,9 +13,11 @@
 
 ### Compatibility
 
-* select Hex `jido_action 3.0.0-beta.9` and `jido_signal 3.0.0-beta.4`
+* select Hex `jido_action 3.0.0-beta.11` and `jido_signal 3.0.0-beta.4`
 * retain current V3 public APIs through the `3.0.x` line
 * defer live code migration, live Topology replacement, and distributed control-plane claims
+* beta.1 includes the optional Bedrock adapter without verified strict durability or MinIO snapshot recovery; real Bedrock tests are skipped pending upstream fixes
+* beta.1 is verified on Elixir 1.20.3/OTP 29.0.5; its Elixir 1.18.5/OTP 27 test gate fails during example compilation
 
 ## [v2.3.3](https://github.com/agentjido/jido/compare/v2.3.2...v2.3.3) (2026-08-10)
 

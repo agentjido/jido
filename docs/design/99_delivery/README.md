@@ -1,4 +1,4 @@
-> Delivery seam prepared for the local Jido V3 beta candidate; release gates remain open.
+> Delivery seam for the approved Jido V3 beta.1 candidate; two beta-only exceptions remain open for later releases.
 
 # 99 — Delivery
 
@@ -8,15 +8,16 @@ The local Jido V3 candidate has one defined beta package set and four delivery
 records. The package uses published Hex sources for `jido_action`,
 `jido_signal`, and the optional Bedrock dependencies. Bedrock persistence is
 included in the beta claim. All real Bedrock service tests are skipped while
-upstream fixes are pending; the unproved contracts still block publication.
+upstream fixes are pending. The release approver accepted this unproved
+contract as a beta.1-only exception, not as evidence of Bedrock durability.
 
 The candidate includes an explicit quiescent Agent Server upgrade boundary,
 validated Agent definition migration, and additive local Topology target
 updates. It does not claim arbitrary BEAM code pinning, Plugin runtime or
 private Server-state migration, destructive Topology updates, Jido AI, Jido
 Browser, a distributed control plane, or an OpenTelemetry bridge. These limits
-have explicit dispositions in the scope ledger. Publication still needs a
-human release decision and an exact-commit CI result.
+have explicit dispositions in the scope ledger. The human release decision is
+recorded there; the release workflow must still pass on its exact commit.
 
 ## Boundary
 
@@ -38,7 +39,7 @@ human release decision and an exact-commit CI result.
 | Authoring | 523 authoring tests pass; the larger case library remains future work. |
 | Core exclusion | `DIST-03` remains excluded. The user directed a skip for `SYSTEM-CLUSTER-01`, which asserts the same out-of-scope cluster authority contract. |
 | Hex package | Build, unpack inspection, fresh dependency resolution, production compile, and docs pass. The [CI Hex dry run](https://github.com/agentjido/jido/actions/runs/34876701594) passes on `c147595e`, before the skip; no upload occurred. |
-| Publication | Not performed. Bedrock durability, support floor, exact-commit CI, and human approval remain open gates. |
+| Publication | Approved for beta.1 with named Bedrock and runtime-floor exceptions. The release workflow must still pass on the exact candidate before upload. |
 
 ## Example contract classification
 

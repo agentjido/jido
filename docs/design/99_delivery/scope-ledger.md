@@ -13,8 +13,14 @@ disposition without copying each ID to a separate row.
 | Gate-exception owner | Human release approver |
 | Publication approval owner | Human release approver |
 
-No gate exception is approved. A deferred or excluded feature is a scope limit,
-not a gate exception. A failing release gate remains a blocker.
+The human release approver approved two exceptions for `3.0.0-beta.1` on
+2026-09-14. Both expire before the next Jido release. This approval permits a
+beta publication; it does not turn a failed or skipped test into passing proof.
+
+| Exception | Gate | Reason and user risk | Review point |
+| --- | --- | --- | --- |
+| `BETA1-BEDROCK` | `DEL-REQ-043` and `DEL-REQ-021` for the real Bedrock service and MinIO snapshot tests | The upstream Bedrock fix is pending. The optional adapter is present but strict durability and snapshot recovery are unverified. Users must not treat this beta as proof of Bedrock durability. | Re-enable and pass the real profiles before the next release. |
+| `BETA1-FLOOR` | `DEL-REQ-016` | The Elixir 1.18.5/OTP 27 test gate fails during example compilation. This beta is verified on Elixir 1.20.3/OTP 29.0.5 only, even though package metadata accepts Elixir 1.18. | Make the floor gate pass or narrow the declared runtime range before the next release. |
 
 ## Requirement ranges
 
@@ -56,8 +62,9 @@ behavior against the exact published Bedrock dependency set in the
 Bedrock service tests, including previously passing cases, plus the MinIO
 Bedrock snapshot test, while upstream fixes are in progress.
 The opt-in commands can pass with these skips, but that does not satisfy
-`DEL-REQ-043` or prove strict durability and snapshot recovery. No release
-gate waiver has been approved. Local, unpublished Bedrock patches do not close it.
+`DEL-REQ-043` or prove strict durability and snapshot recovery. The human
+release approver accepted `BETA1-BEDROCK` for this beta only. Local,
+unpublished Bedrock patches do not close the underlying requirement.
 
 ## Skip classification
 
@@ -69,8 +76,8 @@ gate waiver has been approved. Local, unpublished Bedrock patches do not close i
 | Bedrock/MinIO snapshot module | Skipped by user direction | Bedrock upstream and Jido release owner | Native upload and cold rebuild remain unverified; direct S3 tests still run. | Re-enable after an upstream release and rerun the MinIO profile. |
 
 The skip removes this unsupported contract from the local full-suite gate.
-It does not establish cluster-wide ownership. The Bedrock skips also do not
-change the Bedrock release requirement.
+It does not establish cluster-wide ownership. The Bedrock requirement remains
+open under the beta-only exception above.
 
 UP-01, UP-02, and UP-07 are implemented and are release-required evidence.
 Their assertions pass without skip tags.

@@ -1,13 +1,13 @@
 # Package matrix
 
 This matrix identifies the dependencies selected by the Jido 3.0.0-beta.1
-candidate. It does not claim that the blocked Bedrock profile passes.
+candidate. It does not claim that the unverified Bedrock profile passes.
 
 ## Core set
 
 | Package | Version and source | Immutable identity | Status |
 | --- | --- | --- | --- |
-| `jido` | `3.0.0-beta.1`; local source on `release/v3` | The commit that contains this record; branch cut from `v3-spike` at `23ecf0fd` | Unpublished candidate; release gates open |
+| `jido` | `3.0.0-beta.1`; local source on `release/v3` | The commit that contains this record; branch cut from `v3-spike` at `23ecf0fd` | Approved beta.1 candidate with two recorded exceptions; publication pending release workflow |
 | `jido_action` | Hex `3.0.0-beta.11` | Registry checksum `97c60e158f81713d792c7631ed567673919f1a7d0f9024685863f9ac3fb71818` | Published source selected |
 | `jido_signal` | Hex `3.0.0-beta.4` | Registry checksum `284d4f199b22b358906598ebfba734d37ea8a9404baed47939b94b50d837a05b`; source commit `1a62b1ddc306091cdcb7883ce63490f0f6ed2905` | Published source selected |
 
@@ -34,7 +34,7 @@ test dependencies do not enter the package claim.
 
 | Role | Elixir | OTP | Required result |
 | --- | --- | --- | --- |
-| Support floor | 1.18.5 | 27.3.4.12 | Core suite passes. |
+| Declared package floor; beta.1 exception | 1.18.5 | 27.3.4.12 | Core suite not proven; test compilation fails on an example Directive. |
 | Candidate runtime | 1.20.3 | 29.0.5 | Full local delivery gates pass. |
 
 Jido declares Elixir `~> 1.18`. The tested floor and current runtime are the
