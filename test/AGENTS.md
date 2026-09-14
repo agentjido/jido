@@ -58,12 +58,13 @@ Reuse the scenario modules in `test/system/support/scenarios/` across adapters.
 When a service profile is selected, a missing service must fail with its
 prerequisite; do not skip it or use an in-memory
 replacement. Keep unresolved system probes enabled and describe them in
-`test/system/README.md` and `test/system/TODO.md`.
+`test/system/README.md` and `test/system/TODO.md`, except the user-directed
+`SYSTEM-CLUSTER-01` skip for the excluded cluster-authority contract.
 The DIST-03 test `one logical identity has at most one live cluster owner`
 in `test/jido/agent_server/distributed_authority_test.exs` retains its approved skip.
-Keep every research probe enabled. A probe that records an unsupported contract
+Keep other research probes enabled. A probe that records an unsupported contract
 must state the gap in its source README and keep its evidence focused on current
-observable behavior. Do not add skips or exclude a group to hide a failure. A
+observable behavior. Do not add other skips or exclude a group to hide a failure. A
 missing or empty test selection is an error.
 
 The runtime floor is Elixir 1.18 / OTP 27. Use Conventional Commits. Do not edit

@@ -17,25 +17,26 @@ assertions and core work.
 | `mix quality` | 1,106 core tests pass; format, compile, Credo, and Dialyzer pass |
 | `mix test.authoring` | 523/523 pass |
 | `mix test.bench` | 7/7 pass; these are benchmark contract tests, not a load run |
-| `mix test.system` | 112/113 pass; only `SYSTEM-CLUSTER-01` fails |
-| `mix test.all --cover` | 2,015/2,016 pass; only `SYSTEM-CLUSTER-01` fails; 93.5% coverage, 1 skipped and 115 excluded |
+| `mix test.system` | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
+| `mix test.all --cover` | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
 | `mix test.services` | 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail |
 | `mix test.services.minio` via owned local MinIO | 28/29 pass; `SYSTEM-BEDROCK-05` fails and native upload reports two `Jason.EncodeError` results (`SYSTEM-BEDROCK-03`) |
 | Direct S3/MinIO pressure repeats (2026-09-14) | Four fresh 2/2 runs pass |
 | Two burn-in runs, 20 rounds each (2026-09-13) | 8 selected tests pass; 1,086 model commands and 6 BEAM crashes |
 
-These runs used the Jido changes now committed locally on `v3-spike`. The
+The latest full-suite run used the code on `release/v3`. Earlier focused runs
+used the Jido changes committed on `v3-spike`. The
 Topology target and owned-Agent probes
 `SYSTEM-TOPOLOGY-01/02/03` now pass. Bedrock replacement
 `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
 The supervisor and Bus probes also passed, but their changes still need review
 and repeated runs before the earlier timing failures can be closed.
-`SYSTEM-CLUSTER-01` is tagged `:flaky` for tracking, but its current failure is
-repeatable: it tests a cluster-wide owner guarantee that Jido core does not
-provide. It remains enabled in `mix test.all`. The approved `DIST-03` core skip
-is unchanged. Strict Bedrock
-startup and MinIO snapshot recovery still block their later assertions. No
-failed probe was skipped or replaced with an in-memory adapter.
+`SYSTEM-CLUSTER-01` is skipped by user direction: it tests a cluster-wide
+owner guarantee that Jido core does not provide. The test remains in source,
+but neither `mix test.all` nor the CI core selection runs it. The approved
+`DIST-03` core skip is unchanged. Strict Bedrock startup and MinIO snapshot
+recovery still block their later assertions. No Bedrock probe was skipped or
+replaced with an in-memory adapter.
 
 ## Topology target durability — verified paths and open edges
 

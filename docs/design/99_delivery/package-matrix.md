@@ -7,7 +7,7 @@ candidate. It does not claim that the blocked Bedrock profile passes.
 
 | Package | Version and source | Immutable identity | Status |
 | --- | --- | --- | --- |
-| `jido` | `3.0.0-beta.1`; local source on `v3-spike` | The commit that contains this record; code parent `8d7e26c3` | Unpublished candidate; release gates open |
+| `jido` | `3.0.0-beta.1`; local source on `release/v3` | The commit that contains this record; branch cut from `v3-spike` at `23ecf0fd` | Unpublished candidate; release gates open |
 | `jido_action` | Hex `3.0.0-beta.11` | Registry checksum `97c60e158f81713d792c7631ed567673919f1a7d0f9024685863f9ac3fb71818` | Published source selected |
 | `jido_signal` | Hex `3.0.0-beta.4` | Registry checksum `284d4f199b22b358906598ebfba734d37ea8a9404baed47939b94b50d837a05b`; source commit `1a62b1ddc306091cdcb7883ce63490f0f6ed2905` | Published source selected |
 

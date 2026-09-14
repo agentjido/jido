@@ -9,10 +9,11 @@ Jido is a declarative actor and agent framework for Elixir. You declare what an
 Agent is, instantiate that declaration as an Agent value, and run the value as
 an OTP actor when you need a live process.
 
-This `v3-spike` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
-changes from V2. The package is not published. Core quality and authoring
-checks pass, but local system and Bedrock storage gates still fail. Exact-commit
-CI and human release approval also remain. See the
+This `release/v3` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
+changes from V2. The package is not published. Core quality, authoring, and
+local system checks pass with the out-of-scope cluster-authority probe skipped.
+Bedrock storage and support-floor gates still fail. Exact-commit CI and human
+release approval also remain. See the
 [migration guide](guides/migration.md) for the API changes and known limits.
 
 ## Core model

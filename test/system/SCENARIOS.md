@@ -55,9 +55,9 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 - `SYSTEM-BEDROCK-01`: the placeholder survives unassisted cluster shutdown.
 - `SYSTEM-BEDROCK-02` passes after the upgrade to Bedrock 0.7.2.
 - `SYSTEM-CLUSTER-01`: separate local registries permit two cluster owners.
-  It is tagged `:flaky` for tracking, but the current contract gap is repeatable.
-  The probe remains enabled in `mix test.all`; the approved core DIST-03 skip
-  is unchanged.
+  The user directed a skip because cluster-exclusive ownership is outside the
+  V3 beta scope. The probe stays in source, but it is not in `mix test.all` or
+  CI; the approved core DIST-03 skip is unchanged.
 - `SYSTEM-BUS-01` and shared-Bus replacement readiness pass in the latest
   full run with nonblocking Client delivery. Earlier timing failures
   still need repeated fresh-BEAM runs; no adapter defect is established.
@@ -84,10 +84,10 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 | `mix quality`, 2026-09-14 | 1106 core tests pass; format, warnings-as-errors compile, Credo, and Dialyzer pass |
 | `mix test.authoring`, 2026-09-14 | 523/523 pass |
 | `mix test.bench`, 2026-09-14 | 7/7 benchmark contract tests pass |
-| `mix test.system`, 2026-09-14, seed 0 | 112/113 pass; only `SYSTEM-CLUSTER-01` fails |
+| `mix test.system`, 2026-09-14, seed 0 | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
 | `mix test.services`, 2026-09-14, seed 0 | 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail |
 | Focused sustained partition probes | Two local peer tests pass with held Turn and late spawn; shared-Redis stale-write test passes with real CAS |
-| `mix test.all --cover`, 2026-09-14 | 2015/2016 pass, 1 skipped, 115 excluded; only `SYSTEM-CLUSTER-01` fails; 93.5% coverage |
+| `mix test.all --cover`, 2026-09-14 | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
 | Full MinIO profile, 2026-09-14, seed 0 | 28/29 pass; Bedrock cold-rebuild readiness fails. Native upload reports two `Jason.EncodeError` results; the binary control uploads two real snapshots. The owned bucket and objects were removed, and the dedicated server stopped |
 | Direct S3 MinIO pressure repeats, seed 0 | Four fresh local runs each pass both tests against MinIO `RELEASE.2025-10-15T17-29-55Z` |
 | Burn-in, two runs, 20 rounds, seeds 93 and 94 | All eight selected tests pass; 1086 model commands and six BEAM crashes across both runs |

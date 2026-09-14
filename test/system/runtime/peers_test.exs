@@ -82,8 +82,7 @@ defmodule JidoTest.System.PeerScenarios do
   end
 
   @tag :research
-  # This is a known missing cluster contract, not a timing-dependent failure.
-  @tag :flaky
+  @tag skip: "Cluster-exclusive ownership is outside the V3 beta scope (DIST-03)"
   test "connected peers must not claim an exclusive owner without a cluster authority contract",
        c do
     [{left, node_left}, {right, node_right}] =

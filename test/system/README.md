@@ -314,8 +314,8 @@ review and repeated runs. `SYSTEM-BEDROCK-01` still fails on unassisted
 placeholder shutdown; `SYSTEM-BEDROCK-02` passes with Bedrock 0.7.2.
 The peer probe retains the absent exclusive-owner contract
 (`SYSTEM-CLUSTER-01`) without changing the approved core DIST-03 skip. It is
-tagged `:flaky` for tracking, but the current failure is repeatable and the
-probe remains enabled in `mix test.all`.
+skipped by user direction because cluster-exclusive ownership is outside the
+V3 beta scope. Its source remains, but `mix test.all` and CI do not run it.
 The JSON/Flow/Directive journey's `SYSTEM-BUS-01` timeout did not recur in
 the latest full run with nonblocking Client delivery. Keep it enabled
 and repeat it before closing the timing failure.
@@ -360,4 +360,4 @@ seed with `JIDO_SYSTEM_MODEL_SEED`, or 1..1000 rounds with
 `JIDO_SYSTEM_MODEL_ROUNDS`. Failures retain the original command list before
 bounded reduction starts, then save the shorter replay when reduction ends.
 Every run also writes the compact system report. This focused burn-in does not
-run all research probes; a green burn-in is not a green `mix test.all`.
+run all enabled research probes; a green burn-in is not a green `mix test.all`.

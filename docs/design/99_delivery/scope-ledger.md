@@ -62,11 +62,10 @@ Local, unpublished Bedrock patches do not close it.
 | Assertion | Status | Owner | Reason and user effect | Review point |
 | --- | --- | --- | --- | --- |
 | `DIST-03` | Excluded | Future distributed authority owner | Core does not guarantee one live owner across a cluster. Applications that need this must supply fenced external authority. | Review with enforceable epochs at every protected commit. |
+| `SYSTEM-CLUSTER-01` | Skipped by user direction | Future distributed authority owner | This system probe asserts the same excluded cluster-exclusive owner contract. It remains in source, but normal suites and CI do not run it. | Review with `DIST-03` when cluster authority becomes supported. |
 
-`SYSTEM-CLUSTER-01` is a second, enabled probe of the same excluded cluster
-authority contract. It currently fails in `mix test.all`; the `:flaky` tag is
-not a release exception or proof of an intermittent fault. The release owner
-must resolve the gate disposition before publication.
+The skip removes this unsupported contract from the local full-suite gate.
+It does not establish cluster-wide ownership or change the Bedrock gate.
 
 UP-01, UP-02, and UP-07 are implemented and are release-required evidence.
 Their assertions pass without skip tags.
