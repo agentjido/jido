@@ -14,7 +14,7 @@ defmodule JidoTest.System.BedrockPeers do
   alias JidoTest.System.{StrictCluster, StrictRepo}
 
   def start_link(_), do: GenServer.start_link(__MODULE__, [], name: __MODULE__)
-  def init(_), do: {:ok, %{count: 0, director: nil, waiters: [], logs: []}}
+  def init(_), do: {:ok, %{count: 0, director: nil, waiters: [], logs: [], recovery: []}}
 
   def prepare(directory, objects, nodes) do
     {:ok, _} = Supervisor.start_child(Jido.Supervisor, __MODULE__)
@@ -64,6 +64,13 @@ defmodule JidoTest.System.BedrockPeers do
       &__MODULE__.layout/4,
       nodes
     )
+
+    :telemetry.attach_many(
+      {__MODULE__, :recovery},
+      [[:bedrock, :recovery, :stalled], [:bedrock, :recovery, :failed]],
+      &__MODULE__.recovery/4,
+      nil
+    )
   end
 
   def boot, do: Supervisor.start_child(Jido.Supervisor, StrictCluster.child_spec([]))
@@ -71,11 +78,52 @@ defmodule JidoTest.System.BedrockPeers do
   def log(event, _config), do: GenServer.cast(__MODULE__, {:log, event})
   def logs, do: GenServer.call(__MODULE__, :logs)
 
+  def diagnostics do
+    coordinator = Process.whereis(StrictCluster.otp_name(:coordinator))
+
+    state =
+      if is_pid(coordinator) do
+        :sys.get_state(coordinator, 5_000)
+      end
+
+    director_state =
+      if state && is_pid(state.director) do
+        try do
+          :sys.get_state(state.director, 5_000)
+        catch
+          :exit, reason -> {:error, reason}
+        end
+      end
+
+    %{
+      node: node(),
+      connected: Node.list(),
+      coordinator: coordinator,
+      director: state && state.director,
+      director_state: if(is_map(director_state), do: director_state.state, else: director_state),
+      recovery_attempt:
+        if(is_map(director_state) and is_map(director_state.recovery_attempt),
+          do: director_state.recovery_attempt.attempt
+        ),
+      leader: state && state.leader_node,
+      startup: state && state.leader_startup_state,
+      raft_me: state && state.raft && state.raft.me,
+      raft_peers: state && state.raft && state.raft.peers,
+      raft_mode: state && state.raft && state.raft.mode && state.raft.mode.__struct__,
+      services: state && map_size(state.service_directory),
+      capabilities: state && state.node_capabilities,
+      recovery: GenServer.call(__MODULE__, :recovery)
+    }
+  end
+
   def layout(_event, _measures, _meta, nodes) do
     # This isolated peer runs one Bedrock cluster. Send the layout barrier to
     # all three independent control channels; the host BEAM stays unnamed.
     for peer_node <- nodes, do: GenServer.cast({__MODULE__, peer_node}, {:layout, self()})
   end
+
+  def recovery(event, _measurements, metadata, _config),
+    do: GenServer.cast(__MODULE__, {:recovery, event, metadata})
 
   def ready(after_count \\ 0) do
     {count, director} = GenServer.call(__MODULE__, {:after_layout, after_count}, 30_000)
@@ -112,6 +160,7 @@ defmodule JidoTest.System.BedrockPeers do
   end
 
   def handle_call(:logs, _from, state), do: {:reply, Enum.reverse(state.logs), state}
+  def handle_call(:recovery, _from, state), do: {:reply, Enum.reverse(state.recovery), state}
 
   def handle_call({:after_layout, count}, from, state) do
     if state.count > count,
@@ -121,6 +170,9 @@ defmodule JidoTest.System.BedrockPeers do
 
   def handle_cast({:log, event}, state),
     do: {:noreply, %{state | logs: Enum.take([event | state.logs], 100)}}
+
+  def handle_cast({:recovery, event, metadata}, state),
+    do: {:noreply, %{state | recovery: Enum.take([{event, metadata} | state.recovery], 20)}}
 
   def handle_cast({:layout, director}, state) do
     count = state.count + 1

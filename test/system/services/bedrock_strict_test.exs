@@ -49,7 +49,7 @@ defmodule JidoTest.System.Services.BedrockStrict do
            "SYSTEM-BEDROCK-04: strict multi-node startup failed before durability could be tested: #{inspect(boots, limit: 25)}"
 
     [{left, _lost_node}, {right, _}, {last, _}] = peers
-    {count, layout} = rpc(right, :ready, [])
+    {count, layout} = ready!(c, right, peers, [])
     assert map_size(layout.logs) == 3
     assert rpc(right, :log_nodes, []) |> Enum.uniq() |> length() == 3
     for {peer, _} <- peers, do: assert(:ok == rpc(peer, :start_jido, [c.namespace, c.tmp_dir]))
@@ -64,7 +64,7 @@ defmodule JidoTest.System.Services.BedrockStrict do
            end)
 
     assert :ok = Peers.crash(left)
-    {_count, recovered_layout} = rpc(right, :ready, [count])
+    {_count, recovered_layout} = ready!(c, right, peers, [count])
     assert recovered_layout.epoch > layout.epoch
     assert {:ok, restored} = Peers.call(right, :activate, ["strict-agent", :required])
     assert Peers.call(right, :snapshot, [restored]) == before
@@ -82,4 +82,33 @@ defmodule JidoTest.System.Services.BedrockStrict do
   end
 
   defp rpc(peer, function, args), do: :peer.call(peer, BedrockPeers, function, args, 45_000)
+
+  defp ready!(c, peer, peers, args) do
+    try do
+      rpc(peer, :ready, args)
+    catch
+      :exit, reason ->
+        diagnostics =
+          for {other, node} <- peers do
+            {node, :peer.call(other, BedrockPeers, :diagnostics, [], 5_000)}
+          end
+
+        for {other, node} <- peers do
+          case :peer.call(other, BedrockPeers, :logs, [], 5_000) do
+            events when is_list(events) ->
+              for event <- events do
+                message = event |> :logger_formatter.format(%{}) |> IO.iodata_to_binary()
+                Observability.service_log(c.observer, :bedrock_strict, "#{node}: #{message}")
+              end
+
+            _ ->
+              :ok
+          end
+        end
+
+        flunk(
+          "SYSTEM-BEDROCK-04: strict cluster did not become ready: #{inspect(reason)}. Diagnostics: #{inspect(diagnostics)}. Recent logs:\n#{Observability.format_logs(c.observer)}"
+        )
+    end
+  end
 end
