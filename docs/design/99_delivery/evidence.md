@@ -5,8 +5,9 @@
 - Preparation date: 2026-09-14.
 - Branch: `v3-spike`.
 - Source code and test baseline: `8d7e26c3`. The commit that contains this
-  record changes release text only; exact-commit release verification remains
-  open.
+  record changes release text only. The CI Hex dry run used `4f1639be`, whose
+  change from the prior commit is the release workflow. Exact-commit release
+  verification remains open.
 - Package version: `3.0.0-beta.1`, not published.
 - Dependency set: [package matrix](package-matrix.md).
 - Release scope: [scope ledger](scope-ledger.md), including the optional
@@ -31,6 +32,7 @@ open even when another gate passes.
 | Support floor | `mise exec erlang@27.3.4.12 elixir@1.18.5-otp-27 -- mix test test/jido --include flaky --seed 0` | Elixir 1.18.5, OTP 27.3.4.12 | Fail before tests: example `07_08_placement_policy/move.ex` cannot expand its Directive struct during compilation. |
 | Docs | `mix docs --no-open -f html --warnings-as-errors` | Elixir 1.20.3, OTP 29.0.5 | Pass. |
 | Hex publish dry run | `mix hex.publish --dry-run` | Elixir 1.20.3, OTP 29.0.5 | Package build and checks complete, then command exits 1 because no Hex user is authenticated. No upload or publication occurred. |
+| CI Hex dry run | [Release run 34866351189](https://github.com/agentjido/jido/actions/runs/34866351189), `mix hex.publish --dry-run --yes` | Elixir 1.20.3, OTP 29.0.5; commit `4f1639be` | Pass: package and docs built. The normal Release job was skipped. Hex still has no Jido `3.0.0-beta.1` release. |
 | Hex package inspection | `mix hex.build --unpack --output /tmp/jido-hex-preview.GDGI1G` | Elixir 1.20.3, OTP 29.0.5 | Pass. Unpacked package contains `lib`, `mix.exs`, `.formatter.exs`, `README.md`, `usage-rules.md`, `guides`, and `LICENSE`; it excludes tests, examples, and design records. |
 | Fresh package compilation | `MIX_ENV=prod mix deps.get` and `MIX_ENV=prod mix compile --warnings-as-errors` in the unpacked package | Elixir 1.20.3, OTP 29.0.5 | Pass against newly fetched Hex dependencies. |
 | Exact-commit CI | Pull request or merge-group workflow | GitHub | Pending. A `v3-spike` push alone does not run the configured workflow. |
@@ -51,9 +53,9 @@ selects Hex `jido_action 3.0.0-beta.11` and `jido_signal 3.0.0-beta.4`.
    need a decision.
 3. The Elixir 1.18.5/OTP 27 support-floor run fails during example Directive
    compilation. Core tests did not run under that runtime.
-4. The Hex publish dry-run command could not finish its authentication check;
-   the independent package build and fresh compilation passed. Exact-commit
-   CI and human release approval remain open.
+4. The CI Hex dry run passes, but it is not the full release validation. A
+   passing exact-commit CI result for all required gates and human release
+   approval remain open.
 
 No gate exception is approved. This record does not claim a green candidate,
 publication, or a Bedrock durability result.

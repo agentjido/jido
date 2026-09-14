@@ -38,7 +38,8 @@ text and code differ.
 | --- | --- | --- |
 | `DEL-REQ-001` to `DEL-REQ-007`, and `DEL-REQ-009` | `Proven` | Scope ledger and package matrix. |
 | `DEL-REQ-010` to `DEL-REQ-012`, `DEL-REQ-014`, and `DEL-REQ-015` | `Proven locally` | Current `mix quality`, 92.4% core-only coverage, docs, seven benchmark tests, and 240 example tests pass on the preparation tree. Exact-commit verification remains open. |
-| `DEL-REQ-013` and `DEL-REQ-017` | `Refresh required` | Package build and unpacked production compile pass, but the Hex publish dry run stops at authentication. The full local suite still fails. |
+| `DEL-REQ-013` | `Proven for the CI source commit` | Package build, unpack inspection, fresh production compile, and CI Hex dry run pass on package-equivalent source. Final-candidate verification remains open. |
+| `DEL-REQ-017` | `Refresh required` | The full local suite still fails. The current runtime result is not a passing release result. |
 | `DEL-REQ-016` | `Failed` | Elixir 1.18.5/OTP 27 cannot compile the example Directive module, so core tests do not start. |
 | `DEL-REQ-018` | `External gate` | Exact-commit CI needs a published remote commit. No local result claims this gate. |
 | `DEL-REQ-019` and `DEL-REQ-020` | `Refresh required` | The preparation record names the current baseline. Final evidence must name one committed candidate and clean worktree. |
@@ -58,7 +59,7 @@ text and code differ.
 | Bedrock beta profile | Bedrock and Jido release owners | A published Bedrock dependency set passes real service and MinIO snapshot profiles. |
 | Local full suite | Jido release owner | Resolve the `SYSTEM-CLUSTER-01` gate while preserving the excluded cluster-authority scope. |
 | Support floor | Jido release owner | Elixir 1.18/OTP 27 compiles the full test tree and passes the core suite. |
-| Hex dry run | Jido release owner | Complete the dry run with approved release credentials; the unauthenticated package build already passes. |
+| Hex dry run | Jido release owner | The CI dry run passes on `4f1639be`; rerun if package inputs change before release. |
 | Release approval | Human release approver | Accept the scope, package matrix, compatibility register, and evidence record. |
 | Publication | Human release approver | Publish only after the first two gates pass. |
 

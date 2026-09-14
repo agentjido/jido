@@ -36,7 +36,7 @@ human release decision and an exact-commit CI result.
 | Current runtime | Elixir 1.20.3 and OTP 29.0.5 pass quality, 92.4% core-only coverage, 240 examples, 523 authoring tests, seven benchmark tests, and docs. The full local suite, Bedrock services, and MinIO snapshots have known failures. |
 | Authoring | 523 authoring tests pass; the larger case library remains future work. |
 | Core exclusion | `DIST-03` remains excluded. The enabled `SYSTEM-CLUSTER-01` probe still fails; its `:flaky` tag is not an exception. |
-| Hex package | Build, unpack inspection, fresh dependency resolution, production compile, and docs pass. `mix hex.publish --dry-run` stops at missing authentication; no upload occurred. |
+| Hex package | Build, unpack inspection, fresh dependency resolution, production compile, and docs pass. The [CI Hex dry run](https://github.com/agentjido/jido/actions/runs/34866351189) passes on `4f1639be`; no upload occurred. |
 | Publication | Not performed. Bedrock recovery, local suite, support floor, exact-commit CI, and human approval remain open gates. |
 
 ## Example contract classification
