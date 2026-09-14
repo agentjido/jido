@@ -2,6 +2,305 @@
 
 <!-- changelog -->
 
+## [v3.0.0-beta.1](https://github.com/agentjido/jido/compare/v3.0.0-beta.1...v3.0.0-beta.1) (2026-09-14)
+### Breaking Changes:
+
+* agent: replace the V2 runtime with the V3 command contract by mikehostetler
+
+* install: remove Igniter integration by mikehostetler
+
+* migrate Signal APIs to v3 by mikehostetler
+
+* migrate Agent runtime to jido_action v3 by mikehostetler
+
+* convert Action schemas to Zoi by mikehostetler
+
+
+
+### Features:
+
+* topology: retain accepted targets and settle owned agents by mikehostetler
+
+* persistence: add conditional S3 adapter (#369) by mikehostetler
+
+* add isolated plugin preparation inputs by mikehostetler
+
+* observability: add optional OpenTelemetry API mapping by mikehostetler
+
+* persistence: merge Bedrock adapter by mikehostetler
+
+* persistence: add Bedrock adapter by mikehostetler
+
+* persistence: merge Ecto adapter by mikehostetler
+
+* persistence: add Ecto adapter by mikehostetler
+
+* topology: support additive live targets by mikehostetler
+
+* agent_server: add explicit live upgrade boundary by mikehostetler
+
+* telemetry: align semantic observation by mikehostetler
+
+* error: close public code registry by mikehostetler
+
+* topology: integrate plugin planning by mikehostetler
+
+* topology: align runtime ownership seam by mikehostetler
+
+* jido: add ref-first instance facade by mikehostetler
+
+* agent_server: align activation runtime by mikehostetler
+
+* persistence: add durable record lifecycle by mikehostetler
+
+* commit: enforce write authority boundary by mikehostetler
+
+* plugin: split owner facet contracts by mikehostetler
+
+* turn: fix source signal selection by mikehostetler
+
+* agent: add stable agent reference by mikehostetler
+
+* error: align public failure contracts by mikehostetler
+
+* agent: align authoring parity seam by mikehostetler
+
+* agent: align v3 agent contract by mikehostetler
+
+* agent: support guarded inline route clauses by mikehostetler
+
+* topology: use the agent authoring host by mikehostetler
+
+* agent: support AI profile routes by mikehostetler
+
+* topology: support authoring extensions by mikehostetler
+
+* add default instance lifecycle helpers by mikehostetler
+
+* agent: add static authoring extensions by mikehostetler
+
+* expose scheduler cadence and topology repair controls by mikehostetler
+
+* topology: compose and supervise Agent systems by mikehostetler
+
+### Bug Fixes:
+
+* bus: keep durable delivery off Client mailbox by mikehostetler
+
+* runtime: wait for prior children before Jido replacement by mikehostetler
+
+* runtime: verify Bus subscriptions before Topology readiness by mikehostetler
+
+* telemetry: emit one terminal event per semantic span by mikehostetler
+
+* plugin: enforce owner contracts and normalize once for encoding by mikehostetler
+
+* runtime: treat hive identifiers as literal ETS values by mikehostetler
+
+* examples: align basic learning path by mikehostetler
+
+* isolate quality tooling runtime by mikehostetler
+
+* align hardening type contracts by mikehostetler
+
+* topology: type error location failures by mikehostetler
+
+* topology: reject mixed startup locations by mikehostetler
+
+* agent: reuse normalized plugin specs by mikehostetler
+
+* topology: preserve host options in macro calls by mikehostetler
+
+* agent-server: verify deferred child identity by mikehostetler
+
+* agent-server: harden lifecycle and runtime boundaries by mikehostetler
+
+* scheduler: harden durable runtime behavior by mikehostetler
+
+* review: address topology hardening findings by mikehostetler
+
+* persistence: validate adapters and contain timeouts by mikehostetler
+
+* observe: make telemetry boundaries total by mikehostetler
+
+* tracing: harden dual-format propagation by mikehostetler
+
+* plugin: harden runtime contracts by mikehostetler
+
+* harden agent checkpoints and threads by mikehostetler
+
+* topology: unify authoring validation contracts by mikehostetler
+
+* topology: harden runtime ownership and readiness by mikehostetler
+
+* agent: enforce constructor and codec error contracts by mikehostetler
+
+* plugin: preserve structured state schema errors by mikehostetler
+
+* plugin: keep runtime lookup responsive during restart readiness by mikehostetler
+
+* deps: update Jido Hex releases and supervisor routing by mikehostetler
+
+* ci: keep example tests out of CI (#363) by mikehostetler
+
+* ci: repair shared V3 validation failures (#362) by mikehostetler
+
+* preserve Agent startup errors and apply Flow copy fix by mikehostetler
+
+* scheduler: use patched SchedEx release by mikehostetler
+
+### Performance:
+
+* topology: keep authoring paths linear by mikehostetler
+
+* codec: avoid duplicate set storage during derivation by mikehostetler
+
+* codec: collect Agent registry entries in one accumulator by mikehostetler
+
+* agent: build routes with canonical reversed storage by mikehostetler
+
+* observe: reuse synchronous span start values by mikehostetler
+
+* codec: scan document maps with an iterator by mikehostetler
+
+* scheduler: limit delivery task capture by mikehostetler
+
+* persistence: reuse the default ETS table name by mikehostetler
+
+* state: scan keyword merge input once by mikehostetler
+
+* state: read the module budget once per check by mikehostetler
+
+* thread: filter one kind without a membership list by mikehostetler
+
+* codec: reuse validated neutral definitions during encode by mikehostetler
+
+* command: check reserved keys without copying valid context keys by mikehostetler
+
+* server: limit admission task capture to Plugin specs by mikehostetler
+
+* audit: reuse the count when trimming empty updates by mikehostetler
+
+* audit: keep bounded buffers for empty updates by mikehostetler
+
+* audit: read the clock only for default timestamps by mikehostetler
+
+* audit: generate record IDs only when absent by mikehostetler
+
+### Refactoring:
+
+* core: standardize Signal identities and message contracts by mikehostetler
+
+* runtime: share child lookup and remove duplicate owner watch by mikehostetler
+
+* topology: build dependency layers in linear passes by mikehostetler
+
+* plugins: trim built-in delivery and audit paths by mikehostetler
+
+* persistence: share checkpoint conversion and write options by mikehostetler
+
+* turn: keep source signal on selected turn by mikehostetler
+
+* agent: tighten authoring and instance boundaries by mikehostetler
+
+* core: trim repeated validation and error rules by mikehostetler
+
+* instance: share namespace claim creation by mikehostetler
+
+* plugin: check owned state keys in one pass by mikehostetler
+
+* state: simplify portable map validation by mikehostetler
+
+* bus: use keyword defaults for instance scope by mikehostetler
+
+* plugin: stop runtime processes without liveness prechecks by mikehostetler
+
+* plugin: collect runtime child specs in linear time by mikehostetler
+
+* runtime: share execution cancellation replies by mikehostetler
+
+* runtime: match execution callback tokens explicitly by mikehostetler
+
+* runtime: validate spawn owner monitors once by mikehostetler
+
+* runtime: use the GenServer child specification by mikehostetler
+
+* identify agent server owned work by mikehostetler
+
+* extract agent server persistence by mikehostetler
+
+* extract agent server runtime policy by mikehostetler
+
+* extract agent server admission and views by mikehostetler
+
+* move agent server api to facade by mikehostetler
+
+* separate agent server facade and runtime by mikehostetler
+
+* tighten agent server runtime boundaries by mikehostetler
+
+* normalize v3 verification boundaries by mikehostetler
+
+* tighten v3 runtime boundaries by mikehostetler
+
+* agent: align directive lifecycle names by mikehostetler
+
+* agent: finish simplification pass by mikehostetler
+
+* Jido Plugin Tests and Update Callbacks by mikehostetler
+
+* examples: tighten basic learning path by mikehostetler
+
+* agent: remove state size budget by mikehostetler
+
+* config: colocate defaults with owners by mikehostetler
+
+* agent: generalize extension route targets by mikehostetler
+
+* thread: remove deprecated data helpers by mikehostetler
+
+* id: delegate UUID generation to signals by mikehostetler
+
+* agent: share authoring validation and route targets by mikehostetler
+
+* number application examples and matching tests by mikehostetler
+
+* move examples out of lib and unify test tags by mikehostetler
+
+* remove unused core helpers by mikehostetler
+
+* topology: keep timeout state in active jobs (#358) by mikehostetler
+
+* agent_server: share task completion cleanup (#357) by mikehostetler
+
+* error: remove redundant redaction predicates (#349) by mikehostetler
+
+* util: reuse validation and registry setup (#348) by mikehostetler
+
+* observe: simplify span error completion (#360) by mikehostetler
+
+* observe: share configuration precedence lookup (#351) by mikehostetler
+
+* simplify persistence and runtime store access (#353) by mikehostetler
+
+* topology: narrow startup task inputs (#356) by mikehostetler
+
+* scheduler: simplify reconciliation and validation (#352) by mikehostetler
+
+* plugin: share result checks and remove unused Bus field (#359) by mikehostetler
+
+* agent_server: use one attachment monitor map (#355) by mikehostetler
+
+* reuse authoring data in topology planning and encoding (#354) by mikehostetler
+
+* agent: share common definition validation (#350) by mikehostetler
+
+* complete V3 compatibility and maintenance cleanup by mikehostetler
+
+* scheduler: supervise SchedEx jobs by mikehostetler
+
+* agent: use Zoi for state schemas by mikehostetler
+
 ## Unreleased — V3 beta candidate
 
 ### Features
