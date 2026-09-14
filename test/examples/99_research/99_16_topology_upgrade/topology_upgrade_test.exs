@@ -78,7 +78,7 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
 
   test "a live target grows three workers to five while unchanged Agents retain PID and state",
        c do
-    {instance, controller} = start_team(c.jido)
+    {instance, controller} = start_team(c.jido, repair: :manual)
     old_workers = worker_pids(controller, 3)
     observer = Controller.whereis_agent(controller, :observer)
     assert {:ok, _} = Example.work(hd(old_workers), 7)
@@ -92,9 +92,9 @@ defmodule JidoTest.Examples.TopologyUpgradeTest do
     assert Server.agent(hd(old_workers)).state.total == 7
   end
 
-  defp start_team(jido) do
+  defp start_team(jido, opts \\ []) do
     {:ok, instance} = Example.build(unique_id("upgrade-team"), 3)
-    controller = start_supervised!({Controller, jido: jido, topology: instance})
+    controller = start_supervised!({Controller, [jido: jido, topology: instance] ++ opts})
     :ok = Controller.await_ready(controller)
     {instance, controller}
   end
