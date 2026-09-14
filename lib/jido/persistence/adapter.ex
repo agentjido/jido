@@ -9,13 +9,22 @@ defmodule Jido.Persistence.Adapter do
 
   @type key :: binary()
   @type value :: binary()
+  @type token :: nonempty_binary()
   @type options :: keyword()
 
   @doc "Validates adapter options before an operation starts."
   @callback validate_options(options()) :: :ok | {:error, term()}
 
-  @doc "Gets one value. A missing key returns `{:error, :not_found}`."
-  @callback get(key(), options()) :: {:ok, value()} | {:error, term()}
+  @doc """
+  Gets one value. A missing key returns `{:error, :not_found}`.
+
+  An adapter can return `{:ok, value, token}` when the value and opaque,
+  nonempty binary token come from the same read. Jido validates the value and
+  passes `{:token, token}` to that adapter's next conditional write. The token
+  is valid only for this storage key and location. It is not checkpoint data.
+  """
+  @callback get(key(), options()) ::
+              {:ok, value()} | {:ok, value(), token()} | {:error, term()}
 
   @doc "Stores one value for explicit maintenance and replaces any prior value."
   @callback put(key(), value(), options()) :: :ok | {:error, term()}
@@ -24,6 +33,10 @@ defmodule Jido.Persistence.Adapter do
   Atomically replaces the expected value, or creates a missing key.
 
   `:not_found` requires an absent key. A binary requires an exact byte match.
+  `{:token, token}` requires the adapter to compare a token from its own prior
+  read atomically with this write. Token equality is not byte equality, a
+  writer lease, or an activation generation. Adapters that return bytes only
+  never receive a token condition from Jido.
   A mismatch returns `{:error, :conflict}` without changing the stored value.
   The comparison and write must be one atomic operation relative to other
   writes and deletes. A separate `get/2` followed by `put/3` is not sufficient.
@@ -38,7 +51,7 @@ defmodule Jido.Persistence.Adapter do
   Agent checkpoint saves require this callback. `put/3` remains an
   unconditional byte operation for explicit storage maintenance.
   """
-  @callback compare_and_swap(key(), :not_found | value(), value(), options()) ::
+  @callback compare_and_swap(key(), :not_found | value() | {:token, token()}, value(), options()) ::
               :ok | {:error, term()}
 
   @doc "Physically deletes one value for explicit maintenance."

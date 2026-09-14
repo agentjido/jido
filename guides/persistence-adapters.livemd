@@ -60,9 +60,11 @@ store = {Jido.Persistence.ETS, table: :persistence_guide}
 
 Jido owns the key format, active and tombstone record meaning, validation,
 encoding, and revision check. An adapter only stores binary keys and binary
-values. Runtime adapters must implement binary `get/2` and exact-byte
-`compare_and_swap/4`. Their `put/3` and `delete/2` functions are optional
-maintenance operations.
+values. Runtime adapters must implement binary `get/2` and atomic
+`compare_and_swap/4`. A `get/2` result can also return an opaque binary token
+with the bytes. Jido checks the record and then passes that token to the
+adapter's conditional write. Adapters that return bytes only keep exact-byte
+comparison. `put/3` and `delete/2` are optional maintenance operations.
 
 ## Load and logically delete
 
@@ -115,6 +117,7 @@ Jido includes these adapters:
 | `Jido.Persistence.ETS` | Tests and local development. Data ends with the BEAM. |
 | `Jido.Persistence.File` | One local BEAM with no shared writers. |
 | `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
+| `Jido.Persistence.S3` | Direct single-object checkpoints for infrequent writes through an application-supplied signed request function. |
 | `Jido.Persistence.Bedrock` | Shared durable storage through Bedrock KV 0.7 transactions. |
 | `Jido.Persistence.Ecto` | PostgreSQL or SQLite through an application Ecto repository. |
 
@@ -133,6 +136,43 @@ The ETS adapter creates its table when first used. The File adapter is for one
 local writer domain. The Redis adapter lets the host application own its Redis
 client and connection policy. A Redis TTL applies to tombstones too. Thus, it
 also limits the duration of the delayed-writer fence.
+
+## Configure direct S3 checkpoints
+
+Give the S3 adapter a bucket and a function that signs and sends one request:
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+persistence =
+  {Jido.Persistence.S3,
+   bucket: "my-agent-checkpoints",
+   prefix: "production/agents/",
+   timeout_ms: 5_000,
+   request_fn: &MyApp.S3Client.one_request/1}
+```
+
+The request function receives one map with `method`, `bucket`, `key`,
+`headers`, `body`, `timeout_ms`, `retry: false`, and
+`follow_redirects: false`. It returns `{:ok, %{status: status, headers:
+headers, body: body, code: code}}` or an error. `code` is the parsed S3 error
+code for failed requests. See `Jido.Persistence.S3` for exact response rules.
+The host owns the endpoint, credentials, signing, HTTP client, and connection
+pool. It must stop requests by the given timeout and must not retry a
+conditional write. A lost write reply is indeterminate, even if a later read
+finds the same bytes. Keep credentials, object bodies, ETags, and signed
+headers out of client logs and telemetry.
+
+The adapter uses `If-None-Match: *` to create an object and `If-Match` with
+the ETag from the validated read to replace it. It sends a SHA-256 checksum
+on writes and checks the returned checksum on reads. The endpoint must
+support these conditions and return the checksum. Test each S3 provider and
+configuration before use; a MinIO pass alone does not prove AWS S3 behavior.
+Keep active objects and tombstones from automatic expiry. S3 versioning can
+retain old versions and make maintenance deletion create a delete marker.
+Normal Agent deletion remains a conditional tombstone write. This adapter
+uses one object per key and limits each object to 5,000,000 bytes. It suits
+checkpoints with infrequent writes, not a low-latency write path.
 
 ## Configure the Ecto adapter
 

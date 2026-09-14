@@ -264,7 +264,7 @@ defmodule Jido.Persistence do
                  partition,
                  Keyword.get(opts, :namespace)
                ),
-             {:ok, value} <- adapter_get(adapter, identity.key, adapter_opts),
+             {:ok, value, _condition} <- adapter_get(adapter, identity.key, adapter_opts),
              {:ok, record} <- Record.decode(value),
              :ok <-
                validate_record(record, identity, instance, agent_module, agent_id, partition),
@@ -447,12 +447,12 @@ defmodule Jido.Persistence do
       {:error, :not_found} ->
         {:error, :conflict}
 
-      {:ok, value} ->
+      {:ok, value, condition} ->
         with {:ok, current} <- Record.decode(value),
              :ok <- validate_record_against_record(current, record, identity),
              :ok <- require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
-          {:ok, value}
+          {:ok, condition}
         end
 
       {:error, _reason} = error ->
@@ -471,7 +471,7 @@ defmodule Jido.Persistence do
          partition
        ) do
     case adapter_get(adapter, identity.key, opts) do
-      {:ok, value} ->
+      {:ok, value, condition} ->
         with {:ok, current_record} <- Record.decode(value),
              :ok <-
                Record.validate_ref(
@@ -483,7 +483,7 @@ defmodule Jido.Persistence do
                ),
              :ok <- require_active_for_write(current_record),
              :ok <- check_revision(current_record, target_record, expected_revision) do
-          {:ok, value}
+          {:ok, condition}
         end
 
       {:error, :not_found} ->
@@ -613,7 +613,7 @@ defmodule Jido.Persistence do
 
   defp stored_key_state(adapter, key, opts) do
     case adapter_get(adapter, key, opts) do
-      {:ok, _value} -> :present
+      {:ok, _value, _condition} -> :present
       {:error, :not_found} -> :missing
       {:error, reason} -> {:error, reason}
     end
@@ -717,7 +717,7 @@ defmodule Jido.Persistence do
           adapter_compare_and_swap(adapter, identity.key, :not_found, value, adapter_opts)
         end
 
-      {:ok, expected_value} ->
+      {:ok, expected_value, condition} ->
         with {:ok, current} <- Record.decode(expected_value),
              :ok <-
                validate_record(current, identity, instance, agent_module, agent_id, partition) do
@@ -739,7 +739,7 @@ defmodule Jido.Persistence do
                 adapter_compare_and_swap(
                   adapter,
                   identity.key,
-                  expected_value,
+                  condition,
                   value,
                   adapter_opts
                 )
@@ -825,9 +825,23 @@ defmodule Jido.Persistence do
 
   defp adapter_get(adapter, key, opts) do
     case adapter.get(key, opts) do
-      {:ok, value} when is_binary(value) -> {:ok, value}
-      {:error, _reason} = error -> error
-      result -> invalid_adapter_result(:get, result)
+      {:ok, value} when is_binary(value) ->
+        {:ok, value, value}
+
+      {:ok, value, token} when is_binary(value) and is_binary(token) and byte_size(token) > 0 ->
+        {:ok, value, {:token, token}}
+
+      {:ok, _value, _token} ->
+        invalid_adapter_result(:get, :invalid_token_read)
+
+      result when is_tuple(result) and tuple_size(result) > 2 and elem(result, 0) == :ok ->
+        invalid_adapter_result(:get, :invalid_token_read)
+
+      {:error, _reason} = error ->
+        error
+
+      result ->
+        invalid_adapter_result(:get, result)
     end
   end
 
