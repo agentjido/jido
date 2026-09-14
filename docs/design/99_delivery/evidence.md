@@ -26,8 +26,8 @@ open even when another gate passes.
 | Benchmark contracts | `mix test.bench` | Elixir 1.20.3, OTP 29.0.5 | Pass: 7/7. This is not a sustained load result. |
 | Local system | `mix test.system` | Elixir 1.20.3, OTP 29.0.5 | Last separate run before the skip failed 112/113. The current full suite includes the system selection; a separate rerun is pending. |
 | Full local suite and coverage | `mix test.all --cover` | Elixir 1.20.3, OTP 29.0.5 | Pass: 2,015 passed, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is skipped by user direction. |
-| External services | `mix test.services` | Elixir 1.20.3, OTP 29.0.5 | Fail: 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail against Hex Bedrock 0.7.2. |
-| MinIO snapshot profile | Owned local MinIO runner | Elixir 1.20.3, OTP 29.0.5 | Fail: 28/29 pass; `SYSTEM-BEDROCK-05` fails. Native upload also records two `Jason.EncodeError` results in `SYSTEM-BEDROCK-03`. Direct S3 cases pass. |
+| External services | `mix test.services` | Elixir 1.20.3, OTP 29.0.5 | Pass with skips: 84 passed, 2 skipped (`SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04`). Both failed on Hex Bedrock 0.7.2 before the skip. |
+| MinIO snapshot profile | Owned local MinIO runner | Elixir 1.20.3, OTP 29.0.5 | Pass with skip: 28 passed, 1 skipped (combined `SYSTEM-BEDROCK-03/05` snapshot test). The prior run failed cold rebuild and recorded two native-upload `Jason.EncodeError` results. Direct S3 cases pass. |
 | Support floor | `mise exec erlang@27.3.4.12 elixir@1.18.5-otp-27 -- mix test test/jido --include flaky --seed 0` | Elixir 1.18.5, OTP 27.3.4.12 | Fail before tests: example `07_08_placement_policy/move.ex` cannot expand its Directive struct during compilation. |
 | Docs | `mix docs --no-open -f html --warnings-as-errors` | Elixir 1.20.3, OTP 29.0.5 | Pass. |
 | Hex publish dry run | `mix hex.publish --dry-run` | Elixir 1.20.3, OTP 29.0.5 | Package build and checks complete, then command exits 1 because no Hex user is authenticated. No upload or publication occurred. |
@@ -42,9 +42,11 @@ selects Hex `jido_action 3.0.0-beta.11` and `jido_signal 3.0.0-beta.4`.
 
 ## Open release blockers
 
-1. The included Bedrock profile must pass strict startup, replacement, and
-   MinIO-backed snapshot recovery on a published dependency set. Local Bedrock
-   fixes are not in Hex 0.7.2. See [Bedrock issue 319](https://github.com/bedrock-kv/bedrock/issues/319)
+1. The included Bedrock profile still lacks passing strict startup and
+   MinIO-backed snapshot recovery on a published dependency set. Its three
+   blocked tests are temporarily skipped by user direction; passing profiles
+   with skips do not prove those contracts. Local Bedrock fixes are not in Hex
+   0.7.2. See [Bedrock issue 319](https://github.com/bedrock-kv/bedrock/issues/319)
    and [Jido issue 370](https://github.com/agentjido/jido/issues/370).
 2. The Elixir 1.18.5/OTP 27 support-floor run fails during example Directive
    compilation. Core tests did not run under that runtime.
@@ -52,6 +54,6 @@ selects Hex `jido_action 3.0.0-beta.11` and `jido_signal 3.0.0-beta.4`.
    passing exact-commit CI result for all required gates and human release
    approval remain open.
 
-The user directed the `SYSTEM-CLUSTER-01` skip for the excluded cluster
-contract. No Bedrock or support-floor gate exception is approved. This record
-does not claim publication or a Bedrock durability result.
+The user directed the cluster and Bedrock test skips. No Bedrock release-gate
+waiver or support-floor exception is approved. This record does not claim
+publication or a Bedrock durability result.

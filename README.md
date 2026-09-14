@@ -12,7 +12,8 @@ an OTP actor when you need a live process.
 This `release/v3` branch prepares `3.0.0-beta.1` for evaluation. It has breaking
 changes from V2. The package is not published. Core quality, authoring, and
 local system checks pass with the out-of-scope cluster-authority probe skipped.
-Bedrock storage and support-floor gates still fail. Exact-commit CI and human
+Bedrock durability is not yet verified, and the support-floor gate still fails.
+Exact-commit CI and human
 release approval also remain. See the
 [migration guide](guides/migration.md) for the API changes and known limits.
 

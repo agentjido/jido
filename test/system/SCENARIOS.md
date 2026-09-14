@@ -53,6 +53,9 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 - `SYSTEM-SUPERVISION-01` passes with a bounded wait for old Jido
   children to release registered names. This needs review and repeated runs.
 - `SYSTEM-BEDROCK-01`: the placeholder survives unassisted cluster shutdown.
+- `SYSTEM-BEDROCK-01`, `SYSTEM-BEDROCK-04`, and the MinIO snapshot test for
+  `SYSTEM-BEDROCK-03/05` are temporarily skipped by user direction while
+  Bedrock upstream fixes are pending. The assertions remain in source.
 - `SYSTEM-BEDROCK-02` passes after the upgrade to Bedrock 0.7.2.
 - `SYSTEM-CLUSTER-01`: separate local registries permit two cluster owners.
   The user directed a skip because cluster-exclusive ownership is outside the
@@ -85,10 +88,10 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 | `mix test.authoring`, 2026-09-14 | 523/523 pass |
 | `mix test.bench`, 2026-09-14 | 7/7 benchmark contract tests pass |
 | `mix test.system`, 2026-09-14, seed 0 | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
-| `mix test.services`, 2026-09-14, seed 0 | 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail |
+| `mix test.services`, 2026-09-14, seed 0 | 84 pass, 2 skipped; all other service tests remain active |
 | Focused sustained partition probes | Two local peer tests pass with held Turn and late spawn; shared-Redis stale-write test passes with real CAS |
 | `mix test.all --cover`, 2026-09-14 | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
-| Full MinIO profile, 2026-09-14, seed 0 | 28/29 pass; Bedrock cold-rebuild readiness fails. Native upload reports two `Jason.EncodeError` results; the binary control uploads two real snapshots. The owned bucket and objects were removed, and the dedicated server stopped |
+| Full MinIO profile, 2026-09-14, seed 0 | 28 pass, 1 skipped; the Bedrock snapshot test is skipped, while direct S3 tests pass. The owned bucket and objects were removed, and the dedicated server stopped. The prior run recorded cold-rebuild failure and two native-upload encoding errors. |
 | Direct S3 MinIO pressure repeats, seed 0 | Four fresh local runs each pass both tests against MinIO `RELEASE.2025-10-15T17-29-55Z` |
 | Burn-in, two runs, 20 rounds, seeds 93 and 94 | All eight selected tests pass; 1086 model commands and six BEAM crashes across both runs |
 | Redis Bus readiness, fresh runs at seeds 0, 7 and 19 | All pass with the unchanged readiness call; original intermittent failure remains unexplained |

@@ -19,8 +19,8 @@ assertions and core work.
 | `mix test.bench` | 7/7 pass; these are benchmark contract tests, not a load run |
 | `mix test.system` | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |
 | `mix test.all --cover` | 2,015 pass, 2 skipped, 115 excluded; 93.5% coverage. `SYSTEM-CLUSTER-01` is one of the skips. |
-| `mix test.services` | 84/86 pass; `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` fail |
-| `mix test.services.minio` via owned local MinIO | 28/29 pass; `SYSTEM-BEDROCK-05` fails and native upload reports two `Jason.EncodeError` results (`SYSTEM-BEDROCK-03`) |
+| `mix test.services` | 84 pass, 2 skipped: `SYSTEM-BEDROCK-01` and `SYSTEM-BEDROCK-04` await upstream fixes |
+| MinIO profile via owned local MinIO | 28 pass, 1 skipped: the snapshot test covers `SYSTEM-BEDROCK-03` and `SYSTEM-BEDROCK-05` |
 | Direct S3/MinIO pressure repeats (2026-09-14) | Four fresh 2/2 runs pass |
 | Two burn-in runs, 20 rounds each (2026-09-13) | 8 selected tests pass; 1,086 model commands and 6 BEAM crashes |
 
@@ -34,9 +34,11 @@ and repeated runs before the earlier timing failures can be closed.
 `SYSTEM-CLUSTER-01` is skipped by user direction: it tests a cluster-wide
 owner guarantee that Jido core does not provide. The test remains in source,
 but neither `mix test.all` nor the CI core selection runs it. The approved
-`DIST-03` core skip is unchanged. Strict Bedrock startup and MinIO snapshot
-recovery still block their later assertions. No Bedrock probe was skipped or
-replaced with an in-memory adapter.
+`DIST-03` core skip is unchanged. The user directed temporary skips for the
+three tests blocked by Bedrock upstream defects. Their source and assertions
+remain. Passing service profiles with skips do not prove strict startup or
+MinIO snapshot recovery. No passing Bedrock case was skipped or replaced with
+an in-memory adapter.
 
 ## Topology target durability — verified paths and open edges
 

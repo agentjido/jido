@@ -19,7 +19,7 @@ candidate selects these published packages:
 
 | Package | Version and source | Registry checksum | Status |
 | --- | --- | --- | --- |
-| `bedrock` | Hex `0.7.2` | `a08b779f65b42b159700f050ac76d4514fb9414aafa8a6305026e79fbf332959` | Strict startup and snapshot recovery gates fail |
+| `bedrock` | Hex `0.7.2` | `a08b779f65b42b159700f050ac76d4514fb9414aafa8a6305026e79fbf332959` | Strict startup and snapshot recovery tests are temporarily skipped; prior failures remain unresolved |
 | `bedrock_raft` | Hex `0.10.1` | `6cafdefd445917d1f717cdc09d8d6be3a98cd12fc791f45b62ca6704e89682da` | Selected by the tested Bedrock profile |
 
 Local Bedrock commits `900ee439`, `905c567f`, and `8e97b5b8` are not in Hex
