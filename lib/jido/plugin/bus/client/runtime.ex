@@ -98,6 +98,27 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     end
   end
 
+  def handle_info(
+        {:delivery_result, token, result},
+        %{pending: %{stage: :deliver, token: token, record: record, worker_ref: ref}} = state
+      ) do
+    Process.demonitor(ref, [:flush])
+    state = %{state | pending: nil}
+
+    case result do
+      {:ok, _agent} -> acknowledge(record, state)
+      {:error, _reason} -> retry(record, :deliver, state)
+    end
+  end
+
+  def handle_info(
+        {:DOWN, ref, :process, _pid, _reason},
+        %{pending: %{stage: :deliver, worker_ref: ref, record: record}} = state
+      ) do
+    {:noreply, next} = retry(record, :deliver, %{state | pending: nil})
+    {:noreply, next}
+  end
+
   def handle_info({:reconnect, token}, %{reconnect_token: token} = state) do
     state = %{state | reconnect_token: nil}
 
@@ -110,19 +131,45 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
   def handle_info(_message, state), do: {:noreply, state}
 
   @impl true
-  def terminate(_reason, %{bus: bus, subscription_id: id})
+  def terminate(_reason, %{bus: bus, subscription_id: id} = state)
       when is_pid(bus) and is_binary(id) do
+    _ = cancel_record_retry(state)
     _ = Bus.unsubscribe(bus, id)
     :ok
   end
 
-  def terminate(_reason, _state), do: :ok
+  def terminate(_reason, state) do
+    _ = cancel_record_retry(state)
+    :ok
+  end
 
   defp deliver_record(%RecordedSignal{} = record, state) do
-    case call_agent(state.agent_server, record.signal, state.config.timeout) do
-      {:ok, _agent} -> acknowledge(record, state)
-      {:error, _reason} -> retry(record, :deliver, state)
-    end
+    owner = self()
+    token = make_ref()
+
+    {:ok, worker} =
+      Task.start(fn ->
+        result =
+          try do
+            call_agent(state.agent_server, record.signal, state.config.timeout)
+          rescue
+            error -> {:error, {:delivery_failed, error}}
+          catch
+            kind, reason -> {:error, {:delivery_failed, {kind, reason}}}
+          end
+
+        send(owner, {:delivery_result, token, result})
+      end)
+
+    pending = %{
+      record: record,
+      stage: :deliver,
+      token: token,
+      worker: worker,
+      worker_ref: Process.monitor(worker)
+    }
+
+    {:noreply, %{state | pending: pending}}
   end
 
   defp acknowledge(%RecordedSignal{} = record, state) do
@@ -139,10 +186,18 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     {:noreply, %{state | pending: pending, retry_timer: timer}}
   end
 
-  defp cancel_record_retry(%{retry_timer: nil} = state), do: %{state | pending: nil}
-
   defp cancel_record_retry(state) do
-    _ = Process.cancel_timer(state.retry_timer)
+    if state.retry_timer, do: Process.cancel_timer(state.retry_timer)
+
+    case state.pending do
+      %{worker: worker, worker_ref: ref} ->
+        Process.demonitor(ref, [:flush])
+        Process.exit(worker, :kill)
+
+      _ ->
+        :ok
+    end
+
     %{state | pending: nil, retry_timer: nil}
   end
 
