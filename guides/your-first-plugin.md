@@ -19,5 +19,10 @@ declare the type in the Agent facet. Put post-commit handling in the Agent
 Server facet. Add `child_spec/1` only when the capability needs one permanent
 runtime root.
 
+For a live projection of owned state, use the optional Server
+`after_commit/3` hook. It receives the exact committed owned value and revision
+without a Directive from each Action. Initialize the projection from `Init`
+on startup and replacement. Use semantic Telemetry if you only need observation.
+
 See [the callback guide](plugins.md) and
 [the four-facet tests](../test/jido/plugin/facets_test.exs).

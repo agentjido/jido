@@ -32,6 +32,11 @@ defmodule Jido.Plugin do
   `context.plugin_inputs[Package].prepared` and
   `context.plugin_inputs[Package].runtime`.
 
+  The Server facet can also implement `after_commit/3` to keep a live view of
+  its exact committed owned value and revision, without an Action-owned
+  Directive. Startup and replacement use `Jido.Plugin.Init`; notifications
+  are bounded, best effort, and not replayed.
+
   `use Jido.Plugin` with no manifest options is the mixed-callback compatibility
   form. Its old Directive validation, state update, and Command admission
   callbacks remain for source compatibility. New Plugins must use an

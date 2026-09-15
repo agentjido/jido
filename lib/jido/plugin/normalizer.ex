@@ -21,7 +21,14 @@ defmodule Jido.Plugin.Normalizer do
   @agent_capabilities Keyword.drop(@agent_callbacks, [:update_state, :validate_directive])
 
   # Authority checks keep first-error order. Capability checks only test presence.
-  @server_callbacks [admit: 3, prepare_dispatch: 4, dispatch: 4, await_ready: 2, child_spec: 1]
+  @server_callbacks [
+    admit: 3,
+    prepare_dispatch: 4,
+    dispatch: 4,
+    await_ready: 2,
+    child_spec: 1,
+    after_commit: 3
+  ]
   @persistence_callbacks [dump: 3, load: 3]
   @topology_callbacks [contribute: 2]
 
@@ -40,7 +47,7 @@ defmodule Jido.Plugin.Normalizer do
     await_ready: 2
   ]
 
-  @package_callbacks [reduce: 2] ++
+  @package_callbacks [reduce: 2, after_commit: 3] ++
                        @persistence_callbacks ++ @topology_callbacks ++ @legacy_callbacks
 
   @doc false
@@ -395,10 +402,18 @@ defmodule Jido.Plugin.Normalizer do
   defp validate_legacy_contract(module) do
     behaviours = behaviours(module)
 
-    if Jido.Plugin in behaviours do
-      :ok
-    else
-      invalid_package(module)
+    cond do
+      Jido.Plugin not in behaviours ->
+        invalid_package(module)
+
+      function_exported?(module, :after_commit, 3) ->
+        PluginError.validation("after_commit/3 requires an Agent Server Plugin facet", %{
+          plugin: module,
+          callback: {:after_commit, 3}
+        })
+
+      true ->
+        :ok
     end
   end
 

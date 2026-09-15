@@ -31,10 +31,12 @@ prepared input, and all validated Directives. It returns only the complete next
 value for its owned state field. Each custom Directive owns its `validate/1`
 callback.
 
-The Agent Server owns all runtime processes and tasks. It runs Directive work
-after commit. A failed dispatch does not undo the commit. Supplying committed
-state and its matching version directly in replacement Init belongs to the
-Agent Server alignment work.
+The Agent Server owns all runtime processes and tasks. The optional
+`after_commit/3` hook receives the exact owned state and matching revision
+after every successful Turn, before returned Directives. A failure skips
+remaining work and uses the Server error policy; it cannot undo the commit.
+Startup, restore, and runtime replacement use a fresh `Jido.Plugin.Init`
+state-version pair instead of replaying notifications.
 
 Persistence runs a selected Persistence facet only for the default Agent
 checkpoint. It gives the facet one paired owned-state value, bounded format

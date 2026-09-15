@@ -63,6 +63,12 @@ schema and the portable-value rule.
 A failed Turn does not commit the update. A direct command returns the
 candidate but does not commit it.
 
+For a live projection, pair the Agent facet with a Server facet that implements
+`after_commit/3`. It receives only the owned committed value and its matching
+revision, before returned Directives. The Action does not need to know about
+the runtime. Rebuild from `Init` on startup and replacement; notifications are
+not replayed. See [Commit Projection](../examples/09_plugins/09_08_commit_projection/README.md).
+
 ## Convert One Owned Value for Persistence
 
 A package can select `Jido.Persistence.Plugin` when its live owned value needs

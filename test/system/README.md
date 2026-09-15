@@ -3,6 +3,10 @@
 This suite checks runtime invariants across real components. It is separate
 from pure authoring checks and focused core regressions.
 
+The commit projection scenario checks the optional Plugin `after_commit/3`
+hook with ETS, File, and SQLite/Ecto. It compares live owned state, saved
+revisions, restore, hook settlement events, scoped semantic logs, and cleanup.
+
 ```sh
 mix test.system    # Local ETS, File, and SQLite/Ecto scenarios
 mix test.all       # All normal suites, including local system scenarios
@@ -25,6 +29,7 @@ strict-startup, upload, and cold-rebuild gaps remain. See
 system/
   runtime/                  # :system; included in mix test.all
     agents_test.exs
+    commit_projection_test.exs
     topology_test.exs
     observability_test.exs
     file_storage_test.exs
@@ -248,8 +253,8 @@ publication and startup message barriers, then checks a real transaction.
 
 ## Observability on every scenario
 
-A per-test recorder watches Turn, Agent lifecycle, commit, Directive, persistence,
-and Topology semantic events. It checks bounded metadata, integer measurements,
+A per-test recorder watches Turn, Agent lifecycle, commit, Plugin commit
+notification, Directive, persistence, and Topology semantic events. It checks bounded metadata, integer measurements,
 non-negative duration, outcome status, balanced spans, and no duplicate terminal
 events. Selected Turns must start at evaluation and have one commit span. Successful
 and failed writes must have the expected persistence classification.

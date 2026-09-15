@@ -53,6 +53,10 @@ A direct `Jido.Agent.cmd/3` call returns the list but does not dispatch it.
 Statuses are `:succeeded`, `:failed`, `:cancelled`, `:timed_out`, and
 `:indeterminate`. The first recovery question is always `committed?`.
 
+An optional Plugin `after_commit/3` failure uses stage `:after_commit`. The
+commit remains. Remaining notifications and Directives are skipped; no
+Directive is counted as failed until Directive handling itself starts.
+
 ## Do Not Use Directives As A Queue
 
 An ordinary Directive list is not a durable queue. A process or VM can stop

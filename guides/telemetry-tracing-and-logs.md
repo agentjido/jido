@@ -33,9 +33,9 @@ If evaluation or commit fails, the Turn ends without a new live revision. Jido
 then emits the terminal `turn.settled` event.
 
 If commit succeeds, Jido makes the candidate Agent live and ends the Turn span.
-The caller can receive the committed Agent while post-commit Directive work is
-still active. Each Directive has its own span. Jido emits `turn.settled` after
-all owned Directive attempts stop.
+The caller can receive the committed Agent while Plugin commit notifications
+and Directive work are still active. Each hook and Directive has its own
+span. Jido emits `turn.settled` after all owned attempts stop.
 
 The normal order is:
 
@@ -44,12 +44,14 @@ agent.turn.start
   agent.commit.start
   agent.commit.stop
 agent.turn.stop              committed Agent is live
+  agent.after_commit.start   zero or more Plugin notifications
+  agent.after_commit.stop
   agent.directive.start      zero or more Directives
   agent.directive.stop
 agent.turn.settled           terminal bounded result
 ```
 
-A Directive failure does not undo a successful commit. Use `committed?`,
+A notification or Directive failure does not undo a successful commit. Use `committed?`,
 `status`, `stage`, and the state revisions to distinguish a pre-commit failure
 from a post-commit failure.
 
@@ -64,6 +66,7 @@ Span families use `:start` and one terminal event. A returned failure uses
 | Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Agent identity, `operation`, `status`, `activation_id` | `duration`, `state_version` |
 | Turn result | `[:jido, :agent, :turn, event]` | Turn, Signal, trace, `status`, `stage`, `committed?` | `duration`, revisions, `directive_count` |
 | Commit | `[:jido, :agent, :commit, event]` | Turn identity, `status`, `stage` | `duration` |
+| Plugin commit notification | `[:jido, :agent, :after_commit, event]` | Turn identity, `plugin_module`, `facet_module`, `status`, `stage` | `duration`, start `state_version` |
 | Directive | `[:jido, :agent, :directive, event]` | Turn identity, `directive_module`, `status` | `duration`, `directive_index` |
 | Turn settlement | `[:jido, :agent, :turn, :settled]` | Turn identity, `status`, `stage`, `committed?` | total `duration`, revisions, Directive counts |
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Agent and Signal identity, `admission_reason` | `queue_depth`, `queue_limit` |
@@ -80,7 +83,7 @@ Topology operations are `:activate`, `:repair`, and `:cleanup`.
 
 Public status values are `:ok`, `:error`, `:cancelled`, `:timed_out`,
 `:conflict`, `:indeterminate`, `:not_found`, and `:rejected`. Public Turn stages
-are `:evaluate`, `:commit`, and `:directive`.
+are `:evaluate`, `:commit`, `:after_commit`, and `:directive`.
 
 ## Attach a handler
 
@@ -130,6 +133,7 @@ can include:
 
 - Agent identity: `agent_namespace`, `agent_partition`, and `agent_id`.
 - Runtime identity: `agent_module` and `activation_id`.
+- Plugin notification identity: `plugin_module` and `facet_module`.
 - Turn and Signal identity: `turn_id`, `source_signal_id`, `signal_id`, and
   `signal_type`.
 - Trace and cause identity: `trace_id`, `span_id`, `parent_span_id`,
@@ -167,6 +171,7 @@ events from these span families:
 - Agent lifecycle
 - Turn result
 - commit
+- Plugin commit notification
 - Directive
 - persistence
 - local Topology
@@ -250,6 +255,7 @@ config :jido, :opentelemetry, enabled: false
 | Agent lifecycle | `jido.agent.lifecycle.<operation>` |
 | Turn result | `jido.agent.turn` |
 | Commit | `jido.agent.commit` |
+| Plugin commit notification | `jido.agent.after_commit` |
 | Directive | `jido.agent.directive` |
 | Persistence | `jido.persistence.<operation>` |
 | Local Topology | `jido.topology.<operation>` |
@@ -295,6 +301,6 @@ Tasks that it starts.
 - Do not use high-cardinality IDs as default metric tags.
 - Do not add application state or payloads to the Jido event catalog.
 - Configure exporters and credentials only in the host application.
-- Use `turn.settled` when you need the final Directive result.
+- Use `turn.settled` when you need the final notification and Directive result.
 - Use the Turn `:stop` event when you need the time at which a commit became
   live.

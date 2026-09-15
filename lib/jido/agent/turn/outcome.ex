@@ -4,11 +4,13 @@ defmodule Jido.Agent.Turn.Outcome do
 
   The Agent Server creates this record when a Turn stops. It records whether
   the Agent committed, where processing stopped, and the result of post-commit
-  Directive work. It contains no process handles or private Server state.
+  Plugin notifications and Directive work. Notification failure uses stage
+  `:after_commit`; it does not count as a failed Directive. It contains no
+  process handles or private Server state.
   """
 
   @type status :: :succeeded | :failed | :cancelled | :timed_out | :indeterminate
-  @type stage :: :prepare | :execute | :finalize | :commit | :directive
+  @type stage :: :prepare | :execute | :finalize | :commit | :after_commit | :directive
 
   @type directive_summary :: %{
           total: non_neg_integer(),

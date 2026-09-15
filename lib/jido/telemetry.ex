@@ -4,15 +4,15 @@ defmodule Jido.Telemetry do
 
   Jido uses one version-1 semantic event catalog for Telemetry handlers,
   metrics, semantic logs, and optional OpenTelemetry spans. The catalog covers
-  Agent lifecycle, Turn result, commit, Directive work, Turn settlement,
-  admission rejection, persistence, local Topology operations, and Scheduler
-  delivery.
+  Agent lifecycle, Turn result, commit, Plugin commit notification, Directive
+  work, Turn settlement, admission rejection, persistence, local Topology
+  operations, and Scheduler delivery.
 
-  A successful Turn span ends when its commit becomes live. Directive work can
-  continue after this point. The separate
+  A successful Turn span ends when its commit becomes live. Plugin
+  notifications and Directive work can continue after this point. The separate
   `[:jido, :agent, :turn, :settled]` event reports the terminal bounded result
-  after all owned Directive attempts stop. A post-commit failure does not undo
-  the committed Agent or its revision.
+  after all owned notification and Directive attempts stop. A post-commit
+  failure does not undo the committed Agent or its revision.
 
   Span events use `:start` and one terminal event. A returned result uses
   `:stop`. An error, throw, or exit that escapes the observed boundary uses
@@ -48,6 +48,7 @@ defmodule Jido.Telemetry do
     {"jido.agent.lifecycle", [:jido, :agent, :lifecycle], [:operation, :status]},
     {"jido.agent.turn", [:jido, :agent, :turn], [:status, :stage]},
     {"jido.agent.commit", [:jido, :agent, :commit], [:status]},
+    {"jido.agent.after_commit", [:jido, :agent, :after_commit], [:status]},
     {"jido.agent.directive", [:jido, :agent, :directive], [:status]},
     {"jido.persistence.operation", [:jido, :persistence, :operation],
      [:operation, :status, :persistence_reason]},

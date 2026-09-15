@@ -43,6 +43,44 @@ tests still run. A passing service profile with these skips does not prove
 Bedrock durability. No non-Bedrock case was skipped or replaced with an
 in-memory adapter.
 
+## Plugin commit notification — verification (2026-09-15)
+
+- [x] Add the optional Server facet `after_commit/3` hook. It receives an exact
+      owned-state/revision pair, runs before returned Directives, and cannot
+      replace committed state or return new Directives.
+- [x] Check declaration order, unchanged Turns, stateless facets, callback
+      failures, timeout, late task messages, error policy, runtime replacement,
+      shutdown, owner loss, restore without replay, and bounded failure logs.
+- [x] Check the live projection and saved revision with ETS, File, and
+      SQLite/Ecto. Observe scoped logs, hook settlement, balanced semantic
+      events, and owned-resource cleanup. All three adapter cases pass.
+- [x] Run the final focused hook, ownership, and example checks on Elixir
+      1.18.5 / OTP 27: 27 tests pass. Docs also build with warnings as errors.
+
+Keep observed failures separate from this contract. One quality run recorded
+a CAS conflict in the unchanged Scheduler recovery test
+`cancelling pending work survives restore and rejects the old delivery` at its
+manual save of revision 3 with expected revision 2. The initial full run also
+recorded a 500 ms peer-call timeout in the unchanged remote lifecycle test
+`disconnect stops owned work and reconnect needs explicit replacement`.
+Other builds were active during those runs; this does not establish a cause.
+Neither test was changed, skipped, or given a longer timeout.
+
+The initial `mix test.all --cover` run passed 2,062 of 2,063 active tests,
+with two existing skips and 115 exclusions. The remote lifecycle timeout was
+the only failure. Coverage was 93.7%. The hook cases, examples, authoring,
+benchmark contracts, and local system checks passed in that run.
+
+The final standalone `mix quality` run passed all 1,149 selected core tests,
+with 29 exclusions. Format, warnings-as-errors compile, Credo, and Dialyzer
+also passed. A passing repeat does not establish the cause of either earlier
+failure.
+
+The final standalone `mix test.all --cover` run passed all 2,063 active tests,
+with two existing skips and 115 exclusions, in 305.8 seconds. Coverage remained
+93.7%. The earlier Scheduler conflict and peer timeout remain recorded above;
+their causes are not closed by this passing repeat.
+
 ## Topology target durability — verified paths and open edges
 
 The accepted target now has a versioned record. The Controller saves it before

@@ -23,6 +23,7 @@ external effects.
 | Bedrock storage faults | `services/bedrock_faults_test.exs` | Paused; earlier Bedrock 0.7.2 runs passed restarts and coordinator/log replacement, while unassisted placeholder cleanup failed |
 | Real trace export | `runtime/open_telemetry_test.exs` | Four SDK tests pass: exported parentage, exporter failure isolation, handler failure isolation, and paired overhead measurements |
 | Metrics and logs | `runtime/observability_test.exs` | Public counters, host revision gauge, structured log identity and payload redaction |
+| Plugin commit notification | `runtime/commit_projection_test.exs` | Exact live and saved owned-state/revision pairs, unchanged Turns, required restore without notification replay, scoped hook logs, balanced semantic spans, and resource cleanup; passes on ETS, File, SQLite |
 | Composed Topology | `support/scenarios/topology.exs` | Included teams, logical ownership, exact local placement and shared Bus replacement; latest run passes, earlier readiness timeout needs repeats |
 | Partial Topology cleanup | `runtime/topology_cleanup_test.exs` | Real resource ownership conflict, accepted added members, control-tree failure during cleanup; `SYSTEM-TOPOLOGY-03` passes |
 | Signal journey | `runtime/signal_journey_test.exs` | JSON validation and explicit key conversion, Bus/Router, Action/Flow, commit, Directive, failed acknowledgement and replay; latest run passes, earlier `SYSTEM-BUS-01` timeout needs repeats |
@@ -86,6 +87,9 @@ uses messages, monitors, telemetry, and actual timeout responses, not sleeps.
 | Check | Result |
 | --- | --- |
 | `mix quality`, 2026-09-14 | 1106 core tests pass; format, warnings-as-errors compile, Credo, and Dialyzer pass |
+| `mix quality`, Plugin hook work, 2026-09-15 | Final standalone run: 1,149 core tests pass, 29 excluded; format, warnings-as-errors compile, Credo, and Dialyzer pass. Earlier Scheduler recovery CAS conflict is recorded in TODO. |
+| `mix test.all --cover`, Plugin hook work, 2026-09-15 | Initial run: 2,062/2,063 pass with one remote lifecycle peer timeout. Final standalone run: 2,063 pass, two existing skips, 115 excluded; 93.7% coverage. Earlier failure remains recorded in TODO. |
+| Focused hook, ownership, and example checks on Elixir 1.18.5 / OTP 27 | 27 tests pass; normal Hex dependencies retained. Docs build with warnings as errors on the current runtime. |
 | `mix test.authoring`, 2026-09-14 | 523/523 pass |
 | `mix test.bench`, 2026-09-14 | 7/7 benchmark contract tests pass |
 | `mix test.system`, 2026-09-14, seed 0 | Last separate run before the skip: 112/113 pass; rerun pending. The full suite includes this selection. |

@@ -34,12 +34,13 @@ defmodule JidoTest.TelemetryTest do
     metrics = Telemetry.metrics()
     names = Enum.map(metrics, & &1.name)
 
-    assert length(names) == 28
+    assert length(names) == 32
 
     for prefix <- [
           [:jido, :agent, :lifecycle],
           [:jido, :agent, :turn],
           [:jido, :agent, :commit],
+          [:jido, :agent, :after_commit],
           [:jido, :agent, :directive],
           [:jido, :persistence, :operation],
           [:jido, :topology, :operation]

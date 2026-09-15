@@ -7,10 +7,10 @@ defmodule Jido.Telemetry.Semantic do
   @schema_version 1
 
   @id_keys ~w(agent_namespace agent_id activation_id turn_id source_signal_id signal_id signal_type trace_id span_id parent_span_id causation_id cause_turn_id child_activation_id topology_id node_id)a
-  @module_keys ~w(agent_module directive_module adapter_module)a
+  @module_keys ~w(agent_module directive_module adapter_module plugin_module facet_module)a
   @boolean_keys [:committed?, :retryable?]
   @status_values ~w(ok error cancelled timed_out conflict indeterminate not_found rejected)a
-  @stage_values ~w(evaluate commit directive)a
+  @stage_values ~w(evaluate commit after_commit directive)a
   @kind_values ~w(error throw exit)a
   @operation_values ~w(activate stop hibernate thaw load compare_and_swap delete)a
   @admission_values ~w(deadline_expired overloaded)a

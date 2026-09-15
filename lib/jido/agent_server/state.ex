@@ -75,6 +75,8 @@ defmodule Jido.AgentServer.State do
                 |> Zoi.optional(),
               admission_task:
                 Zoi.any(description: "Active Plugin admission task") |> Zoi.optional(),
+              commit_task:
+                Zoi.any(description: "Active Plugin commit notification task") |> Zoi.optional(),
               directive_task:
                 Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional(),
               error_policy_tasks:

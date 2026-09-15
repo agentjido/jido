@@ -6,8 +6,8 @@ defmodule Jido.AgentServer do
   `:running`, and `:directing`. One Signal selects one Action or Flow. Live
   Plugin admission, `Jido.Exec`, and outbound Plugin work run asynchronously.
   The Server commits only the terminal complete state result. It then
-  interprets returned Directives in list order before it accepts the next
-  Signal.
+  notifies selected Plugin `after_commit/3` hooks in declaration order, then
+  interprets returned Directives in list order before it accepts the next Signal.
 
   The Agent state commit is atomic. Turn execution is not a transaction across
   external systems: an Action or Flow can complete I/O before returning an
@@ -20,8 +20,8 @@ defmodule Jido.AgentServer do
   state-machine callback.
 
   The Server assigns one stable UUID7 to each admitted Turn. It keeps a private
-  `ActiveTurn` until execution and all post-commit Directives stop. It then
-  creates one runtime `Jido.Agent.Turn.Outcome`. A custom two-argument error
+  `ActiveTurn` until execution, commit notifications, and all Directives stop.
+  It then creates one runtime `Jido.Agent.Turn.Outcome`. A custom two-argument error
   policy receives the original error and this Outcome. When the Agent debug
   buffer is on, the terminal event contains a bounded outcome summary. It does
   not contain the complete Outcome, Agent state, or full Signals.
@@ -44,8 +44,8 @@ defmodule Jido.AgentServer do
   Caller wait, Plugin readiness, persistence operations, and post-commit
   Directive work use separate boundaries.
 
-  Exec roots, Action tasks, Flow tasks, and asynchronous Directives run under
-  the Jido instance Task Supervisor. The Server also links each Exec root to
+  Exec roots, Action tasks, Flow tasks, commit notifications, and asynchronous
+  Directives run under the Jido instance Task Supervisor. The Server also links each Exec root to
   itself. Initial Plugin readiness and error Signal delivery are also linked
   to the Server. Owned work cannot outlive its Agent owner.
 
@@ -72,6 +72,7 @@ defmodule Jido.AgentServer do
   alias Jido.Agent.Turn.Outcome
   alias Jido.Plugin
   alias Jido.AgentServer.Plugin, as: ServerPlugin
+  alias Jido.AgentServer.Plugin.Commit
   alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
   alias Jido.Plugin.SignalContext, as: PluginSignalContext
 
@@ -968,10 +969,15 @@ defmodule Jido.AgentServer do
         :directing,
         %State{} = data
       ) do
-    if reentrant_task_call?(from, data.directive_task) do
-      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
-    else
-      postpone_call(from, token, signal, deadline, data)
+    cond do
+      reentrant_task_call?(from, data.commit_task) ->
+        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_commit}}]}
+
+      reentrant_task_call?(from, data.directive_task) ->
+        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
+
+      true ->
+        postpone_call(from, token, signal, deadline, data)
     end
   end
 
@@ -1117,6 +1123,49 @@ defmodule Jido.AgentServer do
       )
 
     fail_turn(error, :prepare, data)
+  end
+
+  def handle_event(
+        :info,
+        {ref, result},
+        :directing,
+        %State{commit_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    release_task_result(pending)
+    complete_commit_notification(result, pending, %{data | commit_task: nil})
+  end
+
+  def handle_event(
+        :info,
+        {:DOWN, ref, :process, _pid, reason},
+        :directing,
+        %State{commit_task: %{task: %Task{ref: ref}} = pending} = data
+      ) do
+    cancel_task_timer(pending.timer)
+
+    error =
+      Error.execution_error("Agent Plugin commit notification task exited",
+        details: %{code: :plugin_callback_task_failed, callback: :after_commit, reason: reason}
+      )
+
+    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil}, :exit)
+  end
+
+  def handle_event(
+        :info,
+        {:timeout, timer, {:after_commit_timeout, task_ref}},
+        :directing,
+        %State{commit_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending} = data
+      ) do
+    shutdown_task(task)
+
+    error =
+      Error.timeout_error("Agent Plugin commit notification timed out",
+        timeout: commit_notification_timeout(data),
+        details: %{code: :plugin_callback_timeout, callback: :after_commit}
+      )
+
+    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil})
   end
 
   def handle_event(
@@ -1391,6 +1440,15 @@ defmodule Jido.AgentServer do
       when phase in [:idle, :admitting, :directing],
       do: :keep_state_and_data
 
+  def handle_event(
+        :internal,
+        {:after_commit, [plugin | rest], directives},
+        :directing,
+        %State{} = data
+      ) do
+    start_commit_notification(plugin, rest, directives, data)
+  end
+
   def handle_event(:internal, {:handle_directives, [], context}, :directing, %State{} = data) do
     continue_directives([], context, data)
   end
@@ -1436,8 +1494,13 @@ defmodule Jido.AgentServer do
 
     stop_plugin_readiness(data.plugin_bootstrap)
     stop_task(data.admission_task)
+    stop_task(data.commit_task)
     stop_task(data.directive_task)
     Enum.each(data.error_policy_tasks, fn {_ref, pending} -> stop_task(pending) end)
+
+    if data.commit_task do
+      finish_span_error(data.commit_task.span, {:agent_stopped, reason})
+    end
 
     if data.directive_task do
       finish_span_error(data.directive_task.span, {:agent_stopped, reason})
@@ -1864,14 +1927,19 @@ defmodule Jido.AgentServer do
         directive_count: directive_count
       })
 
-    actions =
-      reply_action(active.caller, {:ok, agent}) ++
-        directive_actions(directives, agent.id, active)
+    notifications = ServerPlugin.commit_modules(data.plugin_specs)
 
-    phase = if directives == [], do: :idle, else: :directing
+    post_commit_actions =
+      case notifications do
+        [] -> directive_actions(directives, agent.id, active)
+        modules -> [{:next_event, :internal, {:after_commit, modules, directives}}]
+      end
+
+    actions = reply_action(active.caller, {:ok, agent}) ++ post_commit_actions
+    phase = if post_commit_actions == [], do: :idle, else: :directing
 
     next_data =
-      if directives == [] do
+      if phase == :idle do
         outcome = turn_outcome(next_data, :succeeded, :commit, nil)
         next_data |> complete_outcome(outcome) |> maybe_start_idle_timer(phase)
       else
@@ -2112,7 +2180,7 @@ defmodule Jido.AgentServer do
         outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
         next_data = complete_outcome(next_data, outcome)
 
-        apply_directive_error_policy(outcome, next_data)
+        apply_post_commit_error_policy(outcome, next_data)
 
       {:stop, reason, next_data} ->
         finish_span(span, %{result: :stop})
@@ -2188,6 +2256,89 @@ defmodule Jido.AgentServer do
   catch
     kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
   end
+
+  defp start_commit_notification(module, rest, directives, data) do
+    plugin = Enum.find(data.plugin_specs, &(&1.module == module))
+
+    commit = %Commit{
+      plugin: module,
+      turn_id: data.active.turn_id,
+      agent_id: data.agent.id,
+      agent_module: data.agent.module,
+      plugin_state: plugin_state_value(data.agent.state, plugin.state_key),
+      state_version: data.state_version,
+      jido: data.jido,
+      partition: data.partition
+    }
+
+    metadata =
+      Map.merge(AgentTelemetry.turn_metadata(data), %{
+        stage: :after_commit,
+        committed?: true,
+        plugin_module: module,
+        facet_module: plugin.agent_server.module
+      })
+
+    span = AgentTelemetry.start(:after_commit, metadata, %{state_version: data.state_version})
+    pending = %{rest: rest, directives: directives, span: span}
+    launch_commit_notification(plugin, commit, pending, data)
+  end
+
+  defp launch_commit_notification(plugin, commit, pending, data) do
+    supervisor = Jido.task_supervisor_name(data.jido)
+    trace = TraceContext.capture()
+
+    task =
+      Task.Supervisor.async(supervisor, fn ->
+        TraceContext.with_context(trace, fn ->
+          with {:ok, runtime_ref} <- plugin_runtime_ref(data, plugin) do
+            ServerPlugin.after_commit(plugin, runtime_ref, commit)
+          end
+        end)
+      end)
+
+    timer = start_task_timer(commit_notification_timeout(data), :after_commit_timeout, task.ref)
+    {:keep_state, %{data | commit_task: Map.merge(pending, %{task: task, timer: timer})}}
+  rescue
+    error -> complete_commit_notification({:error, error}, pending, data)
+  catch
+    kind, reason -> complete_commit_notification({:error, {kind, reason}}, pending, data)
+  end
+
+  defp complete_commit_notification(result, pending, data, fault_kind \\ nil)
+
+  defp complete_commit_notification(:ok, pending, data, _fault_kind) do
+    finish_span(pending.span, %{result: :ok})
+
+    case {pending.rest, pending.directives} do
+      {[], []} ->
+        outcome = turn_outcome(data, :succeeded, :after_commit, nil)
+        next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
+        TraceContext.clear()
+        {:next_state, :idle, next_data}
+
+      {[], directives} ->
+        {:keep_state, data, directive_actions(directives, data.agent.id, data.active)}
+
+      {rest, directives} ->
+        {:keep_state, data, [{:next_event, :internal, {:after_commit, rest, directives}}]}
+    end
+  end
+
+  defp complete_commit_notification({:error, reason}, pending, data, fault_kind) do
+    if fault_kind,
+      do: finish_span_fault(pending.span, fault_kind, reason, []),
+      else: finish_span_error(pending.span, reason)
+
+    metadata = pending.span.metadata |> Map.merge(AgentTelemetry.error_metadata(reason))
+    Logger.error("Agent Plugin commit notification failed", Map.to_list(metadata))
+
+    outcome = turn_outcome(data, outcome_status(reason), :after_commit, reason)
+    apply_post_commit_error_policy(outcome, complete_outcome(data, outcome))
+  end
+
+  defp commit_notification_timeout(%State{directive_timeout: :infinity}), do: 5_000
+  defp commit_notification_timeout(%State{directive_timeout: timeout}), do: timeout
 
   defp start_task_timer(:infinity, _tag, _task_ref), do: nil
 
@@ -2854,7 +3005,7 @@ defmodule Jido.AgentServer do
     }
   end
 
-  defp apply_directive_error_policy(%Outcome{} = outcome, data) do
+  defp apply_post_commit_error_policy(%Outcome{} = outcome, data) do
     next_data = %{data | error_count: data.error_count + 1}
 
     case error_policy_decision(outcome, next_data) do

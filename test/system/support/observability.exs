@@ -6,6 +6,7 @@ defmodule JidoTest.System.Observability do
     [:jido, :agent, :turn],
     [:jido, :agent, :lifecycle],
     [:jido, :agent, :commit],
+    [:jido, :agent, :after_commit],
     [:jido, :agent, :directive],
     [:jido, :persistence, :operation],
     [:jido, :topology, :operation]

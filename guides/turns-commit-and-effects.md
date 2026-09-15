@@ -12,11 +12,12 @@ ID and can commit at most one new Agent revision.
 | Execution | One Action or Flow returns candidate state and Directives |
 | Finalization | Plugins update owned state and Jido validates all state |
 | Commit | Persistence succeeds and the live Agent value changes |
+| Notification | Optional Plugin `after_commit/3` hooks run in declaration order |
 | Dispatch | Directives run in declared order |
 | Settlement | Jido records the terminal Outcome |
 
 Direct commands use routing, execution, and finalization. They return a
-candidate and Directives. Admission, live commit, dispatch, and settlement
+candidate and Directives. Admission, live commit, notification, dispatch, and settlement
 belong to the Agent Server.
 
 ## Locate The Commit Boundary
@@ -53,6 +54,12 @@ projection. It does not contain the complete `Jido.Agent.Turn.Outcome`.
 
 The Agent Server creates the Outcome as a terminal runtime record. A custom
 error policy receives it after a failure. It is not an authoring value.
+
+An optional Plugin commit notification runs before returned Directives. It
+receives only the owned committed value and its exact revision. Failure uses
+stage `:after_commit`, skips remaining notifications and Directives, and cannot
+undo the commit. Startup and restore rebuild runtimes from `Init`; they do not
+replay notifications. See [Plugin Contract and Lifecycle](plugin-contract-and-lifecycle.md).
 
 ## Keep Timeouts Separate
 

@@ -154,7 +154,14 @@ defmodule Jido.Telemetry.Agent do
 
   def interrupted(data, reason) do
     active = data.active
-    stage = if active.committed_version, do: :directive, else: :execute
+
+    stage =
+      cond do
+        data.commit_task -> :after_commit
+        active.committed_version -> :directive
+        true -> :execute
+      end
+
     outcome = ActiveTurn.outcome(active, data.agent.id, :indeterminate, stage, reason)
     settled(data, outcome, interruption_kind(reason))
   end
