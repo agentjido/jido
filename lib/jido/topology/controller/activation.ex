@@ -7,8 +7,9 @@ defmodule Jido.Topology.Controller.Activation do
 
   def start(spec, context) do
     with {:ok, persistence} <- Jido.Persistence.resolve_config(:inherit, context.jido),
-         {:ok, agent_state, version, restore} <- saved_state(spec, context, persistence),
+         # Load the definition before safe decoding encounters Agent-owned atoms.
          {:ok, definition} <- definition(spec, context),
+         {:ok, agent_state, version, restore} <- saved_state(spec, context, persistence),
          {:ok, agent} <- Agent.instantiate(definition, id: spec.id, state: agent_state) do
       options = [
         agent: agent,
