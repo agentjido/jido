@@ -8,23 +8,37 @@ defmodule Jido.Dispatch.PreparationTest do
   test "trace propagation keeps exact Signals when context is absent or invalid" do
     source = Signal.new!("source", %{}, source: "/test")
     signal = Signal.new!("output", %{}, source: "/test")
+    {:ok, traced} = Trace.put(signal, Trace.new_root())
 
-    for context <- [nil, %{trace_id: "invalid"}] do
+    for context <- [nil, %{trace_id: "invalid"}], signal <- [signal, traced] do
       Context.put(context)
       assert Preparation.propagate(signal, source) === signal
     end
   end
 
+  test "an invalid cause keeps the original outgoing trace" do
+    source = Signal.new!("source", %{}, source: "/test")
+    signal = Signal.new!("output", %{}, source: "/test")
+    {:ok, signal} = Trace.put(signal, Trace.new_root())
+    Context.begin_turn(source)
+
+    assert Preparation.propagate(signal, %{source | id: nil}) === signal
+  end
+
   test "trace propagation preserves identity and adds the current cause" do
     source = Signal.new!("source", %{}, source: "/test")
-    signal = Signal.new!("output", %{value: 1}, source: "/test")
+    signal = Signal.new!("output", %{value: 1}, source: "/test", subject: "worker")
+    {:ok, signal} = Signal.put_context(signal, "tenant", "blue")
+    {:ok, signal} = Trace.put(signal, Trace.new_root())
     trace = Context.begin_turn(source)
     propagated = Preparation.propagate(signal, source)
 
-    assert propagated.id == signal.id
-    assert propagated.data == signal.data
+    assert Map.drop(propagated, [:extensions]) == Map.drop(signal, [:extensions])
+    assert Signal.get_context(propagated, "tenant") == "blue"
     assert Trace.get(propagated).trace_id == trace.trace_id
+    assert Trace.get(propagated).span_id == trace.span_id
     assert Trace.get(propagated).causation_id == source.id
+    assert Context.get() == trace
   end
 
   test "Bus scope inheritance preserves explicit scope, target order and nested lists" do
@@ -40,7 +54,9 @@ defmodule Jido.Dispatch.PreparationTest do
              {:bus, target: :third, jido: nil}
            ]
 
-    assert Preparation.inherit_bus_scope(targets, nil) == targets
+    for scope <- [nil, "invalid", 0] do
+      assert Preparation.inherit_bus_scope(targets, scope) == targets
+    end
 
     assert Preparation.inherit_bus_scope({:pid, target: self()}, :inherited) ==
              {:pid, target: self()}

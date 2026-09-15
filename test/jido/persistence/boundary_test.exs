@@ -100,15 +100,11 @@ defmodule Jido.Persistence.BoundaryTest do
     {:ok, checkpoint} = Agent.checkpoint(c.agent)
 
     for {scope, value, build, validate} <- [
-          {:instance, :first,
-           fn -> Record.build_active(c.agent, :first, "blue", 0, checkpoint) end,
-           fn record -> Record.validate(record, :first, Basic, c.agent.id, "blue") end},
-          {:namespace, "first",
-           fn -> Record.build_ref_active(c.agent, "first", "blue", 0, checkpoint) end,
-           fn record -> Record.validate_ref(record, "first", Basic, c.agent.id, "blue") end}
+          {:instance, :first, &Record.build_active/5, &Record.validate/5},
+          {:namespace, "first", &Record.build_ref_active/5, &Record.validate_ref/5}
         ] do
-      {:ok, record} = build.()
-      assert Map.fetch!(record, scope) == value
+      {:ok, active} = build.(c.agent, value, "blue", 0, checkpoint)
+      tombstone = active |> Map.drop([:agent_vsn, :checkpoint]) |> Map.put(:kind, :tombstone)
 
       changes = [
         {scope, "other"},
@@ -117,20 +113,32 @@ defmodule Jido.Persistence.BoundaryTest do
         {:partition, "other"}
       ]
 
-      for {field, index} <- Enum.with_index(Enum.map(changes, &elem(&1, 0))) do
-        changed = Map.merge(record, Map.new(Enum.drop(changes, index)))
-        assert {:error, {:invalid_persistence_record, ^field}} = validate.(changed)
+      for record <- [active, tombstone] do
+        assert :ok = validate.(record, value, Basic, c.agent.id, "blue")
+
+        for {{field, _value}, index} <- Enum.with_index(changes) do
+          changed = Map.merge(record, Map.new(Enum.drop(changes, index)))
+
+          assert {:error, {:invalid_persistence_record, ^field}} =
+                   validate.(changed, value, Basic, c.agent.id, "blue")
+        end
+
+        for key <- Map.keys(record) do
+          field = if key in [:format, :kind], do: key, else: :shape
+
+          assert {:error, {:invalid_persistence_record, ^field}} =
+                   validate.(Map.delete(record, key), value, Basic, c.agent.id, "blue")
+
+          # Equal size alone does not prove an exact key set.
+          changed = record |> Map.delete(key) |> Map.put(:extra, true)
+
+          assert {:error, {:invalid_persistence_record, ^field}} =
+                   validate.(changed, value, Basic, c.agent.id, "blue")
+        end
+
+        assert {:error, {:invalid_persistence_record, :shape}} =
+                 validate.(Map.put(record, :extra, true), value, Basic, c.agent.id, "blue")
       end
-
-      for key <- Map.keys(record) do
-        field = if key in [:format, :kind], do: key, else: :shape
-
-        assert {:error, {:invalid_persistence_record, ^field}} =
-                 validate.(Map.delete(record, key))
-      end
-
-      assert {:error, {:invalid_persistence_record, :shape}} =
-               validate.(Map.put(record, :extra, true))
     end
   end
 

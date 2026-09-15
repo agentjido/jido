@@ -4,6 +4,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
   alias Jido.Agent.Runner
   alias Jido.Agent
   alias Jido.Agent.Command
+  alias Jido.Agent.Turn
   alias Jido.Plugin
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
@@ -38,7 +39,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     @impl true
     def handle_signal(%Signal{data: %{invalid_source: value}}, _agent) do
-      {:ok, %Jido.Agent.Turn{executable: Add, source_signal: value}}
+      {:ok, %Turn{executable: Add, source_signal: value}}
     end
 
     def handle_signal(%Signal{} = signal, _agent),
@@ -49,7 +50,9 @@ defmodule Jido.Agent.TurnEvaluationTest do
     agent = InvalidSourceAgent.new!(id: "invalid-source")
     assert {:ok, server} = Jido.start_agent(jido, agent)
 
-    for value <- [:invalid, "invalid", %{id: "invalid"}] do
+    replacement = Signal.new!("source.replacement", %{}, source: "/test")
+
+    for value <- [:invalid, "invalid", %{id: "invalid"}, replacement, %{replacement | id: nil}] do
       invalid = Signal.new!("source.invalid", %{invalid_source: value}, source: "/test")
 
       assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
@@ -71,14 +74,17 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
   test "source binding accepts nil and matching Signals and rejects malformed sources" do
     source = Signal.new!("source.route", %{}, source: "/test")
-    unbound = Jido.Agent.Turn.new!(Add)
-    assert {:ok, bound} = Jido.Agent.Turn.bind_source(unbound, source)
+    unbound = Turn.new!(Add)
+    assert {:ok, bound} = Turn.bind_source(unbound, source)
     assert bound.source_signal == source
-    assert {:ok, ^bound} = Jido.Agent.Turn.bind_source(bound, source)
+    assert {:ok, ^bound} = Turn.bind_source(bound, source)
 
     for value <- [:invalid, "invalid", %{id: "invalid"}] do
       assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
-               Jido.Agent.Turn.bind_source(%{unbound | source_signal: value}, source)
+               Turn.bind_source(%{unbound | source_signal: value}, source)
+
+      assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
+               Turn.validate(%{unbound | source_signal: value})
     end
   end
 
@@ -118,6 +124,27 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
              Jido.Agent.Turn.bind_source(turn, source)
+  end
+
+  test "source binding compares the complete Signal, not only its id" do
+    source = Signal.new!("source.route", %{by: 1}, source: "/test")
+
+    for replacement <- [
+          %{source | data: %{by: 2}},
+          %{source | type: "other.route"},
+          %{source | source: "/other"}
+        ] do
+      turn = Turn.new!(Add, %{}, replacement)
+
+      assert {:error,
+              %Jido.Error.ValidationError{
+                subject: :source_signal,
+                details: %{expected_signal_id: expected_id, turn_signal_id: turn_id}
+              }} = Turn.bind_source(turn, source)
+
+      assert expected_id == source.id
+      assert turn_id == source.id
+    end
   end
 
   test "Turn validation returns an error for values that are not Turns" do

@@ -217,7 +217,9 @@ defmodule Jido.Persistence.Record do
     do: exact_keys(record, @tombstone_keys)
 
   defp exact_keys(record, keys) do
-    if Enum.sort(Map.keys(record)) == Enum.sort(keys), do: :ok, else: invalid(:shape)
+    if map_size(record) == length(keys) and Enum.all?(keys, &Map.has_key?(record, &1)),
+      do: :ok,
+      else: invalid(:shape)
   end
 
   defp validate_identity(record, scope_field, scope, agent_module, agent_id, partition) do

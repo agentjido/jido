@@ -20,9 +20,8 @@ defmodule Jido.Plugin.Normalizer do
   @legacy_agent_callbacks Keyword.delete(@agent_callbacks, :reduce)
   @agent_capabilities Keyword.drop(@agent_callbacks, [:update_state, :validate_directive])
 
-  # Authority checks and capability detection keep their existing orders.
+  # Authority checks keep first-error order. Capability checks only test presence.
   @server_callbacks [admit: 3, prepare_dispatch: 4, dispatch: 4, await_ready: 2, child_spec: 1]
-  @server_capabilities Keyword.delete(@server_callbacks, :await_ready) ++ [await_ready: 2]
   @persistence_callbacks [dump: 3, load: 3]
   @topology_callbacks [contribute: 2]
 
@@ -118,7 +117,7 @@ defmodule Jido.Plugin.Normalizer do
       end
 
     server =
-      if has_any?(spec.module, @server_capabilities) or spec.dispatch? or spec.runtime? do
+      if has_any?(spec.module, @server_callbacks) or spec.dispatch? or spec.runtime? do
         %ServerSpec{
           package: spec.module,
           module: spec.module,
@@ -231,7 +230,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp build_legacy_server_spec(module, options) do
-    if has_any?(module, @server_capabilities) do
+    if has_any?(module, @server_callbacks) do
       {:ok,
        %ServerSpec{
          package: module,
@@ -484,7 +483,7 @@ defmodule Jido.Plugin.Normalizer do
     do: require_capability(module, :agent, @agent_capabilities)
 
   defp facet_has_capability(module, :agent_server),
-    do: require_capability(module, :agent_server, @server_capabilities)
+    do: require_capability(module, :agent_server, @server_callbacks)
 
   defp require_capability(module, owner, callbacks) do
     if has_any?(module, callbacks) do

@@ -5,8 +5,3 @@ config :jido, runtime_store_timeout: 100
 
 # Keep test output quiet. ExUnit.CaptureLog installs its own handler when needed.
 config :logger, :default_handler, false
-
-# Declare the metadata emitted by runtime fallback logs without setting a
-# formatter policy for library users.
-config :logger, :default_formatter,
-  metadata: [:agent_id, :pool, :reason, :signal_id, :signal_type]

@@ -67,9 +67,16 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     meta = %{role: :worker}
     assert :ok = Server.adopt_child(parent, child, :worker, meta)
     children = Server.children(parent)
-    assert children.worker.pid == child
-    assert children.worker.partition == :blue
-    assert children.worker.meta == meta
+
+    assert children.worker == %{
+             pid: child,
+             module: ChildAgent,
+             id: child_id,
+             partition: :blue,
+             tag: :worker,
+             kind: :agent,
+             meta: meta
+           }
 
     key = Jido.partition_key(child_id, :blue)
     record = Jido.RuntimeStore.get(jido, :agent_relationships, key)
@@ -83,10 +90,14 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
            }
 
     snapshot = Server.snapshot(parent)
-    assert {:error, _reason} = Server.adopt_child(parent, child, :worker, %{role: :other})
+
+    assert {:error, {:child_tag_in_use, :worker}} =
+             Server.adopt_child(parent, child, :worker, %{role: :other})
+
     assert :ok = Server.stop_child(parent, :missing)
     assert Server.children(parent) == children
     assert Server.snapshot(parent) == snapshot
+    assert Jido.RuntimeStore.get(jido, :agent_relationships, key) == record
 
     monitor = Process.monitor(child)
     assert :ok = Server.stop_child(parent, :worker, {:shutdown, :done})
@@ -102,7 +113,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
           {{:shutdown, :done}, {:shutdown, :done}},
           {:done, {:shutdown, :done}}
         ] do
-      {:ok, server} = Jido.start_agent(jido, RuntimeAgent, id: unique_id("stop-reason"))
+      {:ok, server} = Jido.start_agent(jido, ChildAgent, id: unique_id("stop-reason"))
       monitor = Process.monitor(server)
       assert :ok = Server.stop(server, reason)
       assert_receive {:DOWN, ^monitor, :process, ^server, ^expected}

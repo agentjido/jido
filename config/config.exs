@@ -1,5 +1,12 @@
 import Config
 
+# Declare fallback log metadata for local tests and lint checks. This does not
+# set a formatter policy in applications that depend on Jido.
+if config_env() in [:dev, :test] do
+  config :logger, :default_formatter,
+    metadata: [:agent_id, :pool, :reason, :signal_id, :signal_type]
+end
+
 # Git hooks and git_ops configuration for conventional commits
 # Only enabled in dev environment (git_ops is a dev-only dependency)
 if config_env() == :dev do

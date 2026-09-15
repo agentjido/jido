@@ -2353,13 +2353,6 @@ defmodule Jido.AgentServer do
 
   defp reentrant_turn_call?(_from, _active), do: false
 
-  defp handle_child_directive_call(directive, from, data) do
-    case DirectiveRuntime.handle(directive, directive_context(data), data) do
-      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
-      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    end
-  end
-
   defp reentrant_task_call?({caller, _tag}, %{task: %Task{pid: root}})
        when is_pid(caller) and is_pid(root) do
     related_exec_process?(caller, root, %{}, 0)
@@ -2817,6 +2810,13 @@ defmodule Jido.AgentServer do
       partition: data.partition,
       parent: public_parent(data.parent)
     }
+  end
+
+  defp handle_child_directive_call(directive, from, data) do
+    case DirectiveRuntime.handle(directive, directive_context(data), data) do
+      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
+      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
   end
 
   defp directive_context(%State{} = data) do
