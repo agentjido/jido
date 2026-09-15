@@ -19,7 +19,7 @@ defmodule Jido.Plugin.Dispatch do
   alias Jido.Plugin.Dispatch.{Runtime, Send}
   alias Jido.Signal
   alias Jido.Signal.Dispatch, as: SignalDispatch
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Dispatch.Preparation, as: DispatchPreparation
 
   @doc "Creates one post-commit Signal delivery Directive."
   @spec send(Signal.t(), SignalDispatch.dispatch_configs()) :: Send.t()
@@ -38,8 +38,8 @@ defmodule Jido.Plugin.Dispatch do
 
   @impl Jido.Plugin
   def dispatch(runtime, %Send{} = directive, %DirectiveContext{} = context, opts) do
-    signal = propagate(directive.signal, context.effective_signal)
-    target = inherit_bus_scope(directive.target, context.jido)
+    signal = DispatchPreparation.propagate(directive.signal, context.effective_signal)
+    target = DispatchPreparation.inherit_bus_scope(directive.target, context.jido)
 
     GenServer.call(
       runtime,
@@ -54,21 +54,4 @@ defmodule Jido.Plugin.Dispatch do
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: __MODULE__)
   end
-
-  defp propagate(%Signal{} = signal, %Signal{} = source) do
-    case TraceContext.propagate_to(signal, source.id) do
-      {:ok, traced} -> traced
-      {:error, _reason} -> signal
-    end
-  end
-
-  defp inherit_bus_scope({:bus, opts}, jido) when is_atom(jido) and not is_nil(jido) do
-    {:bus, Keyword.put_new(opts, :jido, jido)}
-  end
-
-  defp inherit_bus_scope(targets, jido) when is_list(targets) do
-    Enum.map(targets, &inherit_bus_scope(&1, jido))
-  end
-
-  defp inherit_bus_scope(target, _jido), do: target
 end

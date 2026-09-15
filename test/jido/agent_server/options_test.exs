@@ -84,6 +84,7 @@ defmodule Jido.AgentServer.OptionsTest do
           {[persistence: :invalid], "persistence adapter is invalid"},
           {[jido: "invalid"], "jido must be an atom"},
           {[registry: "invalid"], "registry must be an atom"},
+          {[register: :invalid], "register must be a boolean"},
           {[name: {:invalid, :name}], "name is invalid"},
           {[register: true, registry: nil], "requires an Agent Registry"},
           {[register: true, registry: Registry, name: :agent], "cannot be used together"},
@@ -125,6 +126,24 @@ defmodule Jido.AgentServer.OptionsTest do
     assert opts.idle_timeout == 100
     assert opts.restore == false
     assert {:error, _} = Options.new(agent: RemoteCounter, parent: :invalid)
+  end
+
+  test "registration keeps explicit booleans and its instance-derived default", %{jido: jido} do
+    for {attrs, expected} <- [
+          {[], false},
+          {[jido: jido], true},
+          {[jido: jido, register: false], false},
+          {[register: true, registry: Registry], true}
+        ] do
+      assert {:ok, %{register: ^expected}} = Options.new([agent: RemoteCounter] ++ attrs)
+    end
+
+    for value <- [nil, :invalid, 0, "true"] do
+      assert_invalid([agent: RemoteCounter, register: value], "register must be a boolean")
+
+      assert {:error, %Jido.Error.ValidationError{kind: :config}} =
+               Jido.AgentServer.start_link(agent: RemoteCounter, register: value)
+    end
   end
 
   test "parent references validate process and request identity fields" do

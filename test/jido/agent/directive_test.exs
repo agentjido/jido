@@ -1,7 +1,51 @@
 defmodule Jido.Agent.DirectiveTest do
-  use JidoTest.Case, async: true
+  use ExUnit.Case, async: true
   alias Jido.Agent.Directive
   alias Jido.Signal
+
+  defmodule PlainDirective do
+    use Jido.Agent.Directive
+    defstruct [:value]
+  end
+
+  defmodule SchemaDirective do
+    use Jido.Agent.Directive
+
+    @schema Zoi.struct(__MODULE__, %{value: Zoi.integer()}, coerce: true)
+    defstruct [:value]
+    def schema, do: @schema
+  end
+
+  defmodule OverrideDirective do
+    use Jido.Agent.Directive
+    defstruct [:value]
+
+    @impl true
+    def validate(%__MODULE__{}), do: {:error, :custom_validation}
+    def validate(_value), do: {:error, :wrong_type}
+  end
+
+  test "custom Directives can use the behavior before their struct is defined" do
+    plain = %PlainDirective{value: 1}
+    assert {:ok, ^plain} = PlainDirective.validate(plain)
+    assert {:ok, ^plain} = Directive.validate(plain)
+
+    typed = %SchemaDirective{value: 1}
+    assert {:ok, ^typed} = SchemaDirective.validate(typed)
+    assert {:ok, ^typed} = Directive.validate(typed)
+    assert {:error, _issues} = SchemaDirective.validate(%SchemaDirective{value: "invalid"})
+
+    for module <- [PlainDirective, SchemaDirective],
+        value <- [:invalid, %URI{}, plain, typed],
+        not is_struct(value, module) do
+      assert {:error, %Jido.Error.ValidationError{}} = module.validate(value)
+    end
+  end
+
+  test "custom Directives can override the default validator" do
+    assert {:error, :custom_validation} = Directive.validate(%OverrideDirective{value: 1})
+    assert {:error, :wrong_type} = OverrideDirective.validate(:invalid)
+  end
 
   test "built-in validation checks Error, SpawnProcess and child adoption fields" do
     process = Directive.spawn_process({Elixir.Agent, fn -> 0 end})

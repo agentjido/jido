@@ -62,8 +62,10 @@ defmodule Jido.Topology.Codec.Value do
              _ ->
                Authoring.error("Invalid topology map entry")
            end) do
-      if length(pairs) == map_size(Map.new(pairs)),
-        do: {:ok, Map.new(pairs)},
+      decoded = Map.new(pairs)
+
+      if length(pairs) == map_size(decoded),
+        do: {:ok, decoded},
         else: Authoring.error("Duplicate decoded map key")
     end
   end

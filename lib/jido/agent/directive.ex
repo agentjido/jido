@@ -41,7 +41,8 @@ defmodule Jido.Agent.Directive do
       @behaviour Jido.Agent.Directive
 
       @impl Jido.Agent.Directive
-      def validate(%__MODULE__{} = directive) do
+      # `use` can precede `defstruct`; do not expand the struct here.
+      def validate(%{__struct__: __MODULE__} = directive) do
         if function_exported?(__MODULE__, :schema, 0) do
           Zoi.parse(apply(__MODULE__, :schema, []), Map.from_struct(directive))
         else

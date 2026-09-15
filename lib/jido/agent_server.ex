@@ -86,7 +86,9 @@ defmodule Jido.AgentServer do
     Options,
     ParentRef,
     PluginLifecycle,
+    Relationship,
     RuntimeCheckpoint,
+    Shutdown,
     State
   }
 
@@ -251,7 +253,7 @@ defmodule Jido.AgentServer do
   @doc "Stops one Agent Server through its normal OTP termination path."
   @spec stop(server(), term(), timeout()) :: :ok
   def stop(server, reason \\ :shutdown, timeout \\ 5_000) do
-    :gen_statem.stop(server, normalize_stop_reason(reason), timeout)
+    :gen_statem.stop(server, Shutdown.normalize_reason(reason), timeout)
   end
 
   @doc "Returns one declared Plugin's owned field from the complete Agent state map."
@@ -717,7 +719,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, :children, _phase, %State{} = data) do
-    children = Map.new(data.children, fn {key, child} -> {key, public_child(child)} end)
+    children = Map.new(data.children, fn {key, child} -> {key, public_child_map(child)} end)
     {:keep_state_and_data, [{:reply, from, children}]}
   end
 
@@ -831,23 +833,12 @@ defmodule Jido.AgentServer do
 
   def handle_event({:call, from}, {:adopt_child, child, tag, meta}, _phase, data) do
     directive = %Directive.AdoptChild{child: child, tag: tag, meta: meta}
-
-    case DirectiveRuntime.handle(directive, directive_context(data), data) do
-      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
-      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    end
+    handle_child_directive_call(directive, from, data)
   end
 
   def handle_event({:call, from}, {:stop_child, tag, reason}, _phase, data) do
     directive = %Directive.StopChild{tag: tag, reason: reason}
-
-    case DirectiveRuntime.handle(directive, directive_context(data), data) do
-      {:ok, next_data} ->
-        {:keep_state, next_data, [{:reply, from, :ok}]}
-
-      {:error, error, _next_data} ->
-        {:keep_state_and_data, [{:reply, from, {:error, error}}]}
-    end
+    handle_child_directive_call(directive, from, data)
   end
 
   def handle_event({:call, from}, :cancel, :idle, %State{}) do
@@ -943,7 +934,7 @@ defmodule Jido.AgentServer do
         :admitting,
         %State{} = data
       ) do
-    if reentrant_admission_call?(from, data.admission_task) do
+    if reentrant_task_call?(from, data.admission_task) do
       {:keep_state_and_data, [{:reply, from, {:error, :reentrant_admission}}]}
     else
       postpone_call(from, token, signal, deadline, data)
@@ -977,7 +968,7 @@ defmodule Jido.AgentServer do
         :directing,
         %State{} = data
       ) do
-    if reentrant_directive_call?(from, data.directive_task) do
+    if reentrant_task_call?(from, data.directive_task) do
       {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
     else
       postpone_call(from, token, signal, deadline, data)
@@ -1854,8 +1845,9 @@ defmodule Jido.AgentServer do
   end
 
   defp commit_checkpointed_turn(agent, directives, version, active, data) do
-    committed_active = ActiveTurn.mark_committed(active, version, length(directives))
-    AgentTelemetry.committed(data, version, length(directives))
+    directive_count = length(directives)
+    committed_active = ActiveTurn.mark_committed(active, version, directive_count)
+    AgentTelemetry.committed(data, version, directive_count)
 
     next_data =
       data
@@ -1869,7 +1861,7 @@ defmodule Jido.AgentServer do
         signal_id: active.effective_signal.id,
         signal_type: active.effective_signal.type,
         state_version: version,
-        directive_count: length(directives)
+        directive_count: directive_count
       })
 
     actions =
@@ -1918,7 +1910,7 @@ defmodule Jido.AgentServer do
 
       {:stop, stop_reason, policy_data} ->
         replies = reply_action(active.caller, {:error, reason})
-        stop_reason = normalize_stop_reason(stop_reason)
+        stop_reason = Shutdown.normalize_reason(stop_reason)
 
         if replies == [] do
           {:stop, stop_reason, policy_data}
@@ -2127,7 +2119,7 @@ defmodule Jido.AgentServer do
         active = ActiveTurn.mark_directive_completed(next_data.active)
         next_data = %{next_data | active: active}
         outcome = turn_outcome(next_data, :succeeded, :directive, nil)
-        {:stop, normalize_stop_reason(reason), complete_outcome(next_data, outcome)}
+        {:stop, Shutdown.normalize_reason(reason), complete_outcome(next_data, outcome)}
     end
   end
 
@@ -2188,7 +2180,7 @@ defmodule Jido.AgentServer do
     supervisor = Jido.task_supervisor_name(data.jido)
     trace = TraceContext.capture()
     task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
-    timer = start_directive_timer(data.directive_timeout, task.ref)
+    timer = start_task_timer(data.directive_timeout, :directive_timeout, task.ref)
     pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
     {:keep_state, %{data | directive_task: pending}}
   rescue
@@ -2196,11 +2188,6 @@ defmodule Jido.AgentServer do
   catch
     kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
   end
-
-  defp start_directive_timer(:infinity, _task_ref), do: nil
-
-  defp start_directive_timer(timeout, task_ref),
-    do: :erlang.start_timer(timeout, self(), {:directive_timeout, task_ref})
 
   defp start_task_timer(:infinity, _tag, _task_ref), do: nil
 
@@ -2366,19 +2353,12 @@ defmodule Jido.AgentServer do
 
   defp reentrant_turn_call?(_from, _active), do: false
 
-  defp reentrant_admission_call?({caller, _tag}, %{task: %Task{pid: root}})
+  defp reentrant_task_call?({caller, _tag}, %{task: %Task{pid: root}})
        when is_pid(caller) and is_pid(root) do
     related_exec_process?(caller, root, %{}, 0)
   end
 
-  defp reentrant_admission_call?(_from, _admission_task), do: false
-
-  defp reentrant_directive_call?({caller, _tag}, %{task: %Task{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_directive_call?(_from, _directive_task), do: false
+  defp reentrant_task_call?(_from, _pending_task), do: false
 
   defp plugin_runtime_refs(%State{} = data, modules) do
     Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
@@ -2567,7 +2547,7 @@ defmodule Jido.AgentServer do
     next_data = State.remove_child(data, key)
 
     next_data =
-      if clean_child_exit?(reason) do
+      if clean_shutdown?(reason) do
         _ = delete_child_relationship(data, child)
         %{next_data | child_spawn_requests: Map.delete(next_data.child_spawn_requests, key)}
       else
@@ -2583,11 +2563,6 @@ defmodule Jido.AgentServer do
     cast(self(), signal)
     {:keep_state, next_data}
   end
-
-  defp clean_child_exit?(:normal), do: true
-  defp clean_child_exit?(:shutdown), do: true
-  defp clean_child_exit?({:shutdown, _reason}), do: true
-  defp clean_child_exit?(_reason), do: false
 
   defp handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
     next_data = %{data | parent: nil, orphaned_from: parent}
@@ -2837,6 +2812,13 @@ defmodule Jido.AgentServer do
     }
   end
 
+  defp handle_child_directive_call(directive, from, data) do
+    case DirectiveRuntime.handle(directive, directive_context(data), data) do
+      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
+      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
+  end
+
   defp directive_context(%State{} = data) do
     signal = RuntimeSignal.new!(%{}, source: "/agent/#{data.agent.id}")
 
@@ -2846,8 +2828,6 @@ defmodule Jido.AgentServer do
       signal: signal
     }
   end
-
-  defp public_child(%ChildInfo{} = child), do: public_child_map(child)
 
   defp public_child_map(%ChildInfo{} = child) do
     %{
@@ -3118,13 +3098,13 @@ defmodule Jido.AgentServer do
       jido,
       :agent_relationships,
       Jido.partition_key(data.agent.id, data.partition),
-      %{
-        parent_id: parent.id,
-        parent_partition: parent.partition,
-        tag: parent.tag,
-        creation_cause: parent.creation_cause,
-        meta: parent.meta
-      }
+      Relationship.record(
+        parent.id,
+        parent.partition,
+        parent.tag,
+        parent.creation_cause,
+        parent.meta
+      )
     )
   end
 
@@ -3136,13 +3116,13 @@ defmodule Jido.AgentServer do
       jido,
       :agent_relationships,
       Jido.partition_key(child.id, child.partition),
-      %{
-        parent_id: data.agent.id,
-        parent_partition: data.partition,
-        tag: child.tag,
-        creation_cause: child.creation_cause,
-        meta: child.meta
-      }
+      Relationship.record(
+        data.agent.id,
+        data.partition,
+        child.tag,
+        child.creation_cause,
+        child.meta
+      )
     )
   end
 
@@ -3387,11 +3367,6 @@ defmodule Jido.AgentServer do
   defp clean_shutdown?(:shutdown), do: true
   defp clean_shutdown?({:shutdown, _reason}), do: true
   defp clean_shutdown?(_reason), do: false
-
-  defp normalize_stop_reason(:normal), do: :normal
-  defp normalize_stop_reason(:shutdown), do: :shutdown
-  defp normalize_stop_reason({:shutdown, _reason} = reason), do: reason
-  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 
   defp reply_action(nil, _reply), do: []
   defp reply_action(from, reply), do: [{:reply, from, reply}]

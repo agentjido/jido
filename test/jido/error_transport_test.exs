@@ -26,6 +26,55 @@ defmodule JidoTest.ErrorTransportTest do
   end
 
   describe "transport key policy" do
+    test "improper nested lists have a bounded JSON-safe fallback without leaking details" do
+      for value <- [
+            [{:ok, 1} | :bad],
+            [1 | :bad],
+            [{:password, "hidden"} | %{token: "hidden"}],
+            Enum.reduce(1..100, :bad, fn _, tail -> [{:password, "hidden"} | tail] end)
+          ] do
+        result = Error.to_map(Error.validation_error("Invalid", details: %{nested: value}))
+        assert result.details.nested == "[IMPROPER LIST]"
+        refute Jason.encode!(result) =~ "hidden"
+
+        result = Error.to_map(%{type: :validation_error, message: "Invalid", details: value})
+        assert result.details == %{value: "[IMPROPER LIST]"}
+        refute result.retryable?
+        refute Jason.encode!(result) =~ "hidden"
+      end
+
+      result =
+        Error.to_map(
+          Error.validation_error("Invalid",
+            details: %{nested: [password: "hidden", visible: [1, 2]]}
+          )
+        )
+
+      assert result.details.nested == %{password: "[REDACTED]", visible: [1, 2]}
+    end
+
+    test "list classification checks beyond the output limit and keeps empty lists" do
+      pairs = List.duplicate({:visible, 1}, 20)
+      improper = [1 | %{token: "hidden"}]
+
+      result =
+        Error.to_map(%{
+          message: "Invalid",
+          details: %{
+            empty: [],
+            pairs: pairs,
+            mixed: pairs ++ [2],
+            nested: [improper]
+          }
+        })
+
+      assert result.details.empty == []
+      assert result.details.pairs == %{visible: 1}
+      assert result.details.mixed == List.duplicate("{:visible, 1}", 20)
+      assert result.details.nested == ["[IMPROPER LIST]"]
+      refute Jason.encode!(result) =~ "hidden"
+    end
+
     test "normalizes absent, scalar and opaque details for JSON transport" do
       for details <- [nil, []] do
         assert Error.to_map(%{message: "failed", details: details}).details == %{}

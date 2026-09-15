@@ -127,8 +127,6 @@ defmodule Jido.Agent.Codec do
          do: agent |> Agent.definition() |> Agent.validate_definition()
   end
 
-  defp neutral_definition(%Agent{} = agent), do: Agent.validate(agent)
-
   defp neutral_definition(value), do: Agent.validate(value)
 
   defp encode_route(route, registry) do

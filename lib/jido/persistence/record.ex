@@ -9,49 +9,11 @@ defmodule Jido.Persistence.Record do
   @format_version 2
   @ref_format_version 3
 
-  @active_keys [
-    :format,
-    :kind,
-    :instance,
-    :agent_module,
-    :agent_vsn,
-    :agent_id,
-    :partition,
-    :revision,
-    :checkpoint
-  ]
-
-  @tombstone_keys [
-    :format,
-    :kind,
-    :instance,
-    :agent_module,
-    :agent_id,
-    :partition,
-    :revision
-  ]
-
-  @ref_active_keys [
-    :format,
-    :kind,
-    :namespace,
-    :agent_module,
-    :agent_vsn,
-    :agent_id,
-    :partition,
-    :revision,
-    :checkpoint
-  ]
-
-  @ref_tombstone_keys [
-    :format,
-    :kind,
-    :namespace,
-    :agent_module,
-    :agent_id,
-    :partition,
-    :revision
-  ]
+  @common_keys [:format, :kind, :agent_module, :agent_id, :partition, :revision]
+  @active_keys @common_keys ++ [:instance, :agent_vsn, :checkpoint]
+  @tombstone_keys @common_keys ++ [:instance]
+  @ref_active_keys @common_keys ++ [:namespace, :agent_vsn, :checkpoint]
+  @ref_tombstone_keys @common_keys ++ [:namespace]
 
   @doc false
   @spec format_version() :: pos_integer()
@@ -163,7 +125,7 @@ defmodule Jido.Persistence.Record do
   def validate(record, instance, agent_module, agent_id, partition) when is_map(record) do
     with :ok <- validate_format_and_kind(record),
          :ok <- validate_exact_shape(record),
-         :ok <- validate_identity(record, instance, agent_module, agent_id, partition),
+         :ok <- validate_identity(record, :instance, instance, agent_module, agent_id, partition),
          :ok <- validate_revision(record),
          :ok <- validate_kind_fields(record),
          :ok <- validate_portable(record) do
@@ -182,7 +144,8 @@ defmodule Jido.Persistence.Record do
     with :ok <- validate_format_and_kind(record),
          true <- Map.get(record, :format) == @ref_format_version,
          :ok <- validate_exact_shape(record),
-         :ok <- validate_ref_identity(record, namespace, agent_module, agent_id, partition),
+         :ok <-
+           validate_identity(record, :namespace, namespace, agent_module, agent_id, partition),
          :ok <- validate_revision(record),
          :ok <- validate_kind_fields(record),
          :ok <- validate_portable(record) do
@@ -254,22 +217,14 @@ defmodule Jido.Persistence.Record do
     do: exact_keys(record, @tombstone_keys)
 
   defp exact_keys(record, keys) do
-    if Enum.sort(Map.keys(record)) == Enum.sort(keys), do: :ok, else: invalid(:shape)
+    if map_size(record) == length(keys) and Enum.all?(keys, &Map.has_key?(record, &1)),
+      do: :ok,
+      else: invalid(:shape)
   end
 
-  defp validate_identity(record, instance, agent_module, agent_id, partition) do
+  defp validate_identity(record, scope_field, scope, agent_module, agent_id, partition) do
     cond do
-      Map.get(record, :instance) != instance -> invalid(:instance)
-      Map.get(record, :agent_module) != agent_module -> invalid(:agent_module)
-      Map.get(record, :agent_id) != agent_id -> invalid(:agent_id)
-      Map.get(record, :partition) != partition -> invalid(:partition)
-      true -> :ok
-    end
-  end
-
-  defp validate_ref_identity(record, namespace, agent_module, agent_id, partition) do
-    cond do
-      Map.get(record, :namespace) != namespace -> invalid(:namespace)
+      Map.get(record, scope_field) != scope -> invalid(scope_field)
       Map.get(record, :agent_module) != agent_module -> invalid(:agent_module)
       Map.get(record, :agent_id) != agent_id -> invalid(:agent_id)
       Map.get(record, :partition) != partition -> invalid(:partition)

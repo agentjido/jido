@@ -4,6 +4,7 @@ defmodule Jido.Agent.TurnEvaluationTest do
   alias Jido.Agent.Runner
   alias Jido.Agent
   alias Jido.Agent.Command
+  alias Jido.Agent.Turn
   alias Jido.Plugin
   alias Jido.Signal
   alias JidoTest.AgentFixtures.Add
@@ -24,6 +25,66 @@ defmodule Jido.Agent.TurnEvaluationTest do
     def handle_signal(%Signal{} = signal, _agent) do
       send(signal.data.observer, {:selected, signal.type})
       Jido.Agent.Turn.new(Add, %{by: 1, label: signal.type})
+    end
+  end
+
+  defmodule InvalidSourceAgent do
+    use Jido.Agent,
+      name: "turn_evaluation_invalid_source",
+      schema:
+        Zoi.object(%{
+          count: Zoi.integer() |> Zoi.default(0),
+          history: Zoi.list(Zoi.string()) |> Zoi.default([])
+        })
+
+    @impl true
+    def handle_signal(%Signal{data: %{invalid_source: value}}, _agent) do
+      {:ok, %Turn{executable: Add, source_signal: value}}
+    end
+
+    def handle_signal(%Signal{} = signal, _agent),
+      do: Jido.Agent.Turn.new(Add, %{by: 1, label: signal.type})
+  end
+
+  test "invalid callback Turn sources return errors and preserve the live server", %{jido: jido} do
+    agent = InvalidSourceAgent.new!(id: "invalid-source")
+    assert {:ok, server} = Jido.start_agent(jido, agent)
+
+    replacement = Signal.new!("source.replacement", %{}, source: "/test")
+
+    for value <- [:invalid, "invalid", %{id: "invalid"}, replacement, %{replacement | id: nil}] do
+      invalid = Signal.new!("source.invalid", %{invalid_source: value}, source: "/test")
+
+      assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
+               Jido.Agent.cmd(agent, invalid)
+
+      assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
+               Jido.AgentServer.call(server, invalid)
+
+      assert Process.alive?(server)
+      assert Jido.AgentServer.agent(server).state == agent.state
+    end
+
+    valid = Signal.new!("source.valid", %{}, source: "/test")
+    assert {:ok, live} = Jido.AgentServer.call(server, valid)
+    assert {:ok, direct, []} = Jido.Agent.cmd(agent, valid)
+    assert live.state == direct.state
+    assert live.state.count == 1
+  end
+
+  test "source binding accepts nil and matching Signals and rejects malformed sources" do
+    source = Signal.new!("source.route", %{}, source: "/test")
+    unbound = Turn.new!(Add)
+    assert {:ok, bound} = Turn.bind_source(unbound, source)
+    assert bound.source_signal == source
+    assert {:ok, ^bound} = Turn.bind_source(bound, source)
+
+    for value <- [:invalid, "invalid", %{id: "invalid"}] do
+      assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
+               Turn.bind_source(%{unbound | source_signal: value}, source)
+
+      assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
+               Turn.validate(%{unbound | source_signal: value})
     end
   end
 
@@ -63,6 +124,27 @@ defmodule Jido.Agent.TurnEvaluationTest do
 
     assert {:error, %Jido.Error.ValidationError{subject: :source_signal}} =
              Jido.Agent.Turn.bind_source(turn, source)
+  end
+
+  test "source binding compares the complete Signal, not only its id" do
+    source = Signal.new!("source.route", %{by: 1}, source: "/test")
+
+    for replacement <- [
+          %{source | data: %{by: 2}},
+          %{source | type: "other.route"},
+          %{source | source: "/other"}
+        ] do
+      turn = Turn.new!(Add, %{}, replacement)
+
+      assert {:error,
+              %Jido.Error.ValidationError{
+                subject: :source_signal,
+                details: %{expected_signal_id: expected_id, turn_signal_id: turn_id}
+              }} = Turn.bind_source(turn, source)
+
+      assert expected_id == source.id
+      assert turn_id == source.id
+    end
   end
 
   test "Turn validation returns an error for values that are not Turns" do

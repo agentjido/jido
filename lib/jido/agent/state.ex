@@ -22,11 +22,8 @@ defmodule Jido.Agent.State do
   end
 
   @spec validate_schema(term()) :: :ok | {:error, Error.ValidationError.t()}
-  def validate_schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields) do
-    with :ok <- static_schema(schema) do
-      :ok
-    end
-  end
+  def validate_schema(%Zoi.Types.Map{fields: fields} = schema) when is_list(fields),
+    do: static_schema(schema)
 
   def validate_schema(schema) do
     {:error,

@@ -16,36 +16,12 @@ defmodule Jido.Agent.Plugin.Pipeline do
           result()
   def run({:ok, state, directives}, %Agent{} = agent, %Signal{} = signal, plugin_inputs, specs)
       when is_map(state) and is_map(plugin_inputs) and is_list(directives) and is_list(specs) do
-    run_pipeline(
-      {:ok, state, directives},
-      agent.state,
-      agent.id,
-      agent.module,
-      signal,
-      plugin_inputs,
-      specs
-    )
-  end
-
-  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs), do: error
-
-  defp run_pipeline(
-         {:ok, state, directives},
-         state_before,
-         agent_id,
-         agent_module,
-         signal,
-         plugin_inputs,
-         specs
-       ) do
-    with :ok <- protect_owned_state(state, state_before, specs),
+    with :ok <- protect_owned_state(state, agent.state, specs),
          {:ok, directives} <- validate_directives(directives, specs),
          {:ok, state} <-
            reduce_owned_state(
              state,
-             state_before,
-             agent_id,
-             agent_module,
+             agent,
              signal,
              plugin_inputs,
              directives,
@@ -54,6 +30,8 @@ defmodule Jido.Agent.Plugin.Pipeline do
       {:ok, state, directives}
     end
   end
+
+  def run({:error, _reason} = error, _agent, _signal, _plugin_inputs, _specs), do: error
 
   defp protect_owned_state(state, original_state, specs) do
     changed =
@@ -123,9 +101,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
 
   defp reduce_owned_state(
          state,
-         state_before,
-         agent_id,
-         agent_module,
+         agent,
          signal,
          plugin_inputs,
          directives,
@@ -135,9 +111,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
       case reduce_one(
              spec,
              current_state,
-             state_before,
-             agent_id,
-             agent_module,
+             agent,
              signal,
              plugin_inputs,
              directives
@@ -151,9 +125,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   defp reduce_one(
          %Spec{state_key: nil},
          state,
-         _state_before,
-         _agent_id,
-         _agent_module,
+         _agent,
          _signal,
          _inputs,
          _directives
@@ -163,9 +135,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   defp reduce_one(
          %Spec{legacy?: true} = spec,
          state,
-         _state_before,
-         _agent_id,
-         _agent_module,
+         _agent,
          _signal,
          _inputs,
          directives
@@ -189,9 +159,7 @@ defmodule Jido.Agent.Plugin.Pipeline do
   defp reduce_one(
          %Spec{} = spec,
          state,
-         state_before,
-         agent_id,
-         agent_module,
+         agent,
          signal,
          inputs,
          directives
@@ -201,10 +169,10 @@ defmodule Jido.Agent.Plugin.Pipeline do
 
       reduction = %Reduction{
         plugin: spec.package,
-        agent_id: agent_id,
-        agent_module: agent_module,
+        agent_id: agent.id,
+        agent_module: agent.module,
         signal: signal,
-        state_before: state_before,
+        state_before: agent.state,
         state: state,
         plugin_state: Map.get(state, spec.state_key),
         prepared_input: package_input.prepared,

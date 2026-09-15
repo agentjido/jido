@@ -290,6 +290,9 @@ defmodule Jido.AgentServer.Options do
     registry = Map.get(attrs, :registry, registry(Map.get(attrs, :jido)))
 
     cond do
+      not is_boolean(register) ->
+        invalid("register must be a boolean", %{register: register})
+
       register and not is_nil(Map.get(attrs, :name)) ->
         invalid("name and register: true cannot be used together", %{
           name: Map.get(attrs, :name),

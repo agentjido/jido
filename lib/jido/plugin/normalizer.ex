@@ -9,6 +9,23 @@ defmodule Jido.Plugin.Normalizer do
   alias Jido.Plugin.Error, as: PluginError
   alias Jido.Topology.Plugin.Spec, as: TopologySpec
 
+  @agent_callbacks [
+    prepare: 2,
+    state_spec: 1,
+    reduce: 2,
+    update_state: 3,
+    directives: 1,
+    validate_directive: 2
+  ]
+  @legacy_agent_callbacks Keyword.delete(@agent_callbacks, :reduce)
+  @agent_capabilities Keyword.drop(@agent_callbacks, [:update_state, :validate_directive])
+
+  # Authority checks keep first-error order. Capability checks only test presence.
+  @server_callbacks [admit: 3, prepare_dispatch: 4, dispatch: 4, await_ready: 2, child_spec: 1]
+  @persistence_callbacks [dump: 3, load: 3]
+  @topology_callbacks [contribute: 2]
+
+  # Legacy package callback order is part of first-error reporting.
   @legacy_callbacks [
     validate_options: 1,
     prepare: 2,
@@ -23,7 +40,8 @@ defmodule Jido.Plugin.Normalizer do
     await_ready: 2
   ]
 
-  @package_callbacks [reduce: 2, dump: 3, load: 3, contribute: 2] ++ @legacy_callbacks
+  @package_callbacks [reduce: 2] ++
+                       @persistence_callbacks ++ @topology_callbacks ++ @legacy_callbacks
 
   @doc false
   @spec normalize_all([Jido.Plugin.declaration()] | [Spec.t()]) ::
@@ -85,13 +103,8 @@ defmodule Jido.Plugin.Normalizer do
 
   defp upgrade_spec(%Spec{} = spec) do
     agent =
-      if has_any?(spec.module,
-           prepare: 2,
-           state_spec: 1,
-           update_state: 3,
-           directives: 1,
-           validate_directive: 2
-         ) or not is_nil(spec.state_key) or spec.directive_modules != [] do
+      if has_any?(spec.module, @legacy_agent_callbacks) or not is_nil(spec.state_key) or
+           spec.directive_modules != [] do
         %AgentSpec{
           package: spec.module,
           module: spec.module,
@@ -104,13 +117,7 @@ defmodule Jido.Plugin.Normalizer do
       end
 
     server =
-      if has_any?(spec.module,
-           admit: 3,
-           prepare_dispatch: 4,
-           dispatch: 4,
-           child_spec: 1,
-           await_ready: 2
-         ) or spec.dispatch? or spec.runtime? do
+      if has_any?(spec.module, @server_callbacks) or spec.dispatch? or spec.runtime? do
         %ServerSpec{
           package: spec.module,
           module: spec.module,
@@ -215,13 +222,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp build_legacy_agent_spec(module, options) do
-    if has_any?(module,
-         prepare: 2,
-         state_spec: 1,
-         update_state: 3,
-         directives: 1,
-         validate_directive: 2
-       ) do
+    if has_any?(module, @legacy_agent_callbacks) do
       build_agent_values(module, module, options, true)
     else
       {:ok, nil}
@@ -229,13 +230,7 @@ defmodule Jido.Plugin.Normalizer do
   end
 
   defp build_legacy_server_spec(module, options) do
-    if has_any?(module,
-         admit: 3,
-         prepare_dispatch: 4,
-         dispatch: 4,
-         child_spec: 1,
-         await_ready: 2
-       ) do
+    if has_any?(module, @server_callbacks) do
       {:ok,
        %ServerSpec{
          package: module,
@@ -463,63 +458,10 @@ defmodule Jido.Plugin.Normalizer do
   defp validate_facet_authority(module, owner) do
     foreign =
       case owner do
-        :agent ->
-          [
-            admit: 3,
-            prepare_dispatch: 4,
-            dispatch: 4,
-            await_ready: 2,
-            child_spec: 1,
-            dump: 3,
-            load: 3,
-            contribute: 2
-          ]
-
-        :agent_server ->
-          [
-            prepare: 2,
-            state_spec: 1,
-            reduce: 2,
-            update_state: 3,
-            directives: 1,
-            validate_directive: 2,
-            dump: 3,
-            load: 3,
-            contribute: 2
-          ]
-
-        :persistence ->
-          [
-            prepare: 2,
-            state_spec: 1,
-            reduce: 2,
-            update_state: 3,
-            directives: 1,
-            validate_directive: 2,
-            admit: 3,
-            prepare_dispatch: 4,
-            dispatch: 4,
-            await_ready: 2,
-            child_spec: 1,
-            contribute: 2
-          ]
-
-        :topology ->
-          [
-            prepare: 2,
-            state_spec: 1,
-            reduce: 2,
-            update_state: 3,
-            directives: 1,
-            validate_directive: 2,
-            admit: 3,
-            prepare_dispatch: 4,
-            dispatch: 4,
-            await_ready: 2,
-            child_spec: 1,
-            dump: 3,
-            load: 3
-          ]
+        :agent -> @server_callbacks ++ @persistence_callbacks ++ @topology_callbacks
+        :agent_server -> @agent_callbacks ++ @persistence_callbacks ++ @topology_callbacks
+        :persistence -> @agent_callbacks ++ @server_callbacks ++ @topology_callbacks
+        :topology -> @agent_callbacks ++ @server_callbacks ++ @persistence_callbacks
       end
 
     case Enum.find(foreign, fn {function, arity} ->
@@ -537,24 +479,11 @@ defmodule Jido.Plugin.Normalizer do
     end
   end
 
-  defp facet_has_capability(module, :agent) do
-    require_capability(module, :agent,
-      prepare: 2,
-      state_spec: 1,
-      reduce: 2,
-      directives: 1
-    )
-  end
+  defp facet_has_capability(module, :agent),
+    do: require_capability(module, :agent, @agent_capabilities)
 
-  defp facet_has_capability(module, :agent_server) do
-    require_capability(module, :agent_server,
-      admit: 3,
-      prepare_dispatch: 4,
-      dispatch: 4,
-      child_spec: 1,
-      await_ready: 2
-    )
-  end
+  defp facet_has_capability(module, :agent_server),
+    do: require_capability(module, :agent_server, @server_callbacks)
 
   defp require_capability(module, owner, callbacks) do
     if has_any?(module, callbacks) do
@@ -858,7 +787,7 @@ defmodule Jido.Plugin.Normalizer do
   defp unique_by(values, key_fun, message, detail_key) do
     case values
          |> Enum.group_by(key_fun)
-         |> Enum.find(fn {_key, group} -> length(group) > 1 end) do
+         |> Enum.find(fn {_key, group} -> match?([_first, _second | _rest], group) end) do
       nil -> :ok
       {key, group} -> PluginError.validation(message, %{detail_key => key, declarations: group})
     end

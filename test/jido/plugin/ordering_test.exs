@@ -131,8 +131,10 @@ defmodule Jido.Plugin.OrderingTest do
 
     def state_spec(_opts), do: {:second_observed, Zoi.integer() |> Zoi.default(0)}
 
-    def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts),
-      do: {:ok, reduction.state.first_reduced}
+    def reduce(%Jido.Agent.Plugin.Reduction{} = reduction, _opts) do
+      send(self(), {:reduction, reduction})
+      {:ok, reduction.state.first_reduced}
+    end
   end
 
   defmodule SecondReducerPackage do
@@ -365,6 +367,12 @@ defmodule Jido.Plugin.OrderingTest do
 
     assert state.first_reduced == 1
     assert state.second_observed == 1
+    assert_received {:reduction, reduction}
+    assert reduction.agent_id == agent.id
+    assert reduction.agent_module == agent.module
+    assert reduction.state_before == agent.state
+    assert reduction.state.first_reduced == 1
+    assert reduction.state_before.first_reduced == 0
   end
 
   defp command do

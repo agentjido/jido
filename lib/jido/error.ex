@@ -592,6 +592,7 @@ defmodule Jido.Error do
   depth limit, so validation paths retain field names and list indexes. Strings
   are limited to #{@transport_max_string} characters plus a truncation suffix.
   Invalid UTF-8 binaries use bounded inspection.
+  Improper lists use `[IMPROPER LIST]` without inspecting their sensitive data.
   Deeper containers and opaque terms are replaced with `#{@depth_limit}`.
   """
   @spec to_map(any()) :: map()
@@ -747,12 +748,17 @@ defmodule Jido.Error do
   end
 
   defp sanitize_transport(value, depth) when is_list(value) do
-    if key_value_list?(value) do
-      sanitize_key_value_pairs(value, depth)
-    else
-      value
-      |> Enum.take(@transport_max_items)
-      |> Enum.map(&sanitize_transport(&1, depth - 1))
+    case transport_list_kind(value) do
+      :key_value ->
+        sanitize_key_value_pairs(value, depth)
+
+      :list ->
+        value
+        |> Enum.take(@transport_max_items)
+        |> Enum.map(&sanitize_transport(&1, depth - 1))
+
+      :improper ->
+        "[IMPROPER LIST]"
     end
   end
 
@@ -779,13 +785,19 @@ defmodule Jido.Error do
     end)
   end
 
-  defp key_value_list?(value) do
-    value != [] and
-      Enum.all?(value, fn
-        {key, _value} when is_atom(key) or is_binary(key) -> true
-        _other -> false
-      end)
-  end
+  # Classify the full shape before using Enum. Do not inspect an improper tail:
+  # it can contain sensitive details that would bypass key-based redaction.
+  defp transport_list_kind([]), do: :list
+  defp transport_list_kind(value), do: transport_list_kind(value, :key_value)
+
+  defp transport_list_kind([], kind), do: kind
+
+  defp transport_list_kind([{key, _value} | tail], :key_value)
+       when is_atom(key) or is_binary(key),
+       do: transport_list_kind(tail, :key_value)
+
+  defp transport_list_kind([_head | tail], _kind), do: transport_list_kind(tail, :list)
+  defp transport_list_kind(_tail, _kind), do: :improper
 
   defp sensitive_key?(key) do
     compact_key = key |> normalized_key() |> compact_key()
@@ -855,12 +867,7 @@ defmodule Jido.Error do
     end
   end
 
-  defp extract_retry_hint(%{details: details}) do
-    case extract_retry_hint(details) do
-      nil -> nil
-      value -> value
-    end
-  end
+  defp extract_retry_hint(%{details: details}), do: extract_retry_hint(details)
 
   defp extract_retry_hint(%{} = map) do
     cond do

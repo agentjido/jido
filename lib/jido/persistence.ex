@@ -102,17 +102,8 @@ defmodule Jido.Persistence do
       protect(:compare_and_swap, fn ->
         with :ok <- validate_operation_options(opts),
              {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-             partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity(
-                 adapter,
-                 adapter_opts,
-                 instance,
-                 agent.module,
-                 agent.id,
-                 partition,
-                 Keyword.get(opts, :namespace)
-               ),
+               storage_identity({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, identity),
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, expected_value} <-
@@ -151,13 +142,11 @@ defmodule Jido.Persistence do
                namespace when is_binary(namespace) <- Keyword.get(opts, :namespace),
                {:ok, %{mode: :ref} = identity} <-
                  storage_identity(
-                   adapter,
-                   adapter_opts,
+                   {adapter, adapter_opts},
                    instance,
                    current_agent.module,
                    current_agent.id,
-                   partition,
-                   namespace
+                   opts
                  ),
                {:ok, record} <- build_record(target_agent, instance, opts, identity),
                {:ok, expected_revision} <- expected_revision(opts),
@@ -201,17 +190,8 @@ defmodule Jido.Persistence do
         with :ok <- validate_operation_options(opts),
              {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              :ok <- validate_initial_revision(opts),
-             partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity(
-                 adapter,
-                 adapter_opts,
-                 instance,
-                 agent.module,
-                 agent.id,
-                 partition,
-                 Keyword.get(opts, :namespace)
-               ),
+               storage_identity({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
              {:ok, record} <-
                build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
              {:ok, value} <- Record.encode(record),
@@ -255,15 +235,7 @@ defmodule Jido.Persistence do
              {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity(
-                 adapter,
-                 adapter_opts,
-                 instance,
-                 agent_module,
-                 agent_id,
-                 partition,
-                 Keyword.get(opts, :namespace)
-               ),
+               storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts),
              {:ok, value, _condition} <- adapter_get(adapter, identity.key, adapter_opts),
              {:ok, record} <- Record.decode(value),
              :ok <-
@@ -293,15 +265,7 @@ defmodule Jido.Persistence do
              {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
              partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity(
-                 adapter,
-                 adapter_opts,
-                 instance,
-                 agent_module,
-                 agent_id,
-                 partition,
-                 Keyword.get(opts, :namespace)
-               ) do
+               storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
           delete_current(
             adapter,
             adapter_opts,
@@ -547,40 +511,24 @@ defmodule Jido.Persistence do
     end
   end
 
-  defp storage_identity(
-         _adapter,
-         _adapter_opts,
-         instance,
-         agent_module,
-         agent_id,
-         partition,
-         nil
-       ) do
-    {:ok,
-     %{
-       mode: :legacy,
-       key: agent_key(instance, agent_module, agent_id, partition)
-     }}
-  end
+  defp storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
+    partition = Keyword.get(opts, :partition)
 
-  defp storage_identity(
-         adapter,
-         adapter_opts,
-         instance,
-         agent_module,
-         agent_id,
-         partition,
-         namespace
-       ) do
-    with {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id) do
-      ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace}
+    case Keyword.get(opts, :namespace) do
+      nil ->
+        {:ok, %{mode: :legacy, key: agent_key(instance, agent_module, agent_id, partition)}}
 
-      legacy_identity = %{
-        mode: :legacy,
-        key: agent_key(instance, agent_module, agent_id, partition)
-      }
+      namespace ->
+        with {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id) do
+          ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace}
 
-      select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity)
+          legacy_identity = %{
+            mode: :legacy,
+            key: agent_key(instance, agent_module, agent_id, partition)
+          }
+
+          select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity)
+        end
     end
   end
 
