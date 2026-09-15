@@ -21,13 +21,15 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     CreationCause,
     DirectiveContext,
     ParentRef,
+    Relationship,
+    Shutdown,
     State
   }
 
   alias Jido.AgentServer.Signal.ChildStarted
   alias Jido.RuntimeStore
   alias Jido.Signal
-  alias Jido.Tracing.Context, as: TraceContext
+  alias Jido.Dispatch.Preparation, as: DispatchPreparation
 
   @relationship_hive :agent_relationships
   @reserved_child_opts [:agent, :id, :jido, :parent, :partition, :name, :register]
@@ -44,7 +46,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
         context,
         %State{parent: %ParentRef{} = parent} = state
       ) do
-    Server.cast(parent.pid, propagate(signal, context.signal))
+    Server.cast(parent.pid, DispatchPreparation.propagate(signal, context.signal))
     {:ok, state}
   end
 
@@ -53,7 +55,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def handle(%EmitToChild{tag: tag, signal: signal}, context, state) do
     case agent_child(state, tag) do
       {:ok, child} ->
-        Server.cast(child.pid, propagate(signal, context.signal))
+        Server.cast(child.pid, DispatchPreparation.propagate(signal, context.signal))
         {:ok, state}
 
       {:error, reason} ->
@@ -111,7 +113,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
           {:ok, struct(), term()} | {:error, term()}
   def prepare_signal(%Emit{signal: signal, dispatch: dispatch} = directive, context, state) do
     target = dispatch || state.default_dispatch || {:agent, state.agent.id}
-    {:ok, %{directive | signal: propagate(signal, context.signal)}, target}
+    {:ok, %{directive | signal: DispatchPreparation.propagate(signal, context.signal)}, target}
   end
 
   def prepare_signal(
@@ -119,7 +121,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
         context,
         %State{parent: %ParentRef{} = parent}
       ) do
-    {:ok, %{directive | signal: propagate(signal, context.signal)}, {:agent, parent.id}}
+    {:ok, %{directive | signal: DispatchPreparation.propagate(signal, context.signal)},
+     {:agent, parent.id}}
   end
 
   def prepare_signal(%EmitToParent{}, _context, %State{}), do: {:error, :no_parent}
@@ -127,7 +130,8 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   def prepare_signal(%EmitToChild{tag: tag, signal: signal} = directive, context, state) do
     case agent_child(state, tag) do
       {:ok, child} ->
-        {:ok, %{directive | signal: propagate(signal, context.signal)}, {:agent, child.id}}
+        {:ok, %{directive | signal: DispatchPreparation.propagate(signal, context.signal)},
+         {:agent, child.id}}
 
       {:error, reason} ->
         {:error, reason}
@@ -172,7 +176,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
     dispatch = dispatch || state.default_dispatch
 
     if is_nil(dispatch) do
-      signal = propagate(signal, context.signal)
+      signal = DispatchPreparation.propagate(signal, context.signal)
       Server.cast(self(), signal)
       {:ok, state}
     else
@@ -186,7 +190,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   @doc false
   @spec dispatch_emit(Emit.t(), DirectiveContext.t(), State.t()) :: :ok | {:error, term()}
   def dispatch_emit(%Emit{signal: signal, dispatch: dispatch}, context, state) do
-    signal = propagate(signal, context.signal)
+    signal = DispatchPreparation.propagate(signal, context.signal)
     dispatch = dispatch || state.default_dispatch
     dispatch_signal(signal, dispatch, state.jido)
   end
@@ -194,7 +198,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   @doc false
   @spec dispatch_signal(Signal.t(), term(), atom() | nil) :: :ok | {:error, term()}
   def dispatch_signal(signal, dispatch, jido) do
-    dispatch = inherit_bus_scope(dispatch, jido)
+    dispatch = DispatchPreparation.inherit_bus_scope(dispatch, jido)
 
     case Jido.Signal.Dispatch.dispatch(signal, dispatch) do
       :ok -> :ok
@@ -533,7 +537,7 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   defp stop_agent_process(pid, reason, _state) do
-    Process.exit(pid, normalize_stop_reason(reason))
+    Process.exit(pid, Shutdown.normalize_reason(reason))
     :ok
   end
 
@@ -560,13 +564,12 @@ defmodule Jido.AgentServer.DirectiveRuntime do
          cause
        )
        when is_atom(jido) and not is_nil(jido) do
-    RuntimeStore.put(jido, @relationship_hive, Jido.partition_key(child_id, child_partition), %{
-      parent_id: state.agent.id,
-      parent_partition: state.partition,
-      tag: tag,
-      creation_cause: cause,
-      meta: meta
-    })
+    RuntimeStore.put(
+      jido,
+      @relationship_hive,
+      Jido.partition_key(child_id, child_partition),
+      Relationship.record(state.agent.id, state.partition, tag, cause, meta)
+    )
   end
 
   defp persist_relationship(_state, _child_id, _partition, _tag, _meta, _cause), do: :ok
@@ -593,23 +596,6 @@ defmodule Jido.AgentServer.DirectiveRuntime do
 
   defp delete_relationship(_state, _child), do: :ok
 
-  defp propagate(%Signal{} = signal, %Signal{} = source) do
-    case TraceContext.propagate_to(signal, source.id) do
-      {:ok, traced} -> traced
-      {:error, _reason} -> signal
-    end
-  end
-
-  defp inherit_bus_scope({:bus, opts}, jido) when is_atom(jido) and not is_nil(jido) do
-    {:bus, Keyword.put_new(opts, :jido, jido)}
-  end
-
-  defp inherit_bus_scope(targets, jido) when is_list(targets) do
-    Enum.map(targets, &inherit_bus_scope(&1, jido))
-  end
-
-  defp inherit_bus_scope(target, _jido), do: target
-
   defp validate_dispatch(dispatch) do
     case Jido.Signal.Dispatch.validate_opts(dispatch) do
       {:ok, normalized} ->
@@ -630,9 +616,4 @@ defmodule Jido.AgentServer.DirectiveRuntime do
          details: %{reason: {kind, reason}}
        )}
   end
-
-  defp normalize_stop_reason(:normal), do: :normal
-  defp normalize_stop_reason(:shutdown), do: :shutdown
-  defp normalize_stop_reason({:shutdown, _reason} = reason), do: reason
-  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end

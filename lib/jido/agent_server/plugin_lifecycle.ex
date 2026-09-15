@@ -3,7 +3,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
   alias Jido.AgentServer.Plugin
   alias Jido.Plugin.Init
-  alias Jido.AgentServer.{ChildInfo, PluginChild, State}
+  alias Jido.AgentServer.{ChildInfo, PluginChild, Shutdown, State}
 
   @doc false
   def start_all(%State{} = state) do
@@ -252,7 +252,7 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
     pid = child.lifecycle_pid || child.pid
 
-    reason = normalize_stop_reason(reason)
+    reason = Shutdown.normalize_reason(reason)
 
     try do
       GenServer.stop(pid, reason, 5_000)
@@ -262,9 +262,4 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
     :ok
   end
-
-  defp normalize_stop_reason(:normal), do: :normal
-  defp normalize_stop_reason(:shutdown), do: :shutdown
-  defp normalize_stop_reason({:shutdown, _reason} = reason), do: reason
-  defp normalize_stop_reason(reason), do: {:shutdown, reason}
 end

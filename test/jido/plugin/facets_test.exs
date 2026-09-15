@@ -148,6 +148,24 @@ defmodule Jido.Plugin.FacetsTest do
     use Jido.Plugin, agent: AgentFacetWithTopologyCallback
   end
 
+  defmodule AgentFacetWithMultipleForeignCallbacks do
+    use Jido.Agent.Plugin
+    def state_spec(_opts), do: :none
+    def child_spec(_init), do: :invalid
+    def await_ready(_runtime, _opts), do: :ok
+    def dump(value, _context, _opts), do: {:ok, value}
+  end
+
+  defmodule PackageWithMultipleForeignCallbacks do
+    use Jido.Plugin, agent: AgentFacetWithMultipleForeignCallbacks
+  end
+
+  defmodule PackageWithMultipleOwnedCallbacks do
+    use Jido.Plugin, agent: AgentFacet
+    def reduce(_reduction, _opts), do: {:ok, 1}
+    def dump(value, _context, _opts), do: {:ok, value}
+  end
+
   defmodule PackageWithOwnedCallback do
     @moduledoc false
     use Jido.Plugin, agent: AgentFacet
@@ -436,6 +454,16 @@ defmodule Jido.Plugin.FacetsTest do
         ] do
       assert {:error, %Jido.Error.ValidationError{} = error} = Plugin.normalize_all([package])
       assert error.details.callback == callback
+    end
+  end
+
+  test "multiple invalid callbacks keep the first-error order for facets and packages" do
+    for {package, callback} <- [
+          {PackageWithMultipleForeignCallbacks, {:await_ready, 2}},
+          {PackageWithMultipleOwnedCallbacks, {:reduce, 2}}
+        ] do
+      assert {:error, %Jido.Error.ValidationError{details: %{callback: ^callback}}} =
+               Plugin.normalize_all([package])
     end
   end
 

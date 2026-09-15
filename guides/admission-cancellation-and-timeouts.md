@@ -18,8 +18,9 @@ can reject them before their deadline.
 ## Run Plugin Admission
 
 Plugins with `admit/3` can use their optional runtime to accept or reject a
-command. Admission has the Plugin Directive timeout. It runs before pure
-preparation and route selection.
+command. Admission has the Plugin Directive timeout. It runs after pure
+preparation and before Turn evaluation. It can inspect its own pure prepared
+input but cannot replace it.
 
 A Plugin cannot make a synchronous reentrant call to the same Agent from its
 admission task. Jido rejects this case to avoid a deadlock.

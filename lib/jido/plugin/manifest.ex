@@ -93,8 +93,10 @@ defmodule Jido.Plugin.Manifest do
 
   defp validate_option_keys(%__MODULE__{option_keys: option_keys} = manifest, options)
        when is_map(option_keys) do
+    owner_keys = Map.keys(option_keys)
+
     invalid_owner =
-      Enum.find_value(Map.keys(option_keys), fn owner ->
+      Enum.find_value(owner_keys, fn owner ->
         if owner not in @owners, do: {:invalid, owner}
       end)
 
@@ -106,7 +108,7 @@ defmodule Jido.Plugin.Manifest do
       end)
 
     unselected_owner =
-      Enum.find_value(Map.keys(option_keys), fn owner ->
+      Enum.find_value(owner_keys, fn owner ->
         if owner in @owners and is_nil(Map.fetch!(manifest, owner)), do: {:unselected, owner}
       end)
 

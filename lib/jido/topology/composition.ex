@@ -154,9 +154,9 @@ defmodule Jido.Topology.Composition do
                   :ok <- kind(child, [:agent, :group]),
                   do: {:ok, {child.key, %{parent: parent.key, policy: edge.on_parent_exit}}}
            end) do
-      if length(records) == map_size(Map.new(records)) do
-        owners = Map.new(records)
+      owners = Map.new(records)
 
+      if length(records) == map_size(owners) do
         {:ok,
          Enum.map(nodes, fn node ->
            case Map.get(owners, node.key) do

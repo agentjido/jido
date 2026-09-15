@@ -78,16 +78,22 @@ defmodule Jido.Agent.Turn do
   def bind_source(%__MODULE__{source_signal: source_signal} = turn, source_signal),
     do: {:ok, turn}
 
-  def bind_source(%__MODULE__{} = turn, %Jido.Signal{} = source_signal) do
+  def bind_source(
+        %__MODULE__{source_signal: %Jido.Signal{} = turn_signal},
+        %Jido.Signal{} = source_signal
+      ) do
     {:error,
      Error.validation_error("Agent Turn source Signal does not match the received Signal",
        field: :source_signal,
        details: %{
          expected_signal_id: source_signal.id,
-         turn_signal_id: turn.source_signal.id
+         turn_signal_id: turn_signal.id
        }
      )}
   end
+
+  def bind_source(%__MODULE__{source_signal: value}, %Jido.Signal{}),
+    do: invalid_source_signal(value)
 
   @doc "Validates one Agent Turn."
   @spec validate(term()) :: {:ok, t()} | {:error, Exception.t()}
@@ -163,7 +169,9 @@ defmodule Jido.Agent.Turn do
     end
   end
 
-  defp validate_source_signal(value) do
+  defp validate_source_signal(value), do: invalid_source_signal(value)
+
+  defp invalid_source_signal(value) do
     {:error,
      Error.validation_error("Agent Turn source_signal must be a Jido.Signal or nil",
        field: :source_signal,

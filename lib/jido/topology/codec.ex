@@ -32,6 +32,21 @@ defmodule Jido.Topology.Codec do
     :exports
   ]
   @fields ~w(type version name schema metadata agents groups resources relationships connections startup includes imports exports)
+  @value_fields [
+    :initial_state,
+    :config,
+    :count,
+    :members,
+    :key_by,
+    :inputs,
+    :from,
+    :to,
+    :parent,
+    :child,
+    :agent,
+    :depends_on,
+    :node
+  ]
 
   @type document :: %{required(String.t()) => term()}
 
@@ -173,21 +188,7 @@ defmodule Jido.Topology.Codec do
     do: {:ok, Atom.to_string(value)}
 
   defp encode_field(field, value, registry)
-       when field in [
-              :initial_state,
-              :config,
-              :count,
-              :members,
-              :key_by,
-              :inputs,
-              :from,
-              :to,
-              :parent,
-              :child,
-              :agent,
-              :depends_on,
-              :node
-            ],
+       when field in @value_fields,
        do: Value.encode(value, registry)
 
   defp encode_field(_, value, _), do: {:ok, value}
@@ -210,21 +211,7 @@ defmodule Jido.Topology.Codec do
     do: Authoring.error("Unknown topology policy")
 
   defp decode_field(field, value, registry)
-       when field in [
-              :initial_state,
-              :config,
-              :count,
-              :members,
-              :key_by,
-              :inputs,
-              :from,
-              :to,
-              :parent,
-              :child,
-              :agent,
-              :depends_on,
-              :node
-            ],
+       when field in @value_fields,
        do: Value.decode(value, registry)
 
   defp decode_field(_, value, _), do: {:ok, value}
