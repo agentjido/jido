@@ -62,9 +62,6 @@ defmodule Jido.AgentServer do
 
   require Logger
 
-  @error_policy_dispatch_fallback_timeout 5_000
-  @max_error_policy_tasks 32
-
   alias Jido.Agent
   alias Jido.Agent.Plugin, as: AgentPlugin
   alias Jido.Agent.Runner
@@ -80,22 +77,25 @@ defmodule Jido.AgentServer do
     ActiveTurn,
     AdmissionDeadline,
     ChildInfo,
+    ChildLifecycle,
     ChildPlacement,
     DirectiveContext,
     DirectiveRuntime,
     ExecutionAdapter,
+    FailurePolicy,
+    Inspection,
     Options,
     ParentRef,
     PluginLifecycle,
     RegistrationGuard,
     Relationship,
-    RuntimeCheckpoint,
     Shutdown,
-    State
+    State,
+    Storage,
+    Upgrade
   }
 
   alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
-  alias Jido.AgentServer.Signal.Error, as: ErrorSignal
   alias Jido.AgentServer.Signal.Runtime, as: RuntimeSignal
   alias Jido.Error
   alias Jido.Signal
@@ -540,7 +540,7 @@ defmodule Jido.AgentServer do
     with :ok <- claim_registration(opts),
          :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
-           restore_initial_agent(opts),
+           Storage.restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
          {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
          {:ok, exec_module} <- validate_exec_module(opts.exec_module),
@@ -549,7 +549,7 @@ defmodule Jido.AgentServer do
            validate_limit(opts.max_postponed_signals, :max_postponed_signals),
          {:ok, max_directives_per_turn} <-
            validate_limit(opts.max_directives_per_turn, :max_directives_per_turn) do
-      parent = opts |> restore_parent(agent) |> monitor_parent()
+      parent = opts |> ChildLifecycle.restore_parent(agent) |> ChildLifecycle.monitor_parent()
 
       data = %State{
         agent: agent,
@@ -634,7 +634,7 @@ defmodule Jido.AgentServer do
     cancel_task_timer(readiness.timer)
     data = %{data | plugin_bootstrap: nil}
 
-    case persist_initial_agent(data) do
+    case Storage.persist_initial_agent(data) do
       {:ok, data} ->
         case publish_agent(data) do
           :ok ->
@@ -644,7 +644,7 @@ defmodule Jido.AgentServer do
 
             notify_startup(data, :ok)
             data = %{data | activation_span: nil, startup_reply: nil}
-            notify_parent_online(data)
+            ChildLifecycle.notify_parent_online(data)
             {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
 
           {:error, reason} ->
@@ -715,7 +715,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, :status, phase, %State{} = data) do
-    {:keep_state_and_data, [{:reply, from, public_status(phase, data)}]}
+    {:keep_state_and_data, [{:reply, from, Inspection.status(phase, data)}]}
   end
 
   def handle_event({:call, from}, :creation_info, _phase, %State{} = data) do
@@ -731,7 +731,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, :children, _phase, %State{} = data) do
-    children = Map.new(data.children, fn {key, child} -> {key, public_child_map(child)} end)
+    children = Map.new(data.children, fn {key, child} -> {key, Inspection.child(child)} end)
     {:keep_state_and_data, [{:reply, from, children}]}
   end
 
@@ -750,7 +750,7 @@ defmodule Jido.AgentServer do
         :idle,
         %State{} = data
       ) do
-    reply = invoke_upgrade_operation(operation)
+    reply = Upgrade.operation(operation)
     {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, reply}]}
   end
 
@@ -779,7 +779,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, {:hibernate, opts}, :idle, %State{} = data) do
-    case persist_agent(data, data.agent, data.state_version, :hibernate, opts) do
+    case Storage.persist_agent(data, data.agent, data.state_version, :hibernate, opts) do
       :ok ->
         {:stop_and_reply, {:shutdown, :hibernate}, [{:reply, from, :ok}], data}
 
@@ -824,18 +824,13 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, from}, {:recent_events, opts}, _phase, %State{} = data) do
-    if data.debug do
-      limit = opts |> Keyword.get(:limit, data.debug_max_events) |> normalize_event_limit()
-      {:keep_state_and_data, [{:reply, from, {:ok, Enum.take(data.debug_events, limit)}}]}
-    else
-      {:keep_state_and_data, [{:reply, from, {:error, :debug_not_enabled}}]}
-    end
+    {:keep_state_and_data, [{:reply, from, Inspection.recent_events(data, opts)}]}
   end
 
   def handle_event({:call, from}, {:adopt_parent, %ParentRef{} = parent}, _phase, data) do
-    case attach_parent(data, parent) do
+    case ChildLifecycle.attach_parent(data, parent) do
       {:ok, next_data} ->
-        reply = relationship_info(next_data)
+        reply = ChildLifecycle.relationship_info(next_data)
         {:keep_state, next_data, [{:reply, from, {:ok, reply}}]}
 
       {:error, reason} ->
@@ -1029,9 +1024,9 @@ defmodule Jido.AgentServer do
         _phase,
         %State{} = data
       ) do
-    case verify_child_online(pid, child_id, tag, data) do
+    case ChildLifecycle.verify_child_online(pid, child_id, tag, data) do
       {:ok, info} ->
-        {:keep_state, track_online_child(data, pid, info)}
+        {:keep_state, ChildLifecycle.track_online_child(data, pid, info)}
 
       {:error, _reason, :stop} ->
         _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
@@ -1287,11 +1282,11 @@ defmodule Jido.AgentServer do
       when is_map_key(data.error_policy_tasks, ref) do
     pending = Map.fetch!(data.error_policy_tasks, ref)
     release_task_result(pending)
-    data = drop_error_policy_task(data, ref)
+    data = FailurePolicy.drop_task(data, ref)
 
     case Map.get(pending, :kind, :dispatch) do
       :custom ->
-        settle_custom_policy(result, data)
+        FailurePolicy.settle_custom(result, data)
 
       :dispatch ->
         case result do
@@ -1299,7 +1294,7 @@ defmodule Jido.AgentServer do
             {:keep_state, data}
 
           {:error, reason} ->
-            {:keep_state, record_error_policy_dispatch_failure(data, reason)}
+            {:keep_state, FailurePolicy.record_dispatch_failure(data, reason)}
 
           other ->
             reason =
@@ -1307,7 +1302,7 @@ defmodule Jido.AgentServer do
                 details: %{result: other}
               )
 
-            {:keep_state, record_error_policy_dispatch_failure(data, reason)}
+            {:keep_state, FailurePolicy.record_dispatch_failure(data, reason)}
         end
     end
   end
@@ -1321,7 +1316,7 @@ defmodule Jido.AgentServer do
       when is_map_key(data.error_policy_tasks, ref) do
     pending = Map.fetch!(data.error_policy_tasks, ref)
     cancel_task_timer(pending.timer)
-    data = drop_error_policy_task(data, ref)
+    data = FailurePolicy.drop_task(data, ref)
 
     case Map.get(pending, :kind, :dispatch) do
       :custom ->
@@ -1333,7 +1328,7 @@ defmodule Jido.AgentServer do
             details: %{reason: reason}
           )
 
-        {:keep_state, record_error_policy_dispatch_failure(data, error)}
+        {:keep_state, FailurePolicy.record_dispatch_failure(data, error)}
     end
   end
 
@@ -1348,22 +1343,22 @@ defmodule Jido.AgentServer do
 
     if pending.timer == timer do
       shutdown_task(pending.task)
-      data = drop_error_policy_task(data, task_ref)
+      data = FailurePolicy.drop_task(data, task_ref)
 
       case Map.get(pending, :kind, :dispatch) do
         :custom ->
           {:stop,
            Shutdown.normalize_reason(
-             {:error_policy_timeout, error_policy_dispatch_timeout(data)}
+             {:error_policy_timeout, FailurePolicy.dispatch_timeout(data)}
            ), data}
 
         :dispatch ->
           error =
             Error.timeout_error("Agent error Signal delivery timed out",
-              timeout: error_policy_dispatch_timeout(data)
+              timeout: FailurePolicy.dispatch_timeout(data)
             )
 
-          {:keep_state, record_error_policy_dispatch_failure(data, error)}
+          {:keep_state, FailurePolicy.record_dispatch_failure(data, error)}
       end
     else
       :keep_state_and_data
@@ -1610,8 +1605,8 @@ defmodule Jido.AgentServer do
 
     AgentTelemetry.interrupted(data, reason)
     cancel_idle_timer(data)
-    maybe_persist_on_stop(reason, data)
-    maybe_delete_runtime_checkpoint(reason, data)
+    Storage.persist_on_stop(reason, data)
+    Storage.delete_runtime_checkpoint(reason, data)
     retire_remote_spawn(reason, data)
     PluginLifecycle.stop_all(data, :shutdown)
     :ok
@@ -1671,14 +1666,10 @@ defmodule Jido.AgentServer do
   end
 
   defp upgrade_definition(from, target_module, migration, %State{} = data) do
-    with :ok <- definition_upgrade_supported?(data, target_module),
-         {:ok, state} <- invoke_state_migration(migration, data.agent),
-         {:ok, target} <- Agent.instantiate(target_module, id: data.agent.id, state: state),
-         {:ok, plugin_specs} <- Plugin.normalize_all(target.plugins),
-         :ok <- unchanged_plugin_contract(data.plugin_specs, plugin_specs) do
+    with {:ok, target, plugin_specs} <- Upgrade.prepare(data, target_module, migration) do
       version = data.state_version + 1
 
-      case persist_definition_upgrade(data, target, version) do
+      case Storage.persist_definition_upgrade(data, target, version) do
         :ok ->
           next_data = %{
             data
@@ -1698,76 +1689,6 @@ defmodule Jido.AgentServer do
       {:error, _reason} = error ->
         {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, error}]}
     end
-  end
-
-  defp definition_upgrade_supported?(%State{persistence: nil}, _target_module), do: :ok
-
-  defp definition_upgrade_supported?(%State{agent: %{module: module}}, module), do: :ok
-
-  defp definition_upgrade_supported?(%State{jido: jido}, _target_module) do
-    if is_binary(Jido.namespace(jido)) do
-      :ok
-    else
-      {:error, :stable_namespace_required}
-    end
-  end
-
-  defp invoke_upgrade_operation(operation) do
-    case operation.() do
-      :ok -> :ok
-      {:error, _reason} = error -> error
-      result -> {:error, {:invalid_upgrade_result, result}}
-    end
-  rescue
-    error ->
-      {:error,
-       Error.execution_error("Agent upgrade operation failed",
-         details: %{code: :agent_upgrade_failed, reason: error}
-       )}
-  catch
-    kind, reason ->
-      {:error,
-       Error.execution_error("Agent upgrade operation failed",
-         details: %{code: :agent_upgrade_failed, kind: kind, reason: reason}
-       )}
-  end
-
-  defp invoke_state_migration(migration, agent) do
-    case migration.(agent) do
-      {:ok, state} when is_map(state) and not is_struct(state) -> {:ok, state}
-      {:ok, state} -> {:error, {:invalid_migrated_state, state}}
-      {:error, _reason} = error -> error
-      result -> {:error, {:invalid_migration_result, result}}
-    end
-  rescue
-    error ->
-      {:error,
-       Error.execution_error("Agent state migration failed",
-         details: %{code: :agent_state_migration_failed, reason: error}
-       )}
-  catch
-    kind, reason ->
-      {:error,
-       Error.execution_error("Agent state migration failed",
-         details: %{code: :agent_state_migration_failed, kind: kind, reason: reason}
-       )}
-  end
-
-  defp unchanged_plugin_contract(specs, specs), do: :ok
-  defp unchanged_plugin_contract(_current, _target), do: {:error, :plugin_contract_changed}
-
-  defp persist_definition_upgrade(%State{persistence: nil} = data, target, version) do
-    RuntimeCheckpoint.put_upgrade(data, target, version)
-  end
-
-  defp persist_definition_upgrade(%State{agent: %{module: module}} = data, target, version)
-       when target.module == module do
-    persist_agent(data, target, version, :definition_upgrade)
-  end
-
-  defp persist_definition_upgrade(%State{} = data, target, version) do
-    opts = persistence_write_opts(data, version, :definition_upgrade)
-    Jido.Persistence.replace_agent(data.persistence, data.agent, target, opts)
   end
 
   defp start_plugin_readiness(%State{} = data) do
@@ -2013,7 +1934,7 @@ defmodule Jido.AgentServer do
       AgentTelemetry.with_span(
         :commit,
         Map.put(AgentTelemetry.turn_metadata(data), :stage, :commit),
-        fn -> persist_commit(data, agent, version) end
+        fn -> Storage.persist_commit(data, agent, version) end
       )
 
     case result do
@@ -2033,7 +1954,7 @@ defmodule Jido.AgentServer do
         state_version: version,
         active: committed_active
       })
-      |> record_event(:turn_committed, %{
+      |> Inspection.record_event(:turn_committed, %{
         turn_id: active.turn_id,
         signal_id: active.effective_signal.id,
         signal_type: active.effective_signal.type,
@@ -2084,7 +2005,7 @@ defmodule Jido.AgentServer do
           {:stop, {:shutdown, {:persistence_failed, failure}}, next_data}
 
         _reason ->
-          error_policy_decision(outcome, next_data)
+          FailurePolicy.decide(outcome, next_data)
       end
 
     case decision do
@@ -2243,7 +2164,7 @@ defmodule Jido.AgentServer do
 
   defp cancel_task_timeout(%ExecutionAdapter{timeout: timeout}, _data), do: timeout + 100
 
-  defp cancel_task_timeout(_handle, data), do: error_policy_dispatch_timeout(data)
+  defp cancel_task_timeout(_handle, data), do: FailurePolicy.dispatch_timeout(data)
 
   defp cancellation_task_error(reason) do
     Error.execution_error("Agent Exec cancellation task failed",
@@ -2392,9 +2313,9 @@ defmodule Jido.AgentServer do
         next_data =
           next_data
           |> Map.put(:active, active)
-          |> record_event(:directive_failed, %{
+          |> Inspection.record_event(:directive_failed, %{
             turn_id: active.turn_id,
-            error: public_error(reason)
+            error: Inspection.public_error(reason)
           })
 
         outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
@@ -2603,54 +2524,6 @@ defmodule Jido.AgentServer do
     }
 
     [{:next_event, :internal, {:handle_directives, directives, context}}]
-  end
-
-  defp public_status(phase, %State{} = data) do
-    message_queue_len =
-      case Process.info(self(), :message_queue_len) do
-        {:message_queue_len, length} -> length
-        nil -> 0
-      end
-
-    %{
-      phase: phase,
-      agent_id: data.agent.id,
-      state_version: data.state_version,
-      admission: %{
-        postponed: MapSet.size(data.postponed_tokens),
-        limit: data.max_postponed_signals,
-        message_queue_len: message_queue_len
-      },
-      runtime: %{
-        partition: data.partition,
-        parent: public_parent(data.parent),
-        child_count: map_size(data.children),
-        pending_child_spawns: pending_child_spawns(data),
-        error_count: data.error_count,
-        lifecycle: %{
-          pool: data.pool,
-          attached: map_size(data.attachments),
-          idle_timeout: data.idle_timeout,
-          idle_timer?: not is_nil(data.idle_timer)
-        }
-      },
-      active: public_active(data.active)
-    }
-  end
-
-  defp public_active(nil), do: nil
-
-  defp public_active(%ActiveTurn{} = active) do
-    signal = active.effective_signal || active.source_signal
-
-    %{
-      turn_id: active.turn_id,
-      source_signal_id: active.source_signal.id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      start_version: active.start_version,
-      committed_version: active.committed_version
-    }
   end
 
   defp postpone_call(from, token, signal, deadline, %State{} = data) do
@@ -2922,8 +2795,8 @@ defmodule Jido.AgentServer do
     next_data = State.remove_child(data, key)
 
     next_data =
-      if clean_shutdown?(reason) do
-        _ = delete_child_relationship(data, child)
+      if Shutdown.clean?(reason) do
+        _ = Relationship.delete_child(data, child)
         %{next_data | child_spawn_requests: Map.delete(next_data.child_spawn_requests, key)}
       else
         next_data
@@ -2941,7 +2814,7 @@ defmodule Jido.AgentServer do
 
   defp handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
     next_data = %{data | parent: nil, orphaned_from: parent}
-    _ = delete_own_relationship(next_data)
+    _ = Relationship.delete_own(next_data)
 
     case data.on_parent_death do
       :stop ->
@@ -2980,201 +2853,6 @@ defmodule Jido.AgentServer do
   defp stop_exec_adapter(%ExecutionAdapter{} = adapter), do: ExecutionAdapter.stop(adapter)
   defp stop_exec_adapter(_handle), do: :ok
 
-  defp attach_parent(%State{parent: %ParentRef{}}, _parent), do: {:error, :already_has_parent}
-
-  defp attach_parent(%State{} = data, %ParentRef{pid: pid} = parent) do
-    cond do
-      pid == self() ->
-        {:error, :cannot_adopt_self}
-
-      not is_pid(pid) or not Process.alive?(pid) ->
-        {:error, :parent_not_alive}
-
-      true ->
-        monitored = %{parent | ref: Process.monitor(pid)}
-        next_data = %{data | parent: monitored, orphaned_from: nil}
-
-        case persist_own_relationship(next_data) do
-          :ok ->
-            {:ok, next_data}
-
-          {:error, reason} ->
-            Process.demonitor(monitored.ref, [:flush])
-            {:error, {:relationship_persist_failed, reason}}
-        end
-    end
-  end
-
-  defp monitor_parent(nil), do: nil
-
-  defp monitor_parent(%ParentRef{pid: pid} = parent) when is_pid(pid) do
-    %{parent | ref: Process.monitor(pid)}
-  end
-
-  defp restore_parent(%Options{parent: %ParentRef{} = parent}, _agent), do: parent
-
-  defp restore_parent(%Options{jido: jido, partition: partition}, agent)
-       when is_atom(jido) and not is_nil(jido) do
-    with {:ok, binding} <- Jido.agent_parent_binding(jido, agent.id, partition: partition),
-         parent_pid when is_pid(parent_pid) <-
-           whereis(Jido.registry_name(jido), binding.parent_id,
-             partition: binding.parent_partition
-           ),
-         true <- Process.alive?(parent_pid),
-         {:ok, parent} <-
-           ParentRef.new(%{
-             pid: parent_pid,
-             id: binding.parent_id,
-             partition: binding.parent_partition,
-             tag: binding.tag,
-             creation_cause: Map.get(binding, :creation_cause),
-             meta: binding.meta
-           }) do
-      parent
-    else
-      _reason -> nil
-    end
-  end
-
-  defp restore_parent(%Options{}, _agent), do: nil
-
-  defp notify_parent_online(%State{parent: %ParentRef{} = parent} = data) do
-    send(
-      parent.pid,
-      {:agent_child_online, self(), data.agent.id, data.agent.module, data.partition, parent.tag,
-       parent.meta}
-    )
-
-    :ok
-  end
-
-  defp notify_parent_online(%State{}), do: :ok
-
-  defp verify_child_online(pid, child_id, tag, %State{} = data) do
-    case creation_info(pid) do
-      {:ok,
-       %{agent_id: ^child_id, parent: %ParentRef{pid: owner, id: parent_id, tag: ^tag} = parent} =
-           info}
-      when owner == self() and parent_id == data.agent.id ->
-        with :ok <- verify_child_placement(pid, tag, parent, info, data), do: {:ok, info}
-
-      _other ->
-        {:error, :parent_mismatch}
-    end
-  end
-
-  defp verify_child_placement(pid, tag, parent, info, data) do
-    case Map.get(data.child_spawn_requests, tag) do
-      %{request_id: request, directive: %{node: target} = directive} ->
-        child_id = Map.get(directive.opts, :id, "#{data.agent.id}/#{tag}")
-        child_partition = Map.get(directive.opts, :partition, data.partition)
-
-        with true <- node(pid) == target and parent.spawn_ref == request,
-             :ok <-
-               DirectiveRuntime.verify_spawned_agent(
-                 info,
-                 directive,
-                 child_id,
-                 child_partition,
-                 self(),
-                 data.agent.id
-               ) do
-          :ok
-        else
-          false -> {:error, :spawn_request_mismatch, :stop}
-          {:error, reason} -> {:error, reason, :stop}
-        end
-
-      nil when node(pid) == node() ->
-        :ok
-
-      nil ->
-        {:error, :unknown_remote_child, :stop}
-    end
-  end
-
-  defp pending_child_spawns(data) do
-    for {tag, %{status: :pending} = request} <- data.child_spawn_requests, into: %{} do
-      {tag, %{node: request.directive.node, request_id: request.request_id}}
-    end
-  end
-
-  defp track_online_child(data, pid, info) do
-    tag = info.parent.tag
-    meta = info.parent.meta
-
-    case State.child(data, tag) do
-      %ChildInfo{pid: ^pid} ->
-        mark_online_spawn_active(data, tag)
-
-      existing ->
-        child =
-          ChildInfo.new!(
-            pid: pid,
-            ref: Process.monitor(pid),
-            module: info.agent_module,
-            id: info.agent_id,
-            activation_id: info.activation_id,
-            creation_cause: info.parent.creation_cause,
-            partition: info.partition,
-            tag: tag,
-            kind: :agent,
-            meta: meta
-          )
-
-        case persist_child_relationship(data, child) do
-          :ok ->
-            if match?(%ChildInfo{}, existing), do: Process.demonitor(existing.ref, [:flush])
-
-            signal =
-              Jido.AgentServer.Signal.ChildStarted.for_child(
-                data.agent.id,
-                child,
-                not is_nil(existing)
-              )
-
-            cast(self(), signal)
-            data |> mark_online_spawn_active(tag) |> State.add_child(tag, child)
-
-          {:error, _reason} ->
-            Process.demonitor(child.ref, [:flush])
-
-            _ =
-              ChildPlacement.stop(
-                data.jido,
-                pid,
-                :relationship_persist_failed,
-                data.directive_timeout
-              )
-
-            data
-        end
-    end
-  end
-
-  defp mark_online_spawn_active(data, tag) do
-    case Map.fetch(data.child_spawn_requests, tag) do
-      {:ok, request} ->
-        %{
-          data
-          | child_spawn_requests:
-              Map.put(data.child_spawn_requests, tag, %{request | status: :active})
-        }
-
-      :error ->
-        data
-    end
-  end
-
-  defp relationship_info(%State{} = data) do
-    %{
-      agent_id: data.agent.id,
-      agent_module: data.agent.module,
-      partition: data.partition,
-      parent: public_parent(data.parent)
-    }
-  end
-
   defp handle_child_directive_call(directive, from, data) do
     case DirectiveRuntime.handle(directive, directive_context(data), data) do
       {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
@@ -3192,35 +2870,10 @@ defmodule Jido.AgentServer do
     }
   end
 
-  defp public_child_map(%ChildInfo{} = child) do
-    %{
-      pid: child.pid,
-      module: child.module,
-      id: child.id,
-      partition: child.partition,
-      tag: child.tag,
-      kind: child.kind,
-      meta: child.meta
-    }
-  end
-
-  defp public_parent(nil), do: nil
-
-  defp public_parent(%ParentRef{} = parent) do
-    %{
-      pid: parent.pid,
-      id: parent.id,
-      partition: parent.partition,
-      tag: parent.tag,
-      spawn_ref: parent.spawn_ref,
-      meta: parent.meta
-    }
-  end
-
   defp apply_post_commit_error_policy(%Outcome{} = outcome, data) do
     next_data = %{data | error_count: data.error_count + 1}
 
-    case error_policy_decision(outcome, next_data) do
+    case FailurePolicy.decide(outcome, next_data) do
       {:continue, policy_data} ->
         TraceContext.clear()
         {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle)}
@@ -3228,163 +2881,6 @@ defmodule Jido.AgentServer do
       {:stop, stop_reason, policy_data} ->
         {:stop, {:shutdown, stop_reason}, policy_data}
     end
-  end
-
-  defp error_policy_decision(%Outcome{}, %State{error_policy: :log_only} = data),
-    do: {:continue, data}
-
-  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: :stop_on_error} = data),
-    do: {:stop, {:agent_error, outcome.error}, data}
-
-  defp error_policy_decision(
-         %Outcome{} = outcome,
-         %State{error_policy: {:max_errors, max}} = data
-       ) do
-    if data.error_count >= max,
-      do: {:stop, {:max_agent_errors, outcome.error}, data},
-      else: {:continue, data}
-  end
-
-  defp error_policy_decision(
-         %Outcome{} = outcome,
-         %State{error_policy: {:emit_signal, dispatch}} = data
-       ) do
-    source_signal = outcome.effective_signal || outcome.source_signal
-
-    if source_signal.type != ErrorSignal.type() do
-      signal =
-        ErrorSignal.new!(
-          %{
-            agent_id: data.agent.id,
-            turn_id: outcome.id,
-            status: outcome.status,
-            stage: outcome.stage,
-            committed?: outcome.committed?,
-            error: Error.to_map(outcome.error)
-          },
-          source: "/agent/#{data.agent.id}"
-        )
-
-      signal =
-        with id when is_binary(id) and byte_size(id) > 0 <- source_signal.id,
-             :ok <- Signal.validate_utf8_string(id, []),
-             {:ok, causal} <- Signal.put_context(signal, "jidocausationid", id) do
-          causal
-        else
-          _invalid -> signal
-        end
-
-      signal =
-        with %Jido.Signal.Trace{} = trace <- Jido.Signal.Trace.get(source_signal),
-             {:ok, traced} <- Jido.Signal.Trace.put(signal, trace) do
-          traced
-        else
-          _unavailable -> signal
-        end
-
-      data = start_error_policy_dispatch(signal, dispatch, data)
-
-      {:continue, data}
-    else
-      {:continue, data}
-    end
-  end
-
-  defp error_policy_decision(%Outcome{} = outcome, %State{error_policy: policy} = data)
-       when is_function(policy, 2) do
-    start_custom_error_policy(policy, outcome, data)
-  end
-
-  defp start_custom_error_policy(policy, outcome, %State{} = data) do
-    if map_size(data.error_policy_tasks) >= @max_error_policy_tasks do
-      {:stop, :error_policy_task_limit, data}
-    else
-      supervisor = Jido.task_supervisor_name(data.jido)
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            try do
-              policy.(outcome.error, outcome)
-            rescue
-              error -> {:stop, {:error_policy_failed, error}}
-            catch
-              kind, reason -> {:stop, {:error_policy_failed, {kind, reason}}}
-            end
-          end)
-        end)
-
-      timeout = error_policy_dispatch_timeout(data)
-      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
-      pending = %{kind: :custom, task: task, timer: timer}
-
-      {:continue,
-       %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}}
-    end
-  rescue
-    error -> {:stop, {:error_policy_start_failed, error}, data}
-  catch
-    kind, reason -> {:stop, {:error_policy_start_failed, {kind, reason}}, data}
-  end
-
-  defp settle_custom_policy(:continue, data), do: {:keep_state, data}
-
-  defp settle_custom_policy({:stop, reason}, data),
-    do: {:stop, Shutdown.normalize_reason(reason), data}
-
-  defp settle_custom_policy(other, data),
-    do: {:stop, Shutdown.normalize_reason({:invalid_error_policy_result, other}), data}
-
-  defp start_error_policy_dispatch(signal, dispatch, %State{} = data) do
-    if map_size(data.error_policy_tasks) >= @max_error_policy_tasks do
-      error =
-        Error.execution_error("Agent error Signal delivery limit was reached",
-          details: %{limit: @max_error_policy_tasks}
-        )
-
-      record_error_policy_dispatch_failure(data, error)
-    else
-      supervisor = Jido.task_supervisor_name(data.jido)
-      jido = data.jido
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
-          end)
-        end)
-
-      timeout = error_policy_dispatch_timeout(data)
-      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
-      pending = %{task: task, timer: timer}
-      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
-    end
-  rescue
-    error -> record_error_policy_dispatch_failure(data, error)
-  catch
-    kind, reason -> record_error_policy_dispatch_failure(data, {kind, reason})
-  end
-
-  defp error_policy_dispatch_timeout(%State{directive_timeout: :infinity}),
-    do: @error_policy_dispatch_fallback_timeout
-
-  defp error_policy_dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
-
-  defp drop_error_policy_task(%State{} = data, ref) do
-    %{data | error_policy_tasks: Map.delete(data.error_policy_tasks, ref)}
-  end
-
-  defp record_error_policy_dispatch_failure(%State{} = data, reason) do
-    error = public_error(reason)
-
-    Logger.error(
-      "Agent error Signal delivery failed " <>
-        "agent_id=#{data.agent.id} error_type=#{error.type} error_code=#{Error.code(reason)}"
-    )
-
-    record_event(data, :error_signal_delivery_failed, %{error: error})
   end
 
   defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
@@ -3401,13 +2897,13 @@ defmodule Jido.AgentServer do
     |> then(fn data ->
       if outcome.status == :succeeded, do: %{data | error_count: 0}, else: data
     end)
-    |> record_event(event, %{
+    |> Inspection.record_event(event, %{
       turn_id: outcome.id,
       signal_id: signal.id,
       signal_type: signal.type,
       stage: outcome.stage,
-      error: if(outcome.error, do: public_error(outcome.error)),
-      outcome: outcome_summary(outcome)
+      error: if(outcome.error, do: Inspection.public_error(outcome.error)),
+      outcome: Inspection.outcome_summary(outcome)
     })
   end
 
@@ -3420,37 +2916,6 @@ defmodule Jido.AgentServer do
       _error -> :failed
     end
   end
-
-  defp record_event(%State{debug: false} = data, _event, _metadata), do: data
-
-  defp record_event(%State{} = data, event, metadata) do
-    entry = %{event: event, at: System.system_time(:millisecond), metadata: metadata}
-    events = Enum.take([entry | data.debug_events], data.debug_max_events)
-    %{data | debug_events: events}
-  end
-
-  defp outcome_summary(%Outcome{} = outcome) do
-    signal = outcome.effective_signal || outcome.source_signal
-
-    %{
-      id: outcome.id,
-      agent_id: outcome.agent_id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      status: outcome.status,
-      stage: outcome.stage,
-      committed?: outcome.committed?,
-      state_version_before: outcome.state_version_before,
-      state_version_after: outcome.state_version_after,
-      directives: outcome.directives,
-      started_at: outcome.started_at,
-      finished_at: outcome.finished_at,
-      duration_ms: outcome.duration_ms,
-      error: if(outcome.error, do: public_error(outcome.error))
-    }
-  end
-
-  defp public_error(reason), do: Error.to_map(reason)
 
   defp start_directive_span(directive, _context, data) do
     metadata =
@@ -3486,67 +2951,6 @@ defmodule Jido.AgentServer do
     metadata = AgentTelemetry.result_metadata({:error, reason}) |> Map.put(:kind, kind)
     AgentTelemetry.finish(span, metadata, %{}, :exception)
   end
-
-  defp normalize_event_limit(limit) when is_integer(limit) and limit >= 0, do: limit
-  defp normalize_event_limit(_limit), do: 0
-
-  defp persist_own_relationship(%State{jido: jido, parent: %ParentRef{} = parent} = data)
-       when is_atom(jido) and not is_nil(jido) do
-    Jido.RuntimeStore.put(
-      jido,
-      :agent_relationships,
-      Jido.partition_key(data.agent.id, data.partition),
-      Relationship.record(
-        parent.id,
-        parent.partition,
-        parent.tag,
-        parent.creation_cause,
-        parent.meta
-      )
-    )
-  end
-
-  defp persist_own_relationship(_data), do: :ok
-
-  defp persist_child_relationship(%State{jido: jido} = data, %ChildInfo{} = child)
-       when is_atom(jido) and not is_nil(jido) do
-    Jido.RuntimeStore.put(
-      jido,
-      :agent_relationships,
-      Jido.partition_key(child.id, child.partition),
-      Relationship.record(
-        data.agent.id,
-        data.partition,
-        child.tag,
-        child.creation_cause,
-        child.meta
-      )
-    )
-  end
-
-  defp persist_child_relationship(%State{}, %ChildInfo{}), do: :ok
-
-  defp delete_own_relationship(%State{jido: jido} = data)
-       when is_atom(jido) and not is_nil(jido) do
-    Jido.RuntimeStore.delete(
-      jido,
-      :agent_relationships,
-      Jido.partition_key(data.agent.id, data.partition)
-    )
-  end
-
-  defp delete_own_relationship(_data), do: :ok
-
-  defp delete_child_relationship(%State{jido: jido}, child)
-       when is_atom(jido) and not is_nil(jido) do
-    Jido.RuntimeStore.delete(
-      jido,
-      :agent_relationships,
-      Jido.partition_key(child.id, child.partition)
-    )
-  end
-
-  defp delete_child_relationship(_data, _child), do: :ok
 
   defp attach_owner(%State{} = data, owner_pid) do
     cond do
@@ -3608,69 +3012,6 @@ defmodule Jido.AgentServer do
     _ = :erlang.cancel_timer(timer)
     %{data | idle_timer: nil}
   end
-
-  defp restore_initial_agent(%Options{restore: false, persistence: nil} = opts) do
-    {:ok, opts.agent, opts.state_version, :none}
-  end
-
-  defp restore_initial_agent(%Options{restore: false} = opts) do
-    {:ok, opts.agent, opts.state_version, :create}
-  end
-
-  defp restore_initial_agent(%Options{persistence: nil, restore: :required}) do
-    {:error, :persistence_not_configured}
-  end
-
-  defp restore_initial_agent(%Options{persistence: nil} = opts) do
-    with {:ok, agent, version} <- RuntimeCheckpoint.restore(opts) do
-      {:ok, agent, version, :none}
-    end
-  end
-
-  defp restore_initial_agent(%Options{} = opts) do
-    load_opts = [
-      instance: opts.jido,
-      namespace: Jido.namespace(opts.jido),
-      partition: opts.partition
-    ]
-
-    case Jido.Persistence.load_agent_with_revision(
-           opts.persistence,
-           opts.agent.module,
-           opts.agent.id,
-           load_opts
-         ) do
-      {:ok, agent, version} ->
-        {:ok, agent, version, :restored}
-
-      {:error, :not_found} when opts.restore == :if_found ->
-        {:ok, opts.agent, opts.state_version, :create}
-
-      {:error, _reason} = error ->
-        error
-    end
-  end
-
-  defp persist_initial_agent(%State{initial_persistence: :create, state_version: 0} = data) do
-    opts = [
-      instance: data.jido,
-      namespace: data.agent_namespace,
-      partition: data.partition,
-      revision: 0,
-      reason: :activate
-    ]
-
-    case Jido.Persistence.create_agent(data.persistence, data.agent, opts) do
-      :ok -> {:ok, %{data | initial_persistence: :ready}}
-      {:error, _reason} = error -> error
-    end
-  end
-
-  defp persist_initial_agent(%State{initial_persistence: :create, state_version: version}),
-    do: {:error, {:invalid_initial_revision, version}}
-
-  defp persist_initial_agent(%State{} = data),
-    do: {:ok, %{data | initial_persistence: :ready}}
 
   defp publish_agent(%State{registered?: false}), do: :ok
 
@@ -3737,75 +3078,15 @@ defmodule Jido.AgentServer do
     end
   end
 
-  defp persist_commit(%State{persistence: nil} = data, agent, version) do
-    RuntimeCheckpoint.put(data, agent, version)
-  end
-
-  defp persist_commit(%State{} = data, agent, version) do
-    persist_agent(data, agent, version, :commit)
-  end
-
-  defp persist_agent(data, agent, version, reason, extra_opts \\ [])
-
-  defp persist_agent(%State{persistence: nil}, %Agent{}, _version, _reason, _extra_opts),
-    do: {:error, :persistence_not_configured}
-
-  defp persist_agent(%State{} = data, %Agent{} = agent, version, reason, extra_opts) do
-    opts = persistence_write_opts(data, version, reason, extra_opts)
-
-    Jido.Persistence.save_agent(data.persistence, agent, opts)
-  end
-
-  defp persistence_write_opts(data, version, reason, extra_opts \\ []) do
-    extra_opts
-    |> Keyword.put(:instance, data.jido)
-    |> Keyword.put(:namespace, data.agent_namespace)
-    |> Keyword.put(:partition, data.partition)
-    |> Keyword.put(:revision, version)
-    |> Keyword.put(:expected_revision, data.state_version)
-    |> Keyword.put(:reason, reason)
-  end
-
-  defp maybe_persist_on_stop({:shutdown, :hibernate}, %State{}), do: :ok
-  defp maybe_persist_on_stop({:shutdown, {:persistence_failed, _reason}}, %State{}), do: :ok
-
-  defp maybe_persist_on_stop(reason, %State{persistence: persistence} = data)
-       when not is_nil(persistence) do
-    if clean_shutdown?(reason) do
-      case persist_agent(data, data.agent, data.state_version, :stop) do
-        :ok ->
-          :ok
-
-        {:error, error} ->
-          Logger.error("Agent persistence failed during shutdown",
-            agent_id: data.agent.id,
-            pool: data.pool,
-            reason: inspect(error)
-          )
-      end
-    end
-  end
-
-  defp maybe_persist_on_stop(_reason, %State{}), do: :ok
-
-  defp maybe_delete_runtime_checkpoint(reason, %State{} = data) do
-    if clean_shutdown?(reason), do: RuntimeCheckpoint.delete(data), else: :ok
-  end
-
   defp retire_remote_spawn(reason, %State{parent: %ParentRef{spawn_ref: request}, jido: jido})
        when not is_nil(request) and not is_nil(jido) do
-    if clean_shutdown?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
+    if Shutdown.clean?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
     :ok
   catch
     :exit, _ -> :ok
   end
 
   defp retire_remote_spawn(_reason, _data), do: :ok
-
-  defp clean_shutdown?(:normal), do: true
-  defp clean_shutdown?(:shutdown), do: true
-  defp clean_shutdown?({:shutdown, _reason}), do: true
-  defp clean_shutdown?(_reason), do: false
 
   defp reply_action(nil, _reply), do: []
   defp reply_action(from, reply), do: [{:reply, from, reply}]
