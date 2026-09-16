@@ -2,6 +2,7 @@ defmodule Jido.Topology.Controller.TargetStore do
   @moduledoc false
 
   alias Jido.Persistence
+  alias Jido.Persistence.Store
   alias Jido.PortableTerm
   alias Jido.Topology
   alias Jido.Topology.Instance
@@ -225,42 +226,23 @@ defmodule Jido.Topology.Controller.TargetStore do
   defp valid_move?(_target, _placements, _move), do: false
 
   defp read(module, key, opts) do
-    case safe_call(fn -> apply(module, :get, [key, opts]) end) do
-      {:ok, bytes} when is_binary(bytes) ->
-        {:ok, bytes, bytes}
-
-      {:ok, bytes, token} when is_binary(bytes) and is_binary(token) and byte_size(token) > 0 ->
-        {:ok, bytes, {:token, token}}
+    case Store.read({module, opts}, key) do
+      {:ok, bytes, condition} ->
+        {:ok, bytes, condition}
 
       {:error, :not_found} ->
         {:ok, :not_found, :not_found}
 
       {:error, reason} ->
         {:error, reason}
-
-      _ ->
-        {:error, :invalid_topology_adapter_result}
     end
   end
 
   defp write(module, key, condition, bytes, opts) do
-    case safe_call(fn -> apply(module, :compare_and_swap, [key, condition, bytes, opts]) end) do
-      :ok -> :ok
-      {:error, :conflict} = error -> error
-      {:error, {:rejected, _}} = error -> error
+    case Store.compare_and_swap({module, opts}, key, condition, bytes) do
       {:error, :indeterminate} -> {:error, {:indeterminate, :unknown}}
-      {:error, {:indeterminate, _}} = error -> error
-      {:error, reason} -> {:error, {:indeterminate, reason}}
-      other -> {:error, {:indeterminate, {:invalid_topology_adapter_result, other}}}
+      result -> result
     end
-  end
-
-  defp safe_call(fun) do
-    fun.()
-  rescue
-    error -> {:error, {:callback_failed, :error, error}}
-  catch
-    kind, reason -> {:error, {:callback_failed, kind, reason}}
   end
 
   defp key(jido, id) do

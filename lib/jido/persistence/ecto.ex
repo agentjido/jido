@@ -279,7 +279,7 @@ defmodule Jido.Persistence.Ecto do
   Ecto SQL persistence adapter for binary keys and values.
 
   This adapter keeps the `Jido.Persistence.Adapter` byte contract. It does not
-  decode checkpoints or change Jido record semantics. The required `:repo`
+  decode domain records or change their semantics. The required `:repo`
   option selects a running Ecto repository. The optional `:schema` defaults to
   `Jido.Persistence.Ecto.Record`. The optional `:repo_options` keyword list is
   sent to repository calls and can contain options such as `:prefix` and

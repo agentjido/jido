@@ -2,8 +2,9 @@ defmodule Jido.Persistence do
   @moduledoc """
   Saves and restores portable Agent checkpoints through a persistence adapter.
 
-  Persistence owns Agent record keys, encoding, validation, and adapter fault
-  containment. Adapters only store binary keys and values.
+  This module owns Agent record keys, encoding, and validation.
+  `Jido.Persistence.Store` contains byte-adapter faults and write outcomes.
+  Adapters only store binary keys and values.
 
   Durable values are versioned active records or compact tombstones. An active
   record does not prove that an Agent process is live. Normal deletion writes a
@@ -37,7 +38,7 @@ defmodule Jido.Persistence do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence.{AdapterOps, Checkpoint, Identity, Record, Source, WriteAuthority}
+  alias Jido.Persistence.{AdapterOps, Checkpoint, Identity, Record, Source, Store, WriteAuthority}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.PortableTerm
 
@@ -85,12 +86,11 @@ defmodule Jido.Persistence do
                current_value(adapter, adapter_opts, record, identity, expected_revision),
              {:ok, value} <- Record.encode(record),
              :ok <-
-               AdapterOps.compare_and_swap(
-                 adapter,
+               Store.compare_and_swap(
+                 {adapter, adapter_opts},
                  identity.key,
                  expected_value,
-                 value,
-                 adapter_opts
+                 value
                ) do
           :ok
         end
@@ -141,12 +141,11 @@ defmodule Jido.Persistence do
                  ),
                {:ok, value} <- Record.encode(record),
                :ok <-
-                 AdapterOps.compare_and_swap(
-                   adapter,
+                 Store.compare_and_swap(
+                   {adapter, adapter_opts},
                    identity.key,
                    expected_value,
-                   value,
-                   adapter_opts
+                   value
                  ) do
             :ok
           else
@@ -174,12 +173,11 @@ defmodule Jido.Persistence do
                build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
              {:ok, value} <- Record.encode(record),
              :ok <-
-               AdapterOps.compare_and_swap(
-                 adapter,
+               Store.compare_and_swap(
+                 {adapter, adapter_opts},
                  identity.key,
                  :not_found,
-                 value,
-                 adapter_opts
+                 value
                ) do
           :ok
         end
@@ -217,7 +215,7 @@ defmodule Jido.Persistence do
              partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
                Identity.resolve({adapter, adapter_opts}, instance, agent_module, agent_id, opts),
-             {:ok, value, _condition} <- AdapterOps.get(adapter, identity.key, adapter_opts),
+             {:ok, value, _condition} <- Store.read({adapter, adapter_opts}, identity.key),
              {:ok, record} <- Record.decode(value),
              :ok <-
                Record.validate_for_identity(
@@ -335,7 +333,7 @@ defmodule Jido.Persistence do
   end
 
   defp current_value(adapter, opts, record, identity, expected_revision) do
-    case AdapterOps.get(adapter, identity.key, opts) do
+    case Store.read({adapter, opts}, identity.key) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
 
@@ -365,7 +363,7 @@ defmodule Jido.Persistence do
          _instance,
          partition
        ) do
-    case AdapterOps.get(adapter, identity.key, opts) do
+    case Store.read({adapter, opts}, identity.key) do
       {:ok, value, condition} ->
         with {:ok, current_record} <- Record.decode(value),
              :ok <-
@@ -458,7 +456,7 @@ defmodule Jido.Persistence do
          agent_id,
          partition
        ) do
-    case AdapterOps.get(adapter, identity.key, adapter_opts) do
+    case read_for_delete({adapter, adapter_opts}, identity.key) do
       {:error, :not_found} ->
         with {:ok, tombstone} <-
                Record.build_tombstone_for_identity(
@@ -470,7 +468,7 @@ defmodule Jido.Persistence do
                  identity
                ),
              {:ok, value} <- Record.encode(tombstone) do
-          AdapterOps.compare_and_swap(adapter, identity.key, :not_found, value, adapter_opts)
+          Store.compare_and_swap({adapter, adapter_opts}, identity.key, :not_found, value)
         end
 
       {:ok, expected_value, condition} ->
@@ -499,12 +497,11 @@ defmodule Jido.Persistence do
                        identity
                      ),
                    {:ok, value} <- Record.encode(tombstone) do
-                AdapterOps.compare_and_swap(
-                  adapter,
+                Store.compare_and_swap(
+                  {adapter, adapter_opts},
                   identity.key,
                   condition,
-                  value,
-                  adapter_opts
+                  value
                 )
               end
           end
@@ -512,6 +509,17 @@ defmodule Jido.Persistence do
 
       {:error, _reason} = error ->
         error
+    end
+  end
+
+  defp read_for_delete(config, key) do
+    case Store.read(config, key) do
+      {:error,
+       %Error.ExecutionError{details: %{code: :persistence_callback_failed} = details} = error} ->
+        {:error, %{error | details: Map.put(details, :operation, :delete)}}
+
+      result ->
+        result
     end
   end
 

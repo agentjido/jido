@@ -2,7 +2,7 @@ defmodule Jido.Persistence.Identity do
   @moduledoc false
 
   alias Jido.Agent.Ref
-  alias Jido.Persistence.{AdapterOps, Source, WriteAuthority}
+  alias Jido.Persistence.{AdapterOps, Source, Store, WriteAuthority}
 
   @key_prefix "jido:agent:v1:"
 
@@ -205,7 +205,7 @@ defmodule Jido.Persistence.Identity do
   end
 
   defp stored_key_state(adapter, key, opts) do
-    case AdapterOps.get(adapter, key, opts) do
+    case Store.read({adapter, opts}, key) do
       {:ok, _value, _condition} -> :present
       {:error, :not_found} -> :missing
       {:error, reason} -> {:error, reason}

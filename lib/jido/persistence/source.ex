@@ -1,22 +1,9 @@
 defmodule Jido.Persistence.Source do
   @moduledoc false
 
-  def normalize_adapter(nil), do: nil
-  def normalize_adapter(false), do: nil
+  alias Jido.Persistence.Store
 
-  def normalize_adapter({adapter, opts}) when is_atom(adapter) and is_list(opts) do
-    if Keyword.keyword?(opts) do
-      {adapter, opts}
-    else
-      raise ArgumentError, "persistence adapter options must be a keyword list"
-    end
-  end
-
-  def normalize_adapter(adapter) when is_atom(adapter), do: {adapter, []}
-
-  def normalize_adapter(config) do
-    raise ArgumentError, "invalid Jido persistence adapter: #{inspect(config)}"
-  end
+  defdelegate normalize_adapter(config), to: Store
 
   def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
   def resolve_config(nil, _jido), do: {:ok, nil}
@@ -87,33 +74,7 @@ defmodule Jido.Persistence.Source do
 
   defp validate_adapter_result({:ok, nil}), do: {:ok, nil}
 
-  defp validate_adapter_result({:ok, {adapter, opts} = config}) do
-    with {:module, ^adapter} <- Code.ensure_loaded(adapter),
-         true <- function_exported?(adapter, :get, 2),
-         true <- function_exported?(adapter, :compare_and_swap, 4),
-         :ok <- validate_adapter_options(adapter, opts) do
-      {:ok, config}
-    else
-      {:error, _reason} = error -> error
-      _value -> {:error, {:invalid_persistence_adapter, adapter}}
-    end
-  end
+  defp validate_adapter_result({:ok, config}), do: Store.open(config)
 
   defp validate_adapter_result({:error, _reason} = error), do: error
-
-  defp validate_adapter_options(adapter, opts) do
-    if function_exported?(adapter, :validate_options, 1) do
-      case adapter.validate_options(opts) do
-        :ok -> :ok
-        {:error, reason} -> {:error, {:invalid_persistence_options, adapter, reason}}
-        result -> {:error, {:invalid_persistence_options, adapter, {:invalid_result, result}}}
-      end
-    else
-      :ok
-    end
-  rescue
-    error -> {:error, {:invalid_persistence_options, adapter, {:error, error}}}
-  catch
-    kind, reason -> {:error, {:invalid_persistence_options, adapter, {kind, reason}}}
-  end
 end

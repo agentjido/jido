@@ -288,7 +288,8 @@ defmodule Jido.MixProject do
           Jido.Persistence.File,
           Jido.Persistence.Plugin,
           Jido.Persistence.Plugin.Context,
-          Jido.Persistence.Redis
+          Jido.Persistence.Redis,
+          Jido.Persistence.Store
         ],
         Observability: [Jido.Telemetry],
         Errors: [

@@ -1,5 +1,66 @@
 # Persistence and recovery
 
+## Share the byte store, not a record format
+
+`Jido.Persistence.Store` is the shared boundary for binary keys and values.
+Use `Store.open/1` to validate an adapter, `Store.read/2` to get bytes and a
+comparison condition, and `Store.compare_and_swap/4` for an atomic write.
+The read condition is the exact bytes or an opaque token from that adapter.
+Do not re-encode read bytes to make a condition. A missing key uses
+`:not_found`. The Store does not define a record envelope or recovery policy.
+
+For example, run this JSON cursor record in `iex -S mix`. It uses ETS only to
+make the example local and repeatable. Replace ETS with a durable adapter in a
+real application:
+
+```elixir
+alias Jido.Persistence.Store
+
+{:ok, store} = Store.open({Jido.Persistence.ETS, table: :cursor_example})
+key = "my-app:cursor:v1:worker-a"
+
+condition =
+  case Store.read(store, key) do
+    {:ok, bytes, condition} ->
+      %{"version" => 1, "offset" => _prior} = Jason.decode!(bytes)
+      condition
+
+    {:error, :not_found} ->
+      :not_found
+  end
+
+bytes = Jason.encode!(%{"version" => 1, "offset" => 42})
+
+case Store.compare_and_swap(store, key, condition, bytes) do
+  :ok -> :ok
+  {:error, :conflict} -> :reload_before_retry
+  {:error, {:rejected, reason}} -> {:not_written, reason}
+  {:error, :indeterminate} -> :reconcile_before_retry
+  {:error, {:indeterminate, reason}} -> {:reconcile_before_retry, reason}
+end
+```
+
+The cursor owner must also handle invalid reads and invalid JSON. It owns the
+key, format version, and revision rule. A Store conflict confirms that the
+candidate did not commit. A rejected write did not start. An indeterminate
+write can have committed; do not replay it without a fresh read and an owner
+decision. Store telemetry reports only the operation, adapter, and status.
+It does not report key or value bytes.
+
+The core Topology target store uses this same byte boundary but keeps its own
+target format, revision, placement, and recovery rules. A future
+`Jido.Cluster.Journal` integration can preserve its current scope key and
+versioned JSON envelope: validate the configured adapter with `Store.open/1`,
+replace direct adapter reads with `Store.read/2`, and pass its returned
+condition to `Store.compare_and_swap/4`. Keep journal revision and write-ID
+checks in Cluster. On conflict, block the old handle and reload. On an
+indeterminate result, block external work, reload to discover whether the
+write committed, then obtain a fresh CAS condition before recovery acts.
+Cluster must not treat the Store token as a lease. AI-owned records can use
+the same API with their own keys, codecs, and lifecycle rules.
+
+## Agent checkpoints
+
 Configure `persistence: {Adapter, options}` on the Jido instance. Jido does not
 start the adapter's process. Implement binary `get/2` and atomic exact-byte
 `compare_and_swap/4` from `Jido.Persistence.Adapter`. A new persistent

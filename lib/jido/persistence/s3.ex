@@ -2,7 +2,7 @@ defmodule Jido.Persistence.S3 do
   @moduledoc """
   Stores Jido records as single S3 objects with conditional writes.
 
-  This adapter is for low-frequency checkpoints. It does not provide an AWS
+  This adapter is for low-frequency records. It does not provide an AWS
   client. The host supplies `:request_fn`, which signs and sends one request.
   The function receives a map with `:method` (`:get`, `:put`, or `:delete`),
   `:bucket`, `:key`, `:headers`, `:body`, `:timeout_ms`, `:retry` (`false`), and
@@ -31,14 +31,14 @@ defmodule Jido.Persistence.S3 do
   `x-amz-checksum-sha256` for these objects. Tokens bind an ETag to the bucket
   and object key. ETags are opaque conditions; they
   are not content hashes, leases, or unique activation generations. A direct
-  byte compare-and-swap uses one GET and one conditional PUT. Jido's token
+  byte compare-and-swap uses one GET and one conditional PUT. The Store's token
   path uses its original GET and one conditional PUT. A create uses one PUT.
 
   Use a bucket with supported read consistency and conditional PUT behavior.
-  Do not apply expiry to active records or tombstones in this prefix. Normal
-  Jido deletion writes a conditional tombstone. `delete/2` is only for explicit
-  maintenance. In a versioned bucket it can create a delete marker; older
-  versions may remain. Do not use maintenance deletion while Agents can write.
+  Record owners define expiry and tombstone rules. `delete/2` is only for
+  explicit maintenance. In a versioned bucket it can create a delete marker;
+  older versions may remain. Do not use maintenance deletion while a writer
+  can use the key.
   """
 
   @behaviour Jido.Persistence.Adapter

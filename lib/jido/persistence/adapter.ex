@@ -2,9 +2,10 @@ defmodule Jido.Persistence.Adapter do
   @moduledoc """
   Minimal byte storage contract for durable Jido values.
 
-  An adapter stores binary keys and binary values. It does not inspect Agent
-  checkpoints or own lifecycle policy. The application supervises any process
-  that the adapter uses.
+  An adapter stores binary keys and binary values. It does not inspect domain
+  records or own lifecycle policy. Use `Jido.Persistence.Store` for validated
+  calls and generic result classification. The application supervises any
+  process that the adapter uses.
   """
 
   @type key :: binary()
@@ -19,8 +20,8 @@ defmodule Jido.Persistence.Adapter do
   Gets one value. A missing key returns `{:error, :not_found}`.
 
   An adapter can return `{:ok, value, token}` when the value and opaque,
-  nonempty binary token come from the same read. Jido validates the value and
-  passes `{:token, token}` to that adapter's next conditional write. The token
+  nonempty binary token come from the same read. The Store validates the value
+  and passes `{:token, token}` to the next conditional write. The token
   is valid only for this storage key and location. It is not checkpoint data.
   """
   @callback get(key(), options()) ::
@@ -43,13 +44,13 @@ defmodule Jido.Persistence.Adapter do
 
   Return `{:error, {:rejected, reason}}` only for a documented check that
   finishes before a storage write starts. Return `{:error, :indeterminate}` or
-  `{:error, {:indeterminate, reason}}` when the write result is unknown. Jido
-  also classifies every other returned error, exception, throw, exit, or invalid
-  callback result as indeterminate. Every required write error stops the Server
-  activation before another Action can run. Restore from storage before retrying.
+  `{:error, {:indeterminate, reason}}` when the write result is unknown. The
+  Store also classifies every other returned error, exception, throw, exit, or
+  invalid callback result as indeterminate. The record owner decides what an
+  indeterminate write means for its runtime. It must not replay blindly.
 
-  Agent checkpoint saves require this callback. `put/3` remains an
-  unconditional byte operation for explicit storage maintenance.
+  The shared Store requires this callback. `put/3` remains an unconditional
+  byte operation for explicit storage maintenance.
   """
   @callback compare_and_swap(key(), :not_found | value() | {:token, token()}, value(), options()) ::
               :ok | {:error, term()}
