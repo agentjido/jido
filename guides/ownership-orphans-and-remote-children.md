@@ -14,6 +14,12 @@ relationship. Use `stop_child/2` to stop and remove one tracked child. Use
 `adopt_child/3` only when application policy assigns an existing child to a new
 parent.
 
+`StopChild` and `AgentServer.stop_child/3` accept a reason. A child still owned
+by its DynamicSupervisor exits with `:shutdown` when removed. The given reason
+applies only if the child is no longer supervised or is a standalone tracked
+process. Do not use this reason as a domain completion result; use a Signal for
+that result.
+
 ## Select Parent-Death Policy
 
 | Policy | Child behavior |

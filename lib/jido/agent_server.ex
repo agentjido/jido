@@ -416,7 +416,13 @@ defmodule Jido.AgentServer do
     :gen_statem.call(server, {:adopt_child, child, tag, meta})
   end
 
-  @doc "Stops one tracked child Agent."
+  @doc """
+  Stops one tracked child Agent.
+
+  A supervised child exits with `:shutdown` when its DynamicSupervisor removes
+  it. The reason applies only if the child is no longer in that supervisor or
+  is a standalone tracked process.
+  """
   @spec stop_child(server(), term(), term()) :: :ok | {:error, term()}
   def stop_child(server, tag, reason \\ :normal) do
     :gen_statem.call(server, {:stop_child, tag, reason})

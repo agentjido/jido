@@ -194,10 +194,10 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     ref = Process.monitor(server)
 
     assert {:ok, stopped} =
-             DirectiveRuntime.handle(Directive.stop_child(:child), context, adopted)
+             DirectiveRuntime.handle(Directive.stop_child(:child, :done), context, adopted)
 
     assert stopped.children == %{}
-    assert_receive {:DOWN, ^ref, :process, ^server, _}
+    assert_receive {:DOWN, ^ref, :process, ^server, :shutdown}
   end
 
   test "child stop keeps Plugin children and unresolved remote requests", %{

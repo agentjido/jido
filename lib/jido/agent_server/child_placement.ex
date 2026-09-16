@@ -111,6 +111,8 @@ defmodule Jido.AgentServer.ChildPlacement do
   end
 
   defp stop_process(jido, pid, reason, timeout) do
+    # DynamicSupervisor owns the exit reason for a supervised removal. The
+    # caller reason applies only after that supervisor no longer owns the child.
     case DynamicSupervisor.terminate_child(Jido.agent_supervisor_name(jido), pid) do
       :ok -> :ok
       {:error, :not_found} -> Server.stop(pid, reason, timeout)

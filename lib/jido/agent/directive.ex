@@ -271,7 +271,13 @@ defmodule Jido.Agent.Directive do
   @spec adopt_child(pid() | String.t(), term(), map()) :: AdoptChild.t()
   def adopt_child(child, tag, meta \\ %{}), do: %AdoptChild{child: child, tag: tag, meta: meta}
 
-  @doc "Creates a StopChild Directive."
+  @doc """
+  Creates a StopChild Directive.
+
+  A supervised child exits with `:shutdown` when its DynamicSupervisor removes
+  it. The reason applies only if the child is no longer in that supervisor or
+  is a standalone tracked process.
+  """
   @spec stop_child(term(), term()) :: StopChild.t()
   def stop_child(tag, reason \\ :normal), do: %StopChild{tag: tag, reason: reason}
 
