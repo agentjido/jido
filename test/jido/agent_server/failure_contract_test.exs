@@ -36,24 +36,6 @@ defmodule Jido.AgentServer.FailureContractTest do
     end
   end
 
-  defmodule ObservedExec do
-    def run_async(executable, input, context, opts) do
-      {observer, opts} = Keyword.pop!(opts, :observer)
-      handle = Jido.Exec.run_async(executable, input, context, opts)
-      send(observer, {:exec_owner, self(), handle.pid})
-      handle
-    end
-
-    defdelegate handle_message(handle, message), to: Jido.Exec
-    defdelegate cancel(handle), to: Jido.Exec
-  end
-
-  defmodule FailedCancelExec do
-    defdelegate run_async(executable, input, context, opts), to: ObservedExec
-    defdelegate handle_message(handle, message), to: Jido.Exec
-    def cancel(_handle), do: {:error, :cancel_refused}
-  end
-
   defmodule HeldReadyPlugin do
     use Jido.Plugin, agent_server: __MODULE__.Server
   end
@@ -338,79 +320,6 @@ defmodule Jido.AgentServer.FailureContractTest do
                    1_000
 
     assert {:error, :not_running} = Server.await_ready(server)
-  end
-
-  test "an Exec owner exit fails the Turn without changing committed state", %{jido: jido} do
-    {:ok, server} =
-      Jido.start_agent(jido, Agent, exec_module: ObservedExec, exec_opts: [observer: self()])
-
-    before = Server.snapshot(server)
-    {request, worker, _gate} = block_turn(server)
-    assert_receive {:exec_owner, owner, root}, 1_000
-    worker_ref = Process.monitor(worker)
-    root_ref = Process.monitor(root)
-    Process.exit(owner, :kill)
-
-    assert {:reply,
-            {:error,
-             %ExecutionError{
-               message: "Agent Exec adapter owner exited",
-               details: %{
-                 code: :agent_exec_callback_task_failed,
-                 module: ObservedExec,
-                 reason: :killed
-               }
-             }}} = Server.receive_response(request)
-
-    assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 1_000
-    assert_receive {:DOWN, ^root_ref, :process, ^root, _reason}, 1_000
-    assert Server.snapshot(server) == before
-    assert %{phase: :idle, active: nil} = Server.status(server)
-  end
-
-  for entry <- [:call, :cast] do
-    test "failed timeout cancellation stops a #{entry} Turn and its owned work", %{jido: jido} do
-      {:ok, server} =
-        Jido.start_agent(jido, Agent,
-          exec_module: FailedCancelExec,
-          exec_opts: [observer: self()],
-          turn_timeout: 60_000,
-          restart: :temporary
-        )
-
-      gate = make_ref()
-      input = signal("counter.block", %{test_pid: self(), gate: gate, by: 1, label: "timeout"})
-      monitor = Process.monitor(server)
-
-      request =
-        case unquote(entry) do
-          :call -> Server.send_request(server, input)
-          :cast -> Server.cast(server, input)
-        end
-
-      assert_receive {:exec_owner, owner, root}, 1_000
-      assert_receive {:agent_action_blocked, ^gate, worker}, 1_000
-      owner_ref = Process.monitor(owner)
-      root_ref = Process.monitor(root)
-      worker_ref = Process.monitor(worker)
-
-      assert {:running, %{active: active}} = :sys.get_state(server)
-      assert is_integer(Process.cancel_timer(active.timeout_timer))
-      send(server, {:timeout, active.timeout_timer, {:turn_timeout, active.turn_id}})
-
-      if unquote(entry) == :call do
-        assert {:reply, {:error, {:turn_timeout_cancellation_failed, :cancel_refused}}} =
-                 Server.receive_response(request)
-      end
-
-      assert_receive {:DOWN, ^monitor, :process, ^server,
-                      {:shutdown, {:turn_timeout_cancellation_failed, :cancel_refused}}},
-                     1_000
-
-      assert_receive {:DOWN, ^owner_ref, :process, ^owner, _reason}, 1_000
-      assert_receive {:DOWN, ^root_ref, :process, ^root, _reason}, 1_000
-      assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 1_000
-    end
   end
 
   for mode <- [:error, :kill] do

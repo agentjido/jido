@@ -247,7 +247,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
       :stop ->
         case next_data.active do
           %ActiveTurn{exec_handle: handle} = active when not is_nil(handle) ->
-            Cancellation.start_cancel_task({:parent, reason}, nil, active, next_data)
+            Cancellation.cancel_execution({:parent, reason}, nil, active, next_data)
 
           _inactive ->
             {:stop, {:shutdown, {:parent_down, reason}}, next_data}

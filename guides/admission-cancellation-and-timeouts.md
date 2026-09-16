@@ -37,13 +37,10 @@ Cancellation can stop admission or executable work before commit. It does not:
 - reverse a Directive that already reached an external system; or
 - make an uncertain external result safe to retry.
 
-Custom Exec cancellation runs in an owned task. While it waits, status reports
-`:cancelling`, and stop can end the Server. A second cancellation request
-returns `{:error, :cancelling}`. Built-in `Jido.Exec` cancellation stays on
-its required owner process and has at most two 500 millisecond stop waits.
+`Jido.Exec` cancellation stays on its required owner process. It has at most
+two 500 millisecond stop waits.
 A successful cancellation ends the Turn. A failed or timed-out cancellation
-is indeterminate and stops the Server. Exec completion that arrives during
-custom cancellation cannot replace its first result.
+is indeterminate and stops the Server.
 
 ## Distinguish Timeouts
 
@@ -52,7 +49,7 @@ custom cancellation cannot replace its first result.
 | `AgentServer.call/3` timeout | Caller wait and admission deadline |
 | `turn_timeout` | Active Plugin admission and candidate evaluation before commit |
 | Jido Action execution timeout | One executable chain |
-| `directive_timeout` | One commit notification, Directive dispatch, custom error policy, or custom Exec cancellation task |
+| `directive_timeout` | One commit notification, Directive dispatch, or custom error policy |
 | `idle_timeout` | Idle actor lifetime |
 | topology startup timeout | One activation and readiness pass |
 | persistence adapter timeout | Application adapter behavior |

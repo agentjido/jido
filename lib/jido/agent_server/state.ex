@@ -15,7 +15,6 @@ defmodule Jido.AgentServer.State do
               registered?:
                 Zoi.boolean(description: "Whether the Agent is Registry named")
                 |> Zoi.default(false),
-              exec_module: Zoi.atom(description: "Executable runtime module"),
               exec_opts: Zoi.any(description: "Executable runtime options"),
               max_postponed_signals: Zoi.any(description: "Postponed Signal admission limit"),
               postponed_tokens: Zoi.any(description: "Bounded postponed Signal token set"),
@@ -80,8 +79,6 @@ defmodule Jido.AgentServer.State do
                 Zoi.any(description: "Active Plugin commit notification task") |> Zoi.optional(),
               directive_task:
                 Zoi.any(description: "Active Plugin Directive task") |> Zoi.optional(),
-              cancel_task:
-                Zoi.any(description: "Active Exec cancellation task") |> Zoi.optional(),
               error_policy_tasks:
                 Zoi.map(description: "Bounded asynchronous error Signal deliveries")
                 |> Zoi.default(%{})

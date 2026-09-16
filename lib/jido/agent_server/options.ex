@@ -30,8 +30,6 @@ defmodule Jido.AgentServer.Options do
               registry: Zoi.any(description: "Optional Registry") |> Zoi.optional(),
               register:
                 Zoi.boolean(description: "Register this Agent by id") |> Zoi.default(false),
-              exec_module:
-                Zoi.atom(description: "Executable runtime module") |> Zoi.default(Jido.Exec),
               exec_opts: Zoi.any(description: "Executable runtime options") |> Zoi.default([]),
               max_postponed_signals:
                 Zoi.any(description: "Postponed Signal admission limit")
@@ -95,6 +93,12 @@ defmodule Jido.AgentServer.Options do
              attrs,
              :directive_handler,
              "does not support custom Directive handlers; use an Agent Plugin"
+           ),
+         :ok <-
+           reject_option(
+             attrs,
+             :exec_module,
+             "does not support custom Exec modules; use Jido.Exec"
            ),
          {:ok, agent} <- build_agent(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
@@ -414,31 +418,6 @@ defmodule Jido.AgentServer.Options do
   defp invalid(message, details \\ %{}) do
     {:error,
      Jido.Error.validation_error("Agent Server #{message}", kind: :config, details: details)}
-  end
-
-  def validate_exec_module(module) when is_atom(module) do
-    required = [run_async: 4, handle_message: 2, cancel: 1]
-
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <-
-           Enum.all?(required, fn {name, arity} -> function_exported?(module, name, arity) end) do
-      {:ok, module}
-    else
-      _reason ->
-        {:error,
-         Error.validation_error("Agent Server Exec module has an invalid contract",
-           kind: :config,
-           details: %{module: module}
-         )}
-    end
-  end
-
-  def validate_exec_module(module) do
-    {:error,
-     Error.validation_error("Agent Server Exec module must be a module",
-       kind: :config,
-       details: %{module: module}
-     )}
   end
 
   def validate_keyword(value, _field) when is_list(value) and value == [], do: {:ok, value}

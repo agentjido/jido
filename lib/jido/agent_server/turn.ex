@@ -12,7 +12,6 @@ defmodule Jido.AgentServer.Turn do
   alias Jido.AgentServer.Plugin.Callbacks
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.DirectiveRuntime
-  alias Jido.AgentServer.ExecutionAdapter
   alias Jido.AgentServer.Inspection
   alias Jido.AgentServer.PluginLifecycle
   alias Jido.AgentServer.State
@@ -43,105 +42,6 @@ defmodule Jido.AgentServer.Turn do
       )
 
     TurnCompletion.fail_turn(error, :prepare, data)
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_started, ref, exec_pid},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.started(adapter, exec_pid)
-    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_start_failed, ref, error},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
-      ) do
-    ExecutionAdapter.cancel_timer(adapter)
-    TurnCompletion.fail_turn(error, :execute, data)
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_callback_started, ref, token, callback},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.callback_started(adapter, token, callback)
-    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_callback_result, ref, token, result},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.callback_finished(adapter, token)
-    data = %{data | active: %{active | exec_handle: adapter}}
-
-    case result do
-      {:done, value} ->
-        ExecutionAdapter.acknowledge(adapter, token)
-        finish_turn(value, data)
-
-      :ignore ->
-        {:keep_state, data}
-
-      {:error, error} ->
-        ExecutionAdapter.acknowledge(adapter, token)
-        TurnCompletion.fail_turn(error, :execute, data)
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:exec_adapter_timeout, ref, token, callback}},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
-      ) do
-    if ExecutionAdapter.timeout?(adapter, timer, token) do
-      ExecutionAdapter.stop(adapter)
-
-      error =
-        Error.timeout_error("Agent Exec callback timed out",
-          timeout: adapter.timeout,
-          details: %{
-            code: :agent_exec_callback_timeout,
-            module: adapter.module,
-            callback: callback
-          }
-        )
-
-      TurnCompletion.fail_turn(error, :execute, data)
-    else
-      :keep_state_and_data
-    end
-  end
-
-  def handle_event(:info, message, :running, %State{active: %ActiveTurn{}} = data),
-    do: handle_exec_message(message, data)
-
-  def adapter_down(reason, %State{active: %ActiveTurn{exec_handle: adapter}} = data) do
-    ExecutionAdapter.cancel_timer(adapter)
-
-    error =
-      Error.execution_error("Agent Exec adapter owner exited",
-        details: %{
-          code: :agent_exec_callback_task_failed,
-          module: adapter.module,
-          reason: reason
-        }
-      )
-
-    TurnCompletion.fail_turn(error, :execute, data)
   end
 
   def start_turn(%Signal{} = signal, from, context, %State{} = data) do
@@ -289,20 +189,18 @@ defmodule Jido.AgentServer.Turn do
              exec_opts,
              data.plugin_specs
            ),
-         {:ok, handle} <- start_async_exec(prepared, data),
+         {:ok, handle} <- start_async_exec(prepared),
          :ok <- link_exec(handle) do
       {:ok, handle, prepared}
     end
   end
-
-  defp link_exec(%ExecutionAdapter{}), do: :ok
 
   defp link_exec(%{pid: pid}) when is_pid(pid) do
     Process.link(pid)
     :ok
   end
 
-  defp start_async_exec(prepared, %State{exec_module: Jido.Exec}) do
+  defp start_async_exec(prepared) do
     {:ok,
      Jido.Exec.run_async(
        prepared.turn.executable,
@@ -314,21 +212,6 @@ defmodule Jido.AgentServer.Turn do
     error -> {:error, error}
   catch
     kind, reason -> {:error, {kind, reason}}
-  end
-
-  defp start_async_exec(prepared, %State{} = data) do
-    ExecutionAdapter.start(
-      self(),
-      Jido.task_supervisor_name(data.jido),
-      data.exec_module,
-      [
-        prepared.turn.executable,
-        prepared.turn.input,
-        prepared.context,
-        prepared.exec_opts
-      ],
-      data.directive_timeout
-    )
   end
 
   defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
@@ -454,13 +337,8 @@ defmodule Jido.AgentServer.Turn do
     handle_exec_message(active.exec_handle, message, data)
   end
 
-  def handle_exec_message(%ExecutionAdapter{} = adapter, message, _data) do
-    ExecutionAdapter.forward(adapter, message)
-    :keep_state_and_data
-  end
-
   def handle_exec_message(handle, message, %State{} = data) do
-    case data.exec_module.handle_message(handle, message) do
+    case Jido.Exec.handle_message(handle, message) do
       {:done, result} -> finish_turn(result, data)
       :ignore -> :keep_state_and_data
       {:error, error} -> TurnCompletion.fail_turn(error, :execute, data)

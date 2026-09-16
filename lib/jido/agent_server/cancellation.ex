@@ -5,8 +5,6 @@ defmodule Jido.AgentServer.Cancellation do
   alias Jido.AgentServer.TaskSupport
   alias Jido.AgentServer.TurnCompletion
   alias Jido.AgentServer.ActiveTurn
-  alias Jido.AgentServer.ExecutionAdapter
-  alias Jido.AgentServer.FailurePolicy
   alias Jido.AgentServer.State
   alias Jido.Error
   alias Jido.Tracing.Context, as: TraceContext
@@ -17,7 +15,7 @@ defmodule Jido.AgentServer.Cancellation do
   end
 
   def handle_event({:call, from}, :cancel, phase, %State{})
-      when phase in [:initializing, :idle, :cancelling, :directing] do
+      when phase in [:initializing, :idle, :directing] do
     {:keep_state_and_data, [{:reply, from, {:error, phase}}]}
   end
 
@@ -31,70 +29,27 @@ defmodule Jido.AgentServer.Cancellation do
     if phase == :admitting, do: cancel_admission(from, data), else: cancel_active(from, data)
   end
 
-  def handle_event({:call, from}, {:cancel, turn_id}, :cancelling, %State{active: active}) do
-    reason = if active.turn_id == turn_id, do: :cancelling, else: :stale_turn
-    {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-  end
-
   def handle_event({:call, from}, {:cancel, _turn_id}, phase, %State{})
       when phase in [:initializing, :idle, :admitting, :running, :directing] do
     {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
   end
 
-  def task_result(result, %State{cancel_task: pending} = data) do
-    TaskSupport.release_task_result(pending)
-    settle_cancel_result(result, %{data | cancel_task: nil}, pending)
-  end
-
-  def task_down(reason, %State{cancel_task: pending} = data) do
-    TaskSupport.cancel_task_timer(pending.timer)
-    error = cancellation_task_error(reason)
-    settle_cancel_result({:error, error}, %{data | cancel_task: nil}, pending)
-  end
-
-  def task_timeout(%State{cancel_task: pending} = data) do
-    TaskSupport.shutdown_task(pending.task)
-
-    error =
-      Error.timeout_error("Agent Exec cancellation task timed out",
-        timeout: pending.timeout,
-        details: %{code: :agent_exec_cancel_task_timeout}
-      )
-
-    settle_cancel_result({:error, error}, %{data | cancel_task: nil}, pending)
-  end
-
   defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    start_cancel_task(:user, cancel_from, active, data)
+    cancel_execution(:user, cancel_from, active, data)
   end
 
-  def start_cancel_task(mode, cancel_from, %ActiveTurn{} = active, %State{} = data) do
-    if data.exec_module == Jido.Exec do
-      result = cancel_exec(active.exec_handle, data)
-      settle_cancel_result(result, data, %{mode: mode, from: cancel_from})
-    else
-      timeout = cancel_task_timeout(active.exec_handle, data)
-
-      pending =
-        TaskSupport.start_traced(
-          data.jido,
-          fn -> cancel_exec(active.exec_handle, data) end,
-          timeout,
-          :exec_cancel_timeout
-        )
-        |> Map.merge(%{timeout: timeout, from: cancel_from, mode: mode})
-
-      {:next_state, :cancelling, %{data | cancel_task: pending}}
-    end
+  def cancel_execution(mode, cancel_from, %ActiveTurn{} = active, %State{} = data) do
+    result = Jido.Exec.cancel(active.exec_handle)
+    settle_cancel_result(result, data, %{mode: mode, from: cancel_from})
   rescue
     error ->
-      settle_cancel_result({:error, cancellation_task_error(error)}, data, %{
+      settle_cancel_result({:error, cancellation_error(error)}, data, %{
         mode: mode,
         from: cancel_from
       })
   catch
     kind, reason ->
-      settle_cancel_result({:error, cancellation_task_error({kind, reason})}, data, %{
+      settle_cancel_result({:error, cancellation_error({kind, reason})}, data, %{
         mode: mode,
         from: cancel_from
       })
@@ -109,7 +64,7 @@ defmodule Jido.AgentServer.Cancellation do
   defp settle_cancel_result(
          result,
          %State{active: %ActiveTurn{} = active} = data,
-         %{mode: :user, from: cancel_from} = pending
+         %{mode: :user, from: cancel_from}
        ) do
     case result do
       :ok ->
@@ -136,18 +91,10 @@ defmodule Jido.AgentServer.Cancellation do
             [{:reply, cancel_from, {:error, error}}]
 
         {:stop_and_reply, {:shutdown, {:exec_cancellation_failed, error}}, actions, next_data}
-
-      other ->
-        settle_cancel_result(
-          {:error, cancellation_task_error({:invalid_result, other})},
-          data,
-          pending
-        )
     end
   end
 
   defp settle_timeout_cancel(:ok, %State{active: %ActiveTurn{} = active} = data) do
-    stop_exec_adapter(active.exec_handle)
     TurnCompletion.fail_turn(turn_timeout_error(active), :execute, data)
   end
 
@@ -164,9 +111,6 @@ defmodule Jido.AgentServer.Cancellation do
       {:stop_and_reply, {:shutdown, error}, replies, next_data}
     end
   end
-
-  defp settle_timeout_cancel(other, data),
-    do: settle_timeout_cancel({:error, cancellation_task_error({:invalid_result, other})}, data)
 
   defp settle_parent_cancel(:ok, %State{active: %ActiveTurn{} = active} = data, parent_reason) do
     error = {:parent_down, :cancelled}
@@ -197,21 +141,9 @@ defmodule Jido.AgentServer.Cancellation do
       else: {:stop_and_reply, {:shutdown, error}, replies, next_data}
   end
 
-  defp settle_parent_cancel(other, data, parent_reason),
-    do:
-      settle_parent_cancel(
-        {:error, cancellation_task_error({:invalid_result, other})},
-        data,
-        parent_reason
-      )
-
-  defp cancel_task_timeout(%ExecutionAdapter{timeout: timeout}, _data), do: timeout + 100
-
-  defp cancel_task_timeout(_handle, data), do: FailurePolicy.dispatch_timeout(data)
-
-  defp cancellation_task_error(reason) do
-    Error.execution_error("Agent Exec cancellation task failed",
-      details: %{code: :agent_exec_cancel_task_failed, reason: reason}
+  defp cancellation_error(reason) do
+    Error.execution_error("Agent Exec cancellation failed",
+      details: %{code: :agent_exec_cancel_failed, reason: reason}
     )
   end
 
@@ -222,7 +154,7 @@ defmodule Jido.AgentServer.Cancellation do
   end
 
   def timeout_execution(%State{active: %ActiveTurn{} = active} = data),
-    do: start_cancel_task(:timeout, nil, active, data)
+    do: cancel_execution(:timeout, nil, active, data)
 
   defp turn_timeout_error(%ActiveTurn{} = active) do
     Error.timeout_error("Agent Turn timed out",
@@ -249,10 +181,4 @@ defmodule Jido.AgentServer.Cancellation do
 
     {:next_state, :idle, next_data, actions}
   end
-
-  def cancel_exec(%ExecutionAdapter{} = adapter, _data), do: ExecutionAdapter.cancel(adapter)
-  def cancel_exec(handle, %State{} = data), do: data.exec_module.cancel(handle)
-
-  def stop_exec_adapter(%ExecutionAdapter{} = adapter), do: ExecutionAdapter.stop(adapter)
-  def stop_exec_adapter(_handle), do: :ok
 end

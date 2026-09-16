@@ -36,21 +36,6 @@ defmodule JidoTest.AgentServerRuntimeFixtures do
       ]
   end
 
-  defmodule ObservedExec do
-    def run_async(executable, input, context, opts) do
-      test = Map.get(input, :test) || get_in(input, [:signal, Access.key(:data), :test])
-      Process.put(__MODULE__, test)
-      Jido.Exec.run_async(executable, input, context, opts)
-    end
-
-    def handle_message(handle, message) do
-      send(Process.get(__MODULE__), {:exec_message, message})
-      Jido.Exec.handle_message(handle, message)
-    end
-
-    defdelegate cancel(handle), to: Jido.Exec
-  end
-
   defmodule CountedDirective do
     defstruct [:test]
 

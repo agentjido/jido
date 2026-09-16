@@ -1,14 +1,12 @@
 defmodule Jido.AgentServer.ServerLifecycle do
   @moduledoc false
 
-  alias Jido.AgentServer.Cancellation
   alias Jido.AgentServer.Idle
   alias Jido.AgentServer.PostCommit
   alias Jido.AgentServer.TaskSupport
   alias Jido.Agent
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.ChildLifecycle
-  alias Jido.AgentServer.ExecutionAdapter
   alias Jido.AgentServer.Options
   alias Jido.AgentServer.PluginLifecycle
   alias Jido.AgentServer.RegistrationGuard
@@ -28,7 +26,6 @@ defmodule Jido.AgentServer.ServerLifecycle do
            Storage.restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
          {:ok, plugin_specs} <- Jido.Plugin.Normalizer.normalize_all(agent.plugins),
-         {:ok, exec_module} <- Options.validate_exec_module(opts.exec_module),
          {:ok, exec_opts} <- Options.validate_keyword(opts.exec_opts, :exec_opts),
          {:ok, max_postponed_signals} <-
            Options.validate_limit(opts.max_postponed_signals, :max_postponed_signals),
@@ -44,7 +41,6 @@ defmodule Jido.AgentServer.ServerLifecycle do
         partition: opts.partition,
         registry: opts.registry,
         registered?: opts.register,
-        exec_module: exec_module,
         exec_opts: exec_opts,
         max_postponed_signals: max_postponed_signals,
         postponed_tokens: MapSet.new(),
@@ -189,12 +185,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
   end
 
   defp terminate_agent(reason, data) do
-    if data.cancel_task do
-      TaskSupport.stop_task(data.cancel_task)
-      if data.active, do: Cancellation.stop_exec_adapter(data.active.exec_handle)
-    else
-      terminate_active_exec(data)
-    end
+    terminate_active_exec(data)
 
     stop_plugin_readiness(data.plugin_bootstrap)
     TaskSupport.stop_task(data.admission_task)
@@ -222,10 +213,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
   defp terminate_active_exec(data) do
     if match?(%ActiveTurn{exec_handle: handle} when not is_nil(handle), data.active) do
       try do
-        case data.active.exec_handle do
-          %ExecutionAdapter{} = adapter -> Cancellation.stop_exec_adapter(adapter)
-          handle -> _result = Cancellation.cancel_exec(handle, data)
-        end
+        _result = Jido.Exec.cancel(data.active.exec_handle)
       catch
         _kind, _reason -> :ok
       end

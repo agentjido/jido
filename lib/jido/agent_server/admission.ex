@@ -5,7 +5,6 @@ defmodule Jido.AgentServer.Admission do
   require Logger
   alias Jido.AgentServer.ActiveTurn
   alias Jido.AgentServer.AdmissionDeadline
-  alias Jido.AgentServer.ExecutionAdapter
   alias Jido.AgentServer.State
   alias Jido.Signal
   alias Jido.Telemetry.Agent, as: AgentTelemetry
@@ -16,7 +15,7 @@ defmodule Jido.AgentServer.Admission do
         phase,
         %State{} = data
       )
-      when phase in [:initializing, :cancelling] do
+      when phase == :initializing do
     postpone_call(from, token, signal, deadline, data)
   end
 
@@ -80,7 +79,7 @@ defmodule Jido.AgentServer.Admission do
   end
 
   def handle_event(:cast, {:signal, token, %Signal{} = signal}, phase, %State{} = data)
-      when phase in [:initializing, :admitting, :running, :cancelling, :directing] do
+      when phase in [:initializing, :admitting, :running, :directing] do
     postpone_cast(token, signal, data)
   end
 
@@ -142,14 +141,6 @@ defmodule Jido.AgentServer.Admission do
   defp overload_error(%State{} = data) do
     {:overloaded,
      %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
-  end
-
-  defp reentrant_turn_call?(
-         {caller, _tag},
-         %ActiveTurn{exec_handle: %ExecutionAdapter{exec_pid: root}}
-       )
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
   end
 
   defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})

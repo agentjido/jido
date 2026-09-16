@@ -44,12 +44,6 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     def new(_opts), do: ChildAgent.new(id: "factory-ignored-request")
   end
 
-  defmodule ParentCancellationExec do
-    defdelegate run_async(executable, input, context, opts), to: Jido.Exec
-    defdelegate handle_message(handle, message), to: Jido.Exec
-    def cancel(_handle), do: {:error, :parent_cancel_failed}
-  end
-
   defp eventually_agent(server, predicate, timeout \\ 3_000) do
     eventually(
       fn ->
@@ -485,7 +479,7 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     assert Server.status(child).runtime.parent == nil
   end
 
-  test "parent death preserves an indeterminate custom cancellation reason", %{jido: jido} do
+  test "parent death cancels active Jido.Exec work", %{jido: jido} do
     {:ok, parent} =
       Jido.start_agent(jido, RuntimeAgent,
         id: unique_id("cancel-parent"),
@@ -500,7 +494,6 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
         id: unique_id("cancel-child"),
         parent: parent_ref,
         on_parent_death: :stop,
-        exec_module: ParentCancellationExec,
         restart: :temporary
       )
 
@@ -520,9 +513,9 @@ defmodule Jido.AgentServer.ChildLifecycleTest do
     child_ref = Process.monitor(child)
     assert :ok = Jido.stop_agent(jido, parent)
 
-    error = {:parent_down, {:cancellation_failed, :parent_cancel_failed}}
+    error = {:parent_down, :cancelled}
     assert {:error, ^error} = Task.await(caller, 2_000)
-    assert_receive {:DOWN, ^child_ref, :process, ^child, {:shutdown, ^error}}, 2_000
+    assert_receive {:DOWN, ^child_ref, :process, ^child, {:shutdown, {:parent_down, _}}}, 2_000
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
   end
 

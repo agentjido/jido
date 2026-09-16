@@ -22,41 +22,6 @@ defmodule Jido.AgentServer.PublicAPITest do
 
   @receive_timeout 2_000
 
-  defmodule SpyExec do
-    def run_async(executable, input, context, opts) do
-      test_pid =
-        Map.get(input, :test_pid) || get_in(input, [:signal, Access.key(:data), :test_pid])
-
-      if test_pid do
-        send(test_pid, {:agent_exec_target, executable})
-      end
-
-      Jido.Exec.run_async(executable, input, context, opts)
-    end
-
-    defdelegate handle_message(handle, message), to: Jido.Exec
-    defdelegate cancel(handle), to: Jido.Exec
-  end
-
-  defmodule InvalidOutputExec do
-    def run_async(_executable, _input, _context, _opts),
-      do: Task.async(fn -> {:ok, :not_a_map} end)
-
-    def handle_message(%Task{ref: ref}, {ref, result}), do: {:done, result}
-    def handle_message(_task, _message), do: :ignore
-
-    def cancel(task) do
-      _result = Task.shutdown(task, :brutal_kill)
-      :ok
-    end
-  end
-
-  defmodule CancellationFailExec do
-    defdelegate run_async(executable, input, context, opts), to: Jido.Exec
-    defdelegate handle_message(handle, message), to: Jido.Exec
-    def cancel(_handle), do: {:error, :cancel_failed}
-  end
-
   defmodule FaultAgent do
     use Jido.Agent, name: "fault_agent"
 
@@ -134,19 +99,6 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert_receive {:agent_execution_boundary, ^input, context}, @receive_timeout
     assert context.agent_state == %{count: 0, history: []}
     assert context.agent_id == Server.agent(server).id
-  end
-
-  test "starts the selected executable at the one live Exec boundary" do
-    server =
-      start_supervised!(
-        {Server,
-         agent: agent([{"counter.observe", ObserveExecutionBoundary}]), exec_module: SpyExec}
-      )
-
-    assert {:ok, _agent} =
-             Server.call(server, signal("counter.observe", %{test_pid: self()}))
-
-    assert_receive {:agent_exec_target, ObserveExecutionBoundary}, @receive_timeout
   end
 
   test "caller context reaches one Turn without changing its Signal or Agent" do
@@ -404,33 +356,6 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert Process.alive?(server)
   end
 
-  test "contains invalid custom Exec output at the finalization boundary" do
-    test = self()
-
-    policy = fn reason, outcome ->
-      send(test, {:invalid_exec_output, reason, outcome})
-      :continue
-    end
-
-    server =
-      start_supervised!(
-        {Server,
-         agent: agent([{"counter.add", Add}]),
-         exec_module: InvalidOutputExec,
-         error_policy: policy}
-      )
-
-    assert {:error, %Jido.Error.ExecutionError{message: message}} =
-             Server.call(server, signal("counter.add", %{by: 1, label: "invalid"}))
-
-    assert message == "Agent executable output must be a plain state map"
-
-    assert_receive {:invalid_exec_output, _reason, %Outcome{stage: :finalize, committed?: false}}
-
-    assert Process.alive?(server)
-    assert Server.status(server).state_version == 0
-  end
-
   test "applies the error policy when Signal preparation fails" do
     test_pid = self()
 
@@ -578,42 +503,6 @@ defmodule Jido.AgentServer.PublicAPITest do
     assert outcome.id == turn_id
     assert outcome.status == :succeeded
     assert outcome.committed?
-  end
-
-  test "stops after an indeterminate custom Exec cancellation" do
-    server =
-      start_supervised!(
-        {Server,
-         agent: agent([{"counter.block", BlockingAdd}]),
-         exec_module: CancellationFailExec,
-         restart: :temporary}
-      )
-
-    gate = make_ref()
-    test = self()
-
-    caller =
-      Task.async(fn ->
-        Server.call(
-          server,
-          signal("counter.block", %{
-            by: 1,
-            label: "indeterminate",
-            test_pid: test,
-            gate: gate
-          })
-        )
-      end)
-
-    assert_receive {:agent_action_blocked, ^gate, _worker}, @receive_timeout
-    monitor = Process.monitor(server)
-
-    assert {:error, :cancel_failed} = Server.cancel(server)
-    assert {:error, :cancel_failed} = Task.await(caller)
-
-    assert_receive {:DOWN, ^monitor, :process, ^server,
-                    {:shutdown, {:exec_cancellation_failed, :cancel_failed}}},
-                   @receive_timeout
   end
 
   test "rejects a custom process name that would disable id registration" do

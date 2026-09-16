@@ -14,7 +14,6 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     FreshRuntimeAgent,
     FreshRuntimePlugin,
     GenerationAgent,
-    ObservedExec,
     OwnedExecutionAgent,
     ReadinessAgent
   }
@@ -96,10 +95,10 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     end
   end
 
-  test "Exec receives general messages and unowned DOWN events after attachment handling", %{
+  test "unowned messages do not interrupt Jido.Exec after attachment handling", %{
     jido: jido
   } do
-    {:ok, server} = Jido.start_agent(jido, OwnedExecutionAgent, exec_module: ObservedExec)
+    {:ok, server} = Jido.start_agent(jido, OwnedExecutionAgent)
     owner = start_supervised!({Elixir.Agent, fn -> nil end})
     assert :ok = Server.attach(server, owner)
     gate = make_ref()
@@ -115,15 +114,14 @@ defmodule Jido.AgentServer.RuntimeLifecycleTest do
     owner_ref = Map.fetch!(state.attachments, owner)
     Elixir.Agent.stop(owner)
     eventually(fn -> Server.status(server).runtime.lifecycle.attached == 0 end)
-    refute_received {:exec_message, {:DOWN, ^owner_ref, :process, ^owner, _}}
+    refute_received {:DOWN, ^owner_ref, :process, ^owner, _}
 
     unknown = make_ref()
     down = {:DOWN, unknown, :process, owner, :normal}
     send(server, down)
     send(server, {:exec_probe, gate})
     assert Server.status(server).phase == :running
-    assert_receive {:exec_message, ^down}
-    assert_receive {:exec_message, {:exec_probe, ^gate}}
+    assert Process.alive?(server)
     send(worker, {:release, gate})
     assert {:ok, _} = Task.await(caller)
     eventually(fn -> Server.status(server).phase == :idle end)

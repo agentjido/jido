@@ -75,7 +75,6 @@ defmodule Jido.AgentServer do
     ActiveTurn,
     AdmissionDeadline,
     ChildLifecycle,
-    ExecutionAdapter,
     FailurePolicy,
     TaskSupport,
     Inspection,
@@ -602,7 +601,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, _from}, event, phase, %State{})
-      when phase in [:initializing, :admitting, :running, :cancelling, :directing] and
+      when phase in [:initializing, :admitting, :running, :directing] and
              is_tuple(event) and
              ((tuple_size(event) == 2 and elem(event, 0) == :upgrade_operation) or
                 (tuple_size(event) == 3 and elem(event, 0) == :upgrade_definition)) do
@@ -620,7 +619,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, _from}, {:hibernate, _opts}, phase, %State{})
-      when phase in [:initializing, :admitting, :running, :cancelling, :directing] do
+      when phase in [:initializing, :admitting, :running, :directing] do
     {:keep_state_and_data, [:postpone]}
   end
 
@@ -737,7 +736,6 @@ defmodule Jido.AgentServer do
       :commit -> PostCommit.commit_result(result, data)
       :directive -> PostCommit.directive_result(result, data)
       :error_policy -> FailurePolicy.task_result(ref, result, data)
-      :cancel -> Cancellation.task_result(result, data)
       nil -> fallback_info(message, phase, data)
     end
   end
@@ -756,31 +754,12 @@ defmodule Jido.AgentServer do
           :commit -> PostCommit.commit_down(reason, data)
           :directive -> PostCommit.directive_down(reason, data)
           :error_policy -> FailurePolicy.task_down(ref, reason, data)
-          :cancel -> Cancellation.task_down(reason, data)
         end
-
-      phase == :running and
-          match?(
-            %ActiveTurn{exec_handle: %ExecutionAdapter{pid: ^pid, monitor_ref: ^ref}},
-            data.active
-          ) ->
-        Turn.adapter_down(reason, data)
-
-      phase == :cancelling ->
-        {:keep_state_and_data, [:postpone]}
 
       true ->
         handle_process_down(ref, pid, reason, phase, data)
     end
   end
-
-  defp route_info({tag, _, _} = message, :running, data)
-       when tag in [:jido_exec_adapter_started, :jido_exec_adapter_start_failed],
-       do: Turn.handle_event(:info, message, :running, data)
-
-  defp route_info({tag, _, _, _} = message, :running, data)
-       when tag in [:jido_exec_adapter_callback_started, :jido_exec_adapter_callback_result],
-       do: Turn.handle_event(:info, message, :running, data)
 
   defp route_info(message, phase, data), do: fallback_info(message, phase, data)
 
@@ -816,24 +795,11 @@ defmodule Jido.AgentServer do
        else: fallback_info(message, phase, data)
   end
 
-  defp route_timeout(_message, timer, {:exec_cancel_timeout, ref}, :cancelling, data) do
-    if task_owner(data, :cancelling, ref) == :cancel and
-         TaskSupport.task_timer?(data.cancel_task, ref, timer),
-       do: Cancellation.task_timeout(data),
-       else: {:keep_state_and_data, [:postpone]}
-  end
-
-  defp route_timeout(message, _timer, {:exec_adapter_timeout, _, _, _}, :running, data),
-    do: Turn.handle_event(:info, message, :running, data)
-
-  defp route_timeout(message, _timer, :agent_idle_timeout, phase, data) when phase != :cancelling,
+  defp route_timeout(message, _timer, :agent_idle_timeout, phase, data),
     do: Idle.handle_event(:info, message, phase, data)
 
   defp route_timeout(message, _timer, _payload, phase, data),
     do: fallback_info(message, phase, data)
-
-  defp fallback_info(_message, :cancelling, %State{}),
-    do: {:keep_state_and_data, [:postpone]}
 
   defp fallback_info(message, :running, %State{active: %ActiveTurn{}} = data),
     do: Turn.handle_exec_message(message, data)
@@ -846,7 +812,6 @@ defmodule Jido.AgentServer do
       phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) -> :commit
       phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) -> :directive
       Map.has_key?(data.error_policy_tasks, ref) -> :error_policy
-      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) -> :cancel
       true -> nil
     end
   end

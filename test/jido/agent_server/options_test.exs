@@ -88,6 +88,7 @@ defmodule Jido.AgentServer.OptionsTest do
           {[name: {:invalid, :name}], "name is invalid"},
           {[register: true, registry: nil], "requires an Agent Registry"},
           {[register: true, registry: Registry, name: :agent], "cannot be used together"},
+          {[exec_module: Jido.Exec], "does not support custom Exec modules"},
           {[directive_handler: fn _ -> :ok end], "does not support custom Directive handlers"},
           {[cron_specs: []], "does not support cron_specs"}
         ] do
