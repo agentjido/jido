@@ -29,6 +29,25 @@ defmodule Jido.InstanceHelpersTest do
     assert :ok = Jido.stop(name)
   end
 
+  test "a later start keeps the first namespace and persistence options", %{jido: jido} do
+    name = Module.concat(jido, FirstOptions)
+    first_namespace = "jido/test/first-options/#{unique_id()}"
+    later_namespace = "jido/test/later-options/#{unique_id()}"
+    first_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, FirstStore)}
+    later_persistence = {Jido.Persistence.ETS, table: Module.concat(jido, LaterStore)}
+    on_exit(fn -> Jido.stop(name) end)
+
+    assert {:ok, pid} =
+             Jido.start(name: name, namespace: first_namespace, persistence: first_persistence)
+
+    assert {:ok, ^pid} =
+             Jido.start(name: name, namespace: later_namespace, persistence: later_persistence)
+
+    assert Jido.namespace(name) == first_namespace
+    assert Jido.instance_persistence(name) == first_persistence
+    assert Jido.Instance.NamespaceRegistry.lookup(later_namespace) == nil
+  end
+
   test "default debug helpers set and clear the default instance overrides" do
     instance = Jido.default_instance()
     key = {:jido_debug, instance}

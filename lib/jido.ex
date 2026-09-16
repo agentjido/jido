@@ -481,6 +481,10 @@ defmodule Jido do
 
   This is an idempotent convenience function - safe to call multiple times
   (returns `{:ok, pid}` even if already started).
+  Options apply only to the first successful start. A later call returns the
+  running instance PID and does not change its namespace, persistence source,
+  Task limit, or other configuration. Stop the instance before starting it
+  with new options.
 
   ## Examples
 

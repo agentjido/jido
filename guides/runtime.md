@@ -1,7 +1,10 @@
 # Agent Server controls
 
 Start the default instance with `Jido.start/1`, or define a supervised module
-that uses `Jido`. Call `Jido.start_agent(MyAgent, id: id, initial_state: state)`
+that uses `Jido`. `Jido.start/1` returns the running instance on a later call;
+only the first successful call applies its options. A later call cannot change
+the namespace or persistence source. Call
+`Jido.start_agent(MyAgent, id: id, initial_state: state)`
 for the default instance. Pass an instance as the first argument only when you
 use more than one Jido supervisor. The live API accepts a PID.
 `Jido.whereis_agent/1` resolves an ID in the default instance. Options select a
