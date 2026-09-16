@@ -133,7 +133,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
 
     case State.child(data, tag) do
       %ChildInfo{pid: ^pid} ->
-        mark_online_spawn_active(data, tag)
+        State.mark_spawn_active(data, tag)
 
       existing ->
         child =
@@ -162,7 +162,7 @@ defmodule Jido.AgentServer.ChildLifecycle do
               )
 
             Server.cast(self(), signal)
-            data |> mark_online_spawn_active(tag) |> State.add_child(tag, child)
+            data |> State.mark_spawn_active(tag) |> State.add_child(tag, child)
 
           {:error, _reason} ->
             Process.demonitor(child.ref, [:flush])
@@ -177,20 +177,6 @@ defmodule Jido.AgentServer.ChildLifecycle do
 
             data
         end
-    end
-  end
-
-  defp mark_online_spawn_active(data, tag) do
-    case Map.fetch(data.child_spawn_requests, tag) do
-      {:ok, request} ->
-        %{
-          data
-          | child_spawn_requests:
-              Map.put(data.child_spawn_requests, tag, %{request | status: :active})
-        }
-
-      :error ->
-        data
     end
   end
 

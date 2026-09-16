@@ -112,4 +112,16 @@ defmodule Jido.AgentServer.State do
   def child_by_ref(%__MODULE__{} = state, ref) do
     Enum.find(state.children, fn {_key, child} -> child.ref == ref end)
   end
+
+  @doc false
+  def mark_spawn_active(%__MODULE__{} = state, tag) do
+    case Map.fetch(state.child_spawn_requests, tag) do
+      {:ok, request} ->
+        requests = Map.put(state.child_spawn_requests, tag, %{request | status: :active})
+        %{state | child_spawn_requests: requests}
+
+      :error ->
+        state
+    end
+  end
 end

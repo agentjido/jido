@@ -848,54 +848,24 @@ defmodule Jido.AgentServer do
     handle_child_directive_call(directive, from, data)
   end
 
-  def handle_event({:call, from}, :cancel, :idle, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :idle}}]}
+  def handle_event({:call, from}, :cancel, phase, %State{} = data)
+      when phase in [:admitting, :running] do
+    if phase == :admitting, do: cancel_admission(from, data), else: cancel_active(from, data)
   end
 
-  def handle_event({:call, from}, :cancel, :admitting, %State{} = data) do
-    cancel_admission(from, data)
-  end
-
-  def handle_event({:call, from}, :cancel, :running, %State{} = data) do
-    cancel_active(from, data)
-  end
-
-  def handle_event({:call, from}, :cancel, :cancelling, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :cancelling}}]}
-  end
-
-  def handle_event({:call, from}, :cancel, :directing, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :directing}}]}
-  end
-
-  def handle_event({:call, from}, {:cancel, _turn_id}, :idle, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+  def handle_event({:call, from}, :cancel, phase, %State{})
+      when phase in [:idle, :cancelling, :directing] do
+    {:keep_state_and_data, [{:reply, from, {:error, phase}}]}
   end
 
   def handle_event(
         {:call, from},
         {:cancel, turn_id},
-        :admitting,
+        phase,
         %State{active: %ActiveTurn{turn_id: turn_id}} = data
-      ) do
-    cancel_admission(from, data)
-  end
-
-  def handle_event({:call, from}, {:cancel, _turn_id}, :admitting, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
-  end
-
-  def handle_event(
-        {:call, from},
-        {:cancel, turn_id},
-        :running,
-        %State{active: %ActiveTurn{turn_id: turn_id}} = data
-      ) do
-    cancel_active(from, data)
-  end
-
-  def handle_event({:call, from}, {:cancel, _turn_id}, :running, %State{}) do
-    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
+      )
+      when phase in [:admitting, :running] do
+    if phase == :admitting, do: cancel_admission(from, data), else: cancel_active(from, data)
   end
 
   def handle_event({:call, from}, {:cancel, turn_id}, :cancelling, %State{active: active}) do
@@ -903,7 +873,8 @@ defmodule Jido.AgentServer do
     {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
   end
 
-  def handle_event({:call, from}, {:cancel, _turn_id}, :directing, %State{}) do
+  def handle_event({:call, from}, {:cancel, _turn_id}, phase, %State{})
+      when phase in [:idle, :admitting, :running, :directing] do
     {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
   end
 
@@ -914,14 +885,11 @@ defmodule Jido.AgentServer do
   def handle_event(
         {:call, from},
         {:signal, token, %Signal{} = signal, deadline, _context},
-        :initializing,
+        phase,
         %State{} = data
-      ) do
+      )
+      when phase in [:initializing, :cancelling] do
     postpone_call(from, token, signal, deadline, data)
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :initializing, %State{} = data) do
-    postpone_cast(token, signal, data)
   end
 
   def handle_event(
@@ -947,48 +915,22 @@ defmodule Jido.AgentServer do
   def handle_event(
         {:call, from},
         {:signal, token, %Signal{} = signal, deadline, _context},
-        :admitting,
+        phase,
         %State{} = data
-      ) do
-    if reentrant_task_call?(from, data.admission_task) do
-      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_admission}}]}
+      )
+      when phase in [:admitting, :running] do
+    reentrant =
+      case phase do
+        :admitting -> reentrant_task_call?(from, data.admission_task)
+        :running -> reentrant_turn_call?(from, data.active)
+      end
+
+    if reentrant do
+      reason = if phase == :admitting, do: :reentrant_admission, else: :reentrant_turn
+      {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
     else
       postpone_call(from, token, signal, deadline, data)
     end
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :admitting, %State{} = data) do
-    postpone_cast(token, signal, data)
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, _context},
-        :running,
-        %State{} = data
-      ) do
-    if reentrant_turn_call?(from, data.active) do
-      {:keep_state_and_data, [{:reply, from, {:error, :reentrant_turn}}]}
-    else
-      postpone_call(from, token, signal, deadline, data)
-    end
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :running, %State{} = data) do
-    postpone_cast(token, signal, data)
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, _context},
-        :cancelling,
-        %State{} = data
-      ) do
-    postpone_call(from, token, signal, deadline, data)
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :cancelling, %State{} = data) do
-    postpone_cast(token, signal, data)
   end
 
   def handle_event(
@@ -1009,7 +951,8 @@ defmodule Jido.AgentServer do
     end
   end
 
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :directing, %State{} = data) do
+  def handle_event(:cast, {:signal, token, %Signal{} = signal}, phase, %State{} = data)
+      when phase in [:initializing, :admitting, :running, :cancelling, :directing] do
     postpone_cast(token, signal, data)
   end
 

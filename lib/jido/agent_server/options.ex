@@ -79,7 +79,12 @@ defmodule Jido.AgentServer.Options do
 
   def new(%{} = attrs) do
     with :ok <- validate_identity_options(attrs),
-         :ok <- reject_custom_directive_handler(attrs),
+         :ok <-
+           reject_option(
+             attrs,
+             :directive_handler,
+             "does not support custom Directive handlers; use an Agent Plugin"
+           ),
          {:ok, agent} <- build_agent(attrs),
          {:ok, parent} <- build_parent(Map.get(attrs, :parent)),
          :ok <- validate_registration(attrs),
@@ -93,49 +98,39 @@ defmodule Jido.AgentServer.Options do
          :ok <- validate_state_version(Map.get(attrs, :state_version, 0)),
          :ok <- validate_debug(Map.get(attrs, :debug, false)),
          :ok <- validate_debug_max_events(Map.get(attrs, :debug_max_events, 500)),
-         :ok <- validate_turn_timeout(Map.get(attrs, :turn_timeout, @default_turn_timeout)),
          :ok <-
-           validate_directive_timeout(
-             Map.get(attrs, :directive_timeout, @default_directive_timeout)
+           validate_timeout(Map.get(attrs, :turn_timeout, @default_turn_timeout), :turn_timeout),
+         :ok <-
+           validate_timeout(
+             Map.get(attrs, :directive_timeout, @default_directive_timeout),
+             :directive_timeout
            ),
          :ok <-
-           validate_readiness_timeout(
-             Map.get(attrs, :readiness_timeout, @default_readiness_timeout)
+           validate_timeout(
+             Map.get(attrs, :readiness_timeout, @default_readiness_timeout),
+             :readiness_timeout
            ),
          :ok <- validate_lifecycle(attrs),
-         :ok <- reject_native_scheduler(attrs) do
+         :ok <-
+           reject_option(
+             attrs,
+             :cron_specs,
+             "does not support cron_specs; use Jido.Plugin.Scheduler"
+           ) do
       jido = Map.get(attrs, :jido)
       register = Map.get(attrs, :register, not is_nil(jido))
 
-      normalized = %{
-        agent: agent,
-        name: Map.get(attrs, :name),
-        jido: jido,
-        partition: Map.get(attrs, :partition),
-        registry: Map.get(attrs, :registry, registry(jido)),
-        register: register,
-        exec_module: Map.get(attrs, :exec_module, Jido.Exec),
-        exec_opts: Map.get(attrs, :exec_opts, []),
-        max_postponed_signals:
-          Map.get(attrs, :max_postponed_signals, @default_max_postponed_signals),
-        turn_timeout: Map.get(attrs, :turn_timeout, @default_turn_timeout),
-        max_directives_per_turn: Map.get(attrs, :max_directives_per_turn, :infinity),
-        directive_timeout: Map.get(attrs, :directive_timeout, @default_directive_timeout),
-        readiness_timeout: Map.get(attrs, :readiness_timeout, @default_readiness_timeout),
-        default_dispatch: default_dispatch,
-        error_policy: Map.get(attrs, :error_policy, :log_only),
-        parent: parent,
-        on_parent_death: Map.get(attrs, :on_parent_death, :stop),
-        spawn_fun: Map.get(attrs, :spawn_fun),
-        pool: Map.get(attrs, :pool),
-        pool_key: Map.get(attrs, :pool_key),
-        idle_timeout: Map.get(attrs, :idle_timeout, :infinity),
-        persistence: persistence,
-        restore: Map.get(attrs, :restore, :if_found),
-        state_version: Map.get(attrs, :state_version, 0),
-        debug: Map.get(attrs, :debug, false),
-        debug_max_events: Map.get(attrs, :debug_max_events, 500)
-      }
+      normalized =
+        attrs
+        |> Map.take(Map.keys(%__MODULE__{agent: nil}) -- [:__struct__])
+        |> Map.merge(%{
+          agent: agent,
+          registry: Map.get(attrs, :registry, registry(jido)),
+          register: register,
+          default_dispatch: default_dispatch,
+          parent: parent,
+          persistence: persistence
+        })
 
       Zoi.parse(@schema, normalized)
     end
@@ -143,20 +138,8 @@ defmodule Jido.AgentServer.Options do
 
   def new(_value), do: invalid("options must be a map or keyword list")
 
-  defp reject_custom_directive_handler(attrs) do
-    if Map.has_key?(attrs, :directive_handler) do
-      invalid("does not support custom Directive handlers; use an Agent Plugin")
-    else
-      :ok
-    end
-  end
-
-  defp reject_native_scheduler(attrs) do
-    if Map.has_key?(attrs, :cron_specs) do
-      invalid("does not support cron_specs; use Jido.Plugin.Scheduler")
-    else
-      :ok
-    end
+  defp reject_option(attrs, field, message) do
+    if Map.has_key?(attrs, field), do: invalid(message), else: :ok
   end
 
   defp build_agent(attrs) do
@@ -356,50 +339,25 @@ defmodule Jido.AgentServer.Options do
     kind, reason -> invalid("default_dispatch is invalid", %{reason: {kind, reason}})
   end
 
-  defp validate_directive_timeout(:infinity), do: :ok
+  defp validate_timeout(:infinity, field) when field != :readiness_timeout, do: :ok
+  defp validate_timeout(timeout, _field) when is_integer(timeout) and timeout > 0, do: :ok
 
-  defp validate_directive_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
+  defp validate_timeout(timeout, field) do
+    requirement =
+      if field == :readiness_timeout,
+        do: "a positive integer",
+        else: ":infinity or a positive integer"
 
-  defp validate_directive_timeout(timeout) do
-    invalid("directive_timeout must be :infinity or a positive integer", %{
-      directive_timeout: timeout
-    })
-  end
-
-  defp validate_turn_timeout(:infinity), do: :ok
-
-  defp validate_turn_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
-
-  defp validate_turn_timeout(timeout) do
-    invalid("turn_timeout must be :infinity or a positive integer", %{
-      turn_timeout: timeout
-    })
-  end
-
-  defp validate_readiness_timeout(timeout) when is_integer(timeout) and timeout > 0, do: :ok
-
-  defp validate_readiness_timeout(timeout) do
-    invalid("readiness_timeout must be a positive integer", %{readiness_timeout: timeout})
+    invalid("#{field} must be #{requirement}", %{field => timeout})
   end
 
   defp validate_lifecycle(attrs) do
     pool = Map.get(attrs, :pool)
-    idle_timeout = Map.get(attrs, :idle_timeout, :infinity)
 
-    cond do
-      not is_nil(pool) and not is_atom(pool) ->
-        invalid("pool must be an atom", %{pool: pool})
-
-      idle_timeout == :infinity ->
-        :ok
-
-      is_integer(idle_timeout) and idle_timeout > 0 ->
-        :ok
-
-      true ->
-        invalid("idle_timeout must be :infinity or a positive integer", %{
-          idle_timeout: idle_timeout
-        })
+    if not is_nil(pool) and not is_atom(pool) do
+      invalid("pool must be an atom", %{pool: pool})
+    else
+      validate_timeout(Map.get(attrs, :idle_timeout, :infinity), :idle_timeout)
     end
   end
 

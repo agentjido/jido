@@ -91,7 +91,7 @@ defmodule Jido.AgentServer.ChildOperations do
         )
 
       next_state =
-        state |> mark_spawn_active(directive.tag) |> State.add_child(directive.tag, child)
+        state |> State.mark_spawn_active(directive.tag) |> State.add_child(directive.tag, child)
 
       Server.cast(self(), ChildStarted.for_child(state.agent.id, child))
       {:ok, next_state}
@@ -239,20 +239,6 @@ defmodule Jido.AgentServer.ChildOperations do
 
   defp parent_value(parent, field) when is_map(parent), do: Map.get(parent, field)
   defp parent_value(_parent, _field), do: nil
-
-  defp mark_spawn_active(state, tag) do
-    case Map.fetch(state.child_spawn_requests, tag) do
-      {:ok, request} ->
-        %{
-          state
-          | child_spawn_requests:
-              Map.put(state.child_spawn_requests, tag, %{request | status: :active})
-        }
-
-      :error ->
-        state
-    end
-  end
 
   def adopt_child(%AdoptChild{} = directive, state) do
     with nil <- State.child(state, directive.tag),

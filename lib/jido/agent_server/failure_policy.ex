@@ -82,28 +82,18 @@ defmodule Jido.AgentServer.FailurePolicy do
     if map_size(data.error_policy_tasks) >= @max_error_policy_tasks do
       {:stop, :error_policy_task_limit, data}
     else
-      supervisor = Jido.task_supervisor_name(data.jido)
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            try do
-              policy.(outcome.error, outcome)
-            rescue
-              error -> {:stop, {:error_policy_failed, error}}
-            catch
-              kind, reason -> {:stop, {:error_policy_failed, {kind, reason}}}
-            end
-          end)
+      next_data =
+        start_policy_task(data, :custom, fn ->
+          try do
+            policy.(outcome.error, outcome)
+          rescue
+            error -> {:stop, {:error_policy_failed, error}}
+          catch
+            kind, reason -> {:stop, {:error_policy_failed, {kind, reason}}}
+          end
         end)
 
-      timeout = dispatch_timeout(data)
-      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
-      pending = %{kind: :custom, task: task, timer: timer}
-
-      {:continue,
-       %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}}
+      {:continue, next_data}
     end
   rescue
     error -> {:stop, {:error_policy_start_failed, error}, data}
@@ -128,21 +118,11 @@ defmodule Jido.AgentServer.FailurePolicy do
 
       record_dispatch_failure(data, error)
     else
-      supervisor = Jido.task_supervisor_name(data.jido)
       jido = data.jido
-      trace = TraceContext.capture()
 
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
-          end)
-        end)
-
-      timeout = dispatch_timeout(data)
-      timer = start_task_timer(timeout, :error_policy_dispatch_timeout, task.ref)
-      pending = %{task: task, timer: timer}
-      %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
+      start_policy_task(data, :dispatch, fn ->
+        DirectiveRuntime.dispatch_signal(signal, dispatch, jido)
+      end)
     end
   rescue
     error -> record_dispatch_failure(data, error)
@@ -154,6 +134,15 @@ defmodule Jido.AgentServer.FailurePolicy do
     do: @error_policy_dispatch_fallback_timeout
 
   def dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
+
+  defp start_policy_task(data, kind, fun) do
+    supervisor = Jido.task_supervisor_name(data.jido)
+    trace = TraceContext.capture()
+    task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
+    timer = start_task_timer(dispatch_timeout(data), :error_policy_dispatch_timeout, task.ref)
+    pending = %{kind: kind, task: task, timer: timer}
+    %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
+  end
 
   def drop_task(%State{} = data, ref) do
     %{data | error_policy_tasks: Map.delete(data.error_policy_tasks, ref)}
