@@ -156,6 +156,25 @@ defmodule JidoTest.InstanceRefTest do
     assert Process.alive?(instance_pid)
   end
 
+  test "a process label identifies each live server for one Agent Ref" do
+    namespace = unique_namespace("process-label")
+    instance = unique_instance("process-label")
+    start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+
+    ref = Ref.new!(namespace: namespace, partition: "west", id: "labelled-agent")
+    assert {:ok, first} = Jido.start_agent_ref(instance, ref, Counter)
+    label = {:jido_agent, ref.namespace, ref.partition, ref.id}
+    assert :proc_lib.get_label(first) == label
+
+    monitor = Process.monitor(first)
+    assert :ok = Jido.stop_agent_ref(instance, ref)
+    assert_receive {:DOWN, ^monitor, :process, ^first, _reason}
+
+    assert {:ok, second} = Jido.start_agent_ref(instance, ref, Counter)
+    assert second != first
+    assert :proc_lib.get_label(second) == label
+  end
+
   test "a failed instance start releases its namespace claim" do
     namespace = unique_namespace("released-claim")
     occupied = unique_instance("occupied")

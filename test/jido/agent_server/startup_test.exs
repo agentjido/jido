@@ -150,6 +150,13 @@ defmodule Jido.AgentServer.StartupTest do
     end
   end
 
+  test "a directly started Server labels its live process" do
+    id = unique_id("direct-label")
+    server = start_supervised!({Server, agent: Agent, id: id})
+
+    assert :proc_lib.get_label(server) == {:jido_agent, nil, nil, id}
+  end
+
   test "start_link links the Server to its caller", %{jido: jido} do
     observer = self()
 

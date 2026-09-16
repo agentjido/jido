@@ -66,6 +66,8 @@ defmodule Jido.AgentServer.ServerLifecycle do
         startup_reply: startup_reply
       }
 
+      Process.set_label({:jido_agent, data.agent_namespace, data.partition, agent.id})
+
       span =
         AgentTelemetry.start(
           :lifecycle,

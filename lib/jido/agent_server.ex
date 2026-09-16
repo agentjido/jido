@@ -53,7 +53,9 @@ defmodule Jido.AgentServer do
   revision, `status/2` for current runtime work, and `children/2` for live
   ownership. Use `set_debug/3` and `recent_events/3` for a short diagnostic
   history for one Agent. Use `Jido.Telemetry` for system-wide runtime
-  observation. See
+  observation. Each live Server has a process label with its namespace,
+  partition, and Agent id. The label can appear in process tools and crash
+  reports. It is not a name for lookup. See
   [Runtime State and Debugging](runtime-state-and-debugging.html) for an
   executable inspection example.
   """
