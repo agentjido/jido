@@ -59,6 +59,31 @@ defmodule Jido.Agent.State do
      )}
   end
 
+  @doc false
+  @spec validate_candidate(term(), Zoi.schema()) ::
+          {:ok, map()} | {:error, Error.ValidationError.t()}
+  def validate_candidate(state, %Zoi.Types.Map{} = schema)
+      when is_map(state) and not is_struct(state) do
+    missing_keys =
+      schema
+      |> defaults_from_schema()
+      |> Map.keys()
+      |> Enum.reject(&Map.has_key?(state, &1))
+      |> Enum.sort()
+
+    if missing_keys == [] do
+      validate(state, schema)
+    else
+      {:error,
+       Error.validation_error("Agent candidate state omits defaulted fields",
+         field: :state,
+         details: %{missing_keys: missing_keys}
+       )}
+    end
+  end
+
+  def validate_candidate(state, schema), do: validate(state, schema)
+
   defp validate_portable(state) do
     case PortableTerm.validate(state, :agent_state) do
       :ok ->

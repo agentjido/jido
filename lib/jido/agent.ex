@@ -297,7 +297,7 @@ defmodule Jido.Agent do
           {:ok, instance()} | {:error, Exception.t()}
   def transition_validated(%__MODULE__{} = agent, next_state) do
     with {:ok, schema} <- complete_schema(agent),
-         {:ok, state} <- State.validate(next_state, schema) do
+         {:ok, state} <- State.validate_candidate(next_state, schema) do
       {:ok, %{agent | state: state}}
     end
   end

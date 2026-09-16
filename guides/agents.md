@@ -8,7 +8,12 @@ Instance options contain only `:id` and `:state`.
 Declare a static data schema. The complete state includes Plugin-owned
 keys. Unknown keys and invalid values fail validation. `Jido.Agent.set/2`
 merges domain attributes and validates the complete result. An Action returns
-a complete candidate state from `context.agent_state`.
+a complete candidate state from `context.agent_state`. A final candidate must
+include each schema field that has a default. If it omits one, Jido rejects the
+Turn before commit rather than replacing old data with the default. To remove
+an optional field that has no default, omit it from the complete candidate.
+For a defaulted field, return an explicit schema-accepted empty value to clear
+it.
 
 Module restore uses the current module definition. Generic Agent checkpoints
 retain their saved definition.
