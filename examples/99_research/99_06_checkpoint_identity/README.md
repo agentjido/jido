@@ -1,6 +1,7 @@
 # 99_06 Checkpoint Identity
 
-Status: implemented persistence regression; awaiting promotion or removal.
+Status: implemented persistence regression; lesson in the
+[Persistence guide](../../../guides/storage.md#check-identity-and-portable-state-on-load).
 
 The loader rejects a valid record whose nested checkpoint identity does not
 match the identity requested by the caller.
@@ -25,9 +26,8 @@ Expected result: the mismatched checkpoint load returns an identity error.
 
 ## Gap and limits
 
-The core contract is implemented. Promote the concept into the persistence
-learning path or keep only its focused core regression. This probe uses an
-in-memory byte adapter and no VM restart.
+The core contract is implemented. This probe uses an in-memory byte adapter
+and no VM restart. The stable guide states the load rule.
 
 ## Files
 

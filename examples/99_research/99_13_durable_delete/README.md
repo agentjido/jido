@@ -1,6 +1,7 @@
 # 99_13 Durable Delete
 
-Status: implemented persistence contract; awaiting a stable lifecycle lesson.
+Status: implemented persistence contract; lesson in the
+[Persistence guide](../../../guides/storage.md#keep-the-delete-fence).
 
 A durable tombstone prevents a delayed old writer from recreating a deleted
 Agent record.
@@ -25,9 +26,9 @@ replace the tombstone.
 
 ## Gap and limits
 
-The fence exists. Promotion should place deletion beside persistence lifecycle
-and compare-and-swap. Tombstone retention and physical purge policy are not
-defined here.
+The fence exists. The stable guide places deletion beside persistence
+lifecycle and compare-and-swap. Tombstone retention and physical purge remain
+application policy.
 
 ## Files
 

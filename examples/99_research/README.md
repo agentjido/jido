@@ -1,7 +1,8 @@
 # Research probes
 
-These probes record implemented contracts that are not yet promoted into the
-stable learning path, and application extensions that are not Jido core APIs.
+These probes record implemented contracts and application extensions that are
+not Jido core APIs. Checkpoint identity, portability, and durable delete also
+have stable lessons in the [Persistence guide](../../guides/storage.md).
 Do not copy a research pattern into an application without reading its status
 and limits.
 

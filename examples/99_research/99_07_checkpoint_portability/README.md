@@ -1,6 +1,7 @@
 # 99_07 Checkpoint Portability
 
-Status: implemented persistence regression; awaiting promotion or removal.
+Status: implemented persistence regression; lesson in the
+[Persistence guide](../../../guides/storage.md#check-identity-and-portable-state-on-load).
 
 The loader rejects a process-local value inserted into a stored Agent checkpoint.
 
@@ -24,9 +25,8 @@ Expected result: a stored nested PID is rejected during load.
 
 ## Gap and limits
 
-The core contract is implemented. Promote it into a stable persistence example
-or keep only the full core term-matrix tests. This probe uses one PID and no VM
-restart.
+The core contract is implemented. This probe uses one PID and no VM restart.
+The stable guide states the portable-state rule.
 
 ## Files
 

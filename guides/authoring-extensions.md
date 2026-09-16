@@ -31,6 +31,40 @@ use Jido.Agent, extensions: [MyApp.AgentExtension]
 Core first collects its data schema, Plugins, routes, and metadata. It then
 calls extensions in declaration order.
 
+The same lowerer accepts static data. For example, a label entity can add one
+metadata field to a direct definition:
+
+```elixir
+defmodule MyApp.Label do
+  defstruct [:key, :value]
+end
+
+defmodule MyApp.Labels do
+  @behaviour Jido.Agent.Extension
+
+  @impl true
+  def lower_agent(config, entities) do
+    {labels, remaining} = Enum.split_with(entities, &match?(%MyApp.Label{}, &1))
+
+    metadata =
+      Enum.reduce(labels, Map.get(config, :metadata, %{}), fn label, values ->
+        Map.put(values, label.key, label.value)
+      end)
+
+    {:ok, Map.put(config, :metadata, metadata), remaining}
+  end
+end
+
+source = %{name: "labelled_agent", schema: Zoi.object(%{})}
+entities = [struct!(MyApp.Label, key: :owner, value: "app")]
+{:ok, lowered} = Jido.Agent.Extension.lower([MyApp.Labels], source, entities)
+{:ok, definition} = Jido.Agent.new(lowered)
+"app" = definition.metadata.owner
+```
+
+`Extension.lower/3` returns lowered data, not a validated Agent. The caller
+must pass it to `Jido.Agent.new/1`, Builder, or another normal validator.
+
 ## Consume Only Owned Entities
 
 An extension must return the entities that belong to later extensions. After
