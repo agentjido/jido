@@ -76,6 +76,16 @@ defmodule JidoTest.PersistenceTest do
     end
   end
 
+  test "configuration resolution supports inherited and explicit adapters" do
+    configured = {ETS, table: ConfiguredInstance}
+
+    assert {:ok, ^configured} = Persistence.resolve_config(:inherit, ConfiguredInstance)
+    assert {:ok, nil} = Persistence.resolve_config(:inherit, DisabledInstance)
+    assert {:ok, nil} = Persistence.resolve_config(:inherit, nil)
+    assert {:ok, {ETS, []}} = Persistence.resolve_config(ETS, ConfiguredInstance)
+    assert {:ok, nil} = Persistence.resolve_config(false, ConfiguredInstance)
+  end
+
   test "public operations reject non-keyword options before adapter work" do
     agent = RuntimeAgent.new!(id: unique_id("invalid-options"))
     persistence = adapter(:invalid_options)

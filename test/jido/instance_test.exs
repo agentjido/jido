@@ -174,6 +174,9 @@ defmodule JidoTest.InstanceTest do
     {:ok, _pid} = TestInstance.start_link(persistence: runtime_persistence)
     assert Jido.instance_persistence(TestInstance) == runtime_persistence
 
+    assert {:ok, ^runtime_persistence} =
+             Jido.Persistence.resolve_config(:inherit, TestInstance)
+
     agent = RedisTestAgent.new!(id: "configured-persistence")
     assert {:ok, server} = TestInstance.start_agent(agent, restore: false)
     assert :ok = TestInstance.hibernate(server)
@@ -186,6 +189,9 @@ defmodule JidoTest.InstanceTest do
     stop_test_instance()
     {:ok, _pid} = TestInstance.start_link()
     assert Jido.instance_persistence(TestInstance) == application_persistence
+
+    assert {:ok, ^application_persistence} =
+             Jido.Persistence.resolve_config(:inherit, TestInstance)
   end
 
   test "hibernate and thaw work through an instance module" do

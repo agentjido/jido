@@ -48,8 +48,20 @@ defmodule Jido.Persistence do
   @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
   defdelegate normalize_adapter(config), to: Source
 
-  @doc false
-  @spec resolve_config(term(), atom() | nil) ::
+  @doc """
+  Resolves and validates a persistence adapter configuration.
+
+  Pass an adapter module or `{adapter, options}` for an explicit configuration.
+  Pass `:inherit` with a Jido instance name to use that instance's configuration.
+  A running instance's configuration takes priority over its module default.
+  Pass `nil` or `false` to disable persistence. A disabled or unconfigured source
+  returns `{:ok, nil}`.
+
+  The result is a normalized `{adapter, options}` tuple or `nil`. This function
+  checks required adapter callbacks and options. It does not start the adapter
+  or confirm that its storage is durable or shared across nodes.
+  """
+  @spec resolve_config(:inherit | adapter_config(), atom() | nil) ::
           {:ok, {module(), keyword()} | nil} | {:error, term()}
   defdelegate resolve_config(config, jido), to: Source
 
