@@ -15,6 +15,20 @@ an optional field that has no default, omit it from the complete candidate.
 For a defaulted field, return an explicit schema-accepted empty value to clear
 it.
 
+`set/2` deep-merges nested maps. For example, `config: %{}` does not clear an
+existing `config.a`. To replace that domain field in a Turn, return the full
+candidate with the explicit new map:
+
+```elixir
+def run(_params, context) do
+  {:ok, %{context.agent_state | config: %{}}}
+end
+```
+
+This keeps every other top-level field and replaces `config` with an empty
+map. The [replacement test](../test/jido/agent/replacement_test.exs) checks
+direct and live Turns.
+
 Module restore uses the current module definition. Generic Agent checkpoints
 retain their saved definition.
 
