@@ -9,6 +9,16 @@ defmodule Jido.AgentServer.Options do
   @default_turn_timeout 5_000
   @default_directive_timeout 5_000
   @default_readiness_timeout 5_000
+  @startup_completion_timeout 5_000
+
+  def startup_timeout(opts) when is_list(opts) do
+    readiness_timeout =
+      opts
+      |> Map.new()
+      |> Map.get(:readiness_timeout, @default_readiness_timeout)
+
+    readiness_timeout + @startup_completion_timeout
+  end
 
   @schema Zoi.struct(
             __MODULE__,

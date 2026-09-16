@@ -418,8 +418,8 @@ defmodule Jido.AgentServer.PostCommit do
     )
   end
 
-  defp commit_notification_timeout(%State{directive_timeout: :infinity}), do: 5_000
-  defp commit_notification_timeout(%State{directive_timeout: timeout}), do: timeout
+  defp commit_notification_timeout(%State{directive_timeout: timeout}),
+    do: TaskSupport.finite_timeout(timeout)
 
   defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do
     outcome = TurnCompletion.turn_outcome(data, :succeeded, :directive, nil)

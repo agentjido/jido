@@ -6,6 +6,9 @@ defmodule Jido.AgentServer.TaskSupport do
   def task_ref?(%{task: %Task{ref: ref}}, ref), do: true
   def task_ref?(_pending, _ref), do: false
 
+  def task_timer?(%{task: %Task{ref: ref}, timer: timer}, ref, timer), do: true
+  def task_timer?(_pending, _ref, _timer), do: false
+
   def start_traced(jido, fun, timeout, tag) do
     trace = TraceContext.capture()
 
@@ -33,6 +36,9 @@ defmodule Jido.AgentServer.TaskSupport do
     _result = Task.shutdown(task, :brutal_kill)
     :ok
   end
+
+  def finite_timeout(:infinity), do: 5_000
+  def finite_timeout(timeout), do: timeout
 
   def start_task_timer(:infinity, _tag, _task_ref), do: nil
 

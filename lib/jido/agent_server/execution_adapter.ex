@@ -2,9 +2,8 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   @moduledoc false
 
   alias Jido.Error
+  alias Jido.AgentServer.TaskSupport
   alias Jido.Tracing.Context, as: TraceContext
-
-  @fallback_timeout 5_000
 
   defstruct [
     :pid,
@@ -22,7 +21,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
   @doc false
   def start(owner, supervisor, module, args, timeout) do
     ref = make_ref()
-    timeout = finite_timeout(timeout)
+    timeout = TaskSupport.finite_timeout(timeout)
     trace = TraceContext.capture()
 
     case Task.Supervisor.start_child(supervisor, fn ->
@@ -178,11 +177,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
       {:jido_exec_adapter_cancel, ^ref, requester, request_ref} ->
         result = cancel_handle(module, handle, requester, request_ref)
 
-        if result == :ok do
-          stop_handle(handle)
-        else
-          loop(owner, ref, module, handle)
-        end
+        if result != :ok, do: loop(owner, ref, module, handle)
 
       message ->
         handle_message(owner, ref, module, handle, message)
@@ -215,11 +210,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
       {:jido_exec_adapter_cancel, ^ref, requester, request_ref} ->
         result = cancel_handle(module, handle, requester, request_ref)
 
-        if result == :ok do
-          stop_handle(handle)
-        else
-          await_terminal_ack(owner, ref, token, module, handle)
-        end
+        if result != :ok, do: await_terminal_ack(owner, ref, token, module, handle)
 
       _message ->
         await_terminal_ack(owner, ref, token, module, handle)
@@ -228,6 +219,7 @@ defmodule Jido.AgentServer.ExecutionAdapter do
 
   defp cancel_handle(module, handle, requester, request_ref) do
     result = normalize_cancel(invoke(module, :cancel, [handle]), module)
+    if result == :ok, do: stop_handle_and_wait(handle)
     send(requester, {:jido_exec_adapter_cancelled, request_ref, result})
     result
   end
@@ -326,8 +318,15 @@ defmodule Jido.AgentServer.ExecutionAdapter do
 
   defp stop_handle(_handle), do: :ok
 
-  defp finite_timeout(:infinity), do: @fallback_timeout
-  defp finite_timeout(timeout), do: timeout
+  defp stop_handle_and_wait(%{pid: pid}) when is_pid(pid) do
+    Process.unlink(pid)
+    ref = Process.monitor(pid)
+    Process.exit(pid, :kill)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, _reason} -> :ok
+    end
+  end
 
   defp start_timer(timeout, ref, token, callback) do
     :erlang.start_timer(timeout, self(), {:exec_adapter_timeout, ref, token, callback})

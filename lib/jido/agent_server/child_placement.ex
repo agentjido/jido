@@ -125,14 +125,7 @@ defmodule Jido.AgentServer.ChildPlacement do
       {:error, reason}
   end
 
-  def alive?(pid) when is_pid(pid) and node(pid) == node(), do: Process.alive?(pid)
-
-  def alive?(pid) when is_pid(pid) do
-    :erpc.call(node(pid), Process, :alive?, [pid], 1_000)
-  catch
-    _kind, _reason -> false
-  end
-
+  def alive?(pid) when is_pid(pid), do: Server.alive?(pid)
   def alive?(_pid), do: false
 
   defp resolve_existing(pid, opts) do

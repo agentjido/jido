@@ -57,31 +57,21 @@ defmodule Jido.AgentServer.ServerLifecycle do
         readiness_timeout: opts.readiness_timeout,
         default_dispatch: opts.default_dispatch,
         error_policy: opts.error_policy,
-        error_count: 0,
         parent: parent,
-        orphaned_from: nil,
-        children: %{},
         on_parent_death: opts.on_parent_death,
         pool: opts.pool,
         pool_key: opts.pool_key,
         idle_timeout: opts.idle_timeout,
         persistence: opts.persistence,
         initial_persistence: initial_persistence,
-        attachments: %{},
-        idle_timer: nil,
         spawn_fun: opts.spawn_fun,
         debug: opts.debug,
-        debug_events: [],
         debug_max_events: opts.debug_max_events,
         state_version: restored_version,
+        checkpoint_origin_module: opts.agent.module,
         activation_id: Signal.ID.generate!(),
         active: nil,
-        plugin_bootstrap: nil,
-        startup_reply: startup_reply,
-        admission_task: nil,
-        directive_task: nil,
-        cancel_task: nil,
-        error_policy_tasks: %{}
+        startup_reply: startup_reply
       }
 
       span =
@@ -274,12 +264,7 @@ defmodule Jido.AgentServer.ServerLifecycle do
   defp publish_agent(%State{registered?: false}), do: :ok
 
   defp publish_agent(%State{registry: registry, agent: agent, partition: partition}) do
-    key = RegistrationGuard.registry_key(agent.id, partition)
-
-    case Registry.update_value(registry, key, fn _status -> :ready end) do
-      {:ready, _previous} -> :ok
-      :error -> {:error, :registry_entry_not_found}
-    end
+    update_registry_status(registry, agent.id, partition, :ready)
   end
 
   defp claim_registration(%Options{register: true, jido: jido} = opts)
@@ -332,7 +317,11 @@ defmodule Jido.AgentServer.ServerLifecycle do
          %Options{registry: registry, agent: agent, partition: partition},
          status
        ) do
-    key = RegistrationGuard.registry_key(agent.id, partition)
+    update_registry_status(registry, agent.id, partition, status)
+  end
+
+  defp update_registry_status(registry, id, partition, status) do
+    key = RegistrationGuard.registry_key(id, partition)
 
     case Registry.update_value(registry, key, fn _previous -> status end) do
       {^status, _previous} -> :ok

@@ -30,8 +30,26 @@ defmodule JidoTest.AgentServer.UpgradeTest do
     end
   end
 
+  defmodule StringAction do
+    use Jido.Action, name: "upgrade_test_string_action"
+
+    def run(_input, _context), do: {:ok, %{value: "updated"}}
+  end
+
   defmodule TargetAgent do
     use Jido.Agent, name: "upgrade_test_target", vsn: 2
+
+    agent do
+      schema Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
+    end
+
+    routes do
+      route "upgrade.update", StringAction
+    end
+  end
+
+  defmodule FinalAgent do
+    use Jido.Agent, name: "upgrade_test_final", vsn: 3
 
     agent do
       schema Zoi.object(%{value: Zoi.string() |> Zoi.default("")})
@@ -149,6 +167,39 @@ defmodule JidoTest.AgentServer.UpgradeTest do
     assert Server.snapshot(replacement).state_version == 1
   end
 
+  test "a checkpoint keeps the upgrade origin after a later Turn", c do
+    id = unique_id("upgraded-turn")
+    {:ok, server} = Jido.start_agent(c.jido, SourceAgent, id: id)
+
+    assert {:ok, %{module: TargetAgent}} =
+             Server.upgrade(server, TargetAgent, fn _source -> {:ok, %{value: "saved"}} end)
+
+    assert {:ok, %{state: %{value: "updated"}}} =
+             Server.call(server, signal("upgrade.update"))
+
+    assert Server.snapshot(server).state_version == 2
+    replacement = restart_server(c.jido, id, server)
+    assert Server.agent(replacement).module == TargetAgent
+    assert Server.agent(replacement).state == %{value: "updated"}
+    assert Server.snapshot(replacement).state_version == 2
+  end
+
+  test "a checkpoint keeps the first upgrade origin after a second upgrade", c do
+    id = unique_id("second-upgrade")
+    {:ok, server} = Jido.start_agent(c.jido, SourceAgent, id: id)
+
+    assert {:ok, %{module: TargetAgent}} =
+             Server.upgrade(server, TargetAgent, fn _source -> {:ok, %{value: "first"}} end)
+
+    assert {:ok, %{module: FinalAgent}} =
+             Server.upgrade(server, FinalAgent, fn _source -> {:ok, %{value: "second"}} end)
+
+    replacement = restart_server(c.jido, id, server)
+    assert Server.agent(replacement).module == FinalAgent
+    assert Server.agent(replacement).state == %{value: "second"}
+    assert Server.snapshot(replacement).state_version == 2
+  end
+
   test "a namespaced durable record changes definition in one revision" do
     start_supervised!(PersistentJido)
     id = unique_id("durable")
@@ -161,5 +212,18 @@ defmodule JidoTest.AgentServer.UpgradeTest do
     assert {:ok, replacement} = PersistentJido.thaw(TargetAgent, id)
     assert Server.agent(replacement).state == %{value: "saved"}
     assert Server.snapshot(replacement).state_version == 1
+  end
+
+  defp restart_server(jido, id, server) do
+    monitor = Process.monitor(server)
+    Process.exit(server, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 1_000
+
+    eventually(fn ->
+      case Jido.whereis_agent(jido, id) do
+        pid when is_pid(pid) and pid != server -> pid
+        _other -> false
+      end
+    end)
   end
 end

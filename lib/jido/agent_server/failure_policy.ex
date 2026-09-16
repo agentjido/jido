@@ -11,7 +11,6 @@ defmodule Jido.AgentServer.FailurePolicy do
   alias Jido.Error
   alias Jido.Signal
 
-  @error_policy_dispatch_fallback_timeout 5_000
   @max_error_policy_tasks 32
 
   def decide(%Outcome{}, %State{error_policy: :log_only} = data),
@@ -131,10 +130,8 @@ defmodule Jido.AgentServer.FailurePolicy do
     kind, reason -> record_dispatch_failure(data, {kind, reason})
   end
 
-  def dispatch_timeout(%State{directive_timeout: :infinity}),
-    do: @error_policy_dispatch_fallback_timeout
-
-  def dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
+  def dispatch_timeout(%State{directive_timeout: timeout}),
+    do: TaskSupport.finite_timeout(timeout)
 
   defp start_policy_task(data, kind, fun) do
     pending =
@@ -212,28 +209,22 @@ defmodule Jido.AgentServer.FailurePolicy do
     end
   end
 
-  def task_timeout(task_ref, timer, %State{} = data) do
+  def task_timeout(task_ref, %State{} = data) do
     pending = Map.fetch!(data.error_policy_tasks, task_ref)
+    TaskSupport.shutdown_task(pending.task)
+    data = drop_task(data, task_ref)
 
-    if pending.timer == timer do
-      TaskSupport.shutdown_task(pending.task)
-      data = drop_task(data, task_ref)
+    case Map.get(pending, :kind, :dispatch) do
+      :custom ->
+        {:stop, Shutdown.normalize_reason({:error_policy_timeout, dispatch_timeout(data)}), data}
 
-      case Map.get(pending, :kind, :dispatch) do
-        :custom ->
-          {:stop, Shutdown.normalize_reason({:error_policy_timeout, dispatch_timeout(data)}),
-           data}
+      :dispatch ->
+        error =
+          Error.timeout_error("Agent error Signal delivery timed out",
+            timeout: dispatch_timeout(data)
+          )
 
-        :dispatch ->
-          error =
-            Error.timeout_error("Agent error Signal delivery timed out",
-              timeout: dispatch_timeout(data)
-            )
-
-          {:keep_state, record_dispatch_failure(data, error)}
-      end
-    else
-      :keep_state_and_data
+        {:keep_state, record_dispatch_failure(data, error)}
     end
   end
 end

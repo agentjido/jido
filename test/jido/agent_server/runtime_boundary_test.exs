@@ -397,6 +397,7 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
     send(adapter, {:release_exec_callback, gate})
 
     assert :ok = Task.await(canceller, 2_000)
+    refute Process.alive?(worker)
     assert {:error, :cancelled} = Task.await(caller, 2_000)
     assert_receive {:exec_callback_started, :cancel, :completion_race, ^adapter}, 2_000
     assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}, 2_000
@@ -442,6 +443,33 @@ defmodule Jido.AgentServer.RuntimeBoundaryTest do
     assert_receive {:DOWN, ^monitor, :process, ^server, :shutdown}, 1_000
     assert {:exit, _reason} = Task.await(canceller, 1_000)
     assert {:exit, _reason} = Task.await(caller, 1_000)
+  end
+
+  test "upgrade and hibernate wait for custom Exec cancellation", %{jido: jido} do
+    {:ok, server} =
+      Jido.start_agent(jido, Agent,
+        exec_module: BoundaryExec,
+        exec_opts: [observer: self(), mode: :cancel_hang],
+        directive_timeout: 2_000,
+        restart: :temporary
+      )
+
+    caller = Task.async(fn -> Server.call(server, signal("boundary.emit", %{count: 1})) end)
+    assert_receive {:boundary_exec_started, _adapter, _worker}, 2_000
+    canceller = Task.async(fn -> Server.cancel(server) end)
+    assert_receive {:exec_callback_started, :cancel, :cancel_hang, cancel_owner}, 2_000
+    assert Server.status(server).phase == :cancelling
+
+    upgrade = Task.async(fn -> Server.upgrade(server, fn -> :ok end) end)
+    hibernate = Task.async(fn -> Server.hibernate(server) end)
+    assert Task.yield(upgrade, 50) == nil
+    assert Task.yield(hibernate, 50) == nil
+
+    send(cancel_owner, {:release_exec_callback, :cancel})
+    assert :ok = Task.await(canceller, 2_000)
+    assert {:error, :cancelled} = Task.await(caller, 2_000)
+    assert :ok = Task.await(upgrade, 2_000)
+    assert {:error, :persistence_not_configured} = Task.await(hibernate, 2_000)
   end
 
   test "a waiting custom policy can query its Server while later Signals and stop run", %{

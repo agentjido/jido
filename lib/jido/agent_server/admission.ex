@@ -10,10 +10,6 @@ defmodule Jido.AgentServer.Admission do
   alias Jido.Signal
   alias Jido.Telemetry.Agent, as: AgentTelemetry
 
-  def handle_event({:call, from}, {:signal, token, %Signal{} = signal, deadline}, phase, data) do
-    handle_event({:call, from}, {:signal, token, signal, deadline, %{}}, phase, data)
-  end
-
   def handle_event(
         {:call, from},
         {:signal, token, %Signal{} = signal, deadline, _context},

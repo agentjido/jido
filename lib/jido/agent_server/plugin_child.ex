@@ -4,6 +4,7 @@ defmodule Jido.AgentServer.PluginChild do
   use GenServer
 
   alias Jido.AgentServer.Plugin
+  alias Jido.AgentServer.TaskSupport
 
   @restart_poll_ms 10
   @restart_poll_attempts 500
@@ -150,8 +151,7 @@ defmodule Jido.AgentServer.PluginChild do
   end
 
   def handle_info({ref, result}, %{readiness: %{task: %Task{ref: ref}} = readiness} = state) do
-    Process.demonitor(ref, [:flush])
-    _ = :erlang.cancel_timer(readiness.timer)
+    TaskSupport.release_task_result(readiness)
     state = %{state | readiness: nil}
 
     case result do
@@ -175,7 +175,7 @@ defmodule Jido.AgentServer.PluginChild do
         {:timeout, timer, {:plugin_readiness_timeout, ref}},
         %{readiness: %{task: %Task{ref: ref}, timer: timer} = readiness} = state
       ) do
-    Task.shutdown(readiness.task, :brutal_kill)
+    TaskSupport.shutdown_task(readiness.task)
 
     {:stop,
      {:plugin_runtime_readiness_timeout, state.child_id, readiness.reason,
@@ -186,7 +186,7 @@ defmodule Jido.AgentServer.PluginChild do
         {:DOWN, ref, :process, _pid, reason},
         %{readiness: %{task: %Task{ref: ref}} = readiness} = state
       ) do
-    _ = :erlang.cancel_timer(readiness.timer)
+    TaskSupport.cancel_task_timer(readiness.timer)
 
     {:stop, {:plugin_runtime_readiness_failed, state.child_id, readiness.reason, reason},
      %{state | readiness: nil}}
@@ -222,11 +222,7 @@ defmodule Jido.AgentServer.PluginChild do
     task = Task.async(fn -> Plugin.await_ready(state.plugin_spec, child_pid) end)
 
     timer =
-      :erlang.start_timer(
-        state.readiness_timeout,
-        self(),
-        {:plugin_readiness_timeout, task.ref}
-      )
+      TaskSupport.start_task_timer(state.readiness_timeout, :plugin_readiness_timeout, task.ref)
 
     readiness = %{task: task, timer: timer, child_pid: child_pid, reason: reason}
 
@@ -241,8 +237,7 @@ defmodule Jido.AgentServer.PluginChild do
   defp stop_readiness(%{readiness: nil} = state), do: state
 
   defp stop_readiness(%{readiness: readiness} = state) do
-    _ = :erlang.cancel_timer(readiness.timer)
-    Task.shutdown(readiness.task, :brutal_kill)
+    TaskSupport.stop_task(readiness)
     %{state | readiness: nil}
   end
 

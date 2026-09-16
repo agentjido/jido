@@ -176,6 +176,45 @@ defmodule Jido.AgentServer.PluginLifecycleTest do
     assert_receive {:DOWN, ^runtime_ref, :process, ^runtime, _reason}, 2_000
   end
 
+  test "cancel and hibernate calls during readiness keep the Server alive" do
+    observer = self()
+    gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
+    server = start_supervised!({Server, agent: definition, readiness_timeout: 10_000})
+
+    assert_receive {:readiness_waiting, waiter, _runtime}, 2_000
+    assert {:error, :initializing} = Server.cancel(server)
+    assert {:error, :stale_turn} = Server.cancel_turn(server, "missing")
+    assert Process.alive?(server)
+
+    hibernate = Task.async(fn -> Server.hibernate(server) end)
+    assert Task.yield(hibernate, 50) == nil
+    send(waiter, {:release_readiness, :ok})
+
+    assert :ok = Server.await_ready(server)
+    assert {:error, :persistence_not_configured} = Task.await(hibernate, 2_000)
+  end
+
+  test "supervised start waits beyond five seconds when readiness allows it", %{jido: jido} do
+    observer = self()
+    gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})
+    definition = %{Agent.definition() | plugins: [{Runtime, gate: register_gate(gate)}]}
+
+    starter =
+      Task.async(fn ->
+        Jido.start_agent(jido, definition,
+          readiness_timeout: 7_000,
+          restart: :temporary
+        )
+      end)
+
+    assert_receive {:readiness_waiting, waiter, _runtime}, 2_000
+    Process.sleep(5_100)
+    send(waiter, {:release_readiness, :ok})
+    assert {:ok, server} = Task.await(starter, 3_000)
+    assert Process.alive?(server)
+  end
+
   test "abrupt owner death stops initial Plugin readiness and its runtime", %{jido: jido} do
     observer = self()
     gate = start_supervised!({Elixir.Agent, fn -> [{:wait, observer}] end})

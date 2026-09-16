@@ -17,7 +17,7 @@ defmodule Jido.AgentServer.Cancellation do
   end
 
   def handle_event({:call, from}, :cancel, phase, %State{})
-      when phase in [:idle, :cancelling, :directing] do
+      when phase in [:initializing, :idle, :cancelling, :directing] do
     {:keep_state_and_data, [{:reply, from, {:error, phase}}]}
   end
 
@@ -37,7 +37,7 @@ defmodule Jido.AgentServer.Cancellation do
   end
 
   def handle_event({:call, from}, {:cancel, _turn_id}, phase, %State{})
-      when phase in [:idle, :admitting, :running, :directing] do
+      when phase in [:initializing, :idle, :admitting, :running, :directing] do
     {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
   end
 

@@ -63,6 +63,9 @@ defmodule Jido.AgentServer.State do
               debug_max_events:
                 Zoi.integer(description: "Maximum recent runtime events") |> Zoi.default(500),
               state_version: Zoi.integer(description: "Agent commit revision"),
+              checkpoint_origin_module:
+                Zoi.atom(description: "Definition module used to start this Agent")
+                |> Zoi.optional(),
               activation_id:
                 Zoi.string(description: "Telemetry activation identity") |> Zoi.optional(),
               activation_span:

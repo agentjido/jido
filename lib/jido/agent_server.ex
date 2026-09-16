@@ -131,8 +131,8 @@ defmodule Jido.AgentServer do
 
         try do
           case DynamicSupervisor.start_child(Jido.agent_supervisor_name(jido), spec) do
-            {:ok, pid} -> startup_result(pid, reply)
-            {:ok, pid, _info} -> startup_result(pid, reply)
+            {:ok, pid} -> startup_result(pid, reply, opts)
+            {:ok, pid, _info} -> startup_result(pid, reply, opts)
             result -> result
           end
         after
@@ -261,7 +261,7 @@ defmodule Jido.AgentServer do
   def send_request(server, %Signal{} = signal, timeout \\ 5_000) do
     :gen_statem.send_request(
       server,
-      {:signal, make_ref(), signal, AdmissionDeadline.new(timeout)}
+      {:signal, make_ref(), signal, AdmissionDeadline.new(timeout), %{}}
     )
   end
 
@@ -601,18 +601,11 @@ defmodule Jido.AgentServer do
     Upgrade.upgrade_definition(from, target_module, migration, data)
   end
 
-  def handle_event({:call, _from}, {:upgrade_operation, _operation}, phase, %State{})
-      when phase in [:initializing, :admitting, :running, :directing] do
-    {:keep_state_and_data, [:postpone]}
-  end
-
-  def handle_event(
-        {:call, _from},
-        {:upgrade_definition, _target_module, _migration},
-        phase,
-        %State{}
-      )
-      when phase in [:initializing, :admitting, :running, :directing] do
+  def handle_event({:call, _from}, event, phase, %State{})
+      when phase in [:initializing, :admitting, :running, :cancelling, :directing] and
+             is_tuple(event) and
+             ((tuple_size(event) == 2 and elem(event, 0) == :upgrade_operation) or
+                (tuple_size(event) == 3 and elem(event, 0) == :upgrade_definition)) do
     {:keep_state_and_data, [:postpone]}
   end
 
@@ -627,7 +620,7 @@ defmodule Jido.AgentServer do
   end
 
   def handle_event({:call, _from}, {:hibernate, _opts}, phase, %State{})
-      when phase in [:admitting, :running, :directing] do
+      when phase in [:initializing, :admitting, :running, :cancelling, :directing] do
     {:keep_state_and_data, [:postpone]}
   end
 
@@ -688,9 +681,6 @@ defmodule Jido.AgentServer do
       when event == :cancel or (is_tuple(event) and elem(event, 0) == :cancel),
       do: Cancellation.handle_event(type, event, phase, data)
 
-  def handle_event({:call, _} = type, {:signal, _, %Signal{}, _} = event, phase, %State{} = data),
-    do: Admission.handle_event(type, event, phase, data)
-
   def handle_event(
         {:call, _} = type,
         {:signal, _, %Signal{}, _, _} = event,
@@ -728,11 +718,9 @@ defmodule Jido.AgentServer do
   defp route_info({:agent_child_online, _, _, _, _, _, _} = message, phase, data),
     do: ChildLifecycle.handle_event(:info, message, phase, data)
 
-  defp route_info({:jido_registry_restarted, pid}, phase, data),
-    do: ServerLifecycle.recover_registry_registration(pid, phase, data)
-
-  defp route_info({:jido_registry_recover, pid}, phase, data),
-    do: ServerLifecycle.recover_registry_registration(pid, phase, data)
+  defp route_info({tag, pid}, phase, data)
+       when tag in [:jido_registry_restarted, :jido_registry_recover],
+       do: ServerLifecycle.recover_registry_registration(pid, phase, data)
 
   defp route_info({:plugin_runtime_restarting, _, _} = message, phase, data),
     do: PluginLifecycle.handle_event(:info, message, phase, data)
@@ -744,24 +732,13 @@ defmodule Jido.AgentServer do
     do: PluginLifecycle.handle_event(:info, message, phase, data)
 
   defp route_info({ref, result} = message, phase, data) when is_reference(ref) do
-    cond do
-      phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) ->
-        Turn.admission_result(result, data)
-
-      phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) ->
-        PostCommit.commit_result(result, data)
-
-      phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) ->
-        PostCommit.directive_result(result, data)
-
-      Map.has_key?(data.error_policy_tasks, ref) ->
-        FailurePolicy.task_result(ref, result, data)
-
-      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) ->
-        Cancellation.task_result(result, data)
-
-      true ->
-        fallback_info(message, phase, data)
+    case task_owner(data, phase, ref) do
+      :admission -> Turn.admission_result(result, data)
+      :commit -> PostCommit.commit_result(result, data)
+      :directive -> PostCommit.directive_result(result, data)
+      :error_policy -> FailurePolicy.task_result(ref, result, data)
+      :cancel -> Cancellation.task_result(result, data)
+      nil -> fallback_info(message, phase, data)
     end
   end
 
@@ -773,20 +750,14 @@ defmodule Jido.AgentServer do
       phase == :initializing and match?(%{ref: ^ref}, data.plugin_bootstrap) ->
         ServerLifecycle.handle_event(:info, message, phase, data)
 
-      phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) ->
-        Turn.admission_down(reason, data)
-
-      phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) ->
-        PostCommit.commit_down(reason, data)
-
-      phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) ->
-        PostCommit.directive_down(reason, data)
-
-      Map.has_key?(data.error_policy_tasks, ref) ->
-        FailurePolicy.task_down(ref, reason, data)
-
-      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) ->
-        Cancellation.task_down(reason, data)
+      task = task_owner(data, phase, ref) ->
+        case task do
+          :admission -> Turn.admission_down(reason, data)
+          :commit -> PostCommit.commit_down(reason, data)
+          :directive -> PostCommit.directive_down(reason, data)
+          :error_policy -> FailurePolicy.task_down(ref, reason, data)
+          :cancel -> Cancellation.task_down(reason, data)
+        end
 
       phase == :running and
           match?(
@@ -825,27 +796,31 @@ defmodule Jido.AgentServer do
   end
 
   defp route_timeout(message, timer, {:after_commit_timeout, ref}, :directing, data) do
-    if TaskSupport.task_ref?(data.commit_task, ref) and data.commit_task.timer == timer,
-      do: PostCommit.commit_timeout(data),
-      else: fallback_info(message, :directing, data)
+    if task_owner(data, :directing, ref) == :commit and
+         TaskSupport.task_timer?(data.commit_task, ref, timer),
+       do: PostCommit.commit_timeout(data),
+       else: fallback_info(message, :directing, data)
   end
 
   defp route_timeout(message, timer, {:directive_timeout, ref}, :directing, data) do
-    if TaskSupport.task_ref?(data.directive_task, ref) and data.directive_task.timer == timer,
-      do: PostCommit.directive_timeout(data),
-      else: fallback_info(message, :directing, data)
+    if task_owner(data, :directing, ref) == :directive and
+         TaskSupport.task_timer?(data.directive_task, ref, timer),
+       do: PostCommit.directive_timeout(data),
+       else: fallback_info(message, :directing, data)
   end
 
   defp route_timeout(message, timer, {:error_policy_dispatch_timeout, ref}, phase, data) do
-    if Map.has_key?(data.error_policy_tasks, ref),
-      do: FailurePolicy.task_timeout(ref, timer, data),
-      else: fallback_info(message, phase, data)
+    if task_owner(data, phase, ref) == :error_policy and
+         TaskSupport.task_timer?(Map.get(data.error_policy_tasks, ref), ref, timer),
+       do: FailurePolicy.task_timeout(ref, data),
+       else: fallback_info(message, phase, data)
   end
 
   defp route_timeout(_message, timer, {:exec_cancel_timeout, ref}, :cancelling, data) do
-    if TaskSupport.task_ref?(data.cancel_task, ref) and data.cancel_task.timer == timer,
-      do: Cancellation.task_timeout(data),
-      else: {:keep_state_and_data, [:postpone]}
+    if task_owner(data, :cancelling, ref) == :cancel and
+         TaskSupport.task_timer?(data.cancel_task, ref, timer),
+       do: Cancellation.task_timeout(data),
+       else: {:keep_state_and_data, [:postpone]}
   end
 
   defp route_timeout(message, _timer, {:exec_adapter_timeout, _, _, _}, :running, data),
@@ -864,6 +839,17 @@ defmodule Jido.AgentServer do
     do: Turn.handle_exec_message(message, data)
 
   defp fallback_info(_message, _phase, %State{}), do: :keep_state_and_data
+
+  defp task_owner(%State{} = data, phase, ref) do
+    cond do
+      phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) -> :admission
+      phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) -> :commit
+      phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) -> :directive
+      Map.has_key?(data.error_policy_tasks, ref) -> :error_policy
+      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) -> :cancel
+      true -> nil
+    end
+  end
 
   defp handle_process_down(ref, pid, reason, phase, %State{} = data) do
     case Map.fetch(data.attachments, pid) do
@@ -901,8 +887,9 @@ defmodule Jido.AgentServer do
 
   defp server_name(%Options{}), do: nil
 
-  defp startup_result(pid, reply) do
+  defp startup_result(pid, reply, opts) do
     monitor = Process.monitor(pid)
+    timeout = Options.startup_timeout(opts)
 
     try do
       receive do
@@ -920,7 +907,7 @@ defmodule Jido.AgentServer do
             0 -> {:error, ServerLifecycle.normalize_startup_error(reason)}
           end
       after
-        5_000 ->
+        timeout ->
           if Process.alive?(pid), do: Process.exit(pid, :shutdown)
           {:error, :timeout}
       end

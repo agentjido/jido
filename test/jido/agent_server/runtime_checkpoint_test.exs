@@ -65,4 +65,28 @@ defmodule JidoTest.AgentServer.RuntimeCheckpointTest do
     assert {:error, :invalid_runtime_checkpoint} =
              Jido.start_agent(jido, Counter, id: id, restart: :temporary)
   end
+
+  test "a checkpoint without an upgrade marker still restores its original definition", %{
+    jido: jido
+  } do
+    id = unique_id("legacy-checkpoint")
+    {:ok, server} = Jido.start_agent(jido, Counter, id: id, restart: :temporary)
+    agent = %{Server.agent(server) | state: %{count: 9}}
+
+    assert :ok =
+             RuntimeStore.put(
+               jido,
+               :agent_runtime_checkpoints,
+               Jido.partition_key(id, nil),
+               %{agent: agent, state_version: 3}
+             )
+
+    monitor = Process.monitor(server)
+    Process.exit(server, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^server, :killed}, 1_000
+
+    assert {:ok, recovered} = Jido.start_agent(jido, Counter, id: id, restart: :temporary)
+    assert Server.agent(recovered).state == %{count: 9}
+    assert Server.snapshot(recovered).state_version == 3
+  end
 end

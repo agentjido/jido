@@ -78,7 +78,7 @@ defmodule Jido.AgentServer.Storage do
   end
 
   def persist_definition_upgrade(%State{persistence: nil} = data, target, version) do
-    RuntimeCheckpoint.put_upgrade(data, target, version)
+    RuntimeCheckpoint.put(data, target, version)
   end
 
   def persist_definition_upgrade(%State{agent: %{module: module}} = data, target, version)
