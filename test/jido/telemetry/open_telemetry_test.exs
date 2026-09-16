@@ -7,6 +7,32 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
   alias Jido.Tracing.Context
   alias JidoTest.OpenTelemetryTracer, as: TestTracer
 
+  defmodule NotifyFacet do
+    use Jido.AgentServer.Plugin
+    def after_commit(_runtime, _commit, _opts), do: :ok
+  end
+
+  defmodule NotifyPlugin do
+    use Jido.Plugin, agent_server: NotifyFacet
+  end
+
+  defmodule Add do
+    use Jido.Action,
+      name: "traced_notification_add",
+      schema: Zoi.object(%{amount: Zoi.integer()})
+
+    def run(%{amount: amount}, context),
+      do: {:ok, %{context.agent_state | count: context.agent_state.count + amount}}
+  end
+
+  defmodule NotifyAgent do
+    use Jido.Agent,
+      name: "traced_notification_agent",
+      schema: Zoi.object(%{count: Zoi.integer() |> Zoi.default(0)}),
+      routes: [{"trace.add", Add}],
+      plugins: [NotifyPlugin]
+  end
+
   setup do
     previous_tracer = :opentelemetry.get_tracer()
     previous_config = Application.fetch_env(:jido, :opentelemetry)
@@ -321,6 +347,35 @@ defmodule JidoTest.Telemetry.OpenTelemetryTest do
     assert span.trace.trace_flags == "01"
 
     Semantic.finish(span, %{status: :ok})
+  end
+
+  test "live Plugin notifications are children of their Turn for local and carrier Signals" do
+    instance = :"notification_trace_#{System.unique_integer([:positive])}"
+    start_supervised!({Jido, name: instance}, id: instance)
+    assert {:ok, server} = Jido.start_agent(instance, NotifyAgent, id: "trace-agent")
+
+    local = Signal.new!("trace.add", %{amount: 1}, source: "/test")
+    incoming = Jido.Signal.Trace.new(trace_flags: "01")
+    remote = Signal.new!("trace.add", %{amount: 2}, source: "/test")
+    assert {:ok, remote} = Jido.Signal.Trace.put(remote, incoming)
+
+    for {signal, remote?} <- [{local, false}, {remote, true}] do
+      assert {:ok, _agent} = Jido.AgentServer.call(server, signal)
+      assert_receive {:otel_start, turn_span, parent, "jido.agent.turn", _opts}, 2_000
+
+      if remote? do
+        assert :otel_span.hex_trace_id(parent) == incoming.trace_id
+        assert :otel_span.hex_span_id(parent) == incoming.span_id
+      else
+        refute :otel_span.is_valid(parent)
+      end
+
+      assert_receive {:otel_start, _notification, notification_parent, "jido.agent.after_commit",
+                      _opts},
+                     2_000
+
+      assert TestTracer.ids(notification_parent) == TestTracer.ids(turn_span)
+    end
   end
 
   test "configuration can disable OpenTelemetry without disabling semantic events" do

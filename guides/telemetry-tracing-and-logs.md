@@ -297,6 +297,11 @@ Jido-owned Tasks capture and attach the current process context. They restore
 the earlier context after they stop. A lower package must transfer context for
 Tasks that it starts.
 
+Plugin commit notification spans use the completed Turn span as their parent,
+as Directive spans do. This parent rule applies to an untraced local Signal and
+to a Signal with an incoming W3C carrier. The notification may run after the
+Turn span ends, but its trace parent remains that Turn.
+
 ## Operating rules
 
 - Keep Telemetry handlers small and non-blocking.

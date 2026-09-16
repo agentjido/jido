@@ -2288,7 +2288,11 @@ defmodule Jido.AgentServer do
         facet_module: plugin.agent_server.module
       })
 
-    span = AgentTelemetry.start(:after_commit, metadata, %{state_version: data.state_version})
+    span =
+      AgentTelemetry.start(:after_commit, metadata, %{state_version: data.state_version},
+        parent_span: data.active.span
+      )
+
     pending = %{rest: rest, directives: directives, span: span}
     launch_commit_notification(plugin, commit, pending, data)
   end
