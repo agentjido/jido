@@ -2919,26 +2919,11 @@ defmodule Jido.AgentServer do
     tag = info.parent.tag
     meta = info.parent.meta
 
-    data =
-      case Map.fetch(data.child_spawn_requests, tag) do
-        {:ok, request} ->
-          %{
-            data
-            | child_spawn_requests:
-                Map.put(data.child_spawn_requests, tag, %{request | status: :active})
-          }
-
-        :error ->
-          data
-      end
-
     case State.child(data, tag) do
       %ChildInfo{pid: ^pid} ->
-        data
+        mark_online_spawn_active(data, tag)
 
       existing ->
-        if match?(%ChildInfo{}, existing), do: Process.demonitor(existing.ref, [:flush])
-
         child =
           ChildInfo.new!(
             pid: pid,
@@ -2953,17 +2938,47 @@ defmodule Jido.AgentServer do
             meta: meta
           )
 
-        _ = persist_child_relationship(data, child)
+        case persist_child_relationship(data, child) do
+          :ok ->
+            if match?(%ChildInfo{}, existing), do: Process.demonitor(existing.ref, [:flush])
 
-        signal =
-          Jido.AgentServer.Signal.ChildStarted.for_child(
-            data.agent.id,
-            child,
-            not is_nil(existing)
-          )
+            signal =
+              Jido.AgentServer.Signal.ChildStarted.for_child(
+                data.agent.id,
+                child,
+                not is_nil(existing)
+              )
 
-        cast(self(), signal)
-        State.add_child(data, tag, child)
+            cast(self(), signal)
+            data |> mark_online_spawn_active(tag) |> State.add_child(tag, child)
+
+          {:error, _reason} ->
+            Process.demonitor(child.ref, [:flush])
+
+            _ =
+              ChildPlacement.stop(
+                data.jido,
+                pid,
+                :relationship_persist_failed,
+                data.directive_timeout
+              )
+
+            data
+        end
+    end
+  end
+
+  defp mark_online_spawn_active(data, tag) do
+    case Map.fetch(data.child_spawn_requests, tag) do
+      {:ok, request} ->
+        %{
+          data
+          | child_spawn_requests:
+              Map.put(data.child_spawn_requests, tag, %{request | status: :active})
+        }
+
+      :error ->
+        data
     end
   end
 

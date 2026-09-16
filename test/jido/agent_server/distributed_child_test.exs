@@ -6,6 +6,7 @@ defmodule Jido.AgentServer.DistributedChildTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Agent.Directive
   alias JidoTest.RemoteChildFixtures, as: Fixtures
+  alias JidoTest.RelationshipFaultStore
   alias Jido.Examples.{RemoteCounter, RemoteParent}
 
   test "a generated command reaches an existing Agent on another node", context do
@@ -239,6 +240,47 @@ defmodule Jido.AgentServer.DistributedChildTest do
 
     assert :ok = peer_call(c.peer_a, Server, :stop_child, [parent, :worker])
     assert supervised(c.peer_b, c.jido) == []
+  end
+
+  test "a late online child is stopped when the parent cannot save its relationship", c do
+    parent = start_parent(c, directive_timeout: 100)
+    supervisor = Jido.agent_supervisor_name(c.jido)
+    store_name = Jido.runtime_store_name(c.jido)
+    directive = Directive.spawn_child(RemoteCounter, :worker, node: c.node_b)
+    assert :ok = peer_call(c.peer_b, :sys, :suspend, [supervisor])
+
+    try do
+      dispatch(c, parent, directive)
+      assert {{:child_spawn_indeterminate, :worker, _, request, :timeout}, _} = failure(c)
+
+      assert :ok = peer_call(c.peer_a, Supervisor, :terminate_child, [c.jido, store_name])
+      assert {:ok, fault} = peer_call(c.peer_a, RelationshipFaultStore, :start, [store_name])
+
+      try do
+        assert :ok = peer_call(c.peer_b, :sys, :resume, [supervisor])
+
+        peer_eventually(fn ->
+          peer_call(c.peer_a, RelationshipFaultStore, :rejected, [fault]) > 0
+        end)
+
+        peer_eventually(fn -> supervised(c.peer_b, c.jido) == [] end)
+        assert peer_call(c.peer_a, Server, :children, [parent]) == %{}
+
+        assert %{runtime: %{pending_child_spawns: %{worker: %{request_id: ^request}}}} =
+                 peer_call(c.peer_a, Server, :status, [parent])
+
+        dispatch(c, parent, directive)
+        assert {{:spawn_child_failed, :spawn_request_closed}, _} = failure(c)
+        assert peer_call(c.peer_a, Server, :status, [parent]).runtime.pending_child_spawns == %{}
+      after
+        assert :ok = peer_call(c.peer_a, GenServer, :stop, [fault])
+
+        assert {:ok, _store} =
+                 peer_call(c.peer_a, Supervisor, :restart_child, [c.jido, store_name])
+      end
+    after
+      peer_call(c.peer_b, :sys, :resume, [supervisor])
+    end
   end
 
   test "parent loss before delayed startup leaves no remote child", c do

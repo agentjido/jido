@@ -65,6 +65,12 @@ target cannot be checked, keep the request unresolved and use an operator rule
 to inspect both nodes before any new parent activation. Core has no public
 pending-start cancellation operation.
 
+The parent must save the child relationship before it accepts a late online
+notice and emits `ChildStarted`. If that write fails, it stops the late child
+and keeps the request pending. A later retry can report
+`:spawn_request_closed` and clear that old request. The write is required for
+restored ownership; an online notice alone is not enough.
+
 `EmitToChild` and `EmitToParent` send relative Signals by asynchronous cast.
 A successful Directive means that Jido queued the cast; it does not mean that
 the receiving Agent committed a Turn. For important work, commit a stable work
