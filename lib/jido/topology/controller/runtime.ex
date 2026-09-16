@@ -27,7 +27,7 @@ defmodule Jido.Topology.Controller.Runtime do
   def init({jido, instance, repair, lifecycle, owner}) do
     Process.flag(:trap_exit, true)
 
-    with {:ok, accepted, revision, placements} <- TargetStore.load(jido, instance) do
+    with {:ok, accepted, revision, placements, pending_move} <- TargetStore.load(jido, instance) do
       state = %{
         jido: jido,
         owner: owner,
@@ -52,7 +52,8 @@ defmodule Jido.Topology.Controller.Runtime do
         operation_id: nil,
         operation_override: nil,
         last_status: nil,
-        placements: placements
+        placements: placements,
+        pending_move: pending_move
       }
 
       {:ok, state, {:continue, :reconcile}}
@@ -148,39 +149,42 @@ defmodule Jido.Topology.Controller.Runtime do
     with :ok <- update_idle(state),
          {:ok, key, current} <- placement_target(state, target, member),
          :ok <- placement_node(target_node),
-         :ok <- placement_resources(current, target_node) do
+         :ok <- placement_resources(current, target_node),
+         :ok <- placement_owner(current, state, timeout) do
       if current.node == target_node do
         {:reply, :ok, state}
       else
-        with :ok <- retire(current, state, timeout) do
-          placements = Map.put(Map.get(state, :placements, %{}), key, target_node)
+        placements = Map.put(state.placements, key, target_node)
+        move = %{key: key, from: current.node, to: target_node}
 
-          case TargetStore.accept(
-                 state.jido,
-                 state.target_revision,
-                 state.instance,
-                 placements
-               ) do
-            {:ok, revision} ->
-              state =
-                state
-                |> Map.put(:placements, placements)
-                |> Map.put(:target_revision, revision)
-                |> Map.update!(:ready, &Map.delete(&1, key))
-                |> Map.update!(:errors, &Map.delete(&1, key))
-                |> Map.put(:operation_override, :place)
-                |> request_pass()
+        case TargetStore.accept_placement(
+               state.jido,
+               state.target_revision,
+               state.instance,
+               placements,
+               move
+             ) do
+          {:ok, revision} ->
+            state =
+              state
+              |> Map.put(:placements, placements)
+              |> Map.put(:pending_move, move)
+              |> Map.put(:target_revision, revision)
+              |> Map.update!(:ready, &Map.delete(&1, key))
+              |> Map.update!(:errors, &Map.delete(&1, key))
+              |> Map.put(:operation_override, :place)
 
-              {:reply, :ok, state}
+            case finish_pending_move(state, timeout) do
+              {:ok, state} -> {:reply, :ok, request_pass(state)}
+              {:error, reason, state} -> {:reply, {:error, reason}, pending_error(state, reason)}
+              {:fatal, reason, state} -> {:stop, reason, {:error, reason}, state}
+            end
 
-            {:error, {:indeterminate, reason}} = error ->
-              {:stop, {:target_write_indeterminate, reason}, error, state}
+          {:error, {:indeterminate, reason}} = error ->
+            {:stop, {:target_write_indeterminate, reason}, error, state}
 
-            {:error, _reason} = error ->
-              {:reply, error, request_pass(state)}
-          end
-        else
-          {:error, _reason} = error -> {:reply, error, state}
+          {:error, _reason} = error ->
+            {:reply, error, state}
         end
       end
     else
@@ -321,7 +325,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp current_phase(state), do: state.phase
 
-  defp update_idle(%{active: active}) when map_size(active) == 0, do: :ok
+  defp update_idle(%{active: active, pending_move: nil}) when map_size(active) == 0, do: :ok
 
   defp update_idle(_state),
     do: Jido.Agent.Authoring.error("Topology update or placement requires an idle repair pass")
@@ -366,6 +370,14 @@ defmodule Jido.Topology.Controller.Runtime do
     if map_size(state.active) > 0,
       do: %{state | reconcile_requested: true},
       else: begin_pass(state)
+  end
+
+  defp begin_pass(%{pending_move: move} = state) when not is_nil(move) do
+    case finish_pending_move(state, state.instance.definition.startup.task_timeout) do
+      {:ok, state} -> begin_pass(state)
+      {:error, reason, state} -> pending_error(state, reason)
+      {:fatal, reason, _state} -> exit(reason)
+    end
   end
 
   defp begin_pass(state) do
@@ -708,6 +720,47 @@ defmodule Jido.Topology.Controller.Runtime do
           end
       end
     end
+  end
+
+  defp placement_owner(spec, state, timeout) do
+    context = ownership_context(state)
+
+    with {:ok, pid} <- lookup_agent(spec, state.jido, timeout) do
+      if is_nil(pid) or owned?(:agent, pid, spec, context),
+        do: :ok,
+        else: Jido.Agent.Authoring.error("Topology Agent identity is in use")
+    end
+  end
+
+  defp finish_pending_move(%{pending_move: %{key: key, from: from}} = state, timeout) do
+    spec = state.instance.plan.agents |> Map.fetch!(key) |> Map.put(:node, from)
+
+    with :ok <- retire(spec, state, timeout),
+         {:ok, revision} <-
+           TargetStore.complete_placement(
+             state.jido,
+             state.target_revision,
+             state.instance,
+             state.placements
+           ) do
+      {:ok, %{state | target_revision: revision, pending_move: nil}}
+    else
+      {:error, {:indeterminate, reason}} ->
+        {:fatal, {:target_write_indeterminate, reason}, state}
+
+      {:error, :conflict} ->
+        {:fatal, :target_write_conflict, state}
+
+      {:error, reason} ->
+        {:error, reason, state}
+    end
+  end
+
+  defp pending_error(state, reason) do
+    key = state.pending_move.key
+
+    %{state | phase: :degraded, errors: Map.put(state.errors, key, reason)}
+    |> schedule_reconcile()
   end
 
   defp bind_parent(_pid, %{parent: nil}, _state), do: :ok

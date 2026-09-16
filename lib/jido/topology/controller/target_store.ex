@@ -21,13 +21,33 @@ defmodule Jido.Topology.Controller.TargetStore do
   end
 
   def accept(jido, revision, %Instance{} = target, placements) do
+    write_target(jido, revision, target, placements, nil)
+  end
+
+  def accept_placement(jido, revision, %Instance{} = target, placements, move) do
+    write_target(jido, revision, target, placements, move)
+  end
+
+  def complete_placement(jido, revision, %Instance{} = target, placements) do
+    write_target(jido, revision, target, placements, nil)
+  end
+
+  defp write_target(jido, revision, target, placements, pending_move) do
     with {:ok, adapter} <- Persistence.resolve_config(:inherit, jido) do
       case adapter do
         nil ->
-          accept_local(jido, revision, target, placements)
+          accept_local(jido, revision, target, placements, pending_move)
 
         {module, opts} ->
-          accept_durable(module, opts, key(jido, target.id), revision, target, placements)
+          accept_durable(
+            module,
+            opts,
+            key(jido, target.id),
+            revision,
+            target,
+            placements,
+            pending_move
+          )
       end
     end
   end
@@ -39,9 +59,9 @@ defmodule Jido.Topology.Controller.TargetStore do
 
   defp load_local(jido, initial) do
     case Jido.RuntimeStore.get(jido, @hive, initial.id) do
-      %{instance: target, revision: revision, placements: placements}
+      %{instance: target, revision: revision, placements: placements} = record
       when is_integer(revision) and revision > 0 and is_map(placements) ->
-        validate_target(initial, target, revision, placements)
+        validate_target(initial, target, revision, placements, Map.get(record, :pending_move))
 
       nil ->
         placements =
@@ -54,21 +74,22 @@ defmodule Jido.Topology.Controller.TargetStore do
               %{}
           end
 
-        {:ok, initial, 0, Map.take(placements, Map.keys(initial.plan.agents))}
+        {:ok, initial, 0, Map.take(placements, Map.keys(initial.plan.agents)), nil}
 
       _ ->
         {:error, :invalid_topology_target}
     end
   end
 
-  defp accept_local(jido, revision, target, placements) do
+  defp accept_local(jido, revision, target, placements, pending_move) do
     next = revision + 1
 
     with :ok <-
            Jido.RuntimeStore.put(jido, @hive, target.id, %{
              instance: target,
              revision: next,
-             placements: placements
+             placements: placements,
+             pending_move: pending_move
            }),
          :ok <-
            Jido.RuntimeStore.put(jido, @placements, target.id, %{
@@ -81,14 +102,14 @@ defmodule Jido.Topology.Controller.TargetStore do
 
   defp load_durable(module, opts, key, initial) do
     case read(module, key, opts) do
-      {:ok, :not_found, _condition} -> {:ok, initial, 0, %{}}
+      {:ok, :not_found, _condition} -> {:ok, initial, 0, %{}, nil}
       {:ok, bytes, _condition} -> decode(bytes, initial)
       {:error, reason} -> {:error, {:topology_target_restore_failed, reason}}
     end
   end
 
-  defp accept_durable(module, opts, key, revision, target, placements) do
-    with :ok <- portable(target, placements),
+  defp accept_durable(module, opts, key, revision, target, placements, pending_move) do
+    with :ok <- portable(target, placements, pending_move),
          {:ok, value, condition} <- read(module, key, opts),
          :ok <- expected_revision(value, target.id, revision),
          next = revision + 1,
@@ -99,16 +120,22 @@ defmodule Jido.Topology.Controller.TargetStore do
              revision: next,
              definition: target.definition,
              input: target.input,
-             placements: placements
+             placements: placements,
+             pending_move: pending_move
            }),
          :ok <- write(module, key, condition, bytes, opts) do
       {:ok, next}
     end
   end
 
-  defp portable(target, placements) do
+  defp portable(target, placements, pending_move) do
     case PortableTerm.validate(
-           %{definition: target.definition, input: target.input, placements: placements},
+           %{
+             definition: target.definition,
+             input: target.input,
+             placements: placements,
+             pending_move: pending_move
+           },
            :topology
          ) do
       :ok -> :ok
@@ -135,11 +162,12 @@ defmodule Jido.Topology.Controller.TargetStore do
             definition: definition,
             input: input,
             placements: placements
-          }} <- decode_record(bytes),
+          } = record} <- decode_record(bytes),
          :ok <- if(id == initial.id, do: :ok, else: {:error, :topology_target_identity_mismatch}),
          {:ok, target} <- Topology.instantiate(definition, id: id, input: input),
-         :ok <- portable(target, placements) do
-      validate_target(initial, target, revision, placements)
+         pending_move = Map.get(record, :pending_move),
+         :ok <- portable(target, placements, pending_move) do
+      validate_target(initial, target, revision, placements, pending_move)
     end
   end
 
@@ -155,13 +183,9 @@ defmodule Jido.Topology.Controller.TargetStore do
       } = record
       when is_binary(id) and is_integer(revision) and revision > 0 and is_map(input) and
              is_map(placements) ->
-        if Map.keys(record) |> Enum.sort() == [
-             :definition,
-             :format,
-             :id,
-             :input,
-             :placements,
-             :revision
+        if Enum.sort(Map.keys(record)) in [
+             [:definition, :format, :id, :input, :placements, :revision],
+             [:definition, :format, :id, :input, :pending_move, :placements, :revision]
            ],
            do: {:ok, record},
            else: {:error, :invalid_topology_target}
@@ -173,22 +197,32 @@ defmodule Jido.Topology.Controller.TargetStore do
     ArgumentError -> {:error, :invalid_topology_target}
   end
 
-  defp validate_target(initial, %Instance{} = target, revision, placements) do
+  defp validate_target(initial, %Instance{} = target, revision, placements, pending_move) do
     unchanged? =
       initial.plan.resources == target.plan.resources and
         Enum.all?(initial.plan.agents, fn {key, spec} ->
           Map.get(target.plan.agents, key) == spec
         end)
 
-    if target.id == initial.id and unchanged? do
-      {:ok, target, revision, Map.take(placements, Map.keys(target.plan.agents))}
+    if target.id == initial.id and unchanged? and valid_move?(target, placements, pending_move) do
+      {:ok, target, revision, Map.take(placements, Map.keys(target.plan.agents)), pending_move}
     else
       {:error, :incompatible_topology_target}
     end
   end
 
-  defp validate_target(_initial, _target, _revision, _placements),
+  defp validate_target(_initial, _target, _revision, _placements, _pending_move),
     do: {:error, :invalid_topology_target}
+
+  defp valid_move?(_target, _placements, nil), do: true
+
+  defp valid_move?(target, placements, %{key: key, from: from, to: to} = move) do
+    move == %{key: key, from: from, to: to} and is_binary(key) and
+      is_atom(from) and is_atom(to) and Map.has_key?(target.plan.agents, key) and
+      Map.get(placements, key) == to
+  end
+
+  defp valid_move?(_target, _placements, _move), do: false
 
   defp read(module, key, opts) do
     case safe_call(fn -> apply(module, :get, [key, opts]) end) do

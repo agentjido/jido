@@ -30,19 +30,27 @@ defmodule Jido.Topology.Controller.TargetStoreTest do
     initial = topology("target-store", 1)
     target = topology(initial.id, 2)
 
-    assert {:ok, ^initial, 0, %{}} = TargetStore.load(jido, initial)
+    assert {:ok, ^initial, 0, %{}, nil} = TargetStore.load(jido, initial)
     assert {:ok, 1} = TargetStore.accept(jido, 0, target, %{})
-    assert {:ok, ^target, 1, %{}} = TargetStore.load(jido, initial)
+    assert {:ok, ^target, 1, %{}, nil} = TargetStore.load(jido, initial)
     assert {:error, :conflict} = TargetStore.accept(jido, 0, target, %{})
 
     key = target.plan.agents |> Map.keys() |> hd()
     placement = %{key => node()}
     expanded = topology(initial.id, 3)
     assert {:ok, 2} = TargetStore.accept(jido, 1, expanded, placement)
-    assert {:ok, ^expanded, 2, ^placement} = TargetStore.load(jido, initial)
+    assert {:ok, ^expanded, 2, ^placement, nil} = TargetStore.load(jido, initial)
+
+    other_node = :"pending-placement@127.0.0.1"
+    move = %{key: key, from: node(), to: other_node}
+    moved = %{key => other_node}
+    assert {:ok, 3} = TargetStore.accept_placement(jido, 2, expanded, moved, move)
+    assert {:ok, ^expanded, 3, ^moved, ^move} = TargetStore.load(jido, initial)
+    assert {:ok, 4} = TargetStore.complete_placement(jido, 3, expanded, moved)
+    assert {:ok, ^expanded, 4, ^moved, nil} = TargetStore.load(jido, initial)
 
     assert {:error, {:nonportable_topology_target, _}} =
-             TargetStore.accept(jido, 2, %{expanded | input: %{pid: self()}}, placement)
+             TargetStore.accept(jido, 4, %{expanded | input: %{pid: self()}}, placement)
   end
 
   test "uncertain target write has an explicit indeterminate result" do

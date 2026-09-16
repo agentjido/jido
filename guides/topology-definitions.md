@@ -104,6 +104,14 @@ code and the same named Jido instance. Core does not fall back to a local node.
 The new Agent restores through configured shared persistence. Without shared
 persistence, it starts from its declared initial state.
 
+Placement checks the old Agent and accepts a pending target record before it
+stops that Agent. A rejected target write leaves the old Agent and its state
+live. After an accepted write, the Controller stops the old Agent, clears the
+pending record, and starts the target Agent. If the Controller crashes during
+those steps, its replacement reads the pending record and finishes the stop
+before it starts the target. A stop failure keeps the move pending and blocks
+target activation until a later reconciliation succeeds.
+
 ## Add Refined Authoring Syntax
 
 Pass Spark extensions with

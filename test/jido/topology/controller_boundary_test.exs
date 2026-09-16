@@ -4,6 +4,7 @@ defmodule Jido.Topology.ControllerBoundaryTest do
   alias Jido.AgentServer, as: Server
   alias Jido.Examples.Topology.Cell
   alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.Controller.TargetStore
 
   @offline :"topology-unavailable@127.0.0.1"
 
@@ -132,6 +133,50 @@ defmodule Jido.Topology.ControllerBoundaryTest do
     assert :ok = Supervisor.stop(controller)
     assert_receive {:ownership_settled, ^topology_id}, 1_000
     assert Jido.RuntimeStore.get(jido, :topology_placements, instance.id) == nil
+  end
+
+  test "a rejected durable placement write keeps the old Agent and state live" do
+    suffix = System.unique_integer([:positive])
+    jido = :"placement_reject_#{suffix}"
+    table = :"placement_reject_table_#{suffix}"
+    start_supervised!({Jido, name: jido, persistence: {Jido.Persistence.ETS, table: table}})
+    instance = topology("placement-reject-#{suffix}")
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert :ok = Controller.await_ready(controller)
+    old = Controller.whereis_agent(controller, :worker)
+    assert {:ok, committed} = Cell.work(old, 7)
+
+    assert {:ok, 1} = TargetStore.accept(jido, 0, instance, %{})
+    assert {:error, :conflict} = Controller.place_agent(controller, :worker, @offline)
+
+    assert Process.alive?(old)
+    assert Controller.whereis_agent(controller, :worker) == old
+    assert Controller.agent_node(controller, :worker) == node()
+    assert Server.agent(old) == committed
+  end
+
+  test "a restarted Controller finishes an accepted pending placement", %{jido: jido} do
+    instance = topology("pending-placement")
+    controller = start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+    assert :ok = Controller.await_ready(controller)
+    old = Controller.whereis_agent(controller, :worker)
+    assert {:ok, committed} = Cell.work(old, 3)
+    assert Server.agent(old) == committed
+    key = "agent/worker"
+    move = %{key: key, from: node(), to: @offline}
+    placements = %{key => @offline}
+    assert {:ok, 1} = TargetStore.accept_placement(jido, 0, instance, placements, move)
+    assert {:ok, ^instance, 1, ^placements, ^move} = TargetStore.load(jido, instance)
+
+    before = runtime(controller)
+    monitor = Process.monitor(before)
+    Process.exit(before, :kill)
+    assert_receive {:DOWN, ^monitor, :process, ^before, :killed}, 1_000
+
+    eventually(fn -> is_pid(runtime(controller)) and runtime(controller) != before end)
+    eventually(fn -> not Process.alive?(old) end)
+    assert {:ok, ^instance, 2, ^placements, nil} = TargetStore.load(jido, instance)
+    assert Controller.agent_node(controller, :worker) == @offline
   end
 
   test "saved placement survives a worker restart and drops keys outside the plan", %{jido: jido} do
