@@ -211,23 +211,30 @@ defmodule Jido.AgentServer.DirectiveRuntime do
   end
 
   defp spawn_process(%SpawnProcess{child_spec: child_spec}, state) do
-    result =
-      cond do
-        is_function(state.spawn_fun, 1) ->
-          state.spawn_fun.(child_spec)
+    try do
+      result =
+        cond do
+          is_function(state.spawn_fun, 1) ->
+            state.spawn_fun.(child_spec)
 
-        is_atom(state.jido) ->
-          DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), child_spec)
+          is_atom(state.jido) ->
+            DynamicSupervisor.start_child(Jido.agent_supervisor_name(state.jido), child_spec)
 
-        true ->
-          {:error, :jido_instance_required}
+          true ->
+            {:error, :jido_instance_required}
+        end
+
+      case result do
+        {:ok, pid} when is_pid(pid) -> {:ok, state}
+        {:ok, pid, _info} when is_pid(pid) -> {:ok, state}
+        :ignore -> {:ok, state}
+        {:error, reason} -> {:error, {:spawn_process_failed, reason}, state}
+        other -> {:error, {:spawn_process_failed, {:invalid_start_result, other}}, state}
       end
-
-    case result do
-      {:ok, _pid} -> {:ok, state}
-      {:ok, _pid, _info} -> {:ok, state}
-      :ignore -> {:ok, state}
-      {:error, reason} -> {:error, {:spawn_process_failed, reason}, state}
+    rescue
+      error -> {:error, {:spawn_process_failed, error}, state}
+    catch
+      kind, reason -> {:error, {:spawn_process_failed, {kind, reason}}, state}
     end
   end
 

@@ -14,6 +14,9 @@ Plugin Agent Server facet. The V2
 If one directive fails, the committed state remains. Later directives in that
 batch do not run. Ordinary directives have no crash-replay guarantee.
 Use explicit persisted intent and acknowledgement for recoverable work.
+For `SpawnProcess`, a raised start callback, an exit, or an unexpected start
+result becomes a Directive failure after commit. The external start may already
+have happened; Jido cannot undo it.
 
 See [commit and delivery tests](../test/jido/agent/stateless_directive_test.exs)
 and the [recovery examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md).

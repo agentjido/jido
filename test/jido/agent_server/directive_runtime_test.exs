@@ -128,6 +128,25 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
            )
   end
 
+  test "generic spawning contains callback faults and unexpected start results", %{
+    runtime: state,
+    context: context
+  } do
+    directive = Directive.spawn_process({Elixir.Agent, fn -> :ready end})
+
+    for {spawn_fun, reason} <- [
+          {fn _spec -> raise "start failed" end, %RuntimeError{message: "start failed"}},
+          {fn _spec -> throw(:start_failed) end, {:throw, :start_failed}},
+          {fn _spec -> :unexpected end, {:invalid_start_result, :unexpected}},
+          {fn _spec -> {:ok, :not_a_pid} end, {:invalid_start_result, {:ok, :not_a_pid}}}
+        ] do
+      runtime = %{state | spawn_fun: spawn_fun}
+
+      assert {:error, {:spawn_process_failed, ^reason}, ^runtime} =
+               DirectiveRuntime.handle(directive, context, runtime)
+    end
+  end
+
   test "adoption rejects self, dead children, missing ids and occupied tags", %{
     runtime: state,
     context: context
