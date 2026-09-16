@@ -201,8 +201,10 @@ defmodule Jido.AgentServer do
   completed even if its reply was lost. A new activation must restore the
   authoritative stored state before it can continue.
 
-  `:agent_id`, `:agent_state`, and `:signal` are reserved execution keys. The
-  Server supplies its own `:jido` and `:partition` values. Caller timeout stops
+  `:agent_id`, `:agent_state`, `:signal`, and `:plugin_inputs` are reserved
+  execution keys. The live Server sets `:jido` and `:partition` from its own
+  state and overrides caller values for those two keys. Direct `Jido.Agent.cmd/3`
+  has no Server state, so those keys stay caller-owned there. Caller timeout stops
   waiting; it does not cancel execution that has already started.
   Admission time starts at the caller. Remote admission queries the caller's
   monotonic clock with a one-second bound and counts the query duration.

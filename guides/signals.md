@@ -8,6 +8,12 @@ its defaults with Signal data. Signal data takes precedence. The merge is
 shallow. Jido selects the first target in Jido Signal Router order. No match
 returns a routing error.
 
+Action Exec context includes Server-owned `:agent_id`, `:agent_state`,
+`:signal`, and `:plugin_inputs`. In a live Turn, AgentServer also sets `:jido`
+and `:partition` from its own state, even when the caller supplies other
+values. Direct `Agent.cmd/3` has no Server state; it passes caller values for
+those two keys and leaves them absent when the caller does not supply them.
+
 The `routes` block can set `signal_source` and declare nested `define` entries
 for generated Signal and command functions. Exact routes can expose interfaces;
 wildcards and match predicates cannot expose positional helpers.
