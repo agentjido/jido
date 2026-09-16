@@ -52,6 +52,26 @@ A timeout or node disconnect does not prove that the child never started. Retry
 with the same logical request, then reconcile the remote result. Local Registry
 and relationship data do not create cluster-wide ownership authority.
 
+While `AgentServer.status/1` shows a `pending_child_spawns` entry for a tag,
+retry only the same `SpawnChild` Directive with the same target node, options,
+and tag. A changed target or `StopChild` returns `:child_spawn_pending`; it does
+not cancel the request. Restore the target connection and retry the original
+Directive. Then check `AgentServer.children/1` and the target Agent identity.
+When the child becomes tracked, use `StopChild` if it must stop. If the old
+request is closed and no child exists, the retry reports
+`:spawn_request_closed` and clears the pending entry; a later request can start
+a new generation. Do not reuse the tag while the old result is unknown. If the
+target cannot be checked, keep the request unresolved and use an operator rule
+to inspect both nodes before any new parent activation. Core has no public
+pending-start cancellation operation.
+
+`EmitToChild` and `EmitToParent` send relative Signals by asynchronous cast.
+A successful Directive means that Jido queued the cast; it does not mean that
+the receiving Agent committed a Turn. For important work, commit a stable work
+ID in the sender's state, let the receiver send an acknowledgement Signal only
+after its own commit, and clear the pending ID when the sender commits that
+acknowledgement. The receiver must ignore a repeated work ID.
+
 See [Start Child Agents](child-agents.livemd),
 [Topology Definitions](topology-definitions.md), and
 [Extension Boundaries](extension-boundaries.md).

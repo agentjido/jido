@@ -65,6 +65,11 @@ or infer a terminal Outcome from the committed revision. A Directive timeout
 also does not prove that an external effect did not occur before the task
 stopped.
 
+For `EmitToParent` and `EmitToChild`, successful dispatch means an asynchronous
+cast was queued. The target can stop or reject the Signal before any state
+commit. Use a stable work ID and a receiver acknowledgement Signal after its
+commit when the work result matters.
+
 For durable delivery, save explicit pending work or use a durable Signal Bus
 subscription when that contract fits.
 

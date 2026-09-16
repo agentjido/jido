@@ -14,6 +14,10 @@ Plugin Agent Server facet. The V2
 If one directive fails, the committed state remains. Later directives in that
 batch do not run. Ordinary directives have no crash-replay guarantee.
 Use explicit persisted intent and acknowledgement for recoverable work.
+`EmitToParent` and `EmitToChild` use asynchronous casts. Their successful
+Directive result means queued, not committed by the target Agent. For important
+work, store a stable work ID and wait for a receiver acknowledgement after its
+commit. See [Recoverable Effects](recoverable-effects.md).
 For `SpawnProcess`, a raised start callback, an exit, or an unexpected start
 result becomes a Directive failure after commit. The external start may already
 have happened; Jido cannot undo it.

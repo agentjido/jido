@@ -71,6 +71,23 @@ defmodule Jido.AgentServer.DirectiveRuntimeTest do
     end
   end
 
+  test "relative Signal cast success does not prove target delivery", %{
+    runtime: state,
+    context: context
+  } do
+    target = spawn(fn -> :ok end)
+    ref = Process.monitor(target)
+    assert_receive {:DOWN, ^ref, :process, ^target, _}
+
+    runtime = %{state | children: %{child: child(target)}}
+    outbound = signal("runtime.unreceived")
+
+    assert {:ok, ^runtime} =
+             DirectiveRuntime.handle(Directive.emit_to_child(:child, outbound), context, runtime)
+
+    refute_received {:"$gen_cast", _}
+  end
+
   test "external dispatch reports errors, exceptions and throws without changing state", %{
     runtime: state,
     context: context
