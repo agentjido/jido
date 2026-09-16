@@ -2,6 +2,8 @@ defmodule Jido.Persistence.Checkpoint do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Error
+  alias Jido.Persistence.Record
   alias Jido.Agent.Plugin.Spec, as: AgentSpec
   alias Jido.Persistence.Plugin, as: PersistencePlugin
   alias Jido.Persistence.Plugin.Spec, as: PersistenceSpec
@@ -113,4 +115,70 @@ defmodule Jido.Persistence.Checkpoint do
   end
 
   defp custom_checkpoint?(checkpoint), do: Map.get(checkpoint, :kind) == @custom_checkpoint_kind
+
+  @doc false
+  def restore_agent(record, agent_module, agent_id, instance) do
+    with :ok <- validate_definition_revision(record, agent_module),
+         {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
+         {:ok, agent} <-
+           Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
+         :ok <- validate_restored_identity(agent, agent_module, agent_id) do
+      {:ok, agent}
+    end
+  end
+
+  defp restore_checkpoint(record, agent_module) do
+    checkpoint = Record.checkpoint(record)
+
+    if Record.format(record) in [Record.format_version(), Record.ref_format_version()] do
+      load(agent_module, checkpoint, Record.format(record), :restore)
+    else
+      {:ok, checkpoint}
+    end
+  end
+
+  defp validate_definition_revision(record, agent_module) do
+    case Record.agent_vsn(record) do
+      nil ->
+        :ok
+
+      saved_vsn ->
+        case current_definition_revision(agent_module) do
+          ^saved_vsn ->
+            :ok
+
+          current_vsn ->
+            {:error,
+             Error.validation_error("Stored Agent definition revision does not match",
+               kind: :config,
+               subject: agent_module,
+               details: %{
+                 code: :definition_mismatch,
+                 saved_vsn: saved_vsn,
+                 current_vsn: current_vsn
+               }
+             )}
+        end
+    end
+  end
+
+  defp current_definition_revision(agent_module) do
+    if Code.ensure_loaded?(agent_module) and function_exported?(agent_module, :vsn, 0),
+      do: agent_module.vsn(),
+      else: nil
+  end
+
+  defp validate_restored_identity(%Agent{module: module, id: id}, module, id), do: :ok
+
+  defp validate_restored_identity(_agent, _module, _id),
+    do: {:error, {:invalid_persistence_record, :checkpoint_identity}}
+
+  defp restore_context(record, instance) do
+    %{
+      instance: instance,
+      partition: Map.fetch!(record, :partition),
+      revision: Record.revision(record),
+      reason: :restore
+    }
+  end
 end

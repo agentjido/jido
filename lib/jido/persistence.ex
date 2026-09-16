@@ -37,46 +37,20 @@ defmodule Jido.Persistence do
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Record, WriteAuthority}
+  alias Jido.Persistence.{AdapterOps, Checkpoint, Identity, Record, Source, WriteAuthority}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.PortableTerm
-
-  @key_prefix "jido:agent:v1:"
-  @ref_key_prefix "jido:agent:v2:"
 
   @type adapter_config :: {module(), keyword()} | module() | nil | false
 
   @doc "Normalizes an adapter declaration."
   @spec normalize_adapter(adapter_config()) :: {module(), keyword()} | nil
-  def normalize_adapter(nil), do: nil
-  def normalize_adapter(false), do: nil
-
-  def normalize_adapter({adapter, opts}) when is_atom(adapter) and is_list(opts) do
-    if Keyword.keyword?(opts) do
-      {adapter, opts}
-    else
-      raise ArgumentError, "persistence adapter options must be a keyword list"
-    end
-  end
-
-  def normalize_adapter(adapter) when is_atom(adapter), do: {adapter, []}
-
-  def normalize_adapter(config) do
-    raise ArgumentError, "invalid Jido persistence adapter: #{inspect(config)}"
-  end
+  defdelegate normalize_adapter(config), to: Source
 
   @doc false
   @spec resolve_config(term(), atom() | nil) ::
           {:ok, {module(), keyword()} | nil} | {:error, term()}
-  def resolve_config(:inherit, jido), do: resolve_instance_config(jido)
-  def resolve_config(nil, _jido), do: {:ok, nil}
-  def resolve_config(false, _jido), do: {:ok, nil}
-
-  def resolve_config(config, _jido) do
-    config
-    |> normalize_adapter_result()
-    |> validate_adapter_result()
-  end
+  defdelegate resolve_config(config, jido), to: Source
 
   @doc """
   Saves one Agent checkpoint with an atomic revision check.
@@ -100,18 +74,18 @@ defmodule Jido.Persistence do
 
   def save_agent(source, %Agent{} = agent, opts) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
-      protect(:compare_and_swap, fn ->
-        with :ok <- validate_operation_options(opts),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      AdapterOps.protect(:compare_and_swap, fn ->
+        with :ok <- Source.validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              {:ok, identity} <-
-               storage_identity({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
+               Identity.resolve({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
              {:ok, record} <- build_record(agent, instance, opts, identity),
              {:ok, expected_revision} <- expected_revision(opts),
              {:ok, expected_value} <-
                current_value(adapter, adapter_opts, record, identity, expected_revision),
              {:ok, value} <- Record.encode(record),
              :ok <-
-               adapter_compare_and_swap(
+               AdapterOps.compare_and_swap(
                  adapter,
                  identity.key,
                  expected_value,
@@ -138,14 +112,14 @@ defmodule Jido.Persistence do
       target_agent.id,
       opts,
       fn ->
-        protect(:compare_and_swap, fn ->
-          with :ok <- validate_operation_options(opts),
+        AdapterOps.protect(:compare_and_swap, fn ->
+          with :ok <- Source.validate_operation_options(opts),
                :ok <- validate_replacement_agents(current_agent, target_agent),
-               {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+               {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
                partition = Keyword.get(opts, :partition),
                namespace when is_binary(namespace) <- Keyword.get(opts, :namespace),
                {:ok, %{mode: :ref} = identity} <-
-                 storage_identity(
+                 Identity.resolve(
                    {adapter, adapter_opts},
                    instance,
                    current_agent.module,
@@ -167,7 +141,7 @@ defmodule Jido.Persistence do
                  ),
                {:ok, value} <- Record.encode(record),
                :ok <-
-                 adapter_compare_and_swap(
+                 AdapterOps.compare_and_swap(
                    adapter,
                    identity.key,
                    expected_value,
@@ -190,17 +164,17 @@ defmodule Jido.Persistence do
           :ok | {:error, term()}
   def create_agent(source, %Agent{} = agent, opts \\ []) do
     PersistenceTelemetry.observe(:compare_and_swap, source, agent.module, agent.id, opts, fn ->
-      protect(:compare_and_swap, fn ->
-        with :ok <- validate_operation_options(opts),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      AdapterOps.protect(:compare_and_swap, fn ->
+        with :ok <- Source.validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              :ok <- validate_initial_revision(opts),
              {:ok, identity} <-
-               storage_identity({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
+               Identity.resolve({adapter, adapter_opts}, instance, agent.module, agent.id, opts),
              {:ok, record} <-
                build_record(agent, instance, Keyword.put(opts, :revision, 0), identity),
              {:ok, value} <- Record.encode(record),
              :ok <-
-               adapter_compare_and_swap(
+               AdapterOps.compare_and_swap(
                  adapter,
                  identity.key,
                  :not_found,
@@ -237,22 +211,25 @@ defmodule Jido.Persistence do
   def load_agent_with_revision(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
     PersistenceTelemetry.observe(:load, source, agent_module, agent_id, opts, fn ->
-      protect(:get, fn ->
-        with :ok <- validate_operation_options(opts),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      AdapterOps.protect(:get, fn ->
+        with :ok <- Source.validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts),
-             {:ok, value, _condition} <- adapter_get(adapter, identity.key, adapter_opts),
+               Identity.resolve({adapter, adapter_opts}, instance, agent_module, agent_id, opts),
+             {:ok, value, _condition} <- AdapterOps.get(adapter, identity.key, adapter_opts),
              {:ok, record} <- Record.decode(value),
              :ok <-
-               validate_record(record, identity, instance, agent_module, agent_id, partition),
-             :ok <- require_active(record),
-             :ok <- validate_definition_revision(record, agent_module),
-             {:ok, checkpoint} <- restore_checkpoint(record, agent_module),
-             {:ok, agent} <-
-               Agent.restore(agent_module, checkpoint, restore_context(record, instance)),
-             :ok <- validate_restored_identity(agent, agent_module, agent_id) do
+               Record.validate_for_identity(
+                 record,
+                 identity,
+                 instance,
+                 agent_module,
+                 agent_id,
+                 partition
+               ),
+             :ok <- Record.require_active(record),
+             {:ok, agent} <- Checkpoint.restore_agent(record, agent_module, agent_id, instance) do
           {:ok, agent, Record.revision(record)}
         end
       end)
@@ -274,12 +251,12 @@ defmodule Jido.Persistence do
   def delete_agent(source, agent_module, agent_id, opts)
       when is_atom(agent_module) and is_binary(agent_id) do
     PersistenceTelemetry.observe(:delete, source, agent_module, agent_id, opts, fn ->
-      protect(:delete, fn ->
-        with :ok <- validate_operation_options(opts),
-             {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+      AdapterOps.protect(:delete, fn ->
+        with :ok <- Source.validate_operation_options(opts),
+             {:ok, {adapter, adapter_opts}, instance} <- Source.resolve(source, opts),
              partition = Keyword.get(opts, :partition),
              {:ok, identity} <-
-               storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
+               Identity.resolve({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
           delete_current(
             adapter,
             adapter_opts,
@@ -312,41 +289,8 @@ defmodule Jido.Persistence do
   @spec establish_write_authority(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, WriteAuthority.t()} | {:error, term()}
   def establish_write_authority(source, agent_module, agent_id, opts)
-      when is_atom(agent_module) and is_binary(agent_id) do
-    protect(:get, fn ->
-      with :ok <- validate_operation_options(opts),
-           namespace when is_binary(namespace) <- Keyword.get(opts, :namespace),
-           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
-           partition = Keyword.get(opts, :partition),
-           {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id),
-           ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace},
-           legacy_identity = %{
-             mode: :legacy,
-             key: agent_key(instance, agent_module, agent_id, partition)
-           },
-           {:ok, selected} <-
-             select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity) do
-        other_key =
-          if selected.mode == :ref, do: legacy_identity.key, else: ref_identity.key
-
-        {:ok,
-         %WriteAuthority{
-           instance: instance,
-           agent_module: agent_module,
-           agent_id: agent_id,
-           partition: partition,
-           namespace: namespace,
-           mode: selected.mode,
-           key: selected.key,
-           other_key: other_key
-         }}
-      else
-        nil -> {:error, :stable_namespace_required}
-        {:error, _reason} = error -> error
-        _other -> {:error, :stable_namespace_required}
-      end
-    end)
-  end
+      when is_atom(agent_module) and is_binary(agent_id),
+      do: Identity.establish_write_authority(source, agent_module, agent_id, opts)
 
   def establish_write_authority(_source, agent_module, agent_id, _opts),
     do:
@@ -368,109 +312,12 @@ defmodule Jido.Persistence do
   @spec agent_key(atom() | nil, module(), String.t(), term()) :: binary()
   def agent_key(instance, agent_module, agent_id, partition \\ nil)
       when (is_atom(instance) or is_nil(instance)) and is_atom(agent_module) and
-             is_binary(agent_id) do
-    identity = :erlang.term_to_binary({instance, agent_module, partition, agent_id})
-    @key_prefix <> Base.url_encode64(identity, padding: false)
-  end
+             is_binary(agent_id),
+      do: Identity.agent_key(instance, agent_module, agent_id, partition)
 
   @doc false
   @spec agent_key(Ref.t()) :: binary()
-  def agent_key(%Ref{} = ref) do
-    ref = Ref.new!(ref)
-    identity = :erlang.term_to_binary({ref.namespace, ref.partition, ref.id})
-    @ref_key_prefix <> Base.url_encode64(identity, padding: false)
-  end
-
-  defp resolve_instance_config(jido) when is_atom(jido) and not is_nil(jido) do
-    config =
-      cond do
-        live_instance?(jido) -> Jido.instance_persistence(jido)
-        function_exported?(jido, :__jido_persistence__, 0) -> jido.__jido_persistence__()
-        true -> nil
-      end
-
-    config
-    |> normalize_adapter_result()
-    |> validate_adapter_result()
-  rescue
-    error -> {:error, {:invalid_persistence_config, error}}
-  end
-
-  defp resolve_instance_config(_jido), do: {:ok, nil}
-
-  defp resolve_source(source, opts) do
-    {config_result, default_instance} =
-      cond do
-        is_atom(source) and not is_nil(source) and
-            function_exported?(source, :__jido_persistence__, 0) ->
-          {resolve_instance_config(source), source}
-
-        live_instance?(source) ->
-          {resolve_instance_config(source), source}
-
-        true ->
-          {resolve_config(source, nil), nil}
-      end
-
-    with {:ok, config} <- config_result,
-         {:ok, config} <- require_adapter(config) do
-      {:ok, config, Keyword.get(opts, :instance, default_instance)}
-    end
-  end
-
-  defp live_instance?(source) when is_atom(source) and not is_nil(source) do
-    is_pid(Process.whereis(source)) and
-      is_pid(Process.whereis(Jido.runtime_store_name(source)))
-  end
-
-  defp live_instance?(_source), do: false
-
-  defp require_adapter(nil), do: {:error, :persistence_not_configured}
-  defp require_adapter(config), do: {:ok, config}
-
-  defp normalize_adapter_result(config) do
-    {:ok, normalize_adapter(config)}
-  rescue
-    error -> {:error, {:invalid_persistence_config, error}}
-  end
-
-  defp validate_adapter_result({:ok, nil}), do: {:ok, nil}
-
-  defp validate_adapter_result({:ok, {adapter, opts} = config}) do
-    with {:module, ^adapter} <- Code.ensure_loaded(adapter),
-         true <- function_exported?(adapter, :get, 2),
-         true <- function_exported?(adapter, :compare_and_swap, 4),
-         :ok <- validate_adapter_options(adapter, opts) do
-      {:ok, config}
-    else
-      {:error, _reason} = error -> error
-      _value -> {:error, {:invalid_persistence_adapter, adapter}}
-    end
-  end
-
-  defp validate_adapter_result({:error, _reason} = error), do: error
-
-  defp validate_adapter_options(adapter, opts) do
-    if function_exported?(adapter, :validate_options, 1) do
-      case adapter.validate_options(opts) do
-        :ok -> :ok
-        {:error, reason} -> {:error, {:invalid_persistence_options, adapter, reason}}
-        result -> {:error, {:invalid_persistence_options, adapter, {:invalid_result, result}}}
-      end
-    else
-      :ok
-    end
-  rescue
-    error -> {:error, {:invalid_persistence_options, adapter, {:error, error}}}
-  catch
-    kind, reason -> {:error, {:invalid_persistence_options, adapter, {kind, reason}}}
-  end
-
-  defp validate_operation_options(opts) do
-    if Keyword.keyword?(opts), do: :ok, else: invalid_operation_options(opts)
-  end
-
-  defp invalid_operation_options(opts), do: {:error, {:invalid_persistence_options, opts}}
+  def agent_key(%Ref{} = ref), do: Identity.agent_key(ref)
 
   defp expected_revision(opts) do
     case Keyword.fetch(opts, :expected_revision) do
@@ -488,7 +335,7 @@ defmodule Jido.Persistence do
   end
 
   defp current_value(adapter, opts, record, identity, expected_revision) do
-    case adapter_get(adapter, identity.key, opts) do
+    case AdapterOps.get(adapter, identity.key, opts) do
       {:error, :not_found} when expected_revision in [:any, 0] ->
         {:ok, :not_found}
 
@@ -497,8 +344,8 @@ defmodule Jido.Persistence do
 
       {:ok, value, condition} ->
         with {:ok, current} <- Record.decode(value),
-             :ok <- validate_record_against_record(current, record, identity),
-             :ok <- require_active_for_write(current),
+             :ok <- Record.validate_against_record(current, record, identity),
+             :ok <- Record.require_active_for_write(current),
              :ok <- check_revision(current, record, expected_revision) do
           {:ok, condition}
         end
@@ -518,7 +365,7 @@ defmodule Jido.Persistence do
          _instance,
          partition
        ) do
-    case adapter_get(adapter, identity.key, opts) do
+    case AdapterOps.get(adapter, identity.key, opts) do
       {:ok, value, condition} ->
         with {:ok, current_record} <- Record.decode(value),
              :ok <-
@@ -529,7 +376,7 @@ defmodule Jido.Persistence do
                  current_agent.id,
                  partition
                ),
-             :ok <- require_active_for_write(current_record),
+             :ok <- Record.require_active_for_write(current_record),
              :ok <- check_revision(current_record, target_record, expected_revision) do
           {:ok, condition}
         end
@@ -575,7 +422,7 @@ defmodule Jido.Persistence do
     partition = Keyword.get(opts, :partition)
     revision = Keyword.get(opts, :revision, 0)
     reason = Keyword.get(opts, :reason, :manual)
-    record_format = record_format(identity)
+    record_format = Record.format_for_identity(identity)
 
     context = %{
       instance: instance,
@@ -587,240 +434,19 @@ defmodule Jido.Persistence do
     with true <- is_integer(revision) and revision >= 0,
          {:ok, checkpoint} <- Checkpoint.dump(agent, context, record_format, reason),
          {:ok, record} <-
-           build_active_record(agent, instance, partition, revision, checkpoint, identity) do
+           Record.build_active_for_identity(
+             agent,
+             instance,
+             partition,
+             revision,
+             checkpoint,
+             identity
+           ) do
       {:ok, record}
     else
       false -> {:error, {:invalid_checkpoint, :shape}}
       {:error, _reason} = error -> error
     end
-  end
-
-  defp storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
-    case Keyword.get(opts, :write_authority) do
-      nil ->
-        discover_storage_identity(adapter, adapter_opts, instance, agent_module, agent_id, opts)
-
-      %WriteAuthority{} = authority ->
-        authority_storage_identity(
-          adapter,
-          adapter_opts,
-          authority,
-          instance,
-          agent_module,
-          agent_id,
-          opts
-        )
-
-      _invalid ->
-        {:error, :invalid_persistence_write_authority}
-    end
-  end
-
-  defp discover_storage_identity(adapter, adapter_opts, instance, agent_module, agent_id, opts) do
-    partition = Keyword.get(opts, :partition)
-
-    case Keyword.get(opts, :namespace) do
-      nil ->
-        {:ok, %{mode: :legacy, key: agent_key(instance, agent_module, agent_id, partition)}}
-
-      namespace ->
-        with {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id) do
-          ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace}
-
-          legacy_identity = %{
-            mode: :legacy,
-            key: agent_key(instance, agent_module, agent_id, partition)
-          }
-
-          select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity)
-        end
-    end
-  end
-
-  defp authority_storage_identity(
-         adapter,
-         adapter_opts,
-         authority,
-         instance,
-         agent_module,
-         agent_id,
-         opts
-       ) do
-    partition = Keyword.get(opts, :partition)
-    namespace = Keyword.get(opts, :namespace)
-
-    with :ok <- authority_identity_match(authority, instance, agent_module, agent_id, partition),
-         :ok <- authority_namespace_match(authority, namespace),
-         :ok <- authority_key_match(authority),
-         :missing <- stored_key_state(adapter, authority.other_key, adapter_opts) do
-      case authority.mode do
-        :legacy -> {:ok, %{mode: :legacy, key: authority.key}}
-        :ref -> {:ok, %{mode: :ref, key: authority.key, namespace: authority.namespace}}
-      end
-    else
-      :present ->
-        {:error, {:persistence_identity_collision, authority_collision_keys(authority)}}
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  end
-
-  defp authority_identity_match(authority, instance, agent_module, agent_id, partition) do
-    if authority.instance == instance and authority.agent_module == agent_module and
-         authority.agent_id == agent_id and authority.partition == partition,
-       do: :ok,
-       else: {:error, :persistence_write_authority_mismatch}
-  end
-
-  defp authority_namespace_match(_authority, nil), do: :ok
-
-  defp authority_namespace_match(%WriteAuthority{namespace: namespace}, namespace), do: :ok
-
-  defp authority_namespace_match(_authority, _namespace),
-    do: {:error, :persistence_write_authority_mismatch}
-
-  defp authority_key_match(%WriteAuthority{} = authority) do
-    legacy_key =
-      agent_key(
-        authority.instance,
-        authority.agent_module,
-        authority.agent_id,
-        authority.partition
-      )
-
-    with {:ok, ref} <-
-           Ref.new(
-             namespace: authority.namespace,
-             partition: authority.partition,
-             id: authority.agent_id
-           ) do
-      ref_key = agent_key(ref)
-
-      valid? =
-        case authority.mode do
-          :legacy -> authority.key == legacy_key and authority.other_key == ref_key
-          :ref -> authority.key == ref_key and authority.other_key == legacy_key
-          _invalid -> false
-        end
-
-      if valid?, do: :ok, else: {:error, :invalid_persistence_write_authority}
-    end
-  end
-
-  defp authority_collision_keys(%WriteAuthority{mode: :ref} = authority),
-    do: %{ref_key: authority.key, legacy_key: authority.other_key}
-
-  defp authority_collision_keys(%WriteAuthority{} = authority),
-    do: %{ref_key: authority.other_key, legacy_key: authority.key}
-
-  defp select_storage_identity(adapter, opts, ref_identity, legacy_identity) do
-    case {
-      stored_key_state(adapter, ref_identity.key, opts),
-      stored_key_state(adapter, legacy_identity.key, opts)
-    } do
-      {:missing, :missing} ->
-        {:ok, ref_identity}
-
-      {:present, :missing} ->
-        {:ok, ref_identity}
-
-      {:missing, :present} ->
-        {:ok, legacy_identity}
-
-      {:present, :present} ->
-        {:error,
-         {:persistence_identity_collision,
-          %{ref_key: ref_identity.key, legacy_key: legacy_identity.key}}}
-
-      {{:error, reason}, _legacy} ->
-        {:error, reason}
-
-      {_ref, {:error, reason}} ->
-        {:error, reason}
-    end
-  end
-
-  defp stored_key_state(adapter, key, opts) do
-    case adapter_get(adapter, key, opts) do
-      {:ok, _value, _condition} -> :present
-      {:error, :not_found} -> :missing
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  defp record_format(%{mode: :legacy}), do: Record.format_version()
-  defp record_format(%{mode: :ref}), do: Record.ref_format_version()
-
-  defp build_active_record(agent, instance, partition, revision, checkpoint, %{mode: :legacy}) do
-    Record.build_active(agent, instance, partition, revision, checkpoint)
-  end
-
-  defp build_active_record(agent, _instance, partition, revision, checkpoint, %{
-         mode: :ref,
-         namespace: namespace
-       }) do
-    Record.build_ref_active(agent, namespace, partition, revision, checkpoint)
-  end
-
-  defp build_tombstone_record(
-         instance,
-         agent_module,
-         agent_id,
-         partition,
-         revision,
-         %{mode: :legacy}
-       ) do
-    Record.build_tombstone(instance, agent_module, agent_id, partition, revision)
-  end
-
-  defp build_tombstone_record(
-         _instance,
-         agent_module,
-         agent_id,
-         partition,
-         revision,
-         %{mode: :ref, namespace: namespace}
-       ) do
-    Record.build_ref_tombstone(namespace, agent_module, agent_id, partition, revision)
-  end
-
-  defp validate_record(record, %{mode: :legacy}, instance, agent_module, agent_id, partition) do
-    Record.validate(record, instance, agent_module, agent_id, partition)
-  end
-
-  defp validate_record(
-         record,
-         %{mode: :ref, namespace: namespace},
-         _instance,
-         agent_module,
-         agent_id,
-         partition
-       ) do
-    Record.validate_ref(record, namespace, agent_module, agent_id, partition)
-  end
-
-  defp validate_record_against_record(current, record, %{mode: :legacy}) do
-    Record.validate(
-      current,
-      record.instance,
-      record.agent_module,
-      record.agent_id,
-      record.partition
-    )
-  end
-
-  defp validate_record_against_record(current, record, %{
-         mode: :ref,
-         namespace: namespace
-       }) do
-    Record.validate_ref(
-      current,
-      namespace,
-      record.agent_module,
-      record.agent_id,
-      record.partition
-    )
   end
 
   defp delete_current(
@@ -832,10 +458,10 @@ defmodule Jido.Persistence do
          agent_id,
          partition
        ) do
-    case adapter_get(adapter, identity.key, adapter_opts) do
+    case AdapterOps.get(adapter, identity.key, adapter_opts) do
       {:error, :not_found} ->
         with {:ok, tombstone} <-
-               build_tombstone_record(
+               Record.build_tombstone_for_identity(
                  instance,
                  agent_module,
                  agent_id,
@@ -844,20 +470,27 @@ defmodule Jido.Persistence do
                  identity
                ),
              {:ok, value} <- Record.encode(tombstone) do
-          adapter_compare_and_swap(adapter, identity.key, :not_found, value, adapter_opts)
+          AdapterOps.compare_and_swap(adapter, identity.key, :not_found, value, adapter_opts)
         end
 
       {:ok, expected_value, condition} ->
         with {:ok, current} <- Record.decode(expected_value),
              :ok <-
-               validate_record(current, identity, instance, agent_module, agent_id, partition) do
+               Record.validate_for_identity(
+                 current,
+                 identity,
+                 instance,
+                 agent_module,
+                 agent_id,
+                 partition
+               ) do
           case Record.kind(current) do
             :tombstone ->
               :ok
 
             :active ->
               with {:ok, tombstone} <-
-                     build_tombstone_record(
+                     Record.build_tombstone_for_identity(
                        instance,
                        agent_module,
                        agent_id,
@@ -866,7 +499,7 @@ defmodule Jido.Persistence do
                        identity
                      ),
                    {:ok, value} <- Record.encode(tombstone) do
-                adapter_compare_and_swap(
+                AdapterOps.compare_and_swap(
                   adapter,
                   identity.key,
                   condition,
@@ -880,173 +513,6 @@ defmodule Jido.Persistence do
       {:error, _reason} = error ->
         error
     end
-  end
-
-  defp require_active(record) do
-    case Record.kind(record) do
-      :active -> :ok
-      :tombstone -> {:error, :deleted}
-      :unknown -> {:error, {:invalid_persistence_record, :kind}}
-    end
-  end
-
-  defp require_active_for_write(record) do
-    case Record.kind(record) do
-      :active -> :ok
-      :tombstone -> {:error, :conflict}
-      :unknown -> {:error, {:invalid_persistence_record, :kind}}
-    end
-  end
-
-  defp restore_checkpoint(record, agent_module) do
-    checkpoint = Record.checkpoint(record)
-
-    if Record.format(record) in [Record.format_version(), Record.ref_format_version()] do
-      Checkpoint.load(agent_module, checkpoint, Record.format(record), :restore)
-    else
-      {:ok, checkpoint}
-    end
-  end
-
-  defp validate_definition_revision(record, agent_module) do
-    case Record.agent_vsn(record) do
-      nil ->
-        :ok
-
-      saved_vsn ->
-        case current_definition_revision(agent_module) do
-          ^saved_vsn ->
-            :ok
-
-          current_vsn ->
-            {:error,
-             Error.validation_error("Stored Agent definition revision does not match",
-               kind: :config,
-               subject: agent_module,
-               details: %{
-                 code: :definition_mismatch,
-                 saved_vsn: saved_vsn,
-                 current_vsn: current_vsn
-               }
-             )}
-        end
-    end
-  end
-
-  defp current_definition_revision(agent_module) do
-    if Code.ensure_loaded?(agent_module) and function_exported?(agent_module, :vsn, 0),
-      do: agent_module.vsn(),
-      else: nil
-  end
-
-  defp validate_restored_identity(%Agent{module: module, id: id}, module, id), do: :ok
-
-  defp validate_restored_identity(_agent, _module, _id),
-    do: {:error, {:invalid_persistence_record, :checkpoint_identity}}
-
-  defp restore_context(record, instance) do
-    %{
-      instance: instance,
-      partition: Map.fetch!(record, :partition),
-      revision: Record.revision(record),
-      reason: :restore
-    }
-  end
-
-  defp adapter_get(adapter, key, opts) do
-    case adapter.get(key, opts) do
-      {:ok, value} when is_binary(value) ->
-        {:ok, value, value}
-
-      {:ok, value, token} when is_binary(value) and is_binary(token) and byte_size(token) > 0 ->
-        {:ok, value, {:token, token}}
-
-      {:ok, _value, _token} ->
-        invalid_adapter_result(:get, :invalid_token_read)
-
-      result when is_tuple(result) and tuple_size(result) > 2 and elem(result, 0) == :ok ->
-        invalid_adapter_result(:get, :invalid_token_read)
-
-      {:error, _reason} = error ->
-        error
-
-      result ->
-        invalid_adapter_result(:get, result)
-    end
-  end
-
-  defp adapter_compare_and_swap(adapter, key, expected, value, opts) do
-    result =
-      try do
-        adapter.compare_and_swap(key, expected, value, opts)
-      rescue
-        error -> {:callback_fault, :error, error}
-      catch
-        kind, reason -> {:callback_fault, kind, reason}
-      end
-
-    case result do
-      :ok ->
-        :ok
-
-      {:error, :conflict} = error ->
-        error
-
-      {:error, {:rejected, _reason}} = error ->
-        error
-
-      {:error, :indeterminate} = error ->
-        error
-
-      {:error, {:indeterminate, _reason}} = error ->
-        error
-
-      {:error, reason} ->
-        {:error, {:indeterminate, reason}}
-
-      {:callback_fault, kind, reason} ->
-        {:error, {:indeterminate, persistence_failure_value(:compare_and_swap, kind, reason)}}
-
-      invalid ->
-        {:error, {:indeterminate, invalid_adapter_result_value(:compare_and_swap, invalid)}}
-    end
-  end
-
-  defp protect(operation, fun) do
-    fun.()
-  rescue
-    error -> persistence_failure(operation, :error, error)
-  catch
-    kind, reason -> persistence_failure(operation, kind, reason)
-  end
-
-  defp invalid_adapter_result(operation, result) do
-    {:error, invalid_adapter_result_value(operation, result)}
-  end
-
-  defp persistence_failure(operation, kind, reason) do
-    {:error, persistence_failure_value(operation, kind, reason)}
-  end
-
-  defp invalid_adapter_result_value(operation, result) do
-    Error.execution_error("Persistence adapter returned an invalid result",
-      details: %{
-        code: :persistence_invalid_callback_result,
-        operation: operation,
-        result: result
-      }
-    )
-  end
-
-  defp persistence_failure_value(operation, kind, reason) do
-    Error.execution_error("Persistence adapter operation failed",
-      details: %{
-        code: :persistence_callback_failed,
-        operation: operation,
-        kind: kind,
-        reason: reason
-      }
-    )
   end
 
   @doc false

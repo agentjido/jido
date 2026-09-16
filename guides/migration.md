@@ -385,11 +385,12 @@ V2 Storage checkpoints, Plugin pointers, and Thread append stores do not have
 an automatic V3 reader. Renaming an envelope is not a conversion.
 
 V3 uses `Jido.Persistence` and a binary adapter with atomic compare-and-swap.
-Compatible unnamed keys start with `jido:agent:v1:` and include instance,
-module, partition, and ID. They use outer format 2. Namespaced keys start with
-`jido:agent:v2:`, use `{namespace, partition, id}`, and use outer format 3. The
-reader also accepts Jido V3 outer format-1 active records. Restore validates
-identity, definition revision, complete state, and recursive portability.
+Compatible unnamed and namespaced keys both start with `jido:agent:v1:`.
+Compatible keys encode instance, module, partition, and ID and use outer
+format 2. Namespaced keys encode `{namespace, partition, id}` and use outer
+format 3. The reader also accepts Jido V3 outer format-1 active records.
+Restore validates identity, definition revision, complete state, and recursive
+portability.
 
 ### What you need to change
 

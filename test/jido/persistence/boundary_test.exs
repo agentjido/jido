@@ -44,6 +44,16 @@ defmodule Jido.Persistence.BoundaryTest do
     %{agent: agent, store: store}
   end
 
+  test "compatible and Ref keys share one prefix but keep distinct identities", c do
+    compatible_key = Persistence.agent_key(nil, Basic, c.agent.id)
+    ref = Agent.Ref.new!(namespace: "record-boundary", id: c.agent.id)
+    ref_key = Persistence.agent_key(ref)
+
+    assert "jido:agent:v1:" <> _identity = compatible_key
+    assert "jido:agent:v1:" <> _identity = ref_key
+    refute compatible_key == ref_key
+  end
+
   test "stored envelopes reject invalid fields without changing their bytes", c do
     namespace = "record-boundary"
     assert :ok = Persistence.save_agent(c.store, c.agent, namespace: namespace)

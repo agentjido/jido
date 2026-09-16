@@ -26,12 +26,13 @@ an application-supplied command function and supports a millisecond TTL. That
 TTL also applies to tombstones and limits the delayed-writer fence. Its unit
 tests use a controlled command function; they do not prove Redis failover.
 
-Compatible unnamed storage keys start with `jido:agent:v1:` and use outer
-format 2. Namespaced Ref keys start with `jido:agent:v2:` and use outer format
-3. The reader also accepts Jido V3 outer format-1 active records. A namespaced
-operation reads a lone compatible key but rejects a compatible and Ref-key
-collision. It does not rewrite across keys. Old V2 and Actor records require
-an explicit offline application conversion.
+Compatible unnamed and namespaced Ref storage keys both start with
+`jido:agent:v1:`. Their encoded identities differ. Compatible keys use outer
+format 2; Ref keys use outer format 3. The reader also accepts Jido V3 outer
+format-1 active records. A namespaced operation reads a lone compatible key
+but rejects a compatible and Ref-key collision. It does not rewrite across
+keys. Old V2 and Actor records require an explicit offline application
+conversion.
 
 ## Check identity and portable state on load
 

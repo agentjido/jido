@@ -188,6 +188,96 @@ defmodule Jido.Persistence.Record do
 
   def agent_vsn(_record), do: nil
 
+  def format_for_identity(%{mode: :legacy}), do: format_version()
+  def format_for_identity(%{mode: :ref}), do: ref_format_version()
+
+  def build_active_for_identity(agent, instance, partition, revision, checkpoint, %{mode: :legacy}) do
+    build_active(agent, instance, partition, revision, checkpoint)
+  end
+
+  def build_active_for_identity(agent, _instance, partition, revision, checkpoint, %{
+        mode: :ref,
+        namespace: namespace
+      }) do
+    build_ref_active(agent, namespace, partition, revision, checkpoint)
+  end
+
+  def build_tombstone_for_identity(
+        instance,
+        agent_module,
+        agent_id,
+        partition,
+        revision,
+        %{mode: :legacy}
+      ) do
+    build_tombstone(instance, agent_module, agent_id, partition, revision)
+  end
+
+  def build_tombstone_for_identity(
+        _instance,
+        agent_module,
+        agent_id,
+        partition,
+        revision,
+        %{mode: :ref, namespace: namespace}
+      ) do
+    build_ref_tombstone(namespace, agent_module, agent_id, partition, revision)
+  end
+
+  def validate_for_identity(record, %{mode: :legacy}, instance, agent_module, agent_id, partition) do
+    validate(record, instance, agent_module, agent_id, partition)
+  end
+
+  def validate_for_identity(
+        record,
+        %{mode: :ref, namespace: namespace},
+        _instance,
+        agent_module,
+        agent_id,
+        partition
+      ) do
+    validate_ref(record, namespace, agent_module, agent_id, partition)
+  end
+
+  def validate_against_record(current, record, %{mode: :legacy}) do
+    validate(
+      current,
+      record.instance,
+      record.agent_module,
+      record.agent_id,
+      record.partition
+    )
+  end
+
+  def validate_against_record(current, record, %{
+        mode: :ref,
+        namespace: namespace
+      }) do
+    validate_ref(
+      current,
+      namespace,
+      record.agent_module,
+      record.agent_id,
+      record.partition
+    )
+  end
+
+  def require_active(record) do
+    case kind(record) do
+      :active -> :ok
+      :tombstone -> {:error, :deleted}
+      :unknown -> {:error, {:invalid_persistence_record, :kind}}
+    end
+  end
+
+  def require_active_for_write(record) do
+    case kind(record) do
+      :active -> :ok
+      :tombstone -> {:error, :conflict}
+      :unknown -> {:error, {:invalid_persistence_record, :kind}}
+    end
+  end
+
   defp validate_format_and_kind(record) do
     case {Map.get(record, :format), Map.get(record, :kind)} do
       {@legacy_format_version, :agent} -> :ok
