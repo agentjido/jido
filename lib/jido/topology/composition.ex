@@ -41,7 +41,7 @@ defmodule Jido.Topology.Composition do
   end
 
   def address(path, kind, key) do
-    prefix = Enum.map_join(path, "", &("component/" <> escape(&1) <> "/"))
+    prefix = Enum.map_join(path, &("component/" <> escape(&1) <> "/"))
     prefix <> Atom.to_string(kind) <> "/" <> escape(key)
   end
 

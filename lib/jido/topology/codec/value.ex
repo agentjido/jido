@@ -19,13 +19,7 @@ defmodule Jido.Topology.Codec.Value do
   end
 
   def encode(value, registry, depth) when is_map(value) and not is_struct(value) do
-    with {:ok, pairs} <-
-           Authoring.traverse(Enum.sort(value), fn {key, item} ->
-             with {:ok, key} <- encode(key, registry, depth + 1),
-                  {:ok, item} <- encode(item, registry, depth + 1),
-                  do: {:ok, [key, item]}
-           end),
-         do: {:ok, %{"$type" => "map", "entries" => pairs}}
+    Data.encode_map(value, &encode(&1, registry, depth + 1))
   end
 
   def encode(value, registry, depth) when is_tuple(value) do

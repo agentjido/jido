@@ -224,15 +224,10 @@ defmodule Jido.Topology.DSL.Compiler do
   defp extension?(_module, _callback), do: false
 
   defp unwrap!({:error, %{details: %{entities: [entity | _]}} = error}, env),
-    do: fail!(location(env, entity), Exception.message(error))
+    do: fail!(Authoring.location(env, entity), Exception.message(error))
 
   defp unwrap!({:ok, value}, _), do: value
   defp unwrap!({:error, error}, env), do: fail!(env, Exception.message(error))
-
-  defp location(env, %{__spark_metadata__: %{anno: anno}}) when not is_nil(anno),
-    do: %{env | line: :erl_anno.line(anno)}
-
-  defp location(env, _entity), do: env
 
   defp fail!(env, message),
     do: raise(CompileError, file: env.file, line: env.line, description: message)

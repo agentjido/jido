@@ -25,6 +25,8 @@ defmodule Jido.Topology.Extension do
   second Topology runtime or bypass normal definition and composition checks.
   """
 
+  alias Jido.Agent.Authoring
+
   @type config :: map()
   @type entities :: [struct()]
   @type lower_result :: {:ok, config(), entities()} | {:error, Exception.t()}
@@ -36,7 +38,7 @@ defmodule Jido.Topology.Extension do
           {:ok, config()} | {:error, Exception.t()}
   def lower(extensions, config, entities) when is_list(extensions) do
     if length(extensions) != length(Enum.uniq(extensions)) do
-      error("Duplicate Topology extension")
+      Authoring.error("Duplicate Topology extension")
     else
       Enum.reduce_while(extensions, {:ok, config, entities}, fn extension, {:ok, attrs, rest} ->
         if is_atom(extension) and Code.ensure_loaded?(extension) and
@@ -51,14 +53,14 @@ defmodule Jido.Topology.Extension do
 
             other ->
               {:halt,
-               error("Invalid Topology extension result", %{
+               Authoring.error("Invalid Topology extension result", %{
                  extension: extension,
                  result: other
                })}
           end
         else
           {:halt,
-           error("Topology extension must implement lower_topology/2", %{
+           Authoring.error("Topology extension must implement lower_topology/2", %{
              extension: extension
            })}
         end
@@ -68,14 +70,12 @@ defmodule Jido.Topology.Extension do
   end
 
   def lower(_extensions, _config, _entities),
-    do: error("Topology extensions must be a list")
+    do: Authoring.error("Topology extensions must be a list")
 
   defp finish({:ok, config, []}), do: {:ok, config}
 
   defp finish({:ok, _config, entities}),
-    do: error("Unclaimed Topology extension entities", %{entities: entities})
+    do: Authoring.error("Unclaimed Topology extension entities", %{entities: entities})
 
   defp finish({:error, _} = error), do: error
-
-  defp error(message, details \\ %{}), do: Jido.Agent.Authoring.error(message, details)
 end

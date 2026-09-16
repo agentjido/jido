@@ -454,27 +454,25 @@ defmodule Jido.Plugin.Normalizer do
 
   defp validate_state_spec({key, schema}, package, facet)
        when is_atom(key) and not is_nil(key) and key != :__struct__ and is_struct(schema) do
-    cond do
-      is_nil(Zoi.Type.impl_for(schema)) ->
-        PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
-          plugin: package,
-          facet: facet,
-          schema: schema
-        })
+    if is_nil(Zoi.Type.impl_for(schema)) do
+      PluginError.validation("Plugin-owned Agent state schema must be a Zoi schema", %{
+        plugin: package,
+        facet: facet,
+        schema: schema
+      })
+    else
+      case Jido.Action.validate_static_data(schema) do
+        :ok ->
+          {:ok, {key, schema}}
 
-      true ->
-        case Jido.Action.validate_static_data(schema) do
-          :ok ->
-            {:ok, {key, schema}}
-
-          {:error, reason} ->
-            PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
-              plugin: package,
-              facet: facet,
-              state_key: key,
-              reason: reason
-            })
-        end
+        {:error, reason} ->
+          PluginError.validation("Plugin-owned Agent state schema must contain static data", %{
+            plugin: package,
+            facet: facet,
+            state_key: key,
+            reason: reason
+          })
+      end
     end
   end
 

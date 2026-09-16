@@ -105,6 +105,11 @@ defmodule Jido.Agent.Authoring do
   def error(message, details \\ %{}),
     do: {:error, Error.validation_error(message, kind: :config, details: details)}
 
+  def location(env, %{__spark_metadata__: %{anno: anno}}) when not is_nil(anno),
+    do: %{env | line: :erl_anno.line(anno)}
+
+  def location(env, _entity), do: env
+
   defp defaults(%{defaults: value}) when not is_map(value) or is_struct(value),
     do: error("Route defaults must be a plain map")
 

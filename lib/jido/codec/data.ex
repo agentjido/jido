@@ -23,13 +23,7 @@ defmodule Jido.Codec.Data do
     do: reference(registry, :value, value)
 
   def encode(value, registry, depth) when is_map(value) do
-    with {:ok, entries} <-
-           Authoring.traverse(Enum.sort(value), fn {key, item} ->
-             with {:ok, key} <- encode(key, registry, depth + 1),
-                  {:ok, item} <- encode(item, registry, depth + 1),
-                  do: {:ok, [key, item]}
-           end),
-         do: {:ok, %{"$type" => "map", "entries" => entries}}
+    encode_map(value, &encode(&1, registry, depth + 1))
   end
 
   def encode(value, registry, depth) when is_tuple(value) do
@@ -41,6 +35,17 @@ defmodule Jido.Codec.Data do
 
   def encode(_value, _registry, _depth),
     do: Authoring.error("Authoring data contains a runtime value")
+
+  @doc false
+  def encode_map(value, encode_value) do
+    with {:ok, entries} <-
+           Authoring.traverse(Enum.sort(value), fn {key, item} ->
+             with {:ok, key} <- encode_value.(key),
+                  {:ok, item} <- encode_value.(item),
+                  do: {:ok, [key, item]}
+           end),
+         do: {:ok, %{"$type" => "map", "entries" => entries}}
+  end
 
   defp encode_list([], _registry, _depth), do: {:ok, []}
 

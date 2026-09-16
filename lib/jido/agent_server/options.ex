@@ -377,10 +377,7 @@ defmodule Jido.AgentServer.Options do
   end
 
   defp resolve_persistence(attrs) do
-    config =
-      if Map.has_key?(attrs, :persistence),
-        do: Map.get(attrs, :persistence),
-        else: :inherit
+    config = Map.get(attrs, :persistence, :inherit)
 
     case Jido.Persistence.resolve_config(config, Map.get(attrs, :jido)) do
       {:ok, persistence} ->

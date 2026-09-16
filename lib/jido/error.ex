@@ -526,7 +526,7 @@ defmodule Jido.Error do
     extra_details =
       opts
       |> Keyword.drop([:details | reserved_keys])
-      |> Enum.into(%{})
+      |> Map.new()
 
     Map.merge(extra_details, explicit_details)
   end

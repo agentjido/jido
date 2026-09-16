@@ -19,6 +19,8 @@ defmodule Jido.Agent.Extension do
   targets. Core assigns each target to its owner before it calls `lower_agent/2`.
   """
 
+  alias Jido.Agent.Authoring
+
   @callback lower_agent(map(), [struct()]) ::
               {:ok, map(), [struct()]} | {:error, Exception.t()}
 
@@ -40,10 +42,13 @@ defmodule Jido.Agent.Extension do
           {:cont, {:ok, claims}}
         else
           {:halt,
-           error("Agent extension route_target_options/0 must return unique atom names", %{
-             extension: extension,
-             options: options
-           })}
+           Authoring.error(
+             "Agent extension route_target_options/0 must return unique atom names",
+             %{
+               extension: extension,
+               options: options
+             }
+           )}
         end
       else
         {:cont, {:ok, claims}}
@@ -53,7 +58,7 @@ defmodule Jido.Agent.Extension do
   end
 
   def route_target_extension(_extensions, option),
-    do: error("Invalid Agent extension route target option", %{option: option})
+    do: Authoring.error("Invalid Agent extension route target option", %{option: option})
 
   @doc """
   Lowers static extension data to ordinary Agent authoring data.
@@ -71,10 +76,10 @@ defmodule Jido.Agent.Extension do
              is_list(entities) do
     cond do
       not proper_list?(extensions) or not proper_list?(entities) ->
-        error("Agent extensions and entities must be proper lists")
+        Authoring.error("Agent extensions and entities must be proper lists")
 
       length(extensions) != length(Enum.uniq(extensions)) ->
-        error("Duplicate Agent extension")
+        Authoring.error("Duplicate Agent extension")
 
       true ->
         with {:ok, config} <- claim_route_targets(extensions, config) do
@@ -92,11 +97,16 @@ defmodule Jido.Agent.Extension do
 
                 other ->
                   {:halt,
-                   error("Invalid Agent extension result", %{extension: extension, result: other})}
+                   Authoring.error("Invalid Agent extension result", %{
+                     extension: extension,
+                     result: other
+                   })}
               end
             else
               {:halt,
-               error("Agent extension must implement lower_agent/2", %{extension: extension})}
+               Authoring.error("Agent extension must implement lower_agent/2", %{
+                 extension: extension
+               })}
             end
           end)
           |> finish()
@@ -105,7 +115,7 @@ defmodule Jido.Agent.Extension do
   end
 
   def lower(_extensions, _config, _entities),
-    do: error("Agent extensions require a list, plain config map, and entity list")
+    do: Authoring.error("Agent extensions require a list, plain config map, and entity list")
 
   defp proper_list?([]), do: true
   defp proper_list?([_head | tail]), do: proper_list?(tail)
@@ -114,7 +124,7 @@ defmodule Jido.Agent.Extension do
   defp finish({:ok, config, []}), do: {:ok, config}
 
   defp finish({:ok, _config, entities}),
-    do: error("Unclaimed Agent extension entities", %{entities: entities})
+    do: Authoring.error("Unclaimed Agent extension entities", %{entities: entities})
 
   defp finish({:error, _} = error), do: error
 
@@ -159,16 +169,17 @@ defmodule Jido.Agent.Extension do
   defp route_target_claim({:ok, [extension]}, _option), do: {:ok, extension}
 
   defp route_target_claim({:ok, []}, option),
-    do: error("Unknown Agent extension route target option #{inspect(option)}", %{option: option})
+    do:
+      Authoring.error("Unknown Agent extension route target option #{inspect(option)}", %{
+        option: option
+      })
 
   defp route_target_claim({:ok, extensions}, option),
     do:
-      error("Conflicting Agent extension route target option #{inspect(option)}", %{
+      Authoring.error("Conflicting Agent extension route target option #{inspect(option)}", %{
         option: option,
         extensions: Enum.reverse(extensions)
       })
 
   defp route_target_claim({:error, _} = error, _option), do: error
-
-  defp error(message, details \\ %{}), do: Jido.Agent.Authoring.error(message, details)
 end

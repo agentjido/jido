@@ -107,7 +107,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
           _ ->
             fail!(
-              location(env, route),
+              Authoring.location(env, route),
               "An exposed Signal type must retain exactly one route without a match predicate after lowering"
             )
         end
@@ -153,7 +153,7 @@ defmodule Jido.Agent.DSL.Compiler do
   defp lower_route(route, env) do
     opts = [priority: route.priority, match: route.match]
     opts = if is_nil(route.defaults), do: opts, else: Keyword.put(opts, :defaults, route.defaults)
-    unwrap!(Authoring.route(route.path, route.target, opts), location(env, route))
+    unwrap!(Authoring.route(route.path, route.target, opts), Authoring.location(env, route))
   end
 
   defp interfaces(routes, source, env) do
@@ -170,7 +170,7 @@ defmodule Jido.Agent.DSL.Compiler do
 
     Enum.flat_map(routes, fn route ->
       Enum.map(route.interfaces, fn interface ->
-        env = location(env, interface)
+        env = Authoring.location(env, interface)
 
         if String.contains?(route.path, "*") or route.match != nil,
           do: fail!(env, "define requires an exact route without a match predicate")
@@ -312,11 +312,6 @@ defmodule Jido.Agent.DSL.Compiler do
   end
 
   defp list_input?(_schema), do: false
-
-  defp location(env, %{__spark_metadata__: %{anno: anno}}) when not is_nil(anno),
-    do: %{env | line: :erl_anno.line(anno)}
-
-  defp location(env, _entity), do: env
 
   defp extension?(module, callback) when is_atom(module) and not is_nil(module),
     do: Code.ensure_loaded?(module) and function_exported?(module, callback, 2)

@@ -33,22 +33,20 @@ defmodule Jido.Examples.ManagedJobs do
         context: context do
         state = context.agent_state
 
-        cond do
-          state.status == :running or input.job_id in state.seen ->
-            {:error, Jido.Action.Error.validation_error("job is active or already used")}
+        if state.status == :running or input.job_id in state.seen do
+          {:error, Jido.Action.Error.validation_error("job is active or already used")}
+        else
+          with {:ok, _runner} <- JobRunner.fetch(context) do
+            candidate = %{
+              state
+              | job_id: input.job_id,
+                seen: state.seen ++ [input.job_id],
+                status: :running,
+                result: ""
+            }
 
-          true ->
-            with {:ok, _runner} <- JobRunner.fetch(context) do
-              candidate = %{
-                state
-                | job_id: input.job_id,
-                  seen: state.seen ++ [input.job_id],
-                  status: :running,
-                  result: ""
-              }
-
-              {:ok, candidate, [struct!(Submit, input)]}
-            end
+            {:ok, candidate, [struct!(Submit, input)]}
+          end
         end
       end
 
