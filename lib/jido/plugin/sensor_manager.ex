@@ -10,6 +10,10 @@ defmodule Jido.Plugin.SensorManager do
   manager restarts a failed sensor while its tag remains desired. Reconciliation
   ignores effects from a revision that is at or below the last successful
   revision, so an old retry cannot replace a newer sensor set.
+
+  The `:retry_delay_ms` Plugin option defaults to `1_000`. It must be an
+  integer from `1` through `4_294_967_295`; invalid values fail Agent startup
+  before a sensor process starts.
   """
 
   use Jido.Plugin,

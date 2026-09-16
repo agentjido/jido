@@ -287,6 +287,18 @@ defmodule Jido.Plugin.SensorManagerTest do
     end
   end
 
+  test "invalid retry delays fail Agent startup before a sensor retry", %{jido: jido} do
+    for delay <- [-1, 0, 1.5, :manual, 4_294_967_296] do
+      id = unique_id("invalid-sensor-retry")
+      definition = %{Agent.definition() | plugins: [{SensorManager, retry_delay_ms: delay}]}
+
+      assert {:error, %Jido.Error.ValidationError{details: %{retry_delay_ms: ^delay}}} =
+               Jido.start_agent(jido, definition, id: id)
+
+      assert Jido.whereis_agent(jido, id) == nil
+    end
+  end
+
   test "calls to an unavailable sensor runtime return errors" do
     pid = spawn(fn -> :ok end)
     ref = Process.monitor(pid)
