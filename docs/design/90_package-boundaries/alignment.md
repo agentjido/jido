@@ -71,7 +71,7 @@ are ready.
 | `lib/jido/persistence/ets.ex:1-58` | Core includes an in-memory byte adapter. |
 | `lib/jido/persistence/file.ex:1-66` | Core includes a file adapter with one-BEAM ownership limits. |
 | `lib/jido/persistence/redis.ex:1-56` | Core includes a Redis adapter that receives an application-owned command function. |
-| `lib/jido/topology/controller.ex:1-24,73-107` | Core owns static local Topology startup, readiness, automatic or manual repair, and current-target reconcile. It has no live target update or cluster policy. |
+| `lib/jido/topology/controller.ex` | Core owns static local Topology startup, readiness, repair, reconcile, additive Agent target update, and exact-node placement. It does not select nodes or own cluster authority. |
 | `Jido.Telemetry` and its semantic owner modules | Jido emits bounded Agent, admission, persistence, and local Topology events. Legacy Agent Server Telemetry remains. Handlers are observers. |
 | `../jido_ai/mix.exs:60-71` | The AI V3 checkout uses sibling paths for Jido, Jido Action, and Jido Signal. |
 | `../jido_browser/mix.exs:61-70` | The browser checkout still declares Jido and Jido Action V2 ranges. It is not current V3 compatibility proof. |
@@ -92,6 +92,7 @@ are ready.
 | `test/jido/persistence/indeterminate_write_test.exs:35-93` | An uncertain write stops stale evaluation and prevents Directive handling. |
 | `test/jido/plugin/scheduler/occurrence_recovery_test.exs:84-229` | Scheduler keeps stable occurrence IDs, pending work, acknowledgement, restart recovery, and configurable delivery timing. |
 | `test/jido/topology/controller_test.exs:20-330` | Static activation, readiness, local repair, state retention, and cleanup are proved. |
+| `test/jido/topology/controller_update_test.exs` and `test/jido/topology/controller_boundary_test.exs` | Additive update and exact-node placement keep their validation boundaries. |
 | `test/jido/agent_server/child_placement_test.exs:8-72` | An explicit node is valid owned-child intent and pure evaluation starts no process. |
 | `test/jido/agent_server/distributed_child_test.exs:41-109,155-234` | Known-node child start, remote restart, and no local fallback are proved. |
 | Agent lifecycle, persistence, Topology, telemetry consumer, and trace-context tests | Direct evaluation emits no runtime events. Handler failure preserves results. Semantic data is bounded, and live result and settlement stay separate. |
@@ -177,8 +178,9 @@ did not rerun runtime tests.
 - A new persistent Agent can become ready before its first record write.
 - Normal delete removes the stored value and revision history.
 - Every required persistence write failure removes the current activation.
-- Static Topology has no live target replacement, cluster placement, or
-  ownership transfer.
+- Static Topology supports additive live Agent target updates and exact-node
+  placement. It does not support general target replacement, cluster placement
+  policy, or cluster ownership transfer.
 - Core does not implement automatic recovery scans, leases, leader election,
   placement, transport gateways, durable Agent mailboxes, exactly-once
   delivery, application checkpoint migration, or durable audit history.
@@ -359,7 +361,7 @@ No deprecation or removal is approved in this seam.
 | Persistence selection | Keep instance defaults and per-Agent override or disablement until the authority model and transition are approved. |
 | Persistence providers | Keep ETS, File, and Redis module APIs. A package move needs dependency, configuration, module-name, and stored-data migration. |
 | Durable values | Do not publish new Ref, Checkpoint, Commit, or Record types until owners, fields, validation, serialization, errors, and migration are approved. |
-| Static Topology | Keep local definition, Builder, Codec, extensions, Controller, readiness, and repair. Live target update is not a V3 package-boundary gate. |
+| Static Topology | Keep local definition, Builder, Codec, extensions, Controller, readiness, repair, additive update, and exact-node placement. General target replacement is not a V3 package-boundary gate. |
 | Remote children | Keep explicit known-node start and ownership. Do not present it as membership, automatic placement, or failover policy. |
 | Observation | Use semantic Telemetry as the single source. Keep the OpenTelemetry API mapping optional and keep SDK and exporter policy outside Core. |
 | Package versions | Test one V3 set. Restore publishable dependency sources before release unless an approved exception exists. |

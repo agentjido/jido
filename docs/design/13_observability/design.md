@@ -31,7 +31,7 @@ The contract separates these facts:
 1. An Agent activation or stop crossed a lifecycle boundary.
 2. An admitted Turn started and reached a live result or a pre-commit failure.
 3. A commit attempt completed.
-4. Post-commit Directive work completed or failed.
+4. Post-commit Plugin notification or Directive work completed or failed.
 5. The Turn reached its terminal Outcome.
 6. A request did not enter a Turn because admission rejected it.
 7. A persistence or local Topology operation completed.
@@ -43,13 +43,19 @@ failure does not undo that commit.
 
 ### Event catalog
 
-All nine rows are implemented.
+All ten families below are implemented.
+The current event names are checked in
+[telemetry_test.exs](../../../test/jido/telemetry_test.exs); Topology update
+and placement boundaries are checked in
+[controller_update_test.exs](../../../test/jido/topology/controller_update_test.exs)
+and [controller_boundary_test.exs](../../../test/jido/topology/controller_boundary_test.exs).
 
 | Family | Event name | Shape | Meaning |
 | --- | --- | --- | --- |
 | Agent lifecycle | `[:jido, :agent, :lifecycle, event]` | Span | One real Agent lifecycle operation |
 | Agent Turn result | `[:jido, :agent, :turn, event]` | Span | From Turn admission to live result or pre-commit failure |
 | Agent commit | `[:jido, :agent, :commit, event]` | Span | One live commit attempt, including required persistence |
+| Plugin notification | `[:jido, :agent, :after_commit, event]` | Span | One post-commit Plugin notification attempt |
 | Agent Directive | `[:jido, :agent, :directive, event]` | Span | One post-commit Directive attempt |
 | Turn settlement | `[:jido, :agent, :turn, :settled]` | Point | One bounded projection of the terminal Turn result |
 | Admission rejection | `[:jido, :agent, :admission, :rejected]` | Point | A call or cast did not enter a Turn |
@@ -64,7 +70,7 @@ boundary uses `:exception`. A point event has no matching start event.
 Lifecycle operations are `:activate`, `:stop`, `:hibernate`, and `:thaw`.
 Record creation and deletion are persistence operations. Persistence operations
 are `:load`, `:compare_and_swap`, and `:delete`. Local Topology operations are
-`:activate`, `:repair`, and `:cleanup`.
+`:activate`, `:repair`, `:cleanup`, `:update`, and `:place`.
 
 ### Status and stage vocabularies
 
@@ -149,7 +155,7 @@ the live-result duration from the Turn span.
 ### Default consumer contract
 
 The default metric set has count and duration metrics for both `:stop` and
-`:exception` events for lifecycle, Turn result, commit, Directive,
+`:exception` events for lifecycle, Turn result, commit, Plugin notification, Directive,
 persistence, and local Topology. It also has settlement count and duration,
 admission rejection count, and Scheduler delivery count. Default metric tags
 can use only the fixed vocabularies `operation`, `status`, `stage`,
@@ -243,11 +249,15 @@ candidate becomes live.
 `OBS-REQ-014`: When one post-commit Directive runs, the Agent Directive
 boundary shall emit one Directive span.
 
+When one Plugin `after_commit/3` notification runs, the Agent observation
+boundary emits one `after_commit` span.
+
 `OBS-REQ-015`: When an admitted Turn reaches its runtime terminal Outcome, the
 Agent observation boundary shall emit exactly one bounded `turn.settled` event.
 
-`OBS-REQ-016`: When a Turn has post-commit Directive work, the Agent observation
-boundary shall emit `turn.settled` after all owned Directive attempts settle.
+`OBS-REQ-016`: When a Turn has post-commit Plugin notification or Directive
+work, the Agent observation boundary shall emit `turn.settled` after all owned
+attempts settle.
 
 `OBS-REQ-017`: If abrupt process or VM loss prevents terminal emission, then
 Jido shall not reconstruct a terminal semantic event from debug history.
@@ -262,7 +272,8 @@ compare-and-swap, or delete operation, the persistence boundary shall emit one
 persistence span.
 
 `OBS-REQ-020`: When the static local Topology Controller performs activation,
-repair, or cleanup, the local Topology boundary shall emit one Topology span.
+repair, cleanup, additive update, or exact-node placement, the local Topology
+boundary shall emit one Topology span.
 
 `OBS-REQ-021`: Where an optional distributed control plane changes membership,
 placement, authority, handoff, recovery, or operator state, its package owner
@@ -417,7 +428,7 @@ shall emit one bounded `[:jido, :scheduler, :delivery]` point event.
 
 | ID | Decision | Recommended answer | Effect if changed |
 | --- | --- | --- | --- |
-| `OBS-DEC-001` | Event catalog | Use the nine families in this file. | Names, tests, metrics, logs, and host mapping change together. |
+| `OBS-DEC-001` | Event catalog | Use the ten families in this file. | Names, tests, metrics, logs, and host mapping change together. |
 | `OBS-DEC-002` | Agent Ref projection | Use `agent_namespace`, `agent_partition`, and `agent_id`. | Identity fields have one stable meaning. |
 | `OBS-DEC-003` | Lifecycle operations | Use `hibernate` and `thaw`; keep create and delete under persistence. | Lifecycle and persistence facts stay separate. |
 | `OBS-DEC-004` | Public statuses and stages | Use the bounded tables and keep private stages hidden. | Dashboards do not depend on evaluator details. |
