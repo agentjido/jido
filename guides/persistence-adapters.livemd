@@ -116,6 +116,7 @@ Jido includes these adapters:
 | --- | --- |
 | `Jido.Persistence.ETS` | Tests and local development. Data ends with the BEAM. |
 | `Jido.Persistence.File` | One local BEAM with no shared writers. |
+| `Jido.Persistence.Mnesia` | An application-owned Mnesia table with transactional CAS. |
 | `Jido.Persistence.Redis` | Shared durable storage through an application-supplied command function. |
 | `Jido.Persistence.S3` | Direct single-object checkpoints for infrequent writes through an application-supplied signed request function. |
 | `Jido.Persistence.Bedrock` | Shared durable storage through Bedrock KV 0.7 transactions. |
@@ -136,6 +137,9 @@ The ETS adapter creates its table when first used. The File adapter is for one
 local writer domain. The Redis adapter lets the host application own its Redis
 client and connection policy. A Redis TTL applies to tombstones too. Thus, it
 also limits the duration of the delayed-writer fence.
+The Mnesia adapter requires a running Mnesia application and an existing
+`set` table with `[:key, :value]` attributes. The application owns table
+copies and disk policy; see the [storage guide](storage.html).
 
 ## Configure direct S3 checkpoints
 

@@ -286,6 +286,7 @@ defmodule Jido.MixProject do
           Jido.Persistence.Ecto.Record,
           Jido.Persistence.ETS,
           Jido.Persistence.File,
+          Jido.Persistence.Mnesia,
           Jido.Persistence.Plugin,
           Jido.Persistence.Plugin.Context,
           Jido.Persistence.Redis,

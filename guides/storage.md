@@ -87,6 +87,17 @@ an application-supplied command function and supports a millisecond TTL. That
 TTL also applies to tombstones and limits the delayed-writer fence. Its unit
 tests use a controlled command function; they do not prove Redis failover.
 
+Mnesia is an opt-in byte adapter. Start Mnesia and create a `set` table with
+attributes `[:key, :value]` before Jido uses it, then configure
+`persistence: {Jido.Persistence.Mnesia, table: :jido_records}`. The application
+owns schema creation, replicas, disk policy, and recovery; Jido does not start
+Mnesia or create its table. A `ram_copies` table is not written to disk for
+each transaction. Use `disc_copies` when the record needs a disk-backed copy.
+For multiple nodes, configure and test replicas and partition
+behavior explicitly. The adapter does not turn a Mnesia table into a lease or
+prove that it is shared or durable. See the
+[Mnesia table options](https://www.erlang.org/doc/apps/mnesia/mnesia.html#create_table-2).
+
 Compatible unnamed and namespaced Ref storage keys both start with
 `jido:agent:v1:`. Their encoded identities differ. Compatible keys use outer
 format 2; Ref keys use outer format 3. The reader also accepts Jido V3 outer
