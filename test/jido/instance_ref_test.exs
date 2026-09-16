@@ -107,6 +107,55 @@ defmodule JidoTest.InstanceRefTest do
     assert :ok = Jido.stop(instance)
   end
 
+  test "a Registry restart preserves one live Agent identity and Ref resolution" do
+    instance = unique_instance("registry-recovery")
+    namespace = unique_namespace("registry-recovery")
+    instance_pid = start_supervised!({Jido, name: instance, namespace: namespace}, id: instance)
+    ref = Ref.new!(namespace: namespace, id: "registry-agent")
+    assert {:ok, server} = Jido.start_agent_ref(instance, ref, Counter)
+
+    signal = Signal.new!("counter.add", %{by: 4}, source: "/test")
+    assert {:ok, %{state: %{count: 4}}} = Jido.AgentServer.call(server, signal)
+
+    registry = Jido.registry_name(instance)
+    old_guard = Process.whereis(Jido.registration_guard_name(instance))
+    old_registry = Process.whereis(registry)
+    assert :ok = :sys.suspend(server)
+
+    try do
+      Process.exit(old_registry, :kill)
+
+      eventually(fn ->
+        current = Process.whereis(registry)
+        is_pid(current) and current != old_registry
+      end)
+
+      assert Process.whereis(Jido.registration_guard_name(instance)) == old_guard
+      assert Process.alive?(server)
+      assert Jido.whereis_agent(instance, ref.id) == nil
+
+      assert {:error, {:already_started, ^server}} =
+               Jido.start_agent_ref(instance, ref, Counter)
+    after
+      assert :ok = :sys.resume(server)
+    end
+
+    eventually(fn -> Jido.resolve_agent(instance, ref) == {:ok, server} end)
+    assert Jido.whereis_agent(instance, ref.id) == server
+    assert Jido.AgentServer.snapshot(server).agent.state.count == 4
+
+    assert {:error, {:already_started, ^server}} = Jido.start_agent_ref(instance, ref, Counter)
+
+    monitor = Process.monitor(server)
+    assert :ok = Jido.stop_agent_ref(instance, ref)
+    assert_receive {:DOWN, ^monitor, :process, ^server, _reason}
+    eventually(fn -> Jido.resolve_agent(instance, ref) == {:error, :not_found} end)
+
+    assert {:ok, replacement} = Jido.start_agent_ref(instance, ref, Counter)
+    assert replacement != server
+    assert Process.alive?(instance_pid)
+  end
+
   test "a failed instance start releases its namespace claim" do
     namespace = unique_namespace("released-claim")
     occupied = unique_instance("occupied")

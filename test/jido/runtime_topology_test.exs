@@ -2,7 +2,7 @@ defmodule Jido.RuntimeTopologyTest do
   use JidoTest.Case, async: true
 
   alias Jido.AgentServer
-  alias Jido.AgentServer.{PluginChild, SpawnRegistry}
+  alias Jido.AgentServer.{PluginChild, RegistrationGuard, RegistryWorker, SpawnRegistry}
   alias Jido.RuntimeStore
 
   alias JidoTest.AgentRuntimeFixtures.{
@@ -12,7 +12,7 @@ defmodule Jido.RuntimeTopologyTest do
 
   @moduletag capture_log: true
 
-  test "an instance owns five isolated standard services", %{jido: jido, jido_pid: jido_pid} do
+  test "an instance owns six isolated standard services", %{jido: jido, jido_pid: jido_pid} do
     assert standard_children(jido_pid) == expected_children(jido)
 
     other = :"#{jido}_other"
@@ -31,7 +31,7 @@ defmodule Jido.RuntimeTopologyTest do
   test "each standard service can be replaced without restarting its siblings", %{
     jido: base_jido
   } do
-    for index <- 0..4 do
+    for index <- 0..5 do
       jido = :"#{base_jido}_restart_#{index}"
       jido_pid = start_supervised!({Jido, name: jido}, id: jido)
       {target, child_id} = Enum.at(services(jido), index)
@@ -165,7 +165,8 @@ defmodule Jido.RuntimeTopologyTest do
   defp expected_children(jido) do
     %{
       Jido.task_supervisor_name(jido) => {:supervisor, [Task.Supervisor]},
-      Jido.registry_name(jido) => {:supervisor, [Registry]},
+      RegistrationGuard => {:worker, [RegistrationGuard]},
+      Jido.registry_name(jido) => {:supervisor, [RegistryWorker]},
       Jido.runtime_store_name(jido) => {:worker, [RuntimeStore]},
       SpawnRegistry => {:worker, [SpawnRegistry]},
       Jido.agent_supervisor_name(jido) => {:supervisor, [DynamicSupervisor]}
@@ -186,6 +187,7 @@ defmodule Jido.RuntimeTopologyTest do
   defp services(jido) do
     [
       {Jido.task_supervisor_name(jido), Jido.task_supervisor_name(jido)},
+      {Jido.registration_guard_name(jido), RegistrationGuard},
       {Jido.registry_name(jido), Jido.registry_name(jido)},
       {Jido.runtime_store_name(jido), Jido.runtime_store_name(jido)},
       {SpawnRegistry.name(jido), SpawnRegistry},

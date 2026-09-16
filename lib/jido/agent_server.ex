@@ -87,6 +87,7 @@ defmodule Jido.AgentServer do
     Options,
     ParentRef,
     PluginLifecycle,
+    RegistrationGuard,
     Relationship,
     RuntimeCheckpoint,
     Shutdown,
@@ -536,7 +537,8 @@ defmodule Jido.AgentServer do
   def init({%Options{} = opts, startup_reply}) do
     Process.flag(:trap_exit, true)
 
-    with :ok <- mark_registry_status(opts, :starting),
+    with :ok <- claim_registration(opts),
+         :ok <- mark_registry_status(opts, :starting),
          {:ok, restored_agent, restored_version, initial_persistence} <-
            restore_initial_agent(opts),
          {:ok, agent} <- Agent.validate_instance(restored_agent),
@@ -1016,6 +1018,12 @@ defmodule Jido.AgentServer do
         :keep_state_and_data
     end
   end
+
+  def handle_event(:info, {:jido_registry_restarted, pid}, phase, %State{} = data),
+    do: recover_registry_registration(pid, phase, data)
+
+  def handle_event(:info, {:jido_registry_recover, pid}, phase, %State{} = data),
+    do: recover_registry_registration(pid, phase, data)
 
   def handle_event(
         :info,
@@ -3463,6 +3471,46 @@ defmodule Jido.AgentServer do
       :error -> {:error, :registry_entry_not_found}
     end
   end
+
+  defp claim_registration(%Options{register: true, jido: jido} = opts)
+       when is_atom(jido) and not is_nil(jido) do
+    RegistrationGuard.claim(jido, registry_key(opts.agent.id, opts.partition), self())
+  end
+
+  defp claim_registration(%Options{}), do: :ok
+
+  defp recover_registry_registration(pid, phase, %State{registered?: true} = data) do
+    if Process.whereis(data.registry) == pid do
+      key = registry_key(data.agent.id, data.partition)
+      value = if phase == :initializing, do: :starting, else: :ready
+
+      result =
+        try do
+          case Registry.register(data.registry, key, value) do
+            {:ok, _owner} ->
+              :ok
+
+            {:error, {:already_registered, owner}} when owner == self() ->
+              case Registry.update_value(data.registry, key, fn _previous -> value end) do
+                {^value, _previous} -> :ok
+                :error -> :retry
+              end
+
+            {:error, _reason} ->
+              :retry
+          end
+        catch
+          :exit, _reason -> :retry
+        end
+
+      if result == :retry,
+        do: Process.send_after(self(), {:jido_registry_recover, pid}, 20)
+    end
+
+    :keep_state_and_data
+  end
+
+  defp recover_registry_registration(_pid, _phase, %State{}), do: :keep_state_and_data
 
   defp mark_registry_status(%Options{register: false}, _status), do: :ok
 

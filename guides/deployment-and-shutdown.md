@@ -47,6 +47,12 @@ activate from its initial state. Restore the store worker, then start the Agent
 again. The local checkpoint is ephemeral: loss of the instance or its ETS table
 still requires durable persistence to recover committed state.
 
+If the local Registry restarts, live Agents register again under the same IDs.
+The instance keeps an Agent ID claim while its owner is alive. A new Agent with
+that ID cannot start during the Registry gap. Lookup and Ref resolution can
+return `:not_found` until the owner registers again. This recovery applies to
+one local instance; it does not coordinate IDs across nodes.
+
 Plugin runtime processes restart from Plugin specifications. Signal bus
 subscribers and application connections must also have a restart or
 reconciliation rule. Do not put a PID or connection in durable Agent state.

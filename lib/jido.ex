@@ -572,6 +572,7 @@ defmodule Jido do
     else
       names = [
         task_supervisor_name(name),
+        registration_guard_name(name),
         registry_name(name),
         runtime_store_name(name),
         Jido.AgentServer.SpawnRegistry.name(name),
@@ -636,7 +637,8 @@ defmodule Jido do
       base_children = [
         {Task.Supervisor,
          name: task_supervisor_name(name), max_children: Keyword.fetch!(opts, :max_tasks)},
-        {Registry, keys: :unique, name: registry_name(name)},
+        {Jido.AgentServer.RegistrationGuard, jido: name},
+        {Jido.AgentServer.RegistryWorker, keys: :unique, name: registry_name(name)},
         {Jido.RuntimeStore, name: runtime_store},
         {Jido.AgentServer.SpawnRegistry, jido: name},
         {DynamicSupervisor,
@@ -671,6 +673,10 @@ defmodule Jido do
   @doc "Returns the Registry name for the selected Jido instance."
   @spec registry_name(atom()) :: atom()
   def registry_name(name), do: Module.concat(name, Registry)
+
+  @doc false
+  @spec registration_guard_name(atom()) :: atom()
+  def registration_guard_name(name), do: Module.concat(name, RegistrationGuard)
 
   @doc "Returns the stable namespace bound to one live Jido instance."
   @spec namespace(atom() | nil) :: String.t() | nil
