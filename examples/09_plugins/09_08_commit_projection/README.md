@@ -1,4 +1,4 @@
-# Commit projection
+# 09_08 Commit projection
 
 The Agent facet copies the domain count into its owned `:projection` field.
 The Server facet uses `after_commit/3` to update a live GenServer with that
@@ -18,6 +18,15 @@ Use semantic Telemetry for observation alone. Use a custom Directive when an
 Action must request a specific effect. Use this hook when a Plugin must track
 its owned committed state after any successful Turn.
 
+Read [the Agent and Plugin source](commit_projection.ex) first, then
+[the test](../../../test/examples/09_plugins/09_08_commit_projection/commit_projection_test.exs).
+Use `Agent.add(server, amount)` to change the count.
+
 ```sh
 mix test test/examples/09_plugins/09_08_commit_projection --include example --seed 0
 ```
+
+Expected result: the domain count and live projection both become `3`, at
+revision `1`. Stopping the Server also stops the projection runtime.
+
+Previous: [Persisted State](../09_07_persisted_state/README.md).

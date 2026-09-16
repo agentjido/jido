@@ -90,7 +90,7 @@ Important actor defaults are:
 | `:max_postponed_signals` | `1_000` | Limit queued Signals while one Turn is active. |
 | `:turn_timeout` | `5_000` | Limit active pre-commit admission and candidate evaluation. |
 | `:max_directives_per_turn` | `:infinity` | Limit Directive work from one Turn. |
-| `:directive_timeout` | `5_000` | Limit Plugin and external Directive handling after commit. |
+| `:directive_timeout` | `5_000` | Limit Plugin admission, each commit notification, and each Directive dispatch. Notifications use `5_000` when this is `:infinity`. |
 | `:idle_timeout` | `:infinity` | Stop a pool-owned idle actor after this time. |
 | `:restore` | `:if_found` | Select durable restore behavior. |
 | `:error_policy` | `:log_only` | Select server behavior after a failed Turn. |

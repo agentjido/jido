@@ -131,10 +131,13 @@ defmodule Jido.AgentServer.AfterCommitTest do
     definition = definition([{First, [key: :first, sink: sink, observer: observer, gate: gate]}])
     {:ok, server} = Jido.start_agent(jido, definition, id: unique_id())
     assert {:ok, committed} = Server.call(server, update(5))
-    assert_receive {:commit_started, %Commit{state_version: 1}, worker}
+    assert_receive {:commit_started, %Commit{state_version: 1, turn_id: turn_id}, worker}
     assert Server.snapshot(server) == %{agent: committed, state_version: 1}
     assert Server.status(server).phase == :directing
     assert {:ok, 5} = Server.plugin_state(server, First)
+    assert Server.cancel(server) == {:error, :directing}
+    assert Server.cancel_turn(server, turn_id) == {:error, :stale_turn}
+    assert Process.alive?(worker)
     second = Task.async(fn -> Server.call(server, update(1)) end)
     send(worker, {:release, gate})
     assert {:ok, next} = Task.await(second)
@@ -420,6 +423,40 @@ defmodule Jido.AgentServer.AfterCommitTest do
 
     assert_receive {:observed, [:jido, :agent, :turn, :settled], _,
                     %{stage: :after_commit, committed?: true, status: :error}}
+  end
+
+  test "hook failure emits a valid error Signal and keeps the committed Server alive", %{
+    jido: jido,
+    sink: sink
+  } do
+    definition = definition([{First, key: :first, sink: sink, result: :error}])
+
+    {:ok, server} =
+      Jido.start_agent(jido, definition,
+        id: unique_id(),
+        restart: :temporary,
+        error_policy: {:emit_signal, {:pid, target: self()}}
+      )
+
+    input = update(6, [%Effect{sink: sink}])
+    assert {:ok, committed} = Server.call(server, input)
+    assert_receive {:signal, error_signal}, 2_000
+    assert error_signal.type == Jido.AgentServer.Signal.Error.type()
+    assert {:ok, data} = Jido.AgentServer.Signal.Error.validate_data(error_signal.data)
+    assert data.stage == :after_commit
+    assert data.status == :failed
+    assert data.committed?
+    assert data.agent_id == committed.id
+    assert Jido.Signal.get_context(error_signal, "jidocausationid") == input.id
+    settle(server, 1)
+    assert Server.snapshot(server) == %{agent: committed, state_version: 1}
+    assert [{:commit, First, nil, commit}] = history(sink)
+    assert data.turn_id == commit.turn_id
+
+    assert {:ok, next} = Server.call(server, update(1))
+    assert next.state.count == 7
+    assert_receive {:signal, _}, 2_000
+    settle(server, 2)
   end
 
   test "hook failure logs contain bounded identity and no raw callback error", %{

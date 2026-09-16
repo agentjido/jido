@@ -43,10 +43,13 @@ Cancellation can stop admission or executable work before commit. It does not:
 | --- | --- |
 | `AgentServer.call/3` timeout | Caller wait and admission deadline |
 | Jido Action execution timeout | One executable chain |
-| `directive_timeout` | Plugin admission and one Directive dispatch |
+| `directive_timeout` | Plugin admission, one commit notification, or one Directive dispatch |
 | `idle_timeout` | Idle actor lifetime |
 | topology startup timeout | One activation and readiness pass |
 | persistence adapter timeout | Application adapter behavior |
+
+Commit notifications use a 5,000 millisecond limit when `directive_timeout`
+is `:infinity`. Each notification has its own limit.
 
 A caller timeout does not cancel work that already started. Use explicit
 cancellation when that is the required policy.

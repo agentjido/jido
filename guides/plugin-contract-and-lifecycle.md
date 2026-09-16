@@ -103,12 +103,17 @@ The Server runs each hook in a linked task. Its limit is the finite
 `directive_timeout`, or 5,000 milliseconds when that option is `:infinity`.
 Inspections remain available, but the next Turn waits for settlement. A
 reentrant Turn call from a hook returns `{:error, :reentrant_commit}`.
+Turn cancellation ends at commit: during a hook, `cancel/2` returns
+`{:error, :directing}` and `cancel_turn/3` returns `{:error, :stale_turn}`.
+Stopping the Server stops the owned hook task.
 
 Failure or timeout skips remaining hooks and Directives and uses the existing
 error policy. The Outcome has stage `:after_commit`; skipped Directives are
 not counted as failed Directives. `Server.call/3` has already returned the
 committed Agent. Neither a hook failure nor owner loss can undo a saved
 commit or completed external work. Jido does not retry these notifications.
+If the error policy continues, a failed projection can remain stale until a
+later successful notification or runtime replacement.
 
 Startup, restore, runtime replacement, direct `Jido.Agent.cmd/3`, and definition
 upgrades do not invoke this hook. Rebuild the current runtime view from

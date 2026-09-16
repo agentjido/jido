@@ -9,7 +9,7 @@ defmodule Jido.AgentServer.Signal.Error do
         agent_id: Zoi.string(),
         turn_id: Zoi.string(),
         status: Zoi.enum([:failed, :cancelled, :timed_out, :indeterminate]),
-        stage: Zoi.enum([:prepare, :execute, :finalize, :commit, :directive]),
+        stage: Zoi.enum([:prepare, :execute, :finalize, :commit, :after_commit, :directive]),
         committed?: Zoi.boolean(),
         error: Zoi.map(description: "Transport error from Jido.Error.to_map/1")
       })
