@@ -1912,7 +1912,6 @@ defmodule Jido.AgentServer do
   defp commit_checkpointed_turn(agent, directives, version, active, data) do
     directive_count = length(directives)
     committed_active = ActiveTurn.mark_committed(active, version, directive_count)
-    AgentTelemetry.committed(data, version, directive_count)
 
     next_data =
       data
@@ -1928,6 +1927,8 @@ defmodule Jido.AgentServer do
         state_version: version,
         directive_count: directive_count
       })
+
+    AgentTelemetry.committed(next_data, version, directive_count)
 
     notifications = ServerPlugin.commit_modules(data.plugin_specs)
 

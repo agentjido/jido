@@ -32,7 +32,8 @@ Agent and then attempts one commit.
 If evaluation or commit fails, the Turn ends without a new live revision. Jido
 then emits the terminal `turn.settled` event.
 
-If commit succeeds, Jido makes the candidate Agent live and ends the Turn span.
+If commit succeeds, the Server assigns the committed Agent and revision, then
+ends the Turn span before it replies to the caller.
 The caller can receive the committed Agent while Plugin commit notifications
 and Directive work are still active. Each hook and Directive has its own
 span. Jido emits `turn.settled` after all owned attempts stop.

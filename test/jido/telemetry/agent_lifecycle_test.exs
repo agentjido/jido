@@ -202,6 +202,10 @@ defmodule JidoTest.Telemetry.AgentLifecycleTest do
                [:jido, :agent, :directive, :start]
              ]
 
+      turn_stop = Enum.find(before, &(&1.event == [:jido, :agent, :turn, :stop]))
+      assert turn_stop.measurements.state_version_after == Server.snapshot(server).state_version
+      assert turn_stop.metadata.committed?
+
       send(worker, :release)
       eventually(fn -> Server.status(server).phase == :idle end)
       events = semantic_events(probe)
