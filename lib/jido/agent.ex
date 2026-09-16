@@ -324,8 +324,16 @@ defmodule Jido.Agent do
   """
   @spec cmd(instance(), Signal.t(), keyword()) ::
           {:ok, instance(), [struct()]} | {:error, term()}
-  def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts \\ []) when is_list(opts),
-    do: Runner.run(agent, signal, opts)
+  def cmd(agent, signal, opts \\ [])
+
+  def cmd(%__MODULE__{} = agent, %Signal{} = signal, opts) when is_list(opts) do
+    if Keyword.keyword?(opts),
+      do: Runner.run(agent, signal, opts),
+      else: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
+  end
+
+  def cmd(%__MODULE__{}, %Signal{}, opts),
+    do: invalid("Agent.cmd/3 options must be a keyword list", %{opts: opts})
 
   @doc false
   @spec handle_signal(Signal.t(), instance()) :: handle_result()

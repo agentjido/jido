@@ -142,10 +142,16 @@ defmodule Jido.Agent.Turn do
          do: :ok
   end
 
-  defp validate_data(value, _field) when is_map(value) or is_list(value) or is_nil(value),
+  defp validate_data(value, _field) when is_map(value) or is_nil(value),
     do: :ok
 
-  defp validate_data(value, field) do
+  defp validate_data(value, field) when is_list(value) do
+    if Keyword.keyword?(value), do: :ok, else: invalid_data(value, field)
+  end
+
+  defp validate_data(value, field), do: invalid_data(value, field)
+
+  defp invalid_data(value, field) do
     {:error,
      Error.validation_error("Agent Turn #{field} must be a map, keyword list, or nil",
        field: field,

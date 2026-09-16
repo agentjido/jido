@@ -123,6 +123,9 @@ defmodule Jido.Persistence do
     end)
   end
 
+  def save_agent(_source, agent, _opts),
+    do: invalid_public_input(:save_agent, %{agent: agent})
+
   @doc false
   @spec replace_agent(adapter_config() | atom(), Agent.t(), Agent.t(), keyword()) ::
           :ok | {:error, term()}
@@ -222,6 +225,9 @@ defmodule Jido.Persistence do
     end
   end
 
+  def load_agent(_source, agent_module, agent_id, _opts),
+    do: invalid_public_input(:load_agent, %{agent_module: agent_module, agent_id: agent_id})
+
   @doc false
   @spec load_agent_with_revision(adapter_config() | atom(), module(), String.t(), keyword()) ::
           {:ok, Agent.t(), non_neg_integer()} | {:error, term()}
@@ -252,6 +258,13 @@ defmodule Jido.Persistence do
     end)
   end
 
+  def load_agent_with_revision(_source, agent_module, agent_id, _opts),
+    do:
+      invalid_public_input(:load_agent_with_revision, %{
+        agent_module: agent_module,
+        agent_id: agent_id
+      })
+
   @doc "Logically deletes one Agent record with a compare-and-swap tombstone."
   @spec delete_agent(adapter_config() | atom(), module(), String.t(), keyword()) ::
           :ok | {:error, term()}
@@ -278,6 +291,18 @@ defmodule Jido.Persistence do
         end
       end)
     end)
+  end
+
+  def delete_agent(_source, agent_module, agent_id, _opts),
+    do: invalid_public_input(:delete_agent, %{agent_module: agent_module, agent_id: agent_id})
+
+  defp invalid_public_input(operation, details) do
+    {:error,
+     Error.validation_error("Persistence input is invalid",
+       kind: :input,
+       subject: __MODULE__,
+       details: Map.put(details, :operation, operation)
+     )}
   end
 
   @doc false

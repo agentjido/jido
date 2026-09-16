@@ -11,12 +11,18 @@ defmodule Jido.Instance.RefFacade do
   @doc false
   @spec build_ref(atom(), String.t(), keyword()) ::
           {:ok, Ref.t()} | {:error, Error.ValidationError.t()}
-  def build_ref(instance, id, opts \\ []) when is_atom(instance) and is_binary(id) do
+  def build_ref(instance, id, opts \\ [])
+
+  def build_ref(instance, id, opts) when is_atom(instance) and is_binary(id) do
     with :ok <- validate_keyword(opts),
+         :ok <- validate_ref_keys(opts),
          {:ok, namespace} <- require_namespace(instance) do
       Ref.new(namespace: namespace, partition: Keyword.get(opts, :partition), id: id)
     end
   end
+
+  def build_ref(_instance, id, _opts),
+    do: invalid("Agent Ref ID must be a binary", %{id: id})
 
   @doc false
   @spec resolve(atom(), Ref.t()) :: {:ok, pid()} | {:error, term()}
@@ -221,6 +227,13 @@ defmodule Jido.Instance.RefFacade do
     if Keyword.keyword?(opts),
       do: :ok,
       else: invalid("Ref facade options must be a keyword list", %{value: opts})
+  end
+
+  defp validate_ref_keys(opts) do
+    case Enum.reject(Keyword.keys(opts), &(&1 == :partition)) do
+      [] -> :ok
+      keys -> invalid("Agent Ref options have unknown keys", %{keys: keys})
+    end
   end
 
   defp invalid(message, details) do

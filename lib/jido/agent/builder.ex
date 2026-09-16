@@ -42,6 +42,11 @@ defmodule Jido.Agent.Builder do
     else
       _ -> failed("Expected an Agent module")
     end
+  rescue
+    error -> failed("Agent module definition failed", %{module: module, reason: error})
+  catch
+    kind, reason ->
+      failed("Agent module definition failed", %{module: module, reason: {kind, reason}})
   end
 
   def new(attrs) do
@@ -204,7 +209,9 @@ defmodule Jido.Agent.Builder do
     end
   end
 
-  defp failed(message), do: %__MODULE__{config: %{}, error: elem(Authoring.error(message), 1)}
+  defp failed(message, details \\ %{}),
+    do: %__MODULE__{config: %{}, error: elem(Authoring.error(message, details), 1)}
+
   defp unwrap!({:ok, value}), do: value
   defp unwrap!({:error, error}), do: raise(error)
 end

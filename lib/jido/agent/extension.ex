@@ -66,37 +66,50 @@ defmodule Jido.Agent.Extension do
   """
   @spec lower([module()], map(), [struct()]) ::
           {:ok, map()} | {:error, Exception.t()}
-  def lower(extensions, config, entities) when is_list(extensions) do
-    if length(extensions) != length(Enum.uniq(extensions)) do
-      error("Duplicate Agent extension")
-    else
-      with {:ok, config} <- claim_route_targets(extensions, config) do
-        Enum.reduce_while(extensions, {:ok, config, entities}, fn extension, {:ok, attrs, rest} ->
-          if is_atom(extension) and Code.ensure_loaded?(extension) and
-               function_exported?(extension, :lower_agent, 2) do
-            case extension.lower_agent(attrs, rest) do
-              {:ok, result, remaining}
-              when is_map(result) and not is_struct(result) and is_list(remaining) ->
-                {:cont, {:ok, result, remaining}}
+  def lower(extensions, config, entities)
+      when is_list(extensions) and is_map(config) and not is_struct(config) and
+             is_list(entities) do
+    cond do
+      not proper_list?(extensions) or not proper_list?(entities) ->
+        error("Agent extensions and entities must be proper lists")
 
-              {:error, error} when is_exception(error) ->
-                {:halt, {:error, error}}
+      length(extensions) != length(Enum.uniq(extensions)) ->
+        error("Duplicate Agent extension")
 
-              other ->
-                {:halt,
-                 error("Invalid Agent extension result", %{extension: extension, result: other})}
+      true ->
+        with {:ok, config} <- claim_route_targets(extensions, config) do
+          Enum.reduce_while(extensions, {:ok, config, entities}, fn extension,
+                                                                    {:ok, attrs, rest} ->
+            if is_atom(extension) and Code.ensure_loaded?(extension) and
+                 function_exported?(extension, :lower_agent, 2) do
+              case extension.lower_agent(attrs, rest) do
+                {:ok, result, remaining}
+                when is_map(result) and not is_struct(result) and is_list(remaining) ->
+                  {:cont, {:ok, result, remaining}}
+
+                {:error, error} when is_exception(error) ->
+                  {:halt, {:error, error}}
+
+                other ->
+                  {:halt,
+                   error("Invalid Agent extension result", %{extension: extension, result: other})}
+              end
+            else
+              {:halt,
+               error("Agent extension must implement lower_agent/2", %{extension: extension})}
             end
-          else
-            {:halt,
-             error("Agent extension must implement lower_agent/2", %{extension: extension})}
-          end
-        end)
-        |> finish()
-      end
+          end)
+          |> finish()
+        end
     end
   end
 
-  def lower(_extensions, _config, _entities), do: error("Agent extensions must be a list")
+  def lower(_extensions, _config, _entities),
+    do: error("Agent extensions require a list, plain config map, and entity list")
+
+  defp proper_list?([]), do: true
+  defp proper_list?([_head | tail]), do: proper_list?(tail)
+  defp proper_list?(_tail), do: false
 
   defp finish({:ok, config, []}), do: {:ok, config}
 
