@@ -107,7 +107,7 @@ runtime, host, and settings. Comparison rejects different environments, settings
 methods, tool hashes, and case sets. Ratios are candidate divided by baseline.
 A ratio below one is lower; one run alone does not establish a speed gain.
 
-See the [50-round plan](https://github.com/agentjido/jido/blob/v3-spike/docs/plans/2026-09-05-core-performance.md) for the idea
+See the [50-round plan](https://github.com/agentjido/jido/blob/310755ac/docs/plans/2026-09-05-core-performance.md) for the idea
 list, acceptance gates, required tests, and commit process. Distributed load,
 complete durable recovery, scheduling, and topology need additional fixtures
 before those optimization rounds can run.

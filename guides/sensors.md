@@ -11,4 +11,4 @@ for an old Sensor. Port its resource startup, readiness, Signal delivery, and
 cleanup into the V3 Plugin contract.
 
 See [resource lifecycle tests](../test/jido/plugin/sensor_manager_test.exs) and
-[Bus tests](../test/jido/plugin/bus_test.exs).
+[Bus tests](../test/jido/plugin/bus/integration_test.exs).

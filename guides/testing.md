@@ -73,7 +73,7 @@ quiescent upgrade boundary, validated definition migration, and additive
 Topology update. See the
 [research results](../test/examples/99_research/README.md).
 
-The [example catalog](https://github.com/agentjido/jido/tree/v3-spike/examples/README.md) has 62 main fixtures and
+The [example catalog](https://github.com/agentjido/jido/blob/release/v3/examples/README.md) has 62 main fixtures and
 16 research probes. Source files live in `examples/`; tests live in
 `test/examples/`. Production builds and the Hex package exclude both trees.
 Local development and test builds compile the source examples so demos and

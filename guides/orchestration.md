@@ -12,6 +12,6 @@ Signals. Node discovery, capacity choice, and rebalance policy belong in an
 application or Plugin. The 1,000-worker example is a local scale check, not a
 multi-host capacity claim. The old Pod mutation API is removed.
 
-See the [Topology guide](https://github.com/agentjido/jido/tree/v3-spike/examples/07_topology/README.md),
-[child ownership](https://github.com/agentjido/jido/tree/v3-spike/examples/05_multi_agent/README.md), and
-[application scenarios](https://github.com/agentjido/jido/tree/v3-spike/examples/08_applications/README.md).
+See the [Topology guide](https://github.com/agentjido/jido/blob/release/v3/examples/07_topology/README.md),
+[child ownership](https://github.com/agentjido/jido/blob/release/v3/examples/05_multi_agent/README.md), and
+[application scenarios](https://github.com/agentjido/jido/blob/release/v3/examples/08_applications/README.md).

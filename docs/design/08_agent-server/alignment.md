@@ -61,24 +61,24 @@ design.
 
 | Evidence | Canonical current behavior |
 | --- | --- |
-| `lib/jido/agent_server.ex:1-47,432-500` | `Jido.AgentServer` is a `:gen_statem`. It owns one live Agent, state version, active Turn, runtime work, and five total phases including initialization. |
-| `lib/jido/agent_server.ex:85-430` | Public PID/name operations include startup, call, cast, request, inspection, cancellation, debug, lookup, child controls, snapshot, and hibernation. |
+| `lib/jido/agent_server.ex` | `Jido.AgentServer` is a `:gen_statem`. It owns one live Agent, state version, active Turn, runtime work, and five total phases including initialization. |
+| `lib/jido/agent_server.ex` | Public PID/name operations include startup, call, cast, request, inspection, cancellation, debug, lookup, child controls, snapshot, and hibernation. |
 | `lib/jido/agent_server.ex` upgrade path | Explicit upgrade calls wait for idle. Definition replacement validates the target Agent, preserves Plugin declarations, checkpoints, and advances one state version. |
 | `lib/jido/agent_server/runtime_checkpoint.ex` | A successful definition replacement remains the restart source for the original managed child specification. |
 | `lib/jido/persistence.ex` replacement path | A stable namespaced record can change Agent module through one exact-byte compare-and-swap. Module-dependent compatibility keys reject that change. |
 | `lib/jido/agent_server/options.ex` | One Zoi-backed option value validates Agent construction, registration, persistence, limits, executable runtime, lifecycle, and open error policies. `turn_timeout` is a distinct pre-commit limit. |
 | `lib/jido/agent_server.ex` startup path | Startup reserves the Registry identity, restores and validates, starts Plugin roots, waits for readiness, confirms revision-zero creation when required, and then publishes `:ready`. |
-| `lib/jido/agent_server.ex:579-620,1878-1924` | Inspection remains responsive in every phase. Status and snapshot are protocol maps, not target-specific public structs. |
-| `lib/jido/agent_server.ex:759-848,1926-1978` | Busy Signals use OTP postponement. A token set bounds only events already seen by the state machine. Full calls fail; full casts are dropped. |
-| `lib/jido/agent_server.ex:709-756,1596-1637` | Admission and executable work can be cancelled. Current controls are atoms such as `:idle`, `:directing`, `:stale_turn`, and `:cancelled`. |
+| `lib/jido/agent_server.ex` | Inspection remains responsive in every phase. Status and snapshot are protocol maps, not target-specific public structs. |
+| `lib/jido/agent_server.ex` | Busy Signals use OTP postponement. A token set bounds only events already seen by the state machine. Full calls fail; full casts are dropped. |
+| `lib/jido/agent_server.ex` | Admission and executable work can be cancelled. Current controls are atoms such as `:idle`, `:directing`, `:stale_turn`, and `:cancelled`. |
 | `lib/jido/agent_server.ex` Turn path | One ActiveTurn starts before live admission. One Server timer covers admission and candidate evaluation until commit begins. Owned admission and executable work are cancelled on timeout. |
-| `lib/jido/agent_server.ex:1469-1545` | Runner finalization and live Directive validation precede checkpoint work. A successful commit writes first, replaces the complete Agent, increments one version, replies, and then starts Directives. |
-| `lib/jido/agent_server.ex:1582-1617` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
-| `lib/jido/agent_server.ex:1639-1862` | Directives run in list order after commit. One failure stops the batch. Process-backed work has one Directive timeout and does not roll back state. |
-| `lib/jido/agent_server.ex:1981-2008` | Synchronous reentry from admission, executable, and Directive process trees is detected and rejected. |
-| `lib/jido/agent_server.ex:2148-2218` | Plugin lifecycle-owner loss stops the Server. Other child exits remove private tracking and create a later child-exit Signal. |
-| `lib/jido/agent_server.ex:2504-2598` | Current error policy permits log-only, stop, maximum-error, error-Signal, and application-function behavior. |
-| `lib/jido/agent_server.ex:2874-2955` | Persistent startup loads durable state. Nonpersistent named startup restores `RuntimeStore`. Commits write runtime or durable checkpoints. Clean stop deletes the runtime checkpoint. |
+| `lib/jido/agent_server.ex` | Runner finalization and live Directive validation precede checkpoint work. A successful commit writes first, replaces the complete Agent, increments one version, replies, and then starts Directives. |
+| `lib/jido/agent_server.ex` | Every required persistence write failure returns the failure and stops the activation before it can evaluate more work. |
+| `lib/jido/agent_server.ex` | Directives run in list order after commit. One failure stops the batch. Process-backed work has one Directive timeout and does not roll back state. |
+| `lib/jido/agent_server.ex` | Synchronous reentry from admission, executable, and Directive process trees is detected and rejected. |
+| `lib/jido/agent_server.ex` | Plugin lifecycle-owner loss stops the Server. Other child exits remove private tracking and create a later child-exit Signal. |
+| `lib/jido/agent_server.ex` | Current error policy permits log-only, stop, maximum-error, error-Signal, and application-function behavior. |
+| `lib/jido/agent_server.ex` | Persistent startup loads durable state. Nonpersistent named startup restores `RuntimeStore`. Commits write runtime or durable checkpoints. Clean stop deletes the runtime checkpoint. |
 | `lib/jido/agent_server/active_turn.ex` | One Zoi-backed private ActiveTurn keeps Turn identity, source and effective Signals, caller, task handle, prepared result, versions, Directive progress, and the pre-commit deadline. |
 | `lib/jido/agent/turn/outcome.ex:1-195` | One public validated Outcome uses five stages, five terminal statuses, complete source/effective Signals, commit fields, and exact Directive counts. |
 | `lib/jido/agent_server/plugin_lifecycle.ex` and `plugin_child.ex` | Plugin roots start in declaration order, use wrapper supervision, expose restarting state, await readiness, and stay outside Agent state. Every generation gets a newly built owned-state and state-version pair. |

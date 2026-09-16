@@ -12,5 +12,5 @@ The example commits business state and acknowledgement together. It skips other
 busy or offline slots according to its stated policy; it does not promise to
 replay every missed interval.
 
-See [scheduled occurrence tests](../test/jido/agent/scheduled_occurrence_test.exs)
-and [recovery tests](../test/jido/agent/scheduled_occurrence_recovery_test.exs).
+See [scheduled occurrence tests](../test/jido/plugin/scheduler/occurrence_runtime_test.exs)
+and [recovery tests](../test/jido/plugin/scheduler/occurrence_recovery_test.exs).

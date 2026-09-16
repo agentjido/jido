@@ -19,4 +19,4 @@ result becomes a Directive failure after commit. The external start may already
 have happened; Jido cannot undo it.
 
 See [commit and delivery tests](../test/jido/agent/stateless_directive_test.exs)
-and the [recovery examples](https://github.com/agentjido/jido/tree/v3-spike/examples/04_runtime/README.md).
+and the [recovery examples](https://github.com/agentjido/jido/blob/release/v3/examples/04_runtime/README.md).

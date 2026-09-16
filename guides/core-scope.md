@@ -1,6 +1,6 @@
 # Core scope and extension points
 
-This guide describes the implemented `v3-spike` API. The files in
+This guide describes the implemented `release/v3` API. The files in
 `docs/design` contain deferred proposals and implementation notes. Use this
 guide and the public module documentation when you build an extension.
 
@@ -56,7 +56,7 @@ duplicate external work.
 The durable scheduling integration test rejects result writes, checks the
 configured delay, then permits a write. It verifies that the same saved work
 commits once and that the acknowledgement clears it. See the
-[recovery tests](https://github.com/agentjido/jido/blob/v3-spike/test/jido/agent/scheduled_occurrence_recovery_test.exs).
+[recovery tests](https://github.com/agentjido/jido/blob/release/v3/test/jido/plugin/scheduler/occurrence_recovery_test.exs).
 
 ## Topology repair timing
 
@@ -103,7 +103,7 @@ rebalance, fencing, or exclusive ownership.
 The independent topology example stops one Agent. In manual mode, it remains
 stopped until the application requests repair. The other Agent keeps its PID
 and state. See the
-[example test](https://github.com/agentjido/jido/blob/v3-spike/test/examples/07_topology/07_01_independent/independent_test.exs).
+[example test](https://github.com/agentjido/jido/blob/release/v3/test/examples/07_topology/07_01_independent/independent_test.exs).
 
 This operation repairs the existing target. Use `update/3` for additive growth
 and `place_agent/4` for one exact-node change. Destructive graph changes and
@@ -153,4 +153,4 @@ mix test test/jido/agent/scheduled_occurrence_recovery_test.exs \
 
 Run all examples separately with `mix test.examples`. All example tests
 pass without skips. See the
-[test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
+[test policy](https://github.com/agentjido/jido/blob/release/v3/guides/testing.md).

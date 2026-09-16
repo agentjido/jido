@@ -377,7 +377,7 @@ registration checks do not establish exclusive ownership across a cluster.
 **Check:** test shutdown, detached owners, idle expiry, worker limits, remote
 failure, and cleanup. See
 [Agent Server Lifecycle](agent-server-lifecycle.md) and the
-[Factory examples](https://github.com/agentjido/jido/tree/v3-spike/examples/06_factory).
+[Factory examples](https://github.com/agentjido/jido/tree/release/v3/examples/06_factory).
 
 ## Convert stored data explicitly
 
@@ -473,7 +473,7 @@ its included Bedrock service profile has open failures. On Elixir 1.18.5 /
 OTP 27.3.4.12, test compilation fails in an example Directive before core
 tests run. Example acceptance tests are secondary; run `mix test.examples`
 separately when needed. See the
-[test policy](https://github.com/agentjido/jido/blob/v3-spike/guides/testing.md).
+[test policy](https://github.com/agentjido/jido/blob/release/v3/guides/testing.md).
 
 All research example assertions pass. They include the quiescent upgrade
 boundary, validated live definition migration, and additive Topology
