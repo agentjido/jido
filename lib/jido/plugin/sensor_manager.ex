@@ -7,7 +7,9 @@ defmodule Jido.Plugin.SensorManager do
   with `Jido.AgentServer.cast(init.agent_server, signal)`.
 
   `start/3` adds or replaces one tagged sensor. `stop/1` removes it. The
-  manager restarts a failed sensor while its tag remains desired.
+  manager restarts a failed sensor while its tag remains desired. Reconciliation
+  ignores effects from a revision that is at or below the last successful
+  revision, so an old retry cannot replace a newer sensor set.
   """
 
   use Jido.Plugin,

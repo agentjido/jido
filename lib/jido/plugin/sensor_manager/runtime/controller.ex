@@ -47,8 +47,9 @@ defmodule Jido.Plugin.SensorManager.Runtime.Controller do
   def handle_call(
         {:reconcile, _desired, version},
         _from,
-        %{last_reconciled_version: version} = state
-      ) do
+        %{last_reconciled_version: last_version} = state
+      )
+      when is_integer(version) and is_integer(last_version) and version <= last_version do
     {:reply, :ok, state}
   end
 

@@ -166,6 +166,28 @@ defmodule Jido.Plugin.SensorManagerTest do
     eventually(fn -> Server.agent(agent).state.readings == [3, 4] end)
   end
 
+  test "older reconciliation and retry cannot replace a newer sensor set", %{jido: jido} do
+    {:ok, agent} = Jido.start_agent(jido, Agent)
+    runtime = Server.children(agent)[{:plugin, SensorManager}].pid
+    controller = child_pid(runtime, Jido.Plugin.SensorManager.Runtime.Controller)
+    gate = start_supervised!({Elixir.Agent, fn -> [{:error, :offline}, :ok] end})
+    old = %{source: %{module: ControlledSensor, config: %{gate: gate}}}
+
+    assert {:error, {:sensor_start_failed, :source, :offline}} =
+             Runtime.reconcile(runtime, old, 1, 1_000)
+
+    old_retry = :sys.get_state(controller).retry_token
+    assert is_reference(old_retry)
+
+    assert :ok = Runtime.reconcile(runtime, %{}, 2, 1_000)
+    assert Runtime.sensors(runtime) == %{}
+
+    assert :ok = Runtime.reconcile(runtime, old, 1, 1_000)
+    send(controller, {:retry_reconcile, old_retry, 1})
+    assert Runtime.sensors(runtime) == %{}
+    assert :sys.get_state(controller).last_reconciled_version == 2
+  end
+
   test "replaces only the sensor whose numeric config type changes", %{jido: jido} do
     {:ok, agent} = Jido.start_agent(jido, Agent)
     runtime = Server.children(agent)[{:plugin, SensorManager}].pid
