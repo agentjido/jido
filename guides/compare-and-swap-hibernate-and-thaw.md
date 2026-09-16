@@ -113,9 +113,18 @@ key, it returns a persistence identity collision. It does not select one or
 rewrite either key.
 
 Adding a namespace is an application migration gate. Stop old writers and
-check for collisions before you enable the new runtime. The adapter contract
-cannot atomically move data between two keys. An older release cannot read
-format 3, so downgrade after the first stable Ref write is not supported.
+call `Jido.Persistence.establish_write_authority/4` before you enable mixed V3
+callers. Pass the stable `:namespace`, `:instance`, and `:partition`. The call
+checks both keys and returns a gate for the existing key, or the Ref key when
+neither record exists. It does not write another adapter record. Pass the
+returned value as `:write_authority` to every compatible and Ref persistence
+call during the migration. Both caller modes then use the same key and CAS.
+Reject any caller that cannot use this gate. An older release cannot use it and
+must stay stopped.
+
+The adapter contract cannot atomically move data between two keys. An older
+release cannot read format 3, so downgrade after the first stable Ref write is
+not supported.
 Legacy keys also contain the Agent module. Inventory the old keyspace for two
 module keys that would collapse to one Ref because Core adapters do not provide
 a key-list operation.

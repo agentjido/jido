@@ -398,9 +398,13 @@ identity, definition revision, complete state, and recursive portability.
    complete Agent state, history, and pending work.
 3. Convert each domain field and Plugin-owned field to the new schemas. Decide how
    to reconcile external work that might already have completed.
-4. Construct and validate a V3 instance. If you add a namespace, confirm that
-   no compatible and stable keys exist for the same Ref. Save through the V3
-   persistence API and adapter. Keep V2 backups separate from V3 records.
+4. Construct and validate a V3 instance. If you add a namespace, stop old
+   writers and call `Jido.Persistence.establish_write_authority/4` for each
+   logical Agent. Pass its result as `:write_authority` to every persistence
+   caller until all callers use Ref identity. This rejects compatible and
+   stable key collisions and routes both V3 caller modes to one record. Save
+   through the V3 persistence API and adapter. Keep V2 backups separate from
+   V3 records.
 5. Restore the saved record in a fresh V3 process. Verify identity, state,
    pending work IDs, retry counts, and Plugin reconstruction before activation.
 6. Rehearse rollback before the first namespaced write. Older code cannot read

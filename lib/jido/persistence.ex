@@ -30,13 +30,14 @@ defmodule Jido.Persistence do
   exact Agent Ref key with record format 3. If only a compatible key exists,
   the namespaced operation continues to use it. If both keys exist, the
   operation returns an identity collision. Jido does not rewrite data across
-  the two keys automatically.
+  the two keys automatically. During a controlled migration, one
+  `WriteAuthority` value routes both caller modes to the selected record key.
   """
 
   alias Jido.Agent
   alias Jido.Agent.Ref
   alias Jido.Error
-  alias Jido.Persistence.{Checkpoint, Record}
+  alias Jido.Persistence.{Checkpoint, Record, WriteAuthority}
   alias Jido.Telemetry.Persistence, as: PersistenceTelemetry
   alias Jido.PortableTerm
 
@@ -296,6 +297,64 @@ defmodule Jido.Persistence do
   def delete_agent(_source, agent_module, agent_id, _opts),
     do: invalid_public_input(:delete_agent, %{agent_module: agent_module, agent_id: agent_id})
 
+  @doc """
+  Creates an explicit write gate for a compatible-to-Ref identity migration.
+
+  Stop old writers before this call. Supply the target `:namespace` and the
+  same `:instance` and `:partition` that the writers use. The call rejects two
+  existing records. It selects the existing record key, or the Ref key when no
+  record exists. It does not write, move, or delete adapter data.
+
+  Pass the returned value as `:write_authority` to every compatible and Ref
+  read or write during the migration. These calls then use one record key and
+  one compare-and-swap authority.
+  """
+  @spec establish_write_authority(adapter_config() | atom(), module(), String.t(), keyword()) ::
+          {:ok, WriteAuthority.t()} | {:error, term()}
+  def establish_write_authority(source, agent_module, agent_id, opts)
+      when is_atom(agent_module) and is_binary(agent_id) do
+    protect(:get, fn ->
+      with :ok <- validate_operation_options(opts),
+           namespace when is_binary(namespace) <- Keyword.get(opts, :namespace),
+           {:ok, {adapter, adapter_opts}, instance} <- resolve_source(source, opts),
+           partition = Keyword.get(opts, :partition),
+           {:ok, ref} <- Ref.new(namespace: namespace, partition: partition, id: agent_id),
+           ref_identity = %{mode: :ref, key: agent_key(ref), namespace: namespace},
+           legacy_identity = %{
+             mode: :legacy,
+             key: agent_key(instance, agent_module, agent_id, partition)
+           },
+           {:ok, selected} <-
+             select_storage_identity(adapter, adapter_opts, ref_identity, legacy_identity) do
+        other_key =
+          if selected.mode == :ref, do: legacy_identity.key, else: ref_identity.key
+
+        {:ok,
+         %WriteAuthority{
+           instance: instance,
+           agent_module: agent_module,
+           agent_id: agent_id,
+           partition: partition,
+           namespace: namespace,
+           mode: selected.mode,
+           key: selected.key,
+           other_key: other_key
+         }}
+      else
+        nil -> {:error, :stable_namespace_required}
+        {:error, _reason} = error -> error
+        _other -> {:error, :stable_namespace_required}
+      end
+    end)
+  end
+
+  def establish_write_authority(_source, agent_module, agent_id, _opts),
+    do:
+      invalid_public_input(:establish_write_authority, %{
+        agent_module: agent_module,
+        agent_id: agent_id
+      })
+
   defp invalid_public_input(operation, details) do
     {:error,
      Error.validation_error("Persistence input is invalid",
@@ -537,6 +596,27 @@ defmodule Jido.Persistence do
   end
 
   defp storage_identity({adapter, adapter_opts}, instance, agent_module, agent_id, opts) do
+    case Keyword.get(opts, :write_authority) do
+      nil ->
+        discover_storage_identity(adapter, adapter_opts, instance, agent_module, agent_id, opts)
+
+      %WriteAuthority{} = authority ->
+        authority_storage_identity(
+          adapter,
+          adapter_opts,
+          authority,
+          instance,
+          agent_module,
+          agent_id,
+          opts
+        )
+
+      _invalid ->
+        {:error, :invalid_persistence_write_authority}
+    end
+  end
+
+  defp discover_storage_identity(adapter, adapter_opts, instance, agent_module, agent_id, opts) do
     partition = Keyword.get(opts, :partition)
 
     case Keyword.get(opts, :namespace) do
@@ -556,6 +636,83 @@ defmodule Jido.Persistence do
         end
     end
   end
+
+  defp authority_storage_identity(
+         adapter,
+         adapter_opts,
+         authority,
+         instance,
+         agent_module,
+         agent_id,
+         opts
+       ) do
+    partition = Keyword.get(opts, :partition)
+    namespace = Keyword.get(opts, :namespace)
+
+    with :ok <- authority_identity_match(authority, instance, agent_module, agent_id, partition),
+         :ok <- authority_namespace_match(authority, namespace),
+         :ok <- authority_key_match(authority),
+         :missing <- stored_key_state(adapter, authority.other_key, adapter_opts) do
+      case authority.mode do
+        :legacy -> {:ok, %{mode: :legacy, key: authority.key}}
+        :ref -> {:ok, %{mode: :ref, key: authority.key, namespace: authority.namespace}}
+      end
+    else
+      :present ->
+        {:error, {:persistence_identity_collision, authority_collision_keys(authority)}}
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
+  defp authority_identity_match(authority, instance, agent_module, agent_id, partition) do
+    if authority.instance == instance and authority.agent_module == agent_module and
+         authority.agent_id == agent_id and authority.partition == partition,
+       do: :ok,
+       else: {:error, :persistence_write_authority_mismatch}
+  end
+
+  defp authority_namespace_match(_authority, nil), do: :ok
+
+  defp authority_namespace_match(%WriteAuthority{namespace: namespace}, namespace), do: :ok
+
+  defp authority_namespace_match(_authority, _namespace),
+    do: {:error, :persistence_write_authority_mismatch}
+
+  defp authority_key_match(%WriteAuthority{} = authority) do
+    legacy_key =
+      agent_key(
+        authority.instance,
+        authority.agent_module,
+        authority.agent_id,
+        authority.partition
+      )
+
+    with {:ok, ref} <-
+           Ref.new(
+             namespace: authority.namespace,
+             partition: authority.partition,
+             id: authority.agent_id
+           ) do
+      ref_key = agent_key(ref)
+
+      valid? =
+        case authority.mode do
+          :legacy -> authority.key == legacy_key and authority.other_key == ref_key
+          :ref -> authority.key == ref_key and authority.other_key == legacy_key
+          _invalid -> false
+        end
+
+      if valid?, do: :ok, else: {:error, :invalid_persistence_write_authority}
+    end
+  end
+
+  defp authority_collision_keys(%WriteAuthority{mode: :ref} = authority),
+    do: %{ref_key: authority.key, legacy_key: authority.other_key}
+
+  defp authority_collision_keys(%WriteAuthority{} = authority),
+    do: %{ref_key: authority.other_key, legacy_key: authority.key}
 
   defp select_storage_identity(adapter, opts, ref_identity, legacy_identity) do
     case {
