@@ -8,20 +8,23 @@ defmodule Jido.Examples.Runtime.EventProbe do
   an OBS-03 consumer with a queue/backpressure contract.
   """
 
-  # Retained Agent Server names plus the version-1 semantic catalog. Attaching
-  # does not create any of these events.
+  # Version-1 semantic span families. Attaching does not create these events.
   @prefixes [
-    [:jido, :agent_server, :signal],
-    [:jido, :agent_server, :directive],
     [:jido, :agent, :lifecycle],
     [:jido, :agent, :turn],
     [:jido, :agent, :commit],
+    [:jido, :agent, :after_commit],
     [:jido, :agent, :directive],
     [:jido, :persistence, :operation],
     [:jido, :topology, :operation]
   ]
   @events for(prefix <- @prefixes, ending <- [:start, :stop, :exception], do: prefix ++ [ending]) ++
-            [[:jido, :agent, :turn, :settled], [:jido, :agent, :admission, :rejected]]
+            [
+              [:jido, :agent, :turn, :settled],
+              [:jido, :agent, :admission, :rejected],
+              [:jido, :scheduler, :delivery],
+              [:jido, :topology, :ownership, :settled]
+            ]
 
   def attach(agent_ids) do
     table = :ets.new(__MODULE__, [:ordered_set, :public])

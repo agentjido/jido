@@ -98,6 +98,12 @@ defmodule PluginRuntime.Effects do
   use Jido.Plugin,
     agent: PluginRuntime.Effects.Agent,
     agent_server: PluginRuntime.Effects.Server
+
+  def settled(_event, _measurements, %{agent_id: "plugin-runtime-1"} = metadata, caller) do
+    send(caller, {:turn_settled, metadata})
+  end
+
+  def settled(_event, _measurements, _metadata, _caller), do: :ok
 end
 ```
 
@@ -142,21 +148,30 @@ end
   )
 
 :ok = Jido.AgentServer.await_ready(agent)
+
+settled_handler = {PluginRuntime.Effects, make_ref()}
+:ok =
+  :telemetry.attach(
+    settled_handler,
+    [:jido, :agent, :turn, :settled],
+    &PluginRuntime.Effects.settled/4,
+    self()
+  )
+
 {:ok, committed} = PluginRuntime.Agent.record(agent, "first")
 
+try do
+  receive do
+    {:turn_settled, %{status: :ok}} -> :ok
+  after
+    5_000 -> raise "Plugin Directive did not settle"
+  end
+after
+  :telemetry.detach(settled_handler)
+end
+
 %{pid: runtime} = Jido.AgentServer.children(agent)[{:plugin, PluginRuntime.Effects}]
-
-records =
-  Enum.reduce_while(1..100, [], fn _, _records ->
-    case GenServer.call(runtime, :records) do
-      [] ->
-        Process.sleep(10)
-        {:cont, []}
-
-      records ->
-        {:halt, records}
-    end
-  end)
+records = GenServer.call(runtime, :records)
 
 {committed.state.count, records}
 ```
