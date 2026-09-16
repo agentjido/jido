@@ -126,5 +126,13 @@ repair, additive Agent updates, lifecycle Signals, and exact known-node
 placement. It does not provide membership discovery, placement selection,
 automatic rebalance, live removal, distributed authority, or work ownership.
 
+`Controller.status/2` and `await_ready/2` report current local readiness. A
+public query checks cached PIDs, each required Bus input subscription runtime,
+and each live parent binding with a short timeout. If a Bus client disconnects
+or a parent binding is lost while the Agent and Bus PIDs remain alive, status
+becomes `:degraded` with an input error. After reconnection or binding repair,
+a later query can report `:ready` again. Readiness does not confirm that a
+Signal has committed a target Agent Turn.
+
 Continue with [Topology DSL](topology-dsl.livemd) and
 [Activate And Repair A Topology](activate-and-repair-a-topology.livemd).

@@ -34,4 +34,18 @@ defmodule Jido.Topology.BusInputs.Server do
         {:halt, {:error, :subscription_unavailable}}
     end)
   end
+
+  @doc false
+  def ready_snapshot(supervisor, opts) do
+    Enum.reduce_while(Supervisor.which_children(supervisor), :ok, fn
+      {_, pid, _, _}, :ok when is_pid(pid) ->
+        case Client.Server.ready_snapshot(pid, opts) do
+          :ok -> {:cont, :ok}
+          error -> {:halt, error}
+        end
+
+      _, _ ->
+        {:halt, {:error, :subscription_unavailable}}
+    end)
+  end
 end

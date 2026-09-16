@@ -76,11 +76,17 @@ defmodule Jido.Topology.Controller do
     end
   end
 
-  @doc "Returns status from the latest repair pass."
+  @doc """
+  Returns the latest repair result with current live input readiness.
+
+  The Controller rechecks owned PIDs, required Bus client subscriptions, and
+  parent bindings on each public query. A disconnected input makes status
+  `:degraded` while its cached Agent and Bus PIDs remain alive.
+  """
   def status(controller, timeout \\ 5_000),
     do: GenServer.call(runtime(controller), :status, timeout)
 
-  @doc "Waits for all resources, Agents, and ownership bindings to be ready."
+  @doc "Waits for current resources, Agents, Bus inputs, and ownership bindings to be ready."
   def await_ready(controller, timeout \\ 60_000),
     do: GenServer.call(runtime(controller), {:await_ready, timeout}, timeout)
 

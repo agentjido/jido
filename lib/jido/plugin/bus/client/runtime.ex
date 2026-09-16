@@ -63,6 +63,15 @@ defmodule Jido.Plugin.Bus.Client.Runtime do
     end
   end
 
+  def handle_call(:ready_snapshot, _from, state) do
+    ready? =
+      is_pid(state.bus) and Process.alive?(state.bus) and
+        is_binary(state.subscription_id) and
+        Bus.whereis(state.config.bus, state.config.lookup_opts) == {:ok, state.bus}
+
+    {:reply, if(ready?, do: :ok, else: {:error, :not_ready}), state}
+  end
+
   @impl true
   def handle_info({:signal, signal}, state) do
     Server.cast(state.agent_server, signal)

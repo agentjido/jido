@@ -17,6 +17,9 @@ defmodule Jido.Topology.Controller.Runtime do
 
   alias Jido.Tracing.Context, as: TraceContext
 
+  @live_query_timeout 100
+  @live_retry_interval 100
+
   def start_link({jido, instance, repair, lifecycle, owner}),
     do: GenServer.start_link(__MODULE__, {jido, instance, repair, lifecycle, owner})
 
@@ -37,6 +40,8 @@ defmodule Jido.Topology.Controller.Runtime do
         reconcile_token: nil,
         ready: %{},
         errors: %{},
+        live_errors: %{},
+        live_refresh_token: nil,
         waiters: %{},
         phase: :starting,
         pending: MapSet.new(),
@@ -85,6 +90,17 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_info({:expire_waiter, token}, state),
     do: {:noreply, %{state | waiters: Map.delete(state.waiters, token)}}
 
+  def handle_info({:refresh_live, token}, %{live_refresh_token: token} = state)
+      when not is_nil(token) do
+    state = %{state | live_refresh_token: nil} |> refresh_phase()
+
+    if current_phase(state) == :ready,
+      do: {:noreply, reply_waiters(state)},
+      else: {:noreply, schedule_live_refresh(state)}
+  end
+
+  def handle_info({:refresh_live, _token}, state), do: {:noreply, state}
+
   @impl true
   def handle_call(:status, _from, state) do
     state = refresh_phase(state)
@@ -97,7 +113,7 @@ defmodule Jido.Topology.Controller.Runtime do
        target_revision: state.target_revision,
        resources: map_size(state.instance.plan.resources),
        ready: map_size(state.ready),
-       errors: state.errors,
+       errors: Map.merge(state.errors, state.live_errors),
        components: state.instance.plan.components,
        active: map_size(state.active),
        pending: MapSet.size(state.pending)
@@ -175,7 +191,7 @@ defmodule Jido.Topology.Controller.Runtime do
   def handle_call({:await_ready, timeout}, from, state) do
     state = refresh_phase(state)
 
-    if state.phase == :ready do
+    if current_phase(state) == :ready do
       {:reply, :ok, state}
     else
       token = make_ref()
@@ -185,7 +201,9 @@ defmodule Jido.Topology.Controller.Runtime do
           do: nil,
           else: Process.send_after(self(), {:expire_waiter, token}, timeout)
 
-      {:noreply, %{state | waiters: Map.put(state.waiters, token, {from, timer})}}
+      {:noreply,
+       %{state | waiters: Map.put(state.waiters, token, {from, timer})}
+       |> schedule_live_refresh()}
     end
   end
 
@@ -296,6 +314,10 @@ defmodule Jido.Topology.Controller.Runtime do
 
     :ok
   end
+
+  defp current_phase(%{phase: :ready, live_errors: live_errors})
+       when map_size(live_errors) > 0,
+       do: :degraded
 
   defp current_phase(state), do: state.phase
 
@@ -541,14 +563,15 @@ defmodule Jido.Topology.Controller.Runtime do
       phase: phase,
       operation_span: nil,
       last_status: phase,
+      live_errors: %{},
       pass_count: Map.get(state, :pass_count, 0) + 1
     })
   end
 
   defp reply_waiters(state) do
-    state = recheck_ready(state)
+    state = refresh_phase(state)
 
-    if map_size(state.errors) == 0 do
+    if current_phase(state) == :ready do
       Enum.each(state.waiters, fn {_, {from, timer}} ->
         if timer, do: Process.cancel_timer(timer)
         GenServer.reply(from, :ok)
@@ -556,7 +579,7 @@ defmodule Jido.Topology.Controller.Runtime do
 
       %{state | phase: :ready, waiters: %{}} |> schedule_reconcile()
     else
-      %{state | phase: :degraded} |> schedule_reconcile()
+      state |> schedule_live_refresh() |> schedule_reconcile()
     end
   end
 
@@ -750,10 +773,85 @@ defmodule Jido.Topology.Controller.Runtime do
 
   defp refresh_phase(%{phase: :ready} = state) do
     state = recheck_ready(state)
-    if map_size(state.errors) == 0, do: state, else: %{state | phase: :degraded}
+
+    if map_size(state.errors) == 0,
+      do: %{state | live_errors: recheck_live_inputs(state)},
+      else: %{state | phase: :degraded, live_errors: %{}}
   end
 
-  defp refresh_phase(state), do: state
+  defp refresh_phase(state), do: %{state | live_errors: %{}}
+
+  defp recheck_live_inputs(state) do
+    Enum.reduce(state.ready, %{}, fn {key, pid}, errors ->
+      case agent_spec(key, state) do
+        nil ->
+          errors
+
+        spec ->
+          case live_input_status(key, pid, spec, state) do
+            :ok -> errors
+            reason -> Map.put(errors, key, reason)
+          end
+      end
+    end)
+  end
+
+  defp live_input_status(key, pid, spec, state) do
+    with :ok <- live_bus_inputs(pid, spec),
+         :ok <- live_parent_binding(key, pid, spec, state),
+         do: :ok
+  end
+
+  defp live_bus_inputs(_pid, %{subscriptions: []}), do: :ok
+
+  defp live_bus_inputs(pid, _spec) do
+    case safely(fn -> Server.children(pid, @live_query_timeout) end) do
+      %{{:plugin, BusInputs} => %{pid: runtime}} when is_pid(runtime) ->
+        case safely(fn ->
+               BusInputs.Server.ready_snapshot(runtime, timeout: @live_query_timeout)
+             end) do
+          :ok -> :ok
+          _reason -> :subscription_unavailable
+        end
+
+      _other ->
+        :subscription_unavailable
+    end
+  end
+
+  defp live_parent_binding(_key, _pid, %{parent: nil}, _state), do: :ok
+
+  defp live_parent_binding(key, pid, %{parent: parent}, state) do
+    parent_spec = agent_spec(parent, state)
+
+    expected_parent =
+      Map.get(state.ready, parent) || whereis_agent(parent_spec, %{jido: state.jido})
+
+    case safely(fn -> Server.status(pid, @live_query_timeout) end) do
+      %{runtime: %{parent: %{pid: ^expected_parent, tag: ^key}}}
+      when is_pid(expected_parent) ->
+        case safely(fn -> Server.children(expected_parent, @live_query_timeout) end) do
+          %{^key => %{pid: ^pid}} -> :ok
+          _other -> :parent_binding_pending
+        end
+
+      _other ->
+        :parent_binding_pending
+    end
+  end
+
+  defp schedule_live_refresh(%{live_refresh_token: nil} = state) do
+    if state.phase == :ready and map_size(state.live_errors) > 0 and
+         map_size(state.waiters) > 0 do
+      token = make_ref()
+      Process.send_after(self(), {:refresh_live, token}, @live_retry_interval)
+      %{state | live_refresh_token: token}
+    else
+      state
+    end
+  end
+
+  defp schedule_live_refresh(state), do: state
 
   defp recheck_ready(state) do
     Enum.reduce(state.ready, state, fn {key, pid}, acc ->

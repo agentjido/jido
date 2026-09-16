@@ -13,6 +13,13 @@ defmodule Jido.Plugin.Bus.Client.Server do
     :exit, reason -> {:error, {:bus_client_runtime_unavailable, reason}}
   end
 
+  @doc false
+  def ready_snapshot(runtime, opts) do
+    GenServer.call(runtime, :ready_snapshot, Keyword.get(opts, :timeout, 100))
+  catch
+    :exit, reason -> {:error, {:bus_client_runtime_unavailable, reason}}
+  end
+
   def child_spec(%Init{} = init) do
     Supervisor.child_spec({Runtime, init}, id: Client)
   end

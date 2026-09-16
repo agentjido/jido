@@ -5,6 +5,7 @@ defmodule Jido.Topology.ControllerTest do
   alias Jido.Examples.Topology.{Cell, Hierarchy, Independent, Swarm}
   alias Jido.Signal.Bus
   alias Jido.Topology.{Builder, Controller}
+  alias Jido.Topology.BusInputs
 
   defmodule LifecycleControl do
     use Jido.Agent, name: "topology_lifecycle_control"
@@ -97,6 +98,83 @@ defmodule Jido.Topology.ControllerTest do
     assert Server.agent(left).state.total == 3
     Supervisor.stop(controller)
     eventually(fn -> not Process.alive?(left) and not Process.alive?(right) end)
+  end
+
+  test "public readiness follows a blocked Bus client reconnect", %{jido: jido} do
+    instance =
+      Builder.new(name: "live_bus_readiness")
+      |> Builder.bus(:events)
+      |> Builder.agent(:cell, Cell)
+      |> Builder.subscribe(:cell, to: :events, path: "examples.topology.cell.work")
+      |> Builder.build!(id: unique_id("live-bus"))
+
+    controller =
+      start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+
+    assert :ok = Controller.await_ready(controller)
+    bus = Controller.whereis_bus(controller, :events)
+    agent = Controller.whereis_agent(controller, :cell)
+    %{pid: inputs} = Server.children(agent)[{:plugin, BusInputs}]
+    [{_, client, _, _}] = Supervisor.which_children(inputs)
+    %{subscription_id: subscription_id, bus_ref: bus_ref} = :sys.get_state(client)
+    assert :ok = Bus.unsubscribe(bus, subscription_id)
+    Process.demonitor(bus_ref, [:flush])
+
+    token = make_ref()
+
+    :sys.replace_state(client, fn state ->
+      %{state | bus: nil, bus_ref: nil, subscription_id: nil, reconnect_token: token}
+    end)
+
+    assert :ok = :sys.suspend(bus)
+
+    try do
+      send(client, {:reconnect, token})
+      assert Process.alive?(bus)
+      assert Process.alive?(agent)
+
+      assert %{status: :degraded, errors: %{"agent/cell" => :subscription_unavailable}} =
+               Controller.status(controller, 500)
+
+      assert catch_exit(Controller.await_ready(controller, 200))
+    after
+      assert :ok = :sys.resume(bus)
+    end
+
+    assert :ok = Controller.await_ready(controller, 2_000)
+    assert %{status: :ready, errors: %{}} = Controller.status(controller)
+    assert Controller.whereis_agent(controller, :cell) == agent
+  end
+
+  test "public readiness follows a lost live parent binding", %{jido: jido} do
+    instance =
+      Builder.new(name: "live_parent_readiness")
+      |> Builder.agent(:parent, Cell)
+      |> Builder.agent(:child, Cell)
+      |> Builder.owns(:parent, :child)
+      |> Builder.build!(id: unique_id("live-parent"))
+
+    controller =
+      start_supervised!({Controller, jido: jido, topology: instance, repair: :manual})
+
+    assert :ok = Controller.await_ready(controller)
+    parent = Controller.whereis_agent(controller, :parent)
+    child = Controller.whereis_agent(controller, :child)
+    {:idle, original} = :sys.get_state(parent)
+    assert Server.children(parent)["agent/child"].pid == child
+
+    :sys.replace_state(parent, fn {phase, data} ->
+      {phase, %{data | children: Map.delete(data.children, "agent/child")}}
+    end)
+
+    assert Process.alive?(parent)
+    assert Process.alive?(child)
+
+    assert %{status: :degraded, errors: %{"agent/child" => :parent_binding_pending}} =
+             Controller.status(controller)
+
+    :sys.replace_state(parent, fn {phase, _data} -> {phase, original} end)
+    assert %{status: :ready, errors: %{}} = Controller.status(controller)
   end
 
   test "activation, repair, and cleanup emit bounded local topology spans", %{jido: jido} do
