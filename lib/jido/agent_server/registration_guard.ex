@@ -115,4 +115,6 @@ defmodule Jido.AgentServer.RegistrationGuard do
         state
     end
   end
+
+  def registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
 end

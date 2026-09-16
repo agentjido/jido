@@ -1,7 +1,12 @@
 defmodule Jido.AgentServer.ChildLifecycle do
   @moduledoc false
 
+  alias Jido.AgentServer.Cancellation
+  alias Jido.AgentServer.Shutdown
+
   alias Jido.AgentServer, as: Server
+  alias Jido.AgentServer.ActiveTurn
+  alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
 
   alias Jido.AgentServer.{
     ChildInfo,
@@ -188,4 +193,94 @@ defmodule Jido.AgentServer.ChildLifecycle do
       parent: Inspection.parent(data.parent)
     }
   end
+
+  def handle_event(
+        :info,
+        {:agent_child_online, pid, child_id, _child_module, _child_partition, tag, _meta},
+        _phase,
+        %State{} = data
+      ) do
+    case verify_child_online(pid, child_id, tag, data) do
+      {:ok, info} ->
+        {:keep_state, track_online_child(data, pid, info)}
+
+      {:error, _reason, :stop} ->
+        _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
+        :keep_state_and_data
+
+      {:error, _reason} ->
+        :keep_state_and_data
+    end
+  end
+
+  def handle_child_down({key, %ChildInfo{kind: :plugin} = child}, pid, reason, data) do
+    next_data = State.remove_child(data, key)
+    {:stop, {:plugin_runtime_down, child.module, pid, reason}, next_data}
+  end
+
+  def handle_child_down({key, %ChildInfo{} = child}, pid, reason, data) do
+    next_data = State.remove_child(data, key)
+
+    next_data =
+      if Shutdown.clean?(reason) do
+        _ = Relationship.delete_child(data, child)
+        %{next_data | child_spawn_requests: Map.delete(next_data.child_spawn_requests, key)}
+      else
+        next_data
+      end
+
+    signal =
+      ChildExit.new!(
+        %{tag: child.tag, child_id: child.id, pid: pid, reason: reason},
+        source: "/agent/#{data.agent.id}"
+      )
+
+    Server.cast(self(), signal)
+    {:keep_state, next_data}
+  end
+
+  def handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
+    next_data = %{data | parent: nil, orphaned_from: parent}
+    _ = Relationship.delete_own(next_data)
+
+    case data.on_parent_death do
+      :stop ->
+        case next_data.active do
+          %ActiveTurn{exec_handle: handle} = active when not is_nil(handle) ->
+            Cancellation.start_cancel_task({:parent, reason}, nil, active, next_data)
+
+          _inactive ->
+            {:stop, {:shutdown, {:parent_down, reason}}, next_data}
+        end
+
+      :continue ->
+        {:keep_state, next_data}
+
+      :emit_orphan ->
+        signal =
+          Orphaned.new!(
+            %{
+              parent_id: parent.id,
+              parent_pid: parent.pid,
+              tag: parent.tag,
+              meta: parent.meta,
+              reason: reason
+            },
+            source: "/agent/#{data.agent.id}"
+          )
+
+        Server.cast(self(), signal)
+        {:keep_state, next_data}
+    end
+  end
+
+  def retire_remote_spawn(reason, %State{parent: %ParentRef{spawn_ref: request}, jido: jido})
+      when not is_nil(request) and not is_nil(jido) do
+    if Shutdown.clean?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
+    :ok
+  catch
+    :exit, _ -> :ok
+  end
+
+  def retire_remote_spawn(_reason, _data), do: :ok
 end

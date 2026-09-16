@@ -2,6 +2,7 @@ defmodule Jido.AgentServer.Options do
   @moduledoc false
 
   alias Jido.Agent
+  alias Jido.Error
   alias Jido.AgentServer.ParentRef
 
   @default_max_postponed_signals 1_000
@@ -403,5 +404,55 @@ defmodule Jido.AgentServer.Options do
   defp invalid(message, details \\ %{}) do
     {:error,
      Jido.Error.validation_error("Agent Server #{message}", kind: :config, details: details)}
+  end
+
+  def validate_exec_module(module) when is_atom(module) do
+    required = [run_async: 4, handle_message: 2, cancel: 1]
+
+    with {:module, ^module} <- Code.ensure_loaded(module),
+         true <-
+           Enum.all?(required, fn {name, arity} -> function_exported?(module, name, arity) end) do
+      {:ok, module}
+    else
+      _reason ->
+        {:error,
+         Error.validation_error("Agent Server Exec module has an invalid contract",
+           kind: :config,
+           details: %{module: module}
+         )}
+    end
+  end
+
+  def validate_exec_module(module) do
+    {:error,
+     Error.validation_error("Agent Server Exec module must be a module",
+       kind: :config,
+       details: %{module: module}
+     )}
+  end
+
+  def validate_keyword(value, _field) when is_list(value) and value == [], do: {:ok, value}
+
+  def validate_keyword(value, field) when is_list(value) do
+    if Keyword.keyword?(value) do
+      {:ok, value}
+    else
+      {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
+    end
+  end
+
+  def validate_keyword(_value, field) do
+    {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
+  end
+
+  def validate_limit(:infinity, _field), do: {:ok, :infinity}
+  def validate_limit(value, _field) when is_integer(value) and value >= 0, do: {:ok, value}
+
+  def validate_limit(value, field) do
+    {:error,
+     Error.validation_error("#{field} must be :infinity or a non-negative integer",
+       field: field,
+       details: %{value: value}
+     )}
   end
 end

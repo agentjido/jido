@@ -60,47 +60,37 @@ defmodule Jido.AgentServer do
 
   @behaviour :gen_statem
 
-  require Logger
+  alias Jido.AgentServer.Admission
+  alias Jido.AgentServer.Cancellation
+  alias Jido.AgentServer.ChildOperations
+  alias Jido.AgentServer.Idle
+  alias Jido.AgentServer.PostCommit
+  alias Jido.AgentServer.ServerLifecycle
+  alias Jido.AgentServer.Turn
 
   alias Jido.Agent
-  alias Jido.Agent.Plugin, as: AgentPlugin
-  alias Jido.Agent.Runner
   alias Jido.Agent.Directive
-  alias Jido.Agent.Turn.Outcome
-  alias Jido.Plugin
-  alias Jido.AgentServer.Plugin, as: ServerPlugin
-  alias Jido.AgentServer.Plugin.Commit
-  alias Jido.Plugin.DirectiveContext, as: PluginDirectiveContext
-  alias Jido.Plugin.SignalContext, as: PluginSignalContext
 
   alias Jido.AgentServer.{
     ActiveTurn,
     AdmissionDeadline,
-    ChildInfo,
     ChildLifecycle,
-    ChildPlacement,
-    DirectiveContext,
-    DirectiveRuntime,
     ExecutionAdapter,
     FailurePolicy,
+    TaskSupport,
     Inspection,
     Options,
     ParentRef,
     PluginLifecycle,
     RegistrationGuard,
-    Relationship,
     Shutdown,
     State,
     Storage,
     Upgrade
   }
 
-  alias Jido.AgentServer.Signal.{ChildExit, Orphaned}
-  alias Jido.AgentServer.Signal.Runtime, as: RuntimeSignal
   alias Jido.Error
   alias Jido.Signal
-  alias Jido.Telemetry.Agent, as: AgentTelemetry
-  alias Jido.Tracing.Context, as: TraceContext
 
   @type server :: pid() | atom() | {:global, term()} | {:via, module(), term()}
   @type signal_result :: {:ok, Agent.t()} | {:error, term()}
@@ -218,7 +208,7 @@ defmodule Jido.AgentServer do
   def call(server, signal, timeout_or_opts \\ 5_000)
 
   def call(server, %Signal{} = signal, opts) when is_list(opts) do
-    with {:ok, opts} <- validate_keyword(opts, :call),
+    with {:ok, opts} <- Options.validate_keyword(opts, :call),
          {:ok, options} <- parse_call_options(opts),
          {:ok, context} <- Jido.Agent.Command.normalize_context(options.context) do
       call_with_context(server, signal, options.timeout, context)
@@ -343,7 +333,7 @@ defmodule Jido.AgentServer do
   @doc "Returns the PID for an Agent id in one Registry."
   @spec whereis(module(), String.t(), keyword()) :: pid() | nil
   def whereis(registry, id, opts \\ []) when is_atom(registry) and is_binary(id) do
-    key = registry_key(id, Keyword.get(opts, :partition))
+    key = RegistrationGuard.registry_key(id, Keyword.get(opts, :partition))
 
     case Registry.lookup(registry, key) do
       [{pid, :ready}] -> if Process.alive?(pid), do: pid
@@ -355,7 +345,8 @@ defmodule Jido.AgentServer do
   @doc "Returns a Registry via tuple for an Agent id."
   @spec via_tuple(String.t(), module(), keyword()) :: {:via, Registry, {module(), term()}}
   def via_tuple(id, registry, opts \\ []) when is_binary(id) and is_atom(registry) do
-    {:via, Registry, {registry, registry_key(id, Keyword.get(opts, :partition))}}
+    {:via, Registry,
+     {registry, RegistrationGuard.registry_key(id, Keyword.get(opts, :partition))}}
   end
 
   @doc """
@@ -532,162 +523,9 @@ defmodule Jido.AgentServer do
   def callback_mode, do: :handle_event_function
 
   @impl true
-  def init(%Options{} = opts), do: init({opts, nil})
+  def init(opts), do: ServerLifecycle.init(opts)
 
-  def init({%Options{} = opts, startup_reply}) do
-    Process.flag(:trap_exit, true)
-
-    with :ok <- claim_registration(opts),
-         :ok <- mark_registry_status(opts, :starting),
-         {:ok, restored_agent, restored_version, initial_persistence} <-
-           Storage.restore_initial_agent(opts),
-         {:ok, agent} <- Agent.validate_instance(restored_agent),
-         {:ok, plugin_specs} <- Plugin.normalize_all(agent.plugins),
-         {:ok, exec_module} <- validate_exec_module(opts.exec_module),
-         {:ok, exec_opts} <- validate_keyword(opts.exec_opts, :exec_opts),
-         {:ok, max_postponed_signals} <-
-           validate_limit(opts.max_postponed_signals, :max_postponed_signals),
-         {:ok, max_directives_per_turn} <-
-           validate_limit(opts.max_directives_per_turn, :max_directives_per_turn) do
-      parent = opts |> ChildLifecycle.restore_parent(agent) |> ChildLifecycle.monitor_parent()
-
-      data = %State{
-        agent: agent,
-        plugin_specs: plugin_specs,
-        jido: opts.jido,
-        agent_namespace: AgentTelemetry.namespace(opts.jido),
-        partition: opts.partition,
-        registry: opts.registry,
-        registered?: opts.register,
-        exec_module: exec_module,
-        exec_opts: exec_opts,
-        max_postponed_signals: max_postponed_signals,
-        postponed_tokens: MapSet.new(),
-        turn_timeout: opts.turn_timeout,
-        max_directives_per_turn: max_directives_per_turn,
-        directive_timeout: opts.directive_timeout,
-        readiness_timeout: opts.readiness_timeout,
-        default_dispatch: opts.default_dispatch,
-        error_policy: opts.error_policy,
-        error_count: 0,
-        parent: parent,
-        orphaned_from: nil,
-        children: %{},
-        on_parent_death: opts.on_parent_death,
-        pool: opts.pool,
-        pool_key: opts.pool_key,
-        idle_timeout: opts.idle_timeout,
-        persistence: opts.persistence,
-        initial_persistence: initial_persistence,
-        attachments: %{},
-        idle_timer: nil,
-        spawn_fun: opts.spawn_fun,
-        debug: opts.debug,
-        debug_events: [],
-        debug_max_events: opts.debug_max_events,
-        state_version: restored_version,
-        activation_id: Signal.ID.generate!(),
-        active: nil,
-        plugin_bootstrap: nil,
-        startup_reply: startup_reply,
-        admission_task: nil,
-        directive_task: nil,
-        cancel_task: nil,
-        error_policy_tasks: %{}
-      }
-
-      span =
-        AgentTelemetry.start(
-          :lifecycle,
-          Map.put(
-            AgentTelemetry.lifecycle_metadata(data),
-            :operation,
-            if(initial_persistence == :restored, do: :thaw, else: :activate)
-          )
-        )
-
-      {:ok, :initializing, %{data | activation_span: span},
-       [{:next_event, :internal, :bootstrap}]}
-    else
-      {:error, reason} -> {:stop, reason}
-    end
-  end
-
-  def handle_event(:internal, :bootstrap, :initializing, %State{} = data) do
-    case PluginLifecycle.start_all(data) do
-      {:ok, data} ->
-        {:keep_state, start_plugin_readiness(data)}
-
-      {:error, reason, data} ->
-        PluginLifecycle.stop_all(data, :shutdown)
-        {:stop, {:shutdown, {:bootstrap_failed, reason}}, data}
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:plugin_readiness, token, :ok},
-        :initializing,
-        %State{plugin_bootstrap: %{token: token, ref: ref} = readiness} = data
-      ) do
-    Process.demonitor(ref, [:flush])
-    cancel_task_timer(readiness.timer)
-    data = %{data | plugin_bootstrap: nil}
-
-    case Storage.persist_initial_agent(data) do
-      {:ok, data} ->
-        case publish_agent(data) do
-          :ok ->
-            AgentTelemetry.finish(data.activation_span, %{status: :ok}, %{
-              state_version: data.state_version
-            })
-
-            notify_startup(data, :ok)
-            data = %{data | activation_span: nil, startup_reply: nil}
-            ChildLifecycle.notify_parent_online(data)
-            {:next_state, :idle, maybe_start_idle_timer(data, :idle)}
-
-          {:error, reason} ->
-            {:stop, {:shutdown, {:publication_failed, reason}}, data}
-        end
-
-      {:error, reason} ->
-        {:stop, {:shutdown, {:persistence_failed, reason}}, data}
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:plugin_readiness, token, {:error, reason}},
-        :initializing,
-        %State{plugin_bootstrap: %{token: token, ref: ref} = readiness} = data
-      ) do
-    Process.demonitor(ref, [:flush])
-    cancel_task_timer(readiness.timer)
-    {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:plugin_readiness_timeout, token}},
-        :initializing,
-        %State{plugin_bootstrap: readiness} = data
-      ) do
-    if readiness && readiness.token == token && readiness.timer == timer do
-      stop_plugin_readiness(readiness)
-
-      error =
-        Error.timeout_error("Agent Plugin readiness timed out",
-          timeout: data.readiness_timeout,
-          details: %{code: :plugin_callback_timeout, callback: :await_ready}
-        )
-
-      {:stop, {:shutdown, {:plugin_readiness_failed, error}}, %{data | plugin_bootstrap: nil}}
-    else
-      :keep_state_and_data
-    end
-  end
-
+  @impl true
   def handle_event({:call, _from}, :await_ready, :initializing, %State{}) do
     {:keep_state_and_data, [:postpone]}
   end
@@ -708,7 +546,7 @@ defmodule Jido.AgentServer do
     reply =
       case Enum.find(data.plugin_specs, &(&1.module == plugin)) do
         nil -> {:error, {:plugin_not_declared, plugin}}
-        spec -> {:ok, plugin_state_value(data.agent.state, spec.state_key)}
+        spec -> {:ok, PluginLifecycle.plugin_state_value(data.agent.state, spec.state_key)}
       end
 
     {:keep_state_and_data, [{:reply, from, reply}]}
@@ -751,7 +589,7 @@ defmodule Jido.AgentServer do
         %State{} = data
       ) do
     reply = Upgrade.operation(operation)
-    {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, reply}]}
+    {:keep_state, Idle.maybe_start_idle_timer(data, :idle), [{:reply, from, reply}]}
   end
 
   def handle_event(
@@ -760,7 +598,7 @@ defmodule Jido.AgentServer do
         :idle,
         %State{} = data
       ) do
-    upgrade_definition(from, target_module, migration, data)
+    Upgrade.upgrade_definition(from, target_module, migration, data)
   end
 
   def handle_event({:call, _from}, {:upgrade_operation, _operation}, phase, %State{})
@@ -793,24 +631,14 @@ defmodule Jido.AgentServer do
     {:keep_state_and_data, [:postpone]}
   end
 
-  def handle_event({:call, from}, {:attach, owner_pid}, _phase, %State{} = data) do
-    case attach_owner(data, owner_pid) do
-      {:ok, next_data} ->
-        {:keep_state, next_data, [{:reply, from, :ok}]}
+  def handle_event({:call, _} = type, {:attach, _} = event, phase, %State{} = data),
+    do: Idle.handle_event(type, event, phase, data)
 
-      {:error, reason} ->
-        {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    end
-  end
+  def handle_event({:call, _} = type, {:detach, _} = event, phase, %State{} = data),
+    do: Idle.handle_event(type, event, phase, data)
 
-  def handle_event({:call, from}, {:detach, owner_pid}, phase, %State{} = data) do
-    next_data = data |> detach_owner(owner_pid) |> maybe_start_idle_timer(phase)
-    {:keep_state, next_data, [{:reply, from, :ok}]}
-  end
-
-  def handle_event(:cast, :touch, phase, %State{} = data) do
-    {:keep_state, data |> cancel_idle_timer() |> maybe_start_idle_timer(phase)}
-  end
+  def handle_event(:cast, :touch, phase, %State{} = data),
+    do: Idle.handle_event(:cast, :touch, phase, data)
 
   def handle_event({:call, from}, {:set_debug, enabled}, _phase, %State{} = data)
       when is_boolean(enabled) do
@@ -840,120 +668,12 @@ defmodule Jido.AgentServer do
 
   def handle_event({:call, from}, {:adopt_child, child, tag, meta}, _phase, data) do
     directive = %Directive.AdoptChild{child: child, tag: tag, meta: meta}
-    handle_child_directive_call(directive, from, data)
+    ChildOperations.handle_child_directive_call(directive, from, data)
   end
 
   def handle_event({:call, from}, {:stop_child, tag, reason}, _phase, data) do
     directive = %Directive.StopChild{tag: tag, reason: reason}
-    handle_child_directive_call(directive, from, data)
-  end
-
-  def handle_event({:call, from}, :cancel, phase, %State{} = data)
-      when phase in [:admitting, :running] do
-    if phase == :admitting, do: cancel_admission(from, data), else: cancel_active(from, data)
-  end
-
-  def handle_event({:call, from}, :cancel, phase, %State{})
-      when phase in [:idle, :cancelling, :directing] do
-    {:keep_state_and_data, [{:reply, from, {:error, phase}}]}
-  end
-
-  def handle_event(
-        {:call, from},
-        {:cancel, turn_id},
-        phase,
-        %State{active: %ActiveTurn{turn_id: turn_id}} = data
-      )
-      when phase in [:admitting, :running] do
-    if phase == :admitting, do: cancel_admission(from, data), else: cancel_active(from, data)
-  end
-
-  def handle_event({:call, from}, {:cancel, turn_id}, :cancelling, %State{active: active}) do
-    reason = if active.turn_id == turn_id, do: :cancelling, else: :stale_turn
-    {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-  end
-
-  def handle_event({:call, from}, {:cancel, _turn_id}, phase, %State{})
-      when phase in [:idle, :admitting, :running, :directing] do
-    {:keep_state_and_data, [{:reply, from, {:error, :stale_turn}}]}
-  end
-
-  def handle_event({:call, from}, {:signal, token, %Signal{} = signal, deadline}, phase, data) do
-    handle_event({:call, from}, {:signal, token, signal, deadline, %{}}, phase, data)
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, _context},
-        phase,
-        %State{} = data
-      )
-      when phase in [:initializing, :cancelling] do
-    postpone_call(from, token, signal, deadline, data)
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, context},
-        :idle,
-        %State{} = data
-      ) do
-    data = forget_postponed(data, token)
-
-    if AdmissionDeadline.expired?(deadline) do
-      AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
-      {:keep_state, data, [{:reply, from, {:error, :admission_timeout}}]}
-    else
-      start_turn(signal, from, context, data)
-    end
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, :idle, %State{} = data) do
-    start_turn(signal, nil, %{}, forget_postponed(data, token))
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, _context},
-        phase,
-        %State{} = data
-      )
-      when phase in [:admitting, :running] do
-    reentrant =
-      case phase do
-        :admitting -> reentrant_task_call?(from, data.admission_task)
-        :running -> reentrant_turn_call?(from, data.active)
-      end
-
-    if reentrant do
-      reason = if phase == :admitting, do: :reentrant_admission, else: :reentrant_turn
-      {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    else
-      postpone_call(from, token, signal, deadline, data)
-    end
-  end
-
-  def handle_event(
-        {:call, from},
-        {:signal, token, %Signal{} = signal, deadline, _context},
-        :directing,
-        %State{} = data
-      ) do
-    cond do
-      reentrant_task_call?(from, data.commit_task) ->
-        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_commit}}]}
-
-      reentrant_task_call?(from, data.directive_task) ->
-        {:keep_state_and_data, [{:reply, from, {:error, :reentrant_directive}}]}
-
-      true ->
-        postpone_call(from, token, signal, deadline, data)
-    end
-  end
-
-  def handle_event(:cast, {:signal, token, %Signal{} = signal}, phase, %State{} = data)
-      when phase in [:initializing, :admitting, :running, :cancelling, :directing] do
-    postpone_cast(token, signal, data)
+    ChildOperations.handle_child_directive_call(directive, from, data)
   end
 
   def handle_event(:info, {:signal, %Signal{} = signal}, _phase, %State{}) do
@@ -961,548 +681,34 @@ defmodule Jido.AgentServer do
     :keep_state_and_data
   end
 
+  def handle_event(:internal, :bootstrap, :initializing, %State{} = data),
+    do: ServerLifecycle.handle_event(:internal, :bootstrap, :initializing, data)
+
+  def handle_event({:call, _} = type, event, phase, %State{} = data)
+      when event == :cancel or (is_tuple(event) and elem(event, 0) == :cancel),
+      do: Cancellation.handle_event(type, event, phase, data)
+
+  def handle_event({:call, _} = type, {:signal, _, %Signal{}, _} = event, phase, %State{} = data),
+    do: Admission.handle_event(type, event, phase, data)
+
   def handle_event(
-        :info,
-        {:agent_child_online, pid, child_id, _child_module, _child_partition, tag, _meta},
-        _phase,
+        {:call, _} = type,
+        {:signal, _, %Signal{}, _, _} = event,
+        phase,
         %State{} = data
-      ) do
-    case ChildLifecycle.verify_child_online(pid, child_id, tag, data) do
-      {:ok, info} ->
-        {:keep_state, ChildLifecycle.track_online_child(data, pid, info)}
+      ),
+      do: Admission.handle_event(type, event, phase, data)
 
-      {:error, _reason, :stop} ->
-        _ = ChildPlacement.stop(data.jido, pid, :identity_mismatch, data.directive_timeout)
-        :keep_state_and_data
+  def handle_event(:cast, {:signal, _, %Signal{}} = event, phase, %State{} = data),
+    do: Admission.handle_event(:cast, event, phase, data)
 
-      {:error, _reason} ->
-        :keep_state_and_data
-    end
-  end
+  def handle_event(:info, message, phase, %State{} = data), do: route_info(message, phase, data)
 
-  def handle_event(:info, {:jido_registry_restarted, pid}, phase, %State{} = data),
-    do: recover_registry_registration(pid, phase, data)
+  def handle_event(:internal, {:after_commit, _, _} = event, :directing, %State{} = data),
+    do: PostCommit.handle_event(:internal, event, :directing, data)
 
-  def handle_event(:info, {:jido_registry_recover, pid}, phase, %State{} = data),
-    do: recover_registry_registration(pid, phase, data)
-
-  def handle_event(
-        :info,
-        {:plugin_runtime_restarting, lifecycle_pid, plugin},
-        _phase,
-        %State{} = data
-      ) do
-    key = {:plugin, plugin}
-
-    case State.child(data, key) do
-      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
-        {:keep_state, State.add_child(data, key, %{child | pid: :restarting})}
-
-      _child ->
-        :keep_state_and_data
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:plugin_runtime_bootstrap, lifecycle_pid, plugin, token},
-        _phase,
-        %State{} = data
-      ) do
-    key = {:plugin, plugin}
-
-    result =
-      case State.child(data, key) do
-        %ChildInfo{lifecycle_pid: ^lifecycle_pid, pid: :restarting} ->
-          PluginLifecycle.replacement_child_spec(data, plugin)
-
-        _child ->
-          {:error, {:stale_plugin_runtime_bootstrap, plugin}}
-      end
-
-    send(lifecycle_pid, {:plugin_runtime_bootstrap, token, result})
-    :keep_state_and_data
-  end
-
-  def handle_event(
-        :info,
-        {:plugin_runtime_ready, lifecycle_pid, plugin, runtime_pid},
-        _phase,
-        %State{} = data
-      ) do
-    key = {:plugin, plugin}
-
-    case State.child(data, key) do
-      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
-        {:keep_state, State.add_child(data, key, %{child | pid: runtime_pid})}
-
-      _child ->
-        :keep_state_and_data
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        :initializing,
-        %State{plugin_bootstrap: %{ref: ref} = readiness} = data
-      ) do
-    cancel_task_timer(readiness.timer)
-    {:stop, {:shutdown, {:plugin_readiness_failed, reason}}, %{data | plugin_bootstrap: nil}}
-  end
-
-  def handle_event(
-        :info,
-        {ref, result},
-        :admitting,
-        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    release_task_result(pending)
-    data = %{data | admission_task: nil}
-
-    case result do
-      {:ok, %Jido.Agent.Command{} = command} -> begin_turn_execution(command, data)
-      {:error, reason} -> fail_turn(reason, :prepare, data)
-      other -> fail_turn({:invalid_plugin_admission_result, other}, :prepare, data)
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:turn_timeout, turn_id}},
-        :admitting,
-        %State{active: %ActiveTurn{turn_id: turn_id, timeout_timer: timer}} = data
-      ) do
-    timeout_admission(data)
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:turn_timeout, turn_id}},
-        :running,
-        %State{active: %ActiveTurn{turn_id: turn_id, timeout_timer: timer}} = data
-      ) do
-    timeout_execution(data)
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        :admitting,
-        %State{admission_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    cancel_task_timer(pending.timer)
-    data = %{data | admission_task: nil}
-
-    error =
-      Error.execution_error("Agent Plugin admission task exited",
-        details: %{code: :plugin_callback_task_failed, callback: :admit, reason: reason}
-      )
-
-    fail_turn(error, :prepare, data)
-  end
-
-  def handle_event(
-        :info,
-        {ref, result},
-        :directing,
-        %State{commit_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    release_task_result(pending)
-    complete_commit_notification(result, pending, %{data | commit_task: nil})
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        :directing,
-        %State{commit_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    cancel_task_timer(pending.timer)
-
-    error =
-      Error.execution_error("Agent Plugin commit notification task exited",
-        details: %{code: :plugin_callback_task_failed, callback: :after_commit, reason: reason}
-      )
-
-    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil}, :exit)
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:after_commit_timeout, task_ref}},
-        :directing,
-        %State{commit_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending} = data
-      ) do
-    shutdown_task(task)
-
-    error =
-      Error.timeout_error("Agent Plugin commit notification timed out",
-        timeout: commit_notification_timeout(data),
-        details: %{code: :plugin_callback_timeout, callback: :after_commit}
-      )
-
-    complete_commit_notification({:error, error}, pending, %{data | commit_task: nil})
-  end
-
-  def handle_event(
-        :info,
-        {ref, result},
-        :directing,
-        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    release_task_result(pending)
-    data = %{data | directive_task: nil}
-
-    directive_result =
-      case result do
-        :ok ->
-          {:ok, data}
-
-        {:dispatch_relative_signal, directive} ->
-          case DirectiveRuntime.dispatch_prepared(directive, data, self()) do
-            :ok -> {:ok, data}
-            {:error, reason} -> {:error, reason, data}
-          end
-
-        {:error, reason} ->
-          {:error, reason, data}
-
-        other ->
-          {:error, {:invalid_plugin_dispatch_result, other}, data}
-      end
-
-    complete_directive(directive_result, pending.rest, pending.context, pending.span)
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        :directing,
-        %State{directive_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    cancel_task_timer(pending.timer)
-    data = %{data | directive_task: nil}
-
-    error =
-      Error.execution_error("Agent Plugin Directive task exited",
-        details: %{code: :plugin_callback_task_failed, callback: :dispatch, reason: reason}
-      )
-
-    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span, :exit)
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:directive_timeout, task_ref}},
-        :directing,
-        %State{
-          directive_task: %{task: %Task{ref: task_ref} = task, timer: timer} = pending
-        } = data
-      ) do
-    shutdown_task(task)
-    data = %{data | directive_task: nil}
-
-    error =
-      Error.timeout_error("Agent Directive timed out",
-        timeout: data.directive_timeout,
-        details: %{
-          code: :plugin_callback_timeout,
-          callback: :dispatch,
-          turn_id: data.active.turn_id
-        }
-      )
-
-    complete_directive({:error, error, data}, pending.rest, pending.context, pending.span)
-  end
-
-  def handle_event(
-        :info,
-        {ref, result},
-        _phase,
-        %State{} = data
-      )
-      when is_map_key(data.error_policy_tasks, ref) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    release_task_result(pending)
-    data = FailurePolicy.drop_task(data, ref)
-
-    case Map.get(pending, :kind, :dispatch) do
-      :custom ->
-        FailurePolicy.settle_custom(result, data)
-
-      :dispatch ->
-        case result do
-          :ok ->
-            {:keep_state, data}
-
-          {:error, reason} ->
-            {:keep_state, FailurePolicy.record_dispatch_failure(data, reason)}
-
-          other ->
-            reason =
-              Error.execution_error("Agent error Signal delivery returned an invalid result",
-                details: %{result: other}
-              )
-
-            {:keep_state, FailurePolicy.record_dispatch_failure(data, reason)}
-        end
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        _phase,
-        %State{} = data
-      )
-      when is_map_key(data.error_policy_tasks, ref) do
-    pending = Map.fetch!(data.error_policy_tasks, ref)
-    cancel_task_timer(pending.timer)
-    data = FailurePolicy.drop_task(data, ref)
-
-    case Map.get(pending, :kind, :dispatch) do
-      :custom ->
-        {:stop, Shutdown.normalize_reason({:error_policy_task_failed, reason}), data}
-
-      :dispatch ->
-        error =
-          Error.execution_error("Agent error Signal delivery task exited",
-            details: %{reason: reason}
-          )
-
-        {:keep_state, FailurePolicy.record_dispatch_failure(data, error)}
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:error_policy_dispatch_timeout, task_ref}},
-        _phase,
-        %State{} = data
-      )
-      when is_map_key(data.error_policy_tasks, task_ref) do
-    pending = Map.fetch!(data.error_policy_tasks, task_ref)
-
-    if pending.timer == timer do
-      shutdown_task(pending.task)
-      data = FailurePolicy.drop_task(data, task_ref)
-
-      case Map.get(pending, :kind, :dispatch) do
-        :custom ->
-          {:stop,
-           Shutdown.normalize_reason(
-             {:error_policy_timeout, FailurePolicy.dispatch_timeout(data)}
-           ), data}
-
-        :dispatch ->
-          error =
-            Error.timeout_error("Agent error Signal delivery timed out",
-              timeout: FailurePolicy.dispatch_timeout(data)
-            )
-
-          {:keep_state, FailurePolicy.record_dispatch_failure(data, error)}
-      end
-    else
-      :keep_state_and_data
-    end
-  end
-
-  def handle_event(
-        :info,
-        {ref, result},
-        :cancelling,
-        %State{cancel_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    release_task_result(pending)
-    settle_cancel_result(result, %{data | cancel_task: nil}, pending)
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, ref, :process, _pid, reason},
-        :cancelling,
-        %State{cancel_task: %{task: %Task{ref: ref}} = pending} = data
-      ) do
-    cancel_task_timer(pending.timer)
-    error = cancellation_task_error(reason)
-    settle_cancel_result({:error, error}, %{data | cancel_task: nil}, pending)
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:exec_cancel_timeout, ref}},
-        :cancelling,
-        %State{cancel_task: %{task: %Task{ref: ref}, timer: timer} = pending} = data
-      ) do
-    shutdown_task(pending.task)
-
-    error =
-      Error.timeout_error("Agent Exec cancellation task timed out",
-        timeout: pending.timeout,
-        details: %{code: :agent_exec_cancel_task_timeout}
-      )
-
-    settle_cancel_result({:error, error}, %{data | cancel_task: nil}, pending)
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_started, ref, exec_pid},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.started(adapter, exec_pid)
-    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_start_failed, ref, error},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
-      ) do
-    ExecutionAdapter.cancel_timer(adapter)
-    fail_turn(error, :execute, data)
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_callback_started, ref, token, callback},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.callback_started(adapter, token, callback)
-    {:keep_state, %{data | active: %{active | exec_handle: adapter}}}
-  end
-
-  def handle_event(
-        :info,
-        {:jido_exec_adapter_callback_result, ref, token, result},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter} = active} =
-          data
-      ) do
-    adapter = ExecutionAdapter.callback_finished(adapter, token)
-    data = %{data | active: %{active | exec_handle: adapter}}
-
-    case result do
-      {:done, value} ->
-        ExecutionAdapter.acknowledge(adapter, token)
-        finish_turn(value, data)
-
-      :ignore ->
-        {:keep_state, data}
-
-      {:error, error} ->
-        ExecutionAdapter.acknowledge(adapter, token)
-        fail_turn(error, :execute, data)
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:timeout, timer, {:exec_adapter_timeout, ref, token, callback}},
-        :running,
-        %State{active: %ActiveTurn{exec_handle: %ExecutionAdapter{ref: ref} = adapter}} = data
-      ) do
-    if ExecutionAdapter.timeout?(adapter, timer, token) do
-      ExecutionAdapter.stop(adapter)
-
-      error =
-        Error.timeout_error("Agent Exec callback timed out",
-          timeout: adapter.timeout,
-          details: %{
-            code: :agent_exec_callback_timeout,
-            module: adapter.module,
-            callback: callback
-          }
-        )
-
-      fail_turn(error, :execute, data)
-    else
-      :keep_state_and_data
-    end
-  end
-
-  def handle_event(
-        :info,
-        {:DOWN, monitor_ref, :process, pid, reason},
-        :running,
-        %State{
-          active: %ActiveTurn{
-            exec_handle: %ExecutionAdapter{pid: pid, monitor_ref: monitor_ref} = adapter
-          }
-        } = data
-      ) do
-    ExecutionAdapter.cancel_timer(adapter)
-
-    error =
-      Error.execution_error("Agent Exec adapter owner exited",
-        details: %{
-          code: :agent_exec_callback_task_failed,
-          module: adapter.module,
-          reason: reason
-        }
-      )
-
-    fail_turn(error, :execute, data)
-  end
-
-  def handle_event(:info, {:DOWN, _ref, :process, _pid, _reason}, :cancelling, %State{}),
-    do: {:keep_state_and_data, [:postpone]}
-
-  def handle_event(:info, {:DOWN, ref, :process, pid, reason}, phase, %State{} = data) do
-    handle_process_down(ref, pid, reason, phase, data)
-  end
-
-  def handle_event(:info, _message, :cancelling, %State{}),
-    do: {:keep_state_and_data, [:postpone]}
-
-  def handle_event(
-        :info,
-        {:timeout, ref, :agent_idle_timeout},
-        :idle,
-        %State{idle_timer: ref} = data
-      ) do
-    {:stop, {:shutdown, :idle_timeout}, %{data | idle_timer: nil}}
-  end
-
-  def handle_event(:info, {:timeout, _ref, :agent_idle_timeout}, _phase, %State{}) do
-    :keep_state_and_data
-  end
-
-  def handle_event(:info, message, :running, %State{active: %ActiveTurn{}} = data) do
-    handle_exec_message(message, data)
-  end
-
-  def handle_event(:info, _message, phase, %State{})
-      when phase in [:idle, :admitting, :directing],
-      do: :keep_state_and_data
-
-  def handle_event(
-        :internal,
-        {:after_commit, [plugin | rest], directives},
-        :directing,
-        %State{} = data
-      ) do
-    start_commit_notification(plugin, rest, directives, data)
-  end
-
-  def handle_event(:internal, {:handle_directives, [], context}, :directing, %State{} = data) do
-    continue_directives([], context, data)
-  end
-
-  def handle_event(
-        :internal,
-        {:handle_directives, [directive | rest], context},
-        :directing,
-        %State{} = data
-      ) do
-    handle_one_directive(directive, rest, context, data)
-  end
+  def handle_event(:internal, {:handle_directives, _, _} = event, :directing, %State{} = data),
+    do: PostCommit.handle_event(:internal, event, :directing, data)
 
   def handle_event({:call, from}, _request, _phase, %State{}) do
     {:keep_state_and_data, [{:reply, from, {:error, :unknown_call}}]}
@@ -1511,1528 +717,180 @@ defmodule Jido.AgentServer do
   def handle_event(_event_type, _event, _phase, %State{}), do: :keep_state_and_data
 
   @impl true
-  def terminate(reason, _phase, %State{} = data) do
-    AgentTelemetry.finish(data.activation_span, AgentTelemetry.result_metadata({:error, reason}))
-    operation = if reason == {:shutdown, :hibernate}, do: :hibernate, else: :stop
-    metadata = Map.put(AgentTelemetry.lifecycle_metadata(data), :operation, operation)
+  def terminate(reason, phase, data), do: ServerLifecycle.terminate(reason, phase, data)
 
-    result =
-      AgentTelemetry.with_span(:lifecycle, metadata, fn -> terminate_agent(reason, data) end)
+  defp route_info({:plugin_readiness, _, _} = message, :initializing, data),
+    do: ServerLifecycle.handle_event(:info, message, :initializing, data)
 
-    TraceContext.clear()
-    notify_startup(data, {:error, normalize_startup_error(reason)})
-    result
-  end
+  defp route_info({:timeout, _, {:plugin_readiness_timeout, _}} = message, :initializing, data),
+    do: ServerLifecycle.handle_event(:info, message, :initializing, data)
 
-  defp terminate_agent(reason, data) do
-    if data.cancel_task do
-      stop_task(data.cancel_task)
-      if data.active, do: stop_exec_adapter(data.active.exec_handle)
-    else
-      terminate_active_exec(data)
-    end
+  defp route_info({:agent_child_online, _, _, _, _, _, _} = message, phase, data),
+    do: ChildLifecycle.handle_event(:info, message, phase, data)
 
-    stop_plugin_readiness(data.plugin_bootstrap)
-    stop_task(data.admission_task)
-    stop_task(data.commit_task)
-    stop_task(data.directive_task)
-    Enum.each(data.error_policy_tasks, fn {_ref, pending} -> stop_task(pending) end)
+  defp route_info({:jido_registry_restarted, pid}, phase, data),
+    do: ServerLifecycle.recover_registry_registration(pid, phase, data)
 
-    if data.commit_task do
-      finish_span_error(data.commit_task.span, {:agent_stopped, reason})
-    end
+  defp route_info({:jido_registry_recover, pid}, phase, data),
+    do: ServerLifecycle.recover_registry_registration(pid, phase, data)
 
-    if data.directive_task do
-      finish_span_error(data.directive_task.span, {:agent_stopped, reason})
-    end
+  defp route_info({:plugin_runtime_restarting, _, _} = message, phase, data),
+    do: PluginLifecycle.handle_event(:info, message, phase, data)
 
-    AgentTelemetry.interrupted(data, reason)
-    cancel_idle_timer(data)
-    Storage.persist_on_stop(reason, data)
-    Storage.delete_runtime_checkpoint(reason, data)
-    retire_remote_spawn(reason, data)
-    PluginLifecycle.stop_all(data, :shutdown)
-    :ok
-  end
+  defp route_info({:plugin_runtime_bootstrap, _, _, _} = message, phase, data),
+    do: PluginLifecycle.handle_event(:info, message, phase, data)
 
-  defp terminate_active_exec(data) do
-    if match?(%ActiveTurn{exec_handle: handle} when not is_nil(handle), data.active) do
-      try do
-        case data.active.exec_handle do
-          %ExecutionAdapter{} = adapter -> stop_exec_adapter(adapter)
-          handle -> _result = cancel_exec(handle, data)
-        end
-      catch
-        _kind, _reason -> :ok
-      end
-    end
-  end
+  defp route_info({:plugin_runtime_ready, _, _, _} = message, phase, data),
+    do: PluginLifecycle.handle_event(:info, message, phase, data)
 
-  defp start_turn(%Signal{} = signal, from, context, %State{} = data) do
-    data = cancel_idle_timer(data)
-    trace = TraceContext.begin_turn(signal)
-    active = ActiveTurn.new(signal, from, data.state_version, data.turn_timeout)
-    data = %{data | active: active}
-    metadata = data |> AgentTelemetry.turn_metadata() |> Map.merge(trace)
-
-    semantic =
-      AgentTelemetry.start(:turn, Map.merge(metadata, %{stage: :evaluate, committed?: false}), %{
-        state_version_before: data.state_version
-      })
-
-    data = %{data | active: %{active | span: semantic}}
-    TraceContext.put(semantic.trace)
-
-    try do
-      with {:ok, command} <- initial_command(signal, context, data) do
-        data = %{data | active: %{data.active | source_signal: command.signal}}
-
-        if AgentPlugin.prepares?(data.plugin_specs) or ServerPlugin.admits?(data.plugin_specs) do
-          start_admission_task(command, data)
-        else
-          begin_turn_execution(command, data)
-        end
-      else
-        {:error, reason} -> fail_turn(reason, :prepare, data)
-      end
-    rescue
-      error ->
-        AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, error), :error)
-        TraceContext.clear()
-        reraise error, __STACKTRACE__
-    catch
-      kind, reason ->
-        AgentTelemetry.settled(data, turn_outcome(data, :failed, :prepare, reason), kind)
-        TraceContext.clear()
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
-  end
-
-  defp upgrade_definition(from, target_module, migration, %State{} = data) do
-    with {:ok, target, plugin_specs} <- Upgrade.prepare(data, target_module, migration) do
-      version = data.state_version + 1
-
-      case Storage.persist_definition_upgrade(data, target, version) do
-        :ok ->
-          next_data = %{
-            data
-            | agent: target,
-              plugin_specs: plugin_specs,
-              state_version: version
-          }
-
-          {:keep_state, maybe_start_idle_timer(next_data, :idle), [{:reply, from, {:ok, target}}]}
-
-        {:error, reason} ->
-          error = {:persistence_failed, reason}
-
-          {:stop_and_reply, {:shutdown, error}, [{:reply, from, {:error, error}}], data}
-      end
-    else
-      {:error, _reason} = error ->
-        {:keep_state, maybe_start_idle_timer(data, :idle), [{:reply, from, error}]}
-    end
-  end
-
-  defp start_plugin_readiness(%State{} = data) do
-    owner = self()
-    token = make_ref()
-
-    {pid, ref} =
-      :erlang.spawn_opt(
-        fn ->
-          send(owner, {:plugin_readiness, token, PluginLifecycle.await_all(data)})
-        end,
-        [:link, :monitor]
-      )
-
-    timer = start_task_timer(data.readiness_timeout, :plugin_readiness_timeout, token)
-
-    %{data | plugin_bootstrap: %{pid: pid, ref: ref, token: token, timer: timer}}
-  end
-
-  defp stop_plugin_readiness(%{pid: pid, ref: ref} = readiness) do
-    Process.demonitor(ref, [:flush])
-    if timer = Map.get(readiness, :timer), do: cancel_task_timer(timer)
-    if Process.alive?(pid), do: Process.exit(pid, :shutdown)
-    :ok
-  end
-
-  defp stop_plugin_readiness(nil), do: :ok
-
-  defp release_task_result(%{task: %Task{ref: ref}, timer: timer}) do
-    Process.demonitor(ref, [:flush])
-    cancel_task_timer(timer)
-  end
-
-  defp stop_task(%{task: %Task{} = task} = pending) do
-    cancel_task_timer(Map.get(pending, :timer))
-    shutdown_task(task)
-  end
-
-  defp stop_task(nil), do: :ok
-
-  defp shutdown_task(%Task{} = task) do
-    _result = Task.shutdown(task, :brutal_kill)
-    :ok
-  end
-
-  defp initial_command(%Signal{} = signal, context, %State{} = data) do
-    context = Map.merge(context, %{jido: data.jido, partition: data.partition})
-    Jido.Agent.Command.new_trusted_agent(data.agent, signal, context)
-  end
-
-  defp start_admission_task(command, %State{} = data) do
-    plugin_specs = data.plugin_specs
-
-    with {:ok, runtime_refs} <-
-           plugin_runtime_refs(data, ServerPlugin.admission_modules(plugin_specs)) do
-      supervisor = Jido.task_supervisor_name(data.jido)
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn ->
-            with {:ok, plugin_inputs} <-
-                   AgentPlugin.prepare(command.agent, command.signal, plugin_specs),
-                 command = %{command | plugin_inputs: plugin_inputs},
-                 {:ok, command} <-
-                   ServerPlugin.admit(
-                     command,
-                     plugin_specs,
-                     runtime_refs,
-                     data.state_version
-                   ) do
-              {:ok, command}
-            end
-          end)
-        end)
-
-      {:next_state, :admitting, %{data | admission_task: %{task: task, timer: nil}}}
-    else
-      {:error, reason} -> fail_turn(reason, :prepare, data)
-    end
-  rescue
-    error -> fail_turn(error, :prepare, data)
-  catch
-    kind, reason -> fail_turn({kind, reason}, :prepare, data)
-  end
-
-  defp begin_turn_execution(%Jido.Agent.Command{} = command, %State{} = data) do
-    if ActiveTurn.expired?(data.active) do
-      timeout_admission(data)
-    else
-      do_begin_turn_execution(command, data)
-    end
-  end
-
-  defp do_begin_turn_execution(%Jido.Agent.Command{} = command, %State{} = data) do
-    # Admission receives the original Signal. Attach the Turn trace only at
-    # the existing execution boundary, after admission has finished.
-    signal =
-      case Jido.Tracing.Trace.put(command.signal, data.active.span.trace) do
-        {:ok, traced} -> traced
-        {:error, _} -> command.signal
-      end
-
-    TraceContext.put(data.active.span.trace)
-    command = %{command | signal: signal}
-
-    case start_exec(command, data) do
-      {:ok, handle, prepared} ->
-        active = ActiveTurn.begin_execution(data.active, handle, prepared)
-        data = %{data | active: active}
-
-        if ActiveTurn.expired?(active) do
-          timeout_execution(data)
-        else
-          {:next_state, :running, data}
-        end
-
-      {:error, reason} ->
-        if ActiveTurn.expired?(data.active),
-          do: timeout_admission(data),
-          else: fail_turn(reason, :prepare, data)
-
-      {:error, stage, reason} ->
-        if ActiveTurn.expired?(data.active),
-          do: timeout_admission(data),
-          else: fail_turn(reason, evaluator_outcome_stage(stage), data)
-    end
-  end
-
-  defp start_exec(%Jido.Agent.Command{} = command, %State{} = data) do
-    exec_opts =
-      Keyword.put(data.exec_opts, :task_supervisor, Jido.task_supervisor_name(data.jido))
-
-    with {:ok, prepared} <-
-           Runner.prepare_for_server(
-             command,
-             data.active.source_signal,
-             exec_opts,
-             data.plugin_specs
-           ),
-         {:ok, handle} <- start_async_exec(prepared, data),
-         :ok <- link_exec(handle) do
-      {:ok, handle, prepared}
-    end
-  end
-
-  defp link_exec(%ExecutionAdapter{}), do: :ok
-
-  defp link_exec(%{pid: pid}) when is_pid(pid) do
-    Process.link(pid)
-    :ok
-  end
-
-  defp start_async_exec(prepared, %State{exec_module: Jido.Exec}) do
-    {:ok,
-     Jido.Exec.run_async(
-       prepared.turn.executable,
-       prepared.turn.input,
-       prepared.context,
-       prepared.exec_opts
-     )}
-  rescue
-    error -> {:error, error}
-  catch
-    kind, reason -> {:error, {kind, reason}}
-  end
-
-  defp start_async_exec(prepared, %State{} = data) do
-    ExecutionAdapter.start(
-      self(),
-      Jido.task_supervisor_name(data.jido),
-      data.exec_module,
-      [
-        prepared.turn.executable,
-        prepared.turn.input,
-        prepared.context,
-        prepared.exec_opts
-      ],
-      data.directive_timeout
-    )
-  end
-
-  defp finish_turn(result, %State{active: %ActiveTurn{prepared: prepared}} = data) do
-    if ActiveTurn.expired?(data.active) do
-      timeout_execution(data)
-    else
-      do_finish_turn(result, prepared, data)
-    end
-  end
-
-  defp do_finish_turn(result, prepared, data) do
-    case result do
-      {:error, reason} ->
-        fail_turn(reason, :execute, data)
-
-      {:error, reason, _extras} ->
-        fail_turn(reason, :execute, data)
-
-      _result ->
-        case Runner.finish_for_server(prepared, result) do
-          {:ok, agent, directives} ->
-            finish_success(agent, directives, data)
-
-          {:error, stage, reason} ->
-            if ActiveTurn.expired?(data.active),
-              do: timeout_execution(data),
-              else: fail_turn(reason, evaluator_outcome_stage(stage), data)
-        end
-    end
-  end
-
-  defp evaluator_outcome_stage(stage) when stage in [:route, :prepare, :input], do: :prepare
-  defp evaluator_outcome_stage(stage) when stage in [:compose, :validate], do: :finalize
-
-  defp finish_success(%Agent{} = agent, directives, %State{} = data) do
-    result = prepare_directives(directives, data)
-
-    if ActiveTurn.expired?(data.active) do
-      timeout_execution(data)
-    else
-      case result do
-        {:ok, directives} -> commit_turn(agent, directives, data)
-        {:error, reason} -> fail_turn(reason, :finalize, data)
-      end
-    end
-  end
-
-  defp commit_turn(agent, directives, %State{active: %ActiveTurn{} = active} = data) do
-    if ActiveTurn.expired?(active) do
-      timeout_execution(data)
-    else
-      active = ActiveTurn.cancel_timeout(active)
-      data = %{data | active: active}
-      do_commit_turn(agent, directives, active, data)
-    end
-  end
-
-  defp do_commit_turn(agent, directives, active, data) do
-    # This is a commit revision, not a count of distinct state values.
-    version = data.state_version + 1
-
-    result =
-      AgentTelemetry.with_span(
-        :commit,
-        Map.put(AgentTelemetry.turn_metadata(data), :stage, :commit),
-        fn -> Storage.persist_commit(data, agent, version) end
-      )
-
-    case result do
-      :ok -> commit_checkpointed_turn(agent, directives, version, active, data)
-      {:error, reason} -> fail_turn({:persistence_failed, reason}, :commit, data)
-    end
-  end
-
-  defp commit_checkpointed_turn(agent, directives, version, active, data) do
-    directive_count = length(directives)
-    committed_active = ActiveTurn.mark_committed(active, version, directive_count)
-
-    next_data =
-      data
-      |> Map.merge(%{
-        agent: agent,
-        state_version: version,
-        active: committed_active
-      })
-      |> Inspection.record_event(:turn_committed, %{
-        turn_id: active.turn_id,
-        signal_id: active.effective_signal.id,
-        signal_type: active.effective_signal.type,
-        state_version: version,
-        directive_count: directive_count
-      })
-
-    AgentTelemetry.committed(next_data, version, directive_count)
-
-    notifications = ServerPlugin.commit_modules(data.plugin_specs)
-
-    post_commit_actions =
-      case notifications do
-        [] -> directive_actions(directives, agent.id, active)
-        modules -> [{:next_event, :internal, {:after_commit, modules, directives}}]
-      end
-
-    actions = reply_action(active.caller, {:ok, agent}) ++ post_commit_actions
-    phase = if post_commit_actions == [], do: :idle, else: :directing
-
-    next_data =
-      if phase == :idle do
-        outcome = turn_outcome(next_data, :succeeded, :commit, nil)
-        next_data |> complete_outcome(outcome) |> maybe_start_idle_timer(phase)
-      else
-        maybe_start_idle_timer(next_data, phase)
-      end
-
-    if phase == :idle, do: TraceContext.clear()
-    {:next_state, phase, next_data, actions}
-  end
-
-  defp fail_turn(reason, stage, %State{active: %ActiveTurn{} = active} = data) do
-    signal = active.effective_signal || active.source_signal
-    maybe_log_cast_failure(active.caller, signal, reason, data.agent.id)
-    outcome = turn_outcome(data, outcome_status(reason), stage, reason)
-
-    next_data =
-      data
-      |> Map.update!(:error_count, &(&1 + 1))
-      |> complete_outcome(outcome)
-
-    TraceContext.clear()
-
-    decision =
-      case reason do
-        {:persistence_failed, failure} ->
-          {:stop, {:shutdown, {:persistence_failed, failure}}, next_data}
-
-        _reason ->
-          FailurePolicy.decide(outcome, next_data)
-      end
-
-    case decision do
-      {:continue, policy_data} ->
-        {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle),
-         reply_action(active.caller, {:error, reason})}
-
-      {:stop, stop_reason, policy_data} ->
-        replies = reply_action(active.caller, {:error, reason})
-        stop_reason = Shutdown.normalize_reason(stop_reason)
-
-        if replies == [] do
-          {:stop, stop_reason, policy_data}
-        else
-          {:stop_and_reply, stop_reason, replies, policy_data}
-        end
-    end
-  end
-
-  defp cancel_active(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    start_cancel_task(:user, cancel_from, active, data)
-  end
-
-  defp start_cancel_task(mode, cancel_from, %ActiveTurn{} = active, %State{} = data) do
-    if data.exec_module == Jido.Exec do
-      result = cancel_exec(active.exec_handle, data)
-      settle_cancel_result(result, data, %{mode: mode, from: cancel_from})
-    else
-      supervisor = Jido.task_supervisor_name(data.jido)
-      timeout = cancel_task_timeout(active.exec_handle, data)
-      trace = TraceContext.capture()
-
-      task =
-        Task.Supervisor.async(supervisor, fn ->
-          TraceContext.with_context(trace, fn -> cancel_exec(active.exec_handle, data) end)
-        end)
-
-      timer = start_task_timer(timeout, :exec_cancel_timeout, task.ref)
-      pending = %{task: task, timer: timer, timeout: timeout, from: cancel_from, mode: mode}
-      {:next_state, :cancelling, %{data | cancel_task: pending}}
-    end
-  rescue
-    error ->
-      settle_cancel_result({:error, cancellation_task_error(error)}, data, %{
-        mode: mode,
-        from: cancel_from
-      })
-  catch
-    kind, reason ->
-      settle_cancel_result({:error, cancellation_task_error({kind, reason})}, data, %{
-        mode: mode,
-        from: cancel_from
-      })
-  end
-
-  defp settle_cancel_result(result, data, %{mode: :timeout}),
-    do: settle_timeout_cancel(result, data)
-
-  defp settle_cancel_result(result, data, %{mode: {:parent, parent_reason}}),
-    do: settle_parent_cancel(result, data, parent_reason)
-
-  defp settle_cancel_result(
-         result,
-         %State{active: %ActiveTurn{} = active} = data,
-         %{mode: :user, from: cancel_from} = pending
-       ) do
-    case result do
-      :ok ->
-        outcome = turn_outcome(data, :cancelled, :execute, :cancelled)
-        next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
-        TraceContext.clear()
-
-        actions =
-          reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
-
-        {:next_state, :idle, next_data, actions}
-
-      {:error, error} ->
-        outcome = turn_outcome(data, :indeterminate, :execute, error)
-        next_data = complete_outcome(data, outcome)
-        TraceContext.clear()
-
-        actions =
-          reply_action(active.caller, {:error, error}) ++
-            [{:reply, cancel_from, {:error, error}}]
-
-        {:stop_and_reply, {:shutdown, {:exec_cancellation_failed, error}}, actions, next_data}
-
-      other ->
-        settle_cancel_result(
-          {:error, cancellation_task_error({:invalid_result, other})},
-          data,
-          pending
-        )
-    end
-  end
-
-  defp settle_timeout_cancel(:ok, %State{active: %ActiveTurn{} = active} = data) do
-    stop_exec_adapter(active.exec_handle)
-    fail_turn(turn_timeout_error(active), :execute, data)
-  end
-
-  defp settle_timeout_cancel({:error, reason}, %State{active: %ActiveTurn{} = active} = data) do
-    error = {:turn_timeout_cancellation_failed, reason}
-    outcome = turn_outcome(data, :indeterminate, :execute, error)
-    next_data = complete_outcome(data, outcome)
-    TraceContext.clear()
-    replies = reply_action(active.caller, {:error, error})
-
-    if replies == [] do
-      {:stop, {:shutdown, error}, next_data}
-    else
-      {:stop_and_reply, {:shutdown, error}, replies, next_data}
-    end
-  end
-
-  defp settle_timeout_cancel(other, data),
-    do: settle_timeout_cancel({:error, cancellation_task_error({:invalid_result, other})}, data)
-
-  defp settle_parent_cancel(:ok, %State{active: %ActiveTurn{} = active} = data, parent_reason) do
-    error = {:parent_down, :cancelled}
-    outcome = turn_outcome(data, :cancelled, :execute, error)
-    replies = reply_action(active.caller, {:error, error})
-    next_data = complete_outcome(data, outcome)
-    TraceContext.clear()
-    reason = {:shutdown, {:parent_down, parent_reason}}
-
-    if replies == [],
-      do: {:stop, reason, next_data},
-      else: {:stop_and_reply, reason, replies, next_data}
-  end
-
-  defp settle_parent_cancel(
-         {:error, reason},
-         %State{active: %ActiveTurn{} = active} = data,
-         _parent_reason
-       ) do
-    error = {:parent_down, {:cancellation_failed, reason}}
-    outcome = turn_outcome(data, :indeterminate, :execute, error)
-    replies = reply_action(active.caller, {:error, error})
-    next_data = complete_outcome(data, outcome)
-    TraceContext.clear()
-
-    if replies == [],
-      do: {:stop, {:shutdown, error}, next_data},
-      else: {:stop_and_reply, {:shutdown, error}, replies, next_data}
-  end
-
-  defp settle_parent_cancel(other, data, parent_reason),
-    do:
-      settle_parent_cancel(
-        {:error, cancellation_task_error({:invalid_result, other})},
-        data,
-        parent_reason
-      )
-
-  defp cancel_task_timeout(%ExecutionAdapter{timeout: timeout}, _data), do: timeout + 100
-
-  defp cancel_task_timeout(_handle, data), do: FailurePolicy.dispatch_timeout(data)
-
-  defp cancellation_task_error(reason) do
-    Error.execution_error("Agent Exec cancellation task failed",
-      details: %{code: :agent_exec_cancel_task_failed, reason: reason}
-    )
-  end
-
-  defp timeout_admission(%State{active: %ActiveTurn{} = active} = data) do
-    stop_task(data.admission_task)
-    data = %{data | admission_task: nil}
-    fail_turn(turn_timeout_error(active), :prepare, data)
-  end
-
-  defp timeout_execution(%State{active: %ActiveTurn{} = active} = data),
-    do: start_cancel_task(:timeout, nil, active, data)
-
-  defp turn_timeout_error(%ActiveTurn{} = active) do
-    Error.timeout_error("Agent Turn timed out",
-      timeout: active.timeout,
-      details: %{code: :agent_turn_timeout, turn_id: active.turn_id}
-    )
-  end
-
-  defp cancel_admission(cancel_from, %State{active: %ActiveTurn{} = active} = data) do
-    stop_task(data.admission_task)
-    outcome = turn_outcome(data, :cancelled, :prepare, :cancelled)
-
-    next_data =
-      data
-      |> Map.put(:admission_task, nil)
-      |> complete_outcome(outcome)
-      |> maybe_start_idle_timer(:idle)
-
-    TraceContext.clear()
-
-    actions = reply_action(active.caller, {:error, :cancelled}) ++ [{:reply, cancel_from, :ok}]
-    {:next_state, :idle, next_data, actions}
-  end
-
-  defp prepare_directives(directives, %State{} = data) do
-    with :ok <- ensure_directive_limit(directives, data.max_directives_per_turn),
-         :ok <- ensure_terminal_directive_last(directives),
-         {:ok, directives} <- DirectiveRuntime.validate_signal_dispatches(directives) do
-      {:ok, directives}
-    end
-  end
-
-  defp handle_one_directive(directive, rest, context, data) do
-    span = start_directive_span(directive, context, data)
-
-    if DirectiveRuntime.signal_directive?(directive) do
-      start_signal_directive(directive, rest, context, span, data)
-    else
-      handle_directive(directive, rest, context, span, data)
-    end
-  end
-
-  defp start_signal_directive(
-         directive,
-         rest,
-         context,
-         span,
-         %State{active: %ActiveTurn{} = active} = data
-       ) do
-    modules = ServerPlugin.dispatch_modules(data.plugin_specs)
-
-    with {:ok, prepared_directive, target} <-
-           DirectiveRuntime.prepare_signal(directive, context, data),
-         {:ok, runtime_refs} <- plugin_runtime_refs(data, modules) do
-      plugin_context = %PluginSignalContext{
-        turn_id: active.turn_id,
-        agent_id: data.agent.id,
-        source_signal: active.source_signal,
-        effective_signal: active.effective_signal,
-        turn_context: active.turn_context,
-        target: target,
-        state_version: data.state_version,
-        plugin_state: nil,
-        jido: data.jido,
-        partition: data.partition
-      }
-
-      agent_server = self()
-
-      start_directive_task(
-        fn ->
-          with {:ok, signal} <-
-                 ServerPlugin.prepare_dispatch(
-                   prepared_directive.signal,
-                   data.plugin_specs,
-                   runtime_refs,
-                   plugin_context,
-                   data.agent.state
-                 ) do
-            prepared_directive = Map.put(prepared_directive, :signal, signal)
-
-            case prepared_directive do
-              %Directive.Emit{} ->
-                DirectiveRuntime.dispatch_prepared(prepared_directive, data, agent_server)
-
-              _relative ->
-                {:dispatch_relative_signal, prepared_directive}
-            end
-          end
-        end,
-        rest,
-        context,
-        span,
-        data
-      )
-    else
-      {:error, reason} -> complete_directive({:error, reason, data}, rest, context, span)
-    end
-  end
-
-  defp handle_directive(directive, rest, context, span, data) do
-    if Directive.built_in?(directive) do
-      directive
-      |> DirectiveRuntime.handle(context, data)
-      |> complete_directive(rest, context, span)
-    else
-      start_plugin_directive(directive, rest, context, span, data)
-    end
-  end
-
-  defp complete_directive(result, rest, context, span, fault_kind \\ nil) do
-    case result do
-      {:ok, next_data} ->
-        finish_span(span, %{result: :ok})
-        active = ActiveTurn.mark_directive_completed(next_data.active)
-        continue_directives(rest, context, %{next_data | active: active})
-
-      {:error, reason, next_data} ->
-        if fault_kind,
-          do: finish_span_fault(span, fault_kind, reason, []),
-          else: finish_span_error(span, reason)
-
-        Logger.error("Agent Directive handling failed",
-          agent_id: context.agent_id,
-          signal_type: context.signal.type,
-          reason: inspect(reason)
-        )
-
-        active = ActiveTurn.mark_directive_failed(next_data.active)
-
-        next_data =
-          next_data
-          |> Map.put(:active, active)
-          |> Inspection.record_event(:directive_failed, %{
-            turn_id: active.turn_id,
-            error: Inspection.public_error(reason)
-          })
-
-        outcome = turn_outcome(next_data, outcome_status(reason), :directive, reason)
-        next_data = complete_outcome(next_data, outcome)
-
-        apply_post_commit_error_policy(outcome, next_data)
-
-      {:stop, reason, next_data} ->
-        finish_span(span, %{result: :stop})
-        active = ActiveTurn.mark_directive_completed(next_data.active)
-        next_data = %{next_data | active: active}
-        outcome = turn_outcome(next_data, :succeeded, :directive, nil)
-        {:stop, Shutdown.normalize_reason(reason), complete_outcome(next_data, outcome)}
-    end
-  end
-
-  defp start_plugin_directive(directive, rest, context, span, %State{} = data) do
-    case Plugin.directive_owner(data.plugin_specs, directive) do
-      %Jido.Plugin.Spec{dispatch?: false} ->
-        complete_directive({:ok, data}, rest, context, span)
-
-      %Jido.Plugin.Spec{} = plugin ->
-        dispatch_plugin_directive(plugin, directive, rest, context, span, data)
-
-      nil ->
-        complete_directive(
-          {:error, {:unsupported_agent_directive, directive}, data},
-          rest,
-          context,
-          span
-        )
-    end
-  end
-
-  defp dispatch_plugin_directive(
-         plugin,
-         directive,
-         rest,
-         context,
-         span,
-         %State{active: %ActiveTurn{} = active} = data
-       ) do
-    plugin_context = %PluginDirectiveContext{
-      turn_id: active.turn_id,
-      agent_id: data.agent.id,
-      source_signal: context.source_signal,
-      effective_signal: context.signal,
-      state_version: data.state_version,
-      plugin_state: plugin_state_value(data.agent.state, plugin.state_key),
-      turn_context: context.turn_context,
-      jido: data.jido,
-      partition: data.partition
-    }
-
-    # A restarting Plugin can need Agent state to become ready. Resolve its
-    # reference in the bounded task so the Agent can answer that state query.
-    start_directive_task(
-      fn ->
-        with {:ok, runtime_ref} <- plugin_runtime_ref(data, plugin) do
-          ServerPlugin.dispatch(plugin, runtime_ref, directive, plugin_context)
-        end
-      end,
-      rest,
-      context,
-      span,
-      data
-    )
-  end
-
-  defp start_directive_task(fun, rest, context, span, data) do
-    supervisor = Jido.task_supervisor_name(data.jido)
-    trace = TraceContext.capture()
-    task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
-    timer = start_task_timer(data.directive_timeout, :directive_timeout, task.ref)
-    pending = %{task: task, timer: timer, rest: rest, context: context, span: span}
-    {:keep_state, %{data | directive_task: pending}}
-  rescue
-    error -> complete_directive({:error, error, data}, rest, context, span)
-  catch
-    kind, reason -> complete_directive({:error, {kind, reason}, data}, rest, context, span)
-  end
-
-  defp start_commit_notification(module, rest, directives, data) do
-    plugin = Enum.find(data.plugin_specs, &(&1.module == module))
-
-    commit = %Commit{
-      plugin: module,
-      turn_id: data.active.turn_id,
-      agent_id: data.agent.id,
-      agent_module: data.agent.module,
-      plugin_state: plugin_state_value(data.agent.state, plugin.state_key),
-      state_version: data.state_version,
-      jido: data.jido,
-      partition: data.partition
-    }
-
-    metadata =
-      Map.merge(AgentTelemetry.turn_metadata(data), %{
-        stage: :after_commit,
-        committed?: true,
-        plugin_module: module,
-        facet_module: plugin.agent_server.module
-      })
-
-    span =
-      AgentTelemetry.start(:after_commit, metadata, %{state_version: data.state_version},
-        parent_span: data.active.span
-      )
-
-    pending = %{rest: rest, directives: directives, span: span}
-    launch_commit_notification(plugin, commit, pending, data)
-  end
-
-  defp launch_commit_notification(plugin, commit, pending, data) do
-    supervisor = Jido.task_supervisor_name(data.jido)
-    trace = TraceContext.capture()
-
-    task =
-      Task.Supervisor.async(supervisor, fn ->
-        TraceContext.with_context(trace, fn ->
-          with {:ok, runtime_ref} <- plugin_runtime_ref(data, plugin) do
-            ServerPlugin.after_commit(plugin, runtime_ref, commit)
-          end
-        end)
-      end)
-
-    timer = start_task_timer(commit_notification_timeout(data), :after_commit_timeout, task.ref)
-    {:keep_state, %{data | commit_task: Map.merge(pending, %{task: task, timer: timer})}}
-  rescue
-    error -> complete_commit_notification({:error, error}, pending, data)
-  catch
-    kind, reason -> complete_commit_notification({:error, {kind, reason}}, pending, data)
-  end
-
-  defp complete_commit_notification(result, pending, data, fault_kind \\ nil)
-
-  defp complete_commit_notification(:ok, pending, data, _fault_kind) do
-    finish_span(pending.span, %{result: :ok})
-
-    case {pending.rest, pending.directives} do
-      {[], []} ->
-        outcome = turn_outcome(data, :succeeded, :after_commit, nil)
-        next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
-        TraceContext.clear()
-        {:next_state, :idle, next_data}
-
-      {[], directives} ->
-        {:keep_state, data, directive_actions(directives, data.agent.id, data.active)}
-
-      {rest, directives} ->
-        {:keep_state, data, [{:next_event, :internal, {:after_commit, rest, directives}}]}
-    end
-  end
-
-  defp complete_commit_notification({:error, reason}, pending, data, fault_kind) do
-    if fault_kind,
-      do: finish_span_fault(pending.span, fault_kind, reason, []),
-      else: finish_span_error(pending.span, reason)
-
-    metadata = pending.span.metadata |> Map.merge(AgentTelemetry.error_metadata(reason))
-    Logger.error("Agent Plugin commit notification failed", Map.to_list(metadata))
-
-    outcome = turn_outcome(data, outcome_status(reason), :after_commit, reason)
-    apply_post_commit_error_policy(outcome, complete_outcome(data, outcome))
-  end
-
-  defp commit_notification_timeout(%State{directive_timeout: :infinity}), do: 5_000
-  defp commit_notification_timeout(%State{directive_timeout: timeout}), do: timeout
-
-  defp start_task_timer(:infinity, _tag, _task_ref), do: nil
-
-  defp start_task_timer(timeout, tag, task_ref) do
-    :erlang.start_timer(timeout, self(), {tag, task_ref})
-  end
-
-  defp cancel_task_timer(nil), do: :ok
-
-  defp cancel_task_timer(timer) do
-    _result = :erlang.cancel_timer(timer)
-    :ok
-  end
-
-  defp plugin_state_value(_state, nil), do: nil
-  defp plugin_state_value(state, key), do: Map.get(state, key)
-
-  defp continue_directives([], _context, %State{active: %ActiveTurn{}} = data) do
-    outcome = turn_outcome(data, :succeeded, :directive, nil)
-    next_data = data |> complete_outcome(outcome) |> maybe_start_idle_timer(:idle)
-    TraceContext.clear()
-    {:next_state, :idle, next_data}
-  end
-
-  defp continue_directives(rest, context, data) do
-    {:keep_state, data, [{:next_event, :internal, {:handle_directives, rest, context}}]}
-  end
-
-  defp directive_actions([], _agent_id, _active), do: []
-
-  defp directive_actions(directives, agent_id, %ActiveTurn{} = active) do
-    context = %DirectiveContext{
-      turn_id: active.turn_id,
-      agent_id: agent_id,
-      source_signal: active.source_signal,
-      signal: active.effective_signal,
-      turn_context: active.turn_context
-    }
-
-    [{:next_event, :internal, {:handle_directives, directives, context}}]
-  end
-
-  defp postpone_call(from, token, signal, deadline, %State{} = data) do
+  defp route_info({ref, result} = message, phase, data) when is_reference(ref) do
     cond do
-      AdmissionDeadline.expired?(deadline) ->
-        AgentTelemetry.admission_rejected(data, signal, :deadline_expired)
+      phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) ->
+        Turn.admission_result(result, data)
 
-        {:keep_state, forget_postponed(data, token),
-         [{:reply, from, {:error, :admission_timeout}}]}
+      phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) ->
+        PostCommit.commit_result(result, data)
 
-      MapSet.member?(data.postponed_tokens, token) ->
-        {:keep_state_and_data, [:postpone]}
+      phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) ->
+        PostCommit.directive_result(result, data)
 
-      admission_full?(data) ->
-        AgentTelemetry.admission_rejected(data, signal, :overloaded)
-        {:keep_state_and_data, [{:reply, from, {:error, overload_error(data)}}]}
+      Map.has_key?(data.error_policy_tasks, ref) ->
+        FailurePolicy.task_result(ref, result, data)
+
+      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) ->
+        Cancellation.task_result(result, data)
 
       true ->
-        {:keep_state, remember_postponed(data, token), [:postpone]}
+        fallback_info(message, phase, data)
     end
   end
 
-  defp postpone_cast(token, signal, %State{} = data) do
+  defp route_info({:timeout, timer, payload} = message, phase, data),
+    do: route_timeout(message, timer, payload, phase, data)
+
+  defp route_info({:DOWN, ref, :process, pid, reason} = message, phase, data) do
     cond do
-      MapSet.member?(data.postponed_tokens, token) ->
+      phase == :initializing and match?(%{ref: ^ref}, data.plugin_bootstrap) ->
+        ServerLifecycle.handle_event(:info, message, phase, data)
+
+      phase == :admitting and TaskSupport.task_ref?(data.admission_task, ref) ->
+        Turn.admission_down(reason, data)
+
+      phase == :directing and TaskSupport.task_ref?(data.commit_task, ref) ->
+        PostCommit.commit_down(reason, data)
+
+      phase == :directing and TaskSupport.task_ref?(data.directive_task, ref) ->
+        PostCommit.directive_down(reason, data)
+
+      Map.has_key?(data.error_policy_tasks, ref) ->
+        FailurePolicy.task_down(ref, reason, data)
+
+      phase == :cancelling and TaskSupport.task_ref?(data.cancel_task, ref) ->
+        Cancellation.task_down(reason, data)
+
+      phase == :running and
+          match?(
+            %ActiveTurn{exec_handle: %ExecutionAdapter{pid: ^pid, monitor_ref: ^ref}},
+            data.active
+          ) ->
+        Turn.adapter_down(reason, data)
+
+      phase == :cancelling ->
         {:keep_state_and_data, [:postpone]}
 
-      admission_full?(data) ->
-        AgentTelemetry.admission_rejected(data, signal, :overloaded)
-
-        Logger.warning("Agent Signal cast dropped because the Server is overloaded",
-          agent_id: data.agent.id,
-          signal_id: signal.id,
-          signal_type: signal.type
-        )
-
-        :keep_state_and_data
-
       true ->
-        {:keep_state, remember_postponed(data, token), [:postpone]}
+        handle_process_down(ref, pid, reason, phase, data)
     end
   end
 
-  defp remember_postponed(%State{} = data, token) do
-    %{data | postponed_tokens: MapSet.put(data.postponed_tokens, token)}
-  end
+  defp route_info({tag, _, _} = message, :running, data)
+       when tag in [:jido_exec_adapter_started, :jido_exec_adapter_start_failed],
+       do: Turn.handle_event(:info, message, :running, data)
 
-  defp forget_postponed(%State{} = data, token) do
-    %{data | postponed_tokens: MapSet.delete(data.postponed_tokens, token)}
-  end
+  defp route_info({tag, _, _, _} = message, :running, data)
+       when tag in [:jido_exec_adapter_callback_started, :jido_exec_adapter_callback_result],
+       do: Turn.handle_event(:info, message, :running, data)
 
-  defp admission_full?(%State{max_postponed_signals: :infinity}), do: false
+  defp route_info(message, phase, data), do: fallback_info(message, phase, data)
 
-  defp admission_full?(%State{} = data) do
-    MapSet.size(data.postponed_tokens) >= data.max_postponed_signals
-  end
-
-  defp overload_error(%State{} = data) do
-    {:overloaded,
-     %{limit: data.max_postponed_signals, postponed: MapSet.size(data.postponed_tokens)}}
-  end
-
-  defp reentrant_turn_call?(
-         {caller, _tag},
-         %ActiveTurn{exec_handle: %ExecutionAdapter{exec_pid: root}}
-       )
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_turn_call?({caller, _tag}, %ActiveTurn{exec_handle: %{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_turn_call?(_from, _active), do: false
-
-  defp reentrant_task_call?({caller, _tag}, %{task: %Task{pid: root}})
-       when is_pid(caller) and is_pid(root) do
-    related_exec_process?(caller, root, %{}, 0)
-  end
-
-  defp reentrant_task_call?(_from, _pending_task), do: false
-
-  defp plugin_runtime_refs(%State{} = data, modules) do
-    Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
-      spec = Enum.find(data.plugin_specs, &(&1.module == module))
-
-      case plugin_runtime_ref(data, spec) do
-        {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, module, runtime_ref)}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-  end
-
-  defp plugin_runtime_ref(_data, %Jido.Plugin.Spec{runtime?: false}), do: {:ok, nil}
-
-  defp plugin_runtime_ref(data, %Jido.Plugin.Spec{module: module}) do
-    PluginLifecycle.runtime_ref(data, module)
-  end
-
-  defp related_exec_process?(pid, root, _visited, _depth) when pid == root, do: true
-  defp related_exec_process?(_pid, _root, _visited, depth) when depth >= 8, do: false
-
-  defp related_exec_process?(pid, root, visited, depth) do
-    if Map.has_key?(visited, pid) do
-      false
+  defp route_timeout(message, timer, {:turn_timeout, turn_id}, phase, data)
+       when phase in [:admitting, :running] do
+    if match?(%ActiveTurn{turn_id: ^turn_id, timeout_timer: ^timer}, data.active) do
+      if phase == :admitting,
+        do: Cancellation.timeout_admission(data),
+        else: Cancellation.timeout_execution(data)
     else
-      visited = Map.put(visited, pid, true)
-
-      pid
-      |> exec_process_parents()
-      |> Enum.any?(&related_exec_process?(&1, root, visited, depth + 1))
+      fallback_info(message, phase, data)
     end
   end
 
-  defp exec_process_parents(pid) when node(pid) != node(), do: []
-
-  defp exec_process_parents(pid) do
-    monitored_by =
-      case Process.info(pid, :monitored_by) do
-        {:monitored_by, pids} -> pids
-        nil -> []
-      end
-
-    callers =
-      case Process.info(pid, :dictionary) do
-        {:dictionary, dictionary} ->
-          dictionary
-          |> Keyword.get(:"$callers", [])
-          |> List.wrap()
-
-        nil ->
-          []
-      end
-
-    (monitored_by ++ callers)
-    |> Enum.filter(&is_pid/1)
-    |> Enum.uniq()
+  defp route_timeout(message, timer, {:after_commit_timeout, ref}, :directing, data) do
+    if TaskSupport.task_ref?(data.commit_task, ref) and data.commit_task.timer == timer,
+      do: PostCommit.commit_timeout(data),
+      else: fallback_info(message, :directing, data)
   end
 
-  defp ensure_directive_limit(_directives, :infinity), do: :ok
-
-  defp ensure_directive_limit(directives, limit) when length(directives) <= limit, do: :ok
-
-  defp ensure_directive_limit(directives, limit) do
-    {:error, {:too_many_directives, %{count: length(directives), limit: limit}}}
+  defp route_timeout(message, timer, {:directive_timeout, ref}, :directing, data) do
+    if TaskSupport.task_ref?(data.directive_task, ref) and data.directive_task.timer == timer,
+      do: PostCommit.directive_timeout(data),
+      else: fallback_info(message, :directing, data)
   end
 
-  defp ensure_terminal_directive_last(directives) do
-    case Enum.find_index(directives, &match?(%Directive.Stop{}, &1)) do
-      nil -> :ok
-      index when index == length(directives) - 1 -> :ok
-      index -> {:error, {:terminal_directive_not_last, %{index: index}}}
-    end
+  defp route_timeout(message, timer, {:error_policy_dispatch_timeout, ref}, phase, data) do
+    if Map.has_key?(data.error_policy_tasks, ref),
+      do: FailurePolicy.task_timeout(ref, timer, data),
+      else: fallback_info(message, phase, data)
   end
 
-  defp validate_exec_module(module) when is_atom(module) do
-    required = [run_async: 4, handle_message: 2, cancel: 1]
-
-    with {:module, ^module} <- Code.ensure_loaded(module),
-         true <-
-           Enum.all?(required, fn {name, arity} -> function_exported?(module, name, arity) end) do
-      {:ok, module}
-    else
-      _reason ->
-        {:error,
-         Error.validation_error("Agent Server Exec module has an invalid contract",
-           kind: :config,
-           details: %{module: module}
-         )}
-    end
+  defp route_timeout(_message, timer, {:exec_cancel_timeout, ref}, :cancelling, data) do
+    if TaskSupport.task_ref?(data.cancel_task, ref) and data.cancel_task.timer == timer,
+      do: Cancellation.task_timeout(data),
+      else: {:keep_state_and_data, [:postpone]}
   end
 
-  defp validate_exec_module(module) do
-    {:error,
-     Error.validation_error("Agent Server Exec module must be a module",
-       kind: :config,
-       details: %{module: module}
-     )}
-  end
+  defp route_timeout(message, _timer, {:exec_adapter_timeout, _, _, _}, :running, data),
+    do: Turn.handle_event(:info, message, :running, data)
 
-  defp validate_keyword(value, _field) when is_list(value) and value == [], do: {:ok, value}
+  defp route_timeout(message, _timer, :agent_idle_timeout, phase, data) when phase != :cancelling,
+    do: Idle.handle_event(:info, message, phase, data)
 
-  defp validate_keyword(value, field) when is_list(value) do
-    if Keyword.keyword?(value) do
-      {:ok, value}
-    else
-      {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
-    end
-  end
+  defp route_timeout(message, _timer, _payload, phase, data),
+    do: fallback_info(message, phase, data)
 
-  defp validate_keyword(_value, field) do
-    {:error, Error.validation_error("#{field} must be a keyword list", field: field)}
-  end
+  defp fallback_info(_message, :cancelling, %State{}),
+    do: {:keep_state_and_data, [:postpone]}
 
-  defp validate_limit(:infinity, _field), do: {:ok, :infinity}
-  defp validate_limit(value, _field) when is_integer(value) and value >= 0, do: {:ok, value}
+  defp fallback_info(message, :running, %State{active: %ActiveTurn{}} = data),
+    do: Turn.handle_exec_message(message, data)
 
-  defp validate_limit(value, field) do
-    {:error,
-     Error.validation_error("#{field} must be :infinity or a non-negative integer",
-       field: field,
-       details: %{value: value}
-     )}
-  end
-
-  defp maybe_log_cast_failure(nil, signal, reason, agent_id) do
-    Logger.error("Agent Signal cast failed",
-      agent_id: agent_id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      reason: inspect(reason)
-    )
-  end
-
-  defp maybe_log_cast_failure(_from, _signal, _reason, _agent_id), do: :ok
+  defp fallback_info(_message, _phase, %State{}), do: :keep_state_and_data
 
   defp handle_process_down(ref, pid, reason, phase, %State{} = data) do
     case Map.fetch(data.attachments, pid) do
       {:ok, ^ref} ->
         next_data =
           data
-          |> remove_attachment(pid)
-          |> maybe_start_idle_timer(phase)
+          |> Idle.remove_attachment(pid)
+          |> Idle.maybe_start_idle_timer(phase)
 
         {:keep_state, next_data}
 
       _other ->
         cond do
           match?(%ParentRef{ref: ^ref, pid: ^pid}, data.parent) ->
-            handle_parent_down(reason, data)
+            ChildLifecycle.handle_parent_down(reason, data)
 
           child_entry = State.child_by_ref(data, ref) ->
-            handle_child_down(child_entry, pid, reason, data)
+            ChildLifecycle.handle_child_down(child_entry, pid, reason, data)
 
           phase == :running and match?(%ActiveTurn{}, data.active) ->
-            handle_exec_message({:DOWN, ref, :process, pid, reason}, data)
+            Turn.handle_exec_message({:DOWN, ref, :process, pid, reason}, data)
 
           true ->
             :keep_state_and_data
         end
     end
   end
-
-  defp handle_exec_message(message, %State{active: %ActiveTurn{} = active} = data) do
-    handle_exec_message(active.exec_handle, message, data)
-  end
-
-  defp handle_exec_message(%ExecutionAdapter{} = adapter, message, _data) do
-    ExecutionAdapter.forward(adapter, message)
-    :keep_state_and_data
-  end
-
-  defp handle_exec_message(handle, message, %State{} = data) do
-    case data.exec_module.handle_message(handle, message) do
-      {:done, result} -> finish_turn(result, data)
-      :ignore -> :keep_state_and_data
-      {:error, error} -> fail_turn(error, :execute, data)
-    end
-  end
-
-  defp handle_child_down({key, %ChildInfo{kind: :plugin} = child}, pid, reason, data) do
-    next_data = State.remove_child(data, key)
-    {:stop, {:plugin_runtime_down, child.module, pid, reason}, next_data}
-  end
-
-  defp handle_child_down({key, %ChildInfo{} = child}, pid, reason, data) do
-    next_data = State.remove_child(data, key)
-
-    next_data =
-      if Shutdown.clean?(reason) do
-        _ = Relationship.delete_child(data, child)
-        %{next_data | child_spawn_requests: Map.delete(next_data.child_spawn_requests, key)}
-      else
-        next_data
-      end
-
-    signal =
-      ChildExit.new!(
-        %{tag: child.tag, child_id: child.id, pid: pid, reason: reason},
-        source: "/agent/#{data.agent.id}"
-      )
-
-    cast(self(), signal)
-    {:keep_state, next_data}
-  end
-
-  defp handle_parent_down(reason, %State{parent: %ParentRef{} = parent} = data) do
-    next_data = %{data | parent: nil, orphaned_from: parent}
-    _ = Relationship.delete_own(next_data)
-
-    case data.on_parent_death do
-      :stop ->
-        case next_data.active do
-          %ActiveTurn{exec_handle: handle} = active when not is_nil(handle) ->
-            start_cancel_task({:parent, reason}, nil, active, next_data)
-
-          _inactive ->
-            {:stop, {:shutdown, {:parent_down, reason}}, next_data}
-        end
-
-      :continue ->
-        {:keep_state, next_data}
-
-      :emit_orphan ->
-        signal =
-          Orphaned.new!(
-            %{
-              parent_id: parent.id,
-              parent_pid: parent.pid,
-              tag: parent.tag,
-              meta: parent.meta,
-              reason: reason
-            },
-            source: "/agent/#{data.agent.id}"
-          )
-
-        cast(self(), signal)
-        {:keep_state, next_data}
-    end
-  end
-
-  defp cancel_exec(%ExecutionAdapter{} = adapter, _data), do: ExecutionAdapter.cancel(adapter)
-  defp cancel_exec(handle, %State{} = data), do: data.exec_module.cancel(handle)
-
-  defp stop_exec_adapter(%ExecutionAdapter{} = adapter), do: ExecutionAdapter.stop(adapter)
-  defp stop_exec_adapter(_handle), do: :ok
-
-  defp handle_child_directive_call(directive, from, data) do
-    case DirectiveRuntime.handle(directive, directive_context(data), data) do
-      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
-      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
-    end
-  end
-
-  defp directive_context(%State{} = data) do
-    signal = RuntimeSignal.new!(%{}, source: "/agent/#{data.agent.id}")
-
-    %DirectiveContext{
-      agent_id: data.agent.id,
-      source_signal: signal,
-      signal: signal
-    }
-  end
-
-  defp apply_post_commit_error_policy(%Outcome{} = outcome, data) do
-    next_data = %{data | error_count: data.error_count + 1}
-
-    case FailurePolicy.decide(outcome, next_data) do
-      {:continue, policy_data} ->
-        TraceContext.clear()
-        {:next_state, :idle, maybe_start_idle_timer(policy_data, :idle)}
-
-      {:stop, stop_reason, policy_data} ->
-        {:stop, {:shutdown, stop_reason}, policy_data}
-    end
-  end
-
-  defp turn_outcome(%State{active: active, agent: agent}, status, stage, error),
-    do: ActiveTurn.outcome(active, agent.id, status, stage, error)
-
-  defp complete_outcome(%State{} = data, %Outcome{} = outcome) do
-    if data.active, do: ActiveTurn.cancel_timeout(data.active)
-    AgentTelemetry.settled(data, outcome)
-    signal = outcome.effective_signal || outcome.source_signal
-    event = if outcome.status == :succeeded, do: :turn_completed, else: :turn_failed
-
-    data
-    |> Map.put(:active, nil)
-    |> then(fn data ->
-      if outcome.status == :succeeded, do: %{data | error_count: 0}, else: data
-    end)
-    |> Inspection.record_event(event, %{
-      turn_id: outcome.id,
-      signal_id: signal.id,
-      signal_type: signal.type,
-      stage: outcome.stage,
-      error: if(outcome.error, do: Inspection.public_error(outcome.error)),
-      outcome: Inspection.outcome_summary(outcome)
-    })
-  end
-
-  defp outcome_status({:child_spawn_indeterminate, _tag, _node, _request, _reason}),
-    do: :indeterminate
-
-  defp outcome_status(reason) do
-    case Error.to_map(reason) do
-      %{type: :timeout} -> :timed_out
-      _error -> :failed
-    end
-  end
-
-  defp start_directive_span(directive, _context, data) do
-    metadata =
-      Map.merge(AgentTelemetry.turn_metadata(data), %{
-        directive_module: Map.get(directive, :__struct__),
-        stage: :directive,
-        committed?: true
-      })
-
-    AgentTelemetry.start(
-      :directive,
-      metadata,
-      %{directive_index: data.active.directive_completed_count},
-      parent_span: data.active.span
-    )
-  end
-
-  defp finish_span(nil, _measurements), do: :ok
-
-  defp finish_span(span, measurements) do
-    AgentTelemetry.finish(span, %{status: :ok}, measurements)
-  end
-
-  defp finish_span_error(nil, _reason), do: :ok
-
-  defp finish_span_error(span, reason) do
-    AgentTelemetry.finish(span, AgentTelemetry.result_metadata({:error, reason}))
-  end
-
-  defp finish_span_fault(nil, _kind, _reason, _stacktrace), do: :ok
-
-  defp finish_span_fault(span, kind, reason, _stacktrace) do
-    metadata = AgentTelemetry.result_metadata({:error, reason}) |> Map.put(:kind, kind)
-    AgentTelemetry.finish(span, metadata, %{}, :exception)
-  end
-
-  defp attach_owner(%State{} = data, owner_pid) do
-    cond do
-      owner_pid == self() ->
-        {:error, :cannot_attach_self}
-
-      not Process.alive?(owner_pid) ->
-        {:error, :owner_not_alive}
-
-      Map.has_key?(data.attachments, owner_pid) ->
-        {:ok, cancel_idle_timer(data)}
-
-      true ->
-        ref = Process.monitor(owner_pid)
-
-        {:ok,
-         %{
-           cancel_idle_timer(data)
-           | attachments: Map.put(data.attachments, owner_pid, ref)
-         }}
-    end
-  end
-
-  defp detach_owner(%State{} = data, owner_pid) do
-    case Map.fetch(data.attachments, owner_pid) do
-      {:ok, ref} ->
-        Process.demonitor(ref, [:flush])
-        remove_attachment(data, owner_pid)
-
-      :error ->
-        data
-    end
-  end
-
-  defp remove_attachment(%State{} = data, owner_pid) do
-    %{data | attachments: Map.delete(data.attachments, owner_pid)}
-  end
-
-  defp maybe_start_idle_timer(%State{} = data, phase) when phase != :idle, do: data
-
-  defp maybe_start_idle_timer(%State{idle_timeout: :infinity} = data, :idle), do: data
-
-  defp maybe_start_idle_timer(%State{idle_timer: timer} = data, :idle)
-       when not is_nil(timer),
-       do: data
-
-  defp maybe_start_idle_timer(%State{} = data, :idle) do
-    if map_size(data.attachments) == 0 do
-      timer = :erlang.start_timer(data.idle_timeout, self(), :agent_idle_timeout)
-      %{data | idle_timer: timer}
-    else
-      data
-    end
-  end
-
-  defp cancel_idle_timer(%State{idle_timer: nil} = data), do: data
-
-  defp cancel_idle_timer(%State{idle_timer: timer} = data) do
-    _ = :erlang.cancel_timer(timer)
-    %{data | idle_timer: nil}
-  end
-
-  defp publish_agent(%State{registered?: false}), do: :ok
-
-  defp publish_agent(%State{registry: registry, agent: agent, partition: partition}) do
-    key = registry_key(agent.id, partition)
-
-    case Registry.update_value(registry, key, fn _status -> :ready end) do
-      {:ready, _previous} -> :ok
-      :error -> {:error, :registry_entry_not_found}
-    end
-  end
-
-  defp claim_registration(%Options{register: true, jido: jido} = opts)
-       when is_atom(jido) and not is_nil(jido) do
-    RegistrationGuard.claim(jido, registry_key(opts.agent.id, opts.partition), self())
-  end
-
-  defp claim_registration(%Options{}), do: :ok
-
-  defp recover_registry_registration(pid, phase, %State{registered?: true} = data) do
-    if Process.whereis(data.registry) == pid do
-      key = registry_key(data.agent.id, data.partition)
-      value = if phase == :initializing, do: :starting, else: :ready
-
-      result =
-        try do
-          case Registry.register(data.registry, key, value) do
-            {:ok, _owner} ->
-              :ok
-
-            {:error, {:already_registered, owner}} when owner == self() ->
-              case Registry.update_value(data.registry, key, fn _previous -> value end) do
-                {^value, _previous} -> :ok
-                :error -> :retry
-              end
-
-            {:error, _reason} ->
-              :retry
-          end
-        catch
-          :exit, _reason -> :retry
-        end
-
-      if result == :retry,
-        do: Process.send_after(self(), {:jido_registry_recover, pid}, 20)
-    end
-
-    :keep_state_and_data
-  end
-
-  defp recover_registry_registration(_pid, _phase, %State{}), do: :keep_state_and_data
-
-  defp mark_registry_status(%Options{register: false}, _status), do: :ok
-
-  defp mark_registry_status(
-         %Options{registry: registry, agent: agent, partition: partition},
-         status
-       ) do
-    key = registry_key(agent.id, partition)
-
-    case Registry.update_value(registry, key, fn _previous -> status end) do
-      {^status, _previous} -> :ok
-      :error -> {:error, :registry_entry_not_found}
-    end
-  end
-
-  defp retire_remote_spawn(reason, %State{parent: %ParentRef{spawn_ref: request}, jido: jido})
-       when not is_nil(request) and not is_nil(jido) do
-    if Shutdown.clean?(reason), do: Jido.AgentServer.SpawnRegistry.retire(jido, self())
-    :ok
-  catch
-    :exit, _ -> :ok
-  end
-
-  defp retire_remote_spawn(_reason, _data), do: :ok
-
-  defp reply_action(nil, _reply), do: []
-  defp reply_action(from, reply), do: [{:reply, from, reply}]
 
   defp server_name(%Options{name: name}) when not is_nil(name), do: normalize_name(name)
 
@@ -3059,7 +917,7 @@ defmodule Jido.AgentServer do
             {^reply, :ok} -> {:ok, pid}
             {^reply, {:error, _reason} = error} -> error
           after
-            0 -> {:error, normalize_startup_error(reason)}
+            0 -> {:error, ServerLifecycle.normalize_startup_error(reason)}
           end
       after
         5_000 ->
@@ -3070,13 +928,6 @@ defmodule Jido.AgentServer do
       Process.demonitor(monitor, [:flush])
     end
   end
-
-  defp notify_startup(%State{startup_reply: nil}, _result), do: :ok
-  defp notify_startup(%State{startup_reply: reply}, result), do: send(reply, {reply, result})
-
-  defp normalize_startup_error({:shutdown, reason}), do: reason
-  defp normalize_startup_error(:noproc), do: :not_running
-  defp normalize_startup_error(reason), do: reason
 
   defp normalize_ready_error(
          {{:shutdown, {:bootstrap_failed, reason}}, {:gen_statem, :call, _details}}
@@ -3091,8 +942,6 @@ defmodule Jido.AgentServer do
   defp normalize_hibernate_error({:noproc, {:gen_statem, :call, _details}}), do: :not_running
   defp normalize_hibernate_error(:noproc), do: :not_running
   defp normalize_hibernate_error(reason), do: reason
-
-  defp registry_key(id, partition), do: {:agent, Jido.partition_key(id, partition)}
 
   defp normalize_name(name) when is_atom(name), do: {:local, name}
   defp normalize_name({:global, _term} = name), do: name

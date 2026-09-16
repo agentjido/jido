@@ -262,4 +262,79 @@ defmodule Jido.AgentServer.PluginLifecycle do
 
     :ok
   end
+
+  def handle_event(
+        :info,
+        {:plugin_runtime_restarting, lifecycle_pid, plugin},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    case State.child(data, key) do
+      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
+        {:keep_state, State.add_child(data, key, %{child | pid: :restarting})}
+
+      _child ->
+        :keep_state_and_data
+    end
+  end
+
+  def handle_event(
+        :info,
+        {:plugin_runtime_bootstrap, lifecycle_pid, plugin, token},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    result =
+      case State.child(data, key) do
+        %ChildInfo{lifecycle_pid: ^lifecycle_pid, pid: :restarting} ->
+          replacement_child_spec(data, plugin)
+
+        _child ->
+          {:error, {:stale_plugin_runtime_bootstrap, plugin}}
+      end
+
+    send(lifecycle_pid, {:plugin_runtime_bootstrap, token, result})
+    :keep_state_and_data
+  end
+
+  def handle_event(
+        :info,
+        {:plugin_runtime_ready, lifecycle_pid, plugin, runtime_pid},
+        _phase,
+        %State{} = data
+      ) do
+    key = {:plugin, plugin}
+
+    case State.child(data, key) do
+      %ChildInfo{lifecycle_pid: ^lifecycle_pid} = child ->
+        {:keep_state, State.add_child(data, key, %{child | pid: runtime_pid})}
+
+      _child ->
+        :keep_state_and_data
+    end
+  end
+
+  def plugin_state_value(_state, nil), do: nil
+  def plugin_state_value(state, key), do: Map.get(state, key)
+
+  def plugin_runtime_refs(%State{} = data, modules) do
+    Enum.reduce_while(modules, {:ok, %{}}, fn module, {:ok, refs} ->
+      spec = Enum.find(data.plugin_specs, &(&1.module == module))
+
+      case plugin_runtime_ref(data, spec) do
+        {:ok, runtime_ref} -> {:cont, {:ok, Map.put(refs, module, runtime_ref)}}
+        {:error, reason} -> {:halt, {:error, reason}}
+      end
+    end)
+  end
+
+  def plugin_runtime_ref(_data, %Jido.Plugin.Spec{runtime?: false}), do: {:ok, nil}
+
+  def plugin_runtime_ref(data, %Jido.Plugin.Spec{module: module}) do
+    runtime_ref(data, module)
+  end
 end

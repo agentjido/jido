@@ -1,6 +1,8 @@
 defmodule Jido.AgentServer.DirectiveRuntime do
   @moduledoc false
 
+  alias Jido.Agent.Directive
+
   alias Jido.Agent.Directive.{
     AdoptChild,
     Emit,
@@ -253,5 +255,29 @@ defmodule Jido.AgentServer.DirectiveRuntime do
        Jido.Error.validation_error("Agent Emit dispatch is invalid",
          details: %{reason: {kind, reason}}
        )}
+  end
+
+  def prepare_directives(directives, %State{} = data) do
+    with :ok <- ensure_directive_limit(directives, data.max_directives_per_turn),
+         :ok <- ensure_terminal_directive_last(directives),
+         {:ok, directives} <- validate_signal_dispatches(directives) do
+      {:ok, directives}
+    end
+  end
+
+  defp ensure_directive_limit(_directives, :infinity), do: :ok
+
+  defp ensure_directive_limit(directives, limit) when length(directives) <= limit, do: :ok
+
+  defp ensure_directive_limit(directives, limit) do
+    {:error, {:too_many_directives, %{count: length(directives), limit: limit}}}
+  end
+
+  defp ensure_terminal_directive_last(directives) do
+    case Enum.find_index(directives, &match?(%Directive.Stop{}, &1)) do
+      nil -> :ok
+      index when index == length(directives) - 1 -> :ok
+      index -> {:error, {:terminal_directive_not_last, %{index: index}}}
+    end
   end
 end

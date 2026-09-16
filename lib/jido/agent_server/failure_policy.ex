@@ -1,6 +1,8 @@
 defmodule Jido.AgentServer.FailurePolicy do
   @moduledoc false
 
+  alias Jido.AgentServer.TaskSupport
+
   require Logger
 
   alias Jido.Agent.Turn.Outcome
@@ -8,7 +10,6 @@ defmodule Jido.AgentServer.FailurePolicy do
   alias Jido.AgentServer.Signal.Error, as: ErrorSignal
   alias Jido.Error
   alias Jido.Signal
-  alias Jido.Tracing.Context, as: TraceContext
 
   @error_policy_dispatch_fallback_timeout 5_000
   @max_error_policy_tasks 32
@@ -136,11 +137,16 @@ defmodule Jido.AgentServer.FailurePolicy do
   def dispatch_timeout(%State{directive_timeout: timeout}), do: timeout
 
   defp start_policy_task(data, kind, fun) do
-    supervisor = Jido.task_supervisor_name(data.jido)
-    trace = TraceContext.capture()
-    task = Task.Supervisor.async(supervisor, fn -> TraceContext.with_context(trace, fun) end)
-    timer = start_task_timer(dispatch_timeout(data), :error_policy_dispatch_timeout, task.ref)
-    pending = %{kind: kind, task: task, timer: timer}
+    pending =
+      TaskSupport.start_traced(
+        data.jido,
+        fun,
+        dispatch_timeout(data),
+        :error_policy_dispatch_timeout
+      )
+      |> Map.put(:kind, kind)
+
+    task = pending.task
     %{data | error_policy_tasks: Map.put(data.error_policy_tasks, task.ref, pending)}
   end
 
@@ -159,7 +165,75 @@ defmodule Jido.AgentServer.FailurePolicy do
     Inspection.record_event(data, :error_signal_delivery_failed, %{error: error})
   end
 
-  defp start_task_timer(timeout, tag, task_ref) do
-    :erlang.start_timer(timeout, self(), {tag, task_ref})
+  def task_result(ref, result, %State{} = data) do
+    pending = Map.fetch!(data.error_policy_tasks, ref)
+    TaskSupport.release_task_result(pending)
+    data = drop_task(data, ref)
+
+    case Map.get(pending, :kind, :dispatch) do
+      :custom ->
+        settle_custom(result, data)
+
+      :dispatch ->
+        case result do
+          :ok ->
+            {:keep_state, data}
+
+          {:error, reason} ->
+            {:keep_state, record_dispatch_failure(data, reason)}
+
+          other ->
+            reason =
+              Error.execution_error("Agent error Signal delivery returned an invalid result",
+                details: %{result: other}
+              )
+
+            {:keep_state, record_dispatch_failure(data, reason)}
+        end
+    end
+  end
+
+  def task_down(ref, reason, %State{} = data) do
+    pending = Map.fetch!(data.error_policy_tasks, ref)
+    TaskSupport.cancel_task_timer(pending.timer)
+    data = drop_task(data, ref)
+
+    case Map.get(pending, :kind, :dispatch) do
+      :custom ->
+        {:stop, Shutdown.normalize_reason({:error_policy_task_failed, reason}), data}
+
+      :dispatch ->
+        error =
+          Error.execution_error("Agent error Signal delivery task exited",
+            details: %{reason: reason}
+          )
+
+        {:keep_state, record_dispatch_failure(data, error)}
+    end
+  end
+
+  def task_timeout(task_ref, timer, %State{} = data) do
+    pending = Map.fetch!(data.error_policy_tasks, task_ref)
+
+    if pending.timer == timer do
+      TaskSupport.shutdown_task(pending.task)
+      data = drop_task(data, task_ref)
+
+      case Map.get(pending, :kind, :dispatch) do
+        :custom ->
+          {:stop, Shutdown.normalize_reason({:error_policy_timeout, dispatch_timeout(data)}),
+           data}
+
+        :dispatch ->
+          error =
+            Error.timeout_error("Agent error Signal delivery timed out",
+              timeout: dispatch_timeout(data)
+            )
+
+          {:keep_state, record_dispatch_failure(data, error)}
+      end
+    else
+      :keep_state_and_data
+    end
   end
 end

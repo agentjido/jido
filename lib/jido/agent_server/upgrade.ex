@@ -1,6 +1,9 @@
 defmodule Jido.AgentServer.Upgrade do
   @moduledoc false
 
+  alias Jido.AgentServer.Idle
+  alias Jido.AgentServer.Storage
+
   alias Jido.Agent
   alias Jido.AgentServer.State
   alias Jido.Error
@@ -71,4 +74,31 @@ defmodule Jido.AgentServer.Upgrade do
 
   defp unchanged_plugin_contract(specs, specs), do: :ok
   defp unchanged_plugin_contract(_current, _target), do: {:error, :plugin_contract_changed}
+
+  def upgrade_definition(from, target_module, migration, %State{} = data) do
+    with {:ok, target, plugin_specs} <- prepare(data, target_module, migration) do
+      version = data.state_version + 1
+
+      case Storage.persist_definition_upgrade(data, target, version) do
+        :ok ->
+          next_data = %{
+            data
+            | agent: target,
+              plugin_specs: plugin_specs,
+              state_version: version
+          }
+
+          {:keep_state, Idle.maybe_start_idle_timer(next_data, :idle),
+           [{:reply, from, {:ok, target}}]}
+
+        {:error, reason} ->
+          error = {:persistence_failed, reason}
+
+          {:stop_and_reply, {:shutdown, error}, [{:reply, from, {:error, error}}], data}
+      end
+    else
+      {:error, _reason} = error ->
+        {:keep_state, Idle.maybe_start_idle_timer(data, :idle), [{:reply, from, error}]}
+    end
+  end
 end

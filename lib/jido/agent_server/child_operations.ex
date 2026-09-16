@@ -8,6 +8,8 @@ defmodule Jido.AgentServer.ChildOperations do
     ChildInfo,
     ChildPlacement,
     CreationCause,
+    DirectiveContext,
+    DirectiveRuntime,
     ParentRef,
     Relationship,
     Shutdown,
@@ -15,6 +17,7 @@ defmodule Jido.AgentServer.ChildOperations do
   }
 
   alias Jido.AgentServer.Signal.ChildStarted
+  alias Jido.AgentServer.Signal.Runtime, as: RuntimeSignal
 
   @reserved_child_opts [:agent, :id, :jido, :parent, :partition, :name, :register]
 
@@ -337,5 +340,22 @@ defmodule Jido.AgentServer.ChildOperations do
         _ = stop_agent_process(pid, {:relationship_persist_failed, reason}, state)
         {:error, {:relationship_persist_failed, reason}}
     end
+  end
+
+  def handle_child_directive_call(directive, from, data) do
+    case DirectiveRuntime.handle(directive, directive_context(data), data) do
+      {:ok, next_data} -> {:keep_state, next_data, [{:reply, from, :ok}]}
+      {:error, reason, _next_data} -> {:keep_state_and_data, [{:reply, from, {:error, reason}}]}
+    end
+  end
+
+  defp directive_context(%State{} = data) do
+    signal = RuntimeSignal.new!(%{}, source: "/agent/#{data.agent.id}")
+
+    %DirectiveContext{
+      agent_id: data.agent.id,
+      source_signal: signal,
+      signal: signal
+    }
   end
 end
